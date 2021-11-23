@@ -1,0 +1,38 @@
+package input_skywalking_agent_v3
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+const (
+	ServiceIdParserSplit = "."
+	ServiceIdConnector = "."
+)
+
+type ServiceIdDefinition struct {
+	Name   string
+	IsReal bool
+}
+
+type InstanceIdDefinition struct {
+	ServiceId string
+	name      string
+}
+
+func AnalyzeServiceId(id string) (*ServiceIdDefinition, error) {
+	parsed := strings.Split(id, ServiceIdParserSplit)
+	if len(parsed) != 2 {
+		return nil, fmt.Errorf("can't split service id into 2 parts, %s", id)
+	}
+	isReal, _ := strconv.ParseBool(parsed[1])
+	return &ServiceIdDefinition{
+		Name:   parsed[0],
+		IsReal: isReal,
+	}, nil
+}
+
+func BuildServiceId(serviceName string, nodeType NodeType) string {
+	return ""
+}

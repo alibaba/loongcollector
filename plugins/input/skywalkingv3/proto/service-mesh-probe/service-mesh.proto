@@ -1,0 +1,67 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+syntax = "proto3";
+
+package skywalking.v3;
+
+option java_multiple_files = true;
+option java_package = "org.apache.skywalking.apm.network.servicemesh.v3";
+option csharp_namespace = "SkyWalking.NetworkProtocol.V3";
+option go_package = "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/servicemesh/v3";
+
+import "common/Common.proto";
+
+// Define metrics report service. The metrics format is typically representing the data model collected in the service mesh case.
+service ServiceMeshMetricService {
+    rpc collect(stream ServiceMeshMetric) returns (MeshProbeDownstream) {
+    }
+}
+
+message ServiceMeshMetric {
+    // Start timestamp in milliseconds of this RPC,
+    // measured between the current time and midnight, January 1, 1970 UTC.
+    int64 startTime = 1;
+    // End timestamp in milliseconds of this RPC,
+    // measured between the current time and midnight, January 1, 1970 UTC.
+    int64 endTime = 2;
+    string sourceServiceName = 3;
+    string sourceServiceInstance = 4;
+    string destServiceName = 5;
+    string destServiceInstance = 6;
+    string endpoint = 7;
+    int32 latency = 8;
+    int32 responseCode = 9;
+    // Status represents the response status of this calling.
+    bool status = 10;
+    Protocol protocol = 11;
+    DetectPoint detectPoint = 12;
+    // NONE, mTLS, or TLS
+    string tlsMode = 13;
+    // The sidecar/proxy internal error code, the value bases on the implementation.
+    // The envoy internal error codes are listed here, https://www.envoyproxy.io/docs/envoy/latest/api-v2/data/accesslog/v2/accesslog.proto#data-accesslog-v2-responseflags
+    string internalErrorCode = 14;
+}
+
+enum Protocol {
+    HTTP = 0;
+    gRPC = 1;
+}
+
+message MeshProbeDownstream {
+}

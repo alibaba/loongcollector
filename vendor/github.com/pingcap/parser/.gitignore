@@ -1,0 +1,5 @@
+bin/
+y.go
+*.output
+.idea/
+coverage.txt

@@ -1,0 +1,294 @@
+package input_skywalking_agent_v3
+
+import (
+	"encoding/json"
+	v3_common "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/common/v3"
+	v3 "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/language/agent/v3"
+	"strconv"
+)
+
+type NodeType int
+type RequestType int
+type DetectPoint int
+
+const (
+	UserEndpointName = "User"
+	UserServiceName  = "User"
+	UserInstanceName = "User"
+	ResponseCodeNone = 0
+)
+
+const (
+	SpantagsStatuscode    = "status_code"
+	SpantagsDbStatement   = "db.statement"
+	SpantagsDbType        = "db.type"
+	SpantagsLogicEndpoint = "x-le"
+)
+
+const (
+	DetectPointClient DetectPoint = iota
+	DetectPointServer
+	DetectPointProxy
+	DetectPointUnrecognized
+)
+
+const (
+	RequestTypeDatabase RequestType = iota
+	RequestTypeHttp
+	RequestTypeRpc
+	RequestTypeGrpc
+	RequestTypeLogic
+)
+
+const (
+	NodeTypeNormal NodeType = iota
+	NodeTypeDatabase
+	NodeTypeRpcFramework
+	NodeTypeHttp
+	NodeTypeMq
+	NodeTypeCache
+	NodeTypeBrowser
+	NodeTypeUser         = 10
+	NodeTypeUnrecognized = 11
+)
+
+type SourceBuilder struct {
+	SourceServiceName              string
+	SourceNodeType                 NodeType
+	SourceServiceInstanceName      string
+	SourceEndpointOwnerServiceName string
+	SourceEndpointName             string
+	DestServiceName                string
+	DestNodeType                   NodeType
+	DestServiceInstanceName        string
+	DestEndpointName               string
+	ComponentId                    int32
+	Latency                        int64
+	Status                         bool
+	ResponseCode                   int64
+	RequestType                    RequestType
+	DetectPoint                    DetectPoint
+	Timestamp                      int64
+	Tags                           []string
+}
+
+func (s *SourceBuilder) addTag(tag *v3_common.KeyStringValuePair) {
+
+}
+
+func nodeTypeFromSpanLayer(spanLayer v3.SpanLayer) NodeType {
+	switch spanLayer {
+	case v3.SpanLayer_Unknown:
+		return NodeTypeNormal
+	case v3.SpanLayer_Database:
+		return NodeTypeDatabase
+	case v3.SpanLayer_RPCFramework:
+		return NodeTypeRpcFramework
+	case v3.SpanLayer_Http:
+		return NodeTypeHttp
+	case v3.SpanLayer_MQ:
+		return NodeTypeMq
+	case v3.SpanLayer_Cache:
+		return NodeTypeCache
+	default:
+		return NodeTypeUnrecognized
+	}
+}
+
+type NamingControl struct {
+	serviceNameMaxLength  int
+	instanceNameMaxLength int
+	endpointNameMaxLength int
+}
+
+func NewNamingControl() *NamingControl {
+	return &NamingControl{
+		serviceNameMaxLength:  70,
+		instanceNameMaxLength: 70,
+		endpointNameMaxLength: 150,
+	}
+}
+
+func (n *NamingControl) formatServiceName(serviceName string) string {
+	if len(serviceName) > n.serviceNameMaxLength {
+		return serviceName[:n.serviceNameMaxLength]
+	}
+	return serviceName
+}
+
+func (n *NamingControl) formatEndpointName(endpointName string) string {
+	if len(endpointName) > n.endpointNameMaxLength {
+		return endpointName[:n.endpointNameMaxLength]
+	}
+	return endpointName
+}
+
+func (n *NamingControl) formatInstanceName(instanceName string) string {
+	if len(instanceName) > n.instanceNameMaxLength {
+		return instanceName[:n.instanceNameMaxLength]
+	}
+	return instanceName
+}
+
+type TraceAnalyzer struct {
+	gatewayAddresses []string
+	logicEndpointBuilders []*SourceBuilder
+	entryBuilders []*SourceBuilder
+}
+
+func (t *TraceAnalyzer) isAddressConfiguredAsGateway(address string) bool {
+	for _, v := range t.gatewayAddresses {
+		if address == v {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *TraceAnalyzer) ParseExit(span v3.SpanObject, segment v3.SegmentObject) {
+	if span.SkipAnalysis {
+		return
+	}
+	sourceBuilder := &SourceBuilder{}
+	networkAddress := span.Peer
+	if len(networkAddress) == 0 {
+		return
+	}
+
+	sourceBuilder.SourceServiceName = segment.Service
+	sourceBuilder.SourceNodeType = NodeTypeNormal
+	sourceBuilder.SourceServiceInstanceName = segment.ServiceInstance
+
+	// TODO address alias
+	var networkAddressAlias string
+	if len(networkAddressAlias) == 0 {
+		sourceBuilder.DestServiceName = networkAddress
+		sourceBuilder.DestServiceInstanceName = networkAddress
+		sourceBuilder.DestNodeType = nodeTypeFromSpanLayer(span.SpanLayer)
+	} else {
+		serviceIdDefine, _ := AnalyzeServiceId(networkAddressAlias)
+	}
+
+
+}
+
+func (t *TraceAnalyzer) ParseEntry(span v3.SpanObject, segment v3.SegmentObject) {
+	if span.SkipAnalysis {
+		return
+	}
+	if len(span.Refs) > 0 {
+		for i := 0; i < len(span.Refs); i++ {
+			ref := span.Refs[i]
+			sourceBuilder := &SourceBuilder{}
+			if ref.ParentEndpoint != "" {
+				sourceBuilder.SourceEndpointName = UserEndpointName
+			} else {
+				sourceBuilder.SourceEndpointName = ref.ParentEndpoint
+			}
+
+			networkAddrUsedAtPeer := ref.NetworkAddressUsedAtPeer
+
+			if span.SpanLayer == v3.SpanLayer_MQ || t.isAddressConfiguredAsGateway(networkAddrUsedAtPeer) {
+				sourceBuilder.SourceServiceName = networkAddrUsedAtPeer
+				sourceBuilder.SourceEndpointOwnerServiceName = ref.ParentService
+				sourceBuilder.SourceServiceInstanceName = networkAddrUsedAtPeer
+				sourceBuilder.SourceNodeType = nodeTypeFromSpanLayer(span.SpanLayer)
+			} else {
+				sourceBuilder.SourceServiceName = networkAddrUsedAtPeer
+				sourceBuilder.SourceServiceInstanceName = networkAddrUsedAtPeer
+				sourceBuilder.SourceNodeType = NodeTypeNormal
+			}
+			sourceBuilder.DestEndpointName = span.OperationName
+			sourceBuilder.DestServiceInstanceName = segment.ServiceInstance
+			sourceBuilder.DestServiceName = segment.Service
+			sourceBuilder.DestNodeType = NodeTypeNormal
+			sourceBuilder.DetectPoint = DetectPointServer
+			sourceBuilder.ComponentId = span.ComponentId
+			// setPublicAttrs
+		}
+	} else {
+		sourceBuilder := &SourceBuilder{}
+		sourceBuilder.SourceServiceName = UserServiceName
+		sourceBuilder.SourceServiceInstanceName = UserInstanceName
+		sourceBuilder.SourceEndpointName = UserEndpointName
+		sourceBuilder.SourceNodeType = NodeTypeUser
+		sourceBuilder.DestServiceInstanceName = segment.ServiceInstance
+		sourceBuilder.DestServiceName = segment.Service
+		sourceBuilder.DestNodeType = NodeTypeNormal
+		sourceBuilder.DestEndpointName = span.OperationName
+		sourceBuilder.DetectPoint = DetectPointServer
+		sourceBuilder.ComponentId = span.ComponentId
+		t.entryBuilders = append(t.entryBuilders, sourceBuilder)
+	}
+	t.parseLogicEndpoint(span, segment)
+}
+
+func (t *TraceAnalyzer) ParseLocal(span v3.SpanObject, segment v3.SegmentObject) {
+	t.parseLogicEndpoint(span, segment)
+}
+
+func (t *TraceAnalyzer) parseLogicEndpoint(span v3.SpanObject, segment v3.SegmentObject) {
+	for i, tag := range span.Tags {
+		switch tag.Key {
+		case SpantagsLogicEndpoint:
+			// final JsonObject tagValue = gson.fromJson(tag.getValue(), JsonObject.class);
+			var tagValue map[string]string
+			err := json.Unmarshal([]byte(tag.Value), &tagValue)
+			if err != nil {
+				// TODO add log
+			}
+			isLocalSpan := v3.SpanType_Local == span.SpanType
+			//isLogicSpan := tagValue.()
+			//if isLocalSpan &&
+			var logicEndpointName string
+			var latency int64
+			var status bool
+			jsonIsLogicSpan, err := strconv.ParseBool(tagValue["logic-span"])
+			if isLocalSpan && err == nil && jsonIsLogicSpan {
+				logicEndpointName = span.OperationName
+				latency = span.EndTime - span.StartTime
+				status = !span.IsError
+			} else if containsKey(tagValue, "name") && containsKey(tagValue, "latency") && containsKey(tagValue, "status") {
+				logicEndpointName = tagValue["name"]
+				latency, _ = strconv.ParseInt(tagValue["latency"], 10, 64)
+				status, _ = strconv.ParseBool(tagValue["status"])
+			} else {
+				break
+			}
+			sourceBuilder := &SourceBuilder{}
+			sourceBuilder.Timestamp = span.StartTime
+			sourceBuilder.DestServiceName = segment.Service
+			sourceBuilder.DestServiceInstanceName = segment.ServiceInstance
+			sourceBuilder.DestEndpointName = logicEndpointName
+			sourceBuilder.DestNodeType = NodeTypeNormal
+			sourceBuilder.DetectPoint = DetectPointServer
+			sourceBuilder.Latency = latency
+			sourceBuilder.Status = status
+			sourceBuilder.RequestType = RequestTypeLogic
+			sourceBuilder.ResponseCode = ResponseCodeNone
+			t.logicEndpointBuilders = append(t.logicEndpointBuilders, sourceBuilder)
+		}
+	}
+}
+
+func (t *TraceAnalyzer) setPublicAttrs(sourceBuilder SourceBuilder, span v3.SpanObject) {
+	latency := span.EndTime - span.StartTime
+	sourceBuilder.Timestamp = span.StartTime
+	sourceBuilder.Latency = latency
+	sourceBuilder.ResponseCode = ResponseCodeNone
+	for _, tag := range span.Tags {
+		if tag.Key == SpantagsStatuscode {
+			statusCode, err := strconv.ParseInt(tag.Value, 0, 64)
+			if err != nil {
+				// add log
+			}
+			sourceBuilder.ResponseCode = statusCode
+		}
+		sourceBuilder.addTag(tag)
+	}
+}
+
+func containsKey(inMap map[string]string, key string) bool {
+	_, ok := inMap[key]
+	return ok
+}

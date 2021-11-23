@@ -1,0 +1,82 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+syntax = "proto3";
+
+package skywalking.v3;
+
+option java_multiple_files = true;
+option java_package = "org.apache.skywalking.apm.network.event.v3";
+option csharp_namespace = "SkyWalking.NetworkProtocol.V3";
+option go_package = "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/event/v3";
+
+import "common/Common.proto";
+
+service EventService {
+  // When reporting an event, you typically call the collect function twice, one for starting of the event and the other one for ending of the event, with the same UUID.
+  // There are also cases where you have both start time and end time already, for example, when exporting events from a 3rd-party system,
+  // the start time and end time are already known so that you can call the collect function only once.
+  rpc collect (stream Event) returns (Commands) {
+  }
+}
+
+message Event {
+  // Unique ID of the event. Because an event may span a long period of time, the UUID is necessary to associate the
+  // start time with the end time of the same event.
+  string uuid = 1;
+
+  // The source object that the event occurs on.
+  Source source = 2;
+
+  // The name of the event. For example, `Reboot`, `Upgrade` etc.
+  string name = 3;
+
+  // The type of the event. This field is friendly for UI visualization, where events of type `Normal` are considered as normal operations,
+  // while `Error` is considered as unexpected operations, such as `Crash` events, therefore we can mark them with different colors to be easier identified.
+  Type type = 4;
+
+  // The detail of the event that describes why this event happened. This should be a one-line message that briefly describes why the event is reported.
+  // Examples of an `Upgrade` event may be something like `Upgrade from ${from_version} to ${to_version}`.
+  // It's NOT encouraged to include the detailed logs of this event, such as the exception stack trace.
+  string message = 5;
+
+  // The parameters in the `message` field.
+  map<string, string> parameters = 6;
+
+  // The start time (in milliseconds) of the event, measured between the current time and midnight, January 1, 1970 UTC.
+  // This field is mandatory when an event occurs.
+  int64 startTime = 7;
+
+  // The end time (in milliseconds) of the event. , measured between the current time and midnight, January 1, 1970 UTC.
+  // This field may be empty if the event has not stopped yet, otherwise it should be a valid timestamp after `startTime`.
+  int64 endTime = 8;
+}
+
+enum Type {
+  Normal = 0;
+  Error = 1;
+}
+
+// If the event occurs on a service ONLY, the `service` field is mandatory, the serviceInstance field and endpoint field are optional;
+// If the event occurs on a service instance, the `service` and `serviceInstance` are mandatory and endpoint is optional;
+// If the event occurs on an endpoint, `service` and `endpoint` are mandatory, `serviceInstance` is optional;
+message Source {
+  string service = 1;
+  string serviceInstance = 2;
+  string endpoint = 3;
+}

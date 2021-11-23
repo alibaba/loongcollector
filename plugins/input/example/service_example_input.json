@@ -1,0 +1,18 @@
+{
+  "inputs" : [
+    {
+      "type" : "service_input_example",
+      "detail" : {
+
+      }
+    }
+  ],
+  "flushers" : [
+    {
+      "type" : "flusher_stdout",
+      "detail" : {
+        "OnlyStdout": true
+      }
+    }
+  ]
+}

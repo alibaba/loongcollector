@@ -1,0 +1,185 @@
+字段加密
+---
+
+## AES-256-CBC 加密
+该插件可使用 AES-256-CBC 算法对指定的字段加密，采用 PKCS7 填充算法。**由于密文可能包含不可见字符，插件会对其进行十六进制编码。**
+
+### 参数说明
+插件类型（type）为 `processor_encrypt`。
+
+|参数|类型|必选或可选|参数说明|
+|----|----|----|----|
+|SourceKeys|string 数组|必选|指定需要加密的字段名，支持指定多个。|
+|EncryptionParameters|object|必须|指定加密参数，展开字段可见表：具体加密参数。|
+|KeepSourceValueIfError|bool|可选|如果发生加密失败，是否保留原始值，如果不保留的话，字段值会被替换为 `ENCRYPT_ERROR`。为了保护您的数据安全，默认值为 false，即失败时进行替换。|
+
+具体加密参数（上表中的参数 `EncryptionParameters`）
+
+|参数|类型|必选或可选|参数说明|
+|----|----|----|----|
+|Key|string|必选|指定密钥（十六进制）。AES-256-CBC 要求密钥为 32 字节，所以直接以此参数指定密钥时，需要填入 64 个十六进制字符。|
+|IV|string|可选|指定加密的初始向量（十六进制），默认值为全 0 组成的 IV。此参数值大小等于内部 block 大小，AES-256-CBC 下为 16 字节，所以需要填入 32 个十六进制字符。|
+|KeyFilePath|string|可选|指定保存加密参数的文件路径。支持将前述参数（Key、IV）保存至文件（JSON 格式），文件中指定的值会覆盖通过前述参数指定的值。|
+
+加密参数文件内容示例
+
+```json
+{
+  "Key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "IV": "00000000000000000000000000000000"
+}
+```
+
+### 示例
+#### 示例 1：直接指定 Key 且使用默认 IV
+对字段 `important` 进行加密，假设密钥（Key）为二进制全 0 组成（256 bits）、不设置初始向量（IV），使用插件默认值，则配置详情及处理结果如下：
+
+- 输入
+
+```
+"normal_key": "1",
+"another_normal_key": "2",
+"important": "0123456"
+```
+
+- 配置详情（注意 Key 是十六进制表示）
+
+```
+{
+  "processors":[
+    {
+      "type":"processor_encrypt",
+      "detail":{
+        "SourceKeys":["important"],
+        "EncryptionParameters": {
+          "Key":"0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      }
+    }
+  ]
+}
+```
+
+- 输出（由于加密后内容包含不可见字符，加密后会将其转换为十六进制）
+
+```
+"normal_key": "1",
+"another_normal_key": "2",
+"important": "bc3acdbd40c283d91f7dc7010fd7d2b1"
+```
+
+- 利用 openssl 进行解密
+
+```
+$ printf "%b" '\xbc\x3a\xcd\xbd\x40\xc2\x83\xd9\x1f\x7d\xc7\x01\x0f\xd7\xd2\xb1' > ciphertext
+$ openssl enc -d -aes-256-cbc -iv 00000000000000000000000000000000 \
+    -K 0000000000000000000000000000000000000000000000000000000000000000 \
+    -in ciphertext -out plaintext
+$ cat plaintext
+0123456
+```
+
+#### 示例 2：直接指定 Key 和 IV
+对字段 `important` 进行加密，假设密钥（Key）为二进制全 0 组成（256 bits）、初始向量（IV）为二进制全 1 组成（128 bits），则配置详情及处理结果如下：
+
+- 输入
+
+```
+"normal_key": "1",
+"another_normal_key": "2",
+"important": "0123456"
+```
+
+- 配置详情（注意 Key/IV 都是十六进制表示）
+
+```
+{
+  "processors":[
+    {
+      "type":"processor_encrypt",
+      "detail":{
+        "SourceKeys":["important"],
+        "EncryptionParameters": {
+          "Key":"0000000000000000000000000000000000000000000000000000000000000000",
+          "IV":"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+        }
+      }
+    }
+  ]
+}
+```
+
+- 输出（由于加密后内容包含不可见字符，加密后会将其转换为十六进制）
+
+```
+"normal_key": "1",
+"another_normal_key": "2",
+"important": "af6428af62d698be617b82cffd9e109b"
+```
+
+- 利用 openssl 进行解密
+
+```
+$ printf "%b" '\xaf\x64\x28\xaf\x62\xd6\x98\xbe\x61\x7b\x82\xcf\xfd\x9e\x10\x9b' > ciphertext
+$ openssl enc -d -aes-256-cbc -iv FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF \
+    -K 0000000000000000000000000000000000000000000000000000000000000000 \
+    -in ciphertext -out plaintext
+$ cat plaintext
+0123456
+```
+
+#### 示例 3：通过文件指定 Key
+对字段 `important` 进行加密，假设密钥（Key）为二进制全 1 组成（256 bits），密钥保存在机器的本地文件 `/home/admin/aes_key` 中，文件内容中未指定 IV 参数，使用插件默认值，配置详情及处理结果如下：
+
+- 前置条件
+
+运行 logtail 的机器上需要创建文件 `/home/admin/aes_key.json`（JSON 格式），并将密钥以十六进制存放在其中，命令如下：
+
+```
+printf "{\"Key\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"}" > /home/admin/aes_key.json
+```
+
+- 输入
+
+```
+"normal_key": "1",
+"another_normal_key": "2",
+"important": "0123456"
+```
+
+- 配置详情
+
+```
+{
+  "processors":[
+    {
+      "type":"processor_encrypt",
+      "detail":{
+        "SourceKeys": ["important"],
+        "EncryptionParameters": {
+          "KeyFilePath":"/home/admin/aes_key.json"
+        }
+      }
+    }
+  ]
+}
+```
+
+- 输出
+
+```
+"normal_key": "1",
+"another_normal_key": "2",
+"important": "bc3acdbd40c283d91f7dc7010fd7d2b1"
+```
+
+- 利用 openssl 进行解密
+
+```
+$ printf "%b" '\xbc\x3a\xcd\xbd\x40\xc2\x83\xd9\x1f\x7d\xc7\x01\x0f\xd7\xd2\xb1' > ciphertext
+$ openssl enc -d -aes-256-cbc -iv 00000000000000000000000000000000 \
+    -K 0000000000000000000000000000000000000000000000000000000000000000 \
+    -in ciphertext -out plaintext
+$ cat plaintext
+0123456
+```

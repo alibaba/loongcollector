@@ -1,0 +1,45 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.apache.skywalking.apm.network.language.agent.v3.compat";
+option csharp_namespace = "SkyWalking.NetworkProtocol.V3";
+option go_package = "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/language/agent/v3/compat";
+option deprecated = true;
+
+import "common/Common.proto";
+import "language-agent/Tracing.proto";
+
+// Define a trace segment report service.
+// All language agents or any trace collecting component, could use this service to send span collection to the SkyWalking OAP backend.
+service TraceSegmentReportService {
+    // Recommended trace segment report channel.
+    // gRPC streaming provides better performance.
+    // All language agents should choose this.
+    rpc collect (stream skywalking.v3.SegmentObject) returns (skywalking.v3.Commands) {
+    }
+
+    // An alternative for trace report by using gRPC unary
+    // This is provided for some 3rd-party integration, if and only if they prefer the unary mode somehow.
+    // The performance of SkyWalking OAP server would be very similar with streaming report,
+    // the performance of the network and client side are affected
+    rpc collectInSync (skywalking.v3.SegmentCollection) returns (skywalking.v3.Commands) {
+    }
+}

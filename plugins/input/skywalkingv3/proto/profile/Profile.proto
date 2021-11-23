@@ -1,0 +1,82 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+syntax = "proto3";
+
+package skywalking.v3;
+
+option java_multiple_files = true;
+option java_package = "org.apache.skywalking.apm.network.language.profile.v3";
+option csharp_namespace = "SkyWalking.NetworkProtocol.V3";
+option go_package = "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/language/profile/v3";
+
+import "common/Common.proto";
+
+service ProfileTask {
+
+    // query all sniffer need to execute profile task commands
+    rpc getProfileTaskCommands (ProfileTaskCommandQuery) returns (Commands) {
+    }
+
+    // collect dumped thread snapshot
+    rpc collectSnapshot (stream ThreadSnapshot) returns (Commands) {
+    }
+
+    // report profiling task finished
+    rpc reportTaskFinish (ProfileTaskFinishReport) returns (Commands) {
+    }
+
+}
+
+message ProfileTaskCommandQuery {
+    // current sniffer information
+    string service = 1;
+    string serviceInstance = 2;
+
+    // last command timestamp
+    int64 lastCommandTime = 3;
+}
+
+// dumped thread snapshot
+message ThreadSnapshot {
+    // profile task id
+    string taskId = 1;
+    // dumped segment id
+    string traceSegmentId = 2;
+    // dump timestamp
+    int64 time = 3;
+    // snapshot dump sequence, start with zero
+    int32 sequence = 4;
+    // snapshot stack
+    ThreadStack stack = 5;
+}
+
+message ThreadStack {
+    // stack code signature list
+    repeated string codeSignatures = 1;
+}
+
+// profile task finished report
+message ProfileTaskFinishReport {
+    // current sniffer information
+    string service = 1;
+    string serviceInstance = 2;
+
+    // profile task
+    string taskId = 3;
+}

@@ -1,0 +1,27 @@
+syntax = "proto2";
+package sls_logs;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option go_package = "logtailplugin/pkg/protocol";
+
+import "sls_logs.proto";
+
+// Report collected logs to the backend
+service LogReportService {
+  rpc collect (stream LogGroup) returns (Response) {
+  }
+}
+
+message Response {
+  required ResponseCode  code = 1;
+  required string message = 2;
+}
+
+enum ResponseCode {
+  Success = 0;
+  Failure = 1;
+}
+

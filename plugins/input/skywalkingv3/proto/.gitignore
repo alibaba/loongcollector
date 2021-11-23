@@ -1,0 +1,5 @@
+# Bazel artifacts
+/bazel-bin
+/bazel-out
+/bazel-skywalking-data-collect-protocol
+/bazel-testlogs

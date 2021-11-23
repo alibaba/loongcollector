@@ -1,0 +1,88 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+syntax = "proto3";
+
+package skywalking.v3;
+
+option java_multiple_files = true;
+option java_package = "org.apache.skywalking.apm.network.language.agent.v3";
+option go_package = "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/language/agent/v3";
+
+import "common/Common.proto";
+
+service MeterReportService {
+    // Meter data is reported in a certain period. The agent/SDK should report all collected metrics in this period through one stream.
+    rpc collect (stream MeterData) returns (Commands) {
+    }
+}
+
+// Label of the meter
+message Label {
+    string name = 1;
+    string value = 2;
+}
+
+// The histogram element definition. It includes the bucket lower boundary and the count in the bucket.
+message MeterBucketValue {
+    // The value represents the min value of the bucket,
+    // the  upper boundary is determined by next MeterBucketValue$bucket,
+    // if it doesn't exist, the upper boundary is positive infinity.
+    // Also, could use Int32.MIN_VALUE to represent negative infinity.
+    double bucket = 1;
+    int64 count = 2;
+}
+
+// Meter single value
+message MeterSingleValue {
+    // Meter name
+    string name = 1;
+    // Labels
+    repeated Label labels = 2;
+    // Single value
+    double value = 3;
+}
+
+// Histogram
+message MeterHistogram {
+    // Meter name
+    string name = 1;
+    // Labels
+    repeated Label labels = 2;
+    // Customize the buckets
+    repeated MeterBucketValue values = 3;
+}
+
+// Single meter data, if the same metrics have a different label, they will separate.
+message MeterData {
+    // Meter data could be a single value or histogram.
+    oneof metric {
+        MeterSingleValue singleValue = 1;
+        MeterHistogram histogram = 2;
+    }
+    // Service name, be set value in the first element in the stream-call.
+    string service = 3;
+    // Service instance name, be set value in the first element in the stream-call.
+    string serviceInstance = 4;
+    // Meter data report time, be set value in the first element in the stream-call.
+    int64 timestamp = 5;
+}
+
+message MeterDataCollection {
+    repeated MeterData meterData = 1;
+}

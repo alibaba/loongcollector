@@ -1,0 +1,95 @@
+#!/bin/bash
+
+CURRENT_DIR=`dirname "$0"`
+CURRENT_DIR=`cd $CURRENT_DIR; pwd`
+cd $CURRENT_DIR
+
+log_file="trace.log"
+trace_log()
+{
+    echo "$(date) $1" >> $log_file
+
+    filesize=$(wc -c <"$log_file")
+    if [ $filesize -ge 1024000 ]; then
+        mv -f $log_file "${log_file}.1"
+    fi
+}
+
+do_start()
+{
+    trace_log "do_start"
+    $(pwd)/telegraf --config "telegraf.conf" --config-directory "conf.d" > /dev/null 2>&1 &
+}
+
+start()
+{
+    c=$(pgrep -l -f "$(pwd)/telegraf " | wc -l)
+    trace_log "start $c"
+    if [ $c -eq 0 ]; then
+        do_start
+    elif [ $c -ne 1 ]; then
+        trace_log "abnormal status: $c"
+    fi
+}
+
+stop()
+{
+    sig=$1
+    ppids=($(pgrep -l -f "$(pwd)/telegraf " | awk '{print $1}'))
+    trace_log "stop with $sig, ppids: $ppids"
+    for ppid in ${ppids[*]}; do
+        kill $sig $ppid
+    done
+}
+
+force_stop()
+{
+    trace_log "force_stop"
+    stop "-9"
+}
+
+status()
+{
+    c=$(pgrep -l -f "$(pwd)/telegraf " | wc -l)
+    if [ $c -eq 1 ]; then
+        val="running"
+    elif [ $c -eq 0 ]; then
+        val="stopped"
+    else
+        val="abnormal"
+        retcode=1
+    fi
+    trace_log "status $val $c"
+    echo $val
+}
+
+reload()
+{
+    c=$(pgrep -l -f "$(pwd)/telegraf " | wc -l)
+    trace_log "reload $c"
+    if [ $c -eq 0 ]; then
+        do_start
+    else
+        stop "-1"
+    fi
+}
+
+retcode=0
+case "$1" in
+    start)
+    start
+    ;;
+    stop)
+    stop
+    ;;
+    force-stop)
+    force_stop
+    ;;
+    reload)
+    reload
+    ;;
+    status)
+    status
+    ;;
+esac
+exit $retcode
