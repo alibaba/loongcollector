@@ -29,7 +29,7 @@ The core advantages of **iLogtail** :
   - Skywalking V2 protocol
   - Skywalking V3 protocol
   - ...
-Metrics
+- Metrics
   - Node metrics
   - Process metrics
   - Gpu metrics
