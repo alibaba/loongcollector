@@ -5,7 +5,6 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 ## Apache 2.0 licenses
 
 - [github.com/mindprince/gonvml](https://pkg.go.dev/github.com/mindprince/gonvml?tab=licenses)
-- [github.com/mindprince/gonvml1](https://pkg.go.dev/github.com/mindprince/gonvml?tab=licenses)
 - [github.com/moby/sys/mount](https://pkg.go.dev/github.com/moby/sys/mount?tab=licenses)
 - [github.com/moby/sys/mountinfo](https://pkg.go.dev/github.com/moby/sys/mountinfo?tab=licenses)
 - [github.com/moby/sys/symlink](https://pkg.go.dev/github.com/moby/sys/symlink?tab=licenses)

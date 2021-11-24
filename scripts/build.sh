@@ -15,12 +15,13 @@
 # limitations under the License.
 
 function os() {
+
   if uname -s | grep Darwin; then
     return 2
   elif uname -s | grep Linux; then
     return 1
   else
-    return 2
+    return 3
   fi
 }
 
@@ -46,6 +47,9 @@ if [ $OS_FLAG = 1 ]; then
   fi
 elif [ $OS_FLAG = 2 ] && [ $BUILDMODE = "c-shared" ]; then
   NAME=libPluginBase.dll
+elif [ $OS_FLAG = 3 ]; then
+  export GOARCH=386
+  export CGO_ENABLED=1
 fi
 
 go build -mod="$MOD" -buildmode="$BUILDMODE" -ldflags="$IDFLAGS" -o "$ROOTDIR"/bin/${NAME} "$ROOTDIR"/main

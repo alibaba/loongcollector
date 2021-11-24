@@ -41,11 +41,7 @@ OUT_DIR = bin
 
 .PHONY: tools
 tools:
-	if [ $(OS) == Darwin ]; then \
-	    $(GO_LINT) version || brew install golangci-lint ; \
-	else \
-  		$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.39.0; \
-  	fi
+	$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.39.0
 	$(GO_ADDLICENSE) version || GO111MODULE=off $(GO_GET) -u github.com/google/addlicense
 
 
@@ -60,23 +56,23 @@ clean:
 	rm -rf find_licenses
 
 .PHONY: license
-license:  tools
+license:  clean tools
 	./scripts/package_license.sh add-license $(SCOPE)
 
 .PHONY: check-license
-check-license: clean
+check-license: clean tools
 	./scripts/package_license.sh check $(SCOPE) > $(LICENSE_COVERAGE_FILE)
 
 .PHONY: lint
-lint: tools
+lint: clean tools
 	$(GO_LINT) run -v --timeout 5m $(SCOPE)/... && make lint-pkg && make lint-e2e
 
 .PHONY: lint-pkg
-lint-pkg: tools
+lint-pkg: clean tools
 	cd pkg && pwd && $(GO_LINT) run -v --timeout 5m ./...
 
 .PHONY: lint-test
-lint-e2e: tools
+lint-e2e: clean tools
 	cd test && pwd && $(GO_LINT) run -v --timeout 5m ./...
 
 .PHONY: build
@@ -92,20 +88,24 @@ gocbuild: clean
 	./scripts/gocbuild.sh
 
 .PHONY: docker
-docker:
+docker: clean
 	./scripts/docker-build.sh $(VERSION) $(DOCKER_TYPE)
 
 # coveragedocker compile with goc to analysis the coverage in e2e testing
-coveragedocker:
+coveragedocker: clean
 	./scripts/docker-build.sh $(VERSION) coverage
+
+# provide base environment for ilogtail
+basedocker: clean
+	./scripts/docker-build.sh $(VERSION) base
 
 # provide a goc server for e2e testing
 .PHONY: gocdocker
-gocdocker:
+gocdocker: clean
 	docker build -t goc-server:latest  --no-cache . -f ./docker/Dockerfile_goc
 
 .PHONY: vendor
-vendor:
+vendor: clean
 	rm -rf vendor
 	$(GO) mod vendor
 	./external/sync_vendor.py

@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build and Test
+name: Build
 
 on:
   pull_request:
   push:
     branches:
       - main
-
 jobs:
   CI:
     runs-on: ${{ matrix.runner }}-latest
@@ -27,26 +26,37 @@ jobs:
     strategy:
       matrix:
         go-version: [ 1.15, 1.16 ]
-        runner: [ ubuntu, macos, windows ]
+        # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
+        runner: [  ubuntu, macos, windows ]
       fail-fast: true
     steps:
+
+      # prepare ubuntu environment
+      - name: prepare ubuntu environment
+        if: matrix.runner == 'ubuntu'
+        run: sudo apt-get install -y libsystemd-dev
+
+      # prepare windows environment
+      # https://github.com/actions/virtual-environments/issues/2549
+      - name: add mingw32 to path
+        if: matrix.runner == 'windows'
+        shell: bash
+        run: |
+          echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
+
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
+
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
         with:
           submodules: true
-      - name: Check License Header
-        if: matrix.runner == 'ubuntu'
-        run: make check-license
-      - name: Check Dependencies Licences
-        run: make check-dependency-licenses
-      - name: Lint
-        run: make lint
+
       - name: Build
         run: make build
+
       - name: Build Docker
         if: matrix.runner == 'ubuntu'
         run: make docker

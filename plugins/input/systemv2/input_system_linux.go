@@ -20,17 +20,17 @@ package systemv2
 import (
 	"bufio"
 	"bytes"
-	"github.com/alibaba/ilogtail/helper"
-	"github.com/shirou/gopsutil/disk"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 
 	"github.com/prometheus/procfs"
+	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/net"
 )
 

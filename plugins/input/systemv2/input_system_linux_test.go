@@ -29,7 +29,7 @@ import (
 
 func TestInputSystem_CollectOpenFD(t *testing.T) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := logtailplugin.MetricInputs["metric_system_v2"]().(*InputSystem)
+	p := ilogtail.MetricInputs["metric_system_v2"]().(*InputSystem)
 	if _, err := p.Init(cxt); err != nil {
 		t.Errorf("cannot init the mock process plugin: %v", err)
 		return

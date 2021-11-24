@@ -4,7 +4,7 @@ iLogtail is a configuration-driven collector. Below we will introduce how to con
 
 ## Quick Start
 
-The iLogtail plugin is implemented based on the Go language, so you need to install the basic Go 1.15+ before
+The iLogtail plugin is implemented based on the Go language, so you need to install the basic Go 1.16+ before
 proceeding with development Language development environment, how to install it can be found
 in [official document](https://golang.org/doc/install?spm=ata.21736010.0.0.d4176268oeFyyi). After the installation is
 complete, please follow [this document](https://golang.org/doc/code#Organization)
