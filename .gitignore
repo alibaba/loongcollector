@@ -1,15 +1,16 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary, built with `go test -c`
+main/main
+pluginmanager/checkpoint/
+*.txt
+*.prof
+*.gif
+main/checkpoint/*
+*.LOG
+*.LOG.*
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
+*.swp
+.idea/
+plugin_logger.xml
+logtail_plugin.LOG*
+plugins/input/input_telegraf/local_test/telegraf.conf
+license_coverage.txt
+e2e-test
