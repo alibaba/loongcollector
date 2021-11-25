@@ -27,14 +27,15 @@ import (
 )
 
 type FlusherKafka struct {
-	context      ilogtail.Context
-	Brokers      []string
-	SASLUsername string
-	SASLPassword string
-	Topic        string
-	ClientID     string
-	isTerminal   chan bool
-	producer     sarama.AsyncProducer
+	context         ilogtail.Context
+	Brokers         []string
+	SASLUsername    string
+	SASLPassword    string
+	Topic           string
+	PartitionerType string
+	ClientID        string
+	isTerminal      chan bool
+	producer        sarama.AsyncProducer
 }
 
 func (k *FlusherKafka) Init(context ilogtail.Context) error {
@@ -55,7 +56,18 @@ func (k *FlusherKafka) Init(context ilogtail.Context) error {
 	config.ClientID = k.ClientID
 	config.Producer.Return.Successes = true
 	// config.Producer.RequiredAcks = sarama.WaitForAll
-	config.Producer.Partitioner = sarama.NewRandomPartitioner
+	partitioner := sarama.NewRandomPartitioner
+	switch k.PartitionerType {
+	case "roundrobin":
+		partitioner = sarama.NewRoundRobinPartitioner
+	case "hash":
+		partitioner = sarama.NewHashPartitioner
+	case "random":
+		partitioner = sarama.NewRandomPartitioner
+	default:
+		logger.Error(k.context.GetRuntimeContext(), "INVALID_KAFKA_PARTITIONER", "invalid PartitionerType, use RandomPartitioner instead, type", k.PartitionerType)
+	}
+	config.Producer.Partitioner = partitioner
 	config.Producer.Timeout = 5 * time.Second
 	producer, err := sarama.NewAsyncProducer(k.Brokers, config)
 	if err != nil {
@@ -128,7 +140,8 @@ func (k *FlusherKafka) Stop() error {
 func init() {
 	ilogtail.Flushers["flusher_kafka"] = func() ilogtail.Flusher {
 		return &FlusherKafka{
-			ClientID: "LogtailPlugin",
+			ClientID:        "LogtailPlugin",
+			PartitionerType: "random",
 		}
 	}
 }
