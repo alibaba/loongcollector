@@ -5,7 +5,7 @@
 对于iLogtail，具有多租户的特点，可以支持多份采集配置同时工作，iLogtail 支持将采集配置的元信息打印到日志中，便于问题的排查与定位。
 ```go
 import (
-"logtailplugin/pkg/logger"
+"github.com/alibaba/ilogtail/pkg/logger"
 )
 ```
 
@@ -13,7 +13,7 @@ import (
 
 ```
 type plugin struct {
-	context logtailplugin.Context
+	context ilogtail.Context
 }
 
 func (p *plugin) func1() {
@@ -30,14 +30,14 @@ WithoutMetaData:
 
 ## 测试如何使用Logger
 ### 一般用法
-对于大多数情况，只需要引入`_ "logtailplugin/pkg/logger/test"`包即可。
+对于大多数情况，只需要引入`_ "github.com/alibaba/ilogtail/pkg/logger/test"`包即可。
 ```go
 import (
 "context"
 "testing"
 
-"logtailplugin/pkg/logger"
-_ "logtailplugin/pkg/logger/test"
+"github.com/alibaba/ilogtail/pkg/logger"
+_ "github.com/alibaba/ilogtail/pkg/logger/test"
 )
 
 func Test_plugin_func1(t *testing.T) {
@@ -54,7 +54,7 @@ import (
 	"context"
 	"testing"
 
-	"logtailplugin/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 func init() {
@@ -75,7 +75,7 @@ import (
 	"strings"
 	"testing"
 
-	"logtailplugin/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/logger"
 	
 	"github.com/stretchr/testify/assert"
 )
@@ -98,19 +98,19 @@ func Test_plugin_func1(t *testing.T) {
 ### 调整日志级别
 启动时如果启动程序相对路径下没有 plugin_logger.xml 文件，则可以使用以下命令设置：
 ```shell
-./logtailplugin --logger-level=debug
+./ilogtail --logger-level=debug
 ```
 如果存在 plugin_logger.xml 文件，可以修改文件，或使用以下命令强制重新生成日志配置文件：
 ```shell
-./logtailplugin --logger-level=info --logger-retain=false
+./ilogtail --logger-level=info --logger-retain=false
 ```
 
 ### 是否开启控制台打印
 默认生成环境关闭控制台打印，如果本地调试环境想开启控制台日志，相对路径下没有 plugin_logger.xml 文件，则可以使用以下命令：
 ```shell
-./logtailplugin --logger-console=true
+./ilogtail --logger-console=true
 ```
 如果存在 plugin_logger.xml 文件，可以修改文件，或使用以下命令强制重新生成日志配置文件：
 ```shell
-./logtailplugin --logger-console=true --logger-retain=false
+./ilogtail --logger-console=true --logger-retain=false
 ```

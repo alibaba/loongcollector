@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ rm -fr ./github.com
+
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/language-agent/CLRMetric.proto --proto_path=./proto
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/language-agent/ConfigurationDiscoveryService.proto --proto_path=./proto
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/language-agent/JVMMetric.proto --proto_path=./proto
@@ -20,6 +22,7 @@
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/profile/Profile.proto --proto_path=./proto
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/management/Management.proto --proto_path=./proto
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/common/Common.proto --proto_path=./proto
- rm -fr ./skywalking
- mv ./logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking ./
- rm -fr ././logtailplugin/plugins/input/input_skywalking_agent_v3/
+
+ rm -rf ./skywalking
+ mv ./github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking ./
+ rm -fr ./github.com

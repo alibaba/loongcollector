@@ -21,7 +21,7 @@ syntax = "proto3";
 option java_multiple_files = true;
 option java_package = "org.apache.skywalking.apm.network.servicemesh.v3.compat";
 option csharp_namespace = "SkyWalking.NetworkProtocol.V3";
-option go_package = "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/servicemesh/v3/compat";
+option go_package = "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/servicemesh/v3/compat";
 option deprecated = true;
 
 import "service-mesh-probe/service-mesh.proto";

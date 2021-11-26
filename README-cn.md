@@ -45,8 +45,7 @@ iLogtail 为可观测场景而生，拥有的轻量级、高性能、自动化�
 1.本地启动
 
 ```shell
-make build
-./bin/logtailplugin
+make build && sh bin/ilogtail
 ```
 
 2、阿里云启动

@@ -5,7 +5,7 @@ import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.unmarshaler_all) = true;
-option go_package = "logtailplugin/pkg/protocol";
+option go_package = "github.com/alibaba/ilogtail/pkg/protocol";
 
 import "sls_logs.proto";
 

@@ -41,16 +41,16 @@ rm -rf "$TEST_HOME"
 mkdir "$TEST_HOME"
 
 cd "$TESTDIR"
-go build -v -o "$TEST_HOME"/logtailplugin-test-tool "$TESTDIR"
+go build -v -o "$TEST_HOME"/ilogtail-test-tool "$TESTDIR"
 
 if [ $? != 0 ]; then
-  echo "build logtailplugin e2e engine failed"
+  echo "build ilogtail e2e engine failed"
   exit 1
 fi
 
 cd "$TEST_HOME"
 
-prefix="./logtailplugin-test-tool start"
+prefix="./ilogtail-test-tool start"
 if [ "$TEST_DEBUG" = "true" ]; then
   prefix=$prefix" --debug"
 fi

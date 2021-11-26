@@ -3,7 +3,7 @@
 package helper
 
 import (
-	"logtailplugin/logger"
+	"github.com/alibaba/ilogtail/logger"
 	"sync"
 
 	api_v1 "k8s.io/client-go/pkg/api/v1"

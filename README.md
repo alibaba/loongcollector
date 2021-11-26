@@ -44,7 +44,7 @@ This repository is the golang part of **iLogtail**，it contains most of the fea
 1. Start with local
 
 ```shell
-make build && sh bin/logtailplugin
+make build && sh bin/ilogtail
 ```
 2. Start with Alibaba Cloud  
 Please read this [doc](https://www.alibabacloud.com/help/doc-detail/28979.htm?spm=a2c63.l28256.b99.76.79c84211P7kJzN).

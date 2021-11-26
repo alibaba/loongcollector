@@ -21,7 +21,7 @@ syntax = "proto3";
 option java_multiple_files = true;
 option java_package = "org.apache.skywalking.apm.network.common";
 option csharp_namespace = "SkyWalking.NetworkProtocol";
-option go_package = "logtailplugin/plugins/input/skywalkingv2/skywalking/apm/network/common";
+option go_package = "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common";
 
 message KeyStringValuePair {
     string key = 1;

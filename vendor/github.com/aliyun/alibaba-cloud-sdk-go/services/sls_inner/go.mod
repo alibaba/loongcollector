@@ -1,3 +1,3 @@
-module logtailplugin/internal/sls_inner
+module github.com/alibaba/ilogtail/internal/sls_inner
 
 go 1.13

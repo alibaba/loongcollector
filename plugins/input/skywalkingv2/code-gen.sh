@@ -14,12 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-rm -rf ./logtailplugin
+rm -rf ./github.com
 protoc --go_out=. --proto_path=./proto/ --go-grpc_opt=require_unimplemented_servers=false ./proto/language-agent/*.proto --go-grpc_out=.
 protoc --go_out=. --proto_path=./proto/ --go-grpc_opt=require_unimplemented_servers=false ./proto/language-agent-v2/*.proto --go-grpc_out=.
 protoc --go_out=. --proto_path=./proto/ --go-grpc_opt=require_unimplemented_servers=false ./proto/register/*.proto --go-grpc_out=.
 protoc --go_out=. --proto_path=./proto/ --go-grpc_opt=require_unimplemented_servers=false ./proto/common/*.proto --go-grpc_out=.
 
 rm -rf ./skywalking
-mv ./logtailplugin/plugins/input/skywalkingv2/skywalking ./
-rm -rf ./logtailplugin
+mv ./github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking ./
+rm -rf ./github.com

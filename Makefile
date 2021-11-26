@@ -116,7 +116,7 @@ check-dependency-licenses: clean
 
 .PHONY: e2e-docs
 e2e-docs: clean
-	cd test && go build -o logtailplugin-test-tool  . && ./logtailplugin-test-tool docs && rm -f logtailplugin-test-tool
+	cd test && go build -o ilogtail-test-tool  . && ./ilogtail-test-tool docs && rm -f ilogtail-test-tool
 
 # e2e test
 .PHONY: e2e

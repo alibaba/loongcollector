@@ -7,7 +7,7 @@ meta-information of the collection configuration to the log, which is convenient
 
 ```go
 import (
-"logtailplugin/pkg/logger"
+"github.com/alibaba/ilogtail/pkg/logger"
 )
 ```
 
@@ -17,7 +17,7 @@ configuration and logstore name will be automatically appended.
 
 ```
 type plugin struct {
-	context logtailplugin.Context
+	context ilogtail.Context
 }
 
 func (p *plugin) func1() {
@@ -36,15 +36,15 @@ WithoutMetaData:
 
 ### General usage
 
-For most cases, you only need to import the `_ "logtailplugin/pkg/logger/test"` package.
+For most cases, you only need to import the `_ "github.com/alibaba/ilogtail/pkg/logger/test"` package.
 
 ```go
 import (
 "context"
 "testing"
 
-"logtailplugin/pkg/logger"
-_ "logtailplugin/pkg/logger/test"
+"github.com/alibaba/ilogtail/pkg/logger"
+_ "github.com/alibaba/ilogtail/pkg/logger/test"
 )
 
 func Test_plugin_func1(t *testing.T) {
@@ -64,7 +64,7 @@ import (
 	"context"
 	"testing"
 
-	"logtailplugin/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 func init() {
@@ -88,7 +88,7 @@ import (
 "strings"
 "testing"
 
-"logtailplugin/pkg/logger"
+"github.com/alibaba/ilogtail/pkg/logger"
 
 "github.com/stretchr/testify/assert"
 )
@@ -116,13 +116,13 @@ If there is no plugin_logger.xml file in the relative path of the startup progra
 following command to set it:
 
 ```shell
-./logtailplugin --logger-level=debug
+./ilogtail --logger-level=debug
 ```
 
 If there is a plugin_logger.xml file, you can modify the file, or use the following command to force the log configuration file to be regenerated:
 
 ```shell
-./logtailplugin --logger-level=info --logger-retain=false
+./ilogtail --logger-level=info --logger-retain=false
 ```
 
 ### Whether to enable console printing
@@ -130,11 +130,11 @@ If there is a plugin_logger.xml file, you can modify the file, or use the follow
 The default generation environment turns off console printing. If the local debugging environment wants to turn on the console log and there is no plugin_logger.xml file in the relative path, you can use the following command:
 
 ```shell
-./logtailplugin --logger-console=true
+./ilogtail --logger-console=true
 ```
 
 If there is a plugin_logger.xml file, you can modify the file, or use the following command to force the log configuration file to be regenerated:
 
 ```shell
-./logtailplugin --logger-console=true --logger-retain=false
+./ilogtail --logger-console=true --logger-retain=false
 ```

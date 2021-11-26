@@ -21,7 +21,7 @@ syntax = "proto3";
 option java_multiple_files = true;
 option java_package = "org.apache.skywalking.apm.network.language.agent";
 option csharp_namespace = "SkyWalking.NetworkProtocol";
-option go_package = "logtailplugin/plugins/input/skywalkingv2/skywalking/apm/network/language/agent";
+option go_package = "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent";
 
 import "language-agent/KeyWithIntegerValue.proto";
 

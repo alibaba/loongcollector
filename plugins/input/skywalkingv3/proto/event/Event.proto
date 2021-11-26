@@ -23,7 +23,7 @@ package skywalking.v3;
 option java_multiple_files = true;
 option java_package = "org.apache.skywalking.apm.network.event.v3";
 option csharp_namespace = "SkyWalking.NetworkProtocol.V3";
-option go_package = "logtailplugin/plugins/input/input_skywalking_agent_v3/skywalking/network/event/v3";
+option go_package = "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/event/v3";
 
 import "common/Common.proto";
 
