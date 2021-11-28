@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 # Copyright 2021 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+FROM sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/logtailplugin-base:1.16-goc as build
 
-VERSION=$1
-DOCKER_TYPE=$2
+WORKDIR /src
 
-HOST_OS=`uname -s`
+COPY . .
 
-case $DOCKER_TYPE in
-coverage) DOCKERFILE=Dockerfile_coverage;;
-base) DOCKERFILE=Dockerfile_base;;
-lib) DOCKERFILE=Dockerfile_lib;;
-whole) DOCKERFILE=Dockerfile_whole;;
-*) DOCKERFILE=Dockerfile;;
-esac
-
-docker build --build-arg VERSION="$VERSION" \
- --build-arg HOST_OS="$HOST_OS" \
-  -t aliyun/ilogtail:"$VERSION" \
-  --no-cache . -f docker/$DOCKERFILE
+RUN make cgobuild
 

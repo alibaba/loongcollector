@@ -12,6 +12,7 @@
 当完成插件编写后，以下内容将指导你如何进行单元测试以及E2E测试，E2E 测试可以帮助你进行mock 测试环境，比如Mysql 依赖等。
 - [如何编写单测](How-to-write-unit-test.md)
 - [如何编写E2E测试](../../../test/README.md)
+- [如何手工测试](How-to-do-manual-test.md)
 
 ## 代码检查
 在你提交Pull Request前，你需要保证代码符合规范，并保证测试通过，以下内容将帮助你进行相应检查。

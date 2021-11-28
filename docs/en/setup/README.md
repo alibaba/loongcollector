@@ -6,12 +6,12 @@ iLogtail is a configuration-driven collector. Below we will introduce how to con
 
 The iLogtail plugin is implemented based on the Go language, so you need to install the basic Go 1.16+ before
 proceeding with development Language development environment, how to install it can be found
-in [official document](https://golang.org/doc/install?spm=ata.21736010.0.0.d4176268oeFyyi). After the installation is
+in [official document](https://golang.org/doc/install). After the installation is
 complete, please follow [this document](https://golang.org/doc/code#Organization)
 Set up your development directory and environment variables such as GOPATH correctly. The rest of this article will
 assume that you have installed the Go development environment and set GOPATH. Currently, the Logtail plugin supports
 running on Linux/Windows/macOS. Some plugins may have conditional compilation and only run under Linux or Windows.
-Please debug in the corresponding environment.
+Please debug in the corresponding environment. More details please see [here](../guides/How-to-do-manual-test.md).
 
 ### Local start
 

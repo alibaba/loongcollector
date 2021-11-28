@@ -64,7 +64,7 @@
 "192.168.0.1","default login"
 ```
 
-在配置Logtail时，请将映射表文件（如上文的`ipExample.csv`）放在用户目录下（如`/home/ipExample.csv`）而非Logtail的配置文件夹`ilogtail`中，因`ilogtail`文件夹会在Logtail升级时被删除。具体配置规则请参考[使用Logtail插件处理数据](https://help.aliyun.com/document_detail/64957.html?spm=a2c4g.11186623.6.669.5184895dcTJc1Y) 。
+在配置Logtail时，请将映射表文件（如上文的`ipExample.csv`）放在用户目录下（如`/home/ipExample.csv`）而非Logtail的配置文件夹`ilogtail`中，因`ilogtail`文件夹会在Logtail升级时被删除。具体配置规则请参考[使用Logtail插件处理数据](https://help.aliyun.com/document_detail/64957.html) 。
 
 
 #### 处理日志示例

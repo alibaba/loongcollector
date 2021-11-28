@@ -12,6 +12,7 @@ Through the following content, you will learn about the overall structure of iLo
 When the plugin is written, the following content will guide you how to do unit testing and E2E testing. E2E testing can help you mock testing environments, such as Mysql dependencies.
 - [How to write a unit test](How-to-write-unit-test.md)
 - [How to write E2E test](../../../test/README.md)
+- [How to do manual testing](How-to-do-manual-test.md)
 
 ## Code Check
 Before you submit a Pull Request, you need to ensure that the code style check and the test are whole pass. The following content will help you to check them.

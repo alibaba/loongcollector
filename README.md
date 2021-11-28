@@ -19,7 +19,7 @@ The core advantages of **iLogtail** :
 * Supports multiple advanced features such as self-monitoring, flow control, resource control, alarms, and statistics collection.
 
 
-**iLogtail** supports the collection of a variety of telemetry data and transmission to a variety of different backends, such as [SLS observable platform](https://www.aliyun.com/product/sls?spm=5176.19720258.J_8058803260.41.68232c4a8fRbNM). The data supported for collection are mainly as follows:
+**iLogtail** supports the collection of a variety of telemetry data and transmission to a variety of different backends, such as [SLS observable platform](https://www.aliyun.com/product/sls). The data supported for collection are mainly as follows:
 - Logs
   - Collect static log files
   - Dynamic collect the files when running with containerized environment
@@ -47,7 +47,7 @@ This repository is the golang part of **iLogtail**，it contains most of the fea
 make build && sh bin/ilogtail
 ```
 2. Start with Alibaba Cloud  
-Please read this [doc](https://www.alibabacloud.com/help/doc-detail/28979.htm?spm=a2c63.l28256.b99.76.79c84211P7kJzN).
+Please read this [doc](https://www.alibabacloud.com/help/doc-detail/28979.htm).
 
 # Documentation
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 # Copyright 2021 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 
-VERSION=$1
-DOCKER_TYPE=$2
+if [ -d "$ROOTDIR"/bin ]; then
+  rm -rf "$ROOTDIR"/bin
+fi
 
-HOST_OS=`uname -s`
+mkdir "$ROOTDIR"/bin
 
-case $DOCKER_TYPE in
-coverage) DOCKERFILE=Dockerfile_coverage;;
-base) DOCKERFILE=Dockerfile_base;;
-lib) DOCKERFILE=Dockerfile_lib;;
-whole) DOCKERFILE=Dockerfile_whole;;
-*) DOCKERFILE=Dockerfile;;
-esac
-
-docker build --build-arg VERSION="$VERSION" \
- --build-arg HOST_OS="$HOST_OS" \
-  -t aliyun/ilogtail:"$VERSION" \
-  --no-cache . -f docker/$DOCKERFILE
-
+id=$(docker create aliyun/ilogtail)
+echo "$id"
+docker cp "$id":/src/bin/libPluginBase.so "$ROOTDIR"/bin
+docker rm -v "$id"
