@@ -710,7 +710,7 @@ func isMapLabelsMatch(includeLabel map[string]string,
 	return true
 }
 
-func isMatch(includeLabel map[string]string,
+func IsContainerLabelMatch(includeLabel map[string]string,
 	excludeLabel map[string]string,
 	includeLabelRegex map[string]*regexp.Regexp,
 	excludeLabelRegex map[string]*regexp.Regexp,
@@ -744,7 +744,7 @@ func isMathEnvItem(env string,
 	return false
 }
 
-func isMatchEnv(includeEnv map[string]string,
+func IsContainerEnvMatch(includeEnv map[string]string,
 	excludeEnv map[string]string,
 	includeEnvRegex map[string]*regexp.Regexp,
 	excludeEnvRegex map[string]*regexp.Regexp,
@@ -815,8 +815,8 @@ func (dc *DockerCenter) GetAllAcceptedInfo(
 	dc.lock.RLock()
 	defer dc.lock.RUnlock()
 	for id, info := range dc.containerMap {
-		if isMatch(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, info) &&
-			isMatchEnv(includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, info) &&
+		if IsContainerLabelMatch(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, info) &&
+			IsContainerEnvMatch(includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, info) &&
 			info.K8SInfo.IsMatch(k8sFilter) {
 			containerMap[id] = info
 		}
@@ -871,8 +871,8 @@ func (dc *DockerCenter) GetAllAcceptedInfoV2(
 	for id, info := range dc.containerMap {
 		if _, exist := fullList[id]; !exist {
 			fullList[id] = true
-			if isMatch(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, info) &&
-				isMatchEnv(includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, info) &&
+			if IsContainerLabelMatch(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, info) &&
+				IsContainerEnvMatch(includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, info) &&
 				info.K8SInfo.IsMatch(k8sFilter) {
 				newCount++
 				matchList[id] = info
