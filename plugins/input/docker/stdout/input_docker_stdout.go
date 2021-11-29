@@ -141,11 +141,12 @@ type ServiceDockerStdout struct {
 	K8sPodRegex           string
 	K8sContainerRegex     string
 
-	includeLabelRegex map[string]*regexp.Regexp
-	excludeLabelRegex map[string]*regexp.Regexp
-	includeEnvRegex   map[string]*regexp.Regexp
-	excludeEnvRegex   map[string]*regexp.Regexp
-	k8sFilter         *helper.K8SFilter
+	// export from ilogtail-trace component
+	IncludeLabelRegex map[string]*regexp.Regexp
+	ExcludeLabelRegex map[string]*regexp.Regexp
+	IncludeEnvRegex   map[string]*regexp.Regexp
+	ExcludeEnvRegex   map[string]*regexp.Regexp
+	K8sFilter         *helper.K8SFilter
 
 	// for tracker
 	tracker           *helper.ReaderMetricTracker
@@ -196,11 +197,11 @@ func (sds *ServiceDockerStdout) Init(context ilogtail.Context) (int, error) {
 	sds.context.RegisterCounterMetric(sds.deleteMetric)
 
 	var err error
-	sds.IncludeEnv, sds.includeEnvRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)
+	sds.IncludeEnv, sds.IncludeLabelRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
 	}
-	sds.ExcludeEnv, sds.excludeEnvRegex, err = helper.SplitRegexFromMap(sds.ExcludeEnv)
+	sds.ExcludeEnv, sds.ExcludeEnvRegex, err = helper.SplitRegexFromMap(sds.ExcludeEnv)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
 	}
@@ -218,15 +219,15 @@ func (sds *ServiceDockerStdout) Init(context ilogtail.Context) (int, error) {
 	} else {
 		sds.ExcludeLabel = sds.ExcludeContainerLabel
 	}
-	sds.IncludeLabel, sds.includeLabelRegex, err = helper.SplitRegexFromMap(sds.IncludeLabel)
+	sds.IncludeLabel, sds.IncludeLabelRegex, err = helper.SplitRegexFromMap(sds.IncludeLabel)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
 	}
-	sds.ExcludeLabel, sds.excludeLabelRegex, err = helper.SplitRegexFromMap(sds.ExcludeLabel)
+	sds.ExcludeLabel, sds.ExcludeEnvRegex, err = helper.SplitRegexFromMap(sds.ExcludeLabel)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
 	}
-	sds.k8sFilter, err = helper.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
+	sds.K8sFilter, err = helper.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
 
 	return 0, err
 }
@@ -251,10 +252,10 @@ func (sds *ServiceDockerStdout) FlushAll(c ilogtail.Collector, firstStart bool) 
 	newCount, delCount := sds.dockerCenter.GetAllAcceptedInfoV2(
 		sds.fullList, sds.matchList,
 		sds.IncludeLabel, sds.ExcludeLabel,
-		sds.includeLabelRegex, sds.excludeLabelRegex,
+		sds.IncludeLabelRegex, sds.ExcludeLabelRegex,
 		sds.IncludeEnv, sds.ExcludeEnv,
-		sds.includeEnvRegex, sds.excludeEnvRegex,
-		sds.k8sFilter)
+		sds.IncludeLabelRegex, sds.ExcludeEnvRegex,
+		sds.K8sFilter)
 	sds.lastUpdateTime = newUpdateTime
 	if !firstStart && newCount == 0 && delCount == 0 {
 		return nil

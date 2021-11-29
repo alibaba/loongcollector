@@ -65,11 +65,12 @@ type InputDockerFile struct {
 	K8sPodRegex           string
 	K8sContainerRegex     string
 
-	includeLabelRegex map[string]*regexp.Regexp
-	excludeLabelRegex map[string]*regexp.Regexp
-	includeEnvRegex   map[string]*regexp.Regexp
-	excludeEnvRegex   map[string]*regexp.Regexp
-	k8sFilter         *helper.K8SFilter
+	// export from ilogtail-trace component
+	IncludeLabelRegex map[string]*regexp.Regexp
+	ExcludeLabelRegex map[string]*regexp.Regexp
+	IncludeEnvRegex   map[string]*regexp.Regexp
+	ExcludeEnvRegex   map[string]*regexp.Regexp
+	K8sFilter         *helper.K8SFilter
 
 	dockerCenter         *helper.DockerCenter
 	lastPathMappingCache map[string]string
@@ -144,11 +145,11 @@ func (idf *InputDockerFile) Init(context ilogtail.Context) (int, error) {
 	idf.context.RegisterCounterMetric(idf.updateMetric)
 
 	var err error
-	idf.IncludeEnv, idf.includeEnvRegex, err = helper.SplitRegexFromMap(idf.IncludeEnv)
+	idf.IncludeEnv, idf.IncludeEnvRegex, err = helper.SplitRegexFromMap(idf.IncludeEnv)
 	if err != nil {
 		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
 	}
-	idf.ExcludeEnv, idf.excludeEnvRegex, err = helper.SplitRegexFromMap(idf.ExcludeEnv)
+	idf.ExcludeEnv, idf.ExcludeEnvRegex, err = helper.SplitRegexFromMap(idf.ExcludeEnv)
 	if err != nil {
 		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
 	}
@@ -166,15 +167,15 @@ func (idf *InputDockerFile) Init(context ilogtail.Context) (int, error) {
 	} else {
 		idf.ExcludeLabel = idf.ExcludeContainerLabel
 	}
-	idf.IncludeLabel, idf.includeLabelRegex, err = helper.SplitRegexFromMap(idf.IncludeLabel)
+	idf.IncludeLabel, idf.IncludeLabelRegex, err = helper.SplitRegexFromMap(idf.IncludeLabel)
 	if err != nil {
 		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
 	}
-	idf.ExcludeLabel, idf.excludeLabelRegex, err = helper.SplitRegexFromMap(idf.ExcludeLabel)
+	idf.ExcludeLabel, idf.ExcludeLabelRegex, err = helper.SplitRegexFromMap(idf.ExcludeLabel)
 	if err != nil {
 		logger.Warning(idf.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
 	}
-	idf.k8sFilter, err = helper.CreateK8SFilter(idf.K8sNamespaceRegex, idf.K8sPodRegex, idf.K8sContainerRegex, idf.IncludeK8sLabel, idf.ExcludeK8sLabel)
+	idf.K8sFilter, err = helper.CreateK8SFilter(idf.K8sNamespaceRegex, idf.K8sPodRegex, idf.K8sContainerRegex, idf.IncludeK8sLabel, idf.ExcludeK8sLabel)
 
 	return 3000, err
 }
@@ -268,10 +269,10 @@ func (idf *InputDockerFile) Collect(collector ilogtail.Collector) error {
 	newCount, delCount := idf.dockerCenter.GetAllAcceptedInfoV2(
 		idf.fullList, idf.matchList,
 		idf.IncludeLabel, idf.ExcludeLabel,
-		idf.includeLabelRegex, idf.excludeLabelRegex,
+		idf.IncludeLabelRegex, idf.ExcludeLabelRegex,
 		idf.IncludeEnv, idf.ExcludeEnv,
-		idf.includeEnvRegex, idf.excludeEnvRegex,
-		idf.k8sFilter)
+		idf.IncludeEnvRegex, idf.ExcludeEnvRegex,
+		idf.K8sFilter)
 	idf.lastUpdateTime = newUpdateTime
 	if newCount != 0 || delCount != 0 {
 		logger.Infof(idf.context.GetRuntimeContext(), "update match list, new: %v, delete: %v", newCount, delCount)
