@@ -31,9 +31,12 @@ your changes, such as:
 
 ## [Unreleased]
 
-- `public` `both` `fixed` fixed processor_regex not support `.*` regular expression. 
-- `public` `both` `updated` optimize system_v2 IOCounter metrics
-- `public` `both` `updated` change kafka flusher partition strategy to hash key
-- [inner][both][fixed] `service_http_server`: unlink unix sock before listen.
-- [inner][both][fixed] `metric_meta_kubernetes`: remove global variables.
+## [Released]
 
+### 1.0.27
+
+- [inner]  [both]  [fixed] fixed processor_regex not support `.*` regular expression.
+- [public] [both] [updated] optimize system_v2 IOCounter metrics
+- [public] [both] [updated] change kafka flusher partition strategy to hash key
+- [inner]  [both]  [fixed] `service_http_server`: unlink unix sock before listen.
+- [inner]  [both]  [fixed] `metric_meta_kubernetes`: remove global variables.
