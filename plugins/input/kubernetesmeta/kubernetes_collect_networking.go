@@ -44,7 +44,7 @@ func (in *InputKubernetesMeta) collectIngresses(lister interface{}, selector lab
 					refs[path.Backend.ServiceName] = struct{}{}
 				}
 			}
-			addIngressMapping(i.Namespace, id, i.Name, refs)
+			in.addIngressMapping(i.Namespace, id, i.Name, refs)
 		}
 		if in.Ingress {
 			node := helper.NewMetaNode(id, Ingress).WithAttributes(make(helper.Attributes, 4)).WithLabels(i.Labels)

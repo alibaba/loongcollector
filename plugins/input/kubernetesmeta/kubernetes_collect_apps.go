@@ -40,7 +40,7 @@ func (in *InputKubernetesMeta) collectDeployment(lister interface{}, selector la
 		id := string(d.UID)
 		if !in.DisableReportParents {
 			s, _ := metav1.LabelSelectorAsSelector(d.Spec.Selector)
-			addMatcher(d.Namespace, Deployment, newLabelMatcher(d.Name, id, s))
+			in.addMatcher(d.Namespace, Deployment, newLabelMatcher(d.Name, id, s))
 		}
 		if in.Deployment {
 			node := helper.NewMetaNode(id, Deployment).WithLabels(d.Labels).WithAttributes(make(helper.Attributes, 10))
@@ -78,7 +78,7 @@ func (in *InputKubernetesMeta) collectDaemonSet(lister interface{}, selector lab
 		id := string(d.UID)
 		if !in.DisableReportParents {
 			s, _ := metav1.LabelSelectorAsSelector(d.Spec.Selector)
-			addMatcher(d.Namespace, DaemonSet, newLabelMatcher(d.Name, id, s))
+			in.addMatcher(d.Namespace, DaemonSet, newLabelMatcher(d.Name, id, s))
 		}
 		if in.DaemonSet {
 			node := helper.NewMetaNode(id, DaemonSet).WithLabels(d.Labels).WithAttributes(make(helper.Attributes, 8)).
@@ -108,7 +108,7 @@ func (in *InputKubernetesMeta) collectStatefulSet(lister interface{}, selector l
 		id := string(d.UID)
 		if !in.DisableReportParents {
 			s, _ := metav1.LabelSelectorAsSelector(d.Spec.Selector)
-			addMatcher(d.Namespace, StatefulSet, newLabelMatcher(d.Name, id, s))
+			in.addMatcher(d.Namespace, StatefulSet, newLabelMatcher(d.Name, id, s))
 		}
 		if in.StatefulSet {
 			node := helper.NewMetaNode(id, StatefulSet).WithLabels(d.Labels).WithAttributes(make(helper.Attributes, 8))

@@ -85,7 +85,7 @@ func (in *InputKubernetesMeta) collectNodes(lister interface{}, selector labels.
 	for _, n := range k8sNodes {
 		id := string(n.UID)
 		if !in.DisableReportParents {
-			nodeMapping[n.Name] = id
+			in.nodeMapping[n.Name] = id
 		}
 		if in.Node {
 			node := helper.NewMetaNode(id, Node).WithAttributes(make(helper.Attributes, 20)).WithLabels(n.Labels).
@@ -151,7 +151,7 @@ func (in *InputKubernetesMeta) collectServices(lister interface{}, selector labe
 	for _, s := range services {
 		id := string(s.UID)
 		if !in.DisableReportParents {
-			addMatcher(s.Namespace, Service, newLabelMatcher(s.Name, id, labels.SelectorFromSet(s.Spec.Selector)))
+			in.addMatcher(s.Namespace, Service, newLabelMatcher(s.Name, id, labels.SelectorFromSet(s.Spec.Selector)))
 		}
 		if in.Service {
 			node := helper.NewMetaNode(id, Service).WithAttributes(make(helper.Attributes, 8)).WithLabels(s.Labels).

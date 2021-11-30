@@ -37,32 +37,38 @@ const (
 )
 
 type InputKubernetesMeta struct {
-	Pod                   bool
-	Node                  bool
-	Service               bool
-	Deployment            bool
-	DaemonSet             bool
-	StatefulSet           bool
-	Configmap             bool
-	Secret                bool
-	Job                   bool
-	CronJob               bool
-	Namespace             bool
-	PersistentVolume      bool
-	PersistentVolumeClaim bool
-	StorageClass          bool
-	Ingress               bool
-	DisableReportParents  bool
-	KubeConfigPath        string
-	SelectedNamespaces    []string
-	LabelSelectors        string
-	IntervalMs            int
-	Labels                map[string]string
-	context               ilogtail.Context
-	informerFactory       informers.SharedInformerFactory
-	selector              labels.Selector
-	collectors            []*collector
-	informerStopChan      chan struct{}
+	Pod                    bool
+	Node                   bool
+	Service                bool
+	Deployment             bool
+	DaemonSet              bool
+	StatefulSet            bool
+	Configmap              bool
+	Secret                 bool
+	Job                    bool
+	CronJob                bool
+	Namespace              bool
+	PersistentVolume       bool
+	PersistentVolumeClaim  bool
+	StorageClass           bool
+	Ingress                bool
+	DisableReportParents   bool
+	KubeConfigPath         string
+	SelectedNamespaces     []string
+	LabelSelectors         string
+	IntervalMs             int
+	Labels                 map[string]string
+	context                ilogtail.Context
+	informerFactory        informers.SharedInformerFactory
+	selector               labels.Selector
+	collectors             []*collector
+	informerStopChan       chan struct{}
+	nodeMapping            map[string]string                           // nodeID:nodeName
+	matchers               map[string]labelMatchers                    // namespace:labelMatchers
+	cronjobActives         map[string]map[string][]api.ObjectReference // namespace:cronjobID:[job references...]
+	cronjobMapping         map[string]string                           // cronjobID:cronjobName
+	ingressRelationMapping map[string]map[string]map[string]struct{}   // namespace:ingressID:[service names...]
+	ingressMapping         map[string]string
 }
 
 func (in *InputKubernetesMeta) Init(context ilogtail.Context) (int, error) {
@@ -112,6 +118,12 @@ func (in *InputKubernetesMeta) Init(context ilogtail.Context) (int, error) {
 		in.selector = selector
 	}
 	in.informerFactory.Start(in.informerStopChan)
+	in.nodeMapping = make(map[string]string, 16)
+	in.matchers = make(map[string]labelMatchers, 16)
+	in.cronjobActives = make(map[string]map[string][]api.ObjectReference, 16)
+	in.cronjobMapping = make(map[string]string, 16)
+	in.ingressRelationMapping = make(map[string]map[string]map[string]struct{}, 16)
+	in.ingressMapping = make(map[string]string, 16)
 	return 0, nil
 }
 
@@ -205,10 +217,10 @@ func (in *InputKubernetesMeta) Collect(collector ilogtail.Collector) error {
 	// wrapper the parents of pod nodes.
 	if len(pods) > 0 {
 		if !in.DisableReportParents {
-			defer free()
-			addPodParents(pods)
-			addServiceParents(services)
-			addJobParents(jobs)
+			defer in.free()
+			in.addPodParents(pods)
+			in.addServiceParents(services)
+			in.addJobParents(jobs)
 		}
 		transfer(pods)
 		transfer(services)

@@ -39,7 +39,7 @@ func (in *InputKubernetesMeta) collectJobs(lister interface{}, selector labels.S
 		id := string(j.UID)
 		if !in.DisableReportParents {
 			s, _ := metav1.LabelSelectorAsSelector(j.Spec.Selector)
-			addMatcher(j.Namespace, Job, newLabelMatcher(j.Name, id, s))
+			in.addMatcher(j.Namespace, Job, newLabelMatcher(j.Name, id, s))
 		}
 		if in.Job {
 			node := helper.NewMetaNode(id, Job).WithLabels(j.Labels).WithAttributes(make(helper.Attributes, 8)).
@@ -73,7 +73,7 @@ func (in *InputKubernetesMeta) collectCronJobs(lister interface{}, selector labe
 	for _, j := range cronJobs {
 		id := string(j.UID)
 		if !in.DisableReportParents && len(j.Status.Active) > 0 {
-			addCronJobMapping(j.Namespace, id, j.Name, j.Status.Active)
+			in.addCronJobMapping(j.Namespace, id, j.Name, j.Status.Active)
 		}
 		if in.CronJob {
 			node := helper.NewMetaNode(id, CronJob).WithLabels(j.Labels).WithAttributes(make(helper.Attributes, 8)).

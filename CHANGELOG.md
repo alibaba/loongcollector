@@ -35,4 +35,5 @@ your changes, such as:
 - `public` `both` `updated` optimize system_v2 IOCounter metrics
 - `public` `both` `updated` change kafka flusher partition strategy to hash key
 - [inner][both][fixed] `service_http_server`: unlink unix sock before listen.
+- [inner][both][fixed] `metric_meta_kubernetes`: remove global variables.
 

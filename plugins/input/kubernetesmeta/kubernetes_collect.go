@@ -103,20 +103,6 @@ const (
 	KeyResourceVersion             = "resource_version"
 )
 
-var (
-	// nodeID:nodeName
-	nodeMapping = make(map[string]string, 16)
-	// namespace:labelMatchers
-	matchers = make(map[string]labelMatchers, 16)
-	// namespace:cronjobID:[job references...]
-	cronjobActives = make(map[string]map[string][]api.ObjectReference, 16)
-	// cronjobID:cronjobName
-	cronjobMapping = make(map[string]string, 16)
-	// namespace:ingressID:[service names...]
-	ingressRelationMapping = make(map[string]map[string]map[string]struct{}, 16)
-	ingressMapping         = make(map[string]string, 16)
-)
-
 type (
 	// collectFunc collect the kubernetes core metadata by the lister of the informer.
 	collectFunc func(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error)
@@ -154,54 +140,54 @@ func addCommonAttributes(meta *v1.ObjectMeta, n *helper.MetaNode) *helper.MetaNo
 	return n
 }
 
-func addMatcher(namespace, resourceType string, matcher *labelMatcher) {
-	ns, ok := matchers[namespace]
+func (in *InputKubernetesMeta) addMatcher(namespace, resourceType string, matcher *labelMatcher) {
+	ns, ok := in.matchers[namespace]
 	if !ok {
 		group := make(labelMatchers, 16)
-		matchers[namespace] = group
+		in.matchers[namespace] = group
 		ns = group
 	}
 	ns[resourceType] = append(ns[resourceType], matcher)
 }
 
-func addCronJobMapping(namespace, id, name string, refs []api.ObjectReference) {
-	ns, ok := cronjobActives[namespace]
+func (in *InputKubernetesMeta) addCronJobMapping(namespace, id, name string, refs []api.ObjectReference) {
+	ns, ok := in.cronjobActives[namespace]
 	if !ok {
 		group := make(map[string][]api.ObjectReference, 16)
-		cronjobActives[namespace] = group
+		in.cronjobActives[namespace] = group
 		ns = group
 	}
 	ns[id] = refs
-	cronjobMapping[id] = name
+	in.cronjobMapping[id] = name
 }
 
-func addIngressMapping(namespace, id, name string, refs map[string]struct{}) {
-	ns, ok := ingressRelationMapping[namespace]
+func (in *InputKubernetesMeta) addIngressMapping(namespace, id, name string, refs map[string]struct{}) {
+	ns, ok := in.ingressRelationMapping[namespace]
 	if !ok {
 		group := make(map[string]map[string]struct{}, 16)
-		ingressRelationMapping[namespace] = group
+		in.ingressRelationMapping[namespace] = group
 		ns = group
 	}
 	ns[id] = refs
-	ingressMapping[id] = name
+	in.ingressMapping[id] = name
 }
 
 // free release the cache objects.
-func free() {
-	nodeMapping = make(map[string]string, len(nodeMapping))
-	cronjobMapping = make(map[string]string, len(cronjobMapping))
-	cronjobActives = make(map[string]map[string][]api.ObjectReference, len(cronjobActives))
-	matchers = make(map[string]labelMatchers, len(matchers))
-	ingressMapping = make(map[string]string, len(ingressMapping))
-	ingressRelationMapping = make(map[string]map[string]map[string]struct{}, len(ingressRelationMapping))
+func (in *InputKubernetesMeta) free() {
+	in.nodeMapping = make(map[string]string, len(in.nodeMapping))
+	in.cronjobMapping = make(map[string]string, len(in.cronjobMapping))
+	in.cronjobActives = make(map[string]map[string][]api.ObjectReference, len(in.cronjobActives))
+	in.matchers = make(map[string]labelMatchers, len(in.matchers))
+	in.ingressMapping = make(map[string]string, len(in.ingressMapping))
+	in.ingressRelationMapping = make(map[string]map[string]map[string]struct{}, len(in.ingressRelationMapping))
 }
 
 // addPodParents construct the relationship between pods and downstream resources.
 // When some dependencies founded, the relations would be added to the parents of pods.
-func addPodParents(pods []*helper.MetaNode) {
+func (in *InputKubernetesMeta) addPodParents(pods []*helper.MetaNode) {
 	// add cronjob matchers
-	for ns, jobRefs := range cronjobActives {
-		jobs, ok := matchers[ns][Job]
+	for ns, jobRefs := range in.cronjobActives {
+		jobs, ok := in.matchers[ns][Job]
 		if !ok {
 			continue
 		}
@@ -209,8 +195,8 @@ func addPodParents(pods []*helper.MetaNode) {
 			for i := 0; i < len(references); i++ {
 				for _, selector := range jobs {
 					if selector.uid == string(references[i].UID) {
-						matchers[ns][CronJob] = append(matchers[ns][CronJob],
-							newLabelMatcher(cronjobMapping[id], id, selector.selector))
+						in.matchers[ns][CronJob] = append(in.matchers[ns][CronJob],
+							newLabelMatcher(in.cronjobMapping[id], id, selector.selector))
 					}
 				}
 			}
@@ -220,11 +206,11 @@ func addPodParents(pods []*helper.MetaNode) {
 	for _, pod := range pods {
 		nodeName := pod.Attributes[KeyAddresses].(string)
 		delete(pod.Attributes, KeyAddresses)
-		uid, ok := nodeMapping[nodeName]
+		uid, ok := in.nodeMapping[nodeName]
 		if ok {
 			pod.WithParent(Node, uid, nodeName)
 		}
-		nsSelectors, ok := matchers[pod.Attributes[KeyNamespace].(string)]
+		nsSelectors, ok := in.matchers[pod.Attributes[KeyNamespace].(string)]
 		if !ok {
 			continue
 		}
@@ -240,17 +226,17 @@ func addPodParents(pods []*helper.MetaNode) {
 }
 
 // addJobParents construct the relationship between job and cronjob.
-func addJobParents(jobs []*helper.MetaNode) {
+func (in *InputKubernetesMeta) addJobParents(jobs []*helper.MetaNode) {
 	for _, job := range jobs {
 		jns := job.Attributes[KeyNamespace].(string)
-		group, ok := cronjobActives[jns]
+		group, ok := in.cronjobActives[jns]
 		if !ok {
 			continue
 		}
 		for id, references := range group {
 			for _, reference := range references {
 				if string(reference.UID) == job.ID {
-					job.WithParent(CronJob, id, cronjobMapping[id])
+					job.WithParent(CronJob, id, in.cronjobMapping[id])
 				}
 			}
 		}
@@ -258,10 +244,10 @@ func addJobParents(jobs []*helper.MetaNode) {
 }
 
 // addServiceParents construct the relationship between service and ingress.
-func addServiceParents(services []*helper.MetaNode) {
+func (in *InputKubernetesMeta) addServiceParents(services []*helper.MetaNode) {
 	for _, service := range services {
 		sns := service.Attributes[KeyNamespace].(string)
-		group, ok := ingressRelationMapping[sns]
+		group, ok := in.ingressRelationMapping[sns]
 		if !ok {
 			continue
 		}
@@ -269,7 +255,7 @@ func addServiceParents(services []*helper.MetaNode) {
 		for id, names := range group {
 			for k := range names {
 				if k == serviceName {
-					service.WithParent(Ingress, id, ingressMapping[id])
+					service.WithParent(Ingress, id, in.ingressMapping[id])
 				}
 			}
 		}
