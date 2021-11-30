@@ -82,7 +82,7 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 	}
 	// Case: end with line feed, must use [\s\S]* if line feed needs to be included.
 	{
-		log := "[2021-08-27 16:37:09][ONLINE_ROLE],json\n"
+		log := "[2021-08-27 16:37:09][ONLINE_ROLE],json\nnextline"
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"jsonlog"}
 
@@ -93,7 +93,7 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 			logArray[0] = test.CreateLogs("content", log)
 			outLogs := s.processor.ProcessLogs(logArray)
 			c.Assert(len(outLogs), check.Equals, 1)
-			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
+			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "json\nnextline")
 		}
 		{
 			processor.Regex = "^[^,]+,([\\s\\S]*)$"
@@ -102,7 +102,7 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 			logArray[0] = test.CreateLogs("content", log)
 			outLogs := s.processor.ProcessLogs(logArray)
 			c.Assert(len(outLogs), check.Equals, 1)
-			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "json\n")
+			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "json\nnextline")
 		}
 		{
 			// Does not include line feed.
@@ -112,7 +112,7 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 			logArray[0] = test.CreateLogs("content", log)
 			outLogs := s.processor.ProcessLogs(logArray)
 			c.Assert(len(outLogs), check.Equals, 1)
-			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "json")
+			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "json\nnextline")
 		}
 	}
 	{
