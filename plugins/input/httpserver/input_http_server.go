@@ -15,6 +15,8 @@
 package httpserver
 
 import (
+	"syscall"
+
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper/decoder"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -42,6 +44,7 @@ type ServiceHTTP struct {
 	ReadTimeoutSec     int
 	ShutdownTimeoutSec int
 	MaxBodySize        int64
+	UnlinkUnixSock     bool
 }
 
 // Init ...
@@ -143,7 +146,11 @@ func (s *ServiceHTTP) Start(c ilogtail.Collector) error {
 	var err error
 	switch {
 	case strings.HasPrefix(s.Address, "unix"):
-		listener, err = net.Listen("unix", strings.Replace(s.Address, "unix://", "", 1))
+		sockPath := strings.Replace(s.Address, "unix://", "", 1)
+		if s.UnlinkUnixSock {
+			_ = syscall.Unlink(sockPath)
+		}
+		listener, err = net.Listen("unix", sockPath)
 	case strings.HasPrefix(s.Address, "http") ||
 		strings.HasPrefix(s.Address, "https") ||
 		strings.HasPrefix(s.Address, "tcp"):
@@ -188,6 +195,7 @@ func init() {
 			ReadTimeoutSec:     10,
 			ShutdownTimeoutSec: 5,
 			MaxBodySize:        64 * 1024 * 1024,
+			UnlinkUnixSock:     true,
 		}
 	}
 }

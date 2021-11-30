@@ -18,7 +18,9 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"syscall"
 	"testing"
 	"time"
 
@@ -220,4 +222,26 @@ func TestInputInfluxDB(t *testing.T) {
 	for _, log := range collector.rawLogs {
 		fmt.Println(log.String())
 	}
+}
+
+func TestUnlinkUnixSock(t *testing.T) {
+	const sockPath = "test_service_http_server_unlink_unix_sock.run"
+	_ = syscall.Unlink(sockPath)
+	listener, err := net.Listen("unix", sockPath)
+	require.NoError(t, err)
+	defer listener.Close()
+
+	ctx := &ContextTest{}
+	ctx.ContextImp.InitContext("a", "b", "c")
+	input := &ServiceHTTP{
+		Address:        "unix://" + sockPath,
+		Format:         "influx",
+		UnlinkUnixSock: true,
+	}
+	_, err = input.Init(&ctx.ContextImp)
+	require.NoError(t, err)
+
+	collector := &mockCollector{}
+	require.NoError(t, input.Start(collector))
+	require.NoError(t, input.Stop())
 }
