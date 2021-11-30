@@ -60,8 +60,7 @@ type InputSystem struct {
 	lastCPUTime            time.Time
 	lastCPUTotal           float64
 	lastCPUBusy            float64
-	lastNetStat            net.IOCountersStat
-	lastNetStatAll         []net.IOCountersStat
+	lastNetStatMap         map[string]*net.IOCountersStat
 	lastNetTime            time.Time
 	lastProtoAll           []net.ProtoCountersStat
 	lastProtoTime          time.Time
@@ -296,37 +295,48 @@ func (r *InputSystem) collectOneNet(collector ilogtail.Collector, name string, t
 func (r *InputSystem) CollectNet(collector ilogtail.Collector) {
 	netIoStatAll, err := net.IOCounters(true)
 	if err == nil && len(netIoStatAll) > 0 {
-		netIoStatTotal := net.IOCountersStat{}
-
-		for _, netIoStat := range netIoStatAll {
-			netIoStatTotal.BytesRecv += netIoStat.BytesRecv
-			netIoStatTotal.BytesSent += netIoStat.BytesSent
-			netIoStatTotal.Dropin += netIoStat.Dropin
-			netIoStatTotal.Dropout += netIoStat.Dropout
-			netIoStatTotal.Errin += netIoStat.Errin
-			netIoStatTotal.Errout += netIoStat.Errout
-			netIoStatTotal.Fifoin += netIoStat.Fifoin
-			netIoStatTotal.Fifoout += netIoStat.Fifoout
-			netIoStatTotal.PacketsRecv += netIoStat.PacketsRecv
-			netIoStatTotal.PacketsSent += netIoStat.PacketsSent
-		}
-
 		nowTime := time.Now()
 		if !r.lastNetTime.IsZero() {
 			timeDeltaSec := float64(nowTime.Sub(r.lastNetTime)) / float64(time.Second)
-			r.collectOneNet(collector, "total", timeDeltaSec, &r.lastNetStat, &netIoStatTotal)
 			// collect every interface
-			if len(r.lastNetStatAll) == len(netIoStatAll) {
-				for i := 0; i < len(netIoStatAll); i++ {
-					if netIoStatAll[i].Name == r.lastNetStatAll[i].Name {
-						r.collectOneNet(collector, netIoStatAll[i].Name, timeDeltaSec, &r.lastNetStatAll[i], &netIoStatAll[i])
-					}
+			var lastTotal, total net.IOCountersStat
+			var built bool
+			for i := 0; i < len(netIoStatAll); i++ {
+				if ls, ok := r.lastNetStatMap[netIoStatAll[i].Name]; ok {
+					r.collectOneNet(collector, netIoStatAll[i].Name, timeDeltaSec, ls, &netIoStatAll[i])
+					// build total
+					total.BytesRecv += netIoStatAll[i].BytesRecv
+					total.BytesSent += netIoStatAll[i].BytesSent
+					total.Dropin += netIoStatAll[i].Dropin
+					total.Dropout += netIoStatAll[i].Dropout
+					total.Errin += netIoStatAll[i].Errin
+					total.Errout += netIoStatAll[i].Errout
+					total.Fifoin += netIoStatAll[i].Fifoin
+					total.Fifoout += netIoStatAll[i].Fifoout
+					total.PacketsRecv += netIoStatAll[i].PacketsRecv
+					total.PacketsSent += netIoStatAll[i].PacketsSent
+					lastTotal.BytesRecv += ls.BytesRecv
+					lastTotal.BytesSent += ls.BytesSent
+					lastTotal.Dropin += ls.Dropin
+					lastTotal.Dropout += ls.Dropout
+					lastTotal.Errin += ls.Errin
+					lastTotal.Errout += ls.Errout
+					lastTotal.Fifoin += ls.Fifoin
+					lastTotal.Fifoout += ls.Fifoout
+					lastTotal.PacketsRecv += ls.PacketsRecv
+					lastTotal.PacketsSent += ls.PacketsSent
+					built = true
 				}
+			}
+			if built {
+				r.collectOneNet(collector, "total", timeDeltaSec, &lastTotal, &total)
 			}
 		}
 		r.lastNetTime = nowTime
-		r.lastNetStat = netIoStatTotal
-		r.lastNetStatAll = netIoStatAll
+		r.lastNetStatMap = make(map[string]*net.IOCountersStat)
+		for i := range netIoStatAll {
+			r.lastNetStatMap[netIoStatAll[i].Name] = &netIoStatAll[i]
+		}
 	}
 }
 
