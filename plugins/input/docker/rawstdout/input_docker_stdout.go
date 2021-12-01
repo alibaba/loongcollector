@@ -407,7 +407,7 @@ func (sds *ServiceDockerStdout) FlushAll(c ilogtail.Collector, firstStart bool) 
 				stdout:               sds.Stdout,
 				stderr:               sds.Stderr,
 				ExternalEnvTag:       sds.ExternalEnvTag,
-				ExternalK8sLabelTag:  sds.ExcludeK8sLabel,
+				ExternalK8sLabelTag:  sds.ExternalK8sLabelTag,
 			}
 			sds.synerMap[id] = syner
 			go syner.Start(c)
