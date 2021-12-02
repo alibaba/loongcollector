@@ -631,6 +631,7 @@ func (dc *DockerCenter) readStaticConfig(forceFlush bool) {
 			dockerInfoDetail := dockerCenterInstance.CreateInfoDetail(info, envConfigPrefix, false)
 			dockerCenterInstance.updateContainer(info.ID, dockerInfoDetail)
 		}
+		dc.mergeK8sInfo()
 	}
 
 	if len(removedIDs) > 0 {
@@ -932,9 +933,13 @@ func (dc *DockerCenter) updateContainers(containerMap map[string]*DockerInfoDeta
 	}
 	// switch to new container map
 	dc.containerMap = containerMap
-	// merge k8s labels
+	dc.mergeK8sInfo()
+	dc.refreshLastUpdateMapTime()
+}
+
+func (dc *DockerCenter) mergeK8sInfo() {
 	k8sInfoMap := make(map[string][]*K8SInfo)
-	for _, container := range containerMap {
+	for _, container := range dc.containerMap {
 		if container.K8SInfo == nil {
 			continue
 		}
@@ -954,7 +959,6 @@ func (dc *DockerCenter) updateContainers(containerMap map[string]*DockerInfoDeta
 			k8sInfo[i].Merge(k8sInfo[0])
 		}
 	}
-	dc.refreshLastUpdateMapTime()
 }
 
 func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) {
