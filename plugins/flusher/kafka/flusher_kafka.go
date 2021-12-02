@@ -17,13 +17,14 @@ package kafka
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
+
+	"github.com/Shopify/sarama"
 
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"github.com/Shopify/sarama"
 )
 
 type FlusherKafka struct {
@@ -33,10 +34,18 @@ type FlusherKafka struct {
 	SASLPassword    string
 	Topic           string
 	PartitionerType string
+	HashKeys        []string
+	HashOnce        bool
 	ClientID        string
-	isTerminal      chan bool
-	producer        sarama.AsyncProducer
+
+	isTerminal chan bool
+	producer   sarama.AsyncProducer
+	hashKeyMap map[string]struct{}
+	hashKey    sarama.StringEncoder
+	flusher    FlusherFunc
 }
+
+type FlusherFunc func(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error
 
 func (k *FlusherKafka) Init(context ilogtail.Context) error {
 	k.context = context
@@ -62,6 +71,12 @@ func (k *FlusherKafka) Init(context ilogtail.Context) error {
 		partitioner = sarama.NewRoundRobinPartitioner
 	case "hash":
 		partitioner = sarama.NewHashPartitioner
+		k.hashKeyMap = make(map[string]struct{})
+		k.hashKey = ""
+		for _, key := range k.HashKeys {
+			k.hashKeyMap[key] = struct{}{}
+		}
+		k.flusher = k.HashFlush
 	case "random":
 		partitioner = sarama.NewRandomPartitioner
 	default:
@@ -102,8 +117,13 @@ func (k *FlusherKafka) Description() string {
 }
 
 func (k *FlusherKafka) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	return k.flusher(projectName, logstoreName, configName, logGroupList)
+}
+
+func (k *FlusherKafka) NormalFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	for _, logGroup := range logGroupList {
 		logger.Debug(k.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
+
 		for _, log := range logGroup.Logs {
 			buf, _ := json.Marshal(log)
 			logger.Debug(k.context.GetRuntimeContext(), string(buf))
@@ -111,15 +131,51 @@ func (k *FlusherKafka) Flush(projectName string, logstoreName string, configName
 				Topic: k.Topic,
 				Value: sarama.ByteEncoder(buf),
 			}
-			key := logstoreName
-			if key != "" {
-				m.Key = sarama.StringEncoder(key)
+			k.producer.Input() <- m
+		}
+	}
+	return nil
+}
+
+func (k *FlusherKafka) HashFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	for _, logGroup := range logGroupList {
+		logger.Debug(k.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
+
+		for _, log := range logGroup.Logs {
+			buf, _ := json.Marshal(log)
+			logger.Debug(k.context.GetRuntimeContext(), string(buf))
+			m := &sarama.ProducerMessage{
+				Topic: k.Topic,
+				Value: sarama.ByteEncoder(buf),
+			}
+			// set key when partition type is hash
+			if k.HashOnce {
+				if len(k.hashKey) == 0 {
+					k.hashKey = k.hashPartitionKey(log, logstoreName)
+				}
+				m.Key = k.hashKey
+			} else {
+				m.Key = k.hashPartitionKey(log, logstoreName)
 			}
 			k.producer.Input() <- m
 		}
 	}
 
 	return nil
+}
+
+func (k *FlusherKafka) hashPartitionKey(log *protocol.Log, defaultKey string) sarama.StringEncoder {
+	var hashData []string
+	for _, content := range log.GetContents() {
+		if _, ok := k.hashKeyMap[content.Key]; ok {
+			hashData = append(hashData, content.Value)
+		}
+	}
+	if len(hashData) == 0 {
+		hashData = append(hashData, defaultKey)
+	}
+	logger.Debug(k.context.GetRuntimeContext(), "partition key", hashData, " hashKeyMap", k.hashKeyMap)
+	return sarama.StringEncoder(strings.Join(hashData, "###"))
 }
 
 func (*FlusherKafka) SetUrgent(flag bool) {
@@ -139,9 +195,11 @@ func (k *FlusherKafka) Stop() error {
 
 func init() {
 	ilogtail.Flushers["flusher_kafka"] = func() ilogtail.Flusher {
-		return &FlusherKafka{
+		f := &FlusherKafka{
 			ClientID:        "LogtailPlugin",
 			PartitionerType: "random",
 		}
+		f.flusher = f.NormalFlush
+		return f
 	}
 }
