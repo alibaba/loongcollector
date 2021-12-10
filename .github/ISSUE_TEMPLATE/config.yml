@@ -1,0 +1,9 @@
+# Ref: https://github.com/pypa/pypi-support/blob/master/.github/ISSUE_TEMPLATE/config.yml
+blank_issues_enabled: true
+contact_links:
+  - name: Contributor Guideline
+    url: https://github.com/alibaba/ilogtail/blob/main/docs/zh/guides/README.md
+    about: Please check this out if you'd like to contribute by opening a PR :)
+  - name: ilogtail chatgroup
+    url: https://camo.githubusercontent.com/b9af43871e4808d766cd7b84512ac6656b4f8d4f9d1b63ee9c6ba2d6c068e6a0/68747470733a2f2f736c732d6f70656e736f757263652e6f73732d75732d776573742d312e616c6979756e63732e636f6d2f696c6f677461696c2f696c6f677461696c2d636f6e746163742e706e673f76657273696f6e49643d434145514d7869426749432e6a507569365263694944686c4e7a566a596d51354f5449774e7a51344e5442694d7a6b31595467794e32566b4e6d55354d444269
+    about: GitHub issues too formal? Questions about ilogtail? Feel free to chat in our chat group!
