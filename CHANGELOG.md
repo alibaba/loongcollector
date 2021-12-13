@@ -30,6 +30,7 @@ your changes, such as:
 - `security` in case of vulnerabilities.
 
 ## [Unreleased]
+- [public] [both] [added] filter instance properties for skywalking v3 plugin
 
 ## [Released]
 

@@ -51,8 +51,19 @@ func (r *ResourcePropertiesCache) put(service string, serviceInstance string, pr
 			return false
 		}
 	}
-	r.cache[key] = properties
+	r.cache[key] = r.filterProperties(properties)
 	return true
+}
+
+func (r *ResourcePropertiesCache) filterProperties(properties map[string]string) map[string]string {
+	if properties == nil {
+		return make(map[string]string)
+	}
+
+	delete(properties, "Start Time")
+	delete(properties, "JVM Arguments")
+	delete(properties, "Jar Dependencies")
+	return properties
 }
 
 func (r *ResourcePropertiesCache) save(ctx ilogtail.Context) {
