@@ -10,7 +10,7 @@ This article will briefly introduce the iLogtail plugin system, including the im
 In this section, we use the following flowchart to show the implementation principle of the iLogtail plugin system.
 
 
-![插件系统实现原理图](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail-adapter-cgo.png?versionId=CAEQMxiBgICu8Pej6BciIDY3MjAyNzNlNjgwYzRjYTRhZjk2YmE5YzI4YTkwMDUw)
+![插件系统实现原理图](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail-adapter-cgo.png?versionId=CAEQNBiBgMCl8rPG7RciIDdlMTUwYWE3MTk0YzRkY2ViN2E3MjgxYjlmODQzNDQx)
 
 
 In order to support the plugin system, we have introduced two dynamic libraries, libPluginAdaptor and libPluginBase (hereinafter referred to as adaptor and base). The relationship between them and iLogtail is as follows:

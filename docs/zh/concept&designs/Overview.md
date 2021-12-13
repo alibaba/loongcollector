@@ -9,7 +9,7 @@
 
 
 
-![插件系统实现原理图](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail-adapter-cgo.png?versionId=CAEQMxiBgICu8Pej6BciIDY3MjAyNzNlNjgwYzRjYTRhZjk2YmE5YzI4YTkwMDUw)
+![插件系统实现原理图](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail-adapter-cgo.png?versionId=CAEQNBiBgMCl8rPG7RciIDdlMTUwYWE3MTk0YzRkY2ViN2E3MjgxYjlmODQzNDQx)
 
 
 为了支持插件系统，我们引入了 libPluginAdaptor 和 libPluginBase（以下简称 adaptor 和 base）这两个动态库，它们与 iLogtail 之间的关系如下：
