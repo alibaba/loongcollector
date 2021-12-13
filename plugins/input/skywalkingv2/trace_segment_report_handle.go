@@ -243,7 +243,7 @@ func generateParentSpanIDByJaeger(ref *v2.SegmentReference) string {
 }
 
 func generateParentSpanIDByOriginal(ref *v2.SegmentReference) string {
-	return convertUniIDToString(ref.ParentTraceSegmentId) + strconv.FormatInt(int64(ref.ParentSpanId), 10)
+	return convertUniIDToString(ref.ParentTraceSegmentId) + "." + strconv.FormatInt(int64(ref.ParentSpanId), 10)
 }
 
 func generateSpanIDByJaeger(applicationInstance *ApplicationInstance, traceSegmentID string, span *v2.SpanObjectV2) string {

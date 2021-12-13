@@ -152,7 +152,7 @@ func (t *TraceSegmentHandle) parseSpan(span *agent.SpanObject, applicationInstan
 			}
 			spanRef := &skywalkingv3.OtSpanRef{
 				TraceID:    traceID,
-				SpanID:     convertUniIDToString(ref.ParentTraceSegmentId) + strconv.FormatInt(int64(ref.ParentSpanId), 10),
+				SpanID:     convertUniIDToString(ref.ParentTraceSegmentId) + "." + strconv.FormatInt(int64(ref.ParentSpanId), 10),
 				TraceState: "",
 				Attributes: nil,
 			}
