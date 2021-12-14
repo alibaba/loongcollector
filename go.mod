@@ -40,6 +40,7 @@ require (
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/gosnmp/gosnmp v1.31.0
 	github.com/influxdata/go-syslog v1.0.1
 	github.com/influxdata/influxdb v1.8.4
 	github.com/jeromer/syslogparser v0.0.0-20190429161531-5fbaaf06d9e7

@@ -90,6 +90,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/jcmturner/gofork](https://pkg.go.dev/github.com/jcmturner/gofork?tab=licenses)
 - [github.com/pierrec/lz4](https://pkg.go.dev/github.com/pierrec/lz4?tab=licenses)
 - [github.com/shirou/gopsutil](https://pkg.go.dev/github.com/shirou/gopsutil?tab=licenses)
+- [github.com/gosnmp/gosnmp](https://pkg.go.dev/github.com/gosnmp/gosnmp)
 - [github.com/spf13/pflag](https://pkg.go.dev/github.com/spf13/pflag?tab=licenses)
 - [github.com/willf/bitset](https://pkg.go.dev/github.com/willf/bitset?tab=licenses)
 - [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto?tab=licenses)

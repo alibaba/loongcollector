@@ -21,5 +21,6 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/input/docker/logmeta"
 	_ "github.com/alibaba/ilogtail/plugins/input/gpu"
 	_ "github.com/alibaba/ilogtail/plugins/input/journal"
+	_ "github.com/alibaba/ilogtail/plugins/input/snmp"
 	_ "github.com/alibaba/ilogtail/plugins/input/telegraf"
 )
