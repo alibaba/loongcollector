@@ -78,6 +78,8 @@ lint-e2e: clean tools
 .PHONY: build
 build: clean
 	./scripts/build.sh vendor default
+	cp pkg/logtail/libPluginAdapter.so bin/libPluginAdapter.so
+	cp pkg/logtail/PluginAdapter.dll bin/PluginAdapter.dll
 
 .PHONY: cgobuild
 cgobuild: clean
