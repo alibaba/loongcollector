@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Static Check
+name: E2E Test
 
 on:
   pull_request:
@@ -22,22 +22,14 @@ on:
 
 jobs:
   CI:
-    env:
-      RUNNER_ALLOW_RUNASROOT: 1
     runs-on: ${{ matrix.runner }}-latest
     timeout-minutes: 30
     strategy:
       matrix:
         go-version: [ 1.16 ]
-        runner: [ ubuntu, macos ]
+        runner: [ ubuntu ]
       fail-fast: true
     steps:
-
-      # prepare ubuntu environment
-      - name: prepare ubuntu environment
-        if: matrix.runner == 'ubuntu'
-        run: sudo apt-get install -y libsystemd-dev
-
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v2
         with:
@@ -48,26 +40,8 @@ jobs:
         with:
           submodules: true
 
-      - name: Check License Header
-        if: matrix.runner == 'ubuntu'
-        run: make check-license
-
-      - name: Check Dependencies Licences
-        if: matrix.runner == 'ubuntu'
-        run: make check-dependency-licenses
-
-      - name: Lint
-        run: make lint
-
-      - name: Test
-        run: make test
-
-      - name: Test Core
-        run: make core-test
-
-      - name: Test E2e Engine
-        if: matrix.runner == 'ubuntu'
-        run: make test-e2e-engine
+      - name: E2E Test
+        run: make e2e
 
   result:
     runs-on: ubuntu-latest

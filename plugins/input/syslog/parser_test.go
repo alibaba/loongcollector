@@ -237,7 +237,16 @@ func TestRfc5424(t *testing.T) {
 			fmt.Printf("############## %s %s\n", string(test.log), r.content)
 			require.Equal(t, string(test.log), r.content)
 		} else {
-			require.Equal(t, test.result, r)
+			require.Equal(t, test.result.hostname, r.hostname)
+			require.Equal(t, test.result.program, r.program)
+			require.Equal(t, test.result.priority, r.priority)
+			require.Equal(t, test.result.facility, r.facility)
+			require.Equal(t, test.result.severity, r.severity)
+			require.Equal(t, test.result.procID, r.procID)
+			require.Equal(t, test.result.msgID, r.msgID)
+			require.Equal(t, test.result.content, r.content)
+			require.Equal(t, test.result.time.Unix(), r.time.Unix())
+			require.Equal(t, test.result.structuredData, r.structuredData)
 		}
 	}
 }
@@ -349,6 +358,15 @@ func TestAutoParser(t *testing.T) {
 			require.Empty(t, r)
 			continue
 		}
-		require.Equal(t, test.result, r)
+		require.Equal(t, test.result.hostname, r.hostname)
+		require.Equal(t, test.result.program, r.program)
+		require.Equal(t, test.result.priority, r.priority)
+		require.Equal(t, test.result.facility, r.facility)
+		require.Equal(t, test.result.severity, r.severity)
+		require.Equal(t, test.result.procID, r.procID)
+		require.Equal(t, test.result.msgID, r.msgID)
+		require.Equal(t, test.result.content, r.content)
+		require.Equal(t, test.result.time.Unix(), r.time.Unix())
+		require.Equal(t, test.result.structuredData, r.structuredData)
 	}
 }

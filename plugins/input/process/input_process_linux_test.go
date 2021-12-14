@@ -90,18 +90,18 @@ func TestInputProcess_Collect(t *testing.T) {
 			11,
 		},
 	}
-	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := ilogtail.MetricInputs["metric_process_v2"]().(*InputProcess)
-	if _, err := p.Init(cxt); err != nil {
-		t.Errorf("cannot init the mock process plugin: %v", err)
-		return
-	}
-	c := &test.MockMetricCollector{}
-	p.TopNCPU = 1
 
-	_ = p.Collect(c)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cxt := mock.NewEmptyContext("project", "store", "config")
+			p := ilogtail.MetricInputs["metric_process_v2"]().(*InputProcess)
+			if _, err := p.Init(cxt); err != nil {
+				t.Errorf("cannot init the mock process plugin: %v", err)
+				return
+			}
+			c := &test.MockMetricCollector{}
+			p.TopNCPU = 1
+			_ = p.Collect(c)
 			c.Logs = nil
 			p.OpenFD = tt.conditions.OpenFD
 			p.IO = tt.conditions.IO

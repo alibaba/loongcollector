@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build docker_ready
-// +build docker_ready
-
 package validator
 
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"testing"
 	"time"
 
@@ -33,11 +31,30 @@ import (
 
 func createDockerContainer(cli *client.Client, t *testing.T) string {
 	config := containertypes.Config{
-		Image: "golang:1.16",
+		Image: "ubuntu:18.04",
 		Cmd: []string{
 			"cat", "/dev/urandom", "gzip -9", ">", "/dev/null",
 		},
 	}
+	res, err := cli.ImageList(context.Background(), types.ImageListOptions{})
+	assert.NoError(t, err)
+	var found bool
+	for _, re := range res {
+		for _, tag := range re.RepoTags {
+			if tag == "ubuntu:18.04" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		pull, errPull := cli.ImagePull(context.Background(), "ubuntu:18.04", types.ImagePullOptions{})
+		assert.NoError(t, errPull)
+		defer pull.Close()
+		// download of docker image finishes at EOF of the pull request
+		_, errPull = ioutil.ReadAll(pull)
+		assert.NoError(t, errPull)
+	}
+
 	container, err := cli.ContainerCreate(context.Background(), &config, &containertypes.HostConfig{}, &networktypes.NetworkingConfig{}, nil, "")
 	assert.NoError(t, err)
 
@@ -54,6 +71,7 @@ func Test_dockerProfileValidator_FetchProfile(t *testing.T) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	assert.NoError(t, err)
 	defer cli.Close()
+
 	ID := createDockerContainer(cli, t)
 	defer closeDockerContainer(cli, ID)
 

@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build docker_ready
-// +build docker_ready
-
 package boot
 
 import (
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -28,6 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/test/config"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 const testComposeContent = `

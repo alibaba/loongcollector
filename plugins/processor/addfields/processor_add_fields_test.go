@@ -29,7 +29,6 @@ func newProcessor() (*ProcessorAddFields, error) {
 	processor := &ProcessorAddFields{
 		Fields: map[string]string{
 			"a": "1",
-			"b": "2",
 		},
 		IgnoreIfExist: true,
 	}
@@ -46,7 +45,6 @@ func TestSourceKey(t *testing.T) {
 	processor.processLog(log)
 	assert.Equal(t, "test_value", log.Contents[0].Value)
 	assert.Equal(t, "6", log.Contents[1].Value)
-	assert.Equal(t, "2", log.Contents[2].Value)
 }
 
 func TestIgnoreIfExistFalse(t *testing.T) {
@@ -60,7 +58,6 @@ func TestIgnoreIfExistFalse(t *testing.T) {
 	assert.Equal(t, "test_value", log.Contents[0].Value)
 	assert.Equal(t, "6", log.Contents[1].Value)
 	assert.Equal(t, "1", log.Contents[2].Value)
-	assert.Equal(t, "2", log.Contents[3].Value)
 }
 
 func TestIgnoreIfExistTrue(t *testing.T) {
@@ -73,7 +70,6 @@ func TestIgnoreIfExistTrue(t *testing.T) {
 	processor.processLog(log)
 	assert.Equal(t, "test_value", log.Contents[0].Value)
 	assert.Equal(t, "6", log.Contents[1].Value)
-	assert.Equal(t, "2", log.Contents[2].Value)
 }
 
 func TestParameterCheck(t *testing.T) {

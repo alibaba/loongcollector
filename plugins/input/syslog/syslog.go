@@ -442,7 +442,7 @@ func (s *Syslog) parse(b []byte, collector ilogtail.Collector) {
 func newSyslog() *Syslog {
 	return &Syslog{
 		ParseProtocol:      "",
-		Address:            "tcp://127.0.0.1:9999",
+		Address:            "tcp://127.0.0.1:0",
 		MaxConnections:     100,
 		TimeoutSeconds:     0,
 		KeepAliveSeconds:   300,
