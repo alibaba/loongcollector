@@ -17,6 +17,9 @@ package snmp
 import (
 	// stdlib
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,6 +46,20 @@ type mockLog struct {
 type mockCollector struct {
 	logs    []mockLog
 	rawLogs []protocol.Log
+}
+
+func ExecCmdWithOption(cmd string, panicErr bool) (string, error) {
+	c := exec.Command("/bin/bash", "-c", cmd)
+	c.Env = os.Environ()
+	output, err := c.CombinedOutput()
+	if err != nil {
+		if panicErr {
+			fmt.Println("Failed to execute command:", cmd, err)
+			panic(err)
+		}
+	}
+	result := strings.Trim(string(output), "\n")
+	return result, err
 }
 
 func (c *mockCollector) AddData(
@@ -134,6 +151,13 @@ func InitGoSNMP(ctx *pluginmanager.ContextImp, input *SNMPAgent) error {
 
 func TestStartAndStop(t *testing.T) {
 	// need open both udp and tcp transport in  snmpd.conf
+	res, _ := ExecCmdWithOption("ps aux | awk '{print $11}' | grep ^snmp", false)
+	n := strings.Count(res, "\n")
+	if n < 1 {
+		// snmpd is not running, skip the test
+		return
+	}
+
 	ctx := &pluginmanager.ContextImp{}
 	ctx.InitContext("test_project", "test_logstore", "test_configname")
 
@@ -181,6 +205,13 @@ func TestStartAndStop(t *testing.T) {
 
 func TestGET(t *testing.T) {
 	// "Content" equals to result of command `snmpget -v2c -c public 127.0.0.1 <Oid>`, may different on different machines
+	res, _ := ExecCmdWithOption("ps aux | awk '{print $11}' | grep ^snmp", false)
+	n := strings.Count(res, "\n")
+	if n < 1 {
+		// snmpd is not running, skip the test
+		return
+	}
+
 	ctx, input := newInputV3()
 	err := InitGoSNMP(ctx, input)
 	require.NoError(t, err)
@@ -280,6 +311,13 @@ func TestGET(t *testing.T) {
 }
 
 func TestAuth(t *testing.T) {
+	res, _ := ExecCmdWithOption("ps aux | awk '{print $11}' | grep ^snmp", false)
+	n := strings.Count(res, "\n")
+	if n < 1 {
+		// snmpd is not running, skip the test
+		return
+	}
+
 	ctx, input := newInputV3()
 	input.UserName = "11111"
 	err := InitGoSNMP(ctx, input)
@@ -324,6 +362,13 @@ func TestAuth(t *testing.T) {
 
 func TestOidsParser(t *testing.T) {
 	// `Field` equals to results of command `snmptranslate -Td -Ob -m all <Oids>`, may different on different machines
+	res, _ := ExecCmdWithOption("ps aux | awk '{print $11}' | grep ^snmp", false)
+	n := strings.Count(res, "\n")
+	if n < 1 {
+		// snmpd is not running, skip the test
+		return
+	}
+
 	ctx, input := newInputV2()
 	input.Oids = append(input.Oids, "1.3.6.1.2.1.1.3.0")
 	input.Oids = append(input.Oids, "1.3.6.1.2.1.1.4.0")
@@ -343,6 +388,13 @@ func TestOidsParser(t *testing.T) {
 }
 
 func TestFieldsParser(t *testing.T) {
+	res, _ := ExecCmdWithOption("ps aux | awk '{print $11}' | grep ^snmp", false)
+	n := strings.Count(res, "\n")
+	if n < 1 {
+		// snmpd is not running, skip the test
+		return
+	}
+
 	ctx, input := newInputV2()
 	input.Fields = append(input.Fields, "SNMPv2-MIB::system.sysUpTime.0")
 	input.Fields = append(input.Fields, "SNMPv2-MIB::sysContact.0")
@@ -364,6 +416,13 @@ func TestFieldsParser(t *testing.T) {
 
 func TestTablesParser(t *testing.T) {
 	// `fieldContents` equals to results of command `snmptable -v 2c -c public -Ch 127.0.0.1 <Tables>`, may different on different machines
+	res, _ := ExecCmdWithOption("ps aux | awk '{print $11}' | grep ^snmp", false)
+	n := strings.Count(res, "\n")
+	if n < 1 {
+		// snmpd is not running, skip the test
+		return
+	}
+
 	ctx, input := newInputV2()
 	input.Tables = append(input.Tables, "SNMPv2-MIB::sysORTable")
 	_, err := input.Init(ctx)
