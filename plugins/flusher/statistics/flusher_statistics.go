@@ -25,7 +25,7 @@ import (
 	"github.com/paulbellamy/ratecounter"
 )
 
-// FlusherStatistics only does staticstics for data to flush instead of flushing really.
+// FlusherStatistics only does statistics for data to flush instead of flushing really.
 // It maintains three rates:
 // 1. loggroupRateCounter: the rate of the number of log groups to flush.
 // 2. logRateCounter: the rate of the total number of logs in log groups to flush.

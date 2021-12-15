@@ -73,7 +73,7 @@ func (p *AggregatorWrapper) AddWithWait(loggroup *protocol.LogGroup, duration ti
 	}
 }
 
-// Run calls periodically Aggregator.Flush to get log groups from associated aggragator and
+// Run calls periodically Aggregator.Flush to get log groups from associated aggregator and
 // pass them to LogstoreConfig through LogGroupsChan.
 func (p *AggregatorWrapper) Run() {
 	defer panicRecover(p.Aggregator.Description())

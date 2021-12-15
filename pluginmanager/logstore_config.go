@@ -180,7 +180,7 @@ func (lc *LogstoreConfig) TryFlushLoggroups() bool {
 // 3. Stop processor goroutine, pass all existing logs to aggregator.
 // 4. Stop all aggregator plugins, make all logs to LogGroups.
 // 5. Set stopping flag, stop flusher goroutine.
-// 6. If Logtail is exiting and there are remainding data, try to flush once.
+// 6. If Logtail is exiting and there are remaining data, try to flush once.
 // 7. Stop flusher plugins.
 func (lc *LogstoreConfig) Stop(exitFlag bool) error {
 	logger.Info(lc.Context.GetRuntimeContext(), "config stop", "begin", "exit", exitFlag)

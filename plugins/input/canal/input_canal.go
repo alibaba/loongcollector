@@ -215,7 +215,7 @@ var canalOldFieldPrefix = "_old_"
 // Three kinds of fields:
 // - Meta fields: stay unchanged, such as _db_, _event_, _gtid_, _host_, _id_. _table_.
 // - Old fields (old_data): any fields start with '_old_'.
-// - New fields (data): remainding fields.
+// - New fields (data): remaining fields.
 func (sc *ServiceCanal) addData(values map[string]string) {
 	if !sc.PackValues {
 		sc.collector.AddData(nil, values)
