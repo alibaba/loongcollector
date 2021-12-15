@@ -30,10 +30,14 @@ your changes, such as:
 - `security` in case of vulnerabilities.
 
 ## [Unreleased]
-- [public] [both] [added] filter instance properties for skywalking v3 plugin
-- [public] [both] [fixed] fix the paren span id is incorrect
 
 ## [Released]
+
+### 1.0.28
+
+- [public] [linux] [added] `snmp`: support SNMP protocol
+- [public] [both] [added] filter instance properties for skywalking v3 plugin
+- [public] [both] [fixed] fix the paren span id is incorrect
 
 ### 1.0.27
 
@@ -42,4 +46,4 @@ your changes, such as:
 - [public] [both] [updated] change kafka flusher partition strategy to hash key
 - [inner]  [both]  [fixed] `service_http_server`: unlink unix sock before listen.
 - [inner]  [both]  [fixed] `metric_meta_kubernetes`: remove global variables.
-- [public] [linux] [added] `snmp`: support SNMP protocol
+
