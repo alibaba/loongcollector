@@ -39,15 +39,18 @@ The development of MetricInput is divided into the following steps:
 1. Create an Issue to describe the function of the plugin development. There will be community committers participating
    in the discussion. If the community review passes, please refer to step 2 to continue.
 2. Implement the MetricInput interface. We use [input/example/metric](../../../plugins/input/example/metric_example.go)
-   as an example mode to introduce how to do. Also, You can
+   as an example to introduce how to do. Also, You can
    use [example.json](../../../plugins/input/example/metric_example_input.json) to experiment with this plugin function.
-3. Add the plugin to the [Global Plugin Definition Center](../../../plugins/all/all.go). If it only runs on the
+3. Register your plugin to [MetricInputs](../../../plugin.go) in init function. The registered name (a.k.a. plugin_type in json configuration) of a MetricInputs plugin must start with "metric_".  We
+   use [input/example/metric](../../../plugins/input/example/metric_example.go)
+   as an example to introduce how to do.
+4. Add the plugin to the [Global Plugin Definition Center](../../../plugins/all/all.go). If it only runs on the
    specified system, please add it to the [Linux Plugin Definition Center](../../../plugins/all/all_linux.go)
    Or [Windows Plugin Definition Center](../../../plugins/all/all_windows.go).
-4. For unit test or E2E test, please refer to [How to write single test](./How-to-write-unit-test.md)
-   and [How to write E2E test](../../../test/README.md) .
-5. Use *make lint* to check the code specification.
-6. Submit a Pull Request.
+5. For unit test or E2E test, please refer to [How to write single test](./How-to-write-unit-test.md)
+   and [How to write E2E test](../../../test/README.md).
+6. Use *make lint* to check the code specification.
+7. Submit a Pull Request.
 
 ## ServiceInput interface definition
 
@@ -86,13 +89,16 @@ The development of ServiceInput is divided into the following steps:
    in the discussion. If the community review passes, please refer to step 2 to continue.
 2. Implement the ServiceInput interface. We
    use [input/example/service](../../../plugins/input/example/service_example.go)
-   as an example mode to introduce how to do. Also, You can
+   as an example to introduce how to do. Also, You can
    use [example.json](../../../plugins/input/example/service_example_input.json) to experiment with this plugin
    function.
-3. Add the plugin to the [Global Plugin Definition Center](../../../plugins/all/all.go). If it only runs on the
+3. Register your plugin to [ServiceInputs](../../../plugin.go) in init function. The registered name (a.k.a. plugin_type in json configuration) of a ServiceInputs plugin must start with "service_".  We
+   use [input/example/service](../../../plugins/input/example/service_example.go)
+   as an example to introduce how to do.
+4. Add the plugin to the [Global Plugin Definition Center](../../../plugins/all/all.go). If it only runs on the
    specified system, please add it to the [Linux Plugin Definition Center](../../../plugins/all/all_linux.go)
    Or [Windows Plugin Definition Center](../../../plugins/all/all_windows.go).
-4. For unit test or E2E test, please refer to [How to write single test](./How-to-write-unit-test.md)
-   and [How to write E2E test](../../../test/README.md) .
-5. Use *make lint* to check the code specification.
-6. Submit a Pull Request.
+5. For unit test or E2E test, please refer to [How to write single test](./How-to-write-unit-test.md)
+   and [How to write E2E test](../../../test/README.md).
+6. Use *make lint* to check the code specification.
+7. Submit a Pull Request.

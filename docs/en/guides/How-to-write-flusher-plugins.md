@@ -16,7 +16,7 @@ develop the Flusher plugin.
   And [Basic structure](../concept&designs/Overview.md).
 
 - SetUrgent: Identifies that iLogtail is about to exit, and passes the system status to the specific flusher plugin, so
-  that the flusher plugin can automatically adapt to the system state, such as speeding up the output rate.
+  that the flusher plugin can automatically adapt to the system state, such as speeding up the output rate. (SetUrgent is called before Stop method of plugins of other kinds, however, there is no meaningful implementaion yet.)
 - Stop: Stop the flusher plugin, such as disconnecting the link to interact with external systems.
 
 ```go
@@ -69,12 +69,15 @@ The development of ServiceInput is divided into the following steps:
 1. Create an Issue to describe the function of the plugin development. There will be community committers participating
    in the discussion. If the community review passes, please refer to step 2 to continue.
 2. Implement the Flusher interface. We use [flusher/stdout](../../../plugins/flusher/stdout/flusher_stdout.go)
-   as an example mode to introduce how to do. Also, You can
+   as an example to introduce how to do. Also, You can
    use [example.json](../../../plugins/processor/addfields/example.json) to experiment with this plugin function.
-3. Add the plugin to the [Global Plugin Definition Center](../../../plugins/all/all.go). If it only runs on the
+3. Register your plugin to [Flushers](../../../plugin.go) in init function. The registered name (a.k.a. plugin_type in json configuration) of a Flusher plugin must start with "flusher_".  We
+   use [flusher/stdout](../../../plugins/flusher/stdout/flusher_stdout.go)
+   as an example to introduce how to do.
+4. Add the plugin to the [Global Plugin Definition Center](../../../plugins/all/all.go). If it only runs on the
    specified system, please add it to the [Linux Plugin Definition Center](../../../plugins/all/all_linux.go)
    Or [Windows Plugin Definition Center](../../../plugins/all/all_windows.go).
-4. For unit test or E2E test, please refer to [How to write single test](./How-to-write-unit-test.md)
+5. For unit test or E2E test, please refer to [How to write single test](./How-to-write-unit-test.md)
    and [How to write E2E test](../../../test/README.md) .
-5. Use *make lint* to check the code specification.
-6. Submit a Pull Request.
+6. Use *make lint* to check the code specification.
+7. Submit a Pull Request.

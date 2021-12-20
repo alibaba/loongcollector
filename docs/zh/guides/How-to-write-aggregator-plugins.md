@@ -8,10 +8,13 @@ Aggregator 插件的作用就是将一条条独立的 Log 根据一定规则聚�
 - Add 接口供外部输入 Log
 - Flush 接口供外部获取聚合得到的 LogGroug
 - Reset 接口目前仅在内部使用，可以忽略 
-- Init 接口，类似于 input 插件的 Input 接口，该接口返回值的第一个参数表示插件系统调用 Flush 接口的周期值，该值为 0 时使用全局参数，第二个参数表示一个初始化错误。 但不同于 input 插件，aggregator 插件的 Init 接口新增了一个 LogGroupQueue 类型的参数，该类型定义于 loggroup_queue.go 文件中，如下：
+- Init 接口，类似于 input 插件的 Init 接口，该接口返回值的第一个参数表示插件系统调用 Flush 接口的周期值，该值为 0 时使用全局参数，第二个参数表示一个初始化错误。 但不同于 input 插件，aggregator 插件的 Init 接口新增了一个 LogGroupQueue 类型的参数，该类型定义于 loggroup_queue.go 文件中，如下：
     ```go
     type LogGroupQueue interface {
+        // Returns errAggAdd immediately if queue is full.
         Add(loggroup *LogGroup) error
+        // Wait at most @duration if queue is full and returns errAggAdd if timeout.
+        // Do not use this method if you are unsure.
         AddWithWait(loggroup *LogGroup, duration time.Duration) error
     }
     ```
@@ -43,15 +46,13 @@ Reset()
 }
 ```
 
-## 
-
-
 ## Aggregator 开发
 
 Aggregator 的开发分为以下步骤:
 1. 创建Issue，描述开发插件功能，会有社区同学参与讨论插件开发的可行性，如果社区review 通过，请参考步骤2继续进行。
 2. 实现 Aggregator 接口，这里我们使用样例模式进行介绍，详细样例请查看[aggregator/defaultone](../../../plugins/aggregator/defaultone/aggregator_default.go)。
-3. 将插件加入[全局插件定义中心](../../../plugins/all/all.go), 如果仅运行于指定系统，请添加到[Linux插件定义中心](../../../plugins/all/all_linux.go) 或 [Windows插件定义中心](../../../plugins/all/all_windows.go).
-4. 进行单测或者E2E测试，请参考[如何使用单测](./How-to-write-unit-test.md) 与 [如何使用E2E测试](../../../test/README.md).
-5. 使用 *make lint* 检查代码规范。
-6. 提交Pull Request。
+3. 通过init将插件注册到[Aggregators](../../../plugin.go)，Aggregator插件的注册名（即json配置中的plugin_type）必须以"aggregator_"开头，详细样例请查看[aggregator/defaultone](../../../plugins/aggregator/defaultone/aggregator_default.go)。
+4. 将插件加入[全局插件定义中心](../../../plugins/all/all.go), 如果仅运行于指定系统，请添加到[Linux插件定义中心](../../../plugins/all/all_linux.go) 或 [Windows插件定义中心](../../../plugins/all/all_windows.go).
+5. 进行单测或者E2E测试，请参考[如何使用单测](./How-to-write-unit-test.md) 与 [如何使用E2E测试](../../../test/README.md).
+6. 使用 *make lint* 检查代码规范。
+7. 提交Pull Request。
