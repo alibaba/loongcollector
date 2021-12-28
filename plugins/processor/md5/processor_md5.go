@@ -39,7 +39,7 @@ func (p *ProcessorMD5) Init(context ilogtail.Context) error {
 }
 
 func (*ProcessorMD5) Description() string {
-	return "base64 encoding processor for logtail"
+	return "md5 processor for logtail"
 }
 
 func (p *ProcessorMD5) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
