@@ -16,8 +16,8 @@ your changes, such as:
 
 - `both` for all platforms.
 - `win` for Windows.
-- `linux` for Linux.
-- `linux.arm` for Linux on ARM.
+- `linux` for Linux on amd64 or arm64 arch.
+- `linux.arm` for Linux on arm64 arch.
 - ....
 
 ## Type of changes
@@ -28,22 +28,10 @@ your changes, such as:
 - `removed` for now removed features.
 - `fixed` for any bug fixes.
 - `security` in case of vulnerabilities.
+- `doc` for doc changes.
 
+## Example 
+
+- [public] [both] [updated] add a new feature
 ## [Unreleased]
-
-## [Released]
-
-### 1.0.28
-
-- [public] [linux] [added] `snmp`: support SNMP protocol
-- [public] [both] [added] filter instance properties for skywalking v3 plugin
-- [public] [both] [fixed] fix the paren span id is incorrect
-
-### 1.0.27
-
-- [inner]  [both]  [fixed] fixed processor_regex not support `.*` regular expression.
-- [public] [both] [updated] optimize system_v2 IOCounter metrics
-- [public] [both] [updated] change kafka flusher partition strategy to hash key
-- [inner]  [both]  [fixed] `service_http_server`: unlink unix sock before listen.
-- [inner]  [both]  [fixed] `metric_meta_kubernetes`: remove global variables.
-
+- [public] [both] [doc] add release doc
