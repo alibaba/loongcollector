@@ -35,3 +35,4 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
 - [public] [both] [doc] add release doc
+- [public] [linux] [doc] add ilogtail local deloyment doc for kafka flusher

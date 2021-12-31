@@ -61,6 +61,10 @@ make build && sh bin/ilogtail
 - [Aggregator 插件](./docs/zh/guides/How-to-write-aggregator-plugins.md)
 - [Flusher 插件](./docs/zh/guides/How-to-write-flusher-plugins.md)
 
+# 使用案例
+
+- [ilogtail使用案例](./docs/zh/usecases/README.md)
+
 # 贡献
 
 - [修复和报告错误](https://github.com/alibaba/ilogtail/issues)
