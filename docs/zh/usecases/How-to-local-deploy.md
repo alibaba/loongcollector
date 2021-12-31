@@ -1,3 +1,5 @@
+# iLogtail本地配置模式部署(For Kafka Flusher)
+
 阿里已经正式[开源](https://mp.weixin.qq.com/s/hcCYBZ0qvs8q4Wp1zFt-lg)了可观测数据采集器iLogtail。作为阿里内部可观测数据采集的基础设施，iLogtail承载了阿里巴巴集团、蚂蚁的日志、监控、Trace、事件等多种可观测数据的采集工作。
 ​
 
