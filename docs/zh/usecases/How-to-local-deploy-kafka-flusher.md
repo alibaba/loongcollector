@@ -46,7 +46,15 @@ $ ll
             "log_path": "/root/bin/input_data",
             "file_pattern": "json.log",
             "plugin": {
-                "processors": [ {
+                "processors": [ 
+                {
+                    "detail": {
+                        "SplitSep": "",
+                        "SplitKey": "content"
+                    },
+                    "type": "processor_split_log_string"
+                },
+                {
                     "detail": {
                         "ExpandConnector": "",
                         "ExpandDepth": 1,
@@ -167,6 +175,13 @@ $ cat sys_conf_dir/user_local_config.json
             {
                 "processors":
                 [
+                    {
+                        "detail": {
+                            "SplitSep": "",
+                            "SplitKey": "content"
+                        },
+                        "type": "processor_split_log_string"
+                    },
                     {
                         "detail":
                         {

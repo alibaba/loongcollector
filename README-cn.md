@@ -63,7 +63,7 @@ make build && sh bin/ilogtail
 ## iLogtail 使用案例
 - [iLogtail使用入门-主机环境日志采集到SLS](./docs/zh/usecases/How-to-setup-on-host.md)
 - [iLogtail使用入门-K8S环境日志采集到SLS](./docs/zh/usecases/How-to-setup-in-k8s-environment.md)
-- [iLogtail本地配置模式部署(For Kafka Flusher)](./docs/zh/usecases/How-to-local-deploy.md)
+- [iLogtail使用入门-iLogtail本地配置模式部署(For Kafka Flusher)](./docs/zh/usecases/How-to-local-deploy-kafka-flusher.md)
 
 # 贡献
 
