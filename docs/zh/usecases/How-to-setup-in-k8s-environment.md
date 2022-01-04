@@ -294,5 +294,6 @@ pod/demo-pod created
 
 &emsp;&emsp;&emsp;也可以学习ilogtail采集的更多用法：
 
+   - [通过DaemonSet-控制台方式采集容器文本日志](https://help.aliyun.com/document_detail/66655.html)
    - [采集容器日志](https://help.aliyun.com/document_detail/95925.html)
    - [如何获取容器的Label和环境变量](https://help.aliyun.com/document_detail/354831.html)

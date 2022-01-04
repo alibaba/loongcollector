@@ -36,3 +36,5 @@ your changes, such as:
 ## [Unreleased]
 - [public] [both] [doc] add release doc
 - [public] [linux] [doc] add ilogtail local deloyment doc for kafka flusher
+- [public] [linux] [doc] add ilogtail local deloyment doc for sls flusher
+- [public] [linux] [doc] add ilogtail k8s deloyment doc for sls flusher 

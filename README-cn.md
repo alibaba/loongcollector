@@ -60,10 +60,10 @@ make build && sh bin/ilogtail
 - [Processor 插件](./docs/zh/guides/How-to-write-processor-plugins.md)
 - [Aggregator 插件](./docs/zh/guides/How-to-write-aggregator-plugins.md)
 - [Flusher 插件](./docs/zh/guides/How-to-write-flusher-plugins.md)
-
-# 使用案例
-
-- [ilogtail使用案例](./docs/zh/usecases/README.md)
+## iLogtail 使用案例
+- [iLogtail使用入门-主机环境日志采集到SLS](./docs/zh/usecases/How-to-setup-on-host.md)
+- [iLogtail使用入门-K8S环境日志采集到SLS](./docs/zh/usecases/How-to-setup-in-k8s-environment.md)
+- [iLogtail本地配置模式部署(For Kafka Flusher)](./docs/zh/usecases/How-to-local-deploy.md)
 
 # 贡献
 
