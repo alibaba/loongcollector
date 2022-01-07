@@ -60,6 +60,9 @@ make build && sh bin/ilogtail
 - [Processor 插件](./docs/zh/guides/How-to-write-processor-plugins.md)
 - [Aggregator 插件](./docs/zh/guides/How-to-write-aggregator-plugins.md)
 - [Flusher 插件](./docs/zh/guides/How-to-write-flusher-plugins.md)
+## iLogtail 性能测试
+- [容器场景iLogtail 与Filebeat 性能对比测试](./docs/zh/performance/Performance-compare-with-filebeat.md)
+
 ## iLogtail 使用案例
 - [iLogtail使用入门-主机环境日志采集到SLS](./docs/zh/usecases/How-to-setup-on-host.md)
 - [iLogtail使用入门-K8S环境日志采集到SLS](./docs/zh/usecases/How-to-setup-in-k8s-environment.md)
