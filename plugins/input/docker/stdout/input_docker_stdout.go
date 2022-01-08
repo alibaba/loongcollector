@@ -197,7 +197,7 @@ func (sds *ServiceDockerStdout) Init(context ilogtail.Context) (int, error) {
 	sds.context.RegisterCounterMetric(sds.deleteMetric)
 
 	var err error
-	sds.IncludeEnv, sds.IncludeLabelRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)
+	sds.IncludeEnv, sds.IncludeEnvRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
 	}
@@ -223,7 +223,8 @@ func (sds *ServiceDockerStdout) Init(context ilogtail.Context) (int, error) {
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
 	}
-	sds.ExcludeLabel, sds.ExcludeEnvRegex, err = helper.SplitRegexFromMap(sds.ExcludeLabel)
+	sds.ExcludeLabel, sds.ExcludeLabelRegex, err = helper.SplitRegexFromMap(sds.ExcludeLabel)
+
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
 	}
