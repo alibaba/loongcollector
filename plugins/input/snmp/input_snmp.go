@@ -42,8 +42,8 @@ const pluginName = "service_snmp"
 // It works with SNMP agents configured by users. It uses TCP or UDP
 // to receive log from agents, and then translate them with MIB.
 
-// SNMPAgent holds the configuration for a SNMP agent and will finally convert it into *g.GoSNMP agent.
-type SNMPAgent struct {
+// Agent holds the configuration for a SNMP agent and will finally convert it into *g.GoSNMP agent.
+type Agent struct {
 	// Targets sets list of status target device ip
 	Targets []string
 	// Port sets local agent address
@@ -96,11 +96,11 @@ type Field struct {
 	Content    string
 }
 
-func (s *SNMPAgent) Description() string {
+func (s *Agent) Description() string {
 	return "get SNMP Agent input for logtail"
 }
 
-func (s *SNMPAgent) Init(context ilogtail.Context) (int, error) {
+func (s *Agent) Init(context ilogtail.Context) (int, error) {
 	s.context = context
 
 	if s.MaxTargetsLength < 1 {
@@ -170,7 +170,7 @@ func (s *SNMPAgent) Init(context ilogtail.Context) (int, error) {
 	return 0, nil
 }
 
-func (s *SNMPAgent) checkInput(checkpoint string) bool {
+func (s *Agent) checkInput(checkpoint string) bool {
 	flag := false
 	switch checkpoint {
 	case "Targets":
@@ -188,7 +188,7 @@ func (s *SNMPAgent) checkInput(checkpoint string) bool {
 }
 
 // Wrapper convert SNMPAgent configs into gosnmp.GoSNMP configs
-func (s *SNMPAgent) Wrapper(envTarget string) (*g.GoSNMP, error) {
+func (s *Agent) Wrapper(envTarget string) (*g.GoSNMP, error) {
 	envPort := s.Port
 	port, _ := strconv.ParseUint(envPort, 10, 16)
 	thisGoSNMP := &g.GoSNMP{
@@ -403,7 +403,7 @@ func snmpTranslateCall(oid string) (oidNum string, oidText string, conversion st
 }
 
 // snmpTableCall search local MIBs to translate table oid information, append table information to r.Field, needs command `snmptable`
-func (s *SNMPAgent) snmpTableCall(oid string) error {
+func (s *Agent) snmpTableCall(oid string) error {
 	// return oidNum, oidText, conversion, mibName , oidSuffix,nil
 	_, oidText, _, mibName, oidSuffix, err := snmpTranslateCall(oid)
 	mibPrefix := mibName + "::"
@@ -430,7 +430,7 @@ func (s *SNMPAgent) snmpTableCall(oid string) error {
 }
 
 // appendField helps translate oids and append information to fieldContents
-func (s *SNMPAgent) appendField(oid string) (err error) {
+func (s *Agent) appendField(oid string) (err error) {
 	oidNum, oidText, conversion, _, _, err := snmpTranslateCall(oid)
 	if err != nil {
 		return err
@@ -445,7 +445,7 @@ func (s *SNMPAgent) appendField(oid string) (err error) {
 }
 
 // GetTranslated translate all oids and fields into fieldContents
-func (s *SNMPAgent) GetTranslated() error {
+func (s *Agent) GetTranslated() error {
 	for _, oids := range s.Oids {
 		err := s.appendField(oids)
 		if err != nil {
@@ -462,7 +462,7 @@ func (s *SNMPAgent) GetTranslated() error {
 	return nil
 }
 
-func (s *SNMPAgent) Start(collector ilogtail.Collector) error {
+func (s *Agent) Start(collector ilogtail.Collector) error {
 	runtime.GOMAXPROCS(len(s.gs))
 	for index, GsAgent := range s.gs {
 		// use anonymous function to avoid resource leak
@@ -573,7 +573,7 @@ func (s *SNMPAgent) Start(collector ilogtail.Collector) error {
 	return nil
 }
 
-func (s *SNMPAgent) Stop() error {
+func (s *Agent) Stop() error {
 	for _, GsAgent := range s.gs {
 		func() {
 			defer GsAgent.Conn.Close()
@@ -582,13 +582,13 @@ func (s *SNMPAgent) Stop() error {
 	return nil
 }
 
-func (s *SNMPAgent) Collect(_ ilogtail.Collector) error {
+func (s *Agent) Collect(_ ilogtail.Collector) error {
 	return nil
 }
 
 func init() {
 	ilogtail.ServiceInputs[pluginName] = func() ilogtail.ServiceInput {
-		return &SNMPAgent{
+		return &Agent{
 			Port:               "161",
 			Transport:          "udp",
 			Community:          "public",

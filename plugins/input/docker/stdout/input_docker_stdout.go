@@ -255,7 +255,7 @@ func (sds *ServiceDockerStdout) FlushAll(c ilogtail.Collector, firstStart bool) 
 		sds.IncludeLabel, sds.ExcludeLabel,
 		sds.IncludeLabelRegex, sds.ExcludeLabelRegex,
 		sds.IncludeEnv, sds.ExcludeEnv,
-		sds.IncludeLabelRegex, sds.ExcludeEnvRegex,
+		sds.IncludeEnvRegex, sds.ExcludeEnvRegex,
 		sds.K8sFilter)
 	sds.lastUpdateTime = newUpdateTime
 	if !firstStart && newCount == 0 && delCount == 0 {

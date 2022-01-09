@@ -21,7 +21,7 @@ COPY . .
 
 RUN make cgobuild
 
-FROM egistry.cn-beijing.aliyuncs.com/log-service/logtail:v1.0.28.0-582a103-aliyun
+FROM registry.cn-beijing.aliyuncs.com/log-service/logtail:v1.0.28.0-582a103-aliyun
 
 RUN rm -f /usr/local/ilogtail/libPluginBase.so
 

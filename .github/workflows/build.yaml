@@ -34,7 +34,7 @@ jobs:
       # prepare ubuntu environment
       - name: prepare ubuntu environment
         if: matrix.runner == 'ubuntu'
-        run: sudo apt-get install -y libsystemd-dev
+        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
       # prepare windows environment
       # https://github.com/actions/virtual-environments/issues/2549

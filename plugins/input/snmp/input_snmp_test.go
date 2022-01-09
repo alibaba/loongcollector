@@ -86,10 +86,10 @@ func (p *ContextTest) LogErrorf(alarmType string, format string, params ...inter
 func (p *ContextTest) LogWarn(alarmType string, kvPairs ...interface{}) {
 	fmt.Println(alarmType, kvPairs)
 }
-func defaultInput() (*pluginmanager.ContextImp, *SNMPAgent) {
+func defaultInput() (*pluginmanager.ContextImp, *Agent) {
 	// to use this function, create "public" community first
 	ctx := &pluginmanager.ContextImp{}
-	input := &SNMPAgent{
+	input := &Agent{
 		Targets:            []string{"127.0.0.1"},
 		Port:               "161",
 		Community:          "public",
@@ -106,28 +106,28 @@ func defaultInput() (*pluginmanager.ContextImp, *SNMPAgent) {
 	return ctx, input
 }
 
-func newUDPInputV1() (*pluginmanager.ContextImp, *SNMPAgent) {
+func newUDPInputV1() (*pluginmanager.ContextImp, *Agent) {
 	ctx, input := defaultInput()
 	input.Version = 1
 	input.Transport = "udp"
 	return ctx, input
 }
 
-func newTCPInputV1() (*pluginmanager.ContextImp, *SNMPAgent) {
+func newTCPInputV1() (*pluginmanager.ContextImp, *Agent) {
 	ctx, input := defaultInput()
 	input.Version = 1
 	input.Transport = "tcp"
 	return ctx, input
 }
 
-func newInputV2() (*pluginmanager.ContextImp, *SNMPAgent) {
+func newInputV2() (*pluginmanager.ContextImp, *Agent) {
 	ctx, input := defaultInput()
 	input.Version = 2
 	input.Transport = "udp"
 	return ctx, input
 }
 
-func newInputV3() (*pluginmanager.ContextImp, *SNMPAgent) {
+func newInputV3() (*pluginmanager.ContextImp, *Agent) {
 	// to use this function, run `net-snmp-create-v3-user -ro -A SecUREDpass -a SHA -X StRongPASS -x AES snmpreadonly` first
 	ctx, input := defaultInput()
 	input.Version = 3
@@ -140,7 +140,7 @@ func newInputV3() (*pluginmanager.ContextImp, *SNMPAgent) {
 	return ctx, input
 }
 
-func InitGoSNMP(ctx *pluginmanager.ContextImp, input *SNMPAgent) error {
+func InitGoSNMP(ctx *pluginmanager.ContextImp, input *Agent) error {
 	input.Oids = append(input.Oids, "1.3.6.1.2.1.1.4.0")
 	_, err := input.Init(ctx)
 	if err != nil {

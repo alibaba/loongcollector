@@ -36,7 +36,8 @@ jobs:
       # prepare ubuntu environment
       - name: prepare ubuntu environment
         if: matrix.runner == 'ubuntu'
-        run: sudo apt-get install -y libsystemd-dev
+        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
+
 
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v2
@@ -47,6 +48,10 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: true
+
+      - name: Copy Lib
+        if: matrix.runner == 'ubuntu'
+        run: sudo cp ./pkg/logtail/libPluginAdapter.so /usr/lib/
 
       - name: Check License Header
         if: matrix.runner == 'ubuntu'
