@@ -34,8 +34,3 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
-- [public] [both] [doc] add release doc
-- [public] [both] [doc] add ilogtail local deloyment doc for kafka flusher
-- [public] [both] [doc] add ilogtail local deloyment doc for sls flusher
-- [public] [both] [doc] add ilogtail k8s deloyment doc for sls flusher 
-- [public] [both] [bug] fix wrong matching lables for stdout input
