@@ -14,6 +14,9 @@ When the plugin is written, the following content will guide you how to do unit 
 - [How to write E2E test](../../../test/README.md)
 - [How to do manual testing](How-to-do-manual-test.md)
 
+## Add plugins doc
+- [generate plugin doc](./How-to-genernate-plugin-doc.md)
+
 ## Code Check
 Before you submit a Pull Request, you need to ensure that the code style check and the test are whole pass. The following content will help you to check them.
 - [Check Code Style](How-to-chek-codestyle.md)

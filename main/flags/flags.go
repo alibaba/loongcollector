@@ -42,6 +42,8 @@ var (
 	Cpuprofile       = flag.String("cpu-profile", "cpu.prof", "write cpu profile to file.")
 	Memprofile       = flag.String("mem-profile", "mem.prof", "write mem profile to file.")
 	HTTPAddr         = flag.String("server", ":18689", "http server address.")
+	Doc              = flag.Bool("doc", false, "generate plugin docs")
+	DocPath          = flag.String("docpath", "./docs/en/plugins", "generate plugin docs")
 )
 
 var (

@@ -114,32 +114,31 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 }
 
 type ServiceDockerStdout struct {
-	IncludeLabel          map[string]string // Deprecated： use IncludeContainerLabel and IncludeK8sLabel instead.
-	ExcludeLabel          map[string]string // Deprecated： use ExcludeContainerLabel and ExcludeK8sLabel instead.
-	IncludeEnv            map[string]string
-	ExcludeEnv            map[string]string
-	IncludeContainerLabel map[string]string
-	ExcludeContainerLabel map[string]string
-	IncludeK8sLabel       map[string]string
-	ExcludeK8sLabel       map[string]string
-	ExternalEnvTag        map[string]string
-	ExternalK8sLabelTag   map[string]string
-	FlushIntervalMs       int
-	ReadIntervalMs        int
-	SaveCheckPointSec     int
-	TimeoutMs             int
-	BeginLineRegex        string
-	BeginLineTimeoutMs    int
-	BeginLineCheckLength  int
-	MaxLogSize            int
-	CloseUnChangedSec     int
-	StartLogMaxOffset     int64
-	Stdout                bool
-	Stderr                bool
-	LogtailInDocker       bool
-	K8sNamespaceRegex     string
-	K8sPodRegex           string
-	K8sContainerRegex     string
+	IncludeLabel          map[string]string `comment:"include container label for selector. [Deprecated： use IncludeContainerLabel and IncludeK8sLabel instead]"`
+	ExcludeLabel          map[string]string `comment:"exclude container label for selector. [Deprecated： use ExcludeContainerLabel and ExcludeK8sLabel instead]"`
+	IncludeEnv            map[string]string `comment:"the container would be selected when it is matched by any environment rules. Furthermore, the regular expression starts with '^' is supported as the env value, such as 'ENVA:^DE.*$'' would hit all containers having any envs starts with DE."`
+	ExcludeEnv            map[string]string `comment:"the container would be excluded when it is matched by any environment rules. Furthermore, the regular expression starts with '^' is supported as the env value, such as 'ENVA:^DE.*$'' would hit all containers having any envs starts with DE."`
+	IncludeContainerLabel map[string]string `comment:"the container would be selected when it is matched by any container labels. Furthermore, the regular expression starts with '^' is supported as the label value, such as 'LABEL:^DE.*$'' would hit all containers having any labels starts with DE."`
+	ExcludeContainerLabel map[string]string `comment:"the container would be excluded when it is matched by any container labels. Furthermore, the regular expression starts with '^' is supported as the label value, such as 'LABEL:^DE.*$'' would hit all containers having any labels starts with DE."`
+	IncludeK8sLabel       map[string]string `comment:"the container of pod would be selected when it is matched by any include k8s label rules. Furthermore, the regular expression starts with '^' is supported as the value to match pods."`
+	ExcludeK8sLabel       map[string]string `comment:"the container of pod would be excluded when it is matched by any exclude k8s label rules. Furthermore, the regular expression starts with '^' is supported as the value to exclude pods."`
+	ExternalEnvTag        map[string]string `comment:"extract the env value as the log tags for one container, such as the value of ENVA would be appended to the 'taga' of log tags when configured 'ENVA:taga' pair."`
+	ExternalK8sLabelTag   map[string]string `comment:"extract the pod label value as the log tags for one container, such as the value of LABELA would be appended to the 'taga' of log tags when configured 'LABELA:taga' pair."`
+	FlushIntervalMs       int               `comment:"the interval of container discovery，and the timeunit is millisecond. Default value is 3000."`
+	ReadIntervalMs        int               `comment:"the interval of read stdout log，and the timeunit is millisecond. Default value is 1000."`
+	SaveCheckPointSec     int               `comment:"the interval of save checkpoint，and the timeunit is second. Default value is 60."`
+	BeginLineRegex        string            `comment:"the regular expression of begin line for the multi line log."`
+	BeginLineTimeoutMs    int               `comment:"the maximum timeout milliseconds for begin line match. Default value is 3000."`
+	BeginLineCheckLength  int               `comment:"the prefix length of log line to match the first line. Default value is 10240."`
+	MaxLogSize            int               `comment:"the maximum log size. Default value is 512*1024, a.k.a 512K."`
+	CloseUnChangedSec     int               `comment:"the reading file would be close when the interval between last read operation is over {CloseUnChangedSec} seconds. Default value is 60."`
+	StartLogMaxOffset     int64             `comment:"the first read operation would read {StartLogMaxOffset} size history logs. Default value is 128*1024, a.k.a 128K."`
+	Stdout                bool              `comment:"collect stdout log. Default is true."`
+	Stderr                bool              `comment:"collect stderr log. Default is true."`
+	LogtailInDocker       bool              `comment:"the logtail running mode. Default is true."`
+	K8sNamespaceRegex     string            `comment:"the regular expression of kubernetes namespace to match containers."`
+	K8sPodRegex           string            `comment:"the regular expression of kubernetes pod to match containers."`
+	K8sContainerRegex     string            `comment:"the regular expression of kubernetes container to match containers."`
 
 	// export from ilogtail-trace component
 	IncludeLabelRegex map[string]*regexp.Regexp
@@ -157,10 +156,11 @@ type ServiceDockerStdout struct {
 	synerMap      map[string]*DockerFileSyner
 	checkpointMap map[string]helper.LogFileReaderCheckPoint
 	dockerCenter  *helper.DockerCenter
-	shutdown      chan struct{}
-	waitGroup     sync.WaitGroup
-	context       ilogtail.Context
-	collector     ilogtail.Collector
+	shutdown      chan struct {
+	}
+	waitGroup sync.WaitGroup
+	context   ilogtail.Context
+	collector ilogtail.Collector
 
 	// Last return of GetAllAcceptedInfoV2
 	fullList       map[string]bool
@@ -234,7 +234,7 @@ func (sds *ServiceDockerStdout) Init(context ilogtail.Context) (int, error) {
 }
 
 func (sds *ServiceDockerStdout) Description() string {
-	return "docker stdout input plugin for logtail"
+	return "the container stdout input plugin for iLogtail, which supports docker and containerd."
 }
 
 func (sds *ServiceDockerStdout) Collect(ilogtail.Collector) error {
@@ -377,7 +377,6 @@ func init() {
 			FlushIntervalMs:      3000,
 			SaveCheckPointSec:    60,
 			ReadIntervalMs:       1000,
-			TimeoutMs:            3000,
 			Stdout:               true,
 			Stderr:               true,
 			BeginLineTimeoutMs:   3000,

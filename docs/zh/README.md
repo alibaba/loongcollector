@@ -9,6 +9,7 @@
 - [启动](setup/README.md)： 介绍如何启动与设置iLogtail。
 
 - [指南](guides/README.md)：指导用户开发或调试iLogtail。
+- [插件文档](../en/plugins/plugin-list.md). 插件配置文档。
 
 - [性能测试](performance/Performance-compare-with-filebeat.md): iLogtail 性能测试文档。
 

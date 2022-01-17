@@ -14,6 +14,9 @@
 - [如何编写E2E测试](../../../test/README.md)
 - [如何手工测试](How-to-do-manual-test.md)
 
+## 增加插件文档
+- [生成插件文档](./How-to-genernate-plugin-doc.md)
+
 ## 代码检查
 在你提交Pull Request前，你需要保证代码符合规范，并保证测试通过，以下内容将帮助你进行相应检查。
 - [检查代码规范](How-to-chek-codestyle.md)
@@ -21,3 +24,4 @@
 - [检查代码依赖License](How-to-chek-dependency-license.md), 如无新增依赖包，请忽略此步。
 - 使用`make test` 执行所有单测，保证单测通过。
 - 使用`make e2e` 执行e2e测试，保证E2E测试通过。
+

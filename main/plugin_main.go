@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/alibaba/ilogtail"
 	_ "github.com/alibaba/ilogtail/helper/envconfig"
 	"github.com/alibaba/ilogtail/main/flags"
 	_ "github.com/alibaba/ilogtail/main/wrapmemcpy"
+	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/signals"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -33,6 +35,10 @@ import (
 func main() {
 	flag.Parse()
 	defer logger.Flush()
+	if *flags.Doc {
+		generatePluginDoc()
+		return
+	}
 	cpu := runtime.NumCPU()
 	procs := runtime.GOMAXPROCS(0)
 	fmt.Println("cpu num:", cpu, " GOMAXPROCS:", procs)
@@ -52,4 +58,23 @@ func main() {
 	logger.Info(context.Background(), "########################## exit process begin ##########################")
 	HoldOn(1)
 	logger.Info(context.Background(), "########################## exit process done ##########################")
+}
+
+func generatePluginDoc() {
+	for name, creator := range ilogtail.ServiceInputs {
+		doc.Register("service_input", name, creator())
+	}
+	for name, creator := range ilogtail.MetricInputs {
+		doc.Register("metric_input", name, creator())
+	}
+	for name, creator := range ilogtail.Processors {
+		doc.Register("processor", name, creator())
+	}
+	for name, creator := range ilogtail.Aggregators {
+		doc.Register("aggregator", name, creator())
+	}
+	for name, creator := range ilogtail.Flushers {
+		doc.Register("flusher", name, creator())
+	}
+	doc.Generate(*flags.DocPath)
 }

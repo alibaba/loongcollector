@@ -124,6 +124,10 @@ vendor: clean
 check-dependency-licenses: clean
 	./scripts/dependency_licenses.sh main LICENSE_OF_ILOGTAIL_DEPENDENCIES.md && ./scripts/dependency_licenses.sh test LICENSE_OF_TESTENGINE_DEPENDENCIES.md
 
+.PHONY: docs
+docs: clean build
+	./bin/ilogtail --doc
+
 .PHONY: e2e-docs
 e2e-docs: clean
 	cd test && go build -o ilogtail-test-tool  . && ./ilogtail-test-tool docs && rm -f ilogtail-test-tool
