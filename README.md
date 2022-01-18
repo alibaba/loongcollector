@@ -69,7 +69,7 @@ There are many ways to contribute:
 # Contact Us
 You can report bugs, make suggestions or participate in discussions through [Github Issues](https://github.com/alibaba/ilogtail/issues), or contact us with the following ways:
 
-- DingTalk：33867413
+- DingTalk：iLogtail社区
 - WeChat：日志服务
 - Bilibli：[阿里云SLS](https://space.bilibili.com/630680534?from=search&seid=2845737427240690794&spm_id_from=333.337.0.0)
 - Zhihu：[阿里云日志服务](https://www.zhihu.com/people/a-li-yun-ri-zhi-fu-wu)

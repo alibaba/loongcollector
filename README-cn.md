@@ -78,7 +78,7 @@ make build && sh bin/ilogtail
 # 联系我们
 您可以通过[Github Issues](https://github.com/alibaba/ilogtail/issues) 报告bug、提出建议或参与讨论，或通过以下方式联系我们：
 
-- 钉钉：33867413
+- 钉钉：iLogtail社区
 - 微信：日志服务
 - 哔哩哔哩：[阿里云SLS](https://space.bilibili.com/630680534?from=search&seid=2845737427240690794&spm_id_from=333.337.0.0)
 - 知乎：[阿里云日志服务](https://www.zhihu.com/people/a-li-yun-ri-zhi-fu-wu)
