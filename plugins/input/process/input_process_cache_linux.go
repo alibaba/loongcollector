@@ -108,7 +108,11 @@ func (pc *processCacheLinux) FetchNetIO() bool {
 }
 
 func (pc *processCacheLinux) FetchThreads() bool {
-	return pc.meta.fetchCoreCount > 0
+	if pc.meta.fetchCoreCount > 0 {
+		pc.status.ThreadsNum = pc.stat.NumThreads
+		return true
+	}
+	return false
 }
 
 func (pc *processCacheLinux) GetPid() int {

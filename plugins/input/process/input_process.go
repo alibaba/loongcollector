@@ -243,7 +243,7 @@ func (ip *InputProcess) addThreadMetrics(pc processCache, labels string, collect
 
 func (ip *InputProcess) addOpenFilesMetrics(pc processCache, labels string, collector ilogtail.Collector) {
 	if pc.FetchFds() {
-		helper.AddMetric(collector, "process_fds", ip.collectTime, labels, float64(pc.GetProcessStatus().ThreadsNum))
+		helper.AddMetric(collector, "process_fds", ip.collectTime, labels, float64(pc.GetProcessStatus().FdsNum))
 	}
 }
 

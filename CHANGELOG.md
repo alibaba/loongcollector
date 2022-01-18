@@ -36,3 +36,4 @@ your changes, such as:
 ## [Unreleased]
 
 - [public] [both] [doc] add input stdout plugin doc
+- [public] [both] [fixed] fix threadNum and fdNum in process plugin
