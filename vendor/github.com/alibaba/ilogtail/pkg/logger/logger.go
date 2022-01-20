@@ -15,14 +15,18 @@
 package logger
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -82,28 +86,33 @@ var (
 	memoryReceiverFlag bool
 	consoleFlag        bool
 	remoteFlag         bool
-	DebugFlag          bool
 	retainFlag         bool
 	levelFlag          string
+	debugFlag          int32
 
-	template string
-	once     sync.Once
+	template  string
+	once      sync.Once
+	wait      sync.WaitGroup
+	closeChan chan struct{}
 )
 
 func Init() {
 	once.Do(func() {
 		initNormalLogger()
+		catchStandardOutput()
 	})
 }
 
 func InitTestLogger(options ...ConfigOption) {
 	once.Do(func() {
 		initTestLogger(options...)
+		catchStandardOutput()
 	})
 }
 
 // initNormalLogger extracted from Init method for unit test.
 func initNormalLogger() {
+	closeChan = make(chan struct{})
 	remoteFlag = true
 	for _, option := range defaultProductionOptions {
 		option()
@@ -113,6 +122,7 @@ func initNormalLogger() {
 
 // initTestLogger extracted from Init method for unit test.
 func initTestLogger(options ...ConfigOption) {
+	closeChan = make(chan struct{})
 	remoteFlag = false
 	for _, option := range defaultTestOptions {
 		option()
@@ -124,7 +134,7 @@ func initTestLogger(options ...ConfigOption) {
 }
 
 func Debug(ctx context.Context, kvPairs ...interface{}) {
-	if !DebugFlag {
+	if !DebugFlag() {
 		return
 	}
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
@@ -136,7 +146,7 @@ func Debug(ctx context.Context, kvPairs ...interface{}) {
 }
 
 func Debugf(ctx context.Context, format string, params ...interface{}) {
-	if !DebugFlag {
+	if !DebugFlag() {
 		return
 	}
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
@@ -238,7 +248,7 @@ func setLogConf(logConfig string) {
 	if !retainFlag {
 		_ = os.Remove(util.GetCurrentBinaryPath() + "plugin_logger.xml")
 	}
-	DebugFlag = false
+	debugFlag = 0
 	logtailLogger = seelog.Disabled
 	path := filepath.Clean(logConfig)
 	if _, err := os.Stat(path); err != nil {
@@ -257,7 +267,9 @@ func setLogConf(logConfig string) {
 	}
 	logtailLogger = logger
 	dat, _ := ioutil.ReadFile(path)
-	DebugFlag = strings.Contains(string(dat), "minlevel=\"debug\"")
+	if strings.Contains(string(dat), "minlevel=\"debug\"") {
+		debugFlag = 1
+	}
 }
 
 func generateLog(kvPairs ...interface{}) string {
@@ -282,4 +294,87 @@ func generateDefaultConfig() string {
 		memoryReceiverFlagStr = "<custom name=\"memory\" />"
 	}
 	return fmt.Sprintf(template, levelFlag, util.GetCurrentBinaryPath(), consoleStr, memoryReceiverFlagStr)
+}
+
+// Close the logger and recover the stdout and stderr
+func Close() {
+	close(closeChan)
+	wait.Wait()
+	logtailLogger.Close()
+}
+
+// catchStandardOutput catch the stdout and stderr to the ilogtail logger.
+func catchStandardOutput() {
+	// do not open standard output catcher when console output is opening.
+	if consoleFlag {
+		return
+	}
+	catch := func(catcher func(*os.File) (old *os.File), logger func(text []byte), recover func(old *os.File)) error {
+		r, w, err := os.Pipe()
+		if err != nil {
+			return err
+		}
+		old := catcher(w)
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			reader := bufio.NewReader(r)
+			go func() {
+				<-closeChan
+				_ = w.Close()
+				_ = r.Close()
+				recover(old)
+			}()
+			for {
+				line, errRead := reader.ReadBytes('\n')
+				if errRead == io.EOF {
+					time.Sleep(100 * time.Millisecond)
+					continue
+				} else if errRead != nil {
+					Error(context.Background(), "CATCH_STANDARD_OUTPUT_ALARM", "err", errRead)
+					break
+				}
+				logger(line)
+			}
+		}()
+		return nil
+	}
+	err := catch(
+		func(w *os.File) (old *os.File) {
+			old = os.Stdout
+			os.Stdout = w
+			return
+		},
+		func(text []byte) {
+			Info(context.Background(), "stdout", string(text))
+		},
+		func(old *os.File) {
+			os.Stdout = old
+			_, _ = fmt.Fprint(os.Stdout, "recover stdout\n")
+		})
+	if err != nil {
+		Error(context.Background(), "INIT_CATCH_STDOUT_ALARM", "err", err)
+		return
+	}
+	err = catch(
+		func(w *os.File) (old *os.File) {
+			old = os.Stderr
+			os.Stderr = w
+			return
+		},
+		func(text []byte) {
+			Error(context.Background(), "STDERR_ALARM", "stderr", string(text))
+		},
+		func(old *os.File) {
+			os.Stderr = old
+			_, _ = fmt.Fprint(os.Stderr, "recover stderr\n")
+		})
+	if err != nil {
+		Error(context.Background(), "INIT_CATCH_STDERR_ALARM", "err", err)
+	}
+}
+
+// DebugFlag returns true when debug level is opening.
+func DebugFlag() bool {
+	return atomic.LoadInt32(&debugFlag) == 1
 }

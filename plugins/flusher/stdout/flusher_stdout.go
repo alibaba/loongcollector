@@ -134,7 +134,10 @@ func (p *FlusherStdout) Flush(projectName string, logstoreName string, configNam
 	return nil
 }
 
-func (*FlusherStdout) SetUrgent(flag bool) {
+func (p *FlusherStdout) SetUrgent(flag bool) {
+	if p.outLogger != nil {
+		p.outLogger.Close()
+	}
 }
 
 // IsReady is ready to flush

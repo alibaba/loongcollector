@@ -234,7 +234,7 @@ func init() {
 			logger.Debug(context.Background(), "force gc done", time.Now())
 			debug.FreeOSMemory()
 			logger.Debug(context.Background(), "free os memory done", time.Now())
-			if logger.DebugFlag {
+			if logger.DebugFlag() {
 				gcStat := debug.GCStats{}
 				debug.ReadGCStats(&gcStat)
 				logger.Debug(context.Background(), "gc stats", gcStat)
