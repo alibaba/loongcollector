@@ -261,16 +261,12 @@ metadata:
 spec:
 #  imagePullSecrets:          # Comment out to enable specific image pull secret
 #    - name: myregistrykey    # repleace it to specific registry key containers
-containers:
+  containers:
     - image: busybox
       imagePullPolicy: IfNotPresent
       name: demo-pod
       command: ["/bin/sh"]
       args: ["-c", "while true; do echo $(date) >>/tmp/demo.log; sleep 10; done"]
-      resources: {}
-      securityContext:
-        capabilities: {}
-        privileged: false
       terminationMessagePath: /dev/termination-log
   dnsPolicy: ClusterFirst
   restartPolicy: Always
