@@ -1,5 +1,7 @@
 # iLogtail本地配置模式部署(For Kafka Flusher)
 
+本文档视频演示[链接](https://www.bilibili.com/video/BV1kb4y1n7qs?spm_id_from=333.999.0.0)
+
 阿里已经正式[开源](https://mp.weixin.qq.com/s/hcCYBZ0qvs8q4Wp1zFt-lg)了可观测数据采集器iLogtail。作为阿里内部可观测数据采集的基础设施，iLogtail承载了阿里巴巴集团、蚂蚁的日志、监控、Trace、事件等多种可观测数据的采集工作。
 ​
 
@@ -12,7 +14,13 @@ iLogtail作为阿里云[SLS](https://help.aliyun.com/document_detail/95923.html)
 # 前提条件
 kafka本地安装完成，并创建名为`logtail-flusher-kafka`的topic。部署详见[链接](https://kafka.apache.org/quickstart)。
 # 安装ilogtail
-[下载](https://github.com/alibaba/ilogtail/releases)最新的ilogtail版本，并解压。
+iLogtail整体功能有两部分组成：
+* 基础进程C部分：提供了基本的采集配置管理及文件采集能力，后续开源。
+* 插件Go部分：扩展了数据源及数据处理能力，目前已开源。
+
+包含上述两部分的完整安装包已归档在[发布版本](https://github.com/alibaba/ilogtail/releases)，使用该版本可以提前使用到iLogtail完整的采集能力。
+
+下载最新的ilogtail版本，并解压。
 ```shell
 # 解压tar包
 $ tar zxvf logtail-linux64.tar.gz
