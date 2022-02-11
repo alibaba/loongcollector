@@ -24,9 +24,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
@@ -38,7 +41,8 @@ const (
 var errNoFile = errors.New("no secret file")
 
 const (
-	ConfigPath = "/var/addon/token-config"
+	AddOnTokenConfigPathEnv     = "ALIYUN_LOG_ADDON_TOKEN_PATH" //nolint:gosec
+	DefaultAddOnTokenConfigPath = "/var/addon/token-config"     //nolint:gosec
 )
 
 // AKInfo ...
@@ -126,11 +130,33 @@ func decrypt(s string, keyring []byte) ([]byte, error) {
 	return origData, nil
 }
 
+func getAddOnTokenConfigPath() string {
+	tokenPath := os.Getenv(AddOnTokenConfigPathEnv)
+	if len(tokenPath) == 0 {
+		return DefaultAddOnTokenConfigPath
+	}
+	return tokenPath
+}
+
 func getAKFromLocalFile() (accessKeyID, accessKeySecret, securityToken string, expireTime time.Time, err error) {
-	if _, err = os.Stat(ConfigPath); err == nil {
+	addonTokenConfigPath := getAddOnTokenConfigPath()
+	if runtime.GOOS == "windows" {
+		addonTokenConfigPath = helper.NormalizeWindowsPath(addonTokenConfigPath)
+
+		// NB(thxCode): since os.Stat has not worked as expected,
+		// we use os.Lstat instead of os.Stat here,
+		// ref to https://github.com/microsoft/Windows-Containers/issues/97#issuecomment-887713195.
+		_, err = os.Lstat(addonTokenConfigPath)
+	} else {
+		_, err = os.Stat(addonTokenConfigPath)
+	}
+	logger.Info(context.Background(), "get security token addon tokenconfig. path", addonTokenConfigPath,
+		"ret_code", err)
+
+	if err == nil {
 		var akInfo AKInfo
 		// 获取token config json
-		encodeTokenCfg, err := ioutil.ReadFile(ConfigPath)
+		encodeTokenCfg, err := ioutil.ReadFile(filepath.Clean(addonTokenConfigPath))
 		if err != nil {
 			return accessKeyID, accessKeySecret, securityToken, expireTime, err
 		}

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build windows
 // +build windows
 
 package helper
@@ -22,36 +23,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testGetMountedFilePath(t *testing.T) {
+func TestGetMountedFilePath(t *testing.T) {
 	testCases := []struct {
 		dockerInstallPath   string
 		dockerDataMountPath string
+		logtailMountPath    string
 		filePath            string
 		outFilePath         string
 	}{
 		{
 			dockerInstallPath:   "",
 			dockerDataMountPath: "",
+			logtailMountPath:    "C:",
+			filePath:            "C:\\Program File\\docker\\containers\\id\\id.json",
+			outFilePath:         "C:\\Program File\\docker\\containers\\id\\id.json",
+		},
+		{
+			dockerInstallPath:   "",
+			dockerDataMountPath: "",
+			logtailMountPath:    "C:\\logtail_host",
 			filePath:            "C:\\Program File\\docker\\containers\\id\\id.json",
 			outFilePath:         "C:\\logtail_host\\Program File\\docker\\containers\\id\\id.json",
 		},
 		{
 			dockerInstallPath:   "\\",
 			dockerDataMountPath: "C:\\docker",
+			logtailMountPath:    "C:\\logtail_host",
 			filePath:            "D:\\containers\\id\\id.json",
 			outFilePath:         "C:\\docker\\containers\\id\\id.json",
 		},
 		{
 			dockerInstallPath:   "\\any_path\\xxx\\",
 			dockerDataMountPath: "C:\\path\\docker",
+			logtailMountPath:    "C:\\logtail_host",
 			filePath:            "E:\\any_path\\xxx\\containers\\id\\id.json",
 			outFilePath:         "C:\\path\\docker\\containers\\id\\id.json",
 		},
 	}
 
 	for _, c := range testCases {
-		*DockerInstallPath = c.dockerInstallPath
-		*DockerDataMountPath = c.dockerDataMountPath
+		*DockerInstallPath = addPathSeparatorAtEnd(c.dockerInstallPath)
+		*DockerDataMountPath = addPathSeparatorAtEnd(c.dockerDataMountPath)
+		DefaultLogtailMountPath = c.logtailMountPath
 		require.Equal(t, c.outFilePath, GetMountedFilePath(c.filePath))
 	}
+
+	require.Equal(t, NormalizeWindowsPath("C:\\var\\addon-logtail\\token-config"), "C:\\var\\addon-logtail\\token-config")
+	require.Equal(t, NormalizeWindowsPath("/var/addon-logtail/token-config"), "C:\\var\\addon-logtail\\token-config")
+	require.Equal(t, NormalizeWindowsPath(""), "")
 }

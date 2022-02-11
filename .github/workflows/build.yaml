@@ -21,25 +21,25 @@ on:
       - main
 jobs:
   CI:
-    runs-on: ${{ matrix.runner }}-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
       matrix:
         go-version: [ 1.15, 1.16 ]
         # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
-        runner: [  ubuntu, macos, windows ]
+        runner: [  ubuntu-latest, macos-latest, windows-2019 ]
       fail-fast: true
     steps:
 
       # prepare ubuntu environment
       - name: prepare ubuntu environment
-        if: matrix.runner == 'ubuntu'
+        if: matrix.runner == 'ubuntu-latest'
         run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
       # prepare windows environment
       # https://github.com/actions/virtual-environments/issues/2549
       - name: add mingw32 to path
-        if: matrix.runner == 'windows'
+        if: matrix.runner == 'windows-2019'
         shell: bash
         run: |
           echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
@@ -58,7 +58,7 @@ jobs:
         run: make build
 
       - name: Build Docker
-        if: matrix.runner == 'ubuntu'
+        if: matrix.runner == 'ubuntu-latest'
         run: make docker
 
   result:

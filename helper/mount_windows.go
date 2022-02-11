@@ -69,8 +69,10 @@ func init() {
 	// only change default mount path when `C:\logtail_host` path exists.
 	if err == nil {
 		DefaultLogtailMountPath = defaultPath
-		fmt.Printf("running with mount path: %s", DefaultLogtailMountPath)
+	} else {
+		DefaultLogtailMountPath = "C:"
 	}
+	fmt.Printf("running with mount path: %s", DefaultLogtailMountPath)
 }
 
 // addPathSeparatorAtEnd adds path separator at the end of file path.

@@ -45,11 +45,14 @@ if [ $OS_FLAG = 1 ]; then
   if [ $BUILDMODE = "c-shared" ]; then
     NAME=libPluginBase.so
   fi
-elif [ $OS_FLAG = 2 ] && [ $BUILDMODE = "c-shared" ]; then
-  NAME=libPluginBase.dll
 elif [ $OS_FLAG = 3 ]; then
   export GOARCH=386
   export CGO_ENABLED=1
+  if [ $BUILDMODE = "c-shared" ]; then
+       NAME=PluginBase.dll
+  fi
+elif [ $OS_FLAG = 2 ]; then
+  BUILDMODE=default
 fi
 
 go build -mod="$MOD" -buildmode="$BUILDMODE" -ldflags="$IDFLAGS" -o "$ROOTDIR"/bin/${NAME} "$ROOTDIR"/main
