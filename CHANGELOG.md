@@ -34,8 +34,3 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
-
-- [public] [both] [doc] add input stdout plugin doc
-- [public] [both] [fixed] fix threadNum and fdNum in process plugin
-- [public] [both] [updated] support running multi prometheus input plugins at the same time
-- [public] [win] [added] add Customize the authentication token in Windows artifact
