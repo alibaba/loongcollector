@@ -15,14 +15,16 @@
 package skywalkingv3
 
 import (
-	"github.com/alibaba/ilogtail"
-	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
-	profile "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/profile/v3"
-	management "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/management/v3"
-
 	"net"
 
 	"google.golang.org/grpc"
+
+	"github.com/alibaba/ilogtail"
+
+	configuration "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/agent/configuration/v3"
+	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
+	profile "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/profile/v3"
+	management "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/management/v3"
 )
 
 type Input struct {
@@ -65,7 +67,7 @@ func (r *Input) Start(collector ilogtail.Collector) error {
 	agent.RegisterTraceSegmentReportServiceServer(r.grpcServer, &TracingHandler{r.ctx, collector, resourcePropertiesCache, InitComponentMapping(r.ComponentMapping)})
 	management.RegisterManagementServiceServer(r.grpcServer, &ManagementHandler{r.ctx, collector, resourcePropertiesCache})
 	profile.RegisterProfileTaskServer(r.grpcServer, &ProfileHandler{})
-
+	configuration.RegisterConfigurationDiscoveryServiceServer(r.grpcServer, &ConfigurationDiscoveryHandler{})
 	if r.Address == "" {
 		r.Address = "0.0.0.0:11800" // skywalking collector default port
 	}
