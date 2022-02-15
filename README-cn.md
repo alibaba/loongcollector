@@ -67,6 +67,7 @@ make build && sh bin/ilogtail
 - [iLogtail使用入门-主机环境日志采集到SLS](./docs/zh/usecases/How-to-setup-on-host.md)
 - [iLogtail使用入门-K8S环境日志采集到SLS](./docs/zh/usecases/How-to-setup-in-k8s-environment.md)
 - [iLogtail使用入门-iLogtail本地配置模式部署(For Kafka Flusher)](./docs/zh/usecases/How-to-local-deploy-kafka-flusher.md)
+- [iLogtail使用入门-如何采集Prometheus Exporter数据](./docs/zh/usecases/How-to-use-prometheus-fetcher.md)
 
 # 贡献
 
