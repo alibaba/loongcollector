@@ -34,4 +34,3 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
-- [public] [both] [fixed] Fix error that skywalking v3 plugin doesn't implement ConfigurationDiscoveryService interface
