@@ -101,6 +101,9 @@ func (f *Flusher) Flush(projectName string, logstoreName string, configName stri
 		return err
 	}
 	for _, group := range logGroupList {
+		if len(group.Logs) == 0 {
+			continue
+		}
 		if err := stream.Send(group); err != nil {
 			logger.Error(f.ctx.GetRuntimeContext(), "GRPC_FLUSH_ALARM", "err", err)
 			return err

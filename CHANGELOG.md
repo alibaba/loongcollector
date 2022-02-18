@@ -35,3 +35,4 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
 - [public] [both] [doc] add prometheus fetcher usecase doc
+- [public] [both] [updated] enhance memory cost for stdout collection

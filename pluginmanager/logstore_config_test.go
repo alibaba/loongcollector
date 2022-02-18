@@ -21,9 +21,11 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/input"
 	"github.com/alibaba/ilogtail/plugins/processor/regex"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -201,4 +203,23 @@ func Test_hasDockerStdoutInput(t *testing.T) {
 		}
 		require.False(t, hasDockerStdoutInput(plugins))
 	}
+}
+
+func Test_extractTags(t *testing.T) {
+	l := &protocol.Log{}
+	extractTags([]byte("k1~=~v1^^^k2~=~v2"), l)
+	assert.Equal(t, l.Contents[0].Key, "k1")
+	assert.Equal(t, l.Contents[0].Value, "v1")
+	assert.Equal(t, l.Contents[1].Key, "k2")
+	assert.Equal(t, l.Contents[1].Value, "v2")
+
+	l = &protocol.Log{}
+	extractTags([]byte("^^^k2~=~v2"), l)
+	assert.Equal(t, l.Contents[0].Key, "k2")
+	assert.Equal(t, l.Contents[0].Value, "v2")
+
+	l = &protocol.Log{}
+	extractTags([]byte("^^^k2"), l)
+	assert.Equal(t, l.Contents[0].Key, "__tag__:__prefix__0")
+	assert.Equal(t, l.Contents[0].Value, "k2")
 }

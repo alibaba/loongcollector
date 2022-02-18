@@ -15,6 +15,7 @@
 package pluginmanager
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5" //nolint:gosec
 	"encoding/json"
@@ -412,9 +413,12 @@ func (lc *LogstoreConfig) resume() {
 
 const (
 	rawStringKey     = "content"
-	tagDelimiter     = "^^^"
-	tagSeparator     = "~=~"
 	defaultTagPrefix = "__tag__:__prefix__"
+)
+
+var (
+	tagDelimiter = []byte("^^^")
+	tagSeparator = []byte("~=~")
 )
 
 func (lc *LogstoreConfig) ProcessRawLog(rawLog []byte, packID string, topic string) int {
@@ -427,44 +431,45 @@ func (lc *LogstoreConfig) ProcessRawLog(rawLog []byte, packID string, topic stri
 
 // extractTags extracts tags from rawTags and append them into log.
 // Rule: k1~=~v1^^^k2~=~v2
+// rawTags
 func extractTags(rawTags []byte, log *protocol.Log) {
-	if len(rawTags) == 0 {
-		return
-	}
-
-	tagStr := string(rawTags)
-	pairs := strings.Split(tagStr, tagDelimiter)
-	if len(pairs) == 0 {
-		return
-	}
-	defaultPrefixIndex := 0
-	for _, pair := range pairs {
-		pos := strings.Index(pair, tagSeparator)
-		if pos <= 0 {
-			log.Contents = append(log.Contents, &protocol.Log_Content{
-				Key:   defaultTagPrefix + strconv.Itoa(defaultPrefixIndex),
-				Value: pair,
-			})
-			defaultPrefixIndex++
-			continue
+	for len(rawTags) != 0 {
+		idx := bytes.Index(rawTags, tagDelimiter)
+		var part []byte
+		if idx < 0 {
+			part = rawTags
+			rawTags = rawTags[len(rawTags):]
+		} else {
+			part = rawTags[:idx]
+			rawTags = rawTags[idx+len(tagDelimiter):]
 		}
-
-		log.Contents = append(log.Contents, &protocol.Log_Content{
-			Key:   pair[:pos],
-			Value: pair[pos+len(tagSeparator):],
-		})
+		if len(part) > 0 {
+			defaultPrefixIndex := 0
+			pos := bytes.Index(part, tagSeparator)
+			if pos > 0 {
+				log.Contents = append(log.Contents, &protocol.Log_Content{
+					Key:   string(part[:pos]),
+					Value: string(part[pos+len(tagSeparator):]),
+				})
+			} else {
+				log.Contents = append(log.Contents, &protocol.Log_Content{
+					Key:   defaultTagPrefix + strconv.Itoa(defaultPrefixIndex),
+					Value: string(part),
+				})
+			}
+		}
 	}
 }
 
 // ProcessRawLogV2 ...
 // V1 -> V2: enable topic field, and use tags field to pass more tags.
 func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic string, tags []byte) int {
-	log := &protocol.Log{}
-	log.Contents = append(log.Contents,
-		&protocol.Log_Content{Key: rawStringKey, Value: string(rawLog)})
+	log := &protocol.Log{
+		Contents: make([]*protocol.Log_Content, 0, 16),
+	}
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: rawStringKey, Value: string(rawLog)})
 	if len(topic) > 0 {
-		log.Contents = append(log.Contents,
-			&protocol.Log_Content{Key: "__log_topic__", Value: topic})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
 	}
 	extractTags(tags, log)
 	lc.LogsChan <- log
