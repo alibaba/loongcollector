@@ -55,10 +55,10 @@ function appendDownloadLinks () {
     version=$2
     echo "| Arch| Platform| Region| Link|" >> $doc
     echo "|  ----  | ----  | ----  | ----  |" >> $doc
-    echo "|arm64|Linux|China|[link](http://logtail-release-cn-hangzhou.oss-cn-hangzhou.aliyuncs.com/linux64/${version}/aarch64/logtail-linux64.tar.gz)|" >> $doc
-    echo "|amd64|Linux|China|[link](http://logtail-release-cn-hangzhou.oss-cn-hangzhou.aliyuncs.com/linux64/${version}/x86_64/logtail-linux64.tar.gz)" >> $doc
-    echo "|arm64|Linux|US|[link](http://logtail-release-us-west-1.oss-us-west-1.aliyuncs.com/linux64/${version}/aarch64/logtail-linux64.tar.gz)" >> $doc
-    echo "|amd64|Linux|US|[link](http://logtail-release-us-west-1.oss-us-west-1.aliyuncs.com/linux64/${version}/x86_64/logtail-linux64.tar.gz)" >> $doc
+    echo "|arm64|Linux|China|[link](https://logtail-release-cn-hangzhou.oss-cn-hangzhou.aliyuncs.com/linux64/${version}/aarch64/logtail-linux64.tar.gz)|" >> $doc
+    echo "|amd64|Linux|China|[link](https://logtail-release-cn-hangzhou.oss-cn-hangzhou.aliyuncs.com/linux64/${version}/x86_64/logtail-linux64.tar.gz)" >> $doc
+    echo "|arm64|Linux|US|[link](https://logtail-release-us-west-1.oss-us-west-1.aliyuncs.com/linux64/${version}/aarch64/logtail-linux64.tar.gz)" >> $doc
+    echo "|amd64|Linux|US|[link](https://logtail-release-us-west-1.oss-us-west-1.aliyuncs.com/linux64/${version}/x86_64/logtail-linux64.tar.gz)" >> $doc
 }
 
 
