@@ -433,6 +433,7 @@ func (lc *LogstoreConfig) ProcessRawLog(rawLog []byte, packID string, topic stri
 // Rule: k1~=~v1^^^k2~=~v2
 // rawTags
 func extractTags(rawTags []byte, log *protocol.Log) {
+	defaultPrefixIndex := 0
 	for len(rawTags) != 0 {
 		idx := bytes.Index(rawTags, tagDelimiter)
 		var part []byte
@@ -444,7 +445,6 @@ func extractTags(rawTags []byte, log *protocol.Log) {
 			rawTags = rawTags[idx+len(tagDelimiter):]
 		}
 		if len(part) > 0 {
-			defaultPrefixIndex := 0
 			pos := bytes.Index(part, tagSeparator)
 			if pos > 0 {
 				log.Contents = append(log.Contents, &protocol.Log_Content{
@@ -457,12 +457,15 @@ func extractTags(rawTags []byte, log *protocol.Log) {
 					Value: string(part),
 				})
 			}
+			defaultPrefixIndex++
 		}
 	}
 }
 
 // ProcessRawLogV2 ...
 // V1 -> V2: enable topic field, and use tags field to pass more tags.
+// unsafe parameter: rawLog,packID and tags
+// safe parameter:  topic
 func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic string, tags []byte) int {
 	log := &protocol.Log{
 		Contents: make([]*protocol.Log_Content, 0, 16),

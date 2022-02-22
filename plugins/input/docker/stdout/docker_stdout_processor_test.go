@@ -564,10 +564,10 @@ func TestSingleLineChangeBlock(t *testing.T) {
 	{
 		part1 := []byte("2021-07-13T16:32:21.212861448Z stdout P partial line:\n")
 		str := helper.ZeroCopyString(part1)
-
 		assert.Equal(t, processor.Process(part1, 0), len(part1))
+		assert.Equal(t, string(processor.lastLogs[0].Content), "partial line:")
 		assert.Equal(t, len(collector.Logs), 0)
-		part1[38] = part1[38] - 10
+		part1[38] -= 10
 		assert.Equal(t, processor.Process(part1, 0), len(part1))
 		assert.Equal(t, len(collector.Logs), 1)
 		value := collector.Logs[0].Contents[0].GetValue()
