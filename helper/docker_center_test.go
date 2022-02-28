@@ -22,6 +22,7 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -199,5 +200,128 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		require.True(t, fullList["c4"])
 		require.Equal(t, newCount, 0)
 		require.Equal(t, delCount, 0)
+	}
+}
+
+func TestK8SInfo_IsMatch(t *testing.T) {
+	type fields struct {
+		Namespace       string
+		Pod             string
+		ContainerName   string
+		Labels          map[string]string
+		PausedContainer bool
+	}
+	type args struct {
+		filter *K8SFilter
+	}
+	filter := func(ns, pod, container string, includeK8sLabels, excludeK8sLabels map[string]string) *K8SFilter {
+		filter, _ := CreateK8SFilter(ns, pod, container, includeK8sLabels, excludeK8sLabels)
+		return filter
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		{
+			name: "namespaceMatch",
+			fields: fields{
+				Namespace:     "ns",
+				Pod:           "pod",
+				ContainerName: "container",
+				Labels: map[string]string{
+					"a": "b",
+				},
+				PausedContainer: false,
+			},
+			args: args{
+				filter: filter("^ns$", "", "", nil, nil),
+			},
+			want: true,
+		},
+		{
+			name: "podMatch",
+			fields: fields{
+				Namespace:     "ns",
+				Pod:           "pod",
+				ContainerName: "container",
+				Labels: map[string]string{
+					"a": "b",
+				},
+				PausedContainer: false,
+			},
+			args: args{
+				filter: filter("", "^pod$", "", nil, nil),
+			},
+			want: true,
+		},
+		{
+			name: "containerMatch",
+			fields: fields{
+				Namespace:     "ns",
+				Pod:           "pod",
+				ContainerName: "container",
+				Labels: map[string]string{
+					"a": "b",
+				},
+				PausedContainer: false,
+			},
+			args: args{
+				filter: filter("", "", "^container$", nil, nil),
+			},
+			want: true,
+		},
+		{
+			name: "includeLabelMatch",
+			fields: fields{
+				Namespace:     "ns",
+				Pod:           "pod",
+				ContainerName: "container",
+				Labels: map[string]string{
+					"a": "b",
+					"c": "d",
+				},
+				PausedContainer: false,
+			},
+			args: args{
+				filter: filter("^ns$", "", "", map[string]string{
+					"a": "b",
+					"e": "f",
+				}, nil),
+			},
+			want: true,
+		},
+		{
+			name: "excludeLabelMatch",
+			fields: fields{
+				Namespace:     "ns",
+				Pod:           "pod",
+				ContainerName: "container",
+				Labels: map[string]string{
+					"a": "b",
+					"c": "d",
+				},
+				PausedContainer: false,
+			},
+			args: args{
+				filter: filter("^ns$", "", "", nil, map[string]string{
+					"a": "b",
+				}),
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info := &K8SInfo{
+				Namespace:       tt.fields.Namespace,
+				Pod:             tt.fields.Pod,
+				ContainerName:   tt.fields.ContainerName,
+				Labels:          tt.fields.Labels,
+				PausedContainer: tt.fields.PausedContainer,
+			}
+			assert.Equalf(t, tt.want, info.IsMatch(tt.args.filter), "IsMatch(%v)", tt.args.filter)
+		})
 	}
 }
