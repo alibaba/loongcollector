@@ -168,7 +168,7 @@ func mockRun(t *testing.T, syslog *Syslog, collector *mockCollector) {
 	t1 := time.Now()
 	assert.NoError(t, syslog.Stop())
 	dur := time.Since(t1)
-	require.True(t, dur/time.Microsecond < 2000, "dur: %v", dur)
+	require.True(t, dur/time.Microsecond < 3000, "dur: %v", dur)
 	assert.NoError(t, conn.Close())
 
 	require.Equal(t, len(collector.rawLogs), len(collector.logs))
@@ -177,6 +177,9 @@ func mockRun(t *testing.T, syslog *Syslog, collector *mockCollector) {
 		priority, _ := strconv.Atoi(slog.fields["_priority_"])
 		log := getLog(priority,
 			slog.fields["_hostname_"], slog.fields["_program_"], slog.fields["_content_"], &slog.t)
+		if t.Name() != "TestMockUnixGram" {
+			require.Equal(t, "127.0.0.1", slog.fields["_client_ip_"])
+		}
 		require.Equal(t, rawLog, log, "log index: %v, slog: %v, raw log: %v", idx, slog, rawLog)
 	}
 

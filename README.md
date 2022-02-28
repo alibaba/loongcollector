@@ -46,6 +46,15 @@ This repository is the golang part of **iLogtail**，it contains most of the fea
 ```shell
 make build && sh bin/ilogtail
 ```
+
+> **NOTE**: for some higher linux version, you have to install systemd-devel in advance
+> ```shell
+> #centos
+> yum install systemd-devel
+> 
+> #ubuntu
+> apt-get update && apt-get install -y libsystemd-dev
+> ```
 2. Start with Alibaba Cloud  
 Please read this [doc](https://www.alibabacloud.com/help/doc-detail/28979.htm).
 

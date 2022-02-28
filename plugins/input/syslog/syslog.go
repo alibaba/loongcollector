@@ -334,7 +334,7 @@ func (s *Syslog) handle(conn net.Conn, collector ilogtail.Collector) {
 
 		data := scanner.Bytes()
 		if len(data) > 0 {
-			s.parse(data, collector)
+			s.parse(data, conn.RemoteAddr().String(), collector)
 		}
 		s.resetTimeout(conn)
 	}
@@ -362,7 +362,7 @@ func (s *Syslog) listenPacket(collector ilogtail.Collector) {
 		if s.TimeoutSeconds > 0 {
 			_ = s.udpListener.SetReadDeadline(time.Now().Add(time.Duration(s.TimeoutSeconds) * time.Second))
 		}
-		n, _, err := s.udpListener.ReadFrom(b)
+		n, addr, err := s.udpListener.ReadFrom(b)
 		if err != nil {
 			if strings.HasSuffix(err.Error(), ": use of closed network connection") {
 				logger.Info(s.context.GetRuntimeContext(), "Quit packet connection because of closed network connection")
@@ -386,12 +386,12 @@ func (s *Syslog) listenPacket(collector ilogtail.Collector) {
 
 		data := b[:n]
 		if len(data) > 0 {
-			s.parse(data, collector)
+			s.parse(data, fmt.Sprint(addr), collector)
 		}
 	}
 }
 
-func (s *Syslog) parse(b []byte, collector ilogtail.Collector) {
+func (s *Syslog) parse(b []byte, clientIP string, collector ilogtail.Collector) {
 	lines := bytes.Split(b, []byte("\n"))
 	if '\n' == b[len(b)-1] {
 		lines = lines[:len(lines)-1]
@@ -421,6 +421,12 @@ func (s *Syslog) parse(b []byte, collector ilogtail.Collector) {
 		} else {
 			fields["_hostname_"] = rst.hostname
 		}
+		if len(clientIP) > 0 {
+			fields["_client_ip_"] = strings.Split(clientIP, ":")[0]
+		} else {
+			fields["_client_ip_"] = ""
+		}
+
 		fields["_ip_"] = util.GetIPAddress()
 		fields["_content_"] = rst.content
 

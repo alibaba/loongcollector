@@ -38,3 +38,4 @@ your changes, such as:
 - [public] [both] [doc] add telegraf receiver usecase doc
 - [public] [both] [updated] enhance memory cost for stdout collection
 - [public] [both] [updated] support parse timestamp in processor_gotime plugin
+- [public] [both] [updated] add content _client_ip_ for syslog plugin

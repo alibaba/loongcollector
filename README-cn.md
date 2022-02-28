@@ -48,6 +48,14 @@ iLogtail 为可观测场景而生，拥有的轻量级、高性能、自动化�
 make build && sh bin/ilogtail
 ```
 
+> **注意**: 对一些高版本Linux需要提前安装systemd-devel
+> ```shell
+> #centos
+> yum install systemd-devel
+> 
+> #ubuntu
+> apt-get update && apt-get install -y libsystemd-dev
+> ```
 2、阿里云启动
 
 请阅读此 [doc](https://help.aliyun.com/document_detail/65018.html)。
