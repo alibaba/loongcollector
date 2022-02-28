@@ -113,3 +113,49 @@ func TestAlarmIfFail(t *testing.T) {
 	assert.True(t, strings.Contains(memoryLog, "GOTIME_PARSE_ALARM\tParseInLocation(2006-01-02 15:04:05, 2019-07-05-19:28:01, SpecifiedTimezone) "+
 		"failed: parsing time \"2019-07-05-19:28:01\" as \"2006-01-02 15:04:05\": cannot parse \"-19:28:01\" as \" \""))
 }
+
+func TestSourceFormatTimestampSeconds(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+
+	log := &protocol.Log{Time: 0}
+	unixStr := "1645595256"
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: unixStr})
+	processor.SourceFormat = fixedSecondsTimestampPattern
+	_ = processor.Init(processor.context)
+
+	processor.processLog(log)
+	assert.Equal(t, "d_key", log.Contents[1].Key)
+	assert.Equal(t, "2022/02/23 14:47:36", log.Contents[1].Value)
+}
+
+func TestSourceFormatTimestampMilliseconds(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+	processor.SourceFormat = fixedMillisecondsTimestampPattern
+	processor.DestFormat = "2006/01/02 15:04:05.000"
+	_ = processor.Init(processor.context)
+
+	log := &protocol.Log{Time: 0}
+	unixStr := "1645595256807"
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: unixStr})
+
+	processor.processLog(log)
+	assert.Equal(t, "d_key", log.Contents[1].Key)
+	assert.Equal(t, "2022/02/23 14:47:36.807", log.Contents[1].Value)
+}
+
+func TestSourceFormatTimestampMicroseconds(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+
+	log := &protocol.Log{Time: 0}
+	unixStr := "1645595256807000"
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: unixStr})
+	processor.SourceFormat = fixedMicrosecondsTimestampPattern
+	processor.DestFormat = "2006/01/02 15:04:05.000000"
+	_ = processor.Init(processor.context)
+	processor.processLog(log)
+	assert.Equal(t, "d_key", log.Contents[1].Key)
+	assert.Equal(t, "2022/02/23 14:47:36.807000", log.Contents[1].Value)
+}

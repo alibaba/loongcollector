@@ -20,7 +20,7 @@
 |NoKeyError|bool|可选|无匹配的key是否记录，默认为true。|
 |AlarmIfFail|bool|可选|失败是否记录，默认为true。|
 
-#### 示例
+#### 示例1
 以格式 `2006-01-02 15:04:05`（东八区）解析字段 `s_key` 的值作为日志时间，并以格式 `2006/01/02 15:04:05`（东九区）将日志时间转换到新字段 `d_key` 中。
 
 配置详情及处理结果如下：
@@ -60,4 +60,48 @@
 ```
 "s_key":"2019-07-05 19:28:01"
 "d_key":"2019/07/05 20:28:01"
+```
+
+#### 示例2
+以 Unix 时间戳格式 `1136185445000`（东八区）解析字段 `s_key` 的值作为日志时间，并以格式 `2006/01/02 15:04:05`（东九区）将日志时间转换到新字段 `d_key` 中。
+
+> 目前支持以 seconds(秒)、milliseconds(毫秒)、microseconds(微秒) 为单位的 Unix 时间戳。
+
+配置详情及处理结果如下：
+
+- 输入
+
+```
+"s_key":"1645595256807"
+```
+
+- 配置详情
+
+```json
+{
+  "processors":[
+    {
+      "type":"processor_gotime",
+      "detail": {
+        "SourceKey": "s_key",
+        "SourceFormat":"milliseconds",
+        "SourceLocation":8,
+        "DestKey":"d_key",
+        "DestFormat":"2006/01/02 15:04:05.000",
+        "DestLocation":9,
+        "SetTime": true,
+        "KeepSource": true,
+        "NoKeyError": true,
+        "AlarmIfFail": true
+      }
+    }
+  ]
+}
+```
+
+- 配置后结果
+
+```
+"s_key":"1645595256807"
+"d_key":"2022/02/23 14:47:36.807"
 ```

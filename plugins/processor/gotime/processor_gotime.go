@@ -16,6 +16,7 @@ package gotime
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/alibaba/ilogtail"
@@ -23,21 +24,29 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-type ProcessorGotime struct {
-	SourceKey      string
-	SourceFormat   string
-	SourceLocation int    // 为空表示本机时区
-	DestKey        string // 目标Key，为空不生效
-	DestFormat     string
-	DestLocation   int  // 为空表示本机时区
-	SetTime        bool // 是否设置到时间字段，默认为true
-	KeepSource     bool // 是否保留源字段
-	NoKeyError     bool
-	AlarmIfFail    bool
+const (
+	fixedSecondsTimestampPattern      = "seconds"
+	fixedMillisecondsTimestampPattern = "milliseconds"
+	fixedMicrosecondsTimestampPattern = "microseconds"
+)
 
-	sourceLocation *time.Location
-	destLocation   *time.Location
-	context        ilogtail.Context
+type ProcessorGotime struct {
+	SourceKey      string `comment:"the source key prepared to be formatted"`
+	SourceFormat   string `comment:"the source key formatted pattern, more details please see [here](https://golang.org/pkg/time/#Time.Format). Furthermore，there are 3 fixed pattern supported to parse timestamp, which are 'seconds','milliseconds' and 'microseconds'."`
+	SourceLocation int    `comment:"the source key time zone, such beijing timezone is 8. And the parameter would be ignored when 'SourceFormat' configured with timestamp format pattern."`
+	DestKey        string `comment:"the generated key name."`
+	DestFormat     string `comment:"the generated key formatted pattern, more details please see [here](https://golang.org/pkg/time/#Time.Format)."`
+	DestLocation   int    `comment:"the generated key time zone, such beijing timezone is 8."`
+	SetTime        bool   `comment:"Whether to config the unix time of the source key to the log time. "`
+	KeepSource     bool   `comment:"Whether to keep the source key in the log content after the processing."`
+	NoKeyError     bool   `comment:"Whether to alarm when not found the source key to parse and format."`
+	AlarmIfFail    bool   `comment:"Whether to alarm when the source key is failed to parse."`
+
+	sourceLocation     *time.Location
+	destLocation       *time.Location
+	context            ilogtail.Context
+	timestampFormat    bool
+	timestampParseFunc func(timestamp int64) time.Time
 }
 
 const pluginName = "processor_gotime"
@@ -64,12 +73,30 @@ func (p *ProcessorGotime) Init(context ilogtail.Context) error {
 	if p.DestLocation != 0 {
 		p.destLocation = time.FixedZone("SpecifiedTimezone", p.DestLocation*60*60)
 	}
+
+	switch p.SourceFormat {
+	case fixedSecondsTimestampPattern:
+		p.timestampParseFunc = func(timestamp int64) time.Time {
+			return time.Unix(timestamp, 0)
+		}
+		p.timestampFormat = true
+	case fixedMicrosecondsTimestampPattern:
+		p.timestampParseFunc = func(timestamp int64) time.Time {
+			return time.Unix(timestamp/1e6, (timestamp%1e6)*1e3)
+		}
+		p.timestampFormat = true
+	case fixedMillisecondsTimestampPattern:
+		p.timestampParseFunc = func(timestamp int64) time.Time {
+			return time.Unix(timestamp/1e3, (timestamp%1e3)*1e6)
+		}
+		p.timestampFormat = true
+	}
 	p.context = context
 	return nil
 }
 
 func (*ProcessorGotime) Description() string {
-	return "gotime processor for logtail"
+	return "the time format processor to parse time field with golang format pattern. More details please see [here](https://golang.org/pkg/time/#Time.Format)"
 }
 
 func (p *ProcessorGotime) ProcessLogs(logs []*protocol.Log) []*protocol.Log {
@@ -83,11 +110,23 @@ func (p *ProcessorGotime) processLog(log *protocol.Log) {
 	found := false
 	for idx, content := range log.Contents {
 		if content.Key == p.SourceKey {
-			parsedTime, err := time.ParseInLocation(p.SourceFormat, content.Value, p.sourceLocation)
-			if err != nil && p.AlarmIfFail {
-				logger.Warningf(p.context.GetRuntimeContext(), "GOTIME_PARSE_ALARM", "ParseInLocation(%v, %v, %v) failed: %v",
-					p.SourceFormat, content.Value, p.sourceLocation, err)
-				return
+			var parsedTime time.Time
+			if p.timestampFormat {
+				i, err := strconv.ParseInt(content.Value, 10, 64)
+				if err != nil && p.AlarmIfFail {
+					logger.Warningf(p.context.GetRuntimeContext(), "GOTIME_PARSE_ALARM", "ParseInt(%v, %v) failed: %v",
+						p.SourceFormat, content.Value, err)
+					return
+				}
+				parsedTime = p.timestampParseFunc(i)
+			} else {
+				parsedStringTime, err := time.ParseInLocation(p.SourceFormat, content.Value, p.sourceLocation)
+				if err != nil && p.AlarmIfFail {
+					logger.Warningf(p.context.GetRuntimeContext(), "GOTIME_PARSE_ALARM", "ParseInLocation(%v, %v, %v) failed: %v",
+						p.SourceFormat, content.Value, p.sourceLocation, err)
+					return
+				}
+				parsedTime = parsedStringTime
 			}
 			if p.SetTime {
 				log.Time = uint32(parsedTime.Unix())
