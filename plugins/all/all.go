@@ -41,6 +41,7 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/input/mqtt"
 	_ "github.com/alibaba/ilogtail/plugins/input/mysql"
 	_ "github.com/alibaba/ilogtail/plugins/input/mysqlbinlog"
+	_ "github.com/alibaba/ilogtail/plugins/input/netping"
 	_ "github.com/alibaba/ilogtail/plugins/input/nginx"
 	_ "github.com/alibaba/ilogtail/plugins/input/process"
 	_ "github.com/alibaba/ilogtail/plugins/input/prometheus"

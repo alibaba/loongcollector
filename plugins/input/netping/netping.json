@@ -1,0 +1,25 @@
+{
+    "inputs" : [
+      {
+        "type" : "metric_input_netinsight",
+        "detail" : {
+          "interval_seconds" : 30,
+          "icmp" : [
+            {"src" : "127.0.0.1", "target" : "www.baidu.com", "count" : 3},
+            {"src" : "127.0.0.1", "target" : "www.baidu.com", "count" : 3}
+          ],
+          "tcp" : [
+            {"src" : "127.0.0.1",  "target" : "www.baidu.com", "port" : 80, "count" : 3}
+          ]
+        }
+      }
+    ],
+    "flushers" : [
+      {
+        "type" : "flusher_stdout",
+        "detail" : {
+          "OnlyStdout": true
+        }
+      }
+    ]
+}

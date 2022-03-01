@@ -7,6 +7,7 @@ require (
 	github.com/StackExchange/wmi v0.0.0-20181212234831-e0a55b97c705 // indirect
 	github.com/VictoriaMetrics/VictoriaMetrics v1.58.0
 	github.com/VictoriaMetrics/metrics v1.17.2
+	github.com/agiledragon/gomonkey/v2 v2.4.0
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/aliyun/alibaba-cloud-sdk-go v0.0.0-20181127062202-5462e9f9dc05 // indirect
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner v0.0.0
@@ -37,6 +38,7 @@ require (
 	github.com/go-kit/kit v0.10.0
 	github.com/go-mysql-org/go-mysql v1.3.0
 	github.com/go-ole/go-ole v1.2.4 // indirect
+	github.com/go-ping/ping v0.0.0-20211130115550-779d1e919534
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gogo/protobuf v1.3.2
@@ -76,6 +78,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/syndtr/goleveldb v0.0.0-20170725064836-b89cc31ef797
+	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e // indirect
 	github.com/tchap/go-patricia v2.3.0+incompatible // indirect
 	go.uber.org/atomic v1.7.0
 	golang.org/x/sys v0.0.0-20210915083310-ed5796bab164

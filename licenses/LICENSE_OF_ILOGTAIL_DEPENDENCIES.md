@@ -153,6 +153,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [go.uber.org/zap](https://pkg.go.dev/go.uber.org/zap?tab=licenses)
 - [gopkg.in/birkirb/loggers.v1](https://pkg.go.dev/gopkg.in/birkirb/loggers.v1?tab=licenses)
 - [gopkg.in/natefinch/lumberjack.v2](https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2?tab=licenses)
+- [github.com/go-ping/ping](https://pkg.go.dev/github.com/go-ping/ping?tab=licenses)
 
 ## ISC licenses
 - [github.com/davecgh/go-spew](https://pkg.go.dev/github.com/davecgh/go-spew?tab=licenses)
