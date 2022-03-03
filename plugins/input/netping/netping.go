@@ -29,15 +29,17 @@ import (
 )
 
 type Result struct {
-	Valid    bool // if the result is meaningful for count
-	Label    string
-	Type     string
-	Total    int
-	Success  int
-	Failed   int
-	MinRTTMs float64
-	MaxRTTMs float64
-	AvgRTTMs float64
+	Valid       bool // if the result is meaningful for count
+	Label       string
+	Type        string
+	Total       int
+	Success     int
+	Failed      int
+	MinRTTMs    float64
+	MaxRTTMs    float64
+	AvgRTTMs    float64
+	TotalRTTMs  float64
+	StdDevRTTMs float64
 }
 
 type ICMPConfig struct {
@@ -83,6 +85,7 @@ func evaluteTcping(target string, port int, timeout time.Duration) (time.Duratio
 }
 
 func (m *NetPing) Init(context ilogtail.Context) (int, error) {
+	logger.Info(context.GetRuntimeContext(), "netping init")
 	m.context = context
 	if m.IntervalSeconds <= MinIntervalSecods {
 		m.IntervalSeconds = MinIntervalSecods
@@ -116,6 +119,9 @@ func (m *NetPing) Init(context ilogtail.Context) (int, error) {
 
 	m.resultChannel = make(chan *Result, 100)
 	m.timeout = time.Duration(m.IntervalSeconds / 2 * int(time.Second))
+	logger.Info(context.GetRuntimeContext(),
+		"netping init result, hasConfig: ", m.hasConfig, " localIP: ", localIP)
+
 	return m.IntervalSeconds * 1000, nil
 }
 
@@ -154,9 +160,11 @@ func (m *NetPing) Collect(collector ilogtail.Collector) error {
 		helper.AddMetric(collector, fmt.Sprintf("%s_success", result.Type), nowTs, result.Label, float64(result.Success))
 		helper.AddMetric(collector, fmt.Sprintf("%s_failed", result.Type), nowTs, result.Label, float64(result.Failed))
 		if result.Success > 0 {
-			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_min", result.Type), nowTs, result.Label, result.MinRTTMs)
-			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_max", result.Type), nowTs, result.Label, result.MaxRTTMs)
-			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_avg", result.Type), nowTs, result.Label, result.AvgRTTMs)
+			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_min_ms", result.Type), nowTs, result.Label, result.MinRTTMs)
+			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_max_ms", result.Type), nowTs, result.Label, result.MaxRTTMs)
+			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_avg_ms", result.Type), nowTs, result.Label, result.AvgRTTMs)
+			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_total_ms", result.Type), nowTs, result.Label, result.TotalRTTMs)
+			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_stddev_ms", result.Type), nowTs, result.Label, result.StdDevRTTMs)
 		}
 	}
 
@@ -198,23 +206,32 @@ func (m *NetPing) doICMPing(config ICMPConfig) {
 	label.Append("src", config.Src)
 	label.Append("dst", config.Target)
 
+	var totalRtt time.Duration
+	for _, rtt := range stats.Rtts {
+		totalRtt += rtt
+	}
+
 	m.resultChannel <- &Result{
-		Valid:    true,
-		Label:    label.String(),
-		Type:     "ping",
-		Total:    pinger.Count,
-		Success:  stats.PacketsRecv,
-		Failed:   pinger.Count - stats.PacketsRecv,
-		MinRTTMs: float64(stats.MinRtt / time.Millisecond),
-		MaxRTTMs: float64(stats.MaxRtt / time.Millisecond),
-		AvgRTTMs: float64(stats.AvgRtt / time.Millisecond),
+		Valid:       true,
+		Label:       label.String(),
+		Type:        "ping",
+		Total:       pinger.Count,
+		Success:     stats.PacketsRecv,
+		Failed:      pinger.Count - stats.PacketsRecv,
+		MinRTTMs:    float64(stats.MinRtt / time.Millisecond),
+		MaxRTTMs:    float64(stats.MaxRtt / time.Millisecond),
+		AvgRTTMs:    float64(stats.AvgRtt / time.Millisecond),
+		TotalRTTMs:  float64(totalRtt / time.Millisecond),
+		StdDevRTTMs: float64(stats.StdDevRtt / time.Millisecond),
 	}
 }
 
 func (m *NetPing) doTCPing(config TCPConfig) {
-	success := 0
+
 	failed := 0
 	var minRTT, maxRTT, totalRTT time.Duration
+
+	rtts := []time.Duration{}
 
 	for i := 0; i < config.Count; i++ {
 		rtt, err := evaluteTcping(config.Target, config.Port, m.timeout)
@@ -230,24 +247,39 @@ func (m *NetPing) doTCPing(config TCPConfig) {
 		}
 
 		totalRTT += rtt
-		success++
+		rtts = append(rtts, rtt)
 	}
 
-	var avgRTTMs float64
+	var avgRTT float64
+	var stdDevRtt float64
+	if len(rtts) > 0 {
+		avgRTT = math.Round(float64(totalRTT) / float64(len(rtts)))
 
-	if success > 0 {
-		avgRTTMs = math.Round(float64(totalRTT/time.Millisecond) / float64(success))
+		var sd float64
+		for _, rtt := range rtts {
+			sd += math.Pow(float64(rtt)-avgRTT, 2)
+		}
+		stdDevRtt = math.Round(math.Sqrt(sd / float64(len(rtts))))
+
 	}
+
+	var label helper.KeyValues
+	label.Append("src", config.Src)
+	label.Append("dst", config.Target)
+	label.Append("port", fmt.Sprint(config.Port))
 
 	m.resultChannel <- &Result{
-		Valid:    true,
-		Type:     "tcping",
-		Total:    config.Count,
-		Success:  success,
-		Failed:   failed,
-		MinRTTMs: float64(minRTT / time.Millisecond),
-		MaxRTTMs: float64(maxRTT / time.Millisecond),
-		AvgRTTMs: avgRTTMs,
+		Valid:       true,
+		Label:       label.String(),
+		Type:        "tcping",
+		Total:       config.Count,
+		Success:     len(rtts),
+		Failed:      failed,
+		MinRTTMs:    float64(minRTT / time.Millisecond),
+		MaxRTTMs:    float64(maxRTT / time.Millisecond),
+		AvgRTTMs:    avgRTT / float64(time.Millisecond),
+		TotalRTTMs:  float64(totalRTT / time.Millisecond),
+		StdDevRTTMs: stdDevRtt / float64(time.Millisecond),
 	}
 }
 
