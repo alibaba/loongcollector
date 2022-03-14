@@ -19,4 +19,4 @@ for package in os.listdir(script_dir_path):
 
     cmd = 'cp -r %s %s' % (os.path.join(script_dir_path, package),
                            os.path.join(script_dir_path, '../vendor/'))
-    print 'execute cmd %s: %s' % (cmd, os.system(cmd))
+    print('execute cmd %s: %s' % (cmd, os.system(cmd)))
