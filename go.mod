@@ -7,7 +7,7 @@ require (
 	github.com/StackExchange/wmi v0.0.0-20181212234831-e0a55b97c705 // indirect
 	github.com/VictoriaMetrics/VictoriaMetrics v1.58.0
 	github.com/VictoriaMetrics/metrics v1.17.2
-	github.com/agiledragon/gomonkey/v2 v2.4.0
+	github.com/agiledragon/gomonkey/v2 v2.4.0 // indirect
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/aliyun/alibaba-cloud-sdk-go v0.0.0-20181127062202-5462e9f9dc05 // indirect
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner v0.0.0

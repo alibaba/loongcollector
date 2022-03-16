@@ -3,8 +3,8 @@
         "Time": 1234567890,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "trace"
+                "Key": "links",
+                "Value": "[]"
             },
             {
                 "Key": "host",
@@ -37,10 +37,6 @@
             {
                 "Key": "parentSpanID",
                 "Value": "trace-seg-id-a.456"
-            },
-            {
-                "Key": "links",
-                "Value": "[]"
             },
             {
                 "Key": "logs",

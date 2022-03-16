@@ -3,16 +3,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_cpu_usage"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_cpu_usage"
             },
             {
                 "Key": "__labels__",
@@ -28,16 +24,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_committed"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_committed"
             },
             {
                 "Key": "__labels__",
@@ -53,16 +45,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_init"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_init"
             },
             {
                 "Key": "__labels__",
@@ -78,16 +66,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_max"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_max"
             },
             {
                 "Key": "__labels__",
@@ -103,16 +87,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_used"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_used"
             },
             {
                 "Key": "__labels__",
@@ -128,16 +108,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_committed"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_committed"
             },
             {
                 "Key": "__labels__",
@@ -153,16 +129,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_init"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_init"
             },
             {
                 "Key": "__labels__",
@@ -178,16 +150,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_max"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_max"
             },
             {
                 "Key": "__labels__",
@@ -203,16 +171,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_used"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_used"
             },
             {
                 "Key": "__labels__",
@@ -227,17 +191,13 @@
     {
         "Time": 10,
         "Contents": [
-            {
-                "Key": "_topic_",
-                "Value": "metrics"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
             {
                 "Key": "__name__",
                 "Value": "skywalking_jvm_gc_time"
+            },
+            {
+                "Key": "__time_nano__",
+                "Value": "10000"
             },
             {
                 "Key": "__labels__",
@@ -253,16 +213,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_gc_count"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_gc_count"
             },
             {
                 "Key": "__labels__",
@@ -278,16 +234,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_gc_time"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_gc_time"
             },
             {
                 "Key": "__labels__",
@@ -303,16 +255,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_gc_count"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_gc_count"
             },
             {
                 "Key": "__labels__",
@@ -328,16 +276,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_pool_committed"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_committed"
             },
             {
                 "Key": "__labels__",
@@ -353,16 +297,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_pool_init"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_init"
             },
             {
                 "Key": "__labels__",
@@ -378,16 +318,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_pool_max"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_max"
             },
             {
                 "Key": "__labels__",
@@ -403,16 +339,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_pool_used"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_used"
             },
             {
                 "Key": "__labels__",
@@ -428,16 +360,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_pool_committed"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_committed"
             },
             {
                 "Key": "__labels__",
@@ -453,16 +381,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_pool_init"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_init"
             },
             {
                 "Key": "__labels__",
@@ -478,16 +402,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_pool_max"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_max"
             },
             {
                 "Key": "__labels__",
@@ -503,16 +423,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_memory_pool_used"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_used"
             },
             {
                 "Key": "__labels__",
@@ -527,17 +443,13 @@
     {
         "Time": 10,
         "Contents": [
-            {
-                "Key": "_topic_",
-                "Value": "metrics"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
             {
                 "Key": "__name__",
                 "Value": "skywalking_jvm_threads_live"
+            },
+            {
+                "Key": "__time_nano__",
+                "Value": "10000"
             },
             {
                 "Key": "__labels__",
@@ -553,16 +465,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_threads_daemon"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_threads_daemon"
             },
             {
                 "Key": "__labels__",
@@ -578,16 +486,12 @@
         "Time": 10,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_jvm_threads_peak"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "10000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_threads_peak"
             },
             {
                 "Key": "__labels__",

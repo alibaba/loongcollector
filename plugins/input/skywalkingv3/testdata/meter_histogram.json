@@ -3,16 +3,12 @@
         "Time": 123456,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "123456789"
-            },
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__labels__",
@@ -28,16 +24,12 @@
         "Time": 123456,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "123456789"
-            },
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__labels__",
@@ -53,16 +45,12 @@
         "Time": 123456,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "123456789"
-            },
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__labels__",
@@ -78,16 +66,12 @@
         "Time": 123456,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "123456789"
-            },
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__labels__",
@@ -103,16 +87,12 @@
         "Time": 123456,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "123456789"
-            },
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
             },
             {
                 "Key": "__labels__",
@@ -128,16 +108,12 @@
         "Time": 123456,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "i_am_histogram_metric_count"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "123456789"
-            },
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_count"
             },
             {
                 "Key": "__labels__",
@@ -153,16 +129,12 @@
         "Time": 123456,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "i_am_histogram_metric_sum"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "123456789"
-            },
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_sum"
             },
             {
                 "Key": "__labels__",

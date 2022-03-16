@@ -74,9 +74,13 @@ func (ot *OtSpan) ToLog() (*protocol.Log, error) {
 		log.Time = uint32(time.Now().Unix())
 	}
 	log.Contents = make([]*protocol.Log_Content, 0)
+	linksJSON, err := json.Marshal(ot.Links)
+	if err != nil {
+		return nil, errors.Wrap(err, "links cannot marshal to json")
+	}
 	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "_topic_",
-		Value: "trace",
+		Key:   "links",
+		Value: string(linksJSON),
 	})
 	log.Contents = append(log.Contents, &protocol.Log_Content{
 		Key:   "host",
@@ -113,14 +117,6 @@ func (ot *OtSpan) ToLog() (*protocol.Log, error) {
 	log.Contents = append(log.Contents, &protocol.Log_Content{
 		Key:   "parentSpanID",
 		Value: ot.ParentSpanID,
-	})
-	linksJSON, err := json.Marshal(ot.Links)
-	if err != nil {
-		return nil, errors.Wrap(err, "links cannot marshal to json")
-	}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "links",
-		Value: string(linksJSON),
 	})
 	logsJSON, err := json.Marshal(ot.Logs)
 	if err != nil {

@@ -94,22 +94,10 @@ func (*AggregatorSkywalking) Description() string {
 func (p *AggregatorSkywalking) Add(log *protocol.Log) error {
 	if len(log.Contents) > 0 {
 		routeKey := log.Contents[0]
-		if routeKey.Key != "_topic_" {
-			logger.Error(p.context.GetRuntimeContext(), "SKYWALKING_ROUTE_KEY_ERROR", "error", "first content is not topic", "key", routeKey.Key, "values", func() string {
-				var str string
-				for _, kv := range log.Contents {
-					str += kv.String() + "$"
-				}
-				return str
-			}())
-
-			return p.logAgg.Add(log)
-		}
-		log.Contents = log.Contents[1:]
-		switch routeKey.Value {
-		case "metrics":
+		switch routeKey.Key {
+		case "__name__":
 			return p.metricsAgg.Add(log)
-		case "trace":
+		case "links":
 			return p.traceAgg.Add(log)
 		case "log":
 			return p.logAgg.Add(log)

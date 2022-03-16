@@ -3,16 +3,12 @@
         "Time": 123456,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "i_am_singleValue_metric"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "123456789"
-            },
-            {
-                "Key": "__name__",
-                "Value": "i_am_singleValue_metric"
             },
             {
                 "Key": "__labels__",

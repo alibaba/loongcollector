@@ -3,16 +3,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_cpu_usage"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_cpu_usage"
             },
             {
                 "Key": "__labels__",
@@ -28,16 +24,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_gc_count"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_gc_count"
             },
             {
                 "Key": "__labels__",
@@ -53,16 +45,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_gc_count"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_gc_count"
             },
             {
                 "Key": "__labels__",
@@ -78,16 +66,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_gc_count"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_gc_count"
             },
             {
                 "Key": "__labels__",
@@ -103,16 +87,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_heap_memory"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_heap_memory"
             },
             {
                 "Key": "__labels__",
@@ -128,16 +108,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_threads"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_threads"
             },
             {
                 "Key": "__labels__",
@@ -153,16 +129,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_threads"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_threads"
             },
             {
                 "Key": "__labels__",
@@ -178,16 +150,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_threads"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_threads"
             },
             {
                 "Key": "__labels__",
@@ -203,16 +171,12 @@
         "Time": 15,
         "Contents": [
             {
-                "Key": "_topic_",
-                "Value": "metrics"
+                "Key": "__name__",
+                "Value": "skywalking_clr_threads"
             },
             {
                 "Key": "__time_nano__",
                 "Value": "15000"
-            },
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_threads"
             },
             {
                 "Key": "__labels__",
