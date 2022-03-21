@@ -90,10 +90,11 @@ var (
 	levelFlag          string
 	debugFlag          int32
 
-	template  string
-	once      sync.Once
-	wait      sync.WaitGroup
-	closeChan chan struct{}
+	template          string
+	once              sync.Once
+	wait              sync.WaitGroup
+	closeChan         chan struct{}
+	closedCatchStdout bool
 )
 
 func Init() {
@@ -298,9 +299,18 @@ func generateDefaultConfig() string {
 
 // Close the logger and recover the stdout and stderr
 func Close() {
+	CloseCatchStdout()
+	logtailLogger.Close()
+}
+
+// CloseCatchStdout close the goroutine with the catching stdout task.
+func CloseCatchStdout() {
+	if consoleFlag || closedCatchStdout {
+		return
+	}
 	close(closeChan)
 	wait.Wait()
-	logtailLogger.Close()
+	closedCatchStdout = true
 }
 
 // catchStandardOutput catch the stdout and stderr to the ilogtail logger.
