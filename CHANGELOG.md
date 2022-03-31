@@ -34,5 +34,6 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
+- [public] [both] [updated] processor_strptime support precise timestamp
 - [public] [both] [fixed] fix skywalking plugin lost data
 - [public] [both] [fixed] fix OnlyStdout not working in flusher_stdout plugin
