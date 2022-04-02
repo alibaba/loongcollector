@@ -62,6 +62,10 @@ func CreateProductLogstore(region, project, logstore, product, lang string) erro
 	request.Project = project
 	request.Logstore = logstore
 	request.CloudProduct = product
+	// not refresh ttl
+	request.Overwrite = "false"
+	// not refresh index and dashboard
+	request.VariableMap = "{\"overwriteIndex\":\"no_overwrite\", \"overwriteDashboard\":\"no_overwrite\"}"
 	request.Lang = lang
 	resp, err := client.AnalyzeProductLog(request)
 	if err != nil {
