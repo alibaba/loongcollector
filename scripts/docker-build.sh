@@ -17,6 +17,16 @@
 
 VERSION=$1
 DOCKER_TYPE=$2
+REPOSITORY=$3
+PUSH=$4
+
+if [[ ! -n $REPOSITORY ]]; then
+  REPOSITORY="aliyun/ilogtail"
+fi
+
+if [[ ! -n $PUSH ]]; then
+  PUSH="false"
+fi
 
 HOST_OS=`uname -s`
 
@@ -30,6 +40,16 @@ esac
 
 docker build --build-arg VERSION="$VERSION" \
  --build-arg HOST_OS="$HOST_OS" \
-  -t aliyun/ilogtail:"$VERSION" \
+  -t "$REPOSITORY":"$VERSION" \
   --no-cache . -f docker/$DOCKERFILE
 
+
+if [[ $PUSH = "true" ]]; then
+    echo "COMMAND:"
+    echo "docker push $REPOSITORY:$VERSION"
+    if [[ $VERSION = "latest" ]]; then
+      echo "Current operation is so dangerous， you should push by yourself !!!"
+    else
+      docker push "$REPOSITORY:$VERSION"
+    fi
+fi

@@ -25,12 +25,12 @@ following command to quickly start the iLogtail program.
 
 ### Docker start
 
-Execute the `make docker` command in the root directory, and you will get the `aliyun/ilogtail:latest` image. Use the
+Execute the `make docker` command in the root directory, and you will get the `aliyun/ilogtail:github-latest` image. Use the
 following command to quickly start the docker program. The behavior of the image is the same as the above program. The
 log output is in `/aliyun/logtail_plugin.LOG `File.
 
 ```shell
-make docker && docker run aliyun/ilogtail:latest 
+make docker && docker run aliyun/ilogtail:github-latest 
 ```
 
 ## Configuration

@@ -17,9 +17,9 @@ iLogtail 插件基于 Go 语言实现，所以在进行开发前，需要安装�
 ```
 
 ### Docker 启动
-在根目录执行 `make docker` 命令，会得到 `aliyun/ilogtail:latest` 镜像，使用以下命令可以快速启动docker 程序，程序的行为与上述本地启动程序相同，日志输出于 `/aliyun/logtail_plugin.LOG` 文件。
+在根目录执行 `make docker` 命令，会得到 `aliyun/ilogtail:github-latest` 镜像，使用以下命令可以快速启动docker 程序，程序的行为与上述本地启动程序相同，日志输出于 `/aliyun/logtail_plugin.LOG` 文件。
 ```shell
-make docker && docker run aliyun/ilogtail:latest 
+make docker && docker run aliyun/ilogtail:github-latest 
 ```
 
 ## 配置

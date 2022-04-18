@@ -6,7 +6,7 @@ Through the following content, you will learn about the overall structure of iLo
 - [Develop Input Plugin](How-to-write-input-plugins.md)
 - [Develop Processor Plugin](How-to-write-processor-plugins.md)
 - [Develop Aggregator plugin](How-to-write-aggregator-plugins.md)
-- [Develop Flushor plugin](How-to-write-flusher-plugins.md)
+- [Develop Flusher plugin](How-to-write-flusher-plugins.md)
 
 ## Test
 When the plugin is written, the following content will guide you how to do unit testing and E2E testing. E2E testing can help you mock testing environments, such as Mysql dependencies.
@@ -24,3 +24,9 @@ Before you submit a Pull Request, you need to ensure that the code style check a
 - [Check Code Dependency License](How-to-chek-dependency-license.md), if there is no new dependency package, please ignore this step.
 - Use `make test` to execute all unit tests to ensure them pass.
 - Use `make e2e` to execute the e2e test to ensure them pass.
+
+
+## Others
+- [How to build image or dynamic library with docker?](How-to-build-with-docker.md)
+- [How to release iLogtail?](How-to-release.md)
+

@@ -54,7 +54,7 @@ services:
       interval: 1s
       retries: 10
   ilogtail:
-    image: aliyun/ilogtail:latest
+    image: aliyun/ilogtail:github-latest
     hostname: ilogtail
     volumes:
       - ./default_flusher.json:/aliyun/default_flusher.json

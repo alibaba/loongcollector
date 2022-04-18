@@ -25,3 +25,6 @@
 - 使用`make test` 执行所有单测，保证单测通过。
 - 使用`make e2e` 执行e2e测试，保证E2E测试通过。
 
+## 其他
+- [如何使用docker编译镜像或CGO 动态链接库?](How-to-build-with-docker.md)
+- [如何发布 iLogtail?](How-to-release.md)
