@@ -29,15 +29,17 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape"
 
 	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var libLoggerOnce sync.Once
 
 type ServiceStaticPrometheus struct {
-	Yaml              string `comment:"the prometheus configuration content, more details please see [here](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)"`
-	ConfigFilePath    string `comment:"the prometheus configuration path, and the param would be ignored when Yaml param is configured."`
-	AuthorizationPath string `comment:"the prometheus authorization path, only using in authorization files. When Yaml param is configured, the default value is the current binary path. However, the default value is the ConfigFilePath directory when ConfigFilePath is working."`
+	Yaml              string            `comment:"the prometheus configuration content, more details please see [here](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)"`
+	ConfigFilePath    string            `comment:"the prometheus configuration path, and the param would be ignored when Yaml param is configured."`
+	AuthorizationPath string            `comment:"the prometheus authorization path, only using in authorization files. When Yaml param is configured, the default value is the current binary path. However, the default value is the ConfigFilePath directory when ConfigFilePath is working."`
+	ExtraFlags        map[string]string `comment:"the prometheus extra configuration flags, like promscrape.maxScrapeSize, for more flags please see [here](https://docs.victoriametrics.com/vmagent.html#advanced-usage)"`
 
 	scraper       *promscrape.Scraper //nolint:typecheck
 	shutdown      chan struct{}
@@ -45,14 +47,22 @@ type ServiceStaticPrometheus struct {
 	context       ilogtail.Context
 }
 
+
 func (p *ServiceStaticPrometheus) Init(context ilogtail.Context) (int, error) {
 	libLoggerOnce.Do(func() {
 		if f := flag.Lookup("loggerOutput"); f != nil {
 			_ = f.Value.Set("stdout")
 		}
+		// set max scrape size to 256MB
+		err := flag.Set("promscrape.maxScrapeSize", "268435456")
+		logger.Info(context.GetRuntimeContext(), "set config maxScrapeSize to 256MB, error", err)
 		liblogger.Init()
 	})
 	p.context = context
+	for k, v := range p.ExtraFlags {
+		err := flag.Set(k, v)
+		logger.Info(context.GetRuntimeContext(), "set config", k, "value", v, "error", err)
+	}
 	var detail []byte
 	switch {
 	case p.Yaml != "":
