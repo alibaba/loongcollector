@@ -62,12 +62,20 @@ type NetPing struct {
 	hasConfig       bool
 	resultChannel   chan *Result
 	context         ilogtail.Context
-	IntervalSeconds int          `json:"interval_seconds" comment:"the interval of ping/tcping, unit is second,must large than 30"`
+	TimeoutSeconds  int          `json:"timeout_seconds" comment:"the timeout of ping/tcping, unit is second,must large than or equal 1, less than  86400, default is 5"`
+	IntervalSeconds int          `json:"interval_seconds" comment:"the interval of ping/tcping, unit is second,must large than or equal 10, less than 86400 and timeout_seconds, default is 60"`
 	ICMPConfigs     []ICMPConfig `json:"icmp" comment:"the icmping config list, example:  {\"src\" : \"${IP_ADDR}\",  \"target\" : \"${REMOTE_HOST}\", \"count\" : 3}"`
 	TCPConfigs      []TCPConfig  `json:"tcp" comment:"the tcping config list, example: {\"src\" : \"${IP_ADDR}\",  \"target\" : \"${REMOTE_HOST}\", \"port\" : ${PORT}, \"count\" : 3}"`
 }
 
-const MinIntervalSecods = 30 // min inteval should large than 30s
+const (
+	DefaultIntervalSeconds = 60    // default interval
+	MinIntervalSeconds     = 10    // min interval  seconds
+	MaxIntervalSeconds     = 86400 // max interval seconds
+	DefaultTimeoutSeconds  = 5     // default timeout is 5s
+	MinTimeoutSeconds      = 1     // min timeout seconds
+	MaxTimeoutSeconds      = 86400 // max timeout seconds
+)
 
 // refer https://github.com/cloverstd/tcping/blob/master/ping/tcp.go
 func evaluteTcping(target string, port int, timeout time.Duration) (time.Duration, error) {
@@ -84,12 +92,30 @@ func evaluteTcping(target string, port int, timeout time.Duration) (time.Duratio
 	return time.Since(now), nil
 }
 
+func (m *NetPing) processTimeoutAndInterval() {
+
+	if m.IntervalSeconds <= MinIntervalSeconds {
+		m.IntervalSeconds = DefaultIntervalSeconds
+	} else if m.IntervalSeconds > MaxIntervalSeconds {
+		m.IntervalSeconds = DefaultIntervalSeconds
+	}
+
+	if m.TimeoutSeconds <= MinTimeoutSeconds {
+		m.TimeoutSeconds = DefaultTimeoutSeconds
+	} else if m.TimeoutSeconds > MaxTimeoutSeconds {
+		m.TimeoutSeconds = DefaultTimeoutSeconds
+	}
+
+	if m.TimeoutSeconds > m.IntervalSeconds {
+		m.TimeoutSeconds = DefaultTimeoutSeconds
+	}
+}
+
 func (m *NetPing) Init(context ilogtail.Context) (int, error) {
 	logger.Info(context.GetRuntimeContext(), "netping init")
 	m.context = context
-	if m.IntervalSeconds <= MinIntervalSecods {
-		m.IntervalSeconds = MinIntervalSecods
-	}
+
+	m.processTimeoutAndInterval()
 
 	localIP := util.GetIPAddress()
 
@@ -118,9 +144,9 @@ func (m *NetPing) Init(context ilogtail.Context) (int, error) {
 	m.icmpPrivileged = true
 
 	m.resultChannel = make(chan *Result, 100)
-	m.timeout = time.Duration(m.IntervalSeconds / 2 * int(time.Second))
+	m.timeout = time.Duration(m.TimeoutSeconds) * time.Second
 	logger.Info(context.GetRuntimeContext(),
-		"netping init result, hasConfig: ", m.hasConfig, " localIP: ", localIP)
+		"netping init result, hasConfig: ", m.hasConfig, " localIP: ", localIP, " timeout: ", m.timeout, " interval: ", m.IntervalSeconds)
 
 	return m.IntervalSeconds * 1000, nil
 }

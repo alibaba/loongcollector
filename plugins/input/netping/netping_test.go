@@ -181,3 +181,108 @@ func TestDoTCPing(t *testing.T) {
 
 	fmt.Print(a[0:2])
 }
+
+func TestProcessTimeoutAndInterval(t *testing.T) {
+	ctx := mock.NewEmptyContext("project", "store", "config")
+
+	// case 1
+	config := `{
+		"interval_seconds" : 60
+	  }`
+
+	netPing := &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, 60, netPing.IntervalSeconds)
+	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+
+	// case 2
+	config = `{
+		"interval_seconds" : 0
+	  }`
+
+	netPing = &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, DefaultIntervalSeconds, netPing.IntervalSeconds)
+	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+
+	// case 3
+	config = `{
+		"interval_seconds" : 86401
+	  }`
+
+	netPing = &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, DefaultIntervalSeconds, netPing.IntervalSeconds)
+	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+
+	// case 4
+	config = `{
+		"timeout_seconds" : 30
+	  }`
+
+	netPing = &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, DefaultIntervalSeconds, netPing.IntervalSeconds)
+	assert.Equal(t, 30, netPing.TimeoutSeconds)
+
+	// case 5
+	config = `{
+			"timeout_seconds" : 0
+		  }`
+
+	netPing = &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, DefaultIntervalSeconds, netPing.IntervalSeconds)
+	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+
+	// case 6
+	config = `{
+			"timeout_seconds" : -1
+		  }`
+
+	netPing = &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, DefaultIntervalSeconds, netPing.IntervalSeconds)
+	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+
+	// case 7
+	config = `{
+			"timeout_seconds" : 86401
+		  }`
+
+	netPing = &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, DefaultIntervalSeconds, netPing.IntervalSeconds)
+	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+
+	// case 8
+	config = `{
+			"timeout_seconds" : 300,
+			"interval_seconds" : 100
+		  }`
+
+	netPing = &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, 100, netPing.IntervalSeconds)
+	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+
+	// case 9
+	config = `{
+			"timeout_seconds" : 86401,
+			"interval_seconds" : 86401
+		  }`
+
+	netPing = &NetPing{}
+	json.Unmarshal([]byte(config), netPing)
+	netPing.Init(ctx)
+	assert.Equal(t, DefaultIntervalSeconds, netPing.IntervalSeconds)
+	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+}
