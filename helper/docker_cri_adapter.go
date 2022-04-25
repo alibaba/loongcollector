@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
 // +build linux
 
 package helper
@@ -34,7 +35,6 @@ import (
 
 	containerdcriserver "github.com/containerd/cri/pkg/server"
 	docker "github.com/fsouza/go-dockerclient"
-	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
@@ -45,8 +45,6 @@ const maxMsgSize = 1024 * 1024 * 16
 var DefaultSyncContainersPeriod = time.Second * 10
 var containerdUnixSocket = "/run/containerd/containerd.sock"
 var criRuntimeWrapper *CRIRuntimeWrapper
-
-var defaultContainerDFlag atomic.Int32
 
 // CRIRuntimeWrapper wrapper for containerd client
 type CRIRuntimeWrapper struct {
@@ -60,6 +58,9 @@ type CRIRuntimeWrapper struct {
 	containers     map[string]cri.ContainerState
 
 	stopCh <-chan struct{}
+
+	rootfsLock  sync.RWMutex
+	rootfsCache map[string]string
 }
 
 func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
@@ -125,7 +126,7 @@ func parseEndpoint(endpoint string) (string, string, error) {
 		return "unix", u.Path, nil
 
 	case "":
-		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+		return "", "", fmt.Errorf("using %q as endpoint is deprecated, please consider using full url format", endpoint)
 
 	default:
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
@@ -168,6 +169,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 		runtimeVersion: runtimeVersion,
 		containers:     make(map[string]cri.ContainerState),
 		stopCh:         make(<-chan struct{}),
+		rootfsCache:    make(map[string]string),
 	}, nil
 }
 
@@ -381,9 +383,29 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 	return nil
 }
 
+func (cw *CRIRuntimeWrapper) sweepCache() {
+	// clear unuseful cache
+	usedCacheItem := make(map[string]bool)
+	cw.dockerCenter.lock.RLock()
+	for key := range cw.dockerCenter.containerMap {
+		usedCacheItem[key] = true
+	}
+	cw.dockerCenter.lock.RUnlock()
+
+	cw.rootfsLock.Lock()
+	for key := range cw.rootfsCache {
+		if _, ok := usedCacheItem[key]; !ok {
+			delete(cw.rootfsCache, key)
+		}
+	}
+	cw.rootfsLock.Unlock()
+}
+
 func (cw *CRIRuntimeWrapper) run() error {
+	logger.Init()
 	logger.Info(context.Background(), "CRIRuntime background syncer", "start")
 	_ = cw.fetchAll()
+	logger.Info(context.Background(), "CRIRuntime background syncer", "gogogogo")
 
 	timerFetch := func() {
 		defer dockerCenterRecover()
@@ -399,6 +421,7 @@ func (cw *CRIRuntimeWrapper) run() error {
 				err := cw.fetchAll()
 				logger.Info(context.Background(), "CRIRuntime fetch all", err)
 				lastFetchAllTime = time.Now()
+				cw.sweepCache()
 			}
 
 		}
@@ -426,8 +449,19 @@ func parseContainerInfo(data string) (containerdcriserver.ContainerInfo, error) 
 	return ci, err
 }
 
-func lookupContainerRootfsAbsDir(info *docker.Container) string {
+func (cw *CRIRuntimeWrapper) lookupRootfsCache(containerID string) (string, bool) {
+	cw.rootfsLock.RLock()
+	defer cw.rootfsLock.RUnlock()
+	dir, ok := cw.rootfsCache[containerID]
+	return dir, ok
+}
+
+func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(info *docker.Container) string {
 	// For cri-runtime
+	containerID := info.ID
+	if dir, ok := cw.lookupRootfsCache(containerID); ok {
+		return dir
+	}
 
 	// Example: /run/containerd/io.containerd.runtime.v1.linux/k8s.io/{ContainerID}/rootfs/
 	aDirs := []string{
@@ -451,20 +485,15 @@ func lookupContainerRootfsAbsDir(info *docker.Container) string {
 		"root",
 	}
 
-	// if default is ok, skip stat
-	if defaultContainerDFlag.Load() == 1 {
-		return path.Join(aDirs[0], bDirs[0], cDirs[0], info.ID, dDirs[0])
-	}
-
-	for aIndex, a := range aDirs {
-		for bIndex, b := range bDirs {
-			for cIndex, c := range cDirs {
-				for dIndex, d := range dDirs {
+	for _, a := range aDirs {
+		for _, c := range cDirs {
+			for _, d := range dDirs {
+				for _, b := range bDirs {
 					dir := path.Join(a, b, c, info.ID, d)
 					if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
-						if aIndex == 0 && bIndex == 0 && cIndex == 0 && dIndex == 0 {
-							defaultContainerDFlag.Store(1)
-						}
+						cw.rootfsLock.Lock()
+						cw.rootfsCache[containerID] = dir
+						cw.rootfsLock.Unlock()
 						return dir
 					}
 				}

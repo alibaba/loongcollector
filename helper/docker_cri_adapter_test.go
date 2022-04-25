@@ -12,40 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !linux
-// +build !linux
+//go:build linux
+// +build linux
 
 package helper
 
 import (
-	"errors"
-	"runtime"
+	"testing"
 
 	docker "github.com/fsouza/go-dockerclient"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	"github.com/stretchr/testify/require"
 )
 
-var errUninplemented = errors.New("Unimplemented on " + runtime.GOOS)
+func TestLookupContainerRootfsAbsDir(t *testing.T) {
+	crirt := &CRIRuntimeWrapper{
+		dockerCenter:   nil,
+		client:         nil,
+		runtimeVersion: nil,
+		containers:     make(map[string]cri.ContainerState),
+		stopCh:         make(<-chan struct{}),
+		rootfsCache:    make(map[string]string),
+	}
 
-var containerdUnixSocket = "/run/containerd/containerd.sock"
-
-var criRuntimeWrapper *CRIRuntimeWrapper
-
-type CRIRuntimeWrapper struct {
-}
-
-func IsCRIRuntimeValid(_ string) bool {
-	return false
-}
-
-func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(_ *docker.Container) string {
-	return ""
-}
-
-// NewCRIRuntimeWrapper ...
-func NewCRIRuntimeWrapper(_ *DockerCenter) (*CRIRuntimeWrapper, error) {
-	return nil, errUninplemented
-}
-
-func (cw *CRIRuntimeWrapper) run() error {
-	return errUninplemented
+	container := docker.Container{
+		ID: "1234567890abcde",
+	}
+	dir := crirt.lookupContainerRootfsAbsDir(&container)
+	require.Equal(t, dir, "")
 }

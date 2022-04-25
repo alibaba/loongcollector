@@ -427,7 +427,7 @@ type DockerCenter struct {
 	eventChan     chan *docker.APIEvents
 	eventChanLock sync.Mutex
 
-	imageLock  sync.Mutex
+	imageLock  sync.RWMutex
 	imageCache map[string]string
 
 	lastFetchAllSuccessTime        time.Time
@@ -464,19 +464,27 @@ func (dc *DockerCenter) UnRegisterEventListener(c chan *docker.APIEvents) {
 	dc.eventChan = nil
 }
 
+func (dc *DockerCenter) lookupImageCache(id string) (string, bool) {
+	dc.imageLock.RLock()
+	defer dc.imageLock.RUnlock()
+	imageName, ok := dc.imageCache[id]
+	return imageName, ok
+}
+
 func (dc *DockerCenter) GetImageName(id, defaultVal string) string {
 	if len(id) == 0 || dc.client == nil {
 		return defaultVal
 	}
-	dc.imageLock.Lock()
-	defer dc.imageLock.Unlock()
-	if imageName, ok := dc.imageCache[id]; ok {
+	if imageName, ok := dc.lookupImageCache(id); ok {
 		return imageName
 	}
+
 	image, err := dc.client.InspectImage(id)
 	logger.Debug(context.Background(), "get image name, id", id, "error", err)
 	if err == nil && image != nil && len(image.RepoTags) > 0 {
+		dc.imageLock.Lock()
 		dc.imageCache[id] = image.RepoTags[0]
+		dc.imageLock.Unlock()
 		return image.RepoTags[0]
 	}
 	return defaultVal
@@ -570,7 +578,7 @@ func (dc *DockerCenter) CreateInfoDetail(info *docker.Container, envConfigPrefix
 	}
 	// for cri-runtime
 	if criRuntimeWrapper != nil && info.HostConfig != nil && len(did.DefaultRootPath) == 0 {
-		did.DefaultRootPath = lookupContainerRootfsAbsDir(info)
+		did.DefaultRootPath = criRuntimeWrapper.lookupContainerRootfsAbsDir(info)
 	}
 	logger.Debugf(context.Background(), "container(id: %s, name: %s) default root path is %s", info.ID, info.Name, did.DefaultRootPath)
 	return did
@@ -583,8 +591,15 @@ func GetDockerCenterInstance() *DockerCenter {
 		dockerCenterInstance = &DockerCenter{}
 		dockerCenterInstance.imageCache = make(map[string]string)
 		dockerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
-		if err := dockerCenterInstance.run(); err != nil {
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "run docker center instance error")
+		if IsCRIRuntimeValid(containerdUnixSocket) {
+			var err error
+			criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance)
+			if err != nil {
+				logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+				criRuntimeWrapper = nil
+			} else {
+				logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
+			}
 		}
 		if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
 			if !ok {
@@ -594,12 +609,14 @@ func GetDockerCenterInstance() *DockerCenter {
 		} else {
 			logger.Warning(context.Background(), "check docker mount path error", err.Error())
 		}
-		if IsCRIRuntimeValid(containerdUnixSocket) {
-			var err error
-			criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance)
-			logger.Infof(context.Background(), "[CRIRuntime] cri-runtime is valid, creating cri-runtime client... error: %v", err)
-			if err == nil {
-				_ = criRuntimeWrapper.run()
+
+		if criRuntimeWrapper != nil {
+			if err := criRuntimeWrapper.run(); err != nil {
+				logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "run cri runtime instance error")
+			}
+		} else {
+			if err := dockerCenterInstance.run(); err != nil {
+				logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "run docker center instance error")
 			}
 		}
 
@@ -886,7 +903,7 @@ func (dc *DockerCenter) GetAllAcceptedInfoV2(
 
 func (dc *DockerCenter) GetAllSpecificInfo(filter func(*DockerInfoDetail) bool) (infoList []*DockerInfoDetail) {
 	dc.lock.RLock()
-	defer dc.lock.Unlock()
+	defer dc.lock.RUnlock()
 	for _, info := range dc.containerMap {
 		if filter(info) {
 			infoList = append(infoList, info)
@@ -919,7 +936,6 @@ func (dc *DockerCenter) refreshLastUpdateMapTime() {
 }
 
 func (dc *DockerCenter) updateContainers(containerMap map[string]*DockerInfoDetail) {
-
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 	for key, container := range dc.containerMap {
@@ -1050,6 +1066,25 @@ func (dc *DockerCenter) cleanTimeoutContainer() {
 	}
 }
 
+func (dc *DockerCenter) sweepCache() {
+	// clear unuseful cache
+	usedImageIDSet := make(map[string]bool)
+	dc.lock.RLock()
+	for _, container := range dc.containerMap {
+		usedImageIDSet[container.ContainerInfo.Image] = true
+	}
+	dc.lock.RUnlock()
+
+	dc.imageLock.Lock()
+
+	for key := range dc.imageCache {
+		if _, ok := usedImageIDSet[key]; !ok {
+			delete(dc.imageCache, key)
+		}
+	}
+	dc.imageLock.Unlock()
+}
+
 func dockerCenterRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
@@ -1122,9 +1157,10 @@ func (dc *DockerCenter) run() error {
 					fetchErrCount = 0
 				}
 				logger.Info(context.Background(), "docker fetch all", "stop")
+				dc.sweepCache()
 				lastFetchAllTime = time.Now()
 				if fetchErrCount > 3 && criRuntimeWrapper != nil {
-					logger.Info(context.Background(), "docker fetch is error and cri runtime wrapper is valid", "skpi docker listen")
+					logger.Info(context.Background(), "docker fetch is error and cri runtime wrapper is valid", "skip docker listen")
 					return
 				}
 			}
@@ -1184,7 +1220,7 @@ func (dc *DockerCenter) run() error {
 				dc.setLastError(err, "remove event listener error")
 			}
 			if errorCount > 10 && criRuntimeWrapper != nil {
-				logger.Info(context.Background(), "docker listen is error and cri runtime wrapper is valid", "skpi docker listen")
+				logger.Info(context.Background(), "docker listen is error and cri runtime wrapper is valid", "skip docker listen")
 				return
 			}
 			// if always error, sleep 300 secs
