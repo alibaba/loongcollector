@@ -44,6 +44,9 @@ const maxMsgSize = 1024 * 1024 * 16
 
 var DefaultSyncContainersPeriod = time.Second * 10
 var containerdUnixSocket = "/run/containerd/containerd.sock"
+var dockerShimUnixSocket1 = "/var/run/dockershim.sock"
+var dockerShimUnixSocket2 = "/run/dockershim.sock"
+
 var criRuntimeWrapper *CRIRuntimeWrapper
 
 // CRIRuntimeWrapper wrapper for containerd client
@@ -67,21 +70,61 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
 	if len(os.Getenv("USE_CONTAINERD")) > 0 {
 		return true
 	}
-	// Verify docker.sock existence.
-	for _, sock := range []string{"/var/run/docker.sock", "/run/docker.sock"} {
+
+	// Verify dockershim.sock existence.
+	for _, sock := range []string{dockerShimUnixSocket1, dockerShimUnixSocket2} {
 		if fi, err := os.Stat(sock); err == nil && !fi.IsDir() {
+			// Having dockershim.sock means k8s + docker cri
 			return false
 		}
 	}
 
-	stat, err := os.Stat(criRuntimeEndpoint)
-	if err != nil || stat.IsDir() {
+	// Verify containerd.sock cri valid.
+	if fi, err := os.Stat(criRuntimeEndpoint); err == nil && !fi.IsDir() {
+		if IsCRIStatusValid(criRuntimeEndpoint) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsCRIStatusValid(criRuntimeEndpoint string) bool {
+	addr, dailer, err := GetAddressAndDialer("unix://" + criRuntimeEndpoint)
+	if err != nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*16))) //nolint:staticcheck
+	if err != nil {
 		return false
 	}
 
-	//TODO: make a cri client and test version() @jiangbo
-
-	return true
+	client := cri.NewRuntimeServiceClient(conn)
+	// check cri status
+	for tryCount := 0; tryCount < 5; tryCount++ {
+		_, err = client.Status(ctx, &cri.StatusRequest{})
+		if err == nil {
+			break
+		}
+		if strings.Contains(err.Error(), "code = Unimplemented") {
+			return false
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	if err != nil {
+		return false
+	}
+	// check running containers
+	for tryCount := 0; tryCount < 5; tryCount++ {
+		containersResp, err := client.ListContainers(ctx, &cri.ListContainersRequest{Filter: nil})
+		if err == nil {
+			return containersResp.Containers != nil
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	return false
 }
 
 // GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.

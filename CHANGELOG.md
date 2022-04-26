@@ -41,3 +41,4 @@ your changes, such as:
 - [public] [both] [fixed] fix analyzeProductLog api call
 - [public] [both] [doc] add build image or dynamic lib doc
 - [public] [both] [fixed] fix netping duration overflow on windows, add timeout option
+- [public] [both] [fixed] fix the judgment function for CRI
