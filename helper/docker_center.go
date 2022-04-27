@@ -614,10 +614,11 @@ func GetDockerCenterInstance() *DockerCenter {
 			if err := criRuntimeWrapper.run(); err != nil {
 				logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "run cri runtime instance error")
 			}
-		} else {
-			if err := dockerCenterInstance.run(); err != nil {
-				logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "run docker center instance error")
-			}
+		}
+		// Cannot use else. We must consider such situation:
+		// pure docker + k8s containerd
+		if err := dockerCenterInstance.run(); err != nil {
+			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "run docker center instance error")
 		}
 
 		if isStaticContainerInfoEnabled() {
