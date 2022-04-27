@@ -34,11 +34,3 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
-- [public] [both] [updated] processor_strptime support precise timestamp
-- [public] [both] [fixed] fix skywalking plugin lost data
-- [public] [both] [fixed] fix OnlyStdout not working in flusher_stdout plugin
-- [public] [both] [updated] export container meta to C part
-- [public] [both] [fixed] fix analyzeProductLog api call
-- [public] [both] [doc] add build image or dynamic lib doc
-- [public] [both] [fixed] fix netping duration overflow on windows, add timeout option
-- [public] [both] [fixed] fix the judgment function for CRI
