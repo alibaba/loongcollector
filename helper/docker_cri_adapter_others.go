@@ -49,3 +49,7 @@ func NewCRIRuntimeWrapper(_ *DockerCenter) (*CRIRuntimeWrapper, error) {
 func (cw *CRIRuntimeWrapper) run() error {
 	return errUninplemented
 }
+
+func ContainerProcessAlive(pid int) bool {
+	return true
+}

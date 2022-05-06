@@ -26,12 +26,12 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 
 	containerdcriserver "github.com/containerd/cri/pkg/server"
 	docker "github.com/fsouza/go-dockerclient"
@@ -42,7 +42,6 @@ import (
 const kubeRuntimeAPIVersion = "0.1.0"
 const maxMsgSize = 1024 * 1024 * 16
 
-var DefaultSyncContainersPeriod = time.Second * 10
 var containerdUnixSocket = "/run/containerd/containerd.sock"
 var dockerShimUnixSocket1 = "/var/run/dockershim.sock"
 var dockerShimUnixSocket2 = "/run/dockershim.sock"
@@ -50,6 +49,10 @@ var dockerShimUnixSocket2 = "/run/dockershim.sock"
 var criRuntimeWrapper *CRIRuntimeWrapper
 
 // CRIRuntimeWrapper wrapper for containerd client
+type innerContainerInfo struct {
+	State cri.ContainerState
+	Pid   int
+}
 type CRIRuntimeWrapper struct {
 	// client       *containerd.Client
 	dockerCenter *DockerCenter
@@ -58,7 +61,8 @@ type CRIRuntimeWrapper struct {
 	runtimeVersion *cri.VersionResponse
 
 	containersLock sync.RWMutex
-	containers     map[string]cri.ContainerState
+
+	containers map[string]innerContainerInfo
 
 	stopCh <-chan struct{}
 
@@ -210,7 +214,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 		dockerCenter:   dockerCenter,
 		client:         client,
 		runtimeVersion: runtimeVersion,
-		containers:     make(map[string]cri.ContainerState),
+		containers:     make(map[string]innerContainerInfo),
 		stopCh:         make(<-chan struct{}),
 		rootfsCache:    make(map[string]string),
 	}, nil
@@ -239,8 +243,18 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(_ context.Context, c *cri.Conta
 			}
 		}
 	}
+
 	if !foundInfo {
 		logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "can not find container info from CRI::ContainerStatus, containerId: %s", c.GetId())
+		return nil, fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", c.GetId())
+	}
+	// only check pid for container that is older than DefaultSyncContainersPeriod
+	// to give a chance to collect emphemeral containers
+	if time.Since(time.Unix(0, c.CreatedAt)) > DefaultSyncContainersPeriod {
+		exist := ContainerProcessAlive(int(ci.Pid))
+		if !exist {
+			return nil, fmt.Errorf("find container %s pid %d was already stopped", c.GetId(), ci.Pid)
+		}
 	}
 
 	labels := c.GetLabels()
@@ -259,6 +273,9 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(_ context.Context, c *cri.Conta
 		Config: &docker.Config{
 			Labels: labels,
 			Image:  image,
+		},
+		State: docker.State{
+			Pid: int(ci.Pid),
 		},
 		HostConfig: &docker.HostConfig{
 			VolumeDriver: ci.Snapshotter,
@@ -361,13 +378,6 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 }
 
 func (cw *CRIRuntimeWrapper) loopSyncContainers() {
-	listenLoopIntervalStr := os.Getenv("CONTAINERD_LISTEN_LOOP_INTERVAL")
-	if len(listenLoopIntervalStr) > 0 {
-		listenLoopIntervalSec, _ := strconv.Atoi(listenLoopIntervalStr)
-		if listenLoopIntervalSec > 0 {
-			DefaultSyncContainersPeriod = time.Second * time.Duration(listenLoopIntervalSec)
-		}
-	}
 	ticker := time.NewTicker(DefaultSyncContainersPeriod)
 	for {
 		select {
@@ -402,7 +412,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 
 	// update container
 	for id, container := range newContainers {
-		if oldState, ok := oldContainers[id]; !ok || oldState != container.State {
+		if oldInfo, ok := oldContainers[id]; !ok || oldInfo.State != container.State {
 			ctx, cancel := getContextWithTimeout(time.Second * 10)
 			dockerContainer, err := cw.createContainerInfo(ctx, container)
 			cancel()
@@ -411,7 +421,15 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 				continue
 			}
 			cw.dockerCenter.updateContainer(id, dockerContainer)
-			cw.containers[id] = container.State
+			cw.containers[id] = innerContainerInfo{
+				State: container.State,
+				Pid:   dockerContainer.ContainerInfo.State.Pid,
+			}
+		} else if ok {
+			exist := ContainerProcessAlive(oldInfo.Pid)
+			if !exist {
+				delete(newContainers, id)
+			}
 		}
 	}
 
@@ -545,6 +563,17 @@ func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(info *docker.Container)
 	}
 
 	return ""
+}
+
+func ContainerProcessAlive(pid int) bool {
+	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
+	exist, err := util.PathExists(procStatPath)
+	if err != nil {
+		logger.Error(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
+	} else if !exist {
+		return false
+	}
+	return true
 }
 
 func init() {

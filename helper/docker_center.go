@@ -18,9 +18,11 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"os"
 	"path"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -42,6 +44,7 @@ var envConfigPrefix = "aliyun_logs_"
 const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 
 var FetchAllInterval = time.Second * time.Duration(300)
+var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
 var ContainerInfoTimeoutMax = time.Second * time.Duration(450)
 var ContainerInfoDeletedTimeout = time.Second * time.Duration(30)
 var EventListenerTimeout = time.Second * time.Duration(3600)
@@ -588,6 +591,25 @@ func GetDockerCenterInstance() *DockerCenter {
 	onceDocker.Do(func() {
 		// load EnvTags first
 		LoadEnvTags()
+		listenLoopIntervalSec := 0
+		// Get env in the same order as in C Logtail
+		listenLoopIntervalStr := os.Getenv("docker_config_update_interval")
+		if len(listenLoopIntervalStr) > 0 {
+			listenLoopIntervalSec, _ = strconv.Atoi(listenLoopIntervalStr)
+		}
+		listenLoopIntervalStr = os.Getenv("ALIYUN_LOGTAIL_DOCKER_CONFIG_UPDATE_INTERVAL")
+		if len(listenLoopIntervalStr) > 0 {
+			listenLoopIntervalSec, _ = strconv.Atoi(listenLoopIntervalStr)
+		}
+		// Keep this env var for compatibility
+		listenLoopIntervalStr = os.Getenv("CONTAINERD_LISTEN_LOOP_INTERVAL")
+		if len(listenLoopIntervalStr) > 0 {
+			listenLoopIntervalSec, _ = strconv.Atoi(listenLoopIntervalStr)
+		}
+		if listenLoopIntervalSec > 0 {
+			DefaultSyncContainersPeriod = time.Second * time.Duration(listenLoopIntervalSec)
+		}
+
 		dockerCenterInstance = &DockerCenter{}
 		dockerCenterInstance.imageCache = make(map[string]string)
 		dockerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
@@ -1004,18 +1026,31 @@ func (dc *DockerCenter) fetchAll() error {
 	logger.Debug(context.Background(), "fetch all", containers)
 	var containerMap = make(map[string]*DockerInfoDetail)
 	hasInspectErr := false
-ContainerLoop:
+
 	for _, container := range containers {
 		var containerDetail *docker.Container
 		for idx := 0; idx < 3; idx++ {
 			if containerDetail, err = dc.client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: container.ID}); err == nil {
-				containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
-				continue ContainerLoop
+				break
 			}
 			time.Sleep(time.Second * 5)
 		}
-		dc.setLastError(err, "inspect container error "+container.ID)
-		hasInspectErr = true
+		if err == nil {
+			if time.Since(containerDetail.Created) < DefaultSyncContainersPeriod {
+				containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
+				continue
+			}
+			exist := ContainerProcessAlive(containerDetail.State.Pid)
+			if exist {
+				containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
+				continue
+			} else {
+				logger.Debug(context.Background(), "find container", containerDetail.ID, "pid", containerDetail.State.Pid, "was already stopped")
+			}
+		} else {
+			dc.setLastError(err, "inspect container error "+container.ID)
+			hasInspectErr = true
+		}
 	}
 	dc.updateContainers(containerMap)
 	if !hasInspectErr {
