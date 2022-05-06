@@ -21,7 +21,7 @@ fi
 
 mkdir "$ROOTDIR"/bin
 
-id=$(docker create aliyun/ilogtail)
+id=$(docker create aliyun/ilogtail:github-latest)
 echo "$id"
 docker cp "$id":/src/bin/libPluginBase.so "$ROOTDIR"/bin
 docker rm -v "$id"
