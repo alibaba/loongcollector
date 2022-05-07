@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	docker "github.com/fsouza/go-dockerclient"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +30,7 @@ func TestLookupContainerRootfsAbsDir(t *testing.T) {
 		dockerCenter:   nil,
 		client:         nil,
 		runtimeVersion: nil,
-		containers:     make(map[string]cri.ContainerState),
+		containers:     make(map[string]innerContainerInfo),
 		stopCh:         make(<-chan struct{}),
 		rootfsCache:    make(map[string]string),
 	}
