@@ -61,6 +61,7 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/processor/drop"
 	_ "github.com/alibaba/ilogtail/plugins/processor/droplastkey"
 	_ "github.com/alibaba/ilogtail/plugins/processor/encrypt"
+	_ "github.com/alibaba/ilogtail/plugins/processor/fieldswithcondition"
 	_ "github.com/alibaba/ilogtail/plugins/processor/filter/keyregex"
 	_ "github.com/alibaba/ilogtail/plugins/processor/filter/regex"
 	_ "github.com/alibaba/ilogtail/plugins/processor/geoip"
