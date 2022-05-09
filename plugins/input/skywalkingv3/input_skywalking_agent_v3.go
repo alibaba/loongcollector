@@ -24,6 +24,7 @@ import (
 	configuration "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/agent/configuration/v3"
 	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 	profile "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/profile/v3"
+	logging "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/logging/v3"
 	management "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/management/v3"
 )
 
@@ -68,6 +69,7 @@ func (r *Input) Start(collector ilogtail.Collector) error {
 	management.RegisterManagementServiceServer(r.grpcServer, &ManagementHandler{r.ctx, collector, resourcePropertiesCache})
 	profile.RegisterProfileTaskServer(r.grpcServer, &ProfileHandler{})
 	configuration.RegisterConfigurationDiscoveryServiceServer(r.grpcServer, &ConfigurationDiscoveryHandler{})
+	logging.RegisterLogReportServiceServer(r.grpcServer, &loggingHandler{r.ctx, collector})
 	if r.Address == "" {
 		r.Address = "0.0.0.0:11800" // skywalking collector default port
 	}

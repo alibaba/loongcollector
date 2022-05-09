@@ -1,0 +1,39 @@
+[
+    {
+        "Time": 1651902032,
+        "Contents": [
+            {
+                "Key": "otlp.name",
+                "Value": "apache-skywalking"
+            },
+            {
+                "Key": "attribute",
+                "Value": "{\"endpoint\":\"test\",\"test\":\"test2\"}"
+            },
+            {
+                "Key": "service",
+                "Value": "test"
+            },
+            {
+                "Key": "content",
+                "Value": "test"
+            },
+            {
+                "Key": "traceID",
+                "Value": "test"
+            },
+            {
+                "Key": "spanID",
+                "Value": "test.0"
+            },
+            {
+                "Key": "resource",
+                "Value": "{\"serviceInstance\":\"123\"}"
+            },
+            {
+                "Key": "timeUnixNano",
+                "Value": "1651902032613"
+            }
+        ]
+    }
+]

@@ -99,7 +99,7 @@ func (p *AggregatorSkywalking) Add(log *protocol.Log) error {
 			return p.metricsAgg.Add(log)
 		case "links":
 			return p.traceAgg.Add(log)
-		case "log":
+		case "otlp.name":
 			return p.logAgg.Add(log)
 		default:
 			logger.Warning(p.context.GetRuntimeContext(), "SKYWALKING_TOPIC_NOT_RECOGNIZED", "error", "topic not recognized", "topic", routeKey.Value)
