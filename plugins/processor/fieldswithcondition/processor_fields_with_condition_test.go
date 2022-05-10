@@ -78,8 +78,8 @@ func newProcessor() (*ProcessorFieldsWithCondition, error) {
 						"Fields":{
 							"eventcode":"c2",
 							"cid":"c-2",
-							"test2.1":"test2.1",
-							"test2.2":"test2.2"
+							"test2.1":"test2.11",
+							"test2.2":"test2.22"
 						}
 					},
 					{
