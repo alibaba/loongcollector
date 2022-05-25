@@ -34,3 +34,4 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
+- [public] [both] [updated] add workload attribute of Pod meta in metric_meta_kubernetes

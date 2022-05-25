@@ -53,6 +53,7 @@ const (
 	KeyPorts                       = "ports"
 	KeyLoadBalancerIP              = "load_balancer_ip"
 	KeyAddresses                   = "addresses"
+	KeyWorkload                    = "workload"
 	KeyTaints                      = "taints"
 	KeyUnschedulable               = "unschedulable"
 	KeyRestartCount                = "restart_count"

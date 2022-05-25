@@ -17,6 +17,7 @@ package kubernetesmeta
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -27,6 +28,24 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	core "k8s.io/client-go/listers/core/v1"
 )
+
+var (
+	deploymentPodReg = regexp.MustCompile(`^([\w\-]+)\-[0-9a-z]{9,10}\-[0-9a-z]{5}$`)
+	setPodReg        = regexp.MustCompile(`^([\w\-]+)\-[0-9a-z]{5}$`)
+)
+
+func ExtractPodWorkloadName(name string) string {
+	if name == "" {
+		return ""
+	}
+	if res := deploymentPodReg.FindStringSubmatch(name); len(res) > 1 {
+		return res[1]
+	} else if res := setPodReg.FindStringSubmatch(name); len(res) > 1 {
+		return res[1]
+	} else {
+		return name
+	}
+}
 
 // collectPods list the kubernetes nodes by the label selector and collect the core metadata.
 func (in *InputKubernetesMeta) collectPods(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
@@ -47,7 +66,8 @@ func (in *InputKubernetesMeta) collectPods(lister interface{}, selector labels.S
 			WithAttribute(KeyPhase, p.Status.Phase).
 			WithAttribute(KeyPodIP, p.Status.PodIP).
 			WithAttribute(KeyRestartCount, totalRestartNum).
-			WithAttribute(KeyAddresses, p.Spec.NodeName)
+			WithAttribute(KeyAddresses, p.Spec.NodeName).
+			WithAttribute(KeyWorkload, ExtractPodWorkloadName(p.Name))
 		if len(p.Spec.Volumes) > 0 {
 			var claimNames []string
 			// PVC name consist of lower case alphanumeric characters, "-" or "."
