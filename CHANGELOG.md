@@ -34,4 +34,5 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
+- [public] [both] [fixed] fixed without k8s labels in CRI fetching.
 - [public] [both] [updated] add workload attribute of Pod meta in metric_meta_kubernetes
