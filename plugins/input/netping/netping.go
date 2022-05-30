@@ -15,9 +15,12 @@
 package netping
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
+	"math/big"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/alibaba/ilogtail"
@@ -42,6 +45,12 @@ type Result struct {
 	StdDevRTTMs float64
 }
 
+type ResolveResult struct {
+	Label   string
+	Success bool
+	RTMs    float64
+}
+
 type ICMPConfig struct {
 	Src    string `json:"src"`
 	Target string `json:"target"`
@@ -62,15 +71,20 @@ type NetPing struct {
 	hasConfig       bool
 	resultChannel   chan *Result
 	context         ilogtail.Context
+	hostname        string
+	ip              string
+	resolveHostMap  *sync.Map
+	resolveChannel  chan *ResolveResult
+	DisableDNS      bool         `json:"disable_dns_metric" comment:"disable dns resolve metric, default is false"`
 	TimeoutSeconds  int          `json:"timeout_seconds" comment:"the timeout of ping/tcping, unit is second,must large than or equal 1, less than  30, default is 5"`
-	IntervalSeconds int          `json:"interval_seconds" comment:"the interval of ping/tcping, unit is second,must large than or equal 10, less than 86400 and timeout_seconds, default is 60"`
+	IntervalSeconds int          `json:"interval_seconds" comment:"the interval of ping/tcping, unit is second,must large than or equal 5, less than 86400 and timeout_seconds, default is 60"`
 	ICMPConfigs     []ICMPConfig `json:"icmp" comment:"the icmping config list, example:  {\"src\" : \"${IP_ADDR}\",  \"target\" : \"${REMOTE_HOST}\", \"count\" : 3}"`
 	TCPConfigs      []TCPConfig  `json:"tcp" comment:"the tcping config list, example: {\"src\" : \"${IP_ADDR}\",  \"target\" : \"${REMOTE_HOST}\", \"port\" : ${PORT}, \"count\" : 3}"`
 }
 
 const (
 	DefaultIntervalSeconds = 60    // default interval
-	MinIntervalSeconds     = 10    // min interval  seconds
+	MinIntervalSeconds     = 5     // min interval seconds
 	MaxIntervalSeconds     = 86400 // max interval seconds
 	DefaultTimeoutSeconds  = 5     // default timeout is 5s
 	MinTimeoutSeconds      = 1     // min timeout seconds
@@ -115,18 +129,25 @@ func (m *NetPing) Init(context ilogtail.Context) (int, error) {
 	logger.Info(context.GetRuntimeContext(), "netping init")
 	m.context = context
 
+	m.hostname = util.GetHostName()
+
 	m.processTimeoutAndInterval()
 
-	localIP := util.GetIPAddress()
+	m.ip = util.GetIPAddress()
 
 	m.hasConfig = false
 	// get local icmp target
 	localICMPConfigs := make([]ICMPConfig, 0)
 
+	m.resolveHostMap = &sync.Map{}
+
 	for _, c := range m.ICMPConfigs {
-		if c.Src == localIP {
+		if c.Src == m.ip {
 			localICMPConfigs = append(localICMPConfigs, c)
 			m.hasConfig = true
+			if !m.DisableDNS {
+				m.resolveHostMap.Store(c.Target, "")
+			}
 		}
 	}
 	m.ICMPConfigs = localICMPConfigs
@@ -134,19 +155,23 @@ func (m *NetPing) Init(context ilogtail.Context) (int, error) {
 	// get tcp target
 	localTCPConfigs := make([]TCPConfig, 0)
 	for _, c := range m.TCPConfigs {
-		if c.Src == localIP {
+		if c.Src == m.ip {
 			localTCPConfigs = append(localTCPConfigs, c)
 			m.hasConfig = true
+			if !m.DisableDNS {
+				m.resolveHostMap.Store(c.Target, "")
+			}
 		}
 	}
 	m.TCPConfigs = localTCPConfigs
 
 	m.icmpPrivileged = true
 
+	m.resolveChannel = make(chan *ResolveResult, 100)
 	m.resultChannel = make(chan *Result, 100)
 	m.timeout = time.Duration(m.TimeoutSeconds) * time.Second
 	logger.Info(context.GetRuntimeContext(),
-		"netping init result, hasConfig: ", m.hasConfig, " localIP: ", localIP, " timeout: ", m.timeout, " interval: ", m.IntervalSeconds)
+		"netping init result, hasConfig: ", m.hasConfig, " localIP: ", m.ip, " timeout: ", m.timeout, " interval: ", m.IntervalSeconds)
 
 	return m.IntervalSeconds * 1000, nil
 }
@@ -155,12 +180,79 @@ func (m *NetPing) Description() string {
 	return "a icmp-ping/tcp-ping plugin for logtail"
 }
 
+func (m *NetPing) evaluteDNSResolve(host string) {
+	success := true
+	start := time.Now()
+	ips, err := net.LookupIP(host)
+	rt := time.Since(start)
+	if err != nil {
+		success = false
+		m.resolveHostMap.Store(host, "")
+	} else {
+		var n int64
+		nBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(ips))))
+		if err == nil {
+			n = nBig.Int64()
+		}
+		m.resolveHostMap.Store(host, ips[n].String())
+	}
+
+	var label helper.KeyValues
+	label.Append("target", host)
+	label.Append("src", m.ip)
+	label.Append("src_host", m.hostname)
+
+	m.resolveChannel <- &ResolveResult{
+		Success: success,
+		RTMs:    float64(rt.Milliseconds()),
+		Label:   label.String(),
+	}
+}
+
+func (m *NetPing) getRealTarget(target string) string {
+	realTarget := ""
+	v, exists := m.resolveHostMap.Load(target)
+	if exists {
+		realTarget = v.(string)
+	}
+	if realTarget == "" {
+		realTarget = target
+	}
+	return realTarget
+}
+
 // Collect is called every trigger interval to collect the metrics and send them to the collector.
 func (m *NetPing) Collect(collector ilogtail.Collector) error {
 	if !m.hasConfig {
 		return nil
 	}
 	nowTs := time.Now()
+
+	// for dns resolve
+	if (len(m.ICMPConfigs) > 0 || len(m.TCPConfigs) > 0) && !m.DisableDNS {
+		resolveCounter := 0
+		m.resolveHostMap.Range(
+			func(key, value interface{}) bool {
+				host := key.(string)
+				ip := net.ParseIP(host)
+				if ip == nil {
+					go m.evaluteDNSResolve(host)
+					resolveCounter++
+				}
+				return true
+			})
+
+		for i := 0; i < resolveCounter; i++ {
+			result := <-m.resolveChannel
+			successCount := 0
+			if result.Success {
+				successCount++
+				helper.AddMetric(collector, "dns_resolve_rt_ms", nowTs, result.Label, result.RTMs)
+			}
+			helper.AddMetric(collector, "dns_resolve_success", nowTs, result.Label, float64(successCount))
+		}
+	}
+
 	counter := 0
 	if len(m.ICMPConfigs) > 0 {
 		for _, config := range m.ICMPConfigs {
@@ -198,7 +290,7 @@ func (m *NetPing) Collect(collector ilogtail.Collector) error {
 }
 
 func (m *NetPing) doICMPing(config ICMPConfig) {
-	pinger, err := goping.NewPinger(config.Target)
+	pinger, err := goping.NewPinger(m.getRealTarget(config.Target))
 	if err != nil {
 		logger.Error(m.context.GetRuntimeContext(), "FAIL_TO_INIT_PING", err.Error())
 		m.resultChannel <- &Result{
@@ -231,6 +323,7 @@ func (m *NetPing) doICMPing(config ICMPConfig) {
 	var label helper.KeyValues
 	label.Append("src", config.Src)
 	label.Append("dst", config.Target)
+	label.Append("src_host", m.hostname)
 
 	var totalRtt time.Duration
 	for _, rtt := range stats.Rtts {
@@ -259,8 +352,9 @@ func (m *NetPing) doTCPing(config TCPConfig) {
 
 	rtts := []time.Duration{}
 
+	target := m.getRealTarget(config.Target)
 	for i := 0; i < config.Count; i++ {
-		rtt, err := evaluteTcping(config.Target, config.Port, m.timeout)
+		rtt, err := evaluteTcping(target, config.Port, m.timeout)
 		if err != nil {
 			failed++
 			continue
@@ -293,6 +387,7 @@ func (m *NetPing) doTCPing(config TCPConfig) {
 	label.Append("src", config.Src)
 	label.Append("dst", config.Target)
 	label.Append("port", fmt.Sprint(config.Port))
+	label.Append("src_host", m.hostname)
 
 	m.resultChannel <- &Result{
 		Valid:       true,

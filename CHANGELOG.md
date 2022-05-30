@@ -34,3 +34,4 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
+[updated] update netping support dns resolve time and add hostname to labels , reduce min interval

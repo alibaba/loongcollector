@@ -17,6 +17,7 @@ package netping
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,20 +86,54 @@ func TestInitAndCollect(t *testing.T) {
 
 	hasTcping := false
 	hasPing := false
+	hasDNS := false
 
 	for _, log := range c.Logs {
 		fmt.Println(log)
 		for _, content := range log.Contents {
-			if content.Key == "__name__" && content.Value == "tcping_total" {
+			switch {
+			case content.Key == "__name__" && content.Value == "tcping_total":
 				hasTcping = true
-			} else if content.Key == "__name__" && content.Value == "ping_total" {
+			case content.Key == "__name__" && content.Value == "ping_total":
 				hasPing = true
+			case content.Key == "__name__" && content.Value == "dns_resolve_rt_ms":
+				hasDNS = true
 			}
 		}
 	}
 
 	assert.Equal(t, true, hasTcping)
 	assert.Equal(t, true, hasPing)
+	assert.Equal(t, true, hasDNS)
+
+	fmt.Println("disable dns")
+	c = &test.MockMetricCollector{}
+	netPing.DisableDNS = true
+	netPing.Collect(c)
+
+	hasTcping = false
+	hasPing = false
+	hasDNS = false
+
+	for _, log := range c.Logs {
+		fmt.Println(log)
+		for _, content := range log.Contents {
+
+			switch {
+			case content.Key == "__name__" && content.Value == "tcping_total":
+				hasTcping = true
+			case content.Key == "__name__" && content.Value == "ping_total":
+				hasPing = true
+			case content.Key == "__name__" && content.Value == "dns_resolve_rt_ms":
+				hasDNS = true
+			}
+
+		}
+	}
+
+	assert.Equal(t, true, hasTcping)
+	assert.Equal(t, true, hasPing)
+	assert.Equal(t, false, hasDNS)
 }
 
 func TestDoICMPing(t *testing.T) {
@@ -119,7 +154,7 @@ func TestDoICMPing(t *testing.T) {
 	res1 := <-netPing.resultChannel
 	fmt.Println(res1)
 
-	assert.Equal(t, "src#$#|dst#$#8.8.8.8", res1.Label)
+	assert.Equal(t, true, strings.Contains(res1.Label, "src#$#|dst#$#8.8.8.8"))
 	assert.Equal(t, true, res1.Valid)
 	assert.Equal(t, 3, res1.Total)
 	assert.Equal(t, 3, res1.Success+res1.Failed)
@@ -285,4 +320,21 @@ func TestProcessTimeoutAndInterval(t *testing.T) {
 	netPing.Init(ctx)
 	assert.Equal(t, DefaultIntervalSeconds, netPing.IntervalSeconds)
 	assert.Equal(t, DefaultTimeoutSeconds, netPing.TimeoutSeconds)
+}
+
+func TestDNSResolve(t *testing.T) {
+	fmt.Println("TestDNSResolve")
+
+	ctx := mock.NewEmptyContext("project", "store", "config")
+	netPing := &NetPing{}
+
+	netPing.Init(ctx)
+
+	netPing.evaluteDNSResolve("www.baidu.com")
+
+	result := <-netPing.resolveChannel
+	resultBytes, _ := json.Marshal(result)
+	fmt.Println(string(resultBytes))
+
+	assert.Equal(t, true, result.Success)
 }
