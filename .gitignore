@@ -14,3 +14,4 @@ logtail_plugin.LOG*
 plugins/input/input_telegraf/local_test/telegraf.conf
 license_coverage.txt
 e2e-test
+bin/

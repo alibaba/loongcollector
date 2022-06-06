@@ -245,7 +245,7 @@ func (m *Mysql) Start(collector ilogtail.Collector) error {
 		val, exist := m.context.GetCheckPoint(m.CheckPointColumn)
 		if exist && len(val) > 0 {
 			cp := CheckPoint{}
-			err := json.Unmarshal(val, &cp)
+			err = json.Unmarshal(val, &cp)
 
 			switch {
 			case err != nil:
@@ -269,13 +269,15 @@ func (m *Mysql) Start(collector ilogtail.Collector) error {
 
 	// first collect after 10 ms
 	timer := time.NewTimer(10 * time.Millisecond)
-
 	for {
 		select {
 		case <-timer.C:
 			startTime := time.Now()
 			m.collectLatency.Begin()
-			_ = m.Collect(collector)
+			err = m.Collect(collector)
+			if err != nil {
+				logger.Error(m.context.GetRuntimeContext(), "MYSQL_QUERY_ALARM", "sql query error", err)
+			}
 			m.collectLatency.End()
 			endTime := time.Now()
 			if endTime.Sub(startTime) > time.Duration(m.IntervalMs)*time.Millisecond/2 {
@@ -458,6 +460,7 @@ func init() {
 			MaxSyncSize:           10000,
 			DialTimeOutMs:         5000,
 			ReadTimeOutMs:         5000,
+			IntervalMs:            60000,
 			shutdown:              make(chan struct{}, 2),
 		}
 	}
