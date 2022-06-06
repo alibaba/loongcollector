@@ -1,13 +1,16 @@
 #!/bin/bash
 
-CURRENT_DIR=`dirname "$0"`
-CURRENT_DIR=`cd $CURRENT_DIR; pwd`
+CURRENT_DIR=$(dirname "$0")
+CURRENT_DIR=$(
+    cd $CURRENT_DIR
+    pwd
+)
 cd $CURRENT_DIR
 
 log_file="trace.log"
-trace_log()
-{
-    echo "$(date) $1" >> $log_file
+start_log_file="start_telegraf.log"
+trace_log() {
+    echo "$(date) $1" >>$log_file
 
     filesize=$(wc -c <"$log_file")
     if [ $filesize -ge 1024000 ]; then
@@ -15,14 +18,14 @@ trace_log()
     fi
 }
 
-do_start()
-{
-    trace_log "do_start"
-    $(pwd)/telegraf --config "telegraf.conf" --config-directory "conf.d" > /dev/null 2>&1 &
+do_start() {
+    rm -rf telegraf*.log
+        trace_log "do_start"
+        touch $start_log_file
+        $(pwd)/telegraf --config "telegraf.conf" --config-directory "conf.d" > $start_log_file 2>&1 &
 }
 
-start()
-{
+start() {
     c=$(pgrep -l -f "$(pwd)/telegraf " | wc -l)
     trace_log "start $c"
     if [ $c -eq 0 ]; then
@@ -32,8 +35,7 @@ start()
     fi
 }
 
-stop()
-{
+stop() {
     sig=$1
     ppids=($(pgrep -l -f "$(pwd)/telegraf " | awk '{print $1}'))
     trace_log "stop with $sig, ppids: $ppids"
@@ -42,14 +44,12 @@ stop()
     done
 }
 
-force_stop()
-{
+force_stop() {
     trace_log "force_stop"
     stop "-9"
 }
 
-status()
-{
+status() {
     c=$(pgrep -l -f "$(pwd)/telegraf " | wc -l)
     if [ $c -eq 1 ]; then
         val="running"
@@ -63,8 +63,7 @@ status()
     echo $val
 }
 
-reload()
-{
+reload() {
     c=$(pgrep -l -f "$(pwd)/telegraf " | wc -l)
     trace_log "reload $c"
     if [ $c -eq 0 ]; then
@@ -76,19 +75,19 @@ reload()
 
 retcode=0
 case "$1" in
-    start)
+start)
     start
     ;;
-    stop)
+stop)
     stop
     ;;
-    force-stop)
+force-stop)
     force_stop
     ;;
-    reload)
+reload)
     reload
     ;;
-    status)
+status)
     status
     ;;
 esac

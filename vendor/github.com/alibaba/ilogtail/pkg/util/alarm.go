@@ -25,6 +25,29 @@ import (
 var GlobalAlarm *Alarm
 var mu sync.Mutex
 
+var RegisterAlarms map[string]*Alarm
+var regMu sync.Mutex
+
+func RegisterAlarm(key string, alarm *Alarm) {
+	regMu.Lock()
+	defer regMu.Unlock()
+	RegisterAlarms[key] = alarm
+}
+
+func DeleteAlarm(key string) {
+	regMu.Lock()
+	defer regMu.Unlock()
+	delete(RegisterAlarms, key)
+}
+
+func RegisterAlarmsSerializeToPb(logGroup *protocol.LogGroup) {
+	regMu.Lock()
+	defer regMu.Unlock()
+	for _, alarm := range RegisterAlarms {
+		alarm.SerializeToPb(logGroup)
+	}
+}
+
 type AlarmItem struct {
 	Message string
 	Count   int
@@ -42,6 +65,13 @@ func (p *Alarm) Init(project, logstore string) {
 	p.Project = project
 	p.Logstore = logstore
 	mu.Unlock()
+}
+
+func (p *Alarm) Update(project, logstore string) {
+	mu.Lock()
+	defer mu.Unlock()
+	p.Project = project
+	p.Logstore = logstore
 }
 
 func (p *Alarm) Record(alarmType, message string) {
@@ -86,4 +116,5 @@ func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
 func init() {
 	GlobalAlarm = new(Alarm)
 	GlobalAlarm.Init("", "")
+	RegisterAlarms = make(map[string]*Alarm)
 }

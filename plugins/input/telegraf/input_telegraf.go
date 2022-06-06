@@ -37,8 +37,7 @@ func (s *ServiceTelegraf) Init(ctx ilogtail.Context) (int, error) {
 		Name:   ctx.GetConfigName(),
 		Detail: s.Detail,
 	}
-	s.tm = GetTelegrafManager(path.Join(
-		pluginmanager.LogtailGlobalConfig.LogtailSysConfDir, "telegraf"))
+	s.tm = GetTelegrafManager(path.Join(pluginmanager.LogtailGlobalConfig.LogtailSysConfDir, "telegraf"))
 	return 0, nil
 }
 
@@ -51,12 +50,12 @@ func (s *ServiceTelegraf) Collect(collector ilogtail.Collector) error {
 }
 
 func (s *ServiceTelegraf) Start(collector ilogtail.Collector) error {
-	s.tm.RegisterConfig(s.config)
+	s.tm.RegisterConfig(s.context, s.config)
 	return nil
 }
 
 func (s *ServiceTelegraf) Stop() error {
-	s.tm.UnregisterConfig(s.config)
+	s.tm.UnregisterConfig(s.context, s.config)
 	return nil
 }
 

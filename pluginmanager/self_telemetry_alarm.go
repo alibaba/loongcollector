@@ -47,6 +47,7 @@ func (r *InputAlarm) Collect(collector ilogtail.Collector) error {
 	if len(loggroup.Logs) > 0 && AlarmConfig != nil {
 		AlarmConfig.LogGroupsChan <- loggroup
 	}
+	util.RegisterAlarmsSerializeToPb(loggroup)
 	logger.Debug(r.context.GetRuntimeContext(), "InputAlarm", *loggroup)
 	return nil
 }

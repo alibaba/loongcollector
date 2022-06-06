@@ -18,14 +18,15 @@ import (
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
 
+	"context"
 	"runtime"
 )
 
-func panicRecover(key string, context ilogtail.Context) {
+func panicRecover(cxt context.Context, key string) {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(context.GetRuntimeContext(), "PLUGIN_RUNTIME_ALARM", "key", key, "panicked", err, "stack", string(trace))
+		logger.Error(cxt, "PLUGIN_RUNTIME_ALARM", "key", key, "panicked", err, "stack", string(trace))
 	}
 }
 
@@ -33,7 +34,7 @@ func panicRecover(key string, context ilogtail.Context) {
 func StartService(name string, context ilogtail.Context, f func()) {
 	go func() {
 		logger.Info(context.GetRuntimeContext(), "service begin", name)
-		defer panicRecover(name, context)
+		defer panicRecover(context.GetRuntimeContext(), name)
 		f()
 		logger.Info(context.GetRuntimeContext(), "service done", name)
 	}()

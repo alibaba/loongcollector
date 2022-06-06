@@ -19,6 +19,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 
+	"context"
 	"io"
 	"os"
 	"sync"
@@ -88,33 +89,39 @@ type LogFileReader struct {
 	readWhenStart  bool
 	checkpointLock sync.Mutex
 	shutdown       chan struct{}
-	context        ilogtail.Context
+	logContext     context.Context
 	waitgroup      sync.WaitGroup
+	foundFile      bool
 }
 
-func NewLogFileReader(checkpoint LogFileReaderCheckPoint, config LogFileReaderConfig, processor LogFileProcessor, context ilogtail.Context) (*LogFileReader, error) {
+func NewLogFileReader(context context.Context, checkpoint LogFileReaderCheckPoint, config LogFileReaderConfig, processor LogFileProcessor) (*LogFileReader, error) {
 	readWhenStart := false
+	foundFile := true
 	if checkpoint.State.IsEmpty() {
 		if newStat, err := os.Stat(checkpoint.Path); err == nil {
 			checkpoint.State = GetOSState(newStat)
 		} else {
-			logger.Warning(context.GetRuntimeContext(), "STAT_FILE_ALARM", "stat file error when create reader, file", checkpoint.Path, "error", err.Error())
+			if os.IsNotExist(err) {
+				foundFile = false
+			}
+			logger.Warning(context, "STAT_FILE_ALARM", "stat file error when create reader, file", checkpoint.Path, "error", err.Error())
 		}
 	}
 	if !checkpoint.State.IsEmpty() {
 		if deltaNano := time.Now().UnixNano() - int64(checkpoint.State.ModifyTime); deltaNano >= 0 && deltaNano < 180*1e9 {
 			readWhenStart = true
-			logger.Warning(context.GetRuntimeContext(), "first read this file, need read when start flag", readWhenStart)
+			logger.Warning(context, "first read this file, need read when start flag", readWhenStart)
 		}
 	}
 	return &LogFileReader{
 		checkpoint:     checkpoint,
 		Config:         config,
 		processor:      processor,
-		context:        context,
+		logContext:     context,
 		lastBufferSize: 0,
 		nowBlock:       nil,
 		readWhenStart:  readWhenStart,
+		foundFile:      foundFile,
 	}, nil
 }
 
@@ -142,7 +149,7 @@ func (r *LogFileReader) CheckFileChange() bool {
 			needResetOffset := false
 			if r.checkpoint.State.IsFileChange(newOsStat) {
 				needResetOffset = true
-				logger.Info(r.context.GetRuntimeContext(), "file dev inode changed, read to end and force read from beginning, file", r.checkpoint.Path, "old", r.checkpoint.State.String(), "new", newOsStat.String(), "offset", r.checkpoint.Offset)
+				logger.Info(r.logContext, "file dev inode changed, read to end and force read from beginning, file", r.checkpoint.Path, "old", r.checkpoint.State.String(), "new", newOsStat.String(), "offset", r.checkpoint.Offset)
 				// read to end or shutdown
 				if r.file != nil {
 					r.ReadAndProcess(false)
@@ -165,8 +172,17 @@ func (r *LogFileReader) CheckFileChange() bool {
 			r.checkpointLock.Unlock()
 			return true
 		}
+		r.foundFile = true
 	} else {
-		logger.Warning(r.context.GetRuntimeContext(), "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", err.Error())
+		if os.IsNotExist(err) {
+			if r.foundFile {
+				logger.Warning(r.logContext, "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", err.Error())
+				r.foundFile = false
+			}
+		} else {
+			logger.Warning(r.logContext, "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", err.Error())
+		}
+
 	}
 	return false
 }
@@ -233,7 +249,7 @@ func (r *LogFileReader) ReadOpen() error {
 		if r.Config.Tracker != nil {
 			r.Config.Tracker.OpenCounter.Add(1)
 		}
-		logger.Debug(r.context.GetRuntimeContext(), "open file for read, file", r.checkpoint.Path, "offset", r.checkpoint.Offset, "status", r.checkpoint.State)
+		logger.Debug(r.logContext, "open file for read, file", r.checkpoint.Path, "offset", r.checkpoint.Offset, "status", r.checkpoint.State)
 		return err
 	}
 	return nil
@@ -258,7 +274,7 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 
 			// check file dev+inode changed
 			if r.checkpoint.State.IsFileChange(newOsStat) {
-				logger.Info(r.context.GetRuntimeContext(), "file dev inode changed, force read from beginning, file", r.checkpoint.Path, "old", r.checkpoint.State.String(), "new", newOsStat.String(), "offset", r.checkpoint.Offset)
+				logger.Info(r.logContext, "file dev inode changed, force read from beginning, file", r.checkpoint.Path, "old", r.checkpoint.State.String(), "new", newOsStat.String(), "offset", r.checkpoint.Offset)
 				// if file dev+inode changed, force flush last buffer
 				if r.lastBufferSize > 0 {
 					processSize := r.processor.Process(r.nowBlock[0:r.lastBufferSize], time.Hour)
@@ -277,7 +293,7 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 
 			// check file truncated
 			if newOsStat.Size < r.checkpoint.Offset {
-				logger.Info(r.context.GetRuntimeContext(), "file truncated, force read from beginning, file", r.checkpoint.Path, "old", r.checkpoint.State.String(), "new", newOsStat.String(), "offset", r.checkpoint.Offset)
+				logger.Info(r.logContext, "file truncated, force read from beginning, file", r.checkpoint.Path, "old", r.checkpoint.State.String(), "new", newOsStat.String(), "offset", r.checkpoint.Offset)
 				// if file dev+inode changed, force flush last buffer
 				if r.lastBufferSize > 0 {
 					processSize := r.processor.Process(r.nowBlock[0:r.lastBufferSize], time.Hour)
@@ -298,7 +314,7 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 				return
 			}
 		} else {
-			logger.Warning(r.context.GetRuntimeContext(), "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", statErr.Error())
+			logger.Warning(r.logContext, "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", statErr.Error())
 		}
 		for {
 			n, readErr := file.ReadAt(r.nowBlock[r.lastBufferSize:], int64(r.lastBufferSize)+r.checkpoint.Offset)
@@ -312,10 +328,10 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 			}
 			if readErr != nil {
 				if readErr != io.EOF {
-					logger.Warning(r.context.GetRuntimeContext(), "READ_FILE_ALARM", "read file error, file", r.checkpoint.Path, "error", readErr.Error())
+					logger.Warning(r.logContext, "READ_FILE_ALARM", "read file error, file", r.checkpoint.Path, "error", readErr.Error())
 					break
 				}
-				logger.Debug(r.context.GetRuntimeContext(), "read end of file", r.checkpoint.Path, "offset", r.checkpoint.Offset, "last buffer size", r.lastBufferSize, "read n", n, "stat", r.checkpoint.State.String())
+				logger.Debug(r.logContext, "read end of file", r.checkpoint.Path, "offset", r.checkpoint.Offset, "last buffer size", r.lastBufferSize, "read n", n, "stat", r.checkpoint.State.String())
 				needBreak = true
 			}
 			// only accept buffer end of '\n'
@@ -326,7 +342,7 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 				// check shutdown
 				select {
 				case <-r.shutdown:
-					logger.Info(r.context.GetRuntimeContext(), "receive stop signal when read data, path", r.checkpoint.Path)
+					logger.Info(r.logContext, "receive stop signal when read data, path", r.checkpoint.Path)
 					needBreak = true
 				default:
 				}
@@ -336,7 +352,7 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 			}
 		}
 	} else {
-		logger.Warning(r.context.GetRuntimeContext(), "READ_FILE_ALARM", "open file for read error, file", r.checkpoint.Path, "error", err.Error())
+		logger.Warning(r.logContext, "READ_FILE_ALARM", "open file for read error, file", r.checkpoint.Path, "error", err.Error())
 	}
 }
 
@@ -347,7 +363,7 @@ func (r *LogFileReader) CloseFile(reason string) {
 		if r.Config.Tracker != nil {
 			r.Config.Tracker.CloseCounter.Add(1)
 		}
-		logger.Debug(r.context.GetRuntimeContext(), "close file, reason", reason, "file", r.checkpoint.Path, "offset", r.checkpoint.Offset, "status", r.checkpoint.State)
+		logger.Debug(r.logContext, "close file, reason", reason, "file", r.checkpoint.Path, "offset", r.checkpoint.Offset, "status", r.checkpoint.State)
 	}
 }
 
@@ -355,7 +371,7 @@ func (r *LogFileReader) Run() {
 	defer func() {
 		r.CloseFile("run done")
 		r.waitgroup.Done()
-		panicRecover(r.checkpoint.Path, r.context)
+		panicRecover(r.logContext, r.checkpoint.Path)
 	}()
 	lastReadTime := time.Now()
 	tracker := r.Config.Tracker
@@ -380,7 +396,7 @@ func (r *LogFileReader) Run() {
 		}
 		endProcessTime := time.Now()
 		sleepDuration := time.Millisecond*time.Duration(r.Config.ReadIntervalMs) - endProcessTime.Sub(startProcessTime)
-		logger.Debug(r.context.GetRuntimeContext(), "sleep duration", sleepDuration, "normal", r.Config.ReadIntervalMs)
+		logger.Debug(r.logContext, "sleep duration", sleepDuration, "normal", r.Config.ReadIntervalMs)
 		if util.RandomSleep(sleepDuration, 0.1, r.shutdown) {
 			r.ReadAndProcess(true)
 			if r.lastBufferSize > 0 {
