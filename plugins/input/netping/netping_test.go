@@ -63,16 +63,24 @@ func TestInitAndCollect(t *testing.T) {
 	config1 := fmt.Sprintf(`{
 		"interval_seconds" : 5,
 		"icmp" : [
-		  {"src" : "%s", "target" : "8.8.8.8", "count" : 3},
+		  {"src" : "%s", "target" : "8.8.8.8", "count" : 3, "name" : "for test", "labels" : {"hello" : "world"}},
 		  {"src" : "2.2.2.2", "target" : "8.8.8.8", "count" : 3}
 		],
 		"tcp" : [
 		  {"src" : "%s",  "target" : "www.baidu.com", "port" : 80, "count" : 3}
-		]
-	  }`, ip, ip)
+		],
+		"http" : [
+			{"src" : "%s",  "target" : "https://www.baidu.com"}
+		  ]
+	  }`, ip, ip, ip)
 
 	netPing := &NetPing{}
-	json.Unmarshal([]byte(config1), netPing)
+	fmt.Println(config1)
+	err := json.Unmarshal([]byte(config1), netPing)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(netPing.ICMPConfigs)
 	assert.Equal(t, 2, len(netPing.ICMPConfigs))
 	assert.Equal(t, 1, len(netPing.TCPConfigs))
 
@@ -86,6 +94,7 @@ func TestInitAndCollect(t *testing.T) {
 
 	hasTcping := false
 	hasPing := false
+	hasHTTPing := false
 	hasDNS := false
 
 	for _, log := range c.Logs {
@@ -96,6 +105,8 @@ func TestInitAndCollect(t *testing.T) {
 				hasTcping = true
 			case content.Key == "__name__" && content.Value == "ping_total":
 				hasPing = true
+			case content.Key == "__name__" && content.Value == "httping_total":
+				hasHTTPing = true
 			case content.Key == "__name__" && content.Value == "dns_resolve_rt_ms":
 				hasDNS = true
 			}
@@ -105,6 +116,7 @@ func TestInitAndCollect(t *testing.T) {
 	assert.Equal(t, true, hasTcping)
 	assert.Equal(t, true, hasPing)
 	assert.Equal(t, true, hasDNS)
+	assert.Equal(t, true, hasHTTPing)
 
 	fmt.Println("disable dns")
 	c = &test.MockMetricCollector{}
@@ -150,7 +162,7 @@ func TestDoICMPing(t *testing.T) {
 		Count:  3,
 	}
 
-	netPing.doICMPing(config1)
+	netPing.doICMPing(&config1)
 	res1 := <-netPing.resultChannel
 	fmt.Println(res1)
 
@@ -165,7 +177,7 @@ func TestDoICMPing(t *testing.T) {
 		Count:  3,
 	}
 
-	netPing.doICMPing(config2)
+	netPing.doICMPing(&config2)
 	res2 := <-netPing.resultChannel
 	fmt.Println(res2)
 
@@ -187,7 +199,7 @@ func TestDoTCPing(t *testing.T) {
 		Count:  3,
 	}
 
-	go netPing.doTCPing(config1)
+	go netPing.doTCPing(&config1)
 
 	res1 := <-netPing.resultChannel
 	fmt.Println(res1)
@@ -201,7 +213,7 @@ func TestDoTCPing(t *testing.T) {
 		Count:  3,
 	}
 
-	go netPing.doTCPing(config2)
+	go netPing.doTCPing(&config2)
 	res2 := <-netPing.resultChannel
 	fmt.Println(res2)
 
@@ -337,4 +349,19 @@ func TestDNSResolve(t *testing.T) {
 	fmt.Println(string(resultBytes))
 
 	assert.Equal(t, true, result.Success)
+}
+
+func TestDoHTTPing(t *testing.T) {
+
+	ctx := mock.NewEmptyContext("project", "store", "config")
+	netPing := &NetPing{}
+
+	netPing.Init(ctx)
+	netPing.doHTTPing(&HTTPConfig{
+		Target:     "https://www.baidu.com",
+		ExpectCode: 200,
+	})
+	result := <-netPing.resultChannel
+	fmt.Println(result)
+
 }
