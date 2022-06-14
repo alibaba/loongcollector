@@ -33,6 +33,22 @@ var criRuntimeWrapper *CRIRuntimeWrapper
 type CRIRuntimeWrapper struct {
 }
 
+func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
+	return nil
+}
+
+func (cw *CRIRuntimeWrapper) fetchAll() error {
+	return nil
+}
+
+func (cw *CRIRuntimeWrapper) loopSyncContainers() {
+
+}
+
+func (cw *CRIRuntimeWrapper) sweepCache() {
+
+}
+
 func IsCRIRuntimeValid(_ string) bool {
 	return false
 }
@@ -44,10 +60,6 @@ func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(_ *docker.Container) st
 // NewCRIRuntimeWrapper ...
 func NewCRIRuntimeWrapper(_ *DockerCenter) (*CRIRuntimeWrapper, error) {
 	return nil, errUninplemented
-}
-
-func (cw *CRIRuntimeWrapper) run() error {
-	return errUninplemented
 }
 
 func ContainerProcessAlive(pid int) bool {

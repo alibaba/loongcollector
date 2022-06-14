@@ -26,7 +26,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
+
+func init() {
+	logger.InitTestLogger(logger.OptionDebugLevel, logger.OptionOpenConsole)
+
+}
 
 var staticDockerConfig = `[
 {
@@ -104,8 +111,8 @@ func TestLoadStaticContainerConfig(t *testing.T) {
 	resetDockerCenter()
 	ioutil.WriteFile("./static_container.json", []byte(staticDockerConfig), os.ModePerm)
 	os.Setenv(staticContainerInfoPathEnvKey, "./static_container.json")
-	instance := GetDockerCenterInstance()
-	allInfo := instance.GetAllInfo()
+	instance := getDockerCenterInstance()
+	allInfo := instance.containerMap
 	require.Equal(t, len(allInfo), 1)
 	for id, info := range allInfo {
 		require.Equal(t, id, "123abc")
@@ -116,7 +123,7 @@ func TestLoadStaticContainerConfig(t *testing.T) {
 
 	time.Sleep(time.Second * 2)
 
-	allInfo = instance.GetAllInfo()
+	allInfo = instance.containerMap
 	require.Equal(t, len(allInfo), 2)
 	newInfo, ok := allInfo["123abc-2"]
 	require.Equal(t, ok, true)

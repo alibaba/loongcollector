@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -29,11 +30,29 @@ import (
 )
 
 /*
+#include <stdlib.h>
+static char**makeCharArray(int size) {
+        return malloc(sizeof(char*)*  size);
+}
+
+static void setArrayString(char **a, char *s, int n) {
+        a[n] = s;
+}
+
 struct containerMeta{
 	char* podName;
 	char* k8sNamespace;
 	char* containerName;
 	char* image;
+	int k8sLabelsSize;
+	int containerLabelsSize;
+	int envSize;
+	char** k8sLabelsKey;
+	char** k8sLabelsVal;
+	char** containerLabelsKey;
+	char** containerLabelsVal;
+	char** envsKey;
+	char** envsVal;
 };
 */
 import "C"
@@ -150,8 +169,8 @@ func CtlCmd(configName string, cmdId int, cmdDetail string) {
 
 //export GetContainerMeta
 func GetContainerMeta(containerID string) *C.struct_containerMeta {
-	detail, ok := helper.GetDockerCenterInstance().GetContainerDetail(containerID)
-	if ok {
+	logger.Init()
+	convertFunc := func(detail *helper.DockerInfoDetail) *C.struct_containerMeta {
 		returnStruct := (*C.struct_containerMeta)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_containerMeta{}))))
 		returnStruct.podName = C.CString(detail.K8SInfo.Pod)
 		returnStruct.k8sNamespace = C.CString(detail.K8SInfo.Namespace)
@@ -161,10 +180,63 @@ func GetContainerMeta(containerID string) *C.struct_containerMeta {
 			returnStruct.containerName = C.CString(detail.K8SInfo.ContainerName)
 		}
 		returnStruct.image = C.CString(detail.ContainerNameTag["_image_name_"])
+		returnStruct.k8sLabelsSize = C.int(len(detail.K8SInfo.Labels))
+		if len(detail.K8SInfo.Labels) > 0 {
+			ck8sLabelsKey := C.makeCharArray(returnStruct.k8sLabelsSize)
+			ck8sLabelsVal := C.makeCharArray(returnStruct.k8sLabelsSize)
+			count := 0
+			for k, v := range detail.K8SInfo.Labels {
+				C.setArrayString(ck8sLabelsKey, C.CString(k), C.int(count))
+				C.setArrayString(ck8sLabelsVal, C.CString(v), C.int(count))
+				count++
+			}
+			returnStruct.k8sLabelsKey = ck8sLabelsKey
+			returnStruct.k8sLabelsVal = ck8sLabelsVal
+		}
+		returnStruct.containerLabelsSize = C.int(len(detail.ContainerInfo.Config.Labels))
+		if len(detail.ContainerInfo.Config.Labels) > 0 {
+			cContainerLabelsKey := C.makeCharArray(returnStruct.containerLabelsSize)
+			cContainerLabelsVal := C.makeCharArray(returnStruct.containerLabelsSize)
+			count := 0
+			for k, v := range detail.ContainerInfo.Config.Labels {
+				C.setArrayString(cContainerLabelsKey, C.CString(k), C.int(count))
+				C.setArrayString(cContainerLabelsVal, C.CString(v), C.int(count))
+				count++
+			}
+			returnStruct.containerLabelsKey = cContainerLabelsKey
+			returnStruct.containerLabelsVal = cContainerLabelsVal
+		}
+		returnStruct.envSize = C.int(len(detail.ContainerInfo.Config.Env))
+		if len(detail.ContainerInfo.Config.Env) > 0 {
+			cEnvsKey := C.makeCharArray(returnStruct.envSize)
+			cEnvsVal := C.makeCharArray(returnStruct.envSize)
+			count := 0
+			for _, env := range detail.ContainerInfo.Config.Env {
+				var envKey, envValue string
+				splitArray := strings.SplitN(env, "=", 2)
+				if len(splitArray) < 2 {
+					envKey = splitArray[0]
+				} else {
+					envKey = splitArray[0]
+					envValue = splitArray[1]
+				}
+
+				C.setArrayString(cEnvsKey, C.CString(envKey), C.int(count))
+				C.setArrayString(cEnvsVal, C.CString(envValue), C.int(count))
+				count++
+			}
+			returnStruct.envsKey = cEnvsKey
+			returnStruct.envsVal = cEnvsVal
+
+		}
+
 		return returnStruct
 	}
-	// TODO: fetchAll again when not found.
 
+	detail := helper.FetchContainerDetail(containerID)
+	if detail != nil {
+		return convertFunc(detail)
+	}
 	return nil
 }
 

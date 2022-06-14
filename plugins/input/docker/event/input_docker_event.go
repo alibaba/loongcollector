@@ -38,6 +38,7 @@ type ServiceDockerEvents struct {
 
 func (p *ServiceDockerEvents) Init(context ilogtail.Context) (int, error) {
 	p.context = context
+	helper.ContainerCenterInit()
 	return 0, nil
 }
 
@@ -86,9 +87,9 @@ func (p *ServiceDockerEvents) Start(c ilogtail.Collector) error {
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	p.innerEventQueue = make(chan *docker.APIEvents, p.EventQueueSize)
-	helper.GetDockerCenterInstance().RegisterEventListener(p.innerEventQueue)
+	helper.RegisterDockerEventListener(p.innerEventQueue)
 	defer func() {
-		helper.GetDockerCenterInstance().UnRegisterEventListener(p.innerEventQueue)
+		helper.UnRegisterDockerEventListener(p.innerEventQueue)
 		close(p.innerEventQueue)
 		p.waitGroup.Done()
 	}()

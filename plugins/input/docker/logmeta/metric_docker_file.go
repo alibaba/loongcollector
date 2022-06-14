@@ -72,7 +72,6 @@ type InputDockerFile struct {
 	ExcludeEnvRegex   map[string]*regexp.Regexp
 	K8sFilter         *helper.K8SFilter
 
-	dockerCenter         *helper.DockerCenter
 	lastPathMappingCache map[string]string
 	context              ilogtail.Context
 	lastClearTime        time.Time
@@ -121,7 +120,7 @@ func (idf *InputDockerFile) Init(context ilogtail.Context) (int, error) {
 	if len(idf.LogPath) <= 1 {
 		return 0, fmt.Errorf("empty log path")
 	}
-	idf.dockerCenter = helper.GetDockerCenterInstance()
+	helper.ContainerCenterInit()
 
 	if idf.HostFlag {
 		idf.MountPath = ""
@@ -252,7 +251,7 @@ func (idf *InputDockerFile) deleteMapping(id string) {
 }
 
 func (idf *InputDockerFile) Collect(collector ilogtail.Collector) error {
-	newUpdateTime := idf.dockerCenter.GetLastUpdateMapTime()
+	newUpdateTime := helper.GetContainersLastUpdateTime()
 	if idf.lastUpdateTime != 0 {
 		// Nothing update, just skip.
 		if idf.lastUpdateTime >= newUpdateTime {
@@ -266,7 +265,7 @@ func (idf *InputDockerFile) Collect(collector ilogtail.Collector) error {
 	if len(idf.lastPathMappingCache) == 0 {
 		allCmd = new(DockerFileUpdateCmdAll)
 	}
-	newCount, delCount := idf.dockerCenter.GetAllAcceptedInfoV2(
+	newCount, delCount := helper.GetContainerByAcceptedInfoV2(
 		idf.fullList, idf.matchList,
 		idf.IncludeLabel, idf.ExcludeLabel,
 		idf.IncludeLabelRegex, idf.ExcludeLabelRegex,

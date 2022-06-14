@@ -38,7 +38,7 @@ func MockDockerInfoDetail(containerName string, envList []string) *helper.Docker
 	dockerInfo.Name = containerName
 	dockerInfo.Config = &docker.Config{}
 	dockerInfo.Config.Env = envList
-	return helper.GetDockerCenterInstance().CreateInfoDetail(dockerInfo, *LogConfigPrefix, false)
+	return helper.CreateContainerInfoDetail(dockerInfo, *LogConfigPrefix, false)
 }
 
 type logConfigTestSuite struct {

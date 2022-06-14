@@ -54,7 +54,6 @@ type innerContainerInfo struct {
 	Pid   int
 }
 type CRIRuntimeWrapper struct {
-	// client       *containerd.Client
 	dockerCenter *DockerCenter
 
 	client         cri.RuntimeServiceClient
@@ -366,12 +365,19 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 		containerMap[container.GetId()] = dockerContainer
 
 		// append the pod labels to the k8s info.
-		if sandbox, ok := sandboxMap[container.PodSandboxId]; ok && dockerContainer.K8SInfo != nil {
+		if sandbox, ok := sandboxMap[container.PodSandboxId]; ok {
 			cw.wrapperK8sInfoByLabels(sandbox.GetLabels(), dockerContainer)
 		}
 		logger.Debug(context.Background(), "Create container info from cri-runtime success, info", *dockerContainer.ContainerInfo, "config", *dockerContainer.ContainerInfo.Config, "detail", *dockerContainer)
 	}
 	cw.dockerCenter.updateContainers(containerMap)
+
+	for k := range cw.containers {
+		if _, ok := containerMap[k]; !ok {
+			cw.dockerCenter.markRemove(k)
+			delete(cw.containers, k)
+		}
+	}
 	return nil
 }
 
@@ -425,16 +431,17 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 		}
 	}
 
+	// delete container
 	cw.containersLock.Lock()
 	defer cw.containersLock.Unlock()
-	// delete container
 	for oldID := range cw.containers {
 		if _, ok := newContainers[oldID]; !ok {
 			cw.dockerCenter.markRemove(oldID)
+			logger.Debug(context.Background(), "cri sync containers remove", oldID)
 			delete(cw.containers, oldID)
 		}
 	}
-
+	logger.Debug(context.Background(), "cri sync containers", "done")
 	return nil
 }
 
@@ -506,38 +513,6 @@ func (cw *CRIRuntimeWrapper) sweepCache() {
 		}
 	}
 	cw.rootfsLock.Unlock()
-}
-
-func (cw *CRIRuntimeWrapper) run() error {
-	logger.Init()
-	logger.Info(context.Background(), "CRIRuntime background syncer", "start")
-	_ = cw.fetchAll()
-	logger.Info(context.Background(), "CRIRuntime background syncer", "gogogogo")
-
-	timerFetch := func() {
-		defer dockerCenterRecover()
-		lastFetchAllTime := time.Now()
-		for {
-			time.Sleep(time.Duration(10) * time.Second)
-			logger.Debug(context.Background(), "docker clean timeout container info", "start")
-			cw.dockerCenter.cleanTimeoutContainer()
-			logger.Debug(context.Background(), "docker clean timeout container info", "done")
-			if time.Since(lastFetchAllTime) >= FetchAllInterval {
-				logger.Info(context.Background(), "CRIRuntime fetch all", "start")
-				cw.dockerCenter.readStaticConfig(true)
-				err := cw.fetchAll()
-				logger.Info(context.Background(), "CRIRuntime fetch all", err)
-				lastFetchAllTime = time.Now()
-				cw.sweepCache()
-			}
-
-		}
-	}
-	go timerFetch()
-
-	go cw.loopSyncContainers()
-
-	return nil
 }
 
 func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {

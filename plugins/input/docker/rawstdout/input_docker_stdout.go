@@ -308,7 +308,6 @@ type ServiceDockerStdout struct {
 	K8sFilter         *helper.K8SFilter
 
 	synerMap         map[string]*stdoutSyner
-	dockerCenter     *helper.DockerCenter
 	client           *docker.Client
 	shutdown         chan struct{}
 	waitGroup        sync.WaitGroup
@@ -319,7 +318,7 @@ type ServiceDockerStdout struct {
 
 func (sds *ServiceDockerStdout) Init(context ilogtail.Context) (int, error) {
 	sds.context = context
-	sds.dockerCenter = helper.GetDockerCenterInstance()
+	helper.ContainerCenterInit()
 	sds.stdoutCheckPoint = &StdoutCheckPoint{
 		checkpointMap: make(map[string]string),
 	}
@@ -373,7 +372,7 @@ func (sds *ServiceDockerStdout) Collect(ilogtail.Collector) error {
 
 func (sds *ServiceDockerStdout) FlushAll(c ilogtail.Collector, firstStart bool) error {
 	var err error
-	dockerInfos := sds.dockerCenter.GetAllAcceptedInfo(
+	dockerInfos := helper.GetContainerByAcceptedInfo(
 		sds.IncludeLabel, sds.ExcludeLabel,
 		sds.IncludeLabelRegex, sds.ExcludeLabelRegex,
 		sds.IncludeEnv, sds.ExcludeEnv,
@@ -459,7 +458,7 @@ func (sds *ServiceDockerStdout) Start(c ilogtail.Collector) error {
 	sds.stdoutCheckPoint = sds.GetCheckPoint()
 
 	var err error
-	if sds.client, err = sds.dockerCenter.CreateDockerClient(); err != nil {
+	if sds.client, err = helper.CreateDockerClient(); err != nil {
 		logger.Error(sds.context.GetRuntimeContext(), "DOCKER_CLIENT_ALARM", "create docker client error", err)
 		return err
 	}

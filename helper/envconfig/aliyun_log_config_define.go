@@ -355,7 +355,7 @@ func makeLogConfigSpec(dockerInfo *helper.DockerInfoDetail, envConfigInfo *helpe
 
 func fetchAllEnvConfig() {
 	dockerEnvConfigInfoList = make([]*helper.DockerInfoDetail, 0, len(dockerEnvConfigInfoList))
-	helper.GetDockerCenterInstance().ProcessAllContainerInfo(dockerInfoEnvConfigProcessFunc)
+	helper.ProcessContainerAllInfo(dockerInfoEnvConfigProcessFunc)
 	logConfigSpecList = make([]*AliyunLogConfigSpec, 0, len(dockerEnvConfigInfoList))
 	for _, info := range dockerEnvConfigInfoList {
 		for _, envConfigInfo := range info.EnvConfigInfoMap {

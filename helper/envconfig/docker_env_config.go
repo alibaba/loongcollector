@@ -89,7 +89,7 @@ func panicRecover() {
 func runDockerEnvConfig() {
 	defer panicRecover()
 	helper.SetEnvConfigPrefix(*LogConfigPrefix)
-	helper.GetDockerCenterInstance()
+	helper.ContainerCenterInit()
 	dockerEnvConfigManager.run()
 }
 
@@ -99,7 +99,7 @@ func initSelfEnvConfig() {
 	dockerInfo.Config = &docker.Config{}
 	dockerInfo.Config.Env = os.Environ()
 	logger.Debug(context.Background(), "load self env config", dockerInfo.Config.Env)
-	selfEnvConfig = helper.GetDockerCenterInstance().CreateInfoDetail(dockerInfo, *LogConfigPrefix, true)
+	selfEnvConfig = helper.CreateContainerInfoDetail(dockerInfo, *LogConfigPrefix, true)
 }
 
 func initConfig() {
