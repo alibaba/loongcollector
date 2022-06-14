@@ -102,6 +102,17 @@ func ProcessRawLogV2(configName string, rawLog []byte, packId string, topic stri
 	return config.ProcessRawLogV2(rawLog, packId, util.StringDeepCopy(topic), tags)
 }
 
+//export ProcessLogs
+func ProcessLogs(configName string, logBytes [][]byte, packId string, topic string, tags []byte) int {
+	logger.Debug(context.Background(), "ProcessLogs triggered")
+	config, exists := pluginmanager.LogtailConfig[configName]
+	if !exists {
+		logger.Debug(context.Background(), "ProcessLogs not found", configName)
+		return -1
+	}
+	return config.ProcessLogs(logBytes, packId, util.StringDeepCopy(topic), tags)
+}
+
 //export HoldOn
 func HoldOn(exitFlag int) {
 	logger.Info(context.Background(), "Hold on", "start", "flag", exitFlag)

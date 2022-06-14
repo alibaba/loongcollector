@@ -36,6 +36,38 @@ import (
 
 var maxFlushOutTime = 5
 
+const mixProcessModeFlag = "mix_process_mode"
+
+type mixProcessMode int
+
+const (
+	normal mixProcessMode = iota
+	file
+	observer
+)
+
+// checkMixProcessMode
+// When inputs plugins not exist, it means this LogConfig is a mixed process mode config.
+// And the default mix process mode is the file mode.
+func checkMixProcessMode(pluginCfg map[string]interface{}) mixProcessMode {
+	config, exists := pluginCfg["inputs"]
+	inputs, ok := config.([]interface{})
+	if exists && ok && len(inputs) > 0 {
+		return normal
+	}
+	mixModeFlag, mixModeFlagOk := pluginCfg[mixProcessModeFlag]
+	if !mixModeFlagOk {
+		return file
+	}
+	s := mixModeFlag.(string)
+	switch {
+	case strings.EqualFold(s, "observer"):
+		return observer
+	default:
+		return file
+	}
+}
+
 type LogstoreStatistics struct {
 	CollecLatencytMetric ilogtail.LatencyMetric
 	RawLogMetric         ilogtail.CounterMetric
@@ -479,6 +511,24 @@ func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic st
 	return 0
 }
 
+func (lc *LogstoreConfig) ProcessLogs(logBytes [][]byte, packID string, topic string, tags []byte) int {
+	for _, logByte := range logBytes {
+		log := &protocol.Log{}
+		err := log.Unmarshal(logByte)
+		if err != nil {
+			logger.Error(lc.Context.GetRuntimeContext(), "WRONG_PROTOBUF_ALARM",
+				"cannot process logs passed by core, err", err)
+			continue
+		}
+		if len(topic) > 0 {
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
+		}
+		extractTags(tags, log)
+		lc.LogsChan <- log
+	}
+	return 0
+}
+
 func hasDockerStdoutInput(plugins map[string]interface{}) bool {
 	inputs, exists := plugins["inputs"]
 	if !exists {
@@ -588,17 +638,11 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		logger.Debug(contextImp.GetRuntimeContext(), "load plugin config", *logstoreC.GlobalConfig)
 	}
 
-	// If inputs is empty, it means that the source of this config may be file buffer
-	//   from logtail core. Because the buffer from logtail is big, we have to limit
-	//   queue size to control memory usage here.
 	logQueueSize := logstoreC.GlobalConfig.DefaultLogQueueSize
-	{
-		config, exists := plugins["inputs"]
-		inputs, ok := config.([]interface{})
-		if !exists || !ok || len(inputs) == 0 {
-			logger.Infof(contextImp.GetRuntimeContext(), "no inputs in config %v, maybe file input, limit queue size", configName)
-			logQueueSize = 10
-		}
+	// Because the transferred data of the file MixProcessMode is quite large, we have to limit queue size to control memory usage here.
+	if checkMixProcessMode(plugins) == file {
+		logger.Infof(contextImp.GetRuntimeContext(), "no inputs in config %v, maybe file input, limit queue size", configName)
+		logQueueSize = 10
 	}
 	logstoreC.LogsChan = make(chan *protocol.Log, logQueueSize)
 	// loggroup chan size must >= flushout loggroups
@@ -721,7 +765,7 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			continue
 		}
 
-		if pluginType != "global" {
+		if pluginType != "global" && pluginType != mixProcessModeFlag {
 			return nil, fmt.Errorf("error plugin name %s", pluginType)
 		}
 	}
