@@ -34,8 +34,3 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
-- [public] [both] [added] Collect the Telegraf log when the service_telegraf plugin works.
-- [public] [both] [updated] update netping support dns resolve time and add hostname to labels , reduce min interval, support httping
-- [public] [both] [fixed] remove unstable syslog unit test in CI and enhance the unit test of test engine
-- [public] [both] [updated] force fetch container info when not found in the cache for export GetContainerMeta API   
-- [public] [both] [added] add new cgo api called ProcessLogs
