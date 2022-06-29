@@ -191,6 +191,8 @@ void do_worker_process() {
 }
 
 int main(int argc, char** argv) {
+    gflags::SetUsageMessage(std::string("The Lightweight Collector of SLS in Alibaba Cloud\nUsage: ./ilogtail [OPTION]"));
+    gflags::SetVersionString(std::string(ILOGTAIL_VERSION) + " Community Edition");
     google::ParseCommandLineFlags(&argc, &argv, true);
 
     // check addr config
