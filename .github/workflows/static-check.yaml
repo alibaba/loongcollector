@@ -38,7 +38,6 @@ jobs:
         if: matrix.runner == 'ubuntu'
         run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
 
-
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v2
         with:
@@ -64,15 +63,12 @@ jobs:
       - name: Lint
         run: make lint
 
-      - name: Test
-        run: make test
+      - name: UnitTest
+        run: make unittest_plugin
 
-      - name: Test Core
-        run: make core-test
+      - name: UnitTest PluginManager
+        run: make unittest_pluginmanager
 
-      - name: Test E2e Engine
-        if: matrix.runner == 'ubuntu'
-        run: make test-e2e-engine
 
   result:
     runs-on: ubuntu-latest

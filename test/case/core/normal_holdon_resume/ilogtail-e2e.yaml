@@ -21,8 +21,6 @@ ilogtail:
         - '{"inputs":[{"type":"metric_mock","detail":{"IntervalMs": 1000,"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"content":"xxxxx","time":"2017.09.12 20:55:36"}}}]}'
   close_wait: 5s
 verify:
-
-
   system_rules:
     - name: counter-check
       validator: sys_counter
@@ -30,34 +28,27 @@ verify:
         expect_equal_raw_log: true
         expect_equal_processed_log: true
         expect_equal_flush_log: true
-        expect_received_minimum_log_group_num: 4
-        expect_received_minimum_log_num: 4
+        expect_received_minimum_log_group_num: 2
+        expect_received_minimum_log_num: 5
     - name: log-check
       validator: sys_logtail_log
       spec:
         expect_contains_log_times:
           # Resume
-          '[Resume] Resume:start': 2
-          '[Resume] checkpoint:Resume': 2
-          '[Resume] Resume:success': 2
-          '[Start] [shennong_log_profile,logtail_plugin_profile]	config start:success': 2
-          '[Start] [logtail_alarm,logtail_alarm]	config start:success': 2
+          '[Resume] Resume:start': 1
+          '[Resume] checkpoint:Resume': 1
+          '[Resume] Resume:success': 1
+          '[Start] [shennong_log_profile,logtail_plugin_profile]	config start:success': 1
+          '[Start] [logtail_alarm,logtail_alarm]	config start:success': 1
           '[Start] [mock-metric-case_0,e2e-test-logstore]	config start:success': 1
-          '[Start] [1.0#PluginProject##MockConfig2,PluginLogstore]	config start:success': 1
           # Holdon
-          '[HoldOn] Hold on:start	flag:0': 1
           '[HoldOn] Hold on:start	flag:1': 1
-          '[HoldOn] checkpoint:HoldOn': 2
-          '[HoldOn] Hold on:success': 2
-          '[1.0#PluginProject##MockConfig2,PluginLogstore]	Stop config in goroutine:begin': 1
-          '[Stop] [1.0#PluginProject##MockConfig2,PluginLogstore]	config stop:begin	exit:false': 1
-          '[Stop] [1.0#PluginProject##MockConfig2,PluginLogstore]	config stop:success': 1
-          '[Stop] [shennong_log_profile,logtail_plugin_profile]	config stop:begin	exit:false': 1
+          '[HoldOn] checkpoint:HoldOn': 1
+          '[HoldOn] Hold on:success': 1
           '[Stop] [shennong_log_profile,logtail_plugin_profile]	config stop:begin	exit:true': 1
-          '[Stop] [shennong_log_profile,logtail_plugin_profile]	config stop:success': 2
-          '[Stop] [logtail_alarm,logtail_alarm]	config stop:begin	exit:false': 1
+          '[Stop] [shennong_log_profile,logtail_plugin_profile]	config stop:success': 1
           '[Stop] [logtail_alarm,logtail_alarm]	config stop:begin	exit:true': 1
-          '[Stop] [logtail_alarm,logtail_alarm]	config stop:success': 2
+          '[Stop] [logtail_alarm,logtail_alarm]	config stop:success': 1
           '[mock-metric-case_0,e2e-test-logstore]	Stop config in goroutine:begin': 1
           '[Stop] [mock-metric-case_0,e2e-test-logstore]	config stop:begin	exit:true': 1
           '[Stop] [mock-metric-case_0,e2e-test-logstore]	config stop:success': 1
@@ -65,3 +56,6 @@ testing_interval: 5s
 coverage_packages:
   - github.com/alibaba/ilogtail/pluginmanager
   - github.com/alibaba/ilogtail/main
+retry:
+  times: 0
+  interval: 10s

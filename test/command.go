@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/urfave/cli/v2"
 
@@ -56,6 +57,14 @@ var (
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
+				if err := recover(); err != nil {
+					trace := make([]byte, 2048)
+					runtime.Stack(trace, true)
+					logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "panicked", err, "stack", string(trace))
+					logger.Flush()
+					_ = os.Rename(util.GetCurrentBinaryPath()+"logtail_plugin.LOG", config.EngineLogFile)
+					os.Exit(1)
+				}
 				_ = os.Rename(util.GetCurrentBinaryPath()+"logtail_plugin.LOG", config.EngineLogFile)
 			}()
 			configPath := c.String("config")

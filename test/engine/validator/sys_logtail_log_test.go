@@ -30,8 +30,8 @@ var flags = []string{
 }
 
 func prepare() {
-	config.LogtailPluginFile = "a.log"
-	fd, _ := os.OpenFile(config.LogtailPluginFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	config.LogDir = "./"
+	fd, _ := os.OpenFile(config.LogDir+"logtail_plugin.LOG", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	writer := bufio.NewWriter(fd)
 	for i := 0; i < 1000000; i++ {
 		for _, flag := range flags {
@@ -43,13 +43,15 @@ func prepare() {
 }
 
 func clean() {
-	os.Remove(config.LogtailPluginFile)
+	_ = os.Remove(config.LogDir + "logtail_plugin.LOG")
 }
 
 func Test_logtailLogValidator_FetchResult(t *testing.T) {
 	prepare()
 	defer clean()
-	count, err := lineCounter()
+	s := new(logtailLogValidator)
+	_ = s.Start()
+	count, err := s.lineCounter()
 	assert.NoError(t, err)
 	assert.Equal(t, 1000000*len(flags), count)
 
@@ -60,6 +62,7 @@ func Test_logtailLogValidator_FetchResult(t *testing.T) {
 			"adfjsal": 1000000,
 		},
 	})
+	_ = sv.Start()
 	assert.NoError(t, err)
 	result := sv.FetchResult()
 	assert.Equal(t, 0, len(result), "got %v", result)
@@ -76,6 +79,7 @@ func Benchmark(b *testing.B) {
 			"adfjsal": 1000000,
 		},
 	})
+	_ = sv.Start()
 	for i := 0; i < b.N; i++ {
 		sv.FetchResult()
 	}

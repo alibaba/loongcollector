@@ -22,6 +22,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
+	"github.com/alibaba/ilogtail/test/engine/boot"
 	"github.com/alibaba/ilogtail/test/engine/validator"
 )
 
@@ -86,6 +87,7 @@ func (c *ValidatorController) Start() error {
 	go func() {
 		<-c.chain.Done()
 		logger.Info(context.Background(), "validator controller is closing....")
+		boot.CopyCoreLogs()
 		c.Clean()
 		c.flushSummaryReport()
 		c.chain.CancelChild()

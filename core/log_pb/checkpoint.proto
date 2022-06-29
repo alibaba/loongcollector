@@ -1,0 +1,39 @@
+// Copyright 2022 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto2";
+package logtail;
+
+message PrimaryCheckpointPB
+{
+    required uint32 concurrency = 1;
+    required uint32 sig_size = 2;
+    required uint64 sig_hash = 3;
+    optional string config_name = 4;
+    optional string log_path = 5;
+    optional string real_path = 6;
+    optional uint64 dev = 7;
+    optional uint64 inode = 8;
+    optional int32 update_time = 9;
+}
+
+message RangeCheckpointPB
+{
+    required string hash_key = 1;
+    required uint64 sequence_id = 2;
+    required uint64 read_offset = 3;
+    required uint64 read_length = 4;
+    required int32 update_time = 5;
+    required bool committed = 6;
+}

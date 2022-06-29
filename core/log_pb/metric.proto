@@ -1,0 +1,40 @@
+// Copyright 2022 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto2";
+package oas;
+
+message Metric {
+    optional int64 AccessID = 1; // 64-bit ID
+    required uint32 Time = 2; // UNIX Time Format
+    optional string MetricName = 3;
+    optional int64 Value = 4;
+    optional string Source = 5;
+    optional int32 Type = 6;
+
+    message Context {
+        required string Key = 1;
+        required string Value = 2;
+    }
+
+    repeated Context ContextGroup = 7;
+}
+
+message MetricGroup {
+    repeated Metric Metrics = 1;
+    
+    optional int64 AccessID = 2;
+    optional string MetricName = 3;
+    optional string Key = 4;
+}

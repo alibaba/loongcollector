@@ -17,15 +17,12 @@ package controller
 import (
 	"context"
 	"io/ioutil"
-	"os"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/subscriber"
 )
-
-const flusherName = "default_flusher.json"
 
 var globalSubscriberChan <-chan *protocol.LogGroup
 
@@ -62,15 +59,10 @@ func (c *SubscriberController) CancelChain() *CancelChain {
 }
 
 func WriteDefaultFlusherConfig(cfg string) error {
-	return ioutil.WriteFile(config.CaseHome+flusherName, []byte(cfg), 0600)
-}
-
-func CleanFlusherConfig() {
-	_ = os.Remove(config.CaseHome + flusherName)
+	return ioutil.WriteFile(config.FlusherFile, []byte(cfg), 0600)
 }
 
 func (c *SubscriberController) Clean() {
 	logger.Info(context.Background(), "subscriber controller is cleaning....")
 	c.sub.Stop()
-	CleanFlusherConfig()
 }

@@ -102,6 +102,6 @@ library，直接使用 [SLS observable platform](https://www.aliyun.com/product/
 5. 参考`README` 重新启动[Logtail AlibabaCloud] 程序。
 
 ### 基于容器运行 [Logtail AlibabaCloud](https://help.aliyun.com/document_detail/28979.html)
-1. 运行 `make wholedocker` 进行 [Logtail AlibabaCloud](https://help.aliyun.com/document_detail/28979.html)docker 模式编译，编译后的镜像为 `aliyun/ilogtail：latest`。
-2. 将`aliyun/ilogtail：latest` 重命名为镜像仓库镜像并push到远程仓库，如 `registry.cn-beijing.aliyuncs.com/log-service/local-test:0.0.1`。
+1. 运行 `make wholedocker` 进行 [Logtail AlibabaCloud](https://help.aliyun.com/document_detail/28979.html)docker 模式编译，编译后的镜像为 `aliyun/ilogtail:latest`。
+2. 将`aliyun/ilogtail:latest` 重命名为镜像仓库镜像并push到远程仓库，如 `registry.cn-beijing.aliyuncs.com/aliyun/ilogtail:0.0.1`。
 3. 将 [ACK](https://www.aliyun.com/product/list/alibabacloudnative)) logtail-ds 组件镜像进行替换并重启，或将自建平台镜像进行替换并重启。

@@ -26,5 +26,8 @@ verify:
       validator: sys_docker_profile
       spec:
         expect_every_second_maximum_cpu: 400
-        expect_every_second_maximum_mem: 30M
+        expect_every_second_maximum_mem: 40M
 testing_interval: 30s
+retry:
+  times: 0
+  interval: 10s

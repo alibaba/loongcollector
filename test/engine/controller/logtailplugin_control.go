@@ -42,24 +42,26 @@ type LogtailPluginController struct {
 }
 
 func (c *LogtailPluginController) Init(parent *CancelChain, cfg *config.Case) error {
-	logger.Info(context.Background(), "ilogtail controller is initializing....")
+	logger.Info(context.Background(), "ilogtail plugin controller is initializing....")
 	c.chain = WithCancelChain(parent)
 	c.cfg = &cfg.Ilogtail
-	duration, err := time.ParseDuration(c.cfg.CloseWait)
-	if err != nil {
-		return err
+	if len(c.cfg.Config) != 0 {
+		duration, err := time.ParseDuration(c.cfg.CloseWait)
+		if err != nil {
+			return err
+		}
+		c.waitDuration = duration
+		loadDuration, err := time.ParseDuration(c.cfg.LoadConfigWait)
+		if err != nil {
+			return err
+		}
+		c.loadDuration = loadDuration
 	}
-	c.waitDuration = duration
-	loadDuration, err := time.ParseDuration(c.cfg.LoadConfigWait)
-	if err != nil {
-		return err
-	}
-	c.loadDuration = loadDuration
 	return nil
 }
 
 func (c *LogtailPluginController) Start() error {
-	logger.Info(context.Background(), "ilogtail controller is starting....")
+	logger.Info(context.Background(), "ilogtail plugin controller is starting....")
 	address := boot.GetPhysicalAddress(lotailpluginHTTPAddress)
 	if address == "" {
 		return errors.New("ilogtail export virtual address should be " + lotailpluginHTTPAddress)
@@ -93,11 +95,10 @@ func (c *LogtailPluginController) Start() error {
 			logger.Infof(context.Background(), "the next load config operation would be started in %s", c.cfg.LoadConfigWait)
 		}
 	}
-
 	// unload test case configuration
 	go func() {
 		<-c.chain.Done()
-		logger.Info(context.Background(), "ilogtail controller is closing....")
+		logger.Info(context.Background(), "ilogtail plugin controller is closing....")
 		c.Clean()
 		resp, err := http.Get("http://" + boot.GetPhysicalAddress(lotailpluginHTTPAddress) + "/holdon")
 		if err != nil {
@@ -120,5 +121,5 @@ func (c *LogtailPluginController) CancelChain() *CancelChain {
 }
 
 func (c *LogtailPluginController) Clean() {
-	logger.Info(context.Background(), "ilogtail controller is cleaning....")
+	logger.Info(context.Background(), "ilogtail plugin controller is cleaning....")
 }

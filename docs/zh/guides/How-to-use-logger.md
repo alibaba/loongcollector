@@ -48,7 +48,7 @@ logger.Info(context.Background(), "a", "b")
 ### 高级用法-自定义Logger
 你可以使用[logger.ConfigOption](../../../pkg/logger)设置Logger 的行为，比如输出、日志级别、异步打印等。
 ```go
-package main
+package test
 
 import (
 	"context"

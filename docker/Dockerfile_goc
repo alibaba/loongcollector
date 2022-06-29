@@ -14,6 +14,6 @@
 
 # goc server is only for e2e test to analysis code coverage.
 
-FROM sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/logtailplugin-base:1.16-goc
+FROM sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux-amd64:latest
 
 ENTRYPOINT ["goc","server"]

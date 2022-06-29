@@ -19,12 +19,14 @@ setups: []
 ilogtail:
     config:
         - name: mock-metric-case
+          mixed_mode: false
           content:
             - '{"inputs":[{"type":"metric_mock","detail":{"IntervalMs": 1000,"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"content":"xxxxx","time":"2017.09.12 20:55:36"}}}]}'
     load_config_wait: 5s
     close_wait: 5s
     env: {}
     depends_on: {}
+    mounts: []
 subscriber:
     name: grpc
     config:
@@ -54,7 +56,7 @@ verify:
             expect_equal_raw_log: true
             expect_minimum_log_num: 15
 retry:
-    times: 1
+    times: 0
     interval: 10s
 testing_interval: 16s
 coverage_packages:

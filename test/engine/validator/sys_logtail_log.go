@@ -37,6 +37,9 @@ const logtailLogValidatorName = "sys_logtail_log"
 
 type logtailLogValidator struct {
 	ExpectContainsLogTimes map[string]int `mapstructure:"expect_contains_log_times" comment:"the times of the expected logs in LogtailPlugin."`
+	Main                   bool           `mapstructure:"main_log" comment:"the C part log would be checked when configured true, otherwise is Go part log."`
+	logtailPluginLog       string
+	logtailLog             string
 }
 
 func (l *logtailLogValidator) Description() string {
@@ -44,8 +47,9 @@ func (l *logtailLogValidator) Description() string {
 }
 
 func (l *logtailLogValidator) Start() error {
-	_, err := os.Stat(config.LogtailPluginFile)
-	return err
+	l.logtailPluginLog = config.LogDir + "/logtail_plugin.LOG"
+	l.logtailLog = config.LogDir + "/ilogtail.LOG"
+	return nil
 }
 
 func (l *logtailLogValidator) Valid(group *protocol.LogGroup) {
@@ -53,14 +57,14 @@ func (l *logtailLogValidator) Valid(group *protocol.LogGroup) {
 }
 
 func (l *logtailLogValidator) FetchResult() (reports []*Report) {
-	count, err := lineCounter()
+	count, err := l.lineCounter()
 	logger.Infof(context.Background(), "find %d lines of the logtail plugin log", count)
 	if err != nil {
-		logger.Error(context.Background(), "READ_LOG_ALARM", "file", config.LogtailPluginFile)
+		logger.Error(context.Background(), "READ_LOG_ALARM", "file", l.GetFile(), "err", err)
 		reports = append(reports, &Report{Validator: logtailLogValidatorName, Name: "err", Want: "success", Got: "error"})
 		return
 	}
-	f, _ := os.Open(config.LogtailPluginFile)
+	f, _ := os.Open(l.GetFile())
 
 	workerNum := count/200000 + 1
 
@@ -133,8 +137,16 @@ func (l *logtailLogValidator) Name() string {
 	return logtailLogValidatorName
 }
 
-func lineCounter() (int, error) {
-	r, err := os.Open(config.LogtailPluginFile)
+func (l *logtailLogValidator) GetFile() string {
+	if l.Main {
+		return l.logtailLog
+	}
+	return l.logtailPluginLog
+
+}
+
+func (l *logtailLogValidator) lineCounter() (int, error) {
+	r, err := os.Open(l.GetFile())
 	if err != nil {
 		return -1, err
 	}

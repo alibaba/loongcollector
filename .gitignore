@@ -1,17 +1,41 @@
-main/main
+# editor
+*.swp
+*.swo
+.DS_Store
+# ctags generated file.
+/tags
+# backup files.
+*.bak
+
+# go
+plugin_main/plugin_main
 pluginmanager/checkpoint/
-*.txt
 *.prof
-*.gif
-main/checkpoint/*
+plugin_main/checkpoint/*
 *.LOG
 *.LOG.*
 *.test
-*.swp
-.idea/
 plugin_logger.xml
-logtail_plugin.LOG*
-plugins/input/input_telegraf/local_test/telegraf.conf
 license_coverage.txt
+
+# C++
+CMakeFiles
+CMakeCache.txt
+*.cmake
+Makefile
+*.cbp
+*.a
+core/log_pb/*.pb.*
+core/build/
+core/common/Version.cpp
+core/installer/public/
+!/Makefile
+!core/dependencies.cmake
+!core/utils.cmakels
+!core/libulogfs.a
+
+# output
 e2e-test
 bin/
+build/
+find_licenses/

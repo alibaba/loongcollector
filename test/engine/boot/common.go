@@ -31,6 +31,7 @@ var started bool
 type Booter interface {
 	Start() error
 	Stop() error
+	CopyCoreLogs()
 }
 
 // Load configuration to the Booter.
@@ -76,6 +77,15 @@ func ShutDown() error {
 	}
 	started = false
 	return nil
+}
+
+func CopyCoreLogs() {
+	mu.Lock()
+	defer mu.Unlock()
+	if !started {
+		return
+	}
+	instance.CopyCoreLogs()
 }
 
 func GetPhysicalAddress(virtual string) string {

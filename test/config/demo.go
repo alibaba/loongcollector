@@ -23,7 +23,7 @@ var DemoCase = Case{
 	Ilogtail: Ilogtail{
 		LoadConfigWait: "5s",
 		CloseWait:      "5s",
-		Config: []LogtailpluginCfgs{
+		Config: []LogtailCfgs{
 			{
 				Name: "mock-metric-case",
 				Content: []string{
@@ -31,10 +31,11 @@ var DemoCase = Case{
 				},
 			},
 		},
+		MountFiles: []string{},
 	},
 	SetUps: []SetUp{},
 	Retry: Retry{
-		Times:    1,
+		Times:    0,
 		Interval: "10s",
 	},
 	Verify: Verify{

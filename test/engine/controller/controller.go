@@ -68,6 +68,7 @@ func Start(cfg *config.Case) error {
 		sequence = append(sequence,
 			new(HTTPCaseController),
 			new(LogtailPluginController),
+			new(LogtailController),
 			validatorController,
 			new(SubscriberController),
 			new(BootController),

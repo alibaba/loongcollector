@@ -27,8 +27,10 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 )
 
-// DockerConfigInitFlag alibaba log docker env config flag, set yes if you want to use it
+// DockerConfigInitFlag is the alibaba log docker env config flag, set yes if you want to use it. And it is also a special flag to control enable go part in ilogtail. If you just want to
+// enable logtail plugin and off the env config, set the env called ALICLOUD_LOG_PLUGIN_ENV_CONFIG with false.
 var DockerConfigInitFlag = flag.Bool("ALICLOUD_LOG_DOCKER_ENV_CONFIG", false, "alibaba log docker env config flag, set true if you want to use it")
+var DockerConfigPluginInitFlag = flag.Bool("ALICLOUD_LOG_PLUGIN_ENV_CONFIG", true, "alibaba log docker env config flag, set true if you want to use it")
 
 // AliCloudECSFlag set true if your docker is on alicloud ECS, so we can use ECS meta
 var AliCloudECSFlag = flag.Bool("ALICLOUD_LOG_ECS_FLAG", false, "set true if your docker is on alicloud ECS, so we can use ECS meta")
@@ -115,6 +117,7 @@ func initConfig() {
 	_ = util.InitFromEnvString("ALICLOUD_LOG_CONFIG_PREFIX", LogConfigPrefix, *LogConfigPrefix)
 	_ = util.InitFromEnvString("ALICLOUD_LOG_PRODUCT_DOMAIN", ProductAPIDomain, *ProductAPIDomain)
 	_ = util.InitFromEnvString("ALICLOUD_LOG_REGION", DefaultRegion, *DefaultRegion)
+	_ = util.InitFromEnvBool("ALICLOUD_LOG_PLUGIN_ENV_CONFIG", DockerConfigPluginInitFlag, *DockerConfigPluginInitFlag)
 
 	if len(*DefaultRegion) == 0 {
 		*DefaultRegion = util.GuessRegionByEndpoint(*LogServiceEndpoint, "cn-hangzhou")
@@ -123,7 +126,7 @@ func initConfig() {
 
 	_ = util.InitFromEnvInt("ALICLOUD_LOG_ENV_CONFIG_UPDATE_INTERVAL", DockerEnvUpdateInterval, *DockerEnvUpdateInterval)
 
-	if *DockerConfigInitFlag {
+	if *DockerConfigInitFlag && *DockerConfigPluginInitFlag {
 		// init docker config
 		logger.Info(context.Background(), "init docker env config, ECS flag", *AliCloudECSFlag, "prefix", *DockerConfigPrefix, "project", *DefaultLogProject, "machine group", *DefaultLogMachineGroup, "id", *DefaultAccessKeyID)
 

@@ -1,0 +1,2 @@
+SMHasher is a test suite designed to test the distribution, collision, and performance properties of non-cryptographic hash functions.
+This is the home for the MurmurHash family of hash functions along with the SMHasher test suite used to verify them. SMHasher is released under the MIT license. All MurmurHash versions are public domain software, and the author disclaims all copyright to their code.

@@ -13,13 +13,13 @@ make solib
 
 ### Build image. 
     - The default {DOCKER_REPOSITORY} is `aliyun/ilogtail`.
-    - The default {VERSION} is `github-latest`.
+    - The default {VERSION} is `1.1.0`.
     - The default {DOCKER_PUSH} is `false`. When the option is configured as true, the built images would also be pushed to the {DOCKER_REPOSITORY} with {VERSION} tag.
 
     ```shell
         DOCKER_PUSH={DOCKER_PUSH} DOCKER_REPOSITORY={DOCKER_REPOSITORY} VERSION={VERSION} make wholedocker
     ```
-   So when you exec `make wholedocker` command, the built image named as `aliyun/ilogtail:github-latest` would be stored in local repository.
+   So when you exec `make wholedocker` command, the built image named as `aliyun/ilogtail:1.1.0` would be stored in local repository.
 
 
 ## Build Pure Go image.
@@ -27,10 +27,10 @@ If the features that you want to use only in Go part, such as collecting stdout 
 
 ### Build image.
     - The default {DOCKER_REPOSITORY} is `aliyun/ilogtail`.
-    - The default {VERSION} is `github-latest`.
+    - The default {VERSION} is `1.1.0`.
     - The default {DOCKER_PUSH} is `false`. When the option is configured as true, the built images would also be pushed to the {DOCKER_REPOSITORY} with {VERSION} tag.
 
     ```shell
         DOCKER_PUSH={DOCKER_PUSH} DOCKER_REPOSITORY={DOCKER_REPOSITORY} VERSION={VERSION} make docker
     ```
-So when you exec `make docker` command, the built image named as `aliyun/ilogtail:github-latest` would be stored in local repository.
+So when you exec `make docker` command, the built image named as `aliyun/ilogtail:1.1.0` would be stored in local repository.

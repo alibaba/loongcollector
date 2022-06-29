@@ -58,7 +58,7 @@ You can use [logger.ConfigOption](../../../pkg/logger) to set the behavior of Lo
 asynchronous printing, etc.
 
 ```go
-package main
+package test
 
 import (
 	"context"

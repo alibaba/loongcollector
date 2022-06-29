@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -54,11 +55,11 @@ services:
       interval: 1s
       retries: 10
   ilogtail:
-    image: aliyun/ilogtail:github-latest
+    image: aliyun/ilogtail:1.1.0
     hostname: ilogtail
     volumes:
-      - ./default_flusher.json:/aliyun/default_flusher.json
-      - %s:/aliyun/logtail_plugin.LOG
+      - %s:/ilogtail/default_flusher.json
+      - %s:/ilogtail/user_local_config.json
       - /:/logtail_host
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
@@ -67,14 +68,19 @@ services:
       - LOGTAIL_FORCE_COLLECT_SELF_TELEMETRY=true
       - LOGTAIL_DEBUG_FLAG=true
       - LOGTAIL_AUTO_PROF=false
+      - LOGTAIL_HTTP_LOAD_CONFIG=true
+      - ALICLOUD_LOG_DOCKER_ENV_CONFIG=true
+      - ALICLOUD_LOG_PLUGIN_ENV_CONFIG=false
+      - ALIYUN_LOGTAIL_USER_DEFINED_ID=1111
 `
 )
 
 // ComposeBooter control docker-compose to start or stop containers.
 type ComposeBooter struct {
-	cfg   *config.Case
-	cli   *client.Client
-	gocID string
+	cfg       *config.Case
+	cli       *client.Client
+	gocID     string
+	logtailID string
 }
 
 // StrategyWrapper caches the real wait.StrategyTarget to get the metadata of the running containers.
@@ -115,6 +121,7 @@ func (c *ComposeBooter) Start() error {
 		logger.Errorf(context.Background(), "LOGTAIL_COMPOSE_ALARM", "logtail container size is not equal 1, got %d count", len(list))
 		return err
 	}
+	c.logtailID = list[0].ID
 	gocList, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", "goc")),
 	})
@@ -130,7 +137,7 @@ func (c *ComposeBooter) Start() error {
 		"-c",
 		"env |grep HOST_OS|grep Linux && ip -4 route list match 0/0|awk '{print $3\" host.docker.internal\"}' >> /etc/hosts",
 	}
-	if err := c.exec(list[0].ID, cmd); err != nil {
+	if err := c.exec(c.logtailID, cmd); err != nil {
 		return err
 	}
 	return registerDockerNetMapping(strategyWrappers)
@@ -182,6 +189,25 @@ func (c *ComposeBooter) exec(id string, cmd []string) error {
 	return nil
 }
 
+func (c *ComposeBooter) CopyCoreLogs() {
+	if c.logtailID != "" {
+		_ = os.Remove(config.LogDir)
+		_ = os.Mkdir(config.LogDir, 0750)
+		cmd := exec.Command("docker", "cp", c.logtailID+":/ilogtail/ilogtail.LOG", config.LogDir) //nolint:gosec
+		output, err := cmd.CombinedOutput()
+		logger.Debugf(context.Background(), "\n%s", string(output))
+		if err != nil {
+			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "main", "err", err)
+		}
+		cmd = exec.Command("docker", "cp", c.logtailID+":/ilogtail/logtail_plugin.LOG", config.LogDir) //nolint:gosec
+		output, err = cmd.CombinedOutput()
+		logger.Debugf(context.Background(), "\n%s", string(output))
+		if err != nil {
+			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "plugin", "err", err)
+		}
+	}
+}
+
 func (s *StrategyWrapper) WaitUntilReady(ctx context.Context, target wait.StrategyTarget) error {
 	s.target = target
 	return s.original.WaitUntilReady(ctx, target)
@@ -228,13 +254,12 @@ func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 		envs = append(envs, k+"="+v)
 	}
 	cfg := make(map[string]interface{})
-	f, _ := os.Create(config.LogtailPluginFile)
+	f, _ := os.Create(config.CoverageFile)
 	_ = f.Close()
-	f, _ = os.Create(config.CoverageFile)
-	_ = f.Close()
-	str := fmt.Sprintf(template, config.CoverageFile, config.LogtailPluginFile)
-	_ = yaml.Unmarshal([]byte(str), &cfg)
-
+	str := fmt.Sprintf(template, config.CoverageFile, config.FlusherFile, config.ConfigFile)
+	if err := yaml.Unmarshal([]byte(str), &cfg); err != nil {
+		panic(err)
+	}
 	services := cfg["services"].(map[string]interface{})
 	ilogtail := services["ilogtail"].(map[string]interface{})
 	if len(envs) > 0 {
@@ -247,7 +272,11 @@ func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 		"condition": "service_healthy",
 	}
 	ilogtail["depends_on"] = c.cfg.Ilogtail.DependsOn
-
+	for _, m := range c.cfg.Ilogtail.MountFiles {
+		ilogtail["volumes"] = append(ilogtail["volumes"].([]interface{}), m)
+	}
+	bytes, _ := yaml.Marshal(cfg)
+	println(string(bytes))
 	return cfg
 }
 

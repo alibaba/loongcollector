@@ -1,0 +1,59 @@
+// Copyright 2022 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto2";
+package sls_logs;
+
+message Log
+{
+    required uint32 Time = 1;// UNIX Time Format
+    message Content
+    {
+        required string Key = 1;
+        required string Value = 2;
+    }  
+    repeated Content Contents= 2;
+
+}
+message LogTag
+{
+    required string Key = 1;
+    required string Value = 2;
+}
+message LogGroup
+{
+    repeated Log Logs= 1;
+    optional string Category = 2;
+    optional string Topic = 3;
+    optional string Source = 4;
+    optional string MachineUUID = 5;
+    repeated LogTag LogTags = 6;
+}
+
+message SlsLogPackage
+{
+    required bytes data = 1;  // the serialized data of LogGroup , may be compressed
+    optional int32 uncompress_size = 2;  
+}
+
+message SlsLogPackageList
+{
+    repeated SlsLogPackage packages = 1;
+}
+
+message LogGroupList
+{
+    repeated LogGroup logGroupList = 1;
+}
+

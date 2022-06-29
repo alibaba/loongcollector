@@ -147,15 +147,11 @@ verify:
           '[Start] [shennong_log_profile,logtail_plugin_profile]	config start:success': 4
           '[Start] [logtail_alarm,logtail_alarm]	config start:success': 4
           '[Start] [nomal-case_0,e2e-test-logstore]	config start:success': 1
-          '[Start] [1.0#PluginProject##MockConfig2,PluginLogstore]	config start:success': 1
           # Holdon
           '[HoldOn] Hold on:start	flag:0': 3
           '[HoldOn] Hold on:start	flag:1': 1
           '[HoldOn] checkpoint:HoldOn': 4
           '[HoldOn] Hold on:success': 4
-          '[1.0#PluginProject##MockConfig2,PluginLogstore]	Stop config in goroutine:begin': 1
-          '[Stop] [1.0#PluginProject##MockConfig2,PluginLogstore]	config stop:begin	exit:false': 1
-          '[Stop] [1.0#PluginProject##MockConfig2,PluginLogstore]	config stop:success': 1
           '[Stop] [shennong_log_profile,logtail_plugin_profile]	config stop:begin	exit:false': 3
           '[Stop] [shennong_log_profile,logtail_plugin_profile]	config stop:begin	exit:true': 1
           '[Stop] [shennong_log_profile,logtail_plugin_profile]	config stop:success': 4

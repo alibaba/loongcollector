@@ -27,36 +27,9 @@ ilogtail:
                                "STDOUT_SWITCH":"true"
                            },
                            "Stdout":true,
-                           "BeginLineRegex":"\\[\\d+-\\d+-\\d+\\s\\S+\\].*"
+                           "BeginLineRegex":"today"
                        }
                    }
-               ],
-               "processors":[
-                   {
-                       "detail":{
-                           "Include":{
-                               "content":".*(Exception).*"
-                           }
-                       },
-                       "type":"processor_filter_regex"
-                   },
-                   {
-                                       "detail":{
-                                           "SourceKey":"content",
-                                           "Regex":"\\[([^]]+)]-\\[(\\S+)\\s(\\w+\\s+)\\w+:(\\S+\\s)(.*)",
-                                           "Keys":[
-                                               "time",
-                                               "info",
-                                               "level",
-                                               "traceid",
-                                               "message"
-                                           ],
-                                           "KeepSource":false,
-                                           "NoKeyError":true,
-                                           "NoMatchError":true
-                                       },
-                                       "type":"processor_regex"
-                                   }
                ]
            }
 

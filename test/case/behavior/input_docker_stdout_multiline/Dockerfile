@@ -14,6 +14,4 @@
 
 FROM busybox
 
-COPY a.log a.log
-
-CMD ["sh", "-c","cat a.log && sleep 90"]
+CMD ["sh", "-c","echo \"today\nhello\" && sleep 90"]

@@ -40,9 +40,40 @@ iLogtail 为可观测场景而生，拥有的轻量级、高性能、自动化�
 
 # 快速开始
 
-本仓库是**iLogtail**的golang部分，包含了iLogtail的大部分功能。 而且，它可以单独工作，也可以使用 CGO 与 iLogtail-C（即将开源）一起工作。
+本仓库是**iLogtail**的开源版本，包括C++核心部分和golang插件部分，含盖了iLogtail的绝大部分功能。承接先前开源的golang部分，保留了纯插件的工作模式。
 
-1.本地启动
+1.完整模式本地启动
+
+```shell
+# Build ilogtail and plugins
+make all
+# Let's start with a simple config
+cp -a example_config/quick_start/* bin
+# Start ilogtail
+cd bin
+nohup ./ilogtail > stdout.log 2> stderr.log &
+# Generate a log
+echo 'hello world!' >> simple.log
+# Show collected logs
+cat stdout.log
+```
+
+2.完整模式Docker启动
+
+```shell
+make wholedocker
+docker run -d --name ilogtail-ds -v core/example_config/user_yaml_config.d:/usr/local/ilogtail/user_yaml_config.d aliyun/ilogtail:local-build
+```
+
+3.完整模式K8s启动
+
+```shell
+VERSION=snapshot make wholedocker
+kubectl apply -f xxx-configmap.yaml
+kubectl apply -f xxx-deployment.yaml
+```
+
+4.纯插件模式本地启动
 
 ```shell
 make build && sh bin/ilogtail
@@ -56,7 +87,8 @@ make build && sh bin/ilogtail
 > #ubuntu
 > apt-get update && apt-get install -y libsystemd-dev
 > ```
-2、阿里云启动
+
+5.阿里云启动
 
 请阅读此 [doc](https://help.aliyun.com/document_detail/65018.html)。
 

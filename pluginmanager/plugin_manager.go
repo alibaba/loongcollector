@@ -16,8 +16,8 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/helper"
-	"github.com/alibaba/ilogtail/main/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/plugin_main/flags"
 
 	"context"
 	"runtime"

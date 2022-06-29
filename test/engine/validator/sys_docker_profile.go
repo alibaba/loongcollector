@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,7 +54,7 @@ func (d *dockerProfileSystemValidator) Description() string {
 
 func (d *dockerProfileSystemValidator) Start() error {
 	list, err := d.cli.ContainerList(context.Background(), types.ContainerListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", "ilogtail")),
+		Filters: filters.NewArgs(filters.Arg("name", "ilogtail-e2e_ilogtail")),
 	})
 	if err != nil {
 		logger.Errorf(context.Background(), "DOCKER_PROFILE_ALARM", "error in find logtailplugon container: %v", err)
@@ -86,6 +87,7 @@ func (d *dockerProfileSystemValidator) Valid(group *protocol.LogGroup) {
 func (d *dockerProfileSystemValidator) FetchResult() (reports []*Report) {
 	close(d.cancel)
 	d.waitGroup.Wait()
+	res := make([]string, 0, len(d.cpu))
 	if d.ExpectEverySecondMaximumCPU > 0 {
 		for i := 0; i < len(d.cpu); i++ {
 			if d.cpu[i] > d.ExpectEverySecondMaximumCPU {
@@ -96,6 +98,11 @@ func (d *dockerProfileSystemValidator) FetchResult() (reports []*Report) {
 			}
 		}
 	}
+	for _, f := range d.cpu {
+		res = append(res, strconv.FormatFloat(f, 'f', 2, 64)+"%")
+	}
+	logger.Info(context.Background(), "cost cpu", strings.Join(res, ","))
+	res = res[:0]
 	if d.ExpectEverySecondMaximumMem != "" {
 		for i := 0; i < len(d.mem); i++ {
 			if d.mem[i] > uint64(d.memSize) {
@@ -106,6 +113,10 @@ func (d *dockerProfileSystemValidator) FetchResult() (reports []*Report) {
 			}
 		}
 	}
+	for _, f := range d.mem {
+		res = append(res, units.HumanSize(float64(f)))
+	}
+	logger.Info(context.Background(), "cost mem", strings.Join(res, ","))
 	return
 }
 

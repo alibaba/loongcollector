@@ -54,8 +54,8 @@ jobs:
         with:
           submodules: true
 
-      - name: Build
-        run: make build
+      - name: Build pure plugin
+        run: make plugin_main
 
       - name: Build Docker
         if: matrix.runner == 'ubuntu-latest'

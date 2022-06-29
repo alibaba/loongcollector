@@ -35,14 +35,16 @@ const (
 )
 
 var (
-	CaseHome          string
-	CaseName          string
-	EngineLogFile     string
-	ReportFile        string
-	PprofDir          string
-	ProfileFlag       bool
-	LogtailPluginFile string
-	CoverageFile      string
+	CaseHome      string
+	CaseName      string
+	EngineLogFile string
+	ReportFile    string
+	PprofDir      string
+	ProfileFlag   bool
+	CoverageFile  string
+	FlusherFile   string
+	ConfigFile    string
+	LogDir        string
 )
 
 // Load E2E engine config and define the global variables.
@@ -62,11 +64,14 @@ func Load(path string, profile bool) (*Case, error) {
 	reportDir := root + "/report/"
 	_ = os.Mkdir(reportDir, 0750)
 	EngineLogFile = reportDir + CaseName + "_engine.log"
-	LogtailPluginFile = reportDir + CaseName + "_ilogtail.log"
 	CoverageFile = reportDir + CaseName + "_coverage.out"
 	ReportFile = reportDir + CaseName + "_report.json"
 	PprofDir = reportDir + CaseName + "_pprof"
+	LogDir = reportDir + CaseName + "_log"
 	ProfileFlag = profile
+
+	FlusherFile = reportDir + CaseName + "default_flusher.json"
+	ConfigFile = reportDir + CaseName + "config.json"
 	return c, nil
 }
 

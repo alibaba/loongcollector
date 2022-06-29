@@ -17,9 +17,9 @@ iLogtail 插件基于 Go 语言实现，所以在进行开发前，需要安装�
 ```
 
 ### Docker 启动
-在根目录执行 `make docker` 命令，会得到 `aliyun/ilogtail:github-latest` 镜像，使用以下命令可以快速启动docker 程序，程序的行为与上述本地启动程序相同，日志输出于 `/aliyun/logtail_plugin.LOG` 文件。
+在根目录执行 `make docker` 命令，会得到 `aliyun/ilogtail:1.1.0` 镜像，使用以下命令可以快速启动docker 程序，程序的行为与上述本地启动程序相同，日志输出于 `/aliyun/logtail_plugin.LOG` 文件。
 ```shell
-make docker && docker run aliyun/ilogtail:github-latest 
+make docker && docker run aliyun/ilogtail:1.1.0
 ```
 
 ## 配置
@@ -136,5 +136,5 @@ Fields\":{\"Content\":\"quickstart_input_1\"}}},{\"type\":\"metric_mock\",\"deta
 
 ### C API 配置变更
 
-iLogtail-C 部分即将开源，提供将iLogtail GO 程序以C-shared 模式编译，与C 程序结合使用的功能，对外开放API 参考 [plugin_export.go](../../../main/plugin_export.go)。
+iLogtail-C 部分即将开源，提供将iLogtail GO 程序以C-shared 模式编译，与C 程序结合使用的功能，对外开放API 参考 [plugin_export.go](../../../plugin_main/plugin_export.go)。
 

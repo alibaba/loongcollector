@@ -52,3 +52,6 @@ verify:
         expect_equal_flush_log: true
         expect_minimum_log_num: 10
 testing_interval: 15s
+retry:
+  times: 0
+  interval: 10s
