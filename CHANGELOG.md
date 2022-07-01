@@ -34,4 +34,6 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 ## [Unreleased]
+- [public] [both] [updated] change CGO ProcessLogs API to ProcessLog
+- [public] [both] [fixed] fixed GetContainerMeta data race problem
 - [public] [both] [added] add cpp core source code

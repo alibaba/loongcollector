@@ -511,21 +511,19 @@ func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic st
 	return 0
 }
 
-func (lc *LogstoreConfig) ProcessLogs(logBytes [][]byte, packID string, topic string, tags []byte) int {
-	for _, logByte := range logBytes {
-		log := &protocol.Log{}
-		err := log.Unmarshal(logByte)
-		if err != nil {
-			logger.Error(lc.Context.GetRuntimeContext(), "WRONG_PROTOBUF_ALARM",
-				"cannot process logs passed by core, err", err)
-			continue
-		}
-		if len(topic) > 0 {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
-		}
-		extractTags(tags, log)
-		lc.LogsChan <- log
+func (lc *LogstoreConfig) ProcessLog(logByte []byte, packID string, topic string, tags []byte) int {
+	log := &protocol.Log{}
+	err := log.Unmarshal(logByte)
+	if err != nil {
+		logger.Error(lc.Context.GetRuntimeContext(), "WRONG_PROTOBUF_ALARM",
+			"cannot process logs passed by core, err", err)
+		return -1
 	}
+	if len(topic) > 0 {
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
+	}
+	extractTags(tags, log)
+	lc.LogsChan <- log
 	return 0
 }
 

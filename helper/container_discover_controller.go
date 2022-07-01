@@ -32,7 +32,7 @@ var FetchAllInterval = time.Second * time.Duration(300)
 //   failed continuously. By default, 20 times of FetchAllInterval.
 var fetchAllSuccessTimeout = FetchAllInterval * 20
 var DockerCenterTimeout = time.Second * time.Duration(30)
-var MaxFetchOneTriggerPerSecond int32 = 10
+var MaxFetchOneTriggerPerSecond int32 = 200
 
 type ContainerDiscoverManager struct {
 	enableDockerDiscover bool // maybe changed

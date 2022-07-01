@@ -16,8 +16,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -121,15 +121,14 @@ func ProcessRawLogV2(configName string, rawLog []byte, packId string, topic stri
 	return config.ProcessRawLogV2(rawLog, packId, util.StringDeepCopy(topic), tags)
 }
 
-//export ProcessLogs
-func ProcessLogs(configName string, logBytes [][]byte, packId string, topic string, tags []byte) int {
-	logger.Debug(context.Background(), "ProcessLogs triggered")
+//export ProcessLog
+func ProcessLog(configName string, logBytes []byte, packId string, topic string, tags []byte) int {
 	config, exists := pluginmanager.LogtailConfig[configName]
 	if !exists {
-		logger.Debug(context.Background(), "ProcessLogs not found", configName)
+		logger.Debug(context.Background(), "ProcessLog not found", configName)
 		return -1
 	}
-	return config.ProcessLogs(logBytes, packId, util.StringDeepCopy(topic), tags)
+	return config.ProcessLog(logBytes, packId, util.StringDeepCopy(topic), tags)
 }
 
 //export HoldOn
@@ -170,74 +169,57 @@ func CtlCmd(configName string, cmdId int, cmdDetail string) {
 //export GetContainerMeta
 func GetContainerMeta(containerID string) *C.struct_containerMeta {
 	logger.Init()
-	convertFunc := func(detail *helper.DockerInfoDetail) *C.struct_containerMeta {
-		returnStruct := (*C.struct_containerMeta)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_containerMeta{}))))
-		returnStruct.podName = C.CString(detail.K8SInfo.Pod)
-		returnStruct.k8sNamespace = C.CString(detail.K8SInfo.Namespace)
-		if detail.K8SInfo.ContainerName == "" {
-			returnStruct.containerName = C.CString(detail.ContainerNameTag["_container_name_"])
-		} else {
-			returnStruct.containerName = C.CString(detail.K8SInfo.ContainerName)
-		}
-		returnStruct.image = C.CString(detail.ContainerNameTag["_image_name_"])
-		returnStruct.k8sLabelsSize = C.int(len(detail.K8SInfo.Labels))
-		if len(detail.K8SInfo.Labels) > 0 {
-			ck8sLabelsKey := C.makeCharArray(returnStruct.k8sLabelsSize)
-			ck8sLabelsVal := C.makeCharArray(returnStruct.k8sLabelsSize)
-			count := 0
-			for k, v := range detail.K8SInfo.Labels {
-				C.setArrayString(ck8sLabelsKey, C.CString(k), C.int(count))
-				C.setArrayString(ck8sLabelsVal, C.CString(v), C.int(count))
-				count++
-			}
-			returnStruct.k8sLabelsKey = ck8sLabelsKey
-			returnStruct.k8sLabelsVal = ck8sLabelsVal
-		}
-		returnStruct.containerLabelsSize = C.int(len(detail.ContainerInfo.Config.Labels))
-		if len(detail.ContainerInfo.Config.Labels) > 0 {
-			cContainerLabelsKey := C.makeCharArray(returnStruct.containerLabelsSize)
-			cContainerLabelsVal := C.makeCharArray(returnStruct.containerLabelsSize)
-			count := 0
-			for k, v := range detail.ContainerInfo.Config.Labels {
-				C.setArrayString(cContainerLabelsKey, C.CString(k), C.int(count))
-				C.setArrayString(cContainerLabelsVal, C.CString(v), C.int(count))
-				count++
-			}
-			returnStruct.containerLabelsKey = cContainerLabelsKey
-			returnStruct.containerLabelsVal = cContainerLabelsVal
-		}
-		returnStruct.envSize = C.int(len(detail.ContainerInfo.Config.Env))
-		if len(detail.ContainerInfo.Config.Env) > 0 {
-			cEnvsKey := C.makeCharArray(returnStruct.envSize)
-			cEnvsVal := C.makeCharArray(returnStruct.envSize)
-			count := 0
-			for _, env := range detail.ContainerInfo.Config.Env {
-				var envKey, envValue string
-				splitArray := strings.SplitN(env, "=", 2)
-				if len(splitArray) < 2 {
-					envKey = splitArray[0]
-				} else {
-					envKey = splitArray[0]
-					envValue = splitArray[1]
-				}
+	meta := helper.GetContainerMeta(containerID)
+	if meta == nil {
+		logger.Debug(context.Background(), "get meta", "")
+		return nil
+	}
+	if logger.DebugFlag() {
+		bytes, _ := json.Marshal(meta)
+		logger.Debug(context.Background(), "get meta", string(bytes))
+	}
+	returnStruct := (*C.struct_containerMeta)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_containerMeta{}))))
+	returnStruct.podName = C.CString(meta.PodName)
+	returnStruct.k8sNamespace = C.CString(meta.K8sNamespace)
+	returnStruct.containerName = C.CString(meta.ContainerName)
+	returnStruct.image = C.CString(meta.Image)
 
-				C.setArrayString(cEnvsKey, C.CString(envKey), C.int(count))
-				C.setArrayString(cEnvsVal, C.CString(envValue), C.int(count))
-				count++
-			}
-			returnStruct.envsKey = cEnvsKey
-			returnStruct.envsVal = cEnvsVal
-
+	returnStruct.k8sLabelsSize = C.int(len(meta.K8sLabels))
+	if len(meta.K8sLabels) > 0 {
+		returnStruct.k8sLabelsKey = C.makeCharArray(returnStruct.k8sLabelsSize)
+		returnStruct.k8sLabelsVal = C.makeCharArray(returnStruct.k8sLabelsSize)
+		count := 0
+		for k, v := range meta.K8sLabels {
+			C.setArrayString(returnStruct.k8sLabelsKey, C.CString(k), C.int(count))
+			C.setArrayString(returnStruct.k8sLabelsVal, C.CString(v), C.int(count))
+			count++
 		}
-
-		return returnStruct
 	}
 
-	detail := helper.FetchContainerDetail(containerID)
-	if detail != nil {
-		return convertFunc(detail)
+	returnStruct.containerLabelsSize = C.int(len(meta.ContainerLabels))
+	if len(meta.ContainerLabels) > 0 {
+		returnStruct.containerLabelsKey = C.makeCharArray(returnStruct.containerLabelsSize)
+		returnStruct.containerLabelsVal = C.makeCharArray(returnStruct.containerLabelsSize)
+		count := 0
+		for k, v := range meta.ContainerLabels {
+			C.setArrayString(returnStruct.containerLabelsKey, C.CString(k), C.int(count))
+			C.setArrayString(returnStruct.containerLabelsVal, C.CString(v), C.int(count))
+			count++
+		}
 	}
-	return nil
+
+	returnStruct.envSize = C.int(len(meta.Env))
+	if len(meta.Env) > 0 {
+		returnStruct.envsKey = C.makeCharArray(returnStruct.envSize)
+		returnStruct.envsVal = C.makeCharArray(returnStruct.envSize)
+		count := 0
+		for k, v := range meta.Env {
+			C.setArrayString(returnStruct.envsKey, C.CString(k), C.int(count))
+			C.setArrayString(returnStruct.envsVal, C.CString(v), C.int(count))
+			count++
+		}
+	}
+	return returnStruct
 }
 
 func initPluginBase(cfgStr string) int {
