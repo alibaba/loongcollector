@@ -408,6 +408,11 @@ public:
 
     int32_t GetLastSendTime() { return mLastSendDataTime; }
 
+    void RestLastSenderTime() {
+        mLastDaemonRunTime = 0;
+        mLastSendDataTime = 0;
+    }
+
     LogstoreSenderQueue<SenderQueueParam>& GetQueue() { return mSenderQueue; }
 
     LogstoreSenderStatistics GetSenderStatistics(const LogstoreFeedBackKey& key);

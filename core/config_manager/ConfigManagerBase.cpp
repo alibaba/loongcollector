@@ -1865,6 +1865,11 @@ int32_t ConfigManagerBase::GetLastConfigGetTime() {
     return mLastConfigGetTime;
 }
 
+void ConfigManagerBase::RestLastConfigTime() {
+    mLastConfigUpdateTime = 0;
+    mLastConfigGetTime = 0;
+}
+
 void ConfigManagerBase::GetAllProfileRegion(std::vector<std::string>& allRegion) {
     ScopedSpinLock lock(mProfileLock);
     if (mAllProfileProjectNames.find(mDefaultProfileRegion) == mAllProfileProjectNames.end()) {

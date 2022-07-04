@@ -191,6 +191,8 @@ public:
     int32_t GetLastConfigUpdateTime();
     int32_t GetLastConfigGetTime();
 
+    void RestLastConfigTime();
+
     /** Read configuration, detect any format errors.
      *
      * @param configFile path for the configuration file

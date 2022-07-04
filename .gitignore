@@ -39,3 +39,7 @@ e2e-test
 bin/
 build/
 find_licenses/
+
+# vscode
+.vscode
+!.vscode/settings.json
