@@ -62,6 +62,10 @@ DEFINE_FLAG_INT32(fork_interval, "fork dispatcher process interval", 10);
 DECLARE_FLAG_INT32(max_open_files_limit);
 DECLARE_FLAG_INT32(max_reader_open_files);
 DECLARE_FLAG_STRING(ilogtail_config_env_name);
+DECLARE_FLAG_STRING(logtail_sys_conf_dir);
+DECLARE_FLAG_STRING(check_point_filename);
+DECLARE_FLAG_STRING(default_buffer_file_path);
+DECLARE_FLAG_STRING(ilogtail_docker_file_path_config);
 
 void HandleSighupSignal(int signum, siginfo_t* info, void* context) {
     ConfigManager::GetInstance()->SetMappingPathsChanged();
@@ -88,6 +92,14 @@ void enable_core(void) {
             (void)setrlimit(RLIMIT_CORE, &rlim_new);
         }
     }
+}
+
+static void overwrite_community_edition_flags() {
+    // support run in installation dir on default
+    STRING_FLAG(logtail_sys_conf_dir) = ".";
+    STRING_FLAG(check_point_filename) = "checkpoint/logtail_check_point";
+    STRING_FLAG(default_buffer_file_path) = "checkpoint";
+    STRING_FLAG(ilogtail_docker_file_path_config) = "checkpoint/docker_path_config.json";
 }
 
 // Main routine of worker process.
@@ -143,6 +155,8 @@ void do_worker_process() {
         APSARA_LOG_INFO(sLogger, ("change working dir", GetProcessExecutionDir())("result", chdirRst));
         AppConfig::GetInstance()->SetWorkingDir(GetProcessExecutionDir());
     }
+
+    overwrite_community_edition_flags();
 
     char* configEnv = getenv(STRING_FLAG(ilogtail_config_env_name).c_str());
     if (configEnv == NULL || strlen(configEnv) == 0) {

@@ -15,11 +15,12 @@
 # limitations under the License.
 
 
-# Currently, there are 3 supported docker categories, which are goc, build, and default.
+# Currently, there are 4 supported docker categories, which are goc, build, development and production.
 #
 # goc: build goc server with Dockerfile_doc
 # build: build core or plugin binary with Dockerfile_build
-# default: build ilogtail images.
+# development: build ilogtail development images.
+# production: build ilogtail production images.
 CATEGORY=$1
 GENERATED_HOME=$2
 VERSION=${3:-1.1.0}
@@ -36,9 +37,12 @@ touch $GEN_DOCKERFILE
 
 if [[ $CATEGORY = "goc" || $CATEGORY = "build" ]]; then
     cat $ROOTDIR/docker/Dockerfile_$CATEGORY|grep -v "#" > $GEN_DOCKERFILE;
-elif [[  $CATEGORY = "default" ]]; then
+elif [[  $CATEGORY = "development" ]]; then
     cat $ROOTDIR/docker/Dockerfile_build |grep -v "#" > $GEN_DOCKERFILE;
-    cat $ROOTDIR/docker/Dockerfile_ilogtail_part |grep -v "#">> $GEN_DOCKERFILE;
+    cat $ROOTDIR/docker/Dockerfile_development_part |grep -v "#">> $GEN_DOCKERFILE;
+elif [[  $CATEGORY = "production" ]]; then
+    cat $ROOTDIR/docker/Dockerfile_build |grep -v "#" > $GEN_DOCKERFILE;
+    cat $ROOTDIR/docker/Dockerfile_production_part |grep -v "#">> $GEN_DOCKERFILE;
 fi
 
 echo "=============DOCKERFILE=================="

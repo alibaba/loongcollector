@@ -102,12 +102,12 @@ plugin_main: clean
 .PHONY: docker
 docker: clean
 	./scripts/gen_build_scripts.sh all $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY)
-	./scripts/docker_build.sh default $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)
+	./scripts/docker_build.sh production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)
 
 .PHONY: e2edocker
 e2edocker: clean
 	./scripts/gen_build_scripts.sh e2e $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY)
-	./scripts/docker_build.sh default $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) false
+	./scripts/docker_build.sh development $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) false
 
 # provide a goc server for e2e testing
 .PHONY: gocdocker

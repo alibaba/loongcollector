@@ -47,6 +47,18 @@ using namespace logtail;
 
 DEFINE_FLAG_STRING(ilogtail_daemon_startup_hints, "hints passed from daemon during startup", "");
 DECLARE_FLAG_STRING(ilogtail_config_env_name);
+DECLARE_FLAG_STRING(logtail_sys_conf_dir);
+DECLARE_FLAG_STRING(check_point_filename);
+DECLARE_FLAG_STRING(default_buffer_file_path);
+DECLARE_FLAG_STRING(ilogtail_docker_file_path_config);
+
+static void overwrite_community_edition_flags() {
+    // support run in installation dir on default
+    STRING_FLAG(logtail_sys_conf_dir) = ".";
+    STRING_FLAG(check_point_filename) = "checkpoint/logtail_check_point";
+    STRING_FLAG(default_buffer_file_path) = "checkpoint";
+    STRING_FLAG(ilogtail_docker_file_path_config) = "checkpoint/docker_path_config.json";
+}
 
 void do_worker_process() {
     Logger::Instance().InitGlobalLoggers();

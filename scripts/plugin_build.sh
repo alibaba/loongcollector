@@ -34,7 +34,7 @@ os
 OS_FLAG=$?
 
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
-mkdir "$ROOTDIR"/bin
+mkdir -p "$ROOTDIR"/bin
 
 if [ $OS_FLAG = 1 ]; then
   IDFLAGS='-extldflags "-Wl,--wrap=memcpy"'

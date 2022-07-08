@@ -361,7 +361,7 @@ void LoadEnvValueIfExisting(const char* envKey, T& cfgValue) {
 
 void AppConfigBase::LoadEnvResourceLimit() {
     LoadSingleValueEnvConfig("cpu_usage_limit", mCpuUsageUpLimit, (float)0.4);
-    LoadSingleValueEnvConfig("mem_usage_limit", mMemUsageUpLimit, (int64_t)100);
+    LoadSingleValueEnvConfig("mem_usage_limit", mMemUsageUpLimit, (int64_t)384);
     LoadSingleValueEnvConfig("max_bytes_per_sec", mMaxBytePerSec, (int32_t)(1024 * 1024));
     LoadSingleValueEnvConfig("process_thread_count", mProcessThreadCount, (int32_t)1);
     LoadSingleValueEnvConfig("send_request_concurrency", mSendRequestConcurrency, (int32_t)2);

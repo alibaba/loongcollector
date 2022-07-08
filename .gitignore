@@ -8,10 +8,10 @@
 *.bak
 
 # go
-plugin_main/plugin_main
-pluginmanager/checkpoint/
+/plugin_main/plugin_main
+/pluginmanager/checkpoint/
 *.prof
-plugin_main/checkpoint/*
+/plugin_main/checkpoint/*
 *.LOG
 *.LOG.*
 *.test
@@ -25,10 +25,10 @@ CMakeCache.txt
 Makefile
 *.cbp
 *.a
-core/log_pb/*.pb.*
-core/build/
-core/common/Version.cpp
-core/installer/public/
+/core/log_pb/*.pb.*
+/core/build/
+/core/common/Version.cpp
+/core/installer/public/
 !/Makefile
 !core/dependencies.cmake
 !core/utils.cmakels
@@ -36,9 +36,10 @@ core/installer/public/
 
 # output
 e2e-test
-bin/
-build/
-find_licenses/
+/bin/
+/generated_files/
+/build/
+/find_licenses/
 
 # vscode
 .vscode

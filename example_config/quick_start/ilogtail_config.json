@@ -1,6 +1,4 @@
 {
     "default_access_key_id": "",
-    "default_access_key": "",
-    "logtail_sys_conf_dir": ".",
-    "check_point_filename": "checkpoint/logtail_check_point"
+    "default_access_key": ""
 }

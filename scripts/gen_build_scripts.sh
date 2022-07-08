@@ -52,7 +52,7 @@ function generateCopyScript() {
     echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR'  >> $COPY_SCRIPT_FILE;
     echo 'docker cp "$id":/src/core/build/plugin/libPluginAdapter.so $BINDIR'  >> $COPY_SCRIPT_FILE;
   else
-    echo ' docker cp "$id":/src/bin/libPluginBase.so $BINDIR'  >> $COPY_SCRIPT_FILE;
+    echo 'docker cp "$id":/src/bin/libPluginBase.so $BINDIR'  >> $COPY_SCRIPT_FILE;
     echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR'  >> $COPY_SCRIPT_FILE;
     echo 'docker cp "$id":/src/core/build/plugin/libPluginAdapter.so $BINDIR'  >> $COPY_SCRIPT_FILE;
   fi
