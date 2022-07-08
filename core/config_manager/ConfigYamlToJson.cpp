@@ -445,7 +445,7 @@ bool ConfigYamlToJson::GenerateLocalJsonConfigForSLSFulsher(const YAML::Node& ya
 bool ConfigYamlToJson::FillupDefalutUserJsonConfig(const WorkMode& workMode, Json::Value& userJsonConfig) {
     if (workMode.mIsFileMode) {
         if (!userJsonConfig.isMember("max_depth")) {
-            userJsonConfig["max_depth"] = 10;
+            userJsonConfig["max_depth"] = 0;
         }
 
         // To compatible with the old configuration, introduce placeholder for file mode.

@@ -15,9 +15,17 @@
 enable: true
 inputs:
   - Type: file_log
-    LogPath: /root
-    FilePattern: simple.log
-    DockerFile: true
+    LogPath: /home/test-dir/test_log
+    FilePattern: multiline.log
+processors:
+  - Type: processor_split_log_regex
+    SplitRegex: \[\d+-\d+-\d+\s\d+:\d+:\d+]\s.*
+    SplitKey: content
+    PreserveOthers: true
 flushers:
+  - Type: flusher_sls
+    Endpoint: cn-xxx.log.aliyuncs.com
+    ProjectName: test_project
+    LogstoreName: test_logstore
   - Type: flusher_stdout
     OnlyStdout: true

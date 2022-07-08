@@ -15,9 +15,19 @@
 enable: true
 inputs:
   - Type: file_log
-    LogPath: /root
-    FilePattern: simple.log
-    DockerFile: true
+    LogPath: /home/test-dir/test_log
+    FilePattern: reg.log
+processors:
+  - Type: processor_regex
+    SourceKey: content
+    Regex: (\d*-\d*-\d*)\s(.*)
+    Keys:
+      - time
+      - msg
 flushers:
+  - Type: flusher_sls
+    Endpoint: cn-xxx.log.aliyuncs.com
+    ProjectName: test_project
+    LogstoreName: test_logstore
   - Type: flusher_stdout
     OnlyStdout: true
