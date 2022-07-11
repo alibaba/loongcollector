@@ -37,3 +37,4 @@ your changes, such as:
 - [public] [both] [updated] change CGO ProcessLogs API to ProcessLog
 - [public] [both] [fixed] fixed GetContainerMeta data race problem
 - [public] [both] [added] add cpp core source code
+- [public] [fixed] netping plugin fix httping for dns resolve

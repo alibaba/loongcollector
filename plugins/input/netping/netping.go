@@ -256,7 +256,7 @@ func (m *NetPing) Collect(collector ilogtail.Collector) error {
 	nowTs := time.Now()
 
 	// for dns resolve
-	if (len(m.ICMPConfigs) > 0 || len(m.TCPConfigs) > 0) && !m.DisableDNS {
+	if (len(m.ICMPConfigs) > 0 || len(m.TCPConfigs) > 0 || len(m.HTTPConfigs) > 0) && !m.DisableDNS {
 		resolveCounter := 0
 		m.resolveHostMap.Range(
 			func(key, value interface{}) bool {
