@@ -15,12 +15,12 @@ Please debug in the corresponding environment. More details please see [here](..
 
 ### Local start
 
-Execute the `make build` command in the root directory, and you will get the `bin/ilogtail` executable file. Use the
+Execute the `make plugin_main` command in the root directory, and you will get the `output/ilogtail` executable file. Use the
 following command to quickly start the iLogtail program.
 
 ```shell
 # The default startup behavior is to use the metric_mock plugin to mock data and print the data to the logs.
- ./bin/ilogtail --logger-console=true --logger-retain=false
+ ./output/ilogtail --logger-console=true --logger-retain=false
 ```
 
 ### Docker start
@@ -143,7 +143,7 @@ The following is a very simple example configuration file (plugin.quickstart.jso
 }
 ```
 
-Execute `./bin/ilogtail --plugin=plugin.quickstart.json`, after a period of time, use ctrl+c to interrupt the operation.
+Execute `./output/ilogtail --plugin=plugin.quickstart.json`, after a period of time, use ctrl+c to interrupt the operation.
 By checking the directory, you will find that two files, quickstart_1.stdout and quickstart_2.stdout, are generated, and
 their contents are the same.
 
@@ -155,7 +155,7 @@ running independently, port 18689 is enabled by default for monitoring configura
 Next, we will use the HTTP mode to re-load the static configuration example in the section **Specified configuration
 file mode startup**.
 
-1. First we start the iLogtail program: `./bin/ilogtail`
+1. First we start the iLogtail program: `./output/ilogtail`
 2. Use the following command to reload the configuration.
 
 ```shell

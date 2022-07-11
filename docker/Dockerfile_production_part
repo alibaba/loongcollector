@@ -30,7 +30,7 @@ ARG VERSION=1.1.0
 
 WORKDIR /usr/local/ilogtail
 
-COPY --from=build /src/bin/libPluginBase.so /usr/local/ilogtail/
+COPY --from=build /src/output/libPluginBase.so /usr/local/ilogtail/
 COPY --from=build /src/example_config/start_with_container/ilogtail_config.json /usr/local/ilogtail/
 COPY --from=build /src/core/build/ilogtail /usr/local/ilogtail/
 COPY --from=build /src/core/build/plugin/libPluginAdapter.so /usr/local/ilogtail/

@@ -42,18 +42,18 @@ GO_PACKR = $(GO_PATH)/bin/packr2
 GO_BUILD_FLAGS = -v
 
 LICENSE_COVERAGE_FILE=license_coverage.txt
-OUT_DIR = bin
+OUT_DIR = output
+DIST_DIR = ilogtail-$(VERSION)
 
 .PHONY: tools
 tools:
 	$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.39.0
 	$(GO_ADDLICENSE) version || GO111MODULE=off $(GO_GET) -u github.com/google/addlicense
 
-
 .PHONY: clean
 clean:
 	rm -rf $(LICENSE_COVERAGE_FILE)
-	rm -rf $(OUT_DIR)
+	rm -rf $(OUT_DIR) $(DIST_DIR)
 	rm -rf behavior-test
 	rm -rf performance-test
 	rm -rf core-test
@@ -83,30 +83,34 @@ lint-e2e: clean tools
 
 .PHONY: core
 core: clean
-	./scripts/gen_build_scripts.sh core $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY)
+	./scripts/gen_build_scripts.sh core $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR)
 	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
 .PHONY: plugin
 plugin: clean
-	./scripts/gen_build_scripts.sh plugin $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY)
+	./scripts/gen_build_scripts.sh plugin $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR)
 	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
 .PHONY: plugin_main
 plugin_main: clean
-	./scripts/plugin_build.sh vendor default
+	./scripts/plugin_build.sh vendor default $(OUT_DIR)
 	cp pkg/logtail/libPluginAdapter.so bin/libPluginAdapter.so
 	cp pkg/logtail/PluginAdapter.dll bin/PluginAdapter.dll
 
+.PHONY: plugin_local
+plugin_main:
+	./scripts/plugin_build.sh vendor c-shared $(OUT_DIR)
+
 .PHONY: docker
 docker: clean
-	./scripts/gen_build_scripts.sh all $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY)
+	./scripts/gen_build_scripts.sh all $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(OUT_DIR)
 	./scripts/docker_build.sh production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)
 
 .PHONY: e2edocker
 e2edocker: clean
-	./scripts/gen_build_scripts.sh e2e $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY)
+	./scripts/gen_build_scripts.sh e2e $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(OUT_DIR)
 	./scripts/docker_build.sh development $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) false
 
 # provide a goc server for e2e testing
@@ -167,6 +171,10 @@ unittest_pluginmanager: clean
 
 .PHONY: all
 all: clean
-	./scripts/gen_build_scripts.sh all $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY)
+	./scripts/gen_build_scripts.sh all $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR)
 	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false
 	./$(GENERATED_HOME)/gen_copy_docker.sh
+
+.PHONY: dist
+dist: all
+	./scripts/dist.sh $(OUT_DIR) $(DIST_DIR)
