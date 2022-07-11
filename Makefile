@@ -95,9 +95,13 @@ plugin: clean
 
 .PHONY: plugin_main
 plugin_main: clean
-	./scripts/plugin_build.sh vendor default
+	./scripts/plugin_build.sh vendor default $(OUT_DIR)
 	cp pkg/logtail/libPluginAdapter.so bin/libPluginAdapter.so
 	cp pkg/logtail/PluginAdapter.dll bin/PluginAdapter.dll
+
+.PHONY: plugin_local
+plugin_main:
+	./scripts/plugin_build.sh vendor c-shared $(OUT_DIR)
 
 .PHONY: docker
 docker: clean

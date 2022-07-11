@@ -44,7 +44,7 @@ This repository is the golang part of **iLogtail**，it contains most of the fea
 1. Start with local
 
 ```shell
-make build && sh bin/ilogtail
+make pluin_main && sh output/ilogtail
 ```
 
 > **NOTE**: for some higher linux version, you have to install systemd-devel in advance

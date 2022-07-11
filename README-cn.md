@@ -48,9 +48,9 @@ iLogtail 为可观测场景而生，拥有的轻量级、高性能、自动化�
 # Build ilogtail and plugins
 make all
 # Let's start with a simple config
-cp -a example_config/quick_start/* bin
+cp -a example_config/quick_start/* output
 # Start ilogtail
-cd bin
+cd output
 nohup ./ilogtail > stdout.log 2> stderr.log &
 # Generate a log
 echo 'hello world!' >> simple.log
@@ -61,14 +61,14 @@ cat stdout.log
 2.完整模式Docker启动
 
 ```shell
-make wholedocker
+make docker
 docker run -d --name ilogtail-ds -v core/example_config/user_yaml_config.d:/usr/local/ilogtail/user_yaml_config.d aliyun/ilogtail:local-build
 ```
 
 3.完整模式K8s启动
 
 ```shell
-VERSION=snapshot make wholedocker
+VERSION=snapshot make docker
 kubectl apply -f xxx-configmap.yaml
 kubectl apply -f xxx-deployment.yaml
 ```
@@ -76,7 +76,7 @@ kubectl apply -f xxx-deployment.yaml
 4.纯插件模式本地启动
 
 ```shell
-make build && sh bin/ilogtail
+make pluin_main && sh output/ilogtail
 ```
 
 > **注意**: 对一些高版本Linux需要提前安装systemd-devel
