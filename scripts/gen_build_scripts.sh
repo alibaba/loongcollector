@@ -23,6 +23,7 @@ export CATEGORY=$1
 GENERATED_HOME=$2
 export VERSION=${3:-1.1.0}
 export REPOSITORY=${4:-aliyun/ilogtail}
+export OUT_DIR=${5:-output}
 
 BUILD_SCRIPT_FILE=$GENERATED_HOME/gen_build.sh
 COPY_SCRIPT_FILE=$GENERATED_HOME/gen_copy_docker.sh
@@ -30,29 +31,29 @@ COPY_SCRIPT_FILE=$GENERATED_HOME/gen_copy_docker.sh
 function generateBuildScript() {
   rm -rf $BUILD_SCRIPT_FILE && touch $BUILD_SCRIPT_FILE && chmod 755 $BUILD_SCRIPT_FILE
   if [ $CATEGORY = "plugin" ]; then
-    echo './scripts/plugin_build.sh vendor c-shared' >> $BUILD_SCRIPT_FILE;
+    echo './scripts/plugin_build.sh vendor c-shared '${OUT_DIR} >> $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "core" ]; then
     echo "mkdir -p core/build && cd core/build && cmake -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >>  $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "all" ]; then
-    echo "./scripts/plugin_build.sh vendor c-shared && mkdir -p core/build && cd core/build && cmake -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >> $BUILD_SCRIPT_FILE;
+    echo "./scripts/plugin_build.sh vendor c-shared ${OUT_DIR} && mkdir -p core/build && cd core/build && cmake -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >> $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "e2e" ]; then
-    echo "./scripts/plugin_gocbuild.sh && mkdir -p core/build && cd core/build && cmake -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >> $BUILD_SCRIPT_FILE;
+    echo "./scripts/plugin_gocbuild.sh ${OUT_DIR} && mkdir -p core/build && cd core/build && cmake -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >> $BUILD_SCRIPT_FILE;
   fi
 }
 
 function generateCopyScript() {
   rm -rf $COPY_SCRIPT_FILE && touch $COPY_SCRIPT_FILE && chmod 755 $COPY_SCRIPT_FILE
-  echo 'BINDIR=$(cd $(dirname "${BASH_SOURCE[0]}")&& cd .. && pwd)/bin/' >> $COPY_SCRIPT_FILE
+  echo 'BINDIR=$(cd $(dirname "${BASH_SOURCE[0]}")&& cd .. && pwd)/'${OUT_DIR}'/' >> $COPY_SCRIPT_FILE
   echo 'rm -rf $BINDIR && mkdir $BINDIR' >> $COPY_SCRIPT_FILE
   echo "id=\$(docker create ${REPOSITORY}:${VERSION})" >> $COPY_SCRIPT_FILE
 
   if [ $CATEGORY = "plugin" ]; then
-    echo 'docker cp "$id":/src/bin/libPluginBase.so $BINDIR'  >> $COPY_SCRIPT_FILE;
+    echo 'docker cp "$id":/src/'${OUT_DIR}'/libPluginBase.so $BINDIR'  >> $COPY_SCRIPT_FILE;
   elif [ $CATEGORY = "core" ]; then
     echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR'  >> $COPY_SCRIPT_FILE;
     echo 'docker cp "$id":/src/core/build/plugin/libPluginAdapter.so $BINDIR'  >> $COPY_SCRIPT_FILE;
   else
-    echo 'docker cp "$id":/src/bin/libPluginBase.so $BINDIR'  >> $COPY_SCRIPT_FILE;
+    echo 'docker cp "$id":/src/'${OUT_DIR}'/libPluginBase.so $BINDIR'  >> $COPY_SCRIPT_FILE;
     echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR'  >> $COPY_SCRIPT_FILE;
     echo 'docker cp "$id":/src/core/build/plugin/libPluginAdapter.so $BINDIR'  >> $COPY_SCRIPT_FILE;
   fi

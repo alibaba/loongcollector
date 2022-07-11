@@ -17,24 +17,25 @@
 NAME=libPluginBase.so
 goc version
 if [ $? != 0 ]; then
-    echo "==========================================================================================================="
-    echo "goc is not install on your test machine, please install it by the doc https://github.com/qiniu/goc."
-    echo "If you don't find binary lib on your platform or arch, you also could run e2e with normal docker container."
-    echo "==========================================================================================================="
-    exit 1
+  echo "==========================================================================================================="
+  echo "goc is not install on your test machine, please install it by the doc https://github.com/qiniu/goc."
+  echo "If you don't find binary lib on your platform or arch, you also could run e2e with normal docker container."
+  echo "==========================================================================================================="
+  exit 1
 fi
 
+OUT_DIR=${1:-output}
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
-if [ -d "$ROOTDIR"/bin ]; then
-    rm -rf $ROOTDIR/bin
+if [ -d "$ROOTDIR/$OUT_DIR" ]; then
+  rm -rf "$ROOTDIR/$OUT_DIR"
 fi
-mkdir "$ROOTDIR"/bin
+mkdir "$ROOTDIR/$OUT_DIR"
 
 cd "$ROOTDIR"/plugin_main
 pwd
 
 if uname -s | grep Linux; then
-  goc build '--buildflags=-mod=vendor -buildmode=c-shared -ldflags="-extldflags "-Wl,--wrap=memcpy""' --center=http://goc:7777 -o "$ROOTDIR"/bin/${NAME}
+  goc build '--buildflags=-mod=vendor -buildmode=c-shared -ldflags="-extldflags "-Wl,--wrap=memcpy""' --center=http://goc:7777 -o "$ROOTDIR/$OUT_DIR/${NAME}"
 else
   echo "goc build only build a dynamic library in linux platform"
   exit 1
