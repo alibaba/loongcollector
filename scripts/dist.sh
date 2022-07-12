@@ -28,6 +28,8 @@ cp LICENSE README.md README-cn.md "${ROOTDIR}/${DIST_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/ilogtail" "${ROOTDIR}/${DIST_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/libPluginAdapter.so" "${ROOTDIR}/${DIST_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/libPluginBase.so" "${ROOTDIR}/${DIST_DIR}"
+cp "${ROOTDIR}/${OUT_DIR}/ilogtail_config.json" "${ROOTDIR}/${DIST_DIR}"
+cp -a "${ROOTDIR}/${OUT_DIR}/user_yaml_config.d" "${ROOTDIR}/${DIST_DIR}"
 cp -a "${ROOTDIR}/example_config" "${ROOTDIR}/${DIST_DIR}"
 
 # pack dist dir
