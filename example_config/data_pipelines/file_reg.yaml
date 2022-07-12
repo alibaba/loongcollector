@@ -15,15 +15,23 @@
 enable: true
 inputs:
   - Type: file_log
-    LogPath: /home/test-dir/test_log
+    LogPath: /home/test-log/
     FilePattern: reg.log
 processors:
   - Type: processor_regex
     SourceKey: content
-    Regex: (\d*-\d*-\d*)\s(.*)
+    Regex: ([\d\.]+) \S+ \S+ \[(\S+) \S+\] \"(\w+) ([^\\"]*)\" ([\d\.]+) (\d+) (\d+) (\d+|-) \"([^\\"]*)\" \"([^\\"]*)\"
     Keys:
+      - ip
       - time
-      - msg
+      - method
+      - url
+      - request_time
+      - request_length
+      - status
+      - length
+      - ref_url
+      - browser
 flushers:
   - Type: flusher_sls
     Endpoint: cn-xxx.log.aliyuncs.com

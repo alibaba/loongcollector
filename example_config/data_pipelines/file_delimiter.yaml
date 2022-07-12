@@ -15,16 +15,23 @@
 enable: true
 inputs:
   - Type: file_log
-    LogPath: /home/test-dir/test_log
+    LogPath: /home/test-log/
     FilePattern: delimiter.log
 processors:
   - Type: processor_split_char
     SourceKey: content
     SplitSep: "|"
     SplitKeys:
+      - ip
       - time
-      - k1
-      - k2
+      - method
+      - url
+      - request_time
+      - request_length
+      - status
+      - length
+      - ref_url
+      - browser
 flushers:
   - Type: flusher_sls
     Endpoint: cn-xxx.log.aliyuncs.com

@@ -1,6 +1,6 @@
-Alibaba iLogtail - The Lightweight Collector of SLS in Alibaba Cloud | [中文版本](README-cn.md)
+Alibaba iLogtail - The Lightweight Collector of SLS in Alibaba Cloud | [中文版本](https://ilogtail.gitbook.io/ilogtail-docs/about/readme)
 ==========
-<img src="https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail.svg?versionId=CAEQMxiBgIDEmq.m6BciIDkzNmE2OWU4NzIwZjQ1Y2ZiYmIxZjhiYjMyNmQxZTdi" alt="ilogtail logo" height="150px" align="right" />
+<img src="https://github.com/iLogtail/ilogtail-docs/raw/main/.gitbook/assets/ilogtail-icon.png" style="width: 100%; height: 100%" />
 
 iLogtail was born for observable scenarios and has many production-level features such as lightweight, high performance, and automated configuration, which are widely used internally by Alibaba Group and tens of thousands of external Alibaba Cloud customers. You can deploy it in physical machines, Kubernetes and other environments to collect telemetry data, such as logs, traces and metrics.
 
@@ -83,7 +83,7 @@ You can report bugs, make suggestions or participate in discussions through [Git
 - Bilibili：[阿里云SLS](https://space.bilibili.com/630680534?from=search&seid=2845737427240690794&spm_id_from=333.337.0.0)
 - Zhihu：[阿里云日志服务](https://www.zhihu.com/people/a-li-yun-ri-zhi-fu-wu)
 
-<img src="https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail-contact.png?versionId=CAEQOhiBgICQkM6b8xciIDcxZTU5M2FjMDAzODQ1Njg5NjI3ZDc4M2FhOTZkNWNk" style="width: 100%; height: 100%" />
+<img src="https://github.com/iLogtail/ilogtail-docs/raw/main/.gitbook/assets/chatgroup.png" style="width: 100%; height: 100%" />
 
 
 
