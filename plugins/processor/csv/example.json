@@ -1,0 +1,37 @@
+{
+    "inputs":[
+        {
+            "type":"metric_debug_file",
+            "detail":{
+                "inputFilePath":"example.csv"
+            }
+        }
+    ],
+    "processors":[
+        {
+            "type":"processor_split_log_string",
+            "detail":{
+                "SplitSep":"\n",
+                "SplitKey":"content"
+            }
+        },
+        {
+            "type":"processor_csv",
+            "detail":{
+                "SrcKey":"content",
+                "DstKeys":["f1", "f2", "f3"],
+                "PreserveOthers":true,
+                "ExpandOthers":false,
+                "TrimLeadingSpace":false
+            }
+        }
+    ],
+        "flushers":[
+        {
+            "type":"flusher_stdout",
+            "detail":{
+                "FileName":"example.out"
+            }
+        }
+    ]
+}

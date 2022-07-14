@@ -56,6 +56,7 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/processor/appender"
 	_ "github.com/alibaba/ilogtail/plugins/processor/base64/decoding"
 	_ "github.com/alibaba/ilogtail/plugins/processor/base64/encoding"
+	_ "github.com/alibaba/ilogtail/plugins/processor/csv"
 	_ "github.com/alibaba/ilogtail/plugins/processor/defaultone"
 	_ "github.com/alibaba/ilogtail/plugins/processor/dictmap"
 	_ "github.com/alibaba/ilogtail/plugins/processor/drop"
