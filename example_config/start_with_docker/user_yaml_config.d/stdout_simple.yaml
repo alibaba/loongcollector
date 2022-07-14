@@ -14,11 +14,9 @@
 
 enable: true
 inputs:
-  - Type: service_docker_stdout
-    BeginLineCheckLength: 10
-    BeginLineRegex: ".*"
-    Stderr: false
-    Stdout: true
+  - Type: service_docker_stdout # 容器标准输出流输入类型
+    Stderr: false               # 不采集标准错误流
+    Stdout: true                # 采集标准输出流
 flushers:
-  - Type: flusher_stdout
-    FileName: simple.stdout
+  - Type: flusher_stdout        # 标准输出流输出类型
+    FileName: simple.stdout     # 重定向文件名

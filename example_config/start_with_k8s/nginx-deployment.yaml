@@ -12,11 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-enable: true
-inputs:
-  - Type: file_log           # 文件输入类型
-    LogPath: .               # 文件路径
-    FilePattern: simple.log  # 文件名模式
-flushers:
-  - Type: flusher_stdout     # 标准输出流输出类型
-    OnlyStdout: true
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: default
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - image: 'nginx:latest'
+          name: nginx
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi

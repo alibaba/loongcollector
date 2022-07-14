@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Copyright 2022 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,11 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-enable: true
-inputs:
-  - Type: file_log           # 文件输入类型
-    LogPath: .               # 文件路径
-    FilePattern: simple.log  # 文件名模式
-flushers:
-  - Type: flusher_stdout     # 标准输出流输出类型
-    OnlyStdout: true
+set -ue
+set -o pipefail
+
+[[ $# -ne 2 ]] && {
+    echo "Usage: $0 version"
+} || :
+
+export VERSION=$1
+make dist
+sha256sum ilogtail-$VERSION.tar.gz > ilogtail-$VERSION.tar.gz.sha256
+ossutil64 cp ilogtail-$VERSION.tar.gz oss://ilogtail-community-edition/$VERSION/ilogtail-$VERSION.linux-amd64.tar.gz
+ossutil64 cp ilogtail-$VERSION.tar.gz.sha256 oss://ilogtail-community-edition/$VERSION/ilogtail-$VERSION.linux-amd64.tar.gz.sha256
