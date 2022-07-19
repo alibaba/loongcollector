@@ -15,6 +15,8 @@
 package kubernetesmeta
 
 import (
+	"strings"
+
 	"github.com/alibaba/ilogtail/helper"
 
 	api "k8s.io/api/core/v1"
@@ -102,6 +104,8 @@ const (
 	KeySystemUUID                  = "system_uuid"
 	KeyImmutable                   = "immutable"
 	KeyResourceVersion             = "resource_version"
+	KeyServiceReferenceName        = "service_reference_name"
+	KeyServiceReferenceType        = "service_reference_type"
 )
 
 type (
@@ -218,7 +222,7 @@ func (in *InputKubernetesMeta) addPodParents(pods []*helper.MetaNode) {
 		set := labels.Set(pod.Labels)
 		for category, selectors := range nsSelectors {
 			for _, s := range selectors {
-				if s.selector.Matches(set) {
+				if !s.selector.Empty() && s.selector.Matches(set) {
 					pod.WithParent(category, s.uid, s.name)
 				}
 			}
@@ -259,6 +263,60 @@ func (in *InputKubernetesMeta) addServiceParents(services []*helper.MetaNode) {
 					service.WithParent(Ingress, id, in.ingressMapping[id])
 				}
 			}
+		}
+	}
+}
+
+// addServiceReference construct the relationship between service and set resources.
+func (in *InputKubernetesMeta) addServiceReference(services []*helper.MetaNode, pods []*helper.MetaNode) {
+	serviceReference := make(map[string]map[string]string)
+	for _, service := range services {
+		ns := service.Attributes[KeyNamespace].(string)
+		for _, pod := range pods {
+			if ns != pod.Attributes[KeyNamespace].(string) {
+				continue
+			}
+			hasService := false
+			referenceName := pod.Attributes[KeyName].(string)
+			referenceType := Pod
+			for _, parent := range pod.Parents {
+				parts := strings.Split(parent, ":")
+				if parts[0] == Node {
+					continue
+				}
+				if parts[0] == Service {
+					if parts[1] == service.ID {
+						hasService = true
+					}
+					continue
+				}
+				referenceType = parts[0]
+				referenceName = parts[2]
+			}
+			if hasService {
+				m, ok := serviceReference[service.Attributes[KeyName].(string)]
+				if !ok {
+					m = make(map[string]string)
+					serviceReference[service.Attributes[KeyName].(string)] = m
+				}
+				m[referenceName] = referenceType
+			}
+		}
+	}
+	for _, service := range services {
+		pairs, ok := serviceReference[service.Attributes[KeyName].(string)]
+		if !ok {
+			continue
+		}
+		if len(pairs) == 1 {
+			for k, v := range pairs {
+				service.WithAttribute(KeyServiceReferenceName, k)
+				service.WithAttribute(KeyServiceReferenceType, v)
+			}
+
+		}
+		if len(pairs) > 1 {
+			service.WithAttribute(KeyServiceReferenceType, "multi_resources")
 		}
 	}
 }

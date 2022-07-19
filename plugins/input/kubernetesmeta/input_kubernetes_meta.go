@@ -221,6 +221,7 @@ func (in *InputKubernetesMeta) Collect(collector ilogtail.Collector) error {
 			in.addPodParents(pods)
 			in.addServiceParents(services)
 			in.addJobParents(jobs)
+			in.addServiceReference(services, pods)
 		}
 		transfer(pods)
 		transfer(services)
