@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+FROM centos:centos7.9.2009 as build
+ARG HOST_OS=Linux
+ARG VERSION=1.1.0
+WORKDIR /output
+COPY ilogtail-${VERSION}.tar.gz .
+RUN tar -xzf ilogtail-${VERSION}.tar.gz
+
 FROM centos:centos7.9.2009
 ENV container docker
 RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
@@ -25,16 +32,15 @@ rm -f /lib/systemd/system/basic.target.wants/*;\
 rm -f /lib/systemd/system/anaconda.target.wants/*;
 VOLUME [ "/sys/fs/cgroup" ]
 
+RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && rm -rf /core.*
+
 ARG HOST_OS=Linux
 ARG VERSION=1.1.0
-
 WORKDIR /usr/local/ilogtail
 
-COPY --from=build /src/output/libPluginBase.so /usr/local/ilogtail/
-COPY --from=build /src/example_config/start_with_container/ilogtail_config.json /usr/local/ilogtail/
-COPY --from=build /src/core/build/ilogtail /usr/local/ilogtail/
-COPY --from=build /src/core/build/plugin/libPluginAdapter.so /usr/local/ilogtail/
-COPY --from=build /src/scripts/run_ilogtail.sh /usr/local/ilogtail/
+COPY --from=build /output/ilogtail-${VERSION}/* /usr/local/ilogtail/
+COPY example_config/start_with_docker/ilogtail_config.json /usr/local/ilogtail/
+COPY scripts/run_ilogtail.sh /usr/local/ilogtail/
 
 RUN chmod -R 755 /usr/local/ilogtail/
 RUN mkdir /usr/local/ilogtail/checkpoint

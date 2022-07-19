@@ -59,7 +59,7 @@ jobs:
 
       - name: Build Docker
         if: matrix.runner == 'ubuntu-latest'
-        run: make docker
+        run: make dist && make docker
 
   result:
     runs-on: ubuntu-latest

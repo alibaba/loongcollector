@@ -63,7 +63,7 @@ spec:
                 key: access_key
                 optional: true
         image: >-
-          sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0
+          sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:latest
         imagePullPolicy: IfNotPresent
         resources:
           limits:

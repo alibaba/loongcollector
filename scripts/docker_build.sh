@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -ue
+set -o pipefail
 
 # Currently, there are 4 supported docker categories, which are goc, build, development and production.
 #
@@ -31,7 +33,7 @@ HOST_OS=`uname -s`
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 GEN_DOCKERFILE=$GENERATED_HOME/Dockerfile
 
-mkdir $GENERATED_HOME
+mkdir -p $GENERATED_HOME
 rm -rf $GEN_DOCKERFILE
 touch $GEN_DOCKERFILE
 
@@ -41,8 +43,7 @@ elif [[  $CATEGORY = "development" ]]; then
     cat $ROOTDIR/docker/Dockerfile_build |grep -v "#" > $GEN_DOCKERFILE;
     cat $ROOTDIR/docker/Dockerfile_development_part |grep -v "#">> $GEN_DOCKERFILE;
 elif [[  $CATEGORY = "production" ]]; then
-    cat $ROOTDIR/docker/Dockerfile_build |grep -v "#" > $GEN_DOCKERFILE;
-    cat $ROOTDIR/docker/Dockerfile_production_part |grep -v "#">> $GEN_DOCKERFILE;
+    cat $ROOTDIR/docker/Dockerfile_production |grep -v "#"> $GEN_DOCKERFILE;
 fi
 
 echo "=============DOCKERFILE=================="

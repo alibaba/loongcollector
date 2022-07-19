@@ -49,10 +49,10 @@ data:
           - http_user_agent
           - http_x_forwarded_for
     flushers:
-      - Type: flusher_kafka
-        Brokers:
-          - <kafka_host>:<kafka_port>
-        Topic: access-log
+      - Type: flusher_sls
+        Endpoint: <sls_endpoint>
+        ProjectName: <sls_project>
+        LogstoreName: <sls_logstore>
   nginx_stderr.yaml: |
     enable: true
     inputs:
@@ -63,10 +63,10 @@ data:
         K8sPodRegex: "^(nginx-.*)$"
         K8sContainerRegex: "nginx"
     flushers:
-      - Type: flusher_kafka
-        Brokers:
-          - <kafka_host>:<kafka_port>
-        Topic: error-log
+      - Type: flusher_sls
+        Endpoint: <sls_endpoint>
+        ProjectName: <sls_project>
+        LogstoreName: <sls_logstore>
 ---
 apiVersion: v1
 kind: Secret
@@ -75,8 +75,8 @@ metadata:
   namespace: ilogtail
 type: Opaque
 data:
-  access_key: 
-  access_key_id: 
+  access_key: <base64_access_key_secret>
+  access_key_id: <base64_access_key_id>
 ---
 apiVersion: apps/v1
 kind: DaemonSet

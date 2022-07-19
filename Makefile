@@ -100,13 +100,8 @@ plugin_main: clean
 	cp pkg/logtail/PluginAdapter.dll bin/PluginAdapter.dll
 
 .PHONY: plugin_local
-plugin_main:
+plugin_local:
 	./scripts/plugin_build.sh vendor c-shared $(OUT_DIR)
-
-.PHONY: docker
-docker: clean
-	./scripts/gen_build_scripts.sh all $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(OUT_DIR)
-	./scripts/docker_build.sh production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)
 
 .PHONY: e2edocker
 e2edocker: clean
@@ -178,3 +173,11 @@ all: clean
 .PHONY: dist
 dist: all
 	./scripts/dist.sh $(OUT_DIR) $(DIST_DIR)
+
+ilogtail-$(VERSION).tar.gz:
+	@echo 'ilogtail-$(VERSION) does not exist! Please download or run `make dist` first!'
+	@false
+
+.PHONY: docker
+docker: ilogtail-$(VERSION).tar.gz
+	./scripts/docker_build.sh production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)
