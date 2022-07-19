@@ -184,9 +184,9 @@ void do_worker_process() {
     appInfoJson["instance_id"] = Json::Value(ConfigManager::GetInstance()->GetInstanceId());
     appInfoJson["logtail_version"] = Json::Value(ILOGTAIL_VERSION);
     appInfoJson["git_hash"] = Json::Value(ILOGTAIL_GIT_HASH);
-    #define STRINGIFY(x) #x
-    #define VERSION_STR(A) "MSVC " STRINGIFY(A)
-    #define ILOGTAIL_COMPILER VERSION_STR(_MSC_FULL_VER)
+#define STRINGIFY(x) #x
+#define VERSION_STR(A) "MSVC " STRINGIFY(A)
+#define ILOGTAIL_COMPILER VERSION_STR(_MSC_FULL_VER)
     appInfoJson["compiler"] = Json::Value(ILOGTAIL_COMPILER);
     appInfoJson["build_date"] = Json::Value(ILOGTAIL_BUILD_DATE);
     appInfoJson["os"] = Json::Value(LogFileProfiler::mOsDetail);
@@ -203,7 +203,8 @@ void do_worker_process() {
 }
 
 int main(int argc, char** argv) {
-    gflags::SetUsageMessage(std::string("The Lightweight Collector of SLS in Alibaba Cloud\nUsage: ./ilogtail [OPTION]"));
+    gflags::SetUsageMessage(
+        std::string("The Lightweight Collector of SLS in Alibaba Cloud\nUsage: ./ilogtail [OPTION]"));
     gflags::SetVersionString(std::string(ILOGTAIL_VERSION) + " Community Edition");
     google::ParseCommandLineFlags(&argc, &argv, true);
 

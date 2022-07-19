@@ -265,9 +265,10 @@ std::string GetAnyAvailableIP() {
         }
 
         const int family = ifa->ifa_addr->sa_family;
-        const char* familyName = (family == AF_PACKET)
-            ? "AF_PACKET"
-            : (family == AF_INET) ? "AF_INET" : (family == AF_INET6) ? "AF_INET6" : "???";
+        const char* familyName = (family == AF_PACKET) ? "AF_PACKET"
+            : (family == AF_INET)                      ? "AF_INET"
+            : (family == AF_INET6)                     ? "AF_INET6"
+                                                       : "???";
         APSARA_LOG_DEBUG(sLogger, ("interface name", ifa->ifa_name)("family", family)("family name", familyName));
         if (family == AF_INET) {
             int s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);

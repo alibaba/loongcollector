@@ -81,7 +81,7 @@ bool Aggregator::FlushReadyBuffer() {
             if (sender->IsFlush()
                 || (pIter->second->IsReady(curTime) && pIter->second->mMergeItems.size() > 0
                     && sender->GetSenderFeedBackInterface()->IsValidToPush(
-                           pIter->second->GetFirstItem()->mLogstoreKey))) {
+                        pIter->second->GetFirstItem()->mLogstoreKey))) {
 #ifdef LOGTAIL_DEBUG_FLAG
                 LOG_DEBUG(sLogger,
                           ("Flush logstore merged packet, size", pIter->second->mMergeItems.size())(

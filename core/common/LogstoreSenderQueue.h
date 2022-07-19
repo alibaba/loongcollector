@@ -110,7 +110,8 @@ struct LoggroupTimeValue {
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    LoggroupTimeValue() {}
+    LoggroupTimeValue() {
+    }
 #endif
 };
 
@@ -427,7 +428,9 @@ public:
         return RemoveItem(item, sendRst != LogstoreSenderInfo::SendResult_Buffered);
     }
 
-    bool IsValidToSend(int32_t curTime) { return mSenderInfo.CanSend(curTime); }
+    bool IsValidToSend(int32_t curTime) {
+        return mSenderInfo.CanSend(curTime);
+    }
 
     LogstoreSenderInfo mSenderInfo;
     LogstoreSenderStatistics mSenderStatistics;

@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
-project (shennong)
+cmake_minimum_required(VERSION 2.8)
+project(shennong)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
-append_source_files (LIB_SOURCE_FILES)
+append_source_files(LIB_SOURCE_FILES)
 add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
-project (sender_unittest)
+cmake_minimum_required(VERSION 2.8)
+project(sender_unittest)
 
-add_executable (sender_unittest SenderUnittest.cpp)
-target_link_libraries (sender_unittest unittest_base)
+add_executable(sender_unittest SenderUnittest.cpp)
+target_link_libraries(sender_unittest unittest_base)

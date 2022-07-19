@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
-project (sdk)
+cmake_minimum_required(VERSION 2.8)
+project(sdk)
 
-file (GLOB LIB_SOURCE_FILES *.cpp *.h)
+file(GLOB LIB_SOURCE_FILES *.cpp *.h)
 if (MSVC)
-    add_definitions (-DNOMINMAX)
+    add_definitions(-DNOMINMAX)
 endif ()
-append_source_files (LIB_SOURCE_FILES)
-add_library (${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
-link_curl (${PROJECT_NAME})
-target_link_libraries (${PROJECT_NAME} logger)
-target_link_libraries (${PROJECT_NAME} common)
-target_link_libraries (${PROJECT_NAME} log_pb)
+append_source_files(LIB_SOURCE_FILES)
+add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
+link_curl(${PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME} logger)
+target_link_libraries(${PROJECT_NAME} common)
+target_link_libraries(${PROJECT_NAME} log_pb)

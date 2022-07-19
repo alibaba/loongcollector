@@ -36,9 +36,13 @@ namespace detail {
         return count;
     }
 
-    inline char valToHex(size_t val) { return val < 10 ? ('0' + val) : ('A' + val - 10); }
+    inline char valToHex(size_t val) {
+        return val < 10 ? ('0' + val) : ('A' + val - 10);
+    }
 
-    inline size_t hexToVal(char hex) { return hex >= 'A' ? 10 + hex - 'A' : hex - '0'; }
+    inline size_t hexToVal(char hex) {
+        return hex >= 'A' ? 10 + hex - 'A' : hex - '0';
+    }
 
 } // namespace detail
 

@@ -16,5 +16,5 @@ cmake_minimum_required(VERSION 2.8)
 project(fuse)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h .c)
-append_source_files (LIB_SOURCE_FILES)
+append_source_files(LIB_SOURCE_FILES)
 add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})

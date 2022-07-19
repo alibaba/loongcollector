@@ -16,6 +16,6 @@ cmake_minimum_required(VERSION 2.8)
 project(logger)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
-append_source_files (LIB_SOURCE_FILES)
+append_source_files(LIB_SOURCE_FILES)
 add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
-target_link_libraries (${PROJECT_NAME} common)
+target_link_libraries(${PROJECT_NAME} common)

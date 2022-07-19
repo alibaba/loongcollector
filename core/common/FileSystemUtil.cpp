@@ -350,7 +350,9 @@ namespace fsutil {
 #endif
     }
 
-    Dir::~Dir() { Close(); }
+    Dir::~Dir() {
+        Close();
+    }
 
 #if defined(_MSC_VER)
     // Invalid entry is returned if fileName starts with ., such as ., .., hidden files.
@@ -518,9 +520,11 @@ namespace fsutil {
 #endif
     }
 
-    PathStat::PathStat() {}
+    PathStat::PathStat() {
+    }
 
-    PathStat::~PathStat() {}
+    PathStat::~PathStat() {
+    }
 
     bool PathStat::stat(const std::string& path, PathStat& ps) {
         ps.mPath = path;
@@ -639,7 +643,9 @@ namespace fsutil {
     }
 #endif
 
-    time_t PathStat::GetMtime() const { return mRawStat.st_mtime; }
+    time_t PathStat::GetMtime() const {
+        return mRawStat.st_mtime;
+    }
 
     void PathStat::GetLastWriteTime(int64_t& sec, int64_t& nsec) const {
 #if defined(__linux__)
@@ -672,7 +678,9 @@ namespace fsutil {
 #endif
     }
 
-    int64_t PathStat::GetFileSize() const { return mRawStat.st_size; }
+    int64_t PathStat::GetFileSize() const {
+        return mRawStat.st_size;
+    }
 
 } // namespace fsutil
 

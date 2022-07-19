@@ -60,7 +60,9 @@ public:
         return ptr;
     }
 
-    ~DynamicLibLoader() { CloseLib(mLibPtr); }
+    ~DynamicLibLoader() {
+        CloseLib(mLibPtr);
+    }
 
     // LoadDynLib loads dynamic library named @libName from current working dir.
     // For linux, the so name is 'lib+@libName.so'.

@@ -1,4 +1,5 @@
 # Dependencies
+
 - [gflags](https://github.com/gflags/gflags): v2.2.1
 - [spdlog](https://github.com/gabime/spdlog/): v1.1.0
 - [jsoncpp](https://github.com/open-source-parsers/jsoncpp): v1.8.4

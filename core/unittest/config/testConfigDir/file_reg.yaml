@@ -21,7 +21,7 @@ processors:
   - Type: processor_regex
     SourceKey: content
     Regex: (\S+)\s(\w+).*
-    Keys: 
+    Keys:
       - time
       - msg
 flushers:

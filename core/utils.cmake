@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-macro (logtail_define varname docstring default)
+macro(logtail_define varname docstring default)
     if ("${ARGC}" GREATER 4)
-        message (FATAL_ERROR "logtail_define: Too many macro arguments")
+        message(FATAL_ERROR "logtail_define: Too many macro arguments")
     endif ()
     if (NOT DEFINED "${varname}")
-        set (${varname} "${default}")
-        message (STATUS "Define ${varname} = ${default}")
+        set(${varname} "${default}")
+        message(STATUS "Define ${varname} = ${default}")
     endif ()
-endmacro ()
+endmacro()

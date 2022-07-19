@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
-project (controller_unittest)
+cmake_minimum_required(VERSION 2.8)
+project(controller_unittest)
 
-add_executable (event_dispatcher_dir_unittest EventDispatcherDirUnittest.cpp)
-target_link_libraries (event_dispatcher_dir_unittest unittest_base)
+add_executable(event_dispatcher_dir_unittest EventDispatcherDirUnittest.cpp)
+target_link_libraries(event_dispatcher_dir_unittest unittest_base)

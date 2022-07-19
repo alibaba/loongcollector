@@ -21,56 +21,43 @@
 #include <vector>
 #include <boost/regex.hpp>
 
-namespace logtail
-{
+namespace logtail {
 
-class RawLog
-{
+class RawLog {
 public:
-
-    struct iterator
-    {
+    struct iterator {
         int32_t mLastOffset = 0;
         int32_t mNowOffset = 0;
     };
 
     RawLog() = default;
-    ~RawLog()
-    {
-        if (mRawBuffer != NULL)
-        {
+    ~RawLog() {
+        if (mRawBuffer != NULL) {
             free(mRawBuffer);
         }
     }
 
-    static RawLog * AddLogFull(uint32_t logTime, std::vector<std::string> keys, boost::match_results<const char*> subMathValues);
+    static RawLog*
+    AddLogFull(uint32_t logTime, std::vector<std::string> keys, boost::match_results<const char*> subMathValues);
 
     void AddLogStart(uint32_t logTime);
 
 
-    void AddKeyValue(const std::string & key, const std::string & value)
-    {
+    void AddKeyValue(const std::string& key, const std::string& value) {
         AddKeyValue(key.c_str(), key.size(), value.c_str(), value.size());
     }
 
-    void AddKeyValue(const std::string & key, const char * value, size_t valueLen)
-    {
+    void AddKeyValue(const std::string& key, const char* value, size_t valueLen) {
         AddKeyValue(key.c_str(), key.size(), value, valueLen);
     }
 
-    uint32_t AddKeyValue(const char * key, size_t kenLen, const char * value, size_t valueLen);
+    uint32_t AddKeyValue(const char* key, size_t kenLen, const char* value, size_t valueLen);
 
     void AddLogDone();
 
-    uint8_t * GetBuffer()
-    {
-        return mRawBuffer + mMallocDelta;
-    }
+    uint8_t* GetBuffer() { return mRawBuffer + mMallocDelta; }
 
-    size_t GetBufferLength()
-    {
-        return mRawLen - mMallocDelta;
-    }
+    size_t GetBufferLength() { return mRawLen - mMallocDelta; }
 
     void AppendToString(std::string* output) const;
 
@@ -89,14 +76,14 @@ public:
      * @param valueLen
      * @return
      */
-    bool NextKeyValue(iterator & iter, const char * & key, uint32_t & keyLen, const char * & value, uint32_t & valueLen);
+    bool NextKeyValue(iterator& iter, const char*& key, uint32_t& keyLen, const char*& value, uint32_t& valueLen);
 
     /**
      * delete this key value pair, return false if iter is invalid
      * @param iter
      * @return
      */
-    bool DeleteKeyValue(iterator & iter);
+    bool DeleteKeyValue(iterator& iter);
 
     /**
      * update this key value pair
@@ -107,7 +94,7 @@ public:
      * @param valueLen
      * @return
      */
-    bool UpdateKeyValue(iterator & iter, const char * key, size_t kenLen, const char * value, size_t valueLen);
+    bool UpdateKeyValue(iterator& iter, const char* key, size_t kenLen, const char* value, size_t valueLen);
 
     /**
      * append key value pair after end of log
@@ -117,26 +104,23 @@ public:
      * @param valueLen
      * @return
      */
-    bool AppendKeyValue(const char * key, size_t kenLen, const char * value, size_t valueLen);
+    bool AppendKeyValue(const char* key, size_t kenLen, const char* value, size_t valueLen);
 
 
 protected:
-
     void adjustBuffer(uint32_t newLen);
     void AddTime(uint32_t logTime);
     void adjustLogSize(int32_t deltaLen);
 
     uint32_t mRawLen = 0;
     uint32_t mMaxLen = 0;
-    uint8_t * mRawBuffer = NULL;
-    uint8_t * mNowBuffer = NULL;
+    uint8_t* mRawBuffer = NULL;
+    uint8_t* mNowBuffer = NULL;
     int8_t mMallocDelta = 0;
-
 };
 
 
-}
-
+} // namespace logtail
 
 
 #endif //LOGTAIL_RAWLOG_H

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
-project (profiler_unittest)
+cmake_minimum_required(VERSION 2.8)
+project(profiler_unittest)
 
-add_executable (profiler_data_integrity_unittest DataIntegrityUnittest.cpp)
-target_link_libraries (profiler_data_integrity_unittest unittest_base)
+add_executable(profiler_data_integrity_unittest DataIntegrityUnittest.cpp)
+target_link_libraries(profiler_data_integrity_unittest unittest_base)

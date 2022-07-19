@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
-project (config_sdk_unittest)
+cmake_minimum_required(VERSION 2.8)
+project(config_sdk_unittest)
 
-add_executable (config_sdk_unittest config_sdk_unittest.cpp)
-target_link_libraries (config_sdk_unittest unittest_base)
+add_executable(config_sdk_unittest config_sdk_unittest.cpp)
+target_link_libraries(config_sdk_unittest unittest_base)

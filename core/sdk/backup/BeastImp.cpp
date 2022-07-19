@@ -128,7 +128,8 @@ namespace sdk {
                                const int32_t timeout,
                                LogsClosure* callBack,
                                const std::string& interface,
-                               const bool httpsFlag) {}
+                               const bool httpsFlag) {
+    }
 
 } // namespace sdk
 

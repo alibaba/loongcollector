@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
-project (helper)
+cmake_minimum_required(VERSION 2.8)
+project(helper)
 
 if (UNIX)
-add_executable (LogtailInsight LogtailInsight.cpp LogtailInsight.h)
-target_link_libraries (LogtailInsight log_pb common)
-link_jsoncpp (LogtailInsight)
+    add_executable(LogtailInsight LogtailInsight.cpp LogtailInsight.h)
+    target_link_libraries(LogtailInsight log_pb common)
+    link_jsoncpp(LogtailInsight)
 endif ()

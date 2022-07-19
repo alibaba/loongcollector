@@ -19,13 +19,11 @@
 
 #include <RawLog.h>
 
-namespace logtail
-{
+namespace logtail {
 
 typedef std::pair<std::string, std::string> LogTag;
 
-class RawLogGroup
-{
+class RawLogGroup {
 public:
     RawLogGroup() = default;
     ~RawLogGroup();
@@ -34,17 +32,17 @@ public:
     void clear_logs();
     const RawLog& logs(int index) const;
     RawLog* mutable_logs(int index);
-    void add_logs(RawLog * log);
-    std::vector<RawLog *>* mutable_logs();
-    const std::vector<RawLog *> & logs();
+    void add_logs(RawLog* log);
+    std::vector<RawLog*>* mutable_logs();
+    const std::vector<RawLog*>& logs();
 
     // repeated .sls_logs.LogTag LogTags = 6;
     int logtags_size() const;
     void clear_logtags();
     const LogTag& logtags(int index) const;
     LogTag* mutable_logtags(int index);
-    void add_logtags(const std::string & key, const std::string & value);
-    void add_logtags(const std::string & key, std::string && value);
+    void add_logtags(const std::string& key, const std::string& value);
+    void add_logtags(const std::string& key, std::string&& value);
     std::vector<LogTag>* mutable_logtags();
     const std::vector<LogTag>& logtags() const;
 
@@ -102,9 +100,9 @@ private:
     void set_has_machineuuid();
     void clear_has_machineuuid();
 
-    void pack_logs(std::string * output) const;
-    void pack_logtags(std::string * output) const;
-    void pack_others(std::string * output) const;
+    void pack_logs(std::string* output) const;
+    void pack_logtags(std::string* output) const;
+    void pack_others(std::string* output) const;
 
 
     uint64_t _has_bits_ = 0;
@@ -113,7 +111,7 @@ private:
     std::string source_;
     std::string machineuuid_;
     std::vector<LogTag> logtags_;
-    std::vector<RawLog *> rawlogs_;
+    std::vector<RawLog*> rawlogs_;
 };
 
 // optional string Category = 2;
@@ -136,23 +134,25 @@ inline const ::std::string& RawLogGroup::category() const {
 }
 inline void RawLogGroup::set_category(const ::std::string& value) {
     set_has_category();
-    category_=value;
+    category_ = value;
     // @@protoc_insertion_point(field_set:sls_logs.LogGroup.Category)
 }
 inline void RawLogGroup::set_category(::std::string&& value) {
     set_has_category();
-    category_=::std::move(value);
+    category_ = ::std::move(value);
     // @@protoc_insertion_point(field_set_rvalue:sls_logs.LogGroup.Category)
 }
 inline void RawLogGroup::set_category(const char* value, size_t size) {
     set_has_category();
-    category_=::std::string(reinterpret_cast<const char*>(value), size);;
+    category_ = ::std::string(reinterpret_cast<const char*>(value), size);
+    ;
     // @@protoc_insertion_point(field_set_pointer:sls_logs.LogGroup.Category)
 }
 inline ::std::string* RawLogGroup::mutable_category() {
     set_has_category();
     // @@protoc_insertion_point(field_mutable:sls_logs.LogGroup.Category)
-    return &category_;;
+    return &category_;
+    ;
 }
 
 // optional string Topic = 3;
@@ -175,23 +175,24 @@ inline const ::std::string& RawLogGroup::topic() const {
 }
 inline void RawLogGroup::set_topic(const ::std::string& value) {
     set_has_topic();
-    topic_=value;
+    topic_ = value;
     // @@protoc_insertion_point(field_set:sls_logs.LogGroup.Topic)
 }
 inline void RawLogGroup::set_topic(::std::string&& value) {
     set_has_topic();
-    topic_=::std::move(value);
+    topic_ = ::std::move(value);
     // @@protoc_insertion_point(field_set_rvalue:sls_logs.LogGroup.Topic)
 }
 inline void RawLogGroup::set_topic(const char* value, size_t size) {
     set_has_topic();
-    topic_=::std::string(reinterpret_cast<const char*>(value), size);
+    topic_ = ::std::string(reinterpret_cast<const char*>(value), size);
     // @@protoc_insertion_point(field_set_pointer:sls_logs.LogGroup.Topic)
 }
 inline ::std::string* RawLogGroup::mutable_topic() {
     set_has_topic();
     // @@protoc_insertion_point(field_mutable:sls_logs.LogGroup.Topic)
-    return &topic_;;
+    return &topic_;
+    ;
 }
 
 // optional string Source = 4;
@@ -214,23 +215,24 @@ inline const ::std::string& RawLogGroup::source() const {
 }
 inline void RawLogGroup::set_source(const ::std::string& value) {
     set_has_source();
-    source_=value;
+    source_ = value;
     // @@protoc_insertion_point(field_set:sls_logs.LogGroup.Source)
 }
 inline void RawLogGroup::set_source(::std::string&& value) {
     set_has_source();
-    source_=::std::move(value);
+    source_ = ::std::move(value);
     // @@protoc_insertion_point(field_set_rvalue:sls_logs.LogGroup.Source)
 }
 inline void RawLogGroup::set_source(const char* value, size_t size) {
     set_has_source();
-    source_=::std::string(reinterpret_cast<const char*>(value), size);
+    source_ = ::std::string(reinterpret_cast<const char*>(value), size);
     // @@protoc_insertion_point(field_set_pointer:sls_logs.LogGroup.Source)
 }
 inline ::std::string* RawLogGroup::mutable_source() {
     set_has_source();
     // @@protoc_insertion_point(field_mutable:sls_logs.LogGroup.Source)
-    return &source_;;
+    return &source_;
+    ;
 }
 
 // optional string MachineUUID = 5;
@@ -253,25 +255,26 @@ inline const ::std::string& RawLogGroup::machineuuid() const {
 }
 inline void RawLogGroup::set_machineuuid(const ::std::string& value) {
     set_has_machineuuid();
-    machineuuid_=value;
+    machineuuid_ = value;
     // @@protoc_insertion_point(field_set:sls_logs.LogGroup.MachineUUID)
 }
 inline void RawLogGroup::set_machineuuid(::std::string&& value) {
     set_has_machineuuid();
-    machineuuid_=::std::move(value);
+    machineuuid_ = ::std::move(value);
     // @@protoc_insertion_point(field_set_rvalue:sls_logs.LogGroup.MachineUUID)
 }
 inline void RawLogGroup::set_machineuuid(const char* value, size_t size) {
     set_has_machineuuid();
-    machineuuid_=::std::string(reinterpret_cast<const char*>(value), size);
+    machineuuid_ = ::std::string(reinterpret_cast<const char*>(value), size);
     // @@protoc_insertion_point(field_set_pointer:sls_logs.LogGroup.MachineUUID)
 }
 inline ::std::string* RawLogGroup::mutable_machineuuid() {
     set_has_machineuuid();
     // @@protoc_insertion_point(field_mutable:sls_logs.LogGroup.MachineUUID)
-    return &machineuuid_;;
+    return &machineuuid_;
+    ;
 }
 
-}
+} // namespace logtail
 
 #endif //LOGTAIL_RAWLOGGROUP_H

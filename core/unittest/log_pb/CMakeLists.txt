@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
-project (log_pb_unittest)
+cmake_minimum_required(VERSION 2.8)
+project(log_pb_unittest)
 
-add_executable (log_pb_unittest PBUnittest.cpp)
-target_link_libraries (log_pb_unittest unittest_base)
+add_executable(log_pb_unittest PBUnittest.cpp)
+target_link_libraries(log_pb_unittest unittest_base)

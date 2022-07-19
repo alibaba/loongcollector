@@ -246,7 +246,9 @@ namespace fsutil {
         int64_t GetFileSize() const;
 
         // GetMode returns st_mode.
-        int GetMode() const { return static_cast<int>(mRawStat.st_mode); }
+        int GetMode() const {
+            return static_cast<int>(mRawStat.st_mode);
+        }
     };
 
 } // namespace fsutil
