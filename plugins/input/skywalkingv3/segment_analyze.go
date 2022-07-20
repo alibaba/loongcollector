@@ -61,7 +61,8 @@ var OtSpanTagsMapping = map[string]string{
 func ParseSegment(span *v3.SpanObject, segment *v3.SegmentObject, cache *ResourcePropertiesCache, mapping map[int32]string) *OtSpan {
 	resource := cache.get(segment.Service, segment.ServiceInstance)
 	if resource == nil {
-		return nil
+		cache.put(segment.Service, segment.GetServiceInstance(), make(map[string]string))
+		resource = cache.get(segment.Service, segment.ServiceInstance)
 	}
 
 	otSpan := NewOtSpan()

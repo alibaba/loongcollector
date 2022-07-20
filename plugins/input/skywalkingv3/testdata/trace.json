@@ -16,6 +16,79 @@
             },
             {
                 "Key": "resource",
+                "Value": "{}"
+            },
+            {
+                "Key": "name",
+                "Value": "name"
+            },
+            {
+                "Key": "kind",
+                "Value": "server"
+            },
+            {
+                "Key": "traceID",
+                "Value": "trace-id-a"
+            },
+            {
+                "Key": "spanID",
+                "Value": "trace-seg-id-a.123"
+            },
+            {
+                "Key": "parentSpanID",
+                "Value": "trace-seg-id-a.456"
+            },
+            {
+                "Key": "logs",
+                "Value": "[]"
+            },
+            {
+                "Key": "traceState",
+                "Value": ""
+            },
+            {
+                "Key": "start",
+                "Value": "1234567890123000"
+            },
+            {
+                "Key": "end",
+                "Value": "1234567890125000"
+            },
+            {
+                "Key": "duration",
+                "Value": "2000"
+            },
+            {
+                "Key": "attribute",
+                "Value": "{\"key-a\":\"value-a\",\"key-b\":\"value-b\",\"net.peer.ip\":\"abc\",\"net.peer.port\":\"1234\"}"
+            },
+            {
+                "Key": "statusCode",
+                "Value": "OK"
+            },
+            {
+                "Key": "statusMessage",
+                "Value": ""
+            }
+        ]
+    },
+    {
+        "Time": 1234567890,
+        "Contents": [
+            {
+                "Key": "links",
+                "Value": "[]"
+            },
+            {
+                "Key": "host",
+                "Value": ""
+            },
+            {
+                "Key": "service",
+                "Value": "service-a"
+            },
+            {
+                "Key": "resource",
                 "Value": "{\"a\":\"b\",\"c\":\"d\"}"
             },
             {

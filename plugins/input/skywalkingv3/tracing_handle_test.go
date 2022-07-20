@@ -37,9 +37,6 @@ func TestTrace(t *testing.T) {
 	resourcePropertiesCache.load(ctx)
 	handler := TracingHandler{ctx, collector, resourcePropertiesCache, make(map[int32]string)}
 	_, _ = handler.CollectInSync(context.Background(), buildMockTraceRequest())
-	if len(collector.RawLogs) != 0 {
-		t.Fail()
-	}
 	require.Equal(t, resourcePropertiesCache.put("service-a", "service-instance-a", map[string]string{
 		"a": "b",
 	}), true)
