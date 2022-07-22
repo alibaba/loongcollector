@@ -14,45 +14,45 @@ Flusher 插件与外部系统进行交互，将数据发送到外部，以下将
 - Stop：停止Flusher 插件，比如断开与外部系统交互的链接
 
 ```go
-    type Flusher interface {
-// Init called for init some system resources, like socket, mutex...
-Init(Context) error
+type Flusher interface {
+   // Init called for init some system resources, like socket, mutex...
+   Init(Context) error
 
-// Description returns a one-sentence description on the Input.
-Description() string
+   // Description returns a one-sentence description on the Input.
+   Description() string
 
-// IsReady checks if flusher is ready to accept more data.
-// @projectName, @logstoreName, @logstoreKey: meta of the corresponding data.
-// Note: If SetUrgent is called, please make some adjustment so that IsReady
-//   can return true to accept more data in time and config instance can be
-//   stopped gracefully.
-IsReady(projectName string, logstoreName string, logstoreKey int64) bool
+   // IsReady checks if flusher is ready to accept more data.
+   // @projectName, @logstoreName, @logstoreKey: meta of the corresponding data.
+   // Note: If SetUrgent is called, please make some adjustment so that IsReady
+   //   can return true to accept more data in time and config instance can be
+   //   stopped gracefully.
+   IsReady(projectName string, logstoreName string, logstoreKey int64) bool
 
-// Flush flushes data to destination, such as SLS, console, file, etc.
-// It is expected to return no error at most time because IsReady will be called
-// before it to make sure there is space for next data.
-Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error
+   // Flush flushes data to destination, such as SLS, console, file, etc.
+   // It is expected to return no error at most time because IsReady will be called
+   // before it to make sure there is space for next data.
+   Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error
 
-// SetUrgent indicates the flusher that it will be destroyed soon.
-// @flag indicates if main program (Logtail mostly) will exit after calling this.
-//
-// Note: there might be more data to flush after SetUrgent is called, and if flag
-//   is true, these data will be passed to flusher through IsReady/Flush before
-//   program exits.
-//
-// Recommendation: set some state flags in this method to guide the behavior
-//   of other methods.
-SetUrgent(flag bool)
+   // SetUrgent indicates the flusher that it will be destroyed soon.
+   // @flag indicates if main program (Logtail mostly) will exit after calling this.
+   //
+   // Note: there might be more data to flush after SetUrgent is called, and if flag
+   //   is true, these data will be passed to flusher through IsReady/Flush before
+   //   program exits.
+   //
+   // Recommendation: set some state flags in this method to guide the behavior
+   //   of other methods.
+   SetUrgent(flag bool)
 
-// Stop stops flusher and release resources.
-// It is time for flusher to do cleaning jobs, includes:
-// 1. Flush cached but not flushed data. For flushers that contain some kinds of
-//   aggregation or buffering, it is important to flush cached out now, otherwise
-//   data will lost.
-// 2. Release opened resources: goroutines, file handles, connections, etc.
-// 3. Maybe more, it depends.
-// In a word, flusher should only have things that can be recycled by GC after this.
-Stop() error
+   // Stop stops flusher and release resources.
+   // It is time for flusher to do cleaning jobs, includes:
+   // 1. Flush cached but not flushed data. For flushers that contain some kinds of
+   //   aggregation or buffering, it is important to flush cached out now, otherwise
+   //   data will lost.
+   // 2. Release opened resources: goroutines, file handles, connections, etc.
+   // 3. Maybe more, it depends.
+   // In a word, flusher should only have things that can be recycled by GC after this.
+   Stop() error
 }
 ```
 
