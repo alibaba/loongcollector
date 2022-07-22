@@ -191,6 +191,20 @@ public:
         EXPECT_EQ(ret, false);
     }
 
+    void TestYamlToJsonForPurelyDigitValue() {
+        LOG_INFO(sLogger, ("TestYamlToJsonForPurelyDigitValue() begin", time(NULL)));
+
+        Json::Value inputJsonConfig;
+        const std::string file = "testConfigDir/plugin_mysql.yaml";
+        YAML::Node yamlConfig = YAML::LoadFile(file);
+
+        Json::Value userLocalJsonConfig;
+        ConfigYamlToJson::GetInstance()->GenerateLocalJsonConfig(file, yamlConfig, userLocalJsonConfig);
+
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"][0]["detail"]["Password"], "123456");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"][0]["detail"]["MaxSyncSize"], 199);
+    }
+
     // input: plugin; processor: plugin
     void TestYamlToJsonForPluginMode() {
         LOG_INFO(sLogger, ("TestYamlToJsonForPluginMode() begin", time(NULL)));
@@ -232,7 +246,7 @@ public:
         ConfigManager::GetInstance()->LoadJsonConfig(userLocalJsonConfig, false);
 
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 10);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["keys"][0].asString(), "content");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["regex"][0].asString(), "(.*)");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
@@ -261,7 +275,7 @@ public:
         ConfigManager::GetInstance()->LoadJsonConfig(userLocalJsonConfig, false);
 
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 10);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"].size(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 2);
@@ -288,7 +302,7 @@ public:
         ConfigManager::GetInstance()->LoadJsonConfig(userLocalJsonConfig, false);
 
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 10);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"].size(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 2);
@@ -315,7 +329,7 @@ public:
         ConfigManager::GetInstance()->LoadJsonConfig(userLocalJsonConfig, false);
 
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 10);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["keys"][0].asString(), "content");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["regex"][0].asString(), "(.*)");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
@@ -328,6 +342,10 @@ TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForCheckConfig) {
 
 TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForPluginMode) {
     TestYamlToJsonForPluginMode();
+}
+
+TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForPurelyDigitValue) {
+    TestYamlToJsonForPurelyDigitValue();
 }
 
 TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileRegMode) {
