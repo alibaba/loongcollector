@@ -96,8 +96,8 @@ plugin: clean
 .PHONY: plugin_main
 plugin_main: clean
 	./scripts/plugin_build.sh vendor default $(OUT_DIR)
-	cp pkg/logtail/libPluginAdapter.so bin/libPluginAdapter.so
-	cp pkg/logtail/PluginAdapter.dll bin/PluginAdapter.dll
+	cp pkg/logtail/libPluginAdapter.so $(OUT_DIR)/libPluginAdapter.so
+	cp pkg/logtail/PluginAdapter.dll $(OUT_DIR)/PluginAdapter.dll
 
 .PHONY: plugin_local
 plugin_local:

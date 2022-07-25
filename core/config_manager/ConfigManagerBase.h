@@ -261,6 +261,10 @@ public:
     void SetDefaultProfileRegion(const std::string& profileRegion);
     std::string GetDefaultProfileRegion();
 
+    /**
+     * @brief Reload aliuid/user_defined_id from disk&env
+     * 
+     */
     void ReloadLogtailSysConf();
     void CorrectionAliuidFile(const Json::Value& aliuidArray);
     void CorrectionAliuidFile();
@@ -340,6 +344,12 @@ public:
 
     Json::Value& GetLocalConfigJson() { return mLocalConfigJson; }
 
+    /**
+     * @brief Load configs from local files and dirs
+     * 
+     * @return true config changed
+     * @return false no update
+     */
     bool GetLocalConfigUpdate();
 
     int32_t UpdateConfigJson(const std::string& configJson);
@@ -425,10 +435,35 @@ private:
     void GetRegexAndKeys(const Json::Value& value, Config* configPtr);
     void GetSensitiveKeys(const Json::Value& value, Config* pConfig);
 
+    /**
+     * @brief Load user_local_config.json from sys_conf_dir
+     * 
+     * @return true config changed
+     * @return false no update
+     */
     bool GetLocalConfigFileUpdate();
+    /**
+     * @brief Load *.json from user_config.d
+     * 
+     * @return true config changed
+     * @return false no update
+     */
     bool GetLocalConfigDirUpdate();
+    /**
+     * @brief Load *.yaml from user_yaml_config.d
+     * 
+     * @return true config changed
+     * @return false no update
+     */
     bool GetLocalYamlConfigDirUpdate();
 
+    /**
+     * @brief Load a single data collection config
+     * 
+     * @param name config name
+     * @param value config json value
+     * @param localFlag 
+     */
     void LoadSingleUserConfig(const std::string& name, const Json::Value& value, bool localFlag = false);
     bool CheckRegFormat(const std::string& regStr);
     void SendAllMatchAlarm(const std::string& path,

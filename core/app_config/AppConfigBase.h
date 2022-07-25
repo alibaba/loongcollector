@@ -136,18 +136,57 @@ private:
     //   local time to adjust logs' time automatically.
     bool mEnableLogTimeAutoAdjust = false;
 
+    /**
+     * @brief Load ConfigServer, DataServer and network interface
+     * 
+     * @param confJson 
+     */
     virtual void LoadAddrConfig(const Json::Value& confJson) = 0;
 
+    /**
+     * @brief Auto scale buffer, file and network parameters according to mem limit.
+     *
+     * If buffer_file_num * buffer_file_size > 4GB, then buffer_file_size will be reduced proprotionally.
+     *
+     * File parameters may be adjusted include
+     * polling_max_stat_count, max_watch_dir_count, max_open_files_limit and etc.
+     * The scaling factor is base on mem_limit_num / 2GB.
+     * For example, if max_open_files_limit is set to 100,000 and mem_limit_num is set to 1GB,
+     * then the effective max_open_files_limit value will be 50,000.
+     *
+     * Disable network flow control if max_bytes_per_sec > 30MB/s.
+     */
     void CheckAndAdjustParameters();
     void MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJson);
+    /**
+     * @brief Load *.json from config.d dir
+     *
+     * Load according to lexical order. Values in later file will overwrite former.
+     *
+     * @param confJson json value to append to
+     */
     void LoadIncludeConfig(Json::Value& confJson);
     void LoadSyslogConf(const Json::Value& confJson);
 
     void DumpAllFlagsToMap(std::unordered_map<std::string, std::string>& flagMap);
     void ReadFlagsFromMap(const std::unordered_map<std::string, std::string>& flagMap);
+    /**
+     * @brief Overwrite gflags with the values in json
+     * 
+     * @param confJson json value to parse from
+     */
     void ParseJsonToFlags(const Json::Value& confJson);
+    /**
+     * @brief Overwrite gflags with the values in environment variales
+     * 
+     */
     void ParseEnvToFlags();
 
+    /**
+     * @brief Load resource related configs such as cpu, memory, buffer size, thread number, send concurrency.
+     * 
+     * @param confJson json value to load from
+     */
     void LoadResourceConf(const Json::Value& confJson);
     void LoadOtherConf(const Json::Value& confJson);
     void LoadGlobalFuseConf(const Json::Value& confJson);

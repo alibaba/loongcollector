@@ -89,6 +89,8 @@ void do_worker_process() {
         AppConfig::GetInstance()->SetWorkingDir(GetProcessExecutionDir());
     }
 
+    overwrite_community_edition_flags();
+
     char* configEnv = getenv(STRING_FLAG(ilogtail_config_env_name).c_str());
     if (configEnv == NULL || strlen(configEnv) == 0) {
         AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));

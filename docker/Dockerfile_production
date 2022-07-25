@@ -45,4 +45,6 @@ COPY scripts/run_ilogtail.sh /usr/local/ilogtail/
 RUN chmod -R 755 /usr/local/ilogtail/
 RUN mkdir /usr/local/ilogtail/checkpoint
 
+ENV ALIYUN_LOGTAIL_USER_DEFINED_ID=default
+ENV docker_file_cache_path=checkpoint/docker_path_config.json
 ENTRYPOINT ["/usr/local/ilogtail/run_ilogtail.sh"]

@@ -170,8 +170,6 @@ AppConfigBase::AppConfigBase() {
     mIgnoreDirInodeChanged = false;
     mLogParseAlarmFlag = true;
     mContainerMode = false;
-    std::string processExecutionDir = GetProcessExecutionDir();
-    mDockerFilePathConfig = processExecutionDir + STRING_FLAG(ilogtail_docker_file_path_config);
     mNoInotify = false;
     mSendDataPort = 80;
     mShennongSocket = true;
@@ -239,6 +237,9 @@ void AppConfigBase::LoadIncludeConfig(Json::Value& confJson) {
 }
 
 void AppConfigBase::LoadAppConfig(const std::string& ilogtailConfigFile) {
+    std::string processExecutionDir = GetProcessExecutionDir();
+    mDockerFilePathConfig = processExecutionDir + STRING_FLAG(ilogtail_docker_file_path_config);
+
     Json::Value confJson(Json::objectValue);
     std::string newSysConfDir;
 
