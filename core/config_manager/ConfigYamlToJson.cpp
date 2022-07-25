@@ -34,46 +34,70 @@ const std::string PROCESSOR_SPLIT_LINE_LOG_USING_SEP = "processor_split_log_stri
 const std::string PROCESSOR_SPLIT_LINE_LOG_USING_REG = "processor_split_log_regex";
 
 ConfigYamlToJson::ConfigYamlToJson() {
-    mFileConfigMap["logType"] = "log_type";
+    // file_log params
     mFileConfigMap["LogPath"] = "log_path";
     mFileConfigMap["FilePattern"] = "file_pattern";
     mFileConfigMap["FileEncoding"] = "file_encoding";
-    mFileConfigMap["LogBeginRegex"] = "log_begin_reg";
-    mFileConfigMap["TailExisted"] = "tail_existed";
-    mFileConfigMap["Preserve"] = "preserve";
-    mFileConfigMap["PreserveDepth"] = "preserve_depth";
     mFileConfigMap["MaxDepth"] = "max_depth";
     mFileConfigMap["TopicFormat"] = "topic_format";
-    mFileConfigMap["DiscardNonUtf8"] = "discard_none_utf8";
-    mFileConfigMap["DiscardUnmatch"] = "discard_unmatch";
+    mFileConfigMap["Preserve"] = "preserve";
+    mFileConfigMap["PreserveDepth"] = "preserve_depth";
     mFileConfigMap["DelaySkipBytes"] = "delay_skip_bytes";
+    mFileConfigMap["DelayAlarmBytes"] = "delay_alarm_bytes";
     mFileConfigMap["DockerFile"] = "docker_file";
-    mFileConfigMap["DockerIncludeLabel"] = "docker_include_label";
-    mFileConfigMap["DockerExcludeLabel"] = "docker_exclude_label";
-    mFileConfigMap["DockerIncludeEnv"] = "docker_include_env";
-    mFileConfigMap["DockerExcludeEnv"] = "docker_exclude_env";
-    mFileConfigMap["CustomizedFields"] = "customizedFields";
+    mFileConfigMap["ContainerFile"] = "docker_file";
+    mFileConfigMap["IncludeContainerLabel"] = "docker_include_label";
+    mFileConfigMap["ExcludeContainerLabel"] = "docker_exclude_label";
+    mFileConfigMap["IncludeEnv"] = "docker_include_env";
+    mFileConfigMap["ExcludeEnv"] = "docker_exclude_env";
 
-    mFileConfigMap["Regex"] = "regex";
-    mFileConfigMap["Keys"] = "keys";
-    mFileConfigMap["LocalStorage"] = "local_storage";
-    mFileConfigMap["EnableTag"] = "enable_tag";
+    // params specific to accelerate processors
+    mFileConfigMap["DiscardUnmatch"] = "discard_unmatch";
     mFileConfigMap["EnableRawLog"] = "raw_log";
     mFileConfigMap["FilterRegex"] = "filter_regs";
     mFileConfigMap["FilterKey"] = "filter_keys";
+    mFileConfigMap["TimeFormat"] = "timeformat";
     mFileConfigMap["AdjustTimezone"] = "tz_adjust";
     mFileConfigMap["LogTimezone"] = "log_tz";
-    mFileConfigMap["DelayAlarmBytes"] = "delay_alarm_bytes";
     mFileConfigMap["SensitiveKeys"] = "sensitive_keys";
     mFileConfigMap["MergeType"] = "merge_type";
-    mFileConfigMap["Priority"] = "priority";
-
+    // params specific to regex accelerate processor
+    mFileConfigMap["Keys"] = "keys";
+    mFileConfigMap["Regex"] = "regex";
+    mFileConfigMap["LogBeginRegex"] = "log_begin_reg";    
+    // params specific to delimiter accelerate processor
+    mFileConfigMap["Separator"] = "delimiter_separator";
+    mFileConfigMap["Quote"] = "delimiter_quote";
+    mFileConfigMap["ColumnKeys"] = "column_keys";
+    mFileConfigMap["AcceptNoEnoughKeys"] = "accept_no_enough_keys";
+    // params specific to delimiter and json accelerate processors
+    mFileConfigMap["TimeKey"] = "time_key";
+    
     mFileConfigMap["ProjectName"] = "project_name";
     mFileConfigMap["LogstoreName"] = "category";
     mFileConfigMap["Endpoint"] = "defaultEndpoint";
     mFileConfigMap["Region"] = "region";
     mFileConfigMap["ShardHashKey"] = "shard_hash_key";
-    mFileConfigMap["MaxSendRate"] = "max_send_rate";
+
+    mFileAdvancedConfigMap["DirBlackList"] = "dir_blacklist";
+    mFileAdvancedConfigMap["FilepathBlackList"] = "filepath_blacklist";
+    mFileAdvancedConfigMap["EnablePreciseTimestamp"] = "enable_precise_timestamp";
+    mFileAdvancedConfigMap["PreciseTimestampKey"] = "precise_timestamp_key";
+    mFileAdvancedConfigMap["PreciseTimestampUnit"] = "precise_timestamp_unit";
+    mFileAdvancedConfigMap["ForceMultiConfig"] = "force_multiconfig";
+    mFileAdvancedConfigMap["TailSizeKB"] = "tail_size_kb";
+
+    mFileK8sConfigMap["K8sNamespaceRegex"] = "K8sNamespaceRegex";
+    mFileK8sConfigMap["K8sPodRegex"] = "K8sPodRegex";
+    mFileK8sConfigMap["IncludeK8sLabel"] = "IncludeK8sLabel";
+    mFileK8sConfigMap["ExcludeK8sLabel"] = "ExcludeK8sLabel";
+    mFileK8sConfigMap["IncludeContainerLabel"] = "IncludeContainerLabel";
+    mFileK8sConfigMap["ExcludeContainerLabel"] = "ExcludeContainerLabel";
+    mFileK8sConfigMap["K8sContainerRegex"] = "K8sContainerRegex";
+    mFileK8sConfigMap["IncludeEnv"] = "IncludeEnv";
+    mFileK8sConfigMap["ExcludeEnv"] = "ExcludeEnv";
+    mFileK8sConfigMap["ExternalK8sLabelTag"] = "ExternalK8sLabelTag";
+    mFileK8sConfigMap["ExternalEnvTag"] = "ExternalEnvTag";
 
     mFilePluginToLogTypeMap[INPUT_FILE_LOG] = "common_reg_log";
     mFilePluginToLogTypeMap[PROCESSOR_REGEX_ACCELERATE] = "common_reg_log";
@@ -84,6 +108,20 @@ ConfigYamlToJson::ConfigYamlToJson() {
 string ConfigYamlToJson::GetTransforKey(const string yamlKey) {
     unordered_map<string, string>::iterator iter = mFileConfigMap.find(yamlKey);
     if (iter != mFileConfigMap.end())
+        return iter->second;
+    return "";
+}
+
+string ConfigYamlToJson::GetTransforAdvancedKey(const string yamlKey) {
+    unordered_map<string, string>::iterator iter = mFileAdvancedConfigMap.find(yamlKey);
+    if (iter != mFileAdvancedConfigMap.end())
+        return iter->second;
+    return "";
+}
+
+string ConfigYamlToJson::GetTransforK8sKey(const string yamlKey) {
+    unordered_map<string, string>::iterator iter = mFileK8sConfigMap.find(yamlKey);
+    if (iter != mFileK8sConfigMap.end())
         return iter->second;
     return "";
 }
@@ -107,7 +145,7 @@ Json::Value ConfigYamlToJson::ParseScalar(const YAML::Node& node) {
     bool b;
     if (YAML::convert<bool>::decode(node, b))
         return b;
-
+    
     string s;
     if (YAML::convert<string>::decode(node, s))
         return s;
@@ -247,6 +285,21 @@ bool ConfigYamlToJson::CheckPluginConfig(const string configName, const YAML::No
                 LOG_ERROR(sLogger,
                           ("CheckPluginConfig failed", "accelerateProcessor must be used with file_log plugin.")(
                               "config_name", configName)("input_plugin_type", workMode.mInputPluginType)(
+                              "accelerate_processor", workMode.mAccelerateProcessorPluginType));
+                return false;
+            }
+            if (flusherPluginsInfo.size() > 1) {
+                LOG_ERROR(sLogger,
+                          ("CheckPluginConfig failed", "accelerateProcessor must only be used with flusher_sls plugin.")(
+                              "config_name", configName)("flusher_plugin_size", flusherPluginsInfo.size())(
+                              "accelerate_processor", workMode.mAccelerateProcessorPluginType));
+                return false;
+            }
+            if (flusherPluginsInfo.size() != 0 && flusherPluginsInfo.find("flusher_sls") == flusherPluginsInfo.end()) {
+                unordered_map<string, PluginInfo>::iterator it = flusherPluginsInfo.begin();
+                LOG_ERROR(sLogger,
+                          ("CheckPluginConfig failed", "accelerateProcessor must be used with flusher_sls plugin.")(
+                              "config_name", configName)("flusher_plugin_type", it->first)(
                               "accelerate_processor", workMode.mAccelerateProcessorPluginType));
                 return false;
             }
@@ -413,12 +466,52 @@ bool ConfigYamlToJson::GenerateLocalJsonConfigForFileMode(const YAML::Node& yaml
         return false;
     }
 
+    Json::Value advancedConfig, k8sConfig, blackListConfig;
     for (YAML::const_iterator it = yamlConfig.begin(); it != yamlConfig.end(); ++it) {
-        string key = GetTransforKey(it->first.as<std::string>());
-        if (0 == key.size()) {
+        string key = GetTransforAdvancedKey(it->first.as<std::string>());
+        if (0 == key.compare("dir_blacklist")) {
+            blackListConfig[key] = ChangeYamlToJson(it->second);
+        } else if (0 == key.compare("filepath_blacklist")) {
+            blackListConfig[key] = ChangeYamlToJson(it->second);
+        } else if (0 != key.size()) {
+            advancedConfig[key] = ChangeYamlToJson(it->second);
         } else {
-            userJsonConfig[key] = ChangeYamlToJson(it->second);
+            key = GetTransforKey(it->first.as<std::string>());
+            if (0 == key.compare("regex")) {
+                userJsonConfig[key][0] = ChangeYamlToJson(it->second);
+            } else if (0 == key.compare("keys")) {
+                string keys;
+                for (auto&& node : it->second) {
+                    keys += node.as<std::string>() + ",";
+                }
+                userJsonConfig[key][0] = keys.substr(0, keys.size()-1);
+            } else if (0 != key.size()) {
+                userJsonConfig[key] = ChangeYamlToJson(it->second);
+            }
         }
+
+        if(0 == it->first.as<std::string>().compare("ContainerInfo")) {
+            for (YAML::const_iterator iter = it->second.begin(); iter != it->second.end(); ++iter) {
+                string key = GetTransforK8sKey(iter->first.as<std::string>());
+                if (0 != key.size()) {
+                    k8sConfig[key] = ChangeYamlToJson(iter->second);
+                }
+                key = GetTransforKey(iter->first.as<std::string>());
+                if (0 != key.size()) {
+                    userJsonConfig[key] = ChangeYamlToJson(iter->second);
+                }
+            }
+            userJsonConfig["docker_file"] = true;
+        }
+    }
+    if (0 != k8sConfig.size()) {
+        advancedConfig["k8s"] = k8sConfig;
+    }
+    if (0 != blackListConfig.size()) {
+        advancedConfig["blacklist"] = blackListConfig;
+    }
+    if (0 != advancedConfig.size()) {
+        userJsonConfig["advanced"] = advancedConfig;
     }
 
     return true;

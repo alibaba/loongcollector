@@ -68,6 +68,8 @@ public:
 
 private:
     string GetTransforKey(const string yamlKey);
+    string GetTransforAdvancedKey(const string yamlKey);
+    string GetTransforK8sKey(const string yamlKey);
     Json::Value ParseScalar(const YAML::Node& node);
 
     bool GeneratePluginStatistics(const string pluginCategory,
@@ -89,6 +91,8 @@ private:
     bool FillupDefalutUserJsonConfig(const WorkMode& workMode, Json::Value& userJsonConfig);
 
     unordered_map<string, string> mFileConfigMap;
+    unordered_map<string, string> mFileAdvancedConfigMap;
+    unordered_map<string, string> mFileK8sConfigMap;
     unordered_map<string, string> mFilePluginToLogTypeMap;
 };
 
