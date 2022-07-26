@@ -200,7 +200,17 @@ public:
      * @return 0 on success; nonzero on error
      */
     virtual bool LoadConfig(const std::string& configFile) = 0;
+
+    /**
+     * @brief Load all name config in @jsonRoot to mNameConfigMap
+     * 
+     * @param jsonRoot 
+     * @param localFlag 
+     * @return true always return true
+     * @return false never return false
+     */
     bool LoadJsonConfig(const Json::Value& jsonRoot, bool localFlag = false);
+
     bool LoadAllConfig();
     const std::unordered_map<std::string, Config*>& GetAllConfig() { return mNameConfigMap; }
     void RegisterWildcardPath(Config* config, const std::string& path, int32_t depth);
@@ -345,7 +355,7 @@ public:
     Json::Value& GetLocalConfigJson() { return mLocalConfigJson; }
 
     /**
-     * @brief Load configs from local files and dirs
+     * @brief Load configs from file and dir in SysConfDir
      * 
      * @return true config changed
      * @return false no update
@@ -458,7 +468,7 @@ private:
     bool GetLocalYamlConfigDirUpdate();
 
     /**
-     * @brief Load a single data collection config
+     * @brief Load a single data collection config and insert it into mNameConfigMap with name @name.
      * 
      * @param name config name
      * @param value config json value

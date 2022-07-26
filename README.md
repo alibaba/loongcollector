@@ -1,4 +1,4 @@
-Alibaba iLogtail - The Lightweight Collector of SLS in Alibaba Cloud | [中文版本](https://ilogtail.gitbook.io/ilogtail-docs/about/readme)
+Alibaba iLogtail - Fast and Lightweight Observability Data Collector | [中文版本](./README-cn.md)
 ==========
 <img src="https://github.com/iLogtail/ilogtail-docs/raw/main/.gitbook/assets/ilogtail-icon.png" style="width: 100%; height: 100%" />
 
@@ -39,33 +39,36 @@ The core advantages of **iLogtail** :
   - ...
 
 # Quick Start
-This repository is the golang part of **iLogtail**，it contains most of the features of iLogtail. And, it can work by itself or work with Ilogtail-C(open source soon) using CGO.
+For the complexity of C++ dependencies, the compilation of iLogtail requires you have docker installed. If you aim to build iLogtail from sources, you can go ahead and start with the following commands.
 
 1. Start with local
 
-```shell
-make pluin_main && sh output/ilogtail
+```bash
+make
+cp example/quick_start/* output
+cd output
+./ilogtail
+# Now, ilogtail is collecting data from output/simple.log and outputing the result to stdout
 ```
 
-> **NOTE**: for some higher linux version, you have to install systemd-devel in advance
-> ```shell
-> #centos
-> yum install systemd-devel
-> 
-> #ubuntu
-> apt-get update && apt-get install -y libsystemd-dev
-> ```
-2. Start with Alibaba Cloud  
-Please read this [doc](https://www.alibabacloud.com/help/doc-detail/28979.htm).
-
 # Documentation
+Our official **User Manual** is located here:
 
-For documentation on the latest version see the [documentation index](./docs/en/README.md)
+[Homepage](https://ilogtail.gitbook.io/ilogtail-docs/about/readme)
 
-- [Input Plugins](./docs/en/guides/How-to-write-input-plugins.md)
-- [Processor Plugins](./docs/en/guides/How-to-write-processor-plugins.md)
-- [Aggregator Plugins](./docs/en/guides/How-to-write-aggregator-plugins.md)
-- [Flusher Plugins](./docs/en/guides/How-to-write-flusher-plugins.md)
+[Download](https://ilogtail.gitbook.io/ilogtail-docs/installation/release-notes)
+
+[Installation](https://ilogtail.gitbook.io/ilogtail-docs/installation/quick-start)
+
+[Configuration](https://ilogtail.gitbook.io/ilogtail-docs/configuration/collection-config)
+
+[All Plugins](https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/overview)
+
+[Getting Started](https://ilogtail.gitbook.io/ilogtail-docs/getting-started/)
+
+[Developer Guide](https://ilogtail.gitbook.io/ilogtail-docs/developer-guide/)
+
+[Benchmark](https://ilogtail.gitbook.io/ilogtail-docs/benchmark/)
 
 # Contribution
 
@@ -79,7 +82,7 @@ There are many ways to contribute:
 You can report bugs, make suggestions or participate in discussions through [Github Issues](https://github.com/alibaba/ilogtail/issues), or contact us with the following ways:
 
 - DingTalk：iLogtail社区
-- WeChat：日志服务
+- WeChat：iLogtail社区
 - Bilibili：[阿里云SLS](https://space.bilibili.com/630680534?from=search&seid=2845737427240690794&spm_id_from=333.337.0.0)
 - Zhihu：[阿里云日志服务](https://www.zhihu.com/people/a-li-yun-ri-zhi-fu-wu)
 
