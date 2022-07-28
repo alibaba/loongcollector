@@ -44,12 +44,17 @@ ConfigYamlToJson::ConfigYamlToJson() {
     mFileConfigMap["PreserveDepth"] = "preserve_depth";
     mFileConfigMap["DelaySkipBytes"] = "delay_skip_bytes";
     mFileConfigMap["DelayAlarmBytes"] = "delay_alarm_bytes";
-    mFileConfigMap["DockerFile"] = "docker_file";
     mFileConfigMap["ContainerFile"] = "docker_file";
     mFileConfigMap["IncludeContainerLabel"] = "docker_include_label";
     mFileConfigMap["ExcludeContainerLabel"] = "docker_exclude_label";
     mFileConfigMap["IncludeEnv"] = "docker_include_env";
     mFileConfigMap["ExcludeEnv"] = "docker_exclude_env";
+    // deprecated
+    mFileConfigMap["DockerFile"] = "docker_file";
+    mFileConfigMap["DockerIncludeLabel"] = "docker_include_label";
+    mFileConfigMap["DockerExcludeLabel"] = "docker_exclude_label";
+    mFileConfigMap["DockerIncludeEnv"] = "docker_include_env";
+    mFileConfigMap["DockerExcludeEnv"] = "docker_exclude_env";
 
     // params specific to accelerate processors
     mFileConfigMap["DiscardUnmatch"] = "discard_unmatch";
