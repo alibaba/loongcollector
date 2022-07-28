@@ -15,7 +15,7 @@
 | Topic | Array | 是 | 待消费的Kafka订阅主题列表。 |
 | ClientID | String | 是 | 消费Kafka的用户ID。 |
 | Offset | String | 否 | Kafka初始消费位移类型，可选值包括：oldest和newest。如果未添加该参数，则默认使用oldest，表示从最早可用的位移处开始消费。 |
-| MaxMessageLen | Interger | 否 | Kafka消息的最大允许长度，单位为字节，取值范围为：1～524288。如果未添加该参数，则默认使用524288，即512KB。 |
+| MaxMessageLen | Integer | 否 | Kafka消息的最大允许长度，单位为字节，取值范围为：1～524288。如果未添加该参数，则默认使用524288，即512KB。 |
 | SASLUsername | String | 否 | SASL用户名。 |
 | SASLPassword | String | 否 | SASL密码。 |
 
