@@ -14,7 +14,6 @@ UseTab: Never
 PointerAlignment: Left
 MaxEmptyLinesToKeep: 2
 KeepEmptyLinesAtTheStartOfBlocks: false
-AllowShortFunctionsOnASingleLine: InlineOnly
 AlwaysBreakTemplateDeclarations: true
 IndentCaseLabels: true
 SpaceAfterTemplateKeyword: true
@@ -33,9 +32,12 @@ ContinuationIndentWidth: 4
 AlignConsecutiveAssignments: false
 AlignOperands: false
 AllowAllParametersOfDeclarationOnNextLine: true
-AllowShortBlocksOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
 AllowShortCaseLabelsOnASingleLine: false
-AllowShortIfStatementsOnASingleLine: false
+AllowShortEnumsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortLambdasOnASingleLine: All
 AllowShortLoopsOnASingleLine: false
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakBeforeMultilineStrings: false

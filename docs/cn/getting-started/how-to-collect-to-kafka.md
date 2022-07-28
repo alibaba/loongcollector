@@ -79,7 +79,6 @@ drwxrwxr-x 5 505 505      4096 7月  10 18:00 example_config
 -rwxr-xr-x 1 505 505     16400 7月  11 00:00 libPluginAdapter.so
 -rw-r--r-- 1 505 505 115963144 7月  11 00:00 libPluginBase.so
 -rw-rw-r-- 1 505 505     11356 7月  11 00:00 LICENSE
--rw-rw-r-- 1 505 505      5810 7月  11 00:00 README-cn.md
 -rw-rw-r-- 1 505 505      4834 7月  11 00:00 README.md
 drwxr-xr-x 2 root root    4096 7月  12 09:55 user_yaml_config.d
 ```

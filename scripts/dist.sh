@@ -24,7 +24,7 @@ ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 
 # prepare dist dir
 mkdir "${ROOTDIR}/${DIST_DIR}"
-cp LICENSE README.md README-cn.md "${ROOTDIR}/${DIST_DIR}"
+cp LICENSE README.md "${ROOTDIR}/${DIST_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/ilogtail" "${ROOTDIR}/${DIST_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/libPluginAdapter.so" "${ROOTDIR}/${DIST_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/libPluginBase.so" "${ROOTDIR}/${DIST_DIR}"

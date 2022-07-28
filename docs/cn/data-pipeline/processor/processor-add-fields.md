@@ -12,22 +12,19 @@
 | Fields        | Map     | 是       | 待添加字段和字段值。键值对格式，支持添加多个。                       |
 | IgnoreIfExist | Boolean | 否       | 当Key相同时是否忽略。如果未添加该参数，则默认使用false，表示不忽略。 |
 
-
-
-
 ## 样例
 
 采集`/home/test-log/`路径下的`test.log`文件，并添加字段service: A用于标识日志所在服务。
 
 * 输入
 
-```
+```bash
 echo 'this is a test log' >> /home/test-log/test.log
 ```
 
 * 采集配置
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log
@@ -49,7 +46,7 @@ flushers:
 
 * 输出
 
-```
+```json
 {
     "__tag__:__path__": "/home/test_log/key_value.log",
     "content": "this is a test log",

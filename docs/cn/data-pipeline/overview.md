@@ -43,6 +43,7 @@
 | `flusher_stdout`<br>标准输出/文件 | SLS官方 | 将采集到的数据输出到标准输出或文件。 |
 
 ## 加速
+
 | 名称 | 提供方 | 简介 |
 | - | - | - |
 | `processor_delimiter_accelerate`<br>分隔符加速 | SLS官方 | 以加速模式实现分隔符日志的字段提取。 |

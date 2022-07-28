@@ -183,9 +183,7 @@ namespace sdk {
 #undef METHOD_LOG_PATTERN
     }
 
-    static unsigned char ToHex(unsigned char x) {
-        return x > 9 ? x + 55 : x + 48;
-    }
+    static unsigned char ToHex(unsigned char x) { return x > 9 ? x + 55 : x + 48; }
 
     static unsigned char FromHex(unsigned char x) {
         unsigned char y;
@@ -331,9 +329,7 @@ namespace sdk {
         return string(buffer);
     }
 
-    std::string GetDateString() {
-        return GetDateString(DATE_FORMAT_RFC822);
-    }
+    std::string GetDateString() { return GetDateString(DATE_FORMAT_RFC822); }
 
     time_t DecodeDateString(const std::string dateString, const std::string& dateFormat) {
         return 0;
@@ -800,9 +796,7 @@ namespace sdk {
         }
     }
 
-    inline size_t min(size_t a, size_t b) {
-        return a < b ? a : b;
-    }
+    inline size_t min(size_t a, size_t b) { return a < b ? a : b; }
 
     void SHA1::transform() {
         uint32_t W[80];
@@ -874,9 +868,7 @@ namespace sdk {
             *p1++ ^= *p2++;
     }
 
-    HMAC::HMAC(const uint8_t* key, size_t lkey) {
-        init(key, lkey);
-    }
+    HMAC::HMAC(const uint8_t* key, size_t lkey) { init(key, lkey); }
 
     void HMAC::init(const uint8_t* key, size_t lkey) {
         in.init();

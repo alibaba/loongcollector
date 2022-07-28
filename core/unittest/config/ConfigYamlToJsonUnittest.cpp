@@ -186,7 +186,7 @@ public:
         yamlConfig.reset();
         generateYamlConfig("inputs", {"file_log"}, yamlConfig);
         generateYamlConfig("processors", {"processor_regex_accelerate"}, yamlConfig);
-        generateYamlConfig("flushers", {"flusher_sls","flusher_stdout"}, yamlConfig);
+        generateYamlConfig("flushers", {"flusher_sls", "flusher_stdout"}, yamlConfig);
         ret = ConfigYamlToJson::GetInstance()->CheckPluginConfig("", yamlConfig, workMode);
         EXPECT_EQ(ret, false);
 
@@ -217,8 +217,10 @@ public:
         Json::Value userLocalJsonConfig;
         ConfigYamlToJson::GetInstance()->GenerateLocalJsonConfig(file, yamlConfig, userLocalJsonConfig);
 
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"][0]["detail"]["Password"], "123456");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"][0]["detail"]["MaxSyncSize"], 199);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"][0]["detail"]["Password"],
+                  "123456");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"][0]["detail"]["MaxSyncSize"],
+                  199);
     }
 
     // input: plugin; processor: plugin
@@ -368,7 +370,8 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["docker_file"].asBool(), true);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["docker_include_env"]["ENV"].asString(), "value");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["docker_exclude_label"]["app"].asString(), "example");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["docker_exclude_label"]["app"].asString(),
+                  "example");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["keys"][0].asString(), "time,msg");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["regex"][0].asString(), "(\\S+)\\s(\\w+).*");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
@@ -390,18 +393,25 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["docker_file"].asBool(), true);
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["K8sNamespaceRegex"].asString(), "default");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["K8sPodRegex"].asString(), "^log.*$");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["IncludeK8sLabel"]["app"].asString(), "log");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["ExcludeEnv"]["ENV"].asString(), "test");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["ExternalEnvTag"]["ENV"].asString(), "envtag");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["K8sNamespaceRegex"].asString(),
+                  "default");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["K8sPodRegex"].asString(),
+                  "^log.*$");
+        EXPECT_EQ(
+            userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["IncludeK8sLabel"]["app"].asString(),
+            "log");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["ExcludeEnv"]["ENV"].asString(),
+                  "test");
+        EXPECT_EQ(
+            userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["k8s"]["ExternalEnvTag"]["ENV"].asString(),
+            "envtag");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["delimiter_separator"].asString(), ",");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["delimiter_quote"].asString(), "\"");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["column_keys"].size(), 2);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "delimiter_log");
     }
 
-        // input: file; processor: json accelerate
+    // input: file; processor: json accelerate
     void TestYamlToJsonForFileJsonAccelerateMode() {
         LOG_INFO(sLogger, ("TestYamlToJsonForFileJsonAccelerateMode() begin", time(NULL)));
 

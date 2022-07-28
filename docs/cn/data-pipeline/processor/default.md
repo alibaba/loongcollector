@@ -1,23 +1,27 @@
 # 原始数据
 
 ## 简介
+
 `processor_default`插件不对数据任何操作，只是简单的数据透传。[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/processor/defaultone/processor_default.go)
 
 ## 配置参数
+
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
 | Type    | String，无默认值（必填） | 插件类型，固定为`processor_default`      |
 
-
 ## 样例
+
 采集`/home/test-log/`路径下的`default.log`文件，提取文件的原始数据。
 
 * 输入
-```
+
+```bash
 echo "2022/07/14/11:32:47 test log" >> /home/test-log/default.log
 ```
 
 * 采集配置
+
 ```yaml
 enable: true
 inputs:
@@ -37,7 +41,12 @@ flushers:
 ```
 
 * 输出
+<<<<<<< HEAD
+
+```
+=======
 ```json
+>>>>>>> main
 {
     "__tag__:__path__":"/home/test-log/default.log",
     "content":"2022/07/14/11:32:47 test log",

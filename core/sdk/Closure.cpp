@@ -18,8 +18,7 @@ namespace logtail {
 
 namespace sdk {
 
-    void PostLogStoreLogsClosure::Done() {
-    }
+    void PostLogStoreLogsClosure::Done() {}
 
 } // namespace sdk
 } // namespace logtail
