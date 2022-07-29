@@ -12,7 +12,7 @@
 | TimeoutSeconds | Integer，`0` | 在关闭远程连接之前的不活动秒数。|
 | MaxMessageSize | Integer，`64 * 1024` | 通过传输协议接收的信息的最大字节数。|
 | KeepAliveSeconds | Integer，`300` | 保持连接存活的秒数，仅使用于TCP。|
-| ParseProtocol | String，`nil` | 指定解析日志所使用的协议，默认为空，表示不解析。其中：`rfc3164`：指定使用RFC3164协议解析日志。`rfc5424`：指定使用RFC5424协议解析日志。`auto`：指定插件根据日志内容自动选择合适的解析协议。 |
+| ParseProtocol | String，`""` | 指定解析日志所使用的协议，默认为空，表示不解析。其中：`rfc3164`：指定使用RFC3164协议解析日志。`rfc5424`：指定使用RFC5424协议解析日志。`auto`：指定插件根据日志内容自动选择合适的解析协议。 |
 | IgnoreParseFailure | Boolean，`true` | 指定解析失败后的操作，不配置表示放弃解析，直接填充所返回的content字段。配置为`false` ，表示解析失败时丢弃日志。 |
 | AddHostname | Boolean，`false` | 当从/dev/log监听unixgram时，log中不包括hostname字段，所以使用rfc3164会导致解析错误，这时将AddHostname设置为`true`，就会给解析器当前主机的hostname，然后解析器就可以解析tag、program、content字段了。 |
 
