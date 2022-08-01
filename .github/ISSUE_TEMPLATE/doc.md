@@ -7,6 +7,4 @@ assignees: ''
 
 ---
 
-<!--
 Please describe any errors, ambiguities, or other improvement opportunities that you can find in the documentation.
--->

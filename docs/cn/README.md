@@ -37,6 +37,33 @@ iLogtail 为可观测场景而生，拥有的轻量级、高性能、自动化�
   * 支持收集Telegraf指标
   * ...
 
+## 快速开始
+
+由于C++编译环境较为复杂，iLogtail的编译依赖docker。如果想从源码编译iLogtail，可以执行下面的命令：
+
+``` bash
+make
+cp example/quick_start/* output
+cd output
+./ilogtail
+# 现在ilogtail已经开始采集output/simple.log文件并输出到标准输出了
+```
+
+如果你对细节感兴趣，请参见文档[编译](https://ilogtail.gitbook.io/ilogtail-docs/installation/sources/build)。
+
+## 贡献
+
+* [贡献指南](./contributing/CONTRIBUTING.md)
+* [开发者](./contributing/developer.md)
+
+## 我们的用户
+
+数以万计的公司在阿里云、线下IDC、其他云等多种环境中使用 iLogtail。 更多详情请看[这里](https://help.aliyun.com/document_detail/250268.html) 。
+
+## Licence
+
+[Apache 2.0 许可证](https://github.com/alibaba/ilogtail/blob/main/LICENSE)
+
 ## 联系我们
 
 您可以通过[Github Issues](https://github.com/alibaba/ilogtail/issues) 报告bug、提出建议或参与讨论，或通过以下方式联系我们：
