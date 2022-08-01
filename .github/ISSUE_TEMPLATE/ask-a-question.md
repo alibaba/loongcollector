@@ -1,7 +1,6 @@
 ---
 name: Ask a question
-about: Ask anything of ilogtail. 
-It is recommended to ask a question in discussions.
+about: Ask anything of ilogtail. It is recommended to ask a question in discussions.
 title: "[QUESTION]:"
 labels: question
 assignees: ''
@@ -15,7 +14,7 @@ Before asking a question, please first consider:
 - Searching [English Doc](https://github.com/alibaba/ilogtail/tree/main/docs/en)
 - Searching Google
 
-##################################
+-------
 
 提问之前，建议先在 iLogtail 社区寻找答案。
 
