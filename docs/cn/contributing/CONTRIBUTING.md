@@ -50,7 +50,7 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 注意一个 PR 尽量不要过于大，如果的确需要有大的变更，可以将其按功能拆分成多个单独的 PR。
 
-若您是初次提交 PR，请先签署 CLA（PR 页面会有自动回复指引）。在提交 PR 后，系统会运行持续集成，请确保所有的 CI 均为 pass 状态。一切就绪后，请给该 PR 打上 review request 及其他相关关联的[标签](#标签)。之后，我们会为 PR 分配一个或多个 reviewer，review通过后即可合入 main。
+若您是初次提交 PR，请先签署 CLA（PR 页面会有自动回复指引）。在提交 PR 后，系统会运行持续集成，请确保所有的 CI 均为 pass 状态。一切就绪后，我们会为 PR 分配一个或多个 reviewer，review通过后即可合入 main。
 
 在合并 PR 的时候，请把多余的提交记录都 squash 成一个，保证最终的提交信息的简练、规范。
 
@@ -97,4 +97,4 @@ Discussion 分类：
 
 ## 联系我们
 
-![](../.gitbook/assets/chatgroup.png)
+<img src="https://cdn.nlark.com/yuque/0/2022/png/22119025/1659441830266-5f238a9e-5c66-4e98-aceb-40659c81cbca.png?x-oss-process=image%2Fresize%2Cw_1500%2Climit_0" style="width: 50%; height: 50%" />

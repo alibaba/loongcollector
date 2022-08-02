@@ -86,14 +86,13 @@ There are many ways to contribute:
 
 ## Contact Us
 
-You can report bugs, make suggestions or participate in discussions through [Github Issues](https://github.com/alibaba/ilogtail/issues), or contact us with the following ways:
+You can report bugs, make suggestions or participate in discussions through [Github Issues](https://github.com/alibaba/ilogtail/issues) and [Github Discussions](https://github.com/alibaba/ilogtail/discussions), or contact us with the following ways:
 
-* DingTalk：iLogtail社区
-* WeChat：iLogtail社区
 * Bilibili：[阿里云SLS](https://space.bilibili.com/630680534?from=search&seid=2845737427240690794&spm_id_from=333.337.0.0)
-* Zhihu：[阿里云日志服务](https://www.zhihu.com/people/a-li-yun-ri-zhi-fu-wu)
+* Zhihu：[iLogtail社区](https://www.zhihu.com/column/c_1533139823409270785)
+* DingTalk：iLogtail社区
 
-<img src="https://github.com/iLogtail/ilogtail-docs/raw/main/.gitbook/assets/chatgroup.png" style="width: 100%; height: 100%" />
+<img src="https://cdn.nlark.com/yuque/0/2022/png/22119025/1659441830266-5f238a9e-5c66-4e98-aceb-40659c81cbca.png?x-oss-process=image%2Fresize%2Cw_1500%2Climit_0" style="width: 50%; height: 50%" />
 
 ## Our Users
 
