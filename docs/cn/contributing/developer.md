@@ -47,7 +47,7 @@ iLogtail 社区包含 Maintainer、Committer、Contributor、User 等角色，�
 感谢所有开发者对社区的贡献！我们会定期将所有贡献者的名字进行展示，当然也可以自己提交 PR 添加。
 > 注：排名不分先后。如有遗漏，请提交 PR 添加。
 
-## PMC(项目管理委员会，Project Management Committee)
+### PMC(项目管理委员会，Project Management Committee)
 
 * Kejia Xu([@messixukejia](https://github.com/messixukejia))
 * Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
@@ -55,13 +55,13 @@ iLogtail 社区包含 Maintainer、Committer、Contributor、User 等角色，�
 * Cheng Zhang([@shabicheng](https://github.com/shabicheng))
 * Goclis Yao([@Goclis](https://github.com/Goclis))
 
-## Committer
+### Committer
 
 * Runqi Lin([@linrunqi08](https://github.com/linrunqi08))
 * Qian Sheng([@qiansheng91](https://github.com/qiansheng91))
 * Yonghua Sun([@yonghua-sun](https://github.com/yonghua-sun))
 
-## Contributor
+### Contributor
 
 * Weilong Pan([@panawala](https://github.com/panawala))
 * Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
