@@ -97,4 +97,4 @@ Discussion 分类：
 
 ## 联系我们
 
-<img src="https://cdn.nlark.com/yuque/0/2022/png/22119025/1659441830266-5f238a9e-5c66-4e98-aceb-40659c81cbca.png?x-oss-process=image%2Fresize%2Cw_1500%2Climit_0" style="width: 50%; height: 50%" />
+<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup.png" style="width: 50%; height: 50%" />
