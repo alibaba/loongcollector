@@ -45,3 +45,4 @@ e2e-test
 # vscode
 .vscode
 !.vscode/settings.json
+/output/
