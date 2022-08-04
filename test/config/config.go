@@ -49,9 +49,10 @@ type (
 	}
 
 	LogtailCfgs struct {
-		Name      string   `mapstructure:"name" yaml:"name"`
-		MixedMode bool     `mapstructure:"mixed_mode" yaml:"mixed_mode"`
-		Content   []string `mapstructure:"content" yaml:"content"`
+		Name      string                   `mapstructure:"name" yaml:"name"`
+		MixedMode bool                     `mapstructure:"mixed_mode" yaml:"mixed_mode"`
+		Detail    []map[string]interface{} `mapstructure:"detail" yaml:"detail"`
+		Content   []string                 `mapstructure:"content" yaml:"content"`
 	}
 
 	Subscriber struct {
@@ -88,13 +89,6 @@ func GetDefaultCase() *Case {
 		Retry: Retry{
 			Times:    0,
 			Interval: "10s",
-		},
-		Subscriber: Subscriber{
-			Name: "grpc",
-			Config: map[string]interface{}{
-				"address": ":8000",
-				"network": "tcp",
-			},
 		},
 		Ilogtail: Ilogtail{
 			CloseWait:      "10s",

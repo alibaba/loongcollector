@@ -15,7 +15,6 @@
 package boot
 
 import (
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -37,7 +36,7 @@ services:
 `
 
 func createComposeFile() {
-	_ = ioutil.WriteFile(config.CaseHome+config.DockerComposeFileName, []byte(testComposeContent), 0600)
+	_ = os.WriteFile(config.CaseHome+config.DockerComposeFileName, []byte(testComposeContent), 0600)
 }
 
 func clean() {
@@ -48,7 +47,8 @@ func TestBootCompose(t *testing.T) {
 	defer os.Remove("./test.log")
 	os.Create("test.log")
 	config.FlusherFile = "./test.log"
-	config.ConfigFile = "./test.log"
+	config.ConfigJSONFileDir = "./json"
+	config.ConfigYamlFileDir = "./yaml"
 	createComposeFile()
 	defer clean()
 	path, _ := filepath.Abs(".")
@@ -83,7 +83,7 @@ func TestComposeBooter_createLogtailpluginComposeFile(t *testing.T) {
 	}
 	booter := NewComposeBooter(&cfg)
 	assert.NoError(t, booter.createComposeFile())
-	bytes, err := ioutil.ReadFile(config.CaseHome + finalFileName)
+	bytes, err := os.ReadFile(config.CaseHome + finalFileName)
 	assert.NoError(t, err)
 	res := make(map[string]interface{})
 	assert.NoError(t, yaml.Unmarshal(bytes, &res))

@@ -63,8 +63,9 @@ verify:
       spec:
         expect_equal_processed_log: true
         expect_equal_flush_log: true
-        expect_minimum_log_num: 1004
+        expect_received_minimum_log_num: 1004
 testing_interval: 10s
 retry:
   times: 0
   interval: 10s
+  

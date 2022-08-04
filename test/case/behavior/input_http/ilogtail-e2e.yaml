@@ -18,7 +18,7 @@ ilogtail:
   config:
     - name: http-case
       content:
-        - '{"inputs":[{"type":"metric_http","detail":{"IntervalMs":1000,"Addresses":["http://www.aliyun.com"],"IncludeBody":true}}],"processors":[{"type":"processor_anchor","detail":{"SourceKey":"content","NoAnchorError":true,"Anchors":[{"Start":"","Stop":"","FieldName":"body","FieldType":"json","ExpondJson":true}]}}]}'
+        - '{"inputs":[{"type":"metric_http","detail":{"IntervalMs":1000,"Addresses":["http://www.google.com"],"IncludeBody":true}}],"processors":[{"type":"processor_anchor","detail":{"SourceKey":"content","NoAnchorError":true,"Anchors":[{"Start":"","Stop":"","FieldName":"body","FieldType":"json","ExpondJson":true}]}}]}'
   close_wait: 5s
 verify:
   log_rules:
@@ -30,17 +30,15 @@ verify:
           - _address_
           - _result_
           - _http_response_code_
-          - _response_match_
           - _response_time_ms_
     - name: kv-check
       validator: log_content_kv_regex
       spec:
         expect_key_value_regex:
-          _address_: "http://www.aliyun.com"
+          _address_: "http://www.google.com"
           _method_: "GET"
-          _result_: "invalid_body"
-          _http_response_code_: "301"
-          _response_match_: "no"
+          _result_: "success"
+          _http_response_code_: "200"
   system_rules:
     - name: counter-check
       validator: sys_counter
@@ -48,5 +46,5 @@ verify:
         expect_equal_raw_log: true
         expect_equal_processed_log: true
         expect_equal_flush_log: true
-        expect_minimum_log_num: 4
+        expect_received_minimum_log_num: 4
 testing_interval: 5s

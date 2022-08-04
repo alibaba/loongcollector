@@ -17,7 +17,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -94,14 +94,11 @@ func (c *ValidatorController) Start() error {
 		validator.CloseCounter()
 	}()
 	go func() {
-		for group := range globalSubscriberChan {
-			projectMatch, staticMatch := staticLogCheck(group.Logs[0])
+		for group := range defaultSubscriberChan {
+			_, staticMatch := staticLogCheck(group.Logs[0])
 
 			switch {
 			case staticMatch:
-				if !projectMatch {
-					continue
-				}
 				validator.GetCounterChan() <- group
 			case alarmLogCheck(group.Logs[0]):
 				validator.GetAlarmLogChan() <- group
@@ -118,6 +115,21 @@ func (c *ValidatorController) Start() error {
 			}
 		}
 	}()
+	if optSubscriberChan != nil {
+		go func() {
+			for group := range optSubscriberChan {
+				for _, log := range group.Logs {
+					logger.Debugf(context.Background(), "%s", log.String())
+				}
+				for _, v := range c.logValidators {
+					c.addLogReport(v.Name(), v.Valid(group))
+				}
+				for _, v := range c.sysValidators {
+					v.Valid(group)
+				}
+			}
+		}()
+	}
 	return nil
 }
 
@@ -141,7 +153,7 @@ func (c *ValidatorController) flushSummaryReport() {
 		c.addSysReport(sysValidator.Name(), result)
 	}
 	bytes, _ := json.MarshalIndent(c.report, "", "\t")
-	_ = ioutil.WriteFile(config.ReportFile, bytes, 0600)
+	_ = os.WriteFile(config.ReportFile, bytes, 0600)
 }
 
 // staticLogCheck checks the log contents to find the static logs of the e2e test case.

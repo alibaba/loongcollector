@@ -18,8 +18,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strconv"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/test/config"
@@ -36,6 +39,37 @@ func (l *LogtailController) Init(parent *CancelChain, fullCfg *config.Case) erro
 	// todo currently only support one fixed config with cgo
 	if len(fullCfg.Ilogtail.Config) == 1 {
 		cfg := fullCfg.Ilogtail.Config[0]
+		if len(cfg.Detail) != 0 {
+			if _, err := os.Stat(config.ConfigYamlFileDir); err == nil {
+				_ = os.Remove(config.ConfigYamlFileDir)
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+			if err := os.Mkdir(config.ConfigYamlFileDir, 0750); err != nil {
+				return err
+			}
+			for idx, detail := range cfg.Detail {
+				name := cfg.Name + "_" + strconv.Itoa(idx) + ".yaml"
+				if _, ok := detail["inputs"]; !ok {
+					return fmt.Errorf("lack of input plugin in the %d config detail under name %s", idx, cfg.Name)
+				}
+				if _, ok := detail["outputs"]; !ok {
+					detail["flushers"] = []map[string]interface{}{
+						{
+							"Type":    "flusher_grpc",
+							"Address": "host.docker.internal:8000",
+						},
+					}
+				}
+				detail["enable"] = true
+				bytes, _ := yaml.Marshal(detail)
+				if err := os.WriteFile(filepath.Join(config.ConfigYamlFileDir, name), bytes, 0600); err != nil {
+					return err
+				}
+			}
+			fullCfg.Ilogtail.Config = fullCfg.Ilogtail.Config[:0]
+			return nil
+		}
 		for idx, con := range cfg.Content {
 			name := cfg.Name + "_" + strconv.Itoa(idx)
 			content := make(map[string]interface{})
@@ -62,7 +96,9 @@ func (l *LogtailController) Init(parent *CancelChain, fullCfg *config.Case) erro
 	bytes, _ := json.Marshal(map[string]interface{}{
 		"metrics": logstoreCfg,
 	})
-	return ioutil.WriteFile(config.ConfigFile, bytes, 0600)
+	_ = os.Remove(config.ConfigJSONFileDir)
+	_ = os.Mkdir(config.ConfigJSONFileDir, 0750)
+	return os.WriteFile(filepath.Join(config.ConfigJSONFileDir, "config.json"), bytes, 0600)
 }
 
 func (l *LogtailController) Start() error {

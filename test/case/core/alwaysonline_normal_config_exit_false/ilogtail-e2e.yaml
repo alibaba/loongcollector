@@ -118,3 +118,4 @@ testing_interval: 10s
 coverage_packages:
   - github.com/alibaba/ilogtail/pluginmanager
   - github.com/alibaba/ilogtail/main
+  

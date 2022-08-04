@@ -15,7 +15,6 @@
 package tools
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -39,5 +38,5 @@ func genernateExample(path string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(abs, bytes, 0600)
+	return os.WriteFile(abs, bytes, 0600)
 }

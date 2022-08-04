@@ -40,6 +40,7 @@ e2e-test
 /generated_files/
 /build/
 /find_licenses/
+*-test/
 
 # vscode
 .vscode

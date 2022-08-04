@@ -16,7 +16,7 @@ package controller
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -24,23 +24,34 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/subscriber"
 )
 
-var globalSubscriberChan <-chan *protocol.LogGroup
+var defaultSubscriberChan, optSubscriberChan <-chan *protocol.LogGroup
 
 type SubscriberController struct {
-	chain *CancelChain
-	sub   subscriber.Subscriber
+	chain      *CancelChain
+	defaultSub subscriber.Subscriber
+	optSub     subscriber.Subscriber
 }
 
 func (c *SubscriberController) Init(parent *CancelChain, cfg *config.Case) error {
 	logger.Info(context.Background(), "subscriber controller is initializing....")
 	c.chain = WithCancelChain(parent)
-	s, err := subscriber.New(cfg.Subscriber.Name, cfg.Subscriber.Config)
-	if err != nil {
-		return err
+	if cfg.Subscriber.Name == "grpc" {
+		c.defaultSub, _ = subscriber.New(cfg.Subscriber.Name, cfg.Subscriber.Config)
+	} else {
+		c.defaultSub, _ = subscriber.New("grpc", map[string]interface{}{
+			"address": ":8000",
+		})
+		if cfg.Subscriber.Name != "" {
+			s, err := subscriber.New(cfg.Subscriber.Name, cfg.Subscriber.Config)
+			if err != nil {
+				return err
+			}
+			c.optSub = s
+			optSubscriberChan = c.optSub.SubscribeChan()
+		}
 	}
-	c.sub = s
-	globalSubscriberChan = c.sub.SubscribeChan()
-	return WriteDefaultFlusherConfig(c.sub.FlusherConfig())
+	defaultSubscriberChan = c.defaultSub.SubscribeChan()
+	return WriteDefaultFlusherConfig(c.defaultSub.FlusherConfig())
 }
 
 func (c *SubscriberController) Start() error {
@@ -51,7 +62,10 @@ func (c *SubscriberController) Start() error {
 		c.Clean()
 		c.chain.CancelChild()
 	}()
-	return c.sub.Start()
+	if c.optSub != nil {
+		return c.optSub.Start()
+	}
+	return c.defaultSub.Start()
 }
 
 func (c *SubscriberController) CancelChain() *CancelChain {
@@ -59,10 +73,13 @@ func (c *SubscriberController) CancelChain() *CancelChain {
 }
 
 func WriteDefaultFlusherConfig(cfg string) error {
-	return ioutil.WriteFile(config.FlusherFile, []byte(cfg), 0600)
+	return os.WriteFile(config.FlusherFile, []byte(cfg), 0600)
 }
 
 func (c *SubscriberController) Clean() {
 	logger.Info(context.Background(), "subscriber controller is cleaning....")
-	c.sub.Stop()
+	c.defaultSub.Stop()
+	if c.optSub != nil {
+		c.optSub.Stop()
+	}
 }

@@ -17,9 +17,16 @@ boot:
 ilogtail:
   config:
     - name: mock-metric-case
-      content:
-        - '{"inputs":[{"type":"metric_mock","detail":{"IntervalMs": 1000,"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"content":"xxxxx","time":"2017.09.12 20:55:36"}}}]}'
-  close_wait: 5s
+      detail:
+        - inputs: 
+            - Type: metric_mock
+              IntervalMs: 1000
+              Tags:
+                tag1: aaaa
+                tag2: bbb
+              Fields:
+                content: xxxxxx
+                time: 2017.09.12 20:55:36
 verify:
   log_rules:
     - name: fields-check
@@ -37,5 +44,5 @@ verify:
         expect_equal_raw_log: true
         expect_equal_processed_log: true
         expect_equal_flush_log: true
-        expect_minimum_log_num: 15
+        expect_received_minimum_log_num: 15
 testing_interval: 16s

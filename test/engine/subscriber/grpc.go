@@ -76,7 +76,9 @@ func (g *GrpcSubscriber) Start() error {
 }
 
 func (g *GrpcSubscriber) Stop() {
-	g.server.Stop()
+	if g.server != nil {
+		g.server.Stop()
+	}
 	close(g.channel)
 }
 

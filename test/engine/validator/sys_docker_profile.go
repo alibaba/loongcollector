@@ -54,7 +54,7 @@ func (d *dockerProfileSystemValidator) Description() string {
 
 func (d *dockerProfileSystemValidator) Start() error {
 	list, err := d.cli.ContainerList(context.Background(), types.ContainerListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", "ilogtail-e2e_ilogtail")),
+		Filters: filters.NewArgs(filters.Arg("name", "e2e-ilogtailC")),
 	})
 	if err != nil {
 		logger.Errorf(context.Background(), "DOCKER_PROFILE_ALARM", "error in find logtailplugon container: %v", err)

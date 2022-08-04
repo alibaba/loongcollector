@@ -73,8 +73,8 @@ ilogtail:
                        }
                    }
                ]
-           }
-        '
+            }
+          '
   close_wait: 5s
 verify:
   system_rules:

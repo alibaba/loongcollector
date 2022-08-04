@@ -120,7 +120,7 @@ ilogtail:
                              }
                          }
                      ]
-                 }'
+            }'
     - name: holdon
       content:
 

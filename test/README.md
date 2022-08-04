@@ -92,7 +92,7 @@ verify:
         expect_equal_raw_log: true
         expect_equal_processed_log: true
         expect_equal_flush_log: true
-        expect_minimum_log_num: 10
+        expect_received_minimum_log_num: 10
 testing_interval: 15s
 ```
 

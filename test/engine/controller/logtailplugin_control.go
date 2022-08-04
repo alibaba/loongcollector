@@ -30,7 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/boot"
 )
 
-const lotailpluginHTTPAddress = "ilogtail:18689"
+const lotailpluginHTTPAddress = "ilogtailC:18689"
 const E2EProjectName = "e2e-test-project"
 const E2ELogstoreName = "e2e-test-logstore"
 

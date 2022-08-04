@@ -40,6 +40,11 @@ jobs:
         with:
           submodules: true
 
+      - name: Update Docker-compose to v2
+        run: |
+          curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
       - name: E2E Core Structure Test
         run: make e2e-core
 

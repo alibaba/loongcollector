@@ -62,5 +62,5 @@ verify:
     - name: counter-check
       validator: sys_counter
       spec:
-        expect_minimum_log_num: 3
+        expect_received_minimum_log_num: 3
 testing_interval: 20s

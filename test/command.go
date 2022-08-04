@@ -86,6 +86,7 @@ var (
 			}
 			if err := controller.Start(cfg); err != nil {
 				logger.Error(context.Background(), "CONTROLLER_ALARM", "err", err)
+				logger.Flush()
 				os.Exit(1)
 			}
 			return nil

@@ -74,8 +74,8 @@ ilogtail:
                        }
                    }
                ]
-           }
-        '
+            }
+            '
     - name: block-case
       content:
         - '{
