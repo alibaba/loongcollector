@@ -12,17 +12,17 @@
 
 ```go
 type Subscriber interface {
-	doc.Doc
-	// Name returns the name of the subscriber
-	Name() string
-	// Start starts the subscriber
-	Start() error
-	// Stop stops the subscriber
-	Stop()
-	// SubscribeChan returns the channel used to transmit received data to validator
-	SubscribeChan() <-chan *protocol.LogGroup
-	// FlusherConfig returns the default flusher config for Ilogtail container correspoding to this subscriber
-	FlusherConfig() string
+    doc.Doc
+    // Name returns the name of the subscriber
+    Name() string
+    // Start starts the subscriber
+    Start() error
+    // Stop stops the subscriber
+    Stop()
+    // SubscribeChan returns the channel used to transmit received data to validator
+    SubscribeChan() <-chan *protocol.LogGroup
+    // FlusherConfig returns the default flusher config for Ilogtail container correspoding to this subscriber
+    FlusherConfig() string
 }
 ```
 

@@ -54,13 +54,16 @@ void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
 
     Json::Value logtailStatus;
     logtailStatus["__topic__"] = "logtail_status_profile";
+    unordered_set<std::string> selectedFields({"cpu", "mem", "version", "instance_key", "os", "os_detail", "load", "status", "metric_json"});
     Json::Value status;
     const sls_logs::Log& log = logGroup.logs(0);
     for (int32_t conIdx = 0; conIdx < log.contents_size(); ++conIdx) {
         const sls_logs::Log_Content& content = log.contents(conIdx);
         const string& key = content.key();
         const string& value = content.value();
-        status[key] = value;
+        if (selectedFields.find(key) != selectedFields.end()) {
+            status[key] = value;
+        }
     }
     logtailStatus["__logs__"][0] = status;
     std::string logBody = logtailStatus.toStyledString();

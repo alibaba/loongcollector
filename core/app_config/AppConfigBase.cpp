@@ -94,6 +94,7 @@ DEFINE_FLAG_BOOL(enable_collection_mark,
                  "enable collection mark function to override check_ulogfs_env in user config",
                  false);
 DEFINE_FLAG_BOOL(enable_env_ref_in_config, "enable environment variable reference replacement in configuration", false);
+DEFINE_FLAG_INT32(data_server_port, "", 80);
 
 DEFINE_FLAG_STRING(alipay_app_zone, "", "ALIPAY_APP_ZONE");
 DEFINE_FLAG_STRING(alipay_zone, "", "ALIPAY_ZONE");
@@ -710,7 +711,9 @@ void AppConfigBase::LoadResourceConf(const Json::Value& confJson) {
         }
     }
 
-    LoadInt32Parameter(mSendDataPort, confJson, "data_server_port", "ALIYUN_LOGTAIL_DATA_SERVER_PORT");
+    if (!LoadInt32Parameter(mSendDataPort, confJson, "data_server_port", "ALIYUN_LOGTAIL_DATA_SERVER_PORT")) {
+        mSendDataPort = INT32_FLAG(data_server_port);
+    }
 
     if (confJson.isMember("shennong_unix_socket") && confJson["shennong_unix_socket"].isBool()) {
         mShennongSocket = confJson["shennong_unix_socket"].asBool();

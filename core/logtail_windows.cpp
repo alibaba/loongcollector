@@ -51,6 +51,7 @@ DECLARE_FLAG_STRING(logtail_sys_conf_dir);
 DECLARE_FLAG_STRING(check_point_filename);
 DECLARE_FLAG_STRING(default_buffer_file_path);
 DECLARE_FLAG_STRING(ilogtail_docker_file_path_config);
+DECLARE_FLAG_INT32(data_server_port);
 
 static void overwrite_community_edition_flags() {
     // support run in installation dir on default
@@ -58,6 +59,7 @@ static void overwrite_community_edition_flags() {
     STRING_FLAG(check_point_filename) = "checkpoint/logtail_check_point";
     STRING_FLAG(default_buffer_file_path) = "checkpoint";
     STRING_FLAG(ilogtail_docker_file_path_config) = "checkpoint/docker_path_config.json";
+    INT32_FLAG(data_server_port) = 443;
 }
 
 void do_worker_process() {
