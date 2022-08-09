@@ -12,39 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM centos:centos7.9.2009 as build
-ARG HOST_OS=Linux
-ARG VERSION=1.1.0
-WORKDIR /output
-COPY ilogtail-${VERSION}.tar.gz .
-RUN tar -xzf ilogtail-${VERSION}.tar.gz
-
 FROM centos:centos7.9.2009
 ENV container docker
 RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
-systemd-tmpfiles-setup.service ] || rm -f $i; done); \
-rm -f /lib/systemd/system/multi-user.target.wants/*;\
-rm -f /etc/systemd/system/*.wants/*;\
-rm -f /lib/systemd/system/local-fs.target.wants/*; \
-rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
-rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
-rm -f /lib/systemd/system/basic.target.wants/*;\
-rm -f /lib/systemd/system/anaconda.target.wants/*;
+    systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+    rm -f /lib/systemd/system/multi-user.target.wants/*;\
+    rm -f /etc/systemd/system/*.wants/*;\
+    rm -f /lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /lib/systemd/system/basic.target.wants/*;\
+    rm -f /lib/systemd/system/anaconda.target.wants/*;
 VOLUME [ "/sys/fs/cgroup" ]
 
 RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 
 ARG HOST_OS=Linux
 ARG VERSION=1.1.0
+
+ADD ilogtail-${VERSION}.tar.gz /usr/local/
+RUN mv /usr/local/ilogtail-${VERSION} /usr/local/ilogtail && \
+    chmod -R 755 /usr/local/ilogtail/ && \
+    mkdir /usr/local/ilogtail/checkpoint
+
 WORKDIR /usr/local/ilogtail
-
-COPY --from=build /output/ilogtail-${VERSION}/* /usr/local/ilogtail/
 COPY example_config/start_with_docker/ilogtail_config.json /usr/local/ilogtail/
-COPY scripts/run_ilogtail.sh /usr/local/ilogtail/
+COPY scripts/ilogtail_control.sh /usr/local/ilogtail/
 
-RUN chmod -R 755 /usr/local/ilogtail/
-RUN mkdir /usr/local/ilogtail/checkpoint
-
-ENV ALIYUN_LOGTAIL_USER_DEFINED_ID=default
-ENV docker_file_cache_path=checkpoint/docker_path_config.json
-ENTRYPOINT ["/usr/local/ilogtail/run_ilogtail.sh"]
+ENV HTTP_PROBE_PORT=7953 \
+    ALIYUN_LOGTAIL_USER_DEFINED_ID=default \
+    docker_file_cache_path=checkpoint/docker_path_config.json
+CMD ["/usr/local/ilogtail/ilogtail_control.sh", "start_and_block"]

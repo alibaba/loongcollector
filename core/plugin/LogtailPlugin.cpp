@@ -364,7 +364,8 @@ bool LogtailPlugin::LoadPluginBase() {
     const char* dockerEnvConfig = getenv("ALICLOUD_LOG_DOCKER_ENV_CONFIG");
     bool dockerEnvConfigEnabled = (dockerEnvConfig != NULL && strlen(dockerEnvConfig) > 0
                                    && (dockerEnvConfig[0] == 't' || dockerEnvConfig[0] == 'T'));
-    if (pluginConfigs.size() == (size_t)0 && !dockerEnvConfigEnabled) {
+    if (pluginConfigs.size() == (size_t)0 && !dockerEnvConfigEnabled
+        && !AppConfig::GetInstance()->IsPurageContainerMode()) {
         LOG_INFO(sLogger, ("no plugin config and no docker env config, do not load plugin base", ""));
         return true;
     }
