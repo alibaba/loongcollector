@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 // Copyright 2017 Marcus Heese
@@ -22,9 +23,9 @@
 package journal
 
 import (
-	"io"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
+	"io"
 	"time"
 
 	"github.com/coreos/go-systemd/sdjournal"

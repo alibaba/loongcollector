@@ -41,12 +41,11 @@ type ServiceStaticPrometheus struct {
 	AuthorizationPath string            `comment:"the prometheus authorization path, only using in authorization files. When Yaml param is configured, the default value is the current binary path. However, the default value is the ConfigFilePath directory when ConfigFilePath is working."`
 	ExtraFlags        map[string]string `comment:"the prometheus extra configuration flags, like promscrape.maxScrapeSize, for more flags please see [here](https://docs.victoriametrics.com/vmagent.html#advanced-usage)"`
 
-	scraper       *promscrape.Scraper //nolint:typecheck
-	shutdown      chan struct{}
-	waitGroup     sync.WaitGroup
-	context       ilogtail.Context
+	scraper   *promscrape.Scraper //nolint:typecheck
+	shutdown  chan struct{}
+	waitGroup sync.WaitGroup
+	context   ilogtail.Context
 }
-
 
 func (p *ServiceStaticPrometheus) Init(context ilogtail.Context) (int, error) {
 	libLoggerOnce.Do(func() {
