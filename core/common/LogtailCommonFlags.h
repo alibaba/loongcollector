@@ -69,3 +69,4 @@ DECLARE_FLAG_STRING(default_region_name);
 DECLARE_FLAG_STRING(fuse_root_dir);
 DECLARE_FLAG_BOOL(enable_root_path_collection);
 DECLARE_FLAG_INT32(logtail_alarm_interval);
+DECLARE_FLAG_INT32(config_update_interval);

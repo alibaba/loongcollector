@@ -30,10 +30,12 @@ your changes, such as:
 - `security` in case of vulnerabilities.
 - `doc` for doc changes.
 
-## Example 
+## Example
 
 - [public] [both] [updated] add a new feature
+
 ## [Unreleased]
+
 - [public] [both] [updated] change CGO ProcessLogs API to ProcessLog
 - [public] [both] [fixed] fixed GetContainerMeta data race problem
 - [public] [both] [added] add cpp core source code
@@ -43,3 +45,5 @@ your changes, such as:
 - [public] [both] [fixed] fix yaml parsing for purely digits value
 - [public] [both] [added] Add support for accelerate processor
 - [public] [both] [updated] Improve file_log plugin
+- [public] [linux] [added] Add support for local config hot reloading
+- [public] [both] [fixed] fix yaml parsing problem for purely-digit values

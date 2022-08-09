@@ -65,6 +65,8 @@ protected:
     std::unordered_map<std::string, Json::Value> mLocalConfigDirMap;
     std::unordered_map<std::string, YAML::Node> mLocalYamlConfigDirMap;
 
+    std::unordered_map<std::string, int64_t> mLocalYamlConfigMTimeMap;
+
     std::unordered_map<std::string, Config*> mNameConfigMap;
     EventHandler* mSharedHandler;
     // one modify handler corresponds to one "leaf" directory
