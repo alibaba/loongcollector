@@ -73,4 +73,4 @@ cd output
 * 知乎：[iLogtail社区](https://www.zhihu.com/column/c_1533139823409270785)
 * 交流群请扫描
 
-<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup.png" style="width: 50%; height: 50%" />
+<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chat-group.png" style="width: 50%; height: 50%" />

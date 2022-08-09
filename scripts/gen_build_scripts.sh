@@ -36,9 +36,9 @@ function generateBuildScript() {
   if [ $CATEGORY = "plugin" ]; then
     echo './scripts/plugin_build.sh vendor c-shared '${OUT_DIR} >> $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "core" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >>  $BUILD_SCRIPT_FILE;
+    echo "mkdir -p core/build && cd core/build && cmake -D CMAKE_BUILD_TYPE=Release -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >>  $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "all" ]; then
-    echo "./scripts/plugin_build.sh vendor c-shared ${OUT_DIR} && mkdir -p core/build && cd core/build && cmake -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >> $BUILD_SCRIPT_FILE;
+    echo "./scripts/plugin_build.sh vendor c-shared ${OUT_DIR} && mkdir -p core/build && cd core/build && cmake -D CMAKE_BUILD_TYPE=Release -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >> $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "e2e" ]; then
     echo "./scripts/plugin_gocbuild.sh ${OUT_DIR} && mkdir -p core/build && cd core/build && cmake -D LOGTAIL_VERSION=${VERSION} .. && make -sj\$(nproc)" >> $BUILD_SCRIPT_FILE;
   fi

@@ -92,7 +92,7 @@ You can report bugs, make suggestions or participate in discussions through [Git
 * Zhihu：[iLogtail社区](https://www.zhihu.com/column/c_1533139823409270785)
 * DingTalk：iLogtail社区
 
-<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup.png" style="width: 50%; height: 50%" />
+<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chat-group.png" style="width: 50%; height: 50%" />
 
 ## Our Users
 
@@ -101,3 +101,4 @@ Tens of thousands of companies use iLogtail in Alibaba Cloud, IDC, or other clou
 ## Licence
 
 [Apache 2.0 License](./LICENSE)
+

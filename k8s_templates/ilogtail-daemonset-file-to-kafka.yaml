@@ -1,0 +1,169 @@
+# Copyright 2022 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# To collect file logs in container and write to Kafka.
+# 
+# You may change ContainerInfo parameters to select containers for collection.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/input/file-log
+# You may change <kafka_host>:<kafka_port> and Topic according to you Kafka cluster setup.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/flusher/kafka
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ilogtail
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ilogtail-user-cm
+  namespace: ilogtail
+data:
+  regex_log.yaml: |
+    enable: true
+    inputs:
+      - Type: file_log
+        LogPath: /root/bin/input_data/
+        FilePattern: access.log
+        ContainerFile: true
+        ContainerInfo:
+          K8sPodRegex: regex-log
+          K8sNamespaceRegex: regex-ns
+          IncludeEnv:
+            COLLECT_FLAG: true
+    processors:
+      - Type: processor_regex
+        SourceKey: content
+        Regex: ([\d\.]+) \S+ \S+ \[(\S+) \S+\] \"(\w+) ([^\\"]*)\" ([\d\.]+) (\d+) (\d+) (\d+|-) \"([^\\"]*)\" \"([^\\"]*)\"
+        Keys:
+          - ip
+          - time
+          - method
+          - url
+          - request_time
+          - request_length
+          - status
+          - length
+          - ref_url
+          - browser
+    flushers:
+      - Type: flusher_kafka
+        Brokers:
+          - <kafka_host>:<kafka_port>
+        Topic: access-log
+  nginx_stderr.yaml: |
+    enable: true
+    inputs:
+      - Type: service_docker_stdout
+        Stderr: true
+        Stdout: false
+        K8sNamespaceRegex: "^(default)$"
+        K8sPodRegex: "^(nginx-.*)$"
+        K8sContainerRegex: "nginx"
+    flushers:
+      - Type: flusher_kafka
+        Brokers:
+          - <kafka_host>:<kafka_port>
+        Topic: error-log
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ilogtail-secret
+  namespace: ilogtail
+type: Opaque
+data:
+  access_key:
+  access_key_id:
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ilogtail-ds
+  namespace: ilogtail
+  labels:
+    k8s-app: logtail-ds
+spec:
+  selector:
+    matchLabels:
+      k8s-app: logtail-ds
+  template:
+    metadata:
+      labels:
+        k8s-app: logtail-ds
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: logtail
+          env:
+            - name: ALIYUN_LOG_ENV_TAGS # add log tags from env
+              value: _node_name_|_node_ip_
+            - name: _node_name_
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: _node_ip_
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: cpu_usage_limit
+              value: "1"
+            - name: mem_usage_limit
+              value: "512"
+          image: >-
+            sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 400m
+              memory: 384Mi
+          volumeMounts:
+            - mountPath: /var/run
+              name: run
+            - mountPath: /logtail_host
+              mountPropagation: HostToContainer
+              name: root
+              readOnly: true
+            - mountPath: /usr/local/ilogtail/checkpoint
+              name: checkpoint
+            - mountPath: /usr/local/ilogtail/user_yaml_config.d
+              name: user-config
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      volumes:
+        - hostPath:
+            path: /var/run
+            type: Directory
+          name: run
+        - hostPath:
+            path: /
+            type: Directory
+          name: root
+        - hostPath:
+            path: /var/lib/ilogtail-ilogtail-ds/checkpoint
+            type: DirectoryOrCreate
+          name: checkpoint
+        - configMap:
+            defaultMode: 420
+            name: ilogtail-user-cm
+          name: user-config

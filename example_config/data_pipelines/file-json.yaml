@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# To collect json format data from file.
+# Before Process: {"content": "{\"key1\":\"value1\",\"key2\":2}"}
+# After Process: {"key1":"value1","key2":"2"}
+#
+# You may change SourceKey and other parameters.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/processor/json
+
 enable: true
 inputs:
   - Type: file_log

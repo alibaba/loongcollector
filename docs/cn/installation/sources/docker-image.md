@@ -8,12 +8,14 @@
 
 ## 镜像制作
 
-iLogtail镜像制作使用两阶段编译，第一阶段同编译，第二阶段将iLogtail的构建产出copy到干净的基础镜像中，以缩减镜像大小。
+制作镜像的命令是`make docker`。制作的过程是将iLogtail发行版的tar包安装到base镜像中，因此依赖本地的ilogtail-<VERSION>.tar.gz文件，已发行的版本可以从[iLogtail发布记录](../release-notes.md)下载，本地最新代码则可以通过`make dist`生成。
 
-以下命令可以制作出iLogtail的生产镜像，默认的本地镜像名称遵循`aliyun/ilogtail-<release version>`的规则。
+制作的镜像默认名称为aliyun/ilogtail，可以DOCKER_REPOSITORY环境变量覆盖，Tag则必须与iLogtail包的版本相同，可以通过环境变量VERSION指定，例如：
 
-1\. 进入源代码顶层目录。
-
-2\. 执行命令`make dist`。
-
-3\. 执行命令`make docker`。
+```shell
+$ VERSION=1.1.1 make dist
+$ VERSION=1.1.1 make docker
+docker image list
+REPOSITORY        TAG     IMAGE ID       CREATED         SIZE
+aliyun/ilogtail   1.1.1   c7977eb7dcc1   2 minutes ago   764MB
+```

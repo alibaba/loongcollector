@@ -12,16 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# To collect delimitered data from file.
+# Before Process: {"content": "123\t2022-08-08\tbuy\t10000"}
+# After Process: {"uid":"123","time":"2022-08-08","method":"buy","value":"10000"}
+#
+# You may change SplitSep and SplitKeys for your need.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/processor/delimiter
+
 enable: true
 inputs:
   - Type: file_log
     LogPath: /home/test-log/
-    FilePattern: multiline.log
+    FilePattern: delimiter.log
 processors:
-  - Type: processor_split_log_regex
-    SplitRegex: \[\d+-\d+-\d+\s\d+:\d+:\d+]\s.*
-    SplitKey: content
-    PreserveOthers: true
+  - Type: processor_split_char
+    SourceKey: content
+    SplitSep: "\t"
+    SplitKeys:
+      - uid
+      - time
+      - method
+      - value
 flushers:
   - Type: flusher_sls
     Endpoint: cn-xxx.log.aliyuncs.com

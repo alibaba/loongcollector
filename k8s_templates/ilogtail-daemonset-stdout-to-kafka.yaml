@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# To collect file logs in container and write to Kafka.
+# 
+# You may change service_docker_stdout parameters to select containers for collection.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/input/input-docker-stdout
+# You may change <kafka_host>:<kafka_port> and Topic according to you Kafka cluster setup.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/flusher/kafka
+
 ---
 apiVersion: v1
 kind: Namespace

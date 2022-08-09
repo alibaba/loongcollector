@@ -12,7 +12,7 @@
 
 将下面内容保存为ilogtail-ns.yaml
 
-```yaml
+```yaml {.line-numbers}
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -35,7 +35,7 @@ kubectl apply -f ilogtail-ns.yaml
 
 将下面内容保存为ilogtail-user-configmap.yaml。该ConfigMap后续将作为配置目录挂载到iLogtail容器中，因此可包含多个采集配置。
 
-```yaml
+```yaml {.line-numbers}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -73,7 +73,7 @@ data:
 
 将下面内容保存为ilogtail-secret.yaml。该Secret为可选，当需要将日志写入SLS时会用到。
 
-```yaml
+```yaml {.line-numbers}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -103,7 +103,7 @@ kubectl apply -f ilogtail-secret.yaml
 
 将下面内容保存为ilogtail-daemonset.yaml。
 
-```yaml
+```yaml {.line-numbers}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -213,7 +213,7 @@ kubectl apply -f ilogtail-daemonset.yaml
 
 将下面内容保存为nginx-deployment.yaml。
 
-```yaml
+```yaml {.line-numbers}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -270,6 +270,20 @@ kubectl logs ilogtail-ds-<pod-id> -n ilogtail
 
 结果为
 
-```
+```json
 2022-07-14 16:36:50 {"_time_":"2022-07-15T00:36:48.489153485+08:00","_source_":"stdout","_image_name_":"docker.io/library/nginx:latest","_container_name_":"nginx","_pod_name_":"nginx-76d49876c7-r892w","_namespace_":"default","_pod_uid_":"07f75a79-da69-40ac-ae2b-77a632929cc6","_container_ip_":"10.223.0.154","remote_addr":"::1","remote_user":"-","time_local":"14/Jul/2022:16:36:48","method":"GET","url":"/hello/ilogtail","protocol":"HTTP/1.1","status":"404","body_bytes_sent":"153","http_referer":"-","http_user_agent":"curl/7.74.0","http_x_forwarded_for":"-","__time__":"1657816609"}
 ```
+
+## 采集模版
+
+查看更多K8s采集日志模版（从容器中采集文件日等）：
+<https://github.com/alibaba/ilogtail/blob/main/k8s_templates>
+
+了解采集配置结构：
+[采集配置](../configuration/collection-config.md)
+
+查看采集配置项：
+[数据流水线组件概览](../data-pipeline/overview.md)
+
+参考更多可组合的日志采集和处理配置样例：
+<https://github.com/alibaba/ilogtail/blob/main/example_config>

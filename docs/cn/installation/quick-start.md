@@ -57,6 +57,17 @@ cat stdout.log
 
 结果为
 
-```
+```json
 2022-07-15 00:20:29 {"__tag__:__path__":"./simple.log","content":"Hello, iLogtail!","__time__":"1657815627"}
 ```
+
+## 更多采集配置
+
+了解采集配置结构：
+[采集配置](../configuration/collection-config.md)
+
+查看采集配置项：
+[数据流水线组件概览](../data-pipeline/overview.md)
+
+参考更多可组合的日志采集和处理配置样例：
+<https://github.com/alibaba/ilogtail/blob/main/example_config>

@@ -12,26 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# To collect nginx access log.
+# In File:
+# ::1 - - [18/Jul/2022:07:28:01 +0000] "GET /hello/ilogtail HTTP/1.1" 404 153 "-" "curl/7.74.0" "-"
+# After Process:
+# {"remote_addr":"::1","remote_user":"-","time_local":"18/Jul/2022:07:28:01","method":"GET","url":"/hello/ilogtail","protocol":"HTTP/1.1","status":"404","body_bytes_sent":"153","http_referer":"-","http_user_agent":"curl/7.74.0","http_x_forwarded_for":"-"}
+#
+# You may change Regex and Keys according to data pattern.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/processor/regex
+
 enable: true
 inputs:
   - Type: file_log
     LogPath: /home/test-log/
-    FilePattern: reg.log
+    FilePattern: access.log
 processors:
   - Type: processor_regex
     SourceKey: content
-    Regex: ([\d\.]+) \S+ \S+ \[(\S+) \S+\] \"(\w+) ([^\\"]*)\" ([\d\.]+) (\d+) (\d+) (\d+|-) \"([^\\"]*)\" \"([^\\"]*)\"
+    Regex: '([\d\.:]+) - (\S+) \[(\S+) \S+\] \"(\S+) (\S+) ([^\\"]+)\" (\d+) (\d+) \"([^\\"]*)\" \"([^\\"]*)\" \"([^\\"]*)\"'
     Keys:
-      - ip
-      - time
+      - remote_addr
+      - remote_user
+      - time_local
       - method
       - url
-      - request_time
-      - request_length
+      - protocol
       - status
-      - length
-      - ref_url
-      - browser
+      - body_bytes_sent
+      - http_referer
+      - http_user_agent
+      - http_x_forwarded_for
 flushers:
   - Type: flusher_sls
     Endpoint: cn-xxx.log.aliyuncs.com

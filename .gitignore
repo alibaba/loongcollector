@@ -6,6 +6,7 @@
 /tags
 # backup files.
 *.bak
+/.devcontainer/
 
 # go
 /plugin_main/plugin_main

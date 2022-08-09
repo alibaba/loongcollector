@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# To collect file logs in container and write to SLS.
+# 
+# You may change service_docker_stdout parameters to select containers for collection.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/input/input-docker-stdout
+# You may change <sls_endpoint>, <sls_project> and <sls_logstore> according to you SLS setup.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/flusher/sls
+
 ---
 apiVersion: v1
 kind: Namespace
