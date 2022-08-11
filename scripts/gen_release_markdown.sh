@@ -26,7 +26,7 @@ INITPWD=$PWD
 ROOTDIR=$(cd $(dirname $0) && cd .. && pwd)
 
 
-function createReleaseFile () {
+function createReleaseFile() {
     local version=$1
     local mileston=$2
     if [ ! -d "${ROOTDIR}/changes" ]; then
@@ -53,37 +53,37 @@ function appendUnreleaseChanges () {
     local doc=$1
     local changeDoc=$ROOTDIR/CHANGELOG.md
     local tempFile=$(mktemp temp.XXXXXX)
-    cat $changeDoc|grep "Unreleased" -A 500 |grep -v "Unreleased"|grep -v '^$' >> $tempFile
+    cat $changeDoc | grep "Unreleased" -A 500 |grep -v "Unreleased"|grep -v '^$' >> $tempFile || :
     echo "### Features" >> $doc
-    cat $tempFile|grep -E '\[added\]|\[updated\]|\[deprecated\]|\[removed\]' >> $doc
+    cat $tempFile | grep -E '\[added\]|\[updated\]|\[deprecated\]|\[removed\]' >> $doc || :
     echo "### Fixed" >> $doc
-    cat $tempFile|grep -E '\[fixed\]|\[security\]' >> $doc
+    cat $tempFile | grep -E '\[fixed\]|\[security\]' >> $doc || :
     echo "### Doc" >> $doc
-    cat $tempFile|grep -E '\[doc\]' >> $doc
+    cat $tempFile | grep -E '\[doc\]' >> $doc || :
     rm -rf $tempFile
 }
 
 function appendDownloadLinks () {
     local doc=$1
     local version=$2
-    local linux_amd_url="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-amd64.tar.gz"
-    local linux_amd_sig=$(wget -nv -O- https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-amd64.tar.gz.sha256 | cut -d' ' -f1)
-cat <<- EOF
+    local linux_amd64_url="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-amd64.tar.gz"
+    local linux_amd64_sig="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-amd64.tar.gz.sha256"
+cat >> $doc <<- EOF
 | **Filename** | **OS** | **Arch** | **SHA256 Checksum** |
 |  ----  | ----  | ----  | ----  |
-|[ilogtail-1.1.0.linux-amd64.tar.gz]($linux_amd64_url)|Linux|x86-64|${linux_amd_sig}|
-EOF >> $doc
+|[ilogtail-${version}.linux-amd64.tar.gz](${linux_amd64_url})|Linux|x86-64|[ilogtail-${version}.linux-amd64.tar.gz.sha256](${linux_amd64_sig})|
+EOF
 }
 
 function appendDockerImageLinks () {
     local doc=$1
     local version=$2
-    cat <<- EOF
+    cat >> $doc <<- EOF
 **Docker Pull Command**
-``` bash
+\`\`\` bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:${version}
-```
-EOF >> $doc
+\`\`\`
+EOF
 }
 
 function removeHistoryUnrelease () {

@@ -25,11 +25,12 @@ INITPWD=$PWD
 ROOTDIR=$(cd $(dirname $0) && cd .. && pwd)
 version=$1
 
+cd "${ROOTDIR}"
+
 # Build version
 sed -i "s/VERSION ?= .*/VERSION ?= $version/g" Makefile
 sed -i "s/set (LOGTAIL_VERSION \".*\")/set (LOGTAIL_VERSION \"$version\")/g" \
-    core/CMakeLists.txt \
-    testfile
+    core/CMakeLists.txt
 
 # Dockerfile
 sed -i "s/ARG VERSION=.*/ARG VERSION=$version/g" docker/Dockerfile*
@@ -41,12 +42,9 @@ sed -i "s/image: aliyun\\/ilogtail:.*/image: aliyun\\/ilogtail:$version/g" test/
 # Docs
 sed -i "s/aliyun\\/ilogtail:[^\` ]*/aliyun\\/ilogtail:$version/g" \
     README.md \
-    docs/zh/guides/How-to-do-manual-test.md \
     docs/en/guides/How-to-do-manual-test.md \
-    docs/zh/guides/How-to-build-with-docker.md \
     docs/en/guides/How-to-build-with-docker.md
 sed -i -r "s/VERSION(.*)\`.*\`/VERSION\\1\`$version\`/g" \
-    docs/zh/guides/How-to-build-with-docker.md \
     docs/en/guides/How-to-build-with-docker.md
 
-cd "$INITPWD"
+cd "${INITPWD}"
