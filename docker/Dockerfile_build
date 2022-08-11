@@ -19,6 +19,6 @@ WORKDIR /src
 COPY . .
 
 ARG HOST_OS=Linux
-ARG VERSION=1.1.0
+ARG VERSION=1.1.1
 
 RUN sh generated_files/gen_build.sh
