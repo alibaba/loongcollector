@@ -1,21 +1,23 @@
 /*
- * Copyright 2022 iLogtail Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Copyright 2022 iLogtail Authors
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*      http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 #pragma once
 #include <cstdint>
+#include <cstdlib>
+#include <ostream>
 #include <json/json.h>
 #include "config/Config.h"
 #if defined(_MSC_VER)
@@ -53,6 +55,58 @@ typedef struct {
 } GoSlice;
 #endif
 
+struct innerContainerMeta {
+    char* podName;
+    char* k8sNamespace;
+    char* containerName;
+    char* image;
+    int k8sLabelsSize;
+    int containerLabelsSize;
+    int envSize;
+    char** k8sLabelsKey;
+    char** k8sLabelsVal;
+    char** containerLabelsKey;
+    char** containerLabelsVal;
+    char** envsKey;
+    char** envsVal;
+};
+struct K8sContainerMeta {
+    std::string PodName;
+    std::string K8sNamespace;
+    std::string ContainerName;
+    std::string Image;
+    std::unordered_map<std::string, std::string> containerLabels;
+    std::unordered_map<std::string, std::string> k8sLabels;
+    std::unordered_map<std::string, std::string> envs;
+    std::string ToString() {
+        std::stringstream ss;
+        ss << "PodName: " << PodName << " K8sNamespace: " << K8sNamespace << " ContainerName: " << ContainerName
+           << " Image: " << Image;
+        ss << " containerLabels: "
+           << std::accumulate(containerLabels.begin(),
+                              containerLabels.end(),
+                              std::string(),
+                              [](const std::string& s, const std::pair<const std::string, std::string>& p) {
+                                  return s + p.first + "=" + p.second + ",";
+                              });
+        ss << " k8sLabels: "
+           << std::accumulate(k8sLabels.begin(),
+                              k8sLabels.end(),
+                              std::string(),
+                              [](const std::string& s, const std::pair<const std::string, std::string>& p) {
+                                  return s + p.first + "=" + p.second + ",";
+                              });
+        ss << " envs: "
+           << std::accumulate(envs.begin(),
+                              envs.end(),
+                              std::string(),
+                              [](const std::string& s, const std::pair<const std::string, std::string>& p) {
+                                  return s + p.first + "=" + p.second + ",";
+                              });
+        return ss.str();
+    }
+};
+
 // Methods export by plugin.
 typedef GoInt (*LoadGlobalConfigFun)(GoString);
 typedef GoInt (*LoadConfigFun)(GoString p, GoString l, GoString c, GoInt64 k, GoString p2);
@@ -63,6 +117,8 @@ typedef void (*HoldOnFun)(GoInt);
 typedef void (*ResumeFun)();
 typedef GoInt (*InitPluginBaseFun)();
 typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
+typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
+typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
 
 // Methods export by adapter.
 typedef int (*IsValidToSendFun)(long long logstoreKey);
@@ -144,6 +200,12 @@ public:
                          const std::string& topic,
                          const std::string& tags);
 
+    void ProcessLog(const std::string& configName,
+                    sls_logs::Log& log,
+                    const std::string& packId,
+                    const std::string& topic,
+                    const std::string& tags);
+
     static int IsValidToSend(long long logstoreKey);
 
     static int SendPb(const char* configName,
@@ -166,6 +228,8 @@ public:
 
     static int ExecPluginCmd(const char* configName, int configNameSize, int cmdId, const char* params, int paramsLen);
 
+    K8sContainerMeta GetContainerMeta(const std::string& containerID);
+
 private:
     void* mPluginBasePtr;
     void* mPluginAdapterPtr;
@@ -180,6 +244,8 @@ private:
     volatile bool mPluginValid;
     logtail::Config mPluginAlarmConfig;
     logtail::Config mPluginProfileConfig;
+    ProcessLogsFun mProcessLogsFun;
+    GetContainerMetaFun mGetContainerMetaFun;
 
     // Configuration for plugin system in JSON format.
     Json::Value mPluginCfg;

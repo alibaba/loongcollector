@@ -24,11 +24,14 @@ COPY --from=build /src/example_config/quick_start/ilogtail_config.json /ilogtail
 COPY --from=build /src/core/build/ilogtail /ilogtail/
 COPY --from=build /src/core/build/plugin/libPluginAdapter.so /ilogtail/
 
+RUN curl https://logtail-release-cn-beijing.oss-cn-beijing.aliyuncs.com/kubernetes/libebpf.so -o  /ilogtail/libebpf.so
 RUN chmod -R 755 /ilogtail/
 RUN mkdir /ilogtail/checkpoint
+RUN yum install -y iproute
 
 ENV HOST_OS=$HOST_OS
 ENV LOGTAIL_VERSION=$VERSION
+
 
 EXPOSE 18689
 

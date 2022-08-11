@@ -18,7 +18,7 @@ ilogtail:
   config:
     - name: static-file-case
       detail:
-        - inputs: 
+        - inputs:
             - Type: file_log
               LogPath: /root/test/
               FilePattern: a*.log

@@ -43,6 +43,7 @@
 #include "common/TimeUtil.h"
 #ifdef __linux__
 #include "streamlog/StreamLogManager.h"
+#include "ObserverManager.h"
 #endif
 #include "app_config/AppConfig.h"
 #include "event_handler/EventHandler.h"
@@ -1130,6 +1131,7 @@ void EventDispatcherBase::UpdateConfig() {
     if (mStreamLogManagerPtr != NULL) {
         ((StreamLogManager*)mStreamLogManagerPtr)->ShutdownConfigUsage();
     }
+    ObserverManager::GetInstance()->HoldOn(false);
 #endif
     LOG_INFO(sLogger, ("main thread", "start update config"));
     LogInput::GetInstance()->HoldOn();
@@ -1150,6 +1152,7 @@ void EventDispatcherBase::UpdateConfig() {
         if (mStreamLogManagerPtr != NULL) {
             ((StreamLogManager*)mStreamLogManagerPtr)->StartupConfigUsage();
         }
+        ObserverManager::GetInstance()->Resume();
 #endif
         ConfigManager::GetInstance()->FinishUpdateConfig();
         return;
@@ -1180,6 +1183,7 @@ void EventDispatcherBase::UpdateConfig() {
     if (mStreamLogManagerPtr != NULL) {
         ((StreamLogManager*)mStreamLogManagerPtr)->StartupConfigUsage();
     }
+    ObserverManager::GetInstance()->Resume();
 #endif
 
     ConfigManager::GetInstance()->FinishUpdateConfig();
@@ -1219,6 +1223,9 @@ void EventDispatcherBase::ExitProcess() {
     Sender::Instance()->SetQueueUrgent();
     // exit logtail plugin
     LogtailPlugin::GetInstance()->HoldOn(true);
+#if defined(__linux__)
+    ObserverManager::GetInstance()->HoldOn(true);
+#endif
 
     bool logProcessFlushFlag = false;
 

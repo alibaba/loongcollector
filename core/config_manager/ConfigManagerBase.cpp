@@ -294,6 +294,11 @@ void ConfigManagerBase::MappingPluginConfig(const Json::Value& configValue, Conf
 // LoadSingleUserConfig constructs new Config object according to @value, and insert it into
 // mNameConfigMap with name @logName.
 void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const Json::Value& rawValue, bool localFlag) {
+    // MIX_PROCESS_MODE used to tag the config using CGO interface to process logs.
+    // Different value maybe means different optimizing strategies, such as adjust the size of channel between goroutines.
+    // But because of historical compatibility, the raw logs would not transfer this flag. The golang part should retain no flag
+    // scenario as the default flag.
+    static const std::string MIX_PROCESS_MODE = "mix_process_mode";
     Config* config = NULL;
     string projectName, category, errorMessage;
     LOG_DEBUG(sLogger, ("message", "load single user config")("json", rawValue.toStyledString()));
@@ -422,8 +427,32 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                     throw ExceptionBase(std::string("The plugin log type is invalid"));
                 }
                 LOG_DEBUG(sLogger, ("load plugin config ", logName)("config", pluginConfig));
-                config->mPluginConfig = pluginConfig;
-
+                if (pluginConfig.find("\"observer_ilogtail_") != string::npos) {
+                    Json::Value observerConfigJson;
+                    Json::Reader jsonReader;
+                    if (jsonReader.parse(pluginConfig, observerConfigJson) && observerConfigJson.isMember("inputs")) {
+                        if (observerConfigJson["inputs"].isObject() || observerConfigJson["inputs"].isArray()) {
+                            config->mObserverConfig = observerConfigJson["inputs"].toStyledString();
+                            config->mObserverFlag = true;
+                            observerConfigJson.removeMember("inputs");
+                        }
+                        if (observerConfigJson.isMember("processors")
+                            && (observerConfigJson["processors"].isObject()
+                                || observerConfigJson["processors"].isArray())) {
+                            config->mPluginProcessFlag = true;
+                            SetNotFoundJsonMember(observerConfigJson, MIX_PROCESS_MODE, "observer");
+                            config->mPluginConfig = observerConfigJson.toStyledString();
+                        }
+                    } else {
+                        LOG_WARNING(sLogger,
+                                    ("observer config is not a legal JSON object",
+                                     logName)("project", projectName)("logstore", category));
+                    }
+                } else {
+                    config->mPluginConfig = pluginConfig;
+                }
+                LOG_DEBUG(sLogger,
+                          ("load plugin config ", logName)("config", pluginConfig)("observer", config->mObserverFlag));
             } else if (logType == STREAM_LOG) {
                 config = new Config("",
                                     "",
@@ -2055,6 +2084,15 @@ void ConfigManagerBase::GetAllPluginConfig(std::vector<Config*>& configVec) {
     unordered_map<string, Config*>::iterator itr = mNameConfigMap.begin();
     for (; itr != mNameConfigMap.end(); ++itr) {
         if (itr->second->mLogType == PLUGIN_LOG || !itr->second->mPluginConfig.empty()) {
+            configVec.push_back(itr->second);
+        }
+    }
+}
+
+void ConfigManagerBase::GetAllObserverConfig(std::vector<Config*>& configVec) {
+    unordered_map<string, Config*>::iterator itr = mNameConfigMap.begin();
+    for (; itr != mNameConfigMap.end(); ++itr) {
+        if (itr->second->mObserverFlag && !itr->second->mObserverConfig.empty()) {
             configVec.push_back(itr->second);
         }
     }

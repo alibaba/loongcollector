@@ -4,6 +4,7 @@ When distributed in a binary form, Logtail may contain portions of the following
 
 ## Apache 2.0 licenses
 - [https://www.openssl.org/source/license.html](https://www.openssl.org/source/apache-license-2.0.txt)
+- [https://github.com/pixie-io/pixie](https://github.com/pixie-io/pixie/blob/main/LICENSE)
 
 ## BSD licenses
 - [https://github.com/gflags/gflags](https://github.com/gflags/gflags/blob/master/COPYING.txt)
@@ -14,6 +15,7 @@ When distributed in a binary form, Logtail may contain portions of the following
 - [https://github.com/google/re2](https://github.com/google/re2/blob/main/LICENSE)
 - [https://github.com/google/breakpad](https://github.com/google/breakpad/blob/main/LICENSE)
 - [https://github.com/google/leveldb](https://github.com/google/leveldb/blob/main/LICENSE)
+- [https://github.com/Cyan4973/xxHash](https://github.com/Cyan4973/xxHash/blob/dev/LICENSE)
 
 ## MIT licenses
 - [https://github.com/google/cityhash](https://github.com/google/cityhash/blob/master/COPYING)
@@ -22,6 +24,7 @@ When distributed in a binary form, Logtail may contain portions of the following
 - [https://github.com/Tencent/rapidjson](https://github.com/Tencent/rapidjson/blob/master/license.txt)
 - [https://github.com/gabime/spdlog](https://github.com/gabime/spdlog/blob/v1.x/LICENSE)
 - [https://github.com/jbeder/yaml-cpp](https://github.com/jbeder/yaml-cpp/blob/master/LICENSE)
+- [https://github.com/h2o/picohttpparser](https://github.com/h2o/picohttpparser/blob/master/picohttpparser.c)
 
 ## Boost Software License
 - [https://www.boost.org/](https://www.boost.org/users/license.html)

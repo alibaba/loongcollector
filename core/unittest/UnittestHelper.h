@@ -19,11 +19,52 @@
 #include <stdlib.h>
 #include <string>
 #include "logger/Logger.h"
+#include "log_pb/sls_logs.pb.h"
 
 namespace logtail {
 
 class UnitTestHelper {
 public:
+    static std::pair<std::string, bool> GetLogTag(const sls_logs::LogGroup* logGroupPB, const std::string& key) {
+        auto tags = logGroupPB->logtags();
+        for (auto iter = tags.begin(); iter != tags.end(); ++iter) {
+            if (iter->key() == key) {
+                return std::make_pair(iter->value(), true);
+            }
+        }
+        return std::make_pair(std::string(), false);
+    }
+
+    static bool LogTagExisted(const sls_logs::LogGroup* logGroupPB, const std::string& key) {
+        auto findRst = GetLogTag(logGroupPB, key);
+        return findRst.second;
+    }
+
+    static bool LogTagMatched(const sls_logs::LogGroup* logGroupPB, const std::string& key, const std::string& value) {
+        auto findRst = GetLogTag(logGroupPB, key);
+        return findRst.second && findRst.first == value;
+    }
+
+    static std::pair<std::string, bool> GetLogKey(const sls_logs::Log* logPB, const std::string& key) {
+        const ::google::protobuf::RepeatedPtrField< ::sls_logs::Log_Content>& contents = logPB->contents();
+        for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
+            if (iter->key() == key) {
+                return std::make_pair(iter->value(), true);
+            }
+        }
+        return std::make_pair(std::string(), false);
+    }
+
+    static bool LogKeyExisted(const sls_logs::Log* logPB, const std::string& key) {
+        auto findRst = GetLogKey(logPB, key);
+        return findRst.second;
+    }
+
+    static bool LogKeyMatched(const sls_logs::Log* logPB, const std::string& key, const std::string& value) {
+        auto findRst = GetLogKey(logPB, key);
+        return findRst.second && findRst.first == value;
+    }
+
     static bool GetKernelVersion(int& mainVersion, int& subVersion) {
         struct utsname buf;
         if (uname(&buf) != 0) {

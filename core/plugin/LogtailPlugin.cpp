@@ -14,11 +14,6 @@
 
 #include "LogtailPlugin.h"
 //#include "LogtailPluginAdapter.h"
-#if defined(__linux__)
-#include <dlfcn.h>
-#elif defined(_MSC_VER)
-#include <Windows.h>
-#endif
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
@@ -27,79 +22,9 @@
 #include "profiler/LogtailAlarm.h"
 #include "profiler/LogFileProfiler.h"
 #include "app_config/AppConfig.h"
+#include "common/DynamicLibHelper.h"
 using namespace std;
 using namespace logtail;
-
-class DynamicLibLoader {
-    void* mLibPtr = nullptr;
-
-    std::string GetError() {
-#if defined(__linux__)
-        auto dlErr = dlerror();
-        return (dlErr != NULL) ? dlErr : "";
-#elif defined(_MSC_VER)
-        return std::to_string(GetLastError());
-#endif
-    }
-
-public:
-    static void CloseLib(void* libPtr) {
-        if (nullptr == libPtr)
-            return;
-#if defined(__linux__)
-        dlclose(libPtr);
-#elif defined(_MSC_VER)
-        FreeLibrary((HINSTANCE)libPtr);
-#endif
-    }
-
-    // Release releases the ownership of @mLibPtr to caller.
-    void* Release() {
-        auto ptr = mLibPtr;
-        mLibPtr = nullptr;
-        return ptr;
-    }
-
-    ~DynamicLibLoader() { CloseLib(mLibPtr); }
-
-    // LoadDynLib loads dynamic library named @libName from current working dir.
-    // For linux, the so name is 'lib+@libName.so'.
-    // For Windows, the dll name is '@libName.dll'.
-    // @return a non-NULL ptr to indicate lib handle, otherwise nullptr is returned.
-    bool LoadDynLib(const std::string& libName, std::string& error) {
-        auto workingDir = AppConfig::GetInstance()->GetWorkingDir();
-        error.clear();
-
-#if defined(__linux__)
-        mLibPtr = dlopen((workingDir + "lib" + libName + ".so").c_str(), RTLD_LAZY);
-#elif defined(_MSC_VER)
-        mLibPtr = LoadLibrary((workingDir + libName + ".dll").c_str());
-#endif
-        if (mLibPtr != NULL)
-            return true;
-        error = GetError();
-        return false;
-    }
-
-    // LoadMethod loads method named @methodName from opened lib.
-    // If error is found, @error param will be set, otherwise empty.
-    void* LoadMethod(const std::string& methodName, std::string& error) {
-        error.clear();
-
-#if defined(__linux__)
-        dlerror(); // Clear last error.
-        auto methodPtr = dlsym(mLibPtr, methodName.c_str());
-        error = GetError();
-        return methodPtr;
-#elif defined(_MSC_VER)
-        auto methodPtr = GetProcAddress((HINSTANCE)mLibPtr, methodName.c_str());
-        if (methodPtr != NULL)
-            return methodPtr;
-        error = std::to_string(GetLastError());
-        return NULL;
-#endif
-    }
-};
 
 LogtailPlugin* LogtailPlugin::s_instance = NULL;
 
@@ -361,11 +286,13 @@ bool LogtailPlugin::LoadPluginBase() {
         return true;
     vector<Config*> pluginConfigs;
     ConfigManager::GetInstance()->GetAllPluginConfig(pluginConfigs);
+    vector<Config *> observerConfigs;
+    ConfigManager::GetInstance()->GetAllObserverConfig(observerConfigs);
     const char* dockerEnvConfig = getenv("ALICLOUD_LOG_DOCKER_ENV_CONFIG");
     bool dockerEnvConfigEnabled = (dockerEnvConfig != NULL && strlen(dockerEnvConfig) > 0
                                    && (dockerEnvConfig[0] == 't' || dockerEnvConfig[0] == 'T'));
-    if (pluginConfigs.size() == (size_t)0 && !dockerEnvConfigEnabled
-        && !AppConfig::GetInstance()->IsPurageContainerMode()) {
+
+    if (observerConfigs.size() == (size_t)0 && pluginConfigs.size() == (size_t)0 && !dockerEnvConfigEnabled) {
         LOG_INFO(sLogger, ("no plugin config and no docker env config, do not load plugin base", ""));
         return true;
     }
@@ -377,7 +304,7 @@ bool LogtailPlugin::LoadPluginBase() {
     if (mPluginAdapterPtr == NULL) {
         DynamicLibLoader loader;
         std::string error;
-        if (!loader.LoadDynLib("PluginAdapter", error)) {
+        if (!loader.LoadDynLib("PluginAdapter", error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open adapter lib error, Message", error));
             return false;
         }
@@ -421,7 +348,7 @@ bool LogtailPlugin::LoadPluginBase() {
     if (mPluginBasePtr == NULL) {
         DynamicLibLoader loader;
         std::string error;
-        if (!loader.LoadDynLib("PluginBase", error)) {
+        if (!loader.LoadDynLib("PluginBase", error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open plugin base dl error, Message", error));
             return false;
         }
@@ -473,6 +400,18 @@ bool LogtailPlugin::LoadPluginBase() {
             return false;
         }
 
+        mGetContainerMetaFun = (GetContainerMetaFun)loader.LoadMethod("GetContainerMeta", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetContainerMeta error, Message", error));
+            return false;
+        }
+        mProcessLogsFun = (ProcessLogsFun)loader.LoadMethod("ProcessLog", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load ProcessLogs error, Message", error));
+            return false;
+        }
+
+
         mPluginBasePtr = loader.Release();
     }
 
@@ -495,4 +434,100 @@ bool LogtailPlugin::LoadPluginBase() {
         mPluginValid = true;
     }
     return mPluginValid;
+}
+
+
+void LogtailPlugin::ProcessLog(const std::string& configName,
+                               sls_logs::Log& log,
+                               const std::string& packId,
+                               const std::string& topic,
+                               const std::string& tags) {
+    if (!log.has_time() || !(mPluginValid && mProcessLogsFun != NULL)) {
+        return;
+    }
+    GoString goConfigName;
+    GoSlice goLog;
+    GoString goPackId;
+    GoString goTopic;
+    GoSlice goTags;
+    goConfigName.n = configName.size();
+    goConfigName.p = configName.c_str();
+    goPackId.n = packId.size();
+    goPackId.p = packId.c_str();
+    goTopic.n = topic.size();
+    goTopic.p = topic.c_str();
+    goTags.data = (void*)tags.c_str();
+    goTags.len = goTags.cap = tags.length();
+    std::string sLog = log.SerializeAsString();
+    goLog.len = goLog.cap = sLog.length();
+    goLog.data = (void*)sLog.c_str();
+    GoInt rst = mProcessLogsFun(goConfigName, goLog, goPackId, goTopic, goTags);
+    if (rst != (GoInt)0) {
+        LOG_WARNING(sLogger, ("process log error", configName)("result", rst));
+    }
+}
+
+K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
+    if (mPluginValid && mGetContainerMetaFun != nullptr) {
+        GoString id;
+        id.n = containerID.size();
+        id.p = containerID.c_str();
+        auto innerMeta = mGetContainerMetaFun(id);
+        if (innerMeta != NULL) {
+            K8sContainerMeta meta;
+            meta.ContainerName.assign(innerMeta->containerName);
+            meta.Image.assign(innerMeta->image);
+            meta.K8sNamespace.assign(innerMeta->k8sNamespace);
+            meta.PodName.assign(innerMeta->podName);
+            for (int i = 0; i < innerMeta->containerLabelsSize; ++i) {
+                std::string key, value;
+                key.assign(innerMeta->containerLabelsKey[i]);
+                value.assign(innerMeta->containerLabelsVal[i]);
+                meta.containerLabels.insert(std::make_pair(std::move(key), std::move(key)));
+            }
+            for (int i = 0; i < innerMeta->k8sLabelsSize; ++i) {
+                std::string key, value;
+                key.assign(innerMeta->k8sLabelsKey[i]);
+                value.assign(innerMeta->k8sLabelsVal[i]);
+                meta.k8sLabels.insert(std::make_pair(std::move(key), std::move(key)));
+            }
+            for (int i = 0; i < innerMeta->envSize; ++i) {
+                std::string key, value;
+                key.assign(innerMeta->envsKey[i]);
+                value.assign(innerMeta->envsVal[i]);
+                meta.envs.insert(std::make_pair(std::move(key), std::move(key)));
+            }
+            free(innerMeta->containerName);
+            free(innerMeta->image);
+            free(innerMeta->k8sNamespace);
+            free(innerMeta->podName);
+            if (innerMeta->containerLabelsSize > 0) {
+                for (int i = 0; i < innerMeta->containerLabelsSize; ++i) {
+                    free(innerMeta->containerLabelsKey[i]);
+                    free(innerMeta->containerLabelsVal[i]);
+                }
+                free(innerMeta->containerLabelsKey);
+                free(innerMeta->containerLabelsVal);
+            }
+            if (innerMeta->k8sLabelsSize > 0) {
+                for (int i = 0; i < innerMeta->k8sLabelsSize; ++i) {
+                    free(innerMeta->k8sLabelsKey[i]);
+                    free(innerMeta->k8sLabelsVal[i]);
+                }
+                free(innerMeta->k8sLabelsKey);
+                free(innerMeta->k8sLabelsVal);
+            }
+            if (innerMeta->envSize > 0) {
+                for (int i = 0; i < innerMeta->envSize; ++i) {
+                    free(innerMeta->envsKey[i]);
+                    free(innerMeta->envsVal[i]);
+                }
+                free(innerMeta->envsKey);
+                free(innerMeta->envsVal);
+            }
+            free(innerMeta);
+            return meta;
+        }
+    }
+    return K8sContainerMeta();
 }

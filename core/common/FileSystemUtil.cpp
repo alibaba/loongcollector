@@ -109,7 +109,7 @@ void TrimLastSeperator(std::string& path) {
     }
 }
 
-bool ReadFileContent(const std::string& fileName, std::string& content) {
+bool ReadFileContent(const std::string& fileName, std::string& content, uint32_t maxFileSize) {
     FILE* pFile = fopen(fileName.c_str(), "r");
     if (pFile == NULL) {
         APSARA_LOG_DEBUG(sLogger, ("open file fail", fileName)("errno", strerror(errno)));
@@ -117,8 +117,8 @@ bool ReadFileContent(const std::string& fileName, std::string& content) {
     }
 
     content.clear();
-    char* buffer = new char[8192];
-    uint32_t readBytes = fread(buffer, 1, 8192, pFile);
+    char* buffer = new char[maxFileSize];
+    uint32_t readBytes = fread(buffer, 1, maxFileSize, pFile);
     if (readBytes > 0) {
         content.append(buffer, readBytes);
         delete[] buffer;

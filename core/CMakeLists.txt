@@ -87,6 +87,7 @@ set(SUB_DIRECTORIES_LIST
         )
 if (UNIX)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} streamlog)
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer)
 endif ()
 
 # Collect source files for UT.
@@ -126,6 +127,7 @@ target_link_libraries(${LOGTAIL_TARGET}
         )
 if (UNIX)
     target_link_libraries(${LOGTAIL_TARGET} streamlog)
+    target_link_libraries(${LOGTAIL_TARGET} observer)
     target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid)
     if (ENABLE_STATIC_LINK_CRT)
         target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)

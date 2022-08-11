@@ -313,4 +313,11 @@ uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
     return adjustSecondTimestamp + preciseTimeDigit;
 }
 
+
+uint64_t GetCurrentTimeInNanoSeconds() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+
 } // namespace logtail

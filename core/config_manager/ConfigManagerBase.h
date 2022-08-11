@@ -1,18 +1,18 @@
 /*
- * Copyright 2022 iLogtail Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Copyright 2022 iLogtail Authors
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*      http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 #pragma once
 #include <cstdint>
@@ -138,8 +138,8 @@ protected:
     std::vector<DockerContainerPathCmd*> mDockerContainerStoppedCmdVec;
 
     /**
-     * @brief mAllDockerContainerPathMap. when config update, we dump all config's std::vector<DockerContainerPath> to mAllDockerContainerPathMap. And reset to config when LoadSingleUserConfig
-     */
+    * @brief mAllDockerContainerPathMap. when config update, we dump all config's std::vector<DockerContainerPath> to mAllDockerContainerPathMap. And reset to config when LoadSingleUserConfig
+    */
     std::unordered_map<std::string, std::shared_ptr<std::vector<DockerContainerPath>>> mAllDockerContainerPathMap;
 
     PTMutex mDockerMountPathsLock;
@@ -151,9 +151,9 @@ protected:
     bool mHaveFuseConfigFlag = false;
 
     /**
-     * @brief CreateCustomizedFuseConfig, call this after starting, insert it into config map
-     * @return
-     */
+    * @brief CreateCustomizedFuseConfig, call this after starting, insert it into config map
+    * @return
+    */
     virtual void CreateCustomizedFuseConfig() = 0;
 
     ConfigManagerBase();
@@ -175,8 +175,8 @@ protected:
     void SetProfileProjectName(const std::string& region, const std::string& profileProject);
 
     /**
-     * delete mHandlersToDelete and mReaderToDelete
-     */
+    * delete mHandlersToDelete and mReaderToDelete
+    */
     void DeleteHandlers();
 
 public:
@@ -196,11 +196,11 @@ public:
     void RestLastConfigTime();
 
     /** Read configuration, detect any format errors.
-     *
-     * @param configFile path for the configuration file
-     *
-     * @return 0 on success; nonzero on error
-     */
+    *
+    * @param configFile path for the configuration file
+    *
+    * @return 0 on success; nonzero on error
+    */
     virtual bool LoadConfig(const std::string& configFile) = 0;
 
     /**
@@ -220,9 +220,9 @@ public:
     bool RegisterHandlers();
     bool RegisterHandlersRecursively(const std::string& dir, Config* config, bool checkTimeout);
     /**
-     * @brief HasFuseConfig
-     * @return true if global fuse flag is true and there is
-     */
+    * @brief HasFuseConfig
+    * @return true if global fuse flag is true and there is
+    */
     bool HaveFuseConfig() { return mHaveFuseConfigFlag; }
 
     virtual bool UpdateAccessKey(const std::string& aliuid,
@@ -283,28 +283,29 @@ public:
     void CorrectionLogtailSysConfDir();
 
     void GetAllPluginConfig(std::vector<Config*>& configVec);
+    void GetAllObserverConfig(std::vector<Config*>& configVec);
 
     // Get all configs that match condition.
     std::vector<Config*> GetMatchedConfigs(const std::function<bool(Config*)>& condition);
 
     /** find che config of DIR path while the name fits the file pattern
-     *  @param path for the dir
-     *  @name for the file name
-     *
-     *  Or if name is empty, find the config of parent of path
-     *  @param path for the newly created dir
-     *
-     */
+    *  @param path for the dir
+    *  @name for the file name
+    *
+    *  Or if name is empty, find the config of parent of path
+    *  @param path for the newly created dir
+    *
+    */
     Config* FindBestMatch(const std::string& path, const std::string& name = "");
 
     int32_t FindAllMatch(std::vector<Config*>& allConfig, const std::string& path, const std::string& name = "");
     /**
-     * @brief FindMatchWithForceFlag only accept best match and config with ForceMultiConfig
-     * @param allConfig
-     * @param path
-     * @param name
-     * @return
-     */
+    * @brief FindMatchWithForceFlag only accept best match and config with ForceMultiConfig
+    * @param allConfig
+    * @param path
+    * @param name
+    * @return
+    */
     int32_t
     FindMatchWithForceFlag(std::vector<Config*>& allConfig, const std::string& path, const std::string& name = "");
 
@@ -317,9 +318,9 @@ public:
     // handler must be created by new, because when path timeout, we would call delete on it
     void AddNewHandler(const std::string& path, EventHandler* handler) { mDirEventHandlerMap[path] = handler; }
     /**delete the timeout dir
-     *
-     * @param dir is the timeout dir
-     */
+    *
+    * @param dir is the timeout dir
+    */
     void RemoveHandler(const std::string& dir, bool delete_flag = true);
 
 
@@ -404,15 +405,15 @@ public:
     bool IsEnvConfig() { return mEnvFlag; }
 
     /**
-     * @brief LoadMountPaths
-     * @return true if logtail is in container mode and mount paths is changed
-     */
+    * @brief LoadMountPaths
+    * @return true if logtail is in container mode and mount paths is changed
+    */
     bool LoadMountPaths();
 
     /**
-     * @brief GetMountPaths
-     * @return
-     */
+    * @brief GetMountPaths
+    * @return
+    */
     DockerMountPaths GetMountPaths();
 
     void SetCollectionMarkFileExistFlag(bool flag) {
@@ -436,9 +437,9 @@ private:
 
     void ClearRegions();
     /** XXX: path is not registered in this method
-     * @param path is the current dir that being registered
-     * @depth is the num of sub dir layers that should be registered
-     */
+    * @param path is the current dir that being registered
+    * @depth is the num of sub dir layers that should be registered
+    */
     bool RegisterHandlersWithinDepth(const std::string& path, Config* config, int depth);
     bool RegisterDescendants(const std::string& path, Config* config, int withinDepth);
     bool CheckLogType(const std::string& logTypeStr, LogType& logType);

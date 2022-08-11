@@ -29,6 +29,7 @@
 #endif
 #include "logger/Logger.h"
 #include "StringTools.h"
+#include "FileSystemUtil.h"
 
 
 #if defined(_MSC_VER)
@@ -298,4 +299,83 @@ std::string GetAnyAvailableIP() {
 #endif
 }
 
+bool GetKernelInfo(std::string& kernelRelease, int64_t& kernelVersion) {
+#if defined(__linux__)
+    struct utsname buf;
+    if (-1 == uname(&buf)) {
+        LOG_ERROR(sLogger, ("uname failed, errno", errno));
+        return false;
+    }
+    kernelRelease.assign(buf.release);
+    std::vector<int64_t> versions;
+    char* p = buf.release;
+    char* maxP = buf.release + sizeof(buf.release);
+    while (*p && p < maxP) {
+        if (isdigit(*p)) {
+            versions.push_back(strtol(p, &p, 10));
+        } else {
+            p++;
+        }
+    }
+    kernelVersion = 0;
+    for (size_t i = 0; i < versions.size() && i < (size_t)4; ++i) {
+        kernelVersion = kernelVersion * 1000 + versions[i];
+    }
+    return true;
+#else
+    return false;
+#endif
+}
+
+uint32_t GetHostIpValueByInterface(const std::string& intf) {
+#if defined(__linux__)
+    int sock;
+    struct sockaddr_in sin;
+    struct ifreq ifr;
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock == -1) {
+        return 0;
+    }
+    // use eth0 as the default ETH name
+    strncpy(ifr.ifr_name, intf.size() > 0 ? intf.c_str() : "eth0", IFNAMSIZ);
+    ifr.ifr_name[IFNAMSIZ - 1] = 0;
+    if (ioctl(sock, SIOCGIFADDR, &ifr) < 0) {
+        close(sock);
+        return 0;
+    }
+    memcpy(&sin, &ifr.ifr_addr, sizeof(sin));
+    close(sock);
+    return sin.sin_addr.s_addr;
+#elif defined(_MSC_VER)
+    // TODO: For Windows, interface should be replace to adaptor name.
+    // Delay implementation, assume that GetIpByHostName will succeed.
+    return 0;
+#endif
+}
+
+void GetAllPids(std::unordered_set<int32_t>& pids) {
+#if defined(__linux__)
+    pids.clear();
+    fsutil::Dir procDir("/proc/");
+    if (!procDir.Open()) {
+        return;
+    }
+    fsutil::Entry entry;
+    while (true) {
+        entry = procDir.ReadNext();
+        if (!entry) {
+            return;
+        }
+        if (!entry.IsDir()) {
+            continue;
+        }
+        std::string name = entry.Name();
+        int32_t pid = strtol(name.data(), NULL, 10);
+        if (pid <= 0) {
+            continue;
+        }
+        pids.insert(pid);
+    }
+#endif
+}
 } // namespace logtail

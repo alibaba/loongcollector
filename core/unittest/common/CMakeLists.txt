@@ -33,3 +33,6 @@ target_link_libraries(common_queue_manager_unittest unittest_base)
 
 add_executable(common_sliding_window_counter_unittest SlidingWindowCounterUnittest.cpp)
 target_link_libraries(common_sliding_window_counter_unittest unittest_base)
+
+add_executable(common_string_piece_unittest StringPieceUnittest.cpp)
+target_link_libraries(common_string_piece_unittest unittest_base)
