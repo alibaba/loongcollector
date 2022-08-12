@@ -85,14 +85,14 @@ LogProcess::~LogProcess() {
     delete[] mProcessThreads;
 }
 
-//Start() should only be called once except for UT
+// Start() should only be called once except for UT
 void LogProcess::Start() {
     if (mInitialized)
         return;
     mInitialized = true;
     Sender::Instance()->SetFeedBackInterface(&mLogFeedbackQueue);
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();
-    //mBufferCountLimit = INT32_FLAG(process_buffer_count_upperlimit_perthread) * mThreadCount;
+    // mBufferCountLimit = INT32_FLAG(process_buffer_count_upperlimit_perthread) * mThreadCount;
     mProcessThreads = new ThreadPtr[mThreadCount];
     mThreadFlags = new bool[mThreadCount];
     for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo)
@@ -393,9 +393,9 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             s_processLines += (lines);
             if (lines > 0) {
                 // @debug
-                //static int linesCount = 0;
-                //linesCount += lines;
-                //LOG_INFO(sLogger, ("Logprocess lines", lines)("Total lines", linesCount));
+                // static int linesCount = 0;
+                // linesCount += lines;
+                // LOG_INFO(sLogger, ("Logprocess lines", lines)("Total lines", linesCount));
                 LogGroup logGroup;
                 time_t lastLogLineTime = 0;
                 string lastLogTimeStr = "";

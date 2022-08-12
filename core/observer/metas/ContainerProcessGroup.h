@@ -39,10 +39,10 @@ struct ContainerProcessGroup {
     void AddProcess(uint32_t pid) { mAllProcesses.insert(pid); }
 
     /**
-         * @brief RemoveProcess
-         * @param pid
-         * @return all processes empty flag
-         */
+     * @brief RemoveProcess
+     * @param pid
+     * @return all processes empty flag
+     */
     bool RemoveProcess(uint32_t pid) {
         mAllProcesses.erase(pid);
         return mAllProcesses.empty();
@@ -83,19 +83,19 @@ public:
 
 
     /**
-         * @brief GetProcessMeta
-         * @param pid
-         * @return
-         */
+     * @brief GetProcessMeta
+     * @param pid
+     * @return
+     */
     ProcessMetaPtr GetProcessMeta(uint32_t pid);
 
 
     /**
-         * @brief GetContainerProcessGroupPtr 判断其所属的ContainerProcessGroup，返回ContainerProcessGroup实例（不存在创建）
-         * @note 当PID不属于某个cgroup时，返回一个新的ContainerProcessGroup
-         * @param pid
-         * @return
-         */
+     * @brief GetContainerProcessGroupPtr 判断其所属的ContainerProcessGroup，返回ContainerProcessGroup实例（不存在创建）
+     * @note 当PID不属于某个cgroup时，返回一个新的ContainerProcessGroup
+     * @param pid
+     * @return
+     */
     ContainerProcessGroupPtr GetContainerProcessGroupPtr(const ProcessMetaPtr& meta, uint32_t pid) {
         const std::string& containerID = meta->Container.ContainerID;
         if (containerID.empty()) {
@@ -119,10 +119,10 @@ public:
     }
 
     /**
-         * @brief OnProcessDestroy 当进程销毁（一段时间没有数据流动也算销毁）的时候需要调用
-         * @note 不能使用meta中的PID，meta可能属于容器内的其他进程
-         * @param pid
-         */
+     * @brief OnProcessDestroy 当进程销毁（一段时间没有数据流动也算销毁）的时候需要调用
+     * @note 不能使用meta中的PID，meta可能属于容器内的其他进程
+     * @param pid
+     */
     void OnProcessDestroy(ProcessMeta* meta, uint32_t pid) {
         const std::string& containerID = meta->Container.ContainerID;
         if (containerID.empty()) {

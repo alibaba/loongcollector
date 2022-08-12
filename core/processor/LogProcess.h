@@ -93,8 +93,8 @@ private:
     ThreadPtr* mProcessThreads;
     int32_t mThreadCount;
     LogstoreFeedbackQueue<LogBuffer*> mLogFeedbackQueue;
-    volatile bool* mThreadFlags; //whether thread is sending data or wait
-    //int32_t mBufferCountLimit;
+    volatile bool* mThreadFlags; // whether thread is sending data or wait
+    // int32_t mBufferCountLimit;
     ReadWriteLock mAccessProcessThreadRWL;
 
 #ifdef APSARA_UNIT_TEST_MAIN

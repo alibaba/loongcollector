@@ -217,7 +217,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
         logstore.assign(logstoreName, (size_t)logstoreSize);
     }
 
-    //LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
+    // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
     Config* pConfig = NULL;
     if (configNameStr == alarmConfig->mCategory) {
         pConfig = alarmConfig;
@@ -286,7 +286,7 @@ bool LogtailPlugin::LoadPluginBase() {
         return true;
     vector<Config*> pluginConfigs;
     ConfigManager::GetInstance()->GetAllPluginConfig(pluginConfigs);
-    vector<Config *> observerConfigs;
+    vector<Config*> observerConfigs;
     ConfigManager::GetInstance()->GetAllObserverConfig(observerConfigs);
     const char* dockerEnvConfig = getenv("ALICLOUD_LOG_DOCKER_ENV_CONFIG");
     bool dockerEnvConfigEnabled = (dockerEnvConfig != NULL && strlen(dockerEnvConfig) > 0

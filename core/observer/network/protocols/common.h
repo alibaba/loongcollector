@@ -337,10 +337,10 @@ protected:
 };
 
 /**
-    * For many protocols, they don't have an ID to bind the request and the response, such as mysql.
-    * So we would get many false matches for persistent connection.
-    * The cache would remove "dirty" data according to the timestamp.
-    */
+ * For many protocols, they don't have an ID to bind the request and the response, such as mysql.
+ * So we would get many false matches for persistent connection.
+ * The cache would remove "dirty" data according to the timestamp.
+ */
 template <typename reqType, typename respType, typename aggregatorType, typename eventType, std::size_t capacity>
 class CommonCache {
 public:

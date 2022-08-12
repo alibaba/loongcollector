@@ -58,7 +58,7 @@ public:
 
 private:
     ThreadPtr mCheckUpdateThreadPtr;
-    
+
     ConfigManager();
     virtual ~ConfigManager(); // no copy
     ConfigManager(const ConfigManager&);

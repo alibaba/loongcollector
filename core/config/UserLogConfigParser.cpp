@@ -306,7 +306,8 @@ BaseFilterNodePtr UserLogConfigParser::ParseExpressionFromJSON(const Json::Value
         }
 
         // check operands
-        // if "op" element occurs, "operands" element must exist its type must be array, otherwise we consider it as invalid json
+        // if "op" element occurs, "operands" element must exist its type must be array, otherwise we consider it as
+        // invalid json
         const Json::Value& operandsValue = value["operands"];
         if (filterOperator == NOT_OPERATOR && operandsValue.size() == 1) {
             BaseFilterNodePtr childNode = ParseExpressionFromJSON(operandsValue[0]);

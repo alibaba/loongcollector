@@ -69,9 +69,13 @@ namespace detail {
         return "";
     }
 
-    void makeRangeKey(std::string& key, uint32_t idx) { key.append("_").append(std::to_string(idx)).append("_r"); }
+    void makeRangeKey(std::string& key, uint32_t idx) {
+        key.append("_").append(std::to_string(idx)).append("_r");
+    }
 
-    bool isRangeKey(const char* data, size_t len) { return len > 0 && data[len - 1] == 'r'; }
+    bool isRangeKey(const char* data, size_t len) {
+        return len > 0 && data[len - 1] == 'r';
+    }
 
 } // namespace detail
 

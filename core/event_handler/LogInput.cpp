@@ -74,7 +74,7 @@ LogInput::LogInput() : mAccessMainThreadRWL(ReadWriteLock::PREFER_WRITER) {
 LogInput::~LogInput() {
 }
 
-//Start() should only be called once except for UT
+// Start() should only be called once except for UT
 void LogInput::Start() {
     mIdleFlag = false;
     static bool initialized = false;
@@ -164,8 +164,8 @@ void LogInput::TryReadEvents(bool forceRead) {
 }
 
 void LogInput::FlowControl() {
-    const static int32_t FLOW_CONTROL_SLEEP_MICROSECONDS = 20 * 1000; //20ms
-    const static int32_t MAX_SLEEP_COUNT = 50; //1s
+    const static int32_t FLOW_CONTROL_SLEEP_MICROSECONDS = 20 * 1000; // 20ms
+    const static int32_t MAX_SLEEP_COUNT = 50; // 1s
     static int32_t sleepCount = 10;
     static int32_t lastCheckTime = 0;
     int32_t i = 0;

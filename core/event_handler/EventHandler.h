@@ -79,7 +79,7 @@ private:
                                             const DevInode& devInode,
                                             bool forceBeginingFlag = false);
 
-    //no copy
+    // no copy
     ModifyHandler(const ModifyHandler&);
     ModifyHandler& operator=(const ModifyHandler&);
 
@@ -112,7 +112,7 @@ class NormalEventHandler : public EventHandler {
 private:
     CreateHandler* mCreateHandlerPtr;
 
-    //no copy
+    // no copy
     NormalEventHandler(const NormalEventHandler&);
     NormalEventHandler& operator=(const NormalEventHandler&);
 
@@ -131,7 +131,7 @@ private:
     typedef std::unordered_map<std::string, ModifyHandler*> ModifyHandlerMap;
     ModifyHandlerMap mModifyHandlerPtrMap;
 
-    //no copy
+    // no copy
     CreateModifyHandler(const CreateModifyHandler&);
     CreateModifyHandler& operator=(const CreateModifyHandler&);
 

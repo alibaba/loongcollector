@@ -1,18 +1,18 @@
 /*
-* Copyright 2022 iLogtail Authors
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2022 iLogtail Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #pragma once
 #include <unordered_map>
@@ -45,7 +45,7 @@ enum EndpointStatus { STATUS_OK_WITH_IP = 0, STATUS_OK_WITH_ENDPOINT, STATUS_ERR
 struct EndpointDetail {
     bool mStatus;
     bool mProxyFlag;
-    int32_t mLatency; //ms
+    int32_t mLatency; // ms
 
     EndpointDetail(bool status, int32_t latency, bool proxy) {
         mStatus = status;
@@ -202,8 +202,8 @@ private:
     std::string mBufferFilePath;
     std::atomic_int mSendingLogGroupCount{0};
     std::atomic_int mSendingBufferCount{0};
-    //buffer file named before this unixtime can be read by daemon buffer sender thread
-    //buffer file named after this unixtime maybe occupied by daemon sender thread at the moment
+    // buffer file named before this unixtime can be read by daemon buffer sender thread
+    // buffer file named after this unixtime maybe occupied by daemon sender thread at the moment
     volatile time_t mBufferDivideTime;
     volatile bool mIsSendingBuffer;
     std::string mBufferFileName;
@@ -239,7 +239,7 @@ private:
     std::atomic<int64_t> mLogGroupContextSeq{0};
 
     int64_t mCheckPeriod;
-    SpinLock mBufferFileLock; //get set bufferfilepath and buffer filename
+    SpinLock mBufferFileLock; // get set bufferfilepath and buffer filename
 
     struct RealIpInfo {
         RealIpInfo() : mLastUpdateTime(0), mForceFlushFlag(false) {}
@@ -294,8 +294,8 @@ private:
     void PutIntoSecondaryBuffer(LoggroupTimeValue* dataPtr, int32_t retryTimes);
 
     /*
-    * add memory barrier for config varibles.
-    */
+     * add memory barrier for config varibles.
+     */
     void SetBufferFilePath(const std::string& bufferfilepath);
     std::string GetBufferFilePath();
     std::string GetBufferFileName();
@@ -310,7 +310,7 @@ private:
     double UpdateSendStatistic(const std::string& key, int32_t curTime, bool serverError);
     void CleanTimeoutSendStatistic();
 
-    //bool CheckBatchMapFull(int64_t key);
+    // bool CheckBatchMapFull(int64_t key);
     static bool IsProfileData(const std::string& region, const std::string& project, const std::string& logstore);
 
     std::string GetRegionCurrentEndpoint(const std::string& region);
@@ -322,8 +322,8 @@ private:
 
 public:
     static Sender* Instance();
-    //void ResetProfileSender();
-    bool InitSender(); //Backward compatible
+    // void ResetProfileSender();
+    bool InitSender(); // Backward compatible
     // from collector to batchmap
     bool Send(const std::string& projectName,
               const std::string& sourceId,
@@ -335,7 +335,7 @@ public:
               const std::string& filename = "",
               const LogGroupContext& context = LogGroupContext());
 
-    //bool LoadConfig(const Json::Value& secondary);
+    // bool LoadConfig(const Json::Value& secondary);
 
     // added by xianzhi(bowen.gbw@antfin.com)
     // no merge and wait, send instantly
@@ -359,7 +359,7 @@ public:
     bool ResetSendClientEndpoint(const std::string aliuid, const std::string region, int32_t curTime);
     void CleanTimeoutSendClient();
 
-    //for debug & ut
+    // for debug & ut
     void (*MockAsyncSend)(const std::string& projectName,
                           const std::string& logstore,
                           const std::string& logData,

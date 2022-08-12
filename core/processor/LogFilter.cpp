@@ -259,11 +259,12 @@ void LogFilter::CastOneSensitiveWord(sls_logs::Log_Content* pContent, const Conf
             }
         }
 
-        //if (!rst)
+        // if (!rst)
         //{
-        //    LOG_WARNING(sLogger, ("cast sensitive word fail", opt.constValue)(pConfig->mProjectName, pConfig->mCategory));
-        //    LogtailAlarm::GetInstance()->SendAlarm(CAST_SENSITIVE_WORD_ALARM, "cast sensitive word fail", pConfig->mProjectName, pConfig->mCategory, pConfig->mRegion);
-        //}
+        //     LOG_WARNING(sLogger, ("cast sensitive word fail", opt.constValue)(pConfig->mProjectName,
+        //     pConfig->mCategory)); LogtailAlarm::GetInstance()->SendAlarm(CAST_SENSITIVE_WORD_ALARM, "cast sensitive
+        //     word fail", pConfig->mProjectName, pConfig->mCategory, pConfig->mRegion);
+        // }
     }
 }
 
@@ -286,7 +287,7 @@ void FilterNoneUtf8(const string& strSrc) {
             /**
              * mapping rule: 0000 0000 - 0000 007F | 0xxxxxxx
              */
-            //nothing to check
+            // nothing to check
         } else if ((*iter & 0xe0) == 0xc0) // two bytes
         {
             /**

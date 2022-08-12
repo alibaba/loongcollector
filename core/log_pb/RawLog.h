@@ -123,4 +123,4 @@ protected:
 } // namespace logtail
 
 
-#endif //LOGTAIL_RAWLOG_H
+#endif // LOGTAIL_RAWLOG_H

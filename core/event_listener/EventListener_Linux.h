@@ -53,4 +53,4 @@ private:
 } // namespace logtail
 
 
-#endif //LOGTAIL_EVENTLISTENER_H
+#endif // LOGTAIL_EVENTLISTENER_H

@@ -26,8 +26,8 @@ namespace logtail {
  */
 struct DockerContainerPath {
     std::string mContainerID; // id of this container
-    // container path for this config's path. eg, config path '/home/admin', container path '/host_all/var/lib/xxxxxx/upper/home/admin'
-    // if config is wildcard, this will mapping to config->mWildcardPaths[0]
+    // container path for this config's path. eg, config path '/home/admin', container path
+    // '/host_all/var/lib/xxxxxx/upper/home/admin' if config is wildcard, this will mapping to config->mWildcardPaths[0]
     std::string mContainerPath;
     std::vector<sls_logs::LogTag> mContainerTags; // tags extracted from this container
     std::string mJsonStr; // this obj's json string, for saving to local file
@@ -67,10 +67,10 @@ private:
 struct DockerContainerPathCmd {
     std::string mConfigName; // config name
     bool mDeleteFlag; // if this flag is true, delete the container from this config's DockerContainerPath array
-    bool
-        mUpdateAllFlag; // if this flag is true, clear this config's DockerContainerPath array and load all DockerContainerPaths
-    std::string
-        mParams; // params, json string. this has 2 types : 1 one DockerContainerPath, 2 multi DockerContainerPaths, just when mUpdateAllFlag is true
+    bool mUpdateAllFlag; // if this flag is true, clear this config's DockerContainerPath array and load all
+                         // DockerContainerPaths
+    std::string mParams; // params, json string. this has 2 types : 1 one DockerContainerPath, 2 multi
+                         // DockerContainerPaths, just when mUpdateAllFlag is true
 
     DockerContainerPathCmd(const std::string& configName, bool delFlag, const std::string& params, bool allFlag)
         : mConfigName(configName), mDeleteFlag(delFlag), mUpdateAllFlag(allFlag), mParams(params) {}
@@ -96,7 +96,8 @@ struct DockerMountPaths {
     std::string mJsonStr; // this obj's json string, for checking difference
 
     /**
-     * @brief find best mount path of specific source. eg source `/home/admin/logs/access`, mountRealPath is `/host_all/home/admin/t4/docker/overlay/xxxxx/upper/access`
+     * @brief find best mount path of specific source. eg source `/home/admin/logs/access`, mountRealPath is
+     * `/host_all/home/admin/t4/docker/overlay/xxxxx/upper/access`
      * @param source, config's path
      * @param mountRealPath, the real path which logtail can access
      * @return

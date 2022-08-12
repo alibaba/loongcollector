@@ -35,7 +35,7 @@ typedef uint32_t EventType;
 
 class Event {
 private:
-    Event() {} //disabled
+    Event() {} // disabled
 
     std::string mSource; // path of file or dir
     std::string mObject; // the object who has changed

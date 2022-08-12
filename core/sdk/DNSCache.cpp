@@ -49,7 +49,7 @@ namespace sdk {
                         if (buffer != NULL)
                             delete[] buffer;
                         bufferLen *= 4;
-                        if (bufferLen > 32768) //32KB
+                        if (bufferLen > 32768) // 32KB
                             return false;
                         continue;
                     }

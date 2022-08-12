@@ -63,10 +63,10 @@ public:
     bool Stop();
 
     /**
-     * @brief 
-     * 
-     * @param maxProcessPackets 
-     * @param maxProcessDurationMs 
+     * @brief
+     *
+     * @param maxProcessPackets
+     * @param maxProcessDurationMs
      * @return int32_t packets processed, 0 no packets, < 0 error
      */
     int32_t ProcessPackets(int32_t maxProcessPackets, int32_t maxProcessDurationMs);

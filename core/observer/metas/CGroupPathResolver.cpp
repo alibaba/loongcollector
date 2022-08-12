@@ -42,34 +42,41 @@ KubernetesCGroupPathMatcher* GetCGroupMatcher(const std::string& path, CONTAINER
     const std::string podRegex = "([0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12})";
     const std::string containerRegex = "([0-9a-f]{64})";
     auto* matcher = new KubernetesCGroupPathMatcher();
-    // STANDARD: kubepods.slice/kubepods-pod2b801b7a_5266_4386_864e_45ed71136371.slice/cri-containerd-20e061fc708d3b66dfe257b19552b34a1307a7347ed6b5bd0d8c5e76afb1a870.scope/cgroup.procs
+    // STANDARD:
+    // kubepods.slice/kubepods-pod2b801b7a_5266_4386_864e_45ed71136371.slice/cri-containerd-20e061fc708d3b66dfe257b19552b34a1307a7347ed6b5bd0d8c5e76afb1a870.scope/cgroup.procs
     matcher->setGuaranteedPathRegex(boost::regex("^kubepods.slice\\/kubepods-pod" + podRegex + ".slice\\/"
                                                  + containerTypeRegexStr[type] + "-" + containerRegex
                                                  + "\\.scope\\/cgroup\\.procs$"));
-    // STANDARD: kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod0d206349_0faf_445c_8c3f_2d2153784f15.slice/cri-containerd-efd08a78ad94af4408bcdb097fbcb603a31a40e4d74907f72ff14c3264ee7e85.scope/cgroup.procs
+    // STANDARD:
+    // kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod0d206349_0faf_445c_8c3f_2d2153784f15.slice/cri-containerd-efd08a78ad94af4408bcdb097fbcb603a31a40e4d74907f72ff14c3264ee7e85.scope/cgroup.procs
     matcher->setBesteffortPathRegex(boost::regex("^kubepods.slice\\/kubepods-besteffort.slice\\/kubepods-besteffort-pod"
                                                  + podRegex + ".slice\\/" + containerTypeRegexStr[type] + "-"
                                                  + containerRegex + "\\.scope\\/cgroup\\.procs$"));
-    // STANDARD: kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podee10fb7d_d989_47b3_bc2a_e9ffbe767849.slice/cri-containerd-4591321a5d841ce6a60a777223cf7fe872d1af0ca721e76a5cf20985056771f7.scope/cgroup.procs
+    // STANDARD:
+    // kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podee10fb7d_d989_47b3_bc2a_e9ffbe767849.slice/cri-containerd-4591321a5d841ce6a60a777223cf7fe872d1af0ca721e76a5cf20985056771f7.scope/cgroup.procs
     matcher->setBurstablePathRegex(boost::regex("^kubepods.slice\\/kubepods-burstable.slice\\/kubepods-burstable-pod"
                                                 + podRegex + ".slice\\/" + containerTypeRegexStr[type] + "-"
                                                 + containerRegex + "\\.scope\\/cgroup\\.procs$"));
     if (matcher->IsMatch(path)) {
         return matcher;
     }
-    // GKE: kubepods/pod8dbc5577-d0e2-4706-8787-57d52c03ddf2/14011c7d92a9e513dfd69211da0413dbf319a5e45a02b354ba6e98e10272542d/cgroup.procs
+    // GKE:
+    // kubepods/pod8dbc5577-d0e2-4706-8787-57d52c03ddf2/14011c7d92a9e513dfd69211da0413dbf319a5e45a02b354ba6e98e10272542d/cgroup.procs
     matcher->setGuaranteedPathRegex(
         boost::regex("^kubepods\\/pod" + podRegex + "\\/" + containerRegex + "\\/cgroup\\.procs$"));
-    // GKE: kubepods/besteffort/pod8dbc5577-d0e2-4706-8787-57d52c03ddf2/14011c7d92a9e513dfd69211da0413dbf319a5e45a02b354ba6e98e10272542d/cgroup.procs
+    // GKE:
+    // kubepods/besteffort/pod8dbc5577-d0e2-4706-8787-57d52c03ddf2/14011c7d92a9e513dfd69211da0413dbf319a5e45a02b354ba6e98e10272542d/cgroup.procs
     matcher->setBesteffortPathRegex(
         boost::regex("^kubepods\\/besteffort\\/pod" + podRegex + "\\/" + containerRegex + "\\/cgroup\\.procs$"));
-    // GKE: kubepods/burstable/pod8dbc5577-d0e2-4706-8787-57d52c03ddf2/14011c7d92a9e513dfd69211da0413dbf319a5e45a02b354ba6e98e10272542d/cgroup.procs
+    // GKE:
+    // kubepods/burstable/pod8dbc5577-d0e2-4706-8787-57d52c03ddf2/14011c7d92a9e513dfd69211da0413dbf319a5e45a02b354ba6e98e10272542d/cgroup.procs
     matcher->setBurstablePathRegex(
         boost::regex("^kubepods\\/burstable\\/pod" + podRegex + "\\/" + containerRegex + "\\/cgroup\\.procs$"));
     if (matcher->IsMatch(path)) {
         return matcher;
     }
-    // pure docker  : /sys/fs/cgroup/cpu/docker/1ad2ce5889acb209e1576339741b1e504480db77d3771365e95b3bbd6fe91120/cgroup.procs
+    // pure docker  :
+    // /sys/fs/cgroup/cpu/docker/1ad2ce5889acb209e1576339741b1e504480db77d3771365e95b3bbd6fe91120/cgroup.procs
     matcher->setGuaranteedPathRegex(boost::regex("^docker\\/" + containerRegex + "\\/cgroup\\.procs$"));
     if (matcher->IsMatch(path)) {
         return matcher;

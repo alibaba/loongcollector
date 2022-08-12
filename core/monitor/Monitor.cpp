@@ -225,7 +225,8 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     }
 
     // the unique id of current instance
-    std::string id = sdk::Base64Enconde(LogFileProfiler::mHostname + LogFileProfiler::mIpAddr + ILOGTAIL_VERSION + GetProcessExecutionDir());
+    std::string id = sdk::Base64Enconde(LogFileProfiler::mHostname + LogFileProfiler::mIpAddr + ILOGTAIL_VERSION
+                                        + GetProcessExecutionDir());
 
     // Collect status information to send.
     LogGroup logGroup;
@@ -326,9 +327,9 @@ bool LogtailMonitor::GetMemStat() {
     fin.ignore(100, ' ');
     fin >> mMemStat.mRss;
     uint32_t pagesize = getpagesize();
-    pagesize /= 1024; //page size in kb
+    pagesize /= 1024; // page size in kb
     mMemStat.mRss *= pagesize;
-    mMemStat.mRss /= 1024; //rss in mb
+    mMemStat.mRss /= 1024; // rss in mb
     fin.close();
     return true;
 #elif defined(_MSC_VER)
@@ -374,7 +375,7 @@ bool LogtailMonitor::GetCpuStat(CpuStat& cur) {
     memcpy(&user, &fuser, sizeof(FILETIME));
     float percent = (sys.QuadPart - cur.mLastSysCPU.QuadPart) + (user.QuadPart - cur.mLastUserCPU.QuadPart);
     percent /= (now.QuadPart - cur.mLastCPU.QuadPart);
-    //percent /= mCPUStat.mNumProcessors;//compute single core cpu util, as Linux logtail
+    // percent /= mCPUStat.mNumProcessors;//compute single core cpu util, as Linux logtail
     cur.mLastCPU = now;
     cur.mLastUserCPU = user;
     cur.mLastSysCPU = sys;

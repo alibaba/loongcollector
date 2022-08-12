@@ -419,8 +419,8 @@ void ConfigUpdatorUnittest::TestDirCheckPoint() {
 
     bfs::create_directories(bfs::path(mRootDir) / "dir");
 
-    //dirs[0] -- inotify:yes, timeout:no;
-    //dirs[1] -- inotify:no
+    // dirs[0] -- inotify:yes, timeout:no;
+    // dirs[1] -- inotify:no
     for (int i = 0; i < 2; ++i) {
         bfs::create_directories(bfs::path(mRootDir) / dirs[i]);
         usleep(WRITE_LOG_SLEEP_INTERVAL);
@@ -451,7 +451,7 @@ void ConfigUpdatorUnittest::TestDirCheckPoint() {
     for (int i = 2; i < 5; ++i) {
         bfs::create_directories(bfs::path(mRootDir) / dirs[i]);
         sleep(1);
-        //usleep(WRITE_LOG_SLEEP_INTERVAL);
+        // usleep(WRITE_LOG_SLEEP_INTERVAL);
     }
 
     auto eventDispatcher = EventDispatcher::GetInstance();
@@ -478,7 +478,7 @@ void ConfigUpdatorUnittest::TestDirCheckPoint() {
     // need a little time here to let config update
     sleep(WAIT_CONFIG_UPDATE_INTERVAL);
 
-    //waiting for check root dir
+    // waiting for check root dir
     sleep(2 * INT32_FLAG(check_base_dir_interval) + 1);
 
     // after update config, check the inotify and timeout again
@@ -598,7 +598,7 @@ void ConfigUpdatorUnittest::TestCheckPointManager() {
     for (int i = 0; i < 4; ++i) {
         checkpointManager->AddDirCheckPoint(dirs[i]);
     }
-    //timeout dircheckpoint
+    // timeout dircheckpoint
     (checkpointManager->mDirNameMap[pdirs[0]])->mUpdateTime -= INT32_FLAG(file_check_point_time_out) + 10;
     (checkpointManager->mDirNameMap[pdirs[2]])->mUpdateTime -= INT32_FLAG(file_check_point_time_out) + 5;
 
@@ -712,7 +712,7 @@ void ConfigUpdatorUnittest::DumpInitConfigToLocal(string localPath) {
     lineCountValue["logstore"] = Json::Value("line_count");
     customizedFieldsValue["line_count"] = lineCountValue;
 
-    //customizedFieldsValue["fuse_mode"] = Json::Value(true);
+    // customizedFieldsValue["fuse_mode"] = Json::Value(true);
 
     commonreg_com["customized_fields"] = customizedFieldsValue;
 
@@ -972,7 +972,7 @@ void ConfigUpdatorUnittest::TestLogRotateWhenUpdate() {
     APSARA_TEST_EQUAL(sProjectNameCountMap["2000000_proj"] + sProjectNameCountMap["1000000_proj"], 300);
     APSARA_TEST_EQUAL(sProjectNameCountMap["8000000_proj"], 300);
 
-    //test add config
+    // test add config
     APSARA_TEST_TRUE(EventDispatcher::GetInstance()->IsRegistered((mRootDir + PATH_SEPARATOR + "comm").c_str()));
     APSARA_TEST_TRUE(EventDispatcher::GetInstance()->IsRegistered((mRootDir + PATH_SEPARATOR + "apsara_log").c_str()));
     APSARA_TEST_TRUE(
@@ -1072,7 +1072,7 @@ void ConfigUpdatorUnittest::TestConfigUpdate() {
     APSARA_TEST_EQUAL(sProjectNameCountMap["2000000_proj"] + sProjectNameCountMap["1000000_proj"], 300);
     APSARA_TEST_EQUAL(sProjectNameCountMap["8000000_proj"], 300);
 
-    //test add config
+    // test add config
 
     APSARA_TEST_TRUE(EventDispatcher::GetInstance()->IsRegistered((mRootDir + PATH_SEPARATOR + "comm").c_str()));
     APSARA_TEST_TRUE(EventDispatcher::GetInstance()->IsRegistered((mRootDir + PATH_SEPARATOR + "apsara_log").c_str()));
@@ -1127,8 +1127,8 @@ void ConfigUpdatorUnittest::TestConfigUpdate() {
     CheckPointPtr checkPointPtr;
     CheckPointManager* pCheckPointManager = CheckPointManager::Instance();
 
-    //APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/comm/job.log", checkPointPtr));
-    //APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/comm/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log/job.log", checkPointPtr));
 
     APSARA_TEST_TRUE(pCheckPointManager->GetDirCheckPoint(mRootDir, dirCheckPointPtr));
     if (dirCheckPointPtr.get() != NULL) {
@@ -1138,9 +1138,9 @@ void ConfigUpdatorUnittest::TestConfigUpdate() {
                          != dirCheckPointPtr->mSubDir.end());
     }
 
-    //pCheckPointManager->PrintStatus();
+    // pCheckPointManager->PrintStatus();
 
-    //test delete config
+    // test delete config
     SetConfigResponse("{}");
     apsara_log = Json::Value();
     apsara_log["project_name"] = Json::Value("8000000_proj");
@@ -1171,9 +1171,9 @@ void ConfigUpdatorUnittest::TestConfigUpdate() {
     APSARA_TEST_TRUE(EventDispatcher::GetInstance()->IsRegistered((mRootDir + PATH_SEPARATOR + "apsara_log1").c_str()));
 
 
-    //APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/comm/job.log", checkPointPtr));
-    //APSARA_TEST_TRUE(!pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log/job.log", checkPointPtr));
-    //APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log1/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/comm/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(!pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log1/job.log", checkPointPtr));
 
     APSARA_TEST_TRUE(pCheckPointManager->GetDirCheckPoint(mRootDir, dirCheckPointPtr));
     if (dirCheckPointPtr.get() != NULL) {
@@ -1318,7 +1318,7 @@ void ConfigUpdatorUnittest::TestLocalConfigUpdate() {
     APSARA_TEST_EQUAL(sProjectNameCountMap["2000000_proj"] + sProjectNameCountMap["1000000_proj"], 300);
     APSARA_TEST_EQUAL(sProjectNameCountMap["8000000_proj"], 300);
 
-    //test add config
+    // test add config
 
     APSARA_TEST_TRUE(EventDispatcher::GetInstance()->IsRegistered((mRootDir + PATH_SEPARATOR + "comm").c_str()));
     APSARA_TEST_TRUE(EventDispatcher::GetInstance()->IsRegistered((mRootDir + PATH_SEPARATOR + "apsara_log").c_str()));
@@ -1374,8 +1374,8 @@ void ConfigUpdatorUnittest::TestLocalConfigUpdate() {
     CheckPointPtr checkPointPtr;
     CheckPointManager* pCheckPointManager = CheckPointManager::Instance();
 
-    //APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/comm/job.log", checkPointPtr));
-    //APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/comm/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log/job.log", checkPointPtr));
 
     APSARA_TEST_TRUE(pCheckPointManager->GetDirCheckPoint(mRootDir, dirCheckPointPtr));
     if (dirCheckPointPtr.get() != NULL) {
@@ -1385,9 +1385,9 @@ void ConfigUpdatorUnittest::TestLocalConfigUpdate() {
                          != dirCheckPointPtr->mSubDir.end());
     }
 
-    //pCheckPointManager->PrintStatus();
+    // pCheckPointManager->PrintStatus();
 
-    //test delete config
+    // test delete config
     bfs::remove_all(AppConfig::GetInstance()->GetLocalUserConfigDirPath() + "config_3000000.json");
 
     sProjectNameCountMap["3000000_proj"] = 0;
@@ -1409,9 +1409,9 @@ void ConfigUpdatorUnittest::TestLocalConfigUpdate() {
         !EventDispatcher::GetInstance()->IsRegistered((mRootDir + PATH_SEPARATOR + "apsara_log1").c_str()));
 
 
-    //APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/comm/job.log", checkPointPtr));
-    //APSARA_TEST_TRUE(!pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log/job.log", checkPointPtr));
-    //APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log1/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/comm/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(!pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log/job.log", checkPointPtr));
+    // APSARA_TEST_TRUE(pCheckPointManager->GetCheckPoint(mRootDir + "/apsara_log1/job.log", checkPointPtr));
 
     APSARA_TEST_TRUE(pCheckPointManager->GetDirCheckPoint(mRootDir, dirCheckPointPtr));
     if (dirCheckPointPtr.get() != NULL) {
@@ -1902,7 +1902,7 @@ void ConfigUpdatorUnittest::TestCheckPointSaveInterval() {
         SignatureToHash(sigs[i], sigHashs[i], sigSizes[i]);
     }
     string dirs[] = {"/tmp/1/2/3/4/5", "/tmp/1/2/3/5", "/tmp/1/2/3/4/", "/tmp/1/3"};
-    //string pdirs[] = { "/tmp/1/2/3/4","/tmp/1/2/3","/tmp/1" };
+    // string pdirs[] = { "/tmp/1/2/3/4","/tmp/1/2/3","/tmp/1" };
 
     DumpInitConfigToLocal();
     CaseSetup();
@@ -1932,32 +1932,32 @@ void ConfigUpdatorUnittest::TestCheckPointSaveInterval() {
 
     CheckPointManager::Instance()->LoadCheckPoint();
     APSARA_TEST_TRUE(CheckPointManager::Instance()->mLastDumpTime > curTime);
-    //for (int i = 0; i < 3; ++i)
+    // for (int i = 0; i < 3; ++i)
     //{
-    //    DirCheckPointPtr ptr;
-    //    if (i == 1)
-    //    {
-    //        APSARA_TEST_EQUAL_FATAL(CheckPointManager::Instance()->GetDirCheckPoint(pdirs[i], ptr), true);
-    //        APSARA_TEST_EQUAL(ptr.get()->mSubDir.size(), 2);
-    //    }
-    //    else
-    //    {
-    //        APSARA_TEST_EQUAL_FATAL(CheckPointManager::Instance()->GetDirCheckPoint(pdirs[i], ptr), true);
-    //        APSARA_TEST_EQUAL(ptr.get()->mSubDir.size(), 1);
-    //    }
-    //}
-    // if checkpoint dump twice in this test, mDevInodeCheckPointPtrMap will be empty
-    //for (int i = 2; i >= 0; --i)
+    //     DirCheckPointPtr ptr;
+    //     if (i == 1)
+    //     {
+    //         APSARA_TEST_EQUAL_FATAL(CheckPointManager::Instance()->GetDirCheckPoint(pdirs[i], ptr), true);
+    //         APSARA_TEST_EQUAL(ptr.get()->mSubDir.size(), 2);
+    //     }
+    //     else
+    //     {
+    //         APSARA_TEST_EQUAL_FATAL(CheckPointManager::Instance()->GetDirCheckPoint(pdirs[i], ptr), true);
+    //         APSARA_TEST_EQUAL(ptr.get()->mSubDir.size(), 1);
+    //     }
+    // }
+    //  if checkpoint dump twice in this test, mDevInodeCheckPointPtrMap will be empty
+    // for (int i = 2; i >= 0; --i)
     //{
-    //    CheckPointPtr checkPointSharePtr;
-    //    bool result = CheckPointManager::Instance()->GetCheckPoint(DevInode(devs[i], inodes[i]), checkPointSharePtr);
-    //    APSARA_TEST_EQUAL_FATAL(result, true);
-    //    CheckPoint * checkPointPtr = checkPointSharePtr.get();
-    //    APSARA_TEST_EQUAL(checkPointPtr->mFileName, filenames[i]);
-    //    APSARA_TEST_EQUAL(checkPointPtr->mSignature, sigs[i]);
-    //    APSARA_TEST_EQUAL(checkPointPtr->mOffset, offsets[i]);
-    //    APSARA_TEST_EQUAL(checkPointPtr->mInode, inodes[i]);
-    //}
+    //     CheckPointPtr checkPointSharePtr;
+    //     bool result = CheckPointManager::Instance()->GetCheckPoint(DevInode(devs[i], inodes[i]), checkPointSharePtr);
+    //     APSARA_TEST_EQUAL_FATAL(result, true);
+    //     CheckPoint * checkPointPtr = checkPointSharePtr.get();
+    //     APSARA_TEST_EQUAL(checkPointPtr->mFileName, filenames[i]);
+    //     APSARA_TEST_EQUAL(checkPointPtr->mSignature, sigs[i]);
+    //     APSARA_TEST_EQUAL(checkPointPtr->mOffset, offsets[i]);
+    //     APSARA_TEST_EQUAL(checkPointPtr->mInode, inodes[i]);
+    // }
 
     INT32_FLAG(check_point_dump_interval) = defaultInterval;
 
@@ -2360,7 +2360,7 @@ void ConfigUpdatorUnittest::TestUpdateGroupTopic() {
     APSARA_TEST_EQUAL(sProjectCategoryTopicCountMap["8000000_proj_8000000_category_"], 100);
     APSARA_TEST_EQUAL(sProjectCategoryTopicCountMap["8000000_proj_8000000_category_xxxx"], 200);
 
-    //update group topic
+    // update group topic
     apsara_log = Json::Value();
     apsara_log["project_name"] = Json::Value("8000000_proj");
     apsara_log["category"] = Json::Value("8000000_category");
@@ -2399,7 +2399,7 @@ void ConfigUpdatorUnittest::TestUpdateGroupTopic() {
     APSARA_TEST_EQUAL(sProjectCategoryTopicCountMap["8000000_proj_8000000_category_xxxx"], 200);
     APSARA_TEST_EQUAL(sProjectCategoryTopicCountMap["8000000_proj_8000000_category_xxxx1"], 200);
 
-    //disable group topic
+    // disable group topic
     apsara_log = Json::Value();
     apsara_log["project_name"] = Json::Value("8000000_proj");
     apsara_log["category"] = Json::Value("8000000_category");
@@ -2443,10 +2443,10 @@ void ConfigUpdatorUnittest::TestValidWildcardPath() {
     auto eventDispatcher = EventDispatcher::GetInstance();
     string dirs[] = {PS + "nginx" + PS + "aa" + PS + "bb",
                      PS + "app_1" + PS + "aa",
-                     PS + "app_2" + PS + "aa" + PS + "bb", //ok
-                     PS + "app_2" + PS + "aa" + PS + "bb" + PS + "cc", //ok
+                     PS + "app_2" + PS + "aa" + PS + "bb", // ok
+                     PS + "app_2" + PS + "aa" + PS + "bb" + PS + "cc", // ok
                      PS + "app_2" + PS + "aa" + PS + "bb" + PS + "cc" + PS + "dd",
-                     PS + "app_3" + PS + "aa" + PS + "bb2" + PS + "cc", //ok
+                     PS + "app_3" + PS + "aa" + PS + "bb2" + PS + "cc", // ok
                      PS + "app_3" + PS + "aa" + PS + "bb2" + PS + "cc" + PS + "dd",
                      PS + "app_13" + PS + "aa" + PS + "bb" + PS + "cc"};
     for (int i = 0; i < 8; ++i) {
@@ -2520,14 +2520,14 @@ void ConfigUpdatorUnittest::TestValidWildcardPath() {
     bfs::remove_all(mRootDir + dirs[3]);
 #endif
     // remove will not work when file is open
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[0]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[1]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[2]) != eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[3]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[4]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[5]) != eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[6]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[7]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[0]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[1]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[2]) != eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[3]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[4]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[5]) != eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[6]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[7]) == eventDispatcher->mPathWdMap.end());
     for (int i = 0; i < 20; ++i) {
         for (int j = 0; j < 8; ++j)
             DumpLog(10, mRootDir + dirs[j], APSARA_LOG);
@@ -2561,14 +2561,14 @@ void ConfigUpdatorUnittest::TestValidWildcardPath() {
     }
     usleep(100 * 1000);
     // remove will not work when file is open
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[0]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[1]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[2]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[3]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[4]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[5]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[6]) == eventDispatcher->mPathWdMap.end());
-    //APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[7]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[0]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[1]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[2]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[3]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[4]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[5]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[6]) == eventDispatcher->mPathWdMap.end());
+    // APSARA_TEST_TRUE(eventDispatcher->mPathWdMap.find(mRootDir + dirs[7]) == eventDispatcher->mPathWdMap.end());
     for (int i = 0; i < 20; ++i) {
         for (int j = 0; j < 8; ++j)
             DumpLog(10, mRootDir + dirs[j], APSARA_LOG);
@@ -2632,8 +2632,8 @@ void ConfigUpdatorUnittest::TestValidWildcardPath2() {
 
     string dirs[] = {PS + "nginx" + PS + "aa" + PS + "bb",
                      PS + "app_1" + PS + "aa",
-                     PS + "app_2" + PS + "aa" + PS + "bb", //ok
-                     PS + "app_2" + PS + "aa" + PS + "bb" + PS + "cc", //ok
+                     PS + "app_2" + PS + "aa" + PS + "bb", // ok
+                     PS + "app_2" + PS + "aa" + PS + "bb" + PS + "cc", // ok
                      PS + "app_2" + PS + "aa" + PS + "bb" + PS + "cc" + PS + "dd",
                      PS + "app_3" + PS + "aa" + PS + "bb2" + PS + "cc",
                      PS + "app_3" + PS + "aa" + PS + "bb2" + PS + "cc" + PS + "dd",
@@ -2846,8 +2846,8 @@ void ConfigUpdatorUnittest::TestContainerModeWildcardConfig() {
 
     string mountDirs[] = {mRootDir + "/mount/nginx/aa/bb",
                           mRootDir + "/mount/app_1/aa",
-                          mRootDir + "/mount/app_2/aa/bb", //ok
-                          mRootDir + "/mount/app_2/aa/bb/cc", //ok
+                          mRootDir + "/mount/app_2/aa/bb", // ok
+                          mRootDir + "/mount/app_2/aa/bb/cc", // ok
                           mRootDir + "/mount/app_2/aa/bb/cc/dd",
                           mRootDir + "/mount/app_2/aa/bb2/cc",
                           mRootDir + "/mount/app_3/aa/bb2/cc/dd",
@@ -3254,7 +3254,7 @@ void ConfigUpdatorUnittest::TestIsWildcardPathMatch() {
 #if defined(__linux__)
 void ConfigUpdatorUnittest::TestLoadGlobalFuseConf() {
     LOG_INFO(sLogger, ("TestLoadGlobalFuseConf() begin", time(NULL)));
-    //CaseSetup();
+    // CaseSetup();
 
     // test default fuse mode
     {
@@ -3297,7 +3297,7 @@ void ConfigUpdatorUnittest::TestLoadGlobalFuseConf() {
         APSARA_TEST_EQUAL(IsFuseModeEnable, false);
     }
 
-    //CaseCleanup();
+    // CaseCleanup();
     LOG_INFO(sLogger, ("TestLoadGlobalFuseConf() end", time(NULL)));
 }
 

@@ -127,7 +127,8 @@ void ContainerProcessGroupManager::FlushMetas() {
     if (mContainerType == CONTAINER_TYPE_UNKNOWN) {
         // paths may have :
         //        1. /sys/fs/cgroup/cpu,cpuacct/kubepods.slice/cgroup.procs
-        //        2. /sys/fs/cgroup/cpu,cpuacct/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode4cd4327_698e_42e0_b6bb_54d32685bcf5.slice/docker-d1eefc8c91baea08621aa21b07abf73b2a565016326732793113f0ba31cc41a1.scope/cgroup.procs
+        //        2.
+        //        /sys/fs/cgroup/cpu,cpuacct/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode4cd4327_698e_42e0_b6bb_54d32685bcf5.slice/docker-d1eefc8c91baea08621aa21b07abf73b2a565016326732793113f0ba31cc41a1.scope/cgroup.procs
         // we should use max length's path to detect exact container type
         size_t maxLenIndex = 0;
         size_t maxLen = 0;
@@ -217,7 +218,7 @@ void ContainerProcessGroupManager::FlushPids(const std::unordered_set<uint32_t>&
                 continue;
             }
             if (existedPids.find(iter->first) != existedPids.end()) {
-                //LOG_INFO(sLogger, (std::to_string(iter->first), iter->second->ToString()));
+                // LOG_INFO(sLogger, (std::to_string(iter->first), iter->second->ToString()));
                 ++iter;
                 continue;
             }

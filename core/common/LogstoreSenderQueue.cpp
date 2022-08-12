@@ -63,7 +63,8 @@ bool LogstoreSenderInfo::CanSend(int32_t curTime) {
                 mNetworkRetryInterval = (double)INT32_FLAG(client_disable_send_retry_interval_max);
             }
 
-            // set lastErrorTime to curTime, make sure client can only try once between client_disable_send_retry_interval seconds
+            // set lastErrorTime to curTime, make sure client can only try once between
+            // client_disable_send_retry_interval seconds
             mLastNetworkErrorTime = curTime;
             // can try INT32_FLAG(max_client_send_error_count) times
             mLastNetworkErrorCount = 0;

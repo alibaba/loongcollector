@@ -177,7 +177,7 @@ bool LogFileProfiler::GetProfileData(LogGroup& logGroup, LogStoreStatistic* stat
 LogFileProfiler::LogstoreSenderStatisticsMap*
 LogFileProfiler::MakesureRegionStatisticsMapUnlocked(const string& region) {
     // @todo
-    //string region;
+    // string region;
     std::map<std::string, LogstoreSenderStatisticsMap*>::iterator iter = mAllStatisticsMap.find(region);
     if (iter != mAllStatisticsMap.end()) {
         return iter->second;

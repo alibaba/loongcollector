@@ -503,7 +503,7 @@ bool LogFileReader::SetReadPosForBackwardReading(LogFileOperator& op) {
 
         if (logTime < systemBootTime)
             begin = nextPos;
-        else //if (logTime >= systemBootTime)
+        else // if (logTime >= systemBootTime)
             end = nextPos;
     }
 
@@ -657,8 +657,8 @@ bool LogFileReader::CheckForFirstOpen(FileReadPolicy policy) {
         return false;
 
     // here we should NOT use mLogFileOp to open file, because LogFileReader may be created from checkpoint
-    // we just want to set file pos, then a TEMPORARY object for LogFileOperator is needed here, not a class member LogFileOperator
-    // we should open file via UpdateFilePtr, then start reading
+    // we just want to set file pos, then a TEMPORARY object for LogFileOperator is needed here, not a class member
+    // LogFileOperator we should open file via UpdateFilePtr, then start reading
     LogFileOperator op;
     op.Open(mLogPath.c_str(), mIsFuseMode);
     if (op.IsOpen() == false) {
@@ -1011,7 +1011,7 @@ bool LogFileReader::UpdateFilePtr() {
                                                    mProjectName,
                                                    mCategory,
                                                    mRegion);
-            //set errno to "too many open file"
+            // set errno to "too many open file"
             errno = EMFILE;
             return false;
         }
@@ -1205,8 +1205,8 @@ bool LogFileReader::CheckFileSignatureAndOffset(int64_t& fileSize) {
                                                mRegion);
 
         mLastFilePos = endSize;
-        // when we use truncate_pos_skip_bytes, if truncate stop and log start to append, logtail will drop less data or collect more data
-        // this just work around for ant's demand
+        // when we use truncate_pos_skip_bytes, if truncate stop and log start to append, logtail will drop less data or
+        // collect more data this just work around for ant's demand
         if (INT32_FLAG(truncate_pos_skip_bytes) > 0 && mLastFilePos > (INT32_FLAG(truncate_pos_skip_bytes) + 1024)) {
             mLastFilePos -= INT32_FLAG(truncate_pos_skip_bytes);
             // after adjust mLastFilePos, we should fix last pos to assure that each log is complete
@@ -1370,12 +1370,15 @@ bool LogFileReader::GetLogTimeByOffset(const char* buffer,
     return true;
 }
 
-// Only get the currently written log file, it will choose the last modified file to read. There are several condition to choose the lastmodify file:
+// Only get the currently written log file, it will choose the last modified file to read. There are several condition
+// to choose the lastmodify file:
 // 1. if the last read file don't exist
-// 2. if the file's first 100 bytes(file signature) is not same with the last read file's signature, which meaning the log file has be rolled
+// 2. if the file's first 100 bytes(file signature) is not same with the last read file's signature, which meaning the
+// log file has be rolled
 //
 // when a new file is choosen, it will set the read position
-// 1. if the time in the file's first line >= the last read log time , then set the file read position to 0 (which mean the file is new created)
+// 1. if the time in the file's first line >= the last read log time , then set the file read position to 0 (which mean
+// the file is new created)
 // 2. other wise , set the position to the end of the file
 // *bufferptr is null terminated.
 /*
@@ -1388,9 +1391,10 @@ bool LogFileReader::GetLogTimeByOffset(const char* buffer,
  *
  * 1-2. bufferSize < 512KB:
  * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\n" -> "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\0"
- * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3_Line_1\n" -> "MultiLineLog_1\nMultiLineLog_2\MultiLineLog_3_Line_1\0"  **this is not expected !**
- * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3_Line_1\nxxx" -> "MultiLineLog_1\nMultiLineLog_2\0"
- * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\nxxx" -> "MultiLineLog_1\nMultiLineLog_2\0"
+ * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3_Line_1\n" -> "MultiLineLog_1\nMultiLineLog_2\MultiLineLog_3_Line_1\0"
+ * **this is not expected !** "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3_Line_1\nxxx" ->
+ * "MultiLineLog_1\nMultiLineLog_2\0" "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\nxxx" ->
+ * "MultiLineLog_1\nMultiLineLog_2\0"
  *
  * 2. for singleline log, "xxx" mean a string without '\n'
  * "SingleLineLog_1\nSingleLineLog_2\nSingleLineLog_3\n" -> "SingleLineLog_1\nSingleLineLog_2\nSingleLineLog_3\0"

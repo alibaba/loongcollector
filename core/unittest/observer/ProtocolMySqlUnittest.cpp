@@ -190,7 +190,7 @@ public:
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "success", "1"));
     }
 
-    //0100000001
+    // 0100000001
     void TestMySQLQuitPacket() {
         // mysql quit command
         const std::string pkt("0100000001");

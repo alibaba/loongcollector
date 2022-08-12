@@ -219,7 +219,7 @@ int32_t JsonLogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& 
                 break;
             ++rollbackLineFeedCount;
             endIdx = pos - buffer;
-            buffer[endIdx] = '\0'; //invalid json line
+            buffer[endIdx] = '\0'; // invalid json line
             beginIdx = endIdx + 1;
             if (noJsonBlockFlag) {
                 // if no json block in this buffer and now line has no block, forse read this line
@@ -289,7 +289,7 @@ bool JsonLogFileReader::FindJsonMatch(
                 inQuote = !inQuote;
                 break;
             case '\\':
-                ++idx; //skip next char after escape char
+                ++idx; // skip next char after escape char
                 break;
             default:
                 break;

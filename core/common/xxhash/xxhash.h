@@ -244,18 +244,18 @@ extern "C" {
 #endif
 
 /*
-    * This part deals with the special case where a unit wants to inline xxHash,
-    * but "xxhash.h" has previously been included without XXH_INLINE_ALL,
-    * such as part of some previously included *.h header file.
-    * Without further action, the new include would just be ignored,
-    * and functions would effectively _not_ be inlined (silent failure).
-    * The following macros solve this situation by prefixing all inlined names,
-    * avoiding naming collision with previous inclusions.
-    */
+ * This part deals with the special case where a unit wants to inline xxHash,
+ * but "xxhash.h" has previously been included without XXH_INLINE_ALL,
+ * such as part of some previously included *.h header file.
+ * Without further action, the new include would just be ignored,
+ * and functions would effectively _not_ be inlined (silent failure).
+ * The following macros solve this situation by prefixing all inlined names,
+ * avoiding naming collision with previous inclusions.
+ */
 /* Before that, we unconditionally #undef all symbols,
-    * in case they were already defined with XXH_NAMESPACE.
-    * They will then be redefined for XXH_INLINE_ALL
-    */
+ * in case they were already defined with XXH_NAMESPACE.
+ * They will then be redefined for XXH_INLINE_ALL
+ */
 #undef XXH_versionNumber
 /* XXH32 */
 #undef XXH32
@@ -312,12 +312,12 @@ extern "C" {
 /* employ the namespace for XXH_INLINE_ALL */
 #define XXH_NAMESPACE XXH_INLINE_
 /*
-    * Some identifiers (enums, type names) are not symbols,
-    * but they must nonetheless be renamed to avoid redeclaration.
-    * Alternative solution: do not redeclare them.
-    * However, this requires some #ifdefs, and has a more dispersed impact.
-    * Meanwhile, renaming can be achieved in a single place.
-    */
+ * Some identifiers (enums, type names) are not symbols,
+ * but they must nonetheless be renamed to avoid redeclaration.
+ * Alternative solution: do not redeclare them.
+ * However, this requires some #ifdefs, and has a more dispersed impact.
+ * Meanwhile, renaming can be achieved in a single place.
+ */
 #define XXH_IPREF(Id) XXH_NAMESPACE##Id
 #define XXH_OK XXH_IPREF(XXH_OK)
 #define XXH_ERROR XXH_IPREF(XXH_ERROR)
@@ -416,8 +416,8 @@ extern "C" {
 
 
 /* *************************************
-*  Compiler specifics
-***************************************/
+ *  Compiler specifics
+ ***************************************/
 
 /* specific declaration modes for Windows */
 #if !defined(XXH_INLINE_ALL) && !defined(XXH_PRIVATE_API)
@@ -443,8 +443,8 @@ extern "C" {
 #endif
 
 /* *************************************
-*  Version
-***************************************/
+ *  Version
+ ***************************************/
 #define XXH_VERSION_MAJOR 0
 #define XXH_VERSION_MINOR 8
 #define XXH_VERSION_RELEASE 1
@@ -463,8 +463,8 @@ XXH_PUBLIC_API XXH_CONSTF unsigned XXH_versionNumber(void);
 
 
 /* ****************************
-*  Common basic types
-******************************/
+ *  Common basic types
+ ******************************/
 #include <stddef.h> /* size_t */
 /*!
  * @brief Exit code for the streaming API.
@@ -476,8 +476,8 @@ typedef enum {
 
 
 /*-**********************************************************************
-*  32-bit hash
-************************************************************************/
+ *  32-bit hash
+ ************************************************************************/
 #if defined(XXH_DOXYGEN) /* Don't show <stdint.h> include */
 /*!
  * @brief An unsigned 32-bit integer.
@@ -749,8 +749,8 @@ XXH_PUBLIC_API XXH_PUREF XXH32_hash_t XXH32_hashFromCanonical(const XXH32_canoni
 
 #ifndef XXH_NO_LONG_LONG
 /*-**********************************************************************
-*  64-bit hash
-************************************************************************/
+ *  64-bit hash
+ ************************************************************************/
 #if defined(XXH_DOXYGEN) /* don't include <stdint.h> */
 /*!
  * @brief An unsigned 64-bit integer.
@@ -884,8 +884,8 @@ XXH_PUBLIC_API XXH_PUREF XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canoni
  * The API supports one-shot hashing, streaming mode, and custom secrets.
  */
 /*-**********************************************************************
-*  XXH3 64-bit variant
-************************************************************************/
+ *  XXH3 64-bit variant
+ ************************************************************************/
 
 /*!
  * @brief 64-bit unseeded variant of XXH3.
@@ -1006,8 +1006,8 @@ XXH_PUBLIC_API XXH_PUREF XXH64_hash_t XXH3_64bits_digest(const XXH3_state_t* sta
 
 
 /*-**********************************************************************
-*  XXH3 128-bit variant
-************************************************************************/
+ *  XXH3 128-bit variant
+ ************************************************************************/
 
 /*!
  * @brief The return value from 128-bit hashes.
@@ -1259,7 +1259,7 @@ struct XXH3_state_s {
     /*!< Reserved field. */
     const unsigned char* extSecret;
     /*!< Reference to an external secret for the _withSecret variants, NULL
-        *   for other variants. */
+     *   for other variants. */
     /* note: there may be some padding at the end due to alignment on 64 bytes */
 }; /* typedef'd to XXH3_state_t */
 
@@ -1469,8 +1469,8 @@ XXH_PUBLIC_API XXH_errorcode XXH3_128bits_reset_withSecretandSeed(XXH3_state_t* 
 #define XXH_IMPLEM_13a8737387
 
 /* *************************************
-*  Tuning parameters
-***************************************/
+ *  Tuning parameters
+ ***************************************/
 
 /*!
  * @defgroup tuning Tuning parameters
@@ -1657,8 +1657,8 @@ XXH_PUBLIC_API XXH_errorcode XXH3_128bits_reset_withSecretandSeed(XXH3_state_t* 
 
 #ifndef XXH_FORCE_MEMORY_ACCESS /* can be defined externally, on command line for example */
 /* prefer __packed__ structures (method 1) for GCC
-    * < ARMv7 with unaligned access (e.g. Raspbian armhf) still uses byte shifting, so we use memcpy
-    * which for some reason does unaligned loads. */
+ * < ARMv7 with unaligned access (e.g. Raspbian armhf) still uses byte shifting, so we use memcpy
+ * which for some reason does unaligned loads. */
 #if defined(__GNUC__) && !(defined(__ARM_ARCH) && __ARM_ARCH < 7 && defined(__ARM_FEATURE_UNALIGNED))
 #define XXH_FORCE_MEMORY_ACCESS 1
 #endif
@@ -1704,8 +1704,8 @@ XXH_PUBLIC_API XXH_errorcode XXH3_128bits_reset_withSecretandSeed(XXH3_state_t* 
 
 
 /* *************************************
-*  Includes & Memory related functions
-***************************************/
+ *  Includes & Memory related functions
+ ***************************************/
 #if defined(XXH_NO_STREAM)
 /* nothing */
 #elif defined(XXH_NO_STDLIB)
@@ -1767,8 +1767,8 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) {
 
 
 /* *************************************
-*  Compiler Specific Options
-***************************************/
+ *  Compiler Specific Options
+ ***************************************/
 #ifdef _MSC_VER /* Visual Studio warning fix */
 #pragma warning(disable : 4127) /* disable: C4127: conditional expression is constant */
 #endif
@@ -1797,8 +1797,8 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) {
 
 
 /* *************************************
-*  Debug
-***************************************/
+ *  Debug
+ ***************************************/
 /*!
  * @ingroup tuning
  * @def XXH_DEBUGLEVEL
@@ -1868,9 +1868,10 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) {
 #endif
 
 /* *************************************
-*  Basic Types
-***************************************/
-#if !defined(__VMS) && (defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */))
+ *  Basic Types
+ ***************************************/
+#if !defined(__VMS) && (defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 \
+                                                                                                             */))
 #include <stdint.h>
 typedef uint8_t xxh_u8;
 #else
@@ -2037,8 +2038,8 @@ static int XXH_isLittleEndian(void) {
 
 
 /* ****************************************
-*  Compiler-specific Functions and Macros
-******************************************/
+ *  Compiler-specific Functions and Macros
+ ******************************************/
 #define XXH_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 
 #ifdef __has_builtin
@@ -2092,8 +2093,8 @@ static xxh_u32 XXH_swap32(xxh_u32 x) {
 
 
 /* ***************************
-*  Memory reads
-*****************************/
+ *  Memory reads
+ *****************************/
 
 /*!
  * @internal
@@ -2141,8 +2142,8 @@ XXH_FORCE_INLINE xxh_u32 XXH_readLE32_align(const void* ptr, XXH_alignment align
 
 
 /* *************************************
-*  Misc
-***************************************/
+ *  Misc
+ ***************************************/
 /*! @ingroup public */
 XXH_PUBLIC_API unsigned XXH_versionNumber(void) {
     return XXH_VERSION_NUMBER;
@@ -2150,8 +2151,8 @@ XXH_PUBLIC_API unsigned XXH_versionNumber(void) {
 
 
 /* *******************************************************************
-*  32-bit hash functions
-*********************************************************************/
+ *  32-bit hash functions
+ *********************************************************************/
 /*!
  * @}
  * @defgroup XXH32_impl XXH32 implementation
@@ -2567,8 +2568,8 @@ XXH_PUBLIC_API XXH32_hash_t XXH32_hashFromCanonical(const XXH32_canonical_t* src
 #ifndef XXH_NO_LONG_LONG
 
 /* *******************************************************************
-*  64-bit hash functions
-*********************************************************************/
+ *  64-bit hash functions
+ *********************************************************************/
 /*!
  * @}
  * @ingroup impl
@@ -2971,9 +2972,9 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src
 #ifndef XXH_NO_XXH3
 
 /* *********************************************************************
-*  XXH3
-*  New generation hash designed for speed on small keys and vectorization
-************************************************************************ */
+ *  XXH3
+ *  New generation hash designed for speed on small keys and vectorization
+ ************************************************************************ */
 /*!
  * @}
  * @defgroup XXH3_impl XXH3 implementation
@@ -3120,11 +3121,11 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src
 enum XXH_VECTOR_TYPE /* fake enum */ {
     XXH_SCALAR = 0, /*!< Portable scalar version */
     XXH_SSE2 = 1, /*!<
-                      * SSE2 for Pentium 4, Opteron, all x86_64.
-                      *
-                      * @note SSE2 is also guaranteed on Windows 10, macOS, and
-                      * Android x86.
-                      */
+                   * SSE2 for Pentium 4, Opteron, all x86_64.
+                   *
+                   * @note SSE2 is also guaranteed on Windows 10, macOS, and
+                   * Android x86.
+                   */
     XXH_AVX2 = 2, /*!< AVX2 for Haswell and Bulldozer */
     XXH_AVX512 = 3, /*!< AVX512 for Skylake and Icelake */
     XXH_NEON = 4, /*!< NEON for most ARMv7-A and all AArch64 */
@@ -3997,25 +3998,25 @@ XXH_NO_INLINE XXH_PUREF XXH64_hash_t XXH3_len_129to240_64b(const xxh_u8* XXH_RES
     && (defined(__ARM_NEON) || defined(__ARM_NEON__)) /* NEON */ \
     && !defined(XXH_ENABLE_AUTOVECTORIZE) /* Define to disable */
 /*
-         * UGLY HACK:
-         * Clang for ARMv7-A tries to vectorize this loop, similar to GCC x86.
-         * In everywhere else, it uses scalar code.
-         *
-         * For 64->128-bit multiplies, even if the NEON was 100% optimal, it
-         * would still be slower than UMAAL (see XXH_mult64to128).
-         *
-         * Unfortunately, Clang doesn't handle the long multiplies properly and
-         * converts them to the nonexistent "vmulq_u64" intrinsic, which is then
-         * scalarized into an ugly mess of VMOV.32 instructions.
-         *
-         * This mess is difficult to avoid without turning autovectorization
-         * off completely, but they are usually relatively minor and/or not
-         * worth it to fix.
-         *
-         * This loop is the easiest to fix, as unlike XXH32, this pragma
-         * _actually works_ because it is a loop vectorization instead of an
-         * SLP vectorization.
-         */
+ * UGLY HACK:
+ * Clang for ARMv7-A tries to vectorize this loop, similar to GCC x86.
+ * In everywhere else, it uses scalar code.
+ *
+ * For 64->128-bit multiplies, even if the NEON was 100% optimal, it
+ * would still be slower than UMAAL (see XXH_mult64to128).
+ *
+ * Unfortunately, Clang doesn't handle the long multiplies properly and
+ * converts them to the nonexistent "vmulq_u64" intrinsic, which is then
+ * scalarized into an ugly mess of VMOV.32 instructions.
+ *
+ * This mess is difficult to avoid without turning autovectorization
+ * off completely, but they are usually relatively minor and/or not
+ * worth it to fix.
+ *
+ * This loop is the easiest to fix, as unlike XXH32, this pragma
+ * _actually works_ because it is a loop vectorization instead of an
+ * SLP vectorization.
+ */
 #pragma clang loop vectorize(disable)
 #endif
         for (i = 8; i < nbRounds; i++) {
@@ -4050,7 +4051,8 @@ XXH_FORCE_INLINE void XXH_writeLE64(void* dst, xxh_u64 v64) {
  * However, several environments do not define __int64 type,
  * requiring a workaround.
  */
-#if !defined(__VMS) && (defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */))
+#if !defined(__VMS) && (defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 \
+                                                                                                             */))
 typedef int64_t xxh_i64;
 #else
 /* the following type must have a width of 64-bit */
@@ -4482,23 +4484,23 @@ XXH_FORCE_INLINE void XXH3_scrambleAcc_neon(void* XXH_RESTRICT acc, const void* 
              * xacc[i] = UNDEFINED; */
             XXH_SPLIT_IN_PLACE(data_key, data_key_lo, data_key_hi);
             { /*
-                 * prod_hi = (data_key >> 32) * XXH_PRIME32_1;
-                 *
-                 * Avoid vmul_u32 + vshll_n_u32 since Clang 6 and 7 will
-                 * incorrectly "optimize" this:
-                 *   tmp     = vmul_u32(vmovn_u64(a), vmovn_u64(b));
-                 *   shifted = vshll_n_u32(tmp, 32);
-                 * to this:
-                 *   tmp     = "vmulq_u64"(a, b); // no such thing!
-                 *   shifted = vshlq_n_u64(tmp, 32);
-                 *
-                 * However, unlike SSE, Clang lacks a 64-bit multiply routine
-                 * for NEON, and it scalarizes two 64-bit multiplies instead.
-                 *
-                 * vmull_u32 has the same timing as vmul_u32, and it avoids
-                 * this bug completely.
-                 * See https://bugs.llvm.org/show_bug.cgi?id=39967
-                 */
+               * prod_hi = (data_key >> 32) * XXH_PRIME32_1;
+               *
+               * Avoid vmul_u32 + vshll_n_u32 since Clang 6 and 7 will
+               * incorrectly "optimize" this:
+               *   tmp     = vmul_u32(vmovn_u64(a), vmovn_u64(b));
+               *   shifted = vshll_n_u32(tmp, 32);
+               * to this:
+               *   tmp     = "vmulq_u64"(a, b); // no such thing!
+               *   shifted = vshlq_n_u64(tmp, 32);
+               *
+               * However, unlike SSE, Clang lacks a 64-bit multiply routine
+               * for NEON, and it scalarizes two 64-bit multiplies instead.
+               *
+               * vmull_u32 has the same timing as vmul_u32, and it avoids
+               * this bug completely.
+               * See https://bugs.llvm.org/show_bug.cgi?id=39967
+               */
                 uint64x2_t prod_hi = vmull_u32(data_key_hi, prime);
                 /* xacc[i] = prod_hi << 32; */
                 prod_hi = vshlq_n_u64(prod_hi, 32);

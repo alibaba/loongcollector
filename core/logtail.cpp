@@ -210,7 +210,7 @@ void do_worker_process() {
     // mNameCoonfigMap is empty, configExistFlag is false
     bool configExistFlag = !ConfigManager::GetInstance()->GetAllConfig().empty();
 
-    //set max open file limit
+    // set max open file limit
     struct rlimit rlimMaxOpenFiles;
     rlimMaxOpenFiles.rlim_cur = rlimMaxOpenFiles.rlim_max = INT32_FLAG(max_open_files_limit);
     if (0 != setrlimit(RLIMIT_NOFILE, &rlimMaxOpenFiles)) {

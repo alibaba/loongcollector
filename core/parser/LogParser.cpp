@@ -615,7 +615,7 @@ static int32_t ParseApsaraBaseFields(const char* buffer, Log* logPtr, uint32_t& 
     }
     int32_t beginIndex, endIndex;
     int32_t findFieldBitMap = 0x0;
-    //i=0 field is the time field.
+    // i=0 field is the time field.
     for (int32_t i = 1; findFieldBitMap != 0x111 && i < baseFieldNum; i++) {
         beginIndex = beginIndexArray[i];
         endIndex = endIndexArray[i];
@@ -635,7 +635,7 @@ static int32_t ParseApsaraBaseFields(const char* buffer, Log* logPtr, uint32_t& 
             }
         }
     }
-    return endIndexArray[baseFieldNum - 1]; //return ']' position
+    return endIndexArray[baseFieldNum - 1]; // return ']' position
 }
 
 bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,

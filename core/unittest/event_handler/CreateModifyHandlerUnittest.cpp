@@ -120,7 +120,7 @@ public:
     void TestHandleContainerStoppedEvent() {
         LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
         CreateModifyHandler createModifyHandler(&mCreateHandler);
-        MockModifyHandler* pHanlder = new MockModifyHandler(); //released by ~CreateModifyHandler
+        MockModifyHandler* pHanlder = new MockModifyHandler(); // released by ~CreateModifyHandler
         createModifyHandler.mModifyHandlerPtrMap.insert(std::make_pair(mConfigName, pHanlder));
 
         Event event1("/not_exist", "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, 0);

@@ -331,7 +331,7 @@ public:
                 pStatistics->mStatus = "sender_invalid";
             }
 
-            //cout << "add, project :" << pStatistics->mProjectName << " logstore :" << pStatistics->mCategory << endl;
+            // cout << "add, project :" << pStatistics->mProjectName << " logstore :" << pStatistics->mCategory << endl;
             mLogstoreProfileMap[pStatistics->mProjectName + '#' + pStatistics->mCategory] = pStatistics;
         } else {
             if (pStatistics->mReadDelayAvg > 10 * 1024 * 104) {
@@ -340,7 +340,8 @@ public:
             if (pStatistics->mParseFailures > 0) {
                 pStatistics->mStatus = "parse_fail";
             }
-            //cout << "add, project :" << pStatistics->mProjectName << " logstore :" << pStatistics->mCategory << " file :" << pStatistics->mFilename << endl;
+            // cout << "add, project :" << pStatistics->mProjectName << " logstore :" << pStatistics->mCategory << "
+            // file :" << pStatistics->mFilename << endl;
             mFileProfileMap[pStatistics->mProjectName + '#' + pStatistics->mCategory + '#' + pStatistics->mFilename]
                 = pStatistics;
         }
@@ -416,7 +417,7 @@ public:
             key = line.substr(0, sept);
             val = line.substr(sept + 1);
             mStatusMap[key] = val;
-            //cout << "key value : " << key << val << endl;
+            // cout << "key value : " << key << val << endl;
         }
         return 0;
     }
@@ -461,11 +462,11 @@ public:
         string key = project + '#' + logstore;
         map<string, LogStoreStatistic*>::iterator iter = mLogstoreProfileMap.find(key);
         if (iter == mLogstoreProfileMap.end()) {
-            //rstValue["find"] = Json::Value(false);
+            // rstValue["find"] = Json::Value(false);
             return rstValue.toStyledString();
         }
         LogStoreStatistic* pStatistics = iter->second;
-        //rstValue["find"] = Json::Value(true);
+        // rstValue["find"] = Json::Value(true);
         rstValue["time_begin_readable"] = Json::Value(DateTimeToString(mTimeValue - 600));
         rstValue["time_end_readable"] = Json::Value(DateTimeToString(mTimeValue));
         rstValue["time_begin"] = Json::Int(mTimeValue - 600);
@@ -502,10 +503,10 @@ public:
         map<string, LogStoreStatistic*>::iterator iter = mLogstoreProfileMap.find(key);
         if (iter == mLogstoreProfileMap.end()) {
             return "";
-            //return "find : false";
+            // return "find : false";
         }
         LogStoreStatistic* pStatistics = iter->second;
-        //string rstStr = "find : true";
+        // string rstStr = "find : true";
         string rstStr = "time_begin_readable : " + DateTimeToString(mTimeValue - 600);
         rstStr += "\ntime_end_readable : " + DateTimeToString(mTimeValue);
         rstStr += "\ntime_begin : " + ToString(mTimeValue - 600);
@@ -539,10 +540,10 @@ public:
         map<string, LogStoreStatistic*>::iterator iter = mLogstoreProfileMap.find(key);
         if (iter == mLogstoreProfileMap.end()) {
             return "";
-            //return "find : false";
+            // return "find : false";
         }
         LogStoreStatistic* pStatistics = iter->second;
-        //string rstStr = "find : true";
+        // string rstStr = "find : true";
         string rstStr = ToWithString(DateTimeToString(mTimeValue - 600), 18);
         rstStr += "  " + ToWithString(pStatistics->mStatus, 14);
         rstStr += "  " + ToWithString(ToHumanReadableByteCount(pStatistics->mReadBytes), 8);
@@ -567,24 +568,24 @@ public:
 
 
     string GetLogStoreProfileHeader() {
-        string rstStr = "        begin_time"; //18
+        string rstStr = "        begin_time"; // 18
         rstStr += "          status"; // 12
-        rstStr += "      read"; //8
-        rstStr += "  parse_success"; //13
-        rstStr += "  parse_fail"; //10
-        rstStr += "      last_read_time"; //18
-        rstStr += "  read_count"; //10
-        rstStr += "  avg_delay"; //9
-        rstStr += "  send_queue"; //10
-        rstStr += "  network_error"; //13
-        rstStr += "  quota_error"; //11
-        rstStr += "  discard_error"; //13
-        rstStr += "  send_success"; //12
-        rstStr += "  send_block"; //10
-        rstStr += "  send_valid"; //10
-        rstStr += "          max_unsend"; //18
-        rstStr += "          min_unsend"; //18
-        rstStr += "    max_send_success\n"; //18
+        rstStr += "      read"; // 8
+        rstStr += "  parse_success"; // 13
+        rstStr += "  parse_fail"; // 10
+        rstStr += "      last_read_time"; // 18
+        rstStr += "  read_count"; // 10
+        rstStr += "  avg_delay"; // 9
+        rstStr += "  send_queue"; // 10
+        rstStr += "  network_error"; // 13
+        rstStr += "  quota_error"; // 11
+        rstStr += "  discard_error"; // 13
+        rstStr += "  send_success"; // 12
+        rstStr += "  send_block"; // 10
+        rstStr += "  send_valid"; // 10
+        rstStr += "          max_unsend"; // 18
+        rstStr += "          min_unsend"; // 18
+        rstStr += "    max_send_success\n"; // 18
         return rstStr;
     }
 
@@ -593,11 +594,11 @@ public:
         string key = project + '#' + logstore + '#' + fileName;
         map<string, LogStoreStatistic*>::iterator iter = mFileProfileMap.find(key);
         if (iter == mFileProfileMap.end()) {
-            //rstValue["find"] = Json::Value(false);
+            // rstValue["find"] = Json::Value(false);
             return rstValue.toStyledString();
         }
         LogStoreStatistic* pStatistics = iter->second;
-        //rstValue["find"] = Json::Value(true);
+        // rstValue["find"] = Json::Value(true);
         rstValue["time_begin_readable"] = Json::Value(DateTimeToString(mTimeValue - 600));
         rstValue["time_end_readable"] = Json::Value(DateTimeToString(mTimeValue));
         rstValue["time_begin"] = Json::Int(mTimeValue - 600);
@@ -627,10 +628,10 @@ public:
         map<string, LogStoreStatistic*>::iterator iter = mFileProfileMap.find(key);
         if (iter == mFileProfileMap.end()) {
             return "";
-            //return "find : false";
+            // return "find : false";
         }
         LogStoreStatistic* pStatistics = iter->second;
-        //string rstStr = "find : true";
+        // string rstStr = "find : true";
 
         string rstStr = "time_begin_readable : " + DateTimeToString(mTimeValue - 600);
         rstStr += "\ntime_end_readable : " + DateTimeToString(mTimeValue);
@@ -662,10 +663,10 @@ public:
         map<string, LogStoreStatistic*>::iterator iter = mFileProfileMap.find(key);
         if (iter == mFileProfileMap.end()) {
             return "";
-            //return "find : false";
+            // return "find : false";
         }
         LogStoreStatistic* pStatistics = iter->second;
-        //string rstStr = "find : true";
+        // string rstStr = "find : true";
         string rstStr = ToWithString(DateTimeToString(mTimeValue - 600), 18);
         rstStr += "  " + ToWithString(pStatistics->mStatus, 14);
         rstStr += "  " + ToWithString(ToHumanReadableByteCount(pStatistics->mReadBytes), 8);
@@ -683,25 +684,25 @@ public:
     }
 
     string GetFileProfileHeader() {
-        string rstStr = "        begin_time"; //18
+        string rstStr = "        begin_time"; // 18
         rstStr += "          status"; // 12
-        rstStr += "      read"; //8
-        rstStr += "  parse_success"; //13
-        rstStr += "  parse_fail"; //10
-        rstStr += "      last_read_time"; //18
-        rstStr += "  read_count"; //10
-        rstStr += "  avg_delay"; //9
-        rstStr += "    device"; //8
-        rstStr += "     inode"; //8
-        rstStr += "  file_size"; //9
-        rstStr += "  read_offset\n"; //11
+        rstStr += "      read"; // 8
+        rstStr += "  parse_success"; // 13
+        rstStr += "  parse_fail"; // 10
+        rstStr += "      last_read_time"; // 18
+        rstStr += "  read_count"; // 10
+        rstStr += "  avg_delay"; // 9
+        rstStr += "    device"; // 8
+        rstStr += "     inode"; // 8
+        rstStr += "  file_size"; // 9
+        rstStr += "  read_offset\n"; // 11
         return rstStr;
     }
 
     int ReadData(string filePath, string& fileContent, string& timeStr) {
         filePath = GetProcessExecutionDir() + filePath;
         FILE* pFile = fopen(filePath.c_str(), "r");
-        //cout << "open file" << filePath << endl;
+        // cout << "open file" << filePath << endl;
         if (pFile == NULL) {
             cout << string("query fail, error: ") + strerror(errno) << endl;
             return errno;
@@ -719,7 +720,7 @@ public:
             string allStr(readBuf);
 
             GetTimeStr(allStr, timeStr);
-            //cout << "time : " << timeStr << endl;
+            // cout << "time : " << timeStr << endl;
 
             size_t contentPos = allStr.find("\n:");
             if (contentPos == string::npos || contentPos == allStr.size() - 2) {
@@ -729,7 +730,7 @@ public:
             }
 
             fileContent = allStr.substr(contentPos + 2);
-            //cout << "fileContent : " << fileContent.substr(0, 100) << endl;
+            // cout << "fileContent : " << fileContent.substr(0, 100) << endl;
         err:
             free(readBuf);
             fclose(pFile);

@@ -36,43 +36,43 @@ namespace logtail {
 Logger::logger gLogger;
 
 const char* logLine[] = {
-    "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]", //1
-    "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]\t", //2
-    "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1754]\tsomestring", //3
+    "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]", // 1
+    "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]\t", // 2
+    "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1754]\tsomestring", // 3
     "[2013-03-13 "
     "18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1755]\tRealRecycle#Command:rm "
-    "-rf /apsara/tubo/.fuxi_tubo_trash/*", //4
+    "-rf /apsara/tubo/.fuxi_tubo_trash/*", // 4
     "[2013-03-13 "
     "18:14:57.365716]\t[ERROR]\t[12835]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\tParseWhiteListOK:{\n\"sys/"
-    "pangu/ChunkServerRole\": \"\",\n\"sys/pangu/PanguMasterRole\": \"\"}", //5
-    "[2013-03-13 18:14:57.365716]\t[12835]\t[ERROR]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]", //6
-    "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]", //7
-    "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[ERROR]", //8
-    "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]\t[5432187]", //9
+    "pangu/ChunkServerRole\": \"\",\n\"sys/pangu/PanguMasterRole\": \"\"}", // 5
+    "[2013-03-13 18:14:57.365716]\t[12835]\t[ERROR]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]", // 6
+    "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]", // 7
+    "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[ERROR]", // 8
+    "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]\t[5432187]", // 9
     "[2013-03-13 "
-    "18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]\t[5432187]\tcount:55", //10
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]", //11
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t", //12
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\n", //13
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tother\tcount:45", //14
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tother:\tcount:45", //15
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tcount:45", //16
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tcount:45\tnum:88\tjob:ss", //17
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corrupt\tcount:45\tnum:88\tjob:ss", //18
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corruptcount:45\tnum:88\tjob:ss", //19
-    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corrupt]count:45\tnum:88\tjob:ss", //20
-    "[2013-03-13 18:14:57.365716]\t[build/debug64]\t[ERROR]\tcount:45\tnum:88\tjob:ss", //21
-    "[2013-03-13 18:14:57.365716]\t[build/debug64:]\t[ERROR]\tcount:45\tnum:88\tjob:ss", //22
-    "[2013-03-13 18:14:57.365716]\t[build/debug64:]\t[ERROR]\tcount:45\t:88\tjob:ss", //23
-    "[2013-03-13 18:14:57.365716]", //24
-    "[2013-03-13 18:14:57.365716]\t", //25
-    "[2013-03-13 18:14:57.365716]\n", //26
-    "[2013-03-13 18:14:57.365716]\t\t\t", //27
-    "", //28
+    "18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]\t[5432187]\tcount:55", // 10
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]", // 11
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t", // 12
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\n", // 13
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tother\tcount:45", // 14
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tother:\tcount:45", // 15
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tcount:45", // 16
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tcount:45\tnum:88\tjob:ss", // 17
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corrupt\tcount:45\tnum:88\tjob:ss", // 18
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corruptcount:45\tnum:88\tjob:ss", // 19
+    "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corrupt]count:45\tnum:88\tjob:ss", // 20
+    "[2013-03-13 18:14:57.365716]\t[build/debug64]\t[ERROR]\tcount:45\tnum:88\tjob:ss", // 21
+    "[2013-03-13 18:14:57.365716]\t[build/debug64:]\t[ERROR]\tcount:45\tnum:88\tjob:ss", // 22
+    "[2013-03-13 18:14:57.365716]\t[build/debug64:]\t[ERROR]\tcount:45\t:88\tjob:ss", // 23
+    "[2013-03-13 18:14:57.365716]", // 24
+    "[2013-03-13 18:14:57.365716]\t", // 25
+    "[2013-03-13 18:14:57.365716]\n", // 26
+    "[2013-03-13 18:14:57.365716]\t\t\t", // 27
+    "", // 28
     "[2013-03-13 "
-    "18:05:09.493309]\t[WARNING]\t[13000]\t[13003]\t[ERROR]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]", //29
-    "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[13003]\t[ERROR]\t[tubo.cpp:1753]", //30
-    "[2013-03-13 18:05:09.493309" //31
+    "18:05:09.493309]\t[WARNING]\t[13000]\t[13003]\t[ERROR]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]", // 29
+    "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[13003]\t[ERROR]\t[tubo.cpp:1753]", // 30
+    "[2013-03-13 18:05:09.493309" // 31
 };
 
 static const char* APSARA_FIELD_LEVEL = "__LEVEL__";
@@ -89,7 +89,7 @@ const char* logParseResult[][16] = {
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
      "1753",
-     NULL}, //1
+     NULL}, // 1
     {APSARA_FIELD_LEVEL,
      "WARNING",
      APSARA_FIELD_THREAD,
@@ -98,7 +98,7 @@ const char* logParseResult[][16] = {
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
      "1753",
-     NULL}, //2
+     NULL}, // 2
     {APSARA_FIELD_LEVEL,
      "WARNING",
      APSARA_FIELD_THREAD,
@@ -107,7 +107,7 @@ const char* logParseResult[][16] = {
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
      "1754",
-     NULL}, //3
+     NULL}, // 3
     {APSARA_FIELD_LEVEL,
      "WARNING",
      APSARA_FIELD_THREAD,
@@ -118,7 +118,7 @@ const char* logParseResult[][16] = {
      "1755",
      "RealRecycle#Command",
      "rm -rf /apsara/tubo/.fuxi_tubo_trash/*",
-     NULL}, //4
+     NULL}, // 4
     {APSARA_FIELD_LEVEL,
      "ERROR",
      APSARA_FIELD_THREAD,
@@ -129,7 +129,7 @@ const char* logParseResult[][16] = {
      "1945",
      "ParseWhiteListOK",
      "{\n\"sys/pangu/ChunkServerRole\": \"\",\n\"sys/pangu/PanguMasterRole\": \"\"}",
-     NULL}, //5
+     NULL}, // 5
     {APSARA_FIELD_THREAD,
      "12835",
      APSARA_FIELD_LEVEL,
@@ -138,7 +138,7 @@ const char* logParseResult[][16] = {
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
      "1945",
-     NULL}, //6
+     NULL}, // 6
     {APSARA_FIELD_FILE,
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
@@ -147,14 +147,14 @@ const char* logParseResult[][16] = {
      "12835",
      APSARA_FIELD_LEVEL,
      "ERROR",
-     NULL}, //7
+     NULL}, // 7
     {APSARA_FIELD_FILE,
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
      "1945",
      APSARA_FIELD_LEVEL,
      "ERROR",
-     NULL}, //8
+     NULL}, // 8
     {APSARA_FIELD_FILE,
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
@@ -163,7 +163,7 @@ const char* logParseResult[][16] = {
      "12835",
      APSARA_FIELD_LEVEL,
      "ERROR",
-     NULL}, //9
+     NULL}, // 9
     {APSARA_FIELD_FILE,
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
@@ -174,17 +174,17 @@ const char* logParseResult[][16] = {
      "ERROR",
      "count",
      "55",
-     NULL}, //10
-    {APSARA_FIELD_LEVEL, "ERROR", NULL}, //11
-    {APSARA_FIELD_LEVEL, "ERROR", NULL}, //12
-    {APSARA_FIELD_LEVEL, "ERROR", NULL}, //13
-    {APSARA_FIELD_LEVEL, "ERROR", "count", "45", NULL}, //14
-    {APSARA_FIELD_LEVEL, "ERROR", "other", "", "count", "45", NULL}, //15
-    {APSARA_FIELD_LEVEL, "ERROR", "count", "45", NULL}, //16
-    {APSARA_FIELD_LEVEL, "ERROR", "count", "45", "num", "88", "job", "ss", NULL}, //17
-    {APSARA_FIELD_LEVEL, "ERROR", "count", "45", "num", "88", "job", "ss", NULL}, //18
-    {APSARA_FIELD_LEVEL, "ERROR", "[corruptcount", "45", "num", "88", "job", "ss", NULL}, //19
-    {APSARA_FIELD_LEVEL, "ERROR", "[corrupt]count", "45", "num", "88", "job", "ss", NULL}, //20
+     NULL}, // 10
+    {APSARA_FIELD_LEVEL, "ERROR", NULL}, // 11
+    {APSARA_FIELD_LEVEL, "ERROR", NULL}, // 12
+    {APSARA_FIELD_LEVEL, "ERROR", NULL}, // 13
+    {APSARA_FIELD_LEVEL, "ERROR", "count", "45", NULL}, // 14
+    {APSARA_FIELD_LEVEL, "ERROR", "other", "", "count", "45", NULL}, // 15
+    {APSARA_FIELD_LEVEL, "ERROR", "count", "45", NULL}, // 16
+    {APSARA_FIELD_LEVEL, "ERROR", "count", "45", "num", "88", "job", "ss", NULL}, // 17
+    {APSARA_FIELD_LEVEL, "ERROR", "count", "45", "num", "88", "job", "ss", NULL}, // 18
+    {APSARA_FIELD_LEVEL, "ERROR", "[corruptcount", "45", "num", "88", "job", "ss", NULL}, // 19
+    {APSARA_FIELD_LEVEL, "ERROR", "[corrupt]count", "45", "num", "88", "job", "ss", NULL}, // 20
     {APSARA_FIELD_FILE,
      "build/debug64",
      APSARA_FIELD_LEVEL,
@@ -195,7 +195,7 @@ const char* logParseResult[][16] = {
      "88",
      "job",
      "ss",
-     NULL}, //21
+     NULL}, // 21
     {APSARA_FIELD_FILE,
      "build/debug64",
      APSARA_FIELD_LINE,
@@ -208,7 +208,7 @@ const char* logParseResult[][16] = {
      "88",
      "job",
      "ss",
-     NULL}, //22
+     NULL}, // 22
     {APSARA_FIELD_FILE,
      "build/debug64",
      APSARA_FIELD_LINE,
@@ -221,12 +221,12 @@ const char* logParseResult[][16] = {
      "88",
      "job",
      "ss",
-     NULL}, //23
-    {NULL}, //24
-    {NULL}, //25
-    {NULL}, //26
-    {NULL}, //27
-    {NULL}, //28
+     NULL}, // 23
+    {NULL}, // 24
+    {NULL}, // 25
+    {NULL}, // 26
+    {NULL}, // 27
+    {NULL}, // 28
     {APSARA_FIELD_LEVEL,
      "WARNING",
      APSARA_FIELD_THREAD,
@@ -235,7 +235,7 @@ const char* logParseResult[][16] = {
      "build/debug64/ilogtail/core/ilogtail.cpp",
      APSARA_FIELD_LINE,
      "1753",
-     NULL}, //29
+     NULL}, // 29
     {APSARA_FIELD_LEVEL,
      "WARNING",
      APSARA_FIELD_THREAD,
@@ -244,8 +244,8 @@ const char* logParseResult[][16] = {
      "tubo.cpp",
      APSARA_FIELD_LINE,
      "1753",
-     NULL}, //30
-    {NULL} //31
+     NULL}, // 30
+    {NULL} // 31
 };
 
 class LogParserUnittest : public ::testing::Test {
@@ -259,13 +259,13 @@ public:
     void TestRegexLogLineParserWithTimeIndex();
     void TestLogParserParseLogTime();
 
-    static void SetUpTestCase() //void Setup()
+    static void SetUpTestCase() // void Setup()
     {
         // mock data is all timeout, so shut up discard_old flag
         BOOL_FLAG(ilogtail_discard_old_data) = false;
         LOG_INFO(gLogger, ("LogParserUnittest", "setup"));
     }
-    static void TearDownTestCase() //void CleanUp()
+    static void TearDownTestCase() // void CleanUp()
     {
         LOG_INFO(gLogger, ("LogParserUnittest", "cleanup"));
     }
@@ -347,7 +347,7 @@ void LogParserUnittest::TestApsaraEasyReadLogLineParser() {
         uint32_t logGroupSize = 0;
         ret = LogParser::ApsaraEasyReadLogLineParser(
             logLine[i], logGroup, true, timeStr, lastLogTime, "", "", "", "", error, logGroupSize);
-        if (i == 27) //empty string
+        if (i == 27) // empty string
         {
             APSARA_TEST_TRUE_DESC(!ret, "Empty string should parse fail.");
             continue;

@@ -60,7 +60,7 @@ class LogFilterUnittest : public ::testing::Test {
     }
 
 public:
-    static void SetUpTestCase() //void Setup()
+    static void SetUpTestCase() // void Setup()
     {
         srand(time(NULL));
     }
@@ -660,34 +660,34 @@ public:
         }
         threadPtr->GetValue(1000);
         sleep(2);
-        //clean the config file produced by this case
+        // clean the config file produced by this case
         bfs::remove_all("ilogtail_config.json");
         LOG_INFO(sLogger, ("TestCategoryFilter() end", time(NULL)));
     }
-    //APSARA_UNIT_TEST_CASE(TestCategoryFilter,0);
+    // APSARA_UNIT_TEST_CASE(TestCategoryFilter,0);
 
     static const char UTF8_BYTE_PREFIX = 0x80;
     static const char UTF8_BYTE_MASK = 0xc0;
 
     void TestFilterNoneUtf8() {
-        const int caseCharacterNum = 80; //ten charactor for every situation
+        const int caseCharacterNum = 80; // ten charactor for every situation
         string characterSet[caseCharacterNum];
-        bool isBlunk[caseCharacterNum][4]; //every charactor has 4 byte atmost
+        bool isBlunk[caseCharacterNum][4]; // every charactor has 4 byte atmost
 
-        //generate one byte utf8;
+        // generate one byte utf8;
 
         for (int i = 0; i < 10; ++i) {
             char tmp;
             do {
                 tmp = rand() & 0xff;
                 tmp &= 0x7f;
-            } while (tmp == 32 || tmp == 9); //tmp should not be space or \t
+            } while (tmp == 32 || tmp == 9); // tmp should not be space or \t
 
             characterSet[i] = string(1, tmp);
             isBlunk[i][0] = false;
         }
 
-        //generate one byte none utf8
+        // generate one byte none utf8
         for (int i = 10; i < 20; ++i) {
             char tmp;
             do {
@@ -699,7 +699,7 @@ public:
             isBlunk[i][0] = true;
         }
 
-        //generate two byte utf8
+        // generate two byte utf8
 
         for (int i = 20; i < 30; ++i) {
             char tmp1, tmp2;
@@ -708,9 +708,9 @@ public:
                 tmp1 = rand() & 0xff;
                 tmp2 = rand() & 0xff;
                 tmp1 |= 0xc0;
-                tmp1 &= 0xdf; //tmp1 should be 0x 110x xxxx
+                tmp1 &= 0xdf; // tmp1 should be 0x 110x xxxx
                 tmp2 |= 0x80;
-                tmp2 &= 0xbf; //tmp2 should be 0x 10xx xxxx
+                tmp2 &= 0xbf; // tmp2 should be 0x 10xx xxxx
                 unicode = (((tmp1 & 0x1f) << 6) | (tmp2 & 0x3f));
             } while (!(unicode >= 0x80 && unicode <= 0x7ff));
 
@@ -719,14 +719,14 @@ public:
             isBlunk[i][1] = false;
         }
 
-        //generate two byte noneutf8
+        // generate two byte noneutf8
         char randArr1[10], randArr2[10], randArr3[10], randArr4[10];
         for (int i = 0; i < 10; ++i) {
             char tmp1, tmp2;
             tmp1 = rand() & 0xff;
             tmp2 = rand() & 0xff;
             tmp1 |= 0xc0;
-            tmp1 &= 0xdf; //tmp1 should be 0x110x xxxx
+            tmp1 &= 0xdf; // tmp1 should be 0x110x xxxx
             tmp2 |= 0x80;
             tmp2 &= 0xbf;
             randArr1[i] = tmp1;
@@ -748,15 +748,15 @@ public:
         // five case of the situation thar only the format is utf8, but not unicode;
 
         for (int index = 35; index < 40; ++index) {
-            randArr1[index - 30]
-                &= 0xe1; //unicode must in rand [0x80,0x7fff]; ant two byte has 11 bits ,so the situation can only be < 0x80
+            randArr1[index - 30] &= 0xe1; // unicode must in rand [0x80,0x7fff]; ant two byte has 11 bits ,so the
+                                          // situation can only be < 0x80
             characterSet[index] = string(1, randArr1[index - 30]) + string(1, randArr2[index - 30]);
             isBlunk[index][0] = true;
             isBlunk[index][1] = true;
         }
 
 
-        //generate three bytes utf8
+        // generate three bytes utf8
 
         for (int i = 40; i < 50; ++i) {
             char tmp1, tmp2, tmp3;
@@ -766,11 +766,11 @@ public:
                 tmp2 = rand() & 0xff;
                 tmp3 = rand() & 0xff;
                 tmp1 |= 0xe0;
-                tmp1 &= 0xef; //tmp1 should be 0x 1110x xxxx
+                tmp1 &= 0xef; // tmp1 should be 0x 1110x xxxx
                 tmp2 |= 0x80;
-                tmp2 &= 0xbf; //tmp2 should be 10xx xxxx
+                tmp2 &= 0xbf; // tmp2 should be 10xx xxxx
                 tmp3 |= 0x80;
-                tmp3 &= 0xbf; //tmp3 should be 10xx xxxx
+                tmp3 &= 0xbf; // tmp3 should be 10xx xxxx
                 unicode = (((tmp1 & 0x0f) << 12) | ((tmp2 & 0x3f) << 6) | (tmp3 & 0x3f));
             } while (!(unicode >= 0x800));
 
@@ -780,53 +780,53 @@ public:
             isBlunk[i][2] = false;
         }
 
-        //generate three bytes none utf8
+        // generate three bytes none utf8
         for (int i = 50; i < 60; ++i) {
             char tmp1, tmp2, tmp3;
             tmp1 = rand() & 0xff;
             tmp2 = rand() & 0xff;
             tmp3 = rand() & 0xff;
             tmp1 |= 0xe0;
-            tmp1 &= 0xef; //tmp1 should be 0x 1110x xxxx
+            tmp1 &= 0xef; // tmp1 should be 0x 1110x xxxx
             tmp2 |= 0x80;
-            tmp2 &= 0xbf; //tmp2 should be 10xx xxxx
+            tmp2 &= 0xbf; // tmp2 should be 10xx xxxx
             tmp3 |= 0x80;
-            tmp3 &= 0xbf; //tmp3 should be 10xx xxxx
+            tmp3 &= 0xbf; // tmp3 should be 10xx xxxx
             randArr1[i - 50] = tmp1;
             randArr2[i - 50] = tmp2;
             randArr3[i - 50] = tmp3;
         }
 
-        //the situation of 1110xxxx 0xxxxxxx 10xxxxxxx
+        // the situation of 1110xxxx 0xxxxxxx 10xxxxxxx
         for (int i = 50; i < 52; ++i) {
             do {
                 randArr2[i - 50] = rand() & 0xff;
-                randArr2[i - 50] &= 0x7f; //second bytes is 0xxx xxxx;
+                randArr2[i - 50] &= 0x7f; // second bytes is 0xxx xxxx;
             } while (randArr2[i - 50] == 32);
             characterSet[i] = string(1, randArr1[i - 50]) + string(1, randArr2[i - 50]) + string(1, randArr3[i - 50]);
             isBlunk[i][0] = true;
             isBlunk[i][1] = false;
             isBlunk[i][2] = true;
         }
-        //the situation of 1110xxxx 10xxxxxx 0xxxxxxx
+        // the situation of 1110xxxx 10xxxxxx 0xxxxxxx
         for (int i = 52; i < 54; ++i) {
             do {
                 randArr3[i - 50] = rand() & 0xff;
-                randArr3[i - 50] &= 0x7f; //second bytes is 0xxx xxxx;
+                randArr3[i - 50] &= 0x7f; // second bytes is 0xxx xxxx;
             } while (randArr3[i - 50] == 32);
             characterSet[i] = string(1, randArr1[i - 50]) + string(1, randArr2[i - 50]) + string(1, randArr3[i - 50]);
             isBlunk[i][0] = true;
             isBlunk[i][1] = true;
             isBlunk[i][2] = false;
         }
-        //the situation of 1110xxxx 0xxxxxxx 0xxxxxxx
+        // the situation of 1110xxxx 0xxxxxxx 0xxxxxxx
 
         for (int i = 54; i < 56; ++i) {
             do {
                 randArr2[i - 50] = rand() & 0xff;
                 randArr2[i - 50] &= 0x7f;
                 randArr3[i - 50] = rand() & 0xff;
-                randArr3[i - 50] &= 0x7f; //second bytes is 0xxx xxxx
+                randArr3[i - 50] &= 0x7f; // second bytes is 0xxx xxxx
             } while (randArr3[i - 50] == 32 || randArr2[i - 50] == 32);
             characterSet[i] = string(1, randArr1[i - 50]) + string(1, randArr2[i - 50]) + string(1, randArr3[i - 50]);
             isBlunk[i][0] = true;
@@ -834,17 +834,17 @@ public:
             isBlunk[i][2] = false;
         }
 
-        //the situation of only format in utf8;
+        // the situation of only format in utf8;
         for (int i = 56; i < 60; ++i) {
             randArr1[i - 50] &= 0xf0;
-            randArr2[i - 50] &= 0xdf; //1110 0000  100xxxxx 10xxxxxx
+            randArr2[i - 50] &= 0xdf; // 1110 0000  100xxxxx 10xxxxxx
 
             characterSet[i] = string(1, randArr1[i - 50]) + string(1, randArr2[i - 50]) + string(1, randArr3[i - 50]);
             isBlunk[i][0] = true;
             isBlunk[i][1] = true;
             isBlunk[i][2] = true;
         }
-        //generate four bytes utf8
+        // generate four bytes utf8
 
         for (int i = 60; i < 70; ++i) {
             char tmp1, tmp2, tmp3, tmp4;
@@ -855,13 +855,13 @@ public:
                 tmp3 = rand() & 0xff;
                 tmp4 = rand() & 0xff;
                 tmp1 |= 0xf0;
-                tmp1 &= 0xf7; //tmp1 should be 0x 11110x xxxx
+                tmp1 &= 0xf7; // tmp1 should be 0x 11110x xxxx
                 tmp2 |= 0x80;
-                tmp2 &= 0xbf; //tmp2 should be 10xx xxxx
+                tmp2 &= 0xbf; // tmp2 should be 10xx xxxx
                 tmp3 |= 0x80;
-                tmp3 &= 0xbf; //tmp3 should be 10xx xxxx
+                tmp3 &= 0xbf; // tmp3 should be 10xx xxxx
                 tmp4 |= 0x80;
-                tmp4 &= 0xbf; //tmp3 should be 10xx xxxx
+                tmp4 &= 0xbf; // tmp3 should be 10xx xxxx
                 unicode = ((tmp1 & 0x07) << 18) | ((tmp2 & 0x3f) << 12) | ((tmp3 & 0x3f) << 6) | (tmp4 & 0x3f);
             } while (!(unicode >= 0x00010000 && unicode <= 0x0010ffff));
 
@@ -872,7 +872,7 @@ public:
             isBlunk[i][3] = false;
         }
 
-        //generate 4 bytes none utf8
+        // generate 4 bytes none utf8
 
         for (int i = 70; i < 80; ++i) {
             char tmp1, tmp2, tmp3, tmp4;
@@ -881,13 +881,13 @@ public:
             tmp3 = rand() & 0xff;
             tmp4 = rand() & 0xff;
             tmp1 |= 0xf0;
-            tmp1 &= 0xf7; //tmp1 should be 0x 1110x xxxx
+            tmp1 &= 0xf7; // tmp1 should be 0x 1110x xxxx
             tmp2 |= 0x80;
-            tmp2 &= 0xbf; //tmp2 should be 10xx xxxx
+            tmp2 &= 0xbf; // tmp2 should be 10xx xxxx
             tmp3 |= 0x80;
-            tmp3 &= 0xbf; //tmp3 should be 10xx xxxx
+            tmp3 &= 0xbf; // tmp3 should be 10xx xxxx
             tmp4 |= 0x80;
-            tmp4 &= 0xbf; //tmp3 should be 10xx xxxx
+            tmp4 &= 0xbf; // tmp3 should be 10xx xxxx
 
             randArr1[i - 70] = tmp1;
             randArr2[i - 70] = tmp2;
@@ -895,11 +895,11 @@ public:
             randArr4[i - 70] = tmp4;
         }
 
-        //the situation of 11110xxx 0xxxxxxx 10xxxxxxx 10xxxxxx
+        // the situation of 11110xxx 0xxxxxxx 10xxxxxxx 10xxxxxx
         for (int i = 70; i < 72; ++i) {
             do {
                 randArr2[i - 70] = rand() & 0xff;
-                randArr2[i - 70] &= 0x7f; //second bytes is 0xxx xxxx;
+                randArr2[i - 70] &= 0x7f; // second bytes is 0xxx xxxx;
             } while (randArr2[i - 70] == 32);
 
             characterSet[i] = string(1, randArr1[i - 70]) + string(1, randArr2[i - 70]) + string(1, randArr3[i - 70])
@@ -909,11 +909,11 @@ public:
             isBlunk[i][2] = true;
             isBlunk[i][3] = true;
         }
-        //the situation of 1110xxxx 10xxxxxx 0xxxxxxx 10xxxxxx
+        // the situation of 1110xxxx 10xxxxxx 0xxxxxxx 10xxxxxx
         for (int i = 72; i < 74; ++i) {
             do {
                 randArr3[i - 70] = rand() & 0xff;
-                randArr3[i - 70] &= 0x7f; //second bytes is 0xxx xxxx;
+                randArr3[i - 70] &= 0x7f; // second bytes is 0xxx xxxx;
             } while (randArr3[i - 70] == 32);
             characterSet[i] = string(1, randArr1[i - 70]) + string(1, randArr2[i - 70]) + string(1, randArr3[i - 70])
                 + string(1, randArr4[i - 70]);
@@ -922,16 +922,16 @@ public:
             isBlunk[i][2] = false;
             isBlunk[i][3] = true;
         }
-        //the situation of 1110xxxx 0xxxxxxx 0xxxxxxx 0xxxxxxxx
+        // the situation of 1110xxxx 0xxxxxxx 0xxxxxxx 0xxxxxxxx
 
         for (int i = 74; i < 76; ++i) {
             do {
                 randArr2[i - 70] = rand() & 0xff;
                 randArr2[i - 70] &= 0x7f;
                 randArr3[i - 70] = rand() & 0xff;
-                randArr3[i - 70] &= 0x7f; //second bytes is 0xxx xxxx
+                randArr3[i - 70] &= 0x7f; // second bytes is 0xxx xxxx
                 randArr4[i - 70] = rand() & 0xff;
-                randArr4[i - 70] &= 0x7f; //second bytes is 0xxx xxxx
+                randArr4[i - 70] &= 0x7f; // second bytes is 0xxx xxxx
             } while (randArr4[i - 70] == 32 || randArr2[i - 70] == 32 || randArr3[i - 70] == 32);
             characterSet[i] = string(1, randArr1[i - 70]) + string(1, randArr2[i - 70]) + string(1, randArr3[i - 70])
                 + string(1, randArr4[i - 70]);
@@ -941,12 +941,12 @@ public:
             isBlunk[i][3] = false;
         }
 
-        //the situation of only format in utf8; and the real unicode is not in range
+        // the situation of only format in utf8; and the real unicode is not in range
 
-        //less than range
+        // less than range
         for (int i = 76; i < 78; ++i) {
             randArr1[i - 70] &= 0xf0;
-            randArr2[i - 70] &= 0x8f; //1110 0000  100xxxxx 10xxxxxx
+            randArr2[i - 70] &= 0x8f; // 1110 0000  100xxxxx 10xxxxxx
             characterSet[i] = string(1, randArr1[i - 70]) + string(1, randArr2[i - 70]) + string(1, randArr3[i - 70])
                 + string(1, randArr4[i - 70]);
             isBlunk[i][0] = true;
@@ -956,10 +956,10 @@ public:
         }
 
 
-        //greater than range
+        // greater than range
         for (int i = 78; i < 80; ++i) {
             randArr1[i - 70] |= 0x04;
-            randArr2[i - 70] |= 0x10; //1110 0000  100xxxxx 10xxxxxx
+            randArr2[i - 70] |= 0x10; // 1110 0000  100xxxxx 10xxxxxx
 
             characterSet[i] = string(1, randArr1[i - 70]) + string(1, randArr2[i - 70]) + string(1, randArr3[i - 70])
                 + string(1, randArr4[i - 70]);
@@ -974,8 +974,8 @@ public:
             string testStr;
             const int CHARACTER_COUNT = 8192;
             bool flow[CHARACTER_COUNT * 4];
-            int index = 0; //index of flow
-            //generate test string with character randomly, and record whether a position should be replaced by blunck
+            int index = 0; // index of flow
+            // generate test string with character randomly, and record whether a position should be replaced by blunck
             for (int j = 0; j < CHARACTER_COUNT; ++j) {
                 int randIndex = rand() % 80;
                 LOG_INFO(sLogger, ("j", j)("randIndex", randIndex)("index", index));
@@ -1001,7 +1001,7 @@ public:
                 }
 
                 if (j == (CHARACTER_COUNT - 1) && randIndex >= 20
-                    && randIndex % 20 < 10) //the last character of string ,and at least two bytes,ant is utf8
+                    && randIndex % 20 < 10) // the last character of string ,and at least two bytes,ant is utf8
                 {
                     testStr = testStr.substr(0, testStr.size() - 1);
                     if (randIndex >= 20 && randIndex < 30)
@@ -1025,7 +1025,7 @@ public:
                 }
             }
         }
-    } //end of case
+    } // end of case
 
     void TestFilterNode() {
         LogGroupContext context;
@@ -1111,8 +1111,8 @@ public:
                 contentPtr->set_key("c");
                 contentPtr->set_value("888.168.1.1"); // failed to match ip regex
                 contentPtr->set_key("d");
-                contentPtr->set_value(
-                    "1999-1-1"); // failed to match 21 century date regex, but because of not operator, match result is true
+                contentPtr->set_value("1999-1-1"); // failed to match 21 century date regex, but because of not
+                                                   // operator, match result is true
             }
             {
                 sls_logs::Log* logPtr = logGroup.add_logs();
@@ -1126,8 +1126,8 @@ public:
                 contentPtr->set_key("c");
                 contentPtr->set_value("8.8.8.8");
                 contentPtr->set_key("d");
-                contentPtr->set_value(
-                    "2222-22-22"); // failed to match 21 century date regex, but because of not operator, match result is true
+                contentPtr->set_value("2222-22-22"); // failed to match 21 century date regex, but because of not
+                                                     // operator, match result is true
             }
 
             APSARA_TEST_EQUAL_FATAL(logGroup.logs_size(), 3);

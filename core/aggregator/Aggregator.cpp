@@ -163,7 +163,7 @@ bool Aggregator::Add(const std::string& projectName,
     const string& topic = logGroup.topic();
     const string& source = logGroup.has_source() ? logGroup.source() : LogFileProfiler::mIpAddr;
     string shardHashKey = CalPostRequestShardHashKey(source, topic, config);
-    //now shardHashKey is compute using machine level fields, so logGroupKey will not contain shardHashKey
+    // now shardHashKey is compute using machine level fields, so logGroupKey will not contain shardHashKey
     int64_t logGroupKey
         = HashString(projectName + "_" + category + "_" + topic + "_" + source + "_"
                      + ((config != NULL && config->mLogType != STREAM_LOG && config->mLogType != PLUGIN_LOG)
@@ -359,8 +359,9 @@ bool Aggregator::Add(const std::string& projectName,
     }
 
     if (sendDataVec.size() > 0) {
-        // if send data package count greater than INT32_FLAG(same_topic_merge_send_count), there will be many little package in send queue, so we merge data package to send.
-        // because the send loggroup's max size is 512k, so this scenario will only happen in log time mess
+        // if send data package count greater than INT32_FLAG(same_topic_merge_send_count), there will be many little
+        // package in send queue, so we merge data package to send. because the send loggroup's max size is 512k, so
+        // this scenario will only happen in log time mess
         if (context.mExactlyOnceCheckpoint) {
             sender->SendLZ4Compressed(sendDataVec);
         } else if (mergeType == MERGE_BY_TOPIC && sendDataVec.size() < (size_t)INT32_FLAG(same_topic_merge_send_count))

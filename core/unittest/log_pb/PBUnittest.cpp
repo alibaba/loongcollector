@@ -29,9 +29,9 @@ public:
     string longLogValue1000 = string(1000 * 1024, 'e');
     string longLogValue10000 = string(10000 * 1024, 'f');
 
-    static void SetUpTestCase() //void Setup();
+    static void SetUpTestCase() // void Setup();
     {}
-    static void TearDownTestCase() //void CleanUp();
+    static void TearDownTestCase() // void CleanUp();
     {}
 
     void TestFullWrite() {

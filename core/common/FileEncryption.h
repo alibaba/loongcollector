@@ -55,12 +55,12 @@ public:
         }
 
         std::string mKey;
-        int32_t mBlockBytes; //equal to mKey.size()
+        int32_t mBlockBytes; // equal to mKey.size()
         int32_t mVersion;
     };
 
 private:
-    std::map<int32_t, KeyInfo*> mKeyMap; //version and its key
+    std::map<int32_t, KeyInfo*> mKeyMap; // version and its key
     KeyInfo* mDefaultKey; // the latest version key
 
     static const int32_t FIRST_KEY_VERSION;

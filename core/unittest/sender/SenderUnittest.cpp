@@ -120,7 +120,7 @@ bool gGlobalMarkOffsetTestFlag = false;
 bool gEnableExactlyOnce = false;
 const size_t kConcurrency = 8;
 
-//warning: if you want to modify these cases, pay attention to the order
+// warning: if you want to modify these cases, pay attention to the order
 void getLogContent(char* buffer, time_t logTime, string content = "", int32_t seq = 0) {
     char timeBuffer[50];
     struct tm timeInfo;
@@ -191,7 +191,7 @@ string GenerateRandomStr(int32_t minLength, int32_t maxLength) {
     int32_t length = (rand() % (maxLength - minLength + 1)) + minLength;
     string randomStr = "";
     for (int32_t i = 0; i < length; ++i) {
-        //ascii: 33 - 126
+        // ascii: 33 - 126
         int temp = (rand() % (126 - 33 + 1)) + 33;
         randomStr += (char)temp;
     }
@@ -348,7 +348,8 @@ void WriteIntegrityConfigJson(int projectNum = 1) {
         if (i >= 4) {
             Json::Value customizedFields;
             Json::Value dataIntegrity;
-            //([0-9]{4})-(0[0-9]{1}|1[0-2])-(0[0-9]{1}|[12][0-9]{1}|3[01]) (0[0-9]{1}|1[0-9]{1}|2[0-3]):[0-5][0-9]{1}:([0-5][0-9]{1})
+            //([0-9]{4})-(0[0-9]{1}|1[0-2])-(0[0-9]{1}|[12][0-9]{1}|3[01])
+            //(0[0-9]{1}|1[0-9]{1}|2[0-3]):[0-5][0-9]{1}:([0-5][0-9]{1})
             dataIntegrity["log_time_reg"]
                 = Json::Value("(0[0-9]{1}|[12][0-9]{1}|3[01])/([A-Za-z]{3})/"
                               "([0-9]{4}):(0[0-9]{1}|1[0-9]{1}|2[0-3]):[0-5][0-9]{1}:([0-5][0-9]{1})");
@@ -447,7 +448,7 @@ struct AsyncRequest {
         mBeginTime = GetCurrentTimeInMilliSeconds();
     }
     ~AsyncRequest() {
-        //printf("#### %d %d ms \n", mSendIndex, (int)(GetNowTime64() - mBeginTime));
+        // printf("#### %d %d ms \n", mSendIndex, (int)(GetNowTime64() - mBeginTime));
     }
 };
 
@@ -504,7 +505,7 @@ protected:
     }
 
     static void MockAsyncSendThread() {
-        //printf("Thread Start.\n");
+        // printf("Thread Start.\n");
         while (gSendThreadRunFlag) {
             vector<AsyncRequest*> reqVec = GetRequest();
             for (size_t i = 0; i < reqVec.size(); ++i) {
@@ -512,7 +513,7 @@ protected:
                 if (gSynMockLatencyMs > 0) {
                     usleep(gSynMockLatencyMs * 1000);
                 }
-                //printf("Send Async Inner \n");
+                // printf("Send Async Inner \n");
                 MockAsyncSendInner(pReq->mProjectName,
                                    pReq->mLogstore,
                                    pReq->mLogData,
@@ -546,7 +547,7 @@ protected:
                              SEND_DATA_TYPE dataType,
                              int32_t rawSize) {
         if (projectName == string("logtail-test-network-project")) {
-            //printf("test network %d.\n", gTestNetWorkStat ? 1 : 0);
+            // printf("test network %d.\n", gTestNetWorkStat ? 1 : 0);
             if (gTestNetWorkStat) {
                 return;
             }
@@ -587,7 +588,7 @@ protected:
                 }
             }
             if (!gNetWorkStat || projectDisabled) {
-                //printf("[@MockSyncSend] fail %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
+                // printf("[@MockSyncSend] fail %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
 
                 if (gSendFailType == 1)
                     throw sdk::LOGException(sdk::LOGE_REQUEST_ERROR, "Can not connect to server.");
@@ -630,7 +631,7 @@ protected:
                 }
 
             } else {
-                //printf("[@MockSyncSend] success %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
+                // printf("[@MockSyncSend] success %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
             }
         }
     }
@@ -642,8 +643,8 @@ protected:
                               int32_t rawSize,
                               SendClosure* sendClosure) {
         // printf("Insert request.\n");
-        //gSenderTest->MockAsyncSendInner(projectName, logstore, logData, dataType, rawSize, sendClosure);
-        //return;
+        // gSenderTest->MockAsyncSendInner(projectName, logstore, logData, dataType, rawSize, sendClosure);
+        // return;
         AsyncRequest* pReq = new AsyncRequest(projectName, logstore, logData, dataType, rawSize, sendClosure);
 
         {
@@ -713,7 +714,7 @@ protected:
                         gMessageSize += gRcvLogGroup.ByteSize();
                         gRecvLogGroupLock.unlock();
                     } else {
-                        //printf("Reject %s %d\n", projectName.c_str(), gProjectNetEnableIndex);
+                        // printf("Reject %s %d\n", projectName.c_str(), gProjectNetEnableIndex);
                         ++gAsynProjectSendFailCount;
                     }
                 }
@@ -726,7 +727,7 @@ protected:
         }
         // can't put this code block in for, if hava multi loggroup, the sendClosure will be destroyed multi times.
         if (gNetWorkStat && !projectDisabled) {
-            //printf("[#MockAsyncSend] success %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
+            // printf("[#MockAsyncSend] success %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
 
             sdk::PostLogStoreLogsResponse* sr = new sdk::PostLogStoreLogsResponse;
             sr->statusCode = 200;
@@ -737,7 +738,7 @@ protected:
             sr->statusCode = 500;
             sr->requestId = "mock_request_id";
 
-            //printf("[#MockAsyncSend] fail %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
+            // printf("[#MockAsyncSend] fail %s %s %d.\n", projectName.c_str(), logstore.c_str(), rawSize);
             if (gSendFailType == 1)
                 sendClosure->OnFail(sr, sdk::LOGE_REQUEST_ERROR, "timeout to connect network");
             else if (gSendFailType == 2) {
@@ -837,7 +838,7 @@ protected:
 
 
 public:
-    static void SetUpTestCase() //void Setup()
+    static void SetUpTestCase() // void Setup()
     {
         sLogger->set_level(spdlog::level::trace);
         printf("Test case setup.\n");
@@ -864,7 +865,7 @@ public:
 
         new Thread(&SenderUnittest::MockAsyncSendThread);
     }
-    static void TearDownTestCase() //void CleanUp()
+    static void TearDownTestCase() // void CleanUp()
     {
         StopMockSendThread();
         try {
@@ -1078,7 +1079,7 @@ public:
             return;
         }
         APSARA_TEST_EQUAL_DESC(pInfo->CanSend(time(NULL)), canSend, string("projectid : ") + ToString(projectId));
-        //printf("EQUAL %d %d\n", projectId, canSend ? 1 : 0);
+        // printf("EQUAL %d %d\n", projectId, canSend ? 1 : 0);
     }
 
     const int PROJECT_NUM = 8;
@@ -1325,7 +1326,7 @@ public:
         APSARA_TEST_EQUAL(log.contents(3).value(), ToString(seqNo));
         APSARA_TEST_TRUE(gAsynProjectSendFailCount >= PROJECT_NUM / 2);
         gRecvLogGroupLock.unlock();
-        //APSARA_TEST_TRUE(gSynProjectSendFailCount > 0);
+        // APSARA_TEST_TRUE(gSynProjectSendFailCount > 0);
 
         // try to recover the connection
 
@@ -1422,7 +1423,7 @@ public:
         APSARA_TEST_EQUAL(log.contents(3).value(), ToString(seqNo));
         APSARA_TEST_TRUE(gAsynProjectSendFailCount >= PROJECT_NUM / 2);
         gRecvLogGroupLock.unlock();
-        //APSARA_TEST_TRUE(gSynProjectSendFailCount > 0);
+        // APSARA_TEST_TRUE(gSynProjectSendFailCount > 0);
 
         // server busy error
         gSendFailType = 5;
@@ -1595,7 +1596,7 @@ public:
 
         sleep(5);
         APSARA_TEST_TRUE(Sender::Instance()->FlushOut(5 * 1000)); // this operation will write buffer file
-        sleep(INT32_FLAG(buffer_file_alive_interval) - 4); //debug
+        sleep(INT32_FLAG(buffer_file_alive_interval) - 4); // debug
         filesToSend.clear();
         Sender::Instance()->LoadFileToSend(time(NULL), filesToSend);
         // buffer file with version2 will be deleted
@@ -1720,21 +1721,21 @@ public:
         CaseSetUp();
         EnableNetWork();
         BOOL_FLAG(ilogtail_discard_old_data) = true;
-        //case#1
+        // case#1
         gCounter = 0;
         OneJob(10, gRootDir, "Job", true, time(NULL));
         WaitForFileBeenRead();
         sleep(2 * INT32_FLAG(batch_send_interval) + 1);
         APSARA_TEST_EQUAL(gCounter, 10);
 
-        //case#2
+        // case#2
         gCounter = 0;
         OneJob(10, gRootDir, "Job", true, time(NULL) - INT32_FLAG(ilogtail_discard_interval) - 100);
         WaitForFileBeenRead();
         sleep(2 * INT32_FLAG(batch_send_interval) + 1);
         APSARA_TEST_EQUAL(gCounter, 0);
 
-        //case#3
+        // case#3
         gCounter = 0;
         time_t timeBefore1970 = -100000;
 #if defined(__linux__)
@@ -1744,7 +1745,7 @@ public:
         APSARA_TEST_EQUAL(gCounter, 0);
 #endif
 
-        //case#4
+        // case#4
         gCounter = 0;
         OneJob(1, gRootDir, "Job", true, time(NULL));
 #if defined(__linux__)
@@ -1763,14 +1764,14 @@ public:
         APSARA_TEST_EQUAL(gCounter, 4);
 
         BOOL_FLAG(ilogtail_discard_old_data) = false;
-        //case#5
+        // case#5
         gCounter = 0;
         OneJob(10, gRootDir, "Job", true, time(NULL) - INT32_FLAG(ilogtail_discard_interval) - 100);
         WaitForFileBeenRead();
         sleep(2 * INT32_FLAG(batch_send_interval) + 1);
         APSARA_TEST_EQUAL(gCounter, 10);
 
-        //case#6
+        // case#6
         gCounter = 0;
 #if defined(__linux__)
         OneJob(10, gRootDir, "Job", true, timeBefore1970);
@@ -1779,7 +1780,7 @@ public:
         APSARA_TEST_EQUAL(gCounter, 0);
 #endif
 
-        //case#7
+        // case#7
         gCounter = 0;
         OneJob(1, gRootDir, "Job", true, time(NULL));
 #if defined(__linux__)
@@ -1840,7 +1841,7 @@ public:
         vector<string> filesToSend;
         Sender::Instance()->LoadFileToSend(time(NULL), filesToSend);
         APSARA_TEST_EQUAL(gCounter, 0);
-        //APSARA_TEST_EQUAL(filesToSend.size(), 1);
+        // APSARA_TEST_EQUAL(filesToSend.size(), 1);
         EnableNetWork();
         sleep(INT32_FLAG(batch_send_interval) * 3 + 1);
         gRecvLogGroupLock.lock();
@@ -1914,10 +1915,10 @@ public:
         }
         WaitForFileBeenRead();
         sleep(3 * INT32_FLAG(batch_send_interval) + 1);
-        //vector<string> filesToSend;
-        //Sender::Instance() -> LoadFileToSend(time(NULL),filesToSend);
-        //LOG_INFO(sLogger,("buffer file num",filesToSend.size()));
-        //APSARA_TEST_TRUE_FATAL(filesToSend.size() > 1);
+        // vector<string> filesToSend;
+        // Sender::Instance() -> LoadFileToSend(time(NULL),filesToSend);
+        // LOG_INFO(sLogger,("buffer file num",filesToSend.size()));
+        // APSARA_TEST_TRUE_FATAL(filesToSend.size() > 1);
         int32_t defaultMaxBps = AppConfig::GetInstance()->mMaxBytePerSec;
         AppConfig::GetInstance()->mMaxBytePerSec = 2 * 1024 * 1024;
         EnableNetWork();
@@ -1936,11 +1937,11 @@ public:
                 && pSender->IsBatchMapEmpty() && pSender->GetSendingCount() == 0 && pSender->IsSecondaryBufferEmpty()) {
                 break;
             }
-            //pSender->mSenderQueue.PrintStatus();
-            //filesToSend.clear();
-            //Sender::Instance() -> LoadFileToSend(time(NULL),filesToSend);
-            //if(filesToSend.size() == 0)
-            //    break;
+            // pSender->mSenderQueue.PrintStatus();
+            // filesToSend.clear();
+            // Sender::Instance() -> LoadFileToSend(time(NULL),filesToSend);
+            // if(filesToSend.size() == 0)
+            //     break;
         }
         double interval = (GetCurrentTimeInMicroSeconds() - start) / 1000000.0;
         double speed = gMessageSize * 1.0 / interval;
@@ -1979,10 +1980,10 @@ public:
         }
         WaitForFileBeenRead();
         sleep(3 * INT32_FLAG(batch_send_interval) + 1);
-        //vector<string> filesToSend;
-        //Sender::Instance() -> LoadFileToSend(time(NULL),filesToSend);
-        //LOG_INFO(sLogger,("buffer file num",filesToSend.size()));
-        //APSARA_TEST_TRUE_FATAL(filesToSend.size() > 1);
+        // vector<string> filesToSend;
+        // Sender::Instance() -> LoadFileToSend(time(NULL),filesToSend);
+        // LOG_INFO(sLogger,("buffer file num",filesToSend.size()));
+        // APSARA_TEST_TRUE_FATAL(filesToSend.size() > 1);
         EnableNetWork();
         Sender::Instance()->TestEndpoint(STRING_FLAG(default_region_name), "");
         //{
@@ -1999,11 +2000,11 @@ public:
                 && pSender->IsBatchMapEmpty() && pSender->GetSendingCount() == 0 && pSender->IsSecondaryBufferEmpty()) {
                 break;
             }
-            //pSender->mSenderQueue.PrintStatus();
-            //filesToSend.clear();
-            //Sender::Instance() -> LoadFileToSend(time(NULL),filesToSend);
-            //if(filesToSend.size() == 0)
-            //    break;
+            // pSender->mSenderQueue.PrintStatus();
+            // filesToSend.clear();
+            // Sender::Instance() -> LoadFileToSend(time(NULL),filesToSend);
+            // if(filesToSend.size() == 0)
+            //     break;
         }
         double interval = (GetCurrentTimeInMicroSeconds() - start) / 1000000.0;
         double speed = gMessageSize * 1.0 / interval;
@@ -2184,10 +2185,10 @@ public:
         LOG_INFO(sLogger, ("TestFilterRule() begin", time(NULL)));
         CaseSetUp(true);
         EnableNetWork();
-        OneJob(1, gRootDir, "Job", true, time(NULL), "filter", 23234); //not match
-        OneJob(1, gRootDir, "Job", true, time(NULL), "testfilter", 5); //not match
-        OneJob(1, gRootDir, "Job", true, time(NULL), "filtersdfas", 5); //match
-        OneJob(1, gRootDir, "Job", true, time(NULL), "sdfsds", 5); //not match
+        OneJob(1, gRootDir, "Job", true, time(NULL), "filter", 23234); // not match
+        OneJob(1, gRootDir, "Job", true, time(NULL), "testfilter", 5); // not match
+        OneJob(1, gRootDir, "Job", true, time(NULL), "filtersdfas", 5); // match
+        OneJob(1, gRootDir, "Job", true, time(NULL), "sdfsds", 5); // not match
         WaitForFileBeenRead();
         sleep(INT32_FLAG(batch_send_interval) + 3);
 
@@ -2354,16 +2355,16 @@ public:
             }
             int32_t curTime = (time(NULL) / 60) * 60;
             int32_t logTimes[10] = {
-                curTime - 300, //new loggroup
-                curTime - 150, //new loggroup
+                curTime - 300, // new loggroup
+                curTime - 150, // new loggroup
                 curTime - 121,
-                curTime - 120, //new loggroup
-                curTime - 60, //new loggroup
+                curTime - 120, // new loggroup
+                curTime - 60, // new loggroup
                 curTime - 59,
                 curTime - 3,
-                curTime, //new loggroup
+                curTime, // new loggroup
                 curTime + 59,
-                curTime + 60 //new loggroup
+                curTime + 60 // new loggroup
             };
 
             int32_t logNums[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};

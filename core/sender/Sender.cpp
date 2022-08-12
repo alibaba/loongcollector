@@ -169,8 +169,8 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                         ("connect refused, use vip directly", mDataPtr->mRegion)(
                             mDataPtr->mProjectName, mDataPtr->mLogstore)("endpoint", mDataPtr->mCurrentEndpoint));
             // just set force update flag
-            //mDataPtr->mRealIpFlag = false;
-            //Sender::Instance()->ResetSendClientEndpoint(mDataPtr->mAliuid, mDataPtr->mRegion, curTime);
+            // mDataPtr->mRealIpFlag = false;
+            // Sender::Instance()->ResetSendClientEndpoint(mDataPtr->mAliuid, mDataPtr->mRegion, curTime);
             Sender::Instance()->ForceUpdateRealIp(mDataPtr->mRegion);
         }
         double serverErrorRatio
@@ -299,7 +299,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                                 "RetryTimes", mDataPtr->mSendRetryTimes)("LogLines", mDataPtr->mLogLines)(
                                 "bytes", mDataPtr->mLogData.size())("endpoint", mDataPtr->mCurrentEndpoint));
             }
-            //Sender::Instance()->PutIntoSecondaryBuffer(mDataPtr, 10);
+            // Sender::Instance()->PutIntoSecondaryBuffer(mDataPtr, 10);
             Sender::Instance()->SubSendingBufferCount();
             // record error
             Sender::Instance()->OnSendDone(mDataPtr, recordRst);
@@ -855,7 +855,7 @@ bool Sender::ReadNextEncryption(int32_t& pos,
         }
     } else {
         bufferMeta.set_project(encodedInfo);
-        bufferMeta.set_endpoint(AppConfig::GetInstance()->GetDefaultRegion()); //new mode
+        bufferMeta.set_endpoint(AppConfig::GetInstance()->GetDefaultRegion()); // new mode
         bufferMeta.set_aliuid("");
     }
 
@@ -1551,7 +1551,7 @@ bool Sender::SendPb(Config* pConfig,
                                                      time(NULL),
                                                      shardHash,
                                                      pConfig->mLogstoreKey);
-    //apsara::timing::TimeInNsec startT = apsara::timing::GetCurrentTimeInNanoSeconds();
+    // apsara::timing::TimeInNsec startT = apsara::timing::GetCurrentTimeInNanoSeconds();
     if (!CompressLz4(pbBuffer, pbSize, pData->mLogData)) {
         LOG_ERROR(sLogger,
                   ("compress data fail", "discard data")("projectName", pConfig->mProjectName)("logstore",
@@ -1559,10 +1559,11 @@ bool Sender::SendPb(Config* pConfig,
         delete pData;
         return false;
     } else {
-        //apsara::timing::TimeInNsec endT = apsara::timing::GetCurrentTimeInNanoSeconds();
+        // apsara::timing::TimeInNsec endT = apsara::timing::GetCurrentTimeInNanoSeconds();
         PutIntoBatchMap(pData);
-        //apsara::timing::TimeInNsec endT2 = apsara::timing::GetCurrentTimeInNanoSeconds();
-        //printf("compress and insert %d %d %d %d\n", (int)(endT - startT), (int)(endT2 - endT), (int)(pbSize), (int)(pData->mLogData.size()));
+        // apsara::timing::TimeInNsec endT2 = apsara::timing::GetCurrentTimeInNanoSeconds();
+        // printf("compress and insert %d %d %d %d\n", (int)(endT - startT), (int)(endT2 - endT), (int)(pbSize),
+        // (int)(pData->mLogData.size()));
     }
     return true;
 }
@@ -1678,7 +1679,7 @@ bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint
         LOG_ERROR(sLogger, ("test network", "send fail")("exception", "unknown"));
     }
     int64_t endTime = GetCurrentTimeInMicroSeconds();
-    int32_t latency = int32_t((endTime - beginTime) / 1000); //ms
+    int32_t latency = int32_t((endTime - beginTime) / 1000); // ms
     LOG_DEBUG(sLogger, ("TestEndpoint, region", region)("endpoint", endpoint)("status", status)("latency", latency));
     SetNetworkStat(region, endpoint, status, latency);
     return status;
@@ -1697,7 +1698,7 @@ SendResult
 Sender::SendBufferFileData(const LogtailBufferMeta& bufferMeta, const std::string& logData, std::string& errorCode) {
     FlowControl(bufferMeta.rawsize(), REPLAY_SEND_THREAD);
     string region = bufferMeta.endpoint();
-    if (region.find("http://") == 0) //old buffer file which record the endpoint
+    if (region.find("http://") == 0) // old buffer file which record the endpoint
         region = GetRegionFromEndpoint(region);
 
     sdk::Client* sendClient = GetSendClient(region, bufferMeta.aliuid());
@@ -2092,7 +2093,7 @@ void Sender::SendLZ4Compressed(std::vector<MergeItem*>& sendDataVec) {
     }
 }
 
-//all data in sendDataVec shoud have same key
+// all data in sendDataVec shoud have same key
 void Sender::SendLogPackageList(std::vector<MergeItem*>& sendDataVec) {
     SlsLogPackageList logPackageList;
     int32_t bytes = 0;
@@ -2321,7 +2322,7 @@ Sender::IncSendServerErrorStatistic(const std::string& projectName, const std::s
 
 double Sender::UpdateSendStatistic(const std::string& key, int32_t curTime, bool serverError) {
     static int32_t WINDOW_COUNT = 6;
-    static int32_t WINDOW_SIZE = 10; //seconds
+    static int32_t WINDOW_SIZE = 10; // seconds
     static int32_t STATISTIC_CYCLE = WINDOW_SIZE * WINDOW_COUNT;
 
     int32_t second = curTime % STATISTIC_CYCLE;
@@ -2536,7 +2537,7 @@ EndpointStatus Sender::UpdateRealIp(const std::string& region, const std::string
         LOG_ERROR(sLogger, ("get real ip", "send fail")("exception", "unknown"));
     }
     int64_t endTime = GetCurrentTimeInMicroSeconds();
-    int32_t latency = int32_t((endTime - beginTime) / 1000); //ms
+    int32_t latency = int32_t((endTime - beginTime) / 1000); // ms
     LOG_DEBUG(sLogger, ("Get real ip, region", region)("endpoint", endpoint)("status", status)("latency", latency));
     return status;
 }

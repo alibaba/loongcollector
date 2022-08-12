@@ -110,7 +110,8 @@ struct LoggroupTimeValue {
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    LoggroupTimeValue() {}
+    LoggroupTimeValue() {
+    }
 #endif
 };
 
@@ -210,7 +211,8 @@ public:
             }
             if (item->mStatus == LoggroupSendStatus_Idle) {
                 // check consurrency
-                // check first, when mMaxSendBytesPerSecond is 1000, and the packet size is 10K, we should send this packet. if not, this logstore will block
+                // check first, when mMaxSendBytesPerSecond is 1000, and the packet size is 10K, we should send this
+                // packet. if not, this logstore will block
                 if ((!mSenderInfo.ConcurrencyValid())
                     || (!expireFlag && mMaxSendBytesPerSecond > 0 && mLastSecondTotalBytes > mMaxSendBytesPerSecond)) {
                     return;
@@ -427,12 +429,14 @@ public:
         return RemoveItem(item, sendRst != LogstoreSenderInfo::SendResult_Buffered);
     }
 
-    bool IsValidToSend(int32_t curTime) { return mSenderInfo.CanSend(curTime); }
+    bool IsValidToSend(int32_t curTime) {
+        return mSenderInfo.CanSend(curTime);
+    }
 
     LogstoreSenderInfo mSenderInfo;
     LogstoreSenderStatistics mSenderStatistics;
 
-    //add for flow control
+    // add for flow control
     volatile int32_t mLastSendTimeSecond;
     volatile int32_t mLastSecondTotalBytes;
 

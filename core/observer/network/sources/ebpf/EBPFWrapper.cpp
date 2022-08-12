@@ -381,12 +381,12 @@ bool EBPFWrapper::Stop() {
     CleanAllDisableProcesses();
     mStartSuccess = false;
     return true;
-    //int err = g_ebpf_stop_func == NULL ? -100 : g_ebpf_stop_func();
-    //if (err) {
-    //    LOG_INFO(sLogger, ("stop ebpf", "failed")("error", err));
-    //    return false;
-    //}
-    //return true;
+    // int err = g_ebpf_stop_func == NULL ? -100 : g_ebpf_stop_func();
+    // if (err) {
+    //     LOG_INFO(sLogger, ("stop ebpf", "failed")("error", err));
+    //     return false;
+    // }
+    // return true;
 }
 
 int32_t EBPFWrapper::ProcessPackets(int32_t maxProcessPackets, int32_t maxProcessDurationMs) {

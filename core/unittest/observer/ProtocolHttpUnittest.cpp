@@ -131,7 +131,8 @@ public:
     //        [Time since request: 0.015786000 seconds]
     //        [Prev response in frame: 97700]
     //        [Request in frame: 97703]
-    //        [Request URI: http://edr-project.cn-beijing.log.aliyuncs.com/logstores/bradar_performance_statistics_log/shards/lb]
+    //        [Request URI:
+    //        http://edr-project.cn-beijing.log.aliyuncs.com/logstores/bradar_performance_statistics_log/shards/lb]
     void TestCommonResponse() {
         const std::string hexString
             = "485454502f312e3120323030204f4b0d0a5365727665723a2054656e67696e650d0a436f6e74656e742d4c656e6774683a20300d"
@@ -504,8 +505,8 @@ APSARA_UNIT_TEST_CASE(ProtocolHttpUnittest, TestHTTPPacketReaderUnorder, 0);
 APSARA_UNIT_TEST_CASE(ProtocolHttpUnittest, TestHTTPParserGC, 0);
 APSARA_UNIT_TEST_CASE(ProtocolHttpUnittest, TestCommonRequest2, 0);
 // TODO : currently only accept the data starts with HTTP or special METHOD , such as GET, PUT and etc.
-//APSARA_UNIT_TEST_CASE(ProtocolHttpUnittest, TestChunkedResponse, 0);
-//APSARA_UNIT_TEST_CASE(ProtocolHttpUnittest, TestMoreContentResponse, 0);
+// APSARA_UNIT_TEST_CASE(ProtocolHttpUnittest, TestChunkedResponse, 0);
+// APSARA_UNIT_TEST_CASE(ProtocolHttpUnittest, TestMoreContentResponse, 0);
 
 } // namespace logtail
 

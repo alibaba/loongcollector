@@ -141,8 +141,8 @@ size_t LogFileOperator::SkipHoleRead(void* ptr, size_t size, size_t count, int64
 
     auto readBytes = (size_t)nBytes;
 
-    //if off == *offset, no hole no extra handle
-    //if off > *offset, there is a hole
+    // if off == *offset, no hole no extra handle
+    // if off > *offset, there is a hole
     if (off > *offset) {
         if (off > *offset + nBytes) {
             readBytes = 0;

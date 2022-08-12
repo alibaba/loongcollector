@@ -183,7 +183,9 @@ namespace sdk {
 #undef METHOD_LOG_PATTERN
     }
 
-    static unsigned char ToHex(unsigned char x) { return x > 9 ? x + 55 : x + 48; }
+    static unsigned char ToHex(unsigned char x) {
+        return x > 9 ? x + 55 : x + 48;
+    }
 
     static unsigned char FromHex(unsigned char x) {
         unsigned char y;
@@ -329,7 +331,9 @@ namespace sdk {
         return string(buffer);
     }
 
-    std::string GetDateString() { return GetDateString(DATE_FORMAT_RFC822); }
+    std::string GetDateString() {
+        return GetDateString(DATE_FORMAT_RFC822);
+    }
 
     time_t DecodeDateString(const std::string dateString, const std::string& dateFormat) {
         return 0;
@@ -339,7 +343,8 @@ namespace sdk {
         //   strptime(dateString.c_str(), dateFormat.c_str(),&t);
         //   if(t.tm_sec == -1)
         //   {
-        //       throw LOGException(LOGE_PARAMETER_INVALID, string("Invalid date string:") + dateString + ",format:" + dateFormat);
+        //       throw LOGException(LOGE_PARAMETER_INVALID, string("Invalid date string:") + dateString + ",format:" +
+        //       dateFormat);
         //   }
         //   struct timezone tz;
         //   struct timeval tv;
@@ -471,20 +476,22 @@ namespace sdk {
         (a) = SHIFT_LEFT((a), (shift)); \
         (a) += (b); \
     }
-    ////////////////////////////////////////////////////////// GLOBAL VARIABLE /////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////// GLOBAL VARIABLE
+    ////////////////////////////////////////////////////////////
     const uint8_t gPadding[64] = {0x80, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
                                   0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
                                   0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
                                   0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
 
 
-    //////////////////////////////////////////////////////// LOCAL DECLEARATION //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////// LOCAL DECLEARATION
+    /////////////////////////////////////////////////////////////
     struct Md5Block {
         uint32_t word[16];
     };
     /**
- * copy a pool into a block, using little endian
- */
+     * copy a pool into a block, using little endian
+     */
     void CopyBytesToBlock(const uint8_t* poolIn, struct Md5Block& block) {
         uint32_t j = 0;
         for (uint32_t i = 0; i < 32; ++i, j += 4) {
@@ -494,8 +501,8 @@ namespace sdk {
     }
 
     /**
- * calculate md5 hash value from a block
- */
+     * calculate md5 hash value from a block
+     */
     void CalMd5(struct Md5Block block, uint32_t h[4]) {
         uint32_t a = h[0];
         uint32_t b = h[1];
@@ -585,122 +592,122 @@ namespace sdk {
     void DoMd5Little(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t hash[16]) {
         struct Md5Block block;
 
-        ///initialize hash value
+        /// initialize hash value
         uint32_t h[4];
         h[0] = 0x67452301;
         h[1] = 0xEFCDAB89;
         h[2] = 0x98BADCFE;
         h[3] = 0x10325476;
 
-        ///padding and divide input data into blocks
-        uint64_t fullLen = (inputBytesNum >> 6) << 6; ///complete blocked length
-        uint64_t partLen = inputBytesNum & 0x3F; ///length remained
+        /// padding and divide input data into blocks
+        uint64_t fullLen = (inputBytesNum >> 6) << 6; /// complete blocked length
+        uint64_t partLen = inputBytesNum & 0x3F; /// length remained
 
         uint32_t i;
         for (i = 0; i < fullLen; i += 64) {
-            ///copy input data into block
+            /// copy input data into block
             memcpy(block.word, &(poolIn[i]), 64);
 
-            ///calculate Md5
+            /// calculate Md5
             CalMd5(block, h);
         }
 
 
-        if (partLen > 55) ///append two more blocks
+        if (partLen > 55) /// append two more blocks
         {
-            ///copy input data into block and pad
+            /// copy input data into block and pad
             memcpy(block.word, &(poolIn[i]), partLen);
             memcpy(((uint8_t*)&(block.word[partLen >> 2])) + (partLen & 0x3), gPadding, (64 - partLen));
 
-            ///calculate Md5
+            /// calculate Md5
             CalMd5(block, h);
 
-            ///set rest byte to 0x0
+            /// set rest byte to 0x0
             memset(block.word, 0x0, 64);
-        } else ///append one more block
+        } else /// append one more block
         {
-            ///copy input data into block and pad
+            /// copy input data into block and pad
             memcpy(block.word, &(poolIn[i]), partLen);
             memcpy(((uint8_t*)&(block.word[partLen >> 2])) + (partLen & 0x3), gPadding, (64 - partLen));
         }
 
-        ///append length (bits)
+        /// append length (bits)
         uint64_t bitsNum = inputBytesNum * 8;
         memcpy(&(block.word[14]), &bitsNum, 8);
 
-        ///calculate Md5
+        /// calculate Md5
         CalMd5(block, h);
 
-        ///clear sensitive information
+        /// clear sensitive information
         memset(block.word, 0, 64);
 
-        ///fill hash value
+        /// fill hash value
         memcpy(&(hash[0]), &(h[0]), 16);
-    } ///DoMd5Little
+    } /// DoMd5Little
 
     void DoMd5Big(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t hash[16]) {
         struct Md5Block block;
         uint8_t tempBlock[64];
 
-        ///initialize hash value
+        /// initialize hash value
         uint32_t h[4];
         h[0] = 0x67452301;
         h[1] = 0xEFCDAB89;
         h[2] = 0x98BADCFE;
         h[3] = 0x10325476;
 
-        ///padding and divide input data into blocks
+        /// padding and divide input data into blocks
         uint64_t fullLen = (inputBytesNum >> 6) << 6;
         uint64_t partLen = inputBytesNum & 0x3F;
 
         uint32_t i;
         for (i = 0; i < fullLen; i += 64) {
-            ///copy input data into block, in little endian
+            /// copy input data into block, in little endian
             CopyBytesToBlock(&(poolIn[i]), block);
 
-            ///calculate Md5
+            /// calculate Md5
             CalMd5(block, h);
         }
 
-        ///append two more blocks
+        /// append two more blocks
         if (partLen > 55) {
-            ///put input data into a temporary block
+            /// put input data into a temporary block
             memcpy(tempBlock, &(poolIn[i]), partLen);
             memcpy(&(tempBlock[partLen]), gPadding, (64 - partLen));
 
-            ///copy temporary data into block, in little endian
+            /// copy temporary data into block, in little endian
             CopyBytesToBlock(tempBlock, block);
 
-            ///calculate Md5
+            /// calculate Md5
             CalMd5(block, h);
 
             memset(tempBlock, 0x0, 64);
         }
-        ///append one more block
+        /// append one more block
         else {
             memcpy(tempBlock, &(poolIn[i]), partLen);
             memcpy(&(tempBlock[partLen]), gPadding, (64 - partLen));
         }
-        ///append length (bits)
+        /// append length (bits)
         uint64_t bitsNum = inputBytesNum * 8;
         memcpy(&(tempBlock[56]), &bitsNum, 8);
 
-        ///copy temporary data into block, in little endian
+        /// copy temporary data into block, in little endian
         CopyBytesToBlock(tempBlock, block);
 
-        ///calculate Md5
+        /// calculate Md5
         CalMd5(block, h);
 
-        ///clear sensitive information
+        /// clear sensitive information
         memset(block.word, 0, 64);
         memset(tempBlock, 0, 64);
 
-        ///fill hash value
+        /// fill hash value
         memcpy(&(hash[0]), &(h[0]), 16);
-    } ///DoMd5Big
+    } /// DoMd5Big
 
     void DoMd5(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t md5[16]) {
-        ///detect big or little endian
+        /// detect big or little endian
         union {
             uint32_t a;
             uint8_t b;
@@ -708,51 +715,51 @@ namespace sdk {
 
         symbol.a = 1;
 
-        ///for little endian
+        /// for little endian
         if (symbol.b == 1) {
             DoMd5Little(poolIn, inputBytesNum, md5);
         }
-        ///for big endian
+        /// for big endian
         else {
             DoMd5Big(poolIn, inputBytesNum, md5);
         }
-    } ///DoMd5
+    } /// DoMd5
 
 /*
-* define the rotate left (circular left shift) operation
-*/
+ * define the rotate left (circular left shift) operation
+ */
 #define rotl(v, b) (((v) << (b)) | ((v) >> (32 - (b))))
 
 /*
-* Define the basic SHA-1 functions F1 ~ F4. Note that the exclusive-OR
-* operation (^) in F1 and F3 may be replaced by a bitwise OR operation
-* (|), which produce identical results.
-*
-* F1 is used in ROUND  0~19, F2 is used in ROUND 20~39
-* F3 is used in ROUND 40~59, F4 is used in ROUND 60~79
-*/
+ * Define the basic SHA-1 functions F1 ~ F4. Note that the exclusive-OR
+ * operation (^) in F1 and F3 may be replaced by a bitwise OR operation
+ * (|), which produce identical results.
+ *
+ * F1 is used in ROUND  0~19, F2 is used in ROUND 20~39
+ * F3 is used in ROUND 40~59, F4 is used in ROUND 60~79
+ */
 #define F1(B, C, D) (((B) & (C)) ^ (~(B) & (D)))
 #define F2(B, C, D) ((B) ^ (C) ^ (D))
 #define F3(B, C, D) (((B) & (C)) ^ ((B) & (D)) ^ ((C) & (D)))
 #define F4(B, C, D) ((B) ^ (C) ^ (D))
 
 /*
-* Use different K in different ROUND
-*/
+ * Use different K in different ROUND
+ */
 #define K00_19 0x5A827999
 #define K20_39 0x6ED9EBA1
 #define K40_59 0x8F1BBCDC
 #define K60_79 0xCA62C1D6
 
 /*
-* Another implementation of the ROUND transformation:
-* (here the T is a temp variable)
-* For t=0 to 79:
-* {
-*     T=rotl(A,5)+Func(B,C,D)+K+W[t]+E;
-*     E=D; D=C; C=rotl(B,30); B=A; A=T;
-* }
-*/
+ * Another implementation of the ROUND transformation:
+ * (here the T is a temp variable)
+ * For t=0 to 79:
+ * {
+ *     T=rotl(A,5)+Func(B,C,D)+K+W[t]+E;
+ *     E=D; D=C; C=rotl(B,30); B=A; A=T;
+ * }
+ */
 #define ROUND(t, A, B, C, D, E, Func, K) \
     E += rotl(A, 5) + Func(B, C, D) + W[t] + K; \
     B = rotl(B, 30);
@@ -771,14 +778,14 @@ namespace sdk {
     ROUND5(t + 15, Func, K)
 
     /*
-* Define constant of the initial vector
-*/
+     * Define constant of the initial vector
+     */
     const uint32_t SHA1::IV[SHA1_DIGEST_WORDS] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0};
 
     /*
-* the message must be the big-endian32 (or left-most word)
-* before calling the transform() function.
-*/
+     * the message must be the big-endian32 (or left-most word)
+     * before calling the transform() function.
+     */
     const static uint32_t iii = 1;
     const static bool littleEndian = *(uint8_t*)&iii != 0;
 
@@ -796,7 +803,9 @@ namespace sdk {
         }
     }
 
-    inline size_t min(size_t a, size_t b) { return a < b ? a : b; }
+    inline size_t min(size_t a, size_t b) {
+        return a < b ? a : b;
+    }
 
     void SHA1::transform() {
         uint32_t W[80];
@@ -868,7 +877,9 @@ namespace sdk {
             *p1++ ^= *p2++;
     }
 
-    HMAC::HMAC(const uint8_t* key, size_t lkey) { init(key, lkey); }
+    HMAC::HMAC(const uint8_t* key, size_t lkey) {
+        init(key, lkey);
+    }
 
     void HMAC::init(const uint8_t* key, size_t lkey) {
         in.init();

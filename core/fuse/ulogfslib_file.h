@@ -184,19 +184,19 @@ int ulogfs_fflush(int fd, const char* name);
 int ulogfs_fflush2(int fd, const char* name);
 
 /**
-  * Dump ulogfs inodes or files data
-  *
-  * @param type
-  *   dump file or inode
-  * @param ino
-  *   inode number, if you want to dump all inodes info, set ino to 0.
-  * @param buf
-  *   data buffer
-  * @param len
-  *   buffer length
-  * @return
-  *   0 on success, or a negative value on error.
-  */
+ * Dump ulogfs inodes or files data
+ *
+ * @param type
+ *   dump file or inode
+ * @param ino
+ *   inode number, if you want to dump all inodes info, set ino to 0.
+ * @param buf
+ *   data buffer
+ * @param len
+ *   buffer length
+ * @return
+ *   0 on success, or a negative value on error.
+ */
 int ulogfs_dump(int type, long ino, void* buf, int64_t* len);
 
 /* send HELLO request to daemon and receive HELLO_REPLY */

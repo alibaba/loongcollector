@@ -42,7 +42,7 @@ void checkRegex(const string& logFile, const string& logBeginReg, const string& 
 vector<string> checkLogBeginReg(const string& logFile, const string& logBeginReg, const bool display);
 void checkFilterRegex(const string& logFile, const string& logRegex);
 
-int main(int argc, char* argv[]) //argv is logFile,logBeginReg,logRegex
+int main(int argc, char* argv[]) // argv is logFile,logBeginReg,logRegex
 {
     if (3 == argc) {
         if (0 == strcmp(argv[1], "-f")) {

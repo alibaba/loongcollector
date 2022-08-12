@@ -105,7 +105,7 @@ public:
      *
      * @param path for whom event handler will be removed.
      */
-    //TODO see whether report errors
+    // TODO see whether report errors
     void UnregisterEventHandler(const char* path);
 
     /** Close handlers for path; If no handler registered for path, do nothing but return.
@@ -289,4 +289,4 @@ protected:
 #endif
 };
 
-} //namespace logtail
+} // namespace logtail

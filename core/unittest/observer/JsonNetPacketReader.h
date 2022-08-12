@@ -63,12 +63,12 @@ public:
     char hexToChar(const char* data) { return (hexToValue(data[0]) << 4) | hexToValue(data[1]); }
 
     /**
-     * @brief 
+     * @brief
      *51:31:79:53:70:58:4a:44:4c:69:36:48:4a:48:30:6b:47:66:4d:50:77:57:47:71:51:3d:22:2c:22:72:73:61:5f:6b:65:79:5f:76:65:72:73:69:6f:6e:22:3a:22:33:22:2c:22:61:65:73:5f:6b:65:79:5f:76:65:72:73:69:6f:6e:22:3a:22:33:22:7d:7d"
-     * @param payload 
-     * @param dataBuffer 
-     * @return true 
-     * @return false 
+     * @param payload
+     * @param dataBuffer
+     * @return true
+     * @return false
      */
     bool ParseData(const std::string& payload, char* dataBuffer) {
         size_t lastIndex = 0;
@@ -164,18 +164,20 @@ public:
                 //     const char * rData = packetData.c_str();
                 //     char * bData = &packetData.at(0);
                 //     PacketEventData * pData = (PacketEventData *)(bData + sizeof(PacketEventHeader));
-                //     printf("%p %p %p %p %d %d \n", data->Buffer, rData, bData, pData->Buffer, pData->Buffer - bData,  pData->Buffer - rData);
+                //     printf("%p %p %p %p %d %d \n", data->Buffer, rData, bData, pData->Buffer, pData->Buffer - bData,
+                //     pData->Buffer - rData);
                 // }
 
                 packets.push_back(packetData);
                 // fix data buffers
                 std::string& lastPacketData = packets.back();
                 {
-                    //const char * rData = lastPacketData.c_str();
+                    // const char * rData = lastPacketData.c_str();
                     char* bData = &lastPacketData.at(0);
                     PacketEventData* pData = (PacketEventData*)(bData + sizeof(PacketEventHeader));
                     pData->Buffer = bData + sizeof(PacketEventHeader) + sizeof(PacketEventData);
-                    //printf("%p %p %p %p %d %d \n", data->Buffer, rData, bData, pData->Buffer, pData->Buffer - bData,  pData->Buffer - rData);
+                    // printf("%p %p %p %p %d %d \n", data->Buffer, rData, bData, pData->Buffer, pData->Buffer - bData,
+                    // pData->Buffer - rData);
                 }
             }
         }

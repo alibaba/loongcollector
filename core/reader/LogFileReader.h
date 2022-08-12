@@ -231,7 +231,7 @@ public:
 
     void SetReaderArray(LogFileReaderPtrArray* readerArray);
 
-    //some Reader will overide these functions (eg. JsonLogFileReader)
+    // some Reader will overide these functions (eg. JsonLogFileReader)
     virtual bool ParseLogLine(const char* buffer,
                               sls_logs::LogGroup& logGroup,
                               ParseLogError& error,
@@ -341,7 +341,7 @@ protected:
     std::string mRealLogPath; // real log path
     bool mSymbolicLinkFlag = false;
     std::string mSourceId;
-    int32_t mTailLimit; //KB
+    int32_t mTailLimit; // KB
     uint64_t mLastFileSignatureHash;
     uint32_t mLastFileSignatureSize;
     int64_t mLastFilePos;
@@ -376,8 +376,8 @@ protected:
     std::string mFuseTrimedFilename;
     LogFileReaderPtrArray* mReaderArray;
     uint64_t mLogstoreKey;
-    // path in other docker container. eg, logtail path `/host_all/xxxxx/home/admin/access.log`, docker path is `/home/admin/access.log`
-    // we should use mDockerPath to extract topic and set it to __tag__:__path__
+    // path in other docker container. eg, logtail path `/host_all/xxxxx/home/admin/access.log`, docker path is
+    // `/home/admin/access.log` we should use mDockerPath to extract topic and set it to __tag__:__path__
     std::string mDockerPath;
     std::vector<sls_logs::LogTag> mExtraTags;
     int32_t mCloseUnusedInterval;

@@ -19,7 +19,7 @@ IndentCaseLabels: true
 SpaceAfterTemplateKeyword: true
 SpaceBeforeCpp11BracedList: false
 SortIncludes: false
-ReflowComments: false
+ReflowComments: true
 AlignEscapedNewlinesLeft: false
 AlignEscapedNewlines: DontAlign
 AlignTrailingComments: false

@@ -130,8 +130,9 @@ bool PCAPWrapper::Init(std::function<int(StringPiece)> processor) {
 
     // the device that we specified in the previous section
     // snaplen is an integer which defines the maximum number of bytes to be captured by pcap
-    // promisc, when set to true, brings the interface into promiscuous mode (however, even if it is set to false, it is possible under specific cases for the interface to be in promiscuous mode, anyway)
-    // to_ms is the read time out in milliseconds (a value of 0 sniffs until an error occurs; -1 sniffs indefinitely)
+    // promisc, when set to true, brings the interface into promiscuous mode (however, even if it is set to false, it is
+    // possible under specific cases for the interface to be in promiscuous mode, anyway) to_ms is the read time out in
+    // milliseconds (a value of 0 sniffs until an error occurs; -1 sniffs indefinitely)
     mHandle = g_pcap_open_live_func(netInterface, BUFSIZ, mConfig->mPCAPPromiscuous, mConfig->mPCAPTimeoutMs, mErrBuf);
     if (mHandle == NULL) {
         LOG_ERROR(sLogger, ("init pcap wrapper when open pcap live error, err", mErrBuf));
@@ -205,7 +206,7 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
     struct ether_header* eth_header;
     eth_header = (struct ether_header*)packet;
     if (ntohs(eth_header->ether_type) != ETHERTYPE_IP) {
-        //printf("Not an IP packet. Skipping...\n\n");
+        // printf("Not an IP packet. Skipping...\n\n");
         return;
     }
 
@@ -217,8 +218,8 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
     than what we currently have captured. If the snapshot
     length set with pcap_open_live() is too small, you may
     not have the whole packet. */
-    //printf("Total packet available: %d bytes\n", header->caplen);
-    //printf("Expected packet size: %d bytes\n", header->len);
+    // printf("Total packet available: %d bytes\n", header->caplen);
+    // printf("Expected packet size: %d bytes\n", header->len);
 
     /* Pointers to start point of various headers */
     const u_char* ip_header = NULL;
@@ -242,7 +243,7 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
     /* The IHL is number of 32-bit segments. Multiply
     by four to get a byte count for pointer arithmetic */
     ip_header_length = ip_header_length << 2;
-    //printf("IP header length (IHL) in bytes: %d\n", ip_header_length);
+    // printf("IP header length (IHL) in bytes: %d\n", ip_header_length);
 
     /* Now that we know where the IP header is, we can
     inspect the IP header for a protocol number to
@@ -299,14 +300,14 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
         tcp_header_length = tcp_header_length << 2;
         srcPort = tcpHeaderSturct->source;
         dstPort = tcpHeaderSturct->dest;
-        //printf("TCP header length in bytes: %d\n", tcp_header_length);
+        // printf("TCP header length in bytes: %d\n", tcp_header_length);
 
         /* Add up all the header sizes to find the payload offset */
         int total_headers_size = ethernet_header_length + ip_header_length + tcp_header_length;
-        //printf("Size of all headers combined: %d bytes\n", total_headers_size);
+        // printf("Size of all headers combined: %d bytes\n", total_headers_size);
         payload_length = header->caplen - total_headers_size;
         payload_raw_length = header->len - total_headers_size;
-        //printf("Payload size: %d bytes\n", payload_length);
+        // printf("Payload size: %d bytes\n", payload_length);
         payload = packet + total_headers_size;
     } else {
         return;
@@ -435,7 +436,7 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
     }
 
 
-    //printf("Memory address where payload begins: %p\n\n", payload);
+    // printf("Memory address where payload begins: %p\n\n", payload);
 
     /* Print payload in ASCII */
     /*

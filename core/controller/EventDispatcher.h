@@ -85,4 +85,4 @@ private:
 #endif
 };
 
-} //namespace logtail
+} // namespace logtail

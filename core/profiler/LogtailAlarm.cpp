@@ -129,7 +129,7 @@ bool LogtailAlarm::SendAlarmLoop() {
                     ++allAlarmIter;
                 }
                 region = allAlarmIter->first;
-                //LOG_DEBUG(sLogger, ("1Send Alarm", region)("region", sendRegionIndex));
+                // LOG_DEBUG(sLogger, ("1Send Alarm", region)("region", sendRegionIndex));
                 LogtailAlarmVector& alarmBufferVec = *(allAlarmIter->second.first);
                 std::vector<int32_t>& lastUpdateTimeVec = allAlarmIter->second.second;
                 // check this region end
@@ -139,8 +139,9 @@ bool LogtailAlarm::SendAlarmLoop() {
                     sendAlarmTypeIndex = 0;
                     continue;
                 }
-                //LOG_DEBUG(sLogger, ("2Send Alarm", region)("region", sendRegionIndex)("alarm index", mMessageType[sendAlarmTypeIndex]));
-                // check valid
+                // LOG_DEBUG(sLogger, ("2Send Alarm", region)("region", sendRegionIndex)("alarm index",
+                // mMessageType[sendAlarmTypeIndex]));
+                //  check valid
                 if (alarmBufferVec.size() != (size_t)ALL_LOGTAIL_ALARM_NUM
                     || lastUpdateTimeVec.size() != (size_t)ALL_LOGTAIL_ALARM_NUM) {
                     LOG_ERROR(sLogger,
@@ -152,7 +153,8 @@ bool LogtailAlarm::SendAlarmLoop() {
                     continue;
                 }
 
-                //LOG_DEBUG(sLogger, ("3Send Alarm", region)("region", sendRegionIndex)("alarm index", mMessageType[sendAlarmTypeIndex]));
+                // LOG_DEBUG(sLogger, ("3Send Alarm", region)("region", sendRegionIndex)("alarm index",
+                // mMessageType[sendAlarmTypeIndex]));
                 map<string, LogtailAlarmMessage*>& alarmMap = alarmBufferVec[sendAlarmTypeIndex];
                 if (alarmMap.size() == 0
                     || currentTime - lastUpdateTimeVec[sendAlarmTypeIndex] < INT32_FLAG(logtail_alarm_interval)) {
@@ -170,14 +172,16 @@ bool LogtailAlarm::SendAlarmLoop() {
                     continue;
                 }
 
-                //LOG_DEBUG(sLogger, ("4Send Alarm", region)("region", sendRegionIndex)("alarm index", mMessageType[sendAlarmTypeIndex]));
+                // LOG_DEBUG(sLogger, ("4Send Alarm", region)("region", sendRegionIndex)("alarm index",
+                // mMessageType[sendAlarmTypeIndex]));
                 logGroup.set_source(LogFileProfiler::mIpAddr);
                 logGroup.set_category("logtail_alarm");
                 for (map<string, LogtailAlarmMessage*>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
                      ++mapIter) {
                     messagePtr = mapIter->second;
 
-                    // LOG_DEBUG(sLogger, ("5Send Alarm", region)("region", sendRegionIndex)("alarm index", sendAlarmTypeIndex)("msg", messagePtr->mMessage));
+                    // LOG_DEBUG(sLogger, ("5Send Alarm", region)("region", sendRegionIndex)("alarm index",
+                    // sendAlarmTypeIndex)("msg", messagePtr->mMessage));
 
                     Log* logPtr = logGroup.add_logs();
                     logPtr->set_time(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? time(NULL) + GetTimeDelta()
@@ -237,7 +241,7 @@ bool LogtailAlarm::SendAlarmLoop() {
 
 LogtailAlarm::LogtailAlarmVector* LogtailAlarm::MakesureLogtailAlarmMapVecUnlocked(const string& region) {
     // @todo
-    //string region;
+    // string region;
     std::map<std::string, std::pair<LogtailAlarmVector*, std::vector<int32_t> > >::iterator iter
         = mAllAlarmMap.find(region);
     if (iter == mAllAlarmMap.end()) {
@@ -270,7 +274,8 @@ void LogtailAlarm::SendAlarm(const LogtailAlarmType alarmType,
     if (!profileProject.empty() && profileProject == projectName) {
         return;
     }
-    //LOG_DEBUG(sLogger, ("Add Alarm", region)("projectName", projectName)("alarm index", mMessageType[alarmType])("msg", message));
+    // LOG_DEBUG(sLogger, ("Add Alarm", region)("projectName", projectName)("alarm index",
+    // mMessageType[alarmType])("msg", message));
     std::lock_guard<std::mutex> lock(mAlarmBufferMutex);
     string key = projectName + "_" + category;
     LogtailAlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);

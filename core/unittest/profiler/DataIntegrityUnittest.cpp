@@ -151,7 +151,7 @@ void DataIntegrityUnittest::TestReloadInvalidJsonFile() {
 
 void DataIntegrityUnittest::MockIntegrityData() {
     // insert mock test data into LogProcess::mRegionLogIntegrityInfoMap
-    //int64_t seqNum, time_t logTime, int32_t lines, int status
+    // int64_t seqNum, time_t logTime, int32_t lines, int status
     LogTimeInfo info1(
         88, 1539091741, 123, LogTimeInfo::LogIntegrityStatus_SendOK | LogTimeInfo::LogIntegrityStatus_ParseOK);
     LogTimeInfo info2(
@@ -159,8 +159,8 @@ void DataIntegrityUnittest::MockIntegrityData() {
     LogTimeInfo info3(
         90, 1539091747, 5, LogTimeInfo::LogIntegrityStatus_SendFail | LogTimeInfo::LogIntegrityStatus_ParseOK);
 
-    //const std::string& region, const std::string& projectName, const std::string& logstore, const std::string& filename,
-    //const std::string& integrityProject, const std::string& integrityLogstore
+    // const std::string& region, const std::string& projectName, const std::string& logstore, const std::string&
+    // filename, const std::string& integrityProject, const std::string& integrityLogstore
     LogIntegrityInfo* logIntegrityInfo = new LogIntegrityInfo(
         "cn-gzone-ant", "test_project", "test_logstore", "abc.log", "aliuid", "test_project", "data_integrity");
     logIntegrityInfo->mSendSucceededFlag = true;

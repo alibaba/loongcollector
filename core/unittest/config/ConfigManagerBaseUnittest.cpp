@@ -69,16 +69,16 @@ public:
         unsetenv("__path4ut");
         unsetenv("__file4ut");
         APSARA_TEST_EQUAL(logtail::replaceEnvVarRefInStr(str), "/*.log");
-        //APSARA_TEST_TRUE_DESC(pwItr != EventDispatcher::GetInstance()->mPathWdMap.end(), dir);
+        // APSARA_TEST_TRUE_DESC(pwItr != EventDispatcher::GetInstance()->mPathWdMap.end(), dir);
         setenv("__path4ut", "/_home/$work", 1);
         setenv("__file4ut", "!transaction/~un-do.log", 1);
         APSARA_TEST_EQUAL(logtail::replaceEnvVarRefInStr(str), "/_home/$work/!transaction/~un-do.log");
-#else //windows
+#else // windows
         str = "${__path4ut}\\${__file4ut:*.log}";
         _putenv_s("__path4ut", "");
         _putenv_s("__file4ut", "");
         APSARA_TEST_EQUAL(logtail::replaceEnvVarRefInStr(str), "\\*.log");
-        //APSARA_TEST_TRUE_DESC(pwItr != EventDispatcher::GetInstance()->mPathWdMap.end(), dir);
+        // APSARA_TEST_TRUE_DESC(pwItr != EventDispatcher::GetInstance()->mPathWdMap.end(), dir);
         _putenv_s("__path4ut", "C:\\Users\\$work");
         _putenv_s("__file4ut", "!transaction\\~un-do.log");
         APSARA_TEST_EQUAL(logtail::replaceEnvVarRefInStr(str), "C:\\Users\\$work\\!transaction\\~un-do.log");

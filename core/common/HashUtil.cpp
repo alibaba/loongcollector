@@ -58,13 +58,15 @@ namespace logtail {
         (a) = SHIFT_LEFT((a), (shift)); \
         (a) += (b); \
     }
-////////////////////////////////////////////////////////// GLOBAL VARIABLE /////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////// GLOBAL VARIABLE
+////////////////////////////////////////////////////////////
 const uint8_t gPadding[64]
     = {0x80, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
        0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
        0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
 
-//////////////////////////////////////////////////////// LOCAL DECLEARATION //////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////// LOCAL DECLEARATION
+/////////////////////////////////////////////////////////////
 struct Md5Block {
     uint32_t word[16];
 };
@@ -171,122 +173,122 @@ void CalMd5(struct Md5Block block, uint32_t h[4]) {
 void DoMd5Little(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t hash[16]) {
     struct Md5Block block;
 
-    ///initialize hash value
+    /// initialize hash value
     uint32_t h[4];
     h[0] = 0x67452301;
     h[1] = 0xEFCDAB89;
     h[2] = 0x98BADCFE;
     h[3] = 0x10325476;
 
-    ///padding and divide input data into blocks
-    uint64_t fullLen = (inputBytesNum >> 6) << 6; ///complete blocked length
-    uint64_t partLen = inputBytesNum & 0x3F; ///length remained
+    /// padding and divide input data into blocks
+    uint64_t fullLen = (inputBytesNum >> 6) << 6; /// complete blocked length
+    uint64_t partLen = inputBytesNum & 0x3F; /// length remained
 
     uint32_t i;
     for (i = 0; i < fullLen; i += 64) {
-        ///copy input data into block
+        /// copy input data into block
         memcpy(block.word, &(poolIn[i]), 64);
 
-        ///calculate Md5
+        /// calculate Md5
         CalMd5(block, h);
     }
 
 
-    if (partLen > 55) ///append two more blocks
+    if (partLen > 55) /// append two more blocks
     {
-        ///copy input data into block and pad
+        /// copy input data into block and pad
         memcpy(block.word, &(poolIn[i]), partLen);
         memcpy(((uint8_t*)&(block.word[partLen >> 2])) + (partLen & 0x3), gPadding, (64 - partLen));
 
-        ///calculate Md5
+        /// calculate Md5
         CalMd5(block, h);
 
-        ///set rest byte to 0x0
+        /// set rest byte to 0x0
         memset(block.word, 0x0, 64);
-    } else ///append one more block
+    } else /// append one more block
     {
-        ///copy input data into block and pad
+        /// copy input data into block and pad
         memcpy(block.word, &(poolIn[i]), partLen);
         memcpy(((uint8_t*)&(block.word[partLen >> 2])) + (partLen & 0x3), gPadding, (64 - partLen));
     }
 
-    ///append length (bits)
+    /// append length (bits)
     uint64_t bitsNum = inputBytesNum * 8;
     memcpy(&(block.word[14]), &bitsNum, 8);
 
-    ///calculate Md5
+    /// calculate Md5
     CalMd5(block, h);
 
-    ///clear sensitive information
+    /// clear sensitive information
     memset(block.word, 0, 64);
 
-    ///fill hash value
+    /// fill hash value
     memcpy(&(hash[0]), &(h[0]), 16);
-} ///DoMd5Little
+} /// DoMd5Little
 
 void DoMd5Big(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t hash[16]) {
     struct Md5Block block;
     uint8_t tempBlock[64];
 
-    ///initialize hash value
+    /// initialize hash value
     uint32_t h[4];
     h[0] = 0x67452301;
     h[1] = 0xEFCDAB89;
     h[2] = 0x98BADCFE;
     h[3] = 0x10325476;
 
-    ///padding and divide input data into blocks
+    /// padding and divide input data into blocks
     uint64_t fullLen = (inputBytesNum >> 6) << 6;
     uint64_t partLen = inputBytesNum & 0x3F;
 
     uint32_t i;
     for (i = 0; i < fullLen; i += 64) {
-        ///copy input data into block, in little endian
+        /// copy input data into block, in little endian
         CopyBytesToBlock(&(poolIn[i]), block);
 
-        ///calculate Md5
+        /// calculate Md5
         CalMd5(block, h);
     }
 
-    ///append two more blocks
+    /// append two more blocks
     if (partLen > 55) {
-        ///put input data into a temporary block
+        /// put input data into a temporary block
         memcpy(tempBlock, &(poolIn[i]), partLen);
         memcpy(&(tempBlock[partLen]), gPadding, (64 - partLen));
 
-        ///copy temporary data into block, in little endian
+        /// copy temporary data into block, in little endian
         CopyBytesToBlock(tempBlock, block);
 
-        ///calculate Md5
+        /// calculate Md5
         CalMd5(block, h);
 
         memset(tempBlock, 0x0, 64);
     }
-    ///append one more block
+    /// append one more block
     else {
         memcpy(tempBlock, &(poolIn[i]), partLen);
         memcpy(&(tempBlock[partLen]), gPadding, (64 - partLen));
     }
-    ///append length (bits)
+    /// append length (bits)
     uint64_t bitsNum = inputBytesNum * 8;
     memcpy(&(tempBlock[56]), &bitsNum, 8);
 
-    ///copy temporary data into block, in little endian
+    /// copy temporary data into block, in little endian
     CopyBytesToBlock(tempBlock, block);
 
-    ///calculate Md5
+    /// calculate Md5
     CalMd5(block, h);
 
-    ///clear sensitive information
+    /// clear sensitive information
     memset(block.word, 0, 64);
     memset(tempBlock, 0, 64);
 
-    ///fill hash value
+    /// fill hash value
     memcpy(&(hash[0]), &(h[0]), 16);
-} ///DoMd5Big
+} /// DoMd5Big
 
 void DoMd5(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t md5[16]) {
-    ///detect big or little endian
+    /// detect big or little endian
     union {
         uint32_t a;
         uint8_t b;
@@ -294,15 +296,15 @@ void DoMd5(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t md5[16])
 
     symbol.a = 1;
 
-    ///for little endian
+    /// for little endian
     if (symbol.b == 1) {
         DoMd5Little(poolIn, inputBytesNum, md5);
     }
-    ///for big endian
+    /// for big endian
     else {
         DoMd5Big(poolIn, inputBytesNum, md5);
     }
-} ///DoMd5
+} /// DoMd5
 
 bool SignatureToHash(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize) {
     sigSize = (uint32_t)signature.size();

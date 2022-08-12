@@ -99,7 +99,7 @@ public:
         int32_t length = (rand() % (maxLength - minLength + 1)) + minLength;
         string randomStr = "";
         for (int32_t i = 0; i < length; ++i) {
-            //A-Z: 65-90
+            // A-Z: 65-90
             int temp = (rand() % (90 - 65 + 1)) + 65;
             randomStr += (char)temp;
         }
@@ -118,7 +118,7 @@ public:
     void MockDefaultConfigs() {
         Json::Value rootJson;
 
-        //commonreg1.com -- logpath: A/B;  preserve: false;  preserve_depth: 1
+        // commonreg1.com -- logpath: A/B;  preserve: false;  preserve_depth: 1
         Json::Value commonreg_com;
         commonreg_com["project_name"] = Json::Value("1000000_proj");
         commonreg_com["category"] = Json::Value("app_log");
@@ -153,7 +153,7 @@ public:
         commonreg_com["preserve_depth"] = Json::Value(1);
         rootJson["commonreg1.com"] = commonreg_com;
 
-        //commonreg2.com -- logpath: A/B/C/Service;  preserve: true
+        // commonreg2.com -- logpath: A/B/C/Service;  preserve: true
         Json::Value commonreg_com2;
         commonreg_com2["project_name"] = Json::Value("1000000_proj");
         commonreg_com2["category"] = Json::Value("app_log");
@@ -191,7 +191,7 @@ public:
     void MockFoceMultiConfigs() {
         Json::Value rootJson;
 
-        //commonreg1.com -- logpath: A/B;  preserve: false;  preserve_depth: 1
+        // commonreg1.com -- logpath: A/B;  preserve: false;  preserve_depth: 1
         Json::Value commonreg_com;
         commonreg_com["project_name"] = Json::Value("1000000_proj");
         commonreg_com["category"] = Json::Value("app_log");
@@ -286,14 +286,14 @@ public:
         CaseSetUp();
 
         string path[] = {
-            //timeout
-            "/A/B", //false
-            "/A/B/Job", //false
-            "/A/B/C", //false
-            "/A/B/C/Job", //true
-            "/A/B/C/Service", //false
-            "/A/B/C/Service/s1", //false
-            "/A/B/C/Service/s2" //false
+            // timeout
+            "/A/B", // false
+            "/A/B/Job", // false
+            "/A/B/C", // false
+            "/A/B/C/Job", // true
+            "/A/B/C/Service", // false
+            "/A/B/C/Service/s1", // false
+            "/A/B/C/Service/s2" // false
         };
 
         bool result[] = {false, false, false, true, false, false, false};
@@ -328,7 +328,7 @@ public:
 
     void MockLotsOfConfigs() {
         Json::Value rootJson;
-        //common regex log
+        // common regex log
         for (size_t i = 0; i < 1000; i++) {
             string logName = "common_regex_log_" + ToString(i);
             Json::Value commonreg_com;
@@ -392,7 +392,7 @@ public:
     void MockMaxDepthConfigs() {
         Json::Value rootJson;
 
-        //commonreg1.com
+        // commonreg1.com
         Json::Value commonreg_com;
         commonreg_com["project_name"] = Json::Value("1000000_proj");
         commonreg_com["category"] = Json::Value("app_log");
@@ -409,10 +409,10 @@ public:
         commonreg_com["regex"] = regs;
         commonreg_com["keys"] = keys;
         commonreg_com["preserve"] = Json::Value(true);
-        commonreg_com["max_depth"] = -1; //default
+        commonreg_com["max_depth"] = -1; // default
         rootJson["commonreg1.com"] = commonreg_com;
 
-        //commonreg2.com
+        // commonreg2.com
         Json::Value commonreg_com2;
         commonreg_com2["project_name"] = Json::Value("1000000_proj");
         commonreg_com2["category"] = Json::Value("app_log_2");
@@ -432,7 +432,7 @@ public:
         commonreg_com2["max_depth"] = 0;
         rootJson["commonreg2.com"] = commonreg_com2;
 
-        //commonreg3.com
+        // commonreg3.com
         Json::Value commonreg_com3;
         commonreg_com3["project_name"] = Json::Value("1000000_proj");
         commonreg_com3["category"] = Json::Value("app_log_3");

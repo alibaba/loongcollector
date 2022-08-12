@@ -77,7 +77,7 @@ void NormalEventHandler::Handle(const Event& event) {
                 // filename before rollback is not exist this moment
                 LOG_DEBUG(sLogger, ("get path info error", fullPath));
             } else if (buf.IsDir()) {
-                //register consider timeout
+                // register consider timeout
                 mCreateHandlerPtr->Handle(event);
             } else if (!buf.IsRegFile()) {
                 LOG_INFO(sLogger, ("path is not file or directory, ignore it", fullPath)("stat mode", buf.GetMode()));
@@ -127,8 +127,8 @@ void NormalEventHandler::Handle(const Event& event) {
             } else {
                 delete handler;
             }
-            //from now on, it's ret who is responsible for this directory
-            //And when it's timeout configmanager will delete it
+            // from now on, it's ret who is responsible for this directory
+            // And when it's timeout configmanager will delete it
 
             if (ConfigManager::GetInstance()->HaveFuseConfig()) {
                 FuseFileBlacklist::GetInstance()->RemoveFromBlackList(PathJoin(path, name));
@@ -403,7 +403,8 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(
                 return LogFileReaderPtr();
             }
         } else {
-            // if first create, we should check and update file signature, because when blocked, new reader will have no chance to update signature
+            // if first create, we should check and update file signature, because when blocked, new reader will have no
+            // chance to update signature
             int64_t fileSize;
             if (!readerPtr->CheckFileSignatureAndOffset(fileSize)) {
                 LOG_ERROR(sLogger, ("check file signature fail when create reader", PathJoin(path, name)));
@@ -470,7 +471,8 @@ void ModifyHandler::Handle(const Event& event) {
             }
         }
     } else if (event.IsModify()) {
-        // devInode cannot be found, this means a rotate file(like a.log.1) has event, and reader for rotate file is moved to mRotatorReaderMap
+        // devInode cannot be found, this means a rotate file(like a.log.1) has event, and reader for rotate file is
+        // moved to mRotatorReaderMap
         if (devInode.IsValid() && devInodeIter == mDevInodeReaderMap.end()) {
             DevInodeLogFileReaderMap::iterator rotateIter = mRotatorReaderMap.find(devInode);
             // the reader for file(whether it's a.log or a.log.1) exists in mDevInodeReaderMap or mRotatorReaderMap
@@ -543,8 +545,9 @@ void ModifyHandler::Handle(const Event& event) {
                     if (readerArray.size() >= config->mAdvancedConfig.mMaxRotateQueueSize) {
                         readerPtr = readerArray[0];
                         // push modify event, use head dev inode
-                        //Event* ev = new Event(event.GetSource(), event.GetObject(), event.GetType(), event.GetWd(), event.GetCookie(), readerArray[0]->GetDevInode().dev, readerArray[0]->GetDevInode().inode);
-                        //LogInput::GetInstance()->PushEventQueue(ev);
+                        // Event* ev = new Event(event.GetSource(), event.GetObject(), event.GetType(), event.GetWd(),
+                        // event.GetCookie(), readerArray[0]->GetDevInode().dev, readerArray[0]->GetDevInode().inode);
+                        // LogInput::GetInstance()->PushEventQueue(ev);
                     } else {
                         // other fail, return
                         return;
@@ -579,9 +582,12 @@ void ModifyHandler::Handle(const Event& event) {
                             ("too many open files", "skip this read operation")("log path", reader->GetLogPath()));
                 return;
             }
-            // eg: a.log rotate to a.log1, event sequece : a.log write 2min ago, file ptr closed -> a.log rotate a.log1 -> logtail process new a.log modify -> open file fail -> [old] delete reader -> logtail process a.log1 modify
+            // eg: a.log rotate to a.log1, event sequece : a.log write 2min ago, file ptr closed -> a.log rotate a.log1
+            // -> logtail process new a.log modify -> open file fail -> [old] delete reader -> logtail process a.log1
+            // modify
             //     -> cannot find reader, treat as new file -> read log tail(1MB)
-            // so when open file ptr faild, put this reader into rotator map, when process a.log1 modify event, we can find it in rotator map
+            // so when open file ptr faild, put this reader into rotator map, when process a.log1 modify event, we can
+            // find it in rotator map
             LOG_INFO(sLogger,
                      ("open file ptr failed, push into rotate map, inode",
                       reader->GetDevInode().inode)("real path", reader->GetRealLogPath())(
@@ -668,7 +674,7 @@ void ModifyHandler::Handle(const Event& event) {
                                                                       reader->GetLastFilePos(),
                                                                       time(NULL));
                 logBuffer->SetDependecy(reader);
-                while (!LogProcess::GetInstance()->PushBuffer(logBuffer)) //10ms
+                while (!LogProcess::GetInstance()->PushBuffer(logBuffer)) // 10ms
                 {
                     ++pushRetry;
                     if (pushRetry % 10 == 0)
@@ -744,7 +750,8 @@ void ModifyHandler::Handle(const Event& event) {
             LogInput::GetInstance()->PushEventQueue(ev);
         }
     }
-    // if a file is created, and dev inode cannot found(this means it's a new file), create reader for this file, then insert reader into mDevInodeReaderMap
+    // if a file is created, and dev inode cannot found(this means it's a new file), create reader for this file, then
+    // insert reader into mDevInodeReaderMap
     else if (event.IsCreate()) {
         if (!devInode.IsValid()) {
             return;

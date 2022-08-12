@@ -43,18 +43,18 @@ public:
         size_t tmpReader = mReader;
         size_t nextWriter = (tmpWriter + 1) % SIZE;
 
-        //ensure we check the mReader *before* write the item into mData
+        // ensure we check the mReader *before* write the item into mData
         ReadWriteBarrier();
 
         if (nextWriter == tmpReader) {
-            //the buffer is full
+            // the buffer is full
             return false;
         }
 
-        //cast off "volatile"
+        // cast off "volatile"
         const_cast<T&>(mData[tmpWriter]) = item;
 
-        //ensure the item writes into mData *before* we update mWriter
+        // ensure the item writes into mData *before* we update mWriter
         WriteBarrier();
 
         mWriter = nextWriter;
@@ -67,7 +67,7 @@ public:
             if (TryPushItem(item)) {
                 return;
             }
-            usleep(SLEEP_TIME); //microseconds
+            usleep(SLEEP_TIME); // microseconds
         }
     }
 
@@ -75,18 +75,18 @@ public:
         size_t tmpWriter = mWriter;
         size_t tmpReader = mReader;
 
-        //ensure we check the mWriter *before* read the item from mData
+        // ensure we check the mWriter *before* read the item from mData
         ReadBarrier();
 
         if (tmpWriter == tmpReader) {
-            //the buffer is empty
+            // the buffer is empty
             return false;
         }
 
-        //cast off "volatile"
+        // cast off "volatile"
         item = const_cast<T&>(mData[tmpReader]);
 
-        //ensure we read the item *before* update mReader
+        // ensure we read the item *before* update mReader
         ReadWriteBarrier();
 
         size_t NextReader = (tmpReader + 1) % SIZE;
@@ -99,16 +99,16 @@ public:
             if (TryPopItem(item)) {
                 return;
             }
-            usleep(SLEEP_TIME); //microseconds
+            usleep(SLEEP_TIME); // microseconds
         }
     }
 
     size_t GetItemNumber() { return mItemNumber; }
 
 private:
-    //Because we always "Keep One Item Open", the actually size should be N + 1
+    // Because we always "Keep One Item Open", the actually size should be N + 1
     static const size_t SIZE = N + 1;
-    static const int SLEEP_TIME = 10; //microsecond
+    static const int SLEEP_TIME = 10; // microsecond
     volatile size_t mWriter;
     volatile size_t mReader;
     volatile T mData[SIZE];

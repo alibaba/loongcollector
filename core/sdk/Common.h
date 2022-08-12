@@ -36,7 +36,7 @@ namespace sdk {
 
     const uint32_t LOG_REQUEST_TIMEOUT = 20;
     const uint32_t MD5_BYTES = 16;
-#define DATE_FORMAT_RFC822 "%a, %d %b %Y %H:%M:%S GMT" ///<RFC822 date formate, GMT time.
+#define DATE_FORMAT_RFC822 "%a, %d %b %Y %H:%M:%S GMT" ///< RFC822 date formate, GMT time.
 
     extern const char* const LOG_HEADSIGNATURE_PREFIX; ///< "";
 
@@ -150,16 +150,16 @@ namespace sdk {
     extern const char* const LOG_SHARD_STATUS_READONLY; // "readonly";
 
     /**
- * HTTP message structure includes three parts: http status code, http header, and http content.
- */
+     * HTTP message structure includes three parts: http status code, http header, and http content.
+     */
     struct HttpMessage {
-        int32_t statusCode = 0; ///<Http status code
-        std::map<std::string, std::string> header; ///<Only contains the header lines which have key:value pair
-        std::string content; ///<Http content
+        int32_t statusCode = 0; ///< Http status code
+        std::map<std::string, std::string> header; ///< Only contains the header lines which have key:value pair
+        std::string content; ///< Http content
         /** Constructor with no parameter.
-    * @param void None.
-    * @return The objcect pointer.
-    */
+         * @param void None.
+         * @return The objcect pointer.
+         */
         HttpMessage() {}
         /** Constructor with header and content.
     * @param para_header A map structure which contains the key:value pair of http header lines.
@@ -197,10 +197,10 @@ namespace sdk {
     };
 
     /*
- * Responses
- */
+     * Responses
+     */
     struct Response {
-        int32_t statusCode = 0; ///<Http status code
+        int32_t statusCode = 0; ///< Http status code
         std::string requestId;
 
         virtual ~Response() {}
@@ -230,12 +230,12 @@ namespace sdk {
 #define BIT_COUNT_BYTES (BIT_COUNT_WORDS * sizeof(uint32_t))
 
     /** Calculate Md5 for a byte stream,
-* result is stored in md5[16]
-*
-* @param poolIn Input data
-* @param inputBytesNum Length of input data
-* @param md5[16] A 128-bit pool for storing md5
-*/
+     * result is stored in md5[16]
+     *
+     * @param poolIn Input data
+     * @param inputBytesNum Length of input data
+     * @param md5[16] A 128-bit pool for storing md5
+     */
     void DoMd5(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t md5[16]);
     void Base64Encoding(std::istream&,
                         std::ostream&,

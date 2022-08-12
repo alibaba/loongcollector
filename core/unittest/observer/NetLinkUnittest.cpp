@@ -37,31 +37,31 @@ public:
     }
 
     /**
-         *   [2022-04-27 15:04:30.859418]    [debug] open self net ns:success        path:/dev/proc/self/ns/net
-         *   [2022-04-27 15:04:30.859437]    [debug] open pid net ns:success path:/dev/proc/27534/ns/net
-         *   [2022-04-27 15:04:30.859444]    [debug] set ns status:success
-         *   [2022-04-27 15:04:30.859448]    [debug] recover netlink net ns:success
-         *   [2022-04-27 15:04:30.859454]    [debug] close pid net ns fd:success
-         *   [2022-04-27 15:04:30.859457]    [debug] close self net ns fd:success
-         */
+     *   [2022-04-27 15:04:30.859418]    [debug] open self net ns:success        path:/dev/proc/self/ns/net
+     *   [2022-04-27 15:04:30.859437]    [debug] open pid net ns:success path:/dev/proc/27534/ns/net
+     *   [2022-04-27 15:04:30.859444]    [debug] set ns status:success
+     *   [2022-04-27 15:04:30.859448]    [debug] recover netlink net ns:success
+     *   [2022-04-27 15:04:30.859454]    [debug] close pid net ns fd:success
+     *   [2022-04-27 15:04:30.859457]    [debug] close self net ns fd:success
+     */
     void TestBindNetNamespace() { NetLinkBinder binder(27534, "/dev/proc"); }
 
     /**
-         * inode221157938
-         * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.30.73.112 localPort: 2222 remotePort: 61552 stat: 1
-         * inode44347245
-         * family: 2 localAddr: 11.122.76.82 remoteAddr: 11.239.153.17 localPort: 20459 remotePort: 19888 stat: 1
-         * inode220153303
-         * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.25.233.92 localPort: 2222 remotePort: 52762 stat: 1
-         * inode221725976
-         * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.30.73.112 localPort: 2222 remotePort: 50089 stat: 1
-         * inode221434065
-         * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.30.73.112 localPort: 22 remotePort: 63831 stat: 1
-         * inode220153335
-         * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.25.233.92 localPort: 2222 remotePort: 52767 stat: 1
-         * inode195705799
-         * family: 2 localAddr: 11.122.76.82 remoteAddr: 100.82.131.45 localPort: 60430 remotePort: 8000 stat: 1
-         */
+     * inode221157938
+     * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.30.73.112 localPort: 2222 remotePort: 61552 stat: 1
+     * inode44347245
+     * family: 2 localAddr: 11.122.76.82 remoteAddr: 11.239.153.17 localPort: 20459 remotePort: 19888 stat: 1
+     * inode220153303
+     * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.25.233.92 localPort: 2222 remotePort: 52762 stat: 1
+     * inode221725976
+     * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.30.73.112 localPort: 2222 remotePort: 50089 stat: 1
+     * inode221434065
+     * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.30.73.112 localPort: 22 remotePort: 63831 stat: 1
+     * inode220153335
+     * family: 2 localAddr: 11.122.76.82 remoteAddr: 30.25.233.92 localPort: 2222 remotePort: 52767 stat: 1
+     * inode195705799
+     * family: 2 localAddr: 11.122.76.82 remoteAddr: 100.82.131.45 localPort: 60430 remotePort: 8000 stat: 1
+     */
     void TestFetchInetConnections() {
         NetLinkProber prober(594114, 1, "/dev/proc/");
         ASSERT_TRUE(prober.Status() == 0);

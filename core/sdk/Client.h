@@ -27,14 +27,15 @@ namespace sdk {
     class Client {
     public:
         /** Constructor needs at least three parameters.
-    * @param LOGHost LOG service address, for example:http://cn-hangzhou.log.aliyuncs.com.
-    * @param accessKeyId Aliyun AccessKeyId.
-    * @param accessKey Aliyun AccessKey Secret.
-    * @param timeout Timeout time of one operation.
-    * @param source Source identifier used to differentiate data from different machines. If it is empty, constructor will use machine ip as its source.
-    * @param compressFlag The flag decides whether compresses the data or not when put data to LOG.
-    * @return The objcect pointer.
-    */
+         * @param LOGHost LOG service address, for example:http://cn-hangzhou.log.aliyuncs.com.
+         * @param accessKeyId Aliyun AccessKeyId.
+         * @param accessKey Aliyun AccessKey Secret.
+         * @param timeout Timeout time of one operation.
+         * @param source Source identifier used to differentiate data from different machines. If it is empty,
+         * constructor will use machine ip as its source.
+         * @param compressFlag The flag decides whether compresses the data or not when put data to LOG.
+         * @return The objcect pointer.
+         */
         Client(const std::string& slsHost,
                const std::string& accessKeyId,
                const std::string& accessKey,
@@ -88,31 +89,31 @@ namespace sdk {
 
         /////////////////////////////////////Internal Interface For Logtail////////////////////////////////////////
         /** Sync Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
-     * @param project The project name
-     * @param serialized data of logGroup, LZ4 comressed
-     * @rawSize before compress
-     * @return request_id.
-     */
+         * @param project The project name
+         * @param serialized data of logGroup, LZ4 comressed
+         * @rawSize before compress
+         * @return request_id.
+         */
         PostLogStoreLogsResponse PostLogStoreLogs(const std::string& project,
                                                   const std::string& logstore,
                                                   const std::string& compressedLogGroup,
                                                   uint32_t rawSize,
                                                   const std::string& hashKey = "");
         /** Sync Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
-     * @param project The project name
-     * @param serialized data of logPackageList, consist of several LogGroup
-     * @return request_id.
-     */
+         * @param project The project name
+         * @param serialized data of logPackageList, consist of several LogGroup
+         * @return request_id.
+         */
         PostLogStoreLogsResponse PostLogStoreLogPackageList(const std::string& project,
                                                             const std::string& logstore,
                                                             const std::string& packageListData,
                                                             const std::string& hashKey = "");
         /** Async Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
-     * @param project The project name
-     * @param serialized data of logGroup, LZ4 comressed
-     * @rawSize before compress
-     * @return request_id.
-     */
+         * @param project The project name
+         * @param serialized data of logGroup, LZ4 comressed
+         * @rawSize before compress
+         * @return request_id.
+         */
         void PostLogStoreLogs(const std::string& project,
                               const std::string& logstore,
                               const std::string& compressedLogGroup,
@@ -121,10 +122,10 @@ namespace sdk {
                               const std::string& hashKey = "",
                               int64_t hashKeySeqID = kInvalidHashKeySeqID);
         /** Async Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
-     * @param project The project name
-     * @param serialized data of logPackageList, consist of several LogGroup
-     * @return request_id.
-     */
+         * @param project The project name
+         * @param serialized data of logPackageList, consist of several LogGroup
+         * @return request_id.
+         */
         void PostLogStoreLogPackageList(const std::string& project,
                                         const std::string& logstore,
                                         const std::string& packageListData,

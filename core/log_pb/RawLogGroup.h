@@ -277,4 +277,4 @@ inline ::std::string* RawLogGroup::mutable_machineuuid() {
 
 } // namespace logtail
 
-#endif //LOGTAIL_RAWLOGGROUP_H
+#endif // LOGTAIL_RAWLOGGROUP_H

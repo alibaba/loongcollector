@@ -48,7 +48,8 @@ void BlockedEventManager::UpdateBlockEvent(const LogstoreFeedBackKey& logstoreKe
             .append(pEvent->GetConfigName());
         hashKey = HashSignatureString(key.c_str(), key.size());
     }
-    //LOG_DEBUG(sLogger, ("Add block event ", pEvent->GetSource())(pEvent->GetObject(), pEvent->GetInode())(pEvent->GetConfigName(), hashKey));
+    // LOG_DEBUG(sLogger, ("Add block event ", pEvent->GetSource())(pEvent->GetObject(),
+    // pEvent->GetInode())(pEvent->GetConfigName(), hashKey));
     ScopedSpinLock lock(mLock);
     mBlockEventMap[hashKey].Update(logstoreKey, pEvent, curTime);
 }
@@ -62,7 +63,9 @@ void BlockedEventManager::GetTimeoutEvent(std::vector<Event*>& eventVec, int32_t
         if (blockedEvent.mEvent != NULL && blockedEvent.mInvalidTime + blockedEvent.mTimeout <= curTime) {
             if (pProcess->IsValidToReadLog(blockedEvent.mLogstoreKey)) {
                 eventVec.push_back(blockedEvent.mEvent);
-                //LOG_DEBUG(sLogger, ("Get timeout block event  ", blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(), blockedEvent.mEvent->GetConfigName()));
+                // LOG_DEBUG(sLogger, ("Get timeout block event  ",
+                // blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(),
+                // blockedEvent.mEvent->GetConfigName()));
                 iter = mBlockEventMap.erase(iter);
                 continue;
             } else {
@@ -74,7 +77,7 @@ void BlockedEventManager::GetTimeoutEvent(std::vector<Event*>& eventVec, int32_t
 }
 
 void BlockedEventManager::FeedBack(const LogstoreFeedBackKey& key) {
-    //LOG_DEBUG(sLogger, ("Get feedback block event  ", key));
+    // LOG_DEBUG(sLogger, ("Get feedback block event  ", key));
     std::vector<Event*> eventVec;
     {
         ScopedSpinLock lock(mLock);
@@ -83,7 +86,9 @@ void BlockedEventManager::FeedBack(const LogstoreFeedBackKey& key) {
             BlockedEvent& blockedEvent = iter->second;
             if (blockedEvent.mEvent != NULL && blockedEvent.mLogstoreKey == key) {
                 eventVec.push_back(blockedEvent.mEvent);
-                //LOG_DEBUG(sLogger, ("Get feedback block event  ", blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(), blockedEvent.mEvent->GetConfigName()));
+                // LOG_DEBUG(sLogger, ("Get feedback block event  ",
+                // blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(),
+                // blockedEvent.mEvent->GetConfigName()));
                 iter = mBlockEventMap.erase(iter);
             } else {
                 ++iter;

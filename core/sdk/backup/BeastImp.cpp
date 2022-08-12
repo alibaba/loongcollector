@@ -113,9 +113,9 @@ namespace sdk {
             std::cerr << "Error: " << e.what() << std::endl;
             for (auto iter = res.begin(); iter != res.end(); ++iter) {
                 auto iter_cp = iter;
-                //std::cerr << "header : " << std::to_string(*iter) << std::endl;
+                // std::cerr << "header : " << std::to_string(*iter) << std::endl;
             }
-            //std::cerr << "Response : " << res.begin() << std::endl;
+            // std::cerr << "Response : " << res.begin() << std::endl;
         }
     }
     void BeastClient::AsynSend(const std::string& httpMethod,
@@ -128,7 +128,8 @@ namespace sdk {
                                const int32_t timeout,
                                LogsClosure* callBack,
                                const std::string& interface,
-                               const bool httpsFlag) {}
+                               const bool httpsFlag) {
+    }
 
 } // namespace sdk
 

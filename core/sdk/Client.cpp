@@ -94,7 +94,8 @@ namespace sdk {
         }
     }
 
-    Client::~Client() throw() {}
+    Client::~Client() throw() {
+    }
 
     void Client::SetPort(int32_t port) {
         mPort = port;
@@ -149,7 +150,9 @@ namespace sdk {
         return hostFieldSuffix;
     }
 
-    bool Client::GetRawSlsHostFlag() { return mIsHostRawIp; }
+    bool Client::GetRawSlsHostFlag() {
+        return mIsHostRawIp;
+    }
 
     void Client::SetSlsHost(const string& slsHost) {
         mSpinLock.lock();

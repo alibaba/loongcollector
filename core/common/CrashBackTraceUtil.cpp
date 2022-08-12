@@ -69,15 +69,16 @@ void CrashBackTrace(int signum) {
         memset(sym, 0, sizeof(sym));
         if (unw_get_proc_name(&cursor, sym, sizeof(sym), &offset) == 0) {
             char* nameptr = sym;
-            //int status;
-            // do not call __cxa_demangle, this will call malloc, and if program crash in malloc(tcmalloc), then it will case dead lock
-            //char* demangled = abi::__cxa_demangle(sym, NULL, NULL, &status);
-            //if (status == 0) {
-            //    nameptr = demangled;
-            //}
+            // int status;
+            //  do not call __cxa_demangle, this will call malloc, and if program crash in malloc(tcmalloc), then it
+            //  will case dead lock
+            // char* demangled = abi::__cxa_demangle(sym, NULL, NULL, &status);
+            // if (status == 0) {
+            //     nameptr = demangled;
+            // }
             fprintf(g_crashBackTraceFilePtr, " (%s+0x%lx)\n", nameptr, offset);
             // no need to call free
-            //std::free(demangled);
+            // std::free(demangled);
         }
     }
     fclose(g_crashBackTraceFilePtr);

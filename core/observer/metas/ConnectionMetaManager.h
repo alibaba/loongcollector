@@ -124,20 +124,20 @@ public:
 
 private:
     /**
-         * Send dump connections request with netlink
-         * reference：
-         * 1.-0 https://man7.org/linux/man-pages/man7/sock_diag.7.html
-         * 2. pixie
-         */
+     * Send dump connections request with netlink
+     * reference：
+     * 1.-0 https://man7.org/linux/man-pages/man7/sock_diag.7.html
+     * 2. pixie
+     */
     template <typename msgType>
     bool SendMsg(const msgType& msg, std::string& errorMsg);
 
     /**
-         * Receive dump connections response with netlink
-         * reference：
-         * 1. https://man7.org/linux/man-pages/man7/sock_diag.7.html
-         * 2. pixie
-         */
+     * Receive dump connections response with netlink
+     * reference：
+     * 1. https://man7.org/linux/man-pages/man7/sock_diag.7.html
+     * 2. pixie
+     */
     template <typename msgType>
     bool ReceiveMsg(std::unordered_map<uint32_t, ConnectionInfoPtr>& infos, std::string& errorMsg);
 

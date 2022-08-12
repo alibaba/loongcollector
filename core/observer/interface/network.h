@@ -90,7 +90,7 @@ inline std::string PacketEventTypeToString(enum PacketEventType type) {
 struct NetStatisticsKey {
     uint32_t PID;
     uint32_t SockHash; // hashed by local addr + local port + remote addrr +
-        // remote port
+                       // remote port
     SockAddress SrcAddr;
     uint16_t SrcPort;
     SockAddress DstAddr;
@@ -148,7 +148,7 @@ struct NetStatisticsTCP {
 struct PacketEventHeader {
     uint32_t PID;
     uint32_t SockHash; // hashed by local addr + local port + remote addrr +
-        // remote port
+                       // remote port
 
     PacketEventType EventType;
     PacketRoleType RoleType;
@@ -170,5 +170,5 @@ struct PacketEventData {
     int32_t BufferLen; // 实际拷贝的数据包大小，即Buffer的Size
 
     char* Buffer; // 一般设置为 buffer + sizeof(PacketEventHeader) +
-        // sizeof(PacketEventData)
+                  // sizeof(PacketEventData)
 };

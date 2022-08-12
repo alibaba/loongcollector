@@ -50,7 +50,7 @@ bool IsValidJson(const char* buffer, int32_t size) {
                 inQuote = !inQuote;
                 break;
             case '\\':
-                ++idx; //skip next char after escape char
+                ++idx; // skip next char after escape char
                 break;
             default:
                 break;

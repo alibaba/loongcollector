@@ -119,11 +119,11 @@ TEST_F(SDKClientUnittest, PostLogstoreLogsSuccessOpenSource)
     try
     {
         sls_logs::LogGroup logGroup;
-        
+
         logGroup.set_source("192.168.1.1");
         logGroup.set_category(logstore);
         logGroup.set_topic("unittest");
-        
+
         sls_logs::Log* log = logGroup.add_logs();
         log->set_time(time(NULL));
         sls_logs::Log_Content* content = nullptr;
@@ -133,19 +133,19 @@ TEST_F(SDKClientUnittest, PostLogstoreLogsSuccessOpenSource)
         content = log->add_contents();
         content->set_key("kk2");
         content->set_value("vv2");
-        
+
         std::string oriData;
         logGroup.SerializeToString(&oriData);
         int32_t logSize = (int32_t) logGroup.logs_size();
         time_t curTime = time(NULL);
-        
+
         LoggroupTimeValue* data = new LoggroupTimeValue(
-            project, logstore, "ut-config", "ut.log", false, 
+            project, logstore, "ut-config", "ut.log", false,
             uid, "cn-huhehaote", LOGGROUP_LZ4_COMPRESSED,
             logSize, oriData.size(), curTime, "", 0);
-        
+
         ASSERT_TRUE(CompressLz4(oriData, data->mLogData));
-        
+
         sdk::PostLogStoreLogsResponse resp = client.PostLogStoreLogs(
             data->mProjectName,
             data->mLogstore,
@@ -180,11 +180,11 @@ TEST_F(SDKClientUnittest, PostLogstoreLogsSuccessClosedSource)
     try
     {
         sls_logs::LogGroup logGroup;
-        
+
         logGroup.set_source("192.168.1.1");
         logGroup.set_category(logstore);
         logGroup.set_topic("unittest");
-        
+
         sls_logs::Log* log = logGroup.add_logs();
         log->set_time(time(NULL));
         sls_logs::Log_Content* content = nullptr;
@@ -194,19 +194,19 @@ TEST_F(SDKClientUnittest, PostLogstoreLogsSuccessClosedSource)
         content = log->add_contents();
         content->set_key("kk2");
         content->set_value("vv2");
-        
+
         std::string oriData;
         logGroup.SerializeToString(&oriData);
         int32_t logSize = (int32_t) logGroup.logs_size();
         time_t curTime = time(NULL);
-        
+
         LoggroupTimeValue* data = new LoggroupTimeValue(
-            project, logstore, "ut-config", "ut.log", false, 
+            project, logstore, "ut-config", "ut.log", false,
             uid, "cn-huhehaote", LOGGROUP_LZ4_COMPRESSED,
             logSize, oriData.size(), curTime, "", 0);
-        
+
         ASSERT_TRUE(CompressLz4(oriData, data->mLogData));
-        
+
         sdk::PostLogStoreLogsResponse resp = client.PostLogStoreLogs(
             data->mProjectName,
             data->mLogstore,

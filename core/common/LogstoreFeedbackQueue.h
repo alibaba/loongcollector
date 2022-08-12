@@ -593,7 +593,7 @@ public:
                         continue;
                     }
                     // don't set start key, for fairness
-                    //startKey = iter->mKey;
+                    // startKey = iter->mKey;
                     if (rst == 2 && mFeedBackObj != NULL) {
                         mFeedBackObj->FeedBack(iter->mKey);
                     }

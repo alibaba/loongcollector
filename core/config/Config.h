@@ -1,18 +1,18 @@
 /*
-* Copyright 2022 iLogtail Authors
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2022 iLogtail Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #pragma once
 #include <string>
@@ -110,12 +110,12 @@ public:
     bool mIsPreserve; // true is service dir, false is job dir
     int mPreserveDepth; // for job dir, the depth that will not be watch timeout
     int mMaxDepth; // dirs exceed depth will not be monitored
-    std::shared_ptr<std::list<std::string>> mRegs; //regex of log format
-    std::shared_ptr<std::list<std::string>> mKeys; //description of each part of regex
+    std::shared_ptr<std::list<std::string>> mRegs; // regex of log format
+    std::shared_ptr<std::list<std::string>> mKeys; // description of each part of regex
     std::string mTimeFormat; // for common_reg_log
     std::string mCategory;
-    int32_t mTailLimit; //KB
-    std::vector<std::string> mUnAcceptDirPattern; //if not empty, files matching this pattern will not be watched
+    int32_t mTailLimit; // KB
+    std::vector<std::string> mUnAcceptDirPattern; // if not empty, files matching this pattern will not be watched
     //  topic is optional,  only used for common_reg_log and apsara_log , the mTopicFormat is three value type :
     // "default" : for common_reg_log , it's empty, for apsara_log, it's the path without "@hostname" and ".LOG" suffix
     //             if the topic is not set, it will be set to default
@@ -153,7 +153,8 @@ public:
     int mLogTimeZoneOffsetSecond;
     int32_t mCreateTime; // create time of this config
     int32_t
-        mMaxSendBytesPerSecond; // limit for logstore, not just this config. so if we have multi configs with different mMaxSendBytesPerSecond, this logstore's limit will be a random mMaxSendBytesPerSecond
+        mMaxSendBytesPerSecond; // limit for logstore, not just this config. so if we have multi configs with different
+                                // mMaxSendBytesPerSecond, this logstore's limit will be a random mMaxSendBytesPerSecond
     int32_t mSendRateExpireTime; // send rate expire time, along with mMaxSendBytesPerSecond
     int64_t mLogDelayAlarmBytes; // if <=0, discard it, default 0.
     LogstoreFeedBackKey mLogstoreKey;
@@ -163,7 +164,8 @@ public:
     std::string mPluginConfig; // plugin config string
     // mDockerContainerPaths is only modified when HoldOn
     std::shared_ptr<std::vector<DockerContainerPath>>
-        mDockerContainerPaths; // docker file mapping paths, if mPluginConfig is true, mDockerContainerPaths must not be NULL
+        mDockerContainerPaths; // docker file mapping paths, if mPluginConfig is true, mDockerContainerPaths must not be
+                               // NULL
     bool mLocalFlag; // this config is loaded from local or remote
     bool mDockerFileFlag; // docker file flag
     bool mPluginProcessFlag; // file config with plugin process
@@ -253,17 +255,17 @@ public:
     void ParseWildcardPath();
 
     /**whether the dir is watched time out
-    *
-    * @param path for the watching dir
-    */
+     *
+     * @param path for the watching dir
+     */
     bool IsTimeout(const std::string& path);
 
     bool WithinMaxDepth(const std::string& path);
 
     /**create new log file reader for a file
-    *
-    * @param fileName is the newly modified log file
-    */
+     *
+     * @param fileName is the newly modified log file
+     */
     LogFileReader* CreateLogFileReader(const std::string& dir,
                                        const std::string& file,
                                        const DevInode& devInode,

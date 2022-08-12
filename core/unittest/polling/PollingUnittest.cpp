@@ -108,7 +108,7 @@ int gCaseID = 0;
 bool gSetTimeFlag = false;
 int gSendFailType = 1; // 1:network error; 2:all error can write secondary; 3:all error will not write secondary
 
-//warning: if you want to modify these cases, pay attention to the order
+// warning: if you want to modify these cases, pay attention to the order
 void getLogContent(char* buffer, time_t logTime, string content = "", int32_t seq = 0) {
     char timeBuffer[50];
     struct tm timeInfo;
@@ -175,7 +175,7 @@ string GenerateRandomStr(int32_t minLength, int32_t maxLength) {
     int32_t length = (rand() % (maxLength - minLength + 1)) + minLength;
     string randomStr = "";
     for (int32_t i = 0; i < length; ++i) {
-        //ascii: 33 - 126
+        // ascii: 33 - 126
         int temp = (rand() % (126 - 33 + 1)) + 33;
         randomStr += (char)temp;
     }

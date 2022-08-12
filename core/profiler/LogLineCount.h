@@ -53,9 +53,9 @@ private:
     ~LogLineCount();
 
 private:
-    // NOTICE: LogStoreLineCount stands for succeeded line count of log group, when a log group is written to shard successfully,
-    // call back function OnSuccess will be called , thus line count information of a certain region, project, log store in a certain minute
-    // will update corresponding map below.
+    // NOTICE: LogStoreLineCount stands for succeeded line count of log group, when a log group is written to shard
+    // successfully, call back function OnSuccess will be called , thus line count information of a certain region,
+    // project, log store in a certain minute will update corresponding map below.
     struct LogStoreLineCount {
         LogStoreLineCount() {}
         LogStoreLineCount(const std::string& region,
@@ -72,7 +72,8 @@ private:
         // key: time(in minute)
         typedef std::map<int32_t, int32_t> LogCountPerMinuteMap;
         // NotifySuccess() will change this map, insert log lines in a new minute, or add log lines in an existed minute
-        // this map may contain log lines in different minutes because in some occasion, the interval we send the log lines result is bigger than one minute
+        // this map may contain log lines in different minutes because in some occasion, the interval we send the log
+        // lines result is bigger than one minute
         LogCountPerMinuteMap mLogCountPerMinuteMap;
 
         std::string mRegion;

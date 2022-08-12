@@ -62,8 +62,10 @@ enum ebpf_config_primary_e {
     SELF_FILTER, // 默认值-1。是否Disable自身的Trace，为-1代表不Disable，其他情况会传入本进程的ID，这时需要过滤掉该进程所有的数据
     PORT_FILTER, // 默认值-1。端口过滤器，为-1时代表Trace所有端口，其他只允许某一端口
     DATA_SAMPLING, // 默认值100。采样策略，取值0 -> 100，代表采样的百分比(0全部丢弃，100全部上传)
-    // 采样的策略：tcp的包，连接建立的ns时间 % 100， 小于采样率即为需要上传，大于的话对该连接进行标记，不上传Data、Ctrl（统计数据还是要上传）
-    //           udp的包，接收到数据包的ns时间 % 100， 小于采样率即为需要上传，大于的话不上传Data（统计数据还是要上传 @note 要注意统计数据Map的清理策略）
+    // 采样的策略：tcp的包，连接建立的ns时间 % 100，
+    // 小于采样率即为需要上传，大于的话对该连接进行标记，不上传Data、Ctrl（统计数据还是要上传）
+    //           udp的包，接收到数据包的ns时间 % 100， 小于采样率即为需要上传，大于的话不上传Data（统计数据还是要上传
+    //           @note 要注意统计数据Map的清理策略）
     PERF_BUFFER_PAGE, // ring buffer page count, 默认128个页，也就是512KB, opt2 的类型是 callback_type_e
 };
 // opt1 列表：
@@ -74,7 +76,8 @@ enum ebpf_config_primary_e {
 
 /**
  * @brief 配置各类参数，例如监听的TGID、协议、端口等黑白名单，采集策略等
- *        每个参数由对应的配置类型来推导，例如 opt1是 AddPortFilter opt2 是 BlackList，params_count 是1，params = {&uint16_t(80)}, params_len = {2}
+ *        每个参数由对应的配置类型来推导，例如 opt1是 AddPortFilter opt2 是 BlackList，params_count 是1，params =
+ * {&uint16_t(80)}, params_len = {2}
  * @param opt1 配置主类型：ebpf_config_primary_e
  * @param opt2 配置副类型，[暂未使用]
  * @param params_count 参数个数 [目前均为1]
@@ -94,8 +97,8 @@ enum ebpf_config_primary_e {
 void ebpf_config(int32_t opt1, int32_t opt2, int32_t params_count, void** params, int32_t* params_len);
 
 /**
- * @brief 由外层调用，每次调用poll数据，然后交给预先setup好的3个回调来处理，每次poll数据，需要检查stop_flag是否 >0，如果 > 0立即退出。
- * 顺序：控制、统计、Data
+ * @brief 由外层调用，每次调用poll数据，然后交给预先setup好的3个回调来处理，每次poll数据，需要检查stop_flag是否 >0，如果
+ * > 0立即退出。 顺序：控制、统计、Data
  *
  * @param max_events 最多处理的事件数
  * @param stop_flag 是否需要立即退出

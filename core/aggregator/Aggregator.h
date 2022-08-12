@@ -43,7 +43,7 @@ struct MergeItem {
     bool mBufferOrNot;
     std::string mAliuid;
     std::string mRegion;
-    int64_t mKey; //for batchmap
+    int64_t mKey; // for batchmap
     DATA_MERGE_TYPE mMergeType;
     LogstoreFeedBackKey mLogstoreKey;
     int32_t mLogTimeInMinute;

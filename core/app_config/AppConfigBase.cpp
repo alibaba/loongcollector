@@ -174,7 +174,7 @@ AppConfigBase::AppConfigBase() {
     mNoInotify = false;
     mSendDataPort = 80;
     mShennongSocket = true;
-    //mInotifyBlackList.insert("/tmp");
+    // mInotifyBlackList.insert("/tmp");
 
     mPurageContainerMode = false;
     mForceQuitReadTimeout = 7200;
@@ -984,7 +984,7 @@ void AppConfigBase::CheckAndAdjustParameters() {
     int32_t defaultMaxReaderOpenFiles = INT32_FLAG(max_reader_open_files);
 
 
-    int64_t baseMemSize = 100; //MB
+    int64_t baseMemSize = 100; // MB
     int32_t nowMaxStatCount = defaultMaxStatCount / 20;
     int32_t nowMaxStatPerDirCount = defaultMaxStatPerDirCount / 20;
     int32_t nowMaxCacheSize = defaultMaxCacheSize / 20;
