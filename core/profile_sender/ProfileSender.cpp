@@ -26,6 +26,8 @@
 
 using namespace std;
 
+DEFINE_FLAG_BOOL(send_running_status, "", true);
+
 namespace logtail {
 
 void ProfileSender::SendToProfileProject(const std::string& region, sls_logs::LogGroup& logGroup) {
@@ -40,6 +42,10 @@ void ProfileSender::SendToProfileProject(const std::string& region, sls_logs::Lo
 }
 
 void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
+    if (!BOOL_FLAG(send_running_status)) {
+        return;
+    }
+
     static int controlFeq = 0;
 
     // every 12 hours
