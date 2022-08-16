@@ -17,9 +17,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -29,6 +26,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/gorilla/mux"
+	_ "github.com/lib/pq"
 )
 
 var protocl = flag.String("protocol", "http", "protocl")

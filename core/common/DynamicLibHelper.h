@@ -21,6 +21,22 @@
 
 namespace logtail {
 
+
+class DynamicLibLoader;
+
+// setns function first appear in kernel 3 and glibc 1.14.
+typedef int (*glibc_setns_func)(int __fd, int __nstype);
+
+// For logtail running with centos 6, use dlopen to load some glibc functions.
+namespace glibc {
+    // setns function first appear in kernel 3 and glibc 1.14.
+    typedef int (*glibc_setns_func)(int __fd, int __nstype);
+    extern glibc_setns_func g_setns_func;
+    extern DynamicLibLoader* g_loader;
+    bool LoadGlibcFunc();
+
+} // namespace glibc
+
 class DynamicLibLoader {
     void* mLibPtr = nullptr;
 
@@ -38,7 +54,10 @@ public:
     // For linux, the so name is 'lib+@libName.so'.
     // For Windows, the dll name is '@libName.dll'.
     // @return a non-NULL ptr to indicate lib handle, otherwise nullptr is returned.
-    bool LoadDynLib(const std::string& libName, std::string& error, const std::string dlPrefix = "");
+    bool LoadDynLib(const std::string& libName,
+                    std::string& error,
+                    const std::string dlPrefix = "",
+                    const std::string dlSuffix = "");
 
     // LoadMethod loads method named @methodName from opened lib.
     // If error is found, @error param will be set, otherwise empty.

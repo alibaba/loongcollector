@@ -23,9 +23,9 @@
 #include <netinet/in.h>
 #include "LogtailAlarm.h"
 #include "MachineInfoUtil.h"
+#include "DynamicLibHelper.h"
 
 namespace logtail {
-
 
 uint32_t ReadInodeNum(const std::string& path, const std::string& prefix, int8_t& errorCode) {
     size_t pathLen = path.size(), prefixLen = prefix.size();
@@ -70,7 +70,7 @@ bool ConnectionMetaManager::Init(const std::string& procBashPath) {
     }
     this->mBashProcPath = bashPath;
     LOG_INFO(sLogger, ("init observer connection manager", "success")("proc path", bashPath));
-    return false;
+    return true;
 }
 
 ConnectionInfoPtr ConnectionMetaManager::GetConnectionInfo(uint32_t pid, uint32_t fd) {
@@ -441,7 +441,7 @@ NetLinkBinder::NetLinkBinder(uint32_t pid, const std::string& procPath) {
     } else {
         LOG_DEBUG(sLogger, ("open pid net ns", "success")("path", pidNsPath));
     }
-    int res = setns(this->mFd, 0);
+    int res = glibc::g_setns_func(this->mFd, 0);
     if (res != 0) {
         LOG_DEBUG(sLogger, ("netlink status", "fail")("reason", "set ns fail")("path", pidNsPath));
         this->Close();
@@ -455,7 +455,7 @@ NetLinkBinder::NetLinkBinder(uint32_t pid, const std::string& procPath) {
 
 void NetLinkBinder::Close() {
     if (this->success && mOrgFd >= 0) {
-        int res = setns(this->mOrgFd, 0);
+        int res = glibc::g_setns_func(this->mOrgFd, 0);
         if (res != 0) {
             LOG_ERROR(sLogger, ("netlink status", "unknown")("reason", "recover netlink net ns fail"));
         } else {

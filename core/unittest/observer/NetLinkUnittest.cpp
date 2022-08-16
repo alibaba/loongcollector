@@ -16,6 +16,7 @@
 
 #include "unittest/Unittest.h"
 #include "metas/ConnectionMetaManager.h"
+#include "DynamicLibHelper.h"
 
 namespace logtail {
 
@@ -89,9 +90,10 @@ public:
         std::cout << sizeof(sockaddr_in) << std::endl;
         std::cout << sizeof(sockaddr_in6) << std::endl;
         std::cout << "==============" << std::endl;
+        APSARA_TEST_TRUE(logtail::glibc::LoadGlibcFunc());
         auto instance = ConnectionMetaManager::GetInstance();
-        instance->Init("/proc/");
-        auto info = instance->GetConnectionInfo(31943, 12);
+        APSARA_TEST_TRUE(instance->Init("/proc/"));
+        auto info = instance->GetConnectionInfo(48064, 6);
         instance->Print();
         std::cout << "==============" << std::endl;
         if (info != nullptr) {
@@ -106,7 +108,7 @@ public:
 //    APSARA_UNIT_TEST_CASE(ConnectionMetaUnitTest, TestReadInode, 0);
 //    APSARA_UNIT_TEST_CASE(ConnectionMetaUnitTest, TestFetchInetConnections, 0);
 //    APSARA_UNIT_TEST_CASE(ConnectionMetaUnitTest, TestFetchUnixConnections, 0);
-//    APSARA_UNIT_TEST_CASE(ConnectionMetaUnitTest, TestReadFdLink, 0);
+APSARA_UNIT_TEST_CASE(ConnectionMetaUnitTest, TestReadFdLink, 0);
 //    APSARA_UNIT_TEST_CASE(ConnectionMetaUnitTest, TestIPV6, 0);
 
 } // namespace logtail

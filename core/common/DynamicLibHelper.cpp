@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "DynamicLibHelper.h"
+#include "Logger.h"
 
 #if defined(__linux__)
 #include <dlfcn.h>
@@ -21,6 +22,11 @@
 #endif
 
 namespace logtail {
+
+namespace glibc {
+    glibc_setns_func g_setns_func = nullptr;
+    DynamicLibLoader* g_loader = nullptr;
+} // namespace glibc
 
 
 std::string DynamicLibLoader::GetError() {
@@ -57,13 +63,16 @@ DynamicLibLoader::~DynamicLibLoader() {
 // For linux, the so name is 'lib+@libName.so'.
 // For Windows, the dll name is '@libName.dll'.
 // @return a non-NULL ptr to indicate lib handle, otherwise nullptr is returned.
-bool DynamicLibLoader::LoadDynLib(const std::string& libName, std::string& error, const std::string dlPrefix) {
+bool DynamicLibLoader::LoadDynLib(const std::string& libName,
+                                  std::string& error,
+                                  const std::string dlPrefix,
+                                  const std::string dlSuffix) {
     error.clear();
 
 #if defined(__linux__)
-    mLibPtr = dlopen((dlPrefix + "lib" + libName + ".so").c_str(), RTLD_LAZY);
+    mLibPtr = dlopen((dlPrefix + "lib" + libName + ".so" + dlSuffix).c_str(), RTLD_LAZY);
 #elif defined(_MSC_VER)
-    mLibPtr = LoadLibrary((dlPrefix + libName + ".dll").c_str());
+    mLibPtr = LoadLibrary((dlPrefix + libName + ".dll" + dlSuffix).c_str());
 #endif
     if (mLibPtr != NULL)
         return true;
@@ -90,5 +99,25 @@ void* DynamicLibLoader::LoadMethod(const std::string& methodName, std::string& e
 #endif
 }
 
+bool glibc::LoadGlibcFunc() {
+    if (g_loader == nullptr) {
+        LOG_INFO(sLogger, ("load glibc dynamic library", "begin"));
+        g_loader = new DynamicLibLoader;
+        std::string loadErr;
+        if (!g_loader->LoadDynLib("c", loadErr, "", ".6")) {
+            LOG_ERROR(sLogger, ("load glibc dynamic library", "failed")("error", loadErr));
+            return false;
+        }
+
+        void* setNsFunc = g_loader->LoadMethod("setns", loadErr);
+        if (setNsFunc == nullptr) {
+            LOG_ERROR(sLogger, ("load glibc method", "failed")("method", "setns")("error", loadErr));
+            return false;
+        }
+        g_setns_func = glibc_setns_func(setNsFunc);
+        LOG_INFO(sLogger, ("load glibc dynamic library", "success"));
+    }
+    return g_setns_func != nullptr;
+}
 
 } // namespace logtail
