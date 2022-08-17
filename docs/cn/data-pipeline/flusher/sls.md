@@ -18,6 +18,10 @@
 | KeepShardHash   | Boolean | 否    | 是否在日志tag中增加__shardhash__:&lt;shardhashkey>。仅当配置了aggregator_shardhash时有效。如果未添加该参数，则默认使用true，表示在日志中增加前述tag。 |
 | ShardHashKey    | Array   | 否    | 以Key路由Shard模式写入数据时，写入shard的判定依据字段。仅当配置了加速处理插件（processor_&lt;type>_accelerate）时有效。如果未添加该参数，则默认以负载均衡模式写入数据 |
 
+## 安全性说明
+
+`flusher_sls` 默认使用 `HTTPS` 协议发送数据到 `SLS`，也可以使用[data_server_port](../../configuration/system-config.md)参数更高发送协议。
+
 ## 样例
 
 采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果发送到SLS。
