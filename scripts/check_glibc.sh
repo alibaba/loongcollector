@@ -21,6 +21,8 @@ set -o pipefail
 OUT_DIR=${1:-output}
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 BIN="${ROOTDIR}/${OUT_DIR}/ilogtail"
+ADAPTER="${ROOTDIR}/${OUT_DIR}/libPluginAdapter.so"
+PLUGIN="${ROOTDIR}/${OUT_DIR}/libPluginBase.so"
 
 # check if the symbols in ilogtail are compatible with GLIBC_2.5
 awk_script=$(cat <<- EOF
@@ -49,4 +51,8 @@ END {
 }
 EOF
 )
-objdump -T "$BIN" | awk "$awk_script"
+all=("$BIN" "$ADAPTER" "$PLUGIN")
+for obj in "${all[@]}"; do
+    echo "Checking symbols in $obj ..."
+    objdump -T "$obj" | awk "$awk_script"
+done

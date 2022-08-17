@@ -46,6 +46,8 @@ VERSION=1.1.1 make dist
 └── libPluginBase.so (插件lib）
 ```
 
+开发环境增量编译的方法请参考[开发环境](../../developer-guide/development-environment.md)。
+
 ## Go插件本地编译
 
 Go插件可以在主机上进行直接编译，编译前，需要安装基础的 Go 1.16+

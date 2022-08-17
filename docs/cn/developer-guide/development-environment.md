@@ -3,6 +3,7 @@
 虽然[源代码编译](docs/cn/installation/sources/build.md)已经提供了方便的iLogtail编译方法，但却不适合开发场景。因为开发过程中需要不断进行编译调试，重复全量编译的速度太慢，因此需要构建支持增量编译开发环境。
 
 ## 进程结构
+
 iLogtail为了支持插件系统，引入了 libPluginAdaptor 和 libPluginBase（以下简称 adaptor 和 base）这两个动态库，它们与 iLogtail 之间的关系如下：<br />
 iLogtail 动态依赖于这两个动态库（即 binary 中不依赖），在初始化时，iLogtail 会尝试使用动态库接口（如 dlopen）动态加载它们，获取所需的符号。<br />
 Adaptor 充当一个中间层，iLogtail 和 base 均依赖它，iLogtail 向 adaptor 注册回调，adpator 将这些回调记录下来以接口的形式暴露给 base 使用。<br />
@@ -133,7 +134,6 @@ make -sj$(nproc)    # 每次更新core代码后从这里开始
 
 ![image.png](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/developer-guide/development-environment/c%2B%2B-compiling.png)<br />![image.png](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/developer-guide/development-environment/c%2B%2B-compile-result.png)
 
-
 如果只是对core代码进行了修改，则只需要执行最后一行命令即可增量编译。
 
 默认的编译选项代码可能被优化，若需要Debug建议修改CMAKE_BUILD_TYPE开关。替换上述第2行为
@@ -207,6 +207,7 @@ docker exec -it ilogtail-build bash
 ### 1. 修改官方镜像entrypoint
 
 基于官方镜像包进行调试，首先用bash覆盖官方镜像的entrypoint，避免杀死ilogtail后容器直接退出。
+
 - docker：指定CMD
 
 ```bash

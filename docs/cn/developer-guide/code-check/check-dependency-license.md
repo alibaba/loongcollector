@@ -5,6 +5,7 @@ iLogtail 基于Apache 2.0 协议进行开源，开发者需要保证依赖包协
 ## 检查依赖包License
 
 开发者可以使用以下命令进行依赖包License 扫描。
+
 ```makefile
 make check-dependency-licenses
 ```

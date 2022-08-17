@@ -15,16 +15,21 @@ LogtailPlugin 遵循标准的 Apache 2.0 许可，所有文件必须具有许可
 ```makefile
 SCOPE=xxx make check-license
 ```
+
 xxx为限定的目录名称。
 
 ## 添加许可证
+
 当某些带有许可证的文件建立后，您可以通过以下方式将许可证添加到文件中。 请注意，这种方式将修复所有缺少许可证的文件。
+
 ```makefile
      make license
 ```
 
 同上，如果你想限制变化范围，请在命令中附加`SCOPE`。
+
 ```makefile
 SCOPE=xxx make license
 ```
+
 xxx为限定的目录名称。
