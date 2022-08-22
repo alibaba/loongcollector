@@ -59,13 +59,13 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 我们使用标签来进行 Issue、PR、Discussion 的管理。您可以根据实际情况打上对应的标签。
 
-* 全新特性开发，对应 label: feature request。
+* 全新特性，对应 label: feature request。
 * 现有功能完善，对应 label: enhancement。
 * 适合新手开发，对应 label: good first issue。
-* 修复 bug，对应 label: bug。
-* 测试框架或测试用例补充，对应 label: test。
-* [配置样例或K8s部署案例补充](#config)，对应 label: example config。
-* 文档补充、完善（document），对应 label: documentation。
+* Bug，对应 label: bug。
+* 测试框架或测试用例，对应 label: test。
+* [配置样例或K8s部署案例](#config)，对应 label: example config。
+* 文档（document），对应 label: documentation。
 * [案例类](#case)，对应 label: awesome ilogtail。
 * 回答、解决问题，对应 label: question。我们建议优先提到 [Discussions](https://github.com/alibaba/ilogtail/discussions) 中讨论。
 
