@@ -64,8 +64,9 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 * 适合新手开发，对应 label: good first issue。
 * 修复 bug，对应 label: bug。
 * 测试框架或测试用例补充，对应 label: test。
+* [配置样例或K8s部署案例补充](#config)，对应 label: example config。
 * 文档补充、完善（document），对应 label: documentation。
-* 案例类，对应 label: awesome ilogtail。
+* [案例类](#case)，对应 label: awesome ilogtail。
 * 回答、解决问题，对应 label: question。我们建议优先提到 [Discussions](https://github.com/alibaba/ilogtail/discussions) 中讨论。
 
 以下为附加标签：
@@ -81,7 +82,15 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 * 优雅性：代码简练、复用度高，有着完善的设计。
 * 测试：重要的代码需要有完善的测试用例（单元测试、E2E 测试），对应的衡量标准是测试覆盖率。
 
-### 案例分享
+### 配置分享 <a href="#config" id="config"></a>
+
+除了共享代码，您也可以为我们的配置样板库做出贡献。
+
+`example_config/data_pipelines`目录包含场景化的采集配置模版，重点突出processor / aggregator插件功能。如您对某些常见日志（如Apache、Spring Boot）的处理有一定心得，可以参考已有样例和[README](https://github.com/alibaba/ilogtail/tree/main/example_config#readme)进行提交。
+
+`k8s_templates`目录包含完整的K8s部署案例，从源到典型处理到输出，以input / flusher插件进行划分。如您对某些常见的日志处理场景（如将数据采集到Elastic Search、Clickhouse）的部署有一定心得，可以参考已有样例和[README](https://github.com/alibaba/ilogtail/tree/main/k8s_templates#readme)进行提交。
+
+### 案例分享 <a href="#case" id="case"></a>
 
 我们也欢迎您分享任何关于 iLogtail 的使用案例。我们在知乎建立了专栏 [iLogtail社区](https://www.zhihu.com/column/c_1533139823409270785)，欢迎大家投稿，分享 iLogtail 的使用案例。
 

@@ -63,14 +63,4 @@ iLogtail 社区包含 Maintainer、Committer、Contributor、User 等角色，�
 
 ### Contributor
 
-* Weilong Pan([@panawala](https://github.com/panawala))
-* Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
-* Haorui([@haoruilee](https://github.com/haoruilee))
-* Chao Lee([@chaolee50](https://github.com/chaolee50))
-* Zehua Yang([@Takuka0311](https://github.com/Takuka0311))
-* Jinchen([@pj1987111](https://github.com/pj1987111))
-* timchenxiaoyu([@timchenxiaoyu](https://github.com/timchenxiaoyu))
-* Doslin([@Doslin](https://github.com/Doslin))
-* Howie([@Howie59](https://github.com/Howie59))
-* Xiaolei Wang([@fatelei](https://github.com/fatelei))
-* Lework([@lework](https://github.com/lework))
+<https://github.com/alibaba/ilogtail/graphs/contributors>

@@ -107,6 +107,7 @@
 
 * [贡献指南](contributing/CONTRIBUTING.md)
 * [开发者](contributing/developer.md)
+* [成就](contributing/achievement.md)
 
 ## 性能测试 <a href="#benchmark" id="benchmark"></a>
 
