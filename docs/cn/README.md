@@ -55,6 +55,7 @@ cd output
 
 * [贡献指南](./contributing/CONTRIBUTING.md)
 * [开发者](./contributing/developer.md)
+* [成就](./contributing/achievement.md)
 
 ## 我们的用户
 
