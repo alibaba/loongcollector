@@ -17,38 +17,17 @@ boot:
 ilogtail:
   config:
     - name: observer-http-case
-      mixed_mode: true
-      content:
-        - '{
-               "enable":true,
-               "docker_file":false,
-               "log_type":"plugin",
-               "plugin":{
-                   "inputs":[
-                       {
-                           "detail":{
-                               "Common":{
-                                   "FlushOutInterval": 1,
-                                   "IncludeCmdRegex": "^.*simulatorclient.*$",
-                                   "IncludeProtocols": ["HTTP"]
-                               },
-                               "EBPF":{
-                                   "Enabled":true
-                               }
-                           },
-                           "type":"observer_ilogtail_network"
-                       }
-                   ],
-                   "processors":[
-                       {
-                           "detail":{
-
-                           },
-                           "type":"processor_default"
-                       }
-                   ]
-               }
-           }'
+      detail:
+        - inputs:
+            - Type: observer_ilogtail_network
+              Common:
+                FlushOutInterval: 1
+                IncludeCmdRegex: "^.*simulatorclient.*$"
+                IncludeProtocols: [ "HTTP" ]
+              EBPF:
+                Enabled: true
+          processors:
+            - Type: processor_default
   close_wait: 5s
 verify:
   system_rules:
