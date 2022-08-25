@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	k8s_event "github.com/alibaba/ilogtail/helper/eventrecorder"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 
@@ -99,7 +100,7 @@ func createAliyunLogOperationWrapper(endpoint, project, accessKeyID, accessKeySe
 	logger.Info(context.Background(), "init aliyun log operation wrapper", "begin")
 	// retry when make project fail
 	for i := 0; i < 1; i++ {
-		err = wrapper.makesureProjectExist(project)
+		err = wrapper.makesureProjectExist(nil, project)
 		if err == nil {
 			break
 		}
@@ -186,18 +187,28 @@ func (o *operationWrapper) retryCreateIndex(project, logstore string) {
 	}
 }
 
-func (o *operationWrapper) createProductLogstore(project, logstore, product, lang string) error {
+func (o *operationWrapper) createProductLogstore(config *AliyunLogConfigSpec, project, logstore, product, lang string) error {
 	logger.Info(context.Background(), "begin to create product logstore, project", project, "logstore", logstore, "product", product, "lang", lang)
 	err := CreateProductLogstore(*DefaultRegion, project, logstore, product, lang)
+
+	annotations := GetAnnotationByObject(config, project, logstore, product, config.LogtailConfig.ConfigName, false)
+
 	if err != nil {
+		if k8s_event.GetEventRecorder() != nil {
+			customErr := CustomErrorFromPopError(err)
+			k8s_event.GetEventRecorder().SendErrorEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.CreateProductLogStore, "", fmt.Sprintf("create product log failed, error: %s", err.Error()))
+		}
 		logger.Warning(context.Background(), "CREATE_PRODUCT_ALARM", "create product error, error", err)
 		return err
+	} else if k8s_event.GetEventRecorder() != nil {
+		k8s_event.GetEventRecorder().SendNormalEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), annotations, k8s_event.CreateProductLogStore, "create product log success")
 	}
+
 	o.addLogstoreCache(project, logstore)
 	return nil
 }
 
-func (o *operationWrapper) makesureLogstoreExist(project, logstore string, shardCount, lifeCycle int, product, lang string) error {
+func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec, project, logstore string, shardCount, lifeCycle int, product, lang string) error {
 	if o.logstoreCacheExists(project, logstore) {
 		return nil
 	}
@@ -206,16 +217,16 @@ func (o *operationWrapper) makesureLogstoreExist(project, logstore string, shard
 		if len(lang) == 0 {
 			lang = "cn"
 		}
-		return o.createProductLogstore(project, logstore, product, lang)
+		return o.createProductLogstore(config, project, logstore, product, lang)
 	}
 
 	// @note hardcode for k8s audit, eg audit-cfc281c9c4ca548638a1aaa765d8f220d
 	if strings.HasPrefix(logstore, "audit-") && len(logstore) == 39 {
-		return o.createProductLogstore(project, logstore, "k8s-audit", "cn")
+		return o.createProductLogstore(config, project, logstore, "k8s-audit", "cn")
 	}
 
 	if project != o.project {
-		if err := o.makesureProjectExist(project); err != nil {
+		if err := o.makesureProjectExist(config, project); err != nil {
 			return err
 		}
 	}
@@ -254,9 +265,17 @@ func (o *operationWrapper) makesureLogstoreExist(project, logstore string, shard
 			break
 		}
 	}
+	annotations := GetAnnotationByObject(config, project, logstore, "", config.LogtailConfig.ConfigName, false)
 	if err != nil {
+		if k8s_event.GetEventRecorder() != nil {
+			customErr := CustomErrorFromSlsSDKError(err)
+			k8s_event.GetEventRecorder().SendErrorEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.CreateLogstore, "", fmt.Sprintf("create logstore failed, error: %s", err.Error()))
+		}
 		return err
+	} else if k8s_event.GetEventRecorder() != nil {
+		k8s_event.GetEventRecorder().SendNormalEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), annotations, k8s_event.CreateLogstore, "create logstore success")
 	}
+
 	// after create logstore success, wait 1 sec
 	time.Sleep(time.Second)
 	// use default k8s index
@@ -279,7 +298,7 @@ func (o *operationWrapper) makesureLogstoreExist(project, logstore string, shard
 	return nil
 }
 
-func (o *operationWrapper) makesureProjectExist(project string) error {
+func (o *operationWrapper) makesureProjectExist(config *AliyunLogConfigSpec, project string) error {
 	ok := false
 	var err error
 
@@ -300,6 +319,21 @@ func (o *operationWrapper) makesureProjectExist(project string) error {
 		} else {
 			break
 		}
+	}
+	configName := ""
+	logstore := ""
+	if config != nil {
+		configName = config.LogtailConfig.ConfigName
+		logstore = config.Logstore
+	}
+	annotations := GetAnnotationByObject(config, project, logstore, "", configName, false)
+	if err != nil {
+		if k8s_event.GetEventRecorder() != nil {
+			customErr := CustomErrorFromSlsSDKError(err)
+			k8s_event.GetEventRecorder().SendErrorEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.CreateProject, "", fmt.Sprintf("create project failed, error: %s", err.Error()))
+		}
+	} else if k8s_event.GetEventRecorder() != nil {
+		k8s_event.GetEventRecorder().SendNormalEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), annotations, k8s_event.CreateProject, "create project success")
 	}
 	return err
 }
@@ -399,7 +433,7 @@ func (o *operationWrapper) updateConfigInner(config *AliyunLogConfigSpec) error 
 	if config.LifeCycle != nil {
 		lifeCycle = int(*config.LifeCycle)
 	}
-	err := o.makesureLogstoreExist(project, logstore, shardCount, lifeCycle, config.ProductCode, config.ProductLang)
+	err := o.makesureLogstoreExist(config, project, logstore, shardCount, lifeCycle, config.ProductCode, config.ProductLang)
 	if err != nil {
 		return fmt.Errorf("Create logconfig error when update config, config : %s, error : %s", config.LogtailConfig.ConfigName, err.Error())
 	}
@@ -484,6 +518,19 @@ func (o *operationWrapper) updateConfigInner(config *AliyunLogConfigSpec) error 
 								break
 							}
 						}
+
+						annotations := GetAnnotationByObject(config, project, logstore, "", config.LogtailConfig.ConfigName, true)
+						if err != nil {
+							if k8s_event.GetEventRecorder() != nil {
+								customErr := CustomErrorFromSlsSDKError(err)
+								k8s_event.GetEventRecorder().SendErrorEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.UpdateConfig, "", fmt.Sprintf("update config failed, error: %s", err.Error()))
+							}
+						} else {
+							if k8s_event.GetEventRecorder() != nil {
+								k8s_event.GetEventRecorder().SendNormalEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), annotations, k8s_event.UpdateConfig, "update config success")
+							}
+						}
+
 					} else {
 						logger.Info(context.Background(), "file config not changed", "skip update")
 					}
@@ -510,6 +557,15 @@ func (o *operationWrapper) updateConfigInner(config *AliyunLogConfigSpec) error 
 			if err == nil {
 				break
 			}
+		}
+		annotations := GetAnnotationByObject(config, project, logstore, "", config.LogtailConfig.ConfigName, true)
+		if err != nil {
+			if k8s_event.GetEventRecorder() != nil {
+				customErr := CustomErrorFromSlsSDKError(err)
+				k8s_event.GetEventRecorder().SendErrorEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.UpdateConfig, "", fmt.Sprintf("update config failed, error: %s", err.Error()))
+			}
+		} else if k8s_event.GetEventRecorder() != nil {
+			k8s_event.GetEventRecorder().SendNormalEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), annotations, k8s_event.UpdateConfig, "update config success")
 		}
 	}
 	if err != nil {
