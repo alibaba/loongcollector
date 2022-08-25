@@ -49,6 +49,8 @@
   * [Journal数据](data-pipeline/input/service-journal.md)
   * [Kafka](data-pipeline/input/service-kafka.md)
   * [Mock数据-Service](data-pipeline/input/service-mock.md)
+  * [SqlServer 查询数据](data-pipeline/input/service-mssql.md)
+  * [PostgreSQL 查询数据](data-pipeline/input/service-pgsql.md)
   * [Syslog数据](data-pipeline/input/service-syslog.md)
 * [处理](data-pipeline/processor/README.md)
   * [添加字段](data-pipeline/processor/processor-add-fields.md)

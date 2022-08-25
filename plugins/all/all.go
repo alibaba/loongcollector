@@ -45,6 +45,8 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/input/nginx"
 	_ "github.com/alibaba/ilogtail/plugins/input/process"
 	_ "github.com/alibaba/ilogtail/plugins/input/prometheus"
+	_ "github.com/alibaba/ilogtail/plugins/input/rdb/mssql"
+	_ "github.com/alibaba/ilogtail/plugins/input/rdb/pgsql"
 	_ "github.com/alibaba/ilogtail/plugins/input/redis"
 	_ "github.com/alibaba/ilogtail/plugins/input/skywalkingv2"
 	_ "github.com/alibaba/ilogtail/plugins/input/skywalkingv3"
