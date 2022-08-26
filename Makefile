@@ -67,7 +67,7 @@ license:  clean tools
 
 .PHONY: check-license
 check-license: clean tools
-	./scripts/package_license.sh check $(SCOPE) > $(LICENSE_COVERAGE_FILE)
+	./scripts/package_license.sh check $(SCOPE) | tee $(LICENSE_COVERAGE_FILE)
 
 .PHONY: lint
 lint: clean tools

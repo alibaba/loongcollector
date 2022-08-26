@@ -24,6 +24,7 @@ if [ "$OPERATION" = "check" ]; then
 fi
 command+=' -ignore "**/.idea/**" -ignore "**/vendor/**" -ignore "**/protocol/**" -ignore "**/oldtest/**"'
 command+=' -ignore "**/internal/**" -ignore "**/diagnose/**" -ignore "**/external/**" -ignore "**/*.html"'
+command+=' -ignore "**/core/log_pb/*.pb.*" -ignore "core/common/Version.cpp"'
 command+=" $SCOPE"
 eval "$command"
 
