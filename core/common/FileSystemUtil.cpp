@@ -135,7 +135,6 @@ bool OverwriteFile(const std::string& fileName, const std::string& content) {
         APSARA_LOG_ERROR(sLogger, ("open file fail", fileName)("errno", strerror(errno)));
         return false;
     }
-    Chmod(fileName.c_str(), 0644);
 
     uint32_t writeBytes = fwrite(content.c_str(), 1, content.size(), pFile);
     if (writeBytes != content.size()) {
@@ -236,9 +235,6 @@ FILE* FileReadOnlyOpen(const char* filePath, const char* mode) {
 FILE* FileWriteOnlyOpen(const char* filePath, const char* mode) {
 #if defined(__linux__)
     FILE* f = fopen(filePath, mode);
-    if (f) {
-        Chmod(filePath, 0644);
-    }
     return f;
 #elif defined(_MSC_VER)
     HANDLE hFile = CreateFile(filePath,
@@ -255,9 +251,6 @@ FILE* FileWriteOnlyOpen(const char* filePath, const char* mode) {
 FILE* FileAppendOpen(const char* filePath, const char* mode) {
 #if defined(__linux__)
     FILE* f = fopen(filePath, mode);
-    if (f) {
-        Chmod(filePath, 0644);
-    }
     return f;
 #elif defined(_MSC_VER)
     HANDLE hFile = CreateFile(filePath,

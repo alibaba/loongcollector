@@ -137,10 +137,9 @@ ParseConfResult ParseConfig(const std::string& configName, Json::Value& jsonRoot
 
     ifstream is;
     is.open(fullPath.c_str());
-    if (!is.good())
+    if (!is.good()) {
         return CONFIG_NOT_EXIST;
-
-    Chmod(fullPath.c_str(), 0644);
+    }
     std::string buffer((std::istreambuf_iterator<char>(is)), (std::istreambuf_iterator<char>()));
     if (!IsValidJson(buffer.c_str(), buffer.length())) {
         return CONFIG_INVALID_FORMAT;
@@ -2435,14 +2434,6 @@ bool ConfigManagerBase::DumpConfigToLocal(std::string fileName, const Json::Valu
     }
     fout << configJson.toStyledString();
     fout.close();
-    // chmod to 644
-#if defined(__linux__)
-    if (chmod(fileName.c_str(), S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) != 0) {
-        LOG_ERROR(sLogger, ("change config file mode error", fileName)("error", ErrnoToString(GetErrno())));
-        return false;
-    }
-    // TODO: Should Windows do this?
-#endif
     return true;
 }
 

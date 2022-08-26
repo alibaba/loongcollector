@@ -1,6 +1,6 @@
 # 成就
 
-## <img alt="Junior Developer" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Dev.png" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Developer</span>
+## <img alt="Junior Developer" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Dev.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Developer</span>
 
 成功提交1次任意 PR，并被社区接受。
 
@@ -25,7 +25,7 @@
 - niuttt([@tong549761863](https://github.com/tong549761863))
 - mrddz([@mrddz](https://github.com/mrddz))
 
-## <img alt="Senior Developer" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Dev.png" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Developer</span>
+## <img alt="Senior Developer" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Dev.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Developer</span>
 
 解决至少10个 PR，并被社区接受（统计commit对应PR数量）。
 
@@ -36,7 +36,7 @@
 - Jiapeng Liu([@EvanLjp](https://github.com/EvanLjp))
 - Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
 
-## <img alt="Junior Developer" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Amb.png" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Ambassador</span>
+## <img alt="Junior Ambassador" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Amb.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Ambassador</span>
 
 为iLogtail做出至少1次宣传。
 
@@ -44,7 +44,7 @@
 
 - Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
 
-## <img alt="Senior Developer" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Amb.png" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Ambassador</span>
+## <img alt="Senior Ambassador" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Amb.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Ambassador</span>
 
 为iLogtail做出至少5次宣传（统计awesome ilogtail tag的issue）。
 
@@ -53,7 +53,7 @@
 - Kejia Xu([@messixukejia](https://github.com/messixukejia))
 - Cheng Zhang([@shabicheng](https://github.com/shabicheng))
 
-## <img alt="Junior Moderator" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Mod.png" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Moderator</span>
+## <img alt="Junior Moderator" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Mod.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Moderator</span>
 
 在论坛中回答问题，并获得至少1个被接受答案。
 
@@ -63,7 +63,7 @@
 - Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
 - Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
 
-## <img alt="Senior Moderator" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Mod.png" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Moderator</span>
+## <img alt="Senior Moderator" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Mod.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Moderator</span>
 
 在论坛中回答问题，并获得至少10个被接受答案（统计accepted的answer数量）。
 
@@ -72,7 +72,9 @@
 ## 证书展示
 
 您可以在GitHub的个人档案档案中展示所获得的证书，向您的小伙伴展示您所取得的成就。就像这样：
+
 ![image](https://user-images.githubusercontent.com/1827594/186176496-6f434cea-a78a-4117-9476-4c882b90185a.png)
+
 全部6种徽章的代码如下，请自行裁剪：
 
 ```html

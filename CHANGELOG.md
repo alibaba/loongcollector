@@ -35,6 +35,8 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
+
 - [public] [both] [added] Add support for PostgreSQL input
 - [public] [both] [added] Add support for SqlServer input
 - [public] [both] [added] Add k8s event when control sls resource
+- [public] [both] [updated] Remov chmod and use  inherited file permissions on target platform

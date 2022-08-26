@@ -377,7 +377,6 @@ bool CheckPointManager::DumpCheckPointToLocal() {
         LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "open check point file failed");
         return false;
     }
-    Chmod(checkPointTempFile.c_str(), 0644);
     Json::Value result;
     result["check_point"] = root;
     result["dir_check_point"] = dirJson;
