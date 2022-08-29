@@ -106,8 +106,8 @@ bool LogtailRuntimePlugin::LoadPluginBase() {
     char* szError = dlerror();
     if (szError != NULL) {
         LOG_ERROR(sLogger, ("load function error, Message", szError));
-        dlclose(mPluginBasePtr);
-        mPluginBasePtr = NULL;
+        dlclose(mPluginAdapterPtr);
+        mPluginAdapterPtr = NULL;
         return false;
     }
     registerFun(LogtailRuntimePlugin::UpdateLogtailConfig);
