@@ -595,9 +595,10 @@ LogFileReader* Config::CreateLogFileReader(const std::string& dir,
         reader->SetSpecifiedYear(mAdvancedConfig.mSpecifiedYear);
         reader->SetPreciseTimestampConfig(mAdvancedConfig.mEnablePreciseTimestamp,
                                           mAdvancedConfig.mPreciseTimestampKey,
-                                          mAdvancedConfig.mPreciseTimestampUnit,
-                                          mTimeZoneAdjust,
-                                          mLogTimeZoneOffsetSecond);
+                                          mAdvancedConfig.mPreciseTimestampUnit);
+        reader->SetTzOffsetSecond(mTimeZoneAdjust, mLogTimeZoneOffsetSecond);
+        reader->SetAdjustApsaraMicroTimezone(mAdvancedConfig.mAdjustApsaraMicroTimezone);
+        
         if (mDockerFileFlag) {
             DockerContainerPath* containerPath = GetContainerPathByLogPath(dir);
             if (containerPath == NULL) {

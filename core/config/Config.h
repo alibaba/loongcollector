@@ -94,6 +94,7 @@ public:
         bool mEnablePreciseTimestamp = false;
         std::string mPreciseTimestampKey;
         TimeStampUnit mPreciseTimestampUnit;
+        bool mAdjustApsaraMicroTimezone = false;
     };
 
 public:
@@ -205,7 +206,6 @@ public:
     std::vector<std::string> mFileNameBlacklist;
     bool mObserverFlag = false; // network observer config flag
     std::string mObserverConfig; // network observer config detail
-
 
     Config() {
         mSimpleLogFlag = false;

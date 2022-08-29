@@ -19,6 +19,7 @@
 #include <boost/regex.hpp>
 #include <vector>
 #include "common/TimeUtil.h"
+#include "config_manager/ConfigManager.h"
 
 namespace sls_logs {
 class LogGroup;
@@ -58,7 +59,9 @@ public:
                                             const std::string& region,
                                             const std::string& logPath,
                                             ParseLogError& error,
-                                            uint32_t& logGroupSize);
+                                            uint32_t& logGroupSize, 
+                                            int32_t tzOffsetSecond, 
+                                            bool adjustApsaraMicroTimezone);
     static time_t ApsaraEasyParseLogTimeParser(const char* buffer);
 
     static bool WholeLineModeParser(const char* buffer,
@@ -87,7 +90,8 @@ public:
                                    const std::string& region,
                                    const std::string& logPath,
                                    ParseLogError& error,
-                                   uint32_t& logGroupSize);
+                                   uint32_t& logGroupSize,
+                                   int32_t mTzOffsetSecond);
     // RegexLogLineParser with specified log time.
     static bool RegexLogLineParser(const char* buffer,
                                    const boost::regex& reg,
@@ -124,7 +128,8 @@ public:
                              const std::string& category,
                              const std::string& region,
                              const std::string& logPath,
-                             ParseLogError& error);
+                             ParseLogError& error,
+                             int32_t tzOffsetSecond);
 
     static void AdjustLogTime(sls_logs::Log* logPtr, int logTimeZoneOffsetSecond, int localTimeZoneOffsetSecond);
 

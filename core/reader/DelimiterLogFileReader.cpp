@@ -182,7 +182,8 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
                                              mCategory,
                                              mRegion,
                                              mLogPath,
-                                             error)) {
+                                             error,
+                                             mTzOffsetSecond)) {
                     parseSuccess = false;
                     if (error == PARSE_LOG_HISTORY_ERROR)
                         return false;

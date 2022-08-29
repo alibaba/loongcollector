@@ -22,9 +22,11 @@
 #include "common/LogtailCommonFlags.h"
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
+#include "config/LogType.h"
 #include "profiler/LogFileProfiler.h"
 #include "profiler/LogtailAlarm.h"
 #include "app_config/AppConfig.h"
+#include "config_manager/ConfigManager.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -156,7 +158,8 @@ static bool StdRegexLogLineParser(const char* buffer,
                                   const string& region,
                                   const string& logPath,
                                   ParseLogError& error,
-                                  uint32_t& logGroupSize) {
+                                  uint32_t& logGroupSize,
+                                  int32_t tzOffsetSecond) {
     std::regex stdReg;
     std::string exception;
     try {
@@ -231,7 +234,8 @@ static bool StdRegexLogLineParser(const char* buffer,
                                         category,
                                         region,
                                         logPath,
-                                        error)) {
+                                        error,
+                                        tzOffsetSecond)) {
         parseSuccess = false;
         if (error == PARSE_LOG_HISTORY_ERROR)
             return false;
@@ -272,7 +276,8 @@ bool LogParser::RegexLogLineParser(const char* buffer,
                                    const string& region,
                                    const string& logPath,
                                    ParseLogError& error,
-                                   uint32_t& logGroupSize) {
+                                   uint32_t& logGroupSize,
+                                   int32_t tzOffsetSecond) {
     boost::match_results<const char*> what;
     string exception;
     uint64_t preciseTimestamp = 0;
@@ -295,7 +300,8 @@ bool LogParser::RegexLogLineParser(const char* buffer,
                                      region,
                                      logPath,
                                      error,
-                                     logGroupSize);
+                                     logGroupSize,
+                                     tzOffsetSecond);
 #endif
 
         if (!exception.empty()) {
@@ -354,7 +360,8 @@ bool LogParser::RegexLogLineParser(const char* buffer,
                              category,
                              region,
                              logPath,
-                             error)) {
+                             error,
+                             tzOffsetSecond)) {
         parseSuccess = false;
         if (error == PARSE_LOG_HISTORY_ERROR)
             return false;
@@ -469,7 +476,8 @@ bool LogParser::ParseLogTime(const char* buffer,
                              const string& category,
                              const string& region,
                              const string& logPath,
-                             ParseLogError& error) {
+                             ParseLogError& error,                                             
+                             int32_t tzOffsetSecond) {
     if (IsPrefixString(curTimeStr, timeStr) == false) {
         struct tm tm;
         memset(&tm, 0, sizeof(tm));
@@ -506,12 +514,12 @@ bool LogParser::ParseLogTime(const char* buffer,
         timeStr = ConvertToTimeStamp(logTime, timeFormat);
 
         if (preciseTimestampConfig.enabled) {
-            preciseTimestamp = GetPreciseTimestamp(logTime, strptimeResult, preciseTimestampConfig);
+            preciseTimestamp = GetPreciseTimestamp(logTime, strptimeResult, preciseTimestampConfig, tzOffsetSecond);
         }
     } else {
         if (preciseTimestampConfig.enabled) {
             preciseTimestamp
-                = GetPreciseTimestamp(logTime, curTimeStr.substr(timeStr.length()).c_str(), preciseTimestampConfig);
+                = GetPreciseTimestamp(logTime, curTimeStr.substr(timeStr.length()).c_str(), preciseTimestampConfig, tzOffsetSecond);
         }
     }
 
@@ -542,16 +550,31 @@ bool LogParser::WholeLineModeParser(
 
 int32_t LogParser::GetApsaraLogMicroTime(const char* buffer) {
     int begIndex = 0;
+    char tmp [6];   
     while (buffer[begIndex]) {
         if (buffer[begIndex] == '.') {
             begIndex++;
             break;
         }
         begIndex++;
+    }   
+    int index = 0;
+    while(buffer[begIndex + index] && index <6) {
+        if (buffer[begIndex + index] == ']'){
+            break;
+        }
+        tmp[index] = buffer[begIndex + index];
+        index ++;
+    }
+    if (index < 6) {
+        for (int i = index; i < 6; i ++) {
+            tmp[i] = '0';
+        }
     }
     char* endPtr;
-    return strtol(buffer + begIndex, &endPtr, 10);
+    return strtol(tmp, &endPtr, 10);
 }
+
 
 static int32_t FindBaseFields(const char* buffer, int32_t beginIndexArray[], int32_t endIndexArray[]) {
     int32_t baseFieldNum = 0;
@@ -648,7 +671,9 @@ bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,
                                             const string& region,
                                             const string& logPath,
                                             ParseLogError& error,
-                                            uint32_t& logGroupSize) {
+                                            uint32_t& logGroupSize,                                             
+                                            int32_t tzOffsetSecond, 
+                                            bool adjustApsaraMicroTimezone) {
     int64_t logTime_in_micro = 0;
     time_t logTime = LogParser::ApsaraEasyReadLogTimeParser(buffer, timeStr, lastLogTime, logTime_in_micro);
     if (logTime <= 0) // this case will handle empty apsara log line
@@ -721,6 +746,9 @@ bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,
             }
         } while (buffer[index]);
     }
+    if (adjustApsaraMicroTimezone) {
+        logTime_in_micro = (int64_t)logTime_in_micro - (int64_t)tzOffsetSecond * (int64_t) 1000000;
+    }
     char s_micro[20] = {0};
 #if defined(__linux__)
     sprintf(s_micro, "%ld", logTime_in_micro);
@@ -737,6 +765,7 @@ void LogParser::AddLog(Log* logPtr, const string& key, const string& value, uint
     logContentPtr->set_value(value);
     logGroupSize += key.size() + value.size() + 5;
 }
+
 
 void LogParser::AdjustLogTime(sls_logs::Log* logPtr, int mLogTimeZoneOffsetSecond, int timeZoneOffsetSecond) {
     logPtr->set_time(logPtr->time() - mLogTimeZoneOffsetSecond + timeZoneOffsetSecond);

@@ -1835,7 +1835,8 @@ bool CommonRegLogFileReader::ParseLogLine(const char* buffer,
                                                 mRegion,
                                                 mLogPath,
                                                 error,
-                                                logGroupSize);
+                                                logGroupSize,
+                                                mTzOffsetSecond);
         } else {
             // if "time" field not exist in user config or timeformat empty, set current system time for logs
             if (format.mIsWholeLineMode) {
@@ -1932,7 +1933,9 @@ bool ApsaraLogFileReader::ParseLogLine(const char* buffer,
                                                   mRegion,
                                                   mLogPath,
                                                   error,
-                                                  logGroupSize);
+                                                  logGroupSize,
+                                                  mTzOffsetSecond, 
+                                                  mAdjustApsaraMicroTimezone);
 }
 
 } // namespace logtail

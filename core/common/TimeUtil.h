@@ -30,8 +30,6 @@ struct PreciseTimestampConfig {
     bool enabled = false;
     std::string key = PRECISE_TIMESTAMP_DEFAULT_KEY;
     TimeStampUnit unit = TimeStampUnit::MILLISECOND;
-
-    int tzOffsetSecond = 0;
 };
 
 // Convert @tm to string accroding to @format. TODO: Merge ConvertToTimeStamp and GetTimeStamp.
@@ -76,7 +74,8 @@ void UpdateTimeDelta(time_t serverTime);
 
 uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
                              const char* preciseTimeSuffix,
-                             const PreciseTimestampConfig& preciseTimestampConfig);
+                             const PreciseTimestampConfig& preciseTimestampConfig,
+                             int32_t tzOffsetSecond);
 } // namespace logtail
 
 #if defined(_MSC_VER)
