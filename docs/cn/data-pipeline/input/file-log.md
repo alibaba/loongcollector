@@ -52,7 +52,7 @@
 
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
-| TopicFormat | String | 否 | Topic生成方式。可选值如下：<br>- none：不生成日志主题。<br>- default：将日志文件的路径作为日志主题。<br>- 文件路径正则表达式：将日志文件路径的某一部分作为日志主题。<br>- `customized://自定义主题名`：使用静态自定义主题名。<br>如果未添加该参数，则默认使用none，表示不生成日志主题。 |
+| TopicFormat | String | 否 | Topic生成方式。可选值如下：<br>- none：不生成日志主题。<br>- 文件路径正则表达式：将日志文件路径的某一部分作为日志主题。<br>- `customized://自定义主题名`：使用静态自定义主题名。<br>如果未添加该参数，则默认使用none，表示不生成日志主题。 |
 | Preserve | Boolean | 否 | 如果一个日志文件在30分钟内没有任何更新，是否继续监 控该文件。如果未添加该参数，则默认使用true，表示始终监控所选文件。 |
 | PreserveDepth | Integer | 否 | 最大超时目录深度，仅当Preserve参数值为false时有效。如果未添加该参数，则默认使用1。 |
 | ForceMultiConfig | Boolean | 否 | 是否允许该Logtail配置采集其他Logtail配置已匹配的文件。如果未添加该参数，则默认使用false，表示不允许。 |

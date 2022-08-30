@@ -261,6 +261,7 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
 #if defined(__linux__)
     AddLogContent(logPtr, "load", GetLoadAvg());
 #endif
+    AddLogContent(logPtr, "plugin_stats", ConfigManager::GetInstance()->GeneratePluginStatString());
     // Metrics.
     vector<string> allProfileRegion;
     ConfigManager::GetInstance()->GetAllProfileRegion(allProfileRegion);

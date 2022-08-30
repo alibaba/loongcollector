@@ -216,7 +216,9 @@ bool ConfigYamlToJson::GenerateLocalJsonConfig(const string configName,
         }
 
         FillupDefalutUserJsonConfig(workMode, userJsonConfig);
-        userJsonConfig["plugin"] = pluginJsonConfig;
+        if(!pluginJsonConfig.empty()) {
+            userJsonConfig["plugin"] = pluginJsonConfig;
+        }
         userJsonConfig["log_type"] = workMode.mLogType;
         if (yamlConfig["enable"])
             userJsonConfig["enable"] = yamlConfig["enable"].as<bool>();

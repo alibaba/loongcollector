@@ -66,6 +66,8 @@ protected:
     std::unordered_map<std::string, YAML::Node> mLocalYamlConfigDirMap;
 
     std::unordered_map<std::string, int64_t> mLocalYamlConfigMTimeMap;
+    SpinLock mPluginStatsLock;
+    std::unordered_map<std::string, std::unordered_map<std::string, int>> mPluginStats;
 
     std::unordered_map<std::string, Config*> mNameConfigMap;
     EventHandler* mSharedHandler;
@@ -213,6 +215,9 @@ public:
      * @return false never return false
      */
     bool LoadJsonConfig(const Json::Value& jsonRoot, bool localFlag = false);
+    void UpdatePluginStats(const Json::Value& config);
+    std::string GeneratePluginStatString();
+    void ClearPluginStats();
 
     bool LoadAllConfig();
     const std::unordered_map<std::string, Config*>& GetAllConfig() { return mNameConfigMap; }
