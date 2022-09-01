@@ -20,6 +20,11 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
+type LogWithContext struct {
+	Log     *protocol.Log
+	Context map[string]interface{}
+}
+
 // Collector ...
 type Collector interface {
 	AddData(tags map[string]string,
@@ -32,4 +37,17 @@ type Collector interface {
 		t ...time.Time)
 
 	AddRawLog(log *protocol.Log)
+
+	AddDataWithContext(tags map[string]string,
+		fields map[string]string,
+		ctx map[string]interface{},
+		t ...time.Time)
+
+	AddDataArrayWithContext(tags map[string]string,
+		columns []string,
+		values []string,
+		ctx map[string]interface{},
+		t ...time.Time)
+
+	AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{})
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/plugins/aggregator/defaultone"
+	baseagg "github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
 
 const (
@@ -42,9 +42,9 @@ type AggregatorOpenTelemetry struct {
 	TraceLogstore    string
 	LogLogstore      string
 
-	metricsAgg *defaultone.AggregatorDefault
-	traceAgg   *defaultone.AggregatorDefault
-	logAgg     *defaultone.AggregatorDefault
+	metricsAgg *baseagg.AggregatorBase
+	traceAgg   *baseagg.AggregatorBase
+	logAgg     *baseagg.AggregatorBase
 	Lock       *sync.Mutex
 	context    ilogtail.Context
 	queue      ilogtail.LogGroupQueue
@@ -63,20 +63,20 @@ func (p *AggregatorOpenTelemetry) Init(context ilogtail.Context, que ilogtail.Lo
 
 	p.context = context
 	p.queue = que
-	p.metricsAgg = defaultone.NewAggregatorDefault()
+	p.metricsAgg = baseagg.NewAggregatorBase()
 	if _, err := p.metricsAgg.Init(context, que); err != nil {
 		return 0, err
 	}
 
 	p.metricsAgg.InitInner(p.PackFlag, p.context.GetConfigName()+p.MetricsLogstore+util.GetIPAddress()+time.Now().String(), p.Lock, p.MetricsLogstore, p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
 
-	p.traceAgg = defaultone.NewAggregatorDefault()
+	p.traceAgg = baseagg.NewAggregatorBase()
 	if _, err := p.traceAgg.Init(context, que); err != nil {
 		return 0, err
 	}
 	p.traceAgg.InitInner(p.PackFlag, p.context.GetConfigName()+p.TraceLogstore+util.GetIPAddress()+time.Now().String(), p.Lock, p.TraceLogstore, p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
 
-	p.logAgg = defaultone.NewAggregatorDefault()
+	p.logAgg = baseagg.NewAggregatorBase()
 	if _, err := p.logAgg.Init(context, que); err != nil {
 		return 0, err
 	}
@@ -91,15 +91,15 @@ func (*AggregatorOpenTelemetry) Description() string {
 // Add adds @log to aggregator.
 // Add use first content as route key
 // Add returns any error encountered, nil means success.
-func (p *AggregatorOpenTelemetry) Add(log *protocol.Log) error {
+func (p *AggregatorOpenTelemetry) Add(log *protocol.Log, ctx map[string]interface{}) error {
 	if len(log.Contents) > 0 {
 		if len(log.Contents) <= 5 {
-			return p.metricsAgg.Add(log)
+			return p.metricsAgg.Add(log, ctx)
 		}
 		if len(log.Contents) >= 19 {
-			return p.traceAgg.Add(log)
+			return p.traceAgg.Add(log, ctx)
 		}
-		return p.logAgg.Add(log)
+		return p.logAgg.Add(log, ctx)
 	}
 	return nil
 }

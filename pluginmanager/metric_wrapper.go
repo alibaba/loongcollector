@@ -30,7 +30,7 @@ type MetricWrapper struct {
 	Tags     map[string]string
 	Interval time.Duration
 
-	LogsChan      chan *protocol.Log
+	LogsChan      chan *ilogtail.LogWithContext
 	LatencyMetric ilogtail.LatencyMetric
 
 	shutdown  chan struct{}
@@ -64,6 +64,21 @@ func (p *MetricWrapper) Stop() {
 }
 
 func (p *MetricWrapper) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
+	p.AddDataWithContext(tags, fields, nil, t...)
+}
+
+func (p *MetricWrapper) AddDataArray(tags map[string]string,
+	columns []string,
+	values []string,
+	t ...time.Time) {
+	p.AddDataArrayWithContext(tags, columns, values, nil, t...)
+}
+
+func (p *MetricWrapper) AddRawLog(log *protocol.Log) {
+	p.AddRawLogWithContext(log, nil)
+}
+
+func (p *MetricWrapper) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
 	var logTime time.Time
 	if len(t) == 0 {
 		logTime = time.Now()
@@ -71,12 +86,13 @@ func (p *MetricWrapper) AddData(tags map[string]string, fields map[string]string
 		logTime = t[0]
 	}
 	slsLog, _ := util.CreateLog(logTime, p.Tags, tags, fields)
-	p.LogsChan <- slsLog
+	p.LogsChan <- &ilogtail.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *MetricWrapper) AddDataArray(tags map[string]string,
+func (p *MetricWrapper) AddDataArrayWithContext(tags map[string]string,
 	columns []string,
 	values []string,
+	ctx map[string]interface{},
 	t ...time.Time) {
 	var logTime time.Time
 	if len(t) == 0 {
@@ -85,9 +101,9 @@ func (p *MetricWrapper) AddDataArray(tags map[string]string,
 		logTime = t[0]
 	}
 	slsLog, _ := util.CreateLogByArray(logTime, p.Tags, tags, columns, values)
-	p.LogsChan <- slsLog
+	p.LogsChan <- &ilogtail.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *MetricWrapper) AddRawLog(log *protocol.Log) {
-	p.LogsChan <- log
+func (p *MetricWrapper) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
+	p.LogsChan <- &ilogtail.LogWithContext{Log: log, Context: ctx}
 }

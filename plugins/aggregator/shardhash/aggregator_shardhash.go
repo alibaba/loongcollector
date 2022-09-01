@@ -28,7 +28,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/plugins/aggregator/defaultone"
+	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
 
 const (
@@ -40,7 +40,7 @@ const (
 // shardAggregator decides which agg (log group) the log belongs to.
 type shardAggregator struct {
 	md5 string
-	agg *defaultone.AggregatorDefault
+	agg *baseagg.AggregatorBase
 }
 
 // Use an inner queue so that we can append shard hash into log groups' tags.
@@ -132,7 +132,7 @@ func (s *AggregatorShardHash) initShardAggs() (int, error) {
 		}
 		shardAgg := &shardAggregator{
 			md5: hexHash,
-			agg: defaultone.NewAggregatorDefault(),
+			agg: baseagg.NewAggregatorBase(),
 		}
 		if _, err := shardAgg.agg.Init(s.context, s.innerQueue); err != nil {
 			return 0, fmt.Errorf("initialize %vth shard agg error: %v", idx, err)
@@ -161,7 +161,7 @@ func (s *AggregatorShardHash) selectShardAgg(sourceValue string) *shardAggregato
 }
 
 // Add ...
-func (s *AggregatorShardHash) Add(log *protocol.Log) error {
+func (s *AggregatorShardHash) Add(log *protocol.Log, ctx map[string]interface{}) error {
 	var sourceValue string
 	for idx, key := range s.SourceKeys {
 		var val string
@@ -185,7 +185,7 @@ func (s *AggregatorShardHash) Add(log *protocol.Log) error {
 		}
 	}
 
-	return s.selectShardAgg(sourceValue).agg.Add(log)
+	return s.selectShardAgg(sourceValue).agg.Add(log, ctx)
 }
 
 // update resets topic and appends tags (shardHash, pack ID) if they are not existing.

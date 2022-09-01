@@ -38,7 +38,7 @@ func (r *InputStatistics) Collect(collector ilogtail.Collector) error {
 		log := &protocol.Log{}
 		config.Context.MetricSerializeToPB(log)
 		if len(log.Contents) > 0 && StatisticsConfig != nil {
-			StatisticsConfig.LogsChan <- log
+			StatisticsConfig.LogsChan <- &ilogtail.LogWithContext{Log: log}
 			logger.Debug(r.context.GetRuntimeContext(), "statistics", *log)
 		}
 	}

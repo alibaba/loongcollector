@@ -24,7 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/plugins/aggregator/defaultone"
+	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 type SubAgg struct {
 	logstore string
 	reg      *regexp.Regexp
-	agg      *defaultone.AggregatorDefault
+	agg      *baseagg.AggregatorBase
 }
 
 type AggregatorRouter struct {
@@ -52,7 +52,7 @@ type AggregatorRouter struct {
 	RouterLogstore   []string
 
 	subAggs    []*SubAgg
-	defaultAgg *defaultone.AggregatorDefault
+	defaultAgg *baseagg.AggregatorBase
 	Lock       *sync.Mutex
 	context    ilogtail.Context
 	queue      ilogtail.LogGroupQueue
@@ -72,7 +72,7 @@ func (p *AggregatorRouter) Init(context ilogtail.Context, que ilogtail.LogGroupQ
 		subAgg := &SubAgg{
 			logstore: p.RouterLogstore[i],
 			reg:      regExp,
-			agg:      defaultone.NewAggregatorDefault(),
+			agg:      baseagg.NewAggregatorBase(),
 		}
 		if _, err := subAgg.agg.Init(context, que); err != nil {
 			continue
@@ -81,7 +81,7 @@ func (p *AggregatorRouter) Init(context ilogtail.Context, que ilogtail.LogGroupQ
 		p.subAggs = append(p.subAggs, subAgg)
 	}
 	if !p.DropDisMatch {
-		p.defaultAgg = defaultone.NewAggregatorDefault()
+		p.defaultAgg = baseagg.NewAggregatorBase()
 		if _, err := p.defaultAgg.Init(context, que); err != nil {
 			return 0, err
 		}
@@ -97,12 +97,12 @@ func (*AggregatorRouter) Description() string {
 func (p *AggregatorRouter) route(log *protocol.Log, value string) error {
 	for _, subAgg := range p.subAggs {
 		if indexArray := subAgg.reg.FindStringSubmatchIndex(value); len(indexArray) >= 2 && indexArray[0] == 0 && indexArray[1] == len(value) {
-			return subAgg.agg.Add(log)
+			return subAgg.agg.Add(log, nil)
 		}
 	}
 	// no match
 	if !p.DropDisMatch {
-		return p.defaultAgg.Add(log)
+		return p.defaultAgg.Add(log, nil)
 	}
 	if p.NoMatchError {
 		logger.Warning(p.context.GetRuntimeContext(), "NO_MATCH_ROUTER_ALARM", "no match router", "drop this log")
@@ -116,7 +116,7 @@ func (p *AggregatorRouter) route(log *protocol.Log, value string) error {
 // If @log don't have specified key but aggregator.DropDisMatch is not set, it passed @log to
 // default aggregator, otherwise, it returns error when aggregator.NoMatchError is set.
 // Add returns any error encountered, nil means success.
-func (p *AggregatorRouter) Add(log *protocol.Log) error {
+func (p *AggregatorRouter) Add(log *protocol.Log, ctx map[string]interface{}) error {
 	// logger.Debug("agg add", *log)
 
 	// find log key
@@ -127,7 +127,7 @@ func (p *AggregatorRouter) Add(log *protocol.Log) error {
 	}
 	// find no key
 	if !p.DropDisMatch {
-		return p.defaultAgg.Add(log)
+		return p.defaultAgg.Add(log, ctx)
 	}
 	if p.NoMatchError {
 		logger.Warning(p.context.GetRuntimeContext(), "NO_MATCH_ROUTER_ALARM", "no match router", "drop this log")

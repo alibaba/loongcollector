@@ -265,7 +265,7 @@ func TestInnerQueue(t *testing.T) {
 		log.Contents = append(log.Contents, &protocol.Log_Content{
 			Key: "test", Value: tc.Value,
 		})
-		require.NoError(t, s.Add(log))
+		require.NoError(t, s.Add(log, nil))
 	}
 
 	logGroups := s.Flush()
@@ -311,7 +311,7 @@ func TestMultipleSourceKeys(t *testing.T) {
 				Key: s.SourceKeys[idx], Value: tc.Values[idx],
 			})
 		}
-		require.NoError(t, s.Add(log))
+		require.NoError(t, s.Add(log, nil))
 
 		logGroups := s.Flush()
 		require.Equal(t, len(logGroups), 1, "%v", logGroups)

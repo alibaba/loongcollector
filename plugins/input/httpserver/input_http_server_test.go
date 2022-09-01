@@ -76,14 +76,28 @@ type mockCollector struct {
 
 func (c *mockCollector) AddData(
 	tags map[string]string, fields map[string]string, t ...time.Time) {
-	c.logs = append(c.logs, &mockLog{tags, fields})
+	c.AddDataWithContext(tags, fields, nil, t...)
 }
 
 func (c *mockCollector) AddDataArray(
 	tags map[string]string, columns []string, values []string, t ...time.Time) {
+	c.AddDataArrayWithContext(tags, columns, values, nil, t...)
 }
 
 func (c *mockCollector) AddRawLog(log *protocol.Log) {
+	c.AddRawLogWithContext(log, nil)
+}
+
+func (c *mockCollector) AddDataWithContext(
+	tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
+	c.logs = append(c.logs, &mockLog{tags, fields})
+}
+
+func (c *mockCollector) AddDataArrayWithContext(
+	tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
+}
+
+func (c *mockCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
 	c.rawLogs = append(c.rawLogs, log)
 }
 

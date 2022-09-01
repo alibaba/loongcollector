@@ -16,13 +16,12 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type ProcessorWrapper struct {
 	Processor ilogtail.Processor
 	Config    *LogstoreConfig
-	LogsChan  chan *protocol.Log
+	LogsChan  chan *ilogtail.LogWithContext
 	Priority  int
 }
 

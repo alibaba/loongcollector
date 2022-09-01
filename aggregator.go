@@ -31,7 +31,7 @@ type Aggregator interface {
 	Description() string
 
 	// Add the metric to the aggregator.
-	Add(log *protocol.Log) error
+	Add(log *protocol.Log, ctx map[string]interface{}) error
 
 	// Flush pushes the current aggregates to the accumulator.
 	Flush() []*protocol.LogGroup

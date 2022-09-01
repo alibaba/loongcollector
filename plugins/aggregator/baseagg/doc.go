@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package defaultone
+package baseagg
 
 // // Sample code to use AggregatorDefault as base in other aggregators such AggregatorShardHash.
 //

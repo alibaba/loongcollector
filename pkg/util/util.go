@@ -74,8 +74,8 @@ func ReadFirstBlock(line string) string {
 // ReadLinesOffsetN reads contents from file and splits them by new line.
 // The offset tells at which line number to start.
 // The count determines the number of lines to read (starting from offset):
-//   n >= 0: at most n lines
-//   n < 0: whole file
+// n >= 0: at most n lines
+// n < 0: whole file
 func ReadLinesOffsetN(filename string, offset uint, n int) ([]string, error) {
 	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
@@ -367,9 +367,9 @@ func NewLogTagForPackID(prefix string, seqNum *int64) *protocol.LogTag {
 }
 
 // ParseVariableValue parse specific key with logic:
-//     1. if key start with '$', the get from env
-//     2. if key == __ip__, return local ip address
-//     3. if key == __host__, return hostName
+//  1. if key start with '$', the get from env
+//  2. if key == __ip__, return local ip address
+//  3. if key == __host__, return hostName
 //     others return key
 func ParseVariableValue(key string) string {
 	if len(key) == 0 {

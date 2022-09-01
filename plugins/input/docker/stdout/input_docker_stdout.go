@@ -23,6 +23,7 @@ import (
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
 
 	docker "github.com/fsouza/go-dockerclient"
@@ -69,8 +70,10 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 		}
 	}
 
+	source := util.NewPackIDPrefix(info.ContainerInfo.ID + sds.context.GetConfigName())
 	tags := info.GetExternalTags(sds.ExternalEnvTag, sds.ExternalK8sLabelTag)
-	processor := NewDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond, sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector, tags)
+
+	processor := NewDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond, sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector, tags, source)
 
 	checkpoint, ok := checkpointMap[info.ContainerInfo.ID]
 	if !ok {

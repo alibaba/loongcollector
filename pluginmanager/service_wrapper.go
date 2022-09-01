@@ -29,7 +29,7 @@ type ServiceWrapper struct {
 	Tags     map[string]string
 	Interval time.Duration
 
-	LogsChan chan *protocol.Log
+	LogsChan chan *ilogtail.LogWithContext
 }
 
 func (p *ServiceWrapper) Run() {
@@ -55,6 +55,21 @@ func (p *ServiceWrapper) Stop() error {
 }
 
 func (p *ServiceWrapper) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
+	p.AddDataWithContext(tags, fields, nil, t...)
+}
+
+func (p *ServiceWrapper) AddDataArray(tags map[string]string,
+	columns []string,
+	values []string,
+	t ...time.Time) {
+	p.AddDataArrayWithContext(tags, columns, values, nil, t...)
+}
+
+func (p *ServiceWrapper) AddRawLog(log *protocol.Log) {
+	p.AddRawLogWithContext(log, nil)
+}
+
+func (p *ServiceWrapper) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
 	var logTime time.Time
 	if len(t) == 0 {
 		logTime = time.Now()
@@ -62,12 +77,13 @@ func (p *ServiceWrapper) AddData(tags map[string]string, fields map[string]strin
 		logTime = t[0]
 	}
 	slsLog, _ := util.CreateLog(logTime, p.Tags, tags, fields)
-	p.LogsChan <- slsLog
+	p.LogsChan <- &ilogtail.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *ServiceWrapper) AddDataArray(tags map[string]string,
+func (p *ServiceWrapper) AddDataArrayWithContext(tags map[string]string,
 	columns []string,
 	values []string,
+	ctx map[string]interface{},
 	t ...time.Time) {
 	var logTime time.Time
 	if len(t) == 0 {
@@ -76,9 +92,9 @@ func (p *ServiceWrapper) AddDataArray(tags map[string]string,
 		logTime = t[0]
 	}
 	slsLog, _ := util.CreateLogByArray(logTime, p.Tags, tags, columns, values)
-	p.LogsChan <- slsLog
+	p.LogsChan <- &ilogtail.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *ServiceWrapper) AddRawLog(log *protocol.Log) {
-	p.LogsChan <- log
+func (p *ServiceWrapper) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
+	p.LogsChan <- &ilogtail.LogWithContext{Log: log, Context: ctx}
 }

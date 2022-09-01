@@ -145,7 +145,7 @@ func timeoutStop(config *LogstoreConfig, flag bool) bool {
 }
 
 // HoldOn stops all config instance and checkpoint manager so that it is ready
-//   to load new configs or quit.
+// to load new configs or quit.
 // For user-defined config, timeoutStop is used to avoid hanging.
 func HoldOn(exitFlag bool) error {
 	defer panicRecover("Run plugin")

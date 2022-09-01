@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -231,16 +232,16 @@ func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 	tags := []byte("")
 	str := helper.ZeroCopyString(rawLogs)
 	l := new(LogstoreConfig)
-	l.LogsChan = make(chan *protocol.Log, 10)
+	l.LogsChan = make(chan *ilogtail.LogWithContext, 10)
 
 	{
 		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
 		assert.Equal(t, 1, len(l.LogsChan))
 		log := <-l.LogsChan
-		assert.Equal(t, log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Contents[1].GetValue(), topic)
-		assert.True(t, helper.IsSafeString(log.Contents[0].GetValue(), str))
-		assert.False(t, helper.IsSafeString(log.Contents[1].GetValue(), topic))
+		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
+		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
+		assert.True(t, helper.IsSafeString(log.Log.Contents[0].GetValue(), str))
+		assert.False(t, helper.IsSafeString(log.Log.Contents[1].GetValue(), topic))
 	}
 
 	{
@@ -249,23 +250,23 @@ func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
 		assert.Equal(t, 1, len(l.LogsChan))
 		log := <-l.LogsChan
-		assert.Equal(t, log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 4, len(log.Contents))
+		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
+		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
+		assert.Equal(t, 4, len(log.Log.Contents))
 
-		assert.Equal(t, log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Contents[2].GetKey(), "k1")
-		assert.Equal(t, log.Contents[2].GetValue(), "v1")
-		assert.Equal(t, log.Contents[3].GetKey(), "k2")
-		assert.Equal(t, log.Contents[3].GetValue(), "v2")
+		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
+		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
+		assert.Equal(t, log.Log.Contents[2].GetKey(), "k1")
+		assert.Equal(t, log.Log.Contents[2].GetValue(), "v1")
+		assert.Equal(t, log.Log.Contents[3].GetKey(), "k2")
+		assert.Equal(t, log.Log.Contents[3].GetValue(), "v2")
 
-		assert.True(t, helper.IsSafeString(log.Contents[0].GetValue(), str))
-		assert.False(t, helper.IsSafeString(log.Contents[1].GetValue(), topic))
-		assert.True(t, helper.IsSafeString(log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, helper.IsSafeString(log.Contents[2].GetValue(), tagsStr))
-		assert.True(t, helper.IsSafeString(log.Contents[3].GetKey(), tagsStr))
-		assert.True(t, helper.IsSafeString(log.Contents[3].GetValue(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[0].GetValue(), str))
+		assert.False(t, helper.IsSafeString(log.Log.Contents[1].GetValue(), topic))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[3].GetKey(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[3].GetValue(), tagsStr))
 	}
 
 	{
@@ -274,19 +275,19 @@ func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
 		assert.Equal(t, 1, len(l.LogsChan))
 		log := <-l.LogsChan
-		assert.Equal(t, log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 3, len(log.Contents))
+		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
+		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
+		assert.Equal(t, 3, len(log.Log.Contents))
 
-		assert.Equal(t, log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Contents[2].GetKey(), "k2")
-		assert.Equal(t, log.Contents[2].GetValue(), "v2")
+		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
+		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
+		assert.Equal(t, log.Log.Contents[2].GetKey(), "k2")
+		assert.Equal(t, log.Log.Contents[2].GetValue(), "v2")
 
-		assert.True(t, helper.IsSafeString(log.Contents[0].GetValue(), str))
-		assert.False(t, helper.IsSafeString(log.Contents[1].GetValue(), topic))
-		assert.True(t, helper.IsSafeString(log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, helper.IsSafeString(log.Contents[2].GetValue(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[0].GetValue(), str))
+		assert.False(t, helper.IsSafeString(log.Log.Contents[1].GetValue(), topic))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
 	}
 
 	{
@@ -295,23 +296,23 @@ func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
 		assert.Equal(t, 1, len(l.LogsChan))
 		log := <-l.LogsChan
-		assert.Equal(t, log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 4, len(log.Contents))
+		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
+		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
+		assert.Equal(t, 4, len(log.Log.Contents))
 
-		assert.Equal(t, log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Contents[2].GetKey(), "__tag__:__prefix__0")
-		assert.Equal(t, log.Contents[2].GetValue(), "k2")
-		assert.Equal(t, log.Contents[3].GetKey(), "__tag__:__prefix__1")
-		assert.Equal(t, log.Contents[3].GetValue(), "k3")
+		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
+		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
+		assert.Equal(t, log.Log.Contents[2].GetKey(), "__tag__:__prefix__0")
+		assert.Equal(t, log.Log.Contents[2].GetValue(), "k2")
+		assert.Equal(t, log.Log.Contents[3].GetKey(), "__tag__:__prefix__1")
+		assert.Equal(t, log.Log.Contents[3].GetValue(), "k3")
 
-		assert.True(t, helper.IsSafeString(log.Contents[0].GetValue(), str))
-		assert.False(t, helper.IsSafeString(log.Contents[1].GetValue(), topic))
-		assert.True(t, helper.IsSafeString(log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, helper.IsSafeString(log.Contents[2].GetValue(), tagsStr))
-		assert.True(t, helper.IsSafeString(log.Contents[3].GetKey(), tagsStr))
-		assert.True(t, helper.IsSafeString(log.Contents[3].GetValue(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[0].GetValue(), str))
+		assert.False(t, helper.IsSafeString(log.Log.Contents[1].GetValue(), topic))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[3].GetKey(), tagsStr))
+		assert.True(t, helper.IsSafeString(log.Log.Contents[3].GetValue(), tagsStr))
 	}
 
 }

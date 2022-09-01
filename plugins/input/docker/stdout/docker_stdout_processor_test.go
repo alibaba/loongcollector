@@ -99,6 +99,7 @@ type inputProcessorTestSuite struct {
 	multiLineContent []string
 	stdoutFlag       []bool
 	multiLineLen     int
+	source           string
 }
 
 func (s *inputProcessorTestSuite) SetUpSuite(c *check.C) {
@@ -106,6 +107,7 @@ func (s *inputProcessorTestSuite) SetUpSuite(c *check.C) {
 	s.tag = make(map[string]string)
 	s.tag["container"] = "test"
 	s.tag["container_id"] = "id"
+	s.source = "ABCEDFG1234567890-"
 
 	s.normalContent = append(s.normalContent, context1)
 	s.normalContent = append(s.normalContent, context2)
@@ -162,7 +164,7 @@ func (s *inputProcessorTestSuite) TearDownTest(c *check.C) {
 }
 
 func (s *inputProcessorTestSuite) TestNormal(c *check.C) {
-	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag)
+	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 	bytes := []byte(s.allLog)
 	str := helper.ZeroCopyString(bytes)
 	n := processor.Process(bytes, time.Duration(0))
@@ -201,7 +203,7 @@ func (s *inputProcessorTestSuite) TestNormal(c *check.C) {
 }
 
 func (s *inputProcessorTestSuite) TestSplitedLine(c *check.C) {
-	processor := NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, true, true, &s.context, &s.collector, s.tag)
+	processor := NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 	splitedlog1Bytes := []byte(splitedlog1)
 	str1 := helper.ZeroCopyString(splitedlog1Bytes)
 	splited2og1Bytes := []byte(splitedlog2)
@@ -237,7 +239,7 @@ func (s *inputProcessorTestSuite) TestSplitedLine(c *check.C) {
 }
 
 func (s *inputProcessorTestSuite) TestError(c *check.C) {
-	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag)
+	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 
 	bytes := []byte(logErrorJSON)
 	str := helper.ZeroCopyString(bytes)
@@ -308,7 +310,7 @@ func (s *inputProcessorTestSuite) TestError(c *check.C) {
 }
 
 func (s *inputProcessorTestSuite) TestMultiLine(c *check.C) {
-	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1024, true, true, &s.context, &s.collector, s.tag)
+	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 
 	bytes := []byte(s.allLog)
 	str := helper.ZeroCopyString(bytes)
@@ -334,7 +336,7 @@ func (s *inputProcessorTestSuite) TestMultiLine(c *check.C) {
 }
 
 func (s *inputProcessorTestSuite) TestMultiLineTimeout(c *check.C) {
-	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1024, true, true, &s.context, &s.collector, s.tag)
+	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 	lastLine := strings.LastIndexByte(s.allLog, '\n')
 	lastLine = strings.LastIndexByte(s.allLog[0:lastLine], '\n')
 	originBytes := []byte(s.allLog)
@@ -374,7 +376,7 @@ func (s *inputProcessorTestSuite) TestMultiLineTimeout(c *check.C) {
 }
 
 func (s *inputProcessorTestSuite) TestMultiLineMaxLength(c *check.C) {
-	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1056, true, true, &s.context, &s.collector, s.tag)
+	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1056, true, true, &s.context, &s.collector, s.tag, s.source)
 	bytes := make([]byte, 3000)
 	str := helper.ZeroCopyString(bytes)
 	content := util.RandomString(1024)
@@ -396,7 +398,7 @@ func (s *inputProcessorTestSuite) TestMultiLineMaxLength(c *check.C) {
 }
 
 func (s *inputProcessorTestSuite) TestMultiLineError(c *check.C) {
-	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1024, true, true, &s.context, &s.collector, s.tag)
+	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 
 	bytes := []byte(logErrorJSON)
 	str := helper.ZeroCopyString(bytes)
@@ -414,7 +416,7 @@ func (s *inputProcessorTestSuite) TestBigLine(c *check.C) {
 	if len(bigline) == 0 {
 		return
 	}
-	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag)
+	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 	for i := 0; i < 1000; i++ {
 		processor.Process(bigline, time.Second*time.Duration(0))
 		c.Assert(helper.IsSafeString(s.collector.Logs[i].Contents[0].GetValue(), helper.ZeroCopyString(bigline)), check.IsTrue)
@@ -429,6 +431,7 @@ func TestParseCRILine(t *testing.T) {
 		"container":    "test",
 		"container_id": "id",
 	}
+	source := "ABCEDFG1234567890-"
 
 	duration := time.Second * time.Duration(0)
 	assertKeyValue := func(log *protocol.Log, key string, value string) {
@@ -447,7 +450,7 @@ func TestParseCRILine(t *testing.T) {
 		str := helper.ZeroCopyString(bytes)
 
 		processor := NewDockerStdoutProcessor(nil, time.Duration(0),
-			0, 512*1024, true, true, &context, &collector, tags)
+			0, 512*1024, true, true, &context, &collector, tags, source)
 
 		single := "2021-07-13T16:32:21.212861448Z stdout F full line\n"
 		copy(bytes, single)
@@ -478,7 +481,7 @@ func TestParseCRILine(t *testing.T) {
 		timeoutDuration := time.Duration(1) * time.Second
 		processor := NewDockerStdoutProcessor(
 			regexp.MustCompile(`\d+-\d+-\d+.*`), timeoutDuration,
-			10, 512*1024, true, true, &context, &collector, tags)
+			10, 512*1024, true, true, &context, &collector, tags, source)
 
 		single := "2021-07-13T16:32:21.212861448Z stdout F 2021-07-13 full line line 1\n"
 		copy(bytes, single)
@@ -537,8 +540,9 @@ func TestSingleLineChangeBlock(t *testing.T) {
 		"container":    "test",
 		"container_id": "id",
 	}
+	source := "ABCEDFG1234567890-"
 	processor := NewDockerStdoutProcessor(nil, time.Duration(0),
-		0, 512*1024, true, true, &context, &collector, tags)
+		0, 512*1024, true, true, &context, &collector, tags, source)
 
 	// valid single line when change block
 	{
@@ -579,7 +583,7 @@ func TestSingleLineChangeBlock(t *testing.T) {
 	// valid containerd multi line when change block
 	{
 		processor := NewDockerStdoutProcessor(regexp.MustCompile(`^\d+-\d+-\d+.*`), time.Duration(0),
-			10, 512*1024, true, true, &context, &collector, tags)
+			10, 512*1024, true, true, &context, &collector, tags, source)
 		part1 := []byte("2017-09-12T22:32:21.212861448Z stderr 2017-09-12 22:32:21.212 [INFO][88] exception 1: \n")
 		str := helper.ZeroCopyString(part1)
 
@@ -600,7 +604,7 @@ func TestSingleLineChangeBlock(t *testing.T) {
 	// valid docker multi line when change block
 	{
 		processor := NewDockerStdoutProcessor(regexp.MustCompile(`^\d+-\d+-\d+.*`), time.Duration(0),
-			10, 512*1024, true, true, &context, &collector, tags)
+			10, 512*1024, true, true, &context, &collector, tags, source)
 		part1 := []byte("{\"log\":\"2017-09-12 22:32:21.212 13:27:36.276 # User requested shutdown...\\n\",\"stream\":\"stdout\", \"time\":\"2018-05-16T06:28:41.2195434Z\"}\n")
 		str := helper.ZeroCopyString(part1)
 

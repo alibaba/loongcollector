@@ -109,17 +109,31 @@ type mockCollector struct {
 	lock    sync.Mutex
 }
 
-func (c *mockCollector) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
+func (c *mockCollector) AddData(
+	tags map[string]string, fields map[string]string, t ...time.Time) {
+	c.AddDataWithContext(tags, fields, nil, t...)
+}
+
+func (c *mockCollector) AddDataArray(
+	tags map[string]string, columns []string, values []string, t ...time.Time) {
+	c.AddDataArrayWithContext(tags, columns, values, nil, t...)
+}
+
+func (c *mockCollector) AddRawLog(log *protocol.Log) {
+	c.AddRawLogWithContext(log, nil)
+}
+
+func (c *mockCollector) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.logs = append(c.logs, &mockLog{tags, fields, t[0], true})
 }
 
-func (c *mockCollector) AddDataArray(
-	tags map[string]string, columns []string, values []string, t ...time.Time) {
+func (c *mockCollector) AddDataArrayWithContext(
+	tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
 }
 
-func (c *mockCollector) AddRawLog(log *protocol.Log) {
+func (c *mockCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
 
 }
 

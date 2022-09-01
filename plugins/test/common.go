@@ -92,14 +92,28 @@ type MockCollector struct {
 
 func (c *MockCollector) AddData(
 	tags map[string]string, fields map[string]string, t ...time.Time) {
-	c.Logs = append(c.Logs, &MockLog{tags, fields})
+	c.AddDataWithContext(tags, fields, nil, t...)
 }
 
 func (c *MockCollector) AddDataArray(
 	tags map[string]string, columns []string, values []string, t ...time.Time) {
+	c.AddDataArrayWithContext(tags, columns, values, nil, t...)
 }
 
 func (c *MockCollector) AddRawLog(log *protocol.Log) {
+	c.AddRawLogWithContext(log, nil)
+}
+
+func (c *MockCollector) AddDataWithContext(
+	tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
+	c.Logs = append(c.Logs, &MockLog{tags, fields})
+}
+
+func (c *MockCollector) AddDataArrayWithContext(
+	tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
+}
+
+func (c *MockCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
 	c.RawLogs = append(c.RawLogs, log)
 }
 
@@ -112,6 +126,18 @@ type MockMetricCollector struct {
 }
 
 func (m *MockMetricCollector) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
+	m.AddDataWithContext(tags, fields, nil, t...)
+}
+
+func (m *MockMetricCollector) AddDataArray(tags map[string]string, columns []string, values []string, t ...time.Time) {
+	m.AddDataArrayWithContext(tags, columns, values, nil, t...)
+}
+
+func (m *MockMetricCollector) AddRawLog(log *protocol.Log) {
+	m.AddRawLogWithContext(log, nil)
+}
+
+func (m *MockMetricCollector) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
 	if m.Benchmark {
 		return
 	}
@@ -124,7 +150,8 @@ func (m *MockMetricCollector) AddData(tags map[string]string, fields map[string]
 	slsLog, _ := util.CreateLog(logTime, m.Tags, tags, fields)
 	m.Logs = append(m.Logs, slsLog)
 }
-func (m *MockMetricCollector) AddDataArray(tags map[string]string, columns []string, values []string, t ...time.Time) {
+
+func (m *MockMetricCollector) AddDataArrayWithContext(tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
 	if m.Benchmark {
 		return
 	}
@@ -137,7 +164,8 @@ func (m *MockMetricCollector) AddDataArray(tags map[string]string, columns []str
 	slsLog, _ := util.CreateLogByArray(logTime, m.Tags, tags, columns, values)
 	m.Logs = append(m.Logs, slsLog)
 }
-func (m *MockMetricCollector) AddRawLog(log *protocol.Log) {
+
+func (m *MockMetricCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
 	if m.Benchmark {
 		return
 	}
