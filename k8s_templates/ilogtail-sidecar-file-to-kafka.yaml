@@ -1,0 +1,115 @@
+# Copyright 2022 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# To collect file logs in container with ilogtail deployed as a sidecar container and write to SLS.
+# 
+# You may change <sls_endpoint>, <sls_project> and <sls_logstore> according to you SLS setup.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/flusher/sls
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ilogtail-user-cm
+  namespace: default
+data:
+  json_log.yaml: |
+    enable: true
+    inputs:
+      - Type: file_log
+        LogPath: /root/log
+        FilePattern: "json.log"
+    processors:
+      - Type: processor_json
+        SourceKey: content
+        KeepSource: false
+        ExpandDepth: 1
+        ExpandConnector: ""
+    flushers:
+      - Type: flusher_kafka
+        Brokers:
+          - <kafka_host>:<kafka_port>
+        Topic: access-log
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: file-log-demo
+  namespace: default
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: file-log-demo
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: log-demo
+          image: <image>
+          volumeMounts:
+            - name: file-log
+              mountPath: /root/log
+        - name: logtail
+          env:
+            - name: "ALIYUN_LOG_ENV_TAGS"
+              value: "_pod_name_|_pod_ip_|_namespace_|_node_name_|_node_ip_"
+            - name: "_pod_name_"
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: "_pod_ip_"
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: "_namespace_"
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: "_node_name_"
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: "_node_ip_"
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: cpu_usage_limit
+              value: "1"
+            - name: mem_usage_limit
+              value: "512"
+          image: >-
+            sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 100m
+              memory: 512Mi
+            requests:
+              cpu: 10m
+              memory: 30Mi
+          volumeMounts:
+            - mountPath: /usr/local/ilogtail/checkpoint
+              name: checkpoint
+            - mountPath: /usr/local/ilogtail/user_yaml_config.d
+              name: user-config
+              readOnly: true
+      volumes:
+        - hostPath:
+            path: /var/lib/ilogtail-file-log-demo/checkpoint
+            type: DirectoryOrCreate
+          name: checkpoint
+        - configMap:
+            defaultMode: 420
+            name: ilogtail-user-cm
+          name: user-config

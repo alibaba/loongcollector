@@ -8,7 +8,7 @@ Please feel free to add one if it doesn't cover your case.
 
 ## 贡献指南
 
-`k8s_templates`目录包含完整的K8s部署案例，从源到典型处理到输出，以input / flusher插件进行划分。模版以`k8s-daemonset-<source>-to-<destination>.yaml`命名，例如`k8s-daemonset-stdout-to-sls.yaml`，`k8s-daemonset-file-to-kafka.yaml`，统一存放在`k8s_templates`目录下。
+`k8s_templates`目录包含完整的K8s部署案例，从源到典型处理到输出，以input / flusher插件进行划分。模版以`k8s-<deploy_method>-<source>-to-<destination>.yaml`命名，其中`<deploy_method>`代表ilogtail的不同部署模式，可选值为`daemonset`和`sidecar`，命名典型示例如`k8s-daemonset-stdout-to-sls.yaml`，`k8s-daemonset-file-to-kafka.yaml`。
 
 模版内注释需要说明清楚适用场景和应用前需要替换的部分。
 

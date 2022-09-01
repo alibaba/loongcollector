@@ -75,16 +75,6 @@ data:
           - <kafka_host>:<kafka_port>
         Topic: error-log
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ilogtail-secret
-  namespace: ilogtail
-type: Opaque
-data:
-  access_key: 
-  access_key_id: 
----
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:

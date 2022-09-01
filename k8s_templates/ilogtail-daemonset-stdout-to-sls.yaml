@@ -119,6 +119,18 @@ spec:
               fieldRef:
                 apiVersion: v1
                 fieldPath: status.hostIP
+          - name: default_access_key_id
+            valueFrom:
+              secretKeyRef:
+                name: ilogtail-secret
+                key: access_key_id
+                optional: true
+          - name: default_access_key
+            valueFrom:
+              secretKeyRef:
+                name: ilogtail-secret
+                key: access_key
+                optional: true
           - name: cpu_usage_limit
             value: "1"
           - name: mem_usage_limit
