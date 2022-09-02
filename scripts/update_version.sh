@@ -37,6 +37,8 @@ sed -i "s/ARG VERSION=.*/ARG VERSION=$version/g" docker/Dockerfile*
 
 # Scripts
 sed -i "s/VERSION=\${1:-.*}/VERSION=\${1:-$version}/g" scripts/*.sh
+sed -i "s/VERSION=\${2:-.*}/VERSION=\${2:-$version}/g" scripts/*.sh
+sed -i "s/VERSION=\${3:-.*}/VERSION=\${3:-$version}/g" scripts/*.sh
 sed -i "s/image: aliyun\\/ilogtail:.*/image: aliyun\\/ilogtail:$version/g" test/engine/boot/compose.go
 
 # Docs

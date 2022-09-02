@@ -38,16 +38,17 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 设计定稿后，即可进行开发流程。下面是开源贡献者常用的工作流（workflow）：
 
-* 将 [iLogtail](https://github.com/alibaba/ilogtail) 仓库 fork 到个人 GitHub 下。
-* 基于个人 fork 分支进行开发、测试工作。详细流程：
-  * 保持个人 main 分支跟 iLogtail 主仓库 main 分支及时同步。
-  * 将 fork 后的个人仓库 clone 到本地。
-  * 创建新的开发分支，并进行开发。**请确保对应的变更都有 UnitTest 或 E2E 测试**。
-  * 在本地提交变更。**注意 commit log 保持简练、规范，提交的 email 需要和 GitHub 的 email 保持一致。**
-  * 将变更 push 到远程个人分支。
-* 向 iLogtail main 分支创建一个 [pull request (PR)](https://github.com/alibaba/ilogtail/pulls)，在进行较大的变更的时候请确保 PR 有一个对应的 Issue，并进行关联。
-  * 发起 PR 前请进行如下规范性检查：[代码/文档风格](../developer-guide/codestyle.md)、[编码规范](../developer-guide/code-check/check-codestyle.md)、[依赖包许可证](../developer-guide/code-check/check-dependency-license.md)、[文件许可证](../developer-guide/code-check/check-license.md)。
-  * 为了更好的进行版本管理，对于一些独立的特性或者关键BUG修复，请提交[Changelog](https://github.com/alibaba/ilogtail/blob/main/CHANGELOG.md).
+1. 将 [iLogtail](https://github.com/alibaba/ilogtail) 仓库 fork 到个人 GitHub 下。
+2. 基于个人 fork 分支进行开发、测试工作。详细流程：
+    1. 保持个人 main 分支跟 iLogtail 主仓库 main 分支及时同步。
+    2. 将 fork 后的个人仓库 clone 到本地。
+    3. 创建新的开发分支，并进行开发。**请确保对应的变更都有 UnitTest 或 E2E 测试**。
+    4. 在本地提交变更。**注意 commit log 保持简练、规范，提交的 email 需要和 GitHub 的 email 保持一致。**
+    5. 将变更 push 到远程个人分支。
+3. 向 iLogtail main 分支创建一个 [pull request (PR)](https://github.com/alibaba/ilogtail/pulls)，在进行较大的变更的时候请确保 PR 有一个对应的 Issue，并进行关联。
+
+    1. 发起 PR 前请进行如下规范性检查：[代码/文档风格](../developer-guide/codestyle.md)、[编码规范](../developer-guide/code-check/check-codestyle.md)、[依赖包许可证](../developer-guide/code-check/check-dependency-license.md)、[文件许可证](../developer-guide/code-check/check-license.md)。
+    2. 为了更好的进行版本管理，对于一些独立的特性或者关键BUG修复，请提交[Changelog](https://github.com/alibaba/ilogtail/blob/main/CHANGELOG.md).
 
 注意一个 PR 尽量不要过于大，如果的确需要有大的变更，可以将其按功能拆分成多个单独的 PR。
 
@@ -93,6 +94,10 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 ### 案例分享 <a href="#case" id="case"></a>
 
 我们也欢迎您分享任何关于 iLogtail 的使用案例。我们在知乎建立了专栏 [iLogtail社区](https://www.zhihu.com/column/c_1533139823409270785)，欢迎大家投稿，分享 iLogtail 的使用案例。
+
+1. 在知乎写文章，例如[一文搞懂 SAE 日志采集架构](https://zhuanlan.zhihu.com/p/557591446)。
+2. 推荐自己的文章到“iLogtail社区”专栏。
+3. GitHub上修改[use-cases.md](https://github.com/alibaba/ilogtail/blob/main/docs/cn/awesome-ilogtail/use-cases.md)并发起PR，Label选awesome ilogtail。
 
 ### 参与社区讨论
 

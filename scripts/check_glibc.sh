@@ -52,7 +52,11 @@ END {
 EOF
 )
 all=("$BIN" "$ADAPTER" "$PLUGIN")
+failed=0
 for obj in "${all[@]}"; do
     echo "Checking symbols in $obj ..."
-    objdump -T "$obj" | awk "$awk_script"
+    objdump -T "$obj" | awk "$awk_script" || failed+=1
 done
+[[ $failed -gt 0 ]] && exit 1 || {
+    echo -e "\033[0;32mAll the checks passed\033[0m"
+}

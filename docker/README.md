@@ -1,9 +1,16 @@
 # Dockerfile
 
-The Logtailplugin would be built with the c-shared mode in production to work with Logtail. So the Logtailplugin image
-would not be pushed to the Dockerhub. There are only 2 usages of it.
+## Dockerfiles to build build image
 
-1. Provide an easy way to run and learn Logtailplugin.
-2. Work with the e2e engine. For the usage, we add a ENV named HOST_OS to distinguish host system because
-   the `host.docker.internal` host cannot be parsed in the docker engine of Linux, more details please
-   see [here](https://github.com/docker/for-linux/issues/264).
+Dockerfile.c7-systemd-linux: base system
+Dockerfile.ilogtail-toolchain-linux-amd64: install toolchain
+Dockerfile.ilogtail-build-linux-amd64: add dependencies
+
+## Dockerfiles to build iLogtail
+
+Dockerfile_build: build iLogtail
+Dockerfile_goc: goc server
+Dockerfile_development_part: testing entrypoint
+Dockerfile_production: production entrypoint
+
+Dockerfile_development_part works with the e2e engine. For the usage, we add a ENV named HOST_OS to distinguish host system because the `host.docker.internal` host cannot be parsed in the docker engine of Linux, more details please see [here](https://github.com/docker/for-linux/issues/264).
