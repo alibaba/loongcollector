@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # This script is used after calling `go mod vendor`, it will use files in external directory to override
 # corresponding files in vendor directory.

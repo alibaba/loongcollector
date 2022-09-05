@@ -1,4 +1,6 @@
-# Copyright 2021 iLogtail Authors
+#!/usr/bin/env bash
+
+# Copyright 2022 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# goc server is only for e2e test to analysis code coverage.
+set -ue
+set -o pipefail
 
-FROM sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest
+docker manifest create \
+sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest \
+--amend sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux-amd64:latest \
+--amend sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux-arm64:latest
 
-ENTRYPOINT ["goc","server"]
+docker manifest push sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest

@@ -39,6 +39,7 @@ mkdir -p "$ROOTDIR"/bin
 if [ $OS_FLAG = 1 ]; then
   IDFLAGS='-extldflags "-Wl,--wrap=memcpy"'
   if [ $BUILDMODE = "c-shared" ]; then
+    cp ${ROOTDIR}/core/build/plugin/libPluginAdapter.so ${ROOTDIR}/vendor/github.com/alibaba/ilogtail/pkg/logtail/libPluginAdapter.so
     NAME=libPluginBase.so
   fi
 elif [ $OS_FLAG = 3 ]; then
