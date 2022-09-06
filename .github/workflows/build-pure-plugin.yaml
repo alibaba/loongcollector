@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build
+name: Build Pure Plugin
 
 on:
   pull_request:
@@ -54,13 +54,8 @@ jobs:
         with:
           submodules: true
 
-      - name: Build Docker
-        if: matrix.runner == 'ubuntu-latest'
-        env:
-            BUILD_LOGTAIL_UT: OFF
-            ENABLE_COMPATIBLE_MODE: ON
-            ENABLE_STATIC_LINK_CRT: ON
-        run: make dist && scripts/check_glibc.sh && make docker
+      - name: Build pure plugin
+        run: make plugin_main
 
   result:
     runs-on: ubuntu-latest
