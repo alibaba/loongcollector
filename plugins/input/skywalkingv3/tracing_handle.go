@@ -32,6 +32,29 @@ type TracingHandler struct {
 	compIDMessagingSystemMapping map[int32]string
 }
 
+type traceSegmentHandler interface {
+	collectorSegment(segment *skywalking.SegmentObject) (result interface{}, e error)
+}
+
+type traceSegmentsHandler interface {
+	collectorSegments(segment []*skywalking.SegmentObject) (result interface{}, e error)
+}
+
+func (h *TracingHandler) collectorSegments(segments []*skywalking.SegmentObject) (result interface{}, e error) {
+	defer panicRecover()
+	for _, segment := range segments {
+		if e = h.collectSegment(segment, h.compIDMessagingSystemMapping); e != nil {
+			return e, nil
+		}
+	}
+	return &v3.Commands{}, nil
+}
+
+func (h *TracingHandler) collectorSegment(segment *skywalking.SegmentObject) (result interface{}, e error) {
+	defer panicRecover()
+	return &v3.Commands{}, h.collectSegment(segment, h.compIDMessagingSystemMapping)
+}
+
 func panicRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)

@@ -97,6 +97,27 @@ type ManagementHandler struct {
 	cache     *ResourcePropertiesCache
 }
 
+func (m *ManagementHandler) keepAliveHandler(req *management.InstancePingPkg) (*v3.Commands, error) {
+	return &v3.Commands{}, nil
+}
+
+func (m *ManagementHandler) reportInstanceProperties(instanceProperties *management.InstanceProperties) (result *v3.Commands, e error) {
+	defer panicRecover()
+	propertyMap := ConvertResourceOt(instanceProperties)
+	if m.cache.put(instanceProperties.Service, instanceProperties.ServiceInstance, propertyMap) {
+		m.cache.save(m.context)
+	}
+	return &v3.Commands{}, nil
+}
+
+type keepAliveHandler interface {
+	keepAliveHandler(req *management.InstancePingPkg) (*v3.Commands, error)
+}
+
+type reportInstancePropertiesHandler interface {
+	reportInstanceProperties(instanceProperties *management.InstanceProperties) (result *v3.Commands, e error)
+}
+
 func NewManagementHandler(context ilogtail.Context, collector ilogtail.Collector, cache *ResourcePropertiesCache) *ManagementHandler {
 	return &ManagementHandler{
 		context:   context,
@@ -106,12 +127,7 @@ func NewManagementHandler(context ilogtail.Context, collector ilogtail.Collector
 }
 
 func (m *ManagementHandler) ReportInstanceProperties(ctx context.Context, req *management.InstanceProperties) (*v3.Commands, error) {
-	defer panicRecover()
-	propertyMap := ConvertResourceOt(req)
-	if m.cache.put(req.Service, req.ServiceInstance, propertyMap) {
-		m.cache.save(m.context)
-	}
-	return &v3.Commands{}, nil
+	return m.reportInstanceProperties(req)
 }
 func (*ManagementHandler) KeepAlive(ctx context.Context, req *management.InstancePingPkg) (*v3.Commands, error) {
 	return &v3.Commands{}, nil

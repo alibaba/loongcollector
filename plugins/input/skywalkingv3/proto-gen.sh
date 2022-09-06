@@ -23,6 +23,7 @@
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/management/Management.proto --proto_path=./proto
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/common/Common.proto --proto_path=./proto
  protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/logging/Logging.proto --proto_path=./proto
+ protoc --go_out=. --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false ./proto/browser/BrowserPerf.proto --proto_path=./proto
 
  rm -rf ./skywalking
  mv ./github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking ./
