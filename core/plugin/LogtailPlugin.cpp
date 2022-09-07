@@ -78,12 +78,14 @@ void LogtailPlugin::LoadConfig() {
             if (mPluginValid && mLoadConfigFun != NULL) {
                 GoInt loadRst = mLoadConfigFun(goProject, goLogstore, goConfigName, logStoreKey, goPluginConfig);
                 if (loadRst != 0) {
-                    LOG_WARNING(sLogger,
-                                ("load plugin error",
-                                 pConfig->mProjectName)(pConfig->mCategory, pConfig->mPluginConfig)("result", loadRst));
+                    LOG_WARNING(
+                        sLogger,
+                        ("msg", "load plugin error")("project", pConfig->mProjectName)("logstore", pConfig->mCategory)(
+                            "config", pConfig->mConfigName)("content", pConfig->mPluginConfig)("result", loadRst));
                     LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                           string("load plugin config error, invalid config. please "
-                                                                  "check you config and logtail's plugin log."),
+                                                           "load plugin config error, invalid config: "
+                                                               + pConfig->mConfigName
+                                                               + ". please check you config and logtail's plugin log.",
                                                            pConfig->GetProjectName(),
                                                            pConfig->GetCategory(),
                                                            pConfig->mRegion);
