@@ -243,7 +243,9 @@ func gatherInfoOutput(
 
 // Parse the special Keyspace line at end of redis stats
 // This is a special line that looks something like:
-//     db0:keys=2,expires=0,avg_ttl=0
+//
+//	db0:keys=2,expires=0,avg_ttl=0
+//
 // And there is one for each db on the redis instance
 func gatherKeyspaceLine(name, line string, fields *map[string]string, dbTotal *TotalDBInfo) {
 	if strings.Contains(line, "keys=") {

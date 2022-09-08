@@ -641,7 +641,7 @@ func (sc *ServiceCanal) getLatestGTID() (mysql.GTIDSet, error) {
 
 // newCanal is a wrapper of canal.NewCanal with retry logic (every 5 seconds).
 // @return bool to indicate if the shutdown has signaled. non-nil error if
-//   NewCanal failed because of non-ROW mode.
+// NewCanal failed because of non-ROW mode.
 func (sc *ServiceCanal) newCanal() (bool, error) {
 	var err error
 	for {

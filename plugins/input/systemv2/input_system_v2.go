@@ -73,8 +73,7 @@ type InputSystem struct {
 	context                ilogtail.Context
 	excludeDiskFsTypeRegex *regexp.Regexp
 	excludeDiskPathRegex   *regexp.Regexp
-	//nolint: structcheck,unused
-	fs *procfs.FS
+	fs                     *procfs.FS //nolint:unused
 }
 
 func (r *InputSystem) Description() string {

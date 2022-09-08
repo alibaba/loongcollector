@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/jackc/pgx/v4/stdlib" //nolint
+	_ "github.com/jackc/pgx/v4/stdlib" //
 
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/util"

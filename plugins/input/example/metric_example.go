@@ -55,8 +55,7 @@ func (m *MetricsExample) Collect(collector ilogtail.Collector) error {
 	// counter increment
 	m.counter++
 	// create a random value as gauge value
-	//nolint:gosec
-	m.gauge = rand.Intn(100)
+	m.gauge = rand.Intn(100) //nolint:gosec
 
 	// collect the metrics
 	helper.AddMetric(collector, "example_counter", time.Now(), m.labels, float64(m.counter))

@@ -2,18 +2,20 @@
 // source: sls_logs.proto
 
 /*
-	Package sls_logs is a generated protocol buffer package.
+Package sls_logs is a generated protocol buffer package.
 
-	It is generated from these files:
-		sls_logs.proto
+It is generated from these files:
 
-	It has these top-level messages:
-		Log
-		LogTag
-		LogGroup
-		SlsLogPackage
-		SlsLogPackageList
-		LogGroupList
+	sls_logs.proto
+
+It has these top-level messages:
+
+	Log
+	LogTag
+	LogGroup
+	SlsLogPackage
+	SlsLogPackageList
+	LogGroupList
 */
 package protocol
 

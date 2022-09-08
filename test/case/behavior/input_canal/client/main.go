@@ -47,7 +47,7 @@ func getConnection() {
 	}
 }
 
-//dbCreate Create action using DB information
+// dbCreate Create action using DB information
 func dbCreate() int64 {
 	getConnection()
 	nowTime := time.Now().Unix()
@@ -77,7 +77,7 @@ func DBExecute(query string) {
 	}
 }
 
-//dbInsert Insert action using DB information
+// dbInsert Insert action using DB information
 func dbInsert(insertTimes int) int64 {
 	nowTime := dbCreate()
 	queryInsert := fmt.Sprintf("insert into specialalarmtest%v"+

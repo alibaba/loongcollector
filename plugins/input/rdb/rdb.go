@@ -28,7 +28,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
-type RdbFunc func() error
+type RdbFunc func() error //nolint:revive
 
 type ColumnResolverFunc func(string) (string, error)
 

@@ -4,11 +4,11 @@ package v2
 
 import (
 	context "context"
+	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common"
+	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common"
-	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent"
 )
 
 // This is a compile-time assertion to ensure that this generated file

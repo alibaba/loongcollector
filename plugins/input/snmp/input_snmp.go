@@ -391,7 +391,7 @@ func snmpTranslateCall(oid string) (oidNum string, oidText string, conversion st
 				}
 				if i := strings.Index(obj, "("); i != -1 {
 					obj = obj[i+1:]
-					oidNum += "." + obj[:strings.Index(obj, ")")]
+					oidNum += "." + obj[:strings.Index(obj, ")")] //nolint:gocritic
 				} else {
 					oidNum += "." + obj
 				}

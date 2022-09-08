@@ -107,7 +107,7 @@ func (p *ProcessorEncrypt) ProcessLogs(logArray []*protocol.Log) []*protocol.Log
 }
 
 // @return (the index of encrypted field,  -1 means not found
-//          any error,  nil if the field is not found)
+// any error,  nil if the field is not found)
 func (p *ProcessorEncrypt) processLog(log *protocol.Log) {
 	for _, cont := range log.Contents {
 		if _, exists := p.keyDict[cont.Key]; !exists {

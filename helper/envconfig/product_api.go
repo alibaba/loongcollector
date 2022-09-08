@@ -44,6 +44,7 @@ func recorrectRegion(region string) string {
 }
 
 // CreateProductLogstore create product logstore
+//
 //	"cn-hangzhou"
 //	"test-hangzhou-project"
 //	"audit-logstore"

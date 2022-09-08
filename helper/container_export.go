@@ -122,18 +122,19 @@ func GetContainerByAcceptedInfo(
 
 // GetContainerByAcceptedInfoV2 works like GetContainerByAcceptedInfo, but uses less CPU.
 // It reduces CPU cost by using full list and match list to find containers that
-//  need to be check.
+// need to be check.
 //
-//   deleted = fullList - containerMap
-//   newList = containerMap - fullList
-//   matchList -= deleted + filter(newList)
-//	 return len(deleted), len(filter(newList))
+//	  deleted = fullList - containerMap
+//	  newList = containerMap - fullList
+//	  matchList -= deleted + filter(newList)
+//		 return len(deleted), len(filter(newList))
 //
 // @param fullList [in,out]: all containers.
 // @param matchList [in,out]: all matched containers.
 //
 // It returns two integers: the number of new matched containers
-//  and deleted containers.
+//
+//	and deleted containers.
 func GetContainerByAcceptedInfoV2(
 	fullList map[string]bool,
 	matchList map[string]*DockerInfoDetail,

@@ -29,7 +29,7 @@ import (
 var FetchAllInterval = time.Second * time.Duration(300)
 
 // fetchAllSuccessTimeout controls when to force timeout containers if fetchAll
-//   failed continuously. By default, 20 times of FetchAllInterval.
+// failed continuously. By default, 20 times of FetchAllInterval.
 var fetchAllSuccessTimeout = FetchAllInterval * 20
 var DockerCenterTimeout = time.Second * time.Duration(30)
 var MaxFetchOneTriggerPerSecond int32 = 200

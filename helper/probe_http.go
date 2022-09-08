@@ -29,7 +29,7 @@ func init() {
 	if err != nil {
 		return
 	}
-	server := &http.Server{
+	server := &http.Server{ //nolint:gosec
 		Addr: ":" + strconv.Itoa(checkPort),
 	}
 	mux := http.NewServeMux()

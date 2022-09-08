@@ -40,8 +40,9 @@ type MetaNode struct {
 	Parents    Parents
 }
 
-//easyjson:json
 // Attributes used to store attributes in common conditions.
+//
+//easyjson:json
 type Attributes map[string]interface{}
 
 //easyjson:json
@@ -99,8 +100,9 @@ func AddMetadata(collector ilogtail.Collector, time time.Time, node *MetaNode) {
 	collector.AddDataArray(nil, keys, vals, time)
 }
 
-//nolint:gosec
 // makeMetaLog convert MetaNode to the log of Logtail
+//
+//nolint:gosec
 func makeMetaLog(node *MetaNode) (keys, values []string) {
 	values = make([]string, 5)
 	values[0] = node.ID

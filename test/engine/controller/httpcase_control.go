@@ -46,12 +46,15 @@ func (c *HTTPCaseController) Init(parent *CancelChain, cfg *config.Case) error {
 		return errors.New("the trigger URL must start with `http://`")
 	}
 	index := strings.Index(cfg.Trigger.URL[7:], "/")
-	c.virtualAddr = cfg.Trigger.URL[7:][:index]
+	if index == -1 {
+		c.virtualAddr = cfg.Trigger.URL[7:]
+	} else {
+		c.virtualAddr = cfg.Trigger.URL[7:][:index]
+		c.path = cfg.Trigger.URL[7+index:]
+	}
 	if !strings.Contains(c.virtualAddr, ":") {
 		c.virtualAddr += ":80"
 	}
-
-	c.path = cfg.Trigger.URL[7+index:]
 
 	duration, err := time.ParseDuration(c.cfg.Interval)
 	if err != nil {

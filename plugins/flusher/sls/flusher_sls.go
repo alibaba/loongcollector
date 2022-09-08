@@ -28,7 +28,7 @@ import (
 )
 
 // SlsFlusher uses symbols in LogtailAdaptor(.so) to flush log groups to Logtail.
-type SlsFlusher struct {
+type SlsFlusher struct { // nolint:revive
 	EnableShardHash bool
 	KeepShardHash   bool
 
@@ -100,9 +100,9 @@ func (p *SlsFlusher) Flush(projectName string, logstoreName string, configName s
 
 // SetUrgent ...
 // We do nothing here because necessary flag has already been set in Logtail
-//   before this method is called. Any future call of IsReady will return
-//   true so that remaining data can be flushed to Logtail (which will flush
-//   data to local file system) before it quits.
+// before this method is called. Any future call of IsReady will return
+// true so that remaining data can be flushed to Logtail (which will flush
+// data to local file system) before it quits.
 func (*SlsFlusher) SetUrgent(flag bool) {
 }
 

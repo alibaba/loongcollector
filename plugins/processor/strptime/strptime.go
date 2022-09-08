@@ -52,6 +52,7 @@ const (
 // 1. 2016/01/02 12:59:59 doesn't have offset information, assume as UTC0
 //   - Default: set to local offset (UTC+8), get 2016/01/02 12:59:59 +0800.
 //   - Set to UTC-8 (-28800): get 2016/01/02 12:59:59 -0800.
+//
 // 2. 2016/01/02 12:59:59 +0700 have offset information => 2016/01/02 05:59:59 +0000
 //   - Default: if local offset is UTC+8, get 2016/01/02 13:59:59 +0800.
 //   - Set to UTC-8 (-28800): get 2016/01/02 05:59:59 -0800.

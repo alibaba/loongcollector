@@ -62,7 +62,7 @@ func (t *TestProcessCache) Labels(values helper.KeyValues) string {
 	return ""
 }
 
-func (t *TestProcessCache) GetProcessStatus() *processStatus {
+func (t *TestProcessCache) GetProcessStatus() *processStatus { // nolint:revive
 	return t.processStatus
 }
 

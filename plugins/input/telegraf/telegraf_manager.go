@@ -105,7 +105,7 @@ func (b *BindingMeta) UpdateAlarm() {
 // Telegraf supervisor for agent start, stop, config reload...
 //
 // Because Telegraf will send all inputs' data to all outputs, so only ONE Logtail
-//   config will be passed to Telegraf simultaneously.
+// config will be passed to Telegraf simultaneously.
 //
 // Data link: Telegraf ------ HTTP ------> Logtail ----- Protobuf ------> SLS.
 // Logtail will work as an InfluxDB server to receive data from telegraf by HTTP protocol.
@@ -347,7 +347,7 @@ func (tm *Manager) removeConfigFile(name string) {
 }
 
 func (tm *Manager) runTelegrafd(command string, needOutput bool) (output []byte, err error) {
-	cmd := exec.Command(tm.telegrafdPath, command) //nolint:gosec
+	cmd := exec.Command(tm.telegrafdPath, command)
 	if needOutput {
 		output, err = cmd.CombinedOutput()
 	} else {
@@ -382,7 +382,7 @@ func (tm *Manager) install() bool {
 	}
 
 	// Install by execute install.sh
-	cmd := exec.Command(scriptPath) //nolint:gosec
+	cmd := exec.Command(scriptPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil && !strings.Contains(err.Error(), "no child process") {
 		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",

@@ -502,7 +502,7 @@ func (dc *DockerCenter) getIPAddress(info *docker.Container) string {
 
 // CreateInfoDetail create DockerInfoDetail with docker.Container
 // Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts
-//                                            ContainerInfo.GraphDriver.Data["UpperDir"] Config.Labels
+// ContainerInfo.GraphDriver.Data["UpperDir"] Config.Labels
 func (dc *DockerCenter) CreateInfoDetail(info *docker.Container, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	containerNameTag := make(map[string]string)
 	k8sInfo := K8SInfo{}

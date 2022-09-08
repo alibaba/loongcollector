@@ -28,7 +28,6 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 )
 
-//
 var K8sFlag = flag.Bool("ALICLOUD_LOG_K8S_FLAG", false, "alibaba log k8s event config flag, set true if you want to use it")
 
 // DockerConfigInitFlag is the alibaba log docker env config flag, set yes if you want to use it. And it is also a special flag to control enable go part in ilogtail. If you just want to

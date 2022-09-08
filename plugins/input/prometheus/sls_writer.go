@@ -95,7 +95,6 @@ func formatLabelValue(value string) string {
 	return string(newValue)
 }
 
-// //nolint:gosec
 func formatNewMetricName(name string) string {
 	newName := []byte(name)
 	for i, b := range newName {

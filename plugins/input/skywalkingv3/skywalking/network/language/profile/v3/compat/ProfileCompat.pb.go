@@ -24,10 +24,10 @@
 package compat
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	v31 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/profile/v3"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 )
 

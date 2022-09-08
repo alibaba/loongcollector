@@ -196,13 +196,13 @@ func (c *ComposeBooter) CopyCoreLogs() {
 	if c.logtailID != "" {
 		_ = os.Remove(config.LogDir)
 		_ = os.Mkdir(config.LogDir, 0750)
-		cmd := exec.Command("docker", "cp", c.logtailID+":/ilogtail/ilogtail.LOG", config.LogDir) //nolint:gosec
+		cmd := exec.Command("docker", "cp", c.logtailID+":/ilogtail/ilogtail.LOG", config.LogDir)
 		output, err := cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {
 			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "main", "err", err)
 		}
-		cmd = exec.Command("docker", "cp", c.logtailID+":/ilogtail/logtail_plugin.LOG", config.LogDir) //nolint:gosec
+		cmd = exec.Command("docker", "cp", c.logtailID+":/ilogtail/logtail_plugin.LOG", config.LogDir)
 		output, err = cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {

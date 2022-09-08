@@ -19,7 +19,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	_ "net/http/pprof" //nolint:gosec
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"runtime/debug"
