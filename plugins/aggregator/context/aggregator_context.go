@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package defaultone
+package context
 
 import (
 	"strings"
@@ -37,9 +37,9 @@ type LogPackSeqInfo struct {
 	lastUpdateTime time.Time
 }
 
-// AggregatorDefault is the default aggregator in plugin system.
+// AggregatorContext is the default aggregator in plugin system.
 // If there is no specific aggregator in plugin config, it will be added.
-type AggregatorDefault struct {
+type AggregatorContext struct {
 	MaxLogGroupCount            int    // the maximum log group count to trigger flush operation
 	MaxLogCount                 int    // the maximum log in a log group
 	Topic                       string // the output topic
@@ -62,7 +62,7 @@ type AggregatorDefault struct {
 // Init method would be trigger before working.
 // 1. context store the metadata of this Logstore config
 // 2. que is a transfer channel for flushing LogGroup when reaches the maximum in the cache.
-func (p *AggregatorDefault) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (p *AggregatorContext) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
 	p.defaultPack = util.NewPackIDPrefix(context.GetConfigName())
 	p.context = context
 	p.queue = que
@@ -70,12 +70,12 @@ func (p *AggregatorDefault) Init(context ilogtail.Context, que ilogtail.LogGroup
 	return 0, nil
 }
 
-func (*AggregatorDefault) Description() string {
+func (*AggregatorContext) Description() string {
 	return "default aggregator for logtail"
 }
 
 // Add adds @log with @ctx to aggregator.
-func (p *AggregatorDefault) Add(log *protocol.Log, ctx map[string]interface{}) error {
+func (p *AggregatorContext) Add(log *protocol.Log, ctx map[string]interface{}) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -116,6 +116,7 @@ func (p *AggregatorDefault) Add(log *protocol.Log, ctx map[string]interface{}) e
 			}
 		}
 		// New log group, reset size.
+		p.nowLogGroupSizeMap[source] = 0
 		logGroupList = append(logGroupList, p.newLogGroup(source, topic))
 		nowLogGroup = logGroupList[len(logGroupList)-1]
 	}
@@ -128,7 +129,7 @@ func (p *AggregatorDefault) Add(log *protocol.Log, ctx map[string]interface{}) e
 }
 
 // Flush ...
-func (p *AggregatorDefault) Flush() []*protocol.LogGroup {
+func (p *AggregatorContext) Flush() []*protocol.LogGroup {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	var ret []*protocol.LogGroup
@@ -160,13 +161,13 @@ func (p *AggregatorDefault) Flush() []*protocol.LogGroup {
 }
 
 // Reset ...
-func (p *AggregatorDefault) Reset() {
+func (p *AggregatorContext) Reset() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.logGroupPoolMap = make(map[string][]*protocol.LogGroup)
 }
 
-func (p *AggregatorDefault) newLogGroup(pack string, topic string) *protocol.LogGroup {
+func (p *AggregatorContext) newLogGroup(pack string, topic string) *protocol.LogGroup {
 	logGroup := &protocol.LogGroup{
 		Logs:  make([]*protocol.Log, 0, p.MaxLogCount),
 		Topic: topic,
@@ -186,7 +187,7 @@ func (p *AggregatorDefault) newLogGroup(pack string, topic string) *protocol.Log
 	return logGroup
 }
 
-func (*AggregatorDefault) evaluateLogSize(log *protocol.Log) int {
+func (*AggregatorContext) evaluateLogSize(log *protocol.Log) int {
 	var logSize = 6
 	for _, logC := range log.Contents {
 		logSize += 5 + len(logC.Key) + len(logC.Value)
@@ -195,8 +196,8 @@ func (*AggregatorDefault) evaluateLogSize(log *protocol.Log) int {
 }
 
 // NewAggregatorDefault create a default aggregator with default value.
-func NewAggregatorDefault() *AggregatorDefault {
-	return &AggregatorDefault{
+func NewAggregatorDefault() *AggregatorContext {
+	return &AggregatorContext{
 		MaxLogGroupCount:            4,
 		MaxLogCount:                 MaxLogCount,
 		ContextPresevationTolerance: 10,
@@ -211,7 +212,7 @@ func NewAggregatorDefault() *AggregatorDefault {
 
 // Register the plugin to the Aggregators array.
 func init() {
-	ilogtail.Aggregators["aggregator_default"] = func() ilogtail.Aggregator {
+	ilogtail.Aggregators["aggregator_context"] = func() ilogtail.Aggregator {
 		return NewAggregatorDefault()
 	}
 }

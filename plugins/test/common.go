@@ -24,7 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"
-	_ "github.com/alibaba/ilogtail/plugins/aggregator/defaultone"
+	_ "github.com/alibaba/ilogtail/plugins/aggregator" //
 	_ "github.com/alibaba/ilogtail/plugins/flusher/checker"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/statistics"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/stdout"

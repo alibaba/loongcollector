@@ -24,7 +24,7 @@ import (
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 
 	// dependency packages
-	_ "github.com/alibaba/ilogtail/plugins/aggregator/defaultone"
+	_ "github.com/alibaba/ilogtail/plugins/aggregator"
 	"github.com/alibaba/ilogtail/plugins/flusher/checker"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/statistics"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/stdout"

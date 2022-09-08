@@ -1,0 +1,127 @@
+# Copyright 2021 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+boot:
+  category: docker-compose
+ilogtail:
+  config:
+    - name: aggregator-default-case
+      mixed_mode: true
+      content:
+        - '{
+            "enable": true,
+            "docker_file" : true,
+            "file_pattern": "example.log",
+            "keys": [
+                "content"
+            ],
+            "log_begin_reg": ".*",
+            "log_path": "/root/test",
+            "log_type": "delimiter_log",
+            "max_depth": 10,
+            "delimiter_separator":"|",
+            "delimiter_quote": "\u0001",
+            "plugin": {
+                "global": {
+                    "DefaultLogQueueSize": 10
+                },
+                "processors": [
+                    {
+                        "detail": {
+                            "SplitKey": "content"
+                        },
+                        "type": "processor_split_log_string"
+                    },
+                    {
+                        "type": "processor_split_char",
+                        "detail": {
+                          "SourceKey": "content",
+                          "QuoteFlag": true,
+                          "SplitSep": "|",
+                          "Quote":"\"",
+                          "SplitKeys": [
+                            "no",
+                            "content"
+                          ]
+                        }
+                    }
+                ],
+                "aggregators": [
+                    {
+                        "detail": {},
+                        "type": "aggregator_context"
+                    }
+                ]
+            },
+            "regex": [
+                "(.*)"
+            ],
+            "advanced" : 
+                      {
+                        "k8s" : 
+                        {
+                          "ExcludeContainerLabel" : {},
+                          "ExcludeEnv" : {},
+                          "ExcludeK8sLabel" : {},
+                          "ExternalEnvTag" : {},
+                          "ExternalK8sLabelTag" : {},
+                          "IncludeContainerLabel" : {},
+                          "IncludeEnv" : {
+                          "STDOUT_SWITCH":"true"
+                          },
+                          "IncludeK8sLabel" : {},
+                          "K8sContainerRegex" : "",
+                          "K8sNamespaceRegex" : "",
+                          "K8sPodRegex" : ""
+                        },
+                        "tail_size_kb" : 1024
+                      },
+                      "docker_exclude_env" : {},
+                      "docker_exclude_label" : {},
+                      "docker_include_env" : {},
+                      "docker_include_label" : {}
+                          
+              }'
+      # detail:
+      #   - inputs:
+      #       - Type: file_log
+      #         LogPath: /root/test/
+      #         FilePattern: example.log
+      #         ContainerInfo:
+      #           IncludeEnv:
+      #             STDOUT_SWITCH: "true"
+      #     processors:
+      #       - Type: processor_split_char
+      #         SourceKey: content
+      #         SplitSep: "|"
+      #         SplitKeys: ["no", "content"]
+      #     aggregators:
+      #       - Type: aggregator_context
+  close_wait: 5s
+verify:
+  log_rules:
+    - name: log-context-check
+      validator: log_context
+      spec:
+  system_rules:
+    - name: counter-check
+      validator: sys_counter
+      spec:
+        expect_equal_processed_log: true
+        expect_equal_flush_log: true
+        expect_received_minimum_log_num: 200
+testing_interval: 15s
+retry:
+  times: 0
+  interval: 10s
