@@ -71,6 +71,7 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/processor/filter/regex"
 	_ "github.com/alibaba/ilogtail/plugins/processor/geoip"
 	_ "github.com/alibaba/ilogtail/plugins/processor/gotime"
+	_ "github.com/alibaba/ilogtail/plugins/processor/grok"
 	_ "github.com/alibaba/ilogtail/plugins/processor/json"
 	_ "github.com/alibaba/ilogtail/plugins/processor/md5"
 	_ "github.com/alibaba/ilogtail/plugins/processor/packjson"

@@ -41,12 +41,7 @@ flushers:
 ```
 
 * 输出
-<<<<<<< HEAD
-
-```
-=======
 ```json
->>>>>>> main
 {
     "__tag__:__path__":"/home/test-log/default.log",
     "content":"2022/07/14/11:32:47 test log",

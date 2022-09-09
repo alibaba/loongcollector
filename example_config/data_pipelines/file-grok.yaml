@@ -1,0 +1,38 @@
+# Copyright 2022 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# To process data by grok.
+# Before Process: {"content": "10.0.0.0 GET /index.html 15824 0.043"}
+# After Process: {"client":"10.0.0.0","method":"GET","request":"/index.html","bytes":"15824","duration":"0.043"}
+#
+# You may change SourceKey and other parameters.
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/processor/processor-grok.md
+
+enable: true
+inputs:
+  - Type: file_log
+    LogPath: /home/test-ilogtail/test-log/
+    FilePattern: processor-grok.log
+processors:
+  - Type: processor_grok
+    SourceKey: content
+    KeepSource: false
+    CustomPatterns:
+      HTTP: '%{IP:client} %{WORD:method} %{URIPATHPARAM:request} %{NUMBER:bytes} %{NUMBER:duration}'
+    Match: 
+      - '%{HTTP}'
+    IgnoreParseFailure: false
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true
