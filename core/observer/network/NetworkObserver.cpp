@@ -179,7 +179,7 @@ void NetworkObserver::FlushStatistics(NetStaticticsMap& statisticsMap, std::vect
             content->set_key(item.first);
             content->set_value(item.second);
         }
-        NetStaticticsMap::StatisticsPairToPB(iter->first, iter->second, log, false);
+        NetStaticticsMap::StatisticsPairToPB(iter->first, iter->second, log, this->mConfig->mLocalPort);
         mNetworkStatistic->mInputBytes += iter->second.Base.RecvBytes;
         mNetworkStatistic->mInputBytes += iter->second.Base.SendBytes;
         mNetworkStatistic->mInputEvents += iter->second.Base.RecvPackets;

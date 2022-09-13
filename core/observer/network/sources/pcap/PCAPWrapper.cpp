@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "PCAPWrapper.h"
+
+#include <utility>
 #include "common/xxhash/xxhash.h"
 #include "common/MachineInfoUtil.h"
 #include "logger/Logger.h"
@@ -24,7 +26,6 @@ static void OnPCAPPacketsCallBack(u_char* user, const struct pcap_pkthdr* packet
     logtail::PCAPWrapper* wrapper = (logtail::PCAPWrapper*)user;
     wrapper->PCAPCallBack(packet_header, packet_content);
 }
-
 
 typedef int (*pcap_compile_func)(pcap_t*, struct bpf_program*, const char*, int, bpf_u_int32);
 typedef char* (*pcap_lookupdev_func)(char*);
@@ -103,14 +104,14 @@ bool PCAPWrapper::Init(std::function<int(StringPiece)> processor) {
         LogtailAlarm::GetInstance()->SendAlarm(OBSERVER_INIT_ALARM, "cannot load pcap dynamic library");
         return false;
     }
-    mPacketProcessor = processor;
-    const char* netInterface = NULL;
+    mPacketProcessor = std::move(processor);
+    const char* netInterface;
     if (!mConfig->mPCAPInterface.empty()) {
         netInterface = mConfig->mPCAPInterface.c_str();
     } else {
         netInterface = g_pcap_lookupdev_func(mErrBuf);
     }
-    if (netInterface == NULL) {
+    if (netInterface == nullptr) {
         LOG_ERROR(sLogger, ("init pcap wrapper when get net interface error, err", mErrBuf));
         LogtailAlarm::GetInstance()->SendAlarm(
             OBSERVER_INIT_ALARM, "cannot find any net interface in pcap source, err: " + std::string(mErrBuf));
@@ -350,37 +351,57 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
         eventHeader->DstPort = ntohs(srcPort);
     }
     // filter host process connections
-    if (mConfig->mDropLocalConnections
-        && (eventHeader->DstAddr.Addr.IPV4 == INADDR_LOOPBACK || eventHeader->DstAddr.Addr.IPV4 == INADDR_ANY)) {
+    if (mConfig->mDropLocalConnections && (eventHeader->DstAddr.Addr.IPV4 == htonl(INADDR_LOOPBACK) || eventHeader->DstAddr.Addr.IPV4 == INADDR_ANY)
+        &&(eventHeader->SrcAddr.Addr.IPV4 == htonl(INADDR_LOOPBACK) || eventHeader->SrcAddr.Addr.IPV4 == INADDR_ANY)) {
         return;
     }
-
-    uint32_t xxHashRst = 0;
-    xxHashRst = XXH32(
-        (void*)(&eventHeader->SrcAddr), (char*)(&eventHeader->DstPort) - (char*)(&eventHeader->SrcAddr) + 2, xxHashRst);
-    eventHeader->SockHash = xxHashRst;
-
+    eventHeader->SockHash
+        = XXH32((void*)(&eventHeader->SrcAddr), (char*)(&eventHeader->DstPort) - (char*)(&eventHeader->SrcAddr) + 2, 0);
     eventHeader->EventType = PacketEventType_Data;
     eventHeader->PID = 0;
     eventHeader->TimeNano = uint64_t(header->ts.tv_sec) * 1000000000LL + header->ts.tv_usec * 1000LL;
-
     PacketEventData* eventData = (PacketEventData*)(packetBuffer + sizeof(PacketEventHeader));
     eventData->Buffer = (char*)payload;
     eventData->BufferLen = payload_length;
     eventData->RealLen = payload_raw_length;
-
-    std::tuple<ProtocolType, MessageType> inferRst
-        = infer_protocol(eventHeader, packetType, eventData->Buffer, eventData->BufferLen, eventData->RealLen);
-    eventData->PtlType = std::get<0>(inferRst);
-    eventData->MsgType = std::get<1>(inferRst);
     eventData->PktType = packetType;
-    eventHeader->RoleType = InferServerOrClient(eventData->PktType, eventData->MsgType);
 
-    LOG_TRACE(sLogger,
-              ("receive data event, addr", SockAddressToString(eventHeader->DstAddr))("port", eventHeader->DstPort)(
-                  "protocol", eventData->PtlType)("msg", MessageTypeToString(eventData->MsgType))(
-                  "data", charToHexString(eventData->Buffer, eventData->RealLen, eventData->RealLen))(
-                  "hash", eventHeader->SockHash)("raw_data", std::string(eventData->Buffer, eventData->RealLen)));
+    auto res = caches.Get(eventHeader->SockHash, nullptr);
+    if (res == nullptr) {
+        std::tuple<ProtocolType, MessageType> inferRst
+            = infer_protocol(eventHeader, packetType, (char*)payload, payload_length, payload_raw_length);
+        eventData->PtlType = std::get<0>(inferRst);
+        eventData->MsgType = std::get<1>(inferRst);
+        eventHeader->RoleType = InferServerOrClient(packetType, eventData->MsgType);
+        if (eventHeader->RoleType != PacketRoleType::Unknown) {
+            caches.Put(
+                eventHeader->SockHash, std::move(std::make_pair(eventHeader->RoleType, eventData->PtlType)), nullptr);
+        }
+        LOG_DEBUG(sLogger,
+                  ("receive data event:new conn, addr",
+                   SockAddressToString(eventHeader->DstAddr))("role", PacketRoleTypeToString(eventHeader->RoleType))(
+                      "port", eventHeader->DstPort)("protocol", eventData->PtlType)(
+                      "msg", MessageTypeToString(eventData->MsgType))("hash", eventHeader->SockHash));
+        LOG_TRACE(sLogger, ("data", charToHexString(eventData->Buffer, eventData->RealLen, eventData->RealLen)));
+    } else {
+        eventData->PtlType = res->second;
+        eventHeader->RoleType = res->first;
+        if (eventData->PktType == PacketType_In) {
+            eventData->MsgType
+                = eventHeader->RoleType == PacketRoleType::Client ? MessageType_Response : MessageType_Request;
+        } else {
+            eventData->MsgType
+                = eventHeader->RoleType == PacketRoleType::Client ? MessageType_Request : MessageType_Response;
+        }
+        LOG_DEBUG(sLogger,
+                  ("receive data event:history conn, addr",
+                   SockAddressToString(eventHeader->DstAddr))("role", PacketRoleTypeToString(eventHeader->RoleType))(
+                      "port", eventHeader->DstPort)("protocol", eventData->PtlType)(
+                      "msg", MessageTypeToString(eventData->MsgType))("hash", eventHeader->SockHash));
+        LOG_TRACE(sLogger, ("data", charToHexString(eventData->Buffer, eventData->RealLen, eventData->RealLen)));
+    }
+    LOG_DEBUG(sLogger, ("tag3", "==="));
+
     NetStatisticsKey key;
     key.PID = eventHeader->PID;
     key.SockHash = eventHeader->SockHash;
@@ -388,13 +409,13 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
     key.DstPort = eventHeader->DstPort;
     key.SockCategory = SocketCategory::InetSocket;
     bool needRebuildHash = false;
-    if (key.DstPort >= 20000) {
+    if (eventHeader->RoleType == PacketRoleType::Server) {
         key.DstPort = 0;
         needRebuildHash = true;
     }
     key.SrcAddr = eventHeader->SrcAddr;
     key.SrcPort = eventHeader->SrcPort;
-    if (key.SrcPort >= 20000) {
+    if (eventHeader->RoleType == PacketRoleType::Client) {
         key.SrcPort = 0;
         needRebuildHash = true;
     }
@@ -430,7 +451,6 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
     } else {
         ++statisticsItem.Base.ProtocolUnMatched;
     }
-
     if (mConfig->IsLegalProtocol(eventData->PtlType)) {
         mPacketProcessor(StringPiece(packetBuffer, sizeof(PacketEventHeader) + sizeof(PacketEventData)));
     }

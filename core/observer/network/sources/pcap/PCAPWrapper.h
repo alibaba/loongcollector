@@ -38,7 +38,7 @@ namespace logtail {
 
 class PCAPWrapper {
 public:
-    PCAPWrapper(NetworkConfig* config) : mConfig(config) {}
+    PCAPWrapper(NetworkConfig* config) : mConfig(config), caches(config->mPCAPCacheConnSize) {}
     ~PCAPWrapper() { Stop(); }
 
     static PCAPWrapper* GetInstance() {
@@ -87,6 +87,7 @@ private:
     bpf_u_int32 mLocalMaskAddress = 0;
     DynamicLibLoader* mPCAPLib = NULL;
     NetStaticticsMap mStatistics;
+    LRUCache<uint32_t, std::pair<PacketRoleType,ProtocolType>> caches;
 };
 
 } // namespace logtail

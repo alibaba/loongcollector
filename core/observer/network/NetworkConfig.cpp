@@ -184,6 +184,7 @@ std::string NetworkConfig::SetFromJsonString() {
             mSampling = GetIntValue(commonValue, "Sampling", 100);
             mSaveToDisk = GetBoolValue(commonValue, "SaveToDisk", false);
             mProtocolProcessFlag = GetBoolValue(commonValue, "ProtocolProcess", true) ? -1 : 0;
+            mLocalPort = GetBoolValue(commonValue, "LocalPort", false);
             mDropUnixSocket = GetBoolValue(commonValue, "DropUnixSocket", true);
             mDropLocalConnections = GetBoolValue(commonValue, "DropLocalConnections", true);
             mDropUnknownSocket = GetBoolValue(commonValue, "DropUnknownSocket", true);

@@ -138,6 +138,7 @@ struct NetworkConfig {
         mDropLocalConnections = true;
         mDropUnknownSocket = true;
         mProtocolProcessFlag = -1;
+        mLocalPort = false;
     }
 
     bool IsLegalProtocol(ProtocolType type) const {
@@ -200,6 +201,7 @@ struct NetworkConfig {
         rst.append("DropUnixSocket : ").append(std::to_string(mDropUnixSocket)).append("\t");
         rst.append("DropLocalConnections : ").append(std::to_string(mDropLocalConnections)).append("\t");
         rst.append("DropUnknownSocket : ").append(std::to_string(mDropUnknownSocket)).append("\t");
+        rst.append("LocalPort : ").append(std::to_string(mLocalPort)).append("\t");
         rst.append("ProtocolProcess : ");
         for (int i = 1; i < ProtocolType_NumProto; ++i) {
             if (IsLegalProtocol((ProtocolType)i)) {
@@ -254,6 +256,7 @@ struct NetworkConfig {
     bool mDropUnixSocket = true;
     bool mDropLocalConnections = true;
     bool mDropUnknownSocket = true;
+    bool mLocalPort = false;
     uint32_t mProtocolProcessFlag = -1;
     std::vector<std::pair<std::string, std::string>> mTags;
     std::unordered_map<uint8_t, std::pair<uint32_t, uint32_t>> mProtocolAggCfg;
@@ -272,6 +275,7 @@ struct NetworkConfig {
     std::string mPCAPInterface;
     bool mPCAPPromiscuous = true;
     int mPCAPTimeoutMs = 0;
+    uint32_t mPCAPCacheConnSize = 2000;
 };
 
 } // namespace logtail

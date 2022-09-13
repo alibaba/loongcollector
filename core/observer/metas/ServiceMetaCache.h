@@ -54,6 +54,46 @@ struct ServiceMeta {
 
 static const ServiceMeta* sEmptyHost = new ServiceMeta;
 
+
+template <typename K, typename V>
+class LRUCache {
+public:
+    LRUCache() = delete;
+    explicit LRUCache(uint32_t capacity) : cap(capacity) {}
+
+    const V* Get(const K& key, std::function<void(V*)> wrapper) {
+        if (mIndexMap.find(key) == mIndexMap.end()) {
+            return nullptr;
+        }
+        mData.splice(mData.begin(), mData, mIndexMap[key]);
+        if (wrapper != nullptr) {
+            wrapper(&(mData.begin()->second));
+        }
+        return &mData.front().second;
+    }
+
+    void Put(const K& k,const V&& v, std::function<void(V*)> wrapper) {
+        if (Get(k, wrapper) != nullptr) {
+            mData.begin()->second = v;
+            wrapper(&mData.begin()->second);
+        } else {
+            if (mData.size() == cap) {
+                K delKey = std::move(mData.back().first);
+                mData.pop_back();
+                mIndexMap.erase(delKey);
+            }
+            mData.emplace_front(k, v);
+            mIndexMap[k] = mData.begin();
+        }
+    }
+
+private:
+    uint32_t cap = 0;
+    std::list<std::pair<K, V>> mData;
+    std::unordered_map<K, typename std::list<std::pair<K, V>>::iterator> mIndexMap;
+};
+
+// todo: Use LRUCache to refine ServiceMetaCache
 class ServiceMetaCache {
 public:
     ServiceMetaCache() = delete;

@@ -89,8 +89,7 @@ inline std::string PacketEventTypeToString(enum PacketEventType type) {
 
 struct NetStatisticsKey {
     uint32_t PID;
-    uint32_t SockHash; // hashed by local addr + local port + remote addrr +
-                       // remote port
+    uint32_t SockHash; // hashed by local addr + local port + remote addrr + remote port
     SockAddress SrcAddr;
     uint16_t SrcPort;
     SockAddress DstAddr;
