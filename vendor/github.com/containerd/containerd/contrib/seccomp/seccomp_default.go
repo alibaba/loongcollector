@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -23,6 +24,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/containerd/containerd/contrib/seccomp/kernelversion"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -42,6 +44,9 @@ func arches() []specs.Arch {
 		return []specs.Arch{specs.ArchMIPSEL, specs.ArchMIPSEL64, specs.ArchMIPSEL64N32}
 	case "s390x":
 		return []specs.Arch{specs.ArchS390, specs.ArchS390X}
+	case "riscv64":
+		// ArchRISCV32 (SCMP_ARCH_RISCV32) does not exist
+		return []specs.Arch{specs.ArchRISCV64}
 	default:
 		return []specs.Arch{}
 	}
@@ -49,6 +54,7 @@ func arches() []specs.Arch {
 
 // DefaultProfile defines the allowed syscalls for the default seccomp profile.
 func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
+	nosys := uint(unix.ENOSYS)
 	syscalls := []specs.LinuxSyscall{
 		{
 			Names: []string{
@@ -74,6 +80,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"clock_nanosleep",
 				"clock_nanosleep_time64",
 				"close",
+				"close_range",
 				"connect",
 				"copy_file_range",
 				"creat",
@@ -85,6 +92,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"epoll_ctl",
 				"epoll_ctl_old",
 				"epoll_pwait",
+				"epoll_pwait2",
 				"epoll_wait",
 				"epoll_wait_old",
 				"eventfd",
@@ -124,6 +132,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"ftruncate64",
 				"futex",
 				"futex_time64",
+				"futex_waitv",
 				"futimesat",
 				"getcpu",
 				"getcwd",
@@ -180,6 +189,9 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"io_uring_setup",
 				"ipc",
 				"kill",
+				"landlock_add_rule",
+				"landlock_create_ruleset",
+				"landlock_restrict_self",
 				"lchown",
 				"lchown32",
 				"lgetxattr",
@@ -197,6 +209,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"madvise",
 				"membarrier",
 				"memfd_create",
+				"memfd_secret",
 				"mincore",
 				"mkdir",
 				"mkdirat",
@@ -244,6 +257,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"preadv",
 				"preadv2",
 				"prlimit64",
+				"process_mrelease",
 				"pselect6",
 				"pselect6_time64",
 				"pwrite64",
@@ -457,12 +471,25 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		Syscalls:      syscalls,
 	}
 
+	// include by kernel version
+	if ok, err := kernelversion.GreaterEqualThan(
+		kernelversion.KernelVersion{Kernel: 4, Major: 8}); err == nil {
+		if ok {
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names:  []string{"ptrace"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		}
+	}
+
 	// include by arch
 	switch runtime.GOARCH {
 	case "ppc64le":
 		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 			Names: []string{
 				"sync_file_range2",
+				"swapcontext",
 			},
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
@@ -507,6 +534,14 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
 		})
+	case "riscv64":
+		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			Names: []string{
+				"riscv_flush_icache",
+			},
+			Action: specs.ActAllow,
+			Args:   []specs.LinuxSeccompArg{},
+		})
 	}
 
 	admin := false
@@ -524,12 +559,21 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Names: []string{
 					"bpf",
 					"clone",
+					"clone3",
 					"fanotify_init",
+					"fsconfig",
+					"fsmount",
+					"fsopen",
+					"fspick",
 					"lookup_dcookie",
 					"mount",
+					"mount_setattr",
+					"move_mount",
 					"name_to_handle_at",
+					"open_tree",
 					"perf_event_open",
 					"quotactl",
+					"quotactl_fd",
 					"setdomainname",
 					"sethostname",
 					"setns",
@@ -574,6 +618,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				Names: []string{
 					"kcmp",
 					"pidfd_getfd",
+					"process_madvise",
 					"process_vm_readv",
 					"process_vm_writev",
 					"ptrace",
@@ -596,6 +641,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"settimeofday",
 					"stime",
 					"clock_settime",
+					"clock_settime64",
 				},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
@@ -648,6 +694,15 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				},
 			})
 		}
+		// clone3 is explicitly requested to give ENOSYS instead of the default EPERM, when CAP_SYS_ADMIN is unset
+		// https://github.com/moby/moby/pull/42681
+		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			Names: []string{
+				"clone3",
+			},
+			Action:   specs.ActErrno,
+			ErrnoRet: &nosys,
+		})
 	}
 
 	return s

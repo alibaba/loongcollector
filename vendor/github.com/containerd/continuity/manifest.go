@@ -19,7 +19,6 @@ package continuity
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"sort"
 
@@ -75,7 +74,7 @@ func MarshalText(w io.Writer, m *Manifest) error {
 // BuildManifest creates the manifest for the given context
 func BuildManifest(ctx Context) (*Manifest, error) {
 	resourcesByPath := map[string]Resource{}
-	hardlinks := newHardlinkManager()
+	hardLinks := newHardlinkManager()
 
 	if err := ctx.Walk(func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -92,12 +91,11 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 			if err == ErrNotFound {
 				return nil
 			}
-			log.Printf("error getting resource %q: %v", p, err)
-			return err
+			return fmt.Errorf("failed to get resource %q: %w", p, err)
 		}
 
 		// add to the hardlink manager
-		if err := hardlinks.Add(fi, resource); err == nil {
+		if err := hardLinks.Add(fi, resource); err == nil {
 			// Resource has been accepted by hardlink manager so we don't add
 			// it to the resourcesByPath until we merge at the end.
 			return nil
@@ -114,14 +112,12 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 	}
 
 	// merge and post-process the hardlinks.
-	// nolint:misspell
-	hardlinked, err := hardlinks.Merge()
+	hardLinked, err := hardLinks.Merge()
 	if err != nil {
 		return nil, err
 	}
 
-	// nolint:misspell
-	for _, resource := range hardlinked {
+	for _, resource := range hardLinked {
 		resourcesByPath[resource.Path()] = resource
 	}
 

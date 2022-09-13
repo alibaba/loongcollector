@@ -18,6 +18,7 @@ package diff
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -168,7 +168,11 @@ func (c *compressedProcessor) Close() error {
 	return c.rc.Close()
 }
 
-func BinaryHandler(id, returnsMediaType string, mediaTypes []string, path string, args []string) Handler {
+// BinaryHandler creates a new stream processor handler which calls out to the given binary.
+// The id is used to identify the stream processor and allows the caller to send
+// payloads specific for that stream processor (i.e. decryption keys for decrypt stream processor).
+// The binary will be called for the provided mediaTypes and return the given media type.
+func BinaryHandler(id, returnsMediaType string, mediaTypes []string, path string, args, env []string) Handler {
 	set := make(map[string]struct{}, len(mediaTypes))
 	for _, m := range mediaTypes {
 		set[m] = struct{}{}
@@ -177,7 +181,7 @@ func BinaryHandler(id, returnsMediaType string, mediaTypes []string, path string
 		if _, ok := set[mediaType]; ok {
 			return func(ctx context.Context, stream StreamProcessor, payloads map[string]*types.Any) (StreamProcessor, error) {
 				payload := payloads[id]
-				return NewBinaryProcessor(ctx, mediaType, returnsMediaType, stream, path, args, payload)
+				return NewBinaryProcessor(ctx, mediaType, returnsMediaType, stream, path, args, env, payload)
 			}, true
 		}
 		return nil, false

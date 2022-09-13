@@ -1,4 +1,5 @@
-// +build darwin freebsd openbsd
+//go:build darwin || openbsd
+// +build darwin openbsd
 
 /*
    Copyright The containerd Authors.
@@ -18,7 +19,7 @@
 
 package mount
 
-import "github.com/pkg/errors"
+import "errors"
 
 var (
 	// ErrNotImplementOnUnix is returned for methods that are not implemented

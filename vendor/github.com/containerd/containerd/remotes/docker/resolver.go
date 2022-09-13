@@ -18,9 +18,9 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -35,16 +35,11 @@ import (
 	"github.com/containerd/containerd/version"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context/ctxhttp"
 )
 
 var (
-	// ErrNoToken is returned if a request is successful but the body does not
-	// contain an authorization token.
-	ErrNoToken = errors.New("authorization server did not include a token in the response")
-
 	// ErrInvalidAuthorization is used when credentials are passed to a server but
 	// those credentials are rejected.
 	ErrInvalidAuthorization = errors.New("authorization failed")
@@ -223,25 +218,20 @@ func (r *countingReader) Read(p []byte) (int, error) {
 var _ remotes.Resolver = &dockerResolver{}
 
 func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocispec.Descriptor, error) {
-	refspec, err := reference.Parse(ref)
+	base, err := r.resolveDockerBase(ref)
 	if err != nil {
 		return "", ocispec.Descriptor{}, err
 	}
-
+	refspec := base.refspec
 	if refspec.Object == "" {
 		return "", ocispec.Descriptor{}, reference.ErrObjectRequired
 	}
 
-	base, err := r.base(refspec)
-	if err != nil {
-		return "", ocispec.Descriptor{}, err
-	}
-
 	var (
-		lastErr error
-		paths   [][]string
-		dgst    = refspec.Digest()
-		caps    = HostCapabilityPull
+		firstErr error
+		paths    [][]string
+		dgst     = refspec.Digest()
+		caps     = HostCapabilityPull
 	)
 
 	if dgst != "" {
@@ -264,10 +254,10 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 	hosts := base.filterHosts(caps)
 	if len(hosts) == 0 {
-		return "", ocispec.Descriptor{}, errors.Wrap(errdefs.ErrNotFound, "no resolve hosts")
+		return "", ocispec.Descriptor{}, fmt.Errorf("no resolve hosts: %w", errdefs.ErrNotFound)
 	}
 
-	ctx, err = contextWithRepositoryScope(ctx, refspec, false)
+	ctx, err = ContextWithRepositoryScope(ctx, refspec, false)
 	if err != nil {
 		return "", ocispec.Descriptor{}, err
 	}
@@ -289,21 +279,30 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			resp, err := req.doWithRetries(ctx, nil)
 			if err != nil {
 				if errors.Is(err, ErrInvalidAuthorization) {
-					err = errors.Wrapf(err, "pull access denied, repository does not exist or may require authorization")
+					err = fmt.Errorf("pull access denied, repository does not exist or may require authorization: %w", err)
 				}
 				// Store the error for referencing later
-				if lastErr == nil {
-					lastErr = err
+				if firstErr == nil {
+					firstErr = err
 				}
+				log.G(ctx).WithError(err).Info("trying next host")
 				continue // try another host
 			}
 			resp.Body.Close() // don't care about body contents.
 
 			if resp.StatusCode > 299 {
 				if resp.StatusCode == http.StatusNotFound {
+					log.G(ctx).Info("trying next host - response was http.StatusNotFound")
 					continue
 				}
-				return "", ocispec.Descriptor{}, errors.Errorf("unexpected status code %v: %v", u, resp.Status)
+				if resp.StatusCode > 399 {
+					// Set firstErr when encountering the first non-404 status code.
+					if firstErr == nil {
+						firstErr = fmt.Errorf("pulling from host %s failed with status code %v: %v", host.Host, u, resp.Status)
+					}
+					continue // try another host
+				}
+				return "", ocispec.Descriptor{}, fmt.Errorf("pulling from host %s failed with unexpected status code %v: %v", host.Host, u, resp.Status)
 			}
 			size := resp.ContentLength
 			contentType := getManifestMediaType(resp)
@@ -319,7 +318,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 				if dgstHeader != "" && size != -1 {
 					if err := dgstHeader.Validate(); err != nil {
-						return "", ocispec.Descriptor{}, errors.Wrapf(err, "%q in header not a valid digest", dgstHeader)
+						return "", ocispec.Descriptor{}, fmt.Errorf("%q in header not a valid digest: %w", dgstHeader, err)
 					}
 					dgst = dgstHeader
 				}
@@ -359,15 +358,15 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 							return "", ocispec.Descriptor{}, err
 						}
 					}
-				} else if _, err := io.Copy(ioutil.Discard, &bodyReader); err != nil {
+				} else if _, err := io.Copy(io.Discard, &bodyReader); err != nil {
 					return "", ocispec.Descriptor{}, err
 				}
 				size = bodyReader.bytesRead
 			}
 			// Prevent resolving to excessively large manifests
 			if size > MaxManifestSize {
-				if lastErr == nil {
-					lastErr = errors.Wrapf(errdefs.ErrNotFound, "rejecting %d byte manifest for %s", size, ref)
+				if firstErr == nil {
+					firstErr = fmt.Errorf("rejecting %d byte manifest for %s: %w", size, ref, errdefs.ErrNotFound)
 				}
 				continue
 			}
@@ -383,20 +382,19 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		}
 	}
 
-	if lastErr == nil {
-		lastErr = errors.Wrap(errdefs.ErrNotFound, ref)
+	// If above loop terminates without return, then there was an error.
+	// "firstErr" contains the first non-404 error. That is, "firstErr == nil"
+	// means that either no registries were given or each registry returned 404.
+
+	if firstErr == nil {
+		firstErr = fmt.Errorf("%s: %w", ref, errdefs.ErrNotFound)
 	}
 
-	return "", ocispec.Descriptor{}, lastErr
+	return "", ocispec.Descriptor{}, firstErr
 }
 
 func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetcher, error) {
-	refspec, err := reference.Parse(ref)
-	if err != nil {
-		return nil, err
-	}
-
-	base, err := r.base(refspec)
+	base, err := r.resolveDockerBase(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -407,21 +405,25 @@ func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetch
 }
 
 func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher, error) {
-	refspec, err := reference.Parse(ref)
-	if err != nil {
-		return nil, err
-	}
-
-	base, err := r.base(refspec)
+	base, err := r.resolveDockerBase(ref)
 	if err != nil {
 		return nil, err
 	}
 
 	return dockerPusher{
 		dockerBase: base,
-		object:     refspec.Object,
+		object:     base.refspec.Object,
 		tracker:    r.tracker,
 	}, nil
+}
+
+func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
+	refspec, err := reference.Parse(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.base(refspec)
 }
 
 type dockerBase struct {
@@ -455,10 +457,11 @@ func (r *dockerBase) filterHosts(caps HostCapabilities) (hosts []RegistryHost) {
 }
 
 func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *request {
-	header := http.Header{}
-	for key, value := range r.header {
-		header[key] = append(header[key], value...)
+	header := r.header.Clone()
+	if header == nil {
+		header = http.Header{}
 	}
+
 	for key, value := range host.Header {
 		header[key] = append(header[key], value...)
 	}
@@ -525,7 +528,10 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header = r.header
+	req.Header = http.Header{} // headers need to be copied to avoid concurrent map access
+	for k, v := range r.header {
+		req.Header[k] = v
+	}
 	if r.body != nil {
 		body, err := r.body()
 		if err != nil {
@@ -541,11 +547,28 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
 	log.G(ctx).WithFields(requestFields(req)).Debug("do request")
 	if err := r.authorize(ctx, req); err != nil {
-		return nil, errors.Wrap(err, "failed to authorize")
+		return nil, fmt.Errorf("failed to authorize: %w", err)
 	}
-	resp, err := ctxhttp.Do(ctx, r.host.Client, req)
+
+	var client = &http.Client{}
+	if r.host.Client != nil {
+		*client = *r.host.Client
+	}
+	if client.CheckRedirect == nil {
+		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			if err := r.authorize(ctx, req); err != nil {
+				return fmt.Errorf("failed to authorize redirect: %w", err)
+			}
+			return nil
+		}
+	}
+
+	resp, err := ctxhttp.Do(ctx, client, req)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to do request")
+		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
 	log.G(ctx).WithFields(responseFields(resp)).Debug("fetch response received")
 	return resp, nil

@@ -1,8 +1,8 @@
-# imgcrypt image encryption library and command line lool
+# imgcrypt image encryption library and command line tool
 
 Project `imgcrypt` is a non-core subproject of containerd.
 
-The `imgcrypt` library provides API exensions for containerd to support encryted container images and implements
+The `imgcrypt` library provides API exensions for containerd to support encrypted container images and implements
 the `ctd-decoder` command line tool for use by containerd to decrypt encrypted container images. An extended version
 of containerd's `ctr` tool (`ctr-enc') with support for encrypting and decrypting container images is also provided.
 
@@ -10,7 +10,8 @@ of containerd's `ctr` tool (`ctr-enc') with support for encrypting and decryptin
 
 # Usage
 
-`imgcrypt` requires containerd 1.3 or later.
+`imgcrypt` requires containerd 1.3 or later. Containerd 1.4 or later is required when used with Kubernetes.
+For configuration instructions for kubernetes, please consult the [CRI decryption document](https://github.com/containerd/containerd/blob/main/docs/cri/decryption.md).
 
 Build and install `imgcrypt`:
 
@@ -47,7 +48,7 @@ state = "/tmp/run/containerd"
 Create an RSA key pair using the openssl command line tool and encrypted an image:
 
 ```
-# openssl genrsa --out mykey.pem
+# openssl genrsa -out mykey.pem
 Generating RSA private key, 2048 bit long modulus (2 primes)
 ...............................................+++++
 ............................+++++
@@ -95,8 +96,8 @@ Hello World!
 
 **imgcrypt** is a non-core containerd sub-project, licensed under the [Apache 2.0 license](./LICENSE).
 As a containerd sub-project, you will find the:
- * [Project governance](https://github.com/containerd/project/blob/master/GOVERNANCE.md),
+ * [Project governance](https://github.com/containerd/project/blob/main/GOVERNANCE.md),
  * [Maintainers](MAINTAINERS),
- * and [Contributing guidelines](https://github.com/containerd/project/blob/master/CONTRIBUTING.md)
+ * and [Contributing guidelines](https://github.com/containerd/project/blob/main/CONTRIBUTING.md)
 
 information in our [`containerd/project`](https://github.com/containerd/project) repository.

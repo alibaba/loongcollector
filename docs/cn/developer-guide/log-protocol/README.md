@@ -7,4 +7,4 @@ iLogtail的日志数据默认以sls自定义协议的形式与外部进行交互
 | 协议类型 | 协议名称 | 支持的编码方式 |
 | ------- | ------- | ------- |
 | 标准协议 | [sls协议](./protocol-spec/sls.md) | json、protobuf |
-| 自定义协议 | [单条协议](./protocol-spec/single.md) | json |
+| 自定义协议 | [单条协议](./protocol-spec/custom_single.md) | json |

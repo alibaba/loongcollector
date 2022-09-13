@@ -18,6 +18,8 @@ package containerd
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -26,13 +28,13 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -60,6 +62,8 @@ type Image interface {
 	ContentStore() content.Store
 	// Metadata returns the underlying image metadata
 	Metadata() images.Image
+	// Platform returns the platform match comparer. Can be nil.
+	Platform() platforms.MatchComparer
 }
 
 type usageOptions struct {
@@ -281,10 +285,33 @@ type UnpackConfig struct {
 	ApplyOpts []diff.ApplyOpt
 	// SnapshotOpts for configuring a snapshotter
 	SnapshotOpts []snapshots.Opt
+	// CheckPlatformSupported is whether to validate that a snapshotter
+	// supports an image's platform before unpacking
+	CheckPlatformSupported bool
+	// DuplicationSuppressor is used to make sure that there is only one
+	// in-flight fetch request or unpack handler for a given descriptor's
+	// digest or chain ID.
+	DuplicationSuppressor kmutex.KeyedLocker
 }
 
 // UnpackOpt provides configuration for unpack
 type UnpackOpt func(context.Context, *UnpackConfig) error
+
+// WithSnapshotterPlatformCheck sets `CheckPlatformSupported` on the UnpackConfig
+func WithSnapshotterPlatformCheck() UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.CheckPlatformSupported = true
+		return nil
+	}
+}
+
+// WithUnpackDuplicationSuppressor sets `DuplicationSuppressor` on the UnpackConfig.
+func WithUnpackDuplicationSuppressor(suppressor kmutex.KeyedLocker) UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.DuplicationSuppressor = suppressor
+		return nil
+	}
+}
 
 func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
 	ctx, done, err := i.client.WithLease(ctx)
@@ -300,7 +327,12 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 		}
 	}
 
-	layers, err := i.getLayers(ctx, i.platform)
+	manifest, err := i.getManifest(ctx, i.platform)
+	if err != nil {
+		return err
+	}
+
+	layers, err := i.getLayers(ctx, i.platform, manifest)
 	if err != nil {
 		return err
 	}
@@ -320,6 +352,12 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	if err != nil {
 		return err
 	}
+	if config.CheckPlatformSupported {
+		if err := i.checkSnapshotterSupport(ctx, snapshotterName, manifest); err != nil {
+			return err
+		}
+	}
+
 	for _, layer := range layers {
 		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
 		if err != nil {
@@ -361,20 +399,23 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	return err
 }
 
-func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer) ([]rootfs.Layer, error) {
-	cs := i.client.ContentStore()
-
+func (i *image) getManifest(ctx context.Context, platform platforms.MatchComparer) (ocispec.Manifest, error) {
+	cs := i.ContentStore()
 	manifest, err := images.Manifest(ctx, cs, i.i.Target, platform)
 	if err != nil {
-		return nil, err
+		return ocispec.Manifest{}, err
 	}
+	return manifest, nil
+}
 
+func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer, manifest ocispec.Manifest) ([]rootfs.Layer, error) {
+	cs := i.ContentStore()
 	diffIDs, err := i.i.RootFS(ctx, cs, platform)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve rootfs")
+		return nil, fmt.Errorf("failed to resolve rootfs: %w", err)
 	}
 	if len(diffIDs) != len(manifest.Layers) {
-		return nil, errors.Errorf("mismatched image rootfs and manifest layers")
+		return nil, errors.New("mismatched image rootfs and manifest layers")
 	}
 	layers := make([]rootfs.Layer, len(diffIDs))
 	for i := range diffIDs {
@@ -388,6 +429,41 @@ func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer)
 	return layers, nil
 }
 
+func (i *image) getManifestPlatform(ctx context.Context, manifest ocispec.Manifest) (ocispec.Platform, error) {
+	cs := i.ContentStore()
+	p, err := content.ReadBlob(ctx, cs, manifest.Config)
+	if err != nil {
+		return ocispec.Platform{}, err
+	}
+
+	var image ocispec.Image
+	if err := json.Unmarshal(p, &image); err != nil {
+		return ocispec.Platform{}, err
+	}
+	return platforms.Normalize(ocispec.Platform{OS: image.OS, Architecture: image.Architecture}), nil
+}
+
+func (i *image) checkSnapshotterSupport(ctx context.Context, snapshotterName string, manifest ocispec.Manifest) error {
+	snapshotterPlatformMatcher, err := i.client.GetSnapshotterSupportedPlatforms(ctx, snapshotterName)
+	if err != nil {
+		return err
+	}
+
+	manifestPlatform, err := i.getManifestPlatform(ctx, manifest)
+	if err != nil {
+		return err
+	}
+
+	if snapshotterPlatformMatcher.Match(manifestPlatform) {
+		return nil
+	}
+	return fmt.Errorf("snapshotter %s does not support platform %s for image %s", snapshotterName, manifestPlatform, manifest.Config.Digest)
+}
+
 func (i *image) ContentStore() content.Store {
 	return i.client.ContentStore()
+}
+
+func (i *image) Platform() platforms.MatchComparer {
+	return i.platform
 }

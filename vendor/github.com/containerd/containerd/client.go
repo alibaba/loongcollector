@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"runtime"
 	"strconv"
 	"strings"
@@ -39,6 +38,7 @@ import (
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
+	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	contentproxy "github.com/containerd/containerd/content/proxy"
@@ -61,9 +61,10 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
@@ -117,31 +118,33 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		}
 		gopts := []grpc.DialOption{
 			grpc.WithBlock(),
-			grpc.WithInsecure(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.FailOnNonTempDialError(true),
 			grpc.WithConnectParams(connParams),
 			grpc.WithContextDialer(dialer.ContextDialer),
-
-			// TODO(stevvooe): We may need to allow configuration of this on the client.
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize)),
-			grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)),
+			grpc.WithReturnConnectionError(),
 		}
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions
 		}
+		gopts = append(gopts, grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize),
+			grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)))
+		if len(copts.callOptions) > 0 {
+			gopts = append(gopts, grpc.WithDefaultCallOptions(copts.callOptions...))
+		}
 		if copts.defaultns != "" {
 			unary, stream := newNSInterceptors(copts.defaultns)
-			gopts = append(gopts,
-				grpc.WithUnaryInterceptor(unary),
-				grpc.WithStreamInterceptor(stream),
-			)
+			gopts = append(gopts, grpc.WithChainUnaryInterceptor(unary))
+			gopts = append(gopts, grpc.WithChainStreamInterceptor(stream))
 		}
+
 		connector := func() (*grpc.ClientConn, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), copts.timeout)
 			defer cancel()
 			conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to dial %q", address)
+				return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 			}
 			return conn, nil
 		}
@@ -152,7 +155,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 		c.conn, c.connector = conn, connector
 	}
 	if copts.services == nil && c.conn == nil {
-		return nil, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection or services is available")
+		return nil, fmt.Errorf("no grpc connection or services is available: %w", errdefs.ErrUnavailable)
 	}
 
 	// check namespace labels for default runtime
@@ -212,7 +215,7 @@ type Client struct {
 // Reconnect re-establishes the GRPC connection to the containerd daemon
 func (c *Client) Reconnect() error {
 	if c.connector == nil {
-		return errors.Wrap(errdefs.ErrUnavailable, "unable to reconnect to containerd, no connector available")
+		return fmt.Errorf("unable to reconnect to containerd, no connector available: %w", errdefs.ErrUnavailable)
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
@@ -225,6 +228,11 @@ func (c *Client) Reconnect() error {
 	return nil
 }
 
+// Runtime returns the name of the runtime being used
+func (c *Client) Runtime() string {
+	return c.runtime
+}
+
 // IsServing returns true if the client can successfully connect to the
 // containerd daemon and the healthcheck service returns the SERVING
 // response.
@@ -235,7 +243,7 @@ func (c *Client) IsServing(ctx context.Context) (bool, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return false, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
+		return false, fmt.Errorf("no grpc connection available: %w", errdefs.ErrUnavailable)
 	}
 	c.connMu.Unlock()
 	r, err := c.HealthService().Check(ctx, &grpc_health_v1.HealthCheckRequest{}, grpc.WaitForReady(true))
@@ -258,8 +266,8 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 	return out, nil
 }
 
-// NewContainer will create a new container in container with the provided id
-// the id must be unique within the namespace
+// NewContainer will create a new container with the provided id.
+// The id must be unique within the namespace.
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
@@ -349,6 +357,9 @@ type RemoteContext struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
 	MaxConcurrentDownloads int
 
+	// MaxConcurrentUploadedLayers is the max concurrent uploaded layers for each push.
+	MaxConcurrentUploadedLayers int
+
 	// AllMetadata downloads all manifests and known-configuration files
 	AllMetadata bool
 
@@ -359,9 +370,7 @@ type RemoteContext struct {
 
 func defaultRemoteContext() *RemoteContext {
 	return &RemoteContext{
-		Resolver: docker.NewResolver(docker.ResolverOptions{
-			Client: http.DefaultClient,
-		}),
+		Resolver: docker.NewResolver(docker.ResolverOptions{}),
 	}
 }
 
@@ -376,7 +385,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	}
 
 	if fetchCtx.Unpack {
-		return images.Image{}, errors.Wrap(errdefs.ErrNotImplemented, "unpack on fetch not supported, try pull")
+		return images.Image{}, fmt.Errorf("unpack on fetch not supported, try pull: %w", errdefs.ErrNotImplemented)
 	}
 
 	if fetchCtx.PlatformMatcher == nil {
@@ -387,7 +396,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 			for _, s := range fetchCtx.Platforms {
 				p, err := platforms.Parse(s)
 				if err != nil {
-					return images.Image{}, errors.Wrapf(err, "invalid platform %s", s)
+					return images.Image{}, fmt.Errorf("invalid platform %s: %w", s, err)
 				}
 				ps = append(ps, p)
 			}
@@ -423,7 +432,7 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 			for _, platform := range pushCtx.Platforms {
 				p, err := platforms.Parse(platform)
 				if err != nil {
-					return errors.Wrapf(err, "invalid platform %s", platform)
+					return fmt.Errorf("invalid platform %s: %w", platform, err)
 				}
 				ps = append(ps, p)
 			}
@@ -457,7 +466,12 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 		wrapper = pushCtx.HandlerWrapper
 	}
 
-	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), pushCtx.PlatformMatcher, wrapper)
+	var limiter *semaphore.Weighted
+	if pushCtx.MaxConcurrentUploadedLayers > 0 {
+		limiter = semaphore.NewWeighted(int64(pushCtx.MaxConcurrentUploadedLayers))
+	}
+
+	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), limiter, pushCtx.PlatformMatcher, wrapper)
 }
 
 // GetImage returns an existing image
@@ -701,7 +715,7 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return Version{}, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
+		return Version{}, fmt.Errorf("no grpc connection available: %w", errdefs.ErrUnavailable)
 	}
 	c.connMu.Unlock()
 	response, err := c.VersionService().Version(ctx, &ptypes.Empty{})
@@ -714,15 +728,17 @@ func (c *Client) Version(ctx context.Context) (Version, error) {
 	}, nil
 }
 
+// ServerInfo represents the introspected server information
 type ServerInfo struct {
 	UUID string
 }
 
+// Server returns server information from the introspection service
 func (c *Client) Server(ctx context.Context) (ServerInfo, error) {
 	c.connMu.Lock()
 	if c.conn == nil {
 		c.connMu.Unlock()
-		return ServerInfo{}, errors.Wrap(errdefs.ErrUnavailable, "no grpc connection available")
+		return ServerInfo{}, fmt.Errorf("no grpc connection available: %w", errdefs.ErrUnavailable)
 	}
 	c.connMu.Unlock()
 
@@ -760,7 +776,7 @@ func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Sna
 
 	s := c.SnapshotService(name)
 	if s == nil {
-		return nil, errors.Wrapf(errdefs.ErrNotFound, "snapshotter %s was not found", name)
+		return nil, fmt.Errorf("snapshotter %s was not found: %w", name, errdefs.ErrNotFound)
 	}
 
 	return s, nil
@@ -781,4 +797,36 @@ func CheckRuntime(current, expected string) bool {
 		}
 	}
 	return true
+}
+
+// GetSnapshotterSupportedPlatforms returns a platform matchers which represents the
+// supported platforms for the given snapshotters
+func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshotterName string) (platforms.MatchComparer, error) {
+	filters := []string{fmt.Sprintf("type==%s, id==%s", plugin.SnapshotPlugin, snapshotterName)}
+	in := c.IntrospectionService()
+
+	resp, err := in.Plugins(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Plugins) <= 0 {
+		return nil, fmt.Errorf("inspection service could not find snapshotter %s plugin", snapshotterName)
+	}
+
+	sn := resp.Plugins[0]
+	snPlatforms := toPlatforms(sn.Platforms)
+	return platforms.Any(snPlatforms...), nil
+}
+
+func toPlatforms(pt []apitypes.Platform) []ocispec.Platform {
+	platforms := make([]ocispec.Platform, len(pt))
+	for i, p := range pt {
+		platforms[i] = ocispec.Platform{
+			Architecture: p.Architecture,
+			OS:           p.OS,
+			Variant:      p.Variant,
+		}
+	}
+	return platforms
 }

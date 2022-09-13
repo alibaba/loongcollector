@@ -21,6 +21,14 @@ const (
 	JOB_OBJECT_MSG_NOTIFICATION_LIMIT    uint32 = 11
 )
 
+// Access rights for creating or opening job objects.
+//
+// https://docs.microsoft.com/en-us/windows/win32/procthread/job-object-security-and-access-rights
+const (
+	JOB_OBJECT_QUERY      = 0x0004
+	JOB_OBJECT_ALL_ACCESS = 0x1F001F
+)
+
 // IO limit flags
 //
 // https://docs.microsoft.com/en-us/windows/win32/api/jobapi2/ns-jobapi2-jobobject_io_rate_control_information
@@ -88,7 +96,7 @@ type JOBOBJECT_BASIC_PROCESS_ID_LIST struct {
 
 // AllPids returns all the process Ids in the job object.
 func (p *JOBOBJECT_BASIC_PROCESS_ID_LIST) AllPids() []uintptr {
-	return (*[(1 << 27) - 1]uintptr)(unsafe.Pointer(&p.ProcessIdList[0]))[:p.NumberOfProcessIdsInList]
+	return (*[(1 << 27) - 1]uintptr)(unsafe.Pointer(&p.ProcessIdList[0]))[:p.NumberOfProcessIdsInList:p.NumberOfProcessIdsInList]
 }
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information
@@ -157,7 +165,7 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 // 		PBOOL  Result
 // );
 //
-//sys IsProcessInJob(procHandle windows.Handle, jobHandle windows.Handle, result *bool) (err error) = kernel32.IsProcessInJob
+//sys IsProcessInJob(procHandle windows.Handle, jobHandle windows.Handle, result *int32) (err error) = kernel32.IsProcessInJob
 
 // BOOL QueryInformationJobObject(
 //		HANDLE             hJob,
@@ -167,7 +175,7 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 //		LPDWORD            lpReturnLength
 // );
 //
-//sys QueryInformationJobObject(jobHandle windows.Handle, infoClass uint32, jobObjectInfo uintptr, jobObjectInformationLength uint32, lpReturnLength *uint32) (err error) = kernel32.QueryInformationJobObject
+//sys QueryInformationJobObject(jobHandle windows.Handle, infoClass uint32, jobObjectInfo unsafe.Pointer, jobObjectInformationLength uint32, lpReturnLength *uint32) (err error) = kernel32.QueryInformationJobObject
 
 // HANDLE OpenJobObjectW(
 //		DWORD   dwDesiredAccess,
@@ -183,3 +191,28 @@ type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
 // );
 //
 //sys SetIoRateControlInformationJobObject(jobHandle windows.Handle, ioRateControlInfo *JOBOBJECT_IO_RATE_CONTROL_INFORMATION) (ret uint32, err error) = kernel32.SetIoRateControlInformationJobObject
+
+// DWORD QueryIoRateControlInformationJobObject(
+// 		HANDLE                                hJob,
+// 		PCWSTR                                VolumeName,
+//		JOBOBJECT_IO_RATE_CONTROL_INFORMATION **InfoBlocks,
+// 		ULONG                                 *InfoBlockCount
+// );
+//sys QueryIoRateControlInformationJobObject(jobHandle windows.Handle, volumeName *uint16, ioRateControlInfo **JOBOBJECT_IO_RATE_CONTROL_INFORMATION, infoBlockCount *uint32) (ret uint32, err error) = kernel32.QueryIoRateControlInformationJobObject
+
+// NTSTATUS
+// NtOpenJobObject (
+//     _Out_ PHANDLE JobHandle,
+//     _In_ ACCESS_MASK DesiredAccess,
+//     _In_ POBJECT_ATTRIBUTES ObjectAttributes
+// );
+//sys NtOpenJobObject(jobHandle *windows.Handle, desiredAccess uint32, objAttributes *ObjectAttributes) (status uint32) = ntdll.NtOpenJobObject
+
+// NTSTATUS
+// NTAPI
+// NtCreateJobObject (
+//     _Out_ PHANDLE JobHandle,
+//     _In_ ACCESS_MASK DesiredAccess,
+//     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes
+// );
+//sys NtCreateJobObject(jobHandle *windows.Handle, desiredAccess uint32, objAttributes *ObjectAttributes) (status uint32) = ntdll.NtCreateJobObject

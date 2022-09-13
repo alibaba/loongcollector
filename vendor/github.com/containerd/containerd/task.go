@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	goruntime "runtime"
@@ -46,7 +47,6 @@ import (
 	is "github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // UnknownExitStatus is returned when containerd is unable to
@@ -312,9 +312,10 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 		}
 		fallthrough
 	default:
-		return nil, errors.Wrapf(errdefs.ErrFailedPrecondition, "task must be stopped before deletion: %s", status.Status)
+		return nil, fmt.Errorf("task must be stopped before deletion: %s: %w", status.Status, errdefs.ErrFailedPrecondition)
 	}
 	if t.io != nil {
+		t.io.Close()
 		t.io.Cancel()
 		t.io.Wait()
 	}
@@ -333,7 +334,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, err error) {
 	if id == "" {
-		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "exec id must not be empty")
+		return nil, fmt.Errorf("exec id must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 	i, err := ioCreate(id)
 	if err != nil {
@@ -451,11 +452,20 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 		}
 		request.Options = any
 	}
-	// make sure we pause it and resume after all other filesystem operations are completed
-	if err := t.Pause(ctx); err != nil {
+
+	status, err := t.Status(ctx)
+	if err != nil {
 		return nil, err
 	}
-	defer t.Resume(ctx)
+
+	if status.Status != Paused {
+		// make sure we pause it and resume after all other filesystem operations are completed
+		if err := t.Pause(ctx); err != nil {
+			return nil, err
+		}
+		defer t.Resume(ctx)
+	}
+
 	index := v1.Index{
 		Versioned: is.Versioned{
 			SchemaVersion: 2,
@@ -503,6 +513,8 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 type UpdateTaskInfo struct {
 	// Resources updates a tasks resource constraints
 	Resources interface{}
+	// Annotations allows arbitrary and/or experimental resource constraints for task update
+	Annotations map[string]string
 }
 
 // UpdateTaskOpts allows a caller to update task settings
@@ -525,6 +537,9 @@ func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
 		}
 		request.Resources = any
 	}
+	if i.Annotations != nil {
+		request.Annotations = i.Annotations
+	}
 	_, err := t.client.TaskService().Update(ctx, request)
 	return errdefs.FromGRPC(err)
 }
@@ -540,7 +555,7 @@ func (t *task) LoadProcess(ctx context.Context, id string, ioAttach cio.Attach) 
 	if err != nil {
 		err = errdefs.FromGRPC(err)
 		if errdefs.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "no running process found")
+			return nil, fmt.Errorf("no running process found: %w", err)
 		}
 		return nil, err
 	}

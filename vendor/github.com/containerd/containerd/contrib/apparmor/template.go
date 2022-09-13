@@ -1,6 +1,9 @@
+//go:build linux
 // +build linux
 
 /*
+   Copyright The docker Authors.
+   Copyright The Moby Authors.
    Copyright The containerd Authors.
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,14 +26,17 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
 	"strings"
 	"text/template"
 
-	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 )
+
+// NOTE: This code is copied from <github.com/docker/docker/profiles/apparmor>.
+//       If you plan to make any changes, please make sure they are also sent
+//       upstream.
 
 const dir = "/etc/apparmor.d"
 
@@ -48,6 +54,14 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   capability,
   file,
   umount,
+{{if ge .Version 208096}}
+  # Host (privileged) processes may send signals to container processes.
+  signal (receive) peer=unconfined,
+  # Manager may send signals to container processes.
+  signal (receive) peer={{.DaemonProfile}},
+  # Container processes may send signals amongst themselves.
+  signal (send,receive) peer={{.Name}},
+{{end}}
 
   deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
   # deny write to files not in /proc/<number>/** or /proc/sys/**
@@ -76,10 +90,23 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 `
 
 type data struct {
-	Name         string
-	Imports      []string
-	InnerImports []string
-	Version      int
+	Name          string
+	Imports       []string
+	InnerImports  []string
+	DaemonProfile string
+	Version       int
+}
+
+func cleanProfileName(profile string) string {
+	// Normally profiles are suffixed by " (enforce)". AppArmor profiles cannot
+	// contain spaces so this doesn't restrict daemon profile names.
+	if parts := strings.SplitN(profile, " ", 2); len(parts) >= 1 {
+		profile = parts[0]
+	}
+	if profile == "" {
+		profile = "unconfined"
+	}
+	return profile
 }
 
 func loadData(name string) (*data, error) {
@@ -97,9 +124,19 @@ func loadData(name string) (*data, error) {
 	}
 	ver, err := getVersion()
 	if err != nil {
-		return nil, errors.Wrap(err, "get apparmor_parser version")
+		return nil, fmt.Errorf("get apparmor_parser version: %w", err)
 	}
 	p.Version = ver
+
+	// Figure out the daemon profile.
+	currentProfile, err := os.ReadFile("/proc/self/attr/current")
+	if err != nil {
+		// If we couldn't get the daemon profile, assume we are running
+		// unconfined which is generally the default.
+		currentProfile = nil
+	}
+	p.DaemonProfile = cleanProfileName(string(currentProfile))
+
 	return &p, nil
 }
 
@@ -114,7 +151,7 @@ func generate(p *data, o io.Writer) error {
 func load(path string) error {
 	out, err := aaParser("-Kr", path)
 	if err != nil {
-		return errors.Errorf("%s: %s", err, out)
+		return fmt.Errorf("parser error(%q): %w", strings.TrimSpace(out), err)
 	}
 	return nil
 }
@@ -127,10 +164,7 @@ func macroExists(m string) bool {
 
 func aaParser(args ...string) (string, error) {
 	out, err := exec.Command("apparmor_parser", args...).CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return string(out), err
 }
 
 func getVersion() (int, error) {
@@ -153,6 +187,11 @@ func parseVersion(output string) (int, error) {
 	lines := strings.SplitN(output, "\n", 2)
 	words := strings.Split(lines[0], " ")
 	version := words[len(words)-1]
+
+	// trim "-beta1" suffix from version="3.0.0-beta1" if exists
+	version = strings.SplitN(version, "-", 2)[0]
+	// also trim tilde
+	version = strings.SplitN(version, "~", 2)[0]
 
 	// split by major minor version
 	v := strings.Split(version, ".")

@@ -33,7 +33,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 
-	containerdcriserver "github.com/containerd/cri/pkg/server"
+	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
 	docker "github.com/fsouza/go-dockerclient"
 	"google.golang.org/grpc"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
