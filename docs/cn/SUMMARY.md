@@ -52,6 +52,7 @@
     * [SqlServer 查询数据](data-pipeline/input/service-mssql.md)
     * [PostgreSQL 查询数据](data-pipeline/input/service-pgsql.md)
     * [Syslog数据](data-pipeline/input/service-syslog.md)
+    * [GPU数据](data-pipeline/input/service-gpu.md)
     * [eBPF网络调用数据](data-pipeline/input/metric-observer.md)
 * [处理](data-pipeline/processor/README.md)
     * [添加字段](data-pipeline/processor/processor-add-fields.md)
