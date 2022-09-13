@@ -44,3 +44,4 @@ your changes, such as:
 - [public] [both] [fixed] fix log context lost in plugin system bug
 - [public] [both] [fixed] restore "__topic__" field in plugin system
 - [public] [both] [added] Add support for Grok processor
+- [public] [both] [added] add support for log protocol conversion

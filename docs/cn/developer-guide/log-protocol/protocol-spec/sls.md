@@ -1,30 +1,26 @@
-# 数据结构
+# sls协议
 
-本文将介绍 iLogtail 内部的数据结构以及数据流，从而大家能够对各个插件的输入输出有更加准确的理解。
+sls协议对应的Protobuf模式定义如下：
 
-## 数据类型概览
-
-本节将介绍插件接口相关的一些数据类型，目前，iLogtail 和服务后端之间的数据类型采用了 protobuf 进行描述（[proto 文件](https://github.com/alibaba/ilogtail/blob/main/pkg/protocol/proto/sls_logs.proto)）。
-
-### Content & LogTag
+## Content & LogTag
 
 传输数据字段以及标签，简单的 key/value 对。
 
 ```protobuf
 message Content
 {
-required string Key = 1;
-required string Value = 2;
+  required string Key = 1;
+  required string Value = 2;
 }
 
 message LogTag
 {
-required string Key = 1;
-required string Value = 2;
+  required string Key = 1;
+  required string Value = 2;
 }
 ```
 
-### Log
+## Log
 
 Log 是表示单条日志的数据类型，Time 字段为日志时间，Contents 字段维护了此日志的内容，由一个 key/value 列表组成。
 
@@ -33,11 +29,10 @@ message Log
 {
   required uint32 Time = 1;// UNIX Time Format
   repeated Content Contents = 2;
-
 }
 ```
 
-### LogGroup
+## LogGroup
 
 LogGroup（日志组）是对多条日志的包装：
 
@@ -48,7 +43,6 @@ LogGroup（日志组）是对多条日志的包装：
 - LogTags：所有日志共同的 tag，同样由 key/value 列表组成。
 
 ```protobuf
-
 message LogGroup
 {
   repeated Log Logs = 1;
