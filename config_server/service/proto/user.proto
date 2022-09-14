@@ -1,0 +1,243 @@
+syntax = "proto3";
+package configserver.proto;
+option go_package = ".;configserver_proto";
+
+message AgentGroupTag {
+    string name = 1;
+    string value = 2;
+}
+
+message AgentGroup {
+    string group_name = 1;
+    string description = 2;
+    repeated AgentGroupTag tags = 3;
+}
+
+message Config {
+    string config_name = 1;
+    string agent_type = 2;
+    string description = 3;
+    string content = 4;
+}
+
+// API: /User/CreateAgentGroup
+
+message CreateAgentGroupRequest {
+    string request_id = 1;
+    AgentGroup agent_group = 2;
+}
+
+message CreateAgentGroupResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /User/UpdateAgentGroup
+
+message UpdateAgentGroupRequest {
+    string request_id = 1;
+    AgentGroup agent_group = 2;
+}
+
+message UpdateAgentGroupResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /User/DeleteAgentGroup/
+
+message DeleteAgentGroupRequest {
+    string request_id = 1;
+    string group_name = 2;
+}
+
+message DeleteAgentGroupResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /User/GetAgentGroup/
+
+message GetAgentGroupRequest {
+    string request_id = 1;
+    string group_name = 2;
+}
+
+message GetAgentGroupResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+
+    AgentGroup agent_group = 4;
+}
+
+// API: /User/ListAgentGroups/ 
+
+message ListAgentGroupsRequest {
+    string request_id = 1;
+}
+
+message ListAgentGroupsResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+
+    repeated AgentGroup agent_groups = 4;
+}
+
+// API: /User/CreateConfig/
+
+message CreateConfigRequest {
+    string request_id = 1;
+    Config config_detail = 2;
+}
+
+message CreateConfigResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /User/UpdateConfig/
+
+message UpdateConfigRequest {
+    string request_id = 1;
+    Config config_detail = 2;
+}
+
+message UpdateConfigResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /User/DeleteConfig/
+
+message DeleteConfigRequest {
+    string request_id = 1;
+    string config_name = 2;
+}
+
+message DeleteConfigResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: User/GetConfig/
+
+message GetConfigRequest {
+    string request_id = 1;
+    string config_name = 2;
+}
+
+message GetConfigResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+
+    Config config_detail = 4;
+}
+
+// API: /User/ListConfigs/
+
+message ListConfigsRequest {
+    string request_id = 1;
+}
+
+message ListConfigsResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+
+    repeated Config config_details = 4;
+}
+
+// API: /User/ApplyConfigToAgentGroup/
+
+message ApplyConfigToAgentGroupRequest {
+    string request_id = 1;
+    string config_name = 2;
+    string group_name = 3;
+}
+
+message ApplyConfigToAgentGroupResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /User/RemoveConfigFromAgentGroup/
+
+message RemoveConfigFromAgentGroupRequest {
+    string request_id = 1;
+    string config_name = 2;
+    string group_name = 3;
+}
+
+message RemoveConfigFromAgentGroupResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /User/GetAppliedConfigsForAgentGroup/
+
+message GetAppliedConfigsForAgentGroupRequest {
+    string request_id = 1;
+    string group_name = 2;
+}
+
+message GetAppliedConfigsForAgentGroupResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+
+    repeated string config_names = 4;
+}
+
+// API: /User/GetAppliedAgentGroups/
+
+message GetAppliedAgentGroupsRequest {
+    string request_id = 1;
+    string config_name = 2;
+}
+
+message GetAppliedAgentGroupsResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+
+    repeated string agent_group_names = 4;
+}
+
+// API: /User/ListAgents/
+
+message ListAgentsRequest {
+    string request_id = 1;
+    string group_name = 2;
+}
+
+message Agent {
+    string agent_id = 1;
+    string agent_type = 2;
+    string ip = 3;
+    string version = 4;
+    string running_status = 5;
+    int64 startup_time = 6;
+    int64 latest_heartbeat_time = 7;
+
+    map<string, string> tags = 8;
+    map<string, string> running_details = 9;
+}
+
+message ListAgentsResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+
+    repeated Agent agents = 4;
+}

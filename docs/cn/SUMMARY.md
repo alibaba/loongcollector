@@ -125,6 +125,12 @@
 
 * [容器场景iLogtail与Filebeat性能对比测试](benchmark/performance-compare-with-filebeat.md)
 
+## 管控工具 <a href="#config-server" id="config-server"></a>
+
+* [使用介绍](config-server/quick-start.md)
+* [通信协议](config-server/communication-protocol.md)
+* [开发指南](config-server/developer-guide.md)
+
 ## Awesome iLogtail <a href="#awesome-ilogtail" id="awesome-ilogtail"></a>
 
 * [走近iLogtail社区版](awesome-ilogtail/ilogtail.md)

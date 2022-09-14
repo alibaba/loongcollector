@@ -1,0 +1,87 @@
+syntax = "proto3";
+package configserver.proto;
+option go_package = ".;configserver_proto";
+
+// API: /Agent/HeartBeat/
+
+message HeartBeatRequest {
+    string request_id = 1;
+    string agent_id = 2;
+    string agent_type = 3;
+    string agent_version = 4;
+    string ip = 5;
+    map<string, string> tags = 6;
+    string running_status = 7;
+    int64 startup_time = 8;
+}
+
+message HeartBeatResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /Agent/RunningStatistics/
+
+message RunningStatistics {
+    float cpu = 1;
+    int64 memory = 2;
+    map<string, string> extras = 100;
+}
+
+message RunningStatisticsRequest {
+    string request_id = 1;
+    string agent_id = 2;
+    RunningStatistics running_details = 3;
+}
+
+message RunningStatisticsResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /Agent/Alarm/
+
+message AlarmRequest {
+    string request_id = 1;
+    string agent_id = 2;
+    string type = 3;
+    string detail = 4;
+}
+
+message AlarmResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+}
+
+// API: /Agent/GetConfigList/
+
+message AgentGetConfigListRequest {
+    string request_id = 1;
+    string agent_id = 2;
+    map<string, int64> config_versions = 3;
+}
+
+message ConfigUpdateInfo {
+    enum UpdateStatus {
+        SAME = 0;
+        NEW = 1;
+        DELETED = 2;
+        MODIFIED = 3;
+    }
+
+    string config_name = 1;
+    UpdateStatus update_status = 2;
+    int64 config_version = 3;
+    string content = 4;
+}
+
+message AgentGetConfigListResponse {
+    string response_id = 1;
+    string code = 2;
+    string message = 3;
+
+    repeated ConfigUpdateInfo config_update_infos = 4;
+}
