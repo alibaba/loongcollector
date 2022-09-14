@@ -1,5 +1,5 @@
 {
-  "image": "sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux-amd64:latest",
+  "image": "sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest",
   "customizations": {
     "vscode": {
       "extensions": [
