@@ -47,3 +47,6 @@ e2e-test
 .vscode
 !.vscode/settings.json
 /output/
+
+# goland
+.idea
