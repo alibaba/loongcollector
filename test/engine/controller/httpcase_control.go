@@ -80,6 +80,7 @@ func (c *HTTPCaseController) Start() error {
 		}
 		go func() {
 			ticker := time.NewTicker(c.duration)
+			defer ticker.Stop()
 			client := &http.Client{}
 			count := 1
 			for range ticker.C {

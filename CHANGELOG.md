@@ -45,3 +45,4 @@ your changes, such as:
 - [public] [both] [fixed] restore "__topic__" field in plugin system
 - [public] [both] [added] Add support for Grok processor
 - [public] [both] [added] add support for log protocol conversion
+- [public] [both] [added] add jmxfetch plugin to auto collect JMX beans metrics

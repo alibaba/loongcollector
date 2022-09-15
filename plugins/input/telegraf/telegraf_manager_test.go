@@ -21,14 +21,11 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/logger"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -265,45 +262,4 @@ func TestOverwriteConfigFile(t *testing.T) {
 	inst.RegisterConfig(nil, c)
 	time.Sleep(time.Millisecond * time.Duration(500))
 	require.True(t, isPathExists(inst.telegrafConfPath))
-}
-
-func TestNewBindMeta(t *testing.T) {
-	genFunc := func(prefix string, start, end int) string {
-		var res []string
-		for i := start; i <= end; i++ {
-			res = append(res, fmt.Sprintf("%s_%d", prefix, i))
-		}
-		return strings.Join(res, ",")
-	}
-	meta := NewBindMeta()
-	for i := 0; i < 8; i++ {
-		prjNum := i / 4
-		logNum := i / 2
-		cfgNum := i
-		meta.Add(fmt.Sprintf("p_%d", prjNum), fmt.Sprintf("l_%d", logNum), fmt.Sprintf("c_%d", cfgNum))
-		assert.Equal(t, meta.ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm().Project, genFunc("p", 0, prjNum))
-		assert.Equal(t, meta.ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm().Logstore, genFunc("l", 0, logNum))
-	}
-
-	for i := 7; i >= 0; i-- {
-		prjNum := i / 4
-		logNum := i / 2
-		cfgNum := i
-		meta.Delete(fmt.Sprintf("p_%d", prjNum), fmt.Sprintf("l_%d", logNum), fmt.Sprintf("c_%d", cfgNum))
-		cfgNum--
-		if i%2 == 0 {
-			logNum--
-		}
-		if i%4 == 0 {
-			prjNum--
-		}
-		if prjNum == -1 && logNum == -1 && cfgNum == -1 {
-			assert.Equal(t, meta.ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm().Project, "")
-			assert.Equal(t, meta.ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm().Logstore, "")
-		} else {
-			assert.Equal(t, meta.ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm().Project, genFunc("p", 0, prjNum))
-			assert.Equal(t, meta.ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm().Logstore, genFunc("l", 0, logNum))
-
-		}
-	}
 }

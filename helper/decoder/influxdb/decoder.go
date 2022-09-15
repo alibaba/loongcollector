@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/helper/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
@@ -58,21 +59,6 @@ func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBo
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-// ReplaceInvalidChars analog of invalidChars = regexp.MustCompile("[^a-zA-Z0-9_]")
-func ReplaceInvalidChars(in *string) {
-
-	for charIndex, char := range *in {
-		charInt := int(char)
-		if !((charInt >= 97 && charInt <= 122) || // a-z
-			(charInt >= 65 && charInt <= 90) || // A-Z
-			(charInt >= 48 && charInt <= 57) || // 0-9
-			charInt == 95 || charInt == ':') { // _
-
-			*in = (*in)[:charIndex] + "_" + (*in)[charIndex+1:]
-		}
-	}
-}
-
 func (d *Decoder) parsePointsToLogs(points []models.Point) []*protocol.Log {
 	logs := make([]*protocol.Log, 0, len(points))
 	for _, s := range points {
@@ -104,14 +90,14 @@ func (d *Decoder) parsePointsToLogs(points []models.Point) []*protocol.Log {
 				name = string(s.Name()) + ":" + field
 			}
 
-			ReplaceInvalidChars(&name)
+			helper.ReplaceInvalidChars(&name)
 			var builder strings.Builder
 			for index, v := range s.Tags() {
 				if index != 0 {
 					builder.WriteByte('|')
 				}
 				key := string(v.Key)
-				ReplaceInvalidChars(&key)
+				helper.ReplaceInvalidChars(&key)
 				builder.WriteString(key)
 				builder.WriteString("#$#")
 				builder.WriteString(string(v.Value))

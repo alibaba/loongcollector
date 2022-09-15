@@ -102,8 +102,8 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/google/uuid](https://pkg.go.dev/github.com/google/uuid?tab=licenses)
 - [github.com/imdario/mergo](https://pkg.go.dev/github.com/imdario/mergo?tab=licenses)
 - [github.com/jcmturner/gofork](https://pkg.go.dev/github.com/jcmturner/gofork?tab=licenses)
-- [github.com/miekg/pkcs11](https://pkg.go.dev/github.com/miekg/pkcs11?tab=licenses)
 - [github.com/pierrec/lz4](https://pkg.go.dev/github.com/pierrec/lz4?tab=licenses)
+- [github.com/miekg/pkcs11](https://pkg.go.dev/github.com/miekg/pkcs11?tab=licenses)
 - [github.com/shirou/gopsutil](https://pkg.go.dev/github.com/shirou/gopsutil?tab=licenses)
 - [github.com/gosnmp/gosnmp](https://pkg.go.dev/github.com/gosnmp/gosnmp)
 - [github.com/spf13/pflag](https://pkg.go.dev/github.com/spf13/pflag?tab=licenses)
@@ -120,6 +120,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 
 ## MIT licenses
 
+- [github.com/narqo/go-dogstatsd-parser](https://pkg.go.dev/github.com/narqo/go-dogstatsd-parser?tab=licenses)
 - [sigs.k8s.io/yaml](https://pkg.go.dev/sigs.k8s.io/yaml?tab=licenses)
 - [github.com/Azure/go-ansiterm](https://pkg.go.dev/github.com/Azure/go-ansiterm?tab=licenses)
 - [github.com/BurntSushi/toml](https://pkg.go.dev/github.com/BurntSushi/toml?tab=licenses)

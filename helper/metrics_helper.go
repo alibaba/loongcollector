@@ -121,6 +121,21 @@ func AddMetric(collector ilogtail.Collector,
 	collector.AddDataArray(nil, keys, vals, time)
 }
 
+// ReplaceInvalidChars analog of invalidChars = regexp.MustCompile("[^a-zA-Z0-9_]")
+func ReplaceInvalidChars(in *string) {
+
+	for charIndex, char := range *in {
+		charInt := int(char)
+		if !((charInt >= 97 && charInt <= 122) || // a-z
+			(charInt >= 65 && charInt <= 90) || // A-Z
+			(charInt >= 48 && charInt <= 57) || // 0-9
+			charInt == 95 || charInt == ':') { // _
+
+			*in = (*in)[:charIndex] + "_" + (*in)[charIndex+1:]
+		}
+	}
+}
+
 func init() {
 	metricKeys = append(metricKeys, "__name__")
 	metricKeys = append(metricKeys, "__labels__")

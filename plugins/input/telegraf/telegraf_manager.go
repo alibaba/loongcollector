@@ -21,12 +21,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -37,69 +37,6 @@ var statusCheckInterval = time.Second * time.Duration(30)
 type Config struct {
 	Name   string
 	Detail string
-}
-
-type BindingMeta struct {
-	Metas map[string]map[string]map[string]struct{}
-	ctx   context.Context
-	meta  *pkg.LogtailContextMeta
-}
-
-func NewBindMeta() *BindingMeta {
-	ctx, meta := pkg.NewLogtailContextMeta("", "", "telegraf")
-	return &BindingMeta{
-		Metas: make(map[string]map[string]map[string]struct{}),
-		ctx:   ctx,
-		meta:  meta,
-	}
-}
-
-func (b *BindingMeta) Add(prj, logstore, cfg string) {
-	change := false
-	if _, ok := b.Metas[prj]; !ok {
-		b.Metas[prj] = make(map[string]map[string]struct{})
-		change = true
-	}
-	if _, ok := b.Metas[prj][logstore]; !ok {
-		b.Metas[prj][logstore] = make(map[string]struct{})
-		change = true
-	}
-	if _, ok := b.Metas[prj][logstore][cfg]; !ok {
-		b.Metas[prj][logstore][cfg] = struct{}{}
-	}
-	if change {
-		b.UpdateAlarm()
-	}
-}
-
-func (b *BindingMeta) Delete(prj, logstore, cfg string) {
-	change := false
-	delete(b.Metas[prj][logstore], cfg)
-	if _, ok := b.Metas[prj][logstore]; ok && len(b.Metas[prj][logstore]) == 0 {
-		delete(b.Metas[prj], logstore)
-		change = true
-	}
-	if _, ok := b.Metas[prj]; ok && len(b.Metas[prj]) == 0 {
-		delete(b.Metas, prj)
-		change = true
-	}
-	if change {
-		b.UpdateAlarm()
-	}
-}
-
-func (b *BindingMeta) UpdateAlarm() {
-	var prjSlice, logstoresSlice []string
-	for prj, logstores := range b.Metas {
-		for logstore := range logstores {
-
-			logstoresSlice = append(logstoresSlice, logstore)
-		}
-		prjSlice = append(prjSlice, prj)
-	}
-	sort.Strings(prjSlice)
-	sort.Strings(logstoresSlice)
-	b.meta.GetAlarm().Update(strings.Join(prjSlice, ","), strings.Join(logstoresSlice, ","))
 }
 
 // Telegraf supervisor for agent start, stop, config reload...
@@ -122,7 +59,7 @@ type Manager struct {
 	telegrafdPath    string
 	telegrafConfPath string
 	collector        *LogCollector
-	bindMeta         *BindingMeta
+	bindMeta         *helper.ManagerMeta
 }
 
 func (tm *Manager) RegisterConfig(ctx ilogtail.Context, c *Config) {
@@ -411,7 +348,7 @@ func (tm *Manager) reload() {
 }
 
 func (tm *Manager) GetContext() context.Context {
-	return tm.bindMeta.ctx
+	return tm.bindMeta.GetContext()
 }
 
 var telegrafManager *Manager
@@ -424,13 +361,13 @@ func GetTelegrafManager(agentDirPath string) *Manager {
 			loadedConfigs:    make(map[string]*Config),
 			ch:               make(chan struct{}, 1),
 			telegrafPath:     agentDirPath,
-			bindMeta:         NewBindMeta(),
+			bindMeta:         helper.NewmanagerMeta("telegraf"),
 			telegrafdPath:    path.Join(agentDirPath, "telegrafd"),
 			telegrafConfPath: path.Join(agentDirPath, "conf.d"),
 		}
 		// don't init the collector with struct because the collector depends on the bindMeta.
 		telegrafManager.collector = NewLogCollector(agentDirPath)
-		util.RegisterAlarm("telegraf", telegrafManager.bindMeta.meta.GetAlarm())
+		util.RegisterAlarm("telegraf", telegrafManager.bindMeta.GetAlarm())
 		go telegrafManager.run()
 		go telegrafManager.collector.Run()
 	})

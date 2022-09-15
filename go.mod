@@ -73,6 +73,7 @@ require (
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/moby/sys/signal v0.6.0 // indirect
+	github.com/narqo/go-dogstatsd-parser v0.2.0 // indirect
 	github.com/pelletier/go-toml v1.9.3 // indirect
 	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect

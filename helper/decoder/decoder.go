@@ -18,10 +18,12 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/alibaba/ilogtail/helper/decoder/influxdb"
 	"github.com/alibaba/ilogtail/helper/decoder/prometheus"
 	"github.com/alibaba/ilogtail/helper/decoder/sls"
+	"github.com/alibaba/ilogtail/helper/decoder/statsd"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -43,6 +45,10 @@ func GetDecoder(format string) (Decoder, error) {
 		return &prometheus.Decoder{}, nil
 	case "influx", "influxdb":
 		return &influxdb.Decoder{}, nil
+	case "statsd":
+		return &statsd.Decoder{
+			Time: time.Now(),
+		}, nil
 	}
 	return nil, errDecoderNotFound
 }

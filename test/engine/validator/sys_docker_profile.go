@@ -71,6 +71,7 @@ func (d *dockerProfileSystemValidator) Start() error {
 		for {
 			select {
 			case <-d.cancel:
+				ticker.Stop()
 				d.waitGroup.Done()
 				return
 			case <-ticker.C:
