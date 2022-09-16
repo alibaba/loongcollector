@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2022 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,26 +18,20 @@
 package helper
 
 import (
-	"testing"
+	"context"
+	"fmt"
 
-	docker "github.com/fsouza/go-dockerclient"
-
-	"github.com/stretchr/testify/require"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-func TestLookupContainerRootfsAbsDir(t *testing.T) {
-	crirt := &CRIRuntimeWrapper{
-		dockerCenter:   nil,
-		client:         nil,
-		runtimeVersion: nil,
-		containers:     make(map[string]*innerContainerInfo),
-		stopCh:         make(<-chan struct{}),
-		rootfsCache:    make(map[string]string),
+func ContainerProcessAlive(pid int) bool {
+	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
+	exist, err := util.PathExists(procStatPath)
+	if err != nil {
+		logger.Error(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
+	} else if !exist {
+		return false
 	}
-
-	container := docker.Container{
-		ID: "1234567890abcde",
-	}
-	dir := crirt.lookupContainerRootfsAbsDir(&container)
-	require.Equal(t, dir, "")
+	return true
 }

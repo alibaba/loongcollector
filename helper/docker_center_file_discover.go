@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -39,12 +40,12 @@ const staticContainerInfoPathEnvKey = "ALIYUN_LOG_STATIC_CONTAINER_INFO"
 // const staticContainerTypeContainerD = "containerd"
 
 var containerdScanIntervalMs = 1000
-var staticDockerContianer []*docker.Container
-var staticDockerContianerError error
-var staticDockerContianerLock sync.Mutex
+var staticDockerContainers []*docker.Container
+var staticDockerContainerError error
+var staticDockerContainerLock sync.Mutex
 var loadStaticContainerOnce sync.Once
 var staticDockerContainerLastStat StateOS
-var staticDockerContianerFile string
+var staticDockerContainerFile string
 var staticDockerContainerLastBody string
 
 type staticContainerMount struct {
@@ -53,9 +54,15 @@ type staticContainerMount struct {
 	Driver      string
 }
 
+type staticContainerState struct {
+	Status string
+	Pid    int
+}
+
 type staticContainerInfo struct {
 	ID       string
 	Name     string
+	Created  string
 	HostName string
 	IP       string
 	Image    string
@@ -65,9 +72,15 @@ type staticContainerInfo struct {
 	UpperDir string
 	Env      map[string]string
 	Mounts   []staticContainerMount
+	State    staticContainerState
 }
 
-func staticContainerInfoToStandard(staticInfo *staticContainerInfo) *docker.Container {
+func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.FileInfo) *docker.Container {
+	created, err := time.Parse(time.RFC3339Nano, staticInfo.Created)
+	if err != nil {
+		created = stat.ModTime()
+	}
+
 	allEnv := make([]string, 0, len(staticInfo.Env))
 	for key, val := range staticInfo.Env {
 		allEnv = append(allEnv, key+"="+val)
@@ -81,9 +94,17 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo) *docker.Cont
 		staticInfo.IP = util.GetIPAddress()
 	}
 
+	status := staticInfo.State.Status
+	if status != ContainerStatusExited {
+		if !ContainerProcessAlive(staticInfo.State.Pid) {
+			status = ContainerStatusExited
+		}
+	}
+
 	dockerContainer := &docker.Container{
 		ID:      staticInfo.ID,
 		Name:    staticInfo.Name,
+		Created: created,
 		LogPath: staticInfo.LogPath,
 		Config: &docker.Config{
 			Labels:   staticInfo.Labels,
@@ -104,6 +125,10 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo) *docker.Cont
 		},
 		NetworkSettings: &docker.NetworkSettings{
 			IPAddress: staticInfo.IP,
+		},
+		State: docker.State{
+			Status: status,
+			Pid:    staticInfo.State.Pid,
 		},
 	}
 
@@ -173,7 +198,7 @@ func scanContainerdFilesAndReLink(filePath string) {
 	}
 }
 
-func innerReadStatisContainerInfo(file string, lastContainerInfo []*docker.Container) (containers []*docker.Container, removed []string, changed bool, err error) {
+func innerReadStatisContainerInfo(file string, lastContainerInfo []*docker.Container, stat fs.FileInfo) (containers []*docker.Container, removed []string, changed bool, err error) {
 	body, err := ioutil.ReadFile(filepath.Clean(file))
 	if err != nil {
 		return nil, nil, false, err
@@ -193,7 +218,7 @@ func innerReadStatisContainerInfo(file string, lastContainerInfo []*docker.Conta
 
 	nowIDs := make(map[string]struct{})
 	for i := 0; i < len(staticContainerInfos); i++ {
-		containers = append(containers, staticContainerInfoToStandard(&staticContainerInfos[i]))
+		containers = append(containers, staticContainerInfoToStandard(&staticContainerInfos[i], stat))
 		nowIDs[staticContainerInfos[i].ID] = struct{}{}
 	}
 
@@ -218,9 +243,9 @@ func tryReadStaticContainerInfo() ([]*docker.Container, []string, bool, error) {
 			if len(envPath) == 0 {
 				return
 			}
-			staticDockerContianerFile = envPath
-			staticDockerContianer, _, _, staticDockerContianerError = innerReadStatisContainerInfo(staticDockerContianerFile, nil)
-			stat, err := os.Stat(staticDockerContianerFile)
+			staticDockerContainerFile = envPath
+			stat, err := os.Stat(staticDockerContainerFile)
+			staticDockerContainers, _, _, staticDockerContainerError = innerReadStatisContainerInfo(staticDockerContainerFile, nil, stat)
 			if err == nil {
 				staticDockerContainerLastStat = GetOSState(stat)
 			}
@@ -239,33 +264,36 @@ func tryReadStaticContainerInfo() ([]*docker.Container, []string, bool, error) {
 		},
 	)
 
-	if staticDockerContianerFile == "" {
+	if staticDockerContainerFile == "" {
 		return nil, nil, false, nil
 	}
 
-	staticDockerContianerLock.Lock()
-	defer staticDockerContianerLock.Unlock()
+	statusChanged := false
+	for _, container := range staticDockerContainers {
+		if container.State.Status == ContainerStatusRunning && !ContainerProcessAlive(container.State.Pid) {
+			container.State.Status = ContainerStatusExited
+			statusChanged = true
+		}
+	}
 
-	stat, err := os.Stat(staticDockerContianerFile)
+	stat, err := os.Stat(staticDockerContainerFile)
 	if err != nil {
-		return staticDockerContianer, nil, false, staticDockerContianerError
+		return staticDockerContainers, nil, statusChanged, err
 	}
 
 	osStat := GetOSState(stat)
-	if !osStat.IsChange(staticDockerContainerLastStat) && staticDockerContianerError == nil {
-		return staticDockerContianer, nil, false, nil
+	if !osStat.IsChange(staticDockerContainerLastStat) && staticDockerContainerError == nil {
+		return staticDockerContainers, nil, statusChanged, nil
 	}
 
-	var removedIDs []string
-	var changed bool
-
-	staticDockerContianer, removedIDs, changed, staticDockerContianerError = innerReadStatisContainerInfo(staticDockerContianerFile, staticDockerContianer)
-
-	if staticDockerContianerError == nil {
-		staticDockerContainerLastStat = osStat
+	newStaticDockerContainer, removedIDs, changed, staticDockerContainerError := innerReadStatisContainerInfo(staticDockerContainerFile, staticDockerContainers, stat)
+	changed = changed || statusChanged
+	if staticDockerContainerError == nil {
+		staticDockerContainers = newStaticDockerContainer
 	}
+	staticDockerContainerLastStat = osStat
 
-	logger.Info(context.Background(), "static docker container info file changed or last read error, last", staticDockerContainerLastStat, "now", osStat, "removed ids", removedIDs, "error", staticDockerContianerError)
-
-	return staticDockerContianer, removedIDs, changed, staticDockerContianerError
+	logger.Info(context.Background(), "static docker container info file changed or last read error, last", staticDockerContainerLastStat,
+		"now", osStat, "removed ids", removedIDs, "error", staticDockerContainerError)
+	return staticDockerContainers, removedIDs, changed, staticDockerContainerError
 }

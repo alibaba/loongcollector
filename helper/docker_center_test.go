@@ -19,7 +19,6 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/stretchr/testify/assert"
@@ -126,7 +125,6 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 
 	// Delete container.
 	{
-		ContainerInfoDeletedTimeout = time.Second
 		delete(dc.containerMap, "c1")
 
 		newCount, delCount := dc.getAllAcceptedInfoV2(
@@ -143,7 +141,6 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 
 	// New and Delete container.
 	{
-		ContainerInfoDeletedTimeout = time.Second
 		dc.updateContainers(map[string]*DockerInfoDetail{
 			"c3": newContainer("c3"),
 			"c4": newContainer("c4"),
@@ -185,7 +182,6 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 
 	// Delete unmatched container.
 	{
-		ContainerInfoDeletedTimeout = time.Second
 		delete(dc.containerMap, "c3")
 
 		newCount, delCount := dc.getAllAcceptedInfoV2(

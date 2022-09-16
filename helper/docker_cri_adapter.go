@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
 
 	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
 	docker "github.com/fsouza/go-dockerclient"
@@ -50,8 +49,10 @@ var criRuntimeWrapper *CRIRuntimeWrapper
 
 // CRIRuntimeWrapper wrapper for containerd client
 type innerContainerInfo struct {
-	State cri.ContainerState
-	Pid   int
+	State  cri.ContainerState
+	Pid    int
+	Name   string
+	Status string
 }
 type CRIRuntimeWrapper struct {
 	dockerCenter *DockerCenter
@@ -59,14 +60,16 @@ type CRIRuntimeWrapper struct {
 	client         cri.RuntimeServiceClient
 	runtimeVersion *cri.VersionResponse
 
-	containersLock sync.RWMutex
+	containersLock sync.Mutex
 
-	containers map[string]innerContainerInfo
+	containers       map[string]*innerContainerInfo
+	containerHistory map[string]bool
 
 	stopCh <-chan struct{}
 
-	rootfsLock  sync.RWMutex
-	rootfsCache map[string]string
+	rootfsLock             sync.RWMutex
+	rootfsCache            map[string]string
+	listContainerStartTime int64 // in nanosecond
 }
 
 func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
@@ -210,12 +213,14 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 	}
 
 	return &CRIRuntimeWrapper{
-		dockerCenter:   dockerCenter,
-		client:         client,
-		runtimeVersion: runtimeVersion,
-		containers:     make(map[string]innerContainerInfo),
-		stopCh:         make(<-chan struct{}),
-		rootfsCache:    make(map[string]string),
+		dockerCenter:           dockerCenter,
+		client:                 client,
+		runtimeVersion:         runtimeVersion,
+		containers:             make(map[string]*innerContainerInfo),
+		containerHistory:       make(map[string]bool),
+		stopCh:                 make(<-chan struct{}),
+		rootfsCache:            make(map[string]string),
+		listContainerStartTime: time.Now().UnixNano(),
 	}, nil
 }
 
@@ -247,14 +252,6 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 		logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
 		return nil, "", cri.ContainerState_CONTAINER_UNKNOWN, fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
 	}
-	// only check pid for container that is older than DefaultSyncContainersPeriod
-	// to give a chance to collect emphemeral containers
-	if time.Since(time.Unix(0, status.GetStatus().GetCreatedAt())) > DefaultSyncContainersPeriod {
-		exist := ContainerProcessAlive(int(ci.Pid))
-		if !exist {
-			return nil, "", cri.ContainerState_CONTAINER_UNKNOWN, fmt.Errorf("find container %s pid %d was already stopped", containerID, ci.Pid)
-		}
-	}
 
 	labels := status.GetStatus().GetLabels()
 	if labels == nil {
@@ -266,15 +263,24 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 		image = status.GetStatus().GetImageRef()
 	}
 
+	// Judge Container Liveness by Pid
+	state = status.Status.State
+	stateStatus := ContainerStatusExited
+	if state == cri.ContainerState_CONTAINER_RUNNING && ContainerProcessAlive(int(ci.Pid)) {
+		stateStatus = ContainerStatusRunning
+	}
+
 	dockerContainer := &docker.Container{
 		ID:      containerID,
+		Created: time.Unix(0, status.GetStatus().CreatedAt),
 		LogPath: status.GetStatus().GetLogPath(),
 		Config: &docker.Config{
 			Labels: labels,
 			Image:  image,
 		},
 		State: docker.State{
-			Pid: int(ci.Pid),
+			Status: stateStatus,
+			Pid:    int(ci.Pid),
 		},
 		HostConfig: &docker.HostConfig{
 			VolumeDriver: ci.Snapshotter,
@@ -325,19 +331,22 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	dockerContainer.HostnamePath = hostnamePath
 	dockerContainer.HostsPath = hostsPath
 
-	return cw.dockerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, status.GetStatus().GetState(), nil
+	return cw.dockerCenter.CreateInfoDetail(dockerContainer, envConfigPrefix, false), ci.SandboxID, state, nil
 }
 
 func (cw *CRIRuntimeWrapper) fetchAll() error {
+	// fetchAll and syncContainers must be isolated
+	// if one procedure read container list then locked out
+	// when it resumes, it may process on a staled list and make wrong decisions
+	cw.containersLock.Lock()
+	defer cw.containersLock.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	containersResp, err := cw.client.ListContainers(ctx, &cri.ListContainersRequest{Filter: nil})
-	logger.Debugf(context.Background(), "CRIRuntime ListContainers: %#v, error: %v", containersResp, err)
+	containersResp, err := cw.client.ListContainers(ctx, &cri.ListContainersRequest{})
 	if err != nil {
 		return err
 	}
 	sandboxResp, err := cw.client.ListPodSandbox(ctx, &cri.ListPodSandboxRequest{Filter: nil})
-	logger.Debugf(context.Background(), "CRIRuntime ListPodSandbox: %#v, error: %v", sandboxResp, err)
 	if err != nil {
 		return err
 	}
@@ -346,38 +355,62 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 		sandboxMap[item.Id] = item
 	}
 
-	containerMap := make(map[string]*DockerInfoDetail)
-	cw.containersLock.Lock()
-	defer cw.containersLock.Unlock()
-	for _, container := range containersResp.Containers {
-		if container.State == cri.ContainerState_CONTAINER_EXITED || container.State == cri.ContainerState_CONTAINER_UNKNOWN {
+	allContainerMap := make(map[string]bool)           // all listable containers
+	runningMap := make(map[string]bool)                // status running
+	containerMap := make(map[string]*DockerInfoDetail) // pid exists
+	for i, container := range containersResp.Containers {
+		logger.Debugf(context.Background(), "CRIRuntime ListContainers [%v]: %+v", i, container)
+		allContainerMap[container.GetId()] = true
+		switch container.State {
+		case cri.ContainerState_CONTAINER_RUNNING:
+			runningMap[container.GetId()] = true
+		case cri.ContainerState_CONTAINER_EXITED:
+			runningMap[container.GetId()] = false
+		default:
 			continue
 		}
+
 		dockerContainer, _, _, err := cw.createContainerInfo(container.GetId())
+		if dockerContainer.ContainerInfo.State.Status != ContainerStatusRunning {
+			continue
+		}
 		if err != nil {
 			logger.Debug(context.Background(), "Create container info from cri-runtime error", err)
 			continue
 		}
-		cw.containers[container.GetId()] = innerContainerInfo{
-			State: container.State,
-			Pid:   dockerContainer.ContainerInfo.State.Pid,
+		cw.containers[container.GetId()] = &innerContainerInfo{
+			State:  container.State,
+			Pid:    dockerContainer.ContainerInfo.State.Pid,
+			Name:   dockerContainer.ContainerInfo.Name,
+			Status: dockerContainer.ContainerInfo.State.Status,
 		}
+		cw.containerHistory[container.GetId()] = true
 		containerMap[container.GetId()] = dockerContainer
 
 		// append the pod labels to the k8s info.
 		if sandbox, ok := sandboxMap[container.PodSandboxId]; ok {
 			cw.wrapperK8sInfoByLabels(sandbox.GetLabels(), dockerContainer)
 		}
-		logger.Debug(context.Background(), "Create container info from cri-runtime success, info", *dockerContainer.ContainerInfo, "config", *dockerContainer.ContainerInfo.Config, "detail", *dockerContainer)
+		logger.Debugf(context.Background(), "Create container info: id=%v name=%v created=%v status=%v detail=%+v",
+			container.Id, container.Metadata.Name, time.Unix(0, container.CreatedAt).Format(time.RFC3339Nano), dockerContainer.ContainerInfo.State.Status, container)
 	}
 	cw.dockerCenter.updateContainers(containerMap)
 
+	// delete not running containers
 	for k := range cw.containers {
-		if _, ok := containerMap[k]; !ok {
+		if running, ok := runningMap[k]; !ok || !running {
 			cw.dockerCenter.markRemove(k)
 			delete(cw.containers, k)
 		}
 	}
+
+	// delete obsolete history
+	for k := range cw.containerHistory {
+		if _, ok := allContainerMap[k]; !ok {
+			delete(cw.containerHistory, k)
+		}
+	}
+
 	return nil
 }
 
@@ -397,6 +430,8 @@ func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 }
 
 func (cw *CRIRuntimeWrapper) syncContainers() error {
+	cw.containersLock.Lock()
+	defer cw.containersLock.Unlock()
 	ctx, cancel := getContextWithTimeout(time.Second * 20)
 	defer cancel()
 	logger.Debug(context.Background(), "cri sync containers", "begin")
@@ -407,38 +442,39 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 
 	newContainers := map[string]*cri.Container{}
 	for i, container := range containersResp.Containers {
-		if container.State == cri.ContainerState_CONTAINER_EXITED || container.State == cri.ContainerState_CONTAINER_UNKNOWN {
+		// https://github.com/containerd/containerd/blob/main/pkg/cri/store/container/status.go
+		// We only care RUNNING and EXITED
+		// This is only an early prune, accurate status must be detected by ContainerProcessAlive
+		if container.State != cri.ContainerState_CONTAINER_RUNNING &&
+			(container.State != cri.ContainerState_CONTAINER_EXITED || container.GetCreatedAt() < cw.listContainerStartTime) {
 			continue
 		}
 		id := containersResp.Containers[i].GetId()
 		newContainers[id] = containersResp.Containers[i]
-	}
-
-	// update container
-	for id, container := range newContainers {
-		cw.containersLock.RLock()
 		oldInfo, ok := cw.containers[id]
-		cw.containersLock.RUnlock()
-		if !ok || oldInfo.State != container.State {
-			if err := cw.fetchOne(id); err != nil {
-				logger.Errorf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "failed to createContainerInfo, containerId: %s, error: %v", id, err)
+		_, inHistory := cw.containerHistory[id]
+		if ok {
+			status := ContainerStatusExited
+			if oldInfo.Status == ContainerStatusRunning && ContainerProcessAlive(oldInfo.Pid) {
+				status = ContainerStatusRunning
+			}
+			if oldInfo.State != cri.ContainerState_CONTAINER_RUNNING || // not running
+				(oldInfo.State == container.State && oldInfo.Name == container.Metadata.Name && oldInfo.Status == status) { // no state change
 				continue
 			}
-		} else if ok {
-			exist := ContainerProcessAlive(oldInfo.Pid)
-			if !exist {
-				delete(newContainers, id)
-			}
+		} else if inHistory {
+			continue
+		}
+		if err := cw.fetchOne(id); err != nil {
+			logger.Errorf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "failed to createContainerInfo, containerId: %s, error: %v", id, err)
 		}
 	}
 
 	// delete container
-	cw.containersLock.Lock()
-	defer cw.containersLock.Unlock()
-	for oldID := range cw.containers {
-		if _, ok := newContainers[oldID]; !ok {
-			cw.dockerCenter.markRemove(oldID)
+	for oldID, c := range cw.containers {
+		if _, ok := newContainers[oldID]; !ok || c.State == cri.ContainerState_CONTAINER_EXITED {
 			logger.Debug(context.Background(), "cri sync containers remove", oldID)
+			cw.dockerCenter.markRemove(oldID)
 			delete(cw.containers, oldID)
 		}
 	}
@@ -455,16 +491,19 @@ func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
 	cw.wrapperK8sInfoByID(sandboxID, dockerContainer)
 
 	if logger.DebugFlag() {
-		bytes, _ := json.Marshal(dockerContainer)
-		logger.Debugf(context.Background(), "cri create container info : %s", string(bytes))
+		// bytes, _ := json.Marshal(dockerContainer)
+		// logger.Debugf(context.Background(), "Create container info: %s", string(bytes))
+		logger.Debugf(context.Background(), "Create container info: id=%v name=%v created=%v status=%v detail=%+v",
+			containerID, dockerContainer.ContainerInfo.Name, dockerContainer.ContainerInfo.Created.Format(time.RFC3339Nano), dockerContainer.ContainerInfo.State.Status, dockerContainer.ContainerInfo)
 	}
 
 	cw.dockerCenter.updateContainer(containerID, dockerContainer)
-	cw.containersLock.Lock()
-	defer cw.containersLock.Unlock()
-	cw.containers[containerID] = innerContainerInfo{
+	cw.containerHistory[containerID] = true
+	cw.containers[containerID] = &innerContainerInfo{
 		status,
 		dockerContainer.ContainerInfo.State.Pid,
+		dockerContainer.ContainerInfo.Name,
+		dockerContainer.ContainerInfo.State.Status,
 	}
 	return nil
 }
@@ -585,17 +624,6 @@ func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(info *docker.Container)
 	}
 
 	return ""
-}
-
-func ContainerProcessAlive(pid int) bool {
-	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
-	exist, err := util.PathExists(procStatPath)
-	if err != nil {
-		logger.Error(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
-	} else if !exist {
-		return false
-	}
-	return true
 }
 
 func init() {

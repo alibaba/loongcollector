@@ -163,7 +163,8 @@ public:
         PLUGIN_DOCKER_UPDATE_FILE = 1,
         PLUGIN_DOCKER_REMOVE_FILE = 2,
         PLUGIN_DOCKER_UPDATE_FILE_ALL = 3,
-        PLUGIN_CMD_MAX = 4
+        PLUGIN_DOCKER_STOP_FILE = 4,
+        PLUGIN_CMD_MAX = 5
     };
 
     static LogtailPlugin* GetInstance() {

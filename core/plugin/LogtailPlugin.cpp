@@ -265,11 +265,13 @@ int LogtailPlugin::ExecPluginCmd(
             DockerContainerPathCmd* cmd = new DockerContainerPathCmd(configNameStr, false, paramsStr, false);
             ConfigManager::GetInstance()->UpdateContainerPath(cmd);
         } break;
+        case PLUGIN_DOCKER_STOP_FILE: {
+            DockerContainerPathCmd* cmd = new DockerContainerPathCmd(configNameStr, true, paramsStr, false);
+            ConfigManager::GetInstance()->UpdateContainerStopped(cmd);
+        } break;
         case PLUGIN_DOCKER_REMOVE_FILE: {
             DockerContainerPathCmd* cmd = new DockerContainerPathCmd(configNameStr, true, paramsStr, false);
             ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-            cmd = new DockerContainerPathCmd(configNameStr, true, paramsStr, false);
-            ConfigManager::GetInstance()->UpdateContainerStopped(cmd);
         } break;
         case PLUGIN_DOCKER_UPDATE_FILE_ALL: {
             DockerContainerPathCmd* cmd = new DockerContainerPathCmd(configNameStr, false, paramsStr, true);

@@ -39,7 +39,7 @@ const (
 	asyncPattern = `
 <seelog type="asynctimer" asyncinterval="500000" minlevel="%s" >
  <outputs formatid="common">
-	 <rollingfile type="size" filename="%slogtail_plugin.LOG" maxsize="2097152" maxrolls="10"/>
+	 <rollingfile type="size" filename="%slogtail_plugin.LOG" maxsize="20000000" maxrolls="10"/>
 	 %s
      %s
  </outputs>
@@ -51,7 +51,7 @@ const (
 	syncPattern = `
 <seelog type="sync" minlevel="%s" >
  <outputs formatid="common">
-	 <rollingfile type="size" filename="%slogtail_plugin.LOG" maxsize="2097152" maxrolls="10"/>
+	 <rollingfile type="size" filename="%slogtail_plugin.LOG" maxsize="20000000" maxrolls="10"/>
 	 %s
 	 %s
  </outputs>

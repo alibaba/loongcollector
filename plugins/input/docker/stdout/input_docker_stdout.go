@@ -122,8 +122,8 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 }
 
 type ServiceDockerStdout struct {
-	IncludeLabel          map[string]string `comment:"include container label for selector. [Deprecated： use IncludeContainerLabel and IncludeK8sLabel instead]"`
-	ExcludeLabel          map[string]string `comment:"exclude container label for selector. [Deprecated： use ExcludeContainerLabel and ExcludeK8sLabel instead]"`
+	IncludeLabel          map[string]string `comment:"include container label for selector. [Deprecated: use IncludeContainerLabel and IncludeK8sLabel instead]"`
+	ExcludeLabel          map[string]string `comment:"exclude container label for selector. [Deprecated: use ExcludeContainerLabel and ExcludeK8sLabel instead]"`
 	IncludeEnv            map[string]string `comment:"the container would be selected when it is matched by any environment rules. Furthermore, the regular expression starts with '^' is supported as the env value, such as 'ENVA:^DE.*$'' would hit all containers having any envs starts with DE."`
 	ExcludeEnv            map[string]string `comment:"the container would be excluded when it is matched by any environment rules. Furthermore, the regular expression starts with '^' is supported as the env value, such as 'ENVA:^DE.*$'' would hit all containers having any envs starts with DE."`
 	IncludeContainerLabel map[string]string `comment:"the container would be selected when it is matched by any container labels. Furthermore, the regular expression starts with '^' is supported as the label value, such as 'LABEL:^DE.*$'' would hit all containers having any labels starts with DE."`
@@ -132,9 +132,9 @@ type ServiceDockerStdout struct {
 	ExcludeK8sLabel       map[string]string `comment:"the container of pod would be excluded when it is matched by any exclude k8s label rules. Furthermore, the regular expression starts with '^' is supported as the value to exclude pods."`
 	ExternalEnvTag        map[string]string `comment:"extract the env value as the log tags for one container, such as the value of ENVA would be appended to the 'taga' of log tags when configured 'ENVA:taga' pair."`
 	ExternalK8sLabelTag   map[string]string `comment:"extract the pod label value as the log tags for one container, such as the value of LABELA would be appended to the 'taga' of log tags when configured 'LABELA:taga' pair."`
-	FlushIntervalMs       int               `comment:"the interval of container discovery，and the timeunit is millisecond. Default value is 3000."`
-	ReadIntervalMs        int               `comment:"the interval of read stdout log，and the timeunit is millisecond. Default value is 1000."`
-	SaveCheckPointSec     int               `comment:"the interval of save checkpoint，and the timeunit is second. Default value is 60."`
+	FlushIntervalMs       int               `comment:"the interval of container discovery, and the timeunit is millisecond. Default value is 3000."`
+	ReadIntervalMs        int               `comment:"the interval of read stdout log, and the timeunit is millisecond. Default value is 1000."`
+	SaveCheckPointSec     int               `comment:"the interval of save checkpoint, and the timeunit is second. Default value is 60."`
 	BeginLineRegex        string            `comment:"the regular expression of begin line for the multi line log."`
 	BeginLineTimeoutMs    int               `comment:"the maximum timeout milliseconds for begin line match. Default value is 3000."`
 	BeginLineCheckLength  int               `comment:"the prefix length of log line to match the first line. Default value is 10240."`
@@ -266,13 +266,15 @@ func (sds *ServiceDockerStdout) FlushAll(c ilogtail.Collector, firstStart bool) 
 		sds.K8sFilter)
 	sds.lastUpdateTime = newUpdateTime
 	if !firstStart && newCount == 0 && delCount == 0 {
+		logger.Debugf(sds.context.GetRuntimeContext(), "update match list, firstStart: %v, new: %v, delete: %v",
+			firstStart, newCount, delCount)
 		return nil
 	}
-	logger.Infof(sds.context.GetRuntimeContext(), "update match list, first: %v, new: %v, delete: %v",
+	logger.Infof(sds.context.GetRuntimeContext(), "update match list, firstStart: %v, new: %v, delete: %v",
 		firstStart, newCount, delCount)
 
 	dockerInfos := sds.matchList
-	logger.Debug(sds.context.GetRuntimeContext(), "flush all", len(dockerInfos))
+	logger.Debug(sds.context.GetRuntimeContext(), "match list length", len(dockerInfos))
 	sds.avgInstanceMetric.Add(int64(len(dockerInfos)))
 	for id, info := range dockerInfos {
 		if !logDriverSupported(info.ContainerInfo) {

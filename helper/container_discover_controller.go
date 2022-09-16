@@ -55,9 +55,11 @@ func NewContainerDiscoverManager(enableDockerDiscover, enableCRIDiscover, enable
 // FetchAll
 // Currently, there are 3 ways to find containers, which are docker interface, cri interface and static container info file.
 func (c *ContainerDiscoverManager) FetchAll() {
-	c.fetchStatic()
-	var err error
+	if c.enableStaticDiscover {
+		c.fetchStatic()
+	}
 
+	var err error
 	if c.enableDockerDiscover {
 		if err = c.fetchDocker(); err != nil {
 			logger.Info(context.Background(), "container docker fetch all", err)

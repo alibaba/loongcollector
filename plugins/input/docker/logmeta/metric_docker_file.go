@@ -35,6 +35,7 @@ const (
 	PluginDockerUpdateFile    = 1
 	PluginDockerDeleteFile    = 2
 	PluginDockerUpdateFileAll = 3
+	PluginDockerStopFile      = 4
 )
 
 type DockerFileUpdateCmd struct {
@@ -72,6 +73,7 @@ type InputDockerFile struct {
 	ExcludeEnvRegex   map[string]*regexp.Regexp
 	K8sFilter         *helper.K8SFilter
 
+	FlushIntervalMs      int `comment:"the interval of container discovery, and the timeunit is millisecond. Default value is 3000."`
 	lastPathMappingCache map[string]string
 	context              ilogtail.Context
 	lastClearTime        time.Time
@@ -176,7 +178,7 @@ func (idf *InputDockerFile) Init(context ilogtail.Context) (int, error) {
 	}
 	idf.K8sFilter, err = helper.CreateK8SFilter(idf.K8sNamespaceRegex, idf.K8sPodRegex, idf.K8sContainerRegex, idf.IncludeK8sLabel, idf.ExcludeK8sLabel)
 
-	return 3000, err
+	return idf.FlushIntervalMs, err
 }
 
 func (idf *InputDockerFile) Description() string {
@@ -195,12 +197,13 @@ func (idf *InputDockerFile) addMappingToLogtail(info *helper.DockerInfoDetail, d
 	}
 	cmdBuf, _ := json.Marshal(&cmd)
 	configName := idf.context.GetConfigName()
+	logger.Info(idf.context.GetRuntimeContext(), "addMappingToLogtail cmd", cmd)
 	if allCmd != nil {
 		allCmd.AllCmd = append(allCmd.AllCmd, cmd)
 		return
 	}
 	if err := logtail.ExecuteCMD(configName, PluginDockerUpdateFile, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmd", cmdBuf, "error", err)
+		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerUpdateFile, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -211,7 +214,18 @@ func (idf *InputDockerFile) deleteMappingFromLogtail(id string) {
 	cmdBuf, _ := json.Marshal(&cmd)
 	configName := idf.context.GetConfigName()
 	if err := logtail.ExecuteCMD(configName, PluginDockerDeleteFile, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmd", cmdBuf, "error", err)
+		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerDeleteFile, "cmd", cmdBuf, "error", err)
+	}
+}
+
+func (idf *InputDockerFile) notifyStopToLogtail(id string) {
+	var cmd DockerFileUpdateCmd
+	cmd.ID = id
+	logger.Info(idf.context.GetRuntimeContext(), "notifyStopToLogtail cmd", cmd)
+	cmdBuf, _ := json.Marshal(&cmd)
+	configName := idf.context.GetConfigName()
+	if err := logtail.ExecuteCMD(configName, PluginDockerStopFile, cmdBuf); err != nil {
+		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerStopFile, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -220,7 +234,7 @@ func (idf *InputDockerFile) updateAll(allCmd *DockerFileUpdateCmdAll) {
 	cmdBuf, _ := json.Marshal(allCmd)
 	configName := idf.context.GetConfigName()
 	if err := logtail.ExecuteCMD(configName, PluginDockerUpdateFileAll, cmdBuf); err != nil {
-		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmd", cmdBuf, "error", err)
+		logger.Error(idf.context.GetRuntimeContext(), "DOCKER_FILE_MAPPING_ALARM", "cmdType", PluginDockerUpdateFileAll, "cmd", cmdBuf, "error", err)
 	}
 }
 
@@ -247,7 +261,11 @@ func (idf *InputDockerFile) deleteMapping(id string) {
 	idf.deleteMappingFromLogtail(id)
 	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "deleted", "source path", idf.lastPathMappingCache[id], "id", id)
 	delete(idf.lastPathMappingCache, id)
+}
 
+func (idf *InputDockerFile) notifyStop(id string) {
+	idf.notifyStopToLogtail(id)
+	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "stopped", "source path", idf.lastPathMappingCache[id], "id", id)
 }
 
 func (idf *InputDockerFile) Collect(collector ilogtail.Collector) error {
@@ -277,25 +295,33 @@ func (idf *InputDockerFile) Collect(collector ilogtail.Collector) error {
 		logger.Infof(idf.context.GetRuntimeContext(), "update match list, new: %v, delete: %v", newCount, delCount)
 		// Can not return here because we should notify empty update to clear
 		//  cache in docker_path_config.json.
+	} else {
+		logger.Debugf(idf.context.GetRuntimeContext(), "update match list, new: %v, delete: %v", newCount, delCount)
 	}
 
 	dockerInfoDetails := idf.matchList
+	logger.Debug(idf.context.GetRuntimeContext(), "match list length", len(dockerInfoDetails))
 	idf.avgInstanceMetric.Add(int64(len(dockerInfoDetails)))
 	for _, info := range dockerInfoDetails {
 		sourcePath, containerPath := info.FindBestMatchedPath(idf.LogPath)
-		logger.Debugf(idf.context.GetRuntimeContext(), "container(%s-%s) bestMatchedPath for %s : sourcePath-%s, containerPath-%s",
-			info.ContainerInfo.ID, info.ContainerInfo.Name, idf.LogPath, sourcePath, containerPath)
+		logger.Debugf(idf.context.GetRuntimeContext(), "bestMatchedPath for logPath:%v container id:%v name:%v created:%v status:%v sourcePath:%v containerPath:%v",
+			idf.LogPath, info.ContainerInfo.ID, info.ContainerInfo.Name, info.ContainerInfo.Created.Format(time.RFC3339Nano), info.ContainerInfo.State.Status, sourcePath, containerPath)
 		if len(sourcePath) > 0 {
-			idf.updateMapping(info, sourcePath, containerPath, allCmd)
+			if info.ContainerInfo.State.Status == helper.ContainerStatusRunning {
+				idf.updateMapping(info, sourcePath, containerPath, allCmd)
+			}
 		} else {
 			logger.Warning(idf.context.GetRuntimeContext(), "DOCKER_FILE_MATCH_ALARM", "unknow error", "can't find path from this container", "path", idf.LogPath, "container", info.ContainerInfo.Name)
 		}
 	}
 
 	for id := range idf.lastPathMappingCache {
-		if _, ok := dockerInfoDetails[id]; !ok {
+		if c, ok := dockerInfoDetails[id]; !ok {
 			idf.deleteMetric.Add(1)
+			idf.notifyStop(id)
 			idf.deleteMapping(id)
+		} else if c.ContainerInfo.State.Status != helper.ContainerStatusRunning {
+			idf.notifyStop(id)
 		}
 	}
 	if allCmd != nil {
@@ -322,6 +348,8 @@ func (idf *InputDockerFile) Collect(collector ilogtail.Collector) error {
 
 func init() {
 	ilogtail.MetricInputs["metric_docker_file"] = func() ilogtail.MetricInput {
-		return &InputDockerFile{}
+		return &InputDockerFile{
+			FlushIntervalMs: 3000,
+		}
 	}
 }
