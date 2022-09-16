@@ -15,7 +15,7 @@
 FROM sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest
 
 ARG HOST_OS=Linux
-ARG VERSION=1.1.1
+ARG VERSION=1.1.2
 
 WORKDIR /ilogtail
 

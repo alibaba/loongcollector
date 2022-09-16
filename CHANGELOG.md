@@ -35,19 +35,3 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
-
-- [public] [both] [added] Add support for PostgreSQL input
-- [public] [both] [added] Add support for SqlServer input
-- [public] [both] [added] Add k8s event when control sls resource
-- [public] [both] [updated] Remove chmod and use inherited file permissions on target platform
-- [public] [both] [fixed] Fix timezone process for microtime in Apsara mode
-- [public] [both] [fixed] Fix log context lost in plugin system bug
-- [public] [both] [fixed] Restore "__topic__" field in plugin system
-- [public] [both] [added] Add support for Grok processor
-- [public] [both] [added] Add support for log protocol conversion
-- [public] [both] [updated] Bump Go version to 1.8
-- [public] [both] [updated] Static container discovery reports container stop events
-- [public] [both] [fixed] CRI container discovery detects exited containers which created during polling interval
-- [public] [both] [updated] Faster container file handle release after container stopped
-- [public] [both] [added] Force release file handle release after file deletion
-- [public] [both] [added] Add jmxfetch plugin to auto collect JMX beans metrics

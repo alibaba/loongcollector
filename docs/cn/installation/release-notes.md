@@ -30,3 +30,39 @@ tag为1.1.0的镜像缺少必要环境变量，无法支持容器内文件采集
 ```
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
 ```
+## 1.1.1
+
+### 发布记录
+
+发版日期：2022 年 8 月 22 日
+
+新功能
+
+* 待补充
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.1.1.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.1.1.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.1.1/ilogtail-1.1.1.linux-amd64.tar.gz) | Linux | x86-64 | 2330692006d151f4b83e4b8be0bfa6b68dc8d9a574c276c1beb6637c4a2939ec |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+```
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
+```
+## 1.1.2
+
+### 发布记录
+
+发版日期：2022 年 9 月 16 日
+
+新功能
+
+* 待补充
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.1.2.md)
