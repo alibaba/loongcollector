@@ -155,26 +155,17 @@ public:
 
     bool IsFileDeleted() const { return mFileDeleted; }
 
-    void SetFileDeleted(bool flag) {
-        mFileDeleted = flag;
-        if (flag) {
-            mDeletedTime = time(NULL);
-        }
-    }
+    void SetFileDeleted(bool flag);
 
     time_t GetDeletedTime() const { return mDeletedTime; }
 
-
     bool IsContainerStopped() const { return mContainerStopped; }
 
-    void SetContainerStopped() {
-        if (!mContainerStopped) {
-            mContainerStopped = true;
-            mContainerStoppedTime = time(NULL);
-        }
-    }
+    void SetContainerStopped();
 
     time_t GetContainerStoppedTime() const { return mContainerStoppedTime; }
+
+    bool ShouldForceReleaseDeletedFileFd();
 
     void SetPluginFlag(bool flag) { mPluginFlag = flag; }
 
@@ -296,8 +287,7 @@ public:
 
     void SetCloseUnusedInterval(int32_t interval) { mCloseUnusedInterval = interval; }
 
-    void SetPreciseTimestampConfig(
-        bool enabled, const std::string& key, TimeStampUnit unit) {
+    void SetPreciseTimestampConfig(bool enabled, const std::string& key, TimeStampUnit unit) {
         mPreciseTimestampConfig.enabled = enabled;
         mPreciseTimestampConfig.key = key;
         mPreciseTimestampConfig.unit = unit;

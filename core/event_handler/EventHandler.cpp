@@ -453,7 +453,7 @@ void ModifyHandler::Handle(const Event& event) {
             // only set when reader array size is 1
             if (readerArray.size() == (size_t)1) {
                 readerArray[0]->SetFileDeleted(true);
-                if (readerArray[0]->IsReadToEnd()) {
+                if (readerArray[0]->IsReadToEnd() || readerArray[0]->ShouldForceReleaseDeletedFileFd()) {
                     // release fd as quick as possible
                     readerArray[0]->CloseFilePtr();
                 }
@@ -464,7 +464,7 @@ void ModifyHandler::Handle(const Event& event) {
             LogFileReaderPtrArray& readerArray = pair.second;
             for (auto& reader : readerArray) {
                 reader->SetContainerStopped();
-                if (reader->IsReadToEnd()) {
+                if (reader->IsReadToEnd() || reader->ShouldForceReleaseDeletedFileFd()) {
                     // release fd as quick as possible
                     reader->CloseFilePtr();
                 }
@@ -630,13 +630,16 @@ void ModifyHandler::Handle(const Event& event) {
         if (recreateReaderFlag) {
             readerArrayPtr->pop_front();
             mDevInodeReaderMap.erase(reader->GetDevInode());
-            // delete this reader, donot insert into rotator reader map
+            // delete this reader, do not insert into rotator reader map
             // repush this event and wait for create reader
             Event* ev = new Event(event);
             LogInput::GetInstance()->PushEventQueue(ev);
             return;
         }
 
+        if (reader->ShouldForceReleaseDeletedFileFd()) {
+            reader->CloseFilePtr();
+        }
         bool hasMoreData;
         do {
             if (!LogProcess::GetInstance()->IsValidToReadLog(reader->GetLogstoreKey())) {
@@ -794,6 +797,8 @@ void ModifyHandler::HandleTimeOut() {
 
         if (readerArray.size() == 1) {
             LogFileReaderPtrArray::iterator iter = readerArray.begin();
+            // We don't care about container stop here.
+            // Because delete event should come after fd is released and Read will finally return IsFileDeleted true.
             if ((*iter)->IsFileDeleted()
                 && nowTime - (*iter)->GetDeletedTime() > INT32_FLAG(logreader_filedeleted_remove_interval)) {
                 actioned = true;
