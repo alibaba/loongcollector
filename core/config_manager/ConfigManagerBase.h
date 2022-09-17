@@ -63,9 +63,10 @@ protected:
     Json::Value mConfigJson;
     Json::Value mLocalConfigJson;
     std::unordered_map<std::string, Json::Value> mLocalConfigDirMap;
-    std::unordered_map<std::string, YAML::Node> mLocalYamlConfigDirMap;
+    std::unordered_map<std::string, YAML::Node> mYamlConfigDirMap;
 
-    std::unordered_map<std::string, int64_t> mLocalYamlConfigMTimeMap;
+    std::unordered_map<std::string, int64_t> mServerYamlConfigVersionMap; // the key is config name
+    std::unordered_map<std::string, int64_t> mYamlConfigMTimeMap; // the key is config name
     SpinLock mPluginStatsLock;
     std::unordered_map<std::string, std::unordered_map<std::string, int>> mPluginStats;
 
@@ -474,7 +475,11 @@ private:
      * @return true config changed
      * @return false no update
      */
-    bool GetLocalYamlConfigDirUpdate();
+    bool GetYamlConfigDirUpdate();
+    bool CheckYamlDirConfigUpdate(const std::string& configDirPath,
+                                  bool isRemote,
+                                  std::vector<std::string>& filepathes,
+                                  std::unordered_map<std::string, int64_t>& yamlConfigMTimeMap);
 
     /**
      * @brief Load a single data collection config and insert it into mNameConfigMap with name @name.

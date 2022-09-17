@@ -1053,14 +1053,14 @@ bool ConfigManagerBase::LoadAllConfig() {
             sLogger,
             ("load local user_config.d config", rst)("file", iter->first)("now config count", mNameConfigMap.size()));
     }
-    for (auto iter = mLocalYamlConfigDirMap.begin(); iter != mLocalYamlConfigDirMap.end(); ++iter) {
+    for (auto iter = mYamlConfigDirMap.begin(); iter != mYamlConfigDirMap.end(); ++iter) {
         Json::Value userLocalJsonConfig;
         std::string fileName = iter->first;
         if (ConfigYamlToJson::GetInstance()->GenerateLocalJsonConfig(fileName, iter->second, userLocalJsonConfig)) {
             rst &= LoadJsonConfig(userLocalJsonConfig);
-            LOG_INFO(sLogger,
-                     ("load local user_yaml_config.d config", rst)("file", fileName)("now config count",
-                                                                                     mNameConfigMap.size()));
+            LOG_INFO(
+                sLogger,
+                ("load user_yaml_config.d config", rst)("file", fileName)("now config count", mNameConfigMap.size()));
         }
     }
     return rst;
@@ -2268,7 +2268,7 @@ void ConfigManagerBase::GetSensitiveKeys(const Json::Value& value, Config* pConf
 bool ConfigManagerBase::GetLocalConfigUpdate() {
     bool fileUpdateFlag = GetLocalConfigFileUpdate();
     bool dirUpdateFlag = GetLocalConfigDirUpdate();
-    bool yamlDirUpdateFlag = GetLocalYamlConfigDirUpdate();
+    bool yamlDirUpdateFlag = GetYamlConfigDirUpdate();
     return fileUpdateFlag || dirUpdateFlag || yamlDirUpdateFlag;
 }
 
@@ -2364,33 +2364,73 @@ bool ConfigManagerBase::GetLocalConfigDirUpdate() {
     return updateFlag;
 }
 
-bool ConfigManagerBase::GetLocalYamlConfigDirUpdate() {
+bool ConfigManagerBase::GetYamlConfigDirUpdate() {
     bool updateFlag = false;
-    // list dir
+    std::vector<std::string> filepathes;
+    std::unordered_map<std::string, int64_t> yamlConfigMTimeMap;
     static std::string localConfigDirPath = AppConfig::GetInstance()->GetLocalUserYamlConfigDirPath();
-    fsutil::Dir localConfigDir(localConfigDirPath);
-    if (!localConfigDir.Open()) {
+    static std::string serverConfigDirPath = localConfigDirPath + "remote_config" + PATH_SEPARATOR;
+
+    updateFlag |= CheckYamlDirConfigUpdate(localConfigDirPath, false, filepathes, yamlConfigMTimeMap);
+    updateFlag |= CheckYamlDirConfigUpdate(serverConfigDirPath, true, filepathes, yamlConfigMTimeMap);
+    if (mYamlConfigMTimeMap.size() != yamlConfigMTimeMap.size()) {
+        updateFlag = true;
+    }
+    mYamlConfigMTimeMap = yamlConfigMTimeMap;
+
+    if (updateFlag) {
+        std::sort(filepathes.begin(), filepathes.end());
+        std::unordered_map<std::string, YAML::Node> configDirMap;
+        for (size_t i = 0; i < filepathes.size(); i++) {
+            YAML::Node subConfYaml;
+            ParseConfResult res = ParseConfig(filepathes[i], subConfYaml);
+            if (res == CONFIG_OK) {
+                LOG_INFO(sLogger, ("user yaml config file loaded", filepathes[i]));
+                configDirMap[filepathes[i]] = subConfYaml;
+            } else {
+                LOG_INFO(sLogger, ("invalid user yaml config file", filepathes[i]));
+                continue;
+            }
+        }
+        if (mYamlConfigDirMap.size() != configDirMap.size()) {
+            LOG_INFO(sLogger,
+                     ("user yaml config removed or added, last", mYamlConfigDirMap.size())("now", configDirMap.size()));
+            if (configDirMap.size() < mYamlConfigDirMap.size()) {
+                SetConfigRemoveFlag(true);
+            }
+        }
+        mYamlConfigDirMap = configDirMap;
+    }
+
+    return updateFlag;
+}
+
+bool ConfigManagerBase::CheckYamlDirConfigUpdate(const std::string& configDirPath,
+                                                 bool isRemote,
+                                                 std::vector<std::string>& filepathes,
+                                                 std::unordered_map<std::string, int64_t>& yamlConfigMTimeMap) {
+    bool updateFlag = false;
+    fsutil::Dir configDir(configDirPath);
+    if (!configDir.Open()) {
         int savedErrno = GetErrno();
         if (fsutil::Dir::IsEACCES(savedErrno) || fsutil::Dir::IsENOTDIR(savedErrno)
             || fsutil::Dir::IsENOENT(savedErrno)) {
-            LOG_DEBUG(sLogger, ("invalid local yaml conf dir", localConfigDirPath)("error", ErrnoToString(savedErrno)));
-            if (!Mkdir(localConfigDirPath.c_str())) {
+            LOG_DEBUG(sLogger, ("invalid yaml conf dir", configDirPath)("error", ErrnoToString(savedErrno)));
+            if (!Mkdir(configDirPath.c_str())) {
                 savedErrno = errno;
                 if (!IsEEXIST(savedErrno)) {
-                    LOG_ERROR(sLogger,
-                              ("create local conf yaml dir failed", localConfigDirPath)("error", strerror(savedErrno)));
+                    LOG_ERROR(sLogger, ("create conf yaml dir failed", configDirPath)("error", strerror(savedErrno)));
                 }
             }
         }
     }
-    if (!localConfigDir.Open()) {
+    if (!configDir.Open()) {
         return updateFlag;
     }
 
-    std::vector<std::string> v;
     fsutil::Entry ent;
-    std::unordered_map<std::string, int64_t> localYamlConfigMTimeMap;
-    while (ent = localConfigDir.ReadNext()) {
+    std::unordered_map<std::string, int64_t> serverYamlConfigVersionMap;
+    while (ent = configDir.ReadNext()) {
         if (!ent.IsRegFile()) {
             continue;
         }
@@ -2400,47 +2440,48 @@ bool ConfigManagerBase::GetLocalYamlConfigDirUpdate() {
             continue;
         }
 
-        std::string fullPath = localConfigDirPath + flName;
-        fsutil::PathStat buf;
-        if (fsutil::PathStat::stat(fullPath, buf)) {
-            auto iter = mLocalYamlConfigMTimeMap.find(fullPath);
-            if (iter == mLocalYamlConfigMTimeMap.end() || buf.GetMtime() != iter->second) {
-                updateFlag = true;
-            }
-            v.push_back(fullPath);
-            localYamlConfigMTimeMap[fullPath] = buf.GetMtime();
-        }
-    }
-    if (mLocalYamlConfigMTimeMap.size() != localYamlConfigMTimeMap.size()) {
-        updateFlag = true;
-    }
-    mLocalYamlConfigMTimeMap = localYamlConfigMTimeMap;
-
-    if (updateFlag) {
-        std::sort(v.begin(), v.end());
-        std::unordered_map<std::string, YAML::Node> localConfigDirMap;
-        for (size_t i = 0; i < v.size(); i++) {
-            YAML::Node subConfYaml;
-            ParseConfResult res = ParseConfig(v[i], subConfYaml);
-            if (res == CONFIG_OK) {
-                LOG_INFO(sLogger, ("local user yaml config file loaded", v[i]));
-                localConfigDirMap[v[i]] = subConfYaml;
-            } else {
-                LOG_INFO(sLogger, ("invalid local user yaml config file", v[i]));
+        if (isRemote) {
+            // filename should be in the following pattern: <config_name>@<version>
+            std::vector<std::string> tokens = SplitString(flName, "@");
+            if (tokens.size() != 2) {
+                LOG_INFO(sLogger, ("invalid server yaml config filename", flName));
                 continue;
             }
-        }
-        if (mLocalYamlConfigDirMap.size() != localConfigDirMap.size()) {
-            LOG_INFO(sLogger,
-                     ("local user yaml config removed or added, last",
-                      mLocalYamlConfigDirMap.size())("now", localConfigDirMap.size()));
-            if (localConfigDirMap.size() < mLocalYamlConfigDirMap.size()) {
-                SetConfigRemoveFlag(true);
+            const std::string configName = tokens.at(0);
+            const int version = stoi(tokens.at(1));
+            if (serverYamlConfigVersionMap.find(configName) == serverYamlConfigVersionMap.end()
+                || serverYamlConfigVersionMap[configName] < version) {
+                serverYamlConfigVersionMap[configName] = version;
+            }
+        } else {
+            std::string fullPath = configDirPath + flName;
+            fsutil::PathStat buf;
+            if (fsutil::PathStat::stat(fullPath, buf)) {
+                auto iter = mYamlConfigMTimeMap.find(fullPath);
+                if (iter == mYamlConfigMTimeMap.end() || buf.GetMtime() != iter->second) {
+                    updateFlag = true;
+                }
+                filepathes.push_back(fullPath);
+                yamlConfigMTimeMap[fullPath] = buf.GetMtime();
             }
         }
-        mLocalYamlConfigDirMap = localConfigDirMap;
     }
-
+    if (isRemote) {
+        mServerYamlConfigVersionMap = serverYamlConfigVersionMap;
+        for (auto it = serverYamlConfigVersionMap.begin(); it != serverYamlConfigVersionMap.end(); ++it) {
+            std::string fullPath = configDirPath + it->first + "@" + to_string(it->second) + ".yaml";
+            std::string fullConfigPath = configDirPath + it->first;
+            fsutil::PathStat buf;
+            if (fsutil::PathStat::stat(fullPath, buf)) {
+                auto iter = mYamlConfigMTimeMap.find(fullConfigPath);
+                if (iter == mYamlConfigMTimeMap.end() || buf.GetMtime() != iter->second) {
+                    updateFlag = true;
+                }
+                filepathes.push_back(fullPath);
+                yamlConfigMTimeMap[fullConfigPath] = buf.GetMtime();
+            }
+        }
+    }
     return updateFlag;
 }
 
