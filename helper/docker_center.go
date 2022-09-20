@@ -260,6 +260,15 @@ func (did *DockerInfoDetail) GetExternalTags(envs, k8sLabels map[string]string) 
 	for k, v := range did.ContainerNameTag {
 		tags[k] = v
 	}
+	did.GetCustomExternalTags(tags, envs, k8sLabels)
+	return tags
+
+}
+
+func (did *DockerInfoDetail) GetCustomExternalTags(tags, envs, k8sLabels map[string]string) {
+	if len(envs) == 0 && len(k8sLabels) == 0 {
+		return
+	}
 	for k, realName := range envs {
 		tags[realName] = did.GetEnv(k)
 	}
@@ -268,8 +277,6 @@ func (did *DockerInfoDetail) GetExternalTags(envs, k8sLabels map[string]string) 
 			tags[realName] = did.K8SInfo.GetLabel(k)
 		}
 	}
-	return tags
-
 }
 
 func (did *DockerInfoDetail) GetEnv(key string) string {

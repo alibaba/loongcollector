@@ -74,6 +74,7 @@ type Jmx struct {
 	Filters           []*Filter
 	NewGcMetrics      bool
 	DefaultJvmMetrics bool
+	Tags              map[string]string
 
 	includeContainerLabelRegex map[string]*regexp.Regexp
 	excludeContainerLabelRegex map[string]*regexp.Regexp
@@ -148,6 +149,9 @@ func (m *Jmx) Start(collector ilogtail.Collector) error {
 		logger.Infof(m.context.GetRuntimeContext(), "find %d static jmx configs", len(m.StaticInstances))
 		for i := range m.StaticInstances {
 			m.StaticInstances[i].Tags[dispatchKey] = m.key
+			for k, v := range m.Tags {
+				m.StaticInstances[i].Tags[k] = v
+			}
 			inner := NewInstanceInner(m.StaticInstances[i].Port, m.StaticInstances[i].Host, m.StaticInstances[i].User,
 				m.StaticInstances[i].Password, m.StaticInstances[i].Tags, m.DefaultJvmMetrics)
 			m.instances[inner.Hash()] = inner
@@ -196,6 +200,9 @@ func (m *Jmx) UpdateContainerCfg() {
 		}
 		tags := make(map[string]string, 8)
 		tags[dispatchKey] = m.key
+		for k, v := range m.Tags {
+			tags[k] = v
+		}
 		if detail.K8SInfo.ContainerName == "" {
 			tags["container"] = detail.ContainerNameTag["_container_name_"]
 		} else {
@@ -204,13 +211,10 @@ func (m *Jmx) UpdateContainerCfg() {
 		if detail.K8SInfo.Pod != "" {
 			tags["namespace"] = detail.K8SInfo.Namespace
 			tags["pod"] = detail.K8SInfo.Pod
+			tags["workload"] = helper.ExtractPodWorkload(detail.K8SInfo.Pod)
 		}
 
-		externalTags := detail.GetExternalTags(m.ExternalEnvTag, m.ExternalK8sLabelTag)
-		for k, v := range externalTags {
-			tags[k] = v
-		}
-
+		detail.GetCustomExternalTags(tags, m.ExternalEnvTag, m.ExternalK8sLabelTag)
 		if val := detail.GetEnv("ILOGTAIL_JMX_TAGS"); val != "" {
 			parts := strings.Split(val, ",")
 			for _, part := range parts {
