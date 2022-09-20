@@ -61,6 +61,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/prometheus/common](https://pkg.go.dev/github.com/prometheus/common?tab=licenses)
 - [github.com/prometheus/procfs](https://pkg.go.dev/github.com/prometheus/procfs?tab=licenses)
 - [github.com/stefanberger/go-pkcs11uri](https://pkg.go.dev/github.com/stefanberger/go-pkcs11uri?tab=licenses)
+- [github.com/tklauser/numcpus](https://pkg.go.dev/github.com/tklauser/numcpus?tab=licenses)
 - [github.com/VictoriaMetrics/metricsql](https://pkg.go.dev/github.com/VictoriaMetrics/metricsql?tab=licenses)
 - [github.com/vishvananda/netlink](https://pkg.go.dev/github.com/vishvananda/netlink?tab=licenses)
 - [github.com/vishvananda/netns](https://pkg.go.dev/github.com/vishvananda/netns?tab=licenses)
@@ -103,10 +104,10 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/imdario/mergo](https://pkg.go.dev/github.com/imdario/mergo?tab=licenses)
 - [github.com/jcmturner/gofork](https://pkg.go.dev/github.com/jcmturner/gofork?tab=licenses)
 - [github.com/pierrec/lz4](https://pkg.go.dev/github.com/pierrec/lz4?tab=licenses)
-- [github.com/miekg/pkcs11](https://pkg.go.dev/github.com/miekg/pkcs11?tab=licenses)
 - [github.com/shirou/gopsutil](https://pkg.go.dev/github.com/shirou/gopsutil?tab=licenses)
 - [github.com/gosnmp/gosnmp](https://pkg.go.dev/github.com/gosnmp/gosnmp)
 - [github.com/spf13/pflag](https://pkg.go.dev/github.com/spf13/pflag?tab=licenses)
+- [github.com/tklauser/go-sysconf](https://pkg.go.dev/github.com/tklauser/go-sysconf?tab=licenses)
 - [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto?tab=licenses)
 - [golang.org/x/net](https://pkg.go.dev/golang.org/x/net?tab=licenses)
 - [golang.org/x/oauth2](https://pkg.go.dev/golang.org/x/oauth2?tab=licenses)
@@ -117,6 +118,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [golang.org/x/time](https://pkg.go.dev/golang.org/x/time?tab=licenses)
 - [google.golang.org/protobuf](https://pkg.go.dev/google.golang.org/protobuf?tab=licenses)
 - [gopkg.in/inf.v0](https://pkg.go.dev/gopkg.in/inf.v0?tab=licenses)
+- [github.com/miekg/pkcs11](https://pkg.go.dev/github.com/miekg/pkcs11?tab=licenses)
 
 ## MIT licenses
 

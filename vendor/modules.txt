@@ -784,7 +784,7 @@ github.com/rcrowley/go-metrics
 # github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b => github.com/satori/go.uuid v1.2.0
 ## explicit
 github.com/satori/go.uuid
-# github.com/shirou/gopsutil v3.21.1+incompatible
+# github.com/shirou/gopsutil v3.21.3+incompatible
 ## explicit
 github.com/shirou/gopsutil/cpu
 github.com/shirou/gopsutil/disk
@@ -852,6 +852,12 @@ github.com/syndtr/goleveldb/leveldb/util
 # github.com/tchap/go-patricia v2.3.0+incompatible
 ## explicit
 github.com/tchap/go-patricia/patricia
+# github.com/tklauser/go-sysconf v0.3.10
+## explicit; go 1.13
+github.com/tklauser/go-sysconf
+# github.com/tklauser/numcpus v0.4.0
+## explicit; go 1.11
+github.com/tklauser/numcpus
 # github.com/valyala/bytebufferpool v1.0.0
 ## explicit
 github.com/valyala/bytebufferpool
