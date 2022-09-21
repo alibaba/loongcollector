@@ -50,3 +50,9 @@ e2e-test
 
 # goland
 .idea
+
+# unit test
+.coretestCoverage.txt
+.testCoverage.txt
+plugin_main/*.dll
+plugin_main/*.so

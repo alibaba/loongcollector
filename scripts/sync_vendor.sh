@@ -1,9 +1,11 @@
-# Copyright 2018 The Prometheus Authors
+#!/bin/sh
+# Copyright 2022 iLogtail Authors
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -11,21 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include Makefile.common
+set -ue
+set -o pipefail
 
-%/.unpacked: %.ttar
-	@echo ">> extracting fixtures"
-	./ttar -C $(dir $*) -x -f $*.ttar
-	touch $@
+# intialize variables
+EXTERNAL_DIR=${1:-external}
+VENDOR_DIR=${2:-vendor}
+ROOT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 
-fixtures: fixtures/.unpacked
-
-update_fixtures:
-	rm -vf fixtures/.unpacked
-	./ttar -c -f fixtures.ttar fixtures/
-
-.PHONY: build
-build:
-
-.PHONY: test
-test: fixtures/.unpacked common-test
+for dir in $(ls $ROOT_DIR/$EXTERNAL_DIR)
+do
+  cp -r "${ROOT_DIR}/${EXTERNAL_DIR}/${dir}" "${ROOT_DIR}/${VENDOR_DIR}/"
+done
