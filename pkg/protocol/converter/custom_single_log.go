@@ -28,8 +28,8 @@ const (
 	numProtocolKeys    = 3
 )
 
-func (c *Converter) ConvertToSingleProtocol(logGroup *protocol.LogGroup, targetFields []string) ([][]byte, [][]string, error) {
-	marshaledLogs, desiredValues := make([][]byte, len(logGroup.Logs)), make([][]string, len(logGroup.Logs))
+func (c *Converter) ConvertToSingleProtocolLogs(logGroup *protocol.LogGroup, targetFields []string) ([]map[string]interface{}, [][]string, error) {
+	convertedLogs, desiredValues := make([]map[string]interface{}, len(logGroup.Logs)), make([][]string, len(logGroup.Logs))
 	for i, log := range logGroup.Logs {
 		contents, tags := convertLogToMap(log, logGroup.LogTags, logGroup.Source, logGroup.Topic, c.TagKeyRenameMap)
 
@@ -55,12 +55,24 @@ func (c *Converter) ConvertToSingleProtocol(logGroup *protocol.LogGroup, targetF
 		} else {
 			customSingleLog[protocolKeyTag] = tags
 		}
+		convertedLogs[i] = customSingleLog
+	}
+	return convertedLogs, desiredValues, nil
+}
 
+func (c *Converter) ConvertToSingleProtocolStream(logGroup *protocol.LogGroup, targetFields []string) ([][]byte, [][]string, error) {
+	convertedLogs, desiredValues, err := c.ConvertToSingleProtocolLogs(logGroup, targetFields)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	marshaledLogs := make([][]byte, len(logGroup.Logs))
+	for i, log := range convertedLogs {
 		switch c.Encoding {
 		case encodingJSON:
-			b, err := json.Marshal(customSingleLog)
+			b, err := json.Marshal(log)
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to marshal log: %v", customSingleLog)
+				return nil, nil, fmt.Errorf("unable to marshal log: %v", log)
 			}
 			marshaledLogs[i] = b
 		default:

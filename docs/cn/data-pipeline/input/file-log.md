@@ -42,8 +42,8 @@
 
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
-| ExternalK8sLabelTag | Map<String, String> | 否 | <p>对于部署于K8s环境的容器，需要在日志中额外添加的与Pod标签相关的tag。如果未添加该参数，则默认为空，表示不添加额外tag。</p><p>例如：在Map中添加<code>app: k8s_label_app</code>，则当Pod中包含<code>app=serviceA</code>的标签时，会将该信息iLogtail添加到日志中，即添加字段__tag__:__k8s_label_app__: serviceA。</p> |
-| ExternalEnvTag | Map<String, String> | 否 | <p>需要在日志中额外添加的与容器环境变量相关的tag。如果未添加该参数，则默认为空，表示不添加额外tag。</p><p>例如：在Map中添加<code>VERSION: env_version</code>，则当容器中包含环境变量<code>VERSION=v1.0.0</code>时，会将该信息以tag形式添加到日志中，即添加字段__tag__:__env_version__: v1.0.0。</p> |
+| ExternalK8sLabelTag | Map<String, String> | 否 | <p>对于部署于K8s环境的容器，需要在日志中额外添加的与Pod标签相关的tag。如果未添加该参数，则默认为空，表示不添加额外tag。</p><p>例如：在Map中添加<code>app: k8s_label_app</code>，则若Pod中包含<code>app=serviceA</code>的标签时，会将该信息iLogtail添加到日志中，即添加字段__tag__:k8s_label_app: serviceA；若不包含<code>app</code>标签，则会添加空字段__tag__:k8s_label_app: </p> |
+| ExternalEnvTag | Map<String, String> | 否 | <p>需要在日志中额外添加的与容器环境变量相关的tag。如果未添加该参数，则默认为空，表示不添加额外tag。</p><p>例如：在Map中添加<code>VERSION: env_version</code>，则当容器中包含环境变量<code>VERSION=v1.0.0</code>时，会将该信息以tag形式添加到日志中，即添加字段__tag__:env_version: v1.0.0；若不包含<code>VERSION</code>环境变量，则会添加空字段__tag__:env_version: </p> |
 
 
 ### 高级参数

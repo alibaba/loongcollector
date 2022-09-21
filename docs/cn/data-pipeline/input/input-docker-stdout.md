@@ -58,8 +58,8 @@
 | BeginLineCheckLength | Integer                            | 否    | <p>行首匹配的长度，单位：字节。</p><p>默认取值为10×1024字节。</p><p>如果行首匹配的正则表达式在前N个字节即可体现，推荐设置此参数，提升行首匹配效率。</p>                                                                                                                                                                    |
 | BeginLineTimeoutMs   | Integer                            | 否    | <p>行首匹配的超时时间，单位：毫秒。</p><p>默认取值为3000毫秒。</p><p>如果3000毫秒内没有出现新日志，则结束匹配，将最后一条日志上传到日志服务。</p>                                                                                                                                                                       |
 | MaxLogSize           | Integer                            | 否    | <p>日志最大长度<strong>，</strong>默认取值为0，单位：字节。</p><p>默认取值为512×1024字节。</p><p>如果日志长度超过该值，则不再继续查找行首，直接上传。</p>                                                                                                                                                          |
-| ExternalK8sLabelTag  | Map，其中LabelKey和LabelValue为String类型 | 否    | <p>设置Kubernetes Label（定义在template.metadata中）日志标签后，iLogtail将在日志中新增Kubernetes Label相关字段。</p><p>例如设置LabelKey为app，LabelValue为<code>k8s_label_app</code>，当Pod中包含Label <code>app=serviceA</code>时，会将该信息iLogtail添加到日志中，即添加字段__tag__:__k8s_label_app__: serviceA。</p> |
-| ExternalEnvTag       | Map，其中EnvKey和EnvValue为String类型     | 否    | <p>设置容器环境变量日志标签后，iLogtail将在日志中新增容器环境变量相关字段。</p><p>例如设置EnvKey为<code>VERSION</code>，EnvValue为<code>env_version</code>，当容器中包含环境变量<code>VERSION=v1.0.0</code>时，会将该信息以tag形式添加到日志中，即添加字段__tag__:__env_version__: v1.0.0。</p>                                        |
+| ExternalK8sLabelTag  | Map，其中LabelKey和LabelValue为String类型 | 否    | <p>设置Kubernetes Label（定义在template.metadata中）日志标签后，iLogtail将在日志中新增Kubernetes Label相关字段。</p><p>例如设置LabelKey为app，LabelValue为<code>k8s_label_app</code>，当Pod中包含Label <code>app=serviceA</code>时，会将该信息iLogtail添加到日志中，即添加字段k8s_label_app: serviceA；若不包含名为app的label时，添加空字段k8s_label_app: 。</p> |
+| ExternalEnvTag       | Map，其中EnvKey和EnvValue为String类型     | 否    | <p>设置容器环境变量日志标签后，iLogtail将在日志中新增容器环境变量相关字段。</p><p>例如设置EnvKey为<code>VERSION</code>，EnvValue为<code>env_version</code>，当容器中包含环境变量<code>VERSION=v1.0.0</code>时，会将该信息以tag形式添加到日志中，即添加字段env_version: v1.0.0；若不包含名为VERSION的环境变量时，添加空字段env_version: 。</p>                                        |
 
 ### 数据处理环境变量
 
@@ -101,7 +101,7 @@ crictl inspect
 ctr -n k8s.io containers info
 {% endhint %}
 
-```
+```plain
             "Env": [
                 ...
                 "NGINX_SERVICE_PORT=80",
@@ -130,7 +130,7 @@ iLogtail采集配置示例如下所示。
 
 您可以登录容器所在的宿主机查看容器的Label。具体操作，请参见[获取容器Label](https://help.aliyun.com/document\_detail/354831.htm#section-7rp-xn8-crg)。
 
-```
+```plain
             "Labels": {
                 ...
                 "io.kubernetes.container.name": "nginx",
@@ -163,7 +163,7 @@ Logtail采集配置示例如下所示。
 kubectl describe
 {% endhint %}
 
-```
+```plain
 Name:         nginx-76d49876c7-r892w
 Namespace:    default
 ...
@@ -190,7 +190,7 @@ Containers:
 
 1\. 获取Kubernetes层级的信息。
 
-```
+```plain
 Name:         nginx-76d49876c7-r892w
 Namespace:    default
 ...
@@ -217,7 +217,7 @@ Labels:       app=nginx
 
 1\. 获取日志样例。
 
-```
+```plain
 2021-02-03 14:18:41.969 ERROR [spring-cloud-monitor] [nio-8080-exec-4] c.g.s.web.controller.DemoController : java.lang.NullPointerException
 at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:193)
 at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:166)
@@ -240,4 +240,3 @@ at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterCha
         BeginLineCheckLength: 10,
         BeginLineRegex: "\\d+-\\d+-\\d+.*"
 ```
-

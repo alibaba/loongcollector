@@ -110,84 +110,85 @@ func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameM
 	}, nil
 }
 
-func (c *Converter) Do(logGroup *protocol.LogGroup) (logs [][]byte, err error) {
+func (c *Converter) Do(logGroup *protocol.LogGroup) (logs interface{}, err error) {
 	logs, _, err = c.DoWithSelectedFields(logGroup, nil)
 	return
 }
 
-func (c *Converter) DoWithSelectedFields(logGroup *protocol.LogGroup, targetFields []string) (logs [][]byte, values [][]string, err error) {
+func (c *Converter) DoWithSelectedFields(logGroup *protocol.LogGroup, targetFields []string) (logs interface{}, values [][]string, err error) {
 	switch c.Protocol {
 	case protocolCustomSingle:
-		return c.ConvertToSingleProtocol(logGroup, targetFields)
+		return c.ConvertToSingleProtocolLogs(logGroup, targetFields)
+	default:
+		return nil, nil, fmt.Errorf("unsupported protocol: %s", c.Protocol)
+	}
+}
+
+func (c *Converter) ToByteStream(logGroup *protocol.LogGroup) (stream [][]byte, err error) {
+	stream, _, err = c.ToByteStreamWithSelectedFields(logGroup, nil)
+	return
+}
+
+func (c *Converter) ToByteStreamWithSelectedFields(logGroup *protocol.LogGroup, targetFields []string) (stream [][]byte, values [][]string, err error) {
+	switch c.Protocol {
+	case protocolCustomSingle:
+		return c.ConvertToSingleProtocolStream(logGroup, targetFields)
 	default:
 		return nil, nil, fmt.Errorf("unsupported protocol: %s", c.Protocol)
 	}
 }
 
 func convertLogToMap(log *protocol.Log, logTags []*protocol.LogTag, src, topic string, tagKeyRenameMap map[string]string) (map[string]string, map[string]string) {
-	contents, tags := make(map[string]string), make(map[string]string, len(tagConversionMap)+2) // the 2 extra tags comes from src and topic
+	contents, tags := make(map[string]string), make(map[string]string)
 	for _, logContent := range log.Contents {
-		if logContent.Key == tagPrefix+"__user_defined_id__" {
+		switch logContent.Key {
+		case "__log_topic__":
+			tags[tagLogTopic] = logContent.Value
+		case tagPrefix + "__user_defined_id__":
 			continue
-		}
-		if strings.HasPrefix(logContent.Key, tagPrefix) {
-			if *inK8s {
-				if defaultTag, ok := specialTagConversionMap[logContent.Key[len(tagPrefix):]]; ok {
-					if newTag, ok := tagKeyRenameMap[defaultTag]; ok {
-						tags[newTag] = logContent.Value
-					} else {
-						tags[defaultTag] = logContent.Value
-					}
-					continue
-				}
-			}
-			if defaultTag, ok := tagConversionMap[logContent.Key[len(tagPrefix):]]; ok {
-				if newTag, ok := tagKeyRenameMap[defaultTag]; ok {
-					tags[newTag] = logContent.Value
-				} else {
-					tags[defaultTag] = logContent.Value
+		default:
+			var tagName string
+			if strings.HasPrefix(logContent.Key, tagPrefix) {
+				tagName = logContent.Key[len(tagPrefix):]
+				if _, ok := specialTagConversionMap[tagName]; *inK8s && ok {
+					tagName = specialTagConversionMap[tagName]
+				} else if _, ok := tagConversionMap[tagName]; ok {
+					tagName = tagConversionMap[tagName]
 				}
 			} else {
-				if newTag, ok := tagKeyRenameMap[logContent.Key[len(tagPrefix):]]; ok {
-					tags[newTag] = logContent.Value
-				} else {
-					tags[logContent.Key[len(tagPrefix):]] = logContent.Value
+				if _, ok := specialTagConversionMap[logContent.Key]; *inK8s && ok {
+					tagName = specialTagConversionMap[logContent.Key]
+				} else if _, ok := tagConversionMap[logContent.Key]; ok {
+					tagName = tagConversionMap[logContent.Key]
 				}
 			}
-		} else {
-			if logContent.Key == "__log_topic__" {
-				tags[tagLogTopic] = logContent.Value
+			if len(tagName) != 0 {
+				if newTagName, ok := tagKeyRenameMap[tagName]; ok && len(newTagName) != 0 {
+					tags[newTagName] = logContent.Value
+				} else if !ok {
+					tags[tagName] = logContent.Value
+				}
 			} else {
 				contents[logContent.Key] = logContent.Value
 			}
 		}
 	}
+
 	for _, logTag := range logTags {
 		if logTag.Key == "__user_defined_id__" || logTag.Key == "__pack_id__" {
 			continue
 		}
-		if *inK8s {
-			if defaultTag, ok := specialTagConversionMap[logTag.Key]; ok {
-				if newTag, ok := tagKeyRenameMap[defaultTag]; ok {
-					tags[newTag] = logTag.Value
-				} else {
-					tags[defaultTag] = logTag.Value
-				}
-				continue
-			}
+
+		tagName := logTag.Key
+		if _, ok := specialTagConversionMap[logTag.Key]; *inK8s && ok {
+			tagName = specialTagConversionMap[logTag.Key]
+		} else if _, ok := tagConversionMap[logTag.Key]; ok {
+			tagName = tagConversionMap[logTag.Key]
 		}
-		if defaultTag, ok := tagConversionMap[logTag.Key]; ok {
-			if newTag, ok := tagKeyRenameMap[defaultTag]; ok {
-				tags[newTag] = logTag.Value
-			} else {
-				tags[defaultTag] = logTag.Value
-			}
-		} else {
-			if newTag, ok := tagKeyRenameMap[logTag.Key]; ok {
-				tags[newTag] = logTag.Value
-			} else {
-				tags[logTag.Key] = logTag.Value
-			}
+		if newTagName, ok := tagKeyRenameMap[tagName]; ok && len(newTagName) != 0 {
+			tags[newTagName] = logTag.Value
+		} else if !ok {
+			tags[tagName] = logTag.Value
 		}
 	}
 

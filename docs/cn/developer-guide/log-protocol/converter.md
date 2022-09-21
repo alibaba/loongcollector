@@ -19,7 +19,7 @@ type Converter struct {
 
 - `Protocol`：协议名称
 - `Encoding`：编码方式
-- `TagKeyRenameMap`：tag字段Key重命名表，可用于重命名sls协议中LogTag字段的Key，Key的默认值见附录
+- `TagKeyRenameMap`：tag字段Key重命名表，可用于重命名sls协议中LogTag字段的Key，其中系统保留的LogTag的Key默认值见附录。如果需要删去某个tag，则只需将该tag重命名为空字符串即可。
 - `ProtocolKeyRenameMap`：协议字段Key重命名表，可用于重命名协议字段的Key，仅部分编码模式下可用，详见附录
 
 用户可以使用如下函数创建`Converter`对象实例：
@@ -32,20 +32,26 @@ func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameM
 
 ## 转换方法
 
-`Converter`结构支持如下两种方法：
+`Converter`结构支持如下几种方法：
 
 ```Go
-func (c *Converter) Do(logGroup *sls.LogGroup) (logs [][]byte, err error)
+func (c *Converter) Do(logGroup *sls.LogGroup) (logs interface{}, err error)
 
-func (c *Converter) DoWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (logs [][]byte, values [][]string, err error)
+func (c *Converter) ToByteStream(logGroup *sls.LogGroup) (stream [][]byte, err error)
+
+func (c *Converter) DoWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (logs interface{}, values [][]string, err error)
+
+func (c *Converter) ToByteStreamWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (stream [][]byte, values [][]string, err error)
 ```
 
 各方法的用法如下：
 
-- `Do`：给定日志组`logGroup`，根据`Converter`中设定的参数，将日志组中的各条日志分别转换为字节数组，并将结果组装在一个`logs`数组中；
+- `Do`：给定日志组`logGroup`，根据`Converter`中设定的协议，将sls日志组中的各条日志分别转换为与目标协议相对应的数据结构，并将结果组装在一个`logs`数组中；
+- `ToByteStream`：在完成`Do`方法的基础上，根据`Converter`中设定的编码格式，对转换后的日志进行编码形成字节流，并将结果组装在一个`stream`数组中；
 - `DoWithSelectedFields`：在完成和`Do`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，将结果保存于`values`数组中。`targetFields`中各字符串的的格式要求如下：
   - 如果需要获取某个日志字段的值，则字符串的命名方式为“content.XXX"，其中XXX为该字段的键名；
   - 如果需要获取某个日志tag的值，则字符串的命名方式为“tag.XXX"，其中XXX为该字段的键名。
+- `ToByteStreamWithSelectedFields`：与`DoWithSelectedFields`方法类似，在完成和`ToByteStream`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，将结果保存于`values`数组中，`targetFields`中各字符串的的格式要求同上。
 
 ## 使用步骤
 
@@ -65,16 +71,28 @@ func (c *Converter) DoWithSelectedFields(logGroup *sls.LogGroup, targetFields []
 
 3. 给定一个日志组,
 
-    - 如果只需要对日志格式进行转换，则调用`Converter`的`Do`方法获得编码后的日志数据：
+    - 如果只需要对日志格式进行转换，则调用`Converter`的`Do`方法获得转换后的数据结构：
 
         ```Go
-        serializedLogList, err := c.Do(logGroup)
+        convertedLogs, err := c.Do(logGroup)
         ```
 
-    - 如果在对日志格式进行转换的同时，还想额外获取日志中某些字段的值，则调用`Converter`的`DoWithSelectedFields`方法同时获得编码后的日志数据与选定日志字段的值：
+    - 如果需要对日志格式进行转换并编码，则调用`Converter`的`ToByteStream`方法获得编码后的字节流：
 
         ```Go
-        serializedLogList, targetValues, err := c.DoWithSelectedFields(logGroup, selectedFields)
+        serializedLogs, err := c.ToByteStream(logGroup)
+        ```
+
+    - 如果在对日志格式进行转换的同时，还想额外获取日志中某些字段的值，则调用`Converter`的`DoWithSelectedFields`方法同时获得转换后的数据结构与选定日志字段的值：
+
+        ```Go
+        convertedLogs, targetValues, err := c.DoWithSelectedFields(logGroup, selectedFields)
+        ```
+
+    - 如果在对日志格式进行转换并编码的同时，还想额外获取日志中某些字段的值，则调用`Converter`的`ToByteStreamWithSelectedFields`方法同时获得编码后的字节流与选定日志字段的值：
+
+        ```Go
+        serializedLogs, targetValues, err := c.ToByteStreamWithSelectedFields(logGroup, selectedFields)
         ```
 
 ## 示例
