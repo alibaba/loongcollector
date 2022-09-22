@@ -227,7 +227,7 @@ func innerReadStatisContainerInfo(file string, lastContainerInfo []*docker.Conta
 			removed = append(removed, lastContainer.ID)
 		}
 	}
-	logger.Info(context.Background(), "read static container info", staticContainerInfos)
+	logger.Infof(context.Background(), "read static container info: %#v", staticContainerInfos)
 	return containers, removed, changed, err
 }
 
@@ -237,6 +237,7 @@ func isStaticContainerInfoEnabled() bool {
 }
 
 func tryReadStaticContainerInfo() ([]*docker.Container, []string, bool, error) {
+	statusChanged := false
 	loadStaticContainerOnce.Do(
 		func() {
 			envPath := os.Getenv(staticContainerInfoPathEnvKey)
@@ -245,7 +246,7 @@ func tryReadStaticContainerInfo() ([]*docker.Container, []string, bool, error) {
 			}
 			staticDockerContainerFile = envPath
 			stat, err := os.Stat(staticDockerContainerFile)
-			staticDockerContainers, _, _, staticDockerContainerError = innerReadStatisContainerInfo(staticDockerContainerFile, nil, stat)
+			staticDockerContainers, _, statusChanged, staticDockerContainerError = innerReadStatisContainerInfo(staticDockerContainerFile, nil, stat)
 			if err == nil {
 				staticDockerContainerLastStat = GetOSState(stat)
 			}
@@ -268,7 +269,6 @@ func tryReadStaticContainerInfo() ([]*docker.Container, []string, bool, error) {
 		return nil, nil, false, nil
 	}
 
-	statusChanged := false
 	for _, container := range staticDockerContainers {
 		if container.State.Status == ContainerStatusRunning && !ContainerProcessAlive(container.State.Pid) {
 			container.State.Status = ContainerStatusExited
