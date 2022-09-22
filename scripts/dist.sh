@@ -30,6 +30,7 @@ cp "${ROOTDIR}/${OUT_DIR}/libPluginAdapter.so" "${ROOTDIR}/${DIST_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/libPluginBase.so" "${ROOTDIR}/${DIST_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/ilogtail_config.json" "${ROOTDIR}/${DIST_DIR}"
 cp -a "${ROOTDIR}/${OUT_DIR}/user_yaml_config.d" "${ROOTDIR}/${DIST_DIR}"
+if file "${ROOTDIR}/${DIST_DIR}/ilogtail" | grep x86-64; then ./scripts/download_ebpflib.sh "${ROOTDIR}/${DIST_DIR}"; fi
 
 # pack dist dir
 cd "${ROOTDIR}"

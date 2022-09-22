@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 # Copyright 2021 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,9 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# goc server is only for e2e test to analysis code coverage.
+set -ue
+set -o pipefail
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:latest as build
-
-USER root
-ENTRYPOINT ["goc","server"]
+if uname -s | grep Linux; then
+  echo -e "HOST_OS=Linux\nUSERNAME=$USER\nUSER_UID=$(id -u $USER)\nGROUPNAME=$(id -gn $USER)\nGROUP_GID=$(id -g $USER)" > .devcontainer/.env;
+else
+  echo "HOST_OS=Darwin\nUSERNAME=$USER\nUSER_UID=$(id -u $USER)\nGROUPNAME=root\nGROUP_GID=0" > .devcontainer/.env;  
+fi

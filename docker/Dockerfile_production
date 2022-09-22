@@ -32,7 +32,8 @@ ARG VERSION=1.1.2
 
 ADD ilogtail-${VERSION}.tar.gz /usr/local/
 RUN mv /usr/local/ilogtail-${VERSION} /usr/local/ilogtail && \
-    chmod -R 755 /usr/local/ilogtail/ && \
+    chown -R $(whoami) /usr/local/ilogtail/ && \
+    chmod 755 /usr/local/ilogtail/ilogtail && \
     mkdir /usr/local/ilogtail/checkpoint
 
 WORKDIR /usr/local/ilogtail

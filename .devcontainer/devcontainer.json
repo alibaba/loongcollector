@@ -1,5 +1,11 @@
 {
-  "image": "sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "USERNAME": "${localEnv:USER}"
+    }
+  },
+  "initializeCommand": ".devcontainer/gen_env.sh",
   "customizations": {
     "vscode": {
       "extensions": [

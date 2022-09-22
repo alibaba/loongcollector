@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest as build
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:latest as build
 
 WORKDIR /src
 
@@ -21,4 +21,4 @@ COPY . .
 ARG HOST_OS=Linux
 ARG VERSION=1.1.2
 
-RUN sh generated_files/gen_build.sh
+RUN sudo chown -R $(whoami) /src /opt/logtail && sh generated_files/gen_build.sh

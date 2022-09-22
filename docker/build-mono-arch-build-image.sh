@@ -17,9 +17,13 @@
 set -ue
 set -o pipefail
 
+cd $(dirname "${BASH_SOURCE[0]}")
+
 machine=`uname -m`
 [[ $machine = 'aarch64' ]] && arch=arm64 || arch=amd64
 
 docker build --rm -t local/c7-systemd-linux-${arch} . -f Dockerfile.c7-systemd-linux
 docker build --rm -t local/ilogtail-toolchain-linux-${arch} . -f Dockerfile.ilogtail-toolchain-linux-${arch}
 docker build --rm -t local/ilogtail-build-linux-${arch} . -f Dockerfile.ilogtail-build-linux-${arch}
+
+cd -

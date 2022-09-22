@@ -14,41 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -ue
+set -o pipefail
+
+OS_FLAG=0
 function os() {
   if uname -s | grep Darwin; then
-    return 2
+    OS_FLAG=2
   elif uname -s | grep Linux; then
-    return 1
+    OS_FLAG=1
   else
-    return 3
+    OS_FLAG=3
   fi
 }
 
-MOD=${1:-vendor}
-BUILDMODE=${2:-default}
-OUT_DIR=${3:-output}
-NAME=ilogtail
-IDFLAGS=''
-
 os
-OS_FLAG=$?
 
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
-mkdir -p "$ROOTDIR"/bin
+SOURCEDIR="core/build/plugin"
+[[ $# -eq 2 ]] && SOURCEDIR="$1" || :
 
 if [ $OS_FLAG = 1 ]; then
-  IDFLAGS='-extldflags "-Wl,--wrap=memcpy"'
-  if [ $BUILDMODE = "c-shared" ]; then
-    NAME=libPluginBase.so
-  fi
-elif [ $OS_FLAG = 3 ]; then
-  export GOARCH=386
-  export CGO_ENABLED=1
-  if [ $BUILDMODE = "c-shared" ]; then
-    NAME=PluginBase.dll
-  fi
-elif [ $OS_FLAG = 2 ]; then
-  BUILDMODE=default
+  cp ${ROOTDIR}/core/build/plugin/libPluginAdapter.so ${ROOTDIR}/pkg/logtail/libPluginAdapter.so
+  cp ${ROOTDIR}/core/build/plugin/libPluginAdapter.so ${ROOTDIR}/vendor/github.com/alibaba/ilogtail/pkg/logtail/libPluginAdapter.so
 fi
-
-go build -mod="$MOD" -buildmode="$BUILDMODE" -ldflags="$IDFLAGS" -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main

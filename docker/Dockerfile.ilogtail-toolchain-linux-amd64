@@ -18,18 +18,16 @@ ENV MANPATH=/opt/rh/devtoolset-8/root/usr/share/man \
     INFOPATH=/opt/rh/devtoolset-8/root/usr/share/info
 
 WORKDIR /
-RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/cmake-3.23.2-linux-x86_64.tar.gz && \
-    wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/llvm-project-14.0.0.src.tar.xz && \
-    wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/go1.18.5.linux-amd64.tar.gz && \
-    wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/git-2.29.3.tar.xz
 
 # prepare cmake
-RUN tar -xzf cmake-3.23.2-linux-x86_64.tar.gz
+RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/cmake-3.23.2-linux-x86_64.tar.gz && \
+    tar -xzf cmake-3.23.2-linux-x86_64.tar.gz
 ENV CMAKE_ROOT=/cmake-3.23.2-linux-x86_64 \
     PATH=/cmake-3.23.2-linux-x86_64/bin:$PATH
 
 # build clang
-RUN tar -xf llvm-project-14.0.0.src.tar.xz && \
+RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/llvm-project-14.0.0.src.tar.xz && \
+    tar -xf llvm-project-14.0.0.src.tar.xz && \
     mkdir llvm-project-14.0.0.src/build && \
     cd llvm-project-14.0.0.src/build && \
     cmake -G 'Unix Makefiles' -D CMAKE_C_COMPILER=/opt/rh/devtoolset-8/root/usr/bin/gcc \
@@ -40,18 +38,25 @@ RUN tar -xf llvm-project-14.0.0.src.tar.xz && \
     cd /
 
 # build git
-RUN tar -xf git-2.29.3.tar.xz && \
+RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/git-2.29.3.tar.xz && \
+    tar -xf git-2.29.3.tar.xz && \
     cd git-2.29.3 && \
     make -sj$(nproc) install install-man prefix=$PWD/build && \
     cd /
 
 # prepare go
-RUN tar -xzf go1.18.5.linux-amd64.tar.gz
+RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/go1.18.5.linux-amd64.tar.gz && \
+    tar -xzf go1.18.5.linux-amd64.tar.gz
+
+# prepare golangci-lint
+RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/golangci-lint-1.49.0-linux-amd64.tar.gz && \
+    tar -xzf golangci-lint-1.49.0-linux-amd64.tar.gz
 
 FROM local/c7-systemd-linux-amd64
 
 # install dev tool set and debug utilities
-RUN yum -y install gcc gcc-c++ make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients
+RUN yum -y install gcc gcc-c++ make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients sudo && \
+    yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 RUN debuginfo-install -y glibc-2.17-326.el7_9.x86_64 libuuid-2.23.2-65.el7_9.1.x86_64
 
 # install cmake
@@ -66,9 +71,12 @@ WORKDIR /
 COPY --from=toolchain-build /go /go
 ENV GOROOT=/go GOPATH=/root/go PATH=/go/bin:$PATH
 
+# install golangci-lint
+COPY --from=toolchain-build /golangci-lint-1.49.0-linux-amd64/golangci-lint /root/go/bin/
+
 # install go language server
 RUN go env -w GOPROXY="https://goproxy.cn,direct"
-RUN go install golang.org/x/tools/gopls@v0.9.1 && \
+RUN go install golang.org/x/tools/gopls@v0.9.3 && \
     go install github.com/go-delve/delve/cmd/dlv@v1.6.1 && \
     go install github.com/josharian/impl@v1.1.0 && \
     go install github.com/fatih/gomodifytags@v1.16.0 && \

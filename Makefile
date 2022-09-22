@@ -99,6 +99,10 @@ plugin: clean
 	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
+.PHONY: upgrade_adapter_lib
+upgrade_adapter_lib:
+	./scripts/upgrade_adapter_lib.sh ${OUT_DIR}
+
 .PHONY: plugin_main
 plugin_main: clean
 	./scripts/plugin_build.sh vendor default $(OUT_DIR)

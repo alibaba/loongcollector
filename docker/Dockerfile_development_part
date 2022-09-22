@@ -12,26 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:latest
 
 ARG HOST_OS=Linux
 ARG VERSION=1.1.2
 
+USER root
 WORKDIR /ilogtail
+
+COPY --from=build /src/core/build/ilogtail /ilogtail/
+COPY ./scripts/download_ebpflib.sh /tmp/
+
+RUN chown -R $(whoami) /ilogtail && \
+    chmod 755 /ilogtail/ilogtail && \
+    mkdir /ilogtail/checkpoint && \
+    if [ `uname -m` = "x86_64" ]; then /tmp/download_ebpflib.sh /ilogtail; fi && \
+    rm /tmp/download_ebpflib.sh
 
 COPY --from=build /src/output/libPluginBase.so /ilogtail/
 COPY --from=build /src/example_config/quick_start/ilogtail_config.json /ilogtail/
-COPY --from=build /src/core/build/ilogtail /ilogtail/
 COPY --from=build /src/core/build/plugin/libPluginAdapter.so /ilogtail/
-
-RUN curl --connect-timeout 5 -m 10 https://logtail-release-us-west-1.oss-us-west-1.aliyuncs.com/kubernetes/libebpf.so -o  /ilogtail/libebpf.so
-RUN chmod -R 755 /ilogtail/
-RUN mkdir /ilogtail/checkpoint
-RUN yum install -y iproute
 
 ENV HOST_OS=$HOST_OS
 ENV LOGTAIL_VERSION=$VERSION
-
 
 EXPOSE 18689
 

@@ -13,3 +13,19 @@ COPY --from=dep-build goc /usr/local/bin
 # install c++ deps
 COPY --from=dep-build ilogtail-deps.linux-arm64 /opt/logtail/deps
 
+ARG USERNAME=admin
+ARG USER_UID=500
+ARG GROUPNAME=$USERNAME
+ARG GROUP_GID=$USER_UID
+
+# Create the user
+RUN if getent passwd $USERNAME; then userdel -f $USERNAME; fi && \
+    if getent group $GROUPNAME; then groupdel $GROUPNAME; fi && \
+    groupadd --gid $GROUP_GID $USERNAME && \
+    useradd --uid $USER_UID --gid $GROUP_GID -m $USERNAME && \
+    echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME && \
+    chmod 0440 /etc/sudoers.d/$USERNAME && \
+    chown -R $USERNAME:$GROUPNAME $(eval echo ~$USERNAME) && \
+    chmod 755 $(eval echo ~$USERNAME)
+
+USER $USERNAME
