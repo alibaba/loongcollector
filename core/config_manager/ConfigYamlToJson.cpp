@@ -19,9 +19,10 @@
 using namespace logtail;
 
 namespace logtail {
-
+const std::string PLUGIN_GLOBAL_CONFIG = "global";
 const std::string PLUGIN_CATEGORY_INPUTS = "inputs";
 const std::string PLUGIN_CATEGORY_PROCESSORS = "processors";
+const std::string PLUGIN_CATEGORY_AGGREGATORS = "aggregators";
 const std::string PLUGIN_CATEGORY_FLUSHERS = "flushers";
 
 const std::string INPUT_FILE_LOG = "file_log";
@@ -202,6 +203,9 @@ bool ConfigYamlToJson::GenerateLocalJsonConfig(const string configName,
 
         Json::Value pluginJsonConfig;
         Json::Value userJsonConfig;
+        if (!GenerateGlobalConfigForPluginCategory(configName, yamlConfig, pluginJsonConfig)) {
+            return false;
+        }
         if (!GenerateLocalJsonConfigForPluginCategory(
                 configName, workMode, PLUGIN_CATEGORY_INPUTS, yamlConfig, pluginJsonConfig, userJsonConfig)) {
             return false;
@@ -211,12 +215,16 @@ bool ConfigYamlToJson::GenerateLocalJsonConfig(const string configName,
             return false;
         }
         if (!GenerateLocalJsonConfigForPluginCategory(
+                configName, workMode, PLUGIN_CATEGORY_AGGREGATORS, yamlConfig, pluginJsonConfig, userJsonConfig)) {
+            return false;
+        }
+        if (!GenerateLocalJsonConfigForPluginCategory(
                 configName, workMode, PLUGIN_CATEGORY_FLUSHERS, yamlConfig, pluginJsonConfig, userJsonConfig)) {
             return false;
         }
 
         FillupDefalutUserJsonConfig(workMode, userJsonConfig);
-        if(!pluginJsonConfig.empty()) {
+        if (!pluginJsonConfig.empty()) {
             userJsonConfig["plugin"] = pluginJsonConfig;
         }
         userJsonConfig["log_type"] = workMode.mLogType;
@@ -413,6 +421,26 @@ bool ConfigYamlToJson::FillupMustMultiLinesSplitProcessor(const WorkMode& workMo
         splitProcessor["type"] = PROCESSOR_SPLIT_LINE_LOG_USING_SEP;
     }
 
+    return true;
+}
+
+bool ConfigYamlToJson::GenerateGlobalConfigForPluginCategory(const std::string& configName,
+                                                             const YAML::Node& yamlConfig,
+                                                             Json::Value& pluginJsonConfig) {
+    if (yamlConfig[PLUGIN_GLOBAL_CONFIG]) {
+        const YAML::Node& globalYaml = yamlConfig[PLUGIN_GLOBAL_CONFIG];
+        if (globalYaml.IsMap()) {
+            Json::Value globalJson;
+            for (YAML::const_iterator it = globalYaml.begin(); it != globalYaml.end(); ++it) {
+                globalJson[it->first.as<std::string>()] = ParseScalar(it->second);
+            }
+            pluginJsonConfig["global"] = globalJson;
+        } else {
+            LOG_ERROR(sLogger,
+                      ("GenerateGlobalConfigForPluginCategory failed", "global config is not sequence.")("config_name",
+                                                                                                         configName));
+        }
+    }
     return true;
 }
 

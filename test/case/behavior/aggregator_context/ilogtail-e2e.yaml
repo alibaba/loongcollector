@@ -17,97 +17,23 @@ boot:
 ilogtail:
   config:
     - name: aggregator-default-case
-      mixed_mode: true
-      content:
-        - '{
-            "enable": true,
-            "docker_file" : true,
-            "file_pattern": "example.log",
-            "keys": [
-                "content"
-            ],
-            "log_begin_reg": ".*",
-            "log_path": "/root/test",
-            "log_type": "delimiter_log",
-            "max_depth": 10,
-            "delimiter_separator":"|",
-            "delimiter_quote": "\u0001",
-            "plugin": {
-                "global": {
-                    "DefaultLogQueueSize": 10
-                },
-                "processors": [
-                    {
-                        "detail": {
-                            "SplitKey": "content"
-                        },
-                        "type": "processor_split_log_string"
-                    },
-                    {
-                        "type": "processor_split_char",
-                        "detail": {
-                          "SourceKey": "content",
-                          "QuoteFlag": true,
-                          "SplitSep": "|",
-                          "Quote":"\"",
-                          "SplitKeys": [
-                            "no",
-                            "content"
-                          ]
-                        }
-                    }
-                ],
-                "aggregators": [
-                    {
-                        "detail": {},
-                        "type": "aggregator_context"
-                    }
-                ]
-            },
-            "regex": [
-                "(.*)"
-            ],
-            "advanced" : 
-                      {
-                        "k8s" : 
-                        {
-                          "ExcludeContainerLabel" : {},
-                          "ExcludeEnv" : {},
-                          "ExcludeK8sLabel" : {},
-                          "ExternalEnvTag" : {},
-                          "ExternalK8sLabelTag" : {},
-                          "IncludeContainerLabel" : {},
-                          "IncludeEnv" : {
-                          "STDOUT_SWITCH":"true"
-                          },
-                          "IncludeK8sLabel" : {},
-                          "K8sContainerRegex" : "",
-                          "K8sNamespaceRegex" : "",
-                          "K8sPodRegex" : ""
-                        },
-                        "tail_size_kb" : 1024
-                      },
-                      "docker_exclude_env" : {},
-                      "docker_exclude_label" : {},
-                      "docker_include_env" : {},
-                      "docker_include_label" : {}
-                          
-              }'
-      # detail:
-      #   - inputs:
-      #       - Type: file_log
-      #         LogPath: /root/test/
-      #         FilePattern: example.log
-      #         ContainerInfo:
-      #           IncludeEnv:
-      #             STDOUT_SWITCH: "true"
-      #     processors:
-      #       - Type: processor_split_char
-      #         SourceKey: content
-      #         SplitSep: "|"
-      #         SplitKeys: ["no", "content"]
-      #     aggregators:
-      #       - Type: aggregator_context
+      detail:
+        - global:
+            DefaultLogQueueSize: 10
+          inputs:
+            - Type: file_log
+              LogPath: /root/test/
+              FilePattern: example.log
+              ContainerInfo:
+                IncludeEnv:
+                  STDOUT_SWITCH: "true"
+          processors:
+            - Type: processor_split_char
+              SourceKey: content
+              SplitSep: "|"
+              SplitKeys: ["no", "content"]
+          aggregators:
+            - Type: aggregator_context
   close_wait: 5s
 verify:
   log_rules:

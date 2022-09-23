@@ -429,6 +429,27 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["time_key"].asString(), "time");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "json_log");
     }
+
+    void TestYamlToJsonForAggregatorsAndGlobalConfig() {
+        LOG_INFO(sLogger, ("TestYamlToJsonForAggregatorsAndGlobalConfig() begin", time(NULL)));
+
+        Json::Value inputJsonConfig;
+        const std::string file = "testConfigDir/file_simple.yaml";
+        YAML::Node yamlConfig = YAML::LoadFile(file);
+
+        Json::Value userLocalJsonConfig;
+        ConfigYamlToJson::GetInstance()->GenerateLocalJsonConfig(file, yamlConfig, userLocalJsonConfig);
+
+        ConfigManager::GetInstance()->LoadJsonConfig(userLocalJsonConfig, false);
+
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["global"].size(), 1);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["global"]["DefaultLogQueueSize"].asInt(),
+                  10);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["aggregators"].size(), 1);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["aggregators"][0]["type"],
+                  "aggregator_context");
+    }
 };
 
 TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForCheckConfig) {
@@ -469,6 +490,10 @@ TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileDelimiterAccelerateMode) {
 
 TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileJsonAccelerateMode) {
     TestYamlToJsonForFileJsonAccelerateMode();
+}
+
+TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForAggregatorsAndGlobalConfig) {
+    TestYamlToJsonForAggregatorsAndGlobalConfig();
 }
 
 } // end of namespace logtail

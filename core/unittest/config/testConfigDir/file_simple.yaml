@@ -13,10 +13,14 @@
 # limitations under the License.
 
 enable: true
+global:
+  DefaultLogQueueSize: 10
 inputs:
   - Type: file_simple_log
     LogPath: /home/test-dir/test_log
     FilePattern: simple.log
+aggregators:
+  - Type: aggregator_context
 flushers:
   - Type: flusher_sls
     Endpoint: cn-xxx.log.aliyuncs.com

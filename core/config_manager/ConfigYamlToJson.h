@@ -76,6 +76,9 @@ private:
                                   const YAML::Node& yamlConfig,
                                   unordered_map<string, PluginInfo>& pluginInfos);
 
+    bool GenerateGlobalConfigForPluginCategory(const std::string& configName,
+                                               const YAML::Node& yamlConfig,
+                                               Json::Value& pluginJsonConfig);
     bool GenerateLocalJsonConfigForPluginCategory(const string configName,
                                                   const WorkMode& workMode,
                                                   const string pluginCategory,
