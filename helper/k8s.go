@@ -1,6 +1,9 @@
 package helper
 
-import "regexp"
+import (
+	"regexp"
+	"strconv"
+)
 
 var deploymentPodReg = regexp.MustCompile(`^([\w\-]+)\-([0-9a-z]{9,10})\-([0-9a-z]{5})$`)
 var setPodReg = regexp.MustCompile(`^([\w\-]+)\-([0-9a-z]{5})$`)
@@ -19,4 +22,14 @@ func ExtractPodWorkload(name string) string {
 		return name[index[2]:index[3]]
 	}
 	return name
+}
+
+func ExtractStatefulSetNum(pod string) int {
+	if statefulSetPodReg.MatchString(pod) {
+		index := statefulSetPodReg.FindStringSubmatchIndex(pod)
+		num := pod[index[4]:index[5]]
+		n, _ := strconv.Atoi(num)
+		return n
+	}
+	return -1
 }

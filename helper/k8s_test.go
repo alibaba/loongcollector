@@ -44,3 +44,10 @@ func TestExtractPodWorkload(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractStatefulSetNum(t *testing.T) {
+	num := ExtractStatefulSetNum("kube-state-metrics-1")
+	assert.Equal(t, num, 1)
+	num = ExtractStatefulSetNum("kube-state-metrics-1-1")
+	assert.Equal(t, num, 1)
+}
