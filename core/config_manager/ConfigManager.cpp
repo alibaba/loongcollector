@@ -175,4 +175,8 @@ void ConfigManager::SetStartWorkerStatus(const std::string& result, const std::s
 void ConfigManager::CreateCustomizedFuseConfig() {
 }
 
+std::string ConfigManager::CheckPluginFlusher(Json::Value& configJSON) {
+    return configJSON.toStyledString();
+}
+
 } // namespace logtail

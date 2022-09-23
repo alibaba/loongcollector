@@ -484,33 +484,37 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                 if (pluginConfig.empty()) {
                     throw ExceptionBase(std::string("The plugin log type is invalid"));
                 }
-                LOG_DEBUG(sLogger, ("load plugin config ", logName)("config", pluginConfig));
-                if (pluginConfig.find("\"observer_ilogtail_") != string::npos) {
-                    Json::Value observerConfigJson;
-                    Json::Reader jsonReader;
-                    if (jsonReader.parse(pluginConfig, observerConfigJson) && observerConfigJson.isMember("inputs")) {
-                        if (observerConfigJson["inputs"].isObject() || observerConfigJson["inputs"].isArray()) {
-                            config->mObserverConfig = observerConfigJson["inputs"].toStyledString();
-                            config->mObserverFlag = true;
-                            observerConfigJson.removeMember("inputs");
-                        }
-                        if (observerConfigJson.isMember("processors")
-                            && (observerConfigJson["processors"].isObject()
-                                || observerConfigJson["processors"].isArray())) {
-                            config->mPluginProcessFlag = true;
-                            SetNotFoundJsonMember(observerConfigJson, MIX_PROCESS_MODE, "observer");
-                            config->mPluginConfig = observerConfigJson.toStyledString();
+                Json::Reader jsonReader;
+                Json::Value pluginConfigJson;
+                if (jsonReader.parse(pluginConfig, pluginConfigJson)) {
+                    pluginConfig = ConfigManager::GetInstance()->CheckPluginFlusher(pluginConfigJson);
+                    if (pluginConfig.find("\"observer_ilogtail_") != string::npos) {
+                        if (pluginConfigJson.isMember("inputs")) {
+                            if (pluginConfigJson["inputs"].isObject() || pluginConfigJson["inputs"].isArray()) {
+                                config->mObserverConfig = pluginConfigJson["inputs"].toStyledString();
+                                config->mObserverFlag = true;
+                                pluginConfigJson.removeMember("inputs");
+                            }
+                            if (pluginConfigJson.isMember("processors")
+                                && (pluginConfigJson["processors"].isObject()
+                                    || pluginConfigJson["processors"].isArray())) {
+                                config->mPluginProcessFlag = true;
+                                SetNotFoundJsonMember(pluginConfigJson, MIX_PROCESS_MODE, "observer");
+                                config->mPluginConfig = pluginConfigJson.toStyledString();
+                            }
+                        } else {
+                            LOG_WARNING(sLogger,
+                                        ("observer config is not a legal JSON object",
+                                         logName)("project", projectName)("logstore", category));
                         }
                     } else {
-                        LOG_WARNING(sLogger,
-                                    ("observer config is not a legal JSON object",
-                                     logName)("project", projectName)("logstore", category));
+                        config->mPluginConfig = pluginConfig;
                     }
-                } else {
-                    config->mPluginConfig = pluginConfig;
-                }
-                LOG_DEBUG(sLogger,
+                    LOG_DEBUG(sLogger,
                           ("load plugin config ", logName)("config", pluginConfig)("observer", config->mObserverFlag));
+                } else {
+                    LOG_WARNING(sLogger, ("invalid plugin config", pluginConfig)("project", projectName)("logstore", category)("config", logName));
+                }
             } else if (logType == STREAM_LOG) {
                 config = new Config("",
                                     "",
@@ -582,6 +586,7 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                             && (pluginConfigJSON["processors"].isObject()
                                 || pluginConfigJSON["processors"].isArray())) {
                             config->mPluginProcessFlag = true;
+                            pluginConfig = ConfigManager::GetInstance()->CheckPluginFlusher(pluginConfigJSON);
                             config->mPluginConfig = pluginConfig;
                         }
                     }

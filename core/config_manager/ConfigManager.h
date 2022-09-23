@@ -56,6 +56,8 @@ public:
 
     void SetStartWorkerStatus(const std::string& result, const std::string& message) override;
 
+    std::string CheckPluginFlusher(Json::Value& configJson);
+
 private:
     ThreadPtr mCheckUpdateThreadPtr;
 
