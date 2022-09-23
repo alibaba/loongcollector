@@ -41,8 +41,6 @@ var envConfigPrefix = "aliyun_logs_"
 const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 
 var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
-// current incremental discovery does not refresh container's lastUpdateTime, so this value must be greater than FetchAllInterval
-var ContainerInfoTimeoutMax = FetchAllInterval * 2
 var ContainerInfoDeletedTimeout = time.Second * time.Duration(30)
 var EventListenerTimeout = time.Second * time.Duration(3600)
 
@@ -245,7 +243,7 @@ type DockerInfoDetail struct {
 
 func (did *DockerInfoDetail) IsTimeout() bool {
 	nowTime := time.Now()
-	if nowTime.Sub(did.lastUpdateTime) > ContainerInfoTimeoutMax ||
+	if nowTime.Sub(did.lastUpdateTime) > fetchAllSuccessTimeout ||
 		(did.deleteFlag && nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout) {
 		return true
 	}
@@ -440,7 +438,6 @@ type DockerCenter struct {
 	containerStateLock             sync.Mutex
 	imageLock                      sync.RWMutex
 	imageCache                     map[string]string
-	lastFetchAllSuccessTime        time.Time
 	initStaticContainerInfoSuccess bool
 }
 
@@ -989,7 +986,6 @@ func (dc *DockerCenter) fetchAll() error {
 	}
 	logger.Debug(context.Background(), "fetch all", containers)
 	var containerMap = make(map[string]*DockerInfoDetail)
-	hasInspectErr := false
 
 	for _, container := range containers {
 		var containerDetail *docker.Container
@@ -1006,14 +1002,9 @@ func (dc *DockerCenter) fetchAll() error {
 			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
 		} else {
 			dc.setLastError(err, "inspect container error "+container.ID)
-			hasInspectErr = true
 		}
 	}
 	dc.updateContainers(containerMap)
-	if !hasInspectErr {
-		// Set at last to make sure update time in detail is less or equal to it.
-		dc.lastFetchAllSuccessTime = time.Now()
-	}
 
 	return err
 }
@@ -1066,14 +1057,11 @@ func (dc *DockerCenter) cleanTimeoutContainer() {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 	hasDelete := false
-	isFetchAllSuccessTimeout := time.Since(dc.lastFetchAllSuccessTime) > fetchAllSuccessTimeout
 	for key, container := range dc.containerMap {
 		// Comfirm to delete:
-		// 1. If the container's update time is newer than the time of last success fetch all.
+		// 1. The container is marked deleted for a while.
 		// 2. The time of last success fetch all is too old.
-		if container.IsTimeout() &&
-			(isFetchAllSuccessTimeout ||
-				(container.lastUpdateTime.Sub(dc.lastFetchAllSuccessTime) > time.Second)) {
+		if container.IsTimeout() {
 			logger.Debugf(context.Background(), "delete container: id=%v name=%v created=%v status=%v detail=%+v",
 				key, container.ContainerInfo.Name, container.ContainerInfo.Created.Format(time.RFC3339Nano), container.ContainerInfo.State.Status, container.ContainerInfo)
 			delete(dc.containerMap, key)
