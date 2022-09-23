@@ -35,6 +35,7 @@ type Instance struct {
 	User     string
 	Password string
 	Tags     map[string]string
+	Name     string
 }
 
 type Attribute struct {
@@ -56,6 +57,7 @@ type Jmx struct {
 	DiscoveryMode         bool // support container discovery
 	DiscoveryUser         string
 	DiscoveryPassword     string
+	Cluster               string
 	IncludeEnv            map[string]string
 	ExcludeEnv            map[string]string
 	IncludeContainerLabel map[string]string
@@ -148,6 +150,10 @@ func (m *Jmx) Start(collector ilogtail.Collector) error {
 	if !m.DiscoveryMode {
 		logger.Infof(m.context.GetRuntimeContext(), "find %d static jmx configs", len(m.StaticInstances))
 		for i := range m.StaticInstances {
+			if m.StaticInstances[i].Tags == nil {
+				m.StaticInstances[i].Tags = make(map[string]string)
+			}
+			m.StaticInstances[i].Tags["cluster"] = m.Cluster
 			m.StaticInstances[i].Tags[dispatchKey] = m.key
 			for k, v := range m.Tags {
 				m.StaticInstances[i].Tags[k] = v
@@ -156,7 +162,7 @@ func (m *Jmx) Start(collector ilogtail.Collector) error {
 				m.StaticInstances[i].Password, m.StaticInstances[i].Tags, m.DefaultJvmMetrics)
 			m.instances[inner.Hash()] = inner
 		}
-		GetJmxFetchManager(m.jvmHome).Register(m.key, m.instances)
+		GetJmxFetchManager(m.jvmHome).Register(m.key, m.instances, m.NewGcMetrics)
 		return nil
 	}
 	go func() {
@@ -199,6 +205,7 @@ func (m *Jmx) UpdateContainerCfg() {
 			continue
 		}
 		tags := make(map[string]string, 8)
+		tags["cluster"] = m.Cluster
 		tags[dispatchKey] = m.key
 		for k, v := range m.Tags {
 			tags[k] = v
@@ -211,7 +218,7 @@ func (m *Jmx) UpdateContainerCfg() {
 		if detail.K8SInfo.Pod != "" {
 			tags["namespace"] = detail.K8SInfo.Namespace
 			tags["pod"] = detail.K8SInfo.Pod
-			tags["workload"] = helper.ExtractPodWorkload(detail.K8SInfo.Pod)
+			tags["service"] = helper.ExtractPodWorkload(detail.K8SInfo.Pod)
 		}
 
 		detail.GetCustomExternalTags(tags, m.ExternalEnvTag, m.ExternalK8sLabelTag)
@@ -228,7 +235,7 @@ func (m *Jmx) UpdateContainerCfg() {
 		m.instances[inner.Hash()] = inner
 	}
 	logger.Infof(m.context.GetRuntimeContext(), "find %d dynamic jmx configs", len(m.instances))
-	GetJmxFetchManager(m.jvmHome).Register(m.key, m.instances)
+	GetJmxFetchManager(m.jvmHome).Register(m.key, m.instances, m.NewGcMetrics)
 }
 
 func init() {
@@ -239,6 +246,7 @@ func init() {
 			DefaultJvmMetrics: true,
 			instances:         map[string]*InstanceInner{},
 			stopChan:          make(chan struct{}),
+			Tags:              make(map[string]string),
 		}
 	}
 }
