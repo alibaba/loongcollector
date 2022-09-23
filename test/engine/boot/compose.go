@@ -54,7 +54,7 @@ services:
       interval: 1s
       retries: 10
   ilogtailC:
-    image: aliyun/ilogtail:1.1.2
+    image: aliyun/ilogtail:1.2.0
     hostname: ilogtail
     privileged: true
     pid: host

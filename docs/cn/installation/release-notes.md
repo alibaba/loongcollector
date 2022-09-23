@@ -38,7 +38,8 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 新功能
 
-* 待补充
+* 新增Logtail CSV处理插件。
+* 支持通过eBPF进行四层、七层网络流量分析，支持HTTP、MySQL、PgSQL、Redis、DNS协议。
 
 [详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.1.1.md)
 
@@ -55,14 +56,26 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 ```
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
 ```
-## 1.1.2
+## 1.2.0
 
 ### 发布记录
 
-发版日期：2022 年 9 月 16 日
+发版日期：2022 年 9 月 23 日
 
 新功能
 
-* 待补充
+* 新增PostgreSQL采集插件。
+* 新增SqlServer采集插件。
+* 新增Grok处理插件。
+* 支持JMX性能指标采集。
+* 新增日志上下文聚合插件，可支持插件处理后的上下文浏览和日志topic提取。
 
-[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.1.2.md)
+优化
+
+* 支持采集秒退容器的标准输出采集。
+* 缩短已退出容器句柄释放时间。
+
+问题修复
+* 飞天日志格式微妙时间戳解析。
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.2.0.md)
