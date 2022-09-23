@@ -18,6 +18,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type InstanceInner struct {
@@ -26,6 +29,7 @@ type InstanceInner struct {
 	User              string   `yaml:"user,omitempty"`
 	Password          string   `yaml:"password,omitempty"`
 	Tags              []string `yaml:"tags,omitempty"`
+	Name              string   `yaml:"name"`
 	DefaultJvmMetrics bool     `yaml:"collect_default_jvm_metrics"`
 }
 
@@ -40,10 +44,25 @@ func (i *InstanceInner) Hash() string {
 }
 
 func NewInstanceInner(port int32, host, user, passowrd string, tags map[string]string, defaultJvmMetrics bool) *InstanceInner {
+	var hostname, instance string
+	_ = util.InitFromEnvString("_node_name_", &hostname, util.GetHostName())
+	tags["hostname"] = hostname
+
+	if host == "localhost" || host == "127.0.0.1" {
+		instance = util.GetHostName() + "_" + strconv.Itoa(int(port))
+	} else {
+		instance = host + "_" + strconv.Itoa(int(port))
+	}
+	helper.ReplaceInvalidChars(&instance)
+
+	if _, ok := tags["service"]; !ok {
+		tags["service"] = hostname
+	}
 	tagsArr := make([]string, 0, len(tags))
 	for k, v := range tags {
 		tagsArr = append(tagsArr, k+":"+v)
 	}
+
 	sort.Strings(tagsArr)
 	return &InstanceInner{
 		Port:              port,
@@ -52,6 +71,7 @@ func NewInstanceInner(port int32, host, user, passowrd string, tags map[string]s
 		Password:          passowrd,
 		Tags:              tagsArr,
 		DefaultJvmMetrics: defaultJvmMetrics,
+		Name:              instance,
 	}
 }
 
@@ -100,9 +120,10 @@ func NewFilterInner(filter *Filter) *FilterInner {
 }
 
 type Cfg struct {
-	include   []*FilterInner
-	instances map[string]*InstanceInner
-	change    bool
+	include      []*FilterInner
+	instances    map[string]*InstanceInner
+	newGcMetrics bool
+	change       bool
 }
 
 func NewCfg(filters []*FilterInner) *Cfg {

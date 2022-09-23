@@ -21,14 +21,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
 	liblogger "github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape"
-
 	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -41,13 +42,23 @@ type ServiceStaticPrometheus struct {
 	AuthorizationPath string            `comment:"the prometheus authorization path, only using in authorization files. When Yaml param is configured, the default value is the current binary path. However, the default value is the ConfigFilePath directory when ConfigFilePath is working."`
 	ExtraFlags        map[string]string `comment:"the prometheus extra configuration flags, like promscrape.maxScrapeSize, for more flags please see [here](https://docs.victoriametrics.com/vmagent.html#advanced-usage)"`
 
-	scraper   *promscrape.Scraper //nolint:typecheck
-	shutdown  chan struct{}
-	waitGroup sync.WaitGroup
-	context   ilogtail.Context
+	scraper         *promscrape.Scraper //nolint:typecheck
+	shutdown        chan struct{}
+	waitGroup       sync.WaitGroup
+	context         ilogtail.Context
+	clusterReplicas int
+	clusterNum      int
 }
 
 func (p *ServiceStaticPrometheus) Init(context ilogtail.Context) (int, error) {
+	// check running with cluster mode
+	env := os.Getenv("ILOGTAIL_PROMETHEUS_CLUSTER_REPLICAS")
+	num := helper.ExtractStatefulSetNum(os.Getenv("POD_NAME"))
+	if env != "" && num != -1 {
+		p.clusterReplicas, _ = strconv.Atoi(env)
+		p.clusterNum = num
+		promscrape.ConfigMemberInfo(p.clusterReplicas, p.clusterNum) // nolint:typecheck
+	}
 	libLoggerOnce.Do(func() {
 		if f := flag.Lookup("loggerOutput"); f != nil {
 			_ = f.Value.Set("stdout")

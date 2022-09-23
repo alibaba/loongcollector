@@ -99,3 +99,8 @@ func loadContentConfig(detail []byte, authorizationPath string) (*Config, error)
 	}
 	return &cfgObj, nil
 }
+
+func ConfigMemberInfo(total, number int) {
+	*clusterMemberNum = number
+	*clusterMembersCount = total
+}

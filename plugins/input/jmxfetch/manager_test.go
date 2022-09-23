@@ -36,11 +36,13 @@ var expectCfg = `init_config:
           metric_type: gauge
           alias: kafka.producer.response_rate
   is_jmx: true
+  new_gc_metrics: false
 instances:
 - port: 123
   host: 127.0.0.1
   tags:
   - a:b
+  name: ""
   collect_default_jvm_metrics: false
 `
 
@@ -75,7 +77,7 @@ func TestManager_Register_static_config(t *testing.T) {
 			Host: "127.0.0.1",
 			Tags: []string{"a:b"},
 		},
-	})
+	}, false)
 	time.Sleep(time.Second * 8)
 	bytes, err := ioutil.ReadFile(m.jmxfetchConfPath + "/test1.yaml")
 	assert.NoErrorf(t, err, "file not read")

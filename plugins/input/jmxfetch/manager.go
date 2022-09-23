@@ -127,7 +127,7 @@ func (m *Manager) ConfigJavaHome(javaHome string) {
 	m.javaPath = javaHome
 }
 
-func (m *Manager) Register(key string, configs map[string]*InstanceInner) {
+func (m *Manager) Register(key string, configs map[string]*InstanceInner, newGcMetrics bool) {
 	if !m.initSuccess {
 		return
 	}
@@ -151,6 +151,10 @@ func (m *Manager) Register(key string, configs map[string]*InstanceInner) {
 			todoAddCfgs = true
 			cfg.instances[key] = configs[key]
 		}
+	}
+	if cfg.newGcMetrics != newGcMetrics {
+		todoAddCfgs = true
+		cfg.newGcMetrics = newGcMetrics
 	}
 	logger.Infof(m.managerMeta.GetContext(), "loaded %s instances after register: %d", key, len(cfg.instances))
 	cfg.change = cfg.change || todoDeleteCfgs || todoAddCfgs
@@ -204,6 +208,7 @@ func (m *Manager) run() {
 				logger.Info(m.managerMeta.GetContext(), "update config", key)
 				m.updateFiles(key, cfg)
 				cfg.change = false
+				m.reload()
 			}
 		}
 
@@ -261,7 +266,8 @@ func (m *Manager) updateFiles(key string, userCfg *Cfg) {
 	}
 	cfg := make(map[string]interface{})
 	initCfg := map[string]interface{}{
-		"is_jmx": true,
+		"is_jmx":         true,
+		"new_gc_metrics": userCfg.newGcMetrics,
 	}
 	cfg["init_config"] = initCfg
 
