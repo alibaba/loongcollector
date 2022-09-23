@@ -51,6 +51,10 @@ cd output
 
 如果你对细节感兴趣，请参见文档[编译](https://ilogtail.gitbook.io/ilogtail-docs/installation/sources/build)。
 
+## RoadMap
+
+iLogtail 发展规划：[RoadMap](https://github.com/alibaba/ilogtail/discussions/422)
+
 ## 贡献
 
 * [贡献指南](./contributing/CONTRIBUTING.md)
