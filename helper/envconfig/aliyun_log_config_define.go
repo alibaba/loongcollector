@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 
 	"github.com/gogo/protobuf/proto"
@@ -177,7 +178,7 @@ func initDockerStdoutConfig(dockerInfo *helper.DockerInfoDetail, config *AliyunL
 	// 	}
 	// }
 	stdoutDetail["IncludeEnv"] = map[string]string{
-		*LogConfigPrefix + config.LogtailConfig.ConfigName: configType,
+		*flags.LogConfigPrefix + config.LogtailConfig.ConfigName: configType,
 	}
 	stdoutConfig := map[string]interface{}{
 		"type":   "service_docker_stdout",
@@ -210,7 +211,7 @@ func initFileConfig(k8sInfo *helper.K8SInfo, config *AliyunLogConfigSpec, filePa
 			"filePattern": filePattern,
 			"dockerFile":  dockerFile,
 			"dockerIncludeEnv": map[string]string{
-				*LogConfigPrefix + config.LogtailConfig.ConfigName: filePath,
+				*flags.LogConfigPrefix + config.LogtailConfig.ConfigName: filePath,
 			},
 		}
 	} else {
@@ -220,7 +221,7 @@ func initFileConfig(k8sInfo *helper.K8SInfo, config *AliyunLogConfigSpec, filePa
 			"filePattern": filePattern,
 			"dockerFile":  dockerFile,
 			"dockerIncludeEnv": map[string]string{
-				*LogConfigPrefix + config.LogtailConfig.ConfigName: filePath,
+				*flags.LogConfigPrefix + config.LogtailConfig.ConfigName: filePath,
 			},
 		}
 	}
@@ -268,7 +269,7 @@ func makeLogConfigSpec(dockerInfo *helper.DockerInfoDetail, envConfigInfo *helpe
 	if val, ok := envConfigInfo.ConfigItemMap["project"]; ok {
 		config.Project = val
 	} else {
-		config.Project = *DefaultLogProject
+		config.Project = *flags.DefaultLogProject
 	}
 	totalConfig += config.Project
 

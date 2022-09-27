@@ -79,6 +79,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [k8s.io/kube-openapi](https://pkg.go.dev/k8s.io/kube-openapi?tab=licenses)
 - [k8s.io/utils](https://pkg.go.dev/k8s.io/utils?tab=licenses)
 - [sigs.k8s.io/structured-merge-diff](https://pkg.go.dev/sigs.k8s.io/structured-merge-diff?tab=licenses)
+- [go.opentelemetry.io/proto/otlp](https://pkg.go.dev/go.opentelemetry.io/proto/otlp?tab=licenses)
 
 ## BSD licenses
 
@@ -187,6 +188,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/blang/semver](https://pkg.go.dev/github.com/blang/semver?tab=licenses)
 - [github.com/cilium/ebpf](https://pkg.go.dev/github.com/cilium/ebpf?tab=licenses)
 - [go.etcd.io/bbolt](https://pkg.go.dev/go.etcd.io/bbolt?tab=licenses)
+- [github.com/grpc-ecosystem/grpc-gateway](https://pkg.go.dev/github.com/grpc-ecosystem/grpc-gateway?tab=licenses)
 
 ## ISC licenses
 

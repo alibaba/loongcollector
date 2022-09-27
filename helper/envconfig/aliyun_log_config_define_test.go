@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/flags"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 
 	docker "github.com/fsouza/go-dockerclient"
@@ -38,7 +39,7 @@ func MockDockerInfoDetail(containerName string, envList []string) *helper.Docker
 	dockerInfo.Name = containerName
 	dockerInfo.Config = &docker.Config{}
 	dockerInfo.Config.Env = envList
-	return helper.CreateContainerInfoDetail(dockerInfo, *LogConfigPrefix, false)
+	return helper.CreateContainerInfoDetail(dockerInfo, *flags.LogConfigPrefix, false)
 }
 
 type logConfigTestSuite struct {
@@ -65,7 +66,7 @@ func (s *logConfigTestSuite) TestNormal(c *check.C) {
 	c.Assert(info.EnvConfigInfoMap["catalina"], check.NotNil)
 	c.Assert(len(info.EnvConfigInfoMap), check.Equals, 1)
 	config := makeLogConfigSpec(info, info.EnvConfigInfoMap["catalina"])
-	c.Assert(config.Project, check.Equals, *DefaultLogProject)
+	c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
 	c.Assert(len(config.MachineGroups), check.Equals, 0)
 	c.Assert(config.Logstore, check.Equals, "catalina")
 	c.Assert(config.ShardCount, check.IsNil)
@@ -94,7 +95,7 @@ func (s *logConfigTestSuite) TestK8S(c *check.C) {
 	c.Assert(info.EnvConfigInfoMap["catalina"], check.NotNil)
 	c.Assert(len(info.EnvConfigInfoMap), check.Equals, 1)
 	config := makeLogConfigSpec(info, info.EnvConfigInfoMap["catalina"])
-	c.Assert(config.Project, check.Equals, *DefaultLogProject)
+	c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
 	c.Assert(len(config.MachineGroups), check.Equals, 0)
 	c.Assert(config.Logstore, check.Equals, "catalina")
 	c.Assert(config.ShardCount, check.IsNil)
@@ -128,7 +129,7 @@ func (s *logConfigTestSuite) TestMulti(c *check.C) {
 		c.Assert(info.EnvConfigInfoMap["catalina"], check.NotNil)
 		c.Assert(len(info.EnvConfigInfoMap), check.Equals, 2)
 		config := makeLogConfigSpec(info, info.EnvConfigInfoMap["catalina"])
-		c.Assert(config.Project, check.Equals, *DefaultLogProject)
+		c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
 		c.Assert(len(config.MachineGroups), check.Equals, 0)
 		c.Assert(config.Logstore, check.Equals, "catalina")
 		c.Assert(config.ShardCount, check.IsNil)
@@ -148,7 +149,7 @@ func (s *logConfigTestSuite) TestMulti(c *check.C) {
 		c.Assert(info.EnvConfigInfoMap["filelogs"], check.NotNil)
 		c.Assert(len(info.EnvConfigInfoMap), check.Equals, 2)
 		config := makeLogConfigSpec(info, info.EnvConfigInfoMap["filelogs"])
-		c.Assert(config.Project, check.Equals, *DefaultLogProject)
+		c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
 		c.Assert(len(config.MachineGroups), check.Equals, 0)
 		c.Assert(config.Logstore, check.Equals, "filelogs")
 		c.Assert(config.ShardCount, check.IsNil)
@@ -202,7 +203,7 @@ func (s *logConfigTestSuite) TestNginxIngress(c *check.C) {
 		c.Assert(len(info.EnvConfigInfoMap), check.Equals, 2)
 		config := makeLogConfigSpec(info, info.EnvConfigInfoMap["ingress-access-abc123"])
 		fmt.Println("ingress access config : ", *(info.EnvConfigInfoMap["ingress-access-abc123"]))
-		c.Assert(config.Project, check.Equals, *DefaultLogProject)
+		c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
 		c.Assert(len(config.MachineGroups), check.Equals, 0)
 		c.Assert(config.Logstore, check.Equals, "ingress-access-abc123")
 		c.Assert(config.ShardCount, check.IsNil)
@@ -222,7 +223,7 @@ func (s *logConfigTestSuite) TestNginxIngress(c *check.C) {
 		c.Assert(info.EnvConfigInfoMap["ingress-error-abc123"], check.NotNil)
 		c.Assert(len(info.EnvConfigInfoMap), check.Equals, 2)
 		config := makeLogConfigSpec(info, info.EnvConfigInfoMap["ingress-error-abc123"])
-		c.Assert(config.Project, check.Equals, *DefaultLogProject)
+		c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
 		c.Assert(len(config.MachineGroups), check.Equals, 0)
 		c.Assert(config.Logstore, check.Equals, "ingress-error-abc123")
 		c.Assert(config.ShardCount, check.IsNil)

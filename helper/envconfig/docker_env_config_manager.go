@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 )
@@ -90,7 +91,7 @@ func (decm *Manager) run() {
 	var err error
 	// always retry when create operator wrapper fail
 	for i := 0; i < 100000000; i++ {
-		decm.operationWrapper, err = createAliyunLogOperationWrapper(*LogServiceEndpoint, *DefaultLogProject, *DefaultAccessKeyID, *DefaultAccessKeySecret, *DefaultSTSToken, decm.shutdown)
+		decm.operationWrapper, err = createAliyunLogOperationWrapper(*flags.LogServiceEndpoint, *flags.DefaultLogProject, *flags.DefaultAccessKeyID, *flags.DefaultAccessKeySecret, *flags.DefaultSTSToken, decm.shutdown)
 		if err != nil {
 			logger.Error(context.Background(), "DOCKER_ENV_CONFIG_INIT_ALARM", "create log operation wrapper, err", err)
 			sleepInterval := i * 5
@@ -142,11 +143,11 @@ func (decm *Manager) run() {
 		if len(updateConfigList) > 0 {
 			decm.saveCheckpoint()
 		}
-		if !errorFlag && selfEnvConfigFlag {
+		if !errorFlag && flags.SelfEnvConfigFlag {
 			logger.Info(context.Background(), "create config success when self env flag", "prepare exit")
 			return
 		}
-		time.Sleep(time.Second * time.Duration(*DockerEnvUpdateInterval))
+		time.Sleep(time.Second * time.Duration(*flags.DockerEnvUpdateInterval))
 		if time.Since(lastCleanTime) > envConfigCacheCleanInterval {
 			decm.removeUselessCache()
 			lastCleanTime = time.Now()

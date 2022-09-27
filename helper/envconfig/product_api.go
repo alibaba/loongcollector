@@ -17,23 +17,24 @@ package envconfig
 import (
 	"context"
 
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 
 	productAPI "github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner"
 )
 
 func createProductClient() (*productAPI.Client, error) {
-	if *AliCloudECSFlag {
+	if *flags.AliCloudECSFlag {
 		accessKeyID, accessKeySecret, stsToken, _, err := UpdateTokenFunction()
 		if err != nil {
 			return nil, err
 		}
 		return productAPI.NewClientWithStsToken("cn-hangzhou", accessKeyID, accessKeySecret, stsToken)
 	}
-	if len(*DefaultSTSToken) > 0 {
-		return productAPI.NewClientWithStsToken("cn-hangzhou", *DefaultAccessKeyID, *DefaultAccessKeySecret, *DefaultSTSToken)
+	if len(*flags.DefaultSTSToken) > 0 {
+		return productAPI.NewClientWithStsToken("cn-hangzhou", *flags.DefaultAccessKeyID, *flags.DefaultAccessKeySecret, *flags.DefaultSTSToken)
 	}
-	return productAPI.NewClientWithAccessKey("cn-hangzhou", *DefaultAccessKeyID, *DefaultAccessKeySecret)
+	return productAPI.NewClientWithAccessKey("cn-hangzhou", *flags.DefaultAccessKeyID, *flags.DefaultAccessKeySecret)
 }
 
 func recorrectRegion(region string) string {
@@ -58,7 +59,7 @@ func CreateProductLogstore(region, project, logstore, product, lang string) erro
 
 	// Create an API request and set parameters
 	request := productAPI.CreateAnalyzeProductLogRequest()
-	request.Domain = *ProductAPIDomain
+	request.Domain = *flags.ProductAPIDomain
 	request.Region = recorrectRegion(region)
 	request.Project = project
 	request.Logstore = logstore
@@ -72,6 +73,6 @@ func CreateProductLogstore(region, project, logstore, product, lang string) erro
 	if err != nil {
 		return err
 	}
-	logger.Info(context.Background(), "create product success, region", region, "project", project, "logstore", logstore, "product", product, "lang", lang, "response", *resp, "domain", *ProductAPIDomain)
+	logger.Info(context.Background(), "create product success, region", region, "project", project, "logstore", logstore, "product", product, "lang", lang, "response", *resp, "domain", *flags.ProductAPIDomain)
 	return nil
 }

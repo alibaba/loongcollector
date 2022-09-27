@@ -24,6 +24,7 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/flusher/checker"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/grpc"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/kafka"
+	_ "github.com/alibaba/ilogtail/plugins/flusher/otlplog"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/sleep"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/statistics"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/stdout"

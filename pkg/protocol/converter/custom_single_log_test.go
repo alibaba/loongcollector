@@ -20,6 +20,7 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -29,7 +30,7 @@ func TestConvertToSimple(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from host environment", func() {
-			*inK8s = false
+			*flags.K8sFlag = false
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -82,7 +83,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the logGroup is generated from files and from docker environment", func() {
-			*inK8s = false
+			*flags.K8sFlag = false
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -142,7 +143,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
-			*inK8s = true
+			*flags.K8sFlag = true
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -214,7 +215,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the logGroup is generated from files and from k8s sidecar environment", func() {
-			*inK8s = false
+			*flags.K8sFlag = false
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -278,7 +279,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the logGroup is generated from stdout and from docker environment", func() {
-			*inK8s = false
+			*flags.K8sFlag = false
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -333,7 +334,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the logGroup is generated from stdout and from k8s daemonset environment", func() {
-			*inK8s = true
+			*flags.K8sFlag = true
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -400,7 +401,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the topic is null but __log_topic__ is not", func() {
-			*inK8s = false
+			*flags.K8sFlag = false
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -453,7 +454,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the topic and __log_topic__ are null", func() {
-			*inK8s = false
+			*flags.K8sFlag = false
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -505,7 +506,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the log is standardized", func() {
-			*inK8s = true
+			*flags.K8sFlag = true
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -592,7 +593,7 @@ func TestConvertToSimple(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
-			*inK8s = true
+			*flags.K8sFlag = true
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -698,7 +699,7 @@ func TestConvertToSimple(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
-			*inK8s = true
+			*flags.K8sFlag = true
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -768,7 +769,7 @@ func TestConvertToSimple(t *testing.T) {
 		})
 
 		Convey("When the log is standardized", func() {
-			*inK8s = true
+			*flags.K8sFlag = true
 			time := []uint32{1662434209, 1662434487}
 			method := []string{"PUT", "GET"}
 			status := []string{"200", "404"}
@@ -845,7 +846,7 @@ func TestConvertToSimple(t *testing.T) {
 	})
 
 	Convey("Given a converter with unsupported encoding", t, func() {
-		*inK8s = false
+		*flags.K8sFlag = false
 		c := &Converter{
 			Protocol: "custom_single",
 			Encoding: "pb",

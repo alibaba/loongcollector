@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/pingcap/check"
+
+	"github.com/alibaba/ilogtail/pkg/flags"
 )
 
 // go test -check.f "logConfigManagerTestSuite.*" -args -debug=true -console=true
@@ -27,7 +29,7 @@ type logConfigManagerTestSuite struct {
 }
 
 func (s *logConfigManagerTestSuite) SetUpSuite(c *check.C) {
-	*DockerEnvUpdateInterval = 3
+	*flags.DockerEnvUpdateInterval = 3
 }
 
 func (s *logConfigManagerTestSuite) TearDownSuite(c *check.C) {
@@ -44,25 +46,25 @@ func (s *logConfigManagerTestSuite) TearDownTest(c *check.C) {
 func (s *logConfigManagerTestSuite) TestE2ECheck(c *check.C) {
 	time.Sleep(time.Second * time.Duration(40))
 	client := dockerEnvConfigManager.operationWrapper.logClient
-	ok, err := client.CheckProjectExist(*DefaultLogProject)
+	ok, err := client.CheckProjectExist(*flags.DefaultLogProject)
 	c.Assert(ok, check.IsTrue)
 	c.Assert(err, check.IsNil)
-	ok, err = client.CheckLogstoreExist(*DefaultLogProject, "stdout-logtail")
+	ok, err = client.CheckLogstoreExist(*flags.DefaultLogProject, "stdout-logtail")
 	c.Assert(ok, check.IsTrue)
 	c.Assert(err, check.IsNil)
-	ok, err = client.CheckLogstoreExist(*DefaultLogProject, "stdout")
+	ok, err = client.CheckLogstoreExist(*flags.DefaultLogProject, "stdout")
 	c.Assert(ok, check.IsTrue)
 	c.Assert(err, check.IsNil)
-	ok, err = client.CheckLogstoreExist(*DefaultLogProject, "catalina")
+	ok, err = client.CheckLogstoreExist(*flags.DefaultLogProject, "catalina")
 	c.Assert(ok, check.IsTrue)
 	c.Assert(err, check.IsNil)
-	ok, err = client.CheckLogstoreExist(*DefaultLogProject, "catalina2")
+	ok, err = client.CheckLogstoreExist(*flags.DefaultLogProject, "catalina2")
 	c.Assert(ok, check.IsTrue)
 	c.Assert(err, check.IsNil)
-	ok, err = client.CheckMachineGroupExist(*DefaultLogProject, *DefaultLogMachineGroup)
+	ok, err = client.CheckMachineGroupExist(*flags.DefaultLogProject, *flags.DefaultLogMachineGroup)
 	c.Assert(ok, check.IsTrue)
 	c.Assert(err, check.IsNil)
-	configNames, err := client.GetAppliedConfigs(*DefaultLogProject, *DefaultLogMachineGroup)
+	configNames, err := client.GetAppliedConfigs(*flags.DefaultLogProject, *flags.DefaultLogMachineGroup)
 	c.Assert(len(configNames), check.Equals, 4)
 	c.Assert(err, check.IsNil)
 }

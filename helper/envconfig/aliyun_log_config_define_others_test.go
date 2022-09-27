@@ -19,6 +19,8 @@ package envconfig
 
 import (
 	"github.com/pingcap/check"
+
+	"github.com/alibaba/ilogtail/pkg/flags"
 )
 
 func (s *logConfigTestSuite) TestFile(c *check.C) {
@@ -28,7 +30,7 @@ func (s *logConfigTestSuite) TestFile(c *check.C) {
 	c.Assert(info.EnvConfigInfoMap["catalina"], check.NotNil)
 	c.Assert(len(info.EnvConfigInfoMap), check.Equals, 1)
 	config := makeLogConfigSpec(info, info.EnvConfigInfoMap["catalina"])
-	c.Assert(config.Project, check.Equals, *DefaultLogProject)
+	c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
 	c.Assert(len(config.MachineGroups), check.Equals, 0)
 	c.Assert(config.Logstore, check.Equals, "catalina")
 	c.Assert(config.ShardCount, check.IsNil)
@@ -52,7 +54,7 @@ func (s *logConfigTestSuite) TestJsonFile(c *check.C) {
 	c.Assert(info.EnvConfigInfoMap["catalina"], check.NotNil)
 	c.Assert(len(info.EnvConfigInfoMap), check.Equals, 1)
 	config := makeLogConfigSpec(info, info.EnvConfigInfoMap["catalina"])
-	c.Assert(config.Project, check.Equals, *DefaultLogProject)
+	c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
 	c.Assert(len(config.MachineGroups), check.Equals, 0)
 	c.Assert(config.Logstore, check.Equals, "catalina")
 	c.Assert(config.ShardCount, check.IsNil)
