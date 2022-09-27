@@ -101,6 +101,7 @@
 
 * [数据结构](developer-guide/data-structure.md)
 * [插件开发](developer-guide/plugin-development/README.md)
+  * [开源插件开发引导](docs/cn/developer-guide/plugin-development/plugin-development-guide.md)
   * [Checkpoint接口](developer-guide/plugin-development/checkpoint-api.md)
   * [Logger接口](developer-guide/plugin-development/logger-api.md)
   * [如何开发Input插件](developer-guide/plugin-development/how-to-write-input-plugins.md)
@@ -108,6 +109,7 @@
   * [如何开发Aggregator插件](developer-guide/plugin-development/how-to-write-aggregator-plugins.md)
   * [如何开发Flusher插件](developer-guide/plugin-development/how-to-write-flusher-plugins.md)
   * [如何生成插件文档](developer-guide/plugin-development/how-to-genernate-plugin-docs.md)
+  * [插件文档规范](docs/cn/developer-guide/plugin-development/plugin-doc-templete.md)
   * [纯插件模式启动](developer-guide/plugin-development/pure-plugin-start.md)
 * [测试](developer-guide/test/README.md)
   * [单元测试](developer-guide/test/unit-test.md)
