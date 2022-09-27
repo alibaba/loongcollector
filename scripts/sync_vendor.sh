@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2022 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
