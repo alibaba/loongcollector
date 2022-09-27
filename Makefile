@@ -64,6 +64,7 @@ clean:
 	rm -rf $(GENERATED_HOME)
 	rm -rf .testCoverage.txt
 	rm -rf .coretestCoverage.txt
+	rm -rf core/build
 	rm -rf plugin_main/*.dll
 	rm -rf plugin_main/*.so
 

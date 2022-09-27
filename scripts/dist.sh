@@ -32,6 +32,12 @@ cp "${ROOTDIR}/${OUT_DIR}/ilogtail_config.json" "${ROOTDIR}/${DIST_DIR}"
 cp -a "${ROOTDIR}/${OUT_DIR}/user_yaml_config.d" "${ROOTDIR}/${DIST_DIR}"
 if file "${ROOTDIR}/${DIST_DIR}/ilogtail" | grep x86-64; then ./scripts/download_ebpflib.sh "${ROOTDIR}/${DIST_DIR}"; fi
 
+# Splitting debug info at build time with -gsplit-dwarf does not work with current gcc version
+# Strip binary to reduce size here
+strip "${ROOTDIR}/${DIST_DIR}/ilogtail"
+strip "${ROOTDIR}/${DIST_DIR}/libPluginAdapter.so"
+strip "${ROOTDIR}/${DIST_DIR}/libPluginBase.so"
+
 # pack dist dir
 cd "${ROOTDIR}"
 tar -cvzf "${DIST_DIR}.tar.gz" "${DIST_DIR}"

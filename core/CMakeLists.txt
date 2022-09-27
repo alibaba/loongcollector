@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.9)
 project(logtail)
 
 # Options.
@@ -46,13 +46,12 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/common/Version.cpp.in ${VERSION_CPP_F
 
 # Default C/CXX flags.
 if (UNIX)
-    set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-deprecated-declarations ")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -ggdb -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g -ggdb -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -ggdb -O0 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=c++11 -g -ggdb -O0 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++11 -O2 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
     string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
     string(REPLACE "-O3" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 elseif (MSVC)
