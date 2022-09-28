@@ -35,3 +35,8 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
+
+- [public] [both] [added] service_http_server support OTLP log input.
+- [public] [both] [added] add a new flusher_otlp_log plugin.
+- [public] [linux] [fixed] strip binaries to reduce dist size.
+

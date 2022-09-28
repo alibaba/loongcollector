@@ -20,6 +20,7 @@
 | `service_syslog`<br>Syslog数据                | SLS官方                                                      | 采集syslog数据。                               |
 | `service_gpu_metric`<br>GPU数据               | SLS官方                                                      | 支持手机英伟达GPU指标。                             |
 | `observer_ilogtail_network`<br>无侵入网络调用数据    | SLS官方                                                      | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。 |
+| `service_http_server otlp`<br>HTTP OTLP数据 | SLS官方 | 通过http协议，接收OTLP数据。 |
 
 ## 处理
 
@@ -48,6 +49,7 @@
 | `flusher_kafka`<br>Kafka          | 社区    | 将采集到的数据输出到Kafka。          |
 | `flusher_sls`<br>SLS              | SLS官方 | 将采集到的数据输出到SLS。            |
 | `flusher_stdout`<br>标准输出/文件 | SLS官方 | 将采集到的数据输出到标准输出或文件。 |
+| `flusher_otlp_log`<br>OTLP日志 | 社区<br>[`liuhaoyang`](https://github.com/liuhaoyang) | 将采集到的数据支持`Opentelemetry log protocol`的后端。 |
 
 ## 加速
 

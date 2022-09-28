@@ -54,12 +54,17 @@ func (s *ServiceHTTP) Init(context ilogtail.Context) (int, error) {
 	if s.decoder, err = decoder.GetDecoder(s.Format); err != nil {
 		return 0, err
 	}
+
+	if s.Format == "otlp_logv1" {
+		s.Address += "/v1/logs"
+	}
+
 	return 0, nil
 }
 
 // Description ...
 func (s *ServiceHTTP) Description() string {
-	return "mock service input plugin for logtail"
+	return "HTTP service input plugin for logtail"
 }
 
 // Collect takes in an accumulator and adds the metrics that the Input

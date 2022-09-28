@@ -26,6 +26,15 @@ import (
 	"github.com/pierrec/lz4"
 )
 
+const (
+	ProtocolSLS        = "sls"
+	ProtocolPrometheus = "prometheus"
+	ProtocolInflux     = "influx"
+	ProtocolInfluxdb   = "influxdb"
+	ProtocolStatsd     = "statsd"
+	ProtocolOTLPLogV1  = "otlp_logv1"
+)
+
 func CollectBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) ([]byte, int, error) {
 	body := req.Body
 

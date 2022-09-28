@@ -80,6 +80,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [k8s.io/utils](https://pkg.go.dev/k8s.io/utils?tab=licenses)
 - [sigs.k8s.io/structured-merge-diff](https://pkg.go.dev/sigs.k8s.io/structured-merge-diff?tab=licenses)
 - [go.opentelemetry.io/proto/otlp](https://pkg.go.dev/go.opentelemetry.io/proto/otlp?tab=licenses)
+- [go.opentelemetry.io/collector/pdata](https://pkg.go.dev/go.opentelemetry.io/collector/pdata?tab=licenses)
 
 ## BSD licenses
 
