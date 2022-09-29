@@ -28,7 +28,7 @@ VOLUME [ "/sys/fs/cgroup" ]
 RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 
 ARG HOST_OS=Linux
-ARG VERSION=1.2.0
+ARG VERSION=1.2.1
 
 ADD ilogtail-${VERSION}.tar.gz /usr/local/
 RUN mv /usr/local/ilogtail-${VERSION} /usr/local/ilogtail && \
