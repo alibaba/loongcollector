@@ -56,11 +56,11 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 ```
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
 ```
-## 1.2.0
+## 1.2.1
 
 ### 发布记录
 
-发版日期：2022 年 9 月 23 日
+发版日期：2022 年 9 月 28 日
 
 新功能
 
@@ -78,4 +78,4 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 问题修复
 * 飞天日志格式微妙时间戳解析。
 
-[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.2.0.md)
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.2.1.md)
