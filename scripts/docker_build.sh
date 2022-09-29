@@ -25,7 +25,7 @@ set -o pipefail
 # production: build ilogtail production images.
 CATEGORY=$1
 GENERATED_HOME=$2
-VERSION=${3:-1.2.0}
+VERSION=${3:-1.2.1}
 REPOSITORY=${4:-aliyun/ilogtail}
 PUSH=${5:-false}
 
