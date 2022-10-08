@@ -29,8 +29,8 @@ var (
 	levelKey = "level"
 )
 
-func (c *Converter) ConvertToOtlpLogsV1(logGroup *protocol.LogGroup, targetFields []string) (*logv1.ResourceLogs, [][]string, error) {
-	desiredValues := make([][]string, len(logGroup.Logs))
+func (c *Converter) ConvertToOtlpLogsV1(logGroup *protocol.LogGroup, targetFields []string) (*logv1.ResourceLogs, []map[string]string, error) {
+	desiredValues := make([]map[string]string, len(logGroup.Logs))
 	attrs := make([]*commonv1.KeyValue, 0)
 	attrs = append(attrs, c.convertToOtlpKeyValue("source", logGroup.GetSource()), c.convertToOtlpKeyValue("topic", logGroup.GetTopic()), c.convertToOtlpKeyValue("machine_uuid", logGroup.GetMachineUUID()))
 	for _, t := range logGroup.LogTags {

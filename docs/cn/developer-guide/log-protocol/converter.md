@@ -37,21 +37,21 @@ func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameM
 ```Go
 func (c *Converter) Do(logGroup *sls.LogGroup) (logs interface{}, err error)
 
-func (c *Converter) ToByteStream(logGroup *sls.LogGroup) (stream [][]byte, err error)
+func (c *Converter) ToByteStream(logGroup *sls.LogGroup) (stream interface{}, err error)
 
-func (c *Converter) DoWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (logs interface{}, values [][]string, err error)
+func (c *Converter) DoWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (logs interface{}, values []map[string]string, err error)
 
-func (c *Converter) ToByteStreamWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (stream [][]byte, values [][]string, err error)
+func (c *Converter) ToByteStreamWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (stream interface{}, values []map[string]string, err error)
 ```
 
 各方法的用法如下：
 
-- `Do`：给定日志组`logGroup`，根据`Converter`中设定的协议，将sls日志组中的各条日志分别转换为与目标协议相对应的数据结构，并将结果组装在一个`logs`数组中；
-- `ToByteStream`：在完成`Do`方法的基础上，根据`Converter`中设定的编码格式，对转换后的日志进行编码形成字节流，并将结果组装在一个`stream`数组中；
-- `DoWithSelectedFields`：在完成和`Do`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，将结果保存于`values`数组中。`targetFields`中各字符串的的格式要求如下：
-  - 如果需要获取某个日志字段的值，则字符串的命名方式为“content.XXX"，其中XXX为该字段的键名；
+- `Do`：给定日志组`logGroup`，根据`Converter`中设定的协议，将sls日志组中的各条日志分别转换为与目标协议相对应的数据结构，并将结果组装在`logs`中；
+- `ToByteStream`：在完成`Do`方法的基础上，根据`Converter`中设定的编码格式，对转换后的日志进行编码形成字节流，并将结果组装在`stream`中；
+- `DoWithSelectedFields`：在完成和`Do`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，以map的形式将结果保存于`values`数组中。如果没有找到该字段，则`values`的各个map中将不包括该字段。`targetFields`中各字符串的的格式要求如下：
+  - 如果需要获取某个日志字段的值，则字符串的命名方式为“attribute.XXX"，其中XXX为该字段的键名；
   - 如果需要获取某个日志tag的值，则字符串的命名方式为“tag.XXX"，其中XXX为该字段的键名。
-- `ToByteStreamWithSelectedFields`：与`DoWithSelectedFields`方法类似，在完成和`ToByteStream`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，将结果保存于`values`数组中，`targetFields`中各字符串的的格式要求同上。
+- `ToByteStreamWithSelectedFields`：与`DoWithSelectedFields`方法类似，在完成和`ToByteStream`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，以map的形式将结果保存于`values`数组中，`targetFields`中各字符串的的格式要求同上。
 
 ## 使用步骤
 

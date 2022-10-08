@@ -21,10 +21,10 @@
     ```Go
     func (c *Converter) ConvertToXXXProtocolLogs(logGroup *sls.LogGroup, targetFields []string) (logs interface{}, values [][]string, err error)
 
-    func (c *Converter) ConvertToXXXProtocolStream(logGroup *sls.LogGroup, targetFields []string) (stream [][]byte, values [][]string, err error)
+    func (c *Converter) ConvertToXXXProtocolStream(logGroup *sls.LogGroup, targetFields []string) (stream interface{}, values [][]string, err error)
     ```
 
-    其中，函数名中的“XXX”为协议名（可缩写），参数中的`logGroup`为sls日志组，`targetFields`为需要提取值的字段名，返回值中的`stream`为与协议对应的数据结构组成的数组，`logs`为代表每条日志的字节流，`values`为每条日志或日志组tag中`targetFields`字段对应的值，`err`为返回的错误。
+    其中，函数名中的“XXX”为协议名（可缩写），参数中的`logGroup`为sls日志组，`targetFields`为需要提取值的字段名，返回值中的`logs`为与协议对应的数据结构组成的数组，`stream`为代表该日志组的字节流，`values`为每条日志或日志组tag中`targetFields`字段对应的值，`err`为返回的错误。
 
     该函数必须支持以下功能：
     1. 对输入日志进行相应的转换
@@ -37,7 +37,7 @@
     ```Go
     func convertLogToMap(log *sls.Log, logTags []*sls.LogTag, src, topic string, tagKeyRenameMap map[string]string) (contents map[string]string, tags map[string]string)
 
-    func findTargetValues(targetFields []string, contents, tags, tagKeyRenameMap map[string]string) (values []string, err error)
+    func findTargetValues(targetFields []string, contents, tags, tagKeyRenameMap map[string]string) (values map[string]string, err error)
     ```
 
     各函数的用途如下：

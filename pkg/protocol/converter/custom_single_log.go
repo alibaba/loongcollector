@@ -28,8 +28,8 @@ const (
 	numProtocolKeys    = 3
 )
 
-func (c *Converter) ConvertToSingleProtocolLogs(logGroup *protocol.LogGroup, targetFields []string) ([]map[string]interface{}, [][]string, error) {
-	convertedLogs, desiredValues := make([]map[string]interface{}, len(logGroup.Logs)), make([][]string, len(logGroup.Logs))
+func (c *Converter) ConvertToSingleProtocolLogs(logGroup *protocol.LogGroup, targetFields []string) ([]map[string]interface{}, []map[string]string, error) {
+	convertedLogs, desiredValues := make([]map[string]interface{}, len(logGroup.Logs)), make([]map[string]string, len(logGroup.Logs))
 	for i, log := range logGroup.Logs {
 		contents, tags := convertLogToMap(log, logGroup.LogTags, logGroup.Source, logGroup.Topic, c.TagKeyRenameMap)
 
@@ -60,7 +60,7 @@ func (c *Converter) ConvertToSingleProtocolLogs(logGroup *protocol.LogGroup, tar
 	return convertedLogs, desiredValues, nil
 }
 
-func (c *Converter) ConvertToSingleProtocolStream(logGroup *protocol.LogGroup, targetFields []string) ([][]byte, [][]string, error) {
+func (c *Converter) ConvertToSingleProtocolStream(logGroup *protocol.LogGroup, targetFields []string) ([][]byte, []map[string]string, error) {
 	convertedLogs, desiredValues, err := c.ConvertToSingleProtocolLogs(logGroup, targetFields)
 	if err != nil {
 		return nil, nil, err
