@@ -56,7 +56,7 @@ func (c *Converter) ConvertToOtlpLogsV1(logGroup *protocol.LogGroup, targetField
 		}
 		logRecord := &logv1.LogRecord{
 			TimeUnixNano:         uint64(log.Time) * uint64(time.Second),
-			ObservedTimeUnixNano: uint64(log.Time) * uint64(time.Second),
+			ObservedTimeUnixNano: uint64(time.Now().UnixNano()),
 			Attributes:           logAttrs,
 		}
 		if body, has := contents[bodyKey]; has {
