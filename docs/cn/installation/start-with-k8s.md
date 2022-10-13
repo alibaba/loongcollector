@@ -121,61 +121,60 @@ spec:
         k8s-app: logtail-ds
     spec:
       tolerations:
-      - key: node-role.kubernetes.io/master # don't deploy on master
-        effect: NoSchedule
+        - operator: Exists                    # deploy on all nodes
       containers:
-      - name: logtail
-        env:
-          - name: ALIYUN_LOG_ENV_TAGS       # add log tags from env
-            value: _node_name_|_node_ip_
-          - name: _node_name_
-            valueFrom:
-              fieldRef:
-                apiVersion: v1
-                fieldPath: spec.nodeName
-          - name: _node_ip_
-            valueFrom:
-              fieldRef:
-                apiVersion: v1
-                fieldPath: status.hostIP
-          - name: cpu_usage_limit           # iLogtail's self monitor cpu limit
-            value: "1"
-          - name: mem_usage_limit           # iLogtail's self monitor mem limit
-            value: "512"
-          - name: default_access_key_id     # accesskey id if you want to flush to SLS
-            valueFrom:
-              secretKeyRef:
-                name: ilogtail-secret
-                key: access_key_id
-                optional: true
-          - name: default_access_key        # accesskey secret if you want to flush to SLS
-            valueFrom:
-              secretKeyRef:
-                name: ilogtail-secret
-                key: access_key
-                optional: true
-        image: >-
-          sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:latest
-        imagePullPolicy: IfNotPresent
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-          requests:
-            cpu: 400m
-            memory: 384Mi
-        volumeMounts:
-          - mountPath: /var/run                       # for container runtime socket
-            name: run
-          - mountPath: /logtail_host                  # for log access on the node
-            mountPropagation: HostToContainer
-            name: root
-            readOnly: true
-          - mountPath: /usr/local/ilogtail/checkpoint # for checkpoint between container restart
-            name: checkpoint
-          - mountPath: /usr/local/ilogtail/user_yaml_config.d # mount config dir
-            name: user-config
-            readOnly: true
+        - name: logtail
+          env:
+            - name: ALIYUN_LOG_ENV_TAGS       # add log tags from env
+              value: _node_name_|_node_ip_
+            - name: _node_name_
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: _node_ip_
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: cpu_usage_limit           # iLogtail's self monitor cpu limit
+              value: "1"
+            - name: mem_usage_limit           # iLogtail's self monitor mem limit
+              value: "512"
+            - name: default_access_key_id     # accesskey id if you want to flush to SLS
+              valueFrom:
+                secretKeyRef:
+                  name: ilogtail-secret
+                  key: access_key_id
+                  optional: true
+            - name: default_access_key        # accesskey secret if you want to flush to SLS
+              valueFrom:
+                secretKeyRef:
+                  name: ilogtail-secret
+                  key: access_key
+                  optional: true
+          image: >-
+            sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 400m
+              memory: 384Mi
+          volumeMounts:
+            - mountPath: /var/run                       # for container runtime socket
+              name: run
+            - mountPath: /logtail_host                  # for log access on the node
+              mountPropagation: HostToContainer
+              name: root
+              readOnly: true
+            - mountPath: /usr/local/ilogtail/checkpoint # for checkpoint between container restart
+              name: checkpoint
+            - mountPath: /usr/local/ilogtail/user_yaml_config.d # mount config dir
+              name: user-config
+              readOnly: true
       dnsPolicy: ClusterFirst
       hostNetwork: true
       volumes:

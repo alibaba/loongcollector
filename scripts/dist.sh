@@ -17,10 +17,21 @@
 set -ue
 set -o pipefail
 
+function arch() {
+  if uname -m | grep x86_64 &>/dev/null; then
+    echo amd64
+  elif uname -m | grep aarch64 &>/dev/null; then
+    echo arm64
+  else
+    echo sw64
+  fi
+}
+
 # intialize variables
 OUT_DIR=${1:-output}
-DIST_DIR=${2:-ilogtail-1.1.0}
+DIST_DIR=${2:-ilogtail-1.2.1}
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
+ARCH=$(arch)
 
 # prepare dist dir
 mkdir "${ROOTDIR}/${DIST_DIR}"
@@ -40,6 +51,6 @@ strip "${ROOTDIR}/${DIST_DIR}/libPluginBase.so"
 
 # pack dist dir
 cd "${ROOTDIR}"
-tar -cvzf "${DIST_DIR}.tar.gz" "${DIST_DIR}"
+tar -cvzf "${DIST_DIR}.linux-${ARCH}.tar.gz" "${DIST_DIR}"
 rm -rf "${DIST_DIR}"
 cd -

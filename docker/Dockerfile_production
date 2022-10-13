@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+FROM --platform=$TARGETPLATFORM centos:centos7.9.2009 as build
+ARG VERSION=1.2.1
+ARG TARGETPLATFORM
+WORKDIR /usr/local
+COPY ilogtail-${VERSION}.linux-*.tar.gz .
+RUN tar -xzf ilogtail-${VERSION}.linux-${TARGETPLATFORM##*/}.tar.gz
+
+
 FROM centos:centos7.9.2009
+MAINTAINER TomYu yyuuttaaoo@gmail.com
+
 ENV container docker
 RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
     systemd-tmpfiles-setup.service ] || rm -f $i; done); \
@@ -29,10 +39,10 @@ RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && 
 
 ARG HOST_OS=Linux
 ARG VERSION=1.2.1
+ARG TARGETPLATFORM
 
-ADD ilogtail-${VERSION}.tar.gz /usr/local/
-RUN mv /usr/local/ilogtail-${VERSION} /usr/local/ilogtail && \
-    chown -R $(whoami) /usr/local/ilogtail/ && \
+COPY --from=build /usr/local/ilogtail-${VERSION} /usr/local/ilogtail
+RUN chown -R $(whoami) /usr/local/ilogtail/ && \
     chmod 755 /usr/local/ilogtail/ilogtail && \
     mkdir /usr/local/ilogtail/checkpoint
 

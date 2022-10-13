@@ -56,6 +56,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 ```
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
 ```
+
 ## 1.2.1
 
 ### 发布记录
@@ -79,3 +80,18 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 * 飞天日志格式微妙时间戳解析。
 
 [详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.2.1.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.2.1.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.2.1/ilogtail-1.2.1.linux-amd64.tar.gz) | Linux | x86-64 | 8a5925f1bc265fd5f55614fcb7cebd571507c2c640814c308f62c498b021fe8f |
+| [ilogtail-1.2.1.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.2.1/ilogtail-1.2.1.linux-arm64.tar.gz) | Linux | arm64  | 04be03f03eb722a3c9ba1b45b32c9be8c92cecabbe32bdc4672d229189e80c2f |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+```
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
+```

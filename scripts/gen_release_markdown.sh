@@ -68,10 +68,13 @@ function appendDownloadLinks () {
     local version=$2
     local linux_amd64_url="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-amd64.tar.gz"
     local linux_amd64_sig="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-amd64.tar.gz.sha256"
+    local linux_arm64_url="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-arm64.tar.gz"
+    local linux_arm64_sig="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-arm64.tar.gz.sha256"
 cat >> $doc <<- EOF
 | **Filename** | **OS** | **Arch** | **SHA256 Checksum** |
 |  ----  | ----  | ----  | ----  |
 |[ilogtail-${version}.linux-amd64.tar.gz](${linux_amd64_url})|Linux|x86-64|[ilogtail-${version}.linux-amd64.tar.gz.sha256](${linux_amd64_sig})|
+|[ilogtail-${version}.linux-arm64.tar.gz](${linux_arm64_url})|Linux|arm64|[ilogtail-${version}.linux-arm64.tar.gz.sha256](${linux_arm64_sig})|
 EOF
 }
 

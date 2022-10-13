@@ -17,12 +17,24 @@
 set -ue
 set -o pipefail
 
+function arch() {
+  if uname -m | grep x86_64 &>/dev/null; then
+    echo amd64
+  elif uname -m | grep aarch64 &>/dev/null; then
+    echo arm64
+  else
+    echo sw64
+  fi
+}
+
 # Currently, there are 4 supported docker categories, which are goc, build, development and production.
 #
 # goc: build goc server with Dockerfile_doc
 # build: build core or plugin binary with Dockerfile_build
 # development: build ilogtail development images.
 # production: build ilogtail production images.
+# multi-arch-production: build ilogtail multi-arch production images.
+ARCH=$(arch)
 CATEGORY=$1
 GENERATED_HOME=$2
 VERSION=${3:-1.2.1}
@@ -50,28 +62,39 @@ touch $GEN_DOCKERFILE
 
 if [[ $CATEGORY = "goc" || $CATEGORY = "build" ]]; then
     cat $ROOTDIR/docker/Dockerfile_$CATEGORY | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" > $GEN_DOCKERFILE;
-elif [[  $CATEGORY = "development" ]]; then
+elif [[ $CATEGORY = "development" ]]; then
     cat $ROOTDIR/docker/Dockerfile_build | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" > $GEN_DOCKERFILE;
     cat $ROOTDIR/docker/Dockerfile_development_part |grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" >> $GEN_DOCKERFILE;
-elif [[  $CATEGORY = "production" ]]; then
-    cat $ROOTDIR/docker/Dockerfile_production |grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" > $GEN_DOCKERFILE;
+elif [[ $CATEGORY = "production" ]]; then
+    cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" | sed 's/ --platform=$TARGETPLATFORM//' > $GEN_DOCKERFILE;
+elif [[ $CATEGORY = "multi-arch-production" ]]; then
+    cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" > $GEN_DOCKERFILE;
 fi
 
 echo "=============DOCKERFILE=================="
 cat $GEN_DOCKERFILE
 echo "========================================="
-docker build --build-arg VERSION="$VERSION" \
- --build-arg HOST_OS="$HOST_OS" \
-  -t "$REPOSITORY":"$VERSION" \
-  --no-cache . -f $GEN_DOCKERFILE
-
+if [[ $CATEGORY != "multi-arch-production" ]]; then
+    docker build --build-arg TARGETPLATFORM=linux/$ARCH \
+	--build-arg VERSION="$VERSION" \
+        --build-arg HOST_OS="$HOST_OS" \
+        -t "$REPOSITORY":"$VERSION" \
+        --no-cache -f $GEN_DOCKERFILE .
+else
+    docker buildx build --platform linux/amd64,linux/arm64 \
+        --build-arg VERSION="$VERSION" \
+        --build-arg HOST_OS="$HOST_OS" \
+        -t "$REPOSITORY":edge \
+        -o type=registry \
+        --no-cache -f $GEN_DOCKERFILE .
+fi
 
 if [[ $PUSH = "true" ]]; then
     echo "COMMAND:"
     echo "docker push $REPOSITORY:$VERSION"
     if [[ $VERSION = "latest" ]]; then
-      echo "Current operation is so dangerous, you should push by yourself !!!"
+        echo "Current operation is so dangerous, you should push by yourself !!!"
     else
-      docker push "$REPOSITORY:$VERSION"
+        docker push "$REPOSITORY:$VERSION"
     fi
 fi

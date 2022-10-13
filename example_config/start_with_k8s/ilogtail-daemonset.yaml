@@ -29,8 +29,7 @@ spec:
         k8s-app: logtail-ds
     spec:
       tolerations:
-        - key: node-role.kubernetes.io/master # don't deploy on master
-          effect: NoSchedule
+        - operator: Exists # deploy on all nodes
       containers:
         - name: logtail
           env:

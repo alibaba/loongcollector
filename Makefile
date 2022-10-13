@@ -20,7 +20,6 @@ BUILD_REPOSITORY ?= aliyun/ilogtail_build
 GENERATED_HOME ?= generated_files
 
 SCOPE ?= .
-BINARY = logtail-plugin
 
 TEST_DEBUG ?= false
 TEST_PROFILE ?= false
@@ -28,8 +27,11 @@ TEST_SCOPE ?= "all"
 
 PLATFORMS := linux darwin windows
 
-OS = $(shell uname)
-ARCH = amd64
+ifeq ($(shell uname -m),x86_64)
+    ARCH := amd64
+else
+    ARCH := arm64
+endif
 
 GO = go
 GO_PATH = $$($(GO) env GOPATH)
@@ -186,10 +188,14 @@ all: clean
 dist: all
 	./scripts/dist.sh $(OUT_DIR) $(DIST_DIR)
 
-ilogtail-$(VERSION).tar.gz:
+ilogtail-$(VERSION).linux-$(ARCH).tar.gz:
 	@echo 'ilogtail-$(VERSION) does not exist! Please download or run `make dist` first!'
 	@false
 
 .PHONY: docker
-docker: ilogtail-$(VERSION).tar.gz
+docker: ilogtail-$(VERSION).linux-$(ARCH).tar.gz
 	./scripts/docker_build.sh production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)
+
+.PHONY: multi-arch-docker
+multi-arch-docker: ilogtail-$(VERSION).linux-$(ARCH).tar.gz
+	./scripts/docker_build.sh multi-arch-production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)
