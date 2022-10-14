@@ -31,34 +31,34 @@ import (
 var supportedCompressionType = map[string]interface{}{"gzip": nil, "snappy": nil, "zstd": nil}
 
 type GrpcClientConfig struct {
-	Endpoint string
+	Endpoint string `json:"Endpoint"`
 
 	// The compression key for supported compression types within collector.
-	Compression string
+	Compression string `json:"Compression"`
 
 	// The headers associated with gRPC requests.
-	Headers map[string]string
+	Headers map[string]string `json:"Headers"`
 
 	// Sets the balancer in grpclb_policy to discover the servers. Default is pick_first.
 	// https://github.com/grpc/grpc-go/blob/master/examples/features/load_balancing/README.md
-	BalancerName string
+	BalancerName string `json:"BalancerName"`
 
 	// WaitForReady parameter configures client to wait for ready state before sending data.
 	// (https://github.com/grpc/grpc/blob/master/doc/wait-for-ready.md)
-	WaitForReady bool
+	WaitForReady bool `json:"WaitForReady"`
 
 	// ReadBufferSize for gRPC client. See grpchelper.WithReadBufferSize.
 	// (https://godoc.org/google.golang.org/grpc#WithReadBufferSize).
-	ReadBufferSize int
+	ReadBufferSize int `json:"ReadBufferSize"`
 
 	// WriteBufferSize for gRPC gRPC. See grpchelper.WithWriteBufferSize.
 	// (https://godoc.org/google.golang.org/grpc#WithWriteBufferSize).
-	WriteBufferSize int
+	WriteBufferSize int `json:"WriteBufferSize"`
 
 	// Send retry setting
 	Retry RetryConfig `json:"Retry"`
 
-	Timeout time.Duration `json:"Timeout"`
+	Timeout int `json:"Timeout"`
 }
 
 type RetryConfig struct {
@@ -67,8 +67,8 @@ type RetryConfig struct {
 	DefaultDelay time.Duration `json:"DefaultDelay"`
 }
 
-// GetOptions maps GrpcClientConfig to a slice of dial options for gRPC.
-func (cfg *GrpcClientConfig) GetOptions() ([]grpc.DialOption, error) {
+// GetDialOptions maps GrpcClientConfig to a slice of dial options for gRPC.
+func (cfg *GrpcClientConfig) GetDialOptions() ([]grpc.DialOption, error) {
 	var opts []grpc.DialOption
 	if cfg.Compression != "" && cfg.Compression != "none" {
 		if _, ok := supportedCompressionType[cfg.Compression]; !ok {
@@ -90,6 +90,14 @@ func (cfg *GrpcClientConfig) GetOptions() ([]grpc.DialOption, error) {
 	if cfg.WriteBufferSize > 0 {
 		opts = append(opts, grpc.WithWriteBufferSize(cfg.WriteBufferSize))
 	}
+
+	opts = append(opts, grpc.WithTimeout(cfg.GetTimeout()))
+	opts = append(opts, grpc.WithDefaultCallOptions(grpc.WaitForReady(cfg.WaitForReady)))
+
+	if cfg.WaitForReady {
+		opts = append(opts, grpc.WithBlock())
+	}
+
 	return opts, nil
 }
 
@@ -105,9 +113,9 @@ func (cfg *GrpcClientConfig) GetEndpoint() string {
 
 func (cfg *GrpcClientConfig) GetTimeout() time.Duration {
 	if cfg.Timeout <= 0 {
-		return 5 * time.Second
+		return 5000 * time.Millisecond
 	}
-	return cfg.Timeout
+	return time.Duration(cfg.Timeout) * time.Millisecond
 }
 
 // RetryInfo Handle retry for grpc. Refer to https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlpexporter/otlp.go#L121

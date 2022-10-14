@@ -12,8 +12,9 @@
 | Grpc              | Struct   | 是    | gRPC 配置项                                 |
 | Grpc.Endpoint     | String   | 是    | gRPC Server 地址                           |
 | Grpc.Compression  | String   | 否    | gRPC 数据压缩协议，可选 gzip、snappy、zstd。默认为 nono |
-| Grpc.Headers      | String数组   | 否    | gRPC 自定义 Headers                         |
-
+| Grpc.Headers      | String数组 | 否    | gRPC 自定义 Headers                         |
+| Grpc.Timeout      | int      | 否    | gRPC 连接超时时间，单位为ms，默认为5000                |
+| Grpc.WaitForReady | bool     | 否    | gRPC 数据发送前是否等待就绪, 默认为false               |
 
 ## 样例
 

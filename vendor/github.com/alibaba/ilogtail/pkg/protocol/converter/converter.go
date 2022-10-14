@@ -34,9 +34,9 @@ const (
 )
 
 const (
-	tagPrefix           = "__tag__:"
-	targetContentPrefix = "content."
-	targetTagPrefix     = "tag."
+	tagPrefix             = "__tag__:"
+	targetAttributePrefix = "attribute."
+	targetTagPrefix       = "tag."
 )
 
 const (
@@ -117,7 +117,7 @@ func (c *Converter) Do(logGroup *protocol.LogGroup) (logs interface{}, err error
 	return
 }
 
-func (c *Converter) DoWithSelectedFields(logGroup *protocol.LogGroup, targetFields []string) (logs interface{}, values [][]string, err error) {
+func (c *Converter) DoWithSelectedFields(logGroup *protocol.LogGroup, targetFields []string) (logs interface{}, values []map[string]string, err error) {
 	switch c.Protocol {
 	case ProtocolCustomSingle:
 		return c.ConvertToSingleProtocolLogs(logGroup, targetFields)
@@ -128,12 +128,12 @@ func (c *Converter) DoWithSelectedFields(logGroup *protocol.LogGroup, targetFiel
 	}
 }
 
-func (c *Converter) ToByteStream(logGroup *protocol.LogGroup) (stream [][]byte, err error) {
+func (c *Converter) ToByteStream(logGroup *protocol.LogGroup) (stream interface{}, err error) {
 	stream, _, err = c.ToByteStreamWithSelectedFields(logGroup, nil)
 	return
 }
 
-func (c *Converter) ToByteStreamWithSelectedFields(logGroup *protocol.LogGroup, targetFields []string) (stream [][]byte, values [][]string, err error) {
+func (c *Converter) ToByteStreamWithSelectedFields(logGroup *protocol.LogGroup, targetFields []string) (stream interface{}, values []map[string]string, err error) {
 	switch c.Protocol {
 	case ProtocolCustomSingle:
 		return c.ConvertToSingleProtocolStream(logGroup, targetFields)
@@ -204,23 +204,23 @@ func convertLogToMap(log *protocol.Log, logTags []*protocol.LogTag, src, topic s
 	return contents, tags
 }
 
-func findTargetValues(targetFields []string, contents, tags, tagKeyRenameMap map[string]string) ([]string, error) {
+func findTargetValues(targetFields []string, contents, tags, tagKeyRenameMap map[string]string) (map[string]string, error) {
 	if len(targetFields) == 0 {
 		return nil, nil
 	}
 
-	desiredValue := make([]string, len(targetFields))
-	for i, field := range targetFields {
+	desiredValue := make(map[string]string, len(targetFields))
+	for _, field := range targetFields {
 		switch {
-		case strings.HasPrefix(field, targetContentPrefix):
-			if value, ok := contents[field[len(targetContentPrefix):]]; ok {
-				desiredValue[i] = value
+		case strings.HasPrefix(field, targetAttributePrefix):
+			if value, ok := contents[field[len(targetAttributePrefix):]]; ok {
+				desiredValue[field] = value
 			}
 		case strings.HasPrefix(field, targetTagPrefix):
 			if value, ok := tags[field[len(targetTagPrefix):]]; ok {
-				desiredValue[i] = value
+				desiredValue[field] = value
 			} else if value, ok := tagKeyRenameMap[field[len(targetTagPrefix):]]; ok {
-				desiredValue[i] = tags[value]
+				desiredValue[field] = tags[value]
 			}
 		default:
 			return nil, fmt.Errorf("unsupported field: %s", field)

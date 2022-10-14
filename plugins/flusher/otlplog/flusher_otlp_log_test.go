@@ -20,17 +20,21 @@ import (
 
 type TestOtlpLogService struct {
 	otlpv1.UnimplementedLogsServiceServer
-	ch chan *otlpv1.ExportLogsServiceRequest
+	ch    chan *otlpv1.ExportLogsServiceRequest
+	pause time.Duration
 }
 
 func (t *TestOtlpLogService) Export(ctx context.Context, request *otlpv1.ExportLogsServiceRequest) (*otlpv1.ExportLogsServiceResponse, error) {
 	t.ch <- request
+	if t.pause > 0 {
+		time.Sleep(t.pause)
+	}
 	return &otlpv1.ExportLogsServiceResponse{}, nil
 }
 
 func Test_Flusher_Init(t *testing.T) {
 	convey.Convey("When init grpc service", t, func() {
-		_, server := newTestGrpcService(t, ":8080")
+		_, server := newTestGrpcService(t, ":8080", time.Nanosecond)
 		defer func() {
 			server.Stop()
 		}()
@@ -46,14 +50,14 @@ func Test_Flusher_Init(t *testing.T) {
 
 func Test_Flusher_Flush(t *testing.T) {
 	convey.Convey("When init grpc service", t, func() {
-		service, server := newTestGrpcService(t, ":8176")
+		service, server := newTestGrpcService(t, ":8176", time.Nanosecond*0)
 		defer func() {
 			server.Stop()
 		}()
 		logCtx := mock.NewEmptyContext("p", "l", "c")
 
 		convey.Convey("When FlusherOTLPLog init", func() {
-			f := &FlusherOTLPLog{Version: v1, GrpcConfig: &helper.GrpcClientConfig{Endpoint: ":8176"}}
+			f := &FlusherOTLPLog{Version: v1, GrpcConfig: &helper.GrpcClientConfig{Endpoint: ":8176", WaitForReady: true}}
 			err := f.Init(logCtx)
 			convey.So(err, convey.ShouldBeNil)
 
@@ -67,6 +71,28 @@ func Test_Flusher_Flush(t *testing.T) {
 				for i := range r.ResourceLogs {
 					convey.So(len(r.ResourceLogs[i].ScopeLogs), convey.ShouldEqual, len(r2.ResourceLogs[i].ScopeLogs))
 				}
+			})
+		})
+	})
+}
+
+func Test_Flusher_Flush_Timeout(t *testing.T) {
+	convey.Convey("When init grpc service", t, func() {
+		_, server := newTestGrpcService(t, ":8176", time.Second*2)
+		defer func() {
+			server.Stop()
+		}()
+		logCtx := mock.NewEmptyContext("p", "l", "c")
+
+		convey.Convey("When FlusherOTLPLog init", func() {
+			f := &FlusherOTLPLog{Version: v1, GrpcConfig: &helper.GrpcClientConfig{Endpoint: ":8176", WaitForReady: true, Timeout: 1000}}
+			err := f.Init(logCtx)
+			convey.So(err, convey.ShouldBeNil)
+
+			convey.Convey("When FlusherOTLPLog flush timeout", func() {
+				groupList := makeTestLogGroupList().GetLogGroupList()
+				err := f.Flush("p", "l", "c", groupList)
+				convey.So(err, convey.ShouldBeError)
 			})
 		})
 	})
@@ -90,12 +116,12 @@ func Test_Flusher_GetConverter(t *testing.T) {
 	})
 }
 
-func newTestGrpcService(t *testing.T, address string) (*TestOtlpLogService, *grpc.Server) {
+func newTestGrpcService(t *testing.T, address string, pause time.Duration) (*TestOtlpLogService, *grpc.Server) {
 	server := grpc.NewServer()
 	listener, err := net.Listen("tcp", address)
 	convey.So(err, convey.ShouldBeNil)
 	ch := make(chan *otlpv1.ExportLogsServiceRequest, 1000)
-	service := &TestOtlpLogService{ch: ch}
+	service := &TestOtlpLogService{ch: ch, pause: pause}
 	otlpv1.RegisterLogsServiceServer(server, service)
 	go func(t *testing.T) {
 		convey.Convey("When gRPC service start", t, func() {

@@ -68,19 +68,19 @@ func (f *FlusherOTLPLog) Init(ctx ilogtail.Context) error {
 		return err
 	}
 
-	opts, err := f.GrpcConfig.GetOptions()
+	dialOpts, err := f.GrpcConfig.GetDialOptions()
 	if err != nil {
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init gRPC client options fail, error", err)
 		return err
 	}
 	logger.Info(f.context.GetRuntimeContext(), "otlplog flusher init", "initializing gRPC conn", "endpoint", f.GrpcConfig.GetEndpoint())
-	timeout, canal := context.WithTimeout(context.Background(), f.GrpcConfig.GetTimeout())
-	defer canal()
 
-	if f.grpcConn, err = grpc.DialContext(timeout, f.GrpcConfig.GetEndpoint(), opts...); err != nil {
+	if f.grpcConn, err = grpc.Dial(f.GrpcConfig.GetEndpoint(), dialOpts...); err != nil {
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init otlplog gRPC conn fail, error", err)
 		return err
 	}
+
+	logger.Info(f.context.GetRuntimeContext(), "init otlplog gRPC conn. status", f.grpcConn.GetState())
 	f.metadata = metadata.New(f.GrpcConfig.Headers)
 	f.logClient = otlpv1.NewLogsServiceClient(f.grpcConn)
 	logger.Info(f.context.GetRuntimeContext(), "otlplog flusher init", "initialized")
@@ -118,9 +118,7 @@ func (f *FlusherOTLPLog) convertLogGroupToRequest(logGroupList []*protocol.LogGr
 }
 
 func (f *FlusherOTLPLog) flush(request *otlpv1.ExportLogsServiceRequest) error {
-	timeout, canal := context.WithTimeout(f.withMetadata(), f.GrpcConfig.GetTimeout())
-	defer canal()
-	if _, err := f.logClient.Export(timeout, request); err != nil {
+	if err := f.timeoutFlush(request); err != nil {
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "send data to otlplog server fail, error", err)
 		return err
 	}
@@ -129,10 +127,9 @@ func (f *FlusherOTLPLog) flush(request *otlpv1.ExportLogsServiceRequest) error {
 
 func (f *FlusherOTLPLog) flushWithRetry(request *otlpv1.ExportLogsServiceRequest) error {
 	var retryNum = 0
-	timeout, canal := context.WithTimeout(f.withMetadata(), f.GrpcConfig.GetTimeout())
-	defer canal()
+
 	for {
-		_, err := f.logClient.Export(timeout, request)
+		err := f.timeoutFlush(request)
 		if err == nil {
 			return nil
 		}
@@ -145,6 +142,13 @@ func (f *FlusherOTLPLog) flushWithRetry(request *otlpv1.ExportLogsServiceRequest
 		retryNum++
 		<-time.After(retry.ShouldDelay(f.GrpcConfig.Retry.DefaultDelay))
 	}
+}
+
+func (f *FlusherOTLPLog) timeoutFlush(request *otlpv1.ExportLogsServiceRequest) error {
+	timeout, canal := context.WithTimeout(f.withMetadata(), f.GrpcConfig.GetTimeout())
+	defer canal()
+	_, err := f.logClient.Export(timeout, request)
+	return err
 }
 
 // append withMetadata to context. refer to https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlpexporter/otlp.go#L121
@@ -160,11 +164,39 @@ func (f *FlusherOTLPLog) SetUrgent(flag bool) {
 
 // IsReady is ready to flush
 func (f *FlusherOTLPLog) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
-	ready := f.grpcConn != nil && f.grpcConn.GetState() == connectivity.Ready
+	if f.grpcConn == nil {
+		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_READY_ALARM", "otlplog flusher is not ready, gRPC conn is nil")
+		return false
+	}
+	state := f.grpcConn.GetState()
+	var ready bool
+	switch f.grpcConn.GetState() {
+	case connectivity.Ready:
+		ready = true
+	case connectivity.Connecting:
+		if !f.GrpcConfig.WaitForReady {
+			ready = false
+			break
+		}
+		timeout, canal := context.WithTimeout(context.Background(), f.GrpcConfig.GetTimeout())
+		defer canal()
+		_ = f.grpcConn.WaitForStateChange(timeout, state)
+		state = f.grpcConn.GetState()
+		ready = state == connectivity.Ready
+	default:
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_READY_ALARM", "gRPC conn is not ready, will reconnect. current status", f.grpcConn.GetState())
+		state = f.reConnect()
+		ready = state == connectivity.Ready
+	}
 	if !ready {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_READY_ALARM", "otlplog flusher is not ready. status", f.grpcConn.GetState())
+		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_READY_ALARM", "otlplog flusher is not ready. current status", f.grpcConn.GetState())
 	}
 	return ready
+}
+
+func (f *FlusherOTLPLog) reConnect() connectivity.State {
+	f.grpcConn.Connect()
+	return f.grpcConn.GetState()
 }
 
 // Stop ...
