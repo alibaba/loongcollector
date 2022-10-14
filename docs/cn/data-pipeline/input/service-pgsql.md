@@ -1,4 +1,4 @@
-# Canal
+# PostgreSQL 导入插件
 
 ## 简介
 
