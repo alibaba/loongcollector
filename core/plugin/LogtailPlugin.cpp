@@ -296,7 +296,8 @@ bool LogtailPlugin::LoadPluginBase() {
     bool dockerEnvConfigEnabled = (dockerEnvConfig != NULL && strlen(dockerEnvConfig) > 0
                                    && (dockerEnvConfig[0] == 't' || dockerEnvConfig[0] == 'T'));
 
-    if (observerConfigs.size() == (size_t)0 && pluginConfigs.size() == (size_t)0 && !dockerEnvConfigEnabled) {
+    if (observerConfigs.size() == (size_t)0 && pluginConfigs.size() == (size_t)0 && !dockerEnvConfigEnabled
+        && !AppConfig::GetInstance()->IsPurageContainerMode()) {
         LOG_INFO(sLogger, ("no plugin config and no docker env config, do not load plugin base", ""));
         return true;
     }
