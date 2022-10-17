@@ -44,11 +44,12 @@
 
 ## 输出
 
-| 名称                              | 提供方  | 简介                                 |
-| --------------------------------- | ------- | ------------------------------------ |
-| `flusher_kafka`<br>Kafka          | 社区    | 将采集到的数据输出到Kafka。          |
-| `flusher_sls`<br>SLS              | SLS官方 | 将采集到的数据输出到SLS。            |
-| `flusher_stdout`<br>标准输出/文件 | SLS官方 | 将采集到的数据输出到标准输出或文件。 |
+| 名称                           | 提供方                                                 | 简介                                        |
+|------------------------------|-----------------------------------------------------|-------------------------------------------|
+| `flusher_kafka`<br>Kafka     | 社区                                                  | 将采集到的数据输出到Kafka。推荐使用下面的flusher_kafka_v2   |
+| `flusher_kafka_v2`<br>Kafka  | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Kafka。                          |
+| `flusher_sls`<br>SLS         | SLS官方                                               | 将采集到的数据输出到SLS。                            |
+| `flusher_stdout`<br>标准输出/文件  | SLS官方                                               | 将采集到的数据输出到标准输出或文件。                        |
 | `flusher_otlp_log`<br>OTLP日志 | 社区<br>[`liuhaoyang`](https://github.com/liuhaoyang) | 将采集到的数据支持`Opentelemetry log protocol`的后端。 |
 
 ## 加速

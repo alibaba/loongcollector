@@ -52,6 +52,7 @@ require (
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/stretchr/testify v1.8.0
 	github.com/syndtr/goleveldb v0.0.0-20170725064836-b89cc31ef797
+	github.com/xdg-go/scram v1.1.1
 	go.opentelemetry.io/collector/pdata v0.60.0
 	go.opentelemetry.io/proto/otlp v0.19.0
 	go.uber.org/atomic v1.7.0
@@ -85,6 +86,8 @@ require (
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
+	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/stringprep v1.0.3 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	k8s.io/component-base v0.22.5 // indirect
 )
