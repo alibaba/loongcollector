@@ -217,6 +217,9 @@ func (m *Manager) run() {
 		m.Lock()
 		defer m.Unlock()
 		var temp []string
+		if len(m.allLoadedCfgs) == 0 {
+			return
+		}
 		for s := range m.allLoadedCfgs {
 			temp = append(temp, s)
 		}
@@ -306,11 +309,11 @@ func (m *Manager) checkJavaPath(javaPath string) (string, error) {
 		if !exists {
 			cmd := exec.Command("which", "java")
 			bytes, err := util.CombinedOutputTimeout(cmd, time.Second)
-			logger.Info(m.managerMeta.GetContext(), "detect user default java path", string(bytes[:len(bytes)-1]))
 			if err != nil && !strings.Contains(err.Error(), "no child process") {
 				return "", fmt.Errorf("java path is illegal: %v", err)
 			}
 			javaPath = string(bytes[:len(bytes)-1]) // remove \n
+			logger.Info(m.managerMeta.GetContext(), "detect user default java path", javaPath)
 		} else {
 			javaPath = jdkHome
 		}

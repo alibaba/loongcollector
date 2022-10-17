@@ -19,11 +19,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	logger.InitTestLogger(logger.OptionDebugLevel, logger.OptionOpenConsole, logger.OptionSyncLogger)
+}
 
 var expectCfg = `init_config:
   conf:
@@ -86,10 +91,13 @@ func TestManager_Register_static_config(t *testing.T) {
 
 func TestManager_RegisterCollector_And_Start_Stop(t *testing.T) {
 	m := createManager("test")
+	manager = m
+	m.collector = NewLogCollector("test")
 	m.initSuccess = true
 	m.manualInstall()
 	m.initConfDir()
 	go m.run()
+	go m.collector.Run()
 	m.RegisterCollector(mock.NewEmptyContext("", "", "11"), "test1", &test.MockMetricCollector{}, []*FilterInner{
 		{
 			Domain:    "kafka.producer",
@@ -107,8 +115,9 @@ func TestManager_RegisterCollector_And_Start_Stop(t *testing.T) {
 		},
 	})
 	assert.True(t, len(m.allLoadedCfgs) == 1)
+	time.Sleep(time.Second * 7)
 	m.UnregisterCollector("test1")
 	assert.True(t, len(m.allLoadedCfgs) == 0)
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 7)
 	assert.True(t, m.server == nil)
 }
