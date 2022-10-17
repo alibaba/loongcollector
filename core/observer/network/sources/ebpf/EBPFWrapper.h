@@ -118,6 +118,14 @@ private:
     ConnectionMetaManager* mConnectionMetaManager;
 
     bool isAppendMySQLMsg(conn_data_event_t* pEvent);
+    /**
+     * @param kernelVersion
+     * @param kernelRelease
+     * @return true if kernel version >= sls_observer_ebpf_min_kernel_version or kernel version equals to 3.10.x in
+     * centos 7.6+.
+     */
+    bool isSupportedOS(int64_t& kernelVersion, std::string& kernelRelease);
+    bool loadEbpfLib(int64_t kernelVersion, std::string& soPath);
 };
 
 

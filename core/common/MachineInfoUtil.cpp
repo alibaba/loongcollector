@@ -378,4 +378,21 @@ void GetAllPids(std::unordered_set<int32_t>& pids) {
     }
 #endif
 }
+bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashPath) {
+    static const boost::regex sReg(R"(^(\S+)\s+\S+\s+\S+\s+(\d+)\.(\d+).*$)");
+    bashPath.append("/etc/redhat-release");
+    os.clear();
+    std::string content, exception;
+    if (!ReadFileContent(bashPath, content)) {
+        return false;
+    }
+    boost::match_results<const char*> what;
+    if (BoostRegexSearch(content.c_str(), sReg, exception, what) && what.size() > 1) {
+        os = what[1].str();
+        osVersion = strtol(what[2].begin(), nullptr, 10) * 1000;
+        osVersion += strtol(what[3].begin(), nullptr, 10);
+    }
+    return !os.empty() && osVersion != 0;
+}
+
 } // namespace logtail
