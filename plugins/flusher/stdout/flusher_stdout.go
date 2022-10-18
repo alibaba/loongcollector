@@ -136,9 +136,6 @@ func (p *FlusherStdout) Flush(projectName string, logstoreName string, configNam
 }
 
 func (p *FlusherStdout) SetUrgent(flag bool) {
-	if p.outLogger != nil {
-		p.outLogger.Close()
-	}
 }
 
 // IsReady is ready to flush
@@ -147,7 +144,10 @@ func (*FlusherStdout) IsReady(projectName string, logstoreName string, logstoreK
 }
 
 // Stop ...
-func (*FlusherStdout) Stop() error {
+func (p *FlusherStdout) Stop() error {
+	if p.outLogger != nil {
+		p.outLogger.Close()
+	}
 	return nil
 }
 
