@@ -19,6 +19,13 @@
 #include <stdint.h>
 #include <string>
 
+
+enum class ObserverMetricsType : uint8_t {
+    L7_DB_METRICS = 0,
+    L7_REQ_METRICS = 1,
+    L4_METRICS = 2,
+};
+
 // 协议的消息类型，包括Request、Response。 TODO : Produce Consume
 enum MessageType { MessageType_None, MessageType_Request, MessageType_Response };
 
@@ -61,10 +68,10 @@ inline std::string ServiceCategoryToString(ServiceCategory type) {
 // Send/Write发送出去的数据
 enum PacketType { PacketType_None, PacketType_In, PacketType_Out };
 
-enum class PacketRoleType {
-    Unknown,
-    Client,
-    Server,
+enum class PacketRoleType : uint8_t {
+    Unknown = 0,
+    Client = 1,
+    Server = 2,
 };
 
 inline std::string PacketRoleTypeToString(PacketRoleType type) {

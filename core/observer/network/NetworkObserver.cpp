@@ -136,7 +136,7 @@ void NetworkObserver::FlushOutMetrics(std::vector<sls_logs::Log>& allData) {
     containerProcessGroupManager->FlushOutMetrics(allData, mConfig->mTags);
 }
 
-void NetworkObserver::FlushStatistics(NetStaticticsMap& statisticsMap, std::vector<sls_logs::Log>& allData) {
+void NetworkObserver::FlushStatistics(logtail::NetStaticticsMap& statisticsMap, std::vector<sls_logs::Log>& allData) {
     static ContainerProcessGroupManager* cpgManager = ContainerProcessGroupManager::GetInstance();
     MergedNetStatisticsHashMap mergedMap;
     for (auto& item : statisticsMap.mHashMap) {
@@ -154,38 +154,39 @@ void NetworkObserver::FlushStatistics(NetStaticticsMap& statisticsMap, std::vect
         log->mutable_contents()->Reserve(16);
         auto content = log->add_contents();
         content->set_key("type");
-        content->set_value("statistics");
+        content->set_value(std::to_string(static_cast<int>(ObserverMetricsType::L4_METRICS)));
+        Json::Value root;
+        Json::StreamWriterBuilder builder;
+        builder["indentation"] = ""; // If you want whitespace-less output
         if (iter->first.PID == 0) {
-            content = log->add_contents();
-            content->set_key("pid");
-            content->set_value("0");
+            root["_process_pid_"] = "0";
         } else {
-            auto meta = cpgManager->GetProcessMeta(iter->first.PID);
-            if (!meta->PassFilterRules()) {
+            const ProcessMetaPtr& ptr = cpgManager->GetProcessMeta(iter->first.PID);
+            if (!ptr->PassFilterRules()) {
                 if (this->mEBPFWrapper != nullptr) {
                     this->mEBPFWrapper->DisableProcess(iter->first.PID);
                 }
                 continue;
             }
-            auto& tags = meta->GetFormattedMeta();
-            for (const auto& item : tags) {
-                content = log->add_contents();
-                content->set_key(item.first);
-                content->set_value(item.second);
+            for (const auto& item : ptr->GetFormattedMeta()) {
+                root[item.first] = item.second;
+            }
+            for (const auto& item : mConfig->mTags) {
+                root[item.first] = item.second;
             }
         }
-        for (const auto& item : mConfig->mTags) {
-            content = log->add_contents();
-            content->set_key(item.first);
-            content->set_value(item.second);
-        }
-        NetStaticticsMap::StatisticsPairToPB(iter->first, iter->second, log, this->mConfig->mLocalPort);
+        content = log->add_contents();
+        content->set_key(observer::kLocalInfo);
+        content->set_value(Json::writeString(builder, root));
+        content = log->add_contents();
+        content->set_key(observer::kInterval);
+        content->set_value(std::to_string(this->mConfig->mFlushOutInterval));
+        iter->first.ToPB(log);
+        iter->second.ToPB(log);
         mNetworkStatistic->mInputBytes += iter->second.Base.RecvBytes;
         mNetworkStatistic->mInputBytes += iter->second.Base.SendBytes;
         mNetworkStatistic->mInputEvents += iter->second.Base.RecvPackets;
         mNetworkStatistic->mInputEvents += iter->second.Base.SendPackets;
-        mNetworkStatistic->mProtocolMatched += iter->second.Base.ProtocolMatched;
-        mNetworkStatistic->mProtocolUnMatched += iter->second.Base.ProtocolUnMatched;
         ++lastSize;
     }
 }

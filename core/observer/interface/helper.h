@@ -26,8 +26,24 @@
 
 #include "metas/ServiceMetaCache.h"
 #include "common/xxhash/xxhash.h"
+#include "layerfour.h"
+#include "MachineInfoUtil.h"
+#include "global.h"
 
-inline std::string SockAddressToString(SockAddress address) {
+
+namespace logtail {
+// GenUniqueConnectionID use connid,add and pid to generate a mostly unique id.
+static uint64_t GenConnectionID(uint32_t pid, uint32_t connid) {
+    static std::string sHostname = GetHostName();
+    static uint32_t sHash = XXH32(sHostname.c_str(), sHostname.size(), pid);
+    return static_cast<uint64_t>(sHash) << 32 | static_cast<uint64_t>(connid);
+}
+static const std::string kRemoteInfoPrefix = R"({"remote_host":")";
+static const std::string kRemoteInfoSuffix = R"("})";
+
+} // namespace logtail
+
+inline std::string SockAddressToString(const SockAddress& address) {
     char addr[INET6_ADDRSTRLEN + 1] = {'\0'};
 
     if (address.Type == SockAddressType_IPV4) {
@@ -49,146 +65,6 @@ inline SockAddress SockAddressFromString(const std::string& ipV4V6) {
     }
     return addr;
 }
-
-struct NetStatisticsKeyHash {
-    size_t operator()(const NetStatisticsKey& key) const {
-        return size_t(((uint64_t)key.PID << 32) | (uint64_t)key.SockHash);
-    }
-};
-
-struct NetStatisticsKeyEqual {
-    bool operator()(const NetStatisticsKey& a, const NetStatisticsKey& b) const {
-        return a.PID == b.PID && a.SockHash == b.SockHash;
-    }
-};
-
-// hash by connection
-typedef std::unordered_map<NetStatisticsKey, NetStatisticsTCP, NetStatisticsKeyHash, NetStatisticsKeyEqual>
-    NetStatisticsHashMap;
-
-struct MergedNetStatisticsKeyHash {
-    size_t operator()(const NetStatisticsKey& key) const {
-        uint32_t hash = XXH32(&key.DstAddr, sizeof(key.DstAddr), 0);
-        hash = XXH32(&key.DstPort, sizeof(key.DstPort), hash);
-        hash = XXH32(&key.PID, sizeof(key.PID), hash);
-        return hash;
-    }
-};
-struct MergedNetStatisticsKeyEqual {
-    bool operator()(const NetStatisticsKey& a, const NetStatisticsKey& b) const {
-        return a.PID == b.PID && a.DstPort == b.DstPort && a.RoleType == b.RoleType && a.DstAddr == b.DstAddr;
-    }
-};
-
-// hash by process and remote addr
-typedef std::unordered_map<NetStatisticsKey, NetStatisticsTCP, MergedNetStatisticsKeyHash, MergedNetStatisticsKeyEqual>
-    MergedNetStatisticsHashMap;
-
-struct NetStaticticsMap {
-    NetStatisticsTCP& GetStatisticsItem(const NetStatisticsKey& key) {
-        auto findRst = mHashMap.find(key);
-        if (findRst != mHashMap.end()) {
-            return findRst->second;
-        }
-        static NetStatisticsTCP sNewTcp;
-        auto insertIter = mHashMap.insert(std::make_pair(key, sNewTcp));
-        return insertIter.first->second;
-    }
-
-    static inline void StatisticsKeyToPB(const NetStatisticsKey& key, sls_logs::Log* log, bool withLocalPort) {
-        static auto sHostnameManager = logtail::ServiceMetaManager::GetInstance();
-        auto remoteIp = SockAddressToString(key.DstAddr);
-        Json::Value root;
-        root["remote_ip"] = remoteIp;
-        root["remote_port"] = key.RoleType == PacketRoleType::Server ? "0" : std::to_string(key.DstPort);
-        if (key.RoleType == PacketRoleType::Client) {
-            auto& serviceMeta = sHostnameManager->GetServiceMeta(key.PID, remoteIp);
-            root["remote_type"]
-                = ServiceCategoryToString(serviceMeta.Empty() ? ServiceCategory::Server : serviceMeta.Category);
-            if (!serviceMeta.Host.empty()) {
-                root["remote_host"] = serviceMeta.Host;
-            }
-        }
-        auto content = log->add_contents();
-        content->set_key("remote_info");
-        content->set_value(Json::FastWriter().write(root));
-
-        // ebpf data don't have local port
-        if (withLocalPort) {
-            content = log->add_contents();
-            content->set_key("local_port");
-            content->set_value(std::to_string(key.SrcPort));
-        }
-
-        content = log->add_contents();
-        content->set_key("socket_type");
-        content->set_value(SocketCategoryToString(key.SockCategory));
-
-        content = log->add_contents();
-        content->set_key("role");
-        content->set_value(PacketRoleTypeToString(key.RoleType));
-    }
-
-    static inline void StatisticsTCPToPB(const NetStatisticsTCP& tcp, sls_logs::Log* log) {
-        auto content = log->add_contents();
-        content->set_key("send_bytes");
-        content->set_value(std::to_string(tcp.Base.SendBytes));
-        content = log->add_contents();
-        content->set_key("recv_bytes");
-        content->set_value(std::to_string(tcp.Base.RecvBytes));
-
-        content = log->add_contents();
-        content->set_key("send_packets");
-        content->set_value(std::to_string(tcp.Base.SendPackets));
-        content = log->add_contents();
-        content->set_key("recv_packets");
-        content->set_value(std::to_string(tcp.Base.RecvPackets));
-
-        //        content = log->add_contents();
-        //        content->set_key("protocol_matched");
-        //        content->set_value(std::to_string(tcp.Base.ProtocolMatched));
-        //        content = log->add_contents();
-        //        content->set_key("protocol_unmatched");
-        //        content->set_value(std::to_string(tcp.Base.ProtocolUnMatched));
-        //        content = log->add_contents();
-        //        content->set_key("protocol");
-        //        content->set_value(ProtocolTypeToString(tcp.Base.LastInferedProtocolType));
-
-        content = log->add_contents();
-        content->set_key("send_total_latency");
-        content->set_value(std::to_string(tcp.SendTotalLatency));
-        content = log->add_contents();
-        content->set_key("recv_total_latency");
-        content->set_value(std::to_string(tcp.RecvTotalLatency));
-
-        //        content = log->add_contents();
-        //        content->set_key("send_retran_count");
-        //        content->set_value(std::to_string(tcp.SendRetranCount));
-        //        content = log->add_contents();
-        //        content->set_key("recv_retran_count");
-        //        content->set_value(std::to_string(tcp.RecvRetranCount));
-        //
-        //        content = log->add_contents();
-        //        content->set_key("send_zerowin_count");
-        //        content->set_value(std::to_string(tcp.SendZeroWinCount));
-        //        content = log->add_contents();
-        //        content->set_key("recv_zerowin_count");
-        //        content->set_value(std::to_string(tcp.RecvZeroWinCount));
-    }
-
-    static inline void StatisticsPairToPB(const NetStatisticsKey& key,
-                                          const NetStatisticsTCP& tcp,
-                                          sls_logs::Log* log,
-                                          bool withLocalPort) {
-        StatisticsKeyToPB(key, log, withLocalPort);
-        StatisticsTCPToPB(tcp, log);
-    }
-
-    inline void Clear() { mHashMap.clear(); }
-
-    NetStatisticsHashMap mHashMap;
-};
-
 inline std::string PacketEventHeaderToString(PacketEventHeader* header) {
     std::string str;
     str.append("EventType : ").append(PacketEventTypeToString(header->EventType)).append("\n");
@@ -320,4 +196,20 @@ inline PacketRoleType InferServerOrClient(PacketType pktType, MessageType messag
         return messageType == MessageType_Request ? PacketRoleType::Client : PacketRoleType::Server;
     }
     return PacketRoleType::Unknown;
+}
+
+
+inline void ConnectionAddrInfoToPB(const ConnectionAddrInfo& info, sls_logs::Log* log) {
+    auto content = log->add_contents();
+    content->set_key(logtail::observer::kLocalAddr);
+    content->set_value(SockAddressToString(info.LocalAddr));
+    content = log->add_contents();
+    content->set_key(logtail::observer::kLocalPort);
+    content->set_value(std::to_string(info.LocalPort));
+    content = log->add_contents();
+    content->set_key(logtail::observer::kRemoteAddr);
+    content->set_value(SockAddressToString(info.RemoteAddr));
+    content = log->add_contents();
+    content->set_key(logtail::observer::kRemotePort);
+    content->set_value(std::to_string(info.RemotePort));
 }

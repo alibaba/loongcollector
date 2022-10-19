@@ -23,6 +23,7 @@
 #include "metas/ConnectionMetaManager.h"
 #include "network/protocols/utils.h"
 #include <netinet/in.h>
+#include "interface/layerfour.h"
 
 DECLARE_FLAG_STRING(default_container_host_path);
 DEFINE_FLAG_INT64(sls_observer_ebpf_min_kernel_version,
@@ -669,21 +670,18 @@ void EBPFWrapper::OnCtrl(struct conn_ctrl_event_t* event) {
 }
 
 void EBPFWrapper::OnStat(struct conn_stats_event_t* event) {
-    NetStatisticsKey key;
-    key.SockCategory = ConvertSockAddress(event->addr, event->conn_id, key.DstAddr, key.DstPort);
-    EBPF_CONNECTION_FILTER(key.SockCategory, key.DstAddr, event->conn_id, event->addr);
+    logtail::NetStatisticsKey key;
+    key.SockCategory = ConvertSockAddress(event->addr, event->conn_id, key.AddrInfo.RemoteAddr, key.AddrInfo.RemotePort);
+    EBPF_CONNECTION_FILTER(key.SockCategory, key.AddrInfo.RemoteAddr, event->conn_id, event->addr);
     key.PID = event->conn_id.tgid;
     key.SockHash = ConvertConnIdToSockHash(&(event->conn_id));
-    key.SrcPort = 0;
-    key.SrcAddr.Type = SockAddressType_IPV4;
-    key.SrcAddr.Addr.IPV4 = 0;
-    key.RoleType = DetectRole(event->role, event->conn_id, key.DstPort);
-    if (key.RoleType == PacketRoleType::Server) {
-        key.DstPort = 0;
-    }
+    key.AddrInfo.LocalPort = 0;
+    key.AddrInfo.LocalAddr.Type = SockAddressType_IPV4;
+    key.AddrInfo.LocalAddr.Addr.IPV4 = 0;
+    key.RoleType = DetectRole(event->role, event->conn_id, key.AddrInfo.RemotePort);
     LOG_TRACE(sLogger,
-              ("receive stat event,addr", SockAddressToString(key.DstAddr))("family", event->addr.sa.sa_family)(
-                  "socket_type", SocketCategoryToString(key.SockCategory))("port", key.DstPort)("pid", key.PID)(
+              ("receive stat event,addr", SockAddressToString(key.AddrInfo.RemoteAddr))("family", event->addr.sa.sa_family)(
+                  "socket_type", SocketCategoryToString(key.SockCategory))("port",key.AddrInfo.RemotePort)("pid", key.PID)(
                   "fd", event->conn_id.fd));
     NetStatisticsTCP& item = mStatistics.GetStatisticsItem(key);
     item.Base.SendBytes += event->wr_bytes - event->last_output_wr_bytes;

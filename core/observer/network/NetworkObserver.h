@@ -29,6 +29,7 @@
 #include "metas/ContainerProcessGroup.h"
 #include "ConnectionObserver.h"
 #include "metas/ConnectionMetaManager.h"
+#include "interface/layerfour.h"
 
 namespace logtail {
 class ProcessObserver;
@@ -108,7 +109,7 @@ private:
      */
     void FlushOutMetrics(std::vector<sls_logs::Log>& allData);
 
-    void FlushStatistics(NetStaticticsMap& map, std::vector<sls_logs::Log>& logs);
+    void FlushStatistics(logtail::NetStaticticsMap& map, std::vector<sls_logs::Log>& logs);
 
     void ReloadSource();
 

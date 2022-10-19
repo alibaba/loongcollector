@@ -21,6 +21,7 @@
 #include "network/protocols/infer.h"
 #include "RuntimeUtil.h"
 #include "network/protocols/utils.h"
+#include "interface/layerfour.h"
 
 static void OnPCAPPacketsCallBack(u_char* user, const struct pcap_pkthdr* packet_header, const u_char* packet_content) {
     logtail::PCAPWrapper* wrapper = (logtail::PCAPWrapper*)user;
@@ -351,8 +352,9 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
         eventHeader->DstPort = ntohs(srcPort);
     }
     // filter host process connections
-    if (mConfig->mDropLocalConnections && (eventHeader->DstAddr.Addr.IPV4 == htonl(INADDR_LOOPBACK) || eventHeader->DstAddr.Addr.IPV4 == INADDR_ANY)
-        &&(eventHeader->SrcAddr.Addr.IPV4 == htonl(INADDR_LOOPBACK) || eventHeader->SrcAddr.Addr.IPV4 == INADDR_ANY)) {
+    if (mConfig->mDropLocalConnections
+        && (eventHeader->DstAddr.Addr.IPV4 == htonl(INADDR_LOOPBACK) || eventHeader->DstAddr.Addr.IPV4 == INADDR_ANY)
+        && (eventHeader->SrcAddr.Addr.IPV4 == htonl(INADDR_LOOPBACK) || eventHeader->SrcAddr.Addr.IPV4 == INADDR_ANY)) {
         return;
     }
     eventHeader->SockHash
@@ -402,21 +404,21 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
     }
     LOG_DEBUG(sLogger, ("tag3", "==="));
 
-    NetStatisticsKey key;
+    logtail::NetStatisticsKey key;
     key.PID = eventHeader->PID;
     key.SockHash = eventHeader->SockHash;
-    key.DstAddr = eventHeader->DstAddr;
-    key.DstPort = eventHeader->DstPort;
+    key.AddrInfo.RemoteAddr = eventHeader->DstAddr;
+    key.AddrInfo.RemotePort = eventHeader->DstPort;
     key.SockCategory = SocketCategory::InetSocket;
     bool needRebuildHash = false;
     if (eventHeader->RoleType == PacketRoleType::Server) {
-        key.DstPort = 0;
+        key.AddrInfo.RemotePort = 0;
         needRebuildHash = true;
     }
-    key.SrcAddr = eventHeader->SrcAddr;
-    key.SrcPort = eventHeader->SrcPort;
+    key.AddrInfo.LocalAddr = eventHeader->SrcAddr;
+    key.AddrInfo.LocalPort = eventHeader->SrcPort;
     if (eventHeader->RoleType == PacketRoleType::Client) {
-        key.SrcPort = 0;
+        key.AddrInfo.LocalPort = 0;
         needRebuildHash = true;
     }
     if (needRebuildHash) {
@@ -444,12 +446,6 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
         if (zeroWindow) {
             ++statisticsItem.RecvZeroWinCount;
         }
-    }
-    if (eventData->PtlType != ProtocolType_None) {
-        statisticsItem.Base.LastInferedProtocolType = eventData->PtlType;
-        ++statisticsItem.Base.ProtocolMatched;
-    } else {
-        ++statisticsItem.Base.ProtocolUnMatched;
     }
     if (mConfig->IsLegalProtocol(eventData->PtlType)) {
         mPacketProcessor(StringPiece(packetBuffer, sizeof(PacketEventHeader) + sizeof(PacketEventData)));

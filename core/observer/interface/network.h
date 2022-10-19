@@ -87,61 +87,6 @@ inline std::string PacketEventTypeToString(enum PacketEventType type) {
     return "None";
 }
 
-struct NetStatisticsKey {
-    uint32_t PID;
-    uint32_t SockHash; // hashed by local addr + local port + remote addrr + remote port
-    SockAddress SrcAddr;
-    uint16_t SrcPort;
-    SockAddress DstAddr;
-    uint16_t DstPort;
-    SocketCategory SockCategory;
-    PacketRoleType RoleType;
-};
-
-struct NetStatisticsBase {
-    void Merge(const struct NetStatisticsBase& o) {
-        SendBytes += o.SendBytes;
-        RecvBytes += o.RecvBytes;
-        SendPackets += o.SendPackets;
-        RecvPackets += o.RecvPackets;
-        ProtocolMatched += o.ProtocolMatched;
-        ProtocolUnMatched += o.ProtocolUnMatched;
-    }
-    int64_t SendBytes{0};
-    int64_t RecvBytes{0};
-    int64_t SendPackets{0};
-    int64_t RecvPackets{0};
-    int32_t ProtocolMatched{0};
-    int32_t ProtocolUnMatched{0};
-    bool ProtocolParseDisabled{false}; // 是否被Disable协议解析
-    ProtocolType LastInferedProtocolType{ProtocolType_None}; // 上一次成功推测的协议类型
-};
-
-struct NetStatisticsTCP {
-    void Merge(const struct NetStatisticsTCP& o) {
-        Base.Merge(o.Base);
-        SendTotalLatency += o.SendTotalLatency;
-        RecvTotalLatency += o.RecvTotalLatency;
-        SendRetranCount += o.SendRetranCount;
-        RecvRetranCount += o.RecvRetranCount;
-        SendZeroWinCount += o.SendZeroWinCount;
-        RecvZeroWinCount += o.RecvZeroWinCount;
-    }
-    struct NetStatisticsBase Base {};
-    int64_t SendTotalLatency{0};
-    int64_t RecvTotalLatency{0};
-
-    int64_t SendRetranCount{0};
-    int64_t RecvRetranCount{0};
-
-    int64_t SendZeroWinCount{0};
-    int64_t RecvZeroWinCount{0};
-};
-
-// BPF_HASH(net_statistics_map, NetStatisticsKey, NetStatistics, 131072);
-
-// BPF_PERF_OUTPUT(PacketEvent)
-
 // 如果是控制消息（建连、断连），只需要output
 // header；如果是数据类型，传PacketEventData
 struct PacketEventHeader {
@@ -170,4 +115,12 @@ struct PacketEventData {
 
     char* Buffer; // 一般设置为 buffer + sizeof(PacketEventHeader) +
                   // sizeof(PacketEventData)
+};
+
+
+struct ConnectionAddrInfo {
+    SockAddress LocalAddr{};
+    SockAddress RemoteAddr{};
+    uint16_t LocalPort{0};
+    uint16_t RemotePort{0};
 };
