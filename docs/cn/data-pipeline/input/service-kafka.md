@@ -12,7 +12,7 @@
 | Version | String | 是 | Kafka集群版本号。 |
 | Brokers | Array | 是 | Kafka服务器地址列表。 |
 | ConsumerGroup | String | 是 | Kafka消费组名称。 |
-| Topic | Array | 是 | 待消费的Kafka订阅主题列表。 |
+| Topics | Array | 是 | 待消费的Kafka订阅主题列表。 |
 | ClientID | String | 是 | 消费Kafka的用户ID。 |
 | Offset | String | 否 | Kafka初始消费位移类型，可选值包括：oldest和newest。如果未添加该参数，则默认使用oldest，表示从最早可用的位移处开始消费。 |
 | MaxMessageLen | Integer | 否 | Kafka消息的最大允许长度，单位为字节，取值范围为：1～524288。如果未添加该参数，则默认使用524288，即512KB。 |
@@ -40,7 +40,7 @@ inputs:
         - 172.xx.xx.48
         - 172.xx.xx.34
     ConsumerGroup: test-group
-    Topic:
+    Topics:
         - topicA
         - topicB
     ClientID: sls
