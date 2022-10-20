@@ -21,9 +21,11 @@
 - Howie([@Howie59](https://github.com/Howie59))
 - Xiaolei Wang([@fatelei](https://github.com/fatelei))
 - Lework([@lework](https://github.com/lework))
-- Liu Haoyang([@liuhaoyang](https://github.com/liuhaoyang))
 - niuttt([@tong549761863](https://github.com/tong549761863))
 - mrddz([@mrddz](https://github.com/mrddz))
+- TDAkory([@TDAkory](https://github.com/TDAkory))
+- Yu Sun([@shalousun](https://github.com/shalousun))
+- XLPE([@XLPE](https://github.com/XLPE))
 
 ## <img alt="Senior Developer" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Dev.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Developer</span>
 
@@ -35,6 +37,8 @@
 - Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
 - Jiapeng Liu([@EvanLjp](https://github.com/EvanLjp))
 - Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
+- Haoyang Liu([@liuhaoyang](https://github.com/liuhaoyang))
+- Zehua Yang([@Takuka0311](https://github.com/Takuka0311))
 
 ## <img alt="Junior Ambassador" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Amb.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Ambassador</span>
 
@@ -43,6 +47,10 @@
 ---
 
 - Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
+- Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
+- Weilong Pan([@panawala](https://github.com/panawala))
+- Jinchen([@pj1987111](https://github.com/pj1987111))
+- niuttt([@tong549761863](https://github.com/tong549761863))
 
 ## <img alt="Senior Ambassador" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Amb.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Ambassador</span>
 
@@ -62,6 +70,7 @@
 - Kejia Xu([@messixukejia](https://github.com/messixukejia))
 - Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
 - Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
+- XLPE([@XLPE](https://github.com/XLPE))
 
 ## <img alt="Senior Moderator" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Mod.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Moderator</span>
 
