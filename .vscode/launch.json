@@ -7,7 +7,6 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/plugin_main",
-            "buildFlags": "-mod=vendor",
             "env": {
                 "LD_LIBRARY_PATH": "${workspaceFolder}/pkg/logtail"
             }
