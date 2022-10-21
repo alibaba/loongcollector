@@ -117,7 +117,7 @@ go install ...
 - 编译Go插件
 
 ```bash
-make vendor       # 若需要更新插件库
+go mod tidy       # 若需要更新插件库
 make plugin_local # 每次更新插件代码后从这里开始
 ```
 

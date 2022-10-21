@@ -36,5 +36,4 @@ SOURCEDIR="core/build/plugin"
 
 if [ $OS_FLAG = 1 ]; then
   cp ${ROOTDIR}/core/build/plugin/libPluginAdapter.so ${ROOTDIR}/pkg/logtail/libPluginAdapter.so
-  cp ${ROOTDIR}/core/build/plugin/libPluginAdapter.so ${ROOTDIR}/vendor/github.com/alibaba/ilogtail/pkg/logtail/libPluginAdapter.so
 fi

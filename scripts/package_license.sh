@@ -22,7 +22,7 @@ command="$GO_ADDLICENSE -v -c \"iLogtail Authors\""
 if [ "$OPERATION" = "check" ]; then
   command=$command"  -check"
 fi
-command+=' -ignore "**/.idea/**" -ignore "**/vendor/**" -ignore "**/protocol/**" -ignore "**/oldtest/**"'
+command+=' -ignore "**/.idea/**" -ignore "**/protocol/**" -ignore "**/oldtest/**"'
 command+=' -ignore "**/internal/**" -ignore "**/diagnose/**" -ignore "**/external/**" -ignore "**/*.html"'
 command+=' -ignore "**/core/log_pb/*.pb.*" -ignore "core/common/Version.cpp"'
 command+=" $SCOPE"

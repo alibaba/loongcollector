@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/Shopify/sarama v1.28.0
 	github.com/VictoriaMetrics/VictoriaMetrics v1.58.0
-	github.com/VictoriaMetrics/metrics v1.17.2
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner v0.0.0
 	github.com/aliyun/aliyun-log-go-sdk v0.1.12
@@ -40,13 +39,10 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.1-0.20170719102518-a803f0e4f071
 	github.com/pierrec/lz4 v2.6.0+incompatible
 	github.com/pingcap/check v0.0.0-20200212061837-5e12011dc712
-	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3
-	github.com/pingcap/parser v0.0.0-20210415081931-48e7f467fd74
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.30.0
 	github.com/prometheus/procfs v0.7.3
 	github.com/shirou/gopsutil v3.21.3+incompatible
-	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
 	github.com/siddontang/go-mysql v0.0.0-20180725024449-535abe8f2eba
 	github.com/sirupsen/logrus v1.8.1
 	github.com/smartystreets/goconvey v1.7.2
@@ -67,6 +63,7 @@ require (
 )
 
 require (
+	github.com/VictoriaMetrics/metrics v1.17.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cilium/ebpf v0.7.0 // indirect
@@ -80,7 +77,10 @@ require (
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/moby/sys/signal v0.6.0 // indirect
 	github.com/pelletier/go-toml v1.9.3 // indirect
+	github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63 // indirect
+	github.com/pingcap/parser v0.0.0-20210415081931-48e7f467fd74 // indirect
 	github.com/prometheus/client_golang v1.11.1 // indirect
+	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
@@ -177,7 +177,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opencontainers/selinux v1.10.1 // indirect
 	github.com/oschwald/maxminddb-golang v1.2.1 // indirect
-	github.com/pingcap/log v0.0.0-20210317133921-96f4fcab92a4 // indirect
+	github.com/pingcap/log v0.0.0-20210625125904-98ed8e2eb1c7 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
@@ -189,14 +189,14 @@ require (
 	github.com/tchap/go-patricia v2.3.0+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fastjson v1.6.3 // indirect
-	github.com/valyala/fastrand v1.0.0 // indirect
+	github.com/valyala/fastrand v1.1.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
-	github.com/valyala/histogram v1.1.2 // indirect
+	github.com/valyala/histogram v1.2.0 // indirect
 	github.com/valyala/quicktemplate v1.6.3 // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.17.0 // indirect
+	go.uber.org/zap v1.18.1 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/net v0.0.0-20220921203646-d300de134e69 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
@@ -222,9 +222,13 @@ require (
 )
 
 replace (
+	github.com/VictoriaMetrics/VictoriaMetrics => github.com/iLogtail/VictoriaMetrics v1.58.0-ilogtail
+	github.com/VictoriaMetrics/metrics => github.com/iLogtail/metrics v1.17.2-ilogtail
 	github.com/alibaba/ilogtail/pkg => ./pkg
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner => ./external/github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner
 	github.com/elastic/beats/v7 => ./external/github.com/elastic/beats/v7
 	github.com/jeromer/syslogparser => ./external/github.com/jeromer/syslogparser
+	github.com/pingcap/parser => github.com/iLogtail/parser v0.0.0-20210415081931-48e7f467fd74-ilogtail
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
+	github.com/siddontang/go-mysql => github.com/iLogtail/go-mysql v0.0.0-20180725024449-535abe8f2eba-ilogtail
 )

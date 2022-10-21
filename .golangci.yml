@@ -47,6 +47,8 @@ run:
   skip-files:
     - plugins/input/journal/unit.go
     - plugins/input/journal/follow.go
+    - plugins/input/prometheus/sls_writer.go
+    - plugin_main/plugin_http.go
 
   # by default isn't set. If set we pass it to "go list -mod={option}". From "go help modules":
   # If invoked with -mod=readonly, the go command is disallowed from the implicit

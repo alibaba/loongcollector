@@ -57,11 +57,11 @@ ram_limit_nproc=\$((ram_size / 1024 / 768))
 EOF
   chmod 755 $BUILD_SCRIPT_FILE
   if [ $CATEGORY = "plugin" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s PluginAdapter && cd ../../.. && ./scripts/plugin_build.sh vendor c-shared ${OUT_DIR}" >> $BUILD_SCRIPT_FILE;
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s PluginAdapter && cd ../../.. && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR}" >> $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "core" ]; then
     echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} .. && make -sj\$nproc" >>  $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "all" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} .. && make -sj\$nproc && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh vendor c-shared ${OUT_DIR}" >> $BUILD_SCRIPT_FILE;
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} .. && make -sj\$nproc && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR}" >> $BUILD_SCRIPT_FILE;
   elif [ $CATEGORY = "e2e" ]; then
     echo "mkdir -p core/build && cd core/build && cmake -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} .. && make -sj\$nproc && cd - && ./scripts/plugin_gocbuild.sh ${OUT_DIR}" >> $BUILD_SCRIPT_FILE;
   fi

@@ -35,8 +35,7 @@ cd "$ROOTDIR"/plugin_main
 pwd
 
 if uname -s | grep Linux; then
-  cp ${ROOTDIR}/core/build/plugin/libPluginAdapter.so ${ROOTDIR}/vendor/github.com/alibaba/ilogtail/pkg/logtail/libPluginAdapter.so
-  goc build '--buildflags=-mod=vendor -buildmode=c-shared -ldflags="-extldflags "-Wl,--wrap=memcpy""' --center=http://goc:7777 -o "$ROOTDIR/$OUT_DIR/${NAME}"
+  goc build '--buildflags=-mod=mod -buildmode=c-shared -ldflags="-extldflags "-Wl,--wrap=memcpy""' --center=http://goc:7777 -o "$ROOTDIR/$OUT_DIR/${NAME}"
 else
   echo "goc build only build a dynamic library in linux platform"
   exit 1

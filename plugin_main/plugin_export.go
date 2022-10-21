@@ -101,34 +101,34 @@ func UnloadConfig(project string, logstore string, configName string) int {
 }
 
 //export ProcessRawLog
-func ProcessRawLog(configName string, rawLog []byte, packId string, topic string) int {
+func ProcessRawLog(configName string, rawLog []byte, packID string, topic string) int {
 	plugin, flag := pluginmanager.LogtailConfig[configName]
 	if !flag {
 		return -1
-	} else {
-		// rawLog will be copied when it is converted to string, packId and topic
-		// are unused now, so deep copy is unnecessary.
-		return plugin.ProcessRawLog(rawLog, packId, topic)
 	}
+
+	// rawLog will be copied when it is converted to string, packID and topic
+	// are unused now, so deep copy is unnecessary.
+	return plugin.ProcessRawLog(rawLog, packID, topic)
 }
 
 //export ProcessRawLogV2
-func ProcessRawLogV2(configName string, rawLog []byte, packId string, topic string, tags []byte) int {
+func ProcessRawLogV2(configName string, rawLog []byte, packID string, topic string, tags []byte) int {
 	config, exists := pluginmanager.LogtailConfig[configName]
 	if !exists {
 		return -1
 	}
-	return config.ProcessRawLogV2(rawLog, packId, util.StringDeepCopy(topic), tags)
+	return config.ProcessRawLogV2(rawLog, packID, util.StringDeepCopy(topic), tags)
 }
 
 //export ProcessLog
-func ProcessLog(configName string, logBytes []byte, packId string, topic string, tags []byte) int {
+func ProcessLog(configName string, logBytes []byte, packID string, topic string, tags []byte) int {
 	config, exists := pluginmanager.LogtailConfig[configName]
 	if !exists {
 		logger.Debug(context.Background(), "ProcessLog not found", configName)
 		return -1
 	}
-	return config.ProcessLog(logBytes, packId, util.StringDeepCopy(topic), tags)
+	return config.ProcessLog(logBytes, packID, util.StringDeepCopy(topic), tags)
 }
 
 //export HoldOn
@@ -162,8 +162,8 @@ func Resume() {
 }
 
 //export CtlCmd
-func CtlCmd(configName string, cmdId int, cmdDetail string) {
-	logger.Info(context.Background(), "execute cmd", cmdId, "detail", cmdDetail, "config", configName)
+func CtlCmd(configName string, cmdID int, cmdDetail string) {
+	logger.Info(context.Background(), "execute cmd", cmdID, "detail", cmdDetail, "config", configName)
 }
 
 //export GetContainerMeta

@@ -24,7 +24,7 @@ function os() {
   fi
 }
 
-MOD=${1:-vendor}
+MOD=${1:-mod}
 BUILDMODE=${2:-default}
 OUT_DIR=${3:-output}
 NAME=ilogtail

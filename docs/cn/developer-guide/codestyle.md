@@ -23,7 +23,7 @@ find core/ -type f -iname '*.h' -o -iname '*.cpp' | xargs clang-format -i
 或使用命令行进行格式化
 
 ```bash
-find ./ -type f -iname '*.go' -not -iname '*.pb.go' | grep -E -v '/vendor|external/' | xargs gofmt -w
+find ./ -type f -iname '*.go' -not -iname '*.pb.go' | grep -E -v '/external/' | xargs gofmt -w
 ```
 
 ## 格式化Markdown

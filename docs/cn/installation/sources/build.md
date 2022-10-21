@@ -17,7 +17,6 @@ Makefile描述了整个项目的所有编译目标，主要的包括：
 | all | 编译完整iLogtail |
 | dist | 打包发行 |
 | docker | 制作iLogtail镜像 |
-| vendor | 更新插件依赖 |
 | plugin_local | 本地编译Go插件 |
 
 使用`make <target>`命令编译所选目标，如果需要指定生成的版本号则在编译命令前加上VERSION环境变量，如：
@@ -55,7 +54,7 @@ Go插件可以在主机上进行直接编译，编译前，需要安装基础的
 在安装完成后，为了方便后续地开发，请遵照[此文档](https://golang.org/doc/code#Organization)正确地设置你的开发目录以及 GOPATH 等环境变量。。
 
 ```bash
-make vendor       # 若需要更新插件依赖库
+go mod tidy       # 若需要更新插件依赖库
 make plugin_local # 每次更新插件代码后从这里开始
 ```
 
