@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -208,5 +209,57 @@ func (s *processorTestSuite) TestNoKeyAlarmAndPreserve(c *check.C) {
 
 		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "preserve_2")
 		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "2")
+	}
+}
+
+func (s *processorTestSuite) TestEnableLogPositionMeta(c *check.C) {
+
+	{
+		processor, _ := s.processor.(*ProcessorSplit)
+		processor.EnableLogPositionMeta = true
+		var log = "xxxx\nyyyy\nzzzz\n"
+		logPb := test.CreateLogs("content", log, helper.FileOffsetKey, "1000")
+		logArray := make([]*protocol.Log, 1)
+		logArray[0] = logPb
+		outLogs := processor.ProcessLogs(logArray)
+		c.Assert(len(outLogs), check.Equals, 3)
+		for i := 0; i < len(outLogs); i++ {
+			cont := helper.GetFileOffsetTag(outLogs[i])
+			c.Assert(cont, check.NotNil)
+			off, _ := strconv.ParseInt(cont.Value, 10, 64)
+			c.Assert(off, check.Equals, int64(1000+i*5))
+		}
+	}
+
+	{
+		processor, _ := s.processor.(*ProcessorSplit)
+		processor.EnableLogPositionMeta = true
+		var log = "xxxx\nyyyy\nzzzz\n"
+		logPb := test.CreateLogs("content", log)
+		logArray := make([]*protocol.Log, 1)
+		logArray[0] = logPb
+		outLogs := processor.ProcessLogs(logArray)
+		c.Assert(len(outLogs), check.Equals, 3)
+		for i := 0; i < len(outLogs); i++ {
+			cont := helper.GetFileOffsetTag(outLogs[i])
+			c.Assert(cont, check.IsNil)
+		}
+	}
+
+	{
+		processor, _ := s.processor.(*ProcessorSplit)
+		processor.EnableLogPositionMeta = false
+		var log = "xxxx\nyyyy\nzzzz\n"
+		logPb := test.CreateLogs("content", log, helper.FileOffsetKey, "1000")
+		logArray := make([]*protocol.Log, 1)
+		logArray[0] = logPb
+		outLogs := processor.ProcessLogs(logArray)
+		c.Assert(len(outLogs), check.Equals, 3)
+		for i := 0; i < len(outLogs); i++ {
+			cont := helper.GetFileOffsetTag(outLogs[i])
+			c.Assert(cont, check.NotNil)
+			off, _ := strconv.ParseInt(cont.Value, 10, 64)
+			c.Assert(off, check.Equals, int64(1000))
+		}
 	}
 }

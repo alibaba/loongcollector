@@ -14,6 +14,7 @@
 | LogPath | String | 是 | <p>采集文本日志所在的目录，支持完整目录和通配符两种模式。</p><p>日志文件查找模式为多层目录匹配，即指定目录（包含所有层级的目录）下所有符合条件的文件都会被查找到。 |
 | FilePattern | String | 是 | 采集文本日志的文件名，支持完整文件名和通配符两种模式。 |
 | MaxDepth | Integer | 否 | 日志目录被监控的最大深度，范围：0~1000。如果未添加该参数，则默认使用0，代表只监控本层目录。 |
+| EnableLogPositionMeta | Boolean | 否 | 是否在日志中添加该日志所属原始文件的元数据信息，即新增__tag__:__inode__字段和__file_offset__字段，默认值为false。 |
 | DirBlackList | Array | 否 | 目录（绝对路径）黑名单。支持使用通配符星号（*）匹配多个目录。 |
 | FilepathBlackList | Array | 否 | 文件路径（绝对路径）黑名单。支持使用通配符星号（*）匹配多个文件。 |
 | ContainerFile | Boolean | 是 | iLogtail与待采集日志是否处于不同环境中。若待采集的日志和iLogtail在不同的容器中，请将参数值置为true，其余情况请置为false。 |

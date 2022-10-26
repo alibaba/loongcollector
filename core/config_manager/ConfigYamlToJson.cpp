@@ -92,6 +92,7 @@ ConfigYamlToJson::ConfigYamlToJson() {
     mFileAdvancedConfigMap["PreciseTimestampUnit"] = "precise_timestamp_unit";
     mFileAdvancedConfigMap["ForceMultiConfig"] = "force_multiconfig";
     mFileAdvancedConfigMap["TailSizeKB"] = "tail_size_kb";
+    mFileAdvancedConfigMap["EnableLogPositionMeta"] = "enable_log_position_meta";
 
     mFileK8sConfigMap["K8sNamespaceRegex"] = "K8sNamespaceRegex";
     mFileK8sConfigMap["K8sPodRegex"] = "K8sPodRegex";

@@ -16,7 +16,7 @@ FROM --platform=$TARGETPLATFORM centos:centos7.9.2009 as build
 ARG VERSION=1.2.1
 ARG TARGETPLATFORM
 WORKDIR /usr/local
-COPY ilogtail-${VERSION}.linux-*.tar.gz .
+COPY dist/ilogtail-${VERSION}.linux-*.tar.gz .
 RUN tar -xzf ilogtail-${VERSION}.linux-${TARGETPLATFORM##*/}.tar.gz
 
 

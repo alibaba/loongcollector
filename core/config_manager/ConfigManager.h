@@ -58,6 +58,8 @@ public:
 
     std::string CheckPluginFlusher(Json::Value& configJson);
 
+    Json::Value& CheckPluginProcessor(Json::Value& pluginConfigJson, const Json::Value& rootConfigJson);
+
 private:
     ThreadPtr mCheckUpdateThreadPtr;
 

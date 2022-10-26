@@ -45,8 +45,10 @@ GO_BUILD_FLAGS = -v
 
 LICENSE_COVERAGE_FILE=license_coverage.txt
 OUT_DIR = output
-DIST_DIR = ilogtail-$(VERSION)
+DIST_DIR = dist
+PACKAGE_DIR = ilogtail-$(VERSION)
 EXTERNAL_DIR = external
+DIST_FILE = $(DIST_DIR)/ilogtail-$(VERSION).linux-$(ARCH).tar.gz
 
 .PHONY: tools
 tools:
@@ -184,16 +186,16 @@ all: clean
 
 .PHONY: dist
 dist: all
-	./scripts/dist.sh $(OUT_DIR) $(DIST_DIR)
+	./scripts/dist.sh $(OUT_DIR) $(DIST_DIR) $(PACKAGE_DIR)
 
-ilogtail-$(VERSION).linux-$(ARCH).tar.gz:
-	@echo 'ilogtail-$(VERSION) does not exist! Please download or run `make dist` first!'
+$(DIST_FILE):
+	@echo 'ilogtail-$(VERSION) dist does not exist! Please download or run `make dist` first!'
 	@false
 
 .PHONY: docker
-docker: ilogtail-$(VERSION).linux-$(ARCH).tar.gz
+docker: $(DIST_FILE)
 	./scripts/docker_build.sh production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)
 
 .PHONY: multi-arch-docker
-multi-arch-docker: ilogtail-$(VERSION).linux-$(ARCH).tar.gz
+multi-arch-docker: $(DIST_FILE)
 	./scripts/docker_build.sh multi-arch-production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH)

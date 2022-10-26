@@ -478,15 +478,22 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                 pluginConfig.clear();
             }
 
+            Json::Value pluginConfigJson;
+            Json::Reader jsonReader;
+            if (!pluginConfig.empty() && !jsonReader.parse(pluginConfig, pluginConfigJson)) {
+                LOG_WARNING(sLogger,
+                            ("invalid plugin config, plugin config json parse error",
+                             pluginConfig)("project", projectName)("logstore", category)("config", logName));
+            }
+
             if (logType == PLUGIN_LOG) {
                 config = new Config(
                     "", "", logType, logName, "", projectName, false, 0, 0, category, false, "", discardUnmatch);
                 if (pluginConfig.empty()) {
                     throw ExceptionBase(std::string("The plugin log type is invalid"));
                 }
-                Json::Reader jsonReader;
-                Json::Value pluginConfigJson;
-                if (jsonReader.parse(pluginConfig, pluginConfigJson)) {
+                if (!pluginConfigJson.isNull()) {
+                    pluginConfigJson = ConfigManager::GetInstance()->CheckPluginProcessor(pluginConfigJson, value);
                     pluginConfig = ConfigManager::GetInstance()->CheckPluginFlusher(pluginConfigJson);
                     if (pluginConfig.find("\"observer_ilogtail_") != string::npos) {
                         if (pluginConfigJson.isMember("inputs")) {
@@ -502,6 +509,7 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                                 SetNotFoundJsonMember(pluginConfigJson, MIX_PROCESS_MODE, "observer");
                                 config->mPluginConfig = pluginConfigJson.toStyledString();
                             }
+
                         } else {
                             LOG_WARNING(sLogger,
                                         ("observer config is not a legal JSON object",
@@ -510,10 +518,6 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                     } else {
                         config->mPluginConfig = pluginConfig;
                     }
-                    LOG_DEBUG(sLogger,
-                          ("load plugin config ", logName)("config", pluginConfig)("observer", config->mObserverFlag));
-                } else {
-                    LOG_WARNING(sLogger, ("invalid plugin config", pluginConfig)("project", projectName)("logstore", category)("config", logName));
                 }
             } else if (logType == STREAM_LOG) {
                 config = new Config("",
@@ -576,53 +580,51 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                                     discardUnmatch);
 
                 // normal log file config can have plugin too
-                Json::Value pluginConfigJSON;
-                if (!pluginConfig.empty()) {
+                if (!pluginConfig.empty() && !pluginConfigJson.isNull()) {
                     // check processors
-                    Json::Reader jsonReader;
-                    if (jsonReader.parse(pluginConfig, pluginConfigJSON)) {
-                        // set process flag when config have processors
-                        if (pluginConfigJSON.isMember("processors")
-                            && (pluginConfigJSON["processors"].isObject()
-                                || pluginConfigJSON["processors"].isArray())) {
-                            config->mPluginProcessFlag = true;
-                            pluginConfig = ConfigManager::GetInstance()->CheckPluginFlusher(pluginConfigJSON);
-                            config->mPluginConfig = pluginConfig;
+                    // set process flag when config have processors
+                    if (pluginConfigJson.isMember("processors")
+                        && (pluginConfigJson["processors"].isObject() || pluginConfigJson["processors"].isArray())) {
+                        // patch enable_log_position_meta to split processor if exists ...
+                        config->mPluginProcessFlag = true;
+                        pluginConfigJson = ConfigManager::GetInstance()->CheckPluginProcessor(pluginConfigJson, value);
+                        pluginConfig = ConfigManager::GetInstance()->CheckPluginFlusher(pluginConfigJson);
+                        config->mPluginConfig = pluginConfig;
+                    }
+
+                    if (value.isMember("docker_file") && value["docker_file"].isBool()
+                        && value["docker_file"].asBool()) {
+                        if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+                            // docker file is not supported in Logtail's container mode
+                            if (AppConfig::GetInstance()->IsContainerMode()) {
+                                throw ExceptionBase(
+                                    std::string("docker file is not supported in Logtail's container mode "));
+                            }
+                            // load saved container path
+                            auto iter = mAllDockerContainerPathMap.find(logName);
+                            if (iter != mAllDockerContainerPathMap.end()) {
+                                config->mDockerContainerPaths = iter->second;
+                                mAllDockerContainerPathMap.erase(iter);
+                            }
+                            if (!config->SetDockerFileFlag(true)) {
+                                // should not happen
+                                throw ExceptionBase(std::string("docker file do not support wildcard path"));
+                            }
+                            MappingPluginConfig(value, config, pluginConfigJson);
+                        } else {
+                            LOG_WARNING(sLogger,
+                                        ("config is docker_file mode, but logtail is not a purage container",
+                                         "the flag is ignored")("project", projectName)("logstore", category));
+                            LogtailAlarm::GetInstance()->SendAlarm(
+                                CATEGORY_CONFIG_ALARM,
+                                string("config is docker_file mode, but logtail is not "
+                                       "a purage container, the flag is ignored"),
+                                projectName,
+                                category,
+                                region);
                         }
                     }
                 }
-
-                if (value.isMember("docker_file") && value["docker_file"].isBool() && value["docker_file"].asBool()) {
-                    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
-                        // docker file is not supported in Logtail's container mode
-                        if (AppConfig::GetInstance()->IsContainerMode()) {
-                            throw ExceptionBase(
-                                std::string("docker file is not supported in Logtail's container mode "));
-                        }
-                        // load saved container path
-                        auto iter = mAllDockerContainerPathMap.find(logName);
-                        if (iter != mAllDockerContainerPathMap.end()) {
-                            config->mDockerContainerPaths = iter->second;
-                            mAllDockerContainerPathMap.erase(iter);
-                        }
-                        if (!config->SetDockerFileFlag(true)) {
-                            // should not happen
-                            throw ExceptionBase(std::string("docker file do not support wildcard path"));
-                        }
-                        MappingPluginConfig(value, config, pluginConfigJSON);
-                    } else {
-                        LOG_WARNING(sLogger,
-                                    ("config is docker_file mode, but logtail is not a purage container",
-                                     "the flag is ignored")("project", projectName)("logstore", category));
-                        LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                               string("config is docker_file mode, but logtail is not "
-                                                                      "a purage container, the flag is ignored"),
-                                                               projectName,
-                                                               category,
-                                                               region);
-                    }
-                }
-
                 if (AppConfig::GetInstance()->IsContainerMode()) {
                     // mapping config's path to real filePath
                     // use docker file flag

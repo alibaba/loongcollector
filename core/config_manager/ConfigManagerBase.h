@@ -437,6 +437,8 @@ public:
 
     virtual std::string CheckPluginFlusher(Json::Value& configJson) = 0;
 
+    virtual Json::Value& CheckPluginProcessor(Json::Value& pluginConfigJson, const Json::Value& rootConfigJson) = 0;
+
 private:
     // no copy
     ConfigManagerBase(const ConfigManagerBase&);

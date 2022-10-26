@@ -179,4 +179,26 @@ std::string ConfigManager::CheckPluginFlusher(Json::Value& configJSON) {
     return configJSON.toStyledString();
 }
 
+Json::Value& ConfigManager::CheckPluginProcessor(Json::Value& pluginConfigJson, const Json::Value& rootConfigJson) {
+    if (pluginConfigJson.isMember("processors")
+        && (pluginConfigJson["processors"].isObject() || pluginConfigJson["processors"].isArray())) {
+        // patch enable_log_position_meta to split processor if exists ...
+        if (rootConfigJson["advanced"] && rootConfigJson["advanced"]["enable_log_position_meta"]) {
+            for (int i = 0; i < pluginConfigJson["processors"].size(); i++) {
+                Json::Value& processorConfigJson = pluginConfigJson["processors"][i];
+                if (processorConfigJson["type"] == "processor_split_log_string"
+                    || processorConfigJson["type"] == "processor_split_log_regex") {
+                    if (processorConfigJson["detail"]) {
+                        processorConfigJson["detail"]["EnableLogPositionMeta"]
+                            = rootConfigJson["advanced"]["enable_log_position_meta"];
+                    }
+                    break;
+                }
+                pluginConfigJson["processors"][i] = processorConfigJson;
+            }
+        }
+    }
+    return pluginConfigJson;
+}
+
 } // namespace logtail

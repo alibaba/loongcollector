@@ -333,6 +333,14 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                             .append(extraTags[i].value());
                     }
 
+                    if(config->mAdvancedConfig.mEnableLogPositionMeta){
+                           passingTags.append(TAG_DELIMITER)
+                            .append(TAG_PREFIX)
+                            .append(LOG_RESERVED_KEY_FILE_OFFSET)
+                            .append(TAG_SEPARATOR)
+                            .append(std::to_string(logBuffer->beginOffset));
+                    }
+
                     LogtailPlugin::GetInstance()->ProcessRawLogV2(logFileReader->GetConfigName(),
                                                                   logBuffer->buffer,
                                                                   logBuffer->bufferSize,

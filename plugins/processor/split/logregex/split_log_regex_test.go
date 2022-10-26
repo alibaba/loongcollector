@@ -21,6 +21,7 @@ import (
 	"github.com/pingcap/check"
 
 	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
@@ -263,4 +264,46 @@ func (s *processorTestSuite) TestNoKeyAlarm(c *check.C) {
 		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "preserve_2")
 		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "2")
 	}
+}
+
+func (s *processorTestSuite) TestEnableLogPositionMeta(c *check.C) {
+
+	processor, _ := s.processor.(*ProcessorSplitRegex)
+	processor.EnableLogPositionMeta = true
+	processor.PreserveOthers = true
+	processor.SplitRegex = "\\[.*"
+	_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
+
+	{
+		{
+			var log = "[2017-12-12 00:00:00] 你好\nhello\n\n[2017-12-12 00:00:00] yyyy\n[2017-12-12 00:00:00] 123"
+			logPb := test.CreateLogs("content", log, helper.FileOffsetKey, "1000")
+			logArray := make([]*protocol.Log, 1)
+			logArray[0] = logPb
+			outLogs := s.processor.ProcessLogs(logArray)
+			c.Assert(len(outLogs), check.Equals, 3)
+			s.assertLogPosition(c, outLogs[0], "1000")
+			s.assertLogPosition(c, outLogs[1], "1036")
+			s.assertLogPosition(c, outLogs[2], "1063")
+		}
+	}
+
+	{
+		{
+			var log = "[2017-12-12 00:00:00] 你好\nhello\n\n [2017-12-12 00:00:00] yyyy\n[2017-12-12 00:00:00] 123"
+			logPb := test.CreateLogs("content", log, helper.FileOffsetKey, "1000")
+			logArray := make([]*protocol.Log, 1)
+			logArray[0] = logPb
+			outLogs := s.processor.ProcessLogs(logArray)
+			c.Assert(len(outLogs), check.Equals, 2)
+			s.assertLogPosition(c, outLogs[0], "1000")
+			s.assertLogPosition(c, outLogs[1], "1064")
+		}
+	}
+}
+
+func (s *processorTestSuite) assertLogPosition(c *check.C, log *protocol.Log, offset string) {
+	cont := helper.GetFileOffsetTag(log)
+	c.Assert(cont, check.NotNil)
+	c.Assert(cont.GetValue(), check.Equals, offset)
 }
