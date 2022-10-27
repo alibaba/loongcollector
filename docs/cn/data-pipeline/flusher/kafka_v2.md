@@ -6,40 +6,49 @@
 
 ## 配置参数
 
-| 参数                                | 类型       | 是否必选 | 说明                                                                                            |
-|-----------------------------------|----------|------|-----------------------------------------------------------------------------------------------|
-| Type                              | String   | 是    | 插件类型                                                                                          |
-| Brokers                           | String数组 | 是    | Kafka Brokers                                                                                 |
-| Topic                             | String   | 是    | Kafka Topic,支持动态topic, 例如: `test_%{contents.appname}`                                         |
-| Version                           | String   | 否    | Kafka协议版本号 ,例如：`2.0.0`                                                                        |
-| Convert                           | Struct   | 否    | ilogtail数据转换协议配置                                                                              |
-| Convert.Protocol                  | String   | 否    | ilogtail数据转换协议，kafka flusher 可选值：`custom_single`,`otlp_log_v1`。默认值：`custom_single`            |
-| Convert.Encoding                  | String   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                |
-| Convert.TagFieldsRename           | Map      | 否    | 对日志中tags中的json字段重命名                                                                           |
-| Convert.ProtocolFieldsRename      | Map      | 否    | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                         |
-| Authentication                    | Struct   | 否    | Kafka连接访问认证配置，支持`SASL/PLAIN`，根据kafka服务端认证方式选择配置                                               |
-| Authentication.PlainText.Username | String   | 否    | PlainText认证用户名                                                                                |
-| Authentication.PlainText.Password | String   | 否    | PlainText认证密码                                                                                 |
-| Authentication.SASL.Username      | String   | 否    | SASL认证用户名                                                                                     |
-| Authentication.SASL.Password      | String   | 否    | SASL认证密码                                                                                      |
-| Authentication.Sasl.SaslMechanism | String   | 否    | SASL认证，配置可选项：`PLAIN`、`SCRAM-SHA-256`、`SCRAM-SHA-512`                                          |
-| PartitionerType                   | String   | 否    | Partitioner类型。取值：`roundrobin`、`hash`、`random`。默认为：`random`。                                   |
-| QequiredAcks                      | int      | 否    | ACK的可靠等级.0=无响应,1=等待本地消息,-1=等待所有副本提交.默认1，                                                      |
-| Compression                       | String   | 否    | 压缩算法，可选值：`none`, `snappy`，`lz4`和`gzip`，默认值`none`                                              |
-| CompressionLevel                  | Int      | 否    | 压缩级别，可选值：`1~9`，默认值：`4`,设置为`0`则禁用`Compression`                                                |
-| MaxMessageBytes                   | Int      | 否    | 一个批次提交的大小限制，配置和`message.max.bytes`对应，默认值：`1000000`                                            |
-| MaxRetries                        | Int      | 否    | 提交失败重试次数，最大`3`次，默认值：`3`                                                                       |
-| BulkMaxSize                       | Int      | 否    | 单次请求提交事件数，默认`2048`                                                                            |
-| BulkFlushFrequency                | Int      | 否    | 发送批量 Kafka 请求之前等待的时间,0标识没有时延，默认值:`0`                                                          |
-| Timeout                           | Int      | 否    | 等待Kafka brokers响应的超时时间，默认`30s`                                                                |
-| BrokerTimeout                     | int      | 否    | kafka broker等待请求的最大时长，默认`10s`                                                                 |
-| Metadata.Retry.Max                | int      | 否    | 最大重试次数，默认值：`3`                                                                               |
-| Metadata.Retry.Backoff            | int      | 否    | 在重试之前等待leader选举发生的时间，默认值：`250ms`                                                              |
-| Metadata.RefreshFrequency         | int      | 否    | Metadata刷新频率，默认值：`250ms`                                                                       |
+| 参数                                | 类型       | 是否必选 | 说明                                                                                                 |
+|-----------------------------------|----------|------|----------------------------------------------------------------------------------------------------|
+| Type                              | String   | 是    | 插件类型                                                                                               |
+| Brokers                           | String数组 | 是    | Kafka Brokers                                                                                      |
+| Topic                             | String   | 是    | Kafka Topic,支持动态topic, 例如: `test_%{contents.appname}`                                              |
+| Version                           | String   | 否    | Kafka协议版本号 ,例如：`2.0.0`，默认值：`1.0.0`                                                                            |
+| Convert                           | Struct   | 否    | ilogtail数据转换协议配置                                                                                   |
+| Convert.Protocol                  | String   | 否    | ilogtail数据转换协议，kafka flusher 可选值：`custom_single`,`otlp_log_v1`。默认值：`custom_single`                 |
+| Convert.Encoding                  | String   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                     |
+| Convert.TagFieldsRename           | Map      | 否    | 对日志中tags中的json字段重命名                                                                                |
+| Convert.ProtocolFieldsRename      | Map      | 否    | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                              |
+| Authentication                    | Struct   | 否    | Kafka连接访问认证配置，支持`SASL/PLAIN`，根据kafka服务端认证方式选择配置                                                    |
+| Authentication.PlainText.Username | String   | 否    | PlainText认证用户名                                                                                     |
+| Authentication.PlainText.Password | String   | 否    | PlainText认证密码                                                                                      |
+| Authentication.SASL.Username      | String   | 否    | SASL认证用户名                                                                                          |
+| Authentication.SASL.Password      | String   | 否    | SASL认证密码                                                                                           |
+| Authentication.Sasl.SaslMechanism | String   | 否    | SASL认证，配置可选项：`PLAIN`、`SCRAM-SHA-256`、`SCRAM-SHA-512`                                               |
+| PartitionerType                   | String   | 否    | Partitioner类型。取值：`roundrobin`、`hash`、`random`。默认为：`random`。                                        |
+| QequiredAcks                      | int      | 否    | ACK的可靠等级.0=无响应,1=等待本地消息,-1=等待所有副本提交.默认1，                                                           |
+| Compression                       | String   | 否    | 压缩算法，可选值：`none`, `snappy`，`lz4`和`gzip`，默认值`none`                                                   |
+| CompressionLevel                  | Int      | 否    | 压缩级别，可选值：`1~9`，默认值：`4`,设置为`0`则禁用`Compression`                                                      |
+| MaxMessageBytes                   | Int      | 否    | 一个批次提交的大小限制，配置和`message.max.bytes`对应，默认值：`1000000`                                                 |
+| MaxRetries                        | Int      | 否    | 提交失败重试次数，最大`3`次，默认值：`3`                                                                            |
+| BulkMaxSize                       | Int      | 否    | 单次请求提交事件数，默认`2048`                                                                                 |
+| BulkFlushFrequency                | Int      | 否    | 发送批量 Kafka 请求之前等待的时间,0标识没有时延，默认值:`0`                                                               |
+| Timeout                           | Int      | 否    | 等待Kafka brokers响应的超时时间，默认`30s`                                                                     |
+| BrokerTimeout                     | int      | 否    | kafka broker等待请求的最大时长，默认`10s`                                                                      |
+| Metadata.Retry.Max                | int      | 否    | 最大重试次数，默认值：`3`                                                                                     |
+| Metadata.Retry.Backoff            | int      | 否    | 在重试之前等待leader选举发生的时间，默认值：`250ms`                                                                   |
+| Metadata.RefreshFrequency         | int      | 否    | Metadata刷新频率，默认值：`250ms`                                                                           |
 | Metadata.Full                     | int      | 否    | 获取原数数据的策略，获取元数据时使用的策略，当此选项为`true`时，客户端将为所有可用主题维护一整套元数据，如果此选项设置为`false`，它将仅刷新已配置主题的元数据。默认值:`false`。 |
-| HashKeys                          | String数组 | 否    | PartitionerType为`hash`时，需指定HashKeys。                                                          |
-| HashOnce                          | Boolean  | 否    |                                                                                               |
-| ClientID                          | String   | 否    | 写入Kafka的Client ID，默认取值：`LogtailPlugin`。                                                       |
+| HashKeys                          | String数组 | 否    | PartitionerType为`hash`时，需指定HashKeys。                                                               |
+| HashOnce                          | Boolean  | 否    |                                                                                                    |
+| ClientID                          | String   | 否    | 写入Kafka的Client ID，默认取值：`LogtailPlugin`。                                                            |
+
+- `Version`需要填写的是`kafka protocol version`版本号，`flusher_kafka_v2`当前支持的`kafka`版本范围：`0.8.2.x~2.7.0`。
+请根据自己的`kafka`版本号参照下面的`kafka protocol version`规则进行配置。`kafka protocol version`配置规则如下：
+```
+// x代表小版本号
+0.8.2.x,0.9.0.x,0.10.0.x,0.10.1.x,0.10.2.x,0.11.0.x,1.0.0,1.1.0,1.1.1,2.0.0,2.0.1,2.1.0,2.2.0,2.3.0,2.4.0,2.5.0,2.6.0,2.7.0
+```
+
+
 
 ## 样例
 

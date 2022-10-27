@@ -481,3 +481,18 @@ func StringPointer(s string) unsafe.Pointer {
 	p := (*reflect.StringHeader)(unsafe.Pointer(&s))
 	return unsafe.Pointer(p.Data)
 }
+
+// UniqueStrings Merge (append) slices and remove duplicate from them!
+func UniqueStrings(strSlices ...[]string) []string {
+	uniqueMap := map[string]bool{}
+	for _, strSlice := range strSlices {
+		for _, number := range strSlice {
+			uniqueMap[number] = true
+		}
+	}
+	result := make([]string, 0, len(uniqueMap))
+	for key := range uniqueMap {
+		result = append(result, key)
+	}
+	return result
+}

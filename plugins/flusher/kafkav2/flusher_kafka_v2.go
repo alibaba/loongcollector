@@ -16,10 +16,8 @@ package kafkav2
 
 import (
 	cryptorand "crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
-
 	"math"
 	"math/big"
 	"strings"
@@ -32,10 +30,10 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (
-	ContentsFieldDefaultName  = "contents"
 	PartitionerTypeRandom     = "random"
 	PartitionerTypeRoundRobin = "roundrobin"
 	PartitionerTypeRoundHash  = "hash"
@@ -103,7 +101,8 @@ type FlusherKafka struct {
 	HashOnce bool
 	ClientID string
 
-	topicKeys  []string // obtain from Topic
+	// obtain from Topic
+	topicKeys  []string
 	isTerminal chan bool
 	producer   sarama.AsyncProducer
 	hashKeyMap map[string]interface{}
@@ -301,14 +300,15 @@ func (k *FlusherKafka) NormalFlush(projectName string, logstoreName string, conf
 func (k *FlusherKafka) HashFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	for _, logGroup := range logGroupList {
 		logger.Debug(k.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-
-		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, k.topicKeys)
+		// Merge topicKeys and HashKeys,Only one convert after merge
+		selectFields := util.UniqueStrings(k.topicKeys, k.HashKeys)
+		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, selectFields)
 		if err != nil {
 			logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
-			valueMap := values[index]
-			topic, err := fmtstr.FormatTopic(valueMap, k.Topic)
+			selectedValueMap := values[index]
+			topic, err := fmtstr.FormatTopic(selectedValueMap, k.Topic)
 			if err != nil {
 				logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka format topic fail, error", err)
 			}
@@ -319,11 +319,11 @@ func (k *FlusherKafka) HashFlush(projectName string, logstoreName string, config
 			// set key when partition type is hash
 			if k.HashOnce {
 				if len(k.hashKey) == 0 {
-					k.hashKey = k.hashPartitionKey(log, logstoreName)
+					k.hashKey = k.hashPartitionKey(selectedValueMap, logstoreName)
 				}
 				m.Key = k.hashKey
 			} else {
-				m.Key = k.hashPartitionKey(log, logstoreName)
+				m.Key = k.hashPartitionKey(selectedValueMap, logstoreName)
 			}
 			k.producer.Input() <- m
 		}
@@ -331,33 +331,11 @@ func (k *FlusherKafka) HashFlush(projectName string, logstoreName string, config
 	return nil
 }
 
-func (k *FlusherKafka) hashPartitionKey(log []byte, defaultKey string) sarama.StringEncoder {
-	// In the next version, this function needs to be optimized
-	// log map contains time,contents,tags
-	logMap := make(map[string]interface{})
-	err := json.Unmarshal(log, &logMap)
-	if err != nil {
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka obtain log contents fail, error", err)
-	}
-	// Obtain renamed contents name
-	contentFieldName := ContentsFieldDefaultName
-	// default content prefix
-	contentPrefix := "content"
-	if _, ok := k.Convert.ProtocolFieldsRename[ContentsFieldDefaultName]; ok {
-		contentFieldName = k.Convert.ProtocolFieldsRename[ContentsFieldDefaultName]
-		contentPrefix = contentFieldName
-	}
+func (k *FlusherKafka) hashPartitionKey(valueMap map[string]string, defaultKey string) sarama.StringEncoder {
 	var hashData []string
-	for key, value := range logMap {
-		// match contents
-		if key != contentFieldName {
-			continue
-		}
-		logContent := value.(map[string]interface{})
-		for contentKey, contentValue := range logContent {
-			if _, ok := k.hashKeyMap[contentPrefix+"."+contentKey]; ok {
-				hashData = append(hashData, contentValue.(string))
-			}
+	for key, value := range valueMap {
+		if _, ok := k.hashKeyMap[key]; ok {
+			hashData = append(hashData, value)
 		}
 	}
 	if len(hashData) == 0 {
