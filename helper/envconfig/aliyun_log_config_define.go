@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
+
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
-
-	"github.com/gogo/protobuf/proto"
 )
 
 // K8S Name : k8s_logtail_logtail-ds-rq95g_kube-system_32417d70-9085-11e8-851d-00163f008685_0
@@ -103,7 +103,13 @@ type AliyunLogConfigSpec struct {
 	LastFetchTime int64                 `json:"lastFetchTime"`
 	ProductCode   string                `json:"productCode"`
 	ProductLang   string                `json:"productLang"`
+	LogstoreMode  string                `json:"logstoreMode"`
 }
+
+const (
+	QueryMode    string = "query"
+	StandardMode string = "standard"
+)
 
 // AliyunLogConfigDetail logtail config detail
 type AliyunLogConfigDetail struct {
@@ -319,6 +325,10 @@ func makeLogConfigSpec(dockerInfo *helper.DockerInfoDetail, envConfigInfo *helpe
 			ttl = 3650
 		}
 		config.LifeCycle = proto.Int32((int32)(ttl))
+	}
+
+	if val, ok := envConfigInfo.ConfigItemMap["logstoremode"]; ok {
+		config.LogstoreMode = val
 	}
 
 	// config

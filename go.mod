@@ -7,7 +7,7 @@ require (
 	github.com/VictoriaMetrics/VictoriaMetrics v1.58.0
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner v0.0.0
-	github.com/aliyun/aliyun-log-go-sdk v0.1.12
+	github.com/aliyun/aliyun-log-go-sdk v0.1.37
 	github.com/bsm/sarama-cluster v2.1.15+incompatible
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash/v2 v2.1.2

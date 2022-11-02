@@ -21,12 +21,12 @@ import (
 	"sync"
 	"time"
 
+	aliyunlog "github.com/aliyun/aliyun-log-go-sdk"
+
 	k8s_event "github.com/alibaba/ilogtail/helper/eventrecorder"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
-
-	aliyunlog "github.com/aliyun/aliyun-log-go-sdk"
 )
 
 // nolint:unused
@@ -209,7 +209,7 @@ func (o *operationWrapper) createProductLogstore(config *AliyunLogConfigSpec, pr
 	return nil
 }
 
-func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec, project, logstore string, shardCount, lifeCycle int, product, lang string) error {
+func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec, project, logstore string, shardCount, lifeCycle int, product, lang, mode string) error {
 	if o.logstoreCacheExists(project, logstore) {
 		return nil
 	}
@@ -256,8 +256,16 @@ func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec, pr
 	if shardCount > 10 {
 		shardCount = 10
 	}
+	logStore := &aliyunlog.LogStore{
+		Name:          logstore,
+		TTL:           ttl,
+		ShardCount:    shardCount,
+		AutoSplit:     true,
+		MaxSplitShard: 32,
+		Mode:          mode,
+	}
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.CreateLogStore(project, logstore, ttl, shardCount, true, 32)
+		err = o.logClient.CreateLogStoreV2(project, logStore)
 		if err != nil {
 			time.Sleep(time.Millisecond * 100)
 		} else {
@@ -434,7 +442,13 @@ func (o *operationWrapper) updateConfigInner(config *AliyunLogConfigSpec) error 
 	if config.LifeCycle != nil {
 		lifeCycle = int(*config.LifeCycle)
 	}
-	err := o.makesureLogstoreExist(config, project, logstore, shardCount, lifeCycle, config.ProductCode, config.ProductLang)
+	mode := StandardMode
+	if len(config.LogstoreMode) != 0 {
+		if config.LogstoreMode == QueryMode {
+			mode = QueryMode
+		}
+	}
+	err := o.makesureLogstoreExist(config, project, logstore, shardCount, lifeCycle, config.ProductCode, config.ProductLang, mode)
 	if err != nil {
 		return fmt.Errorf("Create logconfig error when update config, config : %s, error : %s", config.LogtailConfig.ConfigName, err.Error())
 	}
