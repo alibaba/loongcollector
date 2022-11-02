@@ -1,6 +1,7 @@
 syntax = "proto3";
 package configserver.proto;
 option go_package = ".;configserver_proto";
+import "agent.proto";
 
 message AgentGroupTag {
     string name = 1;
@@ -13,11 +14,14 @@ message AgentGroup {
     repeated AgentGroupTag tags = 3;
 }
 
-message Config {
-    string config_name = 1;
-    string agent_type = 2;
-    string description = 3;
-    string content = 4;
+message Agent {
+    string agent_id = 1;            // Required, Agent's unique identification
+    string agent_type = 2;          // Required, Agent's type(ilogtail, ..)
+    AgentAttributes attributes = 3; // Agent's basic attributes
+    repeated string tags =  4;      // Agent's tags
+    string running_status = 5;      // Required, Agent's running status
+    int64 startup_time = 6;         // Required, Agent's startup time
+    int32 interval = 7;             // Agent's heartbeat interval
 }
 
 // API: /User/CreateAgentGroup
@@ -29,7 +33,7 @@ message CreateAgentGroupRequest {
 
 message CreateAgentGroupResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 }
 
@@ -42,7 +46,7 @@ message UpdateAgentGroupRequest {
 
 message UpdateAgentGroupResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 }
 
@@ -55,7 +59,7 @@ message DeleteAgentGroupRequest {
 
 message DeleteAgentGroupResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 }
 
@@ -68,7 +72,7 @@ message GetAgentGroupRequest {
 
 message GetAgentGroupResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 
     AgentGroup agent_group = 4;
@@ -82,7 +86,7 @@ message ListAgentGroupsRequest {
 
 message ListAgentGroupsResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 
     repeated AgentGroup agent_groups = 4;
@@ -92,12 +96,12 @@ message ListAgentGroupsResponse {
 
 message CreateConfigRequest {
     string request_id = 1;
-    Config config_detail = 2;
+    ConfigDetail config_detail = 2;
 }
 
 message CreateConfigResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 }
 
@@ -105,12 +109,12 @@ message CreateConfigResponse {
 
 message UpdateConfigRequest {
     string request_id = 1;
-    Config config_detail = 2;
+    ConfigDetail config_detail = 2;
 }
 
 message UpdateConfigResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 }
 
@@ -123,7 +127,7 @@ message DeleteConfigRequest {
 
 message DeleteConfigResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 }
 
@@ -136,10 +140,10 @@ message GetConfigRequest {
 
 message GetConfigResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 
-    Config config_detail = 4;
+    ConfigDetail config_detail = 4;
 }
 
 // API: /User/ListConfigs/
@@ -150,10 +154,10 @@ message ListConfigsRequest {
 
 message ListConfigsResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 
-    repeated Config config_details = 4;
+    repeated ConfigDetail config_details = 4;
 }
 
 // API: /User/ApplyConfigToAgentGroup/
@@ -166,7 +170,7 @@ message ApplyConfigToAgentGroupRequest {
 
 message ApplyConfigToAgentGroupResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 }
 
@@ -180,7 +184,7 @@ message RemoveConfigFromAgentGroupRequest {
 
 message RemoveConfigFromAgentGroupResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 }
 
@@ -193,7 +197,7 @@ message GetAppliedConfigsForAgentGroupRequest {
 
 message GetAppliedConfigsForAgentGroupResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 
     repeated string config_names = 4;
@@ -208,7 +212,7 @@ message GetAppliedAgentGroupsRequest {
 
 message GetAppliedAgentGroupsResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 
     repeated string agent_group_names = 4;
@@ -221,22 +225,9 @@ message ListAgentsRequest {
     string group_name = 2;
 }
 
-message Agent {
-    string agent_id = 1;
-    string agent_type = 2;
-    string ip = 3;
-    string version = 4;
-    string running_status = 5;
-    int64 startup_time = 6;
-    int64 latest_heartbeat_time = 7;
-
-    map<string, string> tags = 8;
-    map<string, string> running_details = 9;
-}
-
 message ListAgentsResponse {
     string response_id = 1;
-    string code = 2;
+    RespCode code = 2;
     string message = 3;
 
     repeated Agent agents = 4;

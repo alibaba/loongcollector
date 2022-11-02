@@ -1,0 +1,134 @@
+syntax = "proto3";
+package configserver.proto;
+option go_package = ".;configserver_proto";
+
+// Define Config's type
+enum ConfigType {
+    PIPELINE_CONFIG = 0; 
+    AGENT_CONFIG = 1;      
+}
+
+// Define Config's update status
+enum CheckStatus {
+    NEW = 0;
+    DELETED = 1;
+    MODIFIED = 2;
+}
+
+// Define response code
+enum RespCode {
+    ACCEPT = 0;                 
+    INVALID_PARAMETER = 1;      
+    INTERNAL_SERVER_ERROR = 2;  
+}
+
+// Define the Config information carried in the request
+message ConfigInfo {
+    ConfigType type = 1;    // Required, Config's type
+    string name = 2;        // Required, Config's unique identification
+    int64 version = 3;      // Required, Config's version number
+    string context = 4;     // Config's context
+}
+
+// Define the result of checking the Config update status
+message ConfigCheckResult {
+    ConfigType type = 1;            // Required, Config's type
+    string name = 2;                // Required, Config's unique identification
+    int64 old_version = 3;          // Required, Config's current version number
+    int64 new_version = 4;          // Required, Config's latest version number
+    string context = 5;             // Config's context
+    CheckStatus check_status = 6;   // Required, Config's update status   
+}
+
+// Define Config's detail
+message ConfigDetail {
+    ConfigType type = 1;    // Required, Config's type
+    string name = 2;        // Required, Config's unique identification
+    int64 version = 3;      // Required, Config's version number
+    string context = 4;     // Config's context
+    string detail = 5;      // Required, Config's detail
+}
+
+// Define Agent's basic attributes
+message AgentAttributes {
+    string version = 1;                 // Agent's version
+    string category = 2;                // Agent's type(used to distinguish AGENT_CONFIG)
+    string ip = 3;                      // Agent's ip
+    string hostname = 4;                // Agent's hostname
+    string region = 5;                  // Agent's region
+    string zone = 6;                    // Agent's zone
+    map<string, string> extras = 100;   // Agent's other attributes
+}
+
+// Define command
+message Command {
+    string type = 1;                // Required, Command type
+    string name = 2;                // Required, Command name
+    string id = 3;                  // Required, Command id
+    map<string, string> args = 4;   // Command's parameter arrays
+}
+
+// API: /Agent/HeartBeat/
+
+// Agent sends requests to the ConfigServer to send heartbeats, get config updates and receive commands.
+message HeartBeatRequest {
+    string request_id = 1;  
+
+    string agent_id = 2;                        // Required, Agent's unique identification
+    string agent_type = 3;                      // Required, Agent's type(ilogtail, ..)
+    AgentAttributes attributes = 4;             // Agent's basic attributes
+    repeated string tags =  5;                  // Agent's tags
+    string running_status = 6;                  // Required, Agent's running status
+    int64 startup_time = 7;                     // Required, Agent's startup time
+    int32 interval = 8;                         // Agent's heartbeat interval
+    repeated ConfigInfo pipeline_configs = 9;   // Information about the current PIPELINE_CONFIG held by the Agent
+    repeated ConfigInfo agent_configs = 10;     // Information about the current AGENT_CONFIG held by the Agent
+}
+
+// ConfigServer's response to Agent's heartbeats
+message HeartBeatResponse {
+    string request_id = 1;  
+    RespCode code = 2;      
+    string message = 3;     
+
+    repeated ConfigCheckResult pipeline_check_results = 4;  // Agent's PIPELINE_CONFIG update status
+    repeated ConfigCheckResult agent_check_results = 5;     // Agent's AGENT_CONFIG update status
+    repeated Command custom_commands = 6;                   // Agent received commands
+}
+
+// API: /Agent/FetchPipelineConfig/
+// Agent request to ConfigServer, pulling details of the PIPELINE_CONFIG
+message FetchPipelineConfigRequest {
+    string request_id = 1; 
+
+    string agent_id = 2;                    // Required, Agent's unique identification
+    repeated ConfigInfo req_configs = 3;    // PIPELINE_CONFIGs that Agent requires for full information
+}
+
+// ConfigServer response to Agent's request
+message FetchPipelineConfigResponse {
+    string request_id = 1;                     
+    RespCode code = 2;      
+    string message = 3;     
+
+    repeated ConfigDetail config_details = 4;   // PIPELINE_CONFIGs' detail
+}
+
+// API: /Agent/FetchAgentConfig/
+// Agent request to ConfigServer, pulling details of the AGENT_CONFIG
+message FetchAgentConfigRequest {
+    string request_id = 1; 
+
+    string agent_id = 2;                    // Required, Agent's unique identification
+    AgentAttributes attributes = 3;         // Required, Agent's basic attributes
+    repeated ConfigInfo req_configs = 4;    // AGENT_CONFIGs that Agent requires for full information
+}
+
+// ConfigServer response to Agent's request
+message FetchAgentConfigResponse {
+    string request_id = 1;         
+    RespCode code = 2;               
+    string message = 3;                   
+
+    repeated ConfigDetail config_details = 4;   // AGENT_CONFIGs' detail
+}
