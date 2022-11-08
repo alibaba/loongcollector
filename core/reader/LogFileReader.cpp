@@ -114,9 +114,9 @@ void LogFileReader::SetContainerStopped() {
 bool LogFileReader::ShouldForceReleaseDeletedFileFd() {
     time_t now = time(NULL);
     return INT32_FLAG(force_release_deleted_file_fd_timeout) >= 0
-        && (IsFileDeleted() && now - GetDeletedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout)
-            || IsContainerStopped()
-                && now - GetContainerStoppedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout));
+        && ((IsFileDeleted() && now - GetDeletedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout))
+            || (IsContainerStopped()
+                && now - GetContainerStoppedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout)));
 }
 
 void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t eoConcurrency) {
@@ -488,7 +488,7 @@ void LogFileReader::SetDockerPath(const std::string& dockerBasePath, size_t dock
             mDockerPath = dockerBasePath + mLogPath.substr(dockerReplaceSize);
         }
 
-        LOG_DEBUG(sLogger, ("convert docker file path", "")("host path", mLogPath)("final path", mDockerPath));
+        LOG_DEBUG(sLogger, ("convert docker file path", "")("host path", mLogPath)("docker path", mDockerPath));
     }
 }
 
@@ -1027,7 +1027,13 @@ bool LogFileReader::UpdateFilePtr() {
     // move last update time before check IsValidToPush
     mLastUpdateTime = time(NULL);
     if (mLogFileOp.IsOpen() == false) {
-        // we may have mislabeled the deleted flag and then closed fd. Correct it here.
+        // In several cases we should revert file deletion flag:
+        // 1. File is appended after deletion. This happens when app is still logging, but a user deleted the log file.
+        // 2. File was rename/moved, but is rename/moved back later.
+        // 3. Log rotated. But iLogtail's logic will not remove the reader from readerArray on delete event.
+        //    It will be removed while the new file has modify event. The reader is still the head of readerArray,
+        //    thus it will be open again for reading.
+        // However, if the user explicitly set a delete timeout. We should not revert the flag.
         if (INT32_FLAG(force_release_deleted_file_fd_timeout) < 0) {
             SetFileDeleted(false);
         }
@@ -1126,6 +1132,7 @@ void LogFileReader::CloseFilePtr() {
         // if mLogPath is symbolic link, then we should not update it accrding to /dev/fd/xx
         if (!mSymbolicLinkFlag) {
             // retrieve file path from file descriptor in order to open it later
+            // this is important when file is moved when rotating
             string curRealLogPath = mLogFileOp.GetFilePath();
             if (!curRealLogPath.empty()) {
                 LOG_DEBUG(sLogger,
