@@ -188,6 +188,9 @@ func (m *Jmx) Stop() error {
 }
 
 func (m *Jmx) UpdateContainerCfg() {
+	for s := range m.instances {
+		delete(m.instances, s)
+	}
 	containers := helper.GetContainerByAcceptedInfo(m.IncludeContainerLabel, m.ExcludeContainerLabel,
 		m.includeContainerLabelRegex, m.excludeContainerLabelRegex, m.IncludeEnv, m.ExcludeEnv,
 		m.includeEnvRegex, m.excludeEnvRegex, m.k8sFilter)
@@ -234,7 +237,7 @@ func (m *Jmx) UpdateContainerCfg() {
 		inner := NewInstanceInner(port, detail.ContainerIP, m.DiscoveryUser, m.DiscoveryPassword, tags, m.DefaultJvmMetrics)
 		m.instances[inner.Hash()] = inner
 	}
-	logger.Infof(m.context.GetRuntimeContext(), "find %d dynamic jmx configs", len(m.instances))
+	logger.Debugf(m.context.GetRuntimeContext(), "find %d dynamic jmx configs", len(m.instances))
 	GetJmxFetchManager(m.jvmHome).Register(m.key, m.instances, m.NewGcMetrics)
 }
 

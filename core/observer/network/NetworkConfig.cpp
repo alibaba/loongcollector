@@ -45,8 +45,8 @@ DEFINE_FLAG_INT32(sls_observer_network_no_data_sleep_interval_ms, "SLS Observer 
 DEFINE_FLAG_INT32(sls_observer_network_pcap_loop_count, "SLS Observer NetWork PCAP loop count", 100);
 DEFINE_FLAG_BOOL(sls_observer_network_protocol_stat, "SLS Observer NetWork protocol stat output", false);
 
-#define OBSERVER_CONFIG_TO_REGEX(jsonvalue, param) \
-    { \
+#define OBSERVER_CONFIG_EXTRACT_REGEXP(jsonvalue, param) \
+    do { \
         std::string str##param = GetStringValue(jsonvalue, #param, ""); \
         if (!str##param.empty()) { \
             this->m##param = boost::regex(str##param, boost::regex_constants::no_except); \
@@ -56,16 +56,16 @@ DEFINE_FLAG_BOOL(sls_observer_network_protocol_stat, "SLS Observer NetWork proto
         } else { \
             this->m##param = boost::regex(); \
         } \
-    }
+    } while (0)
 
-#define OBSERVER_CONFIG_MAP_TO_REGEX(jsonvalue, param) \
-    { \
+#define OBSERVER_CONFIG_EXTRACT_REGEXP_MAP(jsonvalue, param) \
+    do { \
         this->m##param.erase(this->m##param.begin(), this->m##param.end()); \
         if ((jsonvalue).isMember(#param) && commonValue[#param].isObject()) { \
             Json::Value& labelsVal = (jsonvalue)[#param]; \
             for (auto item = labelsVal.begin(); item != labelsVal.end(); item++) { \
-                std::string key = item.memberName(); \
-                std::string val = labelsVal[item.memberName()].asString(); \
+                std::string key = item.name(); \
+                std::string val = labelsVal[item.name()].asString(); \
                 if (!val.empty()) { \
                     auto reg = boost::regex(val, boost::regex_constants::no_except); \
                     if (reg.status() != 0) { \
@@ -75,7 +75,23 @@ DEFINE_FLAG_BOOL(sls_observer_network_protocol_stat, "SLS Observer NetWork proto
                 } \
             } \
         } \
-    }
+    } while (0)
+#define OBSERVER_CONFIG_EXTRACT_INT(jsonvalue, param, defaultVal, prefix) \
+    do { \
+        this->m##prefix##param = GetIntValue(jsonvalue, #param, defaultVal); \
+    } while (0)
+
+#define OBSERVER_CONFIG_EXTRACT_BOOL(jsonvalue, param, defaultVal, prefix) \
+    do { \
+        this->m##prefix##param = GetBoolValue(jsonvalue, #param, defaultVal); \
+    } while (0)
+
+#define OBSERVER_CONFIG_EXTRACT_STRING(jsonvalue, param, defaultVal, prefix) \
+    do { \
+        this->m##prefix##param = GetStringValue(jsonvalue, #param, defaultVal); \
+    } while (0)
+
+
 namespace logtail {
 
 
@@ -158,7 +174,7 @@ std::string NetworkConfig::SetFromJsonString() {
     Json::Value jsonRoot;
     bool parseOk = jsonReader.parse(mLastApplyedConfigDetail, jsonRoot);
     if (parseOk == false) {
-        return std::string("invalid config format : ") + jsonReader.getFormatedErrorMessages();
+        return std::string("invalid config format : ") + jsonReader.getFormattedErrorMessages();
     }
     if (jsonRoot.isArray() && jsonRoot.size() == 1) {
         jsonRoot = jsonRoot[0];
@@ -166,64 +182,95 @@ std::string NetworkConfig::SetFromJsonString() {
         jsonRoot = {};
     }
     if (jsonRoot.empty()) {
-        return std::string("invalid config format : ") + jsonReader.getFormatedErrorMessages();
+        return std::string("invalid config format : ") + jsonReader.getFormattedErrorMessages();
     }
 
     try {
-        if (!(jsonRoot.isMember("type") && jsonRoot["type"].asString() == "observer_ilogtail_network")
+        if (!(jsonRoot.isMember("type") && jsonRoot["type"].asString() == "observer_ilogtail_network_v1")
             || !(jsonRoot.isMember("detail") && jsonRoot["detail"].isObject())) {
-            return "invalid format, observer_sls_network is not exist or error type";
+            return "invalid format, observer_ilogtail_network_v1 is not exist or error type";
         }
         Json::Value& obserValue = jsonRoot["detail"];
 
+        if (obserValue.isMember("EBPF") && obserValue["EBPF"].isObject()) {
+            Json::Value& ebpfValue = obserValue["EBPF"];
+            OBSERVER_CONFIG_EXTRACT_BOOL(ebpfValue, Enabled, false, EBPF);
+            OBSERVER_CONFIG_EXTRACT_INT(ebpfValue, Pid, -1, EBPF);
+        }
+        if (obserValue.isMember("PCAP") && obserValue["PCAP"].isObject()) {
+            Json::Value& pcapValue = obserValue["PCAP"];
+            OBSERVER_CONFIG_EXTRACT_BOOL(pcapValue, Enabled, false, PCAP);
+            OBSERVER_CONFIG_EXTRACT_BOOL(pcapValue, Promiscuous, true, PCAP);
+            OBSERVER_CONFIG_EXTRACT_INT(pcapValue, TimeoutMs, 0, PCAP);
+            OBSERVER_CONFIG_EXTRACT_STRING(pcapValue, Filter, "", PCAP);
+            OBSERVER_CONFIG_EXTRACT_STRING(pcapValue, Interface, "", PCAP);
+        }
+
         if (obserValue.isMember("Common") && obserValue["Common"].isObject()) {
             Json::Value& commonValue = obserValue["Common"];
-            mFlushOutInterval = GetIntValue(commonValue, "FlushOutInterval", 30);
-            mFlushMetaInterval = GetIntValue(commonValue, "FlushMetaInterval", 30);
-            mFlushNetlinkInterval = GetIntValue(commonValue, "FlushNetlinkInterval", 10);
-            mSampling = GetIntValue(commonValue, "Sampling", 100);
-            mSaveToDisk = GetBoolValue(commonValue, "SaveToDisk", false);
+            OBSERVER_CONFIG_EXTRACT_INT(commonValue, FlushOutL4Interval, 60, );
+            OBSERVER_CONFIG_EXTRACT_INT(commonValue, FlushOutL7Interval, 15, );
+            OBSERVER_CONFIG_EXTRACT_INT(commonValue, FlushMetaInterval, 30, );
+            OBSERVER_CONFIG_EXTRACT_INT(commonValue, FlushNetlinkInterval, 10, );
+            OBSERVER_CONFIG_EXTRACT_INT(commonValue, Sampling, 100, );
+            OBSERVER_CONFIG_EXTRACT_BOOL(commonValue, SaveToDisk, false, );
+            OBSERVER_CONFIG_EXTRACT_BOOL(commonValue, DropUnixSocket, true, );
+            OBSERVER_CONFIG_EXTRACT_BOOL(commonValue, DropLocalConnections, true, );
+            OBSERVER_CONFIG_EXTRACT_BOOL(commonValue, DropUnknownSocket, true, );
+            OBSERVER_CONFIG_EXTRACT_REGEXP_MAP(commonValue, IncludeContainerLabels);
+            OBSERVER_CONFIG_EXTRACT_REGEXP_MAP(commonValue, ExcludeContainerLabels);
+            OBSERVER_CONFIG_EXTRACT_REGEXP_MAP(commonValue, IncludeK8sLabels);
+            OBSERVER_CONFIG_EXTRACT_REGEXP_MAP(commonValue, ExcludeK8sLabels);
+            OBSERVER_CONFIG_EXTRACT_REGEXP_MAP(commonValue, IncludeEnvs);
+            OBSERVER_CONFIG_EXTRACT_REGEXP_MAP(commonValue, ExcludeEnvs);
+            OBSERVER_CONFIG_EXTRACT_REGEXP(commonValue, IncludeCmdRegex);
+            OBSERVER_CONFIG_EXTRACT_REGEXP(commonValue, ExcludeCmdRegex);
+            OBSERVER_CONFIG_EXTRACT_REGEXP(commonValue, IncludeContainerNameRegex);
+            OBSERVER_CONFIG_EXTRACT_REGEXP(commonValue, ExcludeContainerNameRegex);
+            OBSERVER_CONFIG_EXTRACT_REGEXP(commonValue, IncludePodNameRegex);
+            OBSERVER_CONFIG_EXTRACT_REGEXP(commonValue, ExcludePodNameRegex);
+            OBSERVER_CONFIG_EXTRACT_REGEXP(commonValue, IncludeNamespaceNameRegex);
+            OBSERVER_CONFIG_EXTRACT_REGEXP(commonValue, ExcludeNamespaceNameRegex);
+            // partial open protocol processing.
             mProtocolProcessFlag = GetBoolValue(commonValue, "ProtocolProcess", true) ? -1 : 0;
-            mLocalPort = GetBoolValue(commonValue, "LocalPort", false);
-            mDropUnixSocket = GetBoolValue(commonValue, "DropUnixSocket", true);
-            mDropLocalConnections = GetBoolValue(commonValue, "DropLocalConnections", true);
-            mDropUnknownSocket = GetBoolValue(commonValue, "DropUnknownSocket", true);
-            OBSERVER_CONFIG_MAP_TO_REGEX(commonValue, IncludeContainerLabels);
-            OBSERVER_CONFIG_MAP_TO_REGEX(commonValue, ExcludeContainerLabels);
-            OBSERVER_CONFIG_MAP_TO_REGEX(commonValue, IncludeK8sLabels);
-            OBSERVER_CONFIG_MAP_TO_REGEX(commonValue, ExcludeK8sLabels);
-            OBSERVER_CONFIG_MAP_TO_REGEX(commonValue, IncludeEnvs);
-            OBSERVER_CONFIG_MAP_TO_REGEX(commonValue, ExcludeEnvs);
-            OBSERVER_CONFIG_TO_REGEX(commonValue, IncludeCmdRegex);
-            OBSERVER_CONFIG_TO_REGEX(commonValue, ExcludeCmdRegex);
-            OBSERVER_CONFIG_TO_REGEX(commonValue, IncludeContainerNameRegex);
-            OBSERVER_CONFIG_TO_REGEX(commonValue, ExcludeContainerNameRegex);
-            OBSERVER_CONFIG_TO_REGEX(commonValue, IncludePodNameRegex);
-            OBSERVER_CONFIG_TO_REGEX(commonValue, ExcludePodNameRegex);
-            OBSERVER_CONFIG_TO_REGEX(commonValue, IncludeNamespaceNameRegex);
-            OBSERVER_CONFIG_TO_REGEX(commonValue, ExcludeNamespaceNameRegex);
-            std::vector<std::string> includeProtocolVec;
-            if (commonValue.isMember("IncludeProtocols") && commonValue["IncludeProtocols"].isArray()) {
-                Json::Value& includeProtocols = commonValue["IncludeProtocols"];
-                for (const auto& includeProtocol : includeProtocols) {
-                    includeProtocolVec.push_back(includeProtocol.asString());
-                }
-            }
-            if (!includeProtocolVec.empty()) {
-                mProtocolProcessFlag = 0;
-                for (int i = 1; i < ProtocolType_NumProto; ++i) {
-                    bool enable = false;
-                    for (const auto& item : includeProtocolVec) {
-                        if (strcasecmp(ProtocolTypeToString((ProtocolType)i).c_str(), item.c_str()) == 0) {
-                            enable = true;
-                            break;
+            if (mProtocolProcessFlag != 0) {
+                std::vector<std::string> includeProtocolVec;
+                if (commonValue.isMember("IncludeProtocols") && commonValue["IncludeProtocols"].isArray()) {
+                    Json::Value& includeProtocols = commonValue["IncludeProtocols"];
+                    if (commonValue["IncludeProtocols"].size() >= 0) {
+                        mProtocolProcessFlag = 0; // reset flag to open selected protocol.
+                        for (const auto& includeProtocol : includeProtocols) {
+                            for (int i = 1; i < ProtocolType_NumProto; ++i) {
+                                if (strcasecmp(ProtocolTypeToString((ProtocolType)i).c_str(),
+                                               includeProtocol.asString().c_str())
+                                    == 0) {
+                                    mProtocolProcessFlag |= (1 << (i - 1));
+                                    break;
+                                }
+                            }
                         }
                     }
-                    if (enable) {
-                        mProtocolProcessFlag |= (1 << (i - 1));
+                }
+            }
+            // config protocol advanced config.
+            if (commonValue.isMember("ProtocolAggCfg") && commonValue["ProtocolAggCfg"].isObject()) {
+                Json::Value& protocolAggCfg = commonValue["ProtocolAggCfg"];
+                for (const auto& item : protocolAggCfg.getMemberNames()) {
+                    for (int i = 1; i < ProtocolType_NumProto; ++i) {
+                        if (strcasecmp(ProtocolTypeToString((ProtocolType)i).c_str(), item.c_str()) == 0
+                            && protocolAggCfg[item].isObject() && (mProtocolProcessFlag & 1 << (i - 1))) {
+                            Json::Value& itemCfg = protocolAggCfg[item];
+                            this->mProtocolAggCfg[i] = std::make_pair(GetIntValue(itemCfg, "ClientSize"),
+                                                                      GetIntValue(itemCfg, "ServerSize"));
+                        }
                     }
                 }
             }
+            std::string cluster = GetStringValue(commonValue, "Cluster", "");
+            if (!cluster.empty()) {
+                mTags.emplace_back("__tag__:cluster", cluster);
+            }
+            // append global tags.
             if (commonValue.isMember("Tags") && commonValue["Tags"].isObject()) {
                 Json::Value& tags = commonValue["Tags"];
                 for (const auto& item : tags.getMemberNames()) {
@@ -233,34 +280,6 @@ std::string NetworkConfig::SetFromJsonString() {
                     mTags.emplace_back("__tag__:" + item, GetStringValue(tags, item));
                 }
             }
-            if (commonValue.isMember("ProtocolAggCfg") && commonValue["ProtocolAggCfg"].isObject()) {
-                Json::Value& protocolAggCfg = commonValue["ProtocolAggCfg"];
-                for (const auto& item : protocolAggCfg.getMemberNames()) {
-                    for (int i = 1; i < ProtocolType_NumProto; ++i) {
-                        if (strcasecmp(ProtocolTypeToString((ProtocolType)i).c_str(), item.c_str()) == 0
-                            && protocolAggCfg[item].isObject()) {
-                            Json::Value& itemCfg = protocolAggCfg[item];
-                            this->mProtocolAggCfg[i] = std::make_pair(GetIntValue(itemCfg, "ClientSize"),
-                                                                      GetIntValue(itemCfg, "ServerSize"));
-                        }
-                    }
-                }
-            }
-        }
-
-        if (obserValue.isMember("EBPF") && obserValue["EBPF"].isObject()) {
-            Json::Value& ebpfValue = obserValue["EBPF"];
-            mEBPFEnabled = GetBoolValue(ebpfValue, "Enabled", false);
-            mPid = GetIntValue(ebpfValue, "Pid", -1);
-        }
-
-        if (obserValue.isMember("PCAP") && obserValue["PCAP"].isObject()) {
-            Json::Value& pcapValue = obserValue["PCAP"];
-            mPCAPEnabled = GetBoolValue(pcapValue, "Enabled", false);
-            mPCAPFilter = GetStringValue(pcapValue, "Filter", "");
-            mPCAPInterface = GetStringValue(pcapValue, "Interface", "");
-            mPCAPTimeoutMs = GetIntValue(pcapValue, "TimeoutMs", 0);
-            mPCAPPromiscuous = GetBoolValue(pcapValue, "Promiscuous", true);
         }
     } catch (...) {
         return "invalid config pattern";
@@ -272,5 +291,100 @@ bool NetworkConfig::isOpenPartialSelectDump() {
     return -1 != this->localPickPID || -1 != this->localPickConnectionHashId || -1 != this->localPickSrcPort
         || -1 != this->localPickDstPort;
 }
+
+
+std::string NetworkConfig::ToString() const {
+    std::string rst;
+    rst.append("EBPF : ").append(mEBPFEnabled ? "true" : "false").append("\t");
+    if (mEBPFEnabled) {
+        rst.append("EBPFFilter pid : ").append(std::to_string(mEBPFPid)).append("\t");
+    }
+    rst.append("PCAP : ").append(mPCAPEnabled ? "true" : "false").append("\t");
+    if (mPCAPEnabled) {
+        rst.append("PCAPFilter : ").append(mPCAPFilter).append("\t");
+        rst.append("PCAPInterface : ").append(mPCAPInterface).append("\t");
+        rst.append("PCAPTimeoutMs : ").append(std::to_string(mPCAPTimeoutMs)).append("\t");
+        rst.append("PCAPPromiscuous : ").append(std::to_string(mPCAPPromiscuous)).append("\t");
+    }
+    rst.append("Sampling : ").append(std::to_string(mSampling)).append("\t");
+    rst.append("FlushOutL4Interval : ").append(std::to_string(mFlushOutL4Interval)).append("\t");
+    rst.append("FlushOutL7Interval : ").append(std::to_string(mFlushOutL7Interval)).append("\t");
+    rst.append("FlushMetaInterval : ").append(std::to_string(mFlushMetaInterval)).append("\t");
+    rst.append("FlushNetlinkInterval : ").append(std::to_string(mFlushNetlinkInterval)).append("\t");
+    rst.append("IncludeCmdRegex : ").append(mIncludeCmdRegex.str()).append("\t");
+    rst.append("ExcludeCmdRegex : ").append(mExcludeCmdRegex.str()).append("\t");
+    rst.append("IncludeContainerNameRegex : ").append(mIncludeContainerNameRegex.str()).append("\t");
+    rst.append("ExcludeContainerNameRegex : ").append(mExcludeContainerNameRegex.str()).append("\t");
+    rst.append("IncludeContainerLabels : ").append(label2String(mIncludeContainerLabels)).append("\t");
+    rst.append("ExcludeContainerLabels : ").append(label2String(mExcludeContainerLabels)).append("\t");
+    rst.append("IncludePodNameRegex : ").append(mIncludePodNameRegex.str()).append("\t");
+    rst.append("ExcludePodNameRegex : ").append(mExcludePodNameRegex.str()).append("\t");
+    rst.append("IncludeNamespaceNameRegex : ").append(mIncludeNamespaceNameRegex.str()).append("\t");
+    rst.append("ExcludeNamespaceNameRegex : ").append(mExcludeNamespaceNameRegex.str()).append("\t");
+    rst.append("IncludeK8sLabels : ").append(label2String(mIncludeK8sLabels)).append("\t");
+    rst.append("ExcludeK8sLabels : ").append(label2String(mExcludeK8sLabels)).append("\t");
+    rst.append("IncludeEnvs : ").append(label2String(mIncludeEnvs)).append("\t");
+    rst.append("ExcludeEnvs : ").append(label2String(mExcludeEnvs)).append("\t");
+    rst.append("DropUnixSocket : ").append(mDropUnixSocket ? "true" : "false").append("\t");
+    rst.append("DropLocalConnections : ").append(mDropLocalConnections ? "true" : "false").append("\t");
+    rst.append("DropUnknownSocket : ").append(mDropUnknownSocket ? "true" : "false").append("\t");
+    rst.append("ProtocolProcess : {");
+    for (int i = 1; i < ProtocolType_NumProto; ++i) {
+        if (this->IsLegalProtocol(static_cast<ProtocolType>(i))) {
+            auto pair = GetProtocolAggSize(static_cast<ProtocolType>(i));
+            rst.append(ProtocolTypeToString(static_cast<ProtocolType>(i)))
+                .append(" ClientSize: ")
+                .append(std::to_string(pair.first))
+                .append(" ServerSize: ")
+                .append(std::to_string(pair.second))
+                .append("\t");
+        }
+    }
+    rst.append("} Tags : ");
+    for (const auto& item : mTags) {
+        rst.append(item.first).append("@").append(item.second).append(",");
+    }
+    rst.append("\t");
+    return rst;
+}
+void NetworkConfig::Clear() {
+    mEnabled = false;
+    mEBPFEnabled = false;
+    mSampling = 100;
+    mEBPFPid = -1;
+    mPCAPEnabled = false;
+    mPCAPFilter.clear();
+    mPCAPInterface.clear();
+    mPCAPPromiscuous = true;
+    mPCAPTimeoutMs = 0;
+    mFlushOutL4Interval = 60;
+    mFlushOutL7Interval = 15;
+    mFlushMetaInterval = 30;
+    mFlushNetlinkInterval = 10;
+    mSaveToDisk = false;
+    mDropUnixSocket = true;
+    boost::regex emptyRegex;
+    mIncludeCmdRegex = emptyRegex;
+    mExcludeCmdRegex = emptyRegex;
+    mIncludeContainerNameRegex = emptyRegex;
+    mExcludeContainerNameRegex = emptyRegex;
+    mIncludePodNameRegex = emptyRegex;
+    mExcludePodNameRegex = emptyRegex;
+    mIncludeNamespaceNameRegex = emptyRegex;
+    mExcludeNamespaceNameRegex = emptyRegex;
+    mIncludeContainerLabels.clear();
+    mExcludeContainerLabels.clear();
+    mIncludeK8sLabels.clear();
+    mExcludeK8sLabels.clear();
+    mIncludeEnvs.clear();
+    mExcludeEnvs.clear();
+    mTags.clear();
+    mProtocolAggCfg.clear();
+    mDropUnixSocket = true;
+    mDropLocalConnections = true;
+    mDropUnknownSocket = true;
+    mProtocolProcessFlag = -1;
+}
+
 
 } // namespace logtail

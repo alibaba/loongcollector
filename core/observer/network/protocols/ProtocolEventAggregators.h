@@ -107,8 +107,9 @@ public:
 
     void FlushOutMetrics(uint64_t timeNano,
                          std::vector<sls_logs::Log>& allData,
-                         std::vector<std::pair<std::string, std::string> >& processTags,
-                         std::vector<std::pair<std::string, std::string> >& globalTags);
+                         std::vector<std::pair<std::string, std::string>>& processTags,
+                         std::vector<std::pair<std::string, std::string>>& globalTags,
+                         uint64_t interval);
 
 protected:
     DNSProtocolEventAggregator* mDNSAggregators = NULL;

@@ -46,7 +46,7 @@ struct HTTPRequestInfo {
 };
 struct HTTPResponseInfo {
     uint64_t TimeNano;
-    std::string RespCode;
+    int16_t RespCode;
     int32_t RespBytes;
 
     friend std::ostream& operator<<(std::ostream& os, const HTTPResponseInfo& info) {
@@ -76,11 +76,11 @@ public:
                 }
                 event.Info.ReqBytes = requestInfo->ReqBytes;
                 event.Info.RespBytes = responseInfo->RespBytes;
-                event.Key.Method = std::move(requestInfo->Method);
-                event.Key.Host = std::move(requestInfo->Host);
-                event.Key.URL = std::move(requestInfo->URL);
+                event.Key.ReqType = std::move(requestInfo->Method);
+                event.Key.ReqDomain = std::move(requestInfo->Host);
+                event.Key.ReqResource = std::move(requestInfo->URL);
                 event.Key.Version = std::move(requestInfo->Version);
-                event.Key.RespCode = std::move(responseInfo->RespCode);
+                event.Key.RespCode = responseInfo->RespCode;
                 event.Key.ConnKey = mKey;
                 return true;
             });

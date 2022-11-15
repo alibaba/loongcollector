@@ -30,19 +30,21 @@ namespace logtail {
 
 void ContainerProcessGroup::FlushOutMetrics(uint64_t timeNano,
                                             std::vector<sls_logs::Log>& allData,
-                                            std::vector<std::pair<std::string, std::string>>& tags) {
+                                            std::vector<std::pair<std::string, std::string>>& tags,
+                                            uint64_t interval) {
     auto& metaTags = mMetaPtr->GetFormattedMeta();
-    mAggregator.FlushOutMetrics(timeNano, allData, metaTags, tags);
+    mAggregator.FlushOutMetrics(timeNano, allData, metaTags, tags, interval);
 }
 
 void ContainerProcessGroupManager::FlushOutMetrics(std::vector<sls_logs::Log>& allData,
-                                                   std::vector<std::pair<std::string, std::string>>& tags) {
+                                                   std::vector<std::pair<std::string, std::string>>& tags,
+                                                   uint64_t interval) {
     uint64_t timeNano = GetCurrentTimeInNanoSeconds();
     for (auto& iter : mPureProcessGroupMap) {
-        iter.second->FlushOutMetrics(timeNano, allData, tags);
+        iter.second->FlushOutMetrics(timeNano, allData, tags, interval);
     }
     for (auto& iter : mContainerProcessGroupMap) {
-        iter.second->FlushOutMetrics(timeNano, allData, tags);
+        iter.second->FlushOutMetrics(timeNano, allData, tags, interval);
     }
 }
 

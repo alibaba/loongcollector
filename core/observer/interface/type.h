@@ -21,10 +21,25 @@
 
 
 enum class ObserverMetricsType : uint8_t {
-    L7_DB_METRICS = 0,
-    L7_REQ_METRICS = 1,
-    L4_METRICS = 2,
+    L4_METRICS = 0,
+    L7_DB_METRICS = 1,
+    L7_REQ_METRICS = 2,
 };
+
+inline std::string ObserverMetricsTypeToString(ObserverMetricsType type) {
+    switch (type) {
+        case ObserverMetricsType::L4_METRICS:
+            return "l4";
+        case ObserverMetricsType::L7_DB_METRICS:
+            return "l7_db";
+        case ObserverMetricsType::L7_REQ_METRICS:
+            return "l7_req";
+        default:
+            break;
+    }
+    return "unknown";
+}
+
 
 // 协议的消息类型，包括Request、Response。 TODO : Produce Consume
 enum MessageType { MessageType_None, MessageType_Request, MessageType_Response };
@@ -77,13 +92,13 @@ enum class PacketRoleType : uint8_t {
 inline std::string PacketRoleTypeToString(PacketRoleType type) {
     switch (type) {
         case PacketRoleType::Unknown:
-            return "unknown";
+            return "u";
         case PacketRoleType::Client:
-            return "client";
+            return "c";
         case PacketRoleType::Server:
-            return "server";
+            return "s";
         default:
-            return "unknown";
+            return "u";
     }
 }
 

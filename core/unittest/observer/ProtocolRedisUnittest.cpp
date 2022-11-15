@@ -92,8 +92,8 @@ public:
         APSARA_TEST_EQUAL(allData.size(), size_t(1));
 
         sls_logs::Log* log = &allData[0];
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "cmd", "set"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "success", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "query", "set"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "status", "1"));
     }
 
     void TestRedisPacketReaderUnorder() {
@@ -111,8 +111,8 @@ public:
         APSARA_TEST_EQUAL(allData.size(), size_t(1));
 
         sls_logs::Log* log = &allData[0];
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "cmd", "set"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "success", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "query", "set"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "status", "1"));
     }
 
     void TestRedisParserGC() {

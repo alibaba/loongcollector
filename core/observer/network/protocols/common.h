@@ -19,103 +19,64 @@
 #include "interface/protocol.h"
 #include <deque>
 #include "log_pb/sls_logs.pb.h"
-#include "Logger.h"
 #include "interface/helper.h"
 #include "LogtailAlarm.h"
 #include "metas/ServiceMetaCache.h"
+#include "Logger.h"
 #include <unordered_map>
 #include <ostream>
 
 namespace logtail {
 
-template <typename T>
-inline void AddAnyLogContent(sls_logs::Log* log, const std::string& key, const T& value) {
-    auto content = log->add_contents();
-    content->set_key(key);
-    content->set_value(std::to_string(value));
-}
 
-template <>
-inline void AddAnyLogContent(sls_logs::Log* log, const std::string& key, const std::string& value) {
-    auto content = log->add_contents();
-    content->set_key(key);
-    content->set_value(value);
-}
-
-struct CommonAggKey {
-    CommonAggKey() = default;
-    CommonAggKey(PacketEventHeader* header)
-        : HashVal(0),
-          RemoteIp(SockAddressToString(header->DstAddr)),
-          RemotePort(std::to_string(header->RoleType == PacketRoleType::Server ? 0 : header->DstPort)),
-          Role(PacketRoleTypeToString(header->RoleType)),
-          Pid(header->PID) {
-        HashVal = XXH32(Role.c_str(), Role.size(), HashVal);
-        HashVal = XXH32(RemoteIp.c_str(), RemoteIp.size(), HashVal);
-        HashVal = XXH32(RemotePort.c_str(), RemotePort.size(), HashVal);
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const CommonAggKey& key) {
-        os << "HashVal: " << key.HashVal << " RemoteIp: " << key.RemoteIp << " RemotePort: " << key.RemotePort
-           << " Role: " << key.Role << " Pid: " << key.Pid;
-        return os;
-    }
-
-    void ToPB(sls_logs::Log* log, ProtocolType protocolType) const {
-        static auto sServiceMetaManager = ServiceMetaManager::GetInstance();
-        auto content = log->add_contents();
-        content->set_key("role");
-        content->set_value(Role);
-        Json::Value root;
-        root["remote_ip"] = RemoteIp;
-        root["remote_port"] = RemotePort;
-        if (Role == "client") {
-            auto& serviceMeta = sServiceMetaManager->GetOrPutServiceMeta(Pid, RemoteIp, protocolType);
-            root["remote_type"] = ServiceCategoryToString(
-                serviceMeta.Empty() ? DetectRemoteServiceCategory(protocolType) : serviceMeta.Category);
-            if (!serviceMeta.Host.empty()) {
-                root["remote_host"] = serviceMeta.Host;
-            }
-        }
-        content = log->add_contents();
-        content->set_key("remote_info");
-        content->set_value(Json::FastWriter().write(root));
-    }
-
-    uint64_t HashVal;
-    std::string RemoteIp;
-    std::string RemotePort;
-    std::string Role;
-    uint32_t Pid;
-};
-
+/**
+ * Single protocol event metrics info.
+ */
 struct CommonProtocolEventInfo {
-    CommonProtocolEventInfo() : LatencyNs(0), ReqBytes(0), RespBytes(0) {}
+    CommonProtocolEventInfo() = default;
+    CommonProtocolEventInfo(CommonProtocolEventInfo&& other) noexcept = default;
+    CommonProtocolEventInfo(const CommonProtocolEventInfo& other) = default;
+    CommonProtocolEventInfo& operator=(CommonProtocolEventInfo&& other) noexcept = default;
+    CommonProtocolEventInfo& operator=(const CommonProtocolEventInfo& other) = default;
 
-    void ToPB(sls_logs::Log* log) const {
-        AddAnyLogContent(log, "latency_ns", LatencyNs);
-        AddAnyLogContent(log, "req_bytes", ReqBytes);
-        AddAnyLogContent(log, "resp_bytes", RespBytes);
-    }
 
     friend std::ostream& operator<<(std::ostream& os, const CommonProtocolEventInfo& info) {
         os << "LatencyNs: " << info.LatencyNs << " ReqBytes: " << info.ReqBytes << " RespBytes: " << info.RespBytes;
         return os;
     }
 
-    std::string ToString() {
+    std::string ToString() const {
         std::stringstream ss;
         ss << *this;
         return ss.str();
     }
 
-    int64_t LatencyNs;
-    int32_t ReqBytes;
-    int32_t RespBytes;
+    int64_t LatencyNs{0};
+    int32_t ReqBytes{0};
+    int32_t RespBytes{0};
 };
 
+/**
+ * A pair of protocol keys and metrics info.
+ * @tparam ProtocolEventKey stores unique protocol keys
+ */
+template <typename ProtocolEventKey>
+struct CommonProtocolEvent {
+    CommonProtocolEvent() = default;
+    CommonProtocolEvent(CommonProtocolEvent&& other) noexcept = default;
+    CommonProtocolEvent(const CommonProtocolEvent& other) = default;
+    CommonProtocolEvent& operator=(CommonProtocolEvent&& other) noexcept = default;
+    CommonProtocolEvent& operator=(const CommonProtocolEvent& other) = default;
+
+    ProtocolEventKey Key;
+    CommonProtocolEventInfo Info;
+};
+
+/**
+ * Aggregate single protocol event info.
+ */
 struct CommonProtocolAggResult {
-    CommonProtocolAggResult() : TotalCount(0), TotalLatencyNs(0), TotalReqBytes(0), TotalRespBytes(0) {}
+    CommonProtocolAggResult() = default;
     void Clear() {
         TotalCount = 0;
         TotalLatencyNs = 0;
@@ -140,65 +101,49 @@ struct CommonProtocolAggResult {
     }
 
     void ToPB(sls_logs::Log* log) const {
-        AddAnyLogContent(log, "total_count", TotalCount);
-        AddAnyLogContent(log, "total_latency_ns", TotalLatencyNs);
-        AddAnyLogContent(log, "total_req_bytes", TotalReqBytes);
-        AddAnyLogContent(log, "total_resp_bytes", TotalRespBytes);
+        AddAnyLogContent(log, observer::kCount, TotalCount);
+        AddAnyLogContent(log, observer::kLatencyNs, TotalLatencyNs);
+        AddAnyLogContent(log, observer::kReqBytes, TotalReqBytes);
+        AddAnyLogContent(log, observer::kRespBytes, TotalRespBytes);
+        AddAnyLogContent(log, observer::kTdigestLatency, std::string("xxxxx"));
     }
 
-    int64_t TotalCount;
-    int64_t TotalLatencyNs;
-    int64_t TotalReqBytes;
-    int64_t TotalRespBytes;
+    int64_t TotalCount{0};
+    int64_t TotalLatencyNs{0};
+    int64_t TotalReqBytes{0};
+    int64_t TotalRespBytes{0};
 };
 
-template <typename ProtocolEventKey>
-struct CommonProtocolEvent {
-    void GetKey(ProtocolEventKey& key) { key = Key; }
 
-    void ToPB(sls_logs::Log* log) {
-        Key.ToPB(log);
-        Info.ToPB(log);
-    }
-
-    ProtocolEventKey Key;
-    CommonProtocolEventInfo Info;
-};
-
+/**
+ * A aggregation result for unique protocol event key.
+ * @tparam ProtocolEventKey stores unique protocol keys
+ * @tparam ProtocolEventAggResult stores the whole aggregation result for whole input events
+ */
 template <typename ProtocolEventKey, typename ProtocolEventAggResult>
 struct CommonProtocolEventAggItem {
     CommonProtocolEventAggItem() = default;
-
-    explicit CommonProtocolEventAggItem(const ProtocolEventKey& key) : Key(key) {}
-
     void ToPB(sls_logs::Log* log) {
         Key.ToPB(log);
         AggResult.ToPB(log);
     }
-
-    const ProtocolEventKey& GetKey() const { return Key; }
-
-    void SetKey(const ProtocolEventKey& key) { Key = key; }
-
-    // AddEvent 更新聚合结果
-    template <typename ProtocolEvent>
-    void AddEvent(ProtocolEvent* event) {
-        AggResult.AddEventInfo(event->Info);
-    }
-
     void Merge(CommonProtocolEventAggItem<ProtocolEventKey, ProtocolEventAggResult>& aggItem) {
         AggResult.Merge(aggItem.AggResult);
     }
-
-    // Clear 清理聚合结果
+    void AddEventInfo(CommonProtocolEventInfo& info) { AggResult.AddEventInfo(info); }
     void Clear() { AggResult.Clear(); }
 
     ProtocolEventKey Key;
     ProtocolEventAggResult AggResult;
 };
 
+/**
+ * Cache pool
+ * @tparam ProtocolEventAggItem reused object.
+ */
 template <typename ProtocolEventAggItem>
-struct CommonProtocolEventAggItemManager {
+class CommonProtocolEventAggItemManager {
+public:
     explicit CommonProtocolEventAggItemManager(size_t maxCount = 128) : mMaxCount(maxCount) {}
 
     ~CommonProtocolEventAggItemManager() {
@@ -207,17 +152,29 @@ struct CommonProtocolEventAggItemManager {
         }
     }
 
-    ProtocolEventAggItem* Create() {
-        if (!mUnUsed.empty()) {
-            ProtocolEventAggItem* item = mUnUsed.back();
-            item->Clear();
-            mUnUsed.pop_back();
+    /**
+     * Create an new object or reuse the cached object.
+     * @return an protocol metrics event aggregate node.
+     */
+    template <typename ProtocolEventKey>
+    ProtocolEventAggItem* Create(ProtocolEventKey&& event) {
+        ProtocolEventAggItem* item;
+        if (mUnUsed.empty()) {
+            item = new ProtocolEventAggItem();
+            item->Key = std::move(event);
             return item;
         }
-        ProtocolEventAggItem* item = new ProtocolEventAggItem();
+        item = mUnUsed.back();
+        item->Clear();
+        item->Key = std::move(event);
+        mUnUsed.pop_back();
         return item;
     }
 
+    /**
+     * Delete object when cache is full, or else would cache it.
+     * @param item deleting object.
+     */
     void Delete(ProtocolEventAggItem* item) {
         if (mUnUsed.size() < mMaxCount) {
             mUnUsed.push_back(item);
@@ -226,110 +183,77 @@ struct CommonProtocolEventAggItemManager {
         delete item;
     }
 
+private:
     size_t mMaxCount;
     std::deque<ProtocolEventAggItem*> mUnUsed;
 };
 
-template <typename ProtocolEventKey>
-struct CommonProtocolPatternGenerator {
-    static CommonProtocolPatternGenerator<ProtocolEventKey>* GetInstance() {
-        static CommonProtocolPatternGenerator<ProtocolEventKey>* sCommonProtocolPatternGenerator
-            = new CommonProtocolPatternGenerator<ProtocolEventKey>();
-        return sCommonProtocolPatternGenerator;
-    }
-
-    ProtocolEventKey& GetPattern(ProtocolEventKey& key) { return key; }
-};
-
 // 通用的协议的聚类器实现
-template <typename ProtocolEventKey,
-          typename ProtocolEvent,
-          typename ProtocolEventAggItem,
-          typename ProtocolPatternGenerator,
-          typename ProtocolEventAggItemManager,
-          ProtocolType PT>
+template <typename ProtocolEvent, typename ProtocolEventAggItem, typename ProtocolEventAggItemManager>
 class CommonProtocolEventAggregator {
 public:
     CommonProtocolEventAggregator(uint32_t maxClientAggSize, uint32_t maxServerAggSize)
-        : mPatternGenerator(*(ProtocolPatternGenerator::GetInstance())),
-          mClientAggMaxSize(maxClientAggSize),
-          mServerAggMaxSize(maxServerAggSize) {}
+        : mClientAggMaxSize(maxClientAggSize), mServerAggMaxSize(maxServerAggSize) {}
 
     ~CommonProtocolEventAggregator() {
         for (auto iter = mProtocolEventAggMap.begin(); iter != mProtocolEventAggMap.end(); ++iter) {
             mAggItemManager.Delete(iter->second);
         }
     }
-
-    // AddEvent 增加一个事件
-    bool AddEvent(ProtocolEvent* event) {
-        ProtocolEventKey eventKey;
-        event->GetKey(eventKey);
-        ProtocolEventKey& patternKey = mPatternGenerator.GetPattern(eventKey);
-        uint64_t hashVal = patternKey.Hash();
+    bool AddEvent(ProtocolEvent&& event) {
+        auto key = event.Key;
+        auto hashVal = key.Hash();
         auto findRst = mProtocolEventAggMap.find(hashVal);
         if (findRst == mProtocolEventAggMap.end()) {
-            if ((eventKey.ConnKey.Role == PacketRoleTypeToString(PacketRoleType::Client)
-                 && this->mProtocolEventAggMap.size() >= mClientAggMaxSize)
-                || (eventKey.ConnKey.Role == PacketRoleTypeToString(PacketRoleType::Server)
-                    && this->mProtocolEventAggMap.size() >= mServerAggMaxSize)) {
-                if (sLogger->should_log(spdlog::level::debug)) {
-                    LogMaker maker;
-                    sLogger->log(spdlog::level::debug,
-                                 "{}:{}\t{}",
-                                 __FILE__,
-                                 __LINE__,
-                                 maker("aggregator is full, the event would be dropped", ProtocolTypeToString(PT))(
-                                     "key", event->Key.ToString())("info", event->Info.ToString())
-                                     .GetContent());
-                }
-                static uint32_t sLastDropTime;
-                auto now = time(NULL);
+            if (isFull(event.Key.ConnKey.Role)) {
+                static uint32_t sLastDropTime{0};
+                auto now = time(nullptr);
+                LOG_DEBUG(sLogger, ("aggregator is full, some events would be dropped", event.Key.ToString()));
                 if (now - sLastDropTime > 60) {
                     sLastDropTime = now;
-                    if (sLogger->should_log(spdlog::level::err)) {
-                        LogMaker maker;
-                        sLogger->log(spdlog::level::err,
-                                     "{}:{}\t{}",
-                                     __FILE__,
-                                     __LINE__,
-                                     maker("aggregator is full, some events would be dropped", ProtocolTypeToString(PT))
-                                         .GetContent());
-                    }
+                    LOG_ERROR(sLogger, ("aggregator is full, some events would be dropped", event.Key.ProtocolType()));
                 }
                 return false;
             }
-            ProtocolEventAggItem* item = mAggItemManager.Create();
-            item->SetKey(patternKey);
+            auto item = mAggItemManager.Create(std::move(event.Key));
             findRst = mProtocolEventAggMap.insert(std::make_pair(hashVal, item)).first;
         }
-        findRst->second->AddEvent(event);
+        findRst->second->AddEventInfo(event.Info);
         return true;
     }
 
     void FlushLogs(std::vector<sls_logs::Log>& allData,
-                   ::google::protobuf::RepeatedPtrField<sls_logs::Log_Content>& tags) {
+                   const std::string& tags,
+                   google::protobuf::RepeatedPtrField<sls_logs::Log_Content>& globalTags,
+                   uint64_t interval) {
         for (auto iter = mProtocolEventAggMap.begin(); iter != mProtocolEventAggMap.end();) {
             if (iter->second->AggResult.IsEmpty()) {
                 mAggItemManager.Delete(iter->second);
                 iter = mProtocolEventAggMap.erase(iter);
             } else {
                 sls_logs::Log newLog;
-                newLog.mutable_contents()->CopyFrom(tags);
-                auto content = newLog.add_contents();
-                content->set_key("protocol");
-                content->set_value(ProtocolTypeToString(PT));
+                newLog.mutable_contents()->CopyFrom(globalTags);
+                AddAnyLogContent(&newLog, observer::kLocalInfo, tags);
+                AddAnyLogContent(&newLog, observer::kInterval, interval);
                 iter->second->ToPB(&newLog);
-                // wait for next clear
-                iter->second->Clear();
-                allData.push_back(newLog);
+                iter->second->Clear(); // wait for next clear
+                allData.push_back(std::move(newLog));
                 ++iter;
             }
         }
     }
 
-protected:
-    ProtocolPatternGenerator& mPatternGenerator;
+
+private:
+    bool isFull(PacketRoleType role) {
+        if (role == PacketRoleType::Client) {
+            return this->mProtocolEventAggMap.size() >= mClientAggMaxSize;
+        }
+        if (role == PacketRoleType::Server) {
+            return this->mProtocolEventAggMap.size() >= mServerAggMaxSize;
+        }
+        return true;
+    }
     ProtocolEventAggItemManager mAggItemManager;
     std::unordered_map<uint64_t, ProtocolEventAggItem*> mProtocolEventAggMap;
     uint32_t mClientAggMaxSize;
@@ -422,7 +346,7 @@ private:
         eventType event;
         bool success = true;
         if (this->mConvertEventFunc != nullptr && this->mConvertEventFunc(req, resp, event)) {
-            success = this->mAggregators->AddEvent(&event);
+            success = this->mAggregators->AddEvent(std::move(event));
         }
         ++this->mHeadRequestsIdx;
         ++this->mHeadResponsesIdx;
@@ -459,7 +383,7 @@ private:
             LOG_TRACE(sLogger,
                       ("head_req", this->mHeadRequestsIdx)("tail_req", this->mTailRequestsIdx)(
                           "head_resp", this->mHeadRequestsIdx)("tail_resp", this->mTailResponsesIdx));
-            success = this->mAggregators->AddEvent(&event);
+            success = this->mAggregators->AddEvent(std::move(event));
         }
         ++this->mHeadRequestsIdx;
         ++this->mHeadResponsesIdx;

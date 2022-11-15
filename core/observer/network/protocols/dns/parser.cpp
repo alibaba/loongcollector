@@ -119,11 +119,11 @@ DNSRequestInfo::DNSRequestInfo(uint64_t timeNano, std::string&& queryRecord, std
 }
 
 
-bool DNSProtocolParser::stitcher(const DNSRequestInfo* requestInfo, const DNSResponseInfo* responseInfo) {
+bool DNSProtocolParser::stitcher(DNSRequestInfo* requestInfo, DNSResponseInfo* responseInfo) {
     DNSProtocolEvent dnsEvent;
-    dnsEvent.Key.QueryRecord = std::move(requestInfo->QueryRecord);
-    dnsEvent.Key.QueryType = std::move(requestInfo->QueryType);
-    dnsEvent.Key.IsSuccess = responseInfo->AnswerCount > 0 ? '1' : '0';
+    dnsEvent.Key.ReqResource = std::move(requestInfo->QueryRecord);
+    dnsEvent.Key.ReqType = std::move(requestInfo->QueryType);
+    dnsEvent.Key.RespStatus = responseInfo->AnswerCount > 0 ? 1 : 0;
     dnsEvent.Key.ConnKey = mKey;
     dnsEvent.Info.LatencyNs = responseInfo->TimeNano - requestInfo->TimeNano;
     if (dnsEvent.Info.LatencyNs < 0) {
@@ -131,7 +131,7 @@ bool DNSProtocolParser::stitcher(const DNSRequestInfo* requestInfo, const DNSRes
     }
     dnsEvent.Info.ReqBytes = requestInfo->ReqBytes;
     dnsEvent.Info.RespBytes = responseInfo->RespBytes;
-    return mAggregator->AddEvent(&dnsEvent);
+    return mAggregator->AddEvent(std::move(dnsEvent));
 }
 
 bool DNSProtocolParser::GarbageCollection(size_t size_limit_bytes, uint64_t expireTimeNs) {

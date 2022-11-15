@@ -16,53 +16,14 @@
 
 #pragma once
 
-#include "interface/protocol.h"
-#include "network/protocols/common.h"
-#include <string>
-#include <ostream>
-#include "common/xxhash/xxhash.h"
+#include "network/protocols/category.h"
 
 namespace logtail {
 
-struct PgSQLProtocolEventKey {
-    uint64_t Hash() {
-        uint64_t hashValue = ConnKey.HashVal;
-        hashValue = XXH32(this->SQL.c_str(), this->SQL.size(), hashValue);
-        hashValue = XXH32(this->OK.c_str(), this->OK.size(), hashValue);
-        return hashValue;
-    }
-
-    void ToPB(sls_logs::Log* log) {
-        AddAnyLogContent(log, "sql", SQL);
-        AddAnyLogContent(log, "success", OK);
-        ConnKey.ToPB(log, ProtocolType_PgSQL);
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const PgSQLProtocolEventKey& key) {
-        os << "SQL: " << key.SQL << " OK: " << key.OK << " ConnKey: " << key.ConnKey;
-        return os;
-    }
-
-    std::string ToString() {
-        std::stringstream ss;
-        ss << *this;
-        return ss.str();
-    }
-
-    std::string SQL;
-    std::string OK;
-    CommonAggKey ConnKey;
-};
-
-typedef CommonProtocolEvent<PgSQLProtocolEventKey> PgSQLProtocolEvent;
-typedef CommonProtocolEventAggItem<PgSQLProtocolEventKey, CommonProtocolAggResult> PgSQLProtocolEventAggItem;
-typedef CommonProtocolPatternGenerator<PgSQLProtocolEventKey> PgSQLProtocolPatternGenerator;
-typedef CommonProtocolEventAggItemManager<PgSQLProtocolEventAggItem> PgSQLProtocolEventAggItemManager;
-typedef CommonProtocolEventAggregator<PgSQLProtocolEventKey,
-                                      PgSQLProtocolEvent,
-                                      PgSQLProtocolEventAggItem,
-                                      PgSQLProtocolPatternGenerator,
-                                      PgSQLProtocolEventAggItemManager,
-                                      ProtocolType_PgSQL>
-    PgSQLProtocolEventAggregator;
+using PgSQLProtocolEventKey = DBAggKey<ProtocolType_PgSQL>;
+using PgSQLProtocolEvent = CommonProtocolEvent<PgSQLProtocolEventKey>;
+using PgSQLProtocolEventAggItem = CommonProtocolEventAggItem<PgSQLProtocolEventKey, CommonProtocolAggResult>;
+using PgSQLProtocolEventAggItemManager = CommonProtocolEventAggItemManager<PgSQLProtocolEventAggItem>;
+using PgSQLProtocolEventAggregator
+    = CommonProtocolEventAggregator<PgSQLProtocolEvent, PgSQLProtocolEventAggItem, PgSQLProtocolEventAggItemManager>;
 } // namespace logtail

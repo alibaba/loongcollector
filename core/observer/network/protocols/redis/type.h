@@ -16,53 +16,15 @@
 
 #pragma once
 
-#include "interface/protocol.h"
-#include "network/protocols/common.h"
-#include <string>
-#include <ostream>
-#include "common/xxhash/xxhash.h"
+
+#include "network/protocols/category.h"
 
 namespace logtail {
 
-struct RedisProtocolEventKey {
-    uint64_t Hash() {
-        uint64_t hashValue = ConnKey.HashVal;
-        hashValue = XXH32(this->Cmd.c_str(), this->Cmd.size(), hashValue);
-        hashValue = XXH32(this->OK.c_str(), this->OK.size(), hashValue);
-        return hashValue;
-    }
-
-    void ToPB(sls_logs::Log* log) {
-        AddAnyLogContent(log, "cmd", Cmd);
-        AddAnyLogContent(log, "success", OK);
-        ConnKey.ToPB(log, ProtocolType_PgSQL);
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const RedisProtocolEventKey& key) {
-        os << "Cmd: " << key.Cmd << " OK: " << key.OK << " ConnKey: " << key.ConnKey;
-        return os;
-    }
-
-    std::string ToString() {
-        std::stringstream ss;
-        ss << *this;
-        return ss.str();
-    }
-
-    std::string Cmd;
-    std::string OK;
-    CommonAggKey ConnKey;
-};
-
-typedef CommonProtocolEvent<RedisProtocolEventKey> RedisProtocolEvent;
-typedef CommonProtocolEventAggItem<RedisProtocolEventKey, CommonProtocolAggResult> RedisProtocolEventAggItem;
-typedef CommonProtocolPatternGenerator<RedisProtocolEventKey> RedisProtocolPatternGenerator;
-typedef CommonProtocolEventAggItemManager<RedisProtocolEventAggItem> RedisProtocolEventAggItemManager;
-typedef CommonProtocolEventAggregator<RedisProtocolEventKey,
-                                      RedisProtocolEvent,
-                                      RedisProtocolEventAggItem,
-                                      RedisProtocolPatternGenerator,
-                                      RedisProtocolEventAggItemManager,
-                                      ProtocolType_Redis>
-    RedisProtocolEventAggregator;
+using RedisProtocolEventKey = DBAggKey<ProtocolType_Redis>;
+using RedisProtocolEvent = CommonProtocolEvent<RedisProtocolEventKey>;
+using RedisProtocolEventAggItem = CommonProtocolEventAggItem<RedisProtocolEventKey, CommonProtocolAggResult>;
+using RedisProtocolEventAggItemManager = CommonProtocolEventAggItemManager<RedisProtocolEventAggItem>;
+using RedisProtocolEventAggregator
+    = CommonProtocolEventAggregator<RedisProtocolEvent, RedisProtocolEventAggItem, RedisProtocolEventAggItemManager>;
 } // namespace logtail

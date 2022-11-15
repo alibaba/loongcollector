@@ -299,21 +299,21 @@ public:
         std::vector<sls_logs::Log> allData;
         mObserver->FlushOutMetrics(allData);
 
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "query_record", "xxxxaawefafadsfasfasf.com"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "query_type", "A"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "success", "0"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "total_count", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::GetLogKey(&allData[0], "total_latency_ns").first != "0");
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "total_req_bytes", "54"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "total_resp_bytes", "127"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_resource", "xxxxaawefafadsfasfasf.com"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_type", "A"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "resp_status", "0"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "count", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::GetLogKey(&allData[0], "latency_ns").first != "0");
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_bytes", "54"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "resp_bytes", "127"));
 
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "query_record", "baidu.com"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "query_type", "A"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "success", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "total_count", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::GetLogKey(&allData[0], "total_latency_ns").first != "0");
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "total_req_bytes", "38"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "total_resp_bytes", "70"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_resource", "baidu.com"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_type", "A"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "resp_status", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "count", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::GetLogKey(&allData[0], "latency_ns").first != "0");
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_bytes", "38"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "resp_bytes", "70"));
     }
 
 
@@ -330,21 +330,21 @@ public:
         std::vector<sls_logs::Log> allData;
         mObserver->FlushOutMetrics(allData);
 
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "query_record", "xxxxaawefafadsfasfasf.com"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "query_type", "A"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "success", "0"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "total_latency_ns", "0"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "total_req_bytes", "54"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "total_resp_bytes", "127"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_resource", "xxxxaawefafadsfasfasf.com"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_type", "A"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "resp_status", "0"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "latency_ns", "0"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_bytes", "54"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "resp_bytes", "127"));
 
 
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "query_record", "baidu.com"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "query_type", "A"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "success", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "total_count", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "total_latency_ns", "0"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "total_req_bytes", "38"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "total_resp_bytes", "70"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_resource", "baidu.com"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_type", "A"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "resp_status", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "count", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "latency_ns", "0"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_bytes", "38"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "resp_bytes", "70"));
     }
 
     void TestDNSParserGC() {

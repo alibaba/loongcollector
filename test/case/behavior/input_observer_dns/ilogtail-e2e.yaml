@@ -19,9 +19,10 @@ ilogtail:
     - name: observer-http-case
       detail:
         - inputs:
-            - Type: observer_ilogtail_network
+            - Type: observer_ilogtail_network_v1
               Common:
-                FlushOutInterval: 1
+                FlushOutL7Interval: 1
+                FlushOutL4Interval: 100
                 IncludeCmdRegex: "^.*simulatorclient.*$"
                 IncludeProtocols: [ "DNS" ]
               EBPF:
@@ -35,8 +36,8 @@ verify:
       validator: sys_sum_checker
       spec:
         expect_received_minimum_num: 100
-        field: total_count
-        filter_key: query_record
+        field: count
+        filter_key: req_resource
         filter_val: sls.test.ebpf
 testing_interval: 10s
 retry:

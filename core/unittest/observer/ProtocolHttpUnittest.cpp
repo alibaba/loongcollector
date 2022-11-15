@@ -173,9 +173,9 @@ public:
         mObserver->FlushOutMetrics(allData);
 
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "version", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "host", "baidu.com"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "method", "GET"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "url", "/"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_domain", "baidu.com"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_type", "GET"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_resource", "/"));
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "resp_code", "200"));
     }
 
@@ -192,9 +192,9 @@ public:
         std::vector<sls_logs::Log> allData;
         mObserver->FlushOutMetrics(allData);
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "version", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "host", "baidu.com"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "method", "GET"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "url", "/"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_domain", "baidu.com"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_type", "GET"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_resource", "/"));
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "resp_code", "200"));
     }
 
@@ -281,8 +281,8 @@ public:
             APSARA_TEST_EQUAL(parserRes, expectRes[i]);
         }
         std::vector<sls_logs::Log> allData;
-        ::google::protobuf::RepeatedPtrField<sls_logs::Log_Content> tagsContent;
-        aggregator->FlushLogs(allData, tagsContent);
+        google::protobuf::RepeatedPtrField<sls_logs::Log_Content> tags;
+        aggregator->FlushLogs(allData, {}, tags, 1);
         APSARA_TEST_TRUE(allData.size() == 1);
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "version", "1"));
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "host", "ocs-oneagent-server.alibaba.com"));
@@ -301,7 +301,7 @@ public:
                 = parser->OnPacket(data->PktType, data->MsgType, header, data->Buffer, data->BufferLen, data->RealLen);
             APSARA_TEST_EQUAL(parserRes, expectRes[i]);
         }
-        aggregator->FlushLogs(allData, tagsContent);
+        aggregator->FlushLogs(allData, {}, tags, 1);
         APSARA_TEST_TRUE(allData.size() == 2);
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "version", "1"));
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "host", "ocs-oneagent-server.alibaba.com"));
@@ -382,12 +382,14 @@ public:
         }
         std::vector<sls_logs::Log> allData;
         ::google::protobuf::RepeatedPtrField<sls_logs::Log_Content> tagsContent;
-        aggregator->FlushLogs(allData, tagsContent);
+        google::protobuf::RepeatedPtrField<sls_logs::Log_Content> tags;
+
+        aggregator->FlushLogs(allData, {}, tags, 1);
         APSARA_TEST_TRUE(allData.size() == 1);
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "version", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "host", "anglesharp.azurewebsites.net"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "method", "GET"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "url", "/Chunked"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_version", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_domain", "anglesharp.azurewebsites.net"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_type", "GET"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "req_resource", "/Chunked"));
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "resp_code", "200"));
 
         for (size_t i = 0; i < packets.size(); ++i) {
@@ -398,12 +400,12 @@ public:
                 = parser->OnPacket(data->PktType, data->MsgType, header, data->Buffer, data->BufferLen, data->RealLen);
             APSARA_TEST_EQUAL(parserRes, expectRes[i]);
         }
-        aggregator->FlushLogs(allData, tagsContent);
+        aggregator->FlushLogs(allData, {}, tags, 1);
         APSARA_TEST_TRUE(allData.size() == 2);
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "version", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "host", "anglesharp.azurewebsites.net"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "method", "GET"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "url", "/Chunked"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_version", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_domain", "anglesharp.azurewebsites.net"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_type", "GET"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "req_resource", "/Chunked"));
         APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[1], "resp_code", "200"));
     }
 

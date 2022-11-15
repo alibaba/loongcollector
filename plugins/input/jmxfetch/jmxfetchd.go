@@ -77,7 +77,7 @@ func (m *Manager) execJmxfetchd(command string, needOutput bool) (output []byte,
 var scriptsTemplate = `
 #!/bin/bash
 
-CURRENT_DIR=$(dirname "$0")
+CURRENT_DIR=$(cd "$(dirname "$0")";pwd)
 JAVA_CMD=%s
 CHECKERS=%s
 JAR="ilogtail_jmxfetch.jar"

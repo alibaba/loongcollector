@@ -50,10 +50,10 @@ public:
         dnsEvent.Info.ReqBytes = 100;
         dnsEvent.Info.RespBytes = 200;
         dnsEvent.Info.LatencyNs = 300;
-        dnsEvent.Key.QueryRecord = "cn-hangzhou.log.aliyuncs.com";
-        // dnsEvent.Key.Hash = "cn-hangzhou.log.aliyuncs.com";
-        dnsEvent.Key.IsSuccess = '1';
-        dnsAgg->AddEvent(&dnsEvent);
+        dnsEvent.Key.ReqResource = "cn-hangzhou.log.aliyuncs.com";
+        dnsEvent.Key.RespStatus = 1;
+        dnsEvent.Key.ConnKey.Role = PacketRoleType::Server;
+        dnsAgg->AddEvent(std::move(dnsEvent));
 
         std::vector<sls_logs::Log> allData;
         mObserver->FlushOutMetrics(allData);
@@ -61,14 +61,16 @@ public:
 
         std::cout << allData[0].DebugString();
         sls_logs::Log* log = &allData[0];
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "_process_pid_", "8"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "_process_cmd_", ""));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "query_record", "cn-hangzhou.log.aliyuncs.com"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "success", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "total_count", "1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "total_latency_ns", "300"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "total_req_bytes", "100"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "total_resp_bytes", "200"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(
+            log, "local_info", "{\"_process_cmd_\":\"\",\"_process_pid_\":\"8\",\"_running_mode_\":\"host\"}"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "req_resource", "cn-hangzhou.log.aliyuncs.com"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "resp_status", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "protocol", "dns"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "role", "s"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "count", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "latency_ns", "300"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "req_bytes", "100"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(log, "resp_bytes", "200"));
     }
 
 

@@ -58,7 +58,9 @@ public:
 
 private:
     NetworkObserver() {
-        mLastGCTimeNs = mLastFlushTimeNs = GetCurrentTimeInNanoSeconds();
+        mLastGCTimeNs = GetCurrentTimeInNanoSeconds();
+        mLastL4FlushTimeNs = GetCurrentTimeInNanoSeconds();
+        mLastL7FlushTimeNs = GetCurrentTimeInNanoSeconds();
         mConfig = NetworkConfig::GetInstance();
         mNetworkStatistic = NetworkStatistic::GetInstance();
         mServiceMetaManager = ServiceMetaManager::GetInstance();
@@ -121,7 +123,8 @@ private:
     ThreadPtr mEventLoopThread;
     ReadWriteLock mEventLoopThreadRWL;
     uint64_t mLastGCTimeNs = 0;
-    uint64_t mLastFlushTimeNs = 0;
+    uint64_t mLastL4FlushTimeNs = 0;
+    uint64_t mLastL7FlushTimeNs = 0;
     uint64_t mLastEbpfGCTimeNs = 0;
     uint64_t mLastFlushMetaTimeNs = 0;
     uint64_t mLastFlushNetlinkTimeNs = 0;

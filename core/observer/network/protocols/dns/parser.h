@@ -79,13 +79,9 @@ public:
 
     int32_t GetCacheSize();
 
-    DNSProtocolEventAggregator* Aggregator() const;
-
-    void SetAggregator(DNSProtocolEventAggregator* newAggregator);
-
-    bool stitcher(const DNSRequestInfo* requestInfo, const DNSResponseInfo* responseInfo);
-
 private:
+    bool stitcher(DNSRequestInfo* requestInfo, DNSResponseInfo* responseInfo);
+
     DNSProtocolEventAggregator* mAggregator = NULL;
     std::unordered_map<uint16_t, DNSRequestInfo*> mReqCache;
     std::unordered_map<uint16_t, DNSResponseInfo*> mRespCache;
@@ -93,14 +89,5 @@ private:
 
     friend class ProtocolDnsUnittest;
 };
-
-inline DNSProtocolEventAggregator* DNSProtocolParser::Aggregator() const {
-    return mAggregator;
-}
-
-inline void DNSProtocolParser::SetAggregator(DNSProtocolEventAggregator* newAggregator) {
-    mAggregator = newAggregator;
-}
-
 
 } // namespace logtail

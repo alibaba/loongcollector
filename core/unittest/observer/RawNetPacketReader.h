@@ -105,6 +105,7 @@ public:
 
         header->DstPort = dstPort;
         header->SrcPort = srcPort;
+        header->RoleType = PacketRoleType::Server;
 
         data->BufferLen = dataLen;
         data->RealLen = dataLen;

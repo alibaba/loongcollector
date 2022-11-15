@@ -70,7 +70,7 @@ public:
 
     bool Stop();
 
-    void HoldOn() { holdOnFlag = 1; }
+    void HoldOn(bool exitFlag);
 
     void Resume() { holdOnFlag = 0; }
 

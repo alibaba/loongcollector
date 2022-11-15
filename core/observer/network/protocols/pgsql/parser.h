@@ -76,8 +76,9 @@ public:
                 event.Info.ReqBytes = requestInfo->ReqBytes;
                 event.Info.RespBytes = responseInfo->RespBytes;
                 event.Key.ConnKey = mKey;
-                event.Key.SQL = std::move(requestInfo->SQL);
-                event.Key.OK = std::to_string(responseInfo->OK);
+                event.Key.QueryCmd = ToLowerCaseString(requestInfo->SQL.substr(0, requestInfo->SQL.find_first_of(' ')));
+                event.Key.Query = std::move(requestInfo->SQL);
+                event.Key.Status = responseInfo->OK;
                 return true;
             });
     }

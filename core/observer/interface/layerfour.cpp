@@ -13,45 +13,25 @@ void NetStatisticsTCP::ToPB(sls_logs::Log* log) const {
 }
 
 void NetStatisticsBase::ToPB(sls_logs::Log* log) const {
-    auto content = log->add_contents();
-    content->set_key(logtail::observer::kSendBytes);
-    content->set_value(std::to_string(this->SendBytes));
-    content = log->add_contents();
-    content->set_key(logtail::observer::kRecvBytes);
-    content->set_value(std::to_string(this->RecvBytes));
-
-    content = log->add_contents();
-    content->set_key(logtail::observer::kSendpackets);
-    content->set_value(std::to_string(this->SendPackets));
-    content = log->add_contents();
-    content->set_key(logtail::observer::kRecvPackets);
-    content->set_value(std::to_string(this->RecvPackets));
+    AddAnyLogContent(log, logtail::observer::kSendBytes, this->SendBytes);
+    AddAnyLogContent(log, logtail::observer::kRecvBytes, this->RecvBytes);
+    AddAnyLogContent(log, logtail::observer::kSendpackets, this->SendPackets);
+    AddAnyLogContent(log, logtail::observer::kRecvPackets, this->RecvPackets);
 }
 
 
 void NetStatisticsKey::ToPB(sls_logs::Log* log) const {
     static ServiceMetaManager* sHostnameManager = logtail::ServiceMetaManager::GetInstance();
     ConnectionAddrInfoToPB(this->AddrInfo, log);
-    sls_logs::Log_Content* content = log->add_contents();
-    content->set_key(logtail::observer::kRemoteInfo);
     const std::string& remoteAddr = SockAddressToString(this->AddrInfo.RemoteAddr);
     const ServiceMeta& meta = sHostnameManager->GetServiceMeta(this->PID, remoteAddr);
-    content->set_value(
-        std::string(kRemoteInfoPrefix).append(meta.Empty() ? remoteAddr : meta.Host).append(kRemoteInfoSuffix));
-
-    content = log->add_contents();
-    content->set_key(logtail::observer::kRole);
-    content->set_value(PacketRoleTypeToString(this->RoleType));
-
-
-    content = log->add_contents();
-    content->set_key(logtail::observer::kConnId);
-    content->set_value(std::to_string(GenConnectionID(this->PID, this->SockHash)));
-
-    // todo replace with real type
-    content = log->add_contents();
-    content->set_key(logtail::observer::kConnType);
-    content->set_value("tcp");
+    auto remoteInfo
+        = std::string(kRemoteInfoPrefix).append(meta.Empty() ? remoteAddr : meta.Host).append(kRemoteInfoSuffix);
+    AddAnyLogContent(log, logtail::observer::kRemoteInfo, std::move(remoteInfo));
+    AddAnyLogContent(log, logtail::observer::kRole, PacketRoleTypeToString(this->RoleType));
+    AddAnyLogContent(log, logtail::observer::kConnId, GenConnectionID(this->PID, this->SockHash));
+    AddAnyLogContent(log, logtail::observer::kConnType, std::string("tcp")); // todo replace with real type
+    AddAnyLogContent(log, observer::kType, ObserverMetricsTypeToString(ObserverMetricsType::L4_METRICS));
 }
 
 logtail::NetStatisticsTCP& NetStaticticsMap::GetStatisticsItem(const logtail::NetStatisticsKey& key) {

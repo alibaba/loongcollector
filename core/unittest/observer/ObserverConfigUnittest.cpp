@@ -31,7 +31,8 @@ public:
                                         "        \"detail\":{\n"
                                         "            \"Common\":{\n"
                                         "                \"Sampling\":50,\n"
-                                        "                \"FlushOutInterval\":5,\n"
+                                        "                \"FlushOutL4Interval\":5,\n"
+                                        "                \"FlushOutL7Interval\":55,\n"
                                         "                \"FlushMetaInterval\":6,\n"
                                         "                \"FlushNetlinkInterval\":7,\n"
                                         "                \"ProtocolProcess\":true,\n"
@@ -86,7 +87,7 @@ public:
                                         "                \"Enabled\":true\n"
                                         "            }\n"
                                         "        },\n"
-                                        "        \"type\":\"observer_ilogtail_network\"\n"
+                                        "        \"type\":\"observer_ilogtail_network_v1\"\n"
                                         "    }\n"
                                         "]";
 
@@ -94,7 +95,8 @@ public:
         cfg->SetFromJsonString();
 
         APSARA_TEST_TRUE(cfg->mSampling == 50);
-        APSARA_TEST_TRUE(cfg->mFlushOutInterval == 5);
+        APSARA_TEST_TRUE(cfg->mFlushOutL4Interval == 5);
+        APSARA_TEST_TRUE(cfg->mFlushOutL7Interval == 55);
         APSARA_TEST_TRUE(cfg->mFlushMetaInterval == 6);
         APSARA_TEST_TRUE(cfg->mFlushNetlinkInterval == 7);
         APSARA_TEST_TRUE(cfg->mProtocolProcessFlag > 0);
@@ -133,6 +135,8 @@ public:
         APSARA_TEST_EQUAL(cfg->label2String(cfg->mExcludeK8sLabels), "app1=^test1$,");
         APSARA_TEST_EQUAL(cfg->label2String(cfg->mIncludeEnvs), "env1=^env1,");
         APSARA_TEST_EQUAL(cfg->label2String(cfg->mExcludeEnvs), "env2=^env2,");
+
+        std::cout << cfg->ToString() << std::endl;
     }
 };
 

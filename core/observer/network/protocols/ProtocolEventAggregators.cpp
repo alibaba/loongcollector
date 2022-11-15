@@ -19,43 +19,44 @@ namespace logtail {
 
 void ProtocolEventAggregators::FlushOutMetrics(uint64_t timeNano,
                                                std::vector<sls_logs::Log>& allData,
-                                               std::vector<std::pair<std::string, std::string> >& processTags,
-                                               std::vector<std::pair<std::string, std::string> >& globalTags) {
-    ::google::protobuf::RepeatedPtrField<sls_logs::Log_Content> tagsContent;
-    tagsContent.Reserve(processTags.size() + globalTags.size() + 1);
-    {
-        sls_logs::Log_Content* content = tagsContent.Add();
-        content->set_key("type");
-        content->set_value("protocols");
-    }
+                                               std::vector<std::pair<std::string, std::string>>& processTags,
+                                               std::vector<std::pair<std::string, std::string>>& globalTags,
+                                               uint64_t interval) {
+    Json::Value root;
+    Json::StreamWriterBuilder builder;
+    builder["indentation"] = ""; // If you want whitespace-less output
     for (auto& tag : processTags) {
-        sls_logs::Log_Content* content = tagsContent.Add();
-        content->set_key(tag.first);
-        content->set_value(tag.second);
+        root[tag.first] = tag.second;
     }
+    const std::string& pTags = Json::writeString(builder, root);
+
+    ::google::protobuf::RepeatedPtrField<sls_logs::Log_Content> gTags;
+    gTags.Reserve(globalTags.size());
     for (const auto& tag : globalTags) {
-        sls_logs::Log_Content* content = tagsContent.Add();
+        sls_logs::Log_Content* content = gTags.Add();
         content->set_key(tag.first);
         content->set_value(tag.second);
     }
-    if (mDNSAggregators != NULL) {
-        mDNSAggregators->FlushLogs(allData, tagsContent);
+
+
+    if (mDNSAggregators != nullptr) {
+        mDNSAggregators->FlushLogs(allData, pTags, gTags, interval);
     }
 
-    if (mHTTPAggregators != NULL) {
-        mHTTPAggregators->FlushLogs(allData, tagsContent);
+    if (mHTTPAggregators != nullptr) {
+        mHTTPAggregators->FlushLogs(allData, pTags, gTags, interval);
     }
 
-    if (mMySQLAggregators != NULL) {
-        mMySQLAggregators->FlushLogs(allData, tagsContent);
+    if (mMySQLAggregators != nullptr) {
+        mMySQLAggregators->FlushLogs(allData, pTags, gTags, interval);
     }
 
-    if (mRedisAggregators != NULL) {
-        mRedisAggregators->FlushLogs(allData, tagsContent);
+    if (mRedisAggregators != nullptr) {
+        mRedisAggregators->FlushLogs(allData, pTags, gTags, interval);
     }
 
-    if (mPgSQLAggregators != NULL) {
-        mPgSQLAggregators->FlushLogs(allData, tagsContent);
+    if (mPgSQLAggregators != nullptr) {
+        mPgSQLAggregators->FlushLogs(allData, pTags, gTags, interval);
     }
 }
 

@@ -202,17 +202,17 @@ public:
 
         auto groupPtr1 = instance->GetContainerProcessGroupPtr(instance->GetProcessMeta(1), 1);
         MySQLProtocolEvent MySQLEvent = getEvent(1);
-        groupPtr1->mAggregator.GetMySQLAggregator()->AddEvent(&MySQLEvent);
+        groupPtr1->mAggregator.GetMySQLAggregator()->AddEvent(std::move(MySQLEvent));
 
         std::vector<sls_logs::Log> logs;
         auto tags = std::vector<std::pair<std::string, std::string>>{};
-        instance->FlushOutMetrics(logs, tags);
+        instance->FlushOutMetrics(logs, tags, 1);
 
         APSARA_TEST_TRUE(logs.size() == 1);
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "_process_pid_", "1"));
-        APSARA_TEST_TRUE(!UnitTestHelper::GetLogKey(&logs[0], "_process_cmd_").first.empty());
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "sql", "select 1"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "success", "0"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(
+            &logs[0], "local_info", "{\"_process_cmd_\":\"/usr/lib/systemd/systemd\",\"_process_pid_\":\"1\",\"_running_mode_\":\"host\"}"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "query", "select 1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "status", "0"));
     }
 
     void TestContainerCGroupManager() {
@@ -256,25 +256,23 @@ public:
 
 
         MySQLProtocolEvent MySQLEvent2 = getEvent(2);
-        groupPtr2->mAggregator.GetMySQLAggregator()->AddEvent(&MySQLEvent2);
+        groupPtr2->mAggregator.GetMySQLAggregator()->AddEvent(std::move(MySQLEvent2));
 
         MySQLProtocolEvent MySQLEvent4 = getEvent(4);
-        groupPtr4->mAggregator.GetMySQLAggregator()->AddEvent(&MySQLEvent4);
+        groupPtr4->mAggregator.GetMySQLAggregator()->AddEvent(std::move(MySQLEvent4));
 
         std::vector<sls_logs::Log> logs;
         auto tags = std::vector<std::pair<std::string, std::string>>{};
-        instance->FlushOutMetrics(logs, tags);
+        instance->FlushOutMetrics(logs, tags, 1);
         APSARA_TEST_TRUE(logs.size() == 2);
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "_container_name_", "mock4-container"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "sql", "select 4"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "success", "0"));
 
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "_pod_name_", "mock2-pod"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "_namespace_", "mock2-ns"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "_container_name_", "mock2-container"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "_workload_name_", "mock2-wn"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "sql", "select 2"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "success", "0"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "local_info", "{\"_container_name_\":\"mock4-container\",\"_running_mode_\":\"container\"}"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "query", "select 4"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[0], "status", "0"));
+
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "local_info", "{\"_container_name_\":\"mock2-container\",\"_namespace_\":\"mock2-ns\",\"_pod_name_\":\"mock2-pod\",\"_running_mode_\":\"kubernetes\",\"_workload_name_\":\"mock2-wn\"}"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "query", "select 2"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&logs[1], "status", "0"));
     }
 
     static MySQLProtocolEvent getEvent(int32_t i) {
@@ -282,8 +280,9 @@ public:
         MySQLEvent.Info.LatencyNs = i;
         MySQLEvent.Info.ReqBytes = i;
         MySQLEvent.Info.RespBytes = i;
-        MySQLEvent.Key.SQL = "select " + std::to_string(i);
-        MySQLEvent.Key.OK = '0';
+        MySQLEvent.Key.Query = "select " + std::to_string(i);
+        MySQLEvent.Key.Status = 0;
+        MySQLEvent.Key.ConnKey.Role = PacketRoleType::Server;
         return MySQLEvent;
     }
 

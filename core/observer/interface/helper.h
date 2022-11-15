@@ -32,13 +32,31 @@
 
 
 namespace logtail {
+
+template <typename T>
+inline void AddAnyLogContent(sls_logs::Log* log, const std::string& key, const T& value) {
+    auto content = log->add_contents();
+    content->set_key(key);
+    content->set_value(std::to_string(value));
+}
+inline void AddAnyLogContent(sls_logs::Log* log, const std::string& key, const std::string& value) {
+    auto content = log->add_contents();
+    content->set_key(key);
+    content->set_value(value);
+}
+inline void AddAnyLogContent(sls_logs::Log* log, const std::string& key, std::string&& value) {
+    auto content = log->add_contents();
+    content->set_key(key);
+    content->set_value(std::move(value));
+}
+
 // GenUniqueConnectionID use connid,add and pid to generate a mostly unique id.
-static uint64_t GenConnectionID(uint32_t pid, uint32_t connid) {
+inline uint64_t GenConnectionID(uint32_t pid, uint32_t connid) {
     static std::string sHostname = GetHostName();
-    static uint32_t sHash = XXH32(sHostname.c_str(), sHostname.size(), pid);
+    uint32_t sHash = XXH32(sHostname.c_str(), sHostname.size(), 0);
     return static_cast<uint64_t>(sHash) << 32 | static_cast<uint64_t>(connid);
 }
-static const std::string kRemoteInfoPrefix = R"({"remote_host":")";
+static const std::string kRemoteInfoPrefix = R"({"_remote_host_":")";
 static const std::string kRemoteInfoSuffix = R"("})";
 
 } // namespace logtail
@@ -200,16 +218,8 @@ inline PacketRoleType InferServerOrClient(PacketType pktType, MessageType messag
 
 
 inline void ConnectionAddrInfoToPB(const ConnectionAddrInfo& info, sls_logs::Log* log) {
-    auto content = log->add_contents();
-    content->set_key(logtail::observer::kLocalAddr);
-    content->set_value(SockAddressToString(info.LocalAddr));
-    content = log->add_contents();
-    content->set_key(logtail::observer::kLocalPort);
-    content->set_value(std::to_string(info.LocalPort));
-    content = log->add_contents();
-    content->set_key(logtail::observer::kRemoteAddr);
-    content->set_value(SockAddressToString(info.RemoteAddr));
-    content = log->add_contents();
-    content->set_key(logtail::observer::kRemotePort);
-    content->set_value(std::to_string(info.RemotePort));
+    logtail::AddAnyLogContent(log, logtail::observer::kLocalAddr, SockAddressToString(info.LocalAddr));
+    logtail::AddAnyLogContent(log, logtail::observer::kLocalPort, info.LocalPort);
+    logtail::AddAnyLogContent(log, logtail::observer::kRemoteAddr, SockAddressToString(info.RemoteAddr));
+    logtail::AddAnyLogContent(log, logtail::observer::kRemotePort, info.RemotePort);
 }

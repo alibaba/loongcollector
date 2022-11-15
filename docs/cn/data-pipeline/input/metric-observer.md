@@ -15,20 +15,21 @@
 ### 基础参数
 
 
-| 参数                        | 类型              | 是否必选 | 说明                                                                                        |
-| --------------------------- | ----------------- | -------- | ------------------------------------------------------------------------------------------- |
-| Type                        | String            | 否       | 插件类型，指定为`observer_ilogtail_network`。                                               |
-| Common.FlushOutInterval     | Number            | 否       | 聚合数据输出间隔时间，默认30s                                                               |
-| Common.FlushMetaInterval    | Number            | 否       | 读取容器元信息间隔时间，默认30s，行为可类比我为docker ps                                    |
-| Common.FlushNetlinkInterval | Number            | 否       | 设置读取Socket元信息的时间间隔，默认10s                                                     |
-| Common.Sampling             | Number            | 否       | 设置网络数据的采样率，默认100                                                               |
-| Common.ProtocolProcess      | bool              | 否       | 开启后Logtail将解析应用层的网络协议数据，例如HTTP、MySQL、Redis等，默认开启。               |
-| Common.DropUnixSocket       | Number            | 否       | 开启后将丢弃Unix域网络请求。Unix域常用于本地网络交互，默认开启。                            |
-| Common.DropLocalConnections | Number            | 否       | 开启后丢弃对端地址为本地的INET域网络请求，默认开启。                                        |
-| Common.DropUnknownSocket    | Number            | 否       | 开启后将丢弃非INET域或Unix域的网络请求，默认开启。                                          |
+| 参数                          | 类型              | 是否必选 | 说明                                                         |
+|-----------------------------| ----------------- | -------- |------------------------------------------------------------|
+| Type                        | String            | 否       | 插件类型，指定为`observer_ilogtail_network_v1`。                    |
+| Common.FlushOutL4Interval   | Number            | 否       | 聚合数据输出间隔时间，默认15s                                           |
+| Common.FlushOutL7Interval   | Number            | 否       | 聚合数据输出间隔时间，默认60s                                           |
+| Common.FlushMetaInterval    | Number            | 否       | 读取容器元信息间隔时间，默认30s，行为可类比我为docker ps                         |
+| Common.FlushNetlinkInterval | Number            | 否       | 设置读取Socket元信息的时间间隔，默认10s                                   |
+| Common.Sampling             | Number            | 否       | 设置网络数据的采样率，默认100                                           |
+| Common.ProtocolProcess      | bool              | 否       | 开启后Logtail将解析应用层的网络协议数据，例如HTTP、MySQL、Redis等，默认开启。          |
+| Common.DropUnixSocket       | Number            | 否       | 开启后将丢弃Unix域网络请求。Unix域常用于本地网络交互，默认开启。                       |
+| Common.DropLocalConnections | Number            | 否       | 开启后丢弃对端地址为本地的INET域网络请求，默认开启。                               |
+| Common.DropUnknownSocket    | Number            | 否       | 开启后将丢弃非INET域或Unix域的网络请求，默认开启。                              |
 | Common.IncludeProtocols     | []string          | 否       | 进行7层网络协议识别的协议类别，默认为全部，目前支持HTTP、Redis、MySQL、PgSQL、DNS 5种协议。 |
-| Common.Tags                 | map[string]string | 否       | tagb标签，会被附带上传                                                                      |
-| EBPF.Enabled                | map[string]string | 是       | 开启Ebpf 功能                                                                               |
+| Common.Tags                 | map[string]string | 否       | tagb标签，会被附带上传                                              |
+| EBPF.Enabled                | map[string]string | 是       | 开启Ebpf 功能                                                  |
 
 ### 高级参数
 
@@ -55,14 +56,15 @@
 
 #### 采集配置
 
-*observer_ilogtail_network 程序运行与C++ 核心部分，需要增加processor_default 插件，才可以选取社区多种输出插件，如Kafka*
+*observer_ilogtail_network_v1 程序运行与C++ 核心部分，需要增加processor_default 插件，才可以选取社区多种输出插件，如Kafka*
 
 ```
 enable: true
 inputs:
-  - Type: observer_ilogtail_network
+  - Type: observer_ilogtail_network_v1
     Common:
-      FlushOutInterval: 5
+      FlushOutL4Interval: 5
+      FlushOutL7Interval: 5
     EBPF:
       Enabled: true
 processors:

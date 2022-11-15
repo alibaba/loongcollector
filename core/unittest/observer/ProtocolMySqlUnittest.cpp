@@ -170,8 +170,8 @@ public:
         std::vector<sls_logs::Log> allData;
         mObserver->FlushOutMetrics(allData);
 
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "sql", "select"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "success", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "query", "select"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "status", "1"));
     }
 
 
@@ -186,8 +186,8 @@ public:
         }
         std::vector<sls_logs::Log> allData;
         mObserver->FlushOutMetrics(allData);
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "sql", "select"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "success", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "query", "select"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "status", "1"));
     }
 
     // 0100000001

@@ -121,7 +121,7 @@ ParseResult HTTPProtocolParser::OnPacket(PacketType pktType,
     } else if (msgType == MessageType_Response) {
         insertSuccess = mCache.InsertResp([&](HTTPResponseInfo* info) {
             info->TimeNano = header->TimeNano;
-            info->RespCode = std::to_string(parser.packet.msg.resp.code);
+            info->RespCode = parser.packet.msg.resp.code;
             info->RespBytes = pktRealSize;
             LOG_TRACE(sLogger, ("http insert resp hash", header->SockHash)("data", info->ToString()));
         });

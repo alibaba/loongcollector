@@ -114,8 +114,8 @@ public:
         std::vector<sls_logs::Log> allData;
         mObserver->FlushOutMetrics(allData);
 
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "sql", "SHOW TRANSACTION ISOLATION LEVEL"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "success", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "query", "SHOW TRANSACTION ISOLATION LEVEL"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "status", "1"));
     }
 
     void TestPgSqlPacketReaderUnorder() {
@@ -130,8 +130,8 @@ public:
         std::vector<sls_logs::Log> allData;
         mObserver->FlushOutMetrics(allData);
 
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "sql", "SHOW TRANSACTION ISOLATION LEVEL"));
-        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "success", "1"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "query", "SHOW TRANSACTION ISOLATION LEVEL"));
+        APSARA_TEST_TRUE(UnitTestHelper::LogKeyMatched(&allData[0], "status", "1"));
     }
 
     void TestPgSQLParserGC() {

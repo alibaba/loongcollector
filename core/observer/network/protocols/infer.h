@@ -190,7 +190,7 @@ static __inline bool is_pgsql_message(const char* buf, int32_t count, const uint
               || tag == logtail::PostgreSqlTag::RowDesc || tag == logtail::PostgreSqlTag::NoData)) {
             return false;
         }
-        uint32_t len = ntohl(*(uint32_t*)buf);
+        uint32_t len = ntohl(*(uint32_t*)(buf + pos));
         pos += len;
         if (pos == (uint32_t)count) {
             return true;

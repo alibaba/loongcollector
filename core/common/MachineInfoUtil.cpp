@@ -392,6 +392,7 @@ bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashP
         osVersion = strtol(what[2].begin(), nullptr, 10) * 1000;
         osVersion += strtol(what[3].begin(), nullptr, 10);
     }
+    LOG_DEBUG(sLogger, ("read /etc/redhat-release content", content));
     return !os.empty() && osVersion != 0;
 }
 

@@ -113,6 +113,10 @@ func (m *Manager) UnregisterCollector(key string) {
 	logger.Debug(m.managerMeta.GetContext(), "unregister collector", key)
 	m.Lock()
 	defer m.Unlock()
+	if m.server != nil {
+		m.server.UnregisterCollectors(key)
+	}
+	_ = os.Remove(path.Join(m.jmxfetchConfPath, key+".yaml"))
 	delete(m.allLoadedCfgs, key)
 	delete(m.collectors, key)
 	if len(m.collectors) == 0 {
@@ -156,12 +160,12 @@ func (m *Manager) Register(key string, configs map[string]*InstanceInner, newGcM
 		todoAddCfgs = true
 		cfg.newGcMetrics = newGcMetrics
 	}
-	logger.Infof(m.managerMeta.GetContext(), "loaded %s instances after register: %d", key, len(cfg.instances))
+	logger.Debugf(m.managerMeta.GetContext(), "loaded %s instances after register: %d", key, len(cfg.instances))
 	cfg.change = cfg.change || todoDeleteCfgs || todoAddCfgs
 }
 
 func (m *Manager) startServer() {
-	logger.Info(m.managerMeta.GetContext(), "start", "server")
+	logger.Debug(m.managerMeta.GetContext(), "start", "server")
 	if m.server == nil {
 		m.port, _ = helper.GetFreePort()
 		m.server, _ = udpserver.NewSharedUDPServer(mock.NewEmptyContext("", "", "jmxfetchserver"), "statsd", ":"+strconv.Itoa(m.port), dispatchKey, 65535)
@@ -217,10 +221,10 @@ func (m *Manager) run() {
 		m.Lock()
 		defer m.Unlock()
 		var temp []string
-		if len(m.allLoadedCfgs) == 0 {
+		if len(m.collectors) == 0 {
 			return
 		}
-		for s := range m.allLoadedCfgs {
+		for s := range m.collectors {
 			temp = append(temp, s)
 		}
 		sort.Strings(temp)
@@ -247,6 +251,7 @@ func (m *Manager) run() {
 			logger.Info(m.managerMeta.GetContext(), "stop jmxfetch process")
 			m.stop()
 			m.stopServer()
+			m.uniqueCollectors = ""
 		}
 	}
 

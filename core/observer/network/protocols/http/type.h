@@ -18,62 +18,19 @@
 
 #include "interface/protocol.h"
 #include "network/protocols/common.h"
+#include "network/protocols/category.h"
 #include <string>
 #include <ostream>
 #include "common/xxhash/xxhash.h"
 
 namespace logtail {
 
-struct HTTPProtocolEventKey {
-    uint64_t Hash() const {
-        uint64_t hashValue = ConnKey.HashVal;
-        hashValue = XXH32(this->Version.c_str(), this->Version.size(), hashValue);
-        hashValue = XXH32(this->Method.c_str(), this->Method.size(), hashValue);
-        hashValue = XXH32(this->URL.c_str(), this->URL.size(), hashValue);
-        hashValue = XXH32(this->Host.c_str(), this->Host.size(), hashValue);
-        hashValue = XXH32(this->RespCode.c_str(), this->RespCode.size(), hashValue);
-        return hashValue;
-    }
-
-    void ToPB(sls_logs::Log* log) const {
-        AddAnyLogContent(log, "version", Version);
-        AddAnyLogContent(log, "host", Host);
-        AddAnyLogContent(log, "method", Method);
-        AddAnyLogContent(log, "url", URL);
-        AddAnyLogContent(log, "resp_code", RespCode);
-        ConnKey.ToPB(log, ProtocolType_HTTP);
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const HTTPProtocolEventKey& key) {
-        os << "Version: " << key.Version << " Method: " << key.Method << " URL: " << key.URL << " Host: " << key.Host
-           << " RespCode: " << key.RespCode << " ConnKey: " << key.ConnKey;
-        return os;
-    }
-
-    std::string ToString() {
-        std::stringstream ss;
-        ss << *this;
-        return ss.str();
-    }
-
-    std::string Version;
-    std::string Method;
-    std::string URL;
-    std::string Host;
-    std::string RespCode;
-    CommonAggKey ConnKey;
-};
-
-typedef CommonProtocolEvent<HTTPProtocolEventKey> HTTPProtocolEvent;
-typedef CommonProtocolEventAggItem<HTTPProtocolEventKey, CommonProtocolAggResult> HTTPProtocolEventAggItem;
-typedef CommonProtocolPatternGenerator<HTTPProtocolEventKey> HTTPProtocolPatternGenerator;
-typedef CommonProtocolEventAggItemManager<HTTPProtocolEventAggItem> HTTPProtocolEventAggItemManager;
-typedef CommonProtocolEventAggregator<HTTPProtocolEventKey,
-                                      HTTPProtocolEvent,
-                                      HTTPProtocolEventAggItem,
-                                      HTTPProtocolPatternGenerator,
-                                      HTTPProtocolEventAggItemManager,
-                                      ProtocolType_HTTP>
-    HTTPProtocolEventAggregator;
+using HTTPProtocolEventKey = RequestAggKey<ProtocolType_HTTP>;
+using HTTPProtocolEvent = CommonProtocolEvent<HTTPProtocolEventKey>;
+using HTTPProtocolEventAggItem = CommonProtocolEventAggItem<HTTPProtocolEventKey, CommonProtocolAggResult>;
+using HTTPProtocolEventAggItemManager = CommonProtocolEventAggItemManager<HTTPProtocolEventAggItem>;
+using HTTPProtocolEventAggregator = CommonProtocolEventAggregator<HTTPProtocolEvent,
+                                                                  HTTPProtocolEventAggItem,
+                                                                  HTTPProtocolEventAggItemManager>;
 
 } // namespace logtail
