@@ -4,7 +4,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 
 ## Apache 2.0 licenses
 
-- [cloud.google.com/go](https://pkg.go.dev/cloud.google.com/go?tab=licenses)
+- [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/aliyun/alibaba-cloud-sdk-go](https://pkg.go.dev/github.com/aliyun/alibaba-cloud-sdk-go?tab=licenses)
 - [github.com/containerd/cgroups](https://pkg.go.dev/github.com/containerd/cgroups?tab=licenses)
 - [github.com/containerd/containerd](https://pkg.go.dev/github.com/containerd/containerd?tab=licenses)
@@ -127,6 +127,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 
 ## MIT licenses
 
+- [github.com/go-kit/log](https://pkg.go.dev/github.com/go-kit/log?tab=licenses)
 - [github.com/narqo/go-dogstatsd-parser](https://pkg.go.dev/github.com/narqo/go-dogstatsd-parser?tab=licenses)
 - [sigs.k8s.io/yaml](https://pkg.go.dev/sigs.k8s.io/yaml?tab=licenses)
 - [github.com/Azure/go-ansiterm](https://pkg.go.dev/github.com/Azure/go-ansiterm?tab=licenses)
