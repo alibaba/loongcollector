@@ -553,7 +553,7 @@ func hasDockerStdoutInput(plugins map[string]interface{}) bool {
 	return false
 }
 
-var enableAlwaysOnlineForStdout = false
+var enableAlwaysOnlineForStdout = true
 
 func createLogstoreConfig(project string, logstore string, configName string, logstoreKey int64, jsonStr string) (*LogstoreConfig, error) {
 	var err error
@@ -990,5 +990,5 @@ func GetPluginPriority(pluginName string) int {
 
 func init() {
 	LogtailConfig = make(map[string]*LogstoreConfig)
-	_ = util.InitFromEnvBool("ALIYUN_LOGTAIL_ENABLE_ALWAYS_ONLINE_FOR_STDOUT", &enableAlwaysOnlineForStdout, false)
+	_ = util.InitFromEnvBool("ALIYUN_LOGTAIL_ENABLE_ALWAYS_ONLINE_FOR_STDOUT", &enableAlwaysOnlineForStdout, true)
 }
