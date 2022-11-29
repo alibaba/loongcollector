@@ -166,6 +166,11 @@ private:
     void CheckScaledCpuUsageUpLimit();
 #endif
 
+    // IsHostIpChanged checks if the host ip is changed during running.
+    bool IsHostIpChanged();
+
+    void Suicide();
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConfigUpdatorUnittest;
 #endif

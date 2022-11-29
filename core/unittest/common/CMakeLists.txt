@@ -36,3 +36,6 @@ target_link_libraries(common_sliding_window_counter_unittest unittest_base)
 
 add_executable(common_string_piece_unittest StringPieceUnittest.cpp)
 target_link_libraries(common_string_piece_unittest unittest_base)
+
+add_executable(common_machine_info_util_unittest MachineInfoUtilUnittest.cpp)
+target_link_libraries(common_machine_info_util_unittest unittest_base)

@@ -174,16 +174,14 @@ void LogtailMonitor::Monitor() {
         // logtail to release resource.
         // Mainly for controlling memory because we have no idea to descrease memory usage.
         if (CheckCpuLimit() || CheckMemLimit()) {
-            SendStatusProfile(true);
             LOG_ERROR(sLogger,
                       ("Resource used by program exceeds upper limit",
                        "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
-            mMonitorRunning = false;
-            LogtailGlobalPara::Instance()->SetSigtermFlag(true);
-            sleep(15);
-            // The main thread hang, forcing exit.
-            LOG_ERROR(sLogger, ("worker process force quit", "for reason of timeout"));
-            _exit(1);
+            Suicide();
+        }
+
+        if (IsHostIpChanged()) {
+            Suicide();
         }
 
         SendStatusProfile(false);
@@ -457,6 +455,34 @@ bool LogtailMonitor::DumpMonitorInfo(time_t monitorTime) {
     outfile << "cpu_usage:" << mCpuStat.mCpuUsage << "\t";
     outfile << "mem_rss:" << mMemStat.mRss << "\n";
     return true;
+}
+
+bool LogtailMonitor::IsHostIpChanged() {
+    if (AppConfig::GetInstance()->GetConfigIP().empty()) {
+        const std::string& interface = AppConfig::GetInstance()->GetBindInterface();
+        std::string ip = GetHostIp();
+        if (interface.size() > 0) {
+            ip = GetHostIp(interface);
+        }
+        if (ip.empty()) {
+            ip = GetAnyAvailableIP();
+        }
+        if (ip != LogFileProfiler::mIpAddr) {
+            LOG_ERROR(sLogger,
+                      ("error", "host ip changed during running, prepare to restart Logtail")(
+                          "original ip", LogFileProfiler::mIpAddr)("current ip", ip));
+            return true;
+        }
+        return false;
+    }
+}
+
+void LogtailMonitor::Suicide() {
+    SendStatusProfile(true);
+    mMonitorRunning = false;
+    LogtailGlobalPara::Instance()->SetSigtermFlag(true);
+    sleep(15);
+    _exit(1);
 }
 
 #if defined(__linux__) // Linux only methods, for scale up calculation, load average.
