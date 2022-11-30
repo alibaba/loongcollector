@@ -16,11 +16,12 @@ package envconfig
 
 import (
 	"context"
+	"strings"
+
+	productAPI "github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
-
-	productAPI "github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner"
 )
 
 func createProductClient() (*productAPI.Client, error) {
@@ -59,7 +60,12 @@ func CreateProductLogstore(region, project, logstore, product, lang string) erro
 
 	// Create an API request and set parameters
 	request := productAPI.CreateAnalyzeProductLogRequest()
-	request.Domain = *flags.ProductAPIDomain
+	if strings.HasPrefix(*flags.ProductAPIDomain, "https://") {
+		request.Domain = (*flags.ProductAPIDomain)[len("https://"):]
+		request.Scheme = "HTTPS"
+	} else {
+		request.Domain = *flags.ProductAPIDomain
+	}
 	request.Region = recorrectRegion(region)
 	request.Project = project
 	request.Logstore = logstore
