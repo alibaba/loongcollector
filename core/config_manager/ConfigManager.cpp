@@ -142,9 +142,12 @@ bool ConfigManager::CheckUpdateThread(bool configExistFlag) {
         int32_t curTime = time(NULL);
 
         if (curTime - lastCheckTime >= checkInterval) {
-            // DeleteHandlers is used to remove handlers deleted in main thread by
-            // EventDispatcherBase::DumpAllHandlersMeta after new configs are loaded.
-            DeleteHandlers();
+            if (!IsUpdate()) {
+                // DeleteHandlers is used to remove handlers deleted in main thread by
+                // EventDispatcherBase::DumpAllHandlersMeta after new configs are loaded.
+                DeleteHandlers();
+            }
+
             if (!IsUpdate() && GetLocalConfigUpdate()) {
                 StartUpdateConfig();
             }
