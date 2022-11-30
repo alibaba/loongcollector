@@ -3,10 +3,13 @@
 When distributed in a binary form, Logtail may contain portions of the following works:
 
 ## Apache 2.0 licenses
+
 - [https://www.openssl.org/source/license.html](https://www.openssl.org/source/apache-license-2.0.txt)
 - [https://github.com/pixie-io/pixie](https://github.com/pixie-io/pixie/blob/main/LICENSE)
 
 ## BSD licenses
+
+- [https://github.com/facebook/zstd](https://github.com/facebook/zstd/blob/master/LICENSE)
 - [https://github.com/gflags/gflags](https://github.com/gflags/gflags/blob/master/COPYING.txt)
 - [https://github.com/gperftools/gperftools](https://github.com/gperftools/gperftools/blob/master/COPYING)
 - [https://github.com/google/googletest](https://github.com/google/googletest/blob/main/LICENSE)
@@ -18,6 +21,7 @@ When distributed in a binary form, Logtail may contain portions of the following
 - [https://github.com/Cyan4973/xxHash](https://github.com/Cyan4973/xxHash/blob/dev/LICENSE)
 
 ## MIT licenses
+
 - [https://github.com/google/cityhash](https://github.com/google/cityhash/blob/master/COPYING)
 - [https://curl.se/](https://curl.se/docs/copyright.html)
 - [https://github.com/open-source-parsers/jsoncpp](https://github.com/open-source-parsers/jsoncpp/blob/master/LICENSE)
@@ -27,10 +31,13 @@ When distributed in a binary form, Logtail may contain portions of the following
 - [https://github.com/h2o/picohttpparser](https://github.com/h2o/picohttpparser/blob/master/picohttpparser.c)
 
 ## Boost Software License
+
 - [https://www.boost.org/](https://www.boost.org/users/license.html)
 
 ## X11 License
+
 - [https://savannah.nongnu.org/projects/libunwind/](http://www.xfree86.org/3.3.6/COPYRIGHT2.html#3)
 
 ## zlib License
+
 - [https://opensource.org/licenses/Zlib](https://www.zlib.net/zlib_license.html)

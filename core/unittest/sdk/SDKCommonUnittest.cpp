@@ -50,7 +50,6 @@ TEST_F(SDKClientUnittest, TestNetwork) {
                        STRING_FLAG(default_access_key),
                        INT32_FLAG(sls_client_send_timeout),
                        "192.168.1.1",
-                       BOOL_FLAG(sls_client_send_compress),
                        "");
     try {
         client.TestNetwork();
@@ -58,7 +57,7 @@ TEST_F(SDKClientUnittest, TestNetwork) {
     } catch (const sdk::LOGException& e) {
         const std::string& errorCode = e.GetErrorCode();
         ASSERT_EQ(errorCode, sdk::LOGE_REQUEST_ERROR);
-        std::cout << "ErrorMessage: " << e.GetMessage_() << std::endl;
+        std::cout << "ErrorMessage: " << e.GetMessage() << std::endl;
     }
 
     // Machine to run the test might have accesibility to Internet.
@@ -69,13 +68,13 @@ TEST_F(SDKClientUnittest, TestNetwork) {
     } catch (const sdk::LOGException& e) {
         const std::string errorCode = e.GetErrorCode();
         std::cout << errorCode << std::endl;
-        std::cout << e.GetMessage_() << std::endl;
+        std::cout << e.GetMessage() << std::endl;
         if (e.GetHttpCode() == 404) {
             EXPECT_EQ(errorCode, sdk::LOGE_PROJECT_NOT_EXIST);
         } else if (e.GetHttpCode() == 401) {
             EXPECT_EQ(ConvertErrorCode(errorCode), SEND_UNAUTHORIZED);
         } else if (e.GetHttpCode() == 400) {
-            EXPECT_EQ(ConvertErrorCode(errorCode), SEND_DISCARD_ERROR);
+            EXPECT_EQ(ConvertErrorCode(errorCode), SEND_PARAMETER_INVALID);
         } else {
             std::cout << "HttpCode: " << e.GetHttpCode() << std::endl;
             EXPECT_EQ(ConvertErrorCode(errorCode), SEND_NETWORK_ERROR);
@@ -89,7 +88,6 @@ TEST_F(SDKClientUnittest, TestGetRealIp) {
                        STRING_FLAG(default_access_key),
                        INT32_FLAG(sls_client_send_timeout),
                        "192.168.1.1",
-                       BOOL_FLAG(sls_client_send_compress),
                        "");
     logtail::sdk::GetRealIpResponse resp = client.GetRealIp();
     std::cout << "realIp: " << resp.realIp << std::endl;
@@ -102,123 +100,185 @@ TEST_F(SDKClientUnittest, TestGetRealIp) {
 }
 
 /*
-TEST_F(SDKClientUnittest, PostLogstoreLogsSuccessOpenSource)
-{
+TEST_F(SDKClientUnittest, PostLogstoreLogsSuccessOpenSource) {
     std::string uid = "";
     std::string accessKeyId = "";
     std::string accessKey = "";
+    std::string region = "cn-wulanchabu";
     std::string project = "";
     std::string logstore = "";
-    sdk::Client client("cn-huhehaote.log.aliyuncs.com",
+    sdk::Client client("cn-wulanchabu.log.aliyuncs.com",
                        accessKeyId,
                        accessKey,
                        INT32_FLAG(sls_client_send_timeout),
                        "192.168.1.1",
-                       BOOL_FLAG(sls_client_send_compress),
                        "");
-    try
-    {
-        sls_logs::LogGroup logGroup;
+    SLSControl::Instance()->SetSlsSendClientCommonParam(&client);
+    client.SetKeyProvider("");
+    sls_logs::LogGroup logGroup;
 
-        logGroup.set_source("192.168.1.1");
-        logGroup.set_category(logstore);
-        logGroup.set_topic("unittest");
+    logGroup.set_source("192.168.1.1");
+    logGroup.set_category(logstore);
+    logGroup.set_topic("unittest");
 
-        sls_logs::Log* log = logGroup.add_logs();
-        log->set_time(time(NULL));
-        sls_logs::Log_Content* content = nullptr;
-        content = log->add_contents();
-        content->set_key("kk1");
-        content->set_value("vv1");
-        content = log->add_contents();
-        content->set_key("kk2");
-        content->set_value("vv2");
+    sls_logs::Log* log = logGroup.add_logs();
+    log->set_time(time(NULL));
+    sls_logs::Log_Content* content = nullptr;
+    content = log->add_contents();
+    content->set_key("kk1");
+    content->set_value("vv1");
+    content = log->add_contents();
+    content->set_key("kk2");
+    content->set_value("vv2");
 
-        std::string oriData;
-        logGroup.SerializeToString(&oriData);
-        int32_t logSize = (int32_t) logGroup.logs_size();
-        time_t curTime = time(NULL);
+    std::string oriData;
+    logGroup.SerializeToString(&oriData);
+    int32_t logSize = (int32_t)logGroup.logs_size();
+    time_t curTime = time(NULL);
+    sls_logs::SlsCompressType compressType = sls_logs::SLS_CMP_ZSTD;
 
-        LoggroupTimeValue* data = new LoggroupTimeValue(
-            project, logstore, "ut-config", "ut.log", false,
-            uid, "cn-huhehaote", LOGGROUP_LZ4_COMPRESSED,
-            logSize, oriData.size(), curTime, "", 0);
+    LogGroupContext logGroupContext(region, project, logstore, compressType);
 
-        ASSERT_TRUE(CompressLz4(oriData, data->mLogData));
+    LoggroupTimeValue* data = new LoggroupTimeValue(project,
+                                                    logstore,
+                                                    "ut-config",
+                                                    "ut.log",
+                                                    false,
+                                                    uid,
+                                                    "cn-huhehaote",
+                                                    LOGGROUP_COMPRESSED,
+                                                    logSize,
+                                                    oriData.size(),
+                                                    curTime,
+                                                    "",
+                                                    0,
+                                                    logGroupContext);
 
+    ASSERT_TRUE(CompressData(compressType, oriData, data->mLogData));
+
+    try {
         sdk::PostLogStoreLogsResponse resp = client.PostLogStoreLogs(
-            data->mProjectName,
-            data->mLogstore,
-            data->mLogData,
-            data->mRawSize
-        );
-        std::cout << resp.requestId << "," << resp.statusCode << "," << resp.bodyBytes;
+            data->mProjectName, data->mLogstore, data->mLogGroupContext.mCompressType, data->mLogData, data->mRawSize);
+        std::cout << resp.requestId << "," << resp.statusCode << "," << resp.bodyBytes << std::endl;
+    } catch (const sdk::LOGException& e) {
+        const std::string& errorCode = e.GetErrorCode();
+        std::cerr << "errorCode:" << errorCode << " errorMessage: " << e.GetMessage() << std::endl;
+        if (e.GetMessage().find("x-log-compresstype : zstd") == std::string::npos) { // ignore compresstype error
+            ASSERT_TRUE(false);
+        }
+        std::cerr << "compresstype zstd is not supported, fallback to lz4" << std::endl;
     }
-    catch (const sdk::LOGException &e)
-    {
-        const std::string &errorCode = e.GetErrorCode();
-        std::cout << errorCode << "===" << e.GetMessage_() << std::endl;
+
+    // fallback to lz4
+    ASSERT_TRUE(UncompressData(compressType, data->mLogData, data->mRawSize, oriData));
+
+    compressType = sls_logs::SLS_CMP_LZ4;
+
+    logGroupContext.mCompressType = compressType;
+
+    data->mLogGroupContext = logGroupContext;
+
+    ASSERT_TRUE(CompressData(compressType, oriData, data->mLogData));
+
+    try {
+        sdk::PostLogStoreLogsResponse resp = client.PostLogStoreLogs(
+            data->mProjectName, data->mLogstore, data->mLogGroupContext.mCompressType, data->mLogData, data->mRawSize);
+        std::cout << resp.requestId << "," << resp.statusCode << "," << resp.bodyBytes << std::endl;
+    } catch (const sdk::LOGException& e) {
+        const std::string& errorCode = e.GetErrorCode();
+        std::cerr << "errorCode:" << errorCode << " errorMessage: " << e.GetMessage() << std::endl;
         ASSERT_TRUE(false);
     }
 }
 
-TEST_F(SDKClientUnittest, PostLogstoreLogsSuccessClosedSource)
-{
+TEST_F(SDKClientUnittest, PostLogstoreLogsSuccessClosedSource) {
     std::string uid = "";
-    std::string accessKeyId = ""; // starting with #
+    std::string accessKeyId = ""; // start with ##
     std::string accessKey = "";
+    std::string region = "cn-wulanchabu";
     std::string project = "";
     std::string logstore = "";
-    sdk::Client client("cn-huhehaote.log.aliyuncs.com",
+    sdk::Client client("cn-wulanchabu.log.aliyuncs.com",
                        accessKeyId,
                        accessKey,
                        INT32_FLAG(sls_client_send_timeout),
                        "192.168.1.1",
-                       BOOL_FLAG(sls_client_send_compress),
                        "");
     SLSControl::Instance()->SetSlsSendClientCommonParam(&client);
-    try
-    {
-        sls_logs::LogGroup logGroup;
+    client.SetKeyProvider(sdk::MD5_SHA1_SALT_KEYPROVIDER);
+    sls_logs::LogGroup logGroup;
 
-        logGroup.set_source("192.168.1.1");
-        logGroup.set_category(logstore);
-        logGroup.set_topic("unittest");
+    logGroup.set_source("192.168.1.1");
+    logGroup.set_category(logstore);
+    logGroup.set_topic("unittest");
 
-        sls_logs::Log* log = logGroup.add_logs();
-        log->set_time(time(NULL));
-        sls_logs::Log_Content* content = nullptr;
-        content = log->add_contents();
-        content->set_key("kk1");
-        content->set_value("vv1");
-        content = log->add_contents();
-        content->set_key("kk2");
-        content->set_value("vv2");
+    sls_logs::Log* log = logGroup.add_logs();
+    log->set_time(time(NULL));
+    sls_logs::Log_Content* content = nullptr;
+    content = log->add_contents();
+    content->set_key("kk1");
+    content->set_value("vv1");
+    content = log->add_contents();
+    content->set_key("kk2");
+    content->set_value("vv2");
 
-        std::string oriData;
-        logGroup.SerializeToString(&oriData);
-        int32_t logSize = (int32_t) logGroup.logs_size();
-        time_t curTime = time(NULL);
+    std::string oriData;
+    logGroup.SerializeToString(&oriData);
+    int32_t logSize = (int32_t)logGroup.logs_size();
+    time_t curTime = time(NULL);
 
-        LoggroupTimeValue* data = new LoggroupTimeValue(
-            project, logstore, "ut-config", "ut.log", false,
-            uid, "cn-huhehaote", LOGGROUP_LZ4_COMPRESSED,
-            logSize, oriData.size(), curTime, "", 0);
+    // try zstd first
+    sls_logs::SlsCompressType compressType = sls_logs::SLS_CMP_ZSTD;
 
-        ASSERT_TRUE(CompressLz4(oriData, data->mLogData));
+    LogGroupContext logGroupContext(region, project, logstore, compressType);
 
+    LoggroupTimeValue* data = new LoggroupTimeValue(project,
+                                                    logstore,
+                                                    "ut-config",
+                                                    "ut.log",
+                                                    false,
+                                                    uid,
+                                                    "cn-huhehaote",
+                                                    LOGGROUP_COMPRESSED,
+                                                    logSize,
+                                                    oriData.size(),
+                                                    curTime,
+                                                    "",
+                                                    0,
+                                                    logGroupContext);
+
+    ASSERT_TRUE(CompressData(compressType, oriData, data->mLogData));
+    try {
         sdk::PostLogStoreLogsResponse resp = client.PostLogStoreLogs(
-            data->mProjectName,
-            data->mLogstore,
-            data->mLogData,
-            data->mRawSize
-        );
-        std::cout << resp.requestId << "," << resp.statusCode << "," << resp.bodyBytes;
+            data->mProjectName, data->mLogstore, data->mLogGroupContext.mCompressType, data->mLogData, data->mRawSize);
+        std::cout << resp.requestId << "," << resp.statusCode << "," << resp.bodyBytes << std::endl;
+    } catch (const sdk::LOGException& e) {
+        const std::string& errorCode = e.GetErrorCode();
+        std::cerr << "errorCode:" << errorCode << " errorMessage: " << e.GetMessage() << std::endl;
+        if (e.GetMessage().find("x-log-compresstype : zstd") == std::string::npos) { // ignore compresstype error
+            ASSERT_TRUE(false);
+        }
+        std::cerr << "compresstype zstd is not supported, fallback to lz4" << std::endl;
     }
-    catch (const sdk::LOGException &e)
-    {
-        const std::string &errorCode = e.GetErrorCode();
-        std::cout << errorCode << "===" << e.GetMessage_() << std::endl;
+
+    // fallback to lz4
+    ASSERT_TRUE(UncompressData(compressType, data->mLogData, data->mRawSize, oriData));
+
+    compressType = sls_logs::SLS_CMP_LZ4;
+
+    logGroupContext.mCompressType = compressType;
+
+    data->mLogGroupContext = logGroupContext;
+
+    ASSERT_TRUE(CompressData(compressType, oriData, data->mLogData));
+
+    try {
+        sdk::PostLogStoreLogsResponse resp = client.PostLogStoreLogs(
+            data->mProjectName, data->mLogstore, data->mLogGroupContext.mCompressType, data->mLogData, data->mRawSize);
+        std::cout << resp.requestId << "," << resp.statusCode << "," << resp.bodyBytes << std::endl;
+    } catch (const sdk::LOGException& e) {
+        const std::string& errorCode = e.GetErrorCode();
+        std::cerr << "errorCode:" << errorCode << " errorMessage: " << e.GetMessage() << std::endl;
         ASSERT_TRUE(false);
     }
 }

@@ -28,7 +28,7 @@ namespace logtail {
 
 enum LoggroupSendStatus { LoggroupSendStatus_Idle, LoggroupSendStatus_Sending, LoggroupSendStatus_Ok };
 
-enum SEND_DATA_TYPE { LOG_PACKAGE_LIST, LOGGROUP_LZ4_COMPRESSED };
+enum SEND_DATA_TYPE { LOG_PACKAGE_LIST, LOGGROUP_COMPRESSED };
 
 struct LogstoreSenderStatistics {
     LogstoreSenderStatistics();
@@ -52,7 +52,7 @@ struct LoggroupTimeValue {
     std::string mLogData;
     int32_t mRawSize;
     int32_t mLogLines;
-    bool mBufferOrNot;
+    bool mBufferOrNot; // false only when use exactly once
     std::string mProjectName;
     std::string mLogstore;
     std::string mConfigName;

@@ -147,7 +147,7 @@ namespace sdk {
                 ErrorCheck(httpMsg.content, requestId, httpMsg.statusCode);
             } catch (LOGException& e) {
                 const auto& errCode = e.GetErrorCode();
-                const auto& errMsg = e.GetMessage_();
+                const auto& errMsg = e.GetMessage();
                 if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust() && sdk::LOGE_REQUEST_TIME_EXPIRED == errCode) {
                     time_t serverTime = httpMsg.GetServerTimeFromHeader();
                     if (serverTime > 0) {

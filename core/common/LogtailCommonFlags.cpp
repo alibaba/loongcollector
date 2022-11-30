@@ -33,12 +33,12 @@ DEFINE_FLAG_INT32(default_max_inotify_watch_num, "the max allowed inotify watch 
 DEFINE_FLAG_INT32(cpu_limit_num, "cpu violate limit num before shutdown", 10);
 DEFINE_FLAG_INT32(mem_limit_num, "memory violate limit num before shutdown", 10);
 DEFINE_FLAG_INT32(batch_send_interval, "batch sender interval (second)(default 3)", 3);
-DEFINE_FLAG_INT32(batch_send_metric_size, "batch send matric size limit(bytes)(default 256)", 256 * 1024);
+DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 256KB)", 256 * 1024);
 DEFINE_FLAG_INT32(max_holded_data_size,
-                  "for every id and metric name, the max data size can be holded in memory (default 2MB)",
+                  "for every id and metric name, the max data size can be holded in memory (default 512KB)",
                   512 * 1024);
 DEFINE_FLAG_INT32(pub_max_holded_data_size,
-                  "for every id and metric name, the max data size can be holded in memory (default 2MB)",
+                  "for every id and metric name, the max data size can be holded in memory (default 512KB)",
                   512 * 1024);
 DEFINE_FLAG_STRING(logtail_send_address,
                    "the target address to which to send the log result",

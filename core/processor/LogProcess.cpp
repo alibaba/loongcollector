@@ -28,6 +28,7 @@
 #include "reader/LogFileReader.h"
 #include "monitor/Monitor.h"
 #include "parser/LogParser.h"
+#include "sdk/Client.h"
 #include "sender/Sender.h"
 #include "log_pb/sls_logs.pb.h"
 #include "common/StringTools.h"
@@ -287,8 +288,9 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             Config* config = ConfigManager::GetInstance()->FindConfigByName(logFileReader->GetConfigName());
             if (config == NULL) {
                 LOG_INFO(sLogger,
-                         ("can not find config while processing log, maybe config update",
-                          logPath)(logFileReader->GetProjectName(), logFileReader->GetCategory()));
+                         ("can not find config while processing log, maybe config updated. config",
+                          logFileReader->GetConfigName())("project", logFileReader->GetProjectName())(
+                             "logstore", logFileReader->GetCategory()));
                 delete[] logBuffer->buffer;
                 delete logBuffer;
                 continue;
@@ -333,8 +335,8 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                             .append(extraTags[i].value());
                     }
 
-                    if(config->mAdvancedConfig.mEnableLogPositionMeta){
-                           passingTags.append(TAG_DELIMITER)
+                    if (config->mAdvancedConfig.mEnableLogPositionMeta) {
+                        passingTags.append(TAG_DELIMITER)
                             .append(TAG_PREFIX)
                             .append(LOG_RESERVED_KEY_FILE_OFFSET)
                             .append(TAG_SEPARATOR)
@@ -547,10 +549,12 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                     }
                     IntegrityConfigPtr integrityConfigPtr(integrityConfig);
                     LineCountConfigPtr lineCountConfigPtr(lineCountConfig);
+                    sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(config->mCompressType);
 
                     LogGroupContext context(config->mRegion,
                                             projectName,
                                             config->mCategory,
+                                            compressType,
                                             logBuffer->fileInfo,
                                             integrityConfigPtr,
                                             lineCountConfigPtr,

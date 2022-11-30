@@ -142,7 +142,9 @@ namespace sdk {
     extern const char* const LOGE_SHARD_WRITE_QUOTA_EXCEED;
     extern const char* const LOGE_SHARD_READ_QUOTA_EXCEED;
     extern const char* const LOG_LZ4; //= "lz4";
-
+    extern const char* const LOG_DEFLATE; //= "deflate";
+    extern const char* const LOG_ZSTD; //= "zstd";
+    
     extern const char* const LOG_ERROR_CODE; //= "errorCode";
     extern const char* const LOG_ERROR_MESSAGE; //= "errorMessage";
 

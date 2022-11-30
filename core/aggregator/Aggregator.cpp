@@ -100,7 +100,7 @@ bool Aggregator::FlushReadyBuffer() {
     }
 
     if (sendDataVec.size() > 0)
-        sender->SendLZ4Compressed(sendDataVec);
+        sender->SendCompressed(sendDataVec);
 
     for (vector<vector<MergeItem*> >::iterator plIter = packageListVec.begin(); plIter != packageListVec.end();
          ++plIter)
@@ -174,7 +174,7 @@ bool Aggregator::Add(const std::string& projectName,
     // Replay checkpoint had already been merged, resend directly.
     if (context.mExactlyOnceCheckpoint && context.mExactlyOnceCheckpoint->IsComplete()) {
         AddPackIDForLogGroup(sourceId, logGroupKey, logGroup);
-        sender->SendLZ4Compressed(projectName, logGroup, neededLogs, configName, aliuid, region, filename, context);
+        sender->SendCompressed(projectName, logGroup, neededLogs, configName, aliuid, region, filename, context);
         LOG_DEBUG(sLogger,
                   ("complete checkpoint", "resend directly")("filename", filename)(
                       "key", context.mExactlyOnceCheckpoint->key)("checkpoint",
@@ -363,9 +363,9 @@ bool Aggregator::Add(const std::string& projectName,
         // package in send queue, so we merge data package to send. because the send loggroup's max size is 512k, so
         // this scenario will only happen in log time mess
         if (context.mExactlyOnceCheckpoint) {
-            sender->SendLZ4Compressed(sendDataVec);
+            sender->SendCompressed(sendDataVec);
         } else if (mergeType == MERGE_BY_TOPIC && sendDataVec.size() < (size_t)INT32_FLAG(same_topic_merge_send_count))
-            sender->SendLZ4Compressed(sendDataVec);
+            sender->SendCompressed(sendDataVec);
         else
             sender->SendLogPackageList(sendDataVec);
     }

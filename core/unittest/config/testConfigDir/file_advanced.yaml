@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-# Copyright 2021 iLogtail Authors
+# Copyright 2022 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,11 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -ue
-set -o pipefail
-
-if [[ $(echo 'x\ty') = 'x\ty' ]]; then
-  echo -e "HOST_OS=Linux\nUSERNAME=$USER\nUSER_UID=$(id -u $USER)\nGROUPNAME=$(id -gn $USER)\nGROUP_GID=$(id -g $USER)" > .devcontainer/.env;
-else
-  echo "HOST_OS=Darwin\nUSERNAME=$USER\nUSER_UID=$(id -u $USER)\nGROUPNAME=root\nGROUP_GID=0" > .devcontainer/.env;  
-fi
+enable: true
+inputs:
+  - Type: file_simple_log
+    LogPath: /home/test-dir/test_log
+    FilePattern: simple.log
+    ForceMultiConfig: true #"] = "force_multiconfig";
+    TailSizeKB: 32768 #"] = "tail_size_kb";
+    EnableLogPositionMeta: true #"] = "enable_log_position_meta";
+flushers:
+  - Type: flusher_sls
+    Endpoint: cn-xxx.log.aliyuncs.com
+    ProjectName: test_project
+    LogstoreName: test_logstore
+    CompressType: zstd

@@ -41,7 +41,6 @@ namespace sdk {
                const std::string& accessKey,
                int32_t timeout = LOG_REQUEST_TIMEOUT,
                const std::string& source = "",
-               bool compressFlag = true,
                const std::string& intf = "");
         Client(const std::string& slsHost,
                const std::string& accessKeyId,
@@ -49,7 +48,6 @@ namespace sdk {
                const std::string& securityToken,
                int32_t timeout = LOG_REQUEST_TIMEOUT,
                const std::string& source = "",
-               bool compressFlag = true,
                const std::string& intf = "");
         ~Client() throw();
 
@@ -90,32 +88,40 @@ namespace sdk {
         /////////////////////////////////////Internal Interface For Logtail////////////////////////////////////////
         /** Sync Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
          * @param project The project name
-         * @param serialized data of logGroup, LZ4 comressed
-         * @rawSize before compress
+         * @param logstore The logstore name
+         * @param compressedLogGroup serialized data of logGroup, LZ4 or ZSTD comressed
+         * @param rawSize before compress
+         * @param compressType compression type
          * @return request_id.
          */
         PostLogStoreLogsResponse PostLogStoreLogs(const std::string& project,
                                                   const std::string& logstore,
+                                                  sls_logs::SlsCompressType compressType,
                                                   const std::string& compressedLogGroup,
                                                   uint32_t rawSize,
                                                   const std::string& hashKey = "");
         /** Sync Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
          * @param project The project name
-         * @param serialized data of logPackageList, consist of several LogGroup
+         * @param logstore The logstore name
+         * @param packageListData data of logPackageList, consist of several LogGroup
          * @return request_id.
          */
         PostLogStoreLogsResponse PostLogStoreLogPackageList(const std::string& project,
                                                             const std::string& logstore,
+                                                            sls_logs::SlsCompressType compressType,
                                                             const std::string& packageListData,
                                                             const std::string& hashKey = "");
         /** Async Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
          * @param project The project name
-         * @param serialized data of logGroup, LZ4 comressed
-         * @rawSize before compress
+         * @param logstore The logstore name
+         * @param compressedLogGroup data of logGroup, LZ4 comressed
+         * @param rawSize before compress
+         * @param compressType compression type
          * @return request_id.
          */
         void PostLogStoreLogs(const std::string& project,
                               const std::string& logstore,
+                              sls_logs::SlsCompressType compressType,
                               const std::string& compressedLogGroup,
                               uint32_t rawSize,
                               PostLogStoreLogsClosure* callBack,
@@ -123,20 +129,27 @@ namespace sdk {
                               int64_t hashKeySeqID = kInvalidHashKeySeqID);
         /** Async Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
          * @param project The project name
-         * @param serialized data of logPackageList, consist of several LogGroup
+         * @param logstore The logstore name
+         * @param packageListData data of logPackageList, consist of several LogGroup
          * @return request_id.
          */
         void PostLogStoreLogPackageList(const std::string& project,
                                         const std::string& logstore,
+                                        sls_logs::SlsCompressType compressType,
                                         const std::string& packageListData,
                                         PostLogStoreLogsClosure* callBack,
                                         const std::string& hashKey = "");
 
         PostLogStoreLogsResponse PostLogUsingWebTracking(const std::string& project,
                                                          const std::string& logstore,
+                                                         sls_logs::SlsCompressType compressType,
                                                          const std::string& compressedLogGroup,
                                                          uint32_t rawSize);
         /////////////////////////////////////////////////////////////////////////////////////////////////
+
+        static std::string GetCompressTypeString(sls_logs::SlsCompressType compressType);
+        static sls_logs::SlsCompressType GetCompressType(std::string compressTypeString,
+                                                         sls_logs::SlsCompressType defaultType = sls_logs::SLS_CMP_LZ4);
 
     protected:
         void SendRequest(const std::string& project,
@@ -180,7 +193,6 @@ namespace sdk {
         std::string mAccessKey;
         std::string mSecurityToken;
         std::string mSource;
-        bool mCompressFlag;
         int32_t mTimeout;
         std::string mUserAgent;
         std::string mKeyProvider;

@@ -91,7 +91,7 @@ private:
     bool GenerateLocalJsonConfigForSLSFulsher(const YAML::Node& yamlConfig,
                                               Json::Value& pluginJsonConfig,
                                               Json::Value& userJsonConfig);
-    bool FillupDefalutUserJsonConfig(const WorkMode& workMode, Json::Value& userJsonConfig);
+    bool FillupDefaultUserJsonConfig(const WorkMode& workMode, Json::Value& userJsonConfig);
 
     unordered_map<string, string> mFileConfigMap;
     unordered_map<string, string> mFileAdvancedConfigMap;

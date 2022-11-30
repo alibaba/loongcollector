@@ -69,14 +69,14 @@ RUN chmod +x /usr/bin/clang-format
 # install golang
 WORKDIR /
 COPY --from=toolchain-build /go /go
-ENV GOROOT=/go GOPATH=/root/go PATH=/go/bin:$PATH
+ENV GOROOT=/go GOPATH=/opt/go PATH=/go/bin:$PATH
 
 # install golangci-lint
-COPY --from=toolchain-build /golangci-lint-1.49.0-linux-amd64/golangci-lint /root/go/bin/
+COPY --from=toolchain-build /golangci-lint-1.49.0-linux-amd64/golangci-lint /opt/go/bin/
 
 # install go language server
 RUN go env -w GOPROXY="https://goproxy.cn,direct"
-RUN go install golang.org/x/tools/gopls@v0.9.3 && \
+RUN go install golang.org/x/tools/gopls@v0.10.1 && \
     go install github.com/go-delve/delve/cmd/dlv@v1.6.1 && \
     go install github.com/josharian/impl@v1.1.0 && \
     go install github.com/fatih/gomodifytags@v1.16.0 && \

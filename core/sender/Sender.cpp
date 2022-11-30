@@ -96,10 +96,10 @@ DEFINE_FLAG_INT32(reset_region_concurrency_error_count,
                   5);
 DEFINE_FLAG_INT32(unknow_error_try_max, "discard data when try times > this value", 5);
 DEFINE_FLAG_INT32(test_unavailable_endpoint_interval, "test unavailable endpoint interval", 60);
-DEFINE_FLAG_INT32(sending_cost_time_alarm_interval, "sending log group cost too much time, second", 10);
+DEFINE_FLAG_INT32(sending_cost_time_alarm_interval, "sending log group cost too much time, second", 3);
 DEFINE_FLAG_INT32(log_group_wait_in_queue_alarm_interval,
                   "log group wait in queue alarm interval, may blocked by concurrency or quota, second",
-                  10);
+                  3);
 
 namespace logtail {
 const string Sender::BUFFER_FILE_NAME_PREFIX = "logtail_buffer_file_";
@@ -145,6 +145,18 @@ void SendClosure::OnSuccess(sdk::Response* response) {
     delete this;
 }
 
+static const char* GetOperationString(OperationOnFail op) {
+    switch (op) {
+        case RETRY_ASYNC_WHEN_FAIL:
+            return "retry now";
+        case RECORD_ERROR_WHEN_FAIL:
+            return "retry later";
+        case DISCARD_WHEN_FAIL:
+        default:
+            return "discard data";
+    }
+}
+
 void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const string& errorMessage) {
     // test
     LOG_DEBUG(sLogger, ("send failed, error code", errorCode)("error msg", errorMessage));
@@ -159,15 +171,22 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
     OperationOnFail operation;
     LogstoreSenderInfo::SendResult recordRst = LogstoreSenderInfo::SendResult_OtherFail;
     SendResult sendResult = ConvertErrorCode(errorCode);
+    std::ostringstream failDetail, suggestion;
+    std::string failEndpoint = mDataPtr->mCurrentEndpoint;
     if (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR) {
         if (SEND_NETWORK_ERROR == sendResult) {
             gNetworkErrorCount++;
         }
 
+        if (sendResult == SEND_NETWORK_ERROR) {
+            failDetail << "network error";
+        } else {
+            failDetail << "server error";
+        }
+        suggestion << "check network connection to endpoint";
         if (BOOL_FLAG(send_prefer_real_ip) && mDataPtr->mRealIpFlag) {
-            LOG_WARNING(sLogger,
-                        ("connect refused, use vip directly", mDataPtr->mRegion)(
-                            mDataPtr->mProjectName, mDataPtr->mLogstore)("endpoint", mDataPtr->mCurrentEndpoint));
+            // connect refused, use vip directly
+            failDetail << ", real ip may be stale, force update";
             // just set force update flag
             // mDataPtr->mRealIpFlag = false;
             // Sender::Instance()->ResetSendClientEndpoint(mDataPtr->mAliuid, mDataPtr->mRegion, curTime);
@@ -192,38 +211,95 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
         Sender::Instance()->ResetRegionConcurrency(mDataPtr->mRegion);
     } else if (sendResult == SEND_QUOTA_EXCEED) {
         BOOL_FLAG(global_network_success) = true;
+        if (errorCode == sdk::LOGE_SHARD_WRITE_QUOTA_EXCEED) {
+            failDetail << "shard write quota exceed";
+            suggestion << "split logstore shards. https://help.aliyun.com/document_detail/48998.html";
+        } else {
+            failDetail << "project write quota exceed";
+            suggestion << "create ticket or raise issue in support chat group";
+        }
         Sender::Instance()->IncTotalSendStatistic(mDataPtr->mProjectName, mDataPtr->mLogstore, curTime);
-        LogtailAlarm::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
-                                               "error_code: " + errorCode + ", error_message: " + errorMessage
-                                                   + ", request_id:" + response->requestId,
-                                               mDataPtr->mProjectName,
-                                               mDataPtr->mLogstore,
-                                               mDataPtr->mRegion);
+        if (curTime - mDataPtr->mLastUpdateTime > INT32_FLAG(sending_cost_time_alarm_interval)) {
+            LogtailAlarm::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
+                                                   "error_code: " + errorCode + ", error_message: " + errorMessage
+                                                       + ", request_id:" + response->requestId,
+                                                   mDataPtr->mProjectName,
+                                                   mDataPtr->mLogstore,
+                                                   mDataPtr->mRegion);
+        }
         operation = RECORD_ERROR_WHEN_FAIL;
         recordRst = LogstoreSenderInfo::SendResult_QuotaFail;
-    } else if (sendResult == SEND_UNAUTHORIZED
-               && mDataPtr->mSendRetryTimes < INT32_FLAG(unauthorized_send_retrytimes)) {
-        BOOL_FLAG(global_network_success) = true;
+    } else if (sendResult == SEND_UNAUTHORIZED) {
+        failDetail << "write unauthorized";
+        suggestion << "check https connection to endpoint or access keys provided";
         Sender::Instance()->IncTotalSendStatistic(mDataPtr->mProjectName, mDataPtr->mLogstore, curTime);
-        if (mDataPtr->mAliuid.empty() && ConfigManager::GetInstance()->GetRegionType() == REGION_CORP) {
-            operation = RETRY_ASYNC_WHEN_FAIL;
+        if (mDataPtr->mSendRetryTimes > INT32_FLAG(unauthorized_send_retrytimes)) {
+            operation = DISCARD_WHEN_FAIL;
         } else {
-            int32_t lastUpdateTime;
-            sdk::Client* sendClient = Sender::Instance()->GetSendClient(mDataPtr->mRegion, mDataPtr->mAliuid);
-            if (SLSControl::Instance()->SetSlsSendClientAuth(mDataPtr->mAliuid, false, sendClient, lastUpdateTime))
+            BOOL_FLAG(global_network_success) = true;
+            if (mDataPtr->mAliuid.empty() && ConfigManager::GetInstance()->GetRegionType() == REGION_CORP) {
                 operation = RETRY_ASYNC_WHEN_FAIL;
-            else if (curTime - lastUpdateTime < INT32_FLAG(unauthorized_allowed_delay_after_reset))
-                operation = RETRY_ASYNC_WHEN_FAIL;
-            else
+            } else {
+                int32_t lastUpdateTime;
+                sdk::Client* sendClient = Sender::Instance()->GetSendClient(mDataPtr->mRegion, mDataPtr->mAliuid);
+                if (SLSControl::Instance()->SetSlsSendClientAuth(mDataPtr->mAliuid, false, sendClient, lastUpdateTime))
+                    operation = RETRY_ASYNC_WHEN_FAIL;
+                else if (curTime - lastUpdateTime < INT32_FLAG(unauthorized_allowed_delay_after_reset))
+                    operation = RETRY_ASYNC_WHEN_FAIL;
+                else
+                    operation = DISCARD_WHEN_FAIL;
+            }
+        }
+    } else if (sendResult == SEND_PARAMETER_INVALID) {
+        Sender::Instance()->IncTotalSendStatistic(mDataPtr->mProjectName, mDataPtr->mLogstore, curTime);
+        if (errorMessage.find("x-log-compresstype : zstd") == std::string::npos) {
+            failDetail << "invalid paramters";
+            suggestion << "check input parameters";
+            operation = DefaultOperation();
+        } else {
+            // TODO: feedback compress type support to Global Feedback Map
+            failDetail << "server does not support zstd compress type, will retry with lz4";
+            suggestion << "change compressType config to lz4";
+            LogtailAlarm::GetInstance()->SendAlarm(
+                CATEGORY_CONFIG_ALARM,
+                "message: server does not support zstd compress type. please switch to lz4. error_code: " + errorCode
+                    + ", error_message: " + errorMessage + ", request_id:" + response->requestId,
+                mDataPtr->mProjectName,
+                mDataPtr->mLogstore,
+                mDataPtr->mRegion);
+            // uncompress data
+            std::string oriData;
+            if (!UncompressData(sls_logs::SLS_CMP_ZSTD, mDataPtr->mLogData, mDataPtr->mRawSize, oriData)
+                || !CompressData(sls_logs::SLS_CMP_LZ4, oriData, mDataPtr->mLogData)) {
+                LOG_ERROR(sLogger,
+                          ("compress data fail",
+                           "discard data")("projectName", mDataPtr->mProjectName)("logstore", mDataPtr->mLogstore));
+                LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
+                                                       "discard data. error_code: " + errorCode + ", error_message: "
+                                                           + errorMessage + ", request_id:" + response->requestId,
+                                                       mDataPtr->mProjectName,
+                                                       mDataPtr->mLogstore,
+                                                       mDataPtr->mRegion);
                 operation = DISCARD_WHEN_FAIL;
+            } else {
+                mDataPtr->mLogGroupContext.mCompressType = sls_logs::SLS_CMP_LZ4;
+                operation = RETRY_ASYNC_WHEN_FAIL;
+            }
         }
     } else if (sendResult == SEND_INVALID_SEQUENCE_ID) {
+        failDetail << "invalid exactly-once sequence id";
+        Sender::Instance()->IncTotalSendStatistic(mDataPtr->mProjectName, mDataPtr->mLogstore, curTime);
         do {
-#define LOG_PATTERN ("config", mDataPtr->mConfigName)("request_id", response->requestId)
             auto& cpt = mDataPtr->mLogGroupContext.mExactlyOnceCheckpoint;
             if (!cpt) {
-                LOG_ERROR(sLogger,
-                          LOG_PATTERN("message", "unexpected result when exactly once checkpoint is not found"));
+                failDetail << ", unexpected result when exactly once checkpoint is not found";
+                suggestion << "report bug";
+                LogtailAlarm::GetInstance()->SendAlarm(
+                    EXACTLY_ONCE_ALARM,
+                    "drop exactly once log group because of invalid sequence ID, request id:" + response->requestId,
+                    mDataPtr->mProjectName,
+                    mDataPtr->mLogstore,
+                    mDataPtr->mRegion);
                 operation = DISCARD_WHEN_FAIL;
                 break;
             }
@@ -232,36 +308,33 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
             //  the possibility of hash key conflict is very low, so data is
             //  dropped here.
             cpt->Commit();
-            LOG_WARNING(
-                sLogger,
-                LOG_PATTERN("checkpoint key", cpt->key)("message", "drop exactly once log group and commit checkpoint")(
-                    "checkpoint", cpt->data.DebugString()));
+            failDetail << ", drop exactly once log group and commit checkpoint"
+                       << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
+            suggestion << "no suggestion";
             LogtailAlarm::GetInstance()->SendAlarm(EXACTLY_ONCE_ALARM,
                                                    "drop exactly once log group because of invalid sequence ID, cpt:"
                                                        + cpt->key + ", data:" + cpt->data.DebugString()
-                                                       + "request id:" + response->requestId);
+                                                       + "request id:" + response->requestId,
+                                                   mDataPtr->mProjectName,
+                                                   mDataPtr->mLogstore,
+                                                   mDataPtr->mRegion);
             operation = DISCARD_WHEN_FAIL;
             cpt->IncreaseSequenceID();
-#undef LOG_PATTERN
         } while (0);
     } else if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust() && sdk::LOGE_REQUEST_TIME_EXPIRED == errorCode) {
+        failDetail << "write request expired, will retry";
+        suggestion << "check local system time";
+        Sender::Instance()->IncTotalSendStatistic(mDataPtr->mProjectName, mDataPtr->mLogstore, curTime);
         operation = RETRY_ASYNC_WHEN_FAIL;
-        LOG_INFO(sLogger,
-                 ("retry expired data", response->requestId)("project", mDataPtr->mProjectName)(
-                     "logstore", mDataPtr->mLogstore)("error", errorMessage));
     } else {
+        failDetail << "other error";
+        suggestion << "no suggestion";
         Sender::Instance()->IncTotalSendStatistic(mDataPtr->mProjectName, mDataPtr->mLogstore, curTime);
         // when unknown error such as SignatureNotMatch happens, we should retry several times
         // first time, we will retry immediately
         // then we record error and retry latter
         // when retry times > unknow_error_try_max, we will drop this data
-        if (mDataPtr->mSendRetryTimes == 1) {
-            operation = RETRY_ASYNC_WHEN_FAIL;
-        } else if (mDataPtr->mSendRetryTimes > INT32_FLAG(unknow_error_try_max)) {
-            operation = DISCARD_WHEN_FAIL;
-        } else {
-            operation = RECORD_ERROR_WHEN_FAIL;
-        }
+        operation = DefaultOperation();
     }
     if (curTime - mDataPtr->mLastUpdateTime > INT32_FLAG(discard_send_fail_interval)) {
         operation = DISCARD_WHEN_FAIL;
@@ -270,34 +343,26 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
     if (isProfileData && mDataPtr->mSendRetryTimes >= INT32_FLAG(profile_data_send_retrytimes)) {
         operation = DISCARD_WHEN_FAIL;
     }
+
+#define LOG_PATTERN \
+    ("SendFail", failDetail.str())("Operation", GetOperationString(operation))("Suggestion", suggestion.str())( \
+        "RequestId", response->requestId)("StatusCode", response->statusCode)("ErrorCode", errorCode)("ErrorMessage", \
+                                                                                                      errorMessage)( \
+        "Region", mDataPtr->mRegion)("Project", mDataPtr->mProjectName)("Logstore", mDataPtr->mLogstore)( \
+        "Config", mDataPtr->mConfigName)("RetryTimes", mDataPtr->mSendRetryTimes)("LogLines", mDataPtr->mLogLines)( \
+        "Bytes", mDataPtr->mLogData.size())("Endpoint", mDataPtr->mCurrentEndpoint)("IsProfileData", isProfileData)
+
+    // Log warning if retry for too long or will discard data
     switch (operation) {
         case RETRY_ASYNC_WHEN_FAIL:
-            LOG_DEBUG(sLogger,
-                      ("send data to SLS fail", "will retry soon")("StatusCode", response->statusCode)(
-                          "RequestId", response->requestId)("ErrorCode", errorCode)("ErrorMessage", errorMessage)(
-                          "region", mDataPtr->mRegion)("projectName", mDataPtr->mProjectName)(
-                          "logstore", mDataPtr->mLogstore)("RetryTimes",
-                                                           mDataPtr->mSendRetryTimes)("LogLines", mDataPtr->mLogLines)(
-                          "bytes", mDataPtr->mLogData.size())("endpoint", mDataPtr->mCurrentEndpoint));
-
             if (curTime - mDataPtr->mLastUpdateTime > INT32_FLAG(sending_cost_time_alarm_interval)) {
-                LOG_WARNING(sLogger,
-                            ("continuous network error, will retry soon, region",
-                             mDataPtr->mRegion)("projectName", mDataPtr->mProjectName)("logstore", mDataPtr->mLogstore)(
-                                "RetryTimes", mDataPtr->mSendRetryTimes)("LogLines", mDataPtr->mLogLines)(
-                                "bytes", mDataPtr->mLogData.size())("endpoint", mDataPtr->mCurrentEndpoint));
+                LOG_WARNING(sLogger, LOG_PATTERN);
             }
             Sender::Instance()->SendToNetAsync(mDataPtr);
             break;
         case RECORD_ERROR_WHEN_FAIL:
-            if (!isProfileData) {
-                LOG_WARNING(sLogger,
-                            ("send data to SLS fail", "repush into send buffer and retry later")(
-                                "StatusCode", response->statusCode)("RequestId", response->requestId)(
-                                "ErrorCode", errorCode)("ErrorMessage", errorMessage)("region", mDataPtr->mRegion)(
-                                "projectName", mDataPtr->mProjectName)("logstore", mDataPtr->mLogstore)(
-                                "RetryTimes", mDataPtr->mSendRetryTimes)("LogLines", mDataPtr->mLogLines)(
-                                "bytes", mDataPtr->mLogData.size())("endpoint", mDataPtr->mCurrentEndpoint));
+            if (curTime - mDataPtr->mLastUpdateTime > INT32_FLAG(sending_cost_time_alarm_interval)) {
+                LOG_WARNING(sLogger, LOG_PATTERN);
             }
             // Sender::Instance()->PutIntoSecondaryBuffer(mDataPtr, 10);
             Sender::Instance()->SubSendingBufferCount();
@@ -307,54 +372,54 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
             break;
         case DISCARD_WHEN_FAIL:
         default:
-            if (isProfileData)
-                LOG_DEBUG(sLogger,
-                          ("report Logtail profiling data fail",
-                           "discard data, this will not affect user's log data")("StatusCode", response->statusCode)(
-                              "RequestId", response->requestId)("ErrorCode", errorCode)("ErrorMessage", errorMessage)(
-                              "projectName", mDataPtr->mProjectName)("logstore", mDataPtr->mLogstore)(
-                              "RetryTimes", mDataPtr->mSendRetryTimes)("LogLines", mDataPtr->mLogLines)(
-                              "bytes", mDataPtr->mLogData.size())("endpoint", mDataPtr->mCurrentEndpoint));
-            else {
-                LOG_ERROR(sLogger,
-                          ("send data to SLS fail", "discard data")("StatusCode", response->statusCode)(
-                              "RequestId", response->requestId)("ErrorCode", errorCode)("ErrorMessage", errorMessage)(
-                              "region", mDataPtr->mRegion)("projectName", mDataPtr->mProjectName)("logstore",
-                                                                                                  mDataPtr->mLogstore)(
-                              "RetryTimes", mDataPtr->mSendRetryTimes)("LogLines", mDataPtr->mLogLines)(
-                              "bytes", mDataPtr->mLogData.size())("endpoint", mDataPtr->mCurrentEndpoint));
-                LogtailAlarm::GetInstance()->SendAlarm(SEND_DATA_FAIL_ALARM,
-                                                       "logs:" + ToString(mDataPtr->mLogLines) + ", errorCode:"
-                                                           + errorCode + ", errorMessage:" + errorMessage
-                                                           + ", requestId:" + response->requestId
-                                                           + ", endponit:" + mDataPtr->mCurrentEndpoint,
-                                                       mDataPtr->mProjectName,
-                                                       mDataPtr->mLogstore,
-                                                       mDataPtr->mRegion);
+            LOG_WARNING(sLogger, LOG_PATTERN);
+            if (!isProfileData) {
+                LogtailAlarm::GetInstance()->SendAlarm(
+                    SEND_DATA_FAIL_ALARM,
+                    "lines:" + ToString(mDataPtr->mLogLines) + ", errorCode:" + errorCode
+                        + ", errorMessage:" + errorMessage + ", requestId:" + response->requestId
+                        + ", endpoint:" + mDataPtr->mCurrentEndpoint + ", config:" + mDataPtr->mConfigName,
+                    mDataPtr->mProjectName,
+                    mDataPtr->mLogstore,
+                    mDataPtr->mRegion);
             }
             Sender::Instance()->SubSendingBufferCount();
             // set ok to delete data
             Sender::Instance()->OnSendDone(mDataPtr, LogstoreSenderInfo::SendResult_DiscardFail);
             Sender::Instance()->DescSendingCount();
     }
+#undef LOG_PATTERN
 
     delete this;
 }
 
+OperationOnFail SendClosure::DefaultOperation() {
+    if (mDataPtr->mSendRetryTimes == 1) {
+        return RETRY_ASYNC_WHEN_FAIL;
+    } else if (mDataPtr->mSendRetryTimes > INT32_FLAG(unknow_error_try_max)) {
+        return DISCARD_WHEN_FAIL;
+    } else {
+        return RECORD_ERROR_WHEN_FAIL;
+    }
+}
+
 SendResult ConvertErrorCode(const std::string& errorCode) {
     if (errorCode == sdk::LOGE_REQUEST_ERROR || errorCode == sdk::LOGE_CLIENT_OPERATION_TIMEOUT
-        || errorCode == sdk::LOGE_REQUEST_TIMEOUT)
+        || errorCode == sdk::LOGE_REQUEST_TIMEOUT) {
         return SEND_NETWORK_ERROR;
-    else if (errorCode == sdk::LOGE_SERVER_BUSY || errorCode == sdk::LOGE_INTERNAL_SERVER_ERROR)
+    } else if (errorCode == sdk::LOGE_SERVER_BUSY || errorCode == sdk::LOGE_INTERNAL_SERVER_ERROR) {
         return SEND_SERVER_ERROR;
-    else if (errorCode == sdk::LOGE_WRITE_QUOTA_EXCEED || errorCode == sdk::LOGE_SHARD_WRITE_QUOTA_EXCEED)
+    } else if (errorCode == sdk::LOGE_WRITE_QUOTA_EXCEED || errorCode == sdk::LOGE_SHARD_WRITE_QUOTA_EXCEED) {
         return SEND_QUOTA_EXCEED;
-    else if (errorCode == sdk::LOGE_UNAUTHORIZED)
+    } else if (errorCode == sdk::LOGE_UNAUTHORIZED) {
         return SEND_UNAUTHORIZED;
-    else if (errorCode == sdk::LOGE_INVALID_SEQUENCE_ID) {
+    } else if (errorCode == sdk::LOGE_INVALID_SEQUENCE_ID) {
         return SEND_INVALID_SEQUENCE_ID;
-    } else
+    } else if (errorCode == sdk::LOGE_PARAMETER_INVALID) {
+        return SEND_PARAMETER_INVALID;
+    } else {
         return SEND_DISCARD_ERROR;
+    }
 }
 
 Sender::Sender() {
@@ -366,7 +431,6 @@ Sender::Sender() {
                                          STRING_FLAG(default_access_key),
                                          INT32_FLAG(sls_client_send_timeout),
                                          LogFileProfiler::mIpAddr,
-                                         BOOL_FLAG(sls_client_send_compress),
                                          AppConfig::GetInstance()->GetBindInterface());
     SLSControl::Instance()->SetSlsSendClientCommonParam(mTestNetworkClient);
 
@@ -375,7 +439,6 @@ Sender::Sender() {
                                           STRING_FLAG(default_access_key),
                                           INT32_FLAG(sls_client_send_timeout),
                                           LogFileProfiler::mIpAddr,
-                                          BOOL_FLAG(sls_client_send_compress),
                                           AppConfig::GetInstance()->GetBindInterface());
     SLSControl::Instance()->SetSlsSendClientCommonParam(mUpdateRealIpClient);
     SetSendingBufferCount(0);
@@ -420,7 +483,7 @@ void Sender::ParseLogGroupFromString(const std::string& logData,
                                      SEND_DATA_TYPE dataType,
                                      int32_t rawSize,
                                      std::vector<sls_logs::LogGroup>& logGroupVec) {
-    if (dataType == LOGGROUP_LZ4_COMPRESSED) {
+    if (dataType == LOGGROUP_COMPRESSED) {
         LogGroup logGroupPb;
         if (Sender::ParseLogGroupFromLZ4(logData, rawSize, logGroupPb))
             logGroupVec.push_back(logGroupPb);
@@ -652,7 +715,6 @@ sdk::Client* Sender::GetSendClient(const std::string& region, const std::string&
                                               "",
                                               INT32_FLAG(sls_client_send_timeout),
                                               LogFileProfiler::mIpAddr,
-                                              BOOL_FLAG(sls_client_send_compress),
                                               AppConfig::GetInstance()->GetBindInterface());
     SLSControl::Instance()->SetSlsSendClientCommonParam(sendClient);
     SLSControl::Instance()->SetSlsSendClientAuth(aliuid, true, sendClient, lastUpdateTime);
@@ -998,12 +1060,13 @@ void Sender::SendEncryptionBuffer(const std::string& filename, int32_t keyVersio
                         LOG_ERROR(sLogger, ("LZ4 compress loggroup fail, projectName is", bufferMeta.project()));
                         discardCount++;
                         LogtailAlarm::GetInstance()->SendAlarm(
-                            LZ4_COMPRESS_FAIL_ALARM,
+                            SEND_COMPRESS_FAIL_ALARM,
                             string("projectName is:" + bufferMeta.project() + ", fileName is:" + filename));
                     } else {
                         bufferMeta.set_logstore(logGroup.category());
-                        bufferMeta.set_datatype(LOGGROUP_LZ4_COMPRESSED);
+                        bufferMeta.set_datatype(LOGGROUP_COMPRESSED);
                         bufferMeta.set_rawsize(meta.mLogDataSize);
+                        bufferMeta.set_compresstype(sls_logs::SLS_CMP_LZ4);
                     }
                 }
                 if (!sendResult) {
@@ -1352,6 +1415,7 @@ void Sender::DaemonSender() {
                 sendBufferBytes += data->mRawSize;
                 sendNetBodyBytes += data->mLogData.size();
                 sendLines += data->mLogLines;
+                data->mLastUpdateTime = time(NULL);
                 SendToNetAsync(data);
             }
         }
@@ -1468,6 +1532,7 @@ bool Sender::SendToBufferFile(LoggroupTimeValue* dataPtr) {
     bufferMeta.set_datatype(int32_t(dataPtr->mDataType));
     bufferMeta.set_rawsize(dataPtr->mRawSize);
     bufferMeta.set_shardhashkey(dataPtr->mShardHashKey);
+    bufferMeta.set_compresstype(dataPtr->mLogGroupContext.mCompressType);
     string encodedInfo;
     bufferMeta.SerializeToString(&encodedInfo);
 
@@ -1538,6 +1603,8 @@ bool Sender::SendPb(Config* pConfig,
                     const std::string& logstore,
                     const std::string& shardHash) {
     // if logstore is specific, use this key, otherwise use pConfig->->mCategory
+    sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(pConfig->mCompressType);
+    LogGroupContext logGroupContext(pConfig->mRegion, pConfig->mProjectName, pConfig->mCategory, compressType);
     LoggroupTimeValue* pData = new LoggroupTimeValue(pConfig->mProjectName,
                                                      logstore.empty() ? pConfig->mCategory : logstore,
                                                      pConfig->mConfigName,
@@ -1545,14 +1612,15 @@ bool Sender::SendPb(Config* pConfig,
                                                      true,
                                                      pConfig->mAliuid,
                                                      pConfig->mRegion,
-                                                     LOGGROUP_LZ4_COMPRESSED,
+                                                     LOGGROUP_COMPRESSED,
                                                      lines,
                                                      pbSize,
                                                      time(NULL),
                                                      shardHash,
-                                                     pConfig->mLogstoreKey);
+                                                     pConfig->mLogstoreKey,
+                                                     logGroupContext);
     // apsara::timing::TimeInNsec startT = apsara::timing::GetCurrentTimeInNanoSeconds();
-    if (!CompressLz4(pbBuffer, pbSize, pData->mLogData)) {
+    if (!CompressData(logGroupContext.mCompressType, pbBuffer, pbSize, pData->mLogData)) {
         LOG_ERROR(sLogger,
                   ("compress data fail", "discard data")("projectName", pConfig->mProjectName)("logstore",
                                                                                                pConfig->mCategory));
@@ -1666,7 +1734,7 @@ bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint
         if (BOOL_FLAG(enable_mock_send) && MockTestEndpoint) {
             string logData;
             MockTestEndpoint(
-                "logtail-test-network-project", "logtail-test-network-logstore", logData, LOGGROUP_LZ4_COMPRESSED, 0);
+                "logtail-test-network-project", "logtail-test-network-logstore", logData, LOGGROUP_COMPRESSED, 0);
         } else
             status = mTestNetworkClient->TestNetwork();
     } catch (sdk::LOGException& ex) {
@@ -1740,10 +1808,11 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
                                  bufferMeta.rawsize());
                 else
                     LOG_ERROR(sLogger, ("MockSyncSend", "uninitialized"));
-            } else if (bufferMeta.datatype() == LOGGROUP_LZ4_COMPRESSED) {
+            } else if (bufferMeta.datatype() == LOGGROUP_COMPRESSED) {
 #ifdef LOGTAIL_RUNTIME_PLUGIN
                 LogtailRuntimePlugin::GetInstance()->LogtailSendPb(bufferMeta.project(),
                                                                    bufferMeta.logstore(),
+                                                                   bufferMeta.compresstype(),
                                                                    logData.c_str(),
                                                                    logData.size(),
                                                                    bufferMeta.rawsize(),
@@ -1753,21 +1822,29 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
                 if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
                     sendClient->PostLogStoreLogs(bufferMeta.project(),
                                                  bufferMeta.logstore(),
+                                                 bufferMeta.compresstype(),
                                                  logData,
                                                  bufferMeta.rawsize(),
                                                  bufferMeta.shardhashkey());
                 else
-                    sendClient->PostLogStoreLogs(
-                        bufferMeta.project(), bufferMeta.logstore(), logData, bufferMeta.rawsize());
+                    sendClient->PostLogStoreLogs(bufferMeta.project(),
+                                                 bufferMeta.logstore(),
+                                                 bufferMeta.compresstype(),
+                                                 logData,
+                                                 bufferMeta.rawsize());
             } else {
 #ifdef LOGTAIL_RUNTIME_PLUGIN
                 return SEND_OK;
 #endif
                 if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
-                    sendClient->PostLogStoreLogPackageList(
-                        bufferMeta.project(), bufferMeta.logstore(), logData, bufferMeta.shardhashkey());
+                    sendClient->PostLogStoreLogPackageList(bufferMeta.project(),
+                                                           bufferMeta.logstore(),
+                                                           bufferMeta.compresstype(),
+                                                           logData,
+                                                           bufferMeta.shardhashkey());
                 else
-                    sendClient->PostLogStoreLogPackageList(bufferMeta.project(), bufferMeta.logstore(), logData);
+                    sendClient->PostLogStoreLogPackageList(
+                        bufferMeta.project(), bufferMeta.logstore(), bufferMeta.compresstype(), logData);
             }
             return SEND_OK;
         } catch (sdk::LOGException& ex) {
@@ -1877,6 +1954,7 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
         if (MockAsyncSend && !MockIntegritySend)
             MockAsyncSend(dataPtr->mProjectName,
                           dataPtr->mLogstore,
+                          dataPtr->mLogGroupContext.mCompressType,
                           dataPtr->mLogData,
                           dataPtr->mDataType,
                           dataPtr->mRawSize,
@@ -1889,15 +1967,20 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
             DescSendingCount();
             delete sendClosure;
         }
-    } else if (dataPtr->mDataType == LOGGROUP_LZ4_COMPRESSED) {
+    } else if (dataPtr->mDataType == LOGGROUP_COMPRESSED) {
         const auto& hashKey = exactlyOnceCpt ? exactlyOnceCpt->data.hash_key() : dataPtr->mShardHashKey;
         if (hashKey.empty()) {
-            sendClient->PostLogStoreLogs(
-                dataPtr->mProjectName, dataPtr->mLogstore, dataPtr->mLogData, dataPtr->mRawSize, sendClosure);
+            sendClient->PostLogStoreLogs(dataPtr->mProjectName,
+                                         dataPtr->mLogstore,
+                                         dataPtr->mLogGroupContext.mCompressType,
+                                         dataPtr->mLogData,
+                                         dataPtr->mRawSize,
+                                         sendClosure);
         } else {
             int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
             sendClient->PostLogStoreLogs(dataPtr->mProjectName,
                                          dataPtr->mLogstore,
+                                         dataPtr->mLogGroupContext.mCompressType,
                                          dataPtr->mLogData,
                                          dataPtr->mRawSize,
                                          sendClosure,
@@ -1906,11 +1989,18 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
         }
     } else {
         if (dataPtr->mShardHashKey.empty())
-            sendClient->PostLogStoreLogPackageList(
-                dataPtr->mProjectName, dataPtr->mLogstore, dataPtr->mLogData, sendClosure);
+            sendClient->PostLogStoreLogPackageList(dataPtr->mProjectName,
+                                                   dataPtr->mLogstore,
+                                                   dataPtr->mLogGroupContext.mCompressType,
+                                                   dataPtr->mLogData,
+                                                   sendClosure);
         else
-            sendClient->PostLogStoreLogPackageList(
-                dataPtr->mProjectName, dataPtr->mLogstore, dataPtr->mLogData, sendClosure, dataPtr->mShardHashKey);
+            sendClient->PostLogStoreLogPackageList(dataPtr->mProjectName,
+                                                   dataPtr->mLogstore,
+                                                   dataPtr->mLogGroupContext.mCompressType,
+                                                   dataPtr->mLogData,
+                                                   sendClosure,
+                                                   dataPtr->mShardHashKey);
     }
 }
 
@@ -1960,17 +2050,17 @@ bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
                                                     false,
                                                     aliuid,
                                                     region,
-                                                    LOGGROUP_LZ4_COMPRESSED,
+                                                    LOGGROUP_COMPRESSED,
                                                     logSize,
                                                     oriData.size(),
                                                     curTime,
                                                     shardHashKey,
                                                     feedBackKey);
 
-    if (!CompressLz4(oriData, data->mLogData)) {
+    if (!CompressData(data->mLogGroupContext.mCompressType, oriData, data->mLogData)) {
         LOG_ERROR(sLogger, ("compress data fail", "discard data")("projectName", projectName)("logstore", logstore));
         LogtailAlarm::GetInstance()->SendAlarm(
-            LZ4_COMPRESS_FAIL_ALARM, string("logs :") + ToString(logSize), projectName, logstore, region);
+            SEND_COMPRESS_FAIL_ALARM, string("lines :") + ToString(logSize), projectName, logstore, region);
         delete data;
         return false;
     }
@@ -1979,14 +2069,14 @@ bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
     return true;
 }
 
-void Sender::SendLZ4Compressed(const std::string& projectName,
-                               sls_logs::LogGroup& logGroup,
-                               const std::vector<int32_t>& neededLogIndex,
-                               const std::string& configName,
-                               const std::string& aliuid,
-                               const std::string& region,
-                               const std::string& filename,
-                               const LogGroupContext& context) {
+void Sender::SendCompressed(const std::string& projectName,
+                            sls_logs::LogGroup& logGroup,
+                            const std::vector<int32_t>& neededLogIndex,
+                            const std::string& configName,
+                            const std::string& aliuid,
+                            const std::string& region,
+                            const std::string& filename,
+                            const LogGroupContext& context) {
     string oriData;
     auto lines = static_cast<int32_t>(logGroup.logs_size());
     auto const neededLogLines = static_cast<int32_t>(neededLogIndex.size());
@@ -2024,7 +2114,7 @@ void Sender::SendLZ4Compressed(const std::string& projectName,
                                       false,
                                       aliuid,
                                       region,
-                                      LOGGROUP_LZ4_COMPRESSED,
+                                      LOGGROUP_COMPRESSED,
                                       lines,
                                       oriData.size(),
                                       time(NULL),
@@ -2034,18 +2124,18 @@ void Sender::SendLZ4Compressed(const std::string& projectName,
     data->mLogTimeInMinute = logTimeInMinute;
     data->mLogGroupContext.mSeqNum = ++mLogGroupContextSeq;
 
-    if (!CompressLz4(oriData, data->mLogData)) {
+    if (!CompressData(data->mLogGroupContext.mCompressType, oriData, data->mLogData)) {
         LOG_ERROR(sLogger,
                   ("compress data fail", "discard data")("projectName", projectName)("logstore", logGroup.category()));
         LogtailAlarm::GetInstance()->SendAlarm(
-            LZ4_COMPRESS_FAIL_ALARM, string("logs :") + ToString(lines), projectName, logGroup.category(), region);
+            SEND_COMPRESS_FAIL_ALARM, string("lines :") + ToString(lines), projectName, logGroup.category(), region);
         delete data;
     } else {
         PutIntoBatchMap(data);
     }
 }
 
-void Sender::SendLZ4Compressed(std::vector<MergeItem*>& sendDataVec) {
+void Sender::SendCompressed(std::vector<MergeItem*>& sendDataVec) {
     for (auto item : sendDataVec) {
         string oriData;
         item->mLogGroup.SerializeToString(&oriData);
@@ -2060,7 +2150,7 @@ void Sender::SendLZ4Compressed(std::vector<MergeItem*>& sendDataVec) {
                                                         cpt ? false : item->mBufferOrNot,
                                                         item->mAliuid,
                                                         item->mRegion,
-                                                        LOGGROUP_LZ4_COMPRESSED,
+                                                        LOGGROUP_COMPRESSED,
                                                         item->mLines,
                                                         oriData.size(),
                                                         item->mLastUpdateTime,
@@ -2069,12 +2159,12 @@ void Sender::SendLZ4Compressed(std::vector<MergeItem*>& sendDataVec) {
                                                         context);
         data->mLogTimeInMinute = item->mLogTimeInMinute;
 
-        if (!CompressLz4(oriData, data->mLogData)) {
+        if (!CompressData(data->mLogGroupContext.mCompressType, oriData, data->mLogData)) {
             LOG_ERROR(sLogger,
                       ("compress data fail",
                        "discard data")("projectName", item->mProjectName)("logstore", item->mLogGroup.category()));
-            LogtailAlarm::GetInstance()->SendAlarm(LZ4_COMPRESS_FAIL_ALARM,
-                                                   string("logs :") + ToString(item->mLines),
+            LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
+                                                   string("lines :") + ToString(item->mLines),
                                                    item->mProjectName,
                                                    item->mLogGroup.category(),
                                                    item->mRegion);
@@ -2103,12 +2193,12 @@ void Sender::SendLogPackageList(std::vector<MergeItem*>& sendDataVec) {
         string compressedData;
         string oriData;
         sendDataVec[idx]->mLogGroup.SerializeToString(&oriData);
-        if (!CompressLz4(oriData, compressedData)) {
+        if (!CompressData(sendDataVec[idx]->mLogGroupContext.mCompressType, oriData, compressedData)) {
             LOG_ERROR(sLogger,
                       ("compress data fail", "discard data")("projectName", sendDataVec[idx]->mProjectName)(
                           "logstore", sendDataVec[idx]->mLogGroup.category()));
-            LogtailAlarm::GetInstance()->SendAlarm(LZ4_COMPRESS_FAIL_ALARM,
-                                                   string("logs :") + ToString(sendDataVec[idx]->mLines),
+            LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
+                                                   string("lines :") + ToString(sendDataVec[idx]->mLines),
                                                    sendDataVec[idx]->mProjectName,
                                                    sendDataVec[idx]->mLogGroup.category(),
                                                    sendDataVec[idx]->mRegion);
@@ -2327,14 +2417,15 @@ double Sender::UpdateSendStatistic(const std::string& key, int32_t curTime, bool
 
     int32_t second = curTime % STATISTIC_CYCLE;
     int32_t window = second / WINDOW_SIZE;
-    int32_t curBeginTime = curTime - second + window * WINDOW_SIZE;
+    int32_t curBeginTime = curTime - second + window * WINDOW_SIZE; // normalize to 10s
     {
         PTScopedLock lock(mSendStatisticLock);
         std::unordered_map<std::string, std::vector<SendStatistic*> >::iterator iter = mSendStatisticMap.find(key);
         if (iter == mSendStatisticMap.end()) {
-            vector<SendStatistic*> value;
-            for (int32_t idx = 0; idx < WINDOW_COUNT; ++idx)
+            std::vector<SendStatistic*> value;
+            for (int32_t idx = 0; idx < WINDOW_COUNT; ++idx) {
                 value.push_back(new SendStatistic(0));
+            }
             iter = mSendStatisticMap.insert(iter, std::make_pair(key, value));
         }
 

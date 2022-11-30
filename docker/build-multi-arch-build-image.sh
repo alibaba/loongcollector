@@ -18,8 +18,8 @@ set -ue
 set -o pipefail
 
 docker manifest create \
-sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest \
---amend sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux-amd64:latest \
---amend sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux-arm64:latest
+sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:latest \
+--amend sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux-amd64:latest \
+--amend sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux-arm64:latest
 
-docker manifest push sls-registry.cn-beijing.cr.aliyuncs.com/sls-microservices/ilogtail-build-linux:latest
+docker manifest push sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:latest

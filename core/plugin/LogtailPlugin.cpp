@@ -245,7 +245,8 @@ int LogtailPlugin::SendPbV2(const char* configName,
         }
         return Sender::Instance()->SendPb(pConfig, pbBuffer, pbSize, lines, logstore, shardHashStr) ? 0 : -1;
     } else {
-        LOG_ERROR(sLogger, ("error", "SendPbV2 can not find config")("config", configNameStr));
+        LOG_INFO(sLogger,
+                 ("error", "SendPbV2 can not find config, maybe config updated")("config", configNameStr)("logstore", logstore));
     }
     return -2;
 }

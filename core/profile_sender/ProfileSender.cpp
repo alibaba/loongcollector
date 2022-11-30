@@ -74,12 +74,12 @@ void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
     }
     logtailStatus["__logs__"][0] = status;
     std::string logBody = logtailStatus.toStyledString();
-    sdk::Client client(endpoint, "", "", INT32_FLAG(sls_client_send_timeout), "", true, "");
+    sdk::Client client(endpoint, "", "", INT32_FLAG(sls_client_send_timeout), "", "");
     SLSControl::Instance()->SetSlsSendClientCommonParam(&client);
     try {
         time_t curTime = time(NULL);
         LoggroupTimeValue* data = new LoggroupTimeValue(
-            project, logstore, "", "", false, "", region, LOGGROUP_LZ4_COMPRESSED, 1, logBody.size(), curTime, "", 0);
+            project, logstore, "", "", false, "", region, LOGGROUP_COMPRESSED, 1, logBody.size(), curTime, "", 0);
 
         if (!CompressLz4(logBody, data->mLogData)) {
             LOG_ERROR(sLogger, ("lz4 compress data", "fail"));
@@ -87,7 +87,7 @@ void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
         }
 
         sdk::PostLogStoreLogsResponse resp
-            = client.PostLogUsingWebTracking(data->mProjectName, data->mLogstore, data->mLogData, data->mRawSize);
+            = client.PostLogUsingWebTracking(data->mProjectName, data->mLogstore, sls_logs::SLS_CMP_LZ4, data->mLogData, data->mRawSize);
 
         LOG_DEBUG(sLogger,
                   ("SendToProfileProject",

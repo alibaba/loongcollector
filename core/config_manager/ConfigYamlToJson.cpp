@@ -81,6 +81,7 @@ ConfigYamlToJson::ConfigYamlToJson() {
 
     mFileConfigMap["ProjectName"] = "project_name";
     mFileConfigMap["LogstoreName"] = "category";
+    mFileConfigMap["CompressType"] = "compressType";
     mFileConfigMap["Endpoint"] = "defaultEndpoint";
     mFileConfigMap["Region"] = "region";
     mFileConfigMap["ShardHashKey"] = "shard_hash_key";
@@ -224,7 +225,7 @@ bool ConfigYamlToJson::GenerateLocalJsonConfig(const string configName,
             return false;
         }
 
-        FillupDefalutUserJsonConfig(workMode, userJsonConfig);
+        FillupDefaultUserJsonConfig(workMode, userJsonConfig);
         if (!pluginJsonConfig.empty()) {
             userJsonConfig["plugin"] = pluginJsonConfig;
         }
@@ -579,7 +580,7 @@ bool ConfigYamlToJson::GenerateLocalJsonConfigForSLSFulsher(const YAML::Node& ya
     return true;
 }
 
-bool ConfigYamlToJson::FillupDefalutUserJsonConfig(const WorkMode& workMode, Json::Value& userJsonConfig) {
+bool ConfigYamlToJson::FillupDefaultUserJsonConfig(const WorkMode& workMode, Json::Value& userJsonConfig) {
     if (workMode.mIsFileMode) {
         if (!userJsonConfig.isMember("max_depth")) {
             userJsonConfig["max_depth"] = 0;

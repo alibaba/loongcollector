@@ -40,7 +40,8 @@ your changes, such as:
 - [public] [both] [added] add a new flusher\_otlp\_log plugin.
 - [public] [both] [added] add a new flusher\_kafka\_v2 plugin.
 - [public] [linux] [fixed] strip binaries to reduce dist size.
+- [public] [both] [added] add zstd compress type support to sls_flusher.
+- [public] [linux] [updated] polish ebpf data structure
 - [public] [both] [fixed] fix docker fd leak and event lost by using official docker Go library
 - [public] [linux] [updated] polish ebpf data structure
 - [public] [both] [added] add processor\_desensitize processor
-

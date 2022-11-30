@@ -638,6 +638,7 @@ protected:
 
     static void MockAsyncSend(const std::string& projectName,
                               const std::string& logstore,
+                              sls_logs::SlsCompressType compressType,
                               const std::string& logData,
                               SEND_DATA_TYPE dataType,
                               int32_t rawSize,
@@ -3102,7 +3103,7 @@ void SenderUnittest::MockExactlyOnceSend(LoggroupTimeValue* data) {
 
     gRangeCheckpoints.push_back(RangeCheckpointPtr(new RangeCheckpoint(*(cpt.get()))));
     LOG_INFO(sLogger, ("checkpoint key", cpt->key)("checkpoint", cpt->data.DebugString()));
-    MockAsyncSend(data->mProjectName, data->mLogstore, data->mLogData, data->mDataType, data->mRawSize, closure);
+    MockAsyncSend(data->mProjectName, data->mLogstore, data->mLogGroupContext.mCompressType, data->mLogData, data->mDataType, data->mRawSize, closure);
 }
 
 // Test if data's sequence is generated orderly:

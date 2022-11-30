@@ -127,7 +127,8 @@ namespace sdk {
     const char* const LOGE_SHARD_NOT_EXIST = "ShardNotExist";
     const char* const LOGE_INVALID_CURSOR = "InvalidCursor";
     const char* const LOG_LZ4 = "lz4";
-
+    const char* const LOG_DEFLATE = "deflate";
+    const char* const LOG_ZSTD = "zstd";
     const char* const LOG_ERROR_CODE = "errorCode";
     const char* const LOG_ERROR_MESSAGE = "errorMessage";
 

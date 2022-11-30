@@ -11,6 +11,7 @@
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
 | Type            | String  | 是    | 插件类型，指定为`flusher_sls`。 |
+| Region          | String  | 否    | 区域，一般取接入点公网服务入口前缀（需要向多个Endpoint发送时必须配置） |
 | Endpoint        | String  | 是    | [SLS接入点地址](https://help.aliyun.com/document\_detail/29008.html)。 |
 | ProjectName     | String  | 是    | SLS Project名。 |
 | LogstoreName    | String  | 是    | SLS Logstore名。  |
@@ -34,6 +35,7 @@ inputs:
     FilePattern: "*.log"
 flushers:
   - Type: flusher_sls
+    Region: cn-xxx
     Endpoint: cn-xxx.log.aliyuncs.com
     ProjectName: test_project
     LogstoreName: test_logstore

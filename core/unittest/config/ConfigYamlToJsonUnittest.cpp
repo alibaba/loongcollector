@@ -52,12 +52,12 @@ public:
     void CaseSetUp() {}
     void CaseCleanUp() {}
 
-    void generateYamlConfig(const string pluginCategory,
-                            vector<string> pluginTypeVec,
+    void generateYamlConfig(const std::string& pluginCategory,
+                            const std::vector<std::string>& pluginTypeVec,
                             YAML::Node& yamlConfig,
                             bool invalidType = false) {
         YAML::Node inputsConfig;
-        for (string pluginType : pluginTypeVec) {
+        for (const string& pluginType : pluginTypeVec) {
             YAML::Node inputConfig;
             if (invalidType) {
                 inputConfig["type"] = pluginType;
@@ -77,6 +77,7 @@ public:
         WorkMode workMode;
         YAML::Node yamlConfig;
         bool ret;
+        // normal plugin mode
         generateYamlConfig("inputs", {"file_log"}, yamlConfig);
         generateYamlConfig("flushers", {"flusher_sls"}, yamlConfig);
         ret = ConfigYamlToJson::GetInstance()->CheckPluginConfig("", yamlConfig, workMode);
@@ -88,6 +89,7 @@ public:
         EXPECT_EQ(workMode.mLogSplitProcessorPluginType, "");
         EXPECT_EQ(workMode.mLogType, "common_reg_log");
 
+        // C++ Regex accelerated mode
         yamlConfig.reset();
         generateYamlConfig("inputs", {"file_log"}, yamlConfig);
         generateYamlConfig("processors", {"processor_regex_accelerate"}, yamlConfig);
@@ -101,6 +103,7 @@ public:
         EXPECT_EQ(workMode.mLogSplitProcessorPluginType, "");
         EXPECT_EQ(workMode.mLogType, "common_reg_log");
 
+        // normal plugin mode with regex processor
         yamlConfig.reset();
         generateYamlConfig("inputs", {"file_log"}, yamlConfig);
         generateYamlConfig("processors", {"processor_split_log_regex", "processor_regex"}, yamlConfig);
@@ -114,6 +117,7 @@ public:
         EXPECT_EQ(workMode.mLogSplitProcessorPluginType, "processor_split_log_regex");
         EXPECT_EQ(workMode.mLogType, "common_reg_log");
 
+        // normal plugin mode with syslog input
         yamlConfig.reset();
         generateYamlConfig("inputs", {"service_syslog", "service_syslog"}, yamlConfig);
         generateYamlConfig("flushers", {"flusher_sls"}, yamlConfig);
@@ -126,6 +130,7 @@ public:
         EXPECT_EQ(workMode.mLogSplitProcessorPluginType, "");
         EXPECT_EQ(workMode.mLogType, "plugin");
 
+        // C++ JSON accelerated mode
         yamlConfig.reset();
         generateYamlConfig("inputs", {"file_log"}, yamlConfig);
         generateYamlConfig("processors", {"processor_json_accelerate"}, yamlConfig);
@@ -139,6 +144,7 @@ public:
         EXPECT_EQ(workMode.mLogSplitProcessorPluginType, "");
         EXPECT_EQ(workMode.mLogType, "json_log");
 
+        // C++ Delimiter accelerated mode
         yamlConfig.reset();
         generateYamlConfig("inputs", {"file_log"}, yamlConfig);
         generateYamlConfig("processors", {"processor_delimiter_accelerate"}, yamlConfig);
@@ -159,7 +165,7 @@ public:
         ret = ConfigYamlToJson::GetInstance()->CheckPluginConfig("", yamlConfig, workMode);
         EXPECT_EQ(ret, false);
 
-        // // service_syslog and processor_regex_accelerate are not matched
+        // service_syslog and processor_regex_accelerate are not matched
         yamlConfig.reset();
         generateYamlConfig("inputs", {"service_syslog", "service_syslog"}, yamlConfig);
         generateYamlConfig("processors", {"processor_regex_accelerate"}, yamlConfig);
@@ -449,6 +455,28 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["aggregators"].size(), 1);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["aggregators"][0]["type"],
                   "aggregator_context");
+    }
+
+    void TestYamlToJsonForAdvancedAndCompressConfig() {
+        LOG_INFO(sLogger, ("TestYamlToJsonForAdvancedFlags() begin", time(NULL)));
+
+        Json::Value inputJsonConfig;
+        const std::string file = "testConfigDir/file_advanced.yaml";
+        YAML::Node yamlConfig = YAML::LoadFile(file);
+
+        Json::Value userLocalJsonConfig;
+        ConfigYamlToJson::GetInstance()->GenerateLocalJsonConfig(file, yamlConfig, userLocalJsonConfig);
+
+        ConfigManager::GetInstance()->LoadJsonConfig(userLocalJsonConfig, false);
+
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["force_multiconfig"].asBool(), true);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["tail_size_kb"].asInt(), 32768);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["advanced"]["enable_log_position_meta"].asBool(),
+                  true);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["project_name"], "test_project");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["category"], "test_logstore");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["compressType"], "zstd");
     }
 };
 

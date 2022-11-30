@@ -141,6 +141,7 @@ private:
                                  const std::string& caCert);
     static void MockAsyncSend(const std::string& projectName,
                               const std::string& logstore,
+                              sls_logs::SlsCompressType compressType,
                               const std::string& logData,
                               SEND_DATA_TYPE dataType,
                               int32_t rawSize,
@@ -2171,6 +2172,7 @@ string ConfigUpdatorUnittest::GetConfigResponse() {
 
 void ConfigUpdatorUnittest::MockAsyncSend(const std::string& projectName,
                                           const std::string& logstore,
+                                          sls_logs::SlsCompressType compressType,
                                           const std::string& logData,
                                           SEND_DATA_TYPE dataType,
                                           int32_t rawSize,

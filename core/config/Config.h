@@ -115,6 +115,7 @@ public:
     std::shared_ptr<std::list<std::string>> mKeys; // description of each part of regex
     std::string mTimeFormat; // for common_reg_log
     std::string mCategory;
+    std::string mCompressType;
     int32_t mTailLimit; // KB
     std::vector<std::string> mUnAcceptDirPattern; // if not empty, files matching this pattern will not be watched
     //  topic is optional,  only used for common_reg_log and apsara_log , the mTopicFormat is three value type :
@@ -276,6 +277,7 @@ public:
 
     std::string GetProjectName() const { return mProjectName; }
     std::string GetCategory() const { return mCategory; }
+    std::string GetCompressType() const { return mCompressType; }
 
     bool PassingTagsToPlugin() const { return mAdvancedConfig.mPassTagsToPlugin; }
 

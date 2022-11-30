@@ -54,6 +54,7 @@ set(DEP_NAME_LIST
         boost
         lz4
         zlib
+        zstd
         curl
         unwind                  # google breakpad on Windows
         ssl                     # openssl
@@ -251,6 +252,20 @@ macro(link_zlib target_name)
         target_link_libraries(${target_name}
                 debug "zlibstaticd"
                 optimized "zlibstatic")
+    endif ()
+endmacro()
+
+
+# zstd
+macro(link_zstd target_name)
+    if (zstd_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${zstd_${LINK_OPTION_SUFFIX}}")
+    elseif (UNIX)
+        target_link_libraries(${target_name} "${zstd_${LIBRARY_DIR_SUFFIX}}/libzstd.a")
+    elseif (MSVC)
+        target_link_libraries(${target_name}
+                debug "zstdstaticd"
+                optimized "zstdstatic")
     endif ()
 endmacro()
 

@@ -15,9 +15,66 @@
 #include "CompressTools.h"
 #include <zlib/zlib.h>
 #include <lz4/lz4.h>
+#include <zstd/zstd.h>
 #include <cstring>
 
+#include "log_pb/sls_logs.pb.h"
+
 namespace logtail {
+
+const int32_t ZSTD_DEFAULT_LEVEL = 1;
+
+bool UncompressData(sls_logs::SlsCompressType compressType,
+                    const std::string& src,
+                    uint32_t rawSize,
+                    std::string& dst) {
+    switch (compressType) {
+        case sls_logs::SLS_CMP_NONE:
+            dst = src;
+            return true;
+        case sls_logs::SLS_CMP_LZ4:
+            return UncompressLz4(src, rawSize, dst);
+        case sls_logs::SLS_CMP_DEFLATE:
+            return UncompressDeflate(src, rawSize, dst);
+        case sls_logs::SLS_CMP_ZSTD:
+            return UncompressZstd(src, rawSize, dst);
+        default:
+            return false;
+    }
+}
+
+bool CompressData(sls_logs::SlsCompressType compressType, const std::string& src, std::string& dst) {
+    switch (compressType) {
+        case sls_logs::SLS_CMP_NONE:
+            dst = src;
+            return true;
+        case sls_logs::SLS_CMP_LZ4:
+            return CompressLz4(src, dst);
+        case sls_logs::SLS_CMP_DEFLATE:
+            return CompressDeflate(src, dst);
+        case sls_logs::SLS_CMP_ZSTD:
+            return CompressZstd(src, dst, ZSTD_DEFAULT_LEVEL);
+        default:
+            return false;
+    }
+}
+
+bool CompressData(sls_logs::SlsCompressType compressType, const char* src, uint32_t size, std::string& dst) {
+    switch (compressType) {
+        case sls_logs::SLS_CMP_NONE: {
+            dst.assign(src, size);
+            return true;
+        }
+        case sls_logs::SLS_CMP_LZ4:
+            return CompressLz4(src, size, dst);
+        case sls_logs::SLS_CMP_DEFLATE:
+            return CompressDeflate(src, size, dst);
+        case sls_logs::SLS_CMP_ZSTD:
+            return CompressZstd(src, size, dst, ZSTD_DEFAULT_LEVEL);
+        default:
+            return false;
+    }
+}
 
 bool RawCompress(std::string& data) {
     int64_t length = compressBound(data.length());
@@ -185,7 +242,7 @@ bool CompressLz4(const char* srcPtr, const uint32_t srcSize, std::string& dst) {
     dst.resize(encodingSize);
     char* compressed = const_cast<char*>(dst.c_str());
     try {
-        encodingSize = LZ4_compress(srcPtr, compressed, srcSize);
+        encodingSize = LZ4_compress_default(srcPtr, compressed, srcSize, encodingSize);
         if (encodingSize) {
             dst.resize(encodingSize);
             return true;
@@ -197,6 +254,45 @@ bool CompressLz4(const char* srcPtr, const uint32_t srcSize, std::string& dst) {
 
 bool CompressLz4(const std::string& src, std::string& dst) {
     return CompressLz4(src.c_str(), src.length(), dst);
+}
+
+bool UncompressZstd(const std::string& src, const uint32_t rawSize, std::string& dst) {
+    return UncompressZstd(src.c_str(), src.length(), rawSize, dst);
+}
+
+bool UncompressZstd(const char* srcPtr, const uint32_t srcSize, const uint32_t rawSize, std::string& dst) {
+    dst.resize(rawSize);
+    char* unCompressed = const_cast<char*>(dst.c_str());
+    uint32_t length = 0;
+    try {
+        length = ZSTD_decompress(unCompressed, rawSize, srcPtr, srcSize);
+    } catch (...) {
+        return false;
+    }
+    if (length != rawSize) {
+        return false;
+    }
+    return true;
+}
+
+bool CompressZstd(const char* srcPtr, const uint32_t srcSize, std::string& dst, int32_t level) {
+    uint32_t encodingSize = ZSTD_compressBound(srcSize);
+    dst.resize(encodingSize);
+    char* compressed = const_cast<char*>(dst.c_str());
+    try {
+        size_t const cmp_size = ZSTD_compress(compressed, encodingSize, srcPtr, srcSize, level);
+        if (ZSTD_isError(cmp_size)) {
+            return false;
+        }
+        dst.resize(cmp_size);
+        return true;
+    } catch (...) {
+    }
+    return false;
+}
+
+bool CompressZstd(const std::string& src, std::string& dst, int32_t level) {
+    return CompressZstd(src.c_str(), src.length(), dst, level);
 }
 
 } // namespace logtail

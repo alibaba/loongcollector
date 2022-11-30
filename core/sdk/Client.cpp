@@ -36,12 +36,10 @@ namespace sdk {
                    const string& accessKey,
                    int32_t timeout,
                    const string& source,
-                   bool compressFlag,
                    const string& intf)
         : mAccessKeyId(accessKeyId),
           mAccessKey(accessKey),
           mSource(source),
-          mCompressFlag(compressFlag),
           mTimeout(timeout),
           mUserAgent(LOG_SDK_IDENTIFICATION),
           mKeyProvider(""),
@@ -67,13 +65,11 @@ namespace sdk {
                    const std::string& securityToken,
                    int32_t timeout,
                    const string& source,
-                   bool compressFlag,
                    const string& intf)
         : mAccessKeyId(accessKeyId),
           mAccessKey(accessKey),
           mSecurityToken(securityToken),
           mSource(source),
-          mCompressFlag(compressFlag),
           mTimeout(timeout),
           mUserAgent(LOG_SDK_IDENTIFICATION),
           mKeyProvider(""),
@@ -216,6 +212,7 @@ namespace sdk {
 
     PostLogStoreLogsResponse Client::PostLogStoreLogs(const std::string& project,
                                                       const std::string& logstore,
+                                                      sls_logs::SlsCompressType compressType,
                                                       const std::string& compressedLogGroup,
                                                       uint32_t rawSize,
                                                       const std::string& hashKey) {
@@ -225,12 +222,13 @@ namespace sdk {
             httpHeader[X_LOG_KEYPROVIDER] = mKeyProvider;
         }
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(rawSize);
-        httpHeader[X_LOG_COMPRESSTYPE] = LOG_LZ4;
+        httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         return SynPostLogStoreLogs(project, logstore, compressedLogGroup, httpHeader, hashKey);
     }
 
     PostLogStoreLogsResponse Client::PostLogStoreLogPackageList(const std::string& project,
                                                                 const std::string& logstore,
+                                                                sls_logs::SlsCompressType compressType,
                                                                 const std::string& packageListData,
                                                                 const std::string& hashKey) {
         map<string, string> httpHeader;
@@ -240,12 +238,13 @@ namespace sdk {
         }
         httpHeader[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(packageListData.size());
-        httpHeader[X_LOG_COMPRESSTYPE] = LOG_LZ4;
+        httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         return SynPostLogStoreLogs(project, logstore, packageListData, httpHeader, hashKey);
     }
 
     void Client::PostLogStoreLogs(const std::string& project,
                                   const std::string& logstore,
+                                  sls_logs::SlsCompressType compressType,
                                   const std::string& compressedLogGroup,
                                   uint32_t rawSize,
                                   PostLogStoreLogsClosure* callBack,
@@ -257,12 +256,13 @@ namespace sdk {
             httpHeader[X_LOG_KEYPROVIDER] = mKeyProvider;
         }
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(rawSize);
-        httpHeader[X_LOG_COMPRESSTYPE] = LOG_LZ4;
+        httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         AsynPostLogStoreLogs(project, logstore, compressedLogGroup, httpHeader, callBack, hashKey, hashKeySeqID);
     }
 
     void Client::PostLogStoreLogPackageList(const std::string& project,
                                             const std::string& logstore,
+                                            sls_logs::SlsCompressType compressType,
                                             const std::string& packageListData,
                                             PostLogStoreLogsClosure* callBack,
                                             const std::string& hashKey) {
@@ -273,7 +273,7 @@ namespace sdk {
         }
         httpHeader[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(packageListData.size());
-        httpHeader[X_LOG_COMPRESSTYPE] = LOG_LZ4;
+        httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         AsynPostLogStoreLogs(project, logstore, packageListData, httpHeader, callBack, hashKey, kInvalidHashKeySeqID);
     }
 
@@ -406,10 +406,11 @@ namespace sdk {
 
     PostLogStoreLogsResponse Client::PostLogUsingWebTracking(const std::string& project,
                                                              const std::string& logstore,
+                                                             sls_logs::SlsCompressType compressType,
                                                              const std::string& compressedLog,
                                                              uint32_t rawSize) {
         map<string, string> httpHeader;
-        httpHeader[X_LOG_COMPRESSTYPE] = LOG_LZ4;
+        httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(rawSize);
         SetCommonHeader(httpHeader, (int32_t)(compressedLog.length()), project);
 
@@ -457,6 +458,31 @@ namespace sdk {
         if (!mSecurityToken.empty()) {
             httpHeader[X_ACS_SECURITY_TOKEN] = mSecurityToken;
         }
+    }
+
+    std::string Client::GetCompressTypeString(sls_logs::SlsCompressType compressType) {
+        switch (compressType) {
+            case sls_logs::SLS_CMP_NONE:
+                return "";
+            case sls_logs::SLS_CMP_LZ4:
+                return LOG_LZ4;
+            case sls_logs::SLS_CMP_ZSTD:
+                return LOG_ZSTD;
+            default:
+                return LOG_LZ4;
+        }
+    }
+
+    sls_logs::SlsCompressType Client::GetCompressType(std::string compressTypeString,
+                                                      sls_logs::SlsCompressType defaultType) {
+        if (compressTypeString == "none") {
+            return sls_logs::SLS_CMP_NONE;
+        } else if (compressTypeString == LOG_LZ4) {
+            return sls_logs::SLS_CMP_LZ4;
+        } else if (compressTypeString == LOG_ZSTD) {
+            return sls_logs::SLS_CMP_ZSTD;
+        }
+        return defaultType;
     }
 } // namespace sdk
 } // namespace logtail
