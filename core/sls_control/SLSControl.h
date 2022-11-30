@@ -23,7 +23,9 @@ class SLSControl {
 private:
     SLSControl();
     SLSControl(const SLSControl&);
-    std::string user_agent;
+    std::string GetRunningEnvironment();
+    bool TryCurlEndpoint(const std::string& endpoint);
+    std::string mUserAgent;
 
 public:
     static SLSControl* Instance();
