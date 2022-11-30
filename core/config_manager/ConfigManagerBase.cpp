@@ -1265,9 +1265,11 @@ void ConfigManagerBase::RegisterWildcardPath(Config* config, const string& path,
             return;
         if (finish) {
             DirRegisterStatus registerStatus = EventDispatcher::GetInstance()->IsDirRegistered(item);
-            if (registerStatus == PATH_INODE_NOT_REGISTERED) {
-                if (EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler))
-                    RegisterDescendants(item, config, config->mMaxDepth < 0 ? 100 : config->mMaxDepth);
+            if (registerStatus == GET_REGISTER_STATUS_ERROR) {
+                return;
+            }
+            if (EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler)) {
+                RegisterDescendants(item, config, config->mMaxDepth < 0 ? 100 : config->mMaxDepth);
             }
         } else {
             RegisterWildcardPath(config, item, depth + 1);
@@ -1330,9 +1332,11 @@ void ConfigManagerBase::RegisterWildcardPath(Config* config, const string& path,
         if (fnmatch(&(config->mWildcardPaths[depth + 1].at(dirIndex)), ent.Name().c_str(), FNM_PATHNAME) == 0) {
             if (finish) {
                 DirRegisterStatus registerStatus = EventDispatcher::GetInstance()->IsDirRegistered(item);
-                if (registerStatus == PATH_INODE_NOT_REGISTERED) {
-                    if (EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler))
-                        RegisterDescendants(item, config, config->mMaxDepth < 0 ? 100 : config->mMaxDepth);
+                if (registerStatus == GET_REGISTER_STATUS_ERROR) {
+                    return;
+                }
+                if (EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler)) {
+                    RegisterDescendants(item, config, config->mMaxDepth < 0 ? 100 : config->mMaxDepth);
                 }
             } else {
                 RegisterWildcardPath(config, item, depth + 1);
@@ -1367,7 +1371,7 @@ bool ConfigManagerBase::RegisterHandlers(const string& basePath, Config* config)
         return result;
     }
     DirRegisterStatus registerStatus = EventDispatcher::GetInstance()->IsDirRegistered(basePath);
-    if (registerStatus == PATH_INODE_REGISTERED || registerStatus == GET_REGISTER_STATUS_ERROR)
+    if (registerStatus == GET_REGISTER_STATUS_ERROR)
         return result;
     // dir in config is valid by default, do not call pathValidator
     result = EventDispatcher::GetInstance()->RegisterEventHandler(basePath.c_str(), config, mSharedHandler);
