@@ -19,11 +19,12 @@ import (
 	"os"
 	"runtime"
 
-	docker "github.com/fsouza/go-dockerclient"
-
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 
 	"github.com/alibaba/ilogtail/helper"
 	k8s_event "github.com/alibaba/ilogtail/helper/eventrecorder"
@@ -49,9 +50,9 @@ func runDockerEnvConfig() {
 }
 
 func initSelfEnvConfig() {
-	dockerInfo := &docker.Container{}
+	dockerInfo := types.ContainerJSON{}
 	dockerInfo.Name = "logtail"
-	dockerInfo.Config = &docker.Config{}
+	dockerInfo.Config = &container.Config{}
 	dockerInfo.Config.Env = os.Environ()
 	logger.Debug(context.Background(), "load self env config", dockerInfo.Config.Env)
 	selfEnvConfig = helper.CreateContainerInfoDetail(dockerInfo, *flags.LogConfigPrefix, true)

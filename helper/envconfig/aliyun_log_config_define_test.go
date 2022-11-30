@@ -23,7 +23,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/flags"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/pingcap/check"
 )
 
@@ -35,9 +36,9 @@ func Test(t *testing.T) {
 }
 
 func MockDockerInfoDetail(containerName string, envList []string) *helper.DockerInfoDetail {
-	dockerInfo := &docker.Container{}
+	dockerInfo := types.ContainerJSON{}
 	dockerInfo.Name = containerName
-	dockerInfo.Config = &docker.Config{}
+	dockerInfo.Config = &container.Config{}
 	dockerInfo.Config.Env = envList
 	return helper.CreateContainerInfoDetail(dockerInfo, *flags.LogConfigPrefix, false)
 }

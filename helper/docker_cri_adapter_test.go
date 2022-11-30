@@ -20,7 +20,7 @@ package helper
 import (
 	"testing"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/docker/docker/api/types"
 
 	"github.com/stretchr/testify/require"
 )
@@ -35,9 +35,11 @@ func TestLookupContainerRootfsAbsDir(t *testing.T) {
 		rootfsCache:    make(map[string]string),
 	}
 
-	container := docker.Container{
-		ID: "1234567890abcde",
+	container := types.ContainerJSON{
+		ContainerJSONBase: &types.ContainerJSONBase{
+			ID: "1234567890abcde",
+		},
 	}
-	dir := crirt.lookupContainerRootfsAbsDir(&container)
+	dir := crirt.lookupContainerRootfsAbsDir(container)
 	require.Equal(t, dir, "")
 }

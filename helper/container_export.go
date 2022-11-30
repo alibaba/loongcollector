@@ -22,7 +22,9 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/events"
+	docker "github.com/docker/docker/client"
 )
 
 type ContainerMeta struct {
@@ -173,16 +175,20 @@ func SplitRegexFromMap(input map[string]string) (staticResult map[string]string,
 	return staticResult, regexResult, nil
 }
 
-func CreateDockerClient() (client *docker.Client, err error) {
-	client, err = docker.NewClientFromEnv()
+func CreateDockerClient(opt ...docker.Opt) (client *docker.Client, err error) {
+	opt = append(opt, docker.FromEnv)
+	client, err = docker.NewClientWithOpts(opt...)
+	if err == nil {
+		client.NegotiateAPIVersion(context.Background())
+	}
 	return
 }
 
-func RegisterDockerEventListener(c chan *docker.APIEvents) {
+func RegisterDockerEventListener(c chan events.Message) {
 	getDockerCenterInstance().registerEventListener(c)
 }
 
-func UnRegisterDockerEventListener(c chan *docker.APIEvents) {
+func UnRegisterDockerEventListener(c chan events.Message) {
 	getDockerCenterInstance().unRegisterEventListener(c)
 }
 
@@ -190,6 +196,6 @@ func ContainerCenterInit() {
 	getDockerCenterInstance()
 }
 
-func CreateContainerInfoDetail(info *docker.Container, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
+func CreateContainerInfoDetail(info types.ContainerJSON, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	return getDockerCenterInstance().CreateInfoDetail(info, envConfigPrefix, selfConfigFlag)
 }

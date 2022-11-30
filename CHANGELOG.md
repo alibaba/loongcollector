@@ -36,8 +36,11 @@ your changes, such as:
 
 ## [Unreleased]
 
-- [public] [both] [added] service_http_server support OTLP log input.
-- [public] [both] [added] add a new flusher_otlp_log plugin.
-- [public] [both] [added] add a new flusher_kafka_v2 plugin.
+- [public] [both] [added] service\_http\_server support OTLP log input.
+- [public] [both] [added] add a new flusher\_otlp\_log plugin.
+- [public] [both] [added] add a new flusher\_kafka\_v2 plugin.
 - [public] [linux] [fixed] strip binaries to reduce dist size.
+- [public] [both] [fixed] fix docker fd leak and event lost by using official docker Go library
 - [public] [linux] [updated] polish ebpf data structure
+- [public] [both] [added] add processor\_desensitize processor
+

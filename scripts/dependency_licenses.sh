@@ -78,7 +78,8 @@ function find_licenses() {
        continue
     fi
     license_type=`cat "$tmpdir"/LICENSE|grep "#lic-0"|cut -f 2 -d ">"|cut -f 1 -d "<"`
-     echo "- [$line]($url)" >> "$output_file_prefix-$license_type"
+    line=$(echo $line | sed 's/_/\\_/g')
+    echo "- [$line]($url)" >> "$output_file_prefix-$license_type"
   done
 }
 
@@ -94,7 +95,7 @@ mkdir "$OUTPUT_DIR"
 find_go_dependencies "$ROOT_DIR"/"$MAIN_PACKAGE" "$OUTPUT_DIR"/LIST
 filter_dependencies "$OUTPUT_DIR"/LIST "$OUTPUT_DIR"/HEAD && rm -rf "$OUTPUT_DIR"/LIST
 
-grep '^-' "$ROOT_DIR"/licenses/"$LICENSE_FILE"  |cut -f 2 -d "["|cut -f 1 -d "]"| sort | uniq  > "$OUTPUT_DIR"/LICENSE_OF_DEPENDENCIES
+grep '^-' "$ROOT_DIR"/licenses/"$LICENSE_FILE"  |cut -f 2 -d "["|cut -f 1 -d "]" | sed 's/\\_/_/g' | sort | uniq  > "$OUTPUT_DIR"/LICENSE_OF_DEPENDENCIES
 
 cat "$OUTPUT_DIR"/LICENSE_OF_DEPENDENCIES "$OUTPUT_DIR"/HEAD "$OUTPUT_DIR"/HEAD | sort | uniq -u > "$OUTPUT_DIR"/REMOVING
 cat "$OUTPUT_DIR"/HEAD  "$OUTPUT_DIR"/LICENSE_OF_DEPENDENCIES "$OUTPUT_DIR"/LICENSE_OF_DEPENDENCIES | sort | uniq -u  > "$OUTPUT_DIR"/ADDING

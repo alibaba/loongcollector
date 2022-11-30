@@ -1,6 +1,6 @@
 # Licenses of dependencies
 
-When distributed in a binary form, Logtailplugin may contain portions of the following works:
+When distributed in a binary form, iLogtail may contain portions of the following works:
 
 ## Apache 2.0 licenses
 
@@ -20,6 +20,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/containers/ocicrypt](https://pkg.go.dev/github.com/containers/ocicrypt?tab=licenses)
 - [github.com/coreos/go-systemd](https://pkg.go.dev/github.com/coreos/go-systemd?tab=licenses)
 - [github.com/coreos/pkg](https://pkg.go.dev/github.com/coreos/pkg?tab=licenses)
+- [github.com/docker/distribution](https://pkg.go.dev/github.com/docker/distribution?tab=licenses)
 - [github.com/docker/docker](https://pkg.go.dev/github.com/docker/docker?tab=licenses)
 - [github.com/docker/go-connections](https://pkg.go.dev/github.com/docker/go-connections?tab=licenses)
 - [github.com/docker/go-events](https://pkg.go.dev/github.com/docker/go-events?tab=licenses)
@@ -38,12 +39,10 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/jcmturner/gokrb5](https://pkg.go.dev/github.com/jcmturner/gokrb5?tab=licenses)
 - [github.com/jcmturner/rpc](https://pkg.go.dev/github.com/jcmturner/rpc?tab=licenses)
 - [github.com/jmespath/go-jmespath](https://pkg.go.dev/github.com/jmespath/go-jmespath?tab=licenses)
-- [github.com/matttproud/golang_protobuf_extensions](https://pkg.go.dev/github.com/matttproud/golang_protobuf_extensions?tab=licenses)
+- [github.com/matttproud/golang\_protobuf\_extensions](https://pkg.go.dev/github.com/matttproud/golang_protobuf_extensions?tab=licenses)
 - [github.com/mindprince/gonvml](https://pkg.go.dev/github.com/mindprince/gonvml?tab=licenses)
 - [github.com/moby/locker](https://pkg.go.dev/github.com/moby/locker?tab=licenses)
-- [github.com/moby/term](https://pkg.go.dev/github.com/moby/term?tab=licenses)
 - [github.com/moby/spdystream](https://pkg.go.dev/github.com/moby/spdystream?tab=licenses)
-- [github.com/moby/sys/mount](https://pkg.go.dev/github.com/moby/sys/mount?tab=licenses)
 - [github.com/moby/sys/mountinfo](https://pkg.go.dev/github.com/moby/sys/mountinfo?tab=licenses)
 - [github.com/moby/sys/signal](https://pkg.go.dev/github.com/moby/sys/signal?tab=licenses)
 - [github.com/moby/sys/symlink](https://pkg.go.dev/github.com/moby/sys/symlink?tab=licenses)
@@ -56,8 +55,8 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/opencontainers/selinux](https://pkg.go.dev/github.com/opencontainers/selinux?tab=licenses)
 - [github.com/pingcap/log](https://pkg.go.dev/github.com/pingcap/log?tab=licenses)
 - [github.com/pingcap/parser](https://pkg.go.dev/github.com/pingcap/parser?tab=licenses)
-- [github.com/prometheus/client_golang](https://pkg.go.dev/github.com/prometheus/client_golang?tab=licenses)
-- [github.com/prometheus/client_model](https://pkg.go.dev/github.com/prometheus/client_model?tab=licenses)
+- [github.com/prometheus/client\_golang](https://pkg.go.dev/github.com/prometheus/client_golang?tab=licenses)
+- [github.com/prometheus/client\_model](https://pkg.go.dev/github.com/prometheus/client_model?tab=licenses)
 - [github.com/prometheus/common](https://pkg.go.dev/github.com/prometheus/common?tab=licenses)
 - [github.com/prometheus/procfs](https://pkg.go.dev/github.com/prometheus/procfs?tab=licenses)
 - [github.com/stefanberger/go-pkcs11uri](https://pkg.go.dev/github.com/stefanberger/go-pkcs11uri?tab=licenses)
@@ -90,7 +89,6 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/klauspost/compress](https://pkg.go.dev/github.com/klauspost/compress?tab=licenses)
 - [github.com/danwakefield/fnmatch](https://pkg.go.dev/github.com/danwakefield/fnmatch?tab=licenses)
 - [github.com/denisenkom/go-mssqldb](https://pkg.go.dev/github.com/denisenkom/go-mssqldb?tab=licenses)
-- [github.com/fsouza/go-dockerclient](https://pkg.go.dev/github.com/fsouza/go-dockerclient?tab=licenses)
 - [github.com/godbus/dbus](https://pkg.go.dev/github.com/godbus/dbus?tab=licenses)
 - [github.com/knz/strtime](https://pkg.go.dev/github.com/knz/strtime?tab=licenses)
 - [github.com/pingcap/errors](https://pkg.go.dev/github.com/pingcap/errors?tab=licenses)
@@ -130,7 +128,6 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/go-kit/log](https://pkg.go.dev/github.com/go-kit/log?tab=licenses)
 - [github.com/narqo/go-dogstatsd-parser](https://pkg.go.dev/github.com/narqo/go-dogstatsd-parser?tab=licenses)
 - [sigs.k8s.io/yaml](https://pkg.go.dev/sigs.k8s.io/yaml?tab=licenses)
-- [github.com/Azure/go-ansiterm](https://pkg.go.dev/github.com/Azure/go-ansiterm?tab=licenses)
 - [github.com/BurntSushi/toml](https://pkg.go.dev/github.com/BurntSushi/toml?tab=licenses)
 - [github.com/Microsoft/go-winio](https://pkg.go.dev/github.com/Microsoft/go-winio?tab=licenses)
 - [github.com/Microsoft/hcsshim](https://pkg.go.dev/github.com/Microsoft/hcsshim?tab=licenses)
@@ -165,7 +162,6 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 - [github.com/josharian/intern](https://pkg.go.dev/github.com/josharian/intern?tab=licenses)
 - [github.com/json-iterator/go](https://pkg.go.dev/github.com/json-iterator/go?tab=licenses)
 - [github.com/mailru/easyjson](https://pkg.go.dev/github.com/mailru/easyjson?tab=licenses)
-- [github.com/morikuni/aec](https://pkg.go.dev/github.com/morikuni/aec?tab=licenses)
 - [github.com/paulbellamy/ratecounter](https://pkg.go.dev/github.com/paulbellamy/ratecounter?tab=licenses)
 - [github.com/satori/go.uuid](https://pkg.go.dev/github.com/satori/go.uuid?tab=licenses)
 - [github.com/shopspring/decimal](https://pkg.go.dev/github.com/shopspring/decimal?tab=licenses)
@@ -212,7 +208,7 @@ When distributed in a binary form, Logtailplugin may contain portions of the fol
 
 ## EPL V2 licenses
 
-# Logtailplugin used or modified  source code from these projects
+## iLogtail used or modified source code from these projects
 
 - [github.com/elastic/beats](./LICENSE-beats)
 - [github.com/jeromer/syslogparser](./LICENSE-syslogparser)

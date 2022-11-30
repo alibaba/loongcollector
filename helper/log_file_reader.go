@@ -110,7 +110,9 @@ func NewLogFileReader(context context.Context, checkpoint LogFileReaderCheckPoin
 	if !checkpoint.State.IsEmpty() {
 		if deltaNano := time.Now().UnixNano() - int64(checkpoint.State.ModifyTime); deltaNano >= 0 && deltaNano < 180*1e9 {
 			readWhenStart = true
-			logger.Warning(context, "first read this file, need read when start flag", readWhenStart)
+			logger.Info(context, "read file", checkpoint.Path, "first read", readWhenStart)
+		} else {
+			logger.Info(context, "read file", checkpoint.Path, "since offset", checkpoint.Offset)
 		}
 	}
 	return &LogFileReader{
@@ -396,7 +398,7 @@ func (r *LogFileReader) Run() {
 		}
 		endProcessTime := time.Now()
 		sleepDuration := time.Millisecond*time.Duration(r.Config.ReadIntervalMs) - endProcessTime.Sub(startProcessTime)
-		logger.Debug(r.logContext, "sleep duration", sleepDuration, "normal", r.Config.ReadIntervalMs)
+		// logger.Debug(r.logContext, "sleep duration", sleepDuration, "normal", r.Config.ReadIntervalMs, "path", r.checkpoint.Path)
 		if util.RandomSleep(sleepDuration, 0.1, r.shutdown) {
 			r.ReadAndProcess(true)
 			if r.lastBufferSize > 0 {

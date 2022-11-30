@@ -20,7 +20,8 @@ import (
 	"sync"
 	"testing"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,10 +78,15 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 	dc := getDockerCenterInstance()
 
 	newContainer := func(id string) *DockerInfoDetail {
-		return dc.CreateInfoDetail(&docker.Container{
-			ID:     id,
-			Name:   id,
-			Config: &docker.Config{Env: make([]string, 0)},
+		return dc.CreateInfoDetail(types.ContainerJSON{
+			ContainerJSONBase: &types.ContainerJSONBase{
+				ID:    id,
+				Name:  id,
+				State: &types.ContainerState{},
+			},
+			Config: &container.Config{
+				Env: make([]string, 0),
+			},
 		}, "", false)
 	}
 

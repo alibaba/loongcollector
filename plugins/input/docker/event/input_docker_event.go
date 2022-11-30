@@ -22,14 +22,14 @@ import (
 	"sync"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/docker/docker/api/types/events"
 )
 
 type ServiceDockerEvents struct {
 	IgnoreAttributes bool
 	EventQueueSize   int
 
-	innerEventQueue chan *docker.APIEvents
+	innerEventQueue chan events.Message
 
 	shutdown  chan struct{}
 	waitGroup sync.WaitGroup
@@ -58,7 +58,7 @@ func (p *ServiceDockerEvents) Collect(ilogtail.Collector) error {
 	return nil
 }
 
-func (p *ServiceDockerEvents) fire(c ilogtail.Collector, event *docker.APIEvents) {
+func (p *ServiceDockerEvents) fire(c ilogtail.Collector, event events.Message) {
 	key := make([]string, len(event.Actor.Attributes)+4)
 	value := make([]string, len(key))
 	value[0] = strconv.FormatInt(event.TimeNano, 10)
@@ -86,7 +86,7 @@ func (p *ServiceDockerEvents) fire(c ilogtail.Collector, event *docker.APIEvents
 func (p *ServiceDockerEvents) Start(c ilogtail.Collector) error {
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
-	p.innerEventQueue = make(chan *docker.APIEvents, p.EventQueueSize)
+	p.innerEventQueue = make(chan events.Message, p.EventQueueSize)
 	helper.RegisterDockerEventListener(p.innerEventQueue)
 	defer func() {
 		helper.UnRegisterDockerEventListener(p.innerEventQueue)
@@ -98,9 +98,7 @@ func (p *ServiceDockerEvents) Start(c ilogtail.Collector) error {
 		case <-p.shutdown:
 			return nil
 		case event := <-p.innerEventQueue:
-			if event != nil {
-				p.fire(c, event)
-			}
+			p.fire(c, event)
 		}
 	}
 }

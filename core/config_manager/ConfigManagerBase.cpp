@@ -591,38 +591,35 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                         pluginConfig = ConfigManager::GetInstance()->CheckPluginFlusher(pluginConfigJson);
                         config->mPluginConfig = pluginConfig;
                     }
-
-                    if (value.isMember("docker_file") && value["docker_file"].isBool()
-                        && value["docker_file"].asBool()) {
-                        if (AppConfig::GetInstance()->IsPurageContainerMode()) {
-                            // docker file is not supported in Logtail's container mode
-                            if (AppConfig::GetInstance()->IsContainerMode()) {
-                                throw ExceptionBase(
-                                    std::string("docker file is not supported in Logtail's container mode "));
-                            }
-                            // load saved container path
-                            auto iter = mAllDockerContainerPathMap.find(logName);
-                            if (iter != mAllDockerContainerPathMap.end()) {
-                                config->mDockerContainerPaths = iter->second;
-                                mAllDockerContainerPathMap.erase(iter);
-                            }
-                            if (!config->SetDockerFileFlag(true)) {
-                                // should not happen
-                                throw ExceptionBase(std::string("docker file do not support wildcard path"));
-                            }
-                            MappingPluginConfig(value, config, pluginConfigJson);
-                        } else {
-                            LOG_WARNING(sLogger,
-                                        ("config is docker_file mode, but logtail is not a purage container",
-                                         "the flag is ignored")("project", projectName)("logstore", category));
-                            LogtailAlarm::GetInstance()->SendAlarm(
-                                CATEGORY_CONFIG_ALARM,
-                                string("config is docker_file mode, but logtail is not "
-                                       "a purage container, the flag is ignored"),
-                                projectName,
-                                category,
-                                region);
+                }
+                if (value.isMember("docker_file") && value["docker_file"].isBool() && value["docker_file"].asBool()) {
+                    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+                        // docker file is not supported in Logtail's container mode
+                        if (AppConfig::GetInstance()->IsContainerMode()) {
+                            throw ExceptionBase(
+                                std::string("docker file is not supported in Logtail's container mode "));
                         }
+                        // load saved container path
+                        auto iter = mAllDockerContainerPathMap.find(logName);
+                        if (iter != mAllDockerContainerPathMap.end()) {
+                            config->mDockerContainerPaths = iter->second;
+                            mAllDockerContainerPathMap.erase(iter);
+                        }
+                        if (!config->SetDockerFileFlag(true)) {
+                            // should not happen
+                            throw ExceptionBase(std::string("docker file do not support wildcard path"));
+                        }
+                        MappingPluginConfig(value, config, pluginConfigJson);
+                    } else {
+                        LOG_WARNING(sLogger,
+                                    ("config is docker_file mode, but logtail is not a purage container",
+                                     "the flag is ignored")("project", projectName)("logstore", category));
+                        LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+                                                               string("config is docker_file mode, but logtail is not "
+                                                                      "a purage container, the flag is ignored"),
+                                                               projectName,
+                                                               category,
+                                                               region);
                     }
                 }
                 if (AppConfig::GetInstance()->IsContainerMode()) {

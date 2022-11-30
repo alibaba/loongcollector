@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/helper"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -190,7 +192,7 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		cli, err := client.NewClientWithOpts(client.FromEnv)
+		cli, err := helper.CreateDockerClient()
 		if err != nil {
 			return nil, err
 		}

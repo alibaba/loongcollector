@@ -21,7 +21,7 @@ import (
 	"errors"
 	"runtime"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/docker/docker/api/types"
 )
 
 var errUninplemented = errors.New("Unimplemented on " + runtime.GOOS)
@@ -53,7 +53,7 @@ func IsCRIRuntimeValid(_ string) bool {
 	return false
 }
 
-func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(_ *docker.Container) string {
+func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(_ types.ContainerJSON) string {
 	return ""
 }
 

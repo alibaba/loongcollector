@@ -15,9 +15,6 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
-
 	"context"
 	"encoding/json"
 	"fmt"
@@ -30,7 +27,11 @@ import (
 	"sync"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 )
 
 const staticContainerInfoPathEnvKey = "ALIYUN_LOG_STATIC_CONTAINER_INFO"
@@ -40,7 +41,7 @@ const staticContainerInfoPathEnvKey = "ALIYUN_LOG_STATIC_CONTAINER_INFO"
 // const staticContainerTypeContainerD = "containerd"
 
 var containerdScanIntervalMs = 1000
-var staticDockerContainers []*docker.Container
+var staticDockerContainers []types.ContainerJSON
 var staticDockerContainerError error
 var staticDockerContainerLock sync.Mutex
 var loadStaticContainerOnce sync.Once
@@ -75,7 +76,7 @@ type staticContainerInfo struct {
 	State    staticContainerState
 }
 
-func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.FileInfo) *docker.Container {
+func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.FileInfo) types.ContainerJSON {
 	created, err := time.Parse(time.RFC3339Nano, staticInfo.Created)
 	if err != nil {
 		created = stat.ModTime()
@@ -101,39 +102,43 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.File
 		}
 	}
 
-	dockerContainer := &docker.Container{
-		ID:      staticInfo.ID,
-		Name:    staticInfo.Name,
-		Created: created,
-		LogPath: staticInfo.LogPath,
-		Config: &docker.Config{
+	dockerContainer := types.ContainerJSON{
+		ContainerJSONBase: &types.ContainerJSONBase{
+			ID:      staticInfo.ID,
+			Name:    staticInfo.Name,
+			Created: created.Format(time.RFC3339Nano),
+			LogPath: staticInfo.LogPath,
+			HostConfig: &container.HostConfig{
+				LogConfig: container.LogConfig{
+					Type: staticInfo.LogType,
+				},
+			},
+			GraphDriver: types.GraphDriverData{
+				Name: "overlay",
+				Data: map[string]string{
+					"UpperDir": staticInfo.UpperDir,
+				},
+			},
+			State: &types.ContainerState{
+				Status: status,
+				Pid:    staticInfo.State.Pid,
+			},
+		},
+		Config: &container.Config{
 			Labels:   staticInfo.Labels,
 			Image:    staticInfo.Image,
 			Env:      allEnv,
 			Hostname: staticInfo.HostName,
 		},
-		HostConfig: &docker.HostConfig{
-			LogConfig: docker.LogConfig{
-				Type: staticInfo.LogType,
+		NetworkSettings: &types.NetworkSettings{
+			DefaultNetworkSettings: types.DefaultNetworkSettings{
+				IPAddress: staticInfo.IP,
 			},
-		},
-		GraphDriver: &docker.GraphDriver{
-			Name: "overlay",
-			Data: map[string]string{
-				"UpperDir": staticInfo.UpperDir,
-			},
-		},
-		NetworkSettings: &docker.NetworkSettings{
-			IPAddress: staticInfo.IP,
-		},
-		State: docker.State{
-			Status: status,
-			Pid:    staticInfo.State.Pid,
 		},
 	}
 
 	for _, mount := range staticInfo.Mounts {
-		dockerContainer.Mounts = append(dockerContainer.Mounts, docker.Mount{
+		dockerContainer.Mounts = append(dockerContainer.Mounts, types.MountPoint{
 			Source:      mount.Source,
 			Destination: mount.Destination,
 			Driver:      mount.Driver,
@@ -198,7 +203,7 @@ func scanContainerdFilesAndReLink(filePath string) {
 	}
 }
 
-func innerReadStatisContainerInfo(file string, lastContainerInfo []*docker.Container, stat fs.FileInfo) (containers []*docker.Container, removed []string, changed bool, err error) {
+func innerReadStatisContainerInfo(file string, lastContainerInfo []types.ContainerJSON, stat fs.FileInfo) (containers []types.ContainerJSON, removed []string, changed bool, err error) {
 	body, err := ioutil.ReadFile(filepath.Clean(file))
 	if err != nil {
 		return nil, nil, false, err
@@ -236,7 +241,7 @@ func isStaticContainerInfoEnabled() bool {
 	return len(envPath) != 0
 }
 
-func tryReadStaticContainerInfo() ([]*docker.Container, []string, bool, error) {
+func tryReadStaticContainerInfo() ([]types.ContainerJSON, []string, bool, error) {
 	statusChanged := false
 	loadStaticContainerOnce.Do(
 		func() {

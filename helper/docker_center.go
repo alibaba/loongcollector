@@ -28,7 +28,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/events"
+	docker "github.com/docker/docker/client"
 )
 
 var dockerCenterInstance *DockerCenter
@@ -38,6 +40,7 @@ var onceDocker sync.Once
 // set default value to aliyun_logs_
 var envConfigPrefix = "aliyun_logs_"
 
+const ContainerIDPrefixSize = 12
 const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 
 var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
@@ -155,7 +158,7 @@ func (info *K8SInfo) GetLabel(key string) string {
 }
 
 // ExtractK8sLabels only work for original docker container.
-func (info *K8SInfo) ExtractK8sLabels(containerInfo *docker.Container) {
+func (info *K8SInfo) ExtractK8sLabels(containerInfo types.ContainerJSON) {
 	info.mu.Lock()
 	defer info.mu.Unlock()
 	// only pause container has k8s labels
@@ -230,7 +233,7 @@ func (info *K8SInfo) innerMatch(filter *K8SFilter) bool {
 }
 
 type DockerInfoDetail struct {
-	ContainerInfo    *docker.Container
+	ContainerInfo    types.ContainerJSON
 	ContainerNameTag map[string]string
 	K8SInfo          *K8SInfo
 	EnvConfigInfoMap map[string]*EnvConfigInfo
@@ -239,6 +242,27 @@ type DockerInfoDetail struct {
 
 	lastUpdateTime time.Time
 	deleteFlag     bool
+}
+
+func (did *DockerInfoDetail) IDPrefix() string {
+	if len(did.ContainerInfo.ID) < ContainerIDPrefixSize {
+		return did.ContainerInfo.ID
+	}
+	return did.ContainerInfo.ID[:ContainerIDPrefixSize]
+}
+
+func (did *DockerInfoDetail) PodName() string {
+	if did.K8SInfo != nil {
+		return did.K8SInfo.Pod
+	}
+	return ""
+}
+
+func (did *DockerInfoDetail) Status() string {
+	if did.ContainerInfo.State != nil {
+		return did.ContainerInfo.State.Status
+	}
+	return ""
 }
 
 func (did *DockerInfoDetail) IsTimeout() bool {
@@ -306,12 +330,12 @@ func (did *DockerInfoDetail) FindBestMatchedPath(pth string) (sourcePath, contai
 	pth = path.Clean(pth)
 	pthSize := len(pth)
 
-	// logger.Debugf(context.Background(), "FindBestMatchedPath for container %s, target path: %s, containerInfo: %+v", did.ContainerInfo.ID, pth, did.ContainerInfo)
+	// logger.Debugf(context.Background(), "FindBestMatchedPath for container %s, target path: %s, containerInfo: %+v", did.IDPrefix(), pth, did.ContainerInfo)
 
 	// check mounts
-	var bestMatchedMounts docker.Mount
+	var bestMatchedMounts types.MountPoint
 	for _, mount := range did.ContainerInfo.Mounts {
-		// logger.Debugf("container(%s-%s) mount: source-%s destination-%s", did.ContainerInfo.ID, did.ContainerInfo.Name, mount.Source, mount.Destination)
+		// logger.Debugf("container(%s-%s) mount: source-%s destination-%s", did.IDPrefix(), did.ContainerInfo.Name, mount.Source, mount.Destination)
 
 		dst := path.Clean(mount.Destination)
 		dstSize := len(dst)
@@ -433,7 +457,7 @@ type DockerCenter struct {
 	lastErr                        error
 	lock                           sync.RWMutex
 	lastUpdateMapTime              int64
-	eventChan                      chan *docker.APIEvents
+	eventChan                      chan events.Message
 	eventChanLock                  sync.Mutex
 	containerStateLock             sync.Mutex
 	imageLock                      sync.RWMutex
@@ -459,13 +483,13 @@ func getIPByHosts(hostFileName, hostname string) string {
 	return ""
 }
 
-func (dc *DockerCenter) registerEventListener(c chan *docker.APIEvents) {
+func (dc *DockerCenter) registerEventListener(c chan events.Message) {
 	dc.eventChanLock.Lock()
 	defer dc.eventChanLock.Unlock()
 	dc.eventChan = c
 }
 
-func (dc *DockerCenter) unRegisterEventListener(_ chan *docker.APIEvents) {
+func (dc *DockerCenter) unRegisterEventListener(_ chan events.Message) {
 	dc.eventChanLock.Lock()
 	defer dc.eventChanLock.Unlock()
 	dc.eventChan = nil
@@ -486,9 +510,9 @@ func (dc *DockerCenter) getImageName(id, defaultVal string) string {
 		return imageName
 	}
 
-	image, err := dc.client.InspectImage(id)
+	image, _, err := dc.client.ImageInspectWithRaw(context.Background(), id)
 	logger.Debug(context.Background(), "get image name, id", id, "error", err)
-	if err == nil && image != nil && len(image.RepoTags) > 0 {
+	if err == nil && len(image.RepoTags) > 0 {
 		dc.imageLock.Lock()
 		dc.imageCache[id] = image.RepoTags[0]
 		dc.imageLock.Unlock()
@@ -497,7 +521,7 @@ func (dc *DockerCenter) getImageName(id, defaultVal string) string {
 	return defaultVal
 }
 
-func (dc *DockerCenter) getIPAddress(info *docker.Container) string {
+func (dc *DockerCenter) getIPAddress(info types.ContainerJSON) string {
 	if detail, ok := dc.getContainerDetail(info.ID); ok && detail != nil {
 		return detail.ContainerIP
 	}
@@ -513,7 +537,7 @@ func (dc *DockerCenter) getIPAddress(info *docker.Container) string {
 // CreateInfoDetail create DockerInfoDetail with docker.Container
 // Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts
 // ContainerInfo.GraphDriver.Data["UpperDir"] Config.Labels
-func (dc *DockerCenter) CreateInfoDetail(info *docker.Container, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
+func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	// Generate Log Tags
 	containerNameTag := make(map[string]string)
 	k8sInfo := K8SInfo{}
@@ -583,7 +607,7 @@ func (dc *DockerCenter) CreateInfoDetail(info *docker.Container, envConfigPrefix
 
 	// Find Container FS Root Path on Host
 	// @note for overlayfs only, some driver like nas, you can not see it in upper dir
-	if info.GraphDriver != nil && info.GraphDriver.Data != nil {
+	if info.GraphDriver.Data != nil {
 		if rootPath, ok := did.ContainerInfo.GraphDriver.Data["UpperDir"]; ok {
 			did.DefaultRootPath = rootPath
 		}
@@ -921,8 +945,8 @@ func (dc *DockerCenter) updateContainers(containerMap map[string]*DockerInfoDeta
 	// switch to new container map
 	if logger.DebugFlag() {
 		for i, c := range containerMap {
-			logger.Debugf(context.Background(), "Update all containers [%v]: id=%v name=%v created=%v status=%v detail=%+v",
-				i, c.ContainerInfo.ID, c.ContainerInfo.Name, c.ContainerInfo.Created.Format(time.RFC3339Nano), c.ContainerInfo.State.Status, c.ContainerInfo)
+			logger.Debugf(context.Background(), "Update all containers [%v]: id:%v\tname:%v\tcreated:%v\tstatus:%v detail=%+v",
+				i, c.IDPrefix(), c.ContainerInfo.Name, c.ContainerInfo.Created, c.Status(), c.ContainerInfo)
 		}
 	}
 	dc.containerMap = containerMap
@@ -969,8 +993,8 @@ func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) 
 	if logger.DebugFlag() {
 		// bytes, _ := json.Marshal(container)
 		// logger.Debug(context.Background(), "update container info", string(bytes))
-		logger.Debugf(context.Background(), "Update one container: id=%v name=%v created=%v status=%v detail=%+v",
-			container.ContainerInfo.ID, container.ContainerInfo.Name, container.ContainerInfo.Created.Format(time.RFC3339Nano), container.ContainerInfo.State.Status, container.ContainerInfo)
+		logger.Debugf(context.Background(), "Update one container: id:%v\tname:%v\tcreated:%v\tstatus:%v detail=%+v",
+			container.IDPrefix(), container.ContainerInfo.Name, container.ContainerInfo.Created, container.Status(), container.ContainerInfo)
 	}
 	dc.containerMap[id] = container
 	dc.refreshLastUpdateMapTime()
@@ -979,7 +1003,7 @@ func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) 
 func (dc *DockerCenter) fetchAll() error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
-	containers, err := dc.client.ListContainers(docker.ListContainersOptions{})
+	containers, err := dc.client.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
 		dc.setLastError(err, "list container error")
 		return err
@@ -988,9 +1012,9 @@ func (dc *DockerCenter) fetchAll() error {
 	var containerMap = make(map[string]*DockerInfoDetail)
 
 	for _, container := range containers {
-		var containerDetail *docker.Container
+		var containerDetail types.ContainerJSON
 		for idx := 0; idx < 3; idx++ {
-			if containerDetail, err = dc.client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: container.ID}); err == nil {
+			if containerDetail, err = dc.client.ContainerInspect(context.Background(), container.ID); err == nil {
 				break
 			}
 			time.Sleep(time.Second * 5)
@@ -1012,7 +1036,7 @@ func (dc *DockerCenter) fetchAll() error {
 func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
-	containerDetail, err := dc.client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: containerID})
+	containerDetail, err := dc.client.ContainerInspect(context.Background(), containerID)
 	if err != nil {
 		dc.setLastError(err, "inspect container error "+containerID)
 		return err
@@ -1024,7 +1048,7 @@ func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error 
 	logger.Debug(context.Background(), "update container", containerID, "detail", containerDetail)
 	if tryFindSandbox && containerDetail.Config != nil {
 		if id := containerDetail.Config.Labels["io.kubernetes.sandbox.id"]; id != "" {
-			containerDetail, err = dc.client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: id})
+			containerDetail, err = dc.client.ContainerInspect(context.Background(), id)
 			if err != nil {
 				dc.setLastError(err, "inspect sandbox container error "+id)
 			} else {
@@ -1045,8 +1069,8 @@ func (dc *DockerCenter) markRemove(containerID string) {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 	if container, ok := dc.containerMap[containerID]; ok {
-		logger.Debugf(context.Background(), "mark remove container: id=%v name=%v created=%v status=%v detail=%+v",
-			container.ContainerInfo.ID, container.ContainerInfo.Name, container.ContainerInfo.Created.Format(time.RFC3339Nano), container.ContainerInfo.State.Status, container.ContainerInfo)
+		logger.Debugf(context.Background(), "mark remove container: id:%v\tname:%v\tcreated:%v\tstatus:%v detail=%+v",
+			container.IDPrefix(), container.ContainerInfo.Name, container.ContainerInfo.Created, container.Status(), container.ContainerInfo)
 		container.ContainerInfo.State.Status = ContainerStatusExited
 		container.deleteFlag = true
 		container.lastUpdateTime = time.Now()
@@ -1062,8 +1086,8 @@ func (dc *DockerCenter) cleanTimeoutContainer() {
 		// 1. The container is marked deleted for a while.
 		// 2. The time of last success fetch all is too old.
 		if container.IsTimeout() {
-			logger.Debugf(context.Background(), "delete container: id=%v name=%v created=%v status=%v detail=%+v",
-				key, container.ContainerInfo.Name, container.ContainerInfo.Created.Format(time.RFC3339Nano), container.ContainerInfo.State.Status, container.ContainerInfo)
+			logger.Debugf(context.Background(), "delete container, id:%v\tname:%v\tcreated:%v\tstatus:%v\tdetail:%+v",
+				container.IDPrefix(), container.ContainerInfo.Name, container.ContainerInfo.Created, container.Status(), container.ContainerInfo)
 			delete(dc.containerMap, key)
 			hasDelete = true
 		}
@@ -1102,35 +1126,35 @@ func dockerCenterRecover() {
 
 func (dc *DockerCenter) initClient() error {
 	var err error
-	if dc.client, err = docker.NewClientFromEnv(); err != nil {
+	// DockerCenterTimeout should only be used by context.WithTimeout() in specific methods
+	if dc.client, err = CreateDockerClient(); err != nil {
 		dc.setLastError(err, "init docker client from env error")
 		return err
 	}
-	dc.client.SetTimeout(DockerCenterTimeout)
 	return nil
 }
 
 func (dc *DockerCenter) eventListener() {
 	errorCount := 0
 	defer dockerCenterRecover()
+	timer := time.NewTimer(EventListenerTimeout)
 	var err error
 	for {
 		logger.Info(context.Background(), "docker event listener", "start")
-		events := make(chan *docker.APIEvents)
-		err = dc.client.AddEventListener(events)
-		if err != nil {
-			break
-		}
-		timer := time.NewTimer(EventListenerTimeout)
-	ForBlock:
-		for {
+		ctx, cancel := context.WithCancel(context.Background())
+		events, errors := dc.client.Events(ctx, types.EventsOptions{})
+		breakFlag := false
+		for !breakFlag {
+			timer.Reset(EventListenerTimeout)
 			select {
 			case event, ok := <-events:
 				if !ok {
-					logger.Info(context.Background(), "docker event listener", "stop")
+					logger.Errorf(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener stop")
 					errorCount++
-					break ForBlock
+					breakFlag = true
+					break
 				}
+				logger.Debug(context.Background(), "docker event captured", event)
 				errorCount = 0
 				switch event.Status {
 				case "start", "restart":
@@ -1141,30 +1165,28 @@ func (dc *DockerCenter) eventListener() {
 					dc.markRemove(event.ID)
 				default:
 				}
-				logger.Debug(context.Background(), "event", *event)
-				timer.Reset(EventListenerTimeout)
 				dc.eventChanLock.Lock()
 				if dc.eventChan != nil {
 					// no block insert
 					select {
 					case dc.eventChan <- event:
 					default:
-						logger.Error(context.Background(), "DOCKER_EVENT_ALARM", "event queue is full, this event", *event)
+						logger.Error(context.Background(), "DOCKER_EVENT_ALARM", "event queue is full, miss event", event)
 					}
 				}
 				dc.eventChanLock.Unlock()
+			case err = <-errors:
+				logger.Error(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener error", err)
+				breakFlag = true
 			case <-timer.C:
-				errorCount = 0
-				logger.Info(context.Background(), "no docker event in 1 hour", "remove and add event listener again")
-				break ForBlock
+				logger.Errorf(context.Background(), "DOCKER_EVENT_ALARM", "no docker event in 1 hour. Reset event listener")
+				breakFlag = true
 			}
 		}
-		if err = dc.client.RemoveEventListener(events); err != nil {
-			dc.setLastError(err, "remove event listener error")
-		}
+		cancel()
 		if errorCount > 10 && criRuntimeWrapper != nil {
-			logger.Info(context.Background(), "docker listen is error and cri runtime wrapper is valid", "skip docker listen")
-			return
+			logger.Info(context.Background(), "docker listener fails and cri runtime wrapper is valid", "stop docker listener")
+			break
 		}
 		// if always error, sleep 300 secs
 		if errorCount > 30 {
