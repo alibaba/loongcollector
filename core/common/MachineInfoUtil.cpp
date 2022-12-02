@@ -419,7 +419,7 @@ bool IsDigitsDotsHostname(const char* hostname) {
         while (*cp != '\0' && digits > 0) {
             char* endp;
             u_int64_t sum = strtoul(cp, &endp, 0);
-            if (sum == ULONG_MAX && errno == ERANGE || sum >= (1UL << digits)) {
+            if ((sum == ULONG_MAX && errno == ERANGE) || sum >= (1UL << digits)) {
                 break;
             }
             cp = endp;

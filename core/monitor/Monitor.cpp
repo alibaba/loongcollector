@@ -475,6 +475,7 @@ bool LogtailMonitor::IsHostIpChanged() {
         }
         return false;
     }
+    return false;
 }
 
 void LogtailMonitor::Suicide() {

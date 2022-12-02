@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM --platform=$TARGETPLATFORM centos:centos7.9.2009 as build
-ARG VERSION=1.2.1
+ARG VERSION=1.3.0
 ARG TARGETPLATFORM
 WORKDIR /usr/local
 COPY dist/ilogtail-${VERSION}.linux-*.tar.gz .
@@ -38,7 +38,7 @@ VOLUME [ "/sys/fs/cgroup" ]
 RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 
 ARG HOST_OS=Linux
-ARG VERSION=1.2.1
+ARG VERSION=1.3.0
 ARG TARGETPLATFORM
 
 COPY --from=build /usr/local/ilogtail-${VERSION} /usr/local/ilogtail

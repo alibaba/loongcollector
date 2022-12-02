@@ -37,7 +37,7 @@ function arch() {
 ARCH=$(arch)
 CATEGORY=$1
 GENERATED_HOME=$2
-VERSION=${3:-1.2.1}
+VERSION=${3:-1.3.0}
 REPOSITORY=${4:-aliyun/ilogtail}
 PUSH=${5:-false}
 
