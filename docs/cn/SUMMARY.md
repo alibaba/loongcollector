@@ -60,6 +60,7 @@
   * [原始数据](data-pipeline/processor/default.md)
   * [数据脱敏](data-pipeline/processor/processor-desensitize.md)
   * [丢弃字段](data-pipeline/processor/processor-drop.md)
+  * [字段加密](data-pipeline/processor/processor-encrypy.md)
   * [条件字段处理](data-pipeline/processor/fields-with-condition.md)
   * [日志过滤](data-pipeline/processor/processor-filter-regex.md)
   * [Grok](data-pipeline/processor/processor-grok.md)

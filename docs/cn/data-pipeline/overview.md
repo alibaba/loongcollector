@@ -30,6 +30,7 @@
 | `processor_default`<br>原始数据                    | SLS官方                                             | 不对数据任何操作，只是简单的数据透传。           |
 | `processor_desensitize`<br>数据脱敏                    | SLS官方<br>[`Takuka0311`](https://github.com/Takuka0311) | 对敏感数据进行脱敏处理。           |
 | `processor_drop`<br>丢弃字段                       | SLS官方                                             | 丢弃字段。                                       |
+| `processor_encrypt`<br>字段加密                   | SLS官方                                               | 加密字段                                  |
 | `processor_fields_with_conditions`<br>条件字段处理 | 社区<br>[`pj1987111`](https://github.com/pj1987111) | 根据日志部分字段的取值，动态进行字段扩展或删除。 |
 | `processor_filter_regex`<br>日志过滤               | SLS官方                                             | 通过正则匹配过滤日志。                           |
 | `processor_grok`<br>Grok                          ｜ SLS官方<br>[`Takuka0311`](https://github.com/Takuka0311) | 通过 Grok 语法对数据进行处理              |
