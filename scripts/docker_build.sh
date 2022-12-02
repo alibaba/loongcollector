@@ -74,6 +74,7 @@ fi
 echo "=============DOCKERFILE=================="
 cat $GEN_DOCKERFILE
 echo "========================================="
+
 if [[ $CATEGORY != "multi-arch-production" ]]; then
     docker build --build-arg TARGETPLATFORM=linux/$ARCH \
 	--build-arg VERSION="$VERSION" \
@@ -89,7 +90,7 @@ else
         --no-cache -f $GEN_DOCKERFILE .
 fi
 
-if [[ $PUSH = "true" ]]; then
+if [[ $PUSH = "true" && $CATEGORY != "multi-arch-production" ]]; then
     echo "COMMAND:"
     echo "docker push $REPOSITORY:$VERSION"
     if [[ $VERSION = "latest" ]]; then

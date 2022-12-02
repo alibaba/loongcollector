@@ -435,6 +435,7 @@ bool IsDigitsDotsHostname(const char* hostname) {
         }
         return true;
     }
+    return false;
 }
 
 } // namespace logtail

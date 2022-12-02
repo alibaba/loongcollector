@@ -36,15 +36,15 @@
 
 | 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
 | -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
-| [ilogtail-1.3.0.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.3.0/ilogtail-1.3.0.linux-amd64.tar.gz) | Linux | x86-64 | - |
-| [ilogtail-1.3.0.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.3.0/ilogtail-1.3.0.linux-arm64.tar.gz) | Linux | arm64  | - |
+| [ilogtail-1.3.0.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.3.0/ilogtail-1.3.0.linux-amd64.tar.gz) | Linux | x86-64 | 5ef5672a226089aa98dfb71dc48b01254b9b77c714466ecc1b6c4d9c0df60a50 |
+| [ilogtail-1.3.0.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.3.0/ilogtail-1.3.0.linux-arm64.tar.gz) | Linux | arm64  | 73d33d4cac90543ea5c2481928e090955643c6dc6839535f53bfa54b6101704d |
 
 ### Docker 镜像
 
 **Docker Pull 命令**&#x20;
 
 ```
-docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.3.0
 ```
 
 ## 1.2.1
@@ -83,7 +83,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 **Docker Pull 命令**&#x20;
 
 ```
-docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.2.1
 ```
 
 ## 1.1.1
@@ -110,7 +110,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 **Docker Pull 命令**&#x20;
 
 ```
-docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.1
 ```
 
 ## 1.1.0
