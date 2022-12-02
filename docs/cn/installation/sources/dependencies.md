@@ -22,3 +22,4 @@
 | 16     | breakpad ([66571f4838b2306161f072555cb199049bc68142](https://github.com/google/breakpad/tree/66571f4838b2306161f072555cb199049bc68142))    | Windows上崩溃诊断 |
 | 17     | leveldb ([1.22](https://github.com/google/leveldb/releases/tag/1.22))                                                                      |              |
 | 18     | yaml-cpp ([0.7.0](https://github.com/jbeder/yaml-cpp/releases/tag/yaml-cpp-0.7.0))                                                         | 解析YAML配置     |
+| 19     | zstd ([1.5.2](https://github.com/facebook/zstd/releases/tag/v1.5.2)) | zstd压缩发送数据 |

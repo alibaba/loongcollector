@@ -25,6 +25,21 @@ Makefile描述了整个项目的所有编译目标，主要的包括：
 VERSION=1.1.1 make dist
 ```
 
+如果发生编译错误，如
+
+``` shell
+/src/core/common/CompressTools.cpp:18:23: fatal error: zstd/zstd.h: No such file or directory
+ #include <zstd/zstd.h>
+                       ^
+compilation terminated.
+```
+
+请确保本地编译镜像为最新版本。可使用以下命令更新：
+
+``` shell
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux
+```
+
 ## 使用镜像编译完整iLogtail
 
 编译完整iLogtail的命令是`make all`，由于all是默认的编译目标，因此也可以直接`make`。该命令首先清理`output`目录，然后调用`./scripts/gen_build_scripts.sh`脚本生成编译用的脚本和镜像描述保存到`./gen`目录，调用 docker 制作镜像，制作的过程即镜像内的编译过程，最后将镜像内的编译结果复制到`output`目录。
