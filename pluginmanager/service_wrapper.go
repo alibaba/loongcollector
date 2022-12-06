@@ -24,7 +24,7 @@ import (
 )
 
 type ServiceWrapper struct {
-	Input    ilogtail.ServiceInput
+	Input    ilogtail.ServiceInputV1
 	Config   *LogstoreConfig
 	Tags     map[string]string
 	Interval time.Duration
@@ -32,7 +32,7 @@ type ServiceWrapper struct {
 	LogsChan chan *ilogtail.LogWithContext
 }
 
-func (p *ServiceWrapper) Run() {
+func (p *ServiceWrapper) Run(cc *ilogtail.AsyncControl) {
 	logger.Info(p.Config.Context.GetRuntimeContext(), "start run service", p.Input)
 
 	go func() {

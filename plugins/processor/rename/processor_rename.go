@@ -19,6 +19,7 @@ import (
 
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -91,6 +92,32 @@ func (p *ProcessorRename) processLog(log *protocol.Log) {
 			}
 		}
 	}
+	if p.NoKeyError {
+		if errorArray := p.checkNoKeyError(); errorArray != nil {
+			logger.Warningf(p.context.GetRuntimeContext(), "RENAME_FIND_ALARM", "cannot find key %v", errorArray)
+		}
+	}
+}
+
+func (p *ProcessorRename) Process(in *models.PipelineGroupEvents, context ilogtail.PipelineContext) {
+	if p.NoKeyError {
+		for idx := range p.noKeyErrorBoolArray {
+			p.noKeyErrorBoolArray[idx] = false
+		}
+	}
+	for _, event := range in.Events {
+		tags := event.GetTags()
+		for idx, key := range p.SourceKeys {
+			if tags.Contains(key) {
+				tags.Add(p.DestKeys[idx], tags.Get(key))
+				tags.Delete(key)
+				if p.NoKeyError {
+					p.noKeyErrorBoolArray[idx] = true
+				}
+			}
+		}
+	}
+	context.Collector().Collect(in.Group, in.Events...)
 	if p.NoKeyError {
 		if errorArray := p.checkNoKeyError(); errorArray != nil {
 			logger.Warningf(p.context.GetRuntimeContext(), "RENAME_FIND_ALARM", "cannot find key %v", errorArray)

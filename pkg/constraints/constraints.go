@@ -12,18 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pluginmanager
+package constraints
 
-import (
-	"github.com/alibaba/ilogtail"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"time"
-)
-
-type FlusherWrapper struct {
-	Flusher       ilogtail.FlusherV1
-	Config        *LogstoreConfig
-	LogGroupsChan chan *protocol.LogGroup
-	Interval      time.Duration
+type IntUintFloat interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64
 }

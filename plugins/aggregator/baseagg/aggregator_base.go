@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -190,6 +191,16 @@ func (p *AggregatorBase) InitInner(packFlag bool, packString string, lock *sync.
 	if p.PackFlag {
 		p.pack = util.NewPackIDPrefix(packString)
 	}
+}
+
+func (p *AggregatorBase) Record(event *models.PipelineGroupEvents, ctx ilogtail.PipelineContext) error {
+	ctx.Collector().CollectList(event)
+	return nil
+}
+
+// GetResult the current aggregates to the accumulator.
+func (p *AggregatorBase) GetResult(ctx ilogtail.PipelineContext) error {
+	return nil
 }
 
 // NewAggregatorBase create a default aggregator with default value.

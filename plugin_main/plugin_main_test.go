@@ -99,7 +99,7 @@ func TestHangConfigWhenStop(t *testing.T) {
 	config, exists := pluginmanager.LogtailConfig[configName]
 	require.True(t, exists)
 	require.Equal(t, configName, config.ConfigName)
-	flusher, _ := config.FlusherPlugins[0].Flusher.(*BadFlusher)
+	flusher, _ := pluginmanager.GetConfigFluhsers(config.PluginRunner)[0].(*BadFlusher)
 	flusher.Shutdown = shutdown
 	Resume()
 	time.Sleep(time.Second * 2)
@@ -124,7 +124,7 @@ func TestHangConfigWhenStop(t *testing.T) {
 	config, exists = pluginmanager.LogtailConfig[configName]
 	require.True(t, exists)
 	require.Equal(t, configName, config.ConfigName)
-	flusher, _ = config.FlusherPlugins[0].Flusher.(*BadFlusher)
+	flusher, _ = pluginmanager.GetConfigFluhsers(config.PluginRunner)[0].(*BadFlusher)
 	shutdown = make(chan int)
 	flusher.Shutdown = shutdown
 	Resume()

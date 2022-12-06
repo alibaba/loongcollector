@@ -15,13 +15,12 @@
 package ilogtail
 
 import (
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 // Aggregator is an interface for implementing an Aggregator plugin.
 // the RunningAggregator wraps this interface and guarantees that
-// Add, Push, and Reset can not be called concurrently, so locking is not
-// required when implementing an Aggregator plugin.
 type Aggregator interface {
 	// Init called for init some system resources, like socket, mutex...
 	// return flush interval(ms) and error flag, if interval is 0, use default interval
@@ -30,12 +29,29 @@ type Aggregator interface {
 	// Description returns a one-sentence description on the Input.
 	Description() string
 
+	// Reset resets the aggregators caches and aggregates.
+	Reset()
+}
+
+// AggregatorV1
+// Add, Flush, and Reset can not be called concurrently, so locking is not
+// required when implementing an Aggregator plugin.
+type AggregatorV1 interface {
+	Aggregator
 	// Add the metric to the aggregator.
 	Add(log *protocol.Log, ctx map[string]interface{}) error
 
 	// Flush pushes the current aggregates to the accumulator.
 	Flush() []*protocol.LogGroup
+}
 
-	// Reset resets the aggregators caches and aggregates.
-	Reset()
+// AggregatorV2
+// Apply, Push, and Reset can not be called concurrently, so locking is not
+// required when implementing an Aggregator plugin.
+type AggregatorV2 interface {
+	Aggregator
+	// Add the metric to the aggregator.
+	Record(*models.PipelineGroupEvents, PipelineContext) error
+	// GetResult the current aggregates to the accumulator.
+	GetResult(PipelineContext) error
 }

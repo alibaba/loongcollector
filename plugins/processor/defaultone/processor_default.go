@@ -16,6 +16,7 @@ package defaultone
 
 import (
 	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -33,6 +34,10 @@ func (*ProcessorDefault) Description() string {
 
 func (*ProcessorDefault) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 	return logArray
+}
+
+func (*ProcessorDefault) Process(in *models.PipelineGroupEvents, context ilogtail.PipelineContext) {
+	context.Collector().Collect(in.Group, in.Events...)
 }
 
 func init() {

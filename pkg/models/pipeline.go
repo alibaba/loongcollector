@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2022 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pluginmanager
+package models
 
-import (
-	"github.com/alibaba/ilogtail"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+type PipelineEvent interface {
+	GetName() string
 
-	"time"
-)
+	SetName(string)
 
-type FlusherWrapper struct {
-	Flusher       ilogtail.FlusherV1
-	Config        *LogstoreConfig
-	LogGroupsChan chan *protocol.LogGroup
-	Interval      time.Duration
+	GetTags() Tags
+
+	GetType() EventType
+
+	GetTimestamp() uint64
+
+	GetObservedTimestamp() uint64
+
+	SetObservedTimestamp(uint64)
+}
+
+type GroupInfo struct {
+	Metadata Metadata
+	Tags     Tags
+}
+
+type PipelineGroupEvents struct {
+	Group  *GroupInfo
+	Events []PipelineEvent
 }

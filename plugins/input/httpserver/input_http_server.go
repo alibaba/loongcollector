@@ -15,19 +15,18 @@
 package httpserver
 
 import (
-	"syscall"
-
-	"github.com/alibaba/ilogtail"
-	"github.com/alibaba/ilogtail/helper/decoder"
-	"github.com/alibaba/ilogtail/pkg/logger"
-
 	"context"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
+
+	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/helper/decoder"
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 // ServiceHTTP ...

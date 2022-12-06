@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pluginmanager
+package helper
 
-import (
-	"github.com/alibaba/ilogtail"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+import "github.com/alibaba/ilogtail/pkg/constraints"
 
-	"time"
-)
+func Max[T constraints.IntUintFloat](x T, y T) T {
+	if x > y {
+		return x
+	}
+	return y
+}
 
-type FlusherWrapper struct {
-	Flusher       ilogtail.FlusherV1
-	Config        *LogstoreConfig
-	LogGroupsChan chan *protocol.LogGroup
-	Interval      time.Duration
+func Min[T constraints.IntUintFloat](x T, y T) T {
+	if x < y {
+		return x
+	}
+	return y
 }

@@ -20,11 +20,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 const (

@@ -19,13 +19,14 @@ package input_wineventlog
 
 import (
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/input_wineventlog/eventlog"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (

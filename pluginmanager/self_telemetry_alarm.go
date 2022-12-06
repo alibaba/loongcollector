@@ -45,7 +45,9 @@ func (r *InputAlarm) Collect(collector ilogtail.Collector) error {
 	}
 	util.GlobalAlarm.SerializeToPb(loggroup)
 	if len(loggroup.Logs) > 0 && AlarmConfig != nil {
-		AlarmConfig.LogGroupsChan <- loggroup
+		for _, log := range loggroup.Logs {
+			AlarmConfig.PluginRunner.ReceiveRawLog(&ilogtail.LogWithContext{Log: log})
+		}
 	}
 	util.RegisterAlarmsSerializeToPb(loggroup)
 	logger.Debug(r.context.GetRuntimeContext(), "InputAlarm", *loggroup)

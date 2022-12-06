@@ -16,7 +16,6 @@ package pgsql
 
 import (
 	"fmt"
-
 	"net/url"
 	"strconv"
 	"strings"

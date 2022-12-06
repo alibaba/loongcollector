@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -37,10 +38,10 @@ func TestAlwaysOnlineManager(t *testing.T) {
 		config.ConfigName = name
 		config.configDetailHash = hash
 		config.Context = mock.NewEmptyContext("p", "l", "c")
-		config.processShutdown = make(chan struct{})
-		config.flushShutdown = make(chan struct{})
+		config.PluginRunner = &pluginv1Runner{LogstoreConfig: config, FlushOutStore: NewFlushOutStore[protocol.LogGroup]()}
 		config.pauseChan = make(chan struct{})
 		config.resumeChan = make(chan struct{})
+		config.PluginRunner.Init(1, 1)
 		return config
 	}
 	for i := 0; i < 1000; i++ {

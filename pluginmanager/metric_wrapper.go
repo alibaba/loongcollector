@@ -20,47 +20,34 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 
-	"sync"
 	"time"
 )
 
 type MetricWrapper struct {
-	Input    ilogtail.MetricInput
+	Input    ilogtail.MetricInputV1
 	Config   *LogstoreConfig
 	Tags     map[string]string
 	Interval time.Duration
 
 	LogsChan      chan *ilogtail.LogWithContext
 	LatencyMetric ilogtail.LatencyMetric
-
-	shutdown  chan struct{}
-	waitgroup sync.WaitGroup
 }
 
-func (p *MetricWrapper) Run() {
-	logger.Info(p.Config.Context.GetRuntimeContext(), "start run metric ", p.Input)
-	p.shutdown = make(chan struct{}, 1)
-	p.waitgroup.Add(1)
-	defer p.waitgroup.Done()
+func (p *MetricWrapper) Run(control *ilogtail.AsyncControl) {
+	logger.Info(p.Config.Context.GetRuntimeContext(), "start run metric ", p.Input.Description())
 	defer panicRecover(p.Input.Description())
 	for {
-		if !util.RandomSleep(p.Interval, 0.1, p.shutdown) {
-			p.LatencyMetric.Begin()
-			err := p.Input.Collect(p)
-			p.LatencyMetric.End()
-			if err != nil {
-				logger.Error(p.Config.Context.GetRuntimeContext(), "INPUT_COLLECT_ALARM", "error", err)
-			}
-			continue
+		exitFlag := util.RandomSleep(p.Interval, 0.1, control.CancelToken())
+		p.LatencyMetric.Begin()
+		err := p.Input.Collect(p)
+		p.LatencyMetric.End()
+		if err != nil {
+			logger.Error(p.Config.Context.GetRuntimeContext(), "INPUT_COLLECT_ALARM", "error", err)
 		}
-		return
+		if exitFlag {
+			return
+		}
 	}
-}
-
-func (p *MetricWrapper) Stop() {
-	close(p.shutdown)
-	p.waitgroup.Wait()
-	logger.Info(p.Config.Context.GetRuntimeContext(), "stop metric success", p.Input)
 }
 
 func (p *MetricWrapper) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {

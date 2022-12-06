@@ -56,7 +56,7 @@ func (s *configUpdateTestSuite) TestConfigUpdate() {
 	// block config
 	config := LogtailConfig[updateConfigName]
 	s.NotNil(config, "%s logstrore config should exist", updateConfigName)
-	checkFlusher, ok := config.FlusherPlugins[0].Flusher.(*checker.FlusherChecker)
+	checkFlusher, ok := GetConfigFluhsers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 	s.Equal(0, checkFlusher.GetLogCount(), "the block flusher checker doesn't have any logs")
 
@@ -74,13 +74,13 @@ func (s *configUpdateTestSuite) TestConfigUpdate() {
 	checkFlusher.Block = false
 	time.Sleep(time.Second * time.Duration(3))
 	s.Equal(100000, checkFlusher.GetLogCount())
-	s.Equal(200000, LogtailConfig[noblockUpdateConfigName].FlusherPlugins[0].Flusher.(*checker.FlusherChecker).GetLogCount())
+	s.Equal(200000, GetConfigFluhsers(LogtailConfig[noblockUpdateConfigName].PluginRunner)[0].(*checker.FlusherChecker).GetLogCount())
 }
 
 func (s *configUpdateTestSuite) TestConfigUpdateMany() {
 	config := LogtailConfig[updateConfigName]
 	s.NotNil(config, "%s logstrore config should exist", updateConfigName)
-	checkFlusher, ok := config.FlusherPlugins[0].Flusher.(*checker.FlusherChecker)
+	checkFlusher, ok := GetConfigFluhsers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 
 	s.Equal(0, checkFlusher.GetLogCount(), "the hold on block flusher checker doesn't have any logs")
@@ -105,7 +105,7 @@ func (s *configUpdateTestSuite) TestConfigUpdateMany() {
 		s.NotNil(LogtailConfig[noblockUpdateConfigName])
 		time.Sleep(time.Millisecond)
 	}
-	checkFlusher, ok = LogtailConfig[noblockUpdateConfigName].FlusherPlugins[0].Flusher.(*checker.FlusherChecker)
+	checkFlusher, ok = GetConfigFluhsers(LogtailConfig[noblockUpdateConfigName].PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 	time.Sleep(time.Second * time.Duration(3))
 	s.Equal(checkFlusher.GetLogCount(), 200000)
@@ -115,7 +115,7 @@ func (s *configUpdateTestSuite) TestConfigUpdateName() {
 	time.Sleep(time.Second * time.Duration(1))
 	config := LogtailConfig[updateConfigName]
 	s.NotNil(config)
-	checkFlusher, ok := config.FlusherPlugins[0].Flusher.(*checker.FlusherChecker)
+	checkFlusher, ok := GetConfigFluhsers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	defer func() {
 		checkFlusher.Block = false
 		time.Sleep(time.Second * 3)
@@ -131,7 +131,7 @@ func (s *configUpdateTestSuite) TestConfigUpdateName() {
 	{
 		s.Nil(LogtailConfig[updateConfigName])
 		s.NotNil(LogtailConfig[updateConfigName+"_"])
-		checkFlusher, ok := LogtailConfig[updateConfigName+"_"].FlusherPlugins[0].Flusher.(*checker.FlusherChecker)
+		checkFlusher, ok := GetConfigFluhsers(LogtailConfig[updateConfigName+"_"].PluginRunner)[0].(*checker.FlusherChecker)
 		s.True(ok)
 		s.Equal(checkFlusher.GetLogCount(), 0)
 		checkFlusher.Block = false
@@ -143,7 +143,7 @@ func (s *configUpdateTestSuite) TestConfigUpdateName() {
 func (s *configUpdateTestSuite) TestHoldOnExit() {
 	config := LogtailConfig[updateConfigName]
 	s.NotNil(config)
-	checkFlusher, ok := config.FlusherPlugins[0].Flusher.(*checker.FlusherChecker)
+	checkFlusher, ok := GetConfigFluhsers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 	checkFlusher.Block = false
 	time.Sleep(time.Second * time.Duration(3))
@@ -156,7 +156,7 @@ func (s *configUpdateTestSuite) TestHoldOnExitTimeout() {
 	time.Sleep(time.Second * time.Duration(1))
 	config := LogtailConfig[updateConfigName]
 	s.NotNil(config)
-	checkFlusher, ok := config.FlusherPlugins[0].Flusher.(*checker.FlusherChecker)
+	checkFlusher, ok := GetConfigFluhsers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 	s.Equal(0, checkFlusher.GetLogCount())
 	s.NoError(HoldOn(true))

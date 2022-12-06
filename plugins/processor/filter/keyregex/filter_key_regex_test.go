@@ -65,7 +65,7 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		logArray := make([]*protocol.Log, 1)
 		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processor.ProcessLogs(logArray)
 		c.Assert(len(outLogs), check.Equals, 1)
 		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
 		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
@@ -85,7 +85,7 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		logArray := make([]*protocol.Log, 1)
 		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processor.ProcessLogs(logArray)
 		c.Assert(len(outLogs), check.Equals, 1)
 		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
 		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "content")
@@ -105,7 +105,7 @@ func (s *processorTestSuite) TestNotMatch(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		logArray := make([]*protocol.Log, 1)
 		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processor.ProcessLogs(logArray)
 		c.Assert(len(outLogs), check.Equals, 0)
 	}
 	{
@@ -117,7 +117,7 @@ func (s *processorTestSuite) TestNotMatch(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		logArray := make([]*protocol.Log, 1)
 		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processor.ProcessLogs(logArray)
 		c.Assert(len(outLogs), check.Equals, 0)
 	}
 	{
@@ -129,7 +129,7 @@ func (s *processorTestSuite) TestNotMatch(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		logArray := make([]*protocol.Log, 1)
 		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processor.ProcessLogs(logArray)
 		c.Assert(len(outLogs), check.Equals, 0)
 	}
 }

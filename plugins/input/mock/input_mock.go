@@ -15,16 +15,21 @@
 package mock
 
 import (
-	"github.com/alibaba/ilogtail"
-	"github.com/alibaba/ilogtail/helper"
-
+	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/models"
+
+	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/helper"
 )
 
 type InputMock struct {
+	GroupMeta             map[string]string
+	GroupTags             map[string]string
 	Tags                  map[string]string
-	Fields                map[string]string
+	Fields                map[string]interface{}
 	Index                 int64
 	OpenPrometheusPattern bool
 
@@ -40,7 +45,7 @@ func (r *InputMock) Init(context ilogtail.Context) (int, error) {
 			labels.Append(k, v)
 		}
 		for k, v := range r.Fields {
-			labels.Append(k, v)
+			labels.Append(k, fmt.Sprint(v))
 		}
 	}
 	labels.Sort()
@@ -58,18 +63,45 @@ func (r *InputMock) Collect(collector ilogtail.Collector) error {
 		helper.AddMetric(collector, "metrics_mock", time.Now(), r.labelStr, float64(r.Index))
 	} else {
 		// original log pattern.
-		r.Fields["Index"] = strconv.FormatInt(r.Index, 10)
-		collector.AddData(r.Tags, r.Fields)
+		fields := make(map[string]string)
+		fields["Index"] = strconv.FormatInt(r.Index, 10)
+		for k, v := range r.Fields {
+			fields[k] = fmt.Sprint(v)
+		}
+		collector.AddData(r.Tags, fields)
 	}
+	return nil
+}
+
+func (r *InputMock) Read(context ilogtail.PipelineContext) error {
+	r.Index++
+	group := models.NewGroup(models.NewMetadataWithMap(r.GroupMeta), models.NewTagsWithMap(r.GroupTags))
+	singleValue := models.NewSingleValueMetric("single_metrics_mock", models.MetricTypeCounter, models.NewTagsWithMap(r.Tags), time.Now().UnixNano(), r.Index)
+	values := models.NewMetricMultiValueValues()
+	values.Add("Index", float64(r.Index))
+	typedValues := models.NewMetricTypedValues()
+	for k, v := range r.Fields {
+		if fv, ok := v.(float64); ok {
+			values.Add(k, fv)
+		} else if bv, ok := v.(bool); ok {
+			typedValues.Add(k, &models.TypedValue{Type: models.ValueTypeBoolean, Value: bv})
+		} else {
+			typedValues.Add(k, &models.TypedValue{Type: models.ValueTypeString, Value: fmt.Sprint(v)})
+		}
+	}
+	multiValues := models.NewMetric("multi_values_metrics_mock", models.MetricTypeUntyped, models.NewTagsWithMap(r.Tags), time.Now().UnixNano(), values, typedValues)
+	context.Collector().Collect(group, singleValue, multiValues)
 	return nil
 }
 
 func init() {
 	ilogtail.MetricInputs["metric_mock"] = func() ilogtail.MetricInput {
 		return &InputMock{
-			Index:  0,
-			Tags:   make(map[string]string),
-			Fields: make(map[string]string),
+			Index:     0,
+			GroupMeta: make(map[string]string),
+			GroupTags: make(map[string]string),
+			Tags:      make(map[string]string),
+			Fields:    make(map[string]interface{}),
 		}
 	}
 }

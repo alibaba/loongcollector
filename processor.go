@@ -15,6 +15,7 @@
 package ilogtail
 
 import (
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -25,7 +26,15 @@ type Processor interface {
 
 	// Description returns a one-sentence description on the Input
 	Description() string
+}
 
-	// Apply the filter to the given metric
+type ProcessorV1 interface {
+	Processor
+	// ProcessLogs the filter to the given metric
 	ProcessLogs(logArray []*protocol.Log) []*protocol.Log
+}
+
+type ProcessorV2 interface {
+	Processor
+	Process(in *models.PipelineGroupEvents, context PipelineContext)
 }
