@@ -235,6 +235,6 @@ at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterCha
       - Type: service_docker_stdout
         Stdout: false
         Stderr: true
-        BeginLineCheckLength: 10,
+        BeginLineCheckLength: 10
         BeginLineRegex: "\\d+-\\d+-\\d+.*"
 ```

@@ -120,7 +120,7 @@ data:
         IncludeK8sLabel:
           app: nginx
     flushers:
-      - Type: flusher_kafka
+      - Type: flusher_kafka_v2
         Brokers:
           - <kafka_host>:<kafka_port>
         Topic: access-log
@@ -134,7 +134,7 @@ data:
         K8sPodRegex: "^(nginx-.*)$"
         K8sContainerRegex: "nginx"
     flushers:
-      - Type: flusher_kafka
+      - Type: flusher_kafka_v2
         Brokers:
           - <kafka_host>:<kafka_port>
         Topic: error-log
@@ -201,7 +201,7 @@ spec:
           - mountPath: /usr/local/ilogtail/user_yaml_config.d
             name: user-config
             readOnly: true
-      dnsPolicy: ClusterFirst
+      dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       volumes:
         - hostPath:
@@ -337,7 +337,7 @@ kubectl exec nginx-76d49876c7-r892w -- curl localhost/hello/ilogtail
           - http_user_agent
           - http_x_forwarded_for
     flushers:
-      - Type: flusher_kafka
+      - Type: flusher_kafka_v2
         Brokers:
           - <kafka_host>:<kafka_port>
         Topic: access-log
@@ -410,7 +410,7 @@ data:
         ExpandDepth: 1
         ExpandConnector: ""
     flushers:
-      - Type: flusher_kafka
+      - Type: flusher_kafka_v2
         Brokers:
           - 39.99.61.125:9092
         Topic: json-log

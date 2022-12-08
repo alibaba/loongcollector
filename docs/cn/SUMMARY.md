@@ -74,7 +74,7 @@
   * [基础](data-pipeline/aggregator/aggregator-base.md)
   * [上下文](data-pipeline/aggregator/aggregator-context.md)
 * [输出](data-pipeline/flusher/README.md)
-  * [Kafka](data-pipeline/flusher/kafka.md)
+  * [Kafka（Deprecated）](data-pipeline/flusher/kafka.md)
   * [kafkaV2](data-pipeline/flusher/kafka_v2.md)
   * [SLS](data-pipeline/flusher/sls.md)
   * [标准输出/文件](data-pipeline/flusher/stdout.md)

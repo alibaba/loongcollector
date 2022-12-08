@@ -1,7 +1,7 @@
 # Kafka
 
 ## 简介
-
+`flusher_kafka`已弃用，后续不再维护，请使用`flusher_kafka_v2`。
 `flusher_kafka` `flusher`插件可以实现将采集到的数据，经过处理后，发送到Kafka。
 
 ## 配置参数

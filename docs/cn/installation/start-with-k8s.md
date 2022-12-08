@@ -175,7 +175,7 @@ spec:
             - mountPath: /usr/local/ilogtail/user_yaml_config.d # mount config dir
               name: user-config
               readOnly: true
-      dnsPolicy: ClusterFirst
+      dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       volumes:
         - hostPath:
