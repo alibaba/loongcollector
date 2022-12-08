@@ -25,7 +25,6 @@
 #include <execinfo.h>
 #elif defined(_MSC_VER)
 #include <Rpc.h>
-#include "WinUuid.h"
 #endif
 #include "logger/Logger.h"
 #include "StringTools.h"

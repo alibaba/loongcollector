@@ -48,6 +48,7 @@ namespace sdk {
          * @return Error message string.
          */
         std::string GetMessage(void) const { return mMessage; }
+        // for windows compatability, to avoid conflict with the same function defined in windows.h
         std::string GetMessage_() const { return mMessage; }
         /** Function that return request id.
          * @param void None.

@@ -30,6 +30,7 @@
 #include "common/DevInode.h"
 #include "common/GlobalPara.h"
 #include "common/version.h"
+#include "common/MachineInfoUtil.h"
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
 #include "sender/Sender.h"

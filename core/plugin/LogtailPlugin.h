@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ostream>
+#include <numeric>
 #include <json/json.h>
 #include "config/Config.h"
 #if defined(_MSC_VER)
