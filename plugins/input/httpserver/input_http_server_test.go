@@ -50,7 +50,7 @@ func (p *ContextTest) LogWarn(alarmType string, kvPairs ...interface{}) {
 	fmt.Println(alarmType, kvPairs)
 }
 
-func newInput(format string) (*ServiceHTTP, error) {
+func newInputWithOpts(format string, option func(input *ServiceHTTP)) (*ServiceHTTP, error) {
 	ctx := &ContextTest{}
 	ctx.ContextImp.InitContext("a", "b", "c")
 	input := &ServiceHTTP{
@@ -60,8 +60,15 @@ func newInput(format string) (*ServiceHTTP, error) {
 		Address:            ":0",
 		Format:             format,
 	}
+	if option != nil {
+		option(input)
+	}
 	_, err := input.Init(&ctx.ContextImp)
 	return input, err
+}
+
+func newInput(format string) (*ServiceHTTP, error) {
+	return newInputWithOpts(format, nil)
 }
 
 type mockLog struct {
@@ -235,6 +242,33 @@ func TestInputInfluxDB(t *testing.T) {
 	time.Sleep(time.Second * 2)
 
 	assert.Equal(t, 30, len(collector.rawLogs))
+	for _, log := range collector.rawLogs {
+		fmt.Println(log.String())
+	}
+}
+
+func TestInputInfluxDBWithFieldsExtend(t *testing.T) {
+	input, err := newInputWithOpts("influx", func(input *ServiceHTTP) {
+		input.FieldsExtend = true
+	})
+	require.NoError(t, err)
+	collector := &mockCollector{}
+	err = input.Start(collector)
+	require.NoError(t, err)
+	port := input.listener.Addr().(*net.TCPAddr).Port
+
+	defer func() {
+		require.NoError(t, input.Stop())
+	}()
+
+	err = sendRequest(textFormatInflux, port)
+	require.NoError(t, err)
+	err = sendRequest(textFormatInflux, port)
+	require.NoError(t, err)
+
+	time.Sleep(time.Second * 2)
+
+	assert.Equal(t, 36, len(collector.rawLogs))
 	for _, log := range collector.rawLogs {
 		fmt.Println(log.String())
 	}

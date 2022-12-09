@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/golang/snappy"
 	"github.com/pierrec/lz4"
 )
 
@@ -52,6 +53,13 @@ func CollectBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) 
 	bytes, err := ioutil.ReadAll(body)
 	if err != nil {
 		return nil, http.StatusRequestEntityTooLarge, err
+	}
+
+	if req.Header.Get("Content-Encoding") == "snappy" {
+		bytes, err = snappy.Decode(nil, bytes)
+		if err != nil {
+			return nil, http.StatusBadRequest, err
+		}
 	}
 
 	if req.Header.Get("x-log-compresstype") == "lz4" {

@@ -44,13 +44,14 @@ type ServiceHTTP struct {
 	ShutdownTimeoutSec int
 	MaxBodySize        int64
 	UnlinkUnixSock     bool
+	FieldsExtend       bool
 }
 
 // Init ...
 func (s *ServiceHTTP) Init(context ilogtail.Context) (int, error) {
 	s.context = context
 	var err error
-	if s.decoder, err = decoder.GetDecoder(s.Format); err != nil {
+	if s.decoder, err = decoder.GetDecoderWithOptions(s.Format, decoder.Option{FieldsExtend: s.FieldsExtend}); err != nil {
 		return 0, err
 	}
 

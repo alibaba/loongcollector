@@ -110,6 +110,7 @@ c, err := protocol.NewConverter("custom_single", "json", map[string]string{"host
     | 协议名 | 意义 |
     | ------ | ------ |
     | custom_single | 单条协议 |
+    | influxdb      | Influxdb协议 |
 
 - 可选编码方式
 
@@ -117,6 +118,7 @@ c, err := protocol.NewConverter("custom_single", "json", map[string]string{"host
     | ------ | ------ |
     | json | json编码方式 |
     | protobuf | protobuf编码方式 |
+    | custom | 自定义编码方式  |
 
 - sls协议中系统保留LogTag的Key默认值：
 

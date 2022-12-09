@@ -16,6 +16,7 @@ package prometheus
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,8 @@ telemetry_requests_metrics_latency_microseconds_count 2693
 
 func TestNormal(t *testing.T) {
 	decoder := &Decoder{}
-	logs, err := decoder.Decode([]byte(textFormat), nil)
+	req, _ := http.NewRequest("GET", "http://localhost", nil)
+	logs, err := decoder.Decode([]byte(textFormat), req)
 	assert.Nil(t, err)
 	assert.Equal(t, len(logs), 20)
 	for _, log := range logs {

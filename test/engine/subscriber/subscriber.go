@@ -15,11 +15,16 @@
 package subscriber
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/doc"
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/test/engine/boot"
 )
 
 var factory = make(map[string]Creator)
@@ -57,4 +62,22 @@ func New(name string, cfg map[string]interface{}) (Subscriber, error) {
 		return nil, fmt.Errorf("cannot find %s subscriber", name)
 	}
 	return creator(cfg)
+}
+
+func TryReplacePhysicalAddress(addr string) (string, error) {
+	uri, err := url.Parse(addr)
+	if err != nil {
+		return addr, errors.New("invalid uri: " + addr)
+	}
+	if uri.Port() == "" {
+		uri.Host += ":80"
+	}
+
+	physicalAddr := boot.GetPhysicalAddress(uri.Host)
+	logger.Debugf(context.Background(), "subscriber get physical address result: %s -> %s", uri.Host, physicalAddr)
+	if len(physicalAddr) == 0 {
+		return addr, nil
+	}
+	uri.Host = physicalAddr
+	return uri.String(), nil
 }

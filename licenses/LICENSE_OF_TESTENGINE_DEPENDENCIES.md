@@ -102,6 +102,7 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/Microsoft/hcsshim](https://pkg.go.dev/github.com/Microsoft/hcsshim?tab=licenses)
 - [github.com/cenkalti/backoff](https://pkg.go.dev/github.com/cenkalti/backoff?tab=licenses)
 - [github.com/cpuguy83/go-md2man](https://pkg.go.dev/github.com/cpuguy83/go-md2man?tab=licenses)
+- [github.com/influxdata/influxdb1-client](https://pkg.go.dev/github.com/influxdata/influxdb1-client?tab=licenses)
 - [github.com/mitchellh/mapstructure](https://pkg.go.dev/github.com/mitchellh/mapstructure?tab=licenses)
 - [github.com/morikuni/aec](https://pkg.go.dev/github.com/morikuni/aec?tab=licenses)
 - [github.com/shurcooL/sanitized_anchor_name](https://pkg.go.dev/github.com/shurcooL/sanitized_anchor_name?tab=licenses)

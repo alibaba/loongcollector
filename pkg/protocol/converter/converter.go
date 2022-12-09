@@ -17,6 +17,7 @@ package protocol
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -25,12 +26,14 @@ import (
 const (
 	ProtocolCustomSingle = "custom_single"
 	ProtocolOtlpLogV1    = "otlp_log_v1"
+	ProtocolInfluxdb     = "influxdb"
 )
 
 const (
 	EncodingNone     = "none"
 	EncodingJSON     = "json"
 	EncodingProtobuf = "protobuf"
+	EncodingCustom   = "custom"
 )
 
 const (
@@ -57,6 +60,14 @@ const (
 	tagK8sContainerIP        = "k8s.container.ip"
 	tagK8sContainerImageName = "k8s.container.image.name"
 )
+
+// todo: make multiple pools for different size levels
+var byteBufPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 0, 1024)
+		return &buf
+	},
+}
 
 var tagConversionMap = map[string]string{
 	"__path__":         tagLogFilePath,
@@ -86,6 +97,9 @@ var supportedEncodingMap = map[string]map[string]bool{
 	},
 	ProtocolOtlpLogV1: {
 		EncodingNone: true,
+	},
+	ProtocolInfluxdb: {
+		EncodingCustom: true,
 	},
 }
 
@@ -137,9 +151,19 @@ func (c *Converter) ToByteStreamWithSelectedFields(logGroup *protocol.LogGroup, 
 	switch c.Protocol {
 	case ProtocolCustomSingle:
 		return c.ConvertToSingleProtocolStream(logGroup, targetFields)
+	case ProtocolInfluxdb:
+		return c.ConvertToInfluxdbProtocolStream(logGroup, targetFields)
 	default:
 		return nil, nil, fmt.Errorf("unsupported protocol: %s", c.Protocol)
 	}
+}
+
+func GetPooledByteBuf() *[]byte {
+	return byteBufPool.Get().(*[]byte)
+}
+
+func PutPooledByteBuf(buf *[]byte) {
+	byteBufPool.Put(buf)
 }
 
 func convertLogToMap(log *protocol.Log, logTags []*protocol.LogTag, src, topic string, tagKeyRenameMap map[string]string) (map[string]string, map[string]string) {

@@ -46,6 +46,7 @@ type (
 		ENV            map[string]string      `mapstructure:"env" yaml:"env"`
 		DependsOn      map[string]interface{} `mapstructure:"depends_on" yaml:"depends_on"`
 		MountFiles     []string               `mapstructure:"mounts" yaml:"mounts"`
+		Ports          []string               `mapstructure:"ports" yaml:"ports"`
 	}
 
 	LogtailCfgs struct {
@@ -65,6 +66,7 @@ type (
 		Method   string `mapstructure:"method" yaml:"method"`
 		Interval string `mapstructure:"interval" yaml:"interval"`
 		Times    int    `mapstructure:"times" yaml:"times"`
+		Body     string `mapstructure:"body" yaml:"body"`
 	}
 	// Verify content transferred to the mock backend to verify the collected telemetry data.
 	Verify struct {

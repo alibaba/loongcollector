@@ -6,15 +6,16 @@
 
 ## 配置参数
 
-| 参数    | 类型   | 是否必选 | 说明                                         |
-| ------- | ------ | -------- | -------------------------------------------- |
-| Type    | String | 是       | 插件类型，固定为`service_http_server`      |
-| Format | String | 否       | <p>数据格式。</p> <p>支持格式：`sls`、`prometheus`、`influxdb`、`otlp_logv1`、`statsd`</p> |
-| Address | String | 否       | <p>监听地址。</p><p></p> |
-| ReadTimeoutSec | String | 否       | <p>读取超时时间。</p><p>默认取值为:`10s`。</p> |
-| ShutdownTimeoutSec | String | 否       | <p>关闭超时时间。</p><p>默认取值为:`5s`。</p> |
-| MaxBodySize | String | 否       | <p>最大传输 body 大小。</p><p>默认取值为:`64k`。</p> |
-| UnlinkUnixSock | String | 否       | <p>启动前如果监听地址为unix socket，是否进行强制释放。</p><p>默认取值为:`true`。</p> |
+| 参数               | 类型    | 是否必选 | 说明                                                                                                               |
+| ------------------ | ------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| Type               | String  | 是       | 插件类型，固定为`service_http_server`                                                                              |
+| Format             | String  | 否       | <p>数据格式。</p> <p>支持格式：`sls`、`prometheus`、`influxdb`、`otlp_logv1`、`statsd`</p>                         |
+| Address            | String  | 否       | <p>监听地址。</p><p></p>                                                                                           |
+| ReadTimeoutSec     | String  | 否       | <p>读取超时时间。</p><p>默认取值为:`10s`。</p>                                                                     |
+| ShutdownTimeoutSec | String  | 否       | <p>关闭超时时间。</p><p>默认取值为:`5s`。</p>                                                                      |
+| MaxBodySize        | String  | 否       | <p>最大传输 body 大小。</p><p>默认取值为:`64k`。</p>                                                               |
+| UnlinkUnixSock     | String  | 否       | <p>启动前如果监听地址为unix socket，是否进行强制释放。</p><p>默认取值为:`true`。</p>                               |
+| FieldsExtend         | Boolean | 否       | <p>是否支持非integer以外的数据类型(如String)</p><p>目前仅针对有 String、Bool 等额外类型的 influxdb Format 有效</p> |
 
 ## 样例
 

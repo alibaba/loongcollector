@@ -141,10 +141,12 @@ func (c *ComposeBooter) Start() error {
 		"-c",
 		"env |grep HOST_OS|grep Linux && ip -4 route list match 0/0|awk '{print $3\" host.docker.internal\"}' >> /etc/hosts",
 	}
-	if err := c.exec(c.logtailID, cmd); err != nil {
+	if err = c.exec(c.logtailID, cmd); err != nil {
 		return err
 	}
-	return registerDockerNetMapping(strategyWrappers)
+	err = registerDockerNetMapping(strategyWrappers)
+	logger.Debugf(context.Background(), "registered net mapping: %v", networkMapping)
+	return err
 }
 
 func (c *ComposeBooter) Stop() error {
@@ -278,6 +280,9 @@ func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 	ilogtail["depends_on"] = c.cfg.Ilogtail.DependsOn
 	for _, m := range c.cfg.Ilogtail.MountFiles {
 		ilogtail["volumes"] = append(ilogtail["volumes"].([]interface{}), m)
+	}
+	for _, port := range c.cfg.Ilogtail.Ports {
+		ilogtail["ports"] = append(ilogtail["ports"].([]interface{}), port)
 	}
 	bytes, _ := yaml.Marshal(cfg)
 	println(string(bytes))

@@ -27,6 +27,7 @@ require (
 	github.com/influxdata/go-syslog v1.0.1
 	github.com/influxdata/influxdb v1.10.0
 	github.com/jackc/pgx/v4 v4.16.1
+	github.com/jarcoal/httpmock v1.2.0
 	github.com/jeromer/syslogparser v0.0.0-20190429161531-5fbaaf06d9e7
 	github.com/json-iterator/go v1.1.12
 	github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68
@@ -41,6 +42,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/procfs v0.8.0
+	github.com/prometheus/prometheus v1.8.2-0.20201119142752-3ad25a6dc3d9
 	github.com/shirou/gopsutil v3.21.3+incompatible
 	github.com/siddontang/go-mysql v0.0.0-20180725024449-535abe8f2eba
 	github.com/sirupsen/logrus v1.8.1
@@ -74,6 +76,7 @@ require (
 	github.com/frankban/quicktest v1.14.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
+	github.com/influxdata/line-protocol/v2 v2.2.1 // indirect
 	github.com/intel/goresctrl v0.2.0 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
@@ -138,7 +141,7 @@ require (
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
+	github.com/golang/snappy v0.0.4
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect

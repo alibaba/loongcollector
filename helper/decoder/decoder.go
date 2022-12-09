@@ -36,17 +36,25 @@ type Decoder interface {
 	ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error)
 }
 
+type Option struct {
+	FieldsExtend bool
+}
+
 var errDecoderNotFound = errors.New("no such decoder")
 
 // GetDecoder return a new decoder for specific format
 func GetDecoder(format string) (Decoder, error) {
+	return GetDecoderWithOptions(format, Option{})
+}
+
+func GetDecoderWithOptions(format string, option Option) (Decoder, error) {
 	switch strings.TrimSpace(strings.ToLower(format)) {
 	case common.ProtocolSLS:
 		return &sls.Decoder{}, nil
 	case common.ProtocolPrometheus:
 		return &prometheus.Decoder{}, nil
 	case common.ProtocolInflux, common.ProtocolInfluxdb:
-		return &influxdb.Decoder{}, nil
+		return &influxdb.Decoder{FieldsExtend: option.FieldsExtend}, nil
 	case common.ProtocolStatsd:
 		return &statsd.Decoder{
 			Time: time.Now(),

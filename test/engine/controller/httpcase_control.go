@@ -74,7 +74,7 @@ func (c *HTTPCaseController) Start() error {
 		}
 		realAddress := "http://" + physicalAddress + c.path
 
-		request, err := http.NewRequest(c.cfg.Method, realAddress, nil)
+		request, err := http.NewRequest(c.cfg.Method, realAddress, strings.NewReader(c.cfg.Body))
 		if err != nil {
 			return fmt.Errorf("error in creating http trigger request: %v", err)
 		}
@@ -87,7 +87,7 @@ func (c *HTTPCaseController) Start() error {
 				logger.Infof(context.Background(), "request URL %s the %d time", request.URL, count)
 				resp, err := client.Do(request)
 				if err != nil {
-					logger.Debugf(context.Background(), "error in triggering the http request: %s", request.URL)
+					logger.Debugf(context.Background(), "error in triggering the http request: %s, err: %s", request.URL, err)
 					continue
 				}
 				_ = resp.Body.Close()
