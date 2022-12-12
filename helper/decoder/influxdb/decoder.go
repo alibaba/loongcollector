@@ -119,15 +119,21 @@ func (d *Decoder) parsePointsToLogs(points []models.Point, req *http.Request) []
 				name = string(s.Name()) + ":" + field
 			}
 
-			helper.ReplaceInvalidChars(&name)
+			if !d.FieldsExtend {
+				helper.ReplaceInvalidChars(&name)
+			}
 			var builder strings.Builder
 			for index, v := range s.Tags() {
 				if index != 0 {
 					builder.WriteByte('|')
 				}
-				key := string(v.Key)
-				helper.ReplaceInvalidChars(&key)
-				builder.WriteString(key)
+				if !d.FieldsExtend {
+					key := string(v.Key)
+					helper.ReplaceInvalidChars(&key)
+					builder.WriteString(key)
+				} else {
+					builder.Write(v.Key)
+				}
 				builder.WriteString("#$#")
 				builder.WriteString(string(v.Value))
 			}

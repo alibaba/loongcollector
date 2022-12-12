@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 var textFormat = `
@@ -58,6 +60,83 @@ mysql,host=Vm-Req-170328120400894271-tianchi113855.tc,server=rm-bp1eomqfte2vj91t
 
 mysql,host=Vm-Req-170328120400894271-tianchi113855.tc,server=rm-bp1eomqfte2vj91tkjo.mysql.rds.aliyuncs.com:3306 innodb_buffer_pool_read_ahead_rnd=0i,innodb_data_pending_fsyncs=0i,innodb_buffer_pool_bytes_dirty=4325376i,innodb_buffer_pool_pages_flushed=21810i,innodb_buffer_pool_pages_total=40960i,innodb_buffer_pool_read_ahead_evicted=0i,innodb_buffer_pool_reads=757i,innodb_buffer_pool_load_status="Buffer pool(s) load completed at 200702 21:33:49",innodb_buffer_pool_pages_data=846i,innodb_buffer_pool_read_ahead=0i,innodb_buffer_pool_write_requests=36830857i,innodb_data_fsyncs=344588i,innodb_buffer_pool_dump_status="Dumping of buffer pool not started",innodb_buffer_pool_pages_dirty=264i,innodb_buffer_pool_pages_misc=3i,innodb_buffer_pool_read_requests=45390218i,innodb_buffer_pool_wait_free=0i,innodb_buffer_pool_bytes_data=13860864i,innodb_buffer_pool_pages_free=40111i 1595406780000000000
 `
+
+var txtWithDotNames = `
+cpu.load,host=server01,region=uswest value=1 1434055562000000000
+cpu.load,host.dd=server02,region=uswest value=3 1434055562000010000
+`
+
+func TestFieldsExtend(t *testing.T) {
+	cases := []struct {
+		enableFieldsExtend bool
+		data               string
+		wantLogs           []*protocol.Log
+		wantErr            bool
+	}{
+		{
+			enableFieldsExtend: true,
+			data:               txtWithDotNames,
+			wantErr:            false,
+			wantLogs: []*protocol.Log{
+				{
+					Contents: []*protocol.Log_Content{
+						{Key: "__name__", Value: "cpu.load"},
+						{Key: "__value__", Value: "1"},
+						{Key: "__labels__", Value: "host#$#server01|region#$#uswest"},
+						{Key: "__time_nano__", Value: "1434055562000000000"},
+						{Key: "__type__", Value: "float"},
+					},
+				},
+				{
+					Contents: []*protocol.Log_Content{
+						{Key: "__name__", Value: "cpu.load"},
+						{Key: "__value__", Value: "3"},
+						{Key: "__labels__", Value: "host.dd#$#server02|region#$#uswest"},
+						{Key: "__time_nano__", Value: "1434055562000010000"},
+						{Key: "__type__", Value: "float"},
+					},
+				},
+			},
+		},
+		{
+			enableFieldsExtend: false,
+			data:               txtWithDotNames,
+			wantErr:            false,
+			wantLogs: []*protocol.Log{
+				{
+					Contents: []*protocol.Log_Content{
+						{Key: "__name__", Value: "cpu_load"},
+						{Key: "__value__", Value: "1"},
+						{Key: "__labels__", Value: "host#$#server01|region#$#uswest"},
+						{Key: "__time_nano__", Value: "1434055562000000000"},
+					},
+				},
+				{
+					Contents: []*protocol.Log_Content{
+						{Key: "__name__", Value: "cpu_load"},
+						{Key: "__value__", Value: "3"},
+						{Key: "__labels__", Value: "host_dd#$#server02|region#$#uswest"},
+						{Key: "__time_nano__", Value: "1434055562000010000"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range cases {
+		decoder := &Decoder{FieldsExtend: testCase.enableFieldsExtend}
+		logs, err := decoder.Decode([]byte(txtWithDotNames), &http.Request{})
+		if testCase.wantErr {
+			assert.NotNil(t, err)
+			continue
+		}
+		assert.Nil(t, err)
+		assert.Len(t, logs, len(testCase.wantLogs))
+		for i := 0; i < len(testCase.wantLogs); i++ {
+			assert.ElementsMatch(t, testCase.wantLogs[i].Contents, logs[i].Contents)
+		}
+	}
+}
 
 func TestNormal(t *testing.T) {
 	decoder := &Decoder{}
