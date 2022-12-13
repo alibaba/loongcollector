@@ -27,12 +27,12 @@ import (
 )
 
 type ProcessorDesensitize struct {
-	SourceKey    string
-	Method       string
-	RegexBegin   string
-	RegexContent string
-	ReplaceAll   bool
-	ConstString  string
+	SourceKey     string
+	Method        string
+	Match         string
+	ReplaceString string
+	RegexBegin    string
+	RegexContent  string
 
 	context      ilogtail.Context
 	regexBegin   *regexp2.Regexp
@@ -47,6 +47,13 @@ func (p *ProcessorDesensitize) Init(context ilogtail.Context) error {
 
 	var err error
 
+	// check SourceKey
+	if p.SourceKey == "" {
+		err = errors.New("parameter SourceKey should not be empty")
+		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		return err
+	}
+
 	// check Method
 	if p.Method != "const" && p.Method != "md5" {
 		err = errors.New("parameter Method should be \"const\" or \"md5\"")
@@ -54,38 +61,47 @@ func (p *ProcessorDesensitize) Init(context ilogtail.Context) error {
 		return err
 	}
 
-	// check RegexBegin
-	if p.RegexBegin == "" {
-		err = errors.New("need parameter RegexBegin")
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
-		return err
-	}
-	p.regexBegin, err = regexp2.Compile(p.RegexBegin, regexp2.RE2)
-	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
-		return err
-	}
-
-	// check RegexContent
-	if p.RegexContent == "" {
-		err = errors.New("need parameter RegexContent")
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
-		return err
-	}
-	p.regexContent, err = regexp2.Compile(p.RegexContent, regexp2.RE2)
-	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
-		return err
-	}
-
 	// check Method
-	if p.Method == "const" && p.ConstString == "" {
-		err = errors.New("parameter ConstString should not be empty when Method is \"const\"")
+	if p.Method == "const" && p.ReplaceString == "" {
+		err = errors.New("parameter ReplaceString should not be empty when Method is \"const\"")
 		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 		return err
 	}
 
-	return nil
+	switch p.Match {
+	case "full":
+		return nil
+	case "regex":
+		// check RegexBegin
+		if p.RegexBegin == "" {
+			err = errors.New("need parameter RegexBegin")
+			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			return err
+		}
+		p.regexBegin, err = regexp2.Compile(p.RegexBegin, regexp2.RE2)
+		if err != nil {
+			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			return err
+		}
+
+		// check RegexContent
+		if p.RegexContent == "" {
+			err = errors.New("need parameter RegexContent")
+			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			return err
+		}
+		p.regexContent, err = regexp2.Compile(p.RegexContent, regexp2.RE2)
+		if err != nil {
+			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			return err
+		}
+
+		return nil
+	default:
+		err = errors.New("parameter Match should be \"full\" or \"regex\"")
+		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		return err
+	}
 }
 
 func (*ProcessorDesensitize) Description() string {
@@ -97,11 +113,7 @@ func (p *ProcessorDesensitize) ProcessLogs(logArray []*protocol.Log) []*protocol
 		for i, content := range log.Contents {
 			if p.SourceKey == content.Key {
 				newVal := p.desensitize(content.Value)
-				newContent := &protocol.Log_Content{
-					Key:   content.Key,
-					Value: newVal,
-				}
-				log.Contents[i] = newContent
+				log.Contents[i].Value = newVal
 				break
 			}
 		}
@@ -110,6 +122,17 @@ func (p *ProcessorDesensitize) ProcessLogs(logArray []*protocol.Log) []*protocol
 }
 
 func (p *ProcessorDesensitize) desensitize(val string) string {
+	if p.Match == "full" {
+		if p.Method == "const" {
+			return p.ReplaceString
+		}
+		if p.Method == "md5" {
+			has := md5.Sum([]byte(val)) //nolint:gosec
+			md5str := fmt.Sprintf("%x", has)
+			return md5str
+		}
+	}
+
 	var pos = 0
 	match, _ := p.regexBegin.FindStringMatchStartingAt(val, pos)
 	for match != nil {
@@ -117,17 +140,14 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 		content, _ := p.regexContent.FindStringMatchStartingAt(val, pos)
 		if content != nil {
 			if p.Method == "const" {
-				val, _ = p.regexContent.Replace(val, p.ConstString, pos, 1)
-				pos = content.Index + len(p.ConstString)
+				val, _ = p.regexContent.Replace(val, p.ReplaceString, pos, 1)
+				pos = content.Index + len(p.ReplaceString)
 			}
 			if p.Method == "md5" {
 				has := md5.Sum([]byte(content.String())) //nolint:gosec
 				md5str := fmt.Sprintf("%x", has)
 				val, _ = p.regexContent.Replace(val, md5str, pos, 1)
 				pos = content.Index + len(md5str)
-			}
-			if !p.ReplaceAll {
-				break
 			}
 		}
 		match, _ = p.regexBegin.FindStringMatchStartingAt(val, pos)
@@ -138,12 +158,12 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 func init() {
 	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
 		return &ProcessorDesensitize{
-			SourceKey:    "content",
-			Method:       "",
-			RegexBegin:   "",
-			RegexContent: "",
-			ReplaceAll:   true,
-			ConstString:  "",
+			SourceKey:     "",
+			Method:        "const",
+			Match:         "full",
+			ReplaceString: "",
+			RegexBegin:    "",
+			RegexContent:  "",
 		}
 	}
 }

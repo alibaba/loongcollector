@@ -28,7 +28,7 @@ MOD=${1:-mod}
 BUILDMODE=${2:-default}
 OUT_DIR=${3:-output}
 NAME=ilogtail
-IDFLAGS=''
+LDFLAGS=''
 
 os
 OS_FLAG=$?
@@ -37,7 +37,9 @@ ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 mkdir -p "$ROOTDIR"/bin
 
 if [ $OS_FLAG = 1 ]; then
-  IDFLAGS='-extldflags "-Wl,--wrap=memcpy"'
+  if uname -m | grep x86_64; then
+    LDFLAGS='-extldflags "-Wl,--wrap=memcpy"'
+  fi
   if [ $BUILDMODE = "c-shared" ]; then
     NAME=libPluginBase.so
   fi
@@ -51,4 +53,4 @@ elif [ $OS_FLAG = 2 ]; then
   BUILDMODE=default
 fi
 
-go build -mod="$MOD" -buildmode="$BUILDMODE" -ldflags="$IDFLAGS" -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main
+go build -mod="$MOD" -buildmode="$BUILDMODE" -ldflags="$LDFLAGS" -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main

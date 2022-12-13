@@ -27,12 +27,12 @@ import (
 func newProcessor() (*ProcessorDesensitize, error) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	processor := &ProcessorDesensitize{
-		SourceKey:    "content",
-		Method:       "const",
-		RegexBegin:   "'password':'",
-		RegexContent: "[^']*",
-		ReplaceAll:   true,
-		ConstString:  "***",
+		SourceKey:     "content",
+		Method:        "const",
+		Match:         "regex",
+		ReplaceString: "***",
+		RegexBegin:    "'password':'",
+		RegexContent:  "[^']*",
 	}
 	err := processor.Init(ctx)
 	return processor, err
@@ -49,6 +49,12 @@ func TestProcessorDesensitizeInit(t *testing.T) {
 			So(processor.Description(), ShouldEqual, "desensitize processor for logtail")
 		})
 
+		Convey("Test load fail with no SourceKey error", func() {
+			processor.SourceKey = ""
+			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			So(err, ShouldResemble, errors.New("parameter SourceKey should not be empty"))
+		})
+
 		Convey("Test load fail with no Method error", func() {
 			processor.Method = ""
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
@@ -59,6 +65,12 @@ func TestProcessorDesensitizeInit(t *testing.T) {
 			processor.Method = "Base64"
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldResemble, errors.New("parameter Method should be \"const\" or \"md5\""))
+		})
+
+		Convey("Test load fail with wrong Match error", func() {
+			processor.Match = "overwrite"
+			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			So(err, ShouldResemble, errors.New("parameter Match should be \"full\" or \"regex\""))
 		})
 
 		Convey("Test load fail with no RegexBegin error", func() {
@@ -85,54 +97,57 @@ func TestProcessorDesensitizeInit(t *testing.T) {
 			So(err, ShouldNotBeNil)
 		})
 
-		Convey("Test load fail with no ConstString error", func() {
+		Convey("Test load fail with no ReplaceString error", func() {
 			processor.Method = "const"
-			processor.ConstString = ""
+			processor.ReplaceString = ""
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
-			So(err, ShouldResemble, errors.New("parameter ConstString should not be empty when Method is \"const\""))
+			So(err, ShouldResemble, errors.New("parameter ReplaceString should not be empty when Method is \"const\""))
 		})
 	})
 }
 
 func TestProcessorDesensitizeWork(t *testing.T) {
-	Convey("Test const.", t, func() {
+	Convey("Test Match = full.", t, func() {
 		processor, err := newProcessor()
 		So(err, ShouldBeNil)
+		processor.Match = "full"
 		err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		So(err, ShouldBeNil)
 
-		Convey("Test ReplaceAll=true", func() {
+		Convey("Test const", func() {
 			record := "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}]"
 			res := processor.desensitize(record)
-			So(res, ShouldEqual, "[{'account':'1812213231432969','password':'***'}, {'account':'1812213685634','password':'***'}]")
+			So(res, ShouldEqual, "***")
 		})
 
-		Convey("Test ReplaceAll=false", func() {
-			processor.ReplaceAll = false
+		Convey("Test md5", func() {
+			processor.Method = "md5"
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
 			record := "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}]"
 			res := processor.desensitize(record)
-			So(res, ShouldEqual, "[{'account':'1812213231432969','password':'***'}, {'account':'1812213685634','password':'123a'}]")
+			So(res, ShouldEqual, "700085e3968c3efb83b54ba47dd1367d")
 		})
 	})
 
-	Convey("Test md5.", t, func() {
+	Convey("Test Match = regex.", t, func() {
 		processor, err := newProcessor()
 		So(err, ShouldBeNil)
+		err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		Convey("Test const", func() {
+			record := "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}]"
+			res := processor.desensitize(record)
+			So(res, ShouldEqual, "[{'account':'1812213231432969','password':'***'}, {'account':'1812213685634','password':'***'}]")
+		})
+
 		processor.Method = "md5"
 		err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		So(err, ShouldBeNil)
 
-		Convey("Test ReplaceAll=true", func() {
-			record := "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}]"
-			res := processor.desensitize(record)
-			So(res, ShouldEqual, "[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'1552c03e78d38d5005d4ce7b8018addf'}]")
-		})
-
-		Convey("Test ReplaceAll=false", func() {
-			processor.ReplaceAll = false
+		Convey("Test md5", func() {
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
@@ -142,7 +157,7 @@ func TestProcessorDesensitizeWork(t *testing.T) {
 			logs := []*protocol.Log{}
 			logs = append(logs, log)
 			logs = processor.ProcessLogs(logs)
-			So(logs[0].Contents[0].Value, ShouldEqual, "[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'123a'}]")
+			So(logs[0].Contents[0].Value, ShouldEqual, "[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'1552c03e78d38d5005d4ce7b8018addf'}]")
 		})
 	})
 }

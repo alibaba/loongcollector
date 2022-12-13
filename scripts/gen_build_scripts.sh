@@ -24,7 +24,7 @@ set -o pipefail
 # e2e: Build plugin dynamic lib with GOC and build the CPP part.
 CATEGORY=$1
 GENERATED_HOME=$2
-VERSION=${3:-1.3.0}
+VERSION=${3:-1.3.1}
 REPOSITORY=${4:-aliyun/ilogtail}
 OUT_DIR=${5:-output}
 

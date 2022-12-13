@@ -158,15 +158,15 @@ std::string GetHostName() {
 }
 
 std::string GetHostIpByHostName() {
-    const char* hostname = GetHostName().c_str();
+    std::string hostname = GetHostName();
 
     // if hostname is invalid, other methods should be used to get correct ip.
-    if (!IsDigitsDotsHostname(hostname)) {
+    if (!IsDigitsDotsHostname(hostname.c_str())) {
         LOG_INFO(sLogger, ("invalid hostname", "will use other methods to obtain ip")("hostname", hostname));
         return "";
     }
 
-    struct hostent* entry = gethostbyname(hostname);
+    struct hostent* entry = gethostbyname(hostname.c_str());
     if (entry == NULL) {
         return "";
     }

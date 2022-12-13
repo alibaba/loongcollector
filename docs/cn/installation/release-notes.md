@@ -1,5 +1,37 @@
 # 发布记录
 
+## 1.3.1
+
+### 发布记录
+
+发版日期：2022 年 12 月 13 日
+
+新功能
+
+优化
+
+问题修复
+
+* 获取IP可能失败并引发崩溃的问题 [#576](https://github.com/alibaba/ilogtail/issues/576)
+* ARM版本无法在Ubuntu 20.04上运行的问题 [#570](https://github.com/alibaba/ilogtail/issues/570)
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.3.1.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.3.1.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.3.1/ilogtail-1.3.1.linux-amd64.tar.gz) | Linux | x86-64 | d74e2e8683fa9c01fcaa155e65953936c18611bcd068bcbeced84a1d7f170bd1 |
+| [ilogtail-1.3.1.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.3.1/ilogtail-1.3.1.linux-arm64.tar.gz) | Linux | arm64  | d9a72b2ed836438b9d103d939d11cf1b0a73814e6bb3d0349dc0b6728b981eaf |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+```
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.3.1
+```
+
 ## 1.3.0
 
 ### 发布记录

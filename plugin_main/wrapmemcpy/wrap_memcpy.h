@@ -17,8 +17,22 @@
 #pragma once
 
 #include <string.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if defined(__x86_64__) && defined(__GNUC__)
 __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
-void* __wrap_memcpy(void* dest, const void* src, size_t n)
-{
+void* __wrap_memcpy(void* dest, const void* src, size_t n) {
     return memcpy(dest, src, n);
 }
+#else
+void* __wrap_memcpy(void* dest, const void* src, size_t n) {
+    return memmove(dest, src, n);
+}
+#endif
+
+#ifdef __cplusplus
+}
+#endif

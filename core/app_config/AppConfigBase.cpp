@@ -51,6 +51,7 @@ DECLARE_FLAG_BOOL(ilogtail_discard_old_data);
 DEFINE_FLAG_BOOL(enable_send_tps_smoothing, "avoid web server load burst", true);
 DEFINE_FLAG_BOOL(enable_flow_control, "if enable flow control", true);
 DEFINE_FLAG_STRING(default_buffer_file_path, "set current execution dir in default", "");
+DEFINE_FLAG_STRING(buffer_file_path, "set buffer dir", "");
 DEFINE_FLAG_STRING(default_mapping_config_path, "", "mapping_config.json");
 DEFINE_FLAG_DOUBLE(default_machine_cpu_usage_threshold, "machine level", 0.4);
 DEFINE_FLAG_BOOL(default_resource_auto_scale, "", false);
@@ -156,7 +157,6 @@ AppConfigBase::AppConfigBase() {
     mOpenStreamLog = false;
     mSendRequestConcurrency = INT32_FLAG(send_request_concurrency);
     mProcessThreadCount = INT32_FLAG(process_thread_count);
-    mBufferFilePath = STRING_FLAG(default_buffer_file_path);
     mMappingConfigPath = STRING_FLAG(default_mapping_config_path);
     mMachineCpuUsageThreshold = DOUBLE_FLAG(default_machine_cpu_usage_threshold);
     mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
@@ -573,9 +573,12 @@ void AppConfigBase::LoadResourceConf(const Json::Value& confJson) {
             mScaledCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
     }
 
+    // first set buffer_file_path, if buffer_file_path is null then set default_buffer_file_path
     if (confJson.isMember("buffer_file_path") && confJson["buffer_file_path"].isString())
         mBufferFilePath = confJson["buffer_file_path"].asString();
-    else
+    else if (STRING_FLAG(buffer_file_path) != "") 
+        mBufferFilePath = STRING_FLAG(buffer_file_path);
+    else 
         mBufferFilePath = STRING_FLAG(default_buffer_file_path);
 
     if (confJson.isMember("check_point_filename") && confJson["check_point_filename"].isString())
