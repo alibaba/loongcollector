@@ -31,6 +31,7 @@ const (
 	metricTimeNanoKey  = "__time_nano__"
 	metricValueKey     = "__value__"
 	metricValueTypeKey = "__type__"
+	metricFieldKey     = "__field__"
 )
 
 const (
@@ -52,6 +53,7 @@ type metricReader struct {
 	value     string
 	valueType string
 	timestamp string
+	fieldName string
 }
 
 type metricLabel struct {
@@ -60,11 +62,11 @@ type metricLabel struct {
 }
 
 func (r *metricReader) readNames() (metricName, fieldName string) {
-	idx := strings.LastIndexByte(r.name, ':')
-	if idx <= 0 {
+	if len(r.fieldName) == 0 || r.fieldName == "value" {
 		return r.name, "value"
 	}
-	return r.name[:idx], r.name[idx+1:]
+	name := strings.TrimSuffix(r.name, ":"+r.fieldName)
+	return name, r.fieldName
 }
 
 func (r *metricReader) readSortedLabels() ([]metricLabel, error) {
@@ -80,7 +82,7 @@ func (r *metricReader) readSortedLabels() ([]metricLabel, error) {
 	for i, v := range segments {
 		idx := strings.Index(v, "#$#")
 		if idx < 0 {
-			return nil, fmt.Errorf("failed to peed label key")
+			return nil, fmt.Errorf("failed to peek label key")
 		}
 		labels[i] = metricLabel{key: v[:idx], value: v[idx+3:]}
 	}
@@ -132,6 +134,7 @@ func (r *metricReader) reset() {
 	r.value = ""
 	r.valueType = ""
 	r.timestamp = ""
+	r.fieldName = ""
 }
 
 func (r *metricReader) set(log *protocol.Log) error {
@@ -148,6 +151,8 @@ func (r *metricReader) set(log *protocol.Log) error {
 			r.value = v.Value
 		case metricValueTypeKey:
 			r.valueType = v.Value
+		case metricFieldKey:
+			r.fieldName = v.Value
 		}
 	}
 	if len(r.name) == 0 || len(r.value) == 0 {

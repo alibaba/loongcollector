@@ -85,6 +85,7 @@ func TestFieldsExtend(t *testing.T) {
 						{Key: "__labels__", Value: "host#$#server01|region#$#uswest"},
 						{Key: "__time_nano__", Value: "1434055562000000000"},
 						{Key: "__type__", Value: "float"},
+						{Key: "__field__", Value: "value"},
 					},
 				},
 				{
@@ -94,6 +95,7 @@ func TestFieldsExtend(t *testing.T) {
 						{Key: "__labels__", Value: "host.dd#$#server02|region#$#uswest"},
 						{Key: "__time_nano__", Value: "1434055562000010000"},
 						{Key: "__type__", Value: "float"},
+						{Key: "__field__", Value: "value"},
 					},
 				},
 			},

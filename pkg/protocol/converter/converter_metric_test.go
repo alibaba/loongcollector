@@ -99,6 +99,14 @@ func Test_metricReader_readNames(t *testing.T) {
 			reader: &metricReader{
 				name: "aa:bb",
 			},
+			wantMetricName: "aa:bb",
+			wantFieldName:  "value",
+		},
+		{
+			reader: &metricReader{
+				name:      "aa:bb",
+				fieldName: "bb",
+			},
 			wantMetricName: "aa",
 			wantFieldName:  "bb",
 		},
@@ -107,6 +115,14 @@ func Test_metricReader_readNames(t *testing.T) {
 				name: ":",
 			},
 			wantMetricName: ":",
+			wantFieldName:  "value",
+		},
+		{
+			reader: &metricReader{
+				name:      "aa:value",
+				fieldName: "value",
+			},
+			wantMetricName: "aa:value",
 			wantFieldName:  "value",
 		},
 	}
