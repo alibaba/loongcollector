@@ -77,7 +77,7 @@ func (r *InputMock) Read(context ilogtail.PipelineContext) error {
 	r.Index++
 	group := models.NewGroup(models.NewMetadataWithMap(r.GroupMeta), models.NewTagsWithMap(r.GroupTags))
 	singleValue := models.NewSingleValueMetric("single_metrics_mock", models.MetricTypeCounter, models.NewTagsWithMap(r.Tags), time.Now().UnixNano(), r.Index)
-	values := models.NewMetricMultiValueValues()
+	values := models.NewMetricMultiValue()
 	values.Add("Index", float64(r.Index))
 	typedValues := models.NewMetricTypedValues()
 	for k, v := range r.Fields {

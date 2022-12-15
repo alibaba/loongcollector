@@ -73,8 +73,8 @@ func NewGroup(meta Metadata, tags Tags) *GroupInfo {
 	}
 }
 
-func NewMetric(name string, metricType MetricType, tags Tags, timestamp int64, value MetricValue, typedValues MetricTypedValues) *MetricEvent {
-	return &MetricEvent{
+func NewMetric(name string, metricType MetricType, tags Tags, timestamp int64, value MetricValue, typedValues MetricTypedValues) *Metric {
+	return &Metric{
 		Name:       name,
 		MetricType: metricType,
 		Timestamp:  uint64(timestamp),
@@ -84,29 +84,29 @@ func NewMetric(name string, metricType MetricType, tags Tags, timestamp int64, v
 	}
 }
 
-func NewSingleValueMetric[T constraints.IntUintFloat](name string, metricType MetricType, tags Tags, timestamp int64, value T) *MetricEvent {
-	return &MetricEvent{
+func NewSingleValueMetric[T constraints.IntUintFloat](name string, metricType MetricType, tags Tags, timestamp int64, value T) *Metric {
+	return &Metric{
 		Name:       name,
 		MetricType: metricType,
 		Timestamp:  uint64(timestamp),
 		Tags:       tags,
 		Value:      &MetricSingleValue{Value: float64(value)},
-		TypedValue: nil,
+		TypedValue: noopTypedValues,
 	}
 }
 
-func NewMultiValuesMetric(name string, metricType MetricType, tags Tags, timestamp int64, values MetricFloatValues) *MetricEvent {
-	return &MetricEvent{
+func NewMultiValuesMetric(name string, metricType MetricType, tags Tags, timestamp int64, values MetricFloatValues) *Metric {
+	return &Metric{
 		Name:       name,
 		MetricType: metricType,
 		Timestamp:  uint64(timestamp),
 		Tags:       tags,
 		Value:      &MetricMultiValue{Values: values},
-		TypedValue: nil,
+		TypedValue: noopTypedValues,
 	}
 }
 
-func NewMetricMultiValueValues() *MetricMultiValue {
+func NewMetricMultiValue() *MetricMultiValue {
 	return &MetricMultiValue{
 		Values: &keyValuesImpl[float64]{
 			keyValues: make(map[string]float64),
@@ -126,4 +126,22 @@ func NewMetricTypedValues() MetricTypedValues {
 	return &keyValuesImpl[*TypedValue]{
 		keyValues: make(map[string]*TypedValue),
 	}
+}
+
+func NewSpan(name, traceID, spanID string, kind SpanKind, startTime, endTime uint64, tags Tags, events []*SpanEvent, links []*SpanLink) *Span {
+	return &Span{
+		Name:      name,
+		TraceID:   traceID,
+		SpanID:    spanID,
+		Kind:      kind,
+		StartTime: startTime,
+		EndTime:   endTime,
+		Tags:      tags,
+		Events:    events,
+		Links:     links,
+	}
+}
+
+func NewByteArray(bytes []byte) ByteArray {
+	return ByteArray(bytes)
 }

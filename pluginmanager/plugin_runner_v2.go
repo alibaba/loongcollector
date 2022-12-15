@@ -303,7 +303,7 @@ func (p *pluginv2Runner) runFlusherInternal(cc *ilogtail.AsyncControl) {
 					continue
 				}
 				p.LogstoreConfig.Statistics.FlushLogMetric.Add(int64(len(item.Events)))
-				item.Group.Tags.Merge(loadAdditionalTags(p.LogstoreConfig.GlobalConfig))
+				item.Group.GetTags().Merge(loadAdditionalTags(p.LogstoreConfig.GlobalConfig))
 			}
 
 			// Flush LogGroups to all flushers.

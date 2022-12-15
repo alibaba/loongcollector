@@ -140,8 +140,8 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context ilogtai
 	for _, groupEvents := range in {
 
 		if p.Tags {
-			metadata := fmt.Sprintf("%v", groupEvents.Group.Metadata.Iterator())
-			tags := fmt.Sprintf("%v", groupEvents.Group.Tags.Iterator())
+			metadata := fmt.Sprintf("%v", groupEvents.Group.GetMetadata().Iterator())
+			tags := fmt.Sprintf("%v", groupEvents.Group.GetTags().Iterator())
 			if p.outLogger != nil {
 				p.outLogger.Infof("[Event] event %d, metadata %s, tags %s", len(groupEvents.Events), metadata, tags)
 			} else {
@@ -156,8 +156,8 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context ilogtai
 			switch event.GetType() {
 			case models.EventTypeMetric:
 				writer.WriteString("metric")
-			case models.EventTypeTrace:
-				writer.WriteString("trace")
+			case models.EventTypeSpan:
+				writer.WriteString("span")
 			case models.EventTypeLogging:
 				writer.WriteString("log")
 			}
@@ -186,9 +186,9 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context ilogtai
 
 			switch event.GetType() {
 			case models.EventTypeMetric:
-				p.writeMetricValues(writer, event.(*models.MetricEvent))
-			case models.EventTypeTrace:
-				p.writeTrace(writer, nil)
+				p.writeMetricValues(writer, event.(*models.Metric))
+			case models.EventTypeSpan:
+				p.writeSpan(writer, nil)
 			case models.EventTypeLogging:
 				p.writeLogBody(writer, nil)
 			}
@@ -205,18 +205,18 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context ilogtai
 	return nil
 }
 
-func (p *FlusherStdout) writeMetricValues(writer *jsoniter.Stream, metric *models.MetricEvent) {
+func (p *FlusherStdout) writeMetricValues(writer *jsoniter.Stream, metric *models.Metric) {
 	_, _ = writer.Write([]byte{','})
 	writer.WriteObjectField("metricType")
-	writer.WriteString(models.MetricTypeStrings[metric.MetricType])
+	writer.WriteString(models.MetricTypeTexts[metric.GetMetricType()])
 	_, _ = writer.Write([]byte{','})
-	if metric.Value.IsSingleValue() {
+	if metric.GetValue().IsSingleValue() {
 		writer.WriteObjectField("value")
-		writer.WriteFloat64(metric.Value.GetSingleValue())
+		writer.WriteFloat64(metric.GetValue().GetSingleValue())
 	} else {
 		writer.WriteObjectField("values")
 		writer.WriteObjectStart()
-		values := metric.Value.GetMultiValues()
+		values := metric.GetValue().GetMultiValues()
 		i := 0
 		for k, v := range values.Iterator() {
 			writer.WriteObjectField(k)
@@ -226,10 +226,10 @@ func (p *FlusherStdout) writeMetricValues(writer *jsoniter.Stream, metric *model
 			}
 			i++
 		}
-		if metric.TypedValue != nil && metric.TypedValue.Len() > 0 {
+		if metric.GetTypedValue().Len() > 0 {
 			_, _ = writer.Write([]byte{','})
 			i = 0
-			for k, v := range metric.TypedValue.Iterator() {
+			for k, v := range metric.GetTypedValue().Iterator() {
 				writer.WriteObjectField(k)
 				switch v.Type {
 				case models.ValueTypeString:
@@ -237,7 +237,7 @@ func (p *FlusherStdout) writeMetricValues(writer *jsoniter.Stream, metric *model
 				case models.ValueTypeBoolean:
 					writer.WriteBool(v.Value.(bool))
 				}
-				if i < metric.TypedValue.Len()-1 {
+				if i < metric.GetTypedValue().Len()-1 {
 					_, _ = writer.Write([]byte{','})
 				}
 				i++
@@ -247,11 +247,11 @@ func (p *FlusherStdout) writeMetricValues(writer *jsoniter.Stream, metric *model
 	}
 }
 
-func (p *FlusherStdout) writeTrace(writer *jsoniter.Stream, metric *models.MetricEvent) {
+func (p *FlusherStdout) writeSpan(writer *jsoniter.Stream, metric *models.Span) {
 	// TODO
 }
 
-func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, metric *models.MetricEvent) {
+func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, metric *models.Metric) {
 	// TODO
 }
 

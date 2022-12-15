@@ -14,16 +14,16 @@
 
 package models
 
-type MetricType uint32
+type MetricType int
 
 const (
 	// Common metrics types
 	_ MetricType = iota
+	MetricTypeUntyped
 	MetricTypeCounter
 	MetricTypeGauge
 	MetricTypeHistogram
 	MetricTypeSummary
-	MetricTypeUntyped
 
 	// Extended metrics types
 	MetricTypeMeter       // In bytetsd, meter is an extension of the counter type, which contains a counter value and a rate value within a period
@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	MetricTypeStrings = map[MetricType]string{
+	MetricTypeTexts = map[MetricType]string{
 		MetricTypeCounter:     "Counter",
 		MetricTypeGauge:       "Gauge",
 		MetricTypeHistogram:   "Histogram",
@@ -40,6 +40,18 @@ var (
 		MetricTypeMeter:       "Meter",
 		MetricTypeRateCounter: "RateCounter",
 	}
+
+	MetricTypeValues = map[string]MetricType{
+		"Counter":     MetricTypeCounter,
+		"Gauge":       MetricTypeGauge,
+		"Histogram":   MetricTypeHistogram,
+		"Summary":     MetricTypeSummary,
+		"Untyped":     MetricTypeUntyped,
+		"Meter":       MetricTypeMeter,
+		"RateCounter": MetricTypeRateCounter,
+	}
+
+	emptyMetricValue = &EmptyMetricValue{}
 )
 
 type MetricValue interface {
@@ -72,7 +84,7 @@ func (v *MetricSingleValue) GetSingleValue() float64 {
 }
 
 func (v *MetricSingleValue) GetMultiValues() MetricFloatValues {
-	return nil
+	return noopFloatValues
 }
 
 type MetricMultiValue struct {
@@ -96,10 +108,29 @@ func (v *MetricMultiValue) GetSingleValue() float64 {
 }
 
 func (v *MetricMultiValue) GetMultiValues() MetricFloatValues {
-	if v != nil {
+	if v != nil && v.Values != nil {
 		return v.Values
 	}
-	return nil
+	return noopFloatValues
+}
+
+type EmptyMetricValue struct {
+}
+
+func (v *EmptyMetricValue) IsSingleValue() bool {
+	return false
+}
+
+func (v *EmptyMetricValue) IsMultiValues() bool {
+	return false
+}
+
+func (v *EmptyMetricValue) GetSingleValue() float64 {
+	return 0
+}
+
+func (v *EmptyMetricValue) GetMultiValues() MetricFloatValues {
+	return noopFloatValues
 }
 
 type MetricFloatValues interface {
@@ -113,56 +144,100 @@ type MetricTypedValues interface {
 	KeyValues[*TypedValue]
 }
 
-type MetricEvent struct {
+// Defines a Metric which has one or more timeseries.  The following is a
+// brief summary of the Metric data model.  For more details, see:
+// https://github.com/alibaba/ilogtail/discussions/518
+// - Metric is composed of a metadata and data.
+// - Metadata part contains a name, description, unit, tags
+// - Data is one of the possible types (Counter, Gauge, Histogram, Summary).
+type Metric struct {
 	Name              string
-	MetricType        MetricType
+	Unit              string
+	Description       string
 	Timestamp         uint64
 	ObservedTimestamp uint64
-	Tags              Tags
-	Value             MetricValue
-	TypedValue        MetricTypedValues
+
+	Tags       Tags
+	MetricType MetricType
+	Value      MetricValue
+	TypedValue MetricTypedValues
 }
 
-func (m *MetricEvent) GetName() string {
+func (m *Metric) GetName() string {
 	if m != nil {
 		return m.Name
 	}
 	return ""
 }
 
-func (m *MetricEvent) SetName(name string) {
+func (m *Metric) SetName(name string) {
 	if m != nil {
 		m.Name = name
 	}
 }
 
-func (m *MetricEvent) GetTags() Tags {
+func (m *Metric) GetTags() Tags {
 	if m != nil {
 		return m.Tags
 	}
-	return nil
+	return noopStringValues
 }
 
-func (m *MetricEvent) GetType() EventType {
+func (m *Metric) GetType() EventType {
 	return EventTypeMetric
 }
 
-func (m *MetricEvent) GetTimestamp() uint64 {
+func (m *Metric) GetTimestamp() uint64 {
 	if m != nil {
 		return m.Timestamp
 	}
 	return 0
 }
 
-func (m *MetricEvent) GetObservedTimestamp() uint64 {
+func (m *Metric) GetObservedTimestamp() uint64 {
 	if m != nil {
 		return m.ObservedTimestamp
 	}
 	return 0
 }
 
-func (m *MetricEvent) SetObservedTimestamp(timestamp uint64) {
+func (m *Metric) SetObservedTimestamp(timestamp uint64) {
 	if m != nil {
 		m.ObservedTimestamp = timestamp
 	}
+}
+
+func (m *Metric) GetMetricType() MetricType {
+	if m != nil {
+		return m.MetricType
+	}
+	return MetricTypeUntyped
+}
+
+func (m *Metric) GetUnit() string {
+	if m != nil {
+		return m.Unit
+	}
+	return ""
+}
+
+func (m *Metric) GetDescription() string {
+	if m != nil {
+		return m.Description
+	}
+	return ""
+}
+
+func (m *Metric) GetValue() MetricValue {
+	if m != nil && m.Value != nil {
+		return m.Value
+	}
+	return emptyMetricValue
+}
+
+func (m *Metric) GetTypedValue() MetricTypedValues {
+	if m != nil && m.TypedValue != nil {
+		return m.TypedValue
+	}
+	return noopTypedValues
 }
