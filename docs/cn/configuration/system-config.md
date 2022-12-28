@@ -11,7 +11,7 @@
 | `default_access_key_id` | String | 写入 `SLS` 的 `access_id`，需要具备写入权限。                                                                                                                                                                                                                |
 | `default_access_key`    | String | 写入 `SLS` 的 `access_key`，需要具备写入权限。                                                                                                                                                                                                                 |
 | `config_update_interval`    | Int | 本地配置热加载的更新间隔，单位为秒。<br>**注意：此参数仅对社区版有效。**  |
-| `data_server_port`    | Int |<p>用于控制 `flusher_sls` 往 `SLS` 发送的协议类型。</p> <p>取值范围：433（默认），表示使用 `HTTPS` 协议发送；80表示使用 `HTTP` 协议发送。</p><p>如果使用`SLS`内网域名写入，建议使用`HTTP`协议发送，提高传输性能。</p> |
+| `data_server_port`    | Int |<p>用于控制 `flusher_sls` 往 `SLS` 发送的协议类型。</p> <p>取值范围：443（默认），表示使用 `HTTPS` 协议发送；80表示使用 `HTTP` 协议发送。</p><p>如果使用`SLS`内网域名写入，建议使用`HTTP`协议发送，提高传输性能。</p> |
 | `send_running_status`    | Bool | 为了更好的了解 `iLogtail` 的使用情况，以便做出更有针对性的发展规划，`iLogtail` 会上报一些脱敏后的运行统计信息。您也可以手动关闭此开关。                                              |
 
 ## 典型配置
