@@ -50,7 +50,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 2\. 执行命令`make`。
 
-3\. `output`目录结果。
+3\. 查看`output`目录结果。
 
 ```text
 ./output
