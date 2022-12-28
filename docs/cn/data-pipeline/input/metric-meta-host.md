@@ -9,11 +9,11 @@
 | 参数          | 类型      | 是否必选 | 说明                                                                                         |
 | ----------- | ------- | ---- | ------------------------------------------------------------------------------------------ |
 | Type        | String  | 是    | 插件类型                                                                                       |
-| CPU     | Boolean  | 否    | <p>是否开启主机CPU采集。</p><p>默认取值：是。</p> |
-| Memory | Boolean  | 否   | <p>是否开启主机Memory采集。</p><p>默认取值：是。</p> |
-| Net    | Boolean | 否    | <p>是否开启主机Net采集。</p><p>默认取值：否。</p> |
-| Disk    | Boolean | 否    | <p>是否开启主机Disk采集。</p><p>默认取值：否。</p> |
-| Process  | Boolean | 否    | <p>是否开启主机Process采集。</p><p>默认取值：否。</p>件。                                                                               |
+| CPU     | Boolean  | 否    | <p>是否开启主机CPU采集。</p><p>默认取值：true。</p> |
+| Memory | Boolean  | 否   | <p>是否开启主机Memory采集。</p><p>默认取值：true。</p> |
+| Net    | Boolean | 否    | <p>是否开启主机Net采集。</p><p>默认取值：false。</p> |
+| Disk    | Boolean | 否    | <p>是否开启主机Disk采集。</p><p>默认取值：false。</p> |
+| Process  | Boolean | 否    | <p>是否开启主机Process采集。</p><p>默认取值：false。</p>件。                                                                               |
 | ProcessNamesRegex  | String数组 | 否    | 进程名过滤规则，支持正则匹配。件。                                                                               |
 | Labels  | String字典 | 否    | 自定义Labels。件。                                                                               |
 | ProcessIntervalRound  | Integer | 否    | <p>Process采集间隔。</p><p>默认取值：5s。</p> |
