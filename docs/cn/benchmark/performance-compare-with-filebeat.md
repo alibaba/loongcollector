@@ -198,7 +198,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 
 以下显示了标准输出流不同采集的性能对比，可以看到iLogtail相比于Filebeat 有十倍级的性能优势（CPU的百分比为单核的百分比）：
 
-|  | FIlebeat | ILogtail |
+|  | Filebeat | ILogtail |
 | --- | --- | --- |
 | 1M/s | 20% | 2% |
 | 2M/s | 37% | 3.3% |
@@ -206,7 +206,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 
 以下显示了标准输出流不同采集的内存对比，可以看到logtail 和filebeat 整体内存相差不大，没有出现随采集流量上升内存暴涨情况：
 
-|  | FIlebeat | ILogtail |
+|  | Filebeat | ILogtail |
 | --- | --- | --- |
 | 1M/s | 136M | 90M |
 | 2M/s | 134M | 90M |
@@ -222,9 +222,9 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 
 
 
-以下显示了容器内文件不同采集的性能对比，Filebeat 容器内文件由于与container 采集共用采集组件，并省略了Kubernets meta 相关组件，所以相比于标准输出流采集有大性能提升，iLogtail 的容器内文件采集采用Polling + [inotify](https://link.zhihu.com/?target=http%3A//man7.org/linux/man-pages/man7/inotify.7.html)机制，同样相比于容器标准输出流采集有性能提升， 但可以看到iLogtail相比于Filebeat 有5倍级的性能优势（CPU的百分比为单核的百分比）：
+以下显示了容器内文件不同采集的性能对比，Filebeat 容器内文件由于与container 采集共用采集组件，并省略了Kubernets meta 相关组件，所以相比于标准输出流采集有大性能提升，iLogtail 的容器内文件采集采用Polling + [inotify](https://man7.org/linux/man-pages/man7/inotify.7.html)机制，同样相比于容器标准输出流采集有性能提升， 但可以看到iLogtail相比于Filebeat 有5倍级的性能优势（CPU的百分比为单核的百分比）：
 
-|  | FIlebeat | ILogtail |
+|  | Filebeat | ILogtail |
 | --- | --- | --- |
 | 1M/s | 5% | 1.3% |
 | 2M/s | 11% | 2% |
@@ -232,7 +232,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 
 以下显示了标准输出流不同采集的内存对比，可以看到logtail 和filebeat 整体内存相差不大，没有出现随采集流量上升内存暴涨情况：
 
-|  | FIlebeat | ILogtail |
+|  | Filebeat | ILogtail |
 | --- | --- | --- |
 | 1M/s | 136M | 126M |
 | 2M/s | 140M | 141M |
@@ -246,7 +246,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 #### 标准输出流采集配置膨胀对比
 以下显示了标准输出流不同采集的性能对比，可以看到Filebeat 由于容器采集与静态文件采集底层共用相同静态文件采集逻辑，会在标准输出流采集路径var/log/containers下存在大量正则匹配的工作，可以看到虽然采集数据量没有增加由于采集配置的增加，CPU消耗增加10%+，而iLogtail 针对容器采集模型全局共享容器路径发现机制，所以避免了正则逻辑带来的性能损耗（CPU的百分比为单核的百分比）。
 
-| 采集配置 | FIlebeat | ILogtail |
+| 采集配置 | Filebeat | ILogtail |
 | --- | --- | --- |
 | 50 | 65% | 5% |
 | 100 | 68% | 6.30% |
@@ -255,7 +255,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 
 在内存膨胀方面，可以看到不论是Filebeat 还是iLogtail 都存在由于采集配置增加导致的内存膨胀，但2者的膨胀大小都处于可接受范围。
 
-| 采集配置 | FIlebeat | ILogtail |
+| 采集配置 | Filebeat | ILogtail |
 | --- | --- | --- |
 | 50 | 148M | 95M |
 | 100 | 149M | 98M |
@@ -268,7 +268,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 #### 容器内文件采集配置膨胀对比
 以下显示了容器内文件采集不同采集器的性能对比，可以看到Filebeat 静态文件采集由于避免标准输出流通用路径正则，相较于标准增加CPU消耗较少，而iLogtail CPU 变化同样很小，且相比于标准输出流采集性能略好（CPU的百分比为单核的百分比）。
 
-| 采集配置 | FIlebeat | ILogtail |
+| 采集配置 | Filebeat | ILogtail |
 | --- | --- | --- |
 | 50 | 16% | 4.30% |
 | 100 | 16.30% | 4.30% |
@@ -277,7 +277,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 
 在内存膨胀方面，同样可以看到不论是Filebeat 还是iLogtail 都存在由于采集配置增加导致的内存膨胀，但2者的膨胀大小都处于可接受范围。
 
-| 采集配置 | FIlebeat | ILogtail |
+| 采集配置 | Filebeat | ILogtail |
 | --- | --- | --- |
 | 50 | 142M | 99M |
 | 100 | 145M | 104M |
@@ -299,7 +299,7 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 
 ​
 
-和上述试验类似可以看到CPU消耗方面容器文件采集略好于容器标准输出流采集性能（CPU的百分比为单核的百分比），主要是由于容器文件采集底层Polling + [inotify](https://link.zhihu.com/?target=http%3A//man7.org/linux/man-pages/man7/inotify.7.html)机制，感兴趣的同学可以阅读[Logtail技术分享一](https://zhuanlan.zhihu.com/p/29303600)了解更多内容。
+和上述试验类似可以看到CPU消耗方面容器文件采集略好于容器标准输出流采集性能（CPU的百分比为单核的百分比），主要是由于容器文件采集底层Polling + [inotify](https://man7.org/linux/man-pages/man7/inotify.7.html)机制，感兴趣的同学可以阅读[Logtail技术分享一](https://zhuanlan.zhihu.com/p/29303600)了解更多内容。
 
 | 速率 | 容器文件采集 | 标准输出流采集 |
 | --- | --- | --- |
@@ -330,12 +330,12 @@ Filebeat 与 iLogtail 的对比项主要包含以下内容：标准输出流采�
 | 容器文件采集多配置性能 | 同流量输入下，随着采集配置增加，Filebeat CPU 增加量为iLogtail CPU增加量的2倍。 | iLogtail 与Filebeat 都会因采集配置增加产生内存膨胀，都处于可接受范围。 |
 
 ## **为什么Filebeat 容器标准输出与文件采集差异巨大？**
-通过上述试验可以看到FIlebeat 在不同工作模式下有较大的CPU差异，通过dump 容器标准输出流采集的pprof 可以得到如下火焰图，可以看到Filebeat 容器采集下的add_kubernetes_metadata 插件是性能瓶颈，同时FIlebeat 的add_kubernetes_metadata 采用与每个节点监听api-server 模式，也存在api-server 压力问题。
+通过上述试验可以看到Filebeat 在不同工作模式下有较大的CPU差异，通过dump 容器标准输出流采集的pprof 可以得到如下火焰图，可以看到Filebeat 容器采集下的add_kubernetes_metadata 插件是性能瓶颈，同时Filebeat 的add_kubernetes_metadata 采用与每个节点监听api-server 模式，也存在api-server 压力问题。
 ![image.png](https://cdn.nlark.com/yuque/0/2022/png/22279413/1641537116957-d00ae947-476c-45a8-9c14-3335231ac546.png#clientId=uc89d3166-a47e-4&crop=0&crop=0&crop=1&crop=1&from=paste&height=552&id=ua052289e&margin=%5Bobject%20Object%5D&name=image.png&originHeight=1104&originWidth=2406&originalType=binary&ratio=1&rotation=0&showTitle=false&size=2258463&status=done&style=none&taskId=u20d727bb-d943-4bd9-ae54-c3e76ef8e6d&title=&width=1203)
 而iLogtail 取kubernetes meta 完全是兼容kubernetes CRI 协议，直接通过kubernets sandbox 进行meta 数据读取，保证了iLogtail 的高性能采集效率。
 ### ![image.png](https://cdn.nlark.com/yuque/0/2022/png/22279413/1641537114447-5ac3bcb9-116d-4bff-b2c0-d55be32ca939.png#clientId=uc89d3166-a47e-4&crop=0&crop=0&crop=1&crop=1&from=paste&id=ud0e5bd3d&margin=%5Bobject%20Object%5D&name=image.png&originHeight=136&originWidth=572&originalType=url&ratio=1&rotation=0&showTitle=false&size=27722&status=done&style=none&taskId=u6e4121cd-0024-42dc-a6cf-411f369c34c&title=)
 ## **iLogtail DaemonSet 场景优化**
-通过以上对比，可以看到iLogtail 相比于Filebeat 具有了优秀的内存以及CPU 消耗，有小伙伴可能好奇iLogtail 拥有如此极致性能背后原因，下文主要讲解iLogtail Daemonset 场景下的优化，如何标准输出流相比于FIlebeat 拥有10倍性能，其他具体优化措施请参考：[Logtail技术分享一](https://zhuanlan.zhihu.com/p/29303600)[与 Logtail技术分享二](https://www.sohu.com/a/205324880_465959)。
+通过以上对比，可以看到iLogtail 相比于Filebeat 具有了优秀的内存以及CPU 消耗，有小伙伴可能好奇iLogtail 拥有如此极致性能背后原因，下文主要讲解iLogtail Daemonset 场景下的优化，如何标准输出流相比于Filebeat 拥有10倍性能，其他具体优化措施请参考：[Logtail技术分享一](https://zhuanlan.zhihu.com/p/29303600)[与 Logtail技术分享二](https://www.sohu.com/a/205324880_465959)。
 首先对于标准输出流场景，相比于其他开源采集器，例如Filebeat 或Fluentd。一般都是通过监听var/log/containers** 或 **/var/log/pods/ ** **实现容器标准输出流文件的采集，比如/var/log/pods/ 的路径结构为： /var/log/pods/<namespace>_<pod_name>_<pod_id>/<container_name>/， 通过此路径复用物理机静态文件采集模式进行采集。
 ![image.png](https://cdn.nlark.com/yuque/0/2022/png/22279413/1641537114938-4e5607fc-25c3-4059-a9c9-722f402912c6.png#clientId=uc89d3166-a47e-4&crop=0&crop=0&crop=1&crop=1&from=paste&id=u804ad961&margin=%5Bobject%20Object%5D&name=image.png&originHeight=272&originWidth=2268&originalType=url&ratio=1&rotation=0&showTitle=false&size=731953&status=done&style=none&taskId=udbf1b619-feca-4c97-acac-f56eda1c085&title=)
 而对于iLogtail，做到了容器化的全支持，iLogtail 通过发现机制，全局维护对Node 节点容器的列表，并实时监听与维护此容器列表。当我们拥有容器列表后，我们便具有了如下优势：
