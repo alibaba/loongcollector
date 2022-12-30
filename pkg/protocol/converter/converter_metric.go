@@ -68,7 +68,7 @@ func (m metricLabels) Len() int {
 }
 
 func (m metricLabels) Less(i, j int) bool {
-	return m[i].key < m[j].key || m[i].value < m[j].value
+	return m[i].key < m[j].key
 }
 
 func (m metricLabels) Swap(i, j int) {
