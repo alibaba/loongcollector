@@ -63,7 +63,7 @@ mysql,host=Vm-Req-170328120400894271-tianchi113855.tc,server=rm-bp1eomqfte2vj91t
 
 var txtWithDotNames = `
 cpu.load,host=server01,region=uswest value=1 1434055562000000000
-cpu.load,host.dd=server02,region=uswest value=3 1434055562000010000
+cpu.load,host.dd=server02,region=uswest tt="xx",value=3 1434055562000010000
 `
 
 func TestFieldsExtend(t *testing.T) {
@@ -86,6 +86,16 @@ func TestFieldsExtend(t *testing.T) {
 						{Key: "__time_nano__", Value: "1434055562000000000"},
 						{Key: "__type__", Value: "float"},
 						{Key: "__field__", Value: "value"},
+					},
+				},
+				{
+					Contents: []*protocol.Log_Content{
+						{Key: "__name__", Value: "cpu.load:tt"},
+						{Key: "__value__", Value: "xx"},
+						{Key: "__labels__", Value: "host.dd#$#server02|region#$#uswest"},
+						{Key: "__time_nano__", Value: "1434055562000010000"},
+						{Key: "__type__", Value: "string"},
+						{Key: "__field__", Value: "tt"},
 					},
 				},
 				{
@@ -134,10 +144,19 @@ func TestFieldsExtend(t *testing.T) {
 		}
 		assert.Nil(t, err)
 		assert.Len(t, logs, len(testCase.wantLogs))
-		for i := 0; i < len(testCase.wantLogs); i++ {
-			assert.ElementsMatch(t, testCase.wantLogs[i].Contents, logs[i].Contents)
-		}
+		assert.ElementsMatch(t, convertLog2Map(testCase.wantLogs), convertLog2Map(logs))
 	}
+}
+
+func convertLog2Map(logs []*protocol.Log) (mapLogs []map[string]string) {
+	for _, log := range logs {
+		m := map[string]string{}
+		for _, v := range log.Contents {
+			m[v.Key] = v.Value
+		}
+		mapLogs = append(mapLogs, m)
+	}
+	return mapLogs
 }
 
 func TestNormal(t *testing.T) {

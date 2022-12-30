@@ -61,6 +61,20 @@ type metricLabel struct {
 	value string
 }
 
+type metricLabels []metricLabel
+
+func (m metricLabels) Len() int {
+	return len(m)
+}
+
+func (m metricLabels) Less(i, j int) bool {
+	return m[i].key < m[j].key || m[i].value < m[j].value
+}
+
+func (m metricLabels) Swap(i, j int) {
+	m[i], m[j] = m[j], m[i]
+}
+
 func (r *metricReader) readNames() (metricName, fieldName string) {
 	if len(r.fieldName) == 0 || r.fieldName == "value" {
 		return r.name, "value"
@@ -75,16 +89,58 @@ func (r *metricReader) readSortedLabels() ([]metricLabel, error) {
 		return nil, nil
 	}
 
-	segments := strings.SplitN(r.labels, "|", n)
-	sort.Strings(segments)
+	labels := make([]metricLabel, 0, n)
+	remainLabels := r.labels
+	lastIndex := -1
+	label := ""
+	key := ""
 
-	labels := make([]metricLabel, len(segments))
-	for i, v := range segments {
-		idx := strings.Index(v, "#$#")
-		if idx < 0 {
-			return nil, fmt.Errorf("failed to peek label key")
+	for len(remainLabels) > 0 {
+		endIdx := strings.Index(remainLabels, "|")
+		if endIdx < 0 {
+			label = remainLabels
+			remainLabels = ""
+		} else {
+			label = remainLabels[:endIdx]
+			remainLabels = remainLabels[endIdx+1:]
 		}
-		labels[i] = metricLabel{key: v[:idx], value: v[idx+3:]}
+		splitIdx := strings.Index(label, "#$#")
+		if splitIdx < 0 {
+			if lastIndex >= 0 {
+				labels[lastIndex].value += "|"
+				labels[lastIndex].value += label
+				continue
+			}
+			if len(key) == 0 {
+				key = label
+				continue
+			}
+			key += "|"
+			key += label
+			continue
+		}
+
+		if len(key) > 0 {
+			key += "|"
+			key += label[:splitIdx]
+		} else {
+			key = label[:splitIdx]
+		}
+
+		labels = append(labels, metricLabel{key: key, value: label[splitIdx+3:]})
+
+		lastIndex++
+		key = ""
+
+		if endIdx < 0 {
+			break
+		}
+	}
+
+	sort.Sort(metricLabels(labels))
+
+	if len(key) > 0 {
+		return labels, fmt.Errorf("found miss matching key: %s", key)
 	}
 
 	return labels, nil
