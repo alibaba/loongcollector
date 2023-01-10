@@ -669,6 +669,8 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                     config->mUnAcceptDirPattern = GetStringVector(value["dir_pattern_black_list"]);
                 }
 
+                // TODO: the following codes (line 673 - line 724) seem to be the same as the codes in line 816 - line
+                // 874. Remove the following codes in the future.
                 if (value.isMember("merge_type") && value["merge_type"].isString()) {
                     string mergeType = value["merge_type"].asString();
 
@@ -828,17 +830,35 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                 string logTZ = value["log_tz"].asString();
                 int logTZSecond = 0;
                 bool adjustFlag = value["tz_adjust"].asBool();
-                if (adjustFlag && !ParseTimeZoneOffsetSecond(logTZ, logTZSecond)) {
-                    LOG_ERROR(sLogger, ("invalid log time zone set", logTZ));
-                    config->mTimeZoneAdjust = false;
+                if (adjustFlag) {
+                    if (config->mTimeFormat.empty()) {
+                        LOG_WARNING(sLogger,
+                                    ("choose to adjust log time zone, but time format is not specified",
+                                     "use system time as log time instead")("project", config->mProjectName)(
+                                        "logstore", config->mCategory)("config", config->mConfigName));
+                        config->mTimeZoneAdjust = false;
+                    } else if ((logType == DELIMITER_LOG || logType == JSON_LOG) && config->mTimeKey.empty()) {
+                        LOG_WARNING(sLogger,
+                                    ("choose to adjust log time zone, but time key is not specified",
+                                     "use system time as log time instead")("project", config->mProjectName)(
+                                        "logstore", config->mCategory)("config", config->mConfigName));
+                        config->mTimeZoneAdjust = false;
+                    } else if (!ParseTimeZoneOffsetSecond(logTZ, logTZSecond)) {
+                        LOG_WARNING(sLogger,
+                                    ("invalid log time zone specified, will parse log time without time zone adjusted",
+                                     logTZ)("project", config->mProjectName)("logstore", config->mCategory)(
+                                        "config", config->mConfigName));
+                        config->mTimeZoneAdjust = false;
+                    } else {
+                        config->mTimeZoneAdjust = adjustFlag;
+                        config->mLogTimeZoneOffsetSecond = logTZSecond;
+                        LOG_INFO(sLogger,
+                                 ("set log time zone", logTZ)("project", config->mProjectName)(
+                                     "logstore", config->mCategory)("config", config->mConfigName));
+                    }
                 } else {
                     config->mTimeZoneAdjust = adjustFlag;
                     config->mLogTimeZoneOffsetSecond = logTZSecond;
-                    if (adjustFlag) {
-                        LOG_INFO(sLogger,
-                                 ("set log timezone adjust, project", config->mProjectName)(
-                                     "logstore", config->mCategory)("time zone", logTZ)("offset seconds", logTZSecond));
-                    }
                 }
             }
 

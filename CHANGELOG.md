@@ -35,3 +35,5 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
+
+- [public] [both] [fixed] ignore time zone adjustment in config when using system time as log time

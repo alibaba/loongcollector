@@ -152,6 +152,261 @@ public:
         APSARA_TEST_EQUAL(oss.str(), answer);
         LOG_INFO(sLogger, ("TestReplaceEnvVarRefInConf() end", time(NULL)));
     }
+
+    void TestTimeZoneAdjustment() {
+        std::string configStr = R""""({
+    "metrics" : 
+    {
+        "##1.0##test$regex-1" : 
+		{
+			"category" : "test",
+			"file_pattern" : "*.log",
+			"keys" : 
+			[
+				"time,msg"
+			],
+			"log_begin_reg" : ".*",
+			"log_path" : ".",
+			"log_type" : "common_reg_log",
+			"log_tz" : "",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"regex" : 
+			[
+				"\\[([^]]+)]\\s(.*)"
+			],
+			"timeformat" : "",
+			"tz_adjust" : false
+		},
+        "##1.0##test$regex-2" : 
+		{
+			"category" : "test",
+			"file_pattern" : "*.log",
+			"keys" : 
+			[
+				"time,msg"
+			],
+			"log_begin_reg" : ".*",
+			"log_path" : ".",
+			"log_type" : "common_reg_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"regex" : 
+			[
+				"\\[([^]]+)]\\s(.*)"
+			],
+			"timeformat" : "",
+			"tz_adjust" : true
+		},
+        "##1.0##test$regex-3" : 
+		{
+			"category" : "test",
+			"file_pattern" : "*.log",
+			"keys" : 
+			[
+				"time,msg"
+			],
+			"log_begin_reg" : ".*",
+			"log_path" : ".",
+			"log_type" : "common_reg_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"regex" : 
+			[
+				"\\[([^]]+)]\\s(.*)"
+			],
+			"timeformat" : "%Y-%M-%dT%h:%m:%s",
+			"tz_adjust" : true
+		},
+        "##1.0##test$json-1" : 
+		{
+			"category" : "test",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "json_log",
+			"log_tz" : "",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "",
+			"timeformat" : "",
+			"tz_adjust" : false
+		},
+        "##1.0##test$json-2" : 
+		{
+			"category" : "test",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "json_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "",
+			"timeformat" : "",
+			"tz_adjust" : true
+		},
+        "##1.0##test$json-3" : 
+		{
+			"category" : "test",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "json_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "time",
+			"timeformat" : "",
+			"tz_adjust" : true
+		},
+        "##1.0##test$json-4" : 
+		{
+			"category" : "test",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "json_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "",
+			"timeformat" : "%Y-%M-%dT%h:%m:%s",
+			"tz_adjust" : true
+		},
+        "##1.0##test$json-5" : 
+		{
+			"category" : "test",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "json_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "time",
+			"timeformat" : "%Y-%M-%dT%h:%m:%s",
+			"tz_adjust" : true
+		},
+        "##1.0##test$delimiter-1" : 
+		{
+			"category" : "test",
+			"column_keys" : 
+			[
+				"time",
+				"msg"
+			],
+			"delimiter_quote": "'",
+			"delimiter_separator": " ",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "delimiter_log",
+			"log_tz" : "",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "",
+			"timeformat" : "",
+			"tz_adjust" : false
+		},
+        "##1.0##test$delimiter-2" : 
+		{
+			"category" : "test",
+			"column_keys" : 
+			[
+				"time",
+				"msg"
+			],
+			"delimiter_quote": "'",
+			"delimiter_separator": " ",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "delimiter_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "",
+			"timeformat" : "",
+			"tz_adjust" : true
+		},
+        "##1.0##test$delimiter-3" : 
+		{
+			"category" : "test",
+			"column_keys" : 
+			[
+				"time",
+				"msg"
+			],
+			"delimiter_quote": "'",
+			"delimiter_separator": " ",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "delimiter_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "time",
+			"timeformat" : "",
+			"tz_adjust" : true
+		},
+        "##1.0##test$delimiter-4" : 
+		{
+			"category" : "test",
+			"column_keys" : 
+			[
+				"time",
+				"msg"
+			],
+			"delimiter_quote": "'",
+			"delimiter_separator": " ",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "delimiter_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "",
+			"timeformat" : "%Y-%M-%dT%h:%m:%s",
+			"tz_adjust" : true
+		},
+        "##1.0##test$delimiter-5" : 
+		{
+			"category" : "test",
+			"column_keys" : 
+			[
+				"time",
+				"msg"
+			],
+			"delimiter_quote": "'",
+			"delimiter_separator": " ",
+			"file_pattern" : "*.log",
+			"log_path" : ".",
+			"log_type" : "delimiter_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"time_key": "time",
+			"timeformat" : "%Y-%M-%dT%h:%m:%s",
+			"tz_adjust" : true
+		}
+    }
+})"""";
+        Json::Reader reader;
+        Json::Value root;
+        APSARA_TEST_TRUE(reader.parse(configStr, root));
+
+        ConfigManager::GetInstance()->LoadJsonConfig(root);
+        auto configNameEntityMap = ConfigManager::GetInstance()->GetAllConfig();
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$regex-1"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$regex-2"]->mTimeZoneAdjust);
+        APSARA_TEST_TRUE(configNameEntityMap["##1.0##test$regex-3"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$json-1"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$json-2"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$json-3"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$json-4"]->mTimeZoneAdjust);
+        APSARA_TEST_TRUE(configNameEntityMap["##1.0##test$json-5"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$delimiter-1"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$delimiter-2"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$delimiter-3"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$delimiter-4"]->mTimeZoneAdjust);
+        APSARA_TEST_TRUE(configNameEntityMap["##1.0##test$delimiter-5"]->mTimeZoneAdjust);
+    }
 };
 
 TEST_F(ConfigManagerBaseUnittest, TestReplaceEnvVarRefInStr) {
@@ -159,6 +414,10 @@ TEST_F(ConfigManagerBaseUnittest, TestReplaceEnvVarRefInStr) {
 }
 
 TEST_F(ConfigManagerBaseUnittest, TestReplaceEnvVarRefInConf) {
+    TestReplaceEnvVarRefInConf();
+}
+
+TEST_F(ConfigManagerBaseUnittest, TestTimeZoneAdjustment) {
     TestReplaceEnvVarRefInConf();
 }
 

@@ -240,7 +240,6 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
         return true;
     } else if (!mDiscardUnmatch) {
         LogParser::AddUnmatchLog(buffer, logGroup, logGroupSize);
-        return true;
     }
     return false;
 }

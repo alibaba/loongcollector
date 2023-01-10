@@ -413,8 +413,9 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 int32_t successLogSize = 0;
                 int32_t parseStartTime = (int32_t)time(NULL);
                 for (uint32_t i = 0; i < lines; i++) {
-                    if (!logFileReader->ParseLogLine(
-                            buffer + logIndex[i], logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize)) {
+                    bool successful = logFileReader->ParseLogLine(
+                            buffer + logIndex[i], logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+                    if (!successful) {
                         ++parseFailures;
                         if (error == PARSE_LOG_REGEX_ERROR)
                             ++regexMatchFailures;
@@ -433,7 +434,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                 LogParser::AddLog(
                                     logPtr, config->mAdvancedConfig.mRawLogTag, buffer + logIndex[i], logGroupSize);
                             }
-                            if (config->mTimeZoneAdjust) {
+                            if (successful && config->mTimeZoneAdjust) {
                                 LogParser::AdjustLogTime(
                                     logPtr, config->mLogTimeZoneOffsetSecond, localTimeZoneOffsetSecond);
                             }

@@ -259,6 +259,7 @@ public:
     void TestParseTimestampNotInSeconds();
     void TestRegexLogLineParserWithTimeIndex();
     void TestLogParserParseLogTime();
+    void TestLogParsingError();
 
     static void SetUpTestCase() // void Setup()
     {
@@ -280,6 +281,7 @@ APSARA_UNIT_TEST_CASE(LogParserUnittest, TestParseTimestampNotInSeconds, 4);
 APSARA_UNIT_TEST_CASE(LogParserUnittest, TestRegexLogLineParserWithTimeIndex, 5);
 APSARA_UNIT_TEST_CASE(LogParserUnittest, TestLogParserParseLogTime, 6);
 APSARA_UNIT_TEST_CASE(LogParserUnittest, TestAdjustLogTime, 7);
+APSARA_UNIT_TEST_CASE(LogParserUnittest, TestLogParsingError, 8);
 
 void LogParserUnittest::TestApsaraEasyReadLogTimeParser() {
     LOG_INFO(sLogger, ("TestApsaraEasyReadLogTimeParser() begin", time(NULL)));
@@ -350,7 +352,6 @@ void LogParserUnittest::TestApsaraEasyReadLogTimeParser() {
 }
 
 void LogParserUnittest::TestAdjustLogTime() {
-    
     LOG_INFO(sLogger, ("TestAdjustLogTime() begin", time(NULL)));
     Config* config = new Config("", "", APSARA_LOG, "", "", "1000000_proj", false, 2, -1, "category");
     config->mAdvancedConfig.mAdjustApsaraMicroTimezone = true;
@@ -364,17 +365,17 @@ void LogParserUnittest::TestAdjustLogTime() {
         string logLine = "[2013-09-12 22:18:28.819139]\tA:B";
         const char* pLogLine = logLine.c_str();
         bool ret = LogParser::ApsaraEasyReadLogLineParser(
-            pLogLine, logGroup, true, timeStr, lastLogTime, "", "", "", "", error, logGroupSize, 3600*8, true);
+            pLogLine, logGroup, true, timeStr, lastLogTime, "", "", "", "", error, logGroupSize, 3600 * 8, true);
         APSARA_TEST_EQUAL(logGroup.logs_size(), 1);
-        sls_logs::Log* logPtr = logGroup.mutable_logs(0);    
+        sls_logs::Log* logPtr = logGroup.mutable_logs(0);
         const Log& firstLog = logGroup.logs(0);
-        for (int32_t conIdx = 0; conIdx < logPtr->contents_size(); ++conIdx) {  
-            if ("microtime"==firstLog.contents(conIdx).key()) {
+        for (int32_t conIdx = 0; conIdx < logPtr->contents_size(); ++conIdx) {
+            if ("microtime" == firstLog.contents(conIdx).key()) {
                 APSARA_TEST_EQUAL(firstLog.contents(conIdx).value(), "1378966708819139");
             }
         }
     }
-    
+
     {
         LogGroup logGroup;
         string timeStr = "";
@@ -384,12 +385,12 @@ void LogParserUnittest::TestAdjustLogTime() {
         string logLine = "[2013-09-12 22:18:28.819]\tA:B";
         const char* pLogLine = logLine.c_str();
         bool ret = LogParser::ApsaraEasyReadLogLineParser(
-            pLogLine, logGroup, true, timeStr, lastLogTime, "", "", "", "", error, logGroupSize, 3600*8, true);
+            pLogLine, logGroup, true, timeStr, lastLogTime, "", "", "", "", error, logGroupSize, 3600 * 8, true);
         APSARA_TEST_EQUAL(logGroup.logs_size(), 1);
-        sls_logs::Log* logPtr = logGroup.mutable_logs(0);    
+        sls_logs::Log* logPtr = logGroup.mutable_logs(0);
         const Log& firstLog = logGroup.logs(0);
-        for (int32_t conIdx = 0; conIdx < logPtr->contents_size(); ++conIdx) {  
-            if ("microtime"==firstLog.contents(conIdx).key()) {
+        for (int32_t conIdx = 0; conIdx < logPtr->contents_size(); ++conIdx) {
+            if ("microtime" == firstLog.contents(conIdx).key()) {
                 APSARA_TEST_EQUAL(firstLog.contents(conIdx).value(), "1378966708819000");
             }
         }
@@ -404,17 +405,17 @@ void LogParserUnittest::TestAdjustLogTime() {
         string logLine = "[2013-09-12 22:18:28.8191390]\tA:B";
         const char* pLogLine = logLine.c_str();
         bool ret = LogParser::ApsaraEasyReadLogLineParser(
-            pLogLine, logGroup, true, timeStr, lastLogTime, "", "", "", "", error, logGroupSize, 3600*8, true);
+            pLogLine, logGroup, true, timeStr, lastLogTime, "", "", "", "", error, logGroupSize, 3600 * 8, true);
         APSARA_TEST_EQUAL(logGroup.logs_size(), 1);
-        sls_logs::Log* logPtr = logGroup.mutable_logs(0);    
+        sls_logs::Log* logPtr = logGroup.mutable_logs(0);
         const Log& firstLog = logGroup.logs(0);
-        for (int32_t conIdx = 0; conIdx < logPtr->contents_size(); ++conIdx) {  
-            if ("microtime"==firstLog.contents(conIdx).key()) {
+        for (int32_t conIdx = 0; conIdx < logPtr->contents_size(); ++conIdx) {
+            if ("microtime" == firstLog.contents(conIdx).key()) {
                 APSARA_TEST_EQUAL(firstLog.contents(conIdx).value(), "1378966708819139");
             }
         }
     }
-    
+
     LOG_INFO(sLogger, ("TestAdjustLogTime() end", time(NULL)));
 }
 
@@ -429,7 +430,7 @@ void LogParserUnittest::TestApsaraEasyReadLogLineParser() {
         uint32_t logGroupSize = 0;
         ret = LogParser::ApsaraEasyReadLogLineParser(
             logLine[i], logGroup, true, timeStr, lastLogTime, "", "", "", "", error, logGroupSize, 0, false);
-        if (i == 27) //empty string
+        if (i == 27) // empty string
         {
             APSARA_TEST_TRUE_DESC(!ret, "Empty string should parse fail.");
             continue;
@@ -646,26 +647,26 @@ void LogParserUnittest::TestLogTimeRegexParser() {
 
     std::string timeFormat("%Y-%m-%d %H:%M:%S");
     time_t logTime = -1;
-    bool flag = LogFileReader::ParseLogTime(logBufferRight, &reg2, logTime, timeFormat, 0);
+    bool flag = LogFileReader::ParseLogTime(logBufferRight, &reg2, logTime, timeFormat);
     APSARA_TEST_EQUAL(flag, true);
     APSARA_TEST_EQUAL(logTime, 1530734462);
 
     logTime = -1;
-    flag = LogFileReader::ParseLogTime(logBufferWrong, &reg1, logTime, timeFormat, 0);
+    flag = LogFileReader::ParseLogTime(logBufferWrong, &reg1, logTime, timeFormat);
     APSARA_TEST_EQUAL(flag, false);
     APSARA_TEST_EQUAL(logTime, -1);
 
-    flag = LogFileReader::ParseLogTime(logBufferRight, &reg2, logTime, timeFormat, 0);
+    flag = LogFileReader::ParseLogTime(logBufferRight, &reg2, logTime, timeFormat);
     APSARA_TEST_EQUAL(flag, true);
     APSARA_TEST_EQUAL(logTime, 1530734462); // 2018-07-05 04:01:02 unix time: 1530734462
 
     logTime = -1;
-    flag = LogFileReader::ParseLogTime(logBufferRight, &reg1, logTime, timeFormat, 0);
+    flag = LogFileReader::ParseLogTime(logBufferRight, &reg1, logTime, timeFormat);
     APSARA_TEST_EQUAL(flag, true);
     APSARA_TEST_EQUAL(logTime, 1530734462); // 2018-07-05 04:01:02 unix time: 1530734462
 
     logTime = -1;
-    flag = LogFileReader::ParseLogTime(logBufferRight2, &reg1, logTime, timeFormat, 0);
+    flag = LogFileReader::ParseLogTime(logBufferRight2, &reg1, logTime, timeFormat);
     APSARA_TEST_EQUAL(flag, true);
     APSARA_TEST_EQUAL(logTime, 1533645038); // 2018-08-07 20:30:38 unix time: 1533645038
 
@@ -722,7 +723,7 @@ void LogParserUnittest::TestParseTimestampNotInSeconds() {
                                            "",
                                            "",
                                            "",
-                                           error, 
+                                           error,
                                            0);
         LOG_INFO(sLogger,
                  ("Case", i)("ret", ret)(outTimeStr, outTime)("preciseTimestamp", preciseTimestamp)("error", error));
@@ -747,7 +748,7 @@ void LogParserUnittest::TestParseTimestampNotInSeconds() {
                                        "",
                                        "",
                                        "",
-                                       error, 
+                                       error,
                                        0);
     LOG_INFO(sLogger, ("Bad case", ret)("error", error));
     EXPECT_FALSE(ret);
@@ -879,6 +880,104 @@ void LogParserUnittest::TestLogParserParseLogTime() {
         APSARA_TEST_EQUAL(preciseTimestamp, c.exceptedPreciseTimestamp);
     }
     LOG_INFO(sLogger, ("TestLogParserParseLogTime() end", time(NULL)));
+}
+
+void LogParserUnittest::TestLogParsingError() {
+    LOG_INFO(sLogger, ("TestLogParsingError() begin", time(NULL)));
+
+    string logstore = "test";
+    vector<string> keys{"time", "message"};
+    uint32_t timeIndex = 0;
+
+    LogGroup logGroup;
+    uint32_t logGroupSize = 0;
+    string lastTimeStr;
+    time_t lastLogTime = 0;
+    ParseLogError error;
+    PreciseTimestampConfig preciseTimestampConfig;
+
+    boost::regex correctReg = boost::regex("\\[([^\\]]+)\\]\\s(\\w+)");
+    boost::regex wrongReg = boost::regex("\\[([^\\]]+)\\](\\w+)");
+
+    const char* correctTimeFormat = "%Y-%m-%d %H:%M:%S";
+    const char* wrongTimeFormat = "%Y-%m-%dT%H:%M:%S";
+
+    string timeStr = "2023-10-31 21:03:49";
+    string regexStr = "[" + timeStr + "] sample";
+    string apasaraStr = "[2023-10-31A21:03:49]\t[trace_id:787]\t[ERROR]\tother\tcount:45";
+
+    struct tm sTm;
+    memset(&sTm, 0, sizeof(tm));
+    strptime(timeStr.c_str(), correctTimeFormat, &sTm);
+    time_t logTime = mktime(&sTm);
+
+    bool flag = LogParser::ApsaraEasyReadLogLineParser(
+            apasaraStr.c_str(), logGroup, false, lastTimeStr, lastLogTime, "", "", "", "", error, logGroupSize, 0, false);
+    APSARA_TEST_EQUAL(flag, false);
+    APSARA_TEST_EQUAL(logGroup.logs_size(), 1);
+    APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__raw_log__");
+    APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), apasaraStr);
+
+    logGroup.Clear();
+    logGroupSize = 0;
+    flag = LogParser::RegexLogLineParser(
+        regexStr.c_str(), wrongReg, logGroup, false, keys, logstore, logTime, "", "", "", error, logGroupSize);
+    APSARA_TEST_EQUAL(flag, false);
+    APSARA_TEST_EQUAL(logGroup.logs_size(), 1);
+    APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__raw_log__");
+    APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), regexStr);
+
+    logGroup.Clear();
+    logGroupSize = 0;
+    flag = LogParser::RegexLogLineParser(regexStr.c_str(),
+                                         wrongReg,
+                                         logGroup,
+                                         false,
+                                         keys,
+                                         logstore,
+                                         correctTimeFormat,
+                                         preciseTimestampConfig,
+                                         timeIndex,
+                                         lastTimeStr,
+                                         logTime,
+                                         -1,
+                                         "",
+                                         "",
+                                         "",
+                                         error,
+                                         logGroupSize,
+                                         0);
+    APSARA_TEST_EQUAL(flag, false);
+    APSARA_TEST_EQUAL(logGroup.logs_size(), 1);
+    APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__raw_log__");
+    APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), regexStr);
+
+    logGroup.Clear();
+    logGroupSize = 0;
+    flag = LogParser::RegexLogLineParser(regexStr.c_str(),
+                                         correctReg,
+                                         logGroup,
+                                         false,
+                                         keys,
+                                         logstore,
+                                         wrongTimeFormat,
+                                         preciseTimestampConfig,
+                                         timeIndex,
+                                         lastTimeStr,
+                                         logTime,
+                                         -1,
+                                         "",
+                                         "",
+                                         "",
+                                         error,
+                                         logGroupSize,
+                                         0);
+    APSARA_TEST_EQUAL(flag, false);
+    APSARA_TEST_EQUAL(logGroup.logs_size(), 1);
+    APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__raw_log__");
+    APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), regexStr);
+
+    LOG_INFO(sLogger, ("TestLogParsingError() end", time(NULL)));
 }
 
 } // namespace logtail
