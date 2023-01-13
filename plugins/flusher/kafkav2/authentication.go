@@ -19,6 +19,8 @@ import (
 	"strings"
 
 	"github.com/Shopify/sarama"
+
+	"github.com/alibaba/ilogtail/pkg/tlscommon"
 )
 
 const (
@@ -28,10 +30,14 @@ const (
 )
 
 type Authentication struct {
-	// plaintext authentication
+	// PlainText authentication
 	PlainText *PlainTextConfig
 	// SASL authentication
 	SASL *SaslConfig
+	// TLS authentication
+	TLS *tlscommon.TLSConfig
+	// Kerberos authentication
+	Kerberos *KerberosConfig
 }
 
 type SaslConfig struct {
@@ -50,6 +56,17 @@ type PlainTextConfig struct {
 	Password string
 }
 
+// KerberosConfig defines kereros configuration.
+type KerberosConfig struct {
+	ServiceName string
+	Realm       string
+	UseKeyTab   bool
+	Username    string
+	Password    string
+	ConfigPath  string
+	KeyTabPath  string
+}
+
 func (config *Authentication) ConfigureAuthentication(saramaConfig *sarama.Config) error {
 	if config.PlainText != nil {
 		if err := config.PlainText.ConfigurePlaintext(saramaConfig); err != nil {
@@ -59,6 +76,18 @@ func (config *Authentication) ConfigureAuthentication(saramaConfig *sarama.Confi
 
 	if config.SASL != nil {
 		if err := config.SASL.ConfigureSasl(saramaConfig); err != nil {
+			return err
+		}
+	}
+
+	if config.TLS != nil {
+		if err := configureTLS(config.TLS, saramaConfig); err != nil {
+			return err
+		}
+	}
+
+	if config.Kerberos != nil {
+		if err := config.Kerberos.configureKerberos(saramaConfig); err != nil {
 			return err
 		}
 	}
@@ -112,6 +141,41 @@ func (saslConfig *SaslConfig) ConfigureSasl(saramaConfig *sarama.Config) error {
 		// This should never happen because `SaslMechanism` is checked on `Validate()`, keeping a panic to detect it earlier if it happens.
 		return fmt.Errorf("not valid SASL mechanism '%v', only supported with PLAIN|SCRAM-SHA-512|SCRAM-SHA-256", saslConfig.SaslMechanism)
 	}
+	return nil
+}
+
+func configureTLS(config *tlscommon.TLSConfig, saramaConfig *sarama.Config) error {
+	tlsConfig, err := config.LoadTLSConfig()
+	if err != nil {
+		return fmt.Errorf("error loading tls config: %w", err)
+	}
+	if tlsConfig != nil {
+		saramaConfig.Net.TLS.Enable = true
+		saramaConfig.Net.TLS.Config = tlsConfig
+	}
+	return nil
+}
+
+func (kerberosConfig *KerberosConfig) configureKerberos(saramaConfig *sarama.Config) error {
+	saramaConfig.Net.SASL.Mechanism = sarama.SASLTypeGSSAPI
+	saramaConfig.Net.SASL.Enable = true
+	if kerberosConfig.UseKeyTab {
+		saramaConfig.Net.SASL.GSSAPI.KeyTabPath = kerberosConfig.KeyTabPath
+		saramaConfig.Net.SASL.GSSAPI.AuthType = sarama.KRB5_KEYTAB_AUTH
+	} else {
+		if kerberosConfig.Username == "" {
+			return fmt.Errorf("password authentication is selected for Kerberos, but username is not configured")
+		}
+		if kerberosConfig.Username == "" {
+			return fmt.Errorf("password authentication is selected for Kerberos, but password is not configured")
+		}
+		saramaConfig.Net.SASL.GSSAPI.AuthType = sarama.KRB5_USER_AUTH
+		saramaConfig.Net.SASL.GSSAPI.Password = kerberosConfig.Password
+	}
+	saramaConfig.Net.SASL.GSSAPI.KerberosConfigPath = kerberosConfig.ConfigPath
+	saramaConfig.Net.SASL.GSSAPI.Username = kerberosConfig.Username
+	saramaConfig.Net.SASL.GSSAPI.Realm = kerberosConfig.Realm
+	saramaConfig.Net.SASL.GSSAPI.ServiceName = kerberosConfig.ServiceName
 	return nil
 }
 

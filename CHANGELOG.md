@@ -37,3 +37,6 @@ your changes, such as:
 ## [Unreleased]
 
 - [public] [both] [fixed] ignore time zone adjustment in config when using system time as log time
+
+- [public] [both] [updated] flusher kafka v2 support TLS and Kerberos authentication.
+
