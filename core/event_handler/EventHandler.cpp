@@ -190,9 +190,9 @@ void TimeoutHandler::HandleTimeOut() {
     // do nothing
 }
 
-bool CreateModifyHandler::DumpReaderMeta(bool checkConfigFlag) {
+bool CreateModifyHandler::DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) {
     for (ModifyHandlerMap::iterator iter = mModifyHandlerPtrMap.begin(); iter != mModifyHandlerPtrMap.end(); ++iter) {
-        iter->second->DumpReaderMeta(checkConfigFlag);
+        iter->second->DumpReaderMeta(isRotatorReader, checkConfigFlag);
     }
     return true;
 }
@@ -839,13 +839,15 @@ void ModifyHandler::HandleTimeOut() {
     }
 }
 
-bool ModifyHandler::DumpReaderMeta(bool checkConfigFlag) {
-    DevInodeLogFileReaderMap::iterator it = mDevInodeReaderMap.begin();
-    for (; it != mDevInodeReaderMap.end(); ++it) {
-        it->second->DumpMetaToMem(checkConfigFlag);
-    }
-    for (it = mRotatorReaderMap.begin(); it != mRotatorReaderMap.end(); ++it) {
-        it->second->DumpMetaToMem(checkConfigFlag);
+bool ModifyHandler::DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) {
+    if (!isRotatorReader) {
+        for (DevInodeLogFileReaderMap::iterator it = mDevInodeReaderMap.begin(); it != mDevInodeReaderMap.end(); ++it) {
+            it->second->DumpMetaToMem(checkConfigFlag);
+        }
+    } else {
+        for (DevInodeLogFileReaderMap::iterator it = mRotatorReaderMap.begin(); it != mRotatorReaderMap.end(); ++it) {
+            it->second->DumpMetaToMem(checkConfigFlag);
+        }
     }
     return true;
 }

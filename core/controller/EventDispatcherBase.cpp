@@ -1105,7 +1105,10 @@ void EventDispatcherBase::DumpAllHandlersMeta(bool remove) {
     MapType<int, DirInfo*>::Type::iterator it;
     vector<int> timeout;
     for (it = mWdDirInfoMap.begin(); it != mWdDirInfoMap.end(); ++it) {
-        ((it->second)->mHandler)->DumpReaderMeta(remove);
+        ((it->second)->mHandler)->DumpReaderMeta(true, remove);
+    }
+    for (it = mWdDirInfoMap.begin(); it != mWdDirInfoMap.end(); ++it) {
+        ((it->second)->mHandler)->DumpReaderMeta(false, remove);
         timeout.push_back(it->first);
         if (remove)
             ConfigManager::GetInstance()->AddHandlerToDelete((it->second)->mHandler);

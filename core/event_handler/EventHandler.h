@@ -37,7 +37,7 @@ class EventHandler {
 public:
     virtual void Handle(const Event& event) = 0;
     virtual void HandleTimeOut() = 0;
-    virtual bool DumpReaderMeta(bool checkConfigFlag = false) = 0;
+    virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) = 0;
     virtual ~EventHandler() {}
 };
 
@@ -47,7 +47,7 @@ public:
 
     virtual void Handle(const Event& event);
     virtual void HandleTimeOut();
-    virtual bool DumpReaderMeta(bool checkConfigFlag = false) { return true; }
+    virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) { return true; }
 };
 
 class ModifyHandler : public EventHandler {
@@ -88,7 +88,7 @@ public:
     virtual ~ModifyHandler();
     virtual void Handle(const Event& event);
     virtual void HandleTimeOut();
-    virtual bool DumpReaderMeta(bool checkConfigFlag = false);
+    virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConfigUpdatorUnittest;
@@ -105,7 +105,7 @@ public:
     virtual void Handle(const Event& event);
     virtual void HandleTimeOut();
 
-    virtual bool DumpReaderMeta(bool checkConfigFlag = false) { return true; }
+    virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) { return true; }
 };
 
 class NormalEventHandler : public EventHandler {
@@ -122,7 +122,7 @@ public:
 
     virtual void Handle(const Event& event);
     virtual void HandleTimeOut();
-    virtual bool DumpReaderMeta(bool checkConfigFlag = false) { return true; }
+    virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) { return true; }
 };
 
 class CreateModifyHandler : public EventHandler {
@@ -141,7 +141,7 @@ public:
     virtual ~CreateModifyHandler();
     virtual void Handle(const Event& event);
     virtual void HandleTimeOut();
-    virtual bool DumpReaderMeta(bool checkConfigFlag = false);
+    virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag);
 
     ModifyHandler* GetOrCreateModifyHandler(const std::string& configName, Config* pConfig = NULL);
 
