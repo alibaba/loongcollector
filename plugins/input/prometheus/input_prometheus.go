@@ -34,6 +34,7 @@ import (
 	liblogger "github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/protoparser/common"
 )
 
 var libLoggerOnce sync.Once
@@ -69,6 +70,7 @@ func (p *ServiceStaticPrometheus) Init(context ilogtail.Context) (int, error) {
 		err := flag.Set("promscrape.maxScrapeSize", "268435456")
 		logger.Info(context.GetRuntimeContext(), "set config maxScrapeSize to 256MB, error", err)
 		liblogger.Init()
+		common.StartUnmarshalWorkers()
 	})
 	p.context = context
 	for k, v := range p.ExtraFlags {
@@ -123,7 +125,9 @@ func (p *ServiceStaticPrometheus) Start(c ilogtail.Collector) error {
 	p.waitGroup.Add(1)
 	defer p.waitGroup.Done()
 	p.scraper.Init(func(_ *auth.Token, wr *prompbmarshal.WriteRequest) {
+		logger.Debug(p.context.GetRuntimeContext(), "append new metrics", wr.Size())
 		appendTSDataToSlsLog(c, wr)
+		logger.Debug(p.context.GetRuntimeContext(), "append done", wr.Size())
 	})
 	<-p.shutdown
 	p.scraper.Stop()
