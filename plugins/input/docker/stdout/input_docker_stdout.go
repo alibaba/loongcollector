@@ -15,18 +15,19 @@
 package stdout
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"sync"
 	"time"
+
+	"github.com/docker/docker/api/types"
 
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
-
-	"github.com/docker/docker/api/types"
 )
 
 const serviceDockerStdoutKey = "service_docker_stdout_v2"
@@ -258,7 +259,7 @@ func (sds *ServiceDockerStdout) FlushAll(c ilogtail.Collector, firstStart bool) 
 	}
 
 	var err error
-	newCount, delCount := helper.GetContainerByAcceptedInfoV2(
+	newCount, delCount, addResultList, deleteResultList, addFullList, deleteFullList := helper.GetContainerByAcceptedInfoV2(
 		sds.fullList, sds.matchList,
 		sds.IncludeLabel, sds.ExcludeLabel,
 		sds.IncludeLabelRegex, sds.ExcludeLabelRegex,
@@ -266,6 +267,49 @@ func (sds *ServiceDockerStdout) FlushAll(c ilogtail.Collector, firstStart bool) 
 		sds.IncludeEnvRegex, sds.ExcludeEnvRegex,
 		sds.K8sFilter)
 	sds.lastUpdateTime = newUpdateTime
+
+	// record added container id
+	if len(addFullList) > 0 {
+		for _, id := range addFullList {
+			if len(id) > 0 {
+				util.RecordAddedContainerIDs(id)
+			}
+		}
+	}
+	// record deleted container id
+	if len(deleteFullList) > 0 {
+		for _, id := range deleteFullList {
+			if len(id) > 0 {
+				util.RecordDeletedContainerIDs(util.GetShortID(id))
+			}
+		}
+	}
+	// record config result
+	{
+		keys := make([]string, 0, len(sds.matchList))
+		for k := range sds.matchList {
+			if len(k) > 0 {
+				keys = append(keys, util.GetShortID(k))
+			}
+		}
+		configResult := &util.ConfigResult{
+			DataType:                   "container_config_result",
+			Project:                    sds.context.GetProject(),
+			Logstore:                   sds.context.GetLogstore(),
+			ConfigName:                 sds.context.GetConfigName(),
+			PathExistInputContainerIDs: util.GetStringFromList(keys),
+			SourceAddress:              "stdout",
+			InputType:                  input.ServiceDockerStdoutPluginName,
+			FlusherType:                "flusher_sls",
+			FlusherTargetAddress:       fmt.Sprintf("%s/%s", sds.context.GetProject(), sds.context.GetLogstore()),
+		}
+		util.RecordConfigResultMap(configResult)
+		if newCount != 0 || delCount != 0 {
+			util.RecordConfigResultIncrement(configResult)
+		}
+		logger.Debugf(sds.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v, addFullList: %v, deleteFullList: %v", addResultList, deleteResultList, addFullList, deleteFullList)
+	}
+
 	if !firstStart && newCount == 0 && delCount == 0 {
 		logger.Debugf(sds.context.GetRuntimeContext(), "update match list, firstStart: %v, new: %v, delete: %v",
 			firstStart, newCount, delCount)

@@ -246,6 +246,7 @@ private:
     volatile bool mPluginValid;
     logtail::Config mPluginAlarmConfig;
     logtail::Config mPluginProfileConfig;
+    logtail::Config mPluginContainerConfig;
     ProcessLogsFun mProcessLogsFun;
     GetContainerMetaFun mGetContainerMetaFun;
 

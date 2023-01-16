@@ -110,6 +110,9 @@ type LogstoreConfig struct {
 	// processWaitSema  sync.WaitGroup
 	// flushWaitSema    sync.WaitGroup
 	pauseOrResumeWg sync.WaitGroup
+
+	LabelSet map[string]struct{}
+	EnvSet   map[string]struct{}
 }
 
 func (p *LogstoreStatistics) Init(context ilogtail.Context) {
@@ -363,6 +366,53 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	}
 
 	enableAlwaysOnline := enableAlwaysOnlineForStdout && hasDockerStdoutInput(plugins)
+	logstoreC.LabelSet = make(map[string]struct{})
+	logstoreC.EnvSet = make(map[string]struct{})
+	// add env and label set to logstore config
+	inputs, exists := plugins["inputs"]
+	if exists {
+		inputList, valid := inputs.([]interface{})
+		if valid {
+			for _, detail := range inputList {
+				cfg, valid := detail.(map[string]interface{})
+				if !valid {
+					continue
+				}
+				typeName, valid := cfg["type"]
+				if !valid {
+					continue
+				}
+				if val, valid := typeName.(string); valid && (val == input.ServiceDockerStdoutPluginName || val == input.MetricDocierFilePluginName) {
+					configDetail, valid := cfg["detail"]
+					if !valid {
+						continue
+					}
+					detailMap, valid := configDetail.(map[string]interface{})
+					if !valid {
+						continue
+					}
+					for key, value := range detailMap {
+						if strings.Contains(key, "Include") || strings.Contains(key, "Exclude") {
+							conditionMap, valid := value.(map[string]interface{})
+							if !valid {
+								continue
+							}
+							if strings.Contains(key, "Label") {
+								for key := range conditionMap {
+									logstoreC.LabelSet[key] = struct{}{}
+								}
+							}
+							if strings.Contains(key, "Env") {
+								for key := range conditionMap {
+									logstoreC.EnvSet[key] = struct{}{}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
 	logstoreC.GlobalConfig = &LogtailGlobalConfig
 	// If plugins config has "global" field, then override the logstoreC.GlobalConfig

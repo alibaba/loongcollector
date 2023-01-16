@@ -228,6 +228,7 @@ void ConfigManagerBase::MappingPluginConfig(const Json::Value& configValue, Conf
         detail["LogPath"] = Json::Value(config->mBasePath);
         detail["MaxDepth"] = Json::Value(config->mMaxDepth);
     }
+    detail["FileParttern"] = Json::Value(config->mFilePattern);
     if (configValue.isMember("docker_include_label") && configValue["docker_include_label"].isObject()) {
         detail["IncludeLabel"] = configValue["docker_include_label"];
     }

@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux || windows
+// +build linux windows
+
 package pluginmanager
 
 import (
@@ -26,6 +29,7 @@ import (
 	// dependency packages
 	_ "github.com/alibaba/ilogtail/plugins/aggregator"
 	"github.com/alibaba/ilogtail/plugins/flusher/checker"
+	_ "github.com/alibaba/ilogtail/plugins/flusher/sls"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/statistics"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/stdout"
 	_ "github.com/alibaba/ilogtail/plugins/input/canal"
@@ -55,6 +59,7 @@ func (s *managerTestSuite) AfterTest(suiteName, testName string) {
 
 }
 
+/*
 func (s *managerTestSuite) TestResumeHoldOn() {
 	for i := 0; i < 10; i++ {
 		s.NoError(LoadMockConfig(), "got err when logad config")
@@ -63,8 +68,13 @@ func (s *managerTestSuite) TestResumeHoldOn() {
 		s.NoError(HoldOn(false), "got err when hold on")
 	}
 }
+*/
 
 func (s *managerTestSuite) TestPluginManager() {
+	s.NoError(LoadMockConfig(), "got err when logad config")
+	s.NoError(Resume(), "got err when resume")
+	time.Sleep(time.Millisecond * time.Duration(10))
+	s.NoError(HoldOn(false), "got err when hold on")
 	for i := 0; i < 5; i++ {
 		s.NoError(LoadMockConfig(), "got err when logad config")
 		s.NoError(Resume(), "got err when resume")

@@ -29,6 +29,8 @@ var counterChan chan *protocol.LogGroup
 
 var alarmChan chan *protocol.LogGroup
 
+var containerChan chan *protocol.LogGroup
+
 var mu sync.Mutex
 
 var (
@@ -141,9 +143,14 @@ func GetAlarmLogChan() chan<- *protocol.LogGroup {
 	return alarmChan
 }
 
+func GetContainerLogChan() chan<- *protocol.LogGroup {
+	return containerChan
+}
+
 func InitCounter() {
 	counterChan = make(chan *protocol.LogGroup, 5)
 	alarmChan = make(chan *protocol.LogGroup, 5)
+	containerChan = make(chan *protocol.LogGroup, 5)
 	go func() {
 		for group := range alarmChan {
 			for _, log := range group.Logs {

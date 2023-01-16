@@ -25,12 +25,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
 	docker "github.com/docker/docker/client"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var dockerCenterInstance *DockerCenter
@@ -853,17 +853,28 @@ func (dc *DockerCenter) getAllAcceptedInfoV2(
 	includeEnvRegex map[string]*regexp.Regexp,
 	excludeEnvRegex map[string]*regexp.Regexp,
 	k8sFilter *K8SFilter,
-) (int, int) {
+) (newCount, delCount int, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList []string) {
+
 	dc.lock.RLock()
 	defer dc.lock.RUnlock()
-
+	matchDeletedList = make([]string, 0)
+	matchAddedList = make([]string, 0)
+	fullDeletedList = make([]string, 0)
+	fullAddedList = make([]string, 0)
 	// Remove deleted containers from match list and full list.
-	delCount := 0
+	delCount = 0
+	// 第一次启动的时候，会有全量的容器信息，不需要这里上报，因此忽略掉
+	flagFirstInitContainers := false
+	if len(fullList) == 0 && len(dc.containerMap) != 0 {
+		flagFirstInitContainers = true
+	}
 	for id := range fullList {
 		if _, exist := dc.containerMap[id]; !exist {
 			delete(fullList, id)
+			fullDeletedList = append(fullDeletedList, id)
 			if _, matched := matchList[id]; matched {
 				delete(matchList, id)
+				matchDeletedList = append(matchDeletedList, id)
 				delCount++
 			}
 		}
@@ -880,20 +891,26 @@ func (dc *DockerCenter) getAllAcceptedInfoV2(
 	}
 
 	// Add new containers to full list and matched to match list.
-	newCount := 0
+	newCount = 0
+
 	for id, info := range dc.containerMap {
 		if _, exist := fullList[id]; !exist {
 			fullList[id] = true
+			if !flagFirstInitContainers {
+				fullAddedList = append(fullAddedList, id)
+			}
 			if isContainerLabelMatch(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, info) &&
 				isContainerEnvMatch(includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, info) &&
 				info.K8SInfo.IsMatch(k8sFilter) {
 				newCount++
 				matchList[id] = info
+				if !flagFirstInitContainers {
+					matchAddedList = append(matchAddedList, id)
+				}
 			}
 		}
 	}
-
-	return newCount, delCount
+	return newCount, delCount, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList
 }
 
 func (dc *DockerCenter) getAllSpecificInfo(filter func(*DockerInfoDetail) bool) (infoList []*DockerInfoDetail) {

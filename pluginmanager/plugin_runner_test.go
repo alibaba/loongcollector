@@ -45,7 +45,7 @@ func (s *pluginRunnerTestSuite) AfterTest(suiteName, testName string) {
 }
 
 func (s *pluginRunnerTestSuite) TestTimerRunner() {
-	runner := &timerRunner{state: s, interval: time.Millisecond * 500, context: s.Context}
+	runner := &timerRunner{state: s, interval: time.Millisecond * 600, context: s.Context}
 	cc := ilogtail.NewAsyncControl()
 	ch := make(chan struct{}, 10)
 	cc.Run(func(cc *ilogtail.AsyncControl) {

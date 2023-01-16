@@ -102,6 +102,8 @@ func (c *ValidatorController) Start() error {
 				validator.GetCounterChan() <- group
 			case alarmLogCheck(group.Logs[0]):
 				validator.GetAlarmLogChan() <- group
+			case containerLogCheck(group.Logs[0]):
+				validator.GetContainerLogChan() <- group
 			default:
 				for _, log := range group.Logs {
 					logger.Debugf(context.Background(), "%s", log.String())
@@ -172,6 +174,16 @@ func staticLogCheck(log *protocol.Log) (projectMatch bool, typeMatch bool) {
 func alarmLogCheck(log *protocol.Log) bool {
 	for _, content := range log.Contents {
 		if content.Key == "alarm_count" {
+			return true
+		}
+	}
+	return false
+}
+
+// containerLogCheck checks the log contents to find the container log.
+func containerLogCheck(log *protocol.Log) bool {
+	for _, content := range log.Contents {
+		if content.Key == "input.type" || content.Key == "container_name" {
 			return true
 		}
 	}

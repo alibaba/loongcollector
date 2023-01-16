@@ -174,6 +174,7 @@ func (p *pluginv1Runner) addFlusher(flusher ilogtail.FlusherV1) error {
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Flusher = flusher
 	wrapper.LogGroupsChan = p.LogGroupsChan
+	wrapper.Interval = time.Millisecond * time.Duration(p.LogstoreConfig.GlobalConfig.FlushIntervalMs)
 	p.FlusherPlugins = append(p.FlusherPlugins, &wrapper)
 	return nil
 }

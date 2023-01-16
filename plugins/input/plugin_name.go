@@ -15,3 +15,5 @@
 package input
 
 const ServiceDockerStdoutPluginName = "service_docker_stdout"
+
+const MetricDocierFilePluginName = "metric_docker_file"

@@ -43,6 +43,9 @@ LogtailPlugin::LogtailPlugin() {
     mPluginProfileConfig.mCategory = "shennong_log_profile";
     mPluginProfileConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginProfileConfig.mLogstoreKey = 0;
+    mPluginContainerConfig.mCategory = "logtail_containers";
+    mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
+    mPluginContainerConfig.mLogstoreKey = 0;
 
     mPluginCfg["LogtailSysConfDir"] = AppConfig::GetInstance()->GetLogtailSysConfDir();
     mPluginCfg["HostIP"] = LogFileProfiler::mIpAddr;
@@ -212,6 +215,8 @@ int LogtailPlugin::SendPbV2(const char* configName,
                             int shardHashSize) {
     static Config* alarmConfig = &(LogtailPlugin::GetInstance()->mPluginAlarmConfig);
     static Config* profileConfig = &(LogtailPlugin::GetInstance()->mPluginProfileConfig);
+    static Config* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
+
     string configNameStr = string(configName, configNameSize);
 
     string logstore;
@@ -230,6 +235,13 @@ int LogtailPlugin::SendPbV2(const char* configName,
         }
     } else if (configNameStr == profileConfig->mCategory) {
         pConfig = profileConfig;
+        pConfig->mProjectName = ConfigManager::GetInstance()->GetDefaultProfileProjectName();
+        pConfig->mRegion = ConfigManager::GetInstance()->GetDefaultProfileRegion();
+        if (0 == pConfig->mProjectName.size()) {
+            return 0;
+        }
+    } else if (configNameStr == containerConfig->mCategory) {
+        pConfig = containerConfig;
         pConfig->mProjectName = ConfigManager::GetInstance()->GetDefaultProfileProjectName();
         pConfig->mRegion = ConfigManager::GetInstance()->GetDefaultProfileRegion();
         if (0 == pConfig->mProjectName.size()) {

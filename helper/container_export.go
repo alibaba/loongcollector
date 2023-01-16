@@ -20,11 +20,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/logger"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
 	docker "github.com/docker/docker/client"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 type ContainerMeta struct {
@@ -35,6 +35,12 @@ type ContainerMeta struct {
 	K8sLabels       map[string]string
 	ContainerLabels map[string]string
 	Env             map[string]string
+}
+
+type DockerInfoDetailWithFilteredEnvAndLabel struct {
+	Detail *DockerInfoDetail
+	Env    map[string]string
+	Labels map[string]string
 }
 
 func GetContainersLastUpdateTime() int64 {
@@ -129,14 +135,18 @@ func GetContainerByAcceptedInfo(
 //	  deleted = fullList - containerMap
 //	  newList = containerMap - fullList
 //	  matchList -= deleted + filter(newList)
-//		 return len(deleted), len(filter(newList))
+//	  matchAddedList: new container ID for current config
+//	  matchDeletedList: deleted container ID for current config
+//	  fullAddedList = newList
+//	  fullDeletedList = deleted
+//		 return len(deleted), len(filter(newList)), matchAddedList, matchDeletedList, fullAddedList, fullDeletedList
 //
 // @param fullList [in,out]: all containers.
 // @param matchList [in,out]: all matched containers.
 //
-// It returns two integers: the number of new matched containers
-//
-//	and deleted containers.
+// It returns two integers and four list
+// two integers: the number of new matched containers and deleted containers.
+// four list: new matched containers list, deleted matched containers list, added containers list, delete containers list
 func GetContainerByAcceptedInfoV2(
 	fullList map[string]bool,
 	matchList map[string]*DockerInfoDetail,
@@ -149,7 +159,7 @@ func GetContainerByAcceptedInfoV2(
 	includeEnvRegex map[string]*regexp.Regexp,
 	excludeEnvRegex map[string]*regexp.Regexp,
 	k8sFilter *K8SFilter,
-) (int, int) {
+) (newCount, delCount int, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList []string) {
 	return getDockerCenterInstance().getAllAcceptedInfoV2(
 		fullList, matchList, includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, k8sFilter)
 
@@ -198,4 +208,96 @@ func ContainerCenterInit() {
 
 func CreateContainerInfoDetail(info types.ContainerJSON, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	return getDockerCenterInstance().CreateInfoDetail(info, envConfigPrefix, selfConfigFlag)
+}
+
+// for test
+func GetContainerMap() map[string]*DockerInfoDetail {
+	instance := getDockerCenterInstance()
+	return instance.containerMap
+}
+
+func GetAllContainerToRecord(envSet, labelSet map[string]struct{}, containerIds map[string]struct{}) []*DockerInfoDetailWithFilteredEnvAndLabel {
+	instance := getDockerCenterInstance()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+	result := make([]*DockerInfoDetailWithFilteredEnvAndLabel, 0)
+	if len(containerIds) > 0 {
+		for key := range containerIds {
+			value, ok := instance.containerMap[key]
+			if !ok {
+				continue
+			}
+			result = append(result, CastContainerDetail(value, envSet, labelSet))
+		}
+	} else {
+		for _, value := range instance.containerMap {
+			result = append(result, CastContainerDetail(value, envSet, labelSet))
+		}
+	}
+	return result
+}
+
+func GetAllContainerIncludeEnvAndLabelToRecord(envSet, labelSet, diffEnvSet, diffLabelSet map[string]struct{}) []*DockerInfoDetailWithFilteredEnvAndLabel {
+	instance := getDockerCenterInstance()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+	result := make([]*DockerInfoDetailWithFilteredEnvAndLabel, 0)
+	for _, value := range instance.containerMap {
+		match := false
+		if len(diffEnvSet) > 0 {
+			for _, env := range value.ContainerInfo.Config.Env {
+				splitArray := strings.SplitN(env, "=", 2)
+				envKey := splitArray[0]
+				if len(splitArray) != 2 {
+					continue
+				}
+				_, ok := diffEnvSet[envKey]
+				if ok {
+					match = true
+				}
+			}
+		}
+		if len(diffLabelSet) > 0 {
+			if !match {
+				for key := range value.ContainerInfo.Config.Labels {
+					_, ok := diffLabelSet[key]
+					if ok {
+						match = true
+					}
+				}
+			}
+		}
+		if match {
+			result = append(result, CastContainerDetail(value, envSet, labelSet))
+		}
+	}
+	return result
+}
+
+func CastContainerDetail(containerInfo *DockerInfoDetail, envSet, labelSet map[string]struct{}) *DockerInfoDetailWithFilteredEnvAndLabel {
+	newEnv := make(map[string]string)
+	for _, env := range containerInfo.ContainerInfo.Config.Env {
+		splitArray := strings.SplitN(env, "=", 2)
+		envKey := splitArray[0]
+		if len(splitArray) != 2 {
+			continue
+		}
+		envValue := splitArray[1]
+		_, ok := envSet[envKey]
+		if ok {
+			newEnv[envKey] = envValue
+		}
+	}
+	newLabels := make(map[string]string)
+	for key, value := range containerInfo.ContainerInfo.Config.Labels {
+		_, ok := labelSet[key]
+		if ok {
+			newLabels[key] = value
+		}
+	}
+	return &DockerInfoDetailWithFilteredEnvAndLabel{
+		Detail: containerInfo,
+		Env:    newEnv,
+		Labels: newLabels,
+	}
 }

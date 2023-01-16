@@ -99,7 +99,7 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 			"c1": newContainer("c1"),
 		})
 
-		newCount, delCount := dc.getAllAcceptedInfoV2(
+		newCount, delCount, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList := dc.getAllAcceptedInfoV2(
 			fullList,
 			matchList,
 			nil, nil, nil, nil, nil, nil, nil, nil, nil)
@@ -109,13 +109,17 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		require.True(t, matchList["c1"] != nil)
 		require.Equal(t, newCount, 1)
 		require.Equal(t, delCount, 0)
+		require.Equal(t, len(matchAddedList), 0)
+		require.Equal(t, len(matchDeletedList), 0)
+		require.Equal(t, len(fullAddedList), 0)
+		require.Equal(t, len(fullDeletedList), 0)
 	}
 
 	// New container.
 	{
 		dc.updateContainer("c2", newContainer("c2"))
 
-		newCount, delCount := dc.getAllAcceptedInfoV2(
+		newCount, delCount, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList := dc.getAllAcceptedInfoV2(
 			fullList,
 			matchList,
 			nil, nil, nil, nil, nil, nil, nil, nil, nil)
@@ -127,13 +131,17 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		require.True(t, matchList["c2"] != nil)
 		require.Equal(t, newCount, 1)
 		require.Equal(t, delCount, 0)
+		require.Equal(t, len(matchAddedList), 1)
+		require.Equal(t, len(matchDeletedList), 0)
+		require.Equal(t, len(fullAddedList), 1)
+		require.Equal(t, len(fullDeletedList), 0)
 	}
 
 	// Delete container.
 	{
 		delete(dc.containerMap, "c1")
 
-		newCount, delCount := dc.getAllAcceptedInfoV2(
+		newCount, delCount, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList := dc.getAllAcceptedInfoV2(
 			fullList,
 			matchList,
 			nil, nil, nil, nil, nil, nil, nil, nil, nil)
@@ -143,6 +151,10 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		require.True(t, matchList["c2"] != nil)
 		require.Equal(t, newCount, 0)
 		require.Equal(t, delCount, 1)
+		require.Equal(t, len(matchAddedList), 0)
+		require.Equal(t, len(matchDeletedList), 1)
+		require.Equal(t, len(fullAddedList), 0)
+		require.Equal(t, len(fullDeletedList), 1)
 	}
 
 	// New and Delete container.
@@ -153,7 +165,7 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		})
 		delete(dc.containerMap, "c2")
 
-		newCount, delCount := dc.getAllAcceptedInfoV2(
+		newCount, delCount, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList := dc.getAllAcceptedInfoV2(
 			fullList,
 			matchList,
 			nil, nil, nil, nil, nil, nil, nil, nil, nil)
@@ -165,13 +177,17 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		require.True(t, matchList["c4"] != nil)
 		require.Equal(t, newCount, 2)
 		require.Equal(t, delCount, 1)
+		require.Equal(t, len(matchAddedList), 2)
+		require.Equal(t, len(matchDeletedList), 1)
+		require.Equal(t, len(fullAddedList), 2)
+		require.Equal(t, len(fullDeletedList), 1)
 	}
 
 	// With unmatched filter.
 	fullList = make(map[string]bool)
 	matchList = make(map[string]*DockerInfoDetail)
 	{
-		newCount, delCount := dc.getAllAcceptedInfoV2(
+		newCount, delCount, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList := dc.getAllAcceptedInfoV2(
 			fullList,
 			matchList,
 			map[string]string{
@@ -184,13 +200,17 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		require.True(t, fullList["c4"])
 		require.Equal(t, newCount, 0)
 		require.Equal(t, delCount, 0)
+		require.Equal(t, len(matchAddedList), 0)
+		require.Equal(t, len(matchDeletedList), 0)
+		require.Equal(t, len(fullAddedList), 0)
+		require.Equal(t, len(fullDeletedList), 0)
 	}
 
 	// Delete unmatched container.
 	{
 		delete(dc.containerMap, "c3")
 
-		newCount, delCount := dc.getAllAcceptedInfoV2(
+		newCount, delCount, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList := dc.getAllAcceptedInfoV2(
 			fullList,
 			matchList,
 			map[string]string{
@@ -202,6 +222,10 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		require.True(t, fullList["c4"])
 		require.Equal(t, newCount, 0)
 		require.Equal(t, delCount, 0)
+		require.Equal(t, len(matchAddedList), 0)
+		require.Equal(t, len(matchDeletedList), 0)
+		require.Equal(t, len(fullAddedList), 0)
+		require.Equal(t, len(fullDeletedList), 1)
 	}
 }
 
