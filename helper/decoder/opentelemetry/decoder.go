@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
 
 	"github.com/alibaba/ilogtail/helper/decoder/common"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -122,4 +123,9 @@ func (d *Decoder) ConvertOtlpLogV1(otlpLogReq plogotlp.Request) (logs []*protoco
 
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
 	return common.CollectBody(res, req, maxBodySize)
+}
+
+func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
+	//TODO: Implement DecodeV2
+	return nil, nil
 }

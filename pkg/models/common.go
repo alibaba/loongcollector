@@ -106,8 +106,8 @@ func (kv *keyValuesImpl[TValue]) Get(key string) TValue {
 
 func (kv *keyValuesImpl[TValue]) Contains(key string) bool {
 	if values, ok := kv.values(); ok {
-		_, ok := values[key]
-		return ok
+		_, valueOk := values[key]
+		return valueOk
 	}
 	return false
 }

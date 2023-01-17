@@ -160,6 +160,8 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context ilogtai
 				writer.WriteString("span")
 			case models.EventTypeLogging:
 				writer.WriteString("log")
+			case models.EventTypeByteArray:
+				writer.WriteString("byteArray")
 			}
 			_, _ = writer.Write([]byte{','})
 			writer.WriteObjectField("name")
@@ -191,6 +193,8 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context ilogtai
 				p.writeSpan(writer, nil)
 			case models.EventTypeLogging:
 				p.writeLogBody(writer, nil)
+			case models.EventTypeByteArray:
+				p.writeByteArray(writer, event.(models.ByteArray))
 			}
 
 			writer.WriteObjectEnd()
@@ -253,6 +257,14 @@ func (p *FlusherStdout) writeSpan(writer *jsoniter.Stream, metric *models.Span) 
 
 func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, metric *models.Metric) {
 	// TODO
+}
+
+func (p FlusherStdout) writeByteArray(writer *jsoniter.Stream, metric models.ByteArray) {
+	_, _ = writer.Write([]byte{','})
+	writer.WriteObjectField("byteArray")
+	_, _ = writer.Write([]byte{'"'})
+	_, _ = writer.Write(metric)
+	_, _ = writer.Write([]byte{'"'})
 }
 
 func (p *FlusherStdout) SetUrgent(flag bool) {

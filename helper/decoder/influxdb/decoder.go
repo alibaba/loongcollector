@@ -22,6 +22,7 @@ import (
 
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/helper/decoder/common"
+	imodels "github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/influxdata/influxdb/models"
@@ -70,6 +71,11 @@ func (d *Decoder) Decode(data []byte, req *http.Request) (logs []*protocol.Log, 
 
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
 	return common.CollectBody(res, req, maxBodySize)
+}
+
+func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*imodels.PipelineGroupEvents, err error) {
+	//TODO: Implement DecodeV2
+	return nil, nil
 }
 
 func (d *Decoder) parsePointsToLogs(points []models.Point, req *http.Request) []*protocol.Log {

@@ -27,16 +27,25 @@ import (
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper/decoder"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
+)
+
+const (
+	v1 = iota
+	v2
 )
 
 // ServiceHTTP ...
 type ServiceHTTP struct {
-	context   ilogtail.Context
-	collector ilogtail.Collector
-	decoder   decoder.Decoder
-	server    *http.Server
-	listener  net.Listener
-	wg        sync.WaitGroup
+	context     ilogtail.Context
+	collector   ilogtail.Collector
+	decoder     decoder.Decoder
+	server      *http.Server
+	listener    net.Listener
+	wg          sync.WaitGroup
+	collectorV2 ilogtail.PipelineCollector
+	version     int8
+	paramCount  int
 
 	Format             string
 	Address            string
@@ -45,19 +54,28 @@ type ServiceHTTP struct {
 	MaxBodySize        int64
 	UnlinkUnixSock     bool
 	FieldsExtend       bool
+	DisableUncompress  bool
+
+	// params below works only for version v2
+	QueryParams       []string
+	HeaderParams      []string
+	QueryParamPrefix  string
+	HeaderParamPrefix string
 }
 
 // Init ...
 func (s *ServiceHTTP) Init(context ilogtail.Context) (int, error) {
 	s.context = context
 	var err error
-	if s.decoder, err = decoder.GetDecoderWithOptions(s.Format, decoder.Option{FieldsExtend: s.FieldsExtend}); err != nil {
+	if s.decoder, err = decoder.GetDecoderWithOptions(s.Format, decoder.Option{FieldsExtend: s.FieldsExtend, DisableUncompress: s.DisableUncompress}); err != nil {
 		return 0, err
 	}
 
 	if s.Format == "otlp_logv1" {
 		s.Address += "/v1/logs"
 	}
+
+	s.paramCount = len(s.QueryParams) + len(s.HeaderParams)
 
 	return 0, nil
 }
@@ -78,8 +96,8 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		tooLarge(w)
 		return
 	}
-
 	data, statusCode, err := s.decoder.ParseRequest(w, r, s.MaxBodySize)
+	logger.Debugf(s.context.GetRuntimeContext(), "request [method] %v; [header] %v; [url] %v; [body] %v", r.Method, r.Header, r.URL, string(data))
 
 	switch statusCode {
 	case http.StatusBadRequest:
@@ -96,15 +114,33 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logger.Warning(s.context.GetRuntimeContext(), "READ_BODY_FAIL_ALARM", "read body failed", err, "request", r.URL.String())
 		return
 	}
-	logs, err := s.decoder.Decode(data, r)
-	if err != nil {
-		logger.Warning(s.context.GetRuntimeContext(), "DECODE_BODY_FAIL_ALARM", "decode body failed", err, "request", r.URL.String())
-		badRequest(w)
-		return
+
+	switch s.version {
+	case v1:
+		logs, err := s.decoder.Decode(data, r)
+		if err != nil {
+			logger.Warning(s.context.GetRuntimeContext(), "DECODE_BODY_FAIL_ALARM", "decode body failed", err, "request", r.URL.String())
+			badRequest(w)
+			return
+		}
+		for _, log := range logs {
+			s.collector.AddRawLog(log)
+		}
+	case v2:
+		groups, err := s.decoder.DecodeV2(data, r)
+		if err != nil {
+			logger.Warning(s.context.GetRuntimeContext(), "DECODE_BODY_FAIL_ALARM", "decode body failed", err, "request", r.URL.String())
+			badRequest(w)
+			return
+		}
+		if reqParams := s.extractRequestParams(r); len(reqParams) != 0 {
+			for _, g := range groups {
+				g.Group.Metadata.Merge(models.NewMetadataWithMap(reqParams))
+			}
+		}
+		s.collectorV2.CollectList(groups...)
 	}
-	for _, log := range logs {
-		s.collector.AddRawLog(log)
-	}
+
 	if s.Format == "sls" {
 		w.Header().Set("x-log-requestid", "1234567890abcde")
 		w.WriteHeader(http.StatusOK)
@@ -140,6 +176,19 @@ func badRequest(res http.ResponseWriter) {
 // Start starts the ServiceInput's service, whatever that may be
 func (s *ServiceHTTP) Start(c ilogtail.Collector) error {
 	s.collector = c
+	s.version = v1
+	return s.start()
+}
+
+// StartService start the ServiceInput's service by plugin runner v2
+func (s *ServiceHTTP) StartService(context ilogtail.PipelineContext) error {
+	s.collectorV2 = context.Collector()
+	s.version = v2
+
+	return s.start()
+}
+
+func (s *ServiceHTTP) start() error {
 	s.wg.Add(1)
 
 	server := &http.Server{
@@ -182,6 +231,37 @@ func (s *ServiceHTTP) Start(c ilogtail.Collector) error {
 		s.wg.Done()
 	}()
 	return nil
+}
+
+func (s *ServiceHTTP) extractRequestParams(req *http.Request) map[string]string {
+	keyValues := make(map[string]string, s.paramCount)
+	for _, key := range s.QueryParams {
+		value := req.FormValue(key)
+		if len(value) == 0 {
+			continue
+		}
+		if len(s.QueryParamPrefix) > 0 {
+			builder := strings.Builder{}
+			builder.WriteString(s.QueryParamPrefix)
+			builder.WriteString(key)
+			key = builder.String()
+		}
+		keyValues[key] = value
+	}
+	for _, key := range s.HeaderParams {
+		value := req.Header.Get(key)
+		if len(value) == 0 {
+			continue
+		}
+		if len(s.HeaderParamPrefix) > 0 {
+			builder := strings.Builder{}
+			builder.WriteString(s.HeaderParamPrefix)
+			builder.WriteString(key)
+			key = builder.String()
+		}
+		keyValues[key] = value
+	}
+	return keyValues
 }
 
 // Stop stops the services and closes any necessary channels and connections

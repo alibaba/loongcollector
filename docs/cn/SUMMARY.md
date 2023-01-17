@@ -74,6 +74,7 @@
   * [基础](data-pipeline/aggregator/aggregator-base.md)
   * [上下文](data-pipeline/aggregator/aggregator-context.md)
   * [按Key分组](data-pipeline/aggregator/aggregator-content-value-group.md)
+  * [按GroupMetadata分组](data-pipeline/aggregator/aggregator-metadata-group.md)
 * [输出](data-pipeline/flusher/README.md)
   * [Kafka（Deprecated）](data-pipeline/flusher/kafka.md)
   * [kafkaV2](data-pipeline/flusher/kafka_v2.md)

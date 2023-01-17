@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/ilogtail/helper/decoder/common"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/gogo/protobuf/proto"
@@ -196,4 +197,9 @@ func (d *Decoder) parsePbLabels(labels []prompb.Label) (metricName, labelsValue 
 		builder.WriteString(label.Value)
 	}
 	return metricName, builder.String()
+}
+
+func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
+	//TODO: Implement DecodeV2
+	return nil, nil
 }

@@ -61,8 +61,9 @@ func (p *observePipeCollector) CollectList(groups ...*models.PipelineGroupEvents
 }
 
 func (p *observePipeCollector) ToArray() []*models.PipelineGroupEvents {
-	results := make([]*models.PipelineGroupEvents, len(p.groupChan))
-	for i := 0; i < len(p.groupChan); i++ {
+	totalCount := len(p.groupChan)
+	results := make([]*models.PipelineGroupEvents, totalCount)
+	for i := 0; i < totalCount; i++ {
 		results[i] = <-p.groupChan
 	}
 	return results

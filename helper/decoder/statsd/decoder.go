@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/helper/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	dogstatsd "github.com/narqo/go-dogstatsd-parser"
@@ -113,4 +114,9 @@ func (d *Decoder) Decode(data []byte, req *http.Request) (logs []*protocol.Log, 
 
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
 	return common.CollectBody(res, req, maxBodySize)
+}
+
+func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
+	//TODO: Implement DecodeV2
+	return nil, nil
 }

@@ -24,8 +24,10 @@ import (
 	"github.com/alibaba/ilogtail/helper/decoder/influxdb"
 	"github.com/alibaba/ilogtail/helper/decoder/opentelemetry"
 	"github.com/alibaba/ilogtail/helper/decoder/prometheus"
+	"github.com/alibaba/ilogtail/helper/decoder/raw"
 	"github.com/alibaba/ilogtail/helper/decoder/sls"
 	"github.com/alibaba/ilogtail/helper/decoder/statsd"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -33,11 +35,14 @@ import (
 type Decoder interface {
 	// Decode reader to logs
 	Decode(data []byte, req *http.Request) (logs []*protocol.Log, err error)
+	// DecodeV2 reader to groupEvents
+	DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error)
 	ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error)
 }
 
 type Option struct {
-	FieldsExtend bool
+	FieldsExtend      bool
+	DisableUncompress bool
 }
 
 var errDecoderNotFound = errors.New("no such decoder")
@@ -61,6 +66,9 @@ func GetDecoderWithOptions(format string, option Option) (Decoder, error) {
 		}, nil
 	case common.ProtocolOTLPLogV1:
 		return &opentelemetry.Decoder{Format: common.ProtocolOTLPLogV1}, nil
+	case common.ProtocolRaw:
+		return &raw.Decoder{DisableUncompress: option.DisableUncompress}, nil
+
 	}
 	return nil, errDecoderNotFound
 }

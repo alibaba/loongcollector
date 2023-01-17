@@ -27,8 +27,11 @@ import (
 
 	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestHttpFlusherInit(t *testing.T) {
@@ -286,6 +289,126 @@ func TestHttpFlusherFlush(t *testing.T) {
 	})
 }
 
+func TestHttpFlusherExport(t *testing.T) {
+	Convey("Given a http flusher with protocol: Raw, encoding: custom, query: contains variable '%{metadata.db}'", t, func() {
+		var actualRequests []string
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder("POST", "http://test.com/write?db=mydb", func(req *http.Request) (*http.Response, error) {
+			body, _ := ioutil.ReadAll(req.Body)
+			actualRequests = append(actualRequests, string(body))
+			return httpmock.NewStringResponse(200, "ok"), nil
+		})
+
+		flusher := &FlusherHTTP{
+			RemoteURL: "http://test.com/write",
+			Convert: helper.ConvertConfig{
+				Protocol: converter.ProtocolRaw,
+				Encoding: converter.EncodingCustom,
+			},
+			Timeout:     defaultTimeout,
+			Concurrency: 1,
+			Query: map[string]string{
+				"db": "%{metadata.db}",
+			},
+		}
+
+		err := flusher.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		mockMetric1 := "cpu.load.short,host=server01,region=cn value=0.6 1672321328000000000"
+		mockMetric2 := "cpu.load.short,host=server01,region=cn value=0.2 1672321358000000000"
+		mockMetadata := models.NewMetadataWithKeyValues("db", "mydb")
+
+		Convey("Export a single byte events each GroupEvents with Metadata {db: mydb}", func() {
+			groupEventsArray := []*models.PipelineGroupEvents{
+				{
+					Group:  models.NewGroup(mockMetadata, nil),
+					Events: []models.PipelineEvent{models.ByteArray(mockMetric1)},
+				},
+				{
+					Group:  models.NewGroup(mockMetadata, nil),
+					Events: []models.PipelineEvent{models.ByteArray(mockMetric2)},
+				},
+			}
+			httpmock.ZeroCallCounters()
+			err := flusher.Export(groupEventsArray, nil)
+			So(err, ShouldBeNil)
+			flusher.Stop()
+
+			Convey("each GroupEvents should send in a single request", func() {
+				So(httpmock.GetTotalCallCount(), ShouldEqual, 2)
+			})
+			Convey("request body should by valid", func() {
+				So(actualRequests, ShouldResemble, []string{
+					mockMetric1, mockMetric2,
+				})
+			})
+		})
+
+		Convey("Export multiple byte events in one GroupEvents with Metadata {db: mydb}", func() {
+			groupEvents := models.PipelineGroupEvents{
+				Group: models.NewGroup(mockMetadata, nil),
+				Events: []models.PipelineEvent{models.ByteArray(mockMetric1),
+					models.ByteArray(mockMetric2)},
+			}
+			httpmock.ZeroCallCounters()
+			err := flusher.Export([]*models.PipelineGroupEvents{&groupEvents}, nil)
+			So(err, ShouldBeNil)
+			flusher.Stop()
+
+			Convey("events in the same groupEvents should be send in one request", func() {
+				reqCount := httpmock.GetTotalCallCount()
+				So(reqCount, ShouldEqual, 1)
+			})
+
+			Convey("request body should be valid", func() {
+				So(actualRequests, ShouldResemble, []string{
+					mockMetric1 + "\n" + mockMetric2,
+				})
+			})
+		})
+	})
+}
+
+func TestHttpFlusherExportUnsupportedEventType(t *testing.T) {
+	Convey("Given a http flusher with protocol: raw, encoding: custom", t, func() {
+		flusher := &FlusherHTTP{
+			RemoteURL: "http://test.com/write",
+			Convert: helper.ConvertConfig{
+				Protocol: converter.ProtocolRaw,
+				Encoding: converter.EncodingCustom,
+			},
+			Timeout:     defaultTimeout,
+			Concurrency: 1,
+		}
+
+		err := flusher.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		Convey("Export non byteArray type events, then", func() {
+			groupEvents := models.PipelineGroupEvents{
+				Events: []models.PipelineEvent{&models.Metric{
+					Name:      "cpu.load.short",
+					Timestamp: 1672321328000000000,
+					Tags:      models.NewTagsWithKeyValues("host", "server01", "region", "cn"),
+					Value:     &models.MetricSingleValue{Value: 0.64},
+				}},
+			}
+			logger.ClearMemoryLog()
+			err = flusher.Export([]*models.PipelineGroupEvents{&groupEvents}, nil)
+			So(err, ShouldBeNil)
+			flusher.Stop()
+			Convey("logger should output Error Message when runFlushTask", func() {
+				memoryLog, ok := logger.ReadMemoryLog(1)
+				So(ok, ShouldBeTrue)
+				So(memoryLog, ShouldContainSubstring, "unsupported event type 1")
+			})
+		})
+	})
+}
+
 func TestGetNextRetryDelay(t *testing.T) {
 	f := &FlusherHTTP{
 		Retry: retryConfig{
@@ -325,4 +448,8 @@ func (c mockContext) GetConfigName() string {
 
 func (c mockContext) GetRuntimeContext() context.Context {
 	return context.Background()
+}
+
+func init() {
+	logger.InitTestLogger(logger.OptionOpenMemoryReceiver)
 }
