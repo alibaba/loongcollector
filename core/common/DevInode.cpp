@@ -47,7 +47,7 @@ DevInode GetFileDevInode(const std::string& filePath) {
     if (stat(filePath.c_str(), &buf) != 0) // if symbolic link, return the referred inode
     {
         if (errno != EEXIST)
-            LOG_WARNING(sLogger, ("call stat() on file fail", filePath)("error", strerror(errno)));
+            LOG_INFO(sLogger, ("call stat() on file fail", filePath)("error", strerror(errno)));
         else
             LOG_DEBUG(sLogger, ("call stat() on file fail", filePath)("error", strerror(errno)));
         return DevInode();

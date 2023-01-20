@@ -48,6 +48,7 @@ void PollingModify::Start() {
     ClearCache();
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
+    LOG_INFO(sLogger, ("PollingModify", "start"));
 }
 
 void PollingModify::Stop() {
@@ -56,9 +57,22 @@ void PollingModify::Stop() {
         try {
             mThreadPtr->Wait(5 * 1000000);
         } catch (...) {
-            LOG_ERROR(sLogger, ("stop polling modify thread error", ToString((int)mThreadPtr->GetState())));
+            LOG_ERROR(sLogger, ("stop polling modify thread failed", ToString((int)mThreadPtr->GetState())));
         }
     }
+    LOG_INFO(sLogger, ("PollingModify", "stop"));
+}
+
+void PollingModify::Resume() {
+    mHoldOnFlag = false;
+    mPollingThreadLock.unlock();
+    LOG_INFO(sLogger, ("PollingModify", "resume"));
+}
+
+void PollingModify::HoldOn() {
+    mHoldOnFlag = true;
+    mPollingThreadLock.lock();
+    LOG_INFO(sLogger, ("PollingModify", "hold on"));
 }
 
 struct ModifySortItem {

@@ -47,10 +47,6 @@ bool CheckPointManager::CheckVersion() {
 }
 
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
-    LOG_DEBUG(sLogger,
-              ("add check point ", checkPointPtr->mDevInode.inode)(
-                  checkPointPtr->mFileName, checkPointPtr->mRealFileName)("offset", checkPointPtr->mOffset)(
-                  "sig", checkPointPtr->mSignatureHash)("config", checkPointPtr->mConfigName));
     DevInodeCheckPointHashMap::iterator it
         = mDevInodeCheckPointPtrMap.find(CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName));
     if (it != mDevInodeCheckPointPtrMap.end())
@@ -473,7 +469,7 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
             LOG_ERROR(sLogger, METHOD_LOG_PATTERN("message", "open dir error")("dir", dirPath));
             continue;
         }
-        LOG_INFO(sLogger, METHOD_LOG_PATTERN("dir", dirPath));
+        LOG_DEBUG(sLogger, METHOD_LOG_PATTERN("dir", dirPath));
 
         fsutil::Entry ent;
         DevInode entDevInode;

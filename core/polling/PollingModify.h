@@ -37,15 +37,10 @@ public:
         return ptr;
     }
 
-    void HoldOn() {
-        mHoldOnFlag = true;
-        mPollingThreadLock.lock();
-    }
-
-    void Resume() {
-        mHoldOnFlag = false;
-        mPollingThreadLock.unlock();
-    }
+    void Start();
+    void Stop();
+    void Resume();
+    void HoldOn();
 
     void ClearCache() {
         PTScopedLock lock(mFileLock);
@@ -53,10 +48,6 @@ public:
         mNewFileNameQueue.clear();
         mDeletedFileNameQueue.clear();
     }
-
-    void Start();
-
-    void Stop();
 
     // AddNewFile is called by PollingDirFile when it finds new files.
     void AddNewFile(const std::vector<SplitedFilePath>& fileNameVec);

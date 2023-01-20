@@ -110,7 +110,7 @@ int32_t logtail::EventListener::ReadEvents(std::vector<logtail::Event*>& eventVe
                 etype |= event->mask & IN_MOVED_TO ? EVENT_MOVE_TO : 0;
                 etype |= event->mask & IN_DELETE ? EVENT_DELETE : 0;
                 std::string path;
-                if (dispatcher->IsRegistered(event->wd, path))
+                if (etype != 0 && dispatcher->IsRegistered(event->wd, path))
                     eventVec.push_back(
                         new Event(path, event->len > 0 ? event->name : "", etype, event->wd, event->cookie));
             }

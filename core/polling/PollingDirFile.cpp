@@ -68,6 +68,7 @@ void PollingDirFile::Start() {
     ClearCache();
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
+    LOG_INFO(sLogger, ("PollingDirFile", "start"));
 }
 
 void PollingDirFile::Stop() {
@@ -76,9 +77,22 @@ void PollingDirFile::Stop() {
         try {
             mThreadPtr->Wait(5 * 1000000);
         } catch (...) {
-            LOG_ERROR(sLogger, ("stop polling dir file thread error", ToString((int)mThreadPtr->GetState())));
+            LOG_ERROR(sLogger, ("stop polling dir file thread failed", ToString((int)mThreadPtr->GetState())));
         }
     }
+    LOG_INFO(sLogger, ("PollingDirFile", "stop"));
+}
+
+void PollingDirFile::HoldOn() {
+    mHoldOnFlag = true;
+    mPollingThreadLock.lock();
+    LOG_INFO(sLogger, ("PollingDirFile", "hold on"));
+}
+
+void PollingDirFile::Resume() {
+    mHoldOnFlag = false;
+    mPollingThreadLock.unlock();
+    LOG_INFO(sLogger, ("PollingDirFile", "resume"));
 }
 
 void PollingDirFile::CheckConfigPollingStatCount(const int32_t lastStatCount,

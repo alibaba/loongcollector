@@ -38,15 +38,8 @@ public:
 
     void Start();
     void Stop();
-
-    void HoldOn() {
-        mHoldOnFlag = true;
-        mPollingThreadLock.lock();
-    }
-    void Resume() {
-        mHoldOnFlag = false;
-        mPollingThreadLock.unlock();
-    }
+    void HoldOn();
+    void Resume();
 
     // ClearCache clears all cache items and reset status.
     // It will be called if configs have been updated because match status of

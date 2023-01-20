@@ -313,7 +313,7 @@ bool EventDispatcherBase::RegisterEventHandler(const char* path, Config* config,
         mBrokenLinkSet.erase(path);
     }
     LOG_INFO(sLogger,
-             ("add a new watcher for dir", path)("isSymbolicLink", isSymbolicLink)("dir inode", inode)("wd", wd));
+             ("add a new watcher for dir", path)("wd", wd)("dir inode", inode)("isSymbolicLink", isSymbolicLink));
     DirInfo* dirInfo = new DirInfo(path, inode, isSymbolicLink, handler);
     AddOneToOneMapEntry(dirInfo, wd);
     ++mWatchNum;
@@ -401,9 +401,9 @@ void EventDispatcherBase::AddExistedFileEvents(const char* path, int wd) {
         }
     }
     for (size_t i = 0; i < eventVec.size(); ++i) {
-        LOG_DEBUG(sLogger,
-                  ("add exist file",
-                   eventVec[i]->GetObject())("inode", eventVec[i]->GetInode())("config", eventVec[i]->GetConfigName()));
+        LOG_INFO(sLogger,
+                 ("generate MODIFY event for the recently updated existing file",
+                  PathJoin(eventVec[i]->GetSource(), eventVec[i]->GetObject())));
     }
     if (eventVec.size() > 0)
         LogInput::GetInstance()->PushEventQueue(eventVec);
@@ -417,17 +417,21 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
     Config* config = pConfigMananger->FindConfigByName(checkpoint->mConfigName);
     if (config == NULL) {
         LOG_INFO(sLogger,
-                 ("config", checkpoint->mConfigName)("delete checkpoint without existed config, file path",
-                                                     checkpoint->mFileName));
+                 ("delete checkpoint", "the corresponding config is deleted")("config", checkpoint->mConfigName)(
+                     "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
+                     "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
         return ValidateCheckpointResult::kConfigNotFound;
     }
 
     // Use FileName (logical absolute path) to do config matching.
     const std::string& filePath = checkpoint->mFileName;
-    const std::string& realFilePath = checkpoint->mRealFileName.empty() ? filePath : checkpoint->mRealFileName;
+    const std::string realFilePath = checkpoint->mRealFileName.empty() ? filePath : checkpoint->mRealFileName;
     size_t lastSeparator = filePath.find_last_of(PATH_SEPARATOR);
     if (lastSeparator == std::string::npos || lastSeparator == (size_t)0 || lastSeparator >= filePath.size()) {
-        LOG_INFO(sLogger, ("delete checkpoint because of invalid file path", filePath)("real path", realFilePath));
+        LOG_INFO(sLogger,
+                 ("delete checkpoint", "invalid log reader queue name")("config", checkpoint->mConfigName)(
+                     "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
+                     "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
         return ValidateCheckpointResult::kInvalidFilePath;
     }
     string path = filePath.substr(0, lastSeparator);
@@ -446,22 +450,21 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
         }
     }
     if (!stillMatch) {
-        std::string matchList;
-        for (size_t idx = 0; idx < matchedConfigs.size(); ++idx) {
-            matchList += (!matchList.empty() ? "," : "") + matchedConfigs[idx]->mConfigName;
-        }
-        LOG_INFO(sLogger,
-                 ("delete checkpoint because match list of the file "
-                  "has changed",
-                  filePath)("real path", realFilePath)("old config name", checkpoint->mConfigName)("new match list",
-                                                                                                   matchList));
+        LOG_INFO(
+            sLogger,
+            ("delete checkpoint", "original config no more matches the file path")("config", checkpoint->mConfigName)(
+                "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
+                "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
         return ValidateCheckpointResult::kConfigNotMatched;
     }
 
     // delete checkpoint if file path is not exist
     MapType<std::string, int>::Type::iterator pathIter = mPathWdMap.find(path);
     if (pathIter == mPathWdMap.end()) {
-        LOG_INFO(sLogger, ("delete checkpoint because file path is removed", filePath)("real path", realFilePath));
+        LOG_INFO(sLogger,
+                 ("delete checkpoint", "file path no longer exists")("config", checkpoint->mConfigName)(
+                     "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
+                     "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
         return ValidateCheckpointResult::kLogDirNotWatched;
     }
 
@@ -471,16 +474,20 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
         if (!CheckFileSignature(
                 realFilePath, checkpoint->mSignatureHash, checkpoint->mSignatureSize, config->mIsFuseMode)) {
             LOG_INFO(sLogger,
-                     ("ignore checkpoint, same dev inode but signature "
-                      "has changed",
-                      filePath)("real path", realFilePath)("inode", devInode.inode)("sig", checkpoint->mSignatureHash)(
-                         "offset", checkpoint->mOffset));
+                     ("delete checkpoint", "file device & inode remains the same but signature has changed")(
+                         "config", checkpoint->mConfigName)("log reader queue name", checkpoint->mFileName)(
+                         "real file path", checkpoint->mRealFileName)("file device", checkpoint->mDevInode.inode)(
+                         "file inode", checkpoint->mDevInode.inode));
             return ValidateCheckpointResult::kSigChanged;
         }
 
-        LOG_DEBUG(sLogger,
-                  ("push check point event", filePath)("real path", realFilePath)("inode", devInode.inode)(
-                      "sig", checkpoint->mSignatureHash)("offset", checkpoint->mOffset));
+        LOG_INFO(sLogger,
+                 ("generate MODIFY event for file with checkpoint",
+                  "nothing changed on the file")("config", checkpoint->mConfigName)("log reader queue name", filePath)(
+                     "real file path", realFilePath)("file device", checkpoint->mDevInode.dev)(
+                     "file inode", checkpoint->mDevInode.inode)("signature", checkpoint->mSignatureHash)(
+                     "last file position", checkpoint->mOffset)("is file open when dumped",
+                                                                ToString((bool)checkpoint->mFileOpenFlag)));
         eventVec.push_back(
             new Event(path, fileName, EVENT_MODIFY, wd, 0, checkpoint->mDevInode.dev, checkpoint->mDevInode.inode));
         eventVec[eventVec.size() - 1]->SetConfigName(checkpoint->mConfigName);
@@ -492,8 +499,9 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
     // See https://aone.alibaba-inc.com/req/29052357.
     if (0 == checkpoint->mSignatureSize) {
         LOG_INFO(sLogger,
-                 ("delete checkpoint because signature size is zero",
-                  filePath)("real path", realFilePath)("inode", checkpoint->mDevInode.inode));
+                 ("delete checkpoint", "file signature size is zero")("config", checkpoint->mConfigName)(
+                     "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
+                     "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
         return ValidateCheckpointResult::kZeroSigSize;
     }
 
@@ -502,8 +510,10 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
     if (findIter != cachePathDevInodeMap.end()) {
         if (findIter->second.mFileDir != path) {
             LOG_INFO(sLogger,
-                     ("ignore check point, file dev inode has been used in other dir",
-                      filePath)("old real path", realFilePath)(findIter->second.mFileDir, findIter->second.mFileName));
+                     ("delete checkpoint", "file has been moved to other dir")("config", checkpoint->mConfigName)(
+                         "log reader queue name", checkpoint->mFileName)("original real file path", realFilePath)(
+                         "new real file path", PathJoin(findIter->second.mFileDir, findIter->second.mFileName))(
+                         "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
             return ValidateCheckpointResult::kLogDirChanged;
         }
 
@@ -511,10 +521,15 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
                                checkpoint->mSignatureHash,
                                checkpoint->mSignatureSize,
                                config->mIsFuseMode)) {
-            LOG_INFO(sLogger,
-                     ("find check point, file name has changed in this dir",
-                      filePath)("old real path", realFilePath)("new file name", findIter->second.mFileName));
             checkpoint->mRealFileName = PathJoin(findIter->second.mFileDir, findIter->second.mFileName);
+            LOG_INFO(sLogger,
+                     ("generate MODIFY event for file with checkpoint",
+                      "file has been renamed, but still in the same dir")("config", checkpoint->mConfigName)(
+                         "log reader queue name", filePath)("original real file path", realFilePath)(
+                         "new real file path", checkpoint->mRealFileName)("file device", checkpoint->mDevInode.dev)(
+                         "file inode", checkpoint->mDevInode.inode)("signature", checkpoint->mSignatureHash)(
+                         "last file position", checkpoint->mOffset)("is file open when dumped",
+                                                                    ToString((bool)checkpoint->mFileOpenFlag)));
             eventVec.push_back(
                 new Event(path, fileName, EVENT_MODIFY, wd, 0, checkpoint->mDevInode.dev, checkpoint->mDevInode.inode));
             eventVec[eventVec.size() - 1]->SetConfigName(checkpoint->mConfigName);
@@ -535,28 +550,33 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
     }
 
     if (cachePathDevInodeMap.size() >= (size_t)INT32_FLAG(checkpoint_find_max_cache_size)) {
-        LOG_INFO(sLogger,
-                 ("can not find this log (find cache full), delete checkpoint", filePath)("real path", realFilePath));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
-                                               string("can not find log, delete checkpoint ") + filePath + " real path "
-                                                   + realFilePath + " cache devinode size "
-                                                   + ToString(cachePathDevInodeMap.size()));
+        LOG_WARNING(
+            sLogger,
+            ("delete checkpoint", "cannot find the file because of full find cache")("config", checkpoint->mConfigName)(
+                "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
+                "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
+        LogtailAlarm::GetInstance()->SendAlarm(
+            CHECKPOINT_ALARM,
+            string("cannot find the file because of full find cache, delete the checkpoint, log reader queue name: ")
+                + filePath + ", real file path: " + realFilePath);
         return ValidateCheckpointResult::kCacheFull;
     }
 
-    LOG_INFO(sLogger,
-             ("search file in directory for checkpoint", filePath)("dir", path)("inode", checkpoint->mDevInode.inode)(
-                 "config", config->mConfigName)("depth", config->mAdvancedConfig.mSearchCheckpointDirDepth));
     auto const searchResult = SearchFilePathByDevInodeInDirectory(
         path, config->mAdvancedConfig.mSearchCheckpointDirDepth, checkpoint->mDevInode, &cachePathDevInodeMap);
     if (searchResult) {
         const auto& newRealPath = searchResult.value();
         if (CheckFileSignature(
                 newRealPath, checkpoint->mSignatureHash, checkpoint->mSignatureSize, config->mIsFuseMode)) {
-            LOG_INFO(sLogger,
-                     ("find check point, file path has changed", filePath)("old real path", realFilePath)(
-                         "new real path", newRealPath)("inode", checkpoint->mDevInode.inode));
             checkpoint->mRealFileName = newRealPath;
+            LOG_INFO(sLogger,
+                     ("generate MODIFY event for file with checkpoint",
+                      "file has been renamed, but still in the same dir")("config", checkpoint->mConfigName)(
+                         "log reader queue name", filePath)("original real file path", realFilePath)(
+                         "new real file path", checkpoint->mRealFileName)("file device", checkpoint->mDevInode.dev)(
+                         "file inode", checkpoint->mDevInode.inode)("signature", checkpoint->mSignatureHash)(
+                         "last file position", checkpoint->mOffset)("is file open when dumped",
+                                                                    ToString((bool)checkpoint->mFileOpenFlag)));
             eventVec.push_back(
                 new Event(path, fileName, EVENT_MODIFY, wd, 0, checkpoint->mDevInode.dev, checkpoint->mDevInode.inode));
             eventVec[eventVec.size() - 1]->SetConfigName(checkpoint->mConfigName);
@@ -564,19 +584,18 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
         }
 
         LOG_INFO(sLogger,
-                 ("ignore check point, file signature has changed", filePath)("old real path", realFilePath)(
-                     "new real path", newRealPath)("inode", checkpoint->mDevInode.inode));
+                 ("delete checkpoint", "file has been renamed but signature has changed")(
+                     "config", checkpoint->mConfigName)("log reader queue name", checkpoint->mFileName)(
+                     "original real file path", realFilePath)("new real file path", newRealPath)(
+                     "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
         return ValidateCheckpointResult::kSigChanged;
     }
 
     // Can not find dev inode, delete this checkpoint.
     LOG_INFO(sLogger,
-             ("can not find this log, delete checkpoint",
-              filePath)("real path", realFilePath)("cache devinode size", cachePathDevInodeMap.size()));
-    LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM,
-                                           string("can not find log, delete checkpoint ") + filePath + " real path "
-                                               + realFilePath + " cache devinode size "
-                                               + ToString(cachePathDevInodeMap.size()));
+             ("delete checkpoint", "cannot find the file any more")("config", checkpoint->mConfigName)(
+                 "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
+                 "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
     return ValidateCheckpointResult::kDevInodeNotFound;
 }
 
@@ -585,7 +604,7 @@ void EventDispatcherBase::AddExistedCheckPointFileEvents() {
     // This operation will delete not existed file's check point
     std::map<DevInode, SplitedFilePath> cachePathDevInodeMap;
     auto& checkPointMap = CheckPointManager::Instance()->GetAllFileCheckPoint();
-    LOG_INFO(sLogger, ("start add existed check point events, size", checkPointMap.size()));
+    LOG_INFO(sLogger, ("start to verify existed checkpoints, total checkpoint count", checkPointMap.size()));
     std::vector<CheckPointManager::CheckPointKey> deleteKeyVec;
     std::vector<Event*> eventVec;
     for (auto iter = checkPointMap.begin(); iter != checkPointMap.end(); ++iter) {
@@ -598,8 +617,8 @@ void EventDispatcherBase::AddExistedCheckPointFileEvents() {
         checkPointMap.erase(deleteKeyVec[i]);
     }
     LOG_INFO(sLogger,
-             ("add existed checkpoint events, size", checkPointMap.size())("cache size", cachePathDevInodeMap.size())(
-                 "event size", eventVec.size())("delete size", deleteKeyVec.size()));
+             ("checkpoint verification ends, generated event count", eventVec.size())("checkpoint deletion count",
+                                                                                      deleteKeyVec.size()));
     auto const v1EventCount = eventVec.size();
 
     // Load exactly once checkpoints and create events from them.
@@ -990,7 +1009,7 @@ void EventDispatcherBase::UnregisterEventHandler(const char* path) {
         mInotifyWatchNum--;
     }
     mWatchNum--;
-    LOG_DEBUG(sLogger, ("unregister dir", path));
+    LOG_INFO(sLogger, ("remove the watcher for dir", path)("wd", wd));
 }
 
 void EventDispatcherBase::StopAllDir(const std::string& baseDir) {

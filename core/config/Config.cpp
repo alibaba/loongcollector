@@ -559,7 +559,7 @@ LogFileReader* Config::CreateLogFileReader(const std::string& dir,
         JsonLogFileReader* jsonLogFileReader = static_cast<JsonLogFileReader*>(reader);
         jsonLogFileReader->SetTimeKey(mTimeKey);
     } else {
-        LOG_ERROR(sLogger, ("not supported log type", mLogType)("dir", dir)("file", file));
+        LOG_ERROR(sLogger, ("log reader creation failed, unknown log type", mLogType)("project", GetProjectName())("logstore", GetCategory())("config", mConfigName));
     }
 
     if (reader != NULL) {

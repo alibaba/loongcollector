@@ -165,6 +165,8 @@ public:
 
     time_t GetContainerStoppedTime() const { return mContainerStoppedTime; }
 
+    bool IsFileOpened() const { return mLogFileOp.IsOpen(); }
+
     bool ShouldForceReleaseDeletedFileFd();
 
     void SetPluginFlag(bool flag) { mPluginFlag = flag; }

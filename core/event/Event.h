@@ -94,57 +94,78 @@ public:
         return lhsPath > rhsPath;
     }
 
-    const std::string& GetConfigName() const { return mConfigName; }
+    const std::string& GetSource() const { return mSource; }
 
-    void SetConfigName(const std::string& configName) { mConfigName = configName; }
+    const std::string& GetObject() const { return mObject; }
+
+    // GetObject_ is the same as GetObject, but used to avoid compilation failure on Windows.
+    const std::string& GetObject_() const { return mObject; }
+
+    EventType GetType() const { return mType; }
 
     uint64_t GetDev() const { return mDev; }
 
     uint64_t GetInode() const { return mInode; }
+    
+    int GetWd() const { return mWd; }
+
+    const uint32_t GetCookie() const { return mCookie; }
+
+    int64_t GetHashKey() { return mHashKey; }
+
+    const std::string& GetConfigName() const { return mConfigName; }
+
+    void SetSource(const std::string& source) { mSource = source; }  
 
     void SetDev(uint64_t dev) { mDev = dev; }
 
     void SetInode(uint64_t inode) { mInode = inode; }
 
-    const std::string& GetSource() const { return mSource; }
-
-    void SetSource(const std::string& source) { mSource = source; }
-
-    const std::string& GetObject() const { return mObject; }
-
-    // GetObject_ is same to GetObject, but used to avoid compilation failure on Windows.
-    const std::string& GetObject_() const { return mObject; }
-
-    EventType GetType() const { return mType; }
-
-    int GetWd() const { return mWd; }
-
-    const uint32_t GetCookie() const { return mCookie; }
-    // event type testers
-    bool IsCreate() const {
-        return mType & EVENT_CREATE; // is object created?
-    }
-
-    bool IsModify() const {
-        return mType & EVENT_MODIFY; // is object modified?
-    }
-
-    bool IsDir() const {
-        return mType & EVENT_ISDIR; // is object a dir?
-    }
-
-    bool IsOverflow() const {
-        return mType & EVENT_OVERFLOW; // is event buffer overflow?
-    }
-
-    bool IsTimeout() const { return mType & EVENT_TIMEOUT; }
-    bool IsMoveFrom() const { return mType & EVENT_MOVE_FROM; }
-    bool IsMoveTo() const { return mType & EVENT_MOVE_TO; }
-    bool IsDeleted() const { return mType & EVENT_DELETE; }
-    bool IsContainerStopped() const { return mType & EVENT_CONTAINER_STOPPED; }
     void SetHashKey(int64_t hashKey) { mHashKey = hashKey; }
 
-    int64_t GetHashKey() { return mHashKey; }
+    void SetConfigName(const std::string& configName) { mConfigName = configName; }
+ 
+    bool IsCreate() const { return mType & EVENT_CREATE; }
+
+    bool IsModify() const { return mType & EVENT_MODIFY; }
+
+    bool IsDir() const { return mType & EVENT_ISDIR; }
+
+    // Check if event buffer is overflow.
+    bool IsOverflow() const { return mType & EVENT_OVERFLOW; }
+
+    bool IsTimeout() const { return mType & EVENT_TIMEOUT; }
+
+    bool IsMoveFrom() const { return mType & EVENT_MOVE_FROM; }
+
+    bool IsMoveTo() const { return mType & EVENT_MOVE_TO; }
+
+    bool IsDeleted() const { return mType & EVENT_DELETE; }
+
+    bool IsContainerStopped() const { return mType & EVENT_CONTAINER_STOPPED; }
+
+    std::string GetTypeString() const {
+        std::string type;
+        if (IsDir()) {
+            type = "ISDIR | ";
+        }
+        if (IsCreate()) {
+            type += "CREATE";
+        } else if (IsModify()) {
+            type += "MODIFY";
+        } else if (IsMoveFrom()) {
+            type += "MOVED_FROM";
+        } else if (IsMoveTo()) {
+            type += "MOVED_TO";
+        } else if (IsDeleted()) {
+            type += "DELETE";
+        } else if (IsTimeout()) {
+            type += "DELETE_SELF";
+        } else if (IsContainerStopped()) {
+            type += "CONTAINER_STOPPED";
+        }
+        return type;
+    }
 };
 
 } // namespace logtail

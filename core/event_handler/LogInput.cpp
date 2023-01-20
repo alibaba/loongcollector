@@ -85,40 +85,33 @@ void LogInput::Start() {
 
     mInteruptFlag = false;
     new Thread([this]() { ProcessLoop(); });
+    LOG_INFO(sLogger, ("LogInput", "start"));
 }
 
 void LogInput::Resume(bool addCheckPointEventFlag) {
-    // resume sequence : process -> input -> polling modify -> polling dir file
-    mInteruptFlag = false;
+    // Resume sequence: inotify -> LogProcess -> LogInput -> polling (PollingModify -> PollingDirFile)
     ConfigManager::GetInstance()->RegisterHandlers();
     if (addCheckPointEventFlag) {
         EventDispatcher::GetInstance()->AddExistedCheckPointFileEvents();
     }
-    LOG_DEBUG(sLogger, ("mAccessMainThreadRWL", "Unlock"));
-    LOG_DEBUG(sLogger, ("LogProcess Resume", ""));
     LogProcess::GetInstance()->Resume();
+    mInteruptFlag = false;
     mAccessMainThreadRWL.unlock();
-    LOG_DEBUG(sLogger, ("PollingModify Resume", ""));
+    LOG_INFO(sLogger, ("LogInput", "resume"));
     PollingModify::GetInstance()->Resume();
-    LOG_DEBUG(sLogger, ("PollingDirFile Resume", ""));
     PollingDirFile::GetInstance()->Resume();
 }
 
 void LogInput::HoldOn() {
-    // Profiling HoldOn, if it costs too much time, alarm.
     auto holdOnStart = GetCurrentTimeInMilliSeconds();
 
-    // hold on sequence: PollingDirFile -> PollingModify -> input -> process
-    LOG_DEBUG(sLogger, ("PollingDirFile HoldOn", ""));
+    // Hold on sequence: polling (PollingDirFile -> PollingModify) -> LogInput -> LogProcess
     PollingDirFile::GetInstance()->HoldOn();
-    LOG_DEBUG(sLogger, ("PollingModify HoldOn", ""));
     PollingModify::GetInstance()->HoldOn();
     mInteruptFlag = true;
-    LOG_DEBUG(sLogger, ("LogInput HoldOn", ""));
     mAccessMainThreadRWL.lock();
-    LOG_DEBUG(sLogger, ("LogProcess HoldOn", ""));
+    LOG_INFO(sLogger, ("LogInput", "hold on"));
     LogProcess::GetInstance()->HoldOn();
-    LOG_DEBUG(sLogger, ("LogInput HoldOn end", ""));
 
     auto holdOnCost = GetCurrentTimeInMilliSeconds() - holdOnStart;
     if (holdOnCost >= 60 * 1000) {
@@ -128,8 +121,9 @@ void LogInput::HoldOn() {
 }
 
 void LogInput::TryReadEvents(bool forceRead) {
-    if (mInteruptFlag) // HoldOn
+    if (mInteruptFlag)
         return;
+
     if (!forceRead) {
         int64_t curMicroSeconds = GetCurrentTimeInMicroSeconds();
         if (curMicroSeconds - mLastReadEventMicroSeconds >= INT64_FLAG(read_fs_events_interval))
@@ -142,21 +136,18 @@ void LogInput::TryReadEvents(bool forceRead) {
     vector<Event*> inotifyEvents;
     EventDispatcher::GetInstance()->ReadInotifyEvents(inotifyEvents);
     if (inotifyEvents.size() > 0) {
-        LOG_DEBUG(sLogger, ("push event to inotify event q, event count", inotifyEvents.size()));
         PushEventQueue(inotifyEvents);
     }
 
     vector<Event*> pollingEvents;
     PollingEventQueue::GetInstance()->PopAllEvents(pollingEvents);
     if (pollingEvents.size() > 0) {
-        LOG_DEBUG(sLogger, ("push event to polling event q, event count", pollingEvents.size()));
         PushEventQueue(pollingEvents);
     }
 
     std::vector<Event*> containerStoppedEvents;
     ConfigManager::GetInstance()->GetContainerStoppedEvents(containerStoppedEvents);
     if (containerStoppedEvents.size() > 0) {
-        LOG_DEBUG(sLogger, ("push event to container stopped event q, event count", containerStoppedEvents.size()));
         PushEventQueue(containerStoppedEvents);
     }
 
@@ -309,10 +300,8 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
     const string& source = ev->GetSource();
     const string& object = ev->GetObject();
     LOG_DEBUG(sLogger,
-              ("ProcessEvent Type", ev->GetType())("Source", ev->GetSource())("Object", ev->GetObject())(
-                  "Config", ev->GetConfigName())("IsDir", ev->IsDir())("IsCreate", ev->IsCreate())(
-                  "IsModify", ev->IsModify())("IsDeleted", ev->IsDeleted())("IsMoveFrom", ev->IsMoveFrom())(
-                  "IsContainerStopped", ev->IsContainerStopped())("IsMoveTo", ev->IsMoveTo()));
+              ("process event, type", ev->GetTypeString())("dir", ev->GetSource())("filename", ev->GetObject())(
+                  "config", ev->GetConfigName()));
     if (ev->IsTimeout())
         dispatcher->UnregisterAllDir(source);
     else {
