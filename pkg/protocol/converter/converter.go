@@ -113,8 +113,18 @@ var supportedEncodingMap = map[string]map[string]bool{
 type Converter struct {
 	Protocol             string
 	Encoding             string
+	Separator            string
 	TagKeyRenameMap      map[string]string
 	ProtocolKeyRenameMap map[string]string
+}
+
+func NewConverterWithSep(protocol, encoding, sep string, tagKeyRenameMap, protocolKeyRenameMap map[string]string) (*Converter, error) {
+	converter, err := NewConverter(protocol, encoding, tagKeyRenameMap, protocolKeyRenameMap)
+	if err != nil {
+		return nil, err
+	}
+	converter.Separator = sep
+	return converter, nil
 }
 
 func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameMap map[string]string) (*Converter, error) {

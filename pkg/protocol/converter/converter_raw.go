@@ -26,23 +26,48 @@ func (c *Converter) ConvertToRawStream(groupEvents *models.PipelineGroupEvents, 
 		return nil, nil, nil
 	}
 
-	byteStream := *GetPooledByteBuf()
+	var targetValues map[string]string
+	if len(targetFields) > 0 {
+		targetValues = findTargetFieldsInGroup(targetFields, groupEvents.Group)
+	}
+
+	if len(c.Separator) == 0 {
+		return getByteStream(groupEvents, targetValues)
+	}
+
+	return getByteStreamWithSep(groupEvents, targetValues, c.Separator)
+}
+
+func getByteStreamWithSep(groupEvents *models.PipelineGroupEvents, targetValues map[string]string, sep string) (stream [][]byte, values []map[string]string, err error) {
+	joinedStream := *GetPooledByteBuf()
 	for idx, event := range groupEvents.Events {
 		eventType := event.GetType()
 		if eventType != models.EventTypeByteArray {
 			return nil, nil, fmt.Errorf("unsupported event type %v", eventType)
 		}
 		if idx != 0 {
-			byteStream = append(byteStream, '\n')
+			joinedStream = append(joinedStream, sep...)
 		}
-		byteStream = append(byteStream, event.(models.ByteArray)...)
+		joinedStream = append(joinedStream, event.(models.ByteArray)...)
 	}
+	return [][]byte{joinedStream}, []map[string]string{targetValues}, nil
+}
 
-	var targetValues map[string]string
-	if len(targetFields) > 0 {
-		targetValues = findTargetFieldsInGroup(targetFields, groupEvents.Group)
+func getByteStream(groupEvents *models.PipelineGroupEvents, targetValues map[string]string) (stream [][]byte, values []map[string]string, err error) {
+	byteGroup := make([][]byte, 0, len(groupEvents.Events))
+	valueGroup := make([]map[string]string, 0, len(groupEvents.Events))
+	for _, event := range groupEvents.Events {
+		eventType := event.GetType()
+		if eventType != models.EventTypeByteArray {
+			return nil, nil, fmt.Errorf("unsupported event type %v", eventType)
+		}
+
+		byteStream := *GetPooledByteBuf()
+		byteStream = append(byteStream, event.(models.ByteArray)...)
+		byteGroup = append(byteGroup, byteStream)
+		valueGroup = append(valueGroup, targetValues)
 	}
-	return [][]byte{byteStream}, []map[string]string{targetValues}, nil
+	return byteGroup, valueGroup, nil
 }
 
 func findTargetFieldsInGroup(targetFields []string, group *models.GroupInfo) map[string]string {

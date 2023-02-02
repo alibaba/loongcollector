@@ -13,6 +13,7 @@ func TestConverter_ConvertToRawStream(t *testing.T) {
 	type fields struct {
 		Protocol             string
 		Encoding             string
+		Separator            string
 		TagKeyRenameMap      map[string]string
 		ProtocolKeyRenameMap map[string]string
 	}
@@ -21,8 +22,9 @@ func TestConverter_ConvertToRawStream(t *testing.T) {
 		targetFields []string
 	}
 	mockValidFields := fields{
-		Protocol: ProtocolRaw,
-		Encoding: EncodingCustom,
+		Protocol:  ProtocolRaw,
+		Encoding:  EncodingCustom,
+		Separator: "\n",
 	}
 	mockInvalidFields := fields{
 		Protocol: ProtocolRaw,
@@ -57,7 +59,7 @@ func TestConverter_ConvertToRawStream(t *testing.T) {
 					Events: []models.PipelineEvent{models.ByteArray(mockByteEvent), models.ByteArray(mockByteEvent)}},
 				targetFields: []string{"metadata.db"},
 			},
-			wantStream: [][]byte{append(append(mockByteEvent, '\n'), mockByteEvent...)},
+			wantStream: [][]byte{append(append(mockByteEvent, "\n"...), mockByteEvent...)},
 			wantValues: []map[string]string{{"metadata.db": "test"}},
 			wantErr:    assert.NoError,
 		}, {
@@ -83,6 +85,81 @@ func TestConverter_ConvertToRawStream(t *testing.T) {
 			c := &Converter{
 				Protocol:             tt.fields.Protocol,
 				Encoding:             tt.fields.Encoding,
+				Separator:            tt.fields.Separator,
+				TagKeyRenameMap:      tt.fields.TagKeyRenameMap,
+				ProtocolKeyRenameMap: tt.fields.ProtocolKeyRenameMap,
+			}
+			gotStream, gotValues, err := c.ConvertToRawStream(tt.args.groupEvents, tt.args.targetFields)
+			if !tt.wantErr(t, err, fmt.Sprintf("ConvertToRawStream(%v, %v)", tt.args.groupEvents, tt.args.targetFields)) {
+				return
+			}
+			assert.Equalf(t, tt.wantStream, gotStream, "ConvertToRawStream(%v, %v)", tt.args.groupEvents, tt.args.targetFields)
+			assert.Equalf(t, tt.wantValues, gotValues, "ConvertToRawStream(%v, %v)", tt.args.groupEvents, tt.args.targetFields)
+		})
+	}
+}
+
+func TestConverter_ConvertToRawStreamSeparator(t *testing.T) {
+	type fields struct {
+		Protocol             string
+		Encoding             string
+		Separator            string
+		TagKeyRenameMap      map[string]string
+		ProtocolKeyRenameMap map[string]string
+	}
+	type args struct {
+		groupEvents  *models.PipelineGroupEvents
+		targetFields []string
+	}
+	mockFieldsWithSep := fields{
+		Protocol:  ProtocolRaw,
+		Encoding:  EncodingCustom,
+		Separator: "\r\n",
+	}
+	mockFieldsWithoutSep := fields{
+		Protocol: ProtocolRaw,
+		Encoding: EncodingJSON,
+	}
+	mockGroup := models.NewGroup(models.NewMetadataWithMap(map[string]string{"db": "test"}), nil)
+	mockByteEvent := []byte("cpu.load.short,host=server01,region=cn value=0.6")
+	tests := []struct {
+		name       string
+		fields     fields
+		args       args
+		wantStream [][]byte
+		wantValues []map[string]string
+		wantErr    assert.ErrorAssertionFunc
+	}{
+		{
+			name:   "join with sep",
+			fields: mockFieldsWithSep,
+			args: args{
+				groupEvents: &models.PipelineGroupEvents{Group: mockGroup,
+					Events: []models.PipelineEvent{models.ByteArray(mockByteEvent), models.ByteArray(mockByteEvent)}},
+				targetFields: []string{"metadata.db"},
+			},
+			wantStream: [][]byte{append(append(mockByteEvent, "\r\n"...), mockByteEvent...)},
+			wantValues: []map[string]string{{"metadata.db": "test"}},
+			wantErr:    assert.NoError,
+		}, {
+			name:   "not join",
+			fields: mockFieldsWithoutSep,
+			args: args{
+				groupEvents: &models.PipelineGroupEvents{Group: mockGroup,
+					Events: []models.PipelineEvent{models.ByteArray(mockByteEvent), models.ByteArray(mockByteEvent)}},
+				targetFields: []string{"metadata.db"},
+			},
+			wantStream: [][]byte{mockByteEvent, mockByteEvent},
+			wantValues: []map[string]string{{"metadata.db": "test"}, {"metadata.db": "test"}},
+			wantErr:    assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Converter{
+				Protocol:             tt.fields.Protocol,
+				Encoding:             tt.fields.Encoding,
+				Separator:            tt.fields.Separator,
 				TagKeyRenameMap:      tt.fields.TagKeyRenameMap,
 				ProtocolKeyRenameMap: tt.fields.ProtocolKeyRenameMap,
 			}

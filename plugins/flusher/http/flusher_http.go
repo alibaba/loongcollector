@@ -149,7 +149,7 @@ func (f *FlusherHTTP) Stop() error {
 }
 
 func (f *FlusherHTTP) getConverter() (*converter.Converter, error) {
-	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, nil, nil)
+	return converter.NewConverterWithSep(f.Convert.Protocol, f.Convert.Encoding, f.Convert.Separator, nil, nil)
 }
 
 func (f *FlusherHTTP) addTask(log interface{}) {
