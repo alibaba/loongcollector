@@ -81,7 +81,7 @@ check-license: clean tools
 
 .PHONY: lint
 lint: clean tools
-	$(GO_LINT) run -v --timeout 5m $(SCOPE)/... && make lint-pkg && make lint-e2e
+	$(GO_LINT) run -v --timeout 10m $(SCOPE)/... && make lint-pkg && make lint-e2e
 
 .PHONY: lint-pkg
 lint-pkg: clean tools

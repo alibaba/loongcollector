@@ -24,3 +24,10 @@ func TestFormatString(t *testing.T) {
 
 	assert.Equal(t, expectTopic, actualTopic)
 }
+
+func TestCompileKeys(t *testing.T) {
+	topic := "kafka_%{app_name}"
+	expectTopicKeys := []string{"app_name"}
+	topicKeys, _ := CompileKeys(topic)
+	assert.Equal(t, expectTopicKeys, topicKeys)
+}

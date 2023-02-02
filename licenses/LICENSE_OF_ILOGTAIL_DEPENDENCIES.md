@@ -68,6 +68,10 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/xdg-go/pbkdf2](https://pkg.go.dev/github.com/xdg-go/pbkdf2?tab=licenses)
 - [github.com/xdg-go/scram](https://pkg.go.dev/github.com/xdg-go/scram?tab=licenses)
 - [github.com/xdg-go/stringprep](https://pkg.go.dev/github.com/xdg-go/stringprep?tab=licenses)
+- [github.com/apache/pulsar-client-go](https://pkg.go.dev/github.com/apache/pulsar-client-go?tab=licenses)
+- [github.com/AthenZ/athenz](https://pkg.go.dev/github.com/AthenZ/athenz?tab=licenses)
+- [github.com/ardielle/ardielle-go](https://pkg.go.dev/github.com/ardielle/ardielle-go?tab=licenses)
+- [github.com/linkedin/goavro](https://pkg.go.dev/github.com/linkedin/goavro?tab=licenses)
 - [google.golang.org/genproto](https://pkg.go.dev/google.golang.org/genproto?tab=licenses)
 - [google.golang.org/grpc](https://pkg.go.dev/google.golang.org/grpc?tab=licenses)
 - [gopkg.in/square/go-jose.v2](https://pkg.go.dev/gopkg.in/square/go-jose.v2?tab=licenses)
@@ -112,6 +116,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/gosnmp/gosnmp](https://pkg.go.dev/github.com/gosnmp/gosnmp)
 - [github.com/spf13/pflag](https://pkg.go.dev/github.com/spf13/pflag?tab=licenses)
 - [github.com/tklauser/go-sysconf](https://pkg.go.dev/github.com/tklauser/go-sysconf?tab=licenses)
+- [github.com/DataDog/zstd](https://pkg.go.dev/github.com/DataDog/zstd?tab=licenses)
+- [github.com/spaolacci/murmur3](https://pkg.go.dev/github.com/spaolacci/murmur3?tab=licenses)
 - [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto?tab=licenses)
 - [golang.org/x/net](https://pkg.go.dev/golang.org/x/net?tab=licenses)
 - [golang.org/x/oauth2](https://pkg.go.dev/golang.org/x/oauth2?tab=licenses)
@@ -177,6 +183,12 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/valyala/fasttemplate](https://pkg.go.dev/github.com/valyala/fasttemplate?tab=licenses)
 - [github.com/valyala/histogram](https://pkg.go.dev/github.com/valyala/histogram?tab=licenses)
 - [github.com/valyala/quicktemplate](https://pkg.go.dev/github.com/valyala/quicktemplate?tab=licenses)
+- [github.com/99designs/keyring](https://pkg.go.dev/github.com/99designs/keyring?tab=licenses)
+- [github.com/danieljoos/wincred](https://pkg.go.dev/github.com/danieljoos/wincred?tab=licenses)
+- [github.com/dvsekhvalnov/jose2go](https://pkg.go.dev/github.com/dvsekhvalnov/jose2go?tab=licenses)
+- [github.com/golang-jwt/jwt](https://pkg.go.dev/github.com/golang-jwt/jwt?tab=licenses)
+- [github.com/gsterjov/go-libsecret](https://pkg.go.dev/github.com/gsterjov/go-libsecret?tab=licenses)
+- [github.com/mtibben/percent](https://pkg.go.dev/github.com/mtibben/percent?tab=licenses)
 - [go.mozilla.org/pkcs7](https://pkg.go.dev/go.mozilla.org/pkcs7?tab=licenses)
 - [go.uber.org/atomic](https://pkg.go.dev/go.uber.org/atomic?tab=licenses)
 - [go.uber.org/multierr](https://pkg.go.dev/go.uber.org/multierr?tab=licenses)
@@ -203,6 +215,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 - [github.com/go-sql-driver/mysql](https://pkg.go.dev/github.com/go-sql-driver/mysql?tab=licenses)
 - [github.com/hashicorp/go-uuid](https://pkg.go.dev/github.com/hashicorp/go-uuid?tab=licenses)
+- [github.com/hashicorp/golang-lru](https://pkg.go.dev/github.com/hashicorp/golang-lru?tab=licenses)
 
 ## LGPL v3 licenses
 

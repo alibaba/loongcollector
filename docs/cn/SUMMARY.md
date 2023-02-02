@@ -81,6 +81,7 @@
   * [SLS](data-pipeline/flusher/sls.md)
   * [标准输出/文件](data-pipeline/flusher/stdout.md)
   * [OTLP日志](data-pipeline/flusher/otlp-log.md)
+  * [Pulsar](data-pipeline/flusher/pulsar.md)
   * [HTTP](data-pipeline/flusher/http.md)
 * [加速](data-pipeline/accelerator/README.md)
   * [分隔符加速](data-pipeline/accelerator/delimiter-accelerate.md)

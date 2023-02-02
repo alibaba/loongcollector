@@ -35,7 +35,8 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
-
+- [public] [both] [added] add a new flusher_pulsar plugin.
+- [public] [both] [fixed] ignore time zone adjustment in config when using system time as log time
 - [public] [both] [updated] flusher kafka v2 support TLS and Kerberos authentication.
 - [public] [both] [updated] improve logs related to file discovery
 - [public] [both] [fixed] fix collection duplication problem caused by checkpoint overwritten
