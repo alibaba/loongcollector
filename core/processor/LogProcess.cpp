@@ -153,10 +153,12 @@ void LogProcess::HoldOn() {
                 break;
             }
         }
-        if (allThreadWait)
+        if (allThreadWait) {
+            LOG_INFO(sLogger, ("LogProcess", "hold on"));
             return;
+        }
         if (++tryTime % 100 == 0) {
-            LOG_ERROR(sLogger, ("LogProcess thread is too slow or  blocked with unknow error.", ""));
+            LOG_ERROR(sLogger, ("LogProcess thread is too slow or blocked with unknow error.", ""));
         }
         usleep(10 * 1000);
     }
@@ -166,6 +168,7 @@ void LogProcess::HoldOn() {
 void LogProcess::Resume() {
     mLogFeedbackQueue.Unlock();
     mAccessProcessThreadRWL.unlock();
+    LOG_INFO(sLogger, ("LogProcess", "resume"));
 }
 
 bool LogProcess::FlushOut(int32_t waitMs) {
@@ -414,7 +417,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 int32_t parseStartTime = (int32_t)time(NULL);
                 for (uint32_t i = 0; i < lines; i++) {
                     bool successful = logFileReader->ParseLogLine(
-                            buffer + logIndex[i], logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
+                        buffer + logIndex[i], logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
                     if (!successful) {
                         ++parseFailures;
                         if (error == PARSE_LOG_REGEX_ERROR)

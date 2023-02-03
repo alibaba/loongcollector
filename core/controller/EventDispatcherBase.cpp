@@ -1191,6 +1191,7 @@ void EventDispatcherBase::UpdateConfig() {
     DumpAllHandlersMeta(true);
     // CheckPointManager::Instance()->PrintStatus();
     if (ConfigManager::GetInstance()->GetConfigRemoveFlag()) {
+        LOG_INFO(sLogger, ("dump checkpoint to local", ""));
         CheckPointManager::Instance()->DumpCheckPointToLocal();
         ConfigManager::GetInstance()->SetConfigRemoveFlag(false);
     }

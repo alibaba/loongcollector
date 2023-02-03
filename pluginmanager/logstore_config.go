@@ -357,6 +357,7 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			logger.Info(contextImp.GetRuntimeContext(), "config is same after reload, use it again", GetFlushStoreLen(logstoreC.PluginRunner))
 			return logstoreC, nil
 		}
+		oldConfig.resume()
 		_ = oldConfig.Stop(false)
 		logstoreC.PluginRunner.Merge(oldConfig.PluginRunner)
 		logger.Info(contextImp.GetRuntimeContext(), "config is changed after reload", "stop and create a new one")
