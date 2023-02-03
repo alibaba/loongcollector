@@ -26,9 +26,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 const pluginName = "metric_meta_kubernetes"
@@ -58,7 +58,7 @@ type InputKubernetesMeta struct {
 	LabelSelectors         string
 	IntervalMs             int
 	Labels                 map[string]string
-	context                ilogtail.Context
+	context                pipeline.Context
 	informerFactory        informers.SharedInformerFactory
 	selector               labels.Selector
 	collectors             []*collector
@@ -71,7 +71,7 @@ type InputKubernetesMeta struct {
 	ingressMapping         map[string]string
 }
 
-func (in *InputKubernetesMeta) Init(context ilogtail.Context) (int, error) {
+func (in *InputKubernetesMeta) Init(context pipeline.Context) (int, error) {
 	in.informerStopChan = make(chan struct{})
 	in.context = context
 	if in.IntervalMs < 5000 {
@@ -182,7 +182,7 @@ func (in *InputKubernetesMeta) Description() string {
 	return "collect the kubernetes metadata"
 }
 
-func (in *InputKubernetesMeta) Collect(collector ilogtail.Collector) error {
+func (in *InputKubernetesMeta) Collect(collector pipeline.Collector) error {
 	now := time.Now()
 	transfer := func(nodes []*helper.MetaNode) {
 		for _, node := range nodes {
@@ -236,7 +236,7 @@ func (in *InputKubernetesMeta) Stop() error {
 }
 
 func init() {
-	ilogtail.MetricInputs[pluginName] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs[pluginName] = func() pipeline.MetricInput {
 		return &InputKubernetesMeta{
 			Pod:                   true,
 			Service:               true,

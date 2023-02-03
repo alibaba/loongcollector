@@ -19,6 +19,8 @@
 plugin_logger.xml
 license_coverage.txt
 vendor
+go.work
+go.work.sum
 
 # C++
 CMakeFiles
@@ -63,3 +65,6 @@ plugin_main/*.json
 
 # e2e report
 report
+
+# local plugins
+*.local.go

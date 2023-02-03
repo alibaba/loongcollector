@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pluginmanager"
 
@@ -37,7 +37,7 @@ type BadFlusher struct {
 	Shutdown      chan int
 }
 
-func (f *BadFlusher) Init(ctx ilogtail.Context) error {
+func (f *BadFlusher) Init(ctx pipeline.Context) error {
 	return nil
 }
 
@@ -76,7 +76,7 @@ func (f *BadFlusher) Stop() error {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_bad"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_bad"] = func() pipeline.Flusher {
 		return &BadFlusher{}
 	}
 }

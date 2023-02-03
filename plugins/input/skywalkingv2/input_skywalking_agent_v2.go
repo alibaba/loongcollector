@@ -19,7 +19,7 @@ import (
 
 	"net"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent"
 	v2 "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent/v2"
 	"github.com/alibaba/ilogtail/plugins/input/skywalkingv3"
@@ -27,12 +27,12 @@ import (
 
 type Input struct {
 	grpcServer       *grpc.Server
-	ctx              ilogtail.Context
+	ctx              pipeline.Context
 	Address          string
 	ComponentMapping map[int32]string
 }
 
-func (r *Input) Init(ctx ilogtail.Context) (int, error) {
+func (r *Input) Init(ctx pipeline.Context) (int, error) {
 	r.ctx = ctx
 	r.grpcServer = grpc.NewServer()
 	return 0, nil
@@ -42,11 +42,11 @@ func (r *Input) Description() string {
 	return "skywalking agent v2 input for logtail"
 }
 
-func (r *Input) Collect(ilogtail.Collector) error {
+func (r *Input) Collect(pipeline.Collector) error {
 	return nil
 }
 
-func (r *Input) Start(collector ilogtail.Collector) error {
+func (r *Input) Start(collector pipeline.Collector) error {
 	registryInformationCache := NewRegistryInformationCache()
 	agent.RegisterApplicationRegisterServiceServer(r.grpcServer, &ApplicationRegisterHandle{RegistryInformationCache: registryInformationCache})
 	agent.RegisterInstanceDiscoveryServiceServer(r.grpcServer, &InstanceDiscoveryServiceHandle{RegistryInformationCache: registryInformationCache})
@@ -94,7 +94,7 @@ func (r *Input) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_skywalking_agent_v2"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_skywalking_agent_v2"] = func() pipeline.ServiceInput {
 		return &Input{}
 	}
 }

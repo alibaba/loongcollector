@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -45,11 +45,11 @@ type ProcessorSplitChar struct {
 
 	quoteChar    byte
 	splitSepChar byte
-	context      ilogtail.Context
+	context      pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorSplitChar) Init(context ilogtail.Context) error {
+func (p *ProcessorSplitChar) Init(context pipeline.Context) error {
 	if len(p.SplitSep) != 1 {
 		return fmt.Errorf("split char plugin only support single char, invalid sep : %s", p.SplitSep)
 	}
@@ -181,7 +181,7 @@ func (p *ProcessorSplitChar) shouldKeepSource(splitResult bool) bool {
 }
 
 func init() {
-	ilogtail.Processors["processor_split_char"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_split_char"] = func() pipeline.Processor {
 		return &ProcessorSplitChar{
 			SplitSep:               "\n",
 			PreserveOthers:         true,

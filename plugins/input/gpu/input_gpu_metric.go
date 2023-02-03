@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/mindprince/gonvml"
 )
@@ -28,15 +28,15 @@ import (
 type InputGpuMetric struct {
 	CollectIntervalMs int
 
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 
 	waitGroup sync.WaitGroup
 
 	shutdown chan struct{}
 }
 
-func (r *InputGpuMetric) Init(context ilogtail.Context) (int, error) {
+func (r *InputGpuMetric) Init(context pipeline.Context) (int, error) {
 	r.context = context
 
 	if r.CollectIntervalMs <= 0 {
@@ -50,11 +50,11 @@ func (r *InputGpuMetric) Description() string {
 	return "collect gpu metric plugin for logtail (only linux and nvidia gpu)"
 }
 
-func (r *InputGpuMetric) Collect(collector ilogtail.Collector) error {
+func (r *InputGpuMetric) Collect(collector pipeline.Collector) error {
 	return nil
 }
 
-func (r *InputGpuMetric) Start(collector ilogtail.Collector) error {
+func (r *InputGpuMetric) Start(collector pipeline.Collector) error {
 	err := gonvml.Initialize()
 	if err != nil {
 		logger.Error(r.context.GetRuntimeContext(), "GPU_NVML_INIT_ALARM", "Couldn't initialize nvml, error", err)
@@ -126,7 +126,7 @@ func (r *InputGpuMetric) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_gpu_metric"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_gpu_metric"] = func() pipeline.ServiceInput {
 		return &InputGpuMetric{
 			CollectIntervalMs: 1000,
 		}

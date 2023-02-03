@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -71,8 +71,8 @@ type DockerStdoutProcessor struct {
 	maxLogSize           int
 	stdout               bool
 	stderr               bool
-	context              ilogtail.Context
-	collector            ilogtail.Collector
+	context              pipeline.Context
+	collector            pipeline.Collector
 
 	needCheckStream bool
 	source          string
@@ -85,7 +85,7 @@ type DockerStdoutProcessor struct {
 }
 
 func NewDockerStdoutProcessor(beginLineReg *regexp.Regexp, beginLineTimeout time.Duration, beginLineCheckLength int,
-	maxLogSize int, stdout bool, stderr bool, context ilogtail.Context, collector ilogtail.Collector,
+	maxLogSize int, stdout bool, stderr bool, context pipeline.Context, collector pipeline.Collector,
 	tags map[string]string, source string) *DockerStdoutProcessor {
 	processor := &DockerStdoutProcessor{
 		beginLineReg:         beginLineReg,

@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -150,7 +150,7 @@ func TestInitAndCollect(t *testing.T) {
 
 func TestDoICMPing(t *testing.T) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	netPing := ilogtail.MetricInputs["metric_input_netping"]().(*NetPing)
+	netPing := pipeline.MetricInputs["metric_input_netping"]().(*NetPing)
 	_, err := netPing.Init(cxt)
 	assert.NoError(t, err, "cannot init the mock process plugin: %v", err)
 
@@ -189,7 +189,7 @@ func TestDoICMPing(t *testing.T) {
 func TestDoTCPing(t *testing.T) {
 
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	netPing := ilogtail.MetricInputs["metric_input_netping"]().(*NetPing)
+	netPing := pipeline.MetricInputs["metric_input_netping"]().(*NetPing)
 	_, err := netPing.Init(cxt)
 	assert.NoError(t, err, "cannot init the mock process plugin: %v", err)
 

@@ -19,8 +19,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 // ServiceExample struct implement the ServiceInput interface.
@@ -29,12 +29,12 @@ import (
 type ServiceExample struct {
 	Address string
 	server  *http.Server
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 // Init method would be triggered before working. In the example plugin, we only store the logstore config
 // context reference. And we return 0 to use the default trigger interval.
-func (s *ServiceExample) Init(context ilogtail.Context) (int, error) {
+func (s *ServiceExample) Init(context pipeline.Context) (int, error) {
 	s.context = context
 	return 0, nil
 }
@@ -46,7 +46,7 @@ func (s *ServiceExample) Description() string {
 // Start the service example plugin would run in a separate go routine, so it is blocking method.
 // The ServiceInput plugin is suitable for receiving the external input data.
 // In the demo, we implemented an http server to accept the specified header of requests.
-func (s *ServiceExample) Start(collector ilogtail.Collector) error {
+func (s *ServiceExample) Start(collector pipeline.Collector) error {
 	logger.Info(s.context.GetRuntimeContext(), "start the example plugin")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/data", func(writer http.ResponseWriter, request *http.Request) {
@@ -72,7 +72,7 @@ func (s *ServiceExample) Stop() error {
 
 // Register the plugin to the ServiceInputs array.
 func init() {
-	ilogtail.ServiceInputs["service_input_example"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_input_example"] = func() pipeline.ServiceInput {
 		return &ServiceExample{
 			// here you could set default value.
 			Address: ":19000",

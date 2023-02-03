@@ -19,12 +19,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alibaba/ilogtail"
-	"github.com/alibaba/ilogtail/pkg/logger"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -228,6 +227,6 @@ func TestIgnoreJSONError(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
-	p := ilogtail.Processors["processor_anchor"]()
+	p := pipeline.Processors["processor_anchor"]()
 	assert.Equal(t, reflect.TypeOf(p).String(), "*anchor.ProcessorAnchor")
 }

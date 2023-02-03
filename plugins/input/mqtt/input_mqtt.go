@@ -24,8 +24,8 @@ import (
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pkg/errors"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -33,8 +33,8 @@ import (
 type ServiceMQTT struct {
 	shutdown  chan struct{}
 	waitGroup sync.WaitGroup
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 	keys      []string
 	id        int
 
@@ -65,7 +65,7 @@ func (DebugLogger) Println(v ...interface{}) {
 }
 func (DebugLogger) Printf(format string, v ...interface{}) { fmt.Printf(format, v...) }
 
-func (p *ServiceMQTT) Init(context ilogtail.Context) (int, error) {
+func (p *ServiceMQTT) Init(context pipeline.Context) (int, error) {
 	p.context = context
 	p.id = int(time.Now().Unix() % 100000)
 	if len(p.Topics) == 0 {
@@ -92,7 +92,7 @@ func (p *ServiceMQTT) Description() string {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (p *ServiceMQTT) Collect(ilogtail.Collector) error {
+func (p *ServiceMQTT) Collect(pipeline.Collector) error {
 	return nil
 }
 
@@ -195,7 +195,7 @@ func (p *ServiceMQTT) createClient(tlsConfig *tls.Config, connLostChannel chan s
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (p *ServiceMQTT) Start(c ilogtail.Collector) error {
+func (p *ServiceMQTT) Start(c pipeline.Collector) error {
 	p.shutdown = make(chan struct{})
 	p.collector = c
 	p.waitGroup.Add(1)
@@ -251,7 +251,7 @@ func (p *ServiceMQTT) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_mqtt"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_mqtt"] = func() pipeline.ServiceInput {
 		return &ServiceMQTT{
 			RetryMin:     1,
 			RetryRatio:   2.0,

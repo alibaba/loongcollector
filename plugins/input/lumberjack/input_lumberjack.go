@@ -31,8 +31,8 @@ import (
 	lumberlog "github.com/elastic/go-lumber/log"
 	"github.com/elastic/go-lumber/server"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -78,10 +78,10 @@ type ServiceLumber struct {
 	server    server.Server
 	shutdown  chan struct{}
 	waitGroup sync.WaitGroup
-	context   ilogtail.Context
+	context   pipeline.Context
 }
 
-func (p *ServiceLumber) Init(context ilogtail.Context) (int, error) {
+func (p *ServiceLumber) Init(context pipeline.Context) (int, error) {
 	p.context = context
 	return 0, nil
 }
@@ -92,12 +92,12 @@ func (p *ServiceLumber) Description() string {
 
 // Gather takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (p *ServiceLumber) Collect(ilogtail.Collector) error {
+func (p *ServiceLumber) Collect(pipeline.Collector) error {
 	return nil
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (p *ServiceLumber) Start(c ilogtail.Collector) error {
+func (p *ServiceLumber) Start(c pipeline.Collector) error {
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	defer p.waitGroup.Done()
@@ -179,7 +179,7 @@ func (p *ServiceLumber) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_lumberjack"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_lumberjack"] = func() pipeline.ServiceInput {
 		return &ServiceLumber{
 			BindAddress: "127.0.0.1:5044",
 			V2:          true,

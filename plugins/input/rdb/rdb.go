@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 type RdbFunc func() error //nolint:revive
@@ -77,13 +77,13 @@ type Rdb struct {
 	columnValuePointers   []interface{}
 	Shutdown              chan struct{}
 	waitGroup             sync.WaitGroup
-	Context               ilogtail.Context
-	collectLatency        ilogtail.LatencyMetric
-	collectTotal          ilogtail.CounterMetric
-	checkpointMetric      ilogtail.StringMetric
+	Context               pipeline.Context
+	collectLatency        pipeline.LatencyMetric
+	collectTotal          pipeline.CounterMetric
+	checkpointMetric      pipeline.StringMetric
 }
 
-func (m *Rdb) Init(context ilogtail.Context, rdbFunc RdbFunc) (int, error) {
+func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
 	initAlarmName := fmt.Sprintf("%s_INIT_ALARM", strings.ToUpper(m.Driver))
 	m.Context = context
 	if len(m.StateMent) == 0 && len(m.StateMentPath) != 0 {
@@ -125,7 +125,7 @@ func (m *Rdb) initRdbsql(connStr string, rdbFunc RdbFunc) error {
 		m.dbInstance, err = sql.Open(m.Driver, connStr)
 		if err == nil {
 			if len(m.StateMent) > 0 {
-				m.dbStatment, err = m.dbInstance.Prepare(m.StateMent)
+				m.dbStatment, err = m.dbInstance.Prepare(m.StateMent) // ignore_security_alert
 				if err == nil {
 					logger.Debug(m.Context.GetRuntimeContext(), "sql connect success, ping error", m.dbInstance.Ping())
 					break
@@ -149,7 +149,7 @@ func (m *Rdb) CheckPointToString() string {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (m *Rdb) Start(collector ilogtail.Collector, connStr string, rdbFunc RdbFunc, columnResolverFuncMap map[string]ColumnResolverFunc) error {
+func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFunc, columnResolverFuncMap map[string]ColumnResolverFunc) error {
 	checkpointAlarmName := fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver))
 	timeoutAlarmName := fmt.Sprintf("%s_TIMEOUT_ALARM", strings.ToUpper(m.Driver))
 	queryAlarmName := fmt.Sprintf("%s_QUERY_ALARM", strings.ToUpper(m.Driver))
@@ -217,7 +217,7 @@ func (m *Rdb) Start(collector ilogtail.Collector, connStr string, rdbFunc RdbFun
 	}
 }
 
-func (m *Rdb) Collect(collector ilogtail.Collector, columnResolverFuncMap map[string]ColumnResolverFunc) error {
+func (m *Rdb) Collect(collector pipeline.Collector, columnResolverFuncMap map[string]ColumnResolverFunc) error {
 	if m.dbStatment == nil {
 		return fmt.Errorf("unknow error, instance not init")
 	}
@@ -280,7 +280,7 @@ func (m *Rdb) Collect(collector ilogtail.Collector, columnResolverFuncMap map[st
 	return nil
 }
 
-func (m *Rdb) SaveCheckPoint(collector ilogtail.Collector) {
+func (m *Rdb) SaveCheckPoint(collector pipeline.Collector) {
 	checkpointAlarmName := fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver))
 	cp := CheckPoint{
 		CheckPointColumn:     m.CheckPointColumn,
@@ -303,7 +303,7 @@ func (m *Rdb) SaveCheckPoint(collector ilogtail.Collector) {
 	}
 }
 
-func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnResolverFunc, collector ilogtail.Collector) int {
+func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnResolverFunc, collector pipeline.Collector) int {
 	parseAlarmName := fmt.Sprintf("%s_PARSE_ALARM", strings.ToUpper(m.Driver))
 	defer rows.Close()
 	rowCount := 0

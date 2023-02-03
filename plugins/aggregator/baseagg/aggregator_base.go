@@ -17,8 +17,8 @@ package baseagg
 import (
 	"sync"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -48,15 +48,15 @@ type AggregatorBase struct {
 	packID          int64
 	logstore        string
 	Lock            *sync.Mutex
-	context         ilogtail.Context
-	queue           ilogtail.LogGroupQueue
+	context         pipeline.Context
+	queue           pipeline.LogGroupQueue
 	nowLoggroupSize int
 }
 
 // Init method would be trigger before working.
 // 1. context store the metadata of this Logstore config
 // 2. que is a transfer channel for flushing LogGroup when reaches the maximum in the cache.
-func (p *AggregatorBase) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (p *AggregatorBase) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
 	p.context = context
 	p.queue = que
 	if p.PackFlag {
@@ -193,13 +193,13 @@ func (p *AggregatorBase) InitInner(packFlag bool, packString string, lock *sync.
 	}
 }
 
-func (p *AggregatorBase) Record(event *models.PipelineGroupEvents, ctx ilogtail.PipelineContext) error {
+func (p *AggregatorBase) Record(event *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
 	ctx.Collector().CollectList(event)
 	return nil
 }
 
 // GetResult the current aggregates to the accumulator.
-func (p *AggregatorBase) GetResult(ctx ilogtail.PipelineContext) error {
+func (p *AggregatorBase) GetResult(ctx pipeline.PipelineContext) error {
 	return nil
 }
 
@@ -216,7 +216,7 @@ func NewAggregatorBase() *AggregatorBase {
 
 // Register the plugin to the Aggregators array.
 func init() {
-	ilogtail.Aggregators["aggregator_base"] = func() ilogtail.Aggregator {
+	pipeline.Aggregators["aggregator_base"] = func() pipeline.Aggregator {
 		return NewAggregatorBase()
 	}
 }

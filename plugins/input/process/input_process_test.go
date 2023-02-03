@@ -26,8 +26,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -98,7 +98,7 @@ func TestInputProcess_RegexMatching1(t *testing.T) {
 
 func TestInputProcess_RegexMatching(t *testing.T) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := ilogtail.MetricInputs["metric_process_v2"]().(*InputProcess)
+	p := pipeline.MetricInputs["metric_process_v2"]().(*InputProcess)
 	currentPid := os.Getpid()
 	newProcess, err := process.NewProcess(int32(currentPid))
 	if err != nil {

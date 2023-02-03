@@ -15,16 +15,16 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type InputContainer struct {
-	context ilogtail.Context
+	context pipeline.Context
 }
 
-func (r *InputContainer) Init(context ilogtail.Context) (int, error) {
+func (r *InputContainer) Init(context pipeline.Context) (int, error) {
 	r.context = context
 	util.InitContainer()
 	return 0, nil
@@ -34,7 +34,7 @@ func (r *InputContainer) Description() string {
 	return "container input plugin for logtail"
 }
 
-func (r *InputContainer) Collect(collector ilogtail.Collector) error {
+func (r *InputContainer) Collect(collector pipeline.Collector) error {
 	loggroup := &protocol.LogGroup{}
 
 	CollectContainers(loggroup)
@@ -43,14 +43,14 @@ func (r *InputContainer) Collect(collector ilogtail.Collector) error {
 
 	if len(loggroup.Logs) > 0 && ContainerConfig != nil {
 		for _, log := range loggroup.Logs {
-			ContainerConfig.PluginRunner.ReceiveRawLog(&ilogtail.LogWithContext{Log: log})
+			ContainerConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
 		}
 	}
 	return nil
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_container"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_container"] = func() pipeline.MetricInput {
 		return &InputContainer{}
 	}
 }

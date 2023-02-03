@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 )
 
@@ -33,11 +33,11 @@ type InputMock struct {
 	Index                 int64
 	OpenPrometheusPattern bool
 
-	context  ilogtail.Context
+	context  pipeline.Context
 	labelStr string
 }
 
-func (r *InputMock) Init(context ilogtail.Context) (int, error) {
+func (r *InputMock) Init(context pipeline.Context) (int, error) {
 	r.context = context
 	var labels helper.KeyValues
 	if r.OpenPrometheusPattern {
@@ -57,7 +57,7 @@ func (r *InputMock) Description() string {
 	return "mock input plugin for logtail"
 }
 
-func (r *InputMock) Collect(collector ilogtail.Collector) error {
+func (r *InputMock) Collect(collector pipeline.Collector) error {
 	r.Index++
 	if r.OpenPrometheusPattern {
 		helper.AddMetric(collector, "metrics_mock", time.Now(), r.labelStr, float64(r.Index))
@@ -73,7 +73,7 @@ func (r *InputMock) Collect(collector ilogtail.Collector) error {
 	return nil
 }
 
-func (r *InputMock) Read(context ilogtail.PipelineContext) error {
+func (r *InputMock) Read(context pipeline.PipelineContext) error {
 	r.Index++
 	group := models.NewGroup(models.NewMetadataWithMap(r.GroupMeta), models.NewTagsWithMap(r.GroupTags))
 	singleValue := models.NewSingleValueMetric("single_metrics_mock", models.MetricTypeCounter, models.NewTagsWithMap(r.Tags), time.Now().UnixNano(), r.Index)
@@ -95,7 +95,7 @@ func (r *InputMock) Read(context ilogtail.PipelineContext) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_mock"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_mock"] = func() pipeline.MetricInput {
 		return &InputMock{
 			Index:     0,
 			GroupMeta: make(map[string]string),

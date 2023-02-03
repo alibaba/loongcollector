@@ -15,8 +15,8 @@
 package geoip
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 
@@ -46,14 +46,14 @@ type ProcessorGeoIP struct {
 	SourceKey     string
 	Language      string
 
-	context       ilogtail.Context
+	context       pipeline.Context
 	db            *geoip2.Reader
 	sourceIP      bool
 	sourceIPConts []*protocol.Log_Content
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorGeoIP) Init(context ilogtail.Context) error {
+func (p *ProcessorGeoIP) Init(context pipeline.Context) error {
 	p.context = context
 	var err error
 	if p.db, err = geoip2.Open(p.DBPath); err != nil {
@@ -165,7 +165,7 @@ func (p *ProcessorGeoIP) ProcessGeoIP(log *protocol.Log, val *string) {
 }
 
 func init() {
-	ilogtail.Processors["processor_geoip"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_geoip"] = func() pipeline.Processor {
 		return &ProcessorGeoIP{
 			KeepSource: true,
 			Language:   "zh-CN",

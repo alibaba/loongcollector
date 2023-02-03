@@ -17,7 +17,7 @@ package drop
 import (
 	"fmt"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -25,13 +25,13 @@ type ProcessorDrop struct {
 	DropKeys []string
 
 	keyDictionary map[string]bool
-	context       ilogtail.Context
+	context       pipeline.Context
 }
 
 const pluginName = "processor_drop"
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorDrop) Init(context ilogtail.Context) error {
+func (p *ProcessorDrop) Init(context pipeline.Context) error {
 	if len(p.DropKeys) == 0 {
 		return fmt.Errorf("must specify DropKeys for plugin %v", pluginName)
 	}
@@ -64,7 +64,7 @@ func (p *ProcessorDrop) processLog(log *protocol.Log) {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorDrop{}
 	}
 }

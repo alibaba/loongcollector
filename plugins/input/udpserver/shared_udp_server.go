@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -32,12 +32,12 @@ type SharedUDPServer struct {
 	dispatchKey string
 	lastLog     time.Time
 	udp         *UDPServer
-	collectors  map[string]ilogtail.Collector
+	collectors  map[string]pipeline.Collector
 	lock        sync.RWMutex // mutex for register collector
 }
 
-func NewSharedUDPServer(context ilogtail.Context, format, addr, dispatchKey string, maxBufferSize int) (*SharedUDPServer, error) {
-	server := ilogtail.ServiceInputs["service_udp_server"]().(*UDPServer)
+func NewSharedUDPServer(context pipeline.Context, format, addr, dispatchKey string, maxBufferSize int) (*SharedUDPServer, error) {
+	server := pipeline.ServiceInputs["service_udp_server"]().(*UDPServer)
 	server.Format = format
 	server.Address = addr
 	server.MaxBufferSize = maxBufferSize
@@ -48,7 +48,7 @@ func NewSharedUDPServer(context ilogtail.Context, format, addr, dispatchKey stri
 		dispatchKey: dispatchKey,
 		lastLog:     time.Now(),
 		udp:         server,
-		collectors:  make(map[string]ilogtail.Collector),
+		collectors:  make(map[string]pipeline.Collector),
 	}, nil
 }
 
@@ -72,7 +72,7 @@ func (s *SharedUDPServer) UnregisterCollectors(key string) {
 	delete(s.collectors, key)
 }
 
-func (s *SharedUDPServer) RegisterCollectors(key string, collector ilogtail.Collector) {
+func (s *SharedUDPServer) RegisterCollectors(key string, collector pipeline.Collector) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.collectors[key] = collector

@@ -15,9 +15,9 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugin_main/flags"
 
 	"context"
@@ -191,7 +191,7 @@ func HoldOn(exitFlag bool) error {
 	if StatisticsConfig != nil {
 		if *flags.ForceSelfCollect {
 			logger.Info(context.Background(), "force collect the static metrics")
-			control := ilogtail.NewAsyncControl()
+			control := pipeline.NewAsyncControl()
 			StatisticsConfig.PluginRunner.RunPlugins(pluginMetricInput, control)
 			control.WaitCancel()
 		}
@@ -200,7 +200,7 @@ func HoldOn(exitFlag bool) error {
 	if AlarmConfig != nil {
 		if *flags.ForceSelfCollect {
 			logger.Info(context.Background(), "force collect the alarm metrics")
-			control := ilogtail.NewAsyncControl()
+			control := pipeline.NewAsyncControl()
 			AlarmConfig.PluginRunner.RunPlugins(pluginMetricInput, control)
 			control.WaitCancel()
 		}
@@ -209,7 +209,7 @@ func HoldOn(exitFlag bool) error {
 	if ContainerConfig != nil {
 		if *flags.ForceSelfCollect {
 			logger.Info(context.Background(), "force collect the container metrics")
-			control := ilogtail.NewAsyncControl()
+			control := pipeline.NewAsyncControl()
 			ContainerConfig.PluginRunner.RunPlugins(pluginMetricInput, control)
 			control.WaitCancel()
 		}

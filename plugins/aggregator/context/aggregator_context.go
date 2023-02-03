@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -49,8 +49,8 @@ type AggregatorContext struct {
 	nowLogGroupSizeMap map[string]int
 	packIDMap          map[string]*LogPackSeqInfo
 	defaultPack        string
-	context            ilogtail.Context
-	queue              ilogtail.LogGroupQueue
+	context            pipeline.Context
+	queue              pipeline.LogGroupQueue
 
 	packIDMapCleanInterval time.Duration
 	packIDTimeout          time.Duration
@@ -60,7 +60,7 @@ type AggregatorContext struct {
 // Init method would be trigger before working.
 // 1. context store the metadata of this Logstore config
 // 2. que is a transfer channel for flushing LogGroup when reaches the maximum in the cache.
-func (p *AggregatorContext) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (p *AggregatorContext) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
 	p.defaultPack = util.NewPackIDPrefix(context.GetConfigName())
 	p.context = context
 	p.queue = que
@@ -210,7 +210,7 @@ func NewAggregatorContext() *AggregatorContext {
 
 // Register the plugin to the Aggregators array.
 func init() {
-	ilogtail.Aggregators["aggregator_context"] = func() ilogtail.Aggregator {
+	pipeline.Aggregators["aggregator_context"] = func() pipeline.Aggregator {
 		return NewAggregatorContext()
 	}
 }

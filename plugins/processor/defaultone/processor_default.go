@@ -15,8 +15,8 @@
 package defaultone
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -24,7 +24,7 @@ type ProcessorDefault struct {
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (*ProcessorDefault) Init(ilogtail.Context) error {
+func (*ProcessorDefault) Init(pipeline.Context) error {
 	return nil
 }
 
@@ -36,12 +36,12 @@ func (*ProcessorDefault) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 	return logArray
 }
 
-func (*ProcessorDefault) Process(in *models.PipelineGroupEvents, context ilogtail.PipelineContext) {
+func (*ProcessorDefault) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	context.Collector().Collect(in.Group, in.Events...)
 }
 
 func init() {
-	ilogtail.Processors["processor_default"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_default"] = func() pipeline.Processor {
 		return &ProcessorDefault{}
 	}
 }

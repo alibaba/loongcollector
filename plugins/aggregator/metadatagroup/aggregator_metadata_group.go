@@ -19,8 +19,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 const (
@@ -42,7 +42,7 @@ type metadataGroup struct {
 	lock *sync.Mutex
 }
 
-func (g *metadataGroup) Record(group *models.PipelineGroupEvents, ctx ilogtail.PipelineContext) error {
+func (g *metadataGroup) Record(group *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	eventsLen := len(group.Events)
@@ -62,7 +62,7 @@ func (g *metadataGroup) Record(group *models.PipelineGroupEvents, ctx ilogtail.P
 	return nil
 }
 
-func (g *metadataGroup) GetResult(ctx ilogtail.PipelineContext) error {
+func (g *metadataGroup) GetResult(ctx pipeline.PipelineContext) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	if len(g.events) == 0 {
@@ -104,7 +104,7 @@ type AggregatorMetadataGroup struct {
 	groupAgg sync.Map
 }
 
-func (g *AggregatorMetadataGroup) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (g *AggregatorMetadataGroup) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
 	if len(g.GroupMetadataKeys) == 0 {
 		return 0, fmt.Errorf("must specify GroupMetadataKeys")
 	}
@@ -129,11 +129,11 @@ func (g *AggregatorMetadataGroup) Reset() {
 	})
 }
 
-func (g *AggregatorMetadataGroup) Record(event *models.PipelineGroupEvents, ctx ilogtail.PipelineContext) error {
+func (g *AggregatorMetadataGroup) Record(event *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
 	return g.getOrCreateMetadataGroup(event).Record(event, ctx)
 }
 
-func (g *AggregatorMetadataGroup) GetResult(ctx ilogtail.PipelineContext) error {
+func (g *AggregatorMetadataGroup) GetResult(ctx pipeline.PipelineContext) error {
 	g.groupAgg.Range(func(key, value any) bool {
 		metaGroup := value.(*metadataGroup)
 		return metaGroup.GetResult(ctx) == nil
@@ -179,7 +179,7 @@ func NewAggregatorMetadataGroup() *AggregatorMetadataGroup {
 }
 
 func init() {
-	ilogtail.Aggregators["aggregator_metadata_group"] = func() ilogtail.Aggregator {
+	pipeline.Aggregators["aggregator_metadata_group"] = func() pipeline.Aggregator {
 		return NewAggregatorMetadataGroup()
 	}
 }

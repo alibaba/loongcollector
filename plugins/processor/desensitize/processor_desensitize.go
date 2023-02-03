@@ -21,8 +21,8 @@ import (
 
 	"github.com/dlclark/regexp2"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -34,7 +34,7 @@ type ProcessorDesensitize struct {
 	RegexBegin    string
 	RegexContent  string
 
-	context      ilogtail.Context
+	context      pipeline.Context
 	regexBegin   *regexp2.Regexp
 	regexContent *regexp2.Regexp
 }
@@ -42,7 +42,7 @@ type ProcessorDesensitize struct {
 const pluginName = "processor_desensitize"
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorDesensitize) Init(context ilogtail.Context) error {
+func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 	p.context = context
 
 	var err error
@@ -156,7 +156,7 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorDesensitize{
 			SourceKey:     "",
 			Method:        "const",

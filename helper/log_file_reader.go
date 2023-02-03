@@ -15,8 +15,8 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 
 	"context"
@@ -27,13 +27,13 @@ import (
 )
 
 type ReaderMetricTracker struct {
-	OpenCounter        ilogtail.CounterMetric
-	CloseCounter       ilogtail.CounterMetric
-	FileSizeCounter    ilogtail.CounterMetric
-	FileRotatorCounter ilogtail.CounterMetric
-	ReadCounter        ilogtail.CounterMetric
-	ReadSizeCounter    ilogtail.CounterMetric
-	ProcessLatency     ilogtail.LatencyMetric
+	OpenCounter        pipeline.CounterMetric
+	CloseCounter       pipeline.CounterMetric
+	FileSizeCounter    pipeline.CounterMetric
+	FileRotatorCounter pipeline.CounterMetric
+	ReadCounter        pipeline.CounterMetric
+	ReadSizeCounter    pipeline.CounterMetric
+	ProcessLatency     pipeline.LatencyMetric
 }
 
 func NewReaderMetricTracker() *ReaderMetricTracker {

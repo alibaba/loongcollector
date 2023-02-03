@@ -28,10 +28,10 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/udpserver"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -66,7 +66,7 @@ func createManager(agentDirPath string) *Manager {
 		jmxfetchdPath:    path.Join(agentDirPath, scriptsName),
 		jmxfetchConfPath: path.Join(agentDirPath, "conf.d"),
 		allLoadedCfgs:    make(map[string]*Cfg),
-		collectors:       make(map[string]ilogtail.Collector),
+		collectors:       make(map[string]pipeline.Collector),
 		managerMeta:      helper.NewmanagerMeta("jmxfetch"),
 		stopChan:         make(chan struct{}),
 	}
@@ -77,7 +77,7 @@ type Manager struct {
 	jmxfetchdPath    string
 	jmxfetchConfPath string
 	allLoadedCfgs    map[string]*Cfg
-	collectors       map[string]ilogtail.Collector
+	collectors       map[string]pipeline.Collector
 	managerMeta      *helper.ManagerMeta
 	stopChan         chan struct{}
 	uniqueCollectors string
@@ -89,7 +89,7 @@ type Manager struct {
 	sync.Mutex
 }
 
-func (m *Manager) RegisterCollector(ctx ilogtail.Context, key string, collector ilogtail.Collector, filters []*FilterInner) {
+func (m *Manager) RegisterCollector(ctx pipeline.Context, key string, collector pipeline.Collector, filters []*FilterInner) {
 	if !m.initSuccess {
 		return
 	}

@@ -15,8 +15,8 @@
 package kvsplitter
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"strconv"
@@ -38,7 +38,7 @@ type KeyValueSplitter struct {
 	ErrIfSeparatorNotFound       bool
 	ErrIfKeyIsEmpty              bool
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 const (
@@ -48,7 +48,7 @@ const (
 	defaultNoSeparatorKeyPrefix = "no_separator_key_"
 )
 
-func (s *KeyValueSplitter) Init(context ilogtail.Context) error {
+func (s *KeyValueSplitter) Init(context pipeline.Context) error {
 	s.context = context
 
 	if len(s.Delimiter) == 0 {
@@ -142,7 +142,7 @@ func newKeyValueSplitter() *KeyValueSplitter {
 }
 
 func init() {
-	ilogtail.Processors["processor_split_key_value"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_split_key_value"] = func() pipeline.Processor {
 		return newKeyValueSplitter()
 	}
 }

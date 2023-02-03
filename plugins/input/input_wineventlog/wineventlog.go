@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/input_wineventlog/eventlog"
 )
@@ -71,8 +71,8 @@ type WinEventLog struct {
 
 	shutdown  chan struct{}
 	waitGroup sync.WaitGroup
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 
 	checkpoint         eventlog.Checkpoint
 	lastCheckpointTime time.Time
@@ -81,7 +81,7 @@ type WinEventLog struct {
 }
 
 // Init ...
-func (w *WinEventLog) Init(context ilogtail.Context) (int, error) {
+func (w *WinEventLog) Init(context pipeline.Context) (int, error) {
 	w.context = context
 
 	if "" == w.Name {
@@ -114,12 +114,12 @@ func (w *WinEventLog) Description() string {
 }
 
 // Collect ...
-func (w *WinEventLog) Collect(collector ilogtail.Collector) error {
+func (w *WinEventLog) Collect(collector pipeline.Collector) error {
 	return nil
 }
 
 // Start ...
-func (w *WinEventLog) Start(collector ilogtail.Collector) error {
+func (w *WinEventLog) Start(collector pipeline.Collector) error {
 	w.collector = collector
 	w.initCheckpoint()
 	w.shutdown = make(chan struct{}, 1)
@@ -231,7 +231,7 @@ func newWinEventLog() *WinEventLog {
 }
 
 func init() {
-	ilogtail.ServiceInputs[pluginName] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs[pluginName] = func() pipeline.ServiceInput {
 		return newWinEventLog()
 	}
 }

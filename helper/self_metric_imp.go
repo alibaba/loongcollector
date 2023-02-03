@@ -15,7 +15,7 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"strconv"
@@ -172,41 +172,41 @@ func (s *LatMetric) Serialize(log *protocol.Log) {
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(float64(s.Get())/1000, 'f', 4, 64)})
 }
 
-func NewCounterMetric(n string) ilogtail.CounterMetric {
+func NewCounterMetric(n string) pipeline.CounterMetric {
 	return &NormalMetric{name: n}
 }
 
-func NewAverageMetric(n string) ilogtail.CounterMetric {
+func NewAverageMetric(n string) pipeline.CounterMetric {
 	return &AvgMetric{name: n}
 }
 
-func NewStringMetric(n string) ilogtail.StringMetric {
+func NewStringMetric(n string) pipeline.StringMetric {
 	return &StrMetric{name: n}
 }
 
-func NewLatencyMetric(n string) ilogtail.LatencyMetric {
+func NewLatencyMetric(n string) pipeline.LatencyMetric {
 	return &LatMetric{name: n}
 }
 
-func NewCounterMetricAndRegister(n string, c ilogtail.Context) ilogtail.CounterMetric {
+func NewCounterMetricAndRegister(n string, c pipeline.Context) pipeline.CounterMetric {
 	metric := &NormalMetric{name: n}
 	c.RegisterCounterMetric(metric)
 	return metric
 }
 
-func NewAverageMetricAndRegister(n string, c ilogtail.Context) ilogtail.CounterMetric {
+func NewAverageMetricAndRegister(n string, c pipeline.Context) pipeline.CounterMetric {
 	metric := &AvgMetric{name: n}
 	c.RegisterCounterMetric(metric)
 	return metric
 }
 
-func NewStringMetricAndRegister(n string, c ilogtail.Context) ilogtail.StringMetric {
+func NewStringMetricAndRegister(n string, c pipeline.Context) pipeline.StringMetric {
 	metric := &StrMetric{name: n}
 	c.RegisterStringMetric(metric)
 	return metric
 }
 
-func NewLatencyMetricAndRegister(n string, c ilogtail.Context) ilogtail.LatencyMetric {
+func NewLatencyMetricAndRegister(n string, c pipeline.Context) pipeline.LatencyMetric {
 	metric := &LatMetric{name: n}
 	c.RegisterLatencyMetric(metric)
 	return metric

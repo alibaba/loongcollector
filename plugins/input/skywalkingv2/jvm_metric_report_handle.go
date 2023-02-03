@@ -21,7 +21,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common"
 	v2 "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent/v2"
 )
@@ -29,8 +29,8 @@ import (
 type JVMMetricReportHandle struct {
 	RegistryInformationCache
 
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 }
 
 func (j *JVMMetricReportHandle) Collect(ctx context.Context, metrics *v2.JVMMetricCollection) (*common.Commands, error) {

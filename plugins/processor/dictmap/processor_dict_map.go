@@ -21,9 +21,8 @@ import (
 	"os"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"github.com/alibaba/ilogtail"
 )
 
 const pluginName = "processor_dict_map"
@@ -38,11 +37,11 @@ type ProcessorDictMap struct {
 	Mode          string
 	MaxDictSize   int
 	scanDestKey   bool
-	context       ilogtail.Context
+	context       pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorDictMap) Init(context ilogtail.Context) error {
+func (p *ProcessorDictMap) Init(context pipeline.Context) error {
 	p.context = context
 
 	if p.SourceKey == "" {
@@ -188,7 +187,7 @@ func (p *ProcessorDictMap) processLog(log *protocol.Log) {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorDictMap{
 			HandleMissing: false,
 			Missing:       "Unknown",

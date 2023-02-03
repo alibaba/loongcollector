@@ -22,8 +22,8 @@ import (
 
 	"github.com/knz/strtime"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -67,12 +67,12 @@ type Strptime struct {
 	PreciseTimestampKey    string `comment:"Optional. The generated precise timestamp key."`
 	PreciseTimestampUnit   string `comment:"Optional. The generated precise timestamp unit."`
 
-	context  ilogtail.Context
+	context  pipeline.Context
 	location *time.Location
 }
 
 // Init ...
-func (s *Strptime) Init(context ilogtail.Context) error {
+func (s *Strptime) Init(context pipeline.Context) error {
 	s.context = context
 	if len(s.Format) == 0 {
 		return fmt.Errorf("format can not be empty for plugin %v", pluginName)
@@ -184,7 +184,7 @@ func newStrptime() *Strptime {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return newStrptime()
 	}
 }

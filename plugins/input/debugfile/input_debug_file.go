@@ -17,7 +17,7 @@ package debugfile
 import (
 	"io/ioutil"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 // InputDebugFile can reads all data in specified file, and set them as single field.
@@ -25,12 +25,12 @@ type InputDebugFile struct {
 	InputFilePath string
 	FieldName     string
 
-	context ilogtail.Context
+	context pipeline.Context
 	content string
 }
 
 // Init ...
-func (r *InputDebugFile) Init(context ilogtail.Context) (int, error) {
+func (r *InputDebugFile) Init(context pipeline.Context) (int, error) {
 	r.context = context
 	content, err := ioutil.ReadFile(r.InputFilePath)
 	if err != nil {
@@ -46,7 +46,7 @@ func (r *InputDebugFile) Description() string {
 }
 
 // Collect ...
-func (r *InputDebugFile) Collect(collector ilogtail.Collector) error {
+func (r *InputDebugFile) Collect(collector pipeline.Collector) error {
 	log := map[string]string{}
 	log[r.FieldName] = r.content
 	collector.AddData(nil, log)
@@ -54,7 +54,7 @@ func (r *InputDebugFile) Collect(collector ilogtail.Collector) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_debug_file"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_debug_file"] = func() pipeline.MetricInput {
 		return &InputDebugFile{FieldName: "content"}
 	}
 }

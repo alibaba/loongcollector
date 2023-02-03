@@ -26,8 +26,8 @@ import (
 	"github.com/juju/errors"
 	"github.com/siddontang/go-mysql/replication"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -46,9 +46,9 @@ type InputMysqlBinlog struct {
 	RowMode            bool
 
 	checkpoint   CheckPoint
-	context      ilogtail.Context
+	context      pipeline.Context
 	parser       *replication.BinlogParser
-	collector    ilogtail.Collector
+	collector    pipeline.Collector
 	rotateFile   string
 	collectCount int
 }
@@ -136,7 +136,7 @@ func (b *InputMysqlBinlog) findOffset(fromBegining bool) error {
 	return nil
 }
 
-func (b *InputMysqlBinlog) Init(context ilogtail.Context) (int, error) {
+func (b *InputMysqlBinlog) Init(context pipeline.Context) (int, error) {
 	b.context = context
 	b.parser = replication.NewBinlogParser()
 	// if b.RowMode {
@@ -199,7 +199,7 @@ func (b *InputMysqlBinlog) BinlogEventToLog(event *replication.BinlogEvent) erro
 	return nil
 }
 
-func (b *InputMysqlBinlog) collectOneFile(collector ilogtail.Collector) error {
+func (b *InputMysqlBinlog) collectOneFile(collector pipeline.Collector) error {
 	b.collector = collector
 	b.rotateFile = ""
 	b.collectCount = 0
@@ -220,7 +220,7 @@ func (b *InputMysqlBinlog) collectOneFile(collector ilogtail.Collector) error {
 	return nil
 }
 
-func (b *InputMysqlBinlog) Collect(collector ilogtail.Collector) error {
+func (b *InputMysqlBinlog) Collect(collector pipeline.Collector) error {
 	if b.checkpoint.Offset == 0 {
 		err := b.findOffset(b.FromBegining)
 		if err != nil {
@@ -234,7 +234,7 @@ func (b *InputMysqlBinlog) Collect(collector ilogtail.Collector) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_binlog"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_binlog"] = func() pipeline.MetricInput {
 		return &InputMysqlBinlog{AutoMap: true, RowMode: true}
 	}
 }

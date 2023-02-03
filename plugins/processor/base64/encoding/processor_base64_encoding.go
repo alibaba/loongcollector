@@ -17,8 +17,8 @@ package encoding
 import (
 	"encoding/base64"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -27,11 +27,11 @@ type ProcessorBase64Encoding struct {
 	NewKey     string
 	NoKeyError bool
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorBase64Encoding) Init(context ilogtail.Context) error {
+func (p *ProcessorBase64Encoding) Init(context pipeline.Context) error {
 	p.context = context
 	return nil
 }
@@ -67,7 +67,7 @@ func (p *ProcessorBase64Encoding) ProcessLogs(logArray []*protocol.Log) []*proto
 }
 
 func init() {
-	ilogtail.Processors["processor_base64_encoding"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_base64_encoding"] = func() pipeline.Processor {
 		return &ProcessorBase64Encoding{}
 	}
 }

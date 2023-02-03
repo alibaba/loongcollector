@@ -23,9 +23,9 @@ import (
 
 	"github.com/shirou/gopsutil/host"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -51,12 +51,12 @@ type InputNodeMeta struct {
 	hostname      string
 	ip            string
 	hostCollects  []metaCollectFunc
-	context       ilogtail.Context
+	context       pipeline.Context
 	hostInfo      *host.InfoStat
 	processLabels map[string]string
 }
 
-func (in *InputNodeMeta) Init(context ilogtail.Context) (int, error) {
+func (in *InputNodeMeta) Init(context pipeline.Context) (int, error) {
 	in.context = context
 	for _, regStr := range in.ProcessNamesRegex {
 		if reg, err := regexp.Compile(regStr); err != nil {
@@ -90,7 +90,7 @@ func (in *InputNodeMeta) Description() string {
 	return "Collect the host metadata"
 }
 
-func (in *InputNodeMeta) Collect(collector ilogtail.Collector) error {
+func (in *InputNodeMeta) Collect(collector pipeline.Collector) error {
 	now := time.Now()
 	if len(in.hostCollects) > 0 {
 		node, err := in.collectHostMeta()
@@ -191,7 +191,7 @@ func formatCmd(cmd string) string {
 }
 
 func init() {
-	ilogtail.MetricInputs[pluginName] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs[pluginName] = func() pipeline.MetricInput {
 		return &InputNodeMeta{
 			CPU:                  true,
 			Memory:               true,

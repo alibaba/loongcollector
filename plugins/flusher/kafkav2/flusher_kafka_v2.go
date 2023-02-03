@@ -25,9 +25,9 @@ import (
 
 	"github.com/Shopify/sarama"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -40,7 +40,7 @@ const (
 )
 
 type FlusherKafka struct {
-	context   ilogtail.Context
+	context   pipeline.Context
 	converter *converter.Converter
 	// The list of kafka brokers
 	Brokers []string
@@ -200,7 +200,7 @@ func NewFlusherKafka() *FlusherKafka {
 		},
 	}
 }
-func (k *FlusherKafka) Init(context ilogtail.Context) error {
+func (k *FlusherKafka) Init(context pipeline.Context) error {
 	k.context = context
 	if k.Brokers == nil || len(k.Brokers) == 0 {
 		var err = errors.New("brokers ip is nil")
@@ -529,7 +529,7 @@ func (k *FlusherKafka) getConverter() (*converter.Converter, error) {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_kafka_v2"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_kafka_v2"] = func() pipeline.Flusher {
 		f := NewFlusherKafka()
 		f.flusher = f.NormalFlush
 		return f

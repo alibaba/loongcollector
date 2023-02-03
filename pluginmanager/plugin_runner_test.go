@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -31,7 +31,7 @@ func TestPluginRunner(t *testing.T) {
 
 type pluginRunnerTestSuite struct {
 	suite.Suite
-	Context ilogtail.Context
+	Context pipeline.Context
 }
 
 func (s *pluginRunnerTestSuite) BeforeTest(suiteName, testName string) {
@@ -46,9 +46,9 @@ func (s *pluginRunnerTestSuite) AfterTest(suiteName, testName string) {
 
 func (s *pluginRunnerTestSuite) TestTimerRunner() {
 	runner := &timerRunner{state: s, interval: time.Millisecond * 600, context: s.Context}
-	cc := ilogtail.NewAsyncControl()
+	cc := pipeline.NewAsyncControl()
 	ch := make(chan struct{}, 10)
-	cc.Run(func(cc *ilogtail.AsyncControl) {
+	cc.Run(func(cc *pipeline.AsyncControl) {
 		runner.Run(func(state interface{}) error {
 			ch <- struct{}{}
 			s.Equal(state, s)
@@ -60,7 +60,7 @@ func (s *pluginRunnerTestSuite) TestTimerRunner() {
 
 	ch = make(chan struct{}, 10)
 	cc.Reset()
-	cc.Run(func(cc *ilogtail.AsyncControl) {
+	cc.Run(func(cc *pipeline.AsyncControl) {
 		runner.Run(func(state interface{}) error {
 			ch <- struct{}{}
 			s.Equal(state, s)

@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2022 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,45 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ilogtail
+package pipeline
 
-import (
-	"github.com/alibaba/ilogtail/pkg/protocol"
-)
-
-type CounterMetric interface {
-	Name() string
-
-	Add(v int64)
-
-	// Clear same with set
-	Clear(v int64)
-
-	Get() int64
-
-	Serialize(log *protocol.Log)
-}
-
-type StringMetric interface {
-	Name() string
-
-	Set(v string)
-
-	Get() string
-
-	Serialize(log *protocol.Log)
-}
-
-type LatencyMetric interface {
-	Name() string
-
-	Begin()
-
-	Clear()
-
-	End()
-	// nano second
-	Get() int64
-
-	Serialize(log *protocol.Log)
+// PipelineContext which may include
+// collector interface、checkpoint interface、config read and many more..
+type PipelineContext interface { //nolint
+	Collector() PipelineCollector
 }

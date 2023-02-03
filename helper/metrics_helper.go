@@ -15,7 +15,7 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"sort"
 	"strconv"
@@ -112,7 +112,7 @@ func MakeMetric(name string, labels string, timeNano int64, value float64) ([]st
 }
 
 // AddMetric to the collector.
-func AddMetric(collector ilogtail.Collector,
+func AddMetric(collector pipeline.Collector,
 	name string,
 	time time.Time,
 	labels string,

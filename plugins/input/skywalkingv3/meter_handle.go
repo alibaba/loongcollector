@@ -21,16 +21,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
 
 type MeterHandler struct {
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 }
 
 func (m *MeterHandler) Collect(srv agent.MeterReportService_CollectServer) error {
@@ -94,7 +94,7 @@ func convertHistogramData(histogramData *agent.MeterHistogram) *util.HistogramDa
 	return hd
 }
 
-func handleMeterData(context ilogtail.Context, collector ilogtail.Collector, meterData *agent.MeterData, service string, serviceInstance string, ts int64) {
+func handleMeterData(context pipeline.Context, collector pipeline.Collector, meterData *agent.MeterData, service string, serviceInstance string, ts int64) {
 	singleValue := meterData.GetSingleValue()
 	logger.Debug(context.GetRuntimeContext(), "service", meterData.Service, "serviceInstance", meterData.ServiceInstance)
 	if singleValue != nil {

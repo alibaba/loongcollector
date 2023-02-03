@@ -25,9 +25,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/prometheus/procfs"
 	"github.com/shirou/gopsutil/disk"
@@ -98,7 +98,7 @@ func (st tcpState) String() string {
 	}
 }
 
-func (r *InputSystem) Init(context ilogtail.Context) (int, error) {
+func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 	// mount the host proc path
 	fs, err := procfs.NewFS(helper.GetMountedFilePath(procfs.DefaultMountPoint))
 	if err != nil {
@@ -109,7 +109,7 @@ func (r *InputSystem) Init(context ilogtail.Context) (int, error) {
 	return r.CommonInit(context)
 }
 
-func (r *InputSystem) CollectTCPStats(collector ilogtail.Collector, stat *net.ProtoCountersStat) {
+func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.ProtoCountersStat) {
 	if !r.TCP {
 		r.addMetric(collector, "protocol_tcp_established", r.commonLabelsStr, float64(stat.Stats["CurrEstab"]))
 		return
@@ -142,7 +142,7 @@ func (r *InputSystem) CollectTCPStats(collector ilogtail.Collector, stat *net.Pr
 	}
 }
 
-func (r *InputSystem) CollectOpenFD(collector ilogtail.Collector) {
+func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 	// mount the host proc path
 	file, err := os.Open(helper.GetMountedFilePath("/proc/sys/fs/file-nr"))
 	if err != nil {
@@ -170,7 +170,7 @@ func (r *InputSystem) CollectOpenFD(collector ilogtail.Collector) {
 
 // CollectDiskUsage use `/proc/1/mounts` to find the device rather than `proc/self/mounts`
 // because one device would be mounted many times in virtual environment.
-func (r *InputSystem) CollectDiskUsage(collector ilogtail.Collector) {
+func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 	// mount the host proc path
 	file, err := os.Open(helper.GetMountedFilePath("/proc/1/mounts"))
 	if err != nil {

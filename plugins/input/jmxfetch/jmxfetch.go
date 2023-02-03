@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pluginmanager"
 )
 
@@ -83,7 +83,7 @@ type Jmx struct {
 	includeEnvRegex            map[string]*regexp.Regexp
 	excludeEnvRegex            map[string]*regexp.Regexp
 	k8sFilter                  *helper.K8SFilter
-	context                    ilogtail.Context
+	context                    pipeline.Context
 	stopChan                   chan struct{}
 	instances                  map[string]*InstanceInner
 	filters                    []*FilterInner
@@ -91,7 +91,7 @@ type Jmx struct {
 	jvmHome                    string
 }
 
-func (m *Jmx) Init(context ilogtail.Context) (int, error) {
+func (m *Jmx) Init(context pipeline.Context) (int, error) {
 	m.context = context
 	m.key = m.context.GetProject() + m.context.GetLogstore() + m.context.GetConfigName()
 	helper.ReplaceInvalidChars(&m.key)
@@ -144,7 +144,7 @@ func (m *Jmx) Description() string {
 	return "a jmx fetch manger to generate configuration and control jmx fetch process(https://github.com/DataDog/jmxfetch)."
 }
 
-func (m *Jmx) Start(collector ilogtail.Collector) error {
+func (m *Jmx) Start(collector pipeline.Collector) error {
 	GetJmxFetchManager(m.jvmHome).RegisterCollector(m.context, m.key, collector, m.filters)
 
 	if !m.DiscoveryMode {
@@ -242,7 +242,7 @@ func (m *Jmx) UpdateContainerCfg() {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_jmx"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_jmx"] = func() pipeline.ServiceInput {
 		return &Jmx{
 			DiscoveryMode:     false,
 			NewGcMetrics:      true,

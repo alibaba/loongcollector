@@ -15,7 +15,7 @@
 package telegraf
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 
 	"path"
@@ -25,11 +25,11 @@ type ServiceTelegraf struct {
 	Detail string
 
 	config  *Config
-	context ilogtail.Context
+	context pipeline.Context
 	tm      *Manager
 }
 
-func (s *ServiceTelegraf) Init(ctx ilogtail.Context) (int, error) {
+func (s *ServiceTelegraf) Init(ctx pipeline.Context) (int, error) {
 	// TODO: validate Detail
 
 	s.context = ctx
@@ -45,11 +45,11 @@ func (s *ServiceTelegraf) Description() string {
 	return "service for Telegraf agent"
 }
 
-func (s *ServiceTelegraf) Collect(collector ilogtail.Collector) error {
+func (s *ServiceTelegraf) Collect(collector pipeline.Collector) error {
 	return nil
 }
 
-func (s *ServiceTelegraf) Start(collector ilogtail.Collector) error {
+func (s *ServiceTelegraf) Start(collector pipeline.Collector) error {
 	s.tm.RegisterConfig(s.context, s.config)
 	return nil
 }
@@ -60,7 +60,7 @@ func (s *ServiceTelegraf) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_telegraf"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_telegraf"] = func() pipeline.ServiceInput {
 		return &ServiceTelegraf{}
 	}
 }

@@ -17,20 +17,20 @@ package helper
 import (
 	"fmt"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 )
 
 type goKitLogWrapper struct {
-	context   ilogtail.Context
+	context   pipeline.Context
 	alarmType string
 }
 
 // NewGoKitLogWrapper returns a logger that log with context.
-func NewGoKitLogWrapper(context ilogtail.Context, alarmType string) log.Logger {
+func NewGoKitLogWrapper(context pipeline.Context, alarmType string) log.Logger {
 	logger := &goKitLogWrapper{
 		context:   context,
 		alarmType: alarmType,

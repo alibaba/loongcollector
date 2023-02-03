@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
@@ -55,10 +55,10 @@ type InputSystem struct {
 	lastDiskStatAll map[string]disk.IOCountersStat
 	lastDiskTime    time.Time
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
-func (r *InputSystem) Init(context ilogtail.Context) (int, error) {
+func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 	r.context = context
 	return 0, nil
 }
@@ -67,7 +67,7 @@ func (r *InputSystem) Description() string {
 	return "system metric input plugin for logtail"
 }
 
-func (r *InputSystem) CollectCore(collector ilogtail.Collector) {
+func (r *InputSystem) CollectCore(collector pipeline.Collector) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "core"
 
@@ -113,7 +113,7 @@ func (r *InputSystem) CollectCore(collector ilogtail.Collector) {
 	collector.AddData(nil, fields)
 }
 
-func (r *InputSystem) CollectCPU(collector ilogtail.Collector) {
+func (r *InputSystem) CollectCPU(collector pipeline.Collector) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "cpu"
 	// cpu stat
@@ -159,7 +159,7 @@ func (r *InputSystem) CollectCPU(collector ilogtail.Collector) {
 	collector.AddData(nil, fields)
 }
 
-func (r *InputSystem) CollectMem(collector ilogtail.Collector) {
+func (r *InputSystem) CollectMem(collector pipeline.Collector) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "mem"
 	// mem stat
@@ -189,7 +189,7 @@ func (r *InputSystem) CollectMem(collector ilogtail.Collector) {
 	collector.AddData(nil, fields)
 }
 
-func collectOneDisk(collector ilogtail.Collector, name string, timeDeltaSec float64, last, now *disk.IOCountersStat) {
+func collectOneDisk(collector pipeline.Collector, name string, timeDeltaSec float64, last, now *disk.IOCountersStat) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "disk"
 	fields["name"] = name
@@ -215,7 +215,7 @@ func collectOneDisk(collector ilogtail.Collector, name string, timeDeltaSec floa
 	collector.AddData(nil, fields)
 }
 
-func (r *InputSystem) CollectDisk(collector ilogtail.Collector) {
+func (r *InputSystem) CollectDisk(collector pipeline.Collector) {
 	if allParts, err := disk.Partitions(false); err == nil {
 		for _, part := range allParts {
 			fields := make(map[string]string)
@@ -275,7 +275,7 @@ func (r *InputSystem) CollectDisk(collector ilogtail.Collector) {
 	}
 }
 
-func collectOneNet(collector ilogtail.Collector, name string, timeDeltaSec float64, last, now *net.IOCountersStat) {
+func collectOneNet(collector pipeline.Collector, name string, timeDeltaSec float64, last, now *net.IOCountersStat) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "net"
 	fields["name"] = name
@@ -304,7 +304,7 @@ func collectOneNet(collector ilogtail.Collector, name string, timeDeltaSec float
 	collector.AddData(nil, fields)
 }
 
-func (r *InputSystem) CollectNet(collector ilogtail.Collector) {
+func (r *InputSystem) CollectNet(collector pipeline.Collector) {
 	netIoStatAll, err := net.IOCounters(true)
 	if err == nil && len(netIoStatAll) > 0 {
 		netIoStatTotal := net.IOCountersStat{}
@@ -342,7 +342,7 @@ func (r *InputSystem) CollectNet(collector ilogtail.Collector) {
 	}
 }
 
-func (r *InputSystem) CollectProtocol(collector ilogtail.Collector) {
+func (r *InputSystem) CollectProtocol(collector pipeline.Collector) {
 	protoCounterStats, err := net.ProtoCounters([]string{})
 	if err == nil && len(protoCounterStats) > 0 {
 
@@ -371,7 +371,7 @@ func (r *InputSystem) CollectProtocol(collector ilogtail.Collector) {
 	}
 }
 
-func (r *InputSystem) Collect(collector ilogtail.Collector) error {
+func (r *InputSystem) Collect(collector pipeline.Collector) error {
 	if r.Core {
 		r.CollectCore(collector)
 	}
@@ -395,7 +395,7 @@ func (r *InputSystem) Collect(collector ilogtail.Collector) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_system"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_system"] = func() pipeline.MetricInput {
 		return &InputSystem{
 			CPUPercent: true,
 			Core:       true,

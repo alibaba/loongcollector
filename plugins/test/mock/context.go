@@ -19,9 +19,9 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -31,17 +31,17 @@ func NewEmptyContext(project, logstore, configName string) *EmptyContext {
 	return &EmptyContext{
 		ctx:            ctx,
 		common:         c,
-		StringMetrics:  make(map[string]ilogtail.StringMetric),
-		CounterMetrics: make(map[string]ilogtail.CounterMetric),
-		LatencyMetrics: make(map[string]ilogtail.LatencyMetric),
+		StringMetrics:  make(map[string]pipeline.StringMetric),
+		CounterMetrics: make(map[string]pipeline.CounterMetric),
+		LatencyMetrics: make(map[string]pipeline.LatencyMetric),
 		checkpoint:     make(map[string][]byte),
 	}
 }
 
 type EmptyContext struct {
-	StringMetrics  map[string]ilogtail.StringMetric
-	CounterMetrics map[string]ilogtail.CounterMetric
-	LatencyMetrics map[string]ilogtail.LatencyMetric
+	StringMetrics  map[string]pipeline.StringMetric
+	CounterMetrics map[string]pipeline.CounterMetric
+	LatencyMetrics map[string]pipeline.LatencyMetric
 
 	common      *pkg.LogtailContextMeta
 	ctx         context.Context
@@ -73,29 +73,29 @@ func (p *EmptyContext) InitContext(project, logstore, configName string) {
 	p.ctx, p.common = pkg.NewLogtailContextMetaWithoutAlarm(project, logstore, configName)
 }
 
-func (p *EmptyContext) RegisterCounterMetric(metric ilogtail.CounterMetric) {
+func (p *EmptyContext) RegisterCounterMetric(metric pipeline.CounterMetric) {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 	if p.CounterMetrics == nil {
-		p.CounterMetrics = make(map[string]ilogtail.CounterMetric)
+		p.CounterMetrics = make(map[string]pipeline.CounterMetric)
 	}
 	p.CounterMetrics[metric.Name()] = metric
 }
 
-func (p *EmptyContext) RegisterStringMetric(metric ilogtail.StringMetric) {
+func (p *EmptyContext) RegisterStringMetric(metric pipeline.StringMetric) {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 	if p.StringMetrics == nil {
-		p.StringMetrics = make(map[string]ilogtail.StringMetric)
+		p.StringMetrics = make(map[string]pipeline.StringMetric)
 	}
 	p.StringMetrics[metric.Name()] = metric
 }
 
-func (p *EmptyContext) RegisterLatencyMetric(metric ilogtail.LatencyMetric) {
+func (p *EmptyContext) RegisterLatencyMetric(metric pipeline.LatencyMetric) {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 	if p.LatencyMetrics == nil {
-		p.LatencyMetrics = make(map[string]ilogtail.LatencyMetric)
+		p.LatencyMetrics = make(map[string]pipeline.LatencyMetric)
 	}
 	p.LatencyMetrics[metric.Name()] = metric
 }

@@ -19,8 +19,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -44,7 +44,7 @@ type ProcessorGotime struct {
 
 	sourceLocation     *time.Location
 	destLocation       *time.Location
-	context            ilogtail.Context
+	context            pipeline.Context
 	timestampFormat    bool
 	timestampParseFunc func(timestamp int64) time.Time
 }
@@ -52,7 +52,7 @@ type ProcessorGotime struct {
 const pluginName = "processor_gotime"
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorGotime) Init(context ilogtail.Context) error {
+func (p *ProcessorGotime) Init(context pipeline.Context) error {
 	if p.SourceKey == "" {
 		return fmt.Errorf("must specify SourceKey for plugin %v", pluginName)
 	}
@@ -153,7 +153,7 @@ func (p *ProcessorGotime) processLog(log *protocol.Log) {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorGotime{
 			SourceKey:      "",
 			SourceFormat:   "",

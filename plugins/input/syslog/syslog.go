@@ -29,8 +29,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -58,7 +58,7 @@ type Syslog struct {
 	wg   sync.WaitGroup
 	io.Closer
 
-	context       ilogtail.Context
+	context       pipeline.Context
 	isStream      bool
 	isUnix        bool // If scheme is "unixgram", need to flag it and delete file when closed.
 	connections   map[string]net.Conn
@@ -70,7 +70,7 @@ type Syslog struct {
 }
 
 // Init ...
-func (s *Syslog) Init(context ilogtail.Context) (int, error) {
+func (s *Syslog) Init(context pipeline.Context) (int, error) {
 	if s.MaxMessageSize > maxMessageSize {
 		s.MaxMessageSize = maxMessageSize
 	}
@@ -99,12 +99,12 @@ func (s *Syslog) Description() string {
 }
 
 // Collect ...
-func (s *Syslog) Collect(collector ilogtail.Collector) error {
+func (s *Syslog) Collect(collector pipeline.Collector) error {
 	return nil
 }
 
 // Start ...
-func (s *Syslog) Start(collector ilogtail.Collector) error {
+func (s *Syslog) Start(collector pipeline.Collector) error {
 	s.done = make(chan struct{}, 1)
 	scheme, host, err := getAddressParts(s.Address)
 	if err != nil {
@@ -240,7 +240,7 @@ func (s *Syslog) sleepWithChan(duration time.Duration) bool {
 	}
 }
 
-func (s *Syslog) listenStream(collector ilogtail.Collector) {
+func (s *Syslog) listenStream(collector pipeline.Collector) {
 	defer s.wg.Done()
 
 	s.connections = map[string]net.Conn{}
@@ -292,7 +292,7 @@ Loop:
 	s.connectionsMu.Unlock()
 }
 
-func (s *Syslog) handle(conn net.Conn, collector ilogtail.Collector) {
+func (s *Syslog) handle(conn net.Conn, collector pipeline.Collector) {
 	defer func() {
 		s.removeConnection(conn)
 		_ = conn.Close()
@@ -353,7 +353,7 @@ func (s *Syslog) removeConnection(c net.Conn) {
 
 // TODO: There is a problem here, if for loop quit because of i/o timeout, the plugin quits
 // without any notification.
-func (s *Syslog) listenPacket(collector ilogtail.Collector) {
+func (s *Syslog) listenPacket(collector pipeline.Collector) {
 	defer s.wg.Done()
 
 	b := make([]byte, s.MaxMessageSize)
@@ -391,7 +391,7 @@ func (s *Syslog) listenPacket(collector ilogtail.Collector) {
 	}
 }
 
-func (s *Syslog) parse(b []byte, clientIP string, collector ilogtail.Collector) {
+func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.Collector) {
 	lines := bytes.Split(b, []byte("\n"))
 	if '\n' == b[len(b)-1] {
 		lines = lines[:len(lines)-1]
@@ -458,7 +458,7 @@ func newSyslog() *Syslog {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_syslog"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_syslog"] = func() pipeline.ServiceInput {
 		return newSyslog()
 	}
 }

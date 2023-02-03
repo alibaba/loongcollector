@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -95,7 +95,7 @@ func TestInputProcess_Collect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cxt := mock.NewEmptyContext("project", "store", "config")
-			p := ilogtail.MetricInputs["metric_process_v2"]().(*InputProcess)
+			p := pipeline.MetricInputs["metric_process_v2"]().(*InputProcess)
 			// exclude the systemd proc
 			p.ProcessNamesRegex = []string{"test"}
 			if _, err := p.Init(cxt); err != nil {

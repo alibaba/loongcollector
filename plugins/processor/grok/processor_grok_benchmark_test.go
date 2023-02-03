@@ -26,7 +26,7 @@ import (
 
 	"github.com/dlclark/regexp2"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -224,7 +224,7 @@ func BenchmarkGrokMatchOneTest(b *testing.B) {
 	for _, param := range params2 {
 		b.Run(param.name+strconv.Itoa(param.num), func(b *testing.B) {
 			Logs := param.mockFunc2(param.num, param.separator, param.separatorReg)
-			processor := ilogtail.Processors["processor_grok"]().(*ProcessorGrok)
+			processor := pipeline.Processors["processor_grok"]().(*ProcessorGrok)
 			processor.Match = []string{
 				"%{IPV4:ipv4}",
 			}
@@ -257,7 +257,7 @@ func BenchmarkGrokMatchTwoTest(b *testing.B) {
 	for _, param := range params2 {
 		b.Run(param.name+strconv.Itoa(param.num), func(b *testing.B) {
 			Logs := param.mockFunc2(param.num, param.separator, param.separatorReg)
-			processor := ilogtail.Processors["processor_grok"]().(*ProcessorGrok)
+			processor := pipeline.Processors["processor_grok"]().(*ProcessorGrok)
 			processor.Match = []string{
 				"%{BASE10NUM}",
 				"%{IPV4:ipv4}",
@@ -291,7 +291,7 @@ func BenchmarkGrokMatchThreeTest(b *testing.B) {
 	for _, param := range params2 {
 		b.Run(param.name+strconv.Itoa(param.num), func(b *testing.B) {
 			Logs := param.mockFunc2(param.num, param.separator, param.separatorReg)
-			processor := ilogtail.Processors["processor_grok"]().(*ProcessorGrok)
+			processor := pipeline.Processors["processor_grok"]().(*ProcessorGrok)
 			processor.Match = []string{
 				"%{BASE16FLOAT}",
 				"%{BASE10NUM}",
@@ -326,7 +326,7 @@ func BenchmarkGrokMatchFiveTest(b *testing.B) {
 	for _, param := range params2 {
 		b.Run(param.name+strconv.Itoa(param.num), func(b *testing.B) {
 			Logs := param.mockFunc2(param.num, param.separator, param.separatorReg)
-			processor := ilogtail.Processors["processor_grok"]().(*ProcessorGrok)
+			processor := pipeline.Processors["processor_grok"]().(*ProcessorGrok)
 			processor.Match = []string{
 				"%{IPV6}",
 				"%{MAC}",

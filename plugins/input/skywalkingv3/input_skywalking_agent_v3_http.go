@@ -20,8 +20,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -34,14 +34,14 @@ import (
 type SkywalkingHTTPServerInput struct {
 	Address          string
 	server           *http.Server
-	context          ilogtail.Context
+	context          pipeline.Context
 	ComponentMapping map[int32]string
 }
 
 type parameterParser func(request *http.Request) (interface{}, error)
 type urlHandler func(parameter interface{}) (interface{}, error)
 
-func (s *SkywalkingHTTPServerInput) Init(context ilogtail.Context) (int, error) {
+func (s *SkywalkingHTTPServerInput) Init(context pipeline.Context) (int, error) {
 	s.context = context
 	return 0, nil
 }
@@ -50,7 +50,7 @@ func (s *SkywalkingHTTPServerInput) Description() string {
 	return "This is a skywalking v3 http server input"
 }
 
-func (s *SkywalkingHTTPServerInput) Start(collector ilogtail.Collector) error {
+func (s *SkywalkingHTTPServerInput) Start(collector pipeline.Collector) error {
 	logger.Info(s.context.GetRuntimeContext(), "Start skywalking v3 http server")
 	mux := http.NewServeMux()
 
@@ -252,7 +252,7 @@ func (s *SkywalkingHTTPServerInput) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_skywalking_agent_v3_http"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_skywalking_agent_v3_http"] = func() pipeline.ServiceInput {
 		return &SkywalkingHTTPServerInput{
 			Address: "0.0.0.0:12800",
 		}

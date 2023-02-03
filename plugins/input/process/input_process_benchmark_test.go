@@ -20,7 +20,7 @@ package process
 import (
 	"testing"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -32,7 +32,7 @@ import (
 // Benchmark_CollectDefault-64    	      22	  51563661 ns/op
 func Benchmark_CollectDefault(b *testing.B) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := ilogtail.MetricInputs["metric_process_v2"]().(*InputProcess)
+	p := pipeline.MetricInputs["metric_process_v2"]().(*InputProcess)
 	if _, err := p.Init(cxt); err != nil {
 		b.Errorf("cannot init the mock process plugin: %v", err)
 		return

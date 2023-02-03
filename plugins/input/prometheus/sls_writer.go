@@ -22,7 +22,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
 )
@@ -111,7 +111,7 @@ func formatNewMetricName(name string) string {
 	return *(*string)(unsafe.Pointer(&newName))
 }
 
-func appendTSDataToSlsLog(c ilogtail.Collector, wr *prompbmarshal.WriteRequest) {
+func appendTSDataToSlsLog(c pipeline.Collector, wr *prompbmarshal.WriteRequest) {
 	values := make([]string, 4)
 	for i := range wr.Timeseries {
 		ts := &wr.Timeseries[i]

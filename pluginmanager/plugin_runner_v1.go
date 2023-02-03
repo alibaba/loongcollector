@@ -17,9 +17,9 @@ package pluginmanager
 import (
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugin_main/flags"
@@ -27,7 +27,7 @@ import (
 
 type pluginv1Runner struct {
 	// pipeline v1 fields
-	LogsChan      chan *ilogtail.LogWithContext
+	LogsChan      chan *pipeline.LogWithContext
 	LogGroupsChan chan *protocol.LogGroup
 
 	MetricPlugins     []*MetricWrapper
@@ -39,23 +39,23 @@ type pluginv1Runner struct {
 	FlushOutStore  *FlushOutStore[protocol.LogGroup]
 	LogstoreConfig *LogstoreConfig
 
-	InputControl     *ilogtail.AsyncControl
-	ProcessControl   *ilogtail.AsyncControl
-	AggregateControl *ilogtail.AsyncControl
-	FlushControl     *ilogtail.AsyncControl
+	InputControl     *pipeline.AsyncControl
+	ProcessControl   *pipeline.AsyncControl
+	AggregateControl *pipeline.AsyncControl
+	FlushControl     *pipeline.AsyncControl
 }
 
 func (p *pluginv1Runner) Init(inputQueueSize int, flushQueueSize int) error {
-	p.InputControl = ilogtail.NewAsyncControl()
-	p.ProcessControl = ilogtail.NewAsyncControl()
-	p.AggregateControl = ilogtail.NewAsyncControl()
-	p.FlushControl = ilogtail.NewAsyncControl()
+	p.InputControl = pipeline.NewAsyncControl()
+	p.ProcessControl = pipeline.NewAsyncControl()
+	p.AggregateControl = pipeline.NewAsyncControl()
+	p.FlushControl = pipeline.NewAsyncControl()
 	p.MetricPlugins = make([]*MetricWrapper, 0)
 	p.ServicePlugins = make([]*ServiceWrapper, 0)
 	p.ProcessorPlugins = make([]*ProcessorWrapper, 0)
 	p.AggregatorPlugins = make([]*AggregatorWrapper, 0)
 	p.FlusherPlugins = make([]*FlusherWrapper, 0)
-	p.LogsChan = make(chan *ilogtail.LogWithContext, inputQueueSize)
+	p.LogsChan = make(chan *pipeline.LogWithContext, inputQueueSize)
 	p.LogGroupsChan = make(chan *protocol.LogGroup, helper.Max(flushQueueSize, p.FlushOutStore.Len()))
 	p.FlushOutStore.Write(p.LogGroupsChan)
 	return nil
@@ -81,23 +81,23 @@ func (p *pluginv1Runner) Initialized() error {
 func (p *pluginv1Runner) AddPlugin(pluginName string, category pluginCategory, plugin interface{}, config map[string]interface{}) error {
 	switch category {
 	case pluginMetricInput:
-		if metric, ok := plugin.(ilogtail.MetricInputV1); ok {
+		if metric, ok := plugin.(pipeline.MetricInputV1); ok {
 			return p.addMetricInput(metric, config["interval"].(int))
 		}
 	case pluginServiceInput:
-		if service, ok := plugin.(ilogtail.ServiceInputV1); ok {
+		if service, ok := plugin.(pipeline.ServiceInputV1); ok {
 			return p.addServiceInput(service)
 		}
 	case pluginProcessor:
-		if processor, ok := plugin.(ilogtail.ProcessorV1); ok {
+		if processor, ok := plugin.(pipeline.ProcessorV1); ok {
 			return p.addProcessor(processor, config["priority"].(int))
 		}
 	case pluginAggregator:
-		if aggregator, ok := plugin.(ilogtail.AggregatorV1); ok {
+		if aggregator, ok := plugin.(pipeline.AggregatorV1); ok {
 			return p.addAggregator(aggregator)
 		}
 	case pluginFlusher:
-		if flusher, ok := plugin.(ilogtail.FlusherV1); ok {
+		if flusher, ok := plugin.(pipeline.FlusherV1); ok {
 			return p.addFlusher(flusher)
 		}
 	default:
@@ -113,7 +113,7 @@ func (p *pluginv1Runner) Run() {
 	p.runInput()
 }
 
-func (p *pluginv1Runner) RunPlugins(category pluginCategory, control *ilogtail.AsyncControl) {
+func (p *pluginv1Runner) RunPlugins(category pluginCategory, control *pipeline.AsyncControl) {
 	switch category {
 	case pluginMetricInput:
 		p.runMetricInput(control)
@@ -121,7 +121,7 @@ func (p *pluginv1Runner) RunPlugins(category pluginCategory, control *ilogtail.A
 	}
 }
 
-func (p *pluginv1Runner) addMetricInput(input ilogtail.MetricInputV1, interval int) error {
+func (p *pluginv1Runner) addMetricInput(input pipeline.MetricInputV1, interval int) error {
 	var wrapper MetricWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Input = input
@@ -132,7 +132,7 @@ func (p *pluginv1Runner) addMetricInput(input ilogtail.MetricInputV1, interval i
 	return nil
 }
 
-func (p *pluginv1Runner) addServiceInput(input ilogtail.ServiceInputV1) error {
+func (p *pluginv1Runner) addServiceInput(input pipeline.ServiceInputV1) error {
 	var wrapper ServiceWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Input = input
@@ -141,7 +141,7 @@ func (p *pluginv1Runner) addServiceInput(input ilogtail.ServiceInputV1) error {
 	return nil
 }
 
-func (p *pluginv1Runner) addProcessor(processor ilogtail.ProcessorV1, priority int) error {
+func (p *pluginv1Runner) addProcessor(processor pipeline.ProcessorV1, priority int) error {
 	var wrapper ProcessorWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Processor = processor
@@ -151,7 +151,7 @@ func (p *pluginv1Runner) addProcessor(processor ilogtail.ProcessorV1, priority i
 	return nil
 }
 
-func (p *pluginv1Runner) addAggregator(aggregator ilogtail.AggregatorV1) error {
+func (p *pluginv1Runner) addAggregator(aggregator pipeline.AggregatorV1) error {
 	var wrapper AggregatorWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Aggregator = aggregator
@@ -169,7 +169,7 @@ func (p *pluginv1Runner) addAggregator(aggregator ilogtail.AggregatorV1) error {
 	return nil
 }
 
-func (p *pluginv1Runner) addFlusher(flusher ilogtail.FlusherV1) error {
+func (p *pluginv1Runner) addFlusher(flusher pipeline.FlusherV1) error {
 	var wrapper FlusherWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Flusher = flusher
@@ -188,7 +188,7 @@ func (p *pluginv1Runner) runInput() {
 	}
 }
 
-func (p *pluginv1Runner) runMetricInput(async *ilogtail.AsyncControl) {
+func (p *pluginv1Runner) runMetricInput(async *pipeline.AsyncControl) {
 	for _, metric := range p.MetricPlugins {
 		m := metric
 		async.Run(m.Run)
@@ -211,9 +211,9 @@ func (p *pluginv1Runner) runProcessor() {
 //	one by one, just like logs -> p1 -> p2 -> p3 -> logsGoToNextStep.
 //
 // It returns when processShutdown is closed.
-func (p *pluginv1Runner) runProcessorInternal(cc *ilogtail.AsyncControl) {
+func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
-	var logCtx *ilogtail.LogWithContext
+	var logCtx *pipeline.LogWithContext
 	for {
 		select {
 		case <-cc.CancelToken():
@@ -272,7 +272,7 @@ func (p *pluginv1Runner) runFlusher() {
 	p.FlushControl.Run(p.runFlusherInternal)
 }
 
-func (p *pluginv1Runner) runFlusherInternal(cc *ilogtail.AsyncControl) {
+func (p *pluginv1Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	var logGroup *protocol.LogGroup
 	for {
@@ -377,12 +377,12 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	p.FlushControl.WaitCancel()
 
 	if exit && p.FlushOutStore.Len() > 0 {
-		flushers := make([]ilogtail.FlusherV1, len(p.FlusherPlugins))
+		flushers := make([]pipeline.FlusherV1, len(p.FlusherPlugins))
 		for idx, flusher := range p.FlusherPlugins {
 			flushers[idx] = flusher.Flusher
 		}
 		logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "flushout loggroups, count", p.FlushOutStore.Len())
-		rst := flushOutStore(p.LogstoreConfig, p.FlushOutStore, flushers, func(lc *LogstoreConfig, sf ilogtail.FlusherV1, store *FlushOutStore[protocol.LogGroup]) error {
+		rst := flushOutStore(p.LogstoreConfig, p.FlushOutStore, flushers, func(lc *LogstoreConfig, sf pipeline.FlusherV1, store *FlushOutStore[protocol.LogGroup]) error {
 			return sf.Flush(lc.Context.GetProject(), lc.Context.GetLogstore(), lc.Context.GetConfigName(), store.Get())
 		})
 		logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "flushout loggroups, result", rst)
@@ -399,7 +399,7 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	return nil
 }
 
-func (p *pluginv1Runner) ReceiveRawLog(log *ilogtail.LogWithContext) {
+func (p *pluginv1Runner) ReceiveRawLog(log *pipeline.LogWithContext) {
 	p.LogsChan <- log
 }
 

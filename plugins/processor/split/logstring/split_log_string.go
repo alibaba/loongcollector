@@ -15,9 +15,9 @@
 package logstring
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"strings"
@@ -31,11 +31,11 @@ type ProcessorSplit struct {
 	NoKeyError            bool
 	EnableLogPositionMeta bool
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorSplit) Init(context ilogtail.Context) error {
+func (p *ProcessorSplit) Init(context pipeline.Context) error {
 	p.context = context
 	if len(p.SplitSep) == 0 {
 		p.SplitSep = "\u0000"
@@ -102,7 +102,7 @@ func (p *ProcessorSplit) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 }
 
 func init() {
-	ilogtail.Processors["processor_split_log_string"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_split_log_string"] = func() pipeline.Processor {
 		return &ProcessorSplit{SplitSep: "\n", PreserveOthers: true}
 	}
 }

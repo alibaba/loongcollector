@@ -18,8 +18,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -35,7 +35,7 @@ type MetricsExample struct {
 
 // Init method would be triggered before working. In the example plugin, we set the initial
 // value of counter to 100. And we return 0 to use the default trigger interval.
-func (m *MetricsExample) Init(context ilogtail.Context) (int, error) {
+func (m *MetricsExample) Init(context pipeline.Context) (int, error) {
 	// set the initial value
 	m.counter = 100
 	// use helper.KeyValues to store metric labels
@@ -51,7 +51,7 @@ func (m *MetricsExample) Description() string {
 }
 
 // Collect is called every trigger interval to collect the metrics and send them to the collector.
-func (m *MetricsExample) Collect(collector ilogtail.Collector) error {
+func (m *MetricsExample) Collect(collector pipeline.Collector) error {
 	// counter increment
 	m.counter++
 	// create a random value as gauge value
@@ -65,7 +65,7 @@ func (m *MetricsExample) Collect(collector ilogtail.Collector) error {
 
 // Register the plugin to the MetricInputs array.
 func init() {
-	ilogtail.MetricInputs["metric_input_example"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_input_example"] = func() pipeline.MetricInput {
 		return &MetricsExample{
 			// here you could set default value.
 		}

@@ -20,8 +20,8 @@ import (
 
 	"github.com/pingcap/check"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -35,11 +35,11 @@ func Test(t *testing.T) {
 }
 
 type processorTestSuite struct {
-	processor ilogtail.ProcessorV1
+	processor pipeline.ProcessorV1
 }
 
 func (s *processorTestSuite) SetUpTest(c *check.C) {
-	s.processor = ilogtail.Processors["processor_filter_regex"]().(ilogtail.ProcessorV1)
+	s.processor = pipeline.Processors["processor_filter_regex"]().(pipeline.ProcessorV1)
 	_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 	logger.Info(context.Background(), "set up", s.processor.Description())
 }

@@ -19,15 +19,15 @@ import (
 	"io"
 	"runtime"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	skywalking "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
 
 type TracingHandler struct {
-	context                      ilogtail.Context
-	collector                    ilogtail.Collector
+	context                      pipeline.Context
+	collector                    pipeline.Collector
 	cache                        *ResourcePropertiesCache
 	compIDMessagingSystemMapping map[int32]string
 }

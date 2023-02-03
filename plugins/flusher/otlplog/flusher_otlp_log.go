@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 )
 
@@ -43,7 +43,7 @@ type FlusherOTLPLog struct {
 
 	converter *converter.Converter
 	metadata  metadata.MD
-	context   ilogtail.Context
+	context   pipeline.Context
 	grpcConn  *grpc.ClientConn
 	logClient otlpv1.LogsServiceClient
 }
@@ -52,7 +52,7 @@ func (f *FlusherOTLPLog) Description() string {
 	return "OTLP Log flusher for logtail"
 }
 
-func (f *FlusherOTLPLog) Init(ctx ilogtail.Context) error {
+func (f *FlusherOTLPLog) Init(ctx pipeline.Context) error {
 	f.context = ctx
 	logger.Info(f.context.GetRuntimeContext(), "otlplog flusher init", "initializing")
 	convert, err := f.getConverter()
@@ -209,7 +209,7 @@ func (f *FlusherOTLPLog) Stop() error {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_otlp_log"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_otlp_log"] = func() pipeline.Flusher {
 		return &FlusherOTLPLog{Version: v1}
 	}
 }

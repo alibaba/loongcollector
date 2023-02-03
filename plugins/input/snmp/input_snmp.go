@@ -28,9 +28,8 @@ import (
 	"strings"
 	"time"
 
-	// other packages of that project
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	// third-party
 	g "github.com/gosnmp/gosnmp"
@@ -85,7 +84,7 @@ type Agent struct {
 
 	gs            []*g.GoSNMP
 	fieldContents []Field
-	context       ilogtail.Context
+	context       pipeline.Context
 }
 
 // Field holds the configuration for a Field to look up.
@@ -100,7 +99,7 @@ func (s *Agent) Description() string {
 	return "get SNMP Agent input for logtail"
 }
 
-func (s *Agent) Init(context ilogtail.Context) (int, error) {
+func (s *Agent) Init(context pipeline.Context) (int, error) {
 	s.context = context
 
 	if s.MaxTargetsLength < 1 {
@@ -462,7 +461,7 @@ func (s *Agent) GetTranslated() error {
 	return nil
 }
 
-func (s *Agent) Start(collector ilogtail.Collector) error {
+func (s *Agent) Start(collector pipeline.Collector) error {
 	runtime.GOMAXPROCS(len(s.gs))
 	for index, GsAgent := range s.gs {
 		// use anonymous function to avoid resource leak
@@ -582,12 +581,12 @@ func (s *Agent) Stop() error {
 	return nil
 }
 
-func (s *Agent) Collect(_ ilogtail.Collector) error {
+func (s *Agent) Collect(_ pipeline.Collector) error {
 	return nil
 }
 
 func init() {
-	ilogtail.ServiceInputs[pluginName] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs[pluginName] = func() pipeline.ServiceInput {
 		return &Agent{
 			Port:               "161",
 			Transport:          "udp",

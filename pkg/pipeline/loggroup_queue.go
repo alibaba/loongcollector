@@ -1,4 +1,4 @@
-// Copyright 2022 iLogtail Authors
+// Copyright 2021 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ilogtail
+package pipeline
 
-// PipelineContext, which may include
-// collector interface、checkpoint interface、config read and many more..
-type PipelineContext interface {
-	Collector() PipelineCollector
+import (
+	"time"
+
+	"github.com/alibaba/ilogtail/pkg/protocol"
+)
+
+// LogGroupQueue for aggregator, Non blocked
+// if aggregator's buffer is full, aggregator can add LogGroup to this queue
+// return error if LogGroupQueue is full
+type LogGroupQueue interface {
+	// no blocking
+	Add(loggroup *protocol.LogGroup) error
+	AddWithWait(loggroup *protocol.LogGroup, duration time.Duration) error
 }

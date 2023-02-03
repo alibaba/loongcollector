@@ -23,7 +23,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -137,7 +137,7 @@ func findFirstNoneEmptyLogTag(logGroup *protocol.LogGroup, tagKeys ...string) *p
 }
 
 type mockContext struct {
-	ilogtail.Context
+	pipeline.Context
 }
 
 func (c mockContext) GetConfigName() string {
@@ -149,7 +149,7 @@ func (c mockContext) GetRuntimeContext() context.Context {
 }
 
 type mockQueue struct {
-	ilogtail.LogGroupQueue
+	pipeline.LogGroupQueue
 	logGroups []*protocol.LogGroup
 }
 

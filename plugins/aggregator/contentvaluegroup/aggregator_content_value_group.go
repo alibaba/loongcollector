@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
@@ -48,7 +48,7 @@ func (g *groupAggregator) Flush() []*protocol.LogGroup {
 
 type groupQueue struct {
 	groupKVs map[string]string
-	queue    ilogtail.LogGroupQueue
+	queue    pipeline.LogGroupQueue
 }
 
 // Add ...
@@ -71,8 +71,8 @@ type AggregatorContentValueGroup struct {
 
 	groupAggs sync.Map
 	lock      *sync.Mutex
-	context   ilogtail.Context
-	queue     ilogtail.LogGroupQueue
+	context   pipeline.Context
+	queue     pipeline.LogGroupQueue
 }
 
 // Description ...
@@ -80,7 +80,7 @@ func (*AggregatorContentValueGroup) Description() string {
 	return "aggregator that group logs by a set of keys"
 }
 
-func (g *AggregatorContentValueGroup) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (g *AggregatorContentValueGroup) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
 	g.context = context
 	g.queue = que
 
@@ -200,7 +200,7 @@ func addGroupTags(logGroup *protocol.LogGroup, tagKVs map[string]string) {
 }
 
 func init() {
-	ilogtail.Aggregators["aggregator_content_value_group"] = func() ilogtail.Aggregator {
+	pipeline.Aggregators["aggregator_content_value_group"] = func() pipeline.Aggregator {
 		return &AggregatorContentValueGroup{
 			EnablePackID:     true,
 			ErrIfKeyNotFound: false,

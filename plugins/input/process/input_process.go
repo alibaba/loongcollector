@@ -15,9 +15,9 @@
 package process
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 
 	"regexp"
@@ -49,14 +49,14 @@ type InputProcess struct {
 	NetIO  bool
 	IO     bool
 
-	context       ilogtail.Context
+	context       pipeline.Context
 	lastProcesses map[int]processCache
 	regexpList    []*regexp.Regexp
 	commonLabels  helper.KeyValues
 	collectTime   time.Time
 }
 
-func (ip *InputProcess) Init(context ilogtail.Context) (int, error) {
+func (ip *InputProcess) Init(context pipeline.Context) (int, error) {
 	ip.context = context
 	if ip.MaxProcessCount <= 0 {
 		ip.MaxProcessCount = defaultMaxProcessCount
@@ -83,7 +83,7 @@ func (ip *InputProcess) Description() string {
 	return "Support collect process metrics on the host machine or Linux virtual environments."
 }
 
-func (ip *InputProcess) Collect(collector ilogtail.Collector) error {
+func (ip *InputProcess) Collect(collector pipeline.Collector) error {
 	ip.collectTime = time.Now()
 	matchedProcesses, err := ip.filterMatchedProcesses()
 	if err != nil {
@@ -218,7 +218,7 @@ func (ip *InputProcess) filterTopAndThresholdMatchedProcesses(processList []proc
 	return
 }
 
-func (ip *InputProcess) addCPUMetrics(pc processCache, labels string, collector ilogtail.Collector) {
+func (ip *InputProcess) addCPUMetrics(pc processCache, labels string, collector pipeline.Collector) {
 	if percentage := pc.GetProcessStatus().CPUPercentage; percentage != nil {
 		helper.AddMetric(collector, "process_cpu_percent", ip.collectTime, labels, percentage.TotalPercentage)
 		helper.AddMetric(collector, "process_cpu_stime_percent", ip.collectTime, labels, percentage.STimePercentage)
@@ -226,7 +226,7 @@ func (ip *InputProcess) addCPUMetrics(pc processCache, labels string, collector 
 	}
 }
 
-func (ip *InputProcess) addMemMetrics(pc processCache, labels string, collector ilogtail.Collector) {
+func (ip *InputProcess) addMemMetrics(pc processCache, labels string, collector pipeline.Collector) {
 	if mem := pc.GetProcessStatus().Memory; mem != nil {
 		helper.AddMetric(collector, "process_mem_rss", ip.collectTime, labels, float64(mem.Rss))
 		helper.AddMetric(collector, "process_mem_swap", ip.collectTime, labels, float64(mem.Swap))
@@ -235,19 +235,19 @@ func (ip *InputProcess) addMemMetrics(pc processCache, labels string, collector 
 	}
 }
 
-func (ip *InputProcess) addThreadMetrics(pc processCache, labels string, collector ilogtail.Collector) {
+func (ip *InputProcess) addThreadMetrics(pc processCache, labels string, collector pipeline.Collector) {
 	if pc.FetchThreads() {
 		helper.AddMetric(collector, "process_threads", ip.collectTime, labels, float64(pc.GetProcessStatus().ThreadsNum))
 	}
 }
 
-func (ip *InputProcess) addOpenFilesMetrics(pc processCache, labels string, collector ilogtail.Collector) {
+func (ip *InputProcess) addOpenFilesMetrics(pc processCache, labels string, collector pipeline.Collector) {
 	if pc.FetchFds() {
 		helper.AddMetric(collector, "process_fds", ip.collectTime, labels, float64(pc.GetProcessStatus().FdsNum))
 	}
 }
 
-func (ip *InputProcess) addNetIOMetrics(pc processCache, labels string, collector ilogtail.Collector) {
+func (ip *InputProcess) addNetIOMetrics(pc processCache, labels string, collector pipeline.Collector) {
 	if pc.FetchNetIO() {
 		net := pc.GetProcessStatus().NetIO
 		helper.AddMetric(collector, "process_net_in_bytes", ip.collectTime, labels, float64(net.InBytes))
@@ -257,7 +257,7 @@ func (ip *InputProcess) addNetIOMetrics(pc processCache, labels string, collecto
 	}
 }
 
-func (ip *InputProcess) addIOMetrics(pc processCache, labels string, collector ilogtail.Collector) {
+func (ip *InputProcess) addIOMetrics(pc processCache, labels string, collector pipeline.Collector) {
 	if pc.FetchIO() {
 		io := pc.GetProcessStatus().IO
 		helper.AddMetric(collector, "process_read_bytes", ip.collectTime, labels, float64(io.ReadeBytes))
@@ -268,7 +268,7 @@ func (ip *InputProcess) addIOMetrics(pc processCache, labels string, collector i
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_process_v2"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_process_v2"] = func() pipeline.MetricInput {
 		return &InputProcess{
 			TopNCPU:          5,
 			MinMemoryLimitKB: 100,

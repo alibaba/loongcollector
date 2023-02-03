@@ -17,9 +17,9 @@ package rename
 import (
 	"fmt"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -29,13 +29,13 @@ type ProcessorRename struct {
 	DestKeys            []string
 	keyDictionary       map[string]int
 	noKeyErrorBoolArray []bool
-	context             ilogtail.Context
+	context             pipeline.Context
 }
 
 const pluginName = "processor_rename"
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorRename) Init(context ilogtail.Context) error {
+func (p *ProcessorRename) Init(context pipeline.Context) error {
 	p.context = context
 	if len(p.SourceKeys) == 0 {
 		return fmt.Errorf("must specify SourceKeys for plugin %v", pluginName)
@@ -99,7 +99,7 @@ func (p *ProcessorRename) processLog(log *protocol.Log) {
 	}
 }
 
-func (p *ProcessorRename) Process(in *models.PipelineGroupEvents, context ilogtail.PipelineContext) {
+func (p *ProcessorRename) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if p.NoKeyError {
 		for idx := range p.noKeyErrorBoolArray {
 			p.noKeyErrorBoolArray[idx] = false
@@ -126,7 +126,7 @@ func (p *ProcessorRename) Process(in *models.PipelineGroupEvents, context ilogta
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorRename{
 			NoKeyError: false,
 			SourceKeys: nil,

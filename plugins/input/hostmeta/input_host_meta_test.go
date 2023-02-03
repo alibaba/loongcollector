@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
@@ -68,7 +68,7 @@ func TestInputNodeMeta_Collect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := mock.NewEmptyContext("project", "store", "config")
-			p := ilogtail.MetricInputs[pluginName]().(*InputNodeMeta)
+			p := pipeline.MetricInputs[pluginName]().(*InputNodeMeta)
 			c := new(test.MockMetricCollector)
 			p.Disk = tt.args.Disk
 			p.CPU = tt.args.CPU

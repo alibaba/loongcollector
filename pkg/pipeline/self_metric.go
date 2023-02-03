@@ -12,29 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ilogtail
+package pipeline
 
 import (
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-// Processor also can be a filter
-type Processor interface {
-	// Init called for init some system resources, like socket, mutex...
-	Init(Context) error
+type CounterMetric interface {
+	Name() string
 
-	// Description returns a one-sentence description on the Input
-	Description() string
+	Add(v int64)
+
+	// Clear same with set
+	Clear(v int64)
+
+	Get() int64
+
+	Serialize(log *protocol.Log)
 }
 
-type ProcessorV1 interface {
-	Processor
-	// ProcessLogs the filter to the given metric
-	ProcessLogs(logArray []*protocol.Log) []*protocol.Log
+type StringMetric interface {
+	Name() string
+
+	Set(v string)
+
+	Get() string
+
+	Serialize(log *protocol.Log)
 }
 
-type ProcessorV2 interface {
-	Processor
-	Process(in *models.PipelineGroupEvents, context PipelineContext)
+type LatencyMetric interface {
+	Name() string
+
+	Begin()
+
+	Clear()
+
+	End()
+	// nano second
+	Get() int64
+
+	Serialize(log *protocol.Log)
 }

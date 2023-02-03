@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -29,13 +29,13 @@ type ProcessorPackjson struct {
 	KeepSource        bool     // 是否保留源字段
 	AlarmIfIncomplete bool     // 是否在不存在任何源字段时告警
 	keyDictionary     map[string]bool
-	context           ilogtail.Context
+	context           pipeline.Context
 }
 
 const pluginName = "processor_packjson"
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorPackjson) Init(context ilogtail.Context) error {
+func (p *ProcessorPackjson) Init(context pipeline.Context) error {
 	if len(p.SourceKeys) == 0 {
 		return fmt.Errorf("must specify SourceKeys for plugin %v", pluginName)
 	}
@@ -93,7 +93,7 @@ func (p *ProcessorPackjson) processLog(log *protocol.Log) {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorPackjson{
 			SourceKeys:        nil,
 			DestKey:           "",

@@ -18,7 +18,7 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
@@ -26,8 +26,8 @@ import (
 )
 
 type CLRMetricHandler struct {
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 	interval  int64
 	lastTime  int64
 }

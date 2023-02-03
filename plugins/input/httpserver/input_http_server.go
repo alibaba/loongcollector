@@ -24,10 +24,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper/decoder"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 const (
@@ -37,13 +37,13 @@ const (
 
 // ServiceHTTP ...
 type ServiceHTTP struct {
-	context     ilogtail.Context
-	collector   ilogtail.Collector
+	context     pipeline.Context
+	collector   pipeline.Collector
 	decoder     decoder.Decoder
 	server      *http.Server
 	listener    net.Listener
 	wg          sync.WaitGroup
-	collectorV2 ilogtail.PipelineCollector
+	collectorV2 pipeline.PipelineCollector
 	version     int8
 	paramCount  int
 
@@ -64,7 +64,7 @@ type ServiceHTTP struct {
 }
 
 // Init ...
-func (s *ServiceHTTP) Init(context ilogtail.Context) (int, error) {
+func (s *ServiceHTTP) Init(context pipeline.Context) (int, error) {
 	s.context = context
 	var err error
 	if s.decoder, err = decoder.GetDecoderWithOptions(s.Format, decoder.Option{FieldsExtend: s.FieldsExtend, DisableUncompress: s.DisableUncompress}); err != nil {
@@ -87,7 +87,7 @@ func (s *ServiceHTTP) Description() string {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (s *ServiceHTTP) Collect(ilogtail.Collector) error {
+func (s *ServiceHTTP) Collect(pipeline.Collector) error {
 	return nil
 }
 
@@ -174,14 +174,14 @@ func badRequest(res http.ResponseWriter) {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (s *ServiceHTTP) Start(c ilogtail.Collector) error {
+func (s *ServiceHTTP) Start(c pipeline.Collector) error {
 	s.collector = c
 	s.version = v1
 	return s.start()
 }
 
 // StartService start the ServiceInput's service by plugin runner v2
-func (s *ServiceHTTP) StartService(context ilogtail.PipelineContext) error {
+func (s *ServiceHTTP) StartService(context pipeline.PipelineContext) error {
 	s.collectorV2 = context.Collector()
 	s.version = v2
 
@@ -275,7 +275,7 @@ func (s *ServiceHTTP) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_http_server"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_http_server"] = func() pipeline.ServiceInput {
 		return &ServiceHTTP{
 			ReadTimeoutSec:     10,
 			ShutdownTimeoutSec: 5,

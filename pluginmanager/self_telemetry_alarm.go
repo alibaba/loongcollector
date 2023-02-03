@@ -15,18 +15,18 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type InputAlarm struct {
-	context ilogtail.Context
+	context pipeline.Context
 }
 
-func (r *InputAlarm) Init(context ilogtail.Context) (int, error) {
+func (r *InputAlarm) Init(context pipeline.Context) (int, error) {
 	r.context = context
 	return 0, nil
 }
@@ -35,7 +35,7 @@ func (r *InputAlarm) Description() string {
 	return "alarm input plugin for logtail"
 }
 
-func (r *InputAlarm) Collect(collector ilogtail.Collector) error {
+func (r *InputAlarm) Collect(collector pipeline.Collector) error {
 	loggroup := &protocol.LogGroup{}
 	for _, config := range LogtailConfig {
 		alarm := config.Context.GetRuntimeContext().Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
@@ -46,7 +46,7 @@ func (r *InputAlarm) Collect(collector ilogtail.Collector) error {
 	util.GlobalAlarm.SerializeToPb(loggroup)
 	if len(loggroup.Logs) > 0 && AlarmConfig != nil {
 		for _, log := range loggroup.Logs {
-			AlarmConfig.PluginRunner.ReceiveRawLog(&ilogtail.LogWithContext{Log: log})
+			AlarmConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
 		}
 	}
 	util.RegisterAlarmsSerializeToPb(loggroup)
@@ -55,7 +55,7 @@ func (r *InputAlarm) Collect(collector ilogtail.Collector) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_alarm"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_alarm"] = func() pipeline.MetricInput {
 		return &InputAlarm{}
 	}
 }

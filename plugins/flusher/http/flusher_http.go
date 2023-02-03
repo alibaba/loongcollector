@@ -25,11 +25,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
@@ -66,7 +66,7 @@ type FlusherHTTP struct {
 
 	queryVarKeys []string
 
-	context   ilogtail.Context
+	context   pipeline.Context
 	converter *converter.Converter
 	client    *http.Client
 
@@ -78,7 +78,7 @@ func (f *FlusherHTTP) Description() string {
 	return "http flusher for ilogtail"
 }
 
-func (f *FlusherHTTP) Init(context ilogtail.Context) error {
+func (f *FlusherHTTP) Init(context pipeline.Context) error {
 	f.context = context
 	logger.Info(f.context.GetRuntimeContext(), "http flusher init", "initializing")
 	if f.RemoteURL == "" {
@@ -128,7 +128,7 @@ func (f *FlusherHTTP) Flush(projectName string, logstoreName string, configName 
 	return nil
 }
 
-func (f *FlusherHTTP) Export(groupEventsArray []*models.PipelineGroupEvents, ctx ilogtail.PipelineContext) error {
+func (f *FlusherHTTP) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
 	for _, groupEvents := range groupEventsArray {
 		f.addTask(groupEvents)
 	}
@@ -340,7 +340,7 @@ func (f *FlusherHTTP) fillRequestContentType() {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_http"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_http"] = func() pipeline.Flusher {
 		return &FlusherHTTP{
 			Timeout:     defaultTimeout,
 			Concurrency: 1,

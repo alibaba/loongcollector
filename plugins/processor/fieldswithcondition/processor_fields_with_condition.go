@@ -19,9 +19,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -44,9 +44,9 @@ type ProcessorFieldsWithCondition struct {
 	DropIfNotMatchCondition bool        `comment:"Optional. When the case condition is not met, whether the log is discarded (true) or retained (false)"`
 	Switch                  []Condition `comment:"The switch-case conditions"`
 
-	filterMetric    ilogtail.CounterMetric
-	processedMetric ilogtail.CounterMetric
-	context         ilogtail.Context
+	filterMetric    pipeline.CounterMetric
+	processedMetric pipeline.CounterMetric
+	context         pipeline.Context
 }
 
 type Condition struct {
@@ -82,7 +82,7 @@ type ConditionAction struct {
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorFieldsWithCondition) Init(context ilogtail.Context) error {
+func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 	p.context = context
 	for i := range p.Switch {
 		// set default values
@@ -297,7 +297,7 @@ func (p *ProcessorFieldsWithCondition) ProcessLogs(logArray []*protocol.Log) []*
 }
 
 func init() {
-	ilogtail.Processors[PluginName] = func() ilogtail.Processor {
+	pipeline.Processors[PluginName] = func() pipeline.Processor {
 		return &ProcessorFieldsWithCondition{}
 	}
 }

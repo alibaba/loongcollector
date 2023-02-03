@@ -19,9 +19,8 @@ import (
 	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"github.com/alibaba/ilogtail"
 )
 
 type ProcessorMD5 struct {
@@ -29,11 +28,11 @@ type ProcessorMD5 struct {
 	MD5Key     string
 	NoKeyError bool
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorMD5) Init(context ilogtail.Context) error {
+func (p *ProcessorMD5) Init(context pipeline.Context) error {
 	p.context = context
 	return nil
 }
@@ -65,7 +64,7 @@ func (p *ProcessorMD5) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 }
 
 func init() {
-	ilogtail.Processors["processor_md5"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_md5"] = func() pipeline.Processor {
 		return &ProcessorMD5{}
 	}
 }

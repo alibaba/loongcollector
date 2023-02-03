@@ -21,7 +21,7 @@ import (
 
 	mssql "github.com/denisenkom/go-mssqldb"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/rdb"
 )
@@ -41,7 +41,7 @@ type Mssql struct {
 	rdb.Rdb
 }
 
-func (m *Mssql) Init(context ilogtail.Context) (int, error) {
+func (m *Mssql) Init(context pipeline.Context) (int, error) {
 	return m.Rdb.Init(context, func() error {
 		if m.Rdb.Limit && m.Rdb.PageSize > 0 {
 			m.Rdb.StateMent += fmt.Sprintf(" OFFSET ? ROW FETCH NEXT %d ROW ONLY", m.Rdb.PageSize)
@@ -96,14 +96,14 @@ func (m *Mssql) dsnConfig() string {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (m *Mssql) Start(collector ilogtail.Collector) error {
+func (m *Mssql) Start(collector pipeline.Collector) error {
 	connStr := m.dsnConfig()
 	return m.Rdb.Start(collector, connStr, func() error {
 		return nil
 	}, msColumnResolverFuncMap)
 }
 
-func (m *Mssql) Collect(collector ilogtail.Collector) error {
+func (m *Mssql) Collect(collector pipeline.Collector) error {
 	return m.Rdb.Collect(collector, msColumnResolverFuncMap)
 }
 
@@ -113,7 +113,7 @@ func (m *Mssql) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_mssql"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_mssql"] = func() pipeline.ServiceInput {
 		return &Mssql{
 			Rdb: rdb.Rdb{
 				ConnectionRetryTime:   3,

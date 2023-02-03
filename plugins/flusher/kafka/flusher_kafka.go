@@ -22,13 +22,13 @@ import (
 
 	"github.com/Shopify/sarama"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type FlusherKafka struct {
-	context         ilogtail.Context
+	context         pipeline.Context
 	Brokers         []string
 	SASLUsername    string
 	SASLPassword    string
@@ -47,7 +47,7 @@ type FlusherKafka struct {
 
 type FlusherFunc func(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error
 
-func (k *FlusherKafka) Init(context ilogtail.Context) error {
+func (k *FlusherKafka) Init(context pipeline.Context) error {
 	k.context = context
 	if k.Brokers == nil || len(k.Brokers) == 0 {
 		var err = errors.New("brokers ip is nil")
@@ -194,7 +194,7 @@ func (k *FlusherKafka) Stop() error {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_kafka"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_kafka"] = func() pipeline.Flusher {
 		f := &FlusherKafka{
 			ClientID:        "LogtailPlugin",
 			PartitionerType: "random",

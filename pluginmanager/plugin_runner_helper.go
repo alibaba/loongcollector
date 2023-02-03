@@ -19,21 +19,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type timerRunner struct {
 	interval      time.Duration
-	context       ilogtail.Context
-	latencyMetric ilogtail.LatencyMetric
+	context       pipeline.Context
+	latencyMetric pipeline.LatencyMetric
 	state         interface{}
 }
 
-func (p *timerRunner) Run(task func(state interface{}) error, cc *ilogtail.AsyncControl) {
+func (p *timerRunner) Run(task func(state interface{}) error, cc *pipeline.AsyncControl) {
 	logger.Info(p.context.GetRuntimeContext(), "task run", "start", "interval", p.interval, "state", fmt.Sprintf("%T", p.state))
 	defer panicRecover(fmt.Sprint(p.state))
 	for {
@@ -54,7 +54,7 @@ func (p *timerRunner) Run(task func(state interface{}) error, cc *ilogtail.Async
 	}
 }
 
-func flushOutStore[T FlushData, F ilogtail.Flusher](lc *LogstoreConfig, store *FlushOutStore[T], flushers []F, flushFunc func(*LogstoreConfig, F, *FlushOutStore[T]) error) bool {
+func flushOutStore[T FlushData, F pipeline.Flusher](lc *LogstoreConfig, store *FlushOutStore[T], flushers []F, flushFunc func(*LogstoreConfig, F, *FlushOutStore[T]) error) bool {
 	for _, flusher := range flushers {
 		for waitCount := 0; !flusher.IsReady(lc.ProjectName, lc.LogstoreName, lc.LogstoreKey); waitCount++ {
 			if waitCount > maxFlushOutTime*100 {
@@ -107,8 +107,8 @@ func GetFlushCancelToken(runner PluginRunner) <-chan struct{} {
 	return make(<-chan struct{})
 }
 
-func GetConfigFluhsers(runner PluginRunner) []ilogtail.Flusher {
-	flushers := make([]ilogtail.Flusher, 0)
+func GetConfigFluhsers(runner PluginRunner) []pipeline.Flusher {
+	flushers := make([]pipeline.Flusher, 0)
 	if r, ok := runner.(*pluginv1Runner); ok {
 		for _, f := range r.FlusherPlugins {
 			flushers = append(flushers, f.Flusher)

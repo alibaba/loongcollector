@@ -28,9 +28,8 @@ import (
 	"github.com/dlclark/regexp2"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"github.com/alibaba/ilogtail"
 )
 
 type ProcessorGrok struct {
@@ -45,7 +44,7 @@ type ProcessorGrok struct {
 	NoMatchError        bool              // Whether to report an error if all expressions in Match do not match, default is false
 	TimeoutError        bool              // Whether to report an error if the match timeout, default is false
 
-	context           ilogtail.Context
+	context           pipeline.Context
 	originalPatterns  map[string]string // The initial form of all imported grok patterns, e.g. {"SYSLOGPROG":`%{PROG:program}(?:\[%{POSINT:pid:int}\])?`},
 	processedPatterns map[string]string // The parsed grok patterns in regular expression, e.g. {"SYSLOGPROG":{`(?P<program>[\x21-\x5a\x5c\x5e-\x7e]+)(?:\[(?P<pid>\b(?:[1-9][0-9]*)\b)\])?`,{"pid":"int"}}
 	compiledPatterns  []*regexp2.Regexp // The compiled regexp object of the patterns in Match
@@ -55,7 +54,7 @@ type ProcessorGrok struct {
 const pluginName = "processor_grok"
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorGrok) Init(context ilogtail.Context) error {
+func (p *ProcessorGrok) Init(context pipeline.Context) error {
 	p.context = context
 	p.originalPatterns = map[string]string{}
 
@@ -337,7 +336,7 @@ func (p *ProcessorGrok) compileMatchs() error {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorGrok{
 			CustomPatternDir:    []string{},
 			CustomPatterns:      map[string]string{},

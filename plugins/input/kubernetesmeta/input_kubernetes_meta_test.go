@@ -15,7 +15,7 @@
 package kubernetesmeta
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
@@ -36,7 +36,7 @@ import (
 
 func BenchmarkInputKubernetesMeta_Collect(b *testing.B) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := ilogtail.MetricInputs[pluginName]().(*InputKubernetesMeta)
+	p := pipeline.MetricInputs[pluginName]().(*InputKubernetesMeta)
 	p.KubeConfigPath = "default"
 	if _, err := p.Init(cxt); err != nil {
 		b.Errorf("cannot init the mock process plugin: %v", err)

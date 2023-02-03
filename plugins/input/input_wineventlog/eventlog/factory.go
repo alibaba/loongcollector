@@ -19,14 +19,15 @@ package eventlog
 
 import (
 	"fmt"
-	"github.com/alibaba/ilogtail"
-	"github.com/alibaba/ilogtail/pkg/logger"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 // EventLogConfig represents the config of EventLog.
 type EventLogConfig struct {
-	Context     ilogtail.Context
+	Context     pipeline.Context
 	Name        string
 	IgnoreOlder time.Duration
 	EventID     string

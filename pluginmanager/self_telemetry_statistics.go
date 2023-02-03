@@ -15,16 +15,16 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type InputStatistics struct {
-	context ilogtail.Context
+	context pipeline.Context
 }
 
-func (r *InputStatistics) Init(context ilogtail.Context) (int, error) {
+func (r *InputStatistics) Init(context pipeline.Context) (int, error) {
 	r.context = context
 	return 0, nil
 }
@@ -33,12 +33,12 @@ func (r *InputStatistics) Description() string {
 	return "statistics input plugin for logtail"
 }
 
-func (r *InputStatistics) Collect(collector ilogtail.Collector) error {
+func (r *InputStatistics) Collect(collector pipeline.Collector) error {
 	for _, config := range LogtailConfig {
 		log := &protocol.Log{}
 		config.Context.MetricSerializeToPB(log)
 		if len(log.Contents) > 0 && StatisticsConfig != nil {
-			StatisticsConfig.PluginRunner.ReceiveRawLog(&ilogtail.LogWithContext{Log: log})
+			StatisticsConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
 			logger.Debug(r.context.GetRuntimeContext(), "statistics", *log)
 		}
 	}
@@ -46,7 +46,7 @@ func (r *InputStatistics) Collect(collector ilogtail.Collector) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_statistics"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_statistics"] = func() pipeline.MetricInput {
 		return &InputStatistics{}
 	}
 }

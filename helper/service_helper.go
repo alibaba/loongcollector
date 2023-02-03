@@ -15,8 +15,8 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"context"
 	"runtime"
@@ -31,7 +31,7 @@ func panicRecover(cxt context.Context, key string) {
 }
 
 // StartService ..
-func StartService(name string, context ilogtail.Context, f func()) {
+func StartService(name string, context pipeline.Context, f func()) {
 	go func() {
 		logger.Info(context.GetRuntimeContext(), "service begin", name)
 		defer panicRecover(context.GetRuntimeContext(), name)

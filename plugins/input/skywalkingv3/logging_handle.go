@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
@@ -29,8 +29,8 @@ import (
 )
 
 type loggingHandler struct {
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 }
 
 func (l *loggingHandler) collectorErrorLogs(logs []*agent.BrowserErrorLog) (*v3.Commands, error) {

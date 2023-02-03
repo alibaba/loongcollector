@@ -15,7 +15,7 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"time"
 	"unsafe"
@@ -95,7 +95,7 @@ func (n *MetaNode) WithAttribute(k string, v interface{}) *MetaNode {
 }
 
 // AddMetadata to the collector.
-func AddMetadata(collector ilogtail.Collector, time time.Time, node *MetaNode) {
+func AddMetadata(collector pipeline.Collector, time time.Time, node *MetaNode) {
 	keys, vals := makeMetaLog(node)
 	collector.AddDataArray(nil, keys, vals, time)
 }

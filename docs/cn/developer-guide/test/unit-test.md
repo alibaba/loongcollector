@@ -12,7 +12,7 @@
 import (
     "github.com/stretchr/testify/assert"
 
-    "github.com/alibaba/ilogtail"
+    "github.com/alibaba/ilogtail/pkg/pipeline"
     "github.com/alibaba/ilogtail/plugins/test"
     "github.com/alibaba/ilogtail/plugins/test/mock"
 
@@ -21,7 +21,7 @@ import (
 
 func TestInputSystem_CollectOpenFD(t *testing.T) {
     cxt := mock.NewEmptyContext("project", "store", "config")
-    p := ilogtail.MetricInputs["metric_system_v2"]().(*InputSystem)
+    p := pipeline.MetricInputs["metric_system_v2"]().(*InputSystem)
     _, err := p.Init(cxt)
     assert.NoError(t, err, "cannot init the mock process plugin: %v", err)
     c := &test.MockMetricCollector{}

@@ -15,7 +15,7 @@
 package sleep
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"time"
@@ -23,10 +23,10 @@ import (
 
 type FlusherSleep struct {
 	SleepMS int
-	context ilogtail.Context
+	context pipeline.Context
 }
 
-func (p *FlusherSleep) Init(context ilogtail.Context) error {
+func (p *FlusherSleep) Init(context pipeline.Context) error {
 	p.context = context
 	return nil
 }
@@ -54,7 +54,7 @@ func (*FlusherSleep) Stop() error {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_sleep"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_sleep"] = func() pipeline.Flusher {
 		return &FlusherSleep{}
 	}
 }

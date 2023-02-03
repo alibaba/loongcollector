@@ -15,7 +15,7 @@
 package hostmeta
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
@@ -29,7 +29,7 @@ import (
 // Benchmark_CollectNoProcess-64      	     314	   3775773 ns/op
 func Benchmark_CollectNoProcess(b *testing.B) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := ilogtail.MetricInputs[pluginName]().(*InputNodeMeta)
+	p := pipeline.MetricInputs[pluginName]().(*InputNodeMeta)
 	p.CPU = true
 	p.Memory = true
 	p.Net = true
@@ -56,7 +56,7 @@ func Benchmark_CollectNoProcess(b *testing.B) {
 // Benchmark_CollectWithProcess-64    	     249	   4781412 ns/op
 func Benchmark_CollectWithProcess(b *testing.B) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := ilogtail.MetricInputs[pluginName]().(*InputNodeMeta)
+	p := pipeline.MetricInputs[pluginName]().(*InputNodeMeta)
 	p.CPU = true
 	p.Memory = true
 	p.Net = true

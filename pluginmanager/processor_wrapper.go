@@ -15,13 +15,13 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 type ProcessorWrapper struct {
-	Processor ilogtail.ProcessorV1
+	Processor pipeline.ProcessorV1
 	Config    *LogstoreConfig
-	LogsChan  chan *ilogtail.LogWithContext
+	LogsChan  chan *pipeline.LogWithContext
 	Priority  int
 }
 

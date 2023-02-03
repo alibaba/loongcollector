@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/cihub/seelog"
@@ -52,13 +52,13 @@ type FlusherStdout struct {
 	Tags          bool
 	OnlyStdout    bool
 
-	context   ilogtail.Context
+	context   pipeline.Context
 	outLogger seelog.LoggerInterface
 }
 
 // Init method would be trigger before working. For the plugin, init method choose the log output
 // channel.
-func (p *FlusherStdout) Init(context ilogtail.Context) error {
+func (p *FlusherStdout) Init(context pipeline.Context) error {
 	p.context = context
 
 	pattern := ""
@@ -136,7 +136,7 @@ func (p *FlusherStdout) Flush(projectName string, logstoreName string, configNam
 	return nil
 }
 
-func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context ilogtail.PipelineContext) error {
+func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipeline.PipelineContext) error {
 	for _, groupEvents := range in {
 
 		if p.Tags {
@@ -285,7 +285,7 @@ func (p *FlusherStdout) Stop() error {
 
 // Register the plugin to the Flushers array.
 func init() {
-	ilogtail.Flushers["flusher_stdout"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_stdout"] = func() pipeline.Flusher {
 		return &FlusherStdout{
 			KeyValuePairs: true,
 		}

@@ -15,8 +15,8 @@
 package skywalking
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
@@ -47,11 +47,11 @@ type AggregatorSkywalking struct {
 	traceAgg   *baseagg.AggregatorBase
 	logAgg     *baseagg.AggregatorBase
 	Lock       *sync.Mutex
-	context    ilogtail.Context
-	queue      ilogtail.LogGroupQueue
+	context    pipeline.Context
+	queue      pipeline.LogGroupQueue
 }
 
-func (p *AggregatorSkywalking) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (p *AggregatorSkywalking) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
 	if p.MetricsLogstore == "" {
 		p.MetricsLogstore = DefaultMetricsLogstore
 	}
@@ -132,7 +132,7 @@ func NewAggregatorSkywalking() *AggregatorSkywalking {
 	}
 }
 func init() {
-	ilogtail.Aggregators["aggregator_skywalking"] = func() ilogtail.Aggregator {
+	pipeline.Aggregators["aggregator_skywalking"] = func() pipeline.Aggregator {
 		return NewAggregatorSkywalking()
 	}
 }

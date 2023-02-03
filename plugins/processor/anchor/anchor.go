@@ -17,9 +17,9 @@ package anchor
 import (
 	"strings"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 
@@ -66,12 +66,12 @@ type ProcessorAnchor struct {
 	SourceKey     string
 	KeepSource    bool
 
-	context       ilogtail.Context
-	logPairMetric ilogtail.CounterMetric
+	context       pipeline.Context
+	logPairMetric pipeline.CounterMetric
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorAnchor) Init(context ilogtail.Context) error {
+func (p *ProcessorAnchor) Init(context pipeline.Context) error {
 	p.context = context
 	for i := range p.Anchors {
 		switch p.Anchors[i].FieldType {
@@ -224,7 +224,7 @@ func (p *ProcessorAnchor) ProcessAnchor(log *protocol.Log, val *string) {
 }
 
 func init() {
-	ilogtail.Processors["processor_anchor"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_anchor"] = func() pipeline.Processor {
 		return &ProcessorAnchor{}
 	}
 }

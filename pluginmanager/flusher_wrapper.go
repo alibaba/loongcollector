@@ -15,14 +15,14 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"time"
 )
 
 type FlusherWrapper struct {
-	Flusher       ilogtail.FlusherV1
+	Flusher       pipeline.FlusherV1
 	Config        *LogstoreConfig
 	LogGroupsChan chan *protocol.LogGroup
 	Interval      time.Duration

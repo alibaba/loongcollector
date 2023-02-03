@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/paulbellamy/ratecounter"
@@ -38,10 +38,10 @@ type FlusherStatistics struct {
 	logRateCounter      *ratecounter.RateCounter
 	byteRateCount       *ratecounter.RateCounter
 	lastOutputTime      time.Time
-	context             ilogtail.Context
+	context             pipeline.Context
 }
 
-func (p *FlusherStatistics) Init(context ilogtail.Context) error {
+func (p *FlusherStatistics) Init(context pipeline.Context) error {
 	if p.RateIntervalMs == 0 {
 		p.RateIntervalMs = 1000
 	}
@@ -95,7 +95,7 @@ func (*FlusherStatistics) Stop() error {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_statistics"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_statistics"] = func() pipeline.Flusher {
 		return &FlusherStatistics{}
 	}
 }

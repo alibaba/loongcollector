@@ -25,8 +25,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding"
 
-	"github.com/alibaba/ilogtail"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -69,7 +69,7 @@ func TestFlusher_Flush(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	p := ilogtail.Flushers["flusher_grpc"]().(*Flusher)
+	p := pipeline.Flushers["flusher_grpc"]().(*Flusher)
 	lctx := mock.NewEmptyContext("p", "l", "c")
 	err = p.Init(lctx)
 	assert.NoError(t, err)

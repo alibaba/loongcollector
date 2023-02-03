@@ -20,8 +20,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -37,11 +37,11 @@ func Test(t *testing.T) {
 }
 
 type processorTestSuite struct {
-	processor ilogtail.ProcessorV1
+	processor pipeline.ProcessorV1
 }
 
 func (s *processorTestSuite) SetUpTest(c *check.C) {
-	s.processor = ilogtail.Processors["processor_split_char"]().(ilogtail.ProcessorV1)
+	s.processor = pipeline.Processors["processor_split_char"]().(pipeline.ProcessorV1)
 	require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
 	logger.Info(context.Background(), "set up", s.processor.Description())
 }

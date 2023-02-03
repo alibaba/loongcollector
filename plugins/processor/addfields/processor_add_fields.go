@@ -17,7 +17,7 @@ package addfields
 import (
 	"fmt"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -26,14 +26,14 @@ import (
 type ProcessorAddFields struct {
 	Fields        map[string]string // the appending fields
 	IgnoreIfExist bool              // Whether to ignore when the same key exists
-	context       ilogtail.Context
+	context       pipeline.Context
 }
 
 const pluginName = "processor_add_fields"
 
 // Init method would be triggered before working for init some system resources,
 // like socket, mutex. In this plugin, it verifies Fields must not be empty.
-func (p *ProcessorAddFields) Init(context ilogtail.Context) error {
+func (p *ProcessorAddFields) Init(context pipeline.Context) error {
 	if len(p.Fields) == 0 {
 		return fmt.Errorf("must specify Fields for plugin %v", pluginName)
 	}
@@ -94,7 +94,7 @@ func (p *ProcessorAddFields) isExist(log *protocol.Log, key string) bool {
 
 // Register the plugin to the Processors array.
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorAddFields{
 			Fields:        nil,
 			IgnoreIfExist: false,

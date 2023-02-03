@@ -20,9 +20,9 @@ package sls
 import (
 	"fmt"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -32,12 +32,12 @@ type SlsFlusher struct { // nolint:revive
 	EnableShardHash bool
 	KeepShardHash   bool
 
-	context    ilogtail.Context
-	lenCounter ilogtail.CounterMetric
+	context    pipeline.Context
+	lenCounter pipeline.CounterMetric
 }
 
 // Init ...
-func (p *SlsFlusher) Init(context ilogtail.Context) error {
+func (p *SlsFlusher) Init(context pipeline.Context) error {
 	p.context = context
 	p.lenCounter = helper.NewCounterMetric("flush_sls_size")
 	return nil
@@ -113,7 +113,7 @@ func (*SlsFlusher) Stop() error {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_sls"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_sls"] = func() pipeline.Flusher {
 		return &SlsFlusher{
 			EnableShardHash: false,
 			KeepShardHash:   true,

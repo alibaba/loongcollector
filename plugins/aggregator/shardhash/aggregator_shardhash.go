@@ -24,8 +24,8 @@ import (
 
 	"github.com/cespare/xxhash/v2"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
@@ -81,8 +81,8 @@ type AggregatorShardHash struct {
 	packIDSeqNum int64
 
 	lock       *sync.Mutex
-	context    ilogtail.Context
-	queue      ilogtail.LogGroupQueue
+	context    pipeline.Context
+	queue      pipeline.LogGroupQueue
 	innerQueue *innerQueue
 }
 
@@ -90,7 +90,7 @@ func isPowerOfTwo(num int) bool {
 	return num > 0 && ((num & (num - 1)) == 0)
 }
 
-func (s *AggregatorShardHash) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (s *AggregatorShardHash) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
 	s.context = context
 	s.queue = que
 
@@ -237,7 +237,7 @@ func newAggregatorShardHash() *AggregatorShardHash {
 }
 
 func init() {
-	ilogtail.Aggregators[pluginName] = func() ilogtail.Aggregator {
+	pipeline.Aggregators[pluginName] = func() pipeline.Aggregator {
 		return newAggregatorShardHash()
 	}
 }

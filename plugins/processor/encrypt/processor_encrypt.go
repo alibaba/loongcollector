@@ -27,9 +27,9 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -60,18 +60,18 @@ type ProcessorEncrypt struct {
 	EncryptionParameters   *EncryptionInfo
 	KeepSourceValueIfError bool
 
-	context   ilogtail.Context
+	context   pipeline.Context
 	keyDict   map[string]bool
 	cipher    cipher.Block
 	blockSize int
 	key       []byte
 	iv        []byte
 
-	encryptedCountMetric ilogtail.CounterMetric
-	encryptedBytesMetric ilogtail.CounterMetric
+	encryptedCountMetric pipeline.CounterMetric
+	encryptedBytesMetric pipeline.CounterMetric
 }
 
-func (p *ProcessorEncrypt) Init(context ilogtail.Context) error {
+func (p *ProcessorEncrypt) Init(context pipeline.Context) error {
 	p.context = context
 	if len(p.SourceKeys) == 0 {
 		return fmt.Errorf("plugin %v must specify SourceKey", pluginName)
@@ -217,7 +217,7 @@ func newProcessorEncrypt() *ProcessorEncrypt {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return newProcessorEncrypt()
 	}
 }

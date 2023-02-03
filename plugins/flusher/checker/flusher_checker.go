@@ -20,19 +20,19 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type FlusherChecker struct {
-	context  ilogtail.Context
+	context  pipeline.Context
 	LogGroup protocol.LogGroup
 	Lock     sync.RWMutex
 	Block    bool
 }
 
-func (p *FlusherChecker) Init(context ilogtail.Context) error {
+func (p *FlusherChecker) Init(context pipeline.Context) error {
 	p.context = context
 	return nil
 }
@@ -149,7 +149,7 @@ func (p *FlusherChecker) Stop() error {
 }
 
 func init() {
-	ilogtail.Flushers["flusher_checker"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_checker"] = func() pipeline.Flusher {
 		return &FlusherChecker{}
 	}
 }

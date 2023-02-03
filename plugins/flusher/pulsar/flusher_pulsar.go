@@ -22,9 +22,9 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -64,7 +64,7 @@ type FlusherPulsar struct {
 	PartitionKeys []string
 	ClientID      string
 
-	context   ilogtail.Context
+	context   pipeline.Context
 	converter *converter.Converter
 	// obtain from Topic
 	topicKeys       []string
@@ -85,7 +85,7 @@ type convertConfig struct {
 	Encoding string
 }
 
-func (f *FlusherPulsar) Init(context ilogtail.Context) error {
+func (f *FlusherPulsar) Init(context pipeline.Context) error {
 	f.context = context
 	// Validate config of flusher
 	if err := f.Validate(); err != nil {
@@ -328,7 +328,7 @@ func (f *FlusherPulsar) convertHashScheme(hashScheme string) (pulsar.HashingSche
 }
 
 func init() {
-	ilogtail.Flushers["flusher_pulsar"] = func() ilogtail.Flusher {
+	pipeline.Flushers["flusher_pulsar"] = func() pipeline.Flusher {
 		return &FlusherPulsar{
 			URL:               "",
 			ClientID:          "iLogtail",

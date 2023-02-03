@@ -20,12 +20,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/siddontang/go-mysql/replication"
 )
 
-func binLogEventToSlsLog(event *replication.BinlogEvent, logData map[string]string, collector ilogtail.Collector) error {
+func binLogEventToSlsLog(event *replication.BinlogEvent, logData map[string]string, collector pipeline.Collector) error {
 	switch event.Header.EventType {
 	case replication.ROTATE_EVENT:
 		if rotateEvent, cvt := event.Event.(*replication.RotateEvent); cvt {

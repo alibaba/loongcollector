@@ -19,8 +19,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -41,11 +41,11 @@ type ProcessorSplitString struct {
 	NoMatchError    bool
 	KeepSource      bool
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorSplitString) Init(context ilogtail.Context) error {
+func (p *ProcessorSplitString) Init(context pipeline.Context) error {
 	if len(p.SplitSep) == 0 {
 		return fmt.Errorf("no split separator")
 	}
@@ -123,7 +123,7 @@ func (p *ProcessorSplitString) ProcessLogs(logArray []*protocol.Log) []*protocol
 }
 
 func init() {
-	ilogtail.Processors["processor_split_string"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_split_string"] = func() pipeline.Processor {
 		return &ProcessorSplitString{SplitSep: "\n", PreserveOthers: true}
 	}
 }

@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -57,7 +57,7 @@ type Response struct {
 
 	compiledStringMatch *regexp.Regexp
 	client              *http.Client
-	context             ilogtail.Context
+	context             pipeline.Context
 	tags                map[string]string
 	lastLoadAddressTime time.Time
 }
@@ -93,7 +93,7 @@ func (h *Response) loadAddresses() error {
 	return nil
 }
 
-func (h *Response) Init(context ilogtail.Context) (int, error) {
+func (h *Response) Init(context pipeline.Context) (int, error) {
 	h.context = context
 
 	// Set default values
@@ -294,7 +294,7 @@ func (h *Response) httpGather(address string) (map[string]string, error) {
 }
 
 // Collect gets all metric fields and tags and returns any errors it encounters
-func (h *Response) Collect(collector ilogtail.Collector) error {
+func (h *Response) Collect(collector pipeline.Collector) error {
 	// should not occur
 	if h.tags == nil || h.client == nil {
 		return nil
@@ -326,7 +326,7 @@ func (h *Response) Collect(collector ilogtail.Collector) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_http"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_http"] = func() pipeline.MetricInput {
 		return &Response{}
 	}
 }

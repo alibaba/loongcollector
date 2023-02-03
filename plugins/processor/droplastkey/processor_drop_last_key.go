@@ -17,8 +17,8 @@ package droplastkey
 import (
 	"fmt"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -29,12 +29,12 @@ type ProcessorDropLastKey struct {
 
 	includeMap map[string]struct{}
 
-	filterMetric ilogtail.CounterMetric
-	context      ilogtail.Context
+	filterMetric pipeline.CounterMetric
+	context      pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorDropLastKey) Init(context ilogtail.Context) error {
+func (p *ProcessorDropLastKey) Init(context pipeline.Context) error {
 	p.context = context
 
 	p.filterMetric = helper.NewCounterMetric("drop_key_count")
@@ -89,7 +89,7 @@ func (p *ProcessorDropLastKey) ProcessLogs(logArray []*protocol.Log) []*protocol
 }
 
 func init() {
-	ilogtail.Processors["processor_drop_last_key"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_drop_last_key"] = func() pipeline.Processor {
 		return &ProcessorDropLastKey{}
 	}
 }

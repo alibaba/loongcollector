@@ -22,8 +22,8 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent"
 	"github.com/alibaba/ilogtail/plugins/input/skywalkingv3"
 )
@@ -36,8 +36,8 @@ const (
 type TraceSegmentHandle struct {
 	RegistryInformationCache
 
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 
 	compIDMessagingSystemMapping map[int32]string
 }

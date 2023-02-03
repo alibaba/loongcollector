@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 
@@ -337,7 +337,7 @@ func TestInputWithRequestParams(t *testing.T) {
 	input.QueryParamPrefix = "_query_prefix_"
 	input.QueryParams = []string{"db"}
 
-	inputCtx := ilogtail.NewObservePipelineConext(10)
+	inputCtx := pipeline.NewObservePipelineConext(10)
 	err = input.StartService(inputCtx)
 	require.NoError(t, err)
 
@@ -369,7 +369,7 @@ func TestInputWithRequestParamsWithoutPrefix(t *testing.T) {
 	input.HeaderParams = []string{"Test-A", "Test-B"}
 	input.QueryParams = []string{"db"}
 
-	inputCtx := ilogtail.NewObservePipelineConext(10)
+	inputCtx := pipeline.NewObservePipelineConext(10)
 	err = input.StartService(inputCtx)
 	require.NoError(t, err)
 

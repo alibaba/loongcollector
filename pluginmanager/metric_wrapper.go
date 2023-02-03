@@ -15,8 +15,8 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 
@@ -24,16 +24,16 @@ import (
 )
 
 type MetricWrapper struct {
-	Input    ilogtail.MetricInputV1
+	Input    pipeline.MetricInputV1
 	Config   *LogstoreConfig
 	Tags     map[string]string
 	Interval time.Duration
 
-	LogsChan      chan *ilogtail.LogWithContext
-	LatencyMetric ilogtail.LatencyMetric
+	LogsChan      chan *pipeline.LogWithContext
+	LatencyMetric pipeline.LatencyMetric
 }
 
-func (p *MetricWrapper) Run(control *ilogtail.AsyncControl) {
+func (p *MetricWrapper) Run(control *pipeline.AsyncControl) {
 	logger.Info(p.Config.Context.GetRuntimeContext(), "start run metric ", p.Input.Description())
 	defer panicRecover(p.Input.Description())
 	for {
@@ -73,7 +73,7 @@ func (p *MetricWrapper) AddDataWithContext(tags map[string]string, fields map[st
 		logTime = t[0]
 	}
 	slsLog, _ := util.CreateLog(logTime, p.Tags, tags, fields)
-	p.LogsChan <- &ilogtail.LogWithContext{Log: slsLog, Context: ctx}
+	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
 func (p *MetricWrapper) AddDataArrayWithContext(tags map[string]string,
@@ -88,9 +88,9 @@ func (p *MetricWrapper) AddDataArrayWithContext(tags map[string]string,
 		logTime = t[0]
 	}
 	slsLog, _ := util.CreateLogByArray(logTime, p.Tags, tags, columns, values)
-	p.LogsChan <- &ilogtail.LogWithContext{Log: slsLog, Context: ctx}
+	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
 func (p *MetricWrapper) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	p.LogsChan <- &ilogtail.LogWithContext{Log: log, Context: ctx}
+	p.LogsChan <- &pipeline.LogWithContext{Log: log, Context: ctx}
 }

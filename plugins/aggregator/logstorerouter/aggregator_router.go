@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
@@ -54,11 +54,11 @@ type AggregatorRouter struct {
 	subAggs    []*SubAgg
 	defaultAgg *baseagg.AggregatorBase
 	Lock       *sync.Mutex
-	context    ilogtail.Context
-	queue      ilogtail.LogGroupQueue
+	context    pipeline.Context
+	queue      pipeline.LogGroupQueue
 }
 
-func (p *AggregatorRouter) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (p *AggregatorRouter) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
 	p.context = context
 	p.queue = que
 	if len(p.RouterRegex) != len(p.RouterLogstore) {
@@ -165,7 +165,7 @@ func NewAggregatorRouter() *AggregatorRouter {
 	}
 }
 func init() {
-	ilogtail.Aggregators["aggregator_logstore_router"] = func() ilogtail.Aggregator {
+	pipeline.Aggregators["aggregator_logstore_router"] = func() pipeline.Aggregator {
 		return NewAggregatorRouter()
 	}
 }

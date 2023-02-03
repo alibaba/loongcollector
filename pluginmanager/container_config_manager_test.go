@@ -26,10 +26,10 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/flusher/checker"
@@ -189,7 +189,7 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 	}
 
 	for _, log := range loggroup.Logs {
-		ContainerConfig.PluginRunner.ReceiveRawLog(&ilogtail.LogWithContext{Log: log})
+		ContainerConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
 	}
 	s.Equal(1, len(GetConfigFluhsers(ContainerConfig.PluginRunner)))
 	time.Sleep(time.Millisecond * time.Duration(1500))

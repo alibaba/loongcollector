@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	baseagg "github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
@@ -46,11 +46,11 @@ type AggregatorOpenTelemetry struct {
 	traceAgg   *baseagg.AggregatorBase
 	logAgg     *baseagg.AggregatorBase
 	Lock       *sync.Mutex
-	context    ilogtail.Context
-	queue      ilogtail.LogGroupQueue
+	context    pipeline.Context
+	queue      pipeline.LogGroupQueue
 }
 
-func (p *AggregatorOpenTelemetry) Init(context ilogtail.Context, que ilogtail.LogGroupQueue) (int, error) {
+func (p *AggregatorOpenTelemetry) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
 	if p.MetricsLogstore == "" {
 		p.MetricsLogstore = DefaultMetricsLogstore
 	}
@@ -127,7 +127,7 @@ func NewAggregatorOpenTelemetry() *AggregatorOpenTelemetry {
 	}
 }
 func init() {
-	ilogtail.Aggregators["aggregator_opentelemetry"] = func() ilogtail.Aggregator {
+	pipeline.Aggregators["aggregator_opentelemetry"] = func() pipeline.Aggregator {
 		return NewAggregatorOpenTelemetry()
 	}
 }

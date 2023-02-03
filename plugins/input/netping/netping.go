@@ -28,9 +28,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 
 	goping "github.com/go-ping/ping"
@@ -111,7 +111,7 @@ type NetPing struct {
 	icmpPrivileged  bool
 	hasConfig       bool
 	resultChannel   chan *Result
-	context         ilogtail.Context
+	context         pipeline.Context
 	hostname        string
 	ip              string
 	resolveHostMap  *sync.Map
@@ -143,7 +143,7 @@ func (m *NetPing) processTimeoutAndInterval() {
 	}
 }
 
-func (m *NetPing) Init(context ilogtail.Context) (int, error) {
+func (m *NetPing) Init(context pipeline.Context) (int, error) {
 	logger.Info(context.GetRuntimeContext(), "netping init")
 	m.context = context
 
@@ -249,7 +249,7 @@ func (m *NetPing) Description() string {
 }
 
 // Collect is called every trigger interval to collect the metrics and send them to the collector.
-func (m *NetPing) Collect(collector ilogtail.Collector) error {
+func (m *NetPing) Collect(collector pipeline.Collector) error {
 	if !m.hasConfig {
 		return nil
 	}
@@ -667,7 +667,7 @@ func (m *NetPing) doHTTPing(config *HTTPConfig) {
 
 // Register the plugin to the MetricInputs array.
 func init() {
-	ilogtail.MetricInputs["metric_input_netping"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_input_netping"] = func() pipeline.MetricInput {
 		return &NetPing{
 			// here you could set default value.
 		}

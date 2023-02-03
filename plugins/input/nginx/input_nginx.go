@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -45,10 +45,10 @@ type Nginx struct {
 
 	// HTTP client
 	client  *http.Client
-	context ilogtail.Context
+	context pipeline.Context
 }
 
-func (n *Nginx) Init(context ilogtail.Context) (int, error) {
+func (n *Nginx) Init(context pipeline.Context) (int, error) {
 	n.context = context
 	if n.ResponseTimeoutMs <= 100 {
 		n.ResponseTimeoutMs = 5000
@@ -61,7 +61,7 @@ func (n *Nginx) Description() string {
 	return "Read Nginx's basic status information (ngx_http_stub_status_module)"
 }
 
-func (n *Nginx) Collect(collector ilogtail.Collector) error {
+func (n *Nginx) Collect(collector pipeline.Collector) error {
 	var wg sync.WaitGroup
 	logger.Debug(n.context.GetRuntimeContext(), "start collect nginx info", *n)
 	// Create an HTTP client that is re-used for each
@@ -111,7 +111,7 @@ func (n *Nginx) createHTTPClient() (*http.Client, error) {
 	return client, nil
 }
 
-func (n *Nginx) gatherURL(addr *url.URL, collector ilogtail.Collector) error {
+func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.Collector) error {
 	resp, err := n.client.Get(addr.String())
 	if err != nil {
 		return fmt.Errorf("error making HTTP request to %s: %s", addr.String(), err)
@@ -190,7 +190,7 @@ func getTags(addr *url.URL) map[string]string {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_nginx_status"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_nginx_status"] = func() pipeline.MetricInput {
 		return &Nginx{}
 	}
 }

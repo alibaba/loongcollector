@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/alibaba/ilogtail"
 	_ "github.com/alibaba/ilogtail/helper/envconfig"
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/signals"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugin_main/flags"
@@ -71,19 +71,19 @@ func main() {
 }
 
 func generatePluginDoc() {
-	for name, creator := range ilogtail.ServiceInputs {
+	for name, creator := range pipeline.ServiceInputs {
 		doc.Register("service_input", name, creator())
 	}
-	for name, creator := range ilogtail.MetricInputs {
+	for name, creator := range pipeline.MetricInputs {
 		doc.Register("metric_input", name, creator())
 	}
-	for name, creator := range ilogtail.Processors {
+	for name, creator := range pipeline.Processors {
 		doc.Register("processor", name, creator())
 	}
-	for name, creator := range ilogtail.Aggregators {
+	for name, creator := range pipeline.Aggregators {
 		doc.Register("aggregator", name, creator())
 	}
-	for name, creator := range ilogtail.Flushers {
+	for name, creator := range pipeline.Flushers {
 		doc.Register("flusher", name, creator())
 	}
 	doc.Generate(*flags.DocPath)

@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	management "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/management/v3"
 )
@@ -66,7 +66,7 @@ func (r *ResourcePropertiesCache) filterProperties(properties map[string]string)
 	return properties
 }
 
-func (r *ResourcePropertiesCache) save(ctx ilogtail.Context) {
+func (r *ResourcePropertiesCache) save(ctx pipeline.Context) {
 	r.lock.Lock()
 	jsonBytes, _ := json.Marshal(r.cache)
 	r.lock.Unlock()
@@ -78,7 +78,7 @@ func (r *ResourcePropertiesCache) save(ctx ilogtail.Context) {
 	}
 }
 
-func (r *ResourcePropertiesCache) load(ctx ilogtail.Context) bool {
+func (r *ResourcePropertiesCache) load(ctx pipeline.Context) bool {
 	bytes, ok := ctx.GetCheckPoint(r.cacheKey)
 	if ok {
 		err := json.Unmarshal(bytes, &r.cache)
@@ -92,8 +92,8 @@ func (r *ResourcePropertiesCache) load(ctx ilogtail.Context) bool {
 }
 
 type ManagementHandler struct {
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 	cache     *ResourcePropertiesCache
 }
 
@@ -118,7 +118,7 @@ type reportInstancePropertiesHandler interface {
 	reportInstanceProperties(instanceProperties *management.InstanceProperties) (result *v3.Commands, e error)
 }
 
-func NewManagementHandler(context ilogtail.Context, collector ilogtail.Collector, cache *ResourcePropertiesCache) *ManagementHandler {
+func NewManagementHandler(context pipeline.Context, collector pipeline.Collector, cache *ResourcePropertiesCache) *ManagementHandler {
 	return &ManagementHandler{
 		context:   context,
 		collector: collector,

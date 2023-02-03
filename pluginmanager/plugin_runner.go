@@ -15,7 +15,7 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 type pluginCategory string
@@ -33,13 +33,13 @@ type PluginRunner interface {
 
 	Initialized() error
 
-	ReceiveRawLog(log *ilogtail.LogWithContext)
+	ReceiveRawLog(log *pipeline.LogWithContext)
 
 	AddPlugin(pluginName string, category pluginCategory, plugin interface{}, config map[string]interface{}) error
 
 	Run()
 
-	RunPlugins(category pluginCategory, control *ilogtail.AsyncControl)
+	RunPlugins(category pluginCategory, control *pipeline.AsyncControl)
 
 	Merge(p PluginRunner)
 

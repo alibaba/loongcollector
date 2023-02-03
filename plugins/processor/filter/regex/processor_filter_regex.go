@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -37,13 +37,13 @@ type ProcessorRegexFilter struct {
 
 	includeRegex    map[string]*regexp.Regexp
 	excludeRegex    map[string]*regexp.Regexp
-	filterMetric    ilogtail.CounterMetric
-	processedMetric ilogtail.CounterMetric
-	context         ilogtail.Context
+	filterMetric    pipeline.CounterMetric
+	processedMetric pipeline.CounterMetric
+	context         pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorRegexFilter) Init(context ilogtail.Context) error {
+func (p *ProcessorRegexFilter) Init(context pipeline.Context) error {
 	p.context = context
 	if p.Include != nil {
 		p.includeRegex = make(map[string]*regexp.Regexp)
@@ -133,7 +133,7 @@ func (p *ProcessorRegexFilter) ProcessLogs(logArray []*protocol.Log) []*protocol
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorRegexFilter{}
 	}
 }

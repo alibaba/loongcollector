@@ -26,9 +26,9 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -82,13 +82,13 @@ type Mysql struct {
 	columnValuePointers   []interface{}
 	shutdown              chan struct{}
 	waitGroup             sync.WaitGroup
-	context               ilogtail.Context
-	collectLatency        ilogtail.LatencyMetric
-	collectTotal          ilogtail.CounterMetric
-	checkpointMetric      ilogtail.StringMetric
+	context               pipeline.Context
+	collectLatency        pipeline.LatencyMetric
+	collectTotal          pipeline.CounterMetric
+	checkpointMetric      pipeline.StringMetric
 }
 
-func (m *Mysql) Init(context ilogtail.Context) (int, error) {
+func (m *Mysql) Init(context pipeline.Context) (int, error) {
 	m.context = context
 	if len(m.StateMent) == 0 && len(m.StateMentPath) != 0 {
 		data, err := ioutil.ReadFile(m.StateMentPath)
@@ -139,7 +139,7 @@ func (m *Mysql) initMysql() error {
 		m.dbInstance, err = sql.Open("mysql", serv)
 		if err == nil {
 			if len(m.StateMent) > 0 {
-				m.dbStatment, err = m.dbInstance.Prepare(m.StateMent)
+				m.dbStatment, err = m.dbInstance.Prepare(m.StateMent) // ignore_security_alert
 				if err == nil {
 					logger.Debug(m.context.GetRuntimeContext(), "sql connect success, ping error", m.dbInstance.Ping())
 					break
@@ -231,7 +231,7 @@ func (m *Mysql) CheckPointToString() string {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (m *Mysql) Start(collector ilogtail.Collector) error {
+func (m *Mysql) Start(collector pipeline.Collector) error {
 	m.waitGroup.Add(1)
 	defer m.waitGroup.Done()
 	// initialize additional query intervals
@@ -295,7 +295,7 @@ func (m *Mysql) Start(collector ilogtail.Collector) error {
 	}
 }
 
-func (m *Mysql) Collect(collector ilogtail.Collector) error {
+func (m *Mysql) Collect(collector pipeline.Collector) error {
 	if m.dbStatment == nil {
 		return fmt.Errorf("unknow error, instance not init")
 	}
@@ -357,7 +357,7 @@ func (m *Mysql) Collect(collector ilogtail.Collector) error {
 	return nil
 }
 
-func (m *Mysql) SaveCheckPoint(collector ilogtail.Collector) {
+func (m *Mysql) SaveCheckPoint(collector pipeline.Collector) {
 	cp := CheckPoint{CheckPointColumn: m.CheckPointColumn, CheckPointColumnType: m.CheckPointColumnType, Value: m.CheckPointToString(), LastUpdateTime: time.Now()}
 	buf, err := json.Marshal(&cp)
 	if err != nil {
@@ -373,7 +373,7 @@ func (m *Mysql) SaveCheckPoint(collector ilogtail.Collector) {
 	}
 }
 
-func (m *Mysql) ParseRows(rows *sql.Rows, collector ilogtail.Collector) int {
+func (m *Mysql) ParseRows(rows *sql.Rows, collector pipeline.Collector) int {
 	// Must be closed manually, otherwise the connection will not be closed when the statement
 	//   is a storage procedure call such as 'CALL SP(?)' or error happened.
 	defer rows.Close()
@@ -449,7 +449,7 @@ func (m *Mysql) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_mysql"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_mysql"] = func() pipeline.ServiceInput {
 		return &Mysql{
 			ConnectionRetryTime:   3,
 			ConnectionRetryWaitMs: 5000,

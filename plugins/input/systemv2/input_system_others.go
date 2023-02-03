@@ -18,26 +18,26 @@
 package systemv2
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/net"
 )
 
-func (r *InputSystem) Init(context ilogtail.Context) (int, error) {
+func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 	return r.CommonInit(context)
 }
 
-func (r *InputSystem) CollectTCPStats(collector ilogtail.Collector, stat *net.ProtoCountersStat) {
+func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.ProtoCountersStat) {
 	r.addMetric(collector, "protocol_tcp_established", r.commonLabelsStr, float64(stat.Stats["CurrEstab"]))
 }
 
-func (r *InputSystem) CollectOpenFD(collector ilogtail.Collector) {
+func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 
 }
 
-func (r *InputSystem) CollectDiskUsage(collector ilogtail.Collector) {
+func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 	if allParts, err := disk.Partitions(false); err == nil {
 		for _, part := range allParts {
 			if r.excludeDiskFsTypeRegex != nil && r.excludeDiskFsTypeRegex.MatchString(part.Fstype) {

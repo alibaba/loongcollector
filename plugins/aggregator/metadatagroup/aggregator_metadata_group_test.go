@@ -19,8 +19,8 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 const (
@@ -88,7 +88,7 @@ func TestMetadataGroupAggregatorRecord(t *testing.T) {
 
 		Convey("record events with ByteArray, when byte length exceeds GroupMaxByteLength", func() {
 			agg.GroupMaxByteLength = len([]byte(RawData)) * 5
-			ctx := ilogtail.NewObservePipelineConext(100)
+			ctx := pipeline.NewObservePipelineConext(100)
 			groupEvent := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
 			for _, group := range groupEvent {
 				err := agg.Record(group, ctx)
@@ -120,7 +120,7 @@ func TestMetadataGroupAggregatorRecord(t *testing.T) {
 
 		Convey("record with metric events,when events length exceeds GroupMaxEventLength", func() {
 			agg.GroupMaxEventLength = 5
-			ctx := ilogtail.NewObservePipelineConext(100)
+			ctx := pipeline.NewObservePipelineConext(100)
 			groupEvent := generateMetricEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
 			for _, group := range groupEvent {
 				err := agg.Record(group, ctx)
@@ -158,7 +158,7 @@ func TestMetadataGroupAggregatorRecordWithNonexistentKey(t *testing.T) {
 		agg.GroupMetadataKeys = []string{"nonexistentKEY"}
 
 		Convey("record events with ByteArray, when metadata key not existed: all groups aggregate in one aggregator", func() {
-			ctx := ilogtail.NewObservePipelineConext(100)
+			ctx := pipeline.NewObservePipelineConext(100)
 			agg.GroupMaxByteLength = len([]byte(RawData)) * 5
 			groups := generateByteArrayEvents(5, map[string]string{"a": "1"})
 			for _, group := range groups {
@@ -186,7 +186,7 @@ func TestMetadataGroupAggregatorRecordWithNonexistentKey(t *testing.T) {
 
 		Convey("record with metric events,when events length exceeds GroupMaxEventLength", func() {
 			agg.GroupMaxEventLength = 5
-			ctx := ilogtail.NewObservePipelineConext(100)
+			ctx := pipeline.NewObservePipelineConext(100)
 			groupEvent := generateMetricEvents(5, map[string]string{"a": "1"})
 			for _, group := range groupEvent {
 				err := agg.Record(group, ctx)
@@ -241,7 +241,7 @@ func TestMetadataGroupAggregatorGetResult(t *testing.T) {
 		agg.GroupMetadataKeys = []string{"a", "b"}
 
 		Convey("record ByteArray Events, then GetResult", func() {
-			ctx := ilogtail.NewObservePipelineConext(100)
+			ctx := pipeline.NewObservePipelineConext(100)
 			groupEvent := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
 			groupEvent = append(groupEvent,
 				generateByteArrayEvents(5, map[string]string{"a": "1", "b": "1", "c": "3"})...)

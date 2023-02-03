@@ -15,9 +15,9 @@
 package logregex
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"regexp"
@@ -31,12 +31,12 @@ type ProcessorSplitRegex struct {
 	NoKeyError            bool
 	EnableLogPositionMeta bool
 
-	context ilogtail.Context
+	context pipeline.Context
 	regex   *regexp.Regexp
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorSplitRegex) Init(context ilogtail.Context) error {
+func (p *ProcessorSplitRegex) Init(context pipeline.Context) error {
 	p.context = context
 	var err error
 	if p.regex, err = regexp.Compile(p.SplitRegex); err != nil {
@@ -132,7 +132,7 @@ func (p *ProcessorSplitRegex) ProcessLogs(logArray []*protocol.Log) []*protocol.
 }
 
 func init() {
-	ilogtail.Processors["processor_split_log_regex"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_split_log_regex"] = func() pipeline.Processor {
 		return &ProcessorSplitRegex{SplitRegex: ".*", PreserveOthers: false}
 	}
 }

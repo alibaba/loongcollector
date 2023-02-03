@@ -15,8 +15,8 @@
 package event
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"strconv"
 	"sync"
@@ -33,10 +33,10 @@ type ServiceDockerEvents struct {
 
 	shutdown  chan struct{}
 	waitGroup sync.WaitGroup
-	context   ilogtail.Context
+	context   pipeline.Context
 }
 
-func (p *ServiceDockerEvents) Init(context ilogtail.Context) (int, error) {
+func (p *ServiceDockerEvents) Init(context pipeline.Context) (int, error) {
 	p.context = context
 	helper.ContainerCenterInit()
 	return 0, nil
@@ -48,7 +48,7 @@ func (p *ServiceDockerEvents) Description() string {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (p *ServiceDockerEvents) Collect(ilogtail.Collector) error {
+func (p *ServiceDockerEvents) Collect(pipeline.Collector) error {
 	if p.EventQueueSize < 4 {
 		p.EventQueueSize = 4
 	}
@@ -58,7 +58,7 @@ func (p *ServiceDockerEvents) Collect(ilogtail.Collector) error {
 	return nil
 }
 
-func (p *ServiceDockerEvents) fire(c ilogtail.Collector, event events.Message) {
+func (p *ServiceDockerEvents) fire(c pipeline.Collector, event events.Message) {
 	key := make([]string, len(event.Actor.Attributes)+4)
 	value := make([]string, len(key))
 	value[0] = strconv.FormatInt(event.TimeNano, 10)
@@ -83,7 +83,7 @@ func (p *ServiceDockerEvents) fire(c ilogtail.Collector, event events.Message) {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (p *ServiceDockerEvents) Start(c ilogtail.Collector) error {
+func (p *ServiceDockerEvents) Start(c pipeline.Collector) error {
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	p.innerEventQueue = make(chan events.Message, p.EventQueueSize)
@@ -111,7 +111,7 @@ func (p *ServiceDockerEvents) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_docker_event"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_docker_event"] = func() pipeline.ServiceInput {
 		return &ServiceDockerEvents{
 			EventQueueSize: 10,
 		}

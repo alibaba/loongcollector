@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/go-mysql-org/go-mysql/canal"
@@ -151,23 +151,23 @@ type ServiceCanal struct {
 	canal              *canal.Canal
 	checkpoint         CheckPoint
 	lastOffsetString   string
-	context            ilogtail.Context
-	collector          ilogtail.Collector
+	context            pipeline.Context
+	collector          pipeline.Collector
 	lastCheckPointTime time.Time
 	lastErrorCount     int
 	lastErrorChan      chan error
 
-	rotateCounter     ilogtail.CounterMetric
-	syncCounter       ilogtail.CounterMetric
-	ddlCounter        ilogtail.CounterMetric
-	rowCounter        ilogtail.CounterMetric
-	xgidCounter       ilogtail.CounterMetric
-	checkpointCounter ilogtail.CounterMetric
-	lastBinLogMetric  ilogtail.StringMetric
-	lastGTIDMetric    ilogtail.StringMetric
+	rotateCounter     pipeline.CounterMetric
+	syncCounter       pipeline.CounterMetric
+	ddlCounter        pipeline.CounterMetric
+	rowCounter        pipeline.CounterMetric
+	xgidCounter       pipeline.CounterMetric
+	checkpointCounter pipeline.CounterMetric
+	lastBinLogMetric  pipeline.StringMetric
+	lastGTIDMetric    pipeline.StringMetric
 }
 
-func (sc *ServiceCanal) Init(context ilogtail.Context) (int, error) {
+func (sc *ServiceCanal) Init(context pipeline.Context) (int, error) {
 	sc.context = context
 	if sc.ReadTimeout < 1 {
 		sc.ReadTimeout = 120
@@ -536,7 +536,7 @@ func (sc *ServiceCanal) syncCheckpointWithCanal() {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (sc *ServiceCanal) Collect(ilogtail.Collector) error {
+func (sc *ServiceCanal) Collect(pipeline.Collector) error {
 	return nil
 }
 
@@ -664,7 +664,7 @@ func (sc *ServiceCanal) newCanal() (bool, error) {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (sc *ServiceCanal) Start(c ilogtail.Collector) error {
+func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 	sc.lastErrorCount = 0
 	sc.shutdown = make(chan struct{}, 1)
 	sc.waitGroup.Add(1)
@@ -859,7 +859,7 @@ func NewServiceCanal() *ServiceCanal {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_canal"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_canal"] = func() pipeline.ServiceInput {
 		return NewServiceCanal()
 	}
 

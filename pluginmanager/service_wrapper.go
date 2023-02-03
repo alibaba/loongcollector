@@ -15,8 +15,8 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 
@@ -24,15 +24,15 @@ import (
 )
 
 type ServiceWrapper struct {
-	Input    ilogtail.ServiceInputV1
+	Input    pipeline.ServiceInputV1
 	Config   *LogstoreConfig
 	Tags     map[string]string
 	Interval time.Duration
 
-	LogsChan chan *ilogtail.LogWithContext
+	LogsChan chan *pipeline.LogWithContext
 }
 
-func (p *ServiceWrapper) Run(cc *ilogtail.AsyncControl) {
+func (p *ServiceWrapper) Run(cc *pipeline.AsyncControl) {
 	logger.Info(p.Config.Context.GetRuntimeContext(), "start run service", p.Input)
 
 	go func() {
@@ -77,7 +77,7 @@ func (p *ServiceWrapper) AddDataWithContext(tags map[string]string, fields map[s
 		logTime = t[0]
 	}
 	slsLog, _ := util.CreateLog(logTime, p.Tags, tags, fields)
-	p.LogsChan <- &ilogtail.LogWithContext{Log: slsLog, Context: ctx}
+	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
 func (p *ServiceWrapper) AddDataArrayWithContext(tags map[string]string,
@@ -92,9 +92,9 @@ func (p *ServiceWrapper) AddDataArrayWithContext(tags map[string]string,
 		logTime = t[0]
 	}
 	slsLog, _ := util.CreateLogByArray(logTime, p.Tags, tags, columns, values)
-	p.LogsChan <- &ilogtail.LogWithContext{Log: slsLog, Context: ctx}
+	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
 func (p *ServiceWrapper) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	p.LogsChan <- &ilogtail.LogWithContext{Log: log, Context: ctx}
+	p.LogsChan <- &pipeline.LogWithContext{Log: log, Context: ctx}
 }

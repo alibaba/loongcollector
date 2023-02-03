@@ -19,8 +19,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -31,7 +31,7 @@ type ProcessorAppender struct {
 	SortLabels bool
 
 	realValue string
-	context   ilogtail.Context
+	context   pipeline.Context
 }
 
 const pluginName = "processor_appender"
@@ -39,7 +39,7 @@ const pluginName = "processor_appender"
 var replaceReg = regexp.MustCompile(`{{[^}]+}}`)
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorAppender) Init(context ilogtail.Context) error {
+func (p *ProcessorAppender) Init(context pipeline.Context) error {
 	if len(p.Key) == 0 || len(p.Value) == 0 {
 		return fmt.Errorf("must specify Key and Value for plugin %v", pluginName)
 	}
@@ -100,7 +100,7 @@ func (p *ProcessorAppender) find(log *protocol.Log, key string) *protocol.Log_Co
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorAppender{}
 	}
 }

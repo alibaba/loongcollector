@@ -15,7 +15,7 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"reflect"
@@ -622,7 +622,7 @@ func TestNewCounterMetric(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want ilogtail.CounterMetric
+		want pipeline.CounterMetric
 	}{
 		// TODO: Add test cases.
 	}
@@ -642,7 +642,7 @@ func TestNewAverageMetric(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want ilogtail.CounterMetric
+		want pipeline.CounterMetric
 	}{
 		// TODO: Add test cases.
 	}
@@ -662,7 +662,7 @@ func TestNewStringMetric(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want ilogtail.StringMetric
+		want pipeline.StringMetric
 	}{
 		// TODO: Add test cases.
 	}
@@ -682,7 +682,7 @@ func TestNewLatencyMetric(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want ilogtail.LatencyMetric
+		want pipeline.LatencyMetric
 	}{
 		// TODO: Add test cases.
 	}

@@ -17,8 +17,8 @@ package decoding
 import (
 	"encoding/base64"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -28,11 +28,11 @@ type ProcessorBase64Decoding struct {
 	NoKeyError  bool
 	DecodeError bool
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorBase64Decoding) Init(context ilogtail.Context) error {
+func (p *ProcessorBase64Decoding) Init(context pipeline.Context) error {
 	p.context = context
 	return nil
 }
@@ -68,7 +68,7 @@ func (p *ProcessorBase64Decoding) ProcessLogs(logArray []*protocol.Log) []*proto
 }
 
 func init() {
-	ilogtail.Processors["processor_base64_decoding"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_base64_decoding"] = func() pipeline.Processor {
 		return &ProcessorBase64Decoding{}
 	}
 }

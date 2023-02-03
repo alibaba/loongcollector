@@ -15,9 +15,9 @@
 package systemv2
 
 import (
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 
 	"math"
@@ -70,7 +70,7 @@ type InputSystem struct {
 	commonLabels           helper.KeyValues
 	commonLabelsStr        string
 	collectTime            time.Time
-	context                ilogtail.Context
+	context                pipeline.Context
 	excludeDiskFsTypeRegex *regexp.Regexp
 	excludeDiskPathRegex   *regexp.Regexp
 	fs                     *procfs.FS //nolint:unused
@@ -80,7 +80,7 @@ func (r *InputSystem) Description() string {
 	return "Support collect system metrics on the host machine or Linux virtual environments."
 }
 
-func (r *InputSystem) CommonInit(context ilogtail.Context) (int, error) {
+func (r *InputSystem) CommonInit(context pipeline.Context) (int, error) {
 	if r.ExcludeDiskFsType != "" {
 		reg, err := regexp.Compile(r.ExcludeDiskFsType)
 		if err != nil {
@@ -108,7 +108,7 @@ func (r *InputSystem) CommonInit(context ilogtail.Context) (int, error) {
 	return 0, nil
 }
 
-func (r *InputSystem) addMetric(collector ilogtail.Collector,
+func (r *InputSystem) addMetric(collector pipeline.Collector,
 	name string,
 	labels string,
 	value float64) {
@@ -116,7 +116,7 @@ func (r *InputSystem) addMetric(collector ilogtail.Collector,
 	collector.AddDataArray(nil, keys, vals, r.collectTime)
 }
 
-func (r *InputSystem) CollectCore(collector ilogtail.Collector) {
+func (r *InputSystem) CollectCore(collector pipeline.Collector) {
 
 	// host info
 	if r.lastInfo == nil {
@@ -133,7 +133,7 @@ func (r *InputSystem) CollectCore(collector ilogtail.Collector) {
 	r.addMetric(collector, "system_boot_time", r.commonLabelsStr, float64(r.lastInfo.BootTime))
 }
 
-func (r *InputSystem) CollectCPU(collector ilogtail.Collector) {
+func (r *InputSystem) CollectCPU(collector pipeline.Collector) {
 	// cpu stat
 	cpuStat, err := cpu.Times(false)
 	cpuInfo, _ := cpu.Info()
@@ -183,7 +183,7 @@ func (r *InputSystem) CollectCPU(collector ilogtail.Collector) {
 	}
 }
 
-func (r *InputSystem) CollectMem(collector ilogtail.Collector) {
+func (r *InputSystem) CollectMem(collector pipeline.Collector) {
 	// mem stat
 	memStat, err := mem.VirtualMemory()
 	if err == nil {
@@ -201,7 +201,7 @@ func (r *InputSystem) CollectMem(collector ilogtail.Collector) {
 	}
 }
 
-func (r *InputSystem) collectOneDisk(collector ilogtail.Collector, name string, timeDeltaSec float64, last, now *disk.IOCountersStat) {
+func (r *InputSystem) collectOneDisk(collector pipeline.Collector, name string, timeDeltaSec float64, last, now *disk.IOCountersStat) {
 	newLabels := r.commonLabels.Clone()
 	newLabels.Append("disk", name)
 	newLabels.Sort()
@@ -225,7 +225,7 @@ func (r *InputSystem) collectOneDisk(collector ilogtail.Collector, name string, 
 	}
 }
 
-func (r *InputSystem) CollectDisk(collector ilogtail.Collector) {
+func (r *InputSystem) CollectDisk(collector pipeline.Collector) {
 	r.CollectDiskUsage(collector)
 
 	// disk stat
@@ -263,7 +263,7 @@ func (r *InputSystem) CollectDisk(collector ilogtail.Collector) {
 	}
 }
 
-func (r *InputSystem) collectOneNet(collector ilogtail.Collector, name string, timeDeltaSec float64, last, now *net.IOCountersStat) {
+func (r *InputSystem) collectOneNet(collector pipeline.Collector, name string, timeDeltaSec float64, last, now *net.IOCountersStat) {
 	newLabels := r.commonLabels.Clone()
 	newLabels.Append("interface", name)
 	newLabels.Sort()
@@ -291,7 +291,7 @@ func (r *InputSystem) collectOneNet(collector ilogtail.Collector, name string, t
 	}
 }
 
-func (r *InputSystem) CollectNet(collector ilogtail.Collector) {
+func (r *InputSystem) CollectNet(collector pipeline.Collector) {
 	netIoStatAll, err := net.IOCounters(true)
 	if err == nil && len(netIoStatAll) > 0 {
 		nowTime := time.Now()
@@ -339,7 +339,7 @@ func (r *InputSystem) CollectNet(collector ilogtail.Collector) {
 	}
 }
 
-func (r *InputSystem) CollectProtocol(collector ilogtail.Collector) {
+func (r *InputSystem) CollectProtocol(collector pipeline.Collector) {
 	protoCounterStats, err := net.ProtoCounters([]string{})
 	if err == nil && len(protoCounterStats) > 0 {
 
@@ -376,7 +376,7 @@ func (r *InputSystem) CollectProtocol(collector ilogtail.Collector) {
 	}
 }
 
-func (r *InputSystem) Collect(collector ilogtail.Collector) error {
+func (r *InputSystem) Collect(collector pipeline.Collector) error {
 	r.collectTime = time.Now()
 	r.CollectCore(collector)
 	if r.CPU {
@@ -401,7 +401,7 @@ func (r *InputSystem) Collect(collector ilogtail.Collector) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_system_v2"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_system_v2"] = func() pipeline.MetricInput {
 		return &InputSystem{
 			CPUPercent:        true,
 			CPU:               true,

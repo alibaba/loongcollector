@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -39,10 +39,10 @@ type ProcessorCSVDecoder struct {
 	KeepSource       bool     `comment:"Optional. Whether to keep the source log content given successful decoding, default to false"`
 
 	sep     rune
-	context ilogtail.Context
+	context pipeline.Context
 }
 
-func (p *ProcessorCSVDecoder) Init(context ilogtail.Context) error {
+func (p *ProcessorCSVDecoder) Init(context pipeline.Context) error {
 	sepRunes := []rune(p.SplitSep)
 	if len(sepRunes) != 1 {
 		return fmt.Errorf("invalid separator: %s", p.SplitSep)
@@ -133,7 +133,7 @@ func (p *ProcessorCSVDecoder) shouldKeepSrc(res bool) bool {
 }
 
 func init() {
-	ilogtail.Processors["processor_csv"] = func() ilogtail.Processor {
+	pipeline.Processors["processor_csv"] = func() pipeline.Processor {
 		return &ProcessorCSVDecoder{
 			SplitSep: ",",
 		}

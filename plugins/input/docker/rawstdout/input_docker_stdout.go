@@ -27,9 +27,9 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -88,7 +88,7 @@ type stdoutSyner struct {
 	startCheckPoint      string
 	lock                 sync.Mutex
 	stdoutCheckPoint     *StdoutCheckPoint
-	context              ilogtail.Context
+	context              pipeline.Context
 	runtimeContext       context.Context
 	cancelFun            context.CancelFunc
 	wg                   sync.WaitGroup
@@ -100,7 +100,7 @@ type stdoutSyner struct {
 	stderr               bool
 }
 
-func (ss *stdoutSyner) newContainerPump(c ilogtail.Collector, stdout, stderr *io.PipeReader) {
+func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io.PipeReader) {
 	pump := func(source string, tags map[string]string, input io.Reader) {
 		ss.wg.Add(1)
 		defer ss.wg.Done()
@@ -207,7 +207,7 @@ func (ss *stdoutSyner) newContainerPump(c ilogtail.Collector, stdout, stderr *io
 	}
 }
 
-func (ss *stdoutSyner) Start(c ilogtail.Collector) {
+func (ss *stdoutSyner) Start(c pipeline.Collector) {
 	if ss.beginLineCheckLength <= 0 {
 		ss.beginLineCheckLength = 10 * 1024
 	}
@@ -361,12 +361,12 @@ type ServiceDockerStdout struct {
 	client           *docker.Client
 	shutdown         chan struct{}
 	waitGroup        sync.WaitGroup
-	context          ilogtail.Context
+	context          pipeline.Context
 	runtimeContext   context.Context
 	stdoutCheckPoint *StdoutCheckPoint
 }
 
-func (sds *ServiceDockerStdout) Init(context ilogtail.Context) (int, error) {
+func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	sds.context = context
 	helper.ContainerCenterInit()
 	sds.synerMap = make(map[string]*stdoutSyner)
@@ -413,11 +413,11 @@ func (sds *ServiceDockerStdout) Description() string {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (sds *ServiceDockerStdout) Collect(ilogtail.Collector) error {
+func (sds *ServiceDockerStdout) Collect(pipeline.Collector) error {
 	return nil
 }
 
-func (sds *ServiceDockerStdout) FlushAll(c ilogtail.Collector, firstStart bool) error {
+func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) error {
 	var err error
 	dockerInfos := helper.GetContainerByAcceptedInfo(
 		sds.IncludeLabel, sds.ExcludeLabel,
@@ -500,7 +500,7 @@ func (sds *ServiceDockerStdout) GetCheckPoint() *StdoutCheckPoint {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (sds *ServiceDockerStdout) Start(c ilogtail.Collector) error {
+func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
 	sds.shutdown = make(chan struct{})
 	sds.waitGroup.Add(1)
 	defer sds.waitGroup.Done()
@@ -543,7 +543,7 @@ func (sds *ServiceDockerStdout) Stop() error {
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_docker_stdout_raw"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_docker_stdout_raw"] = func() pipeline.ServiceInput {
 		return &ServiceDockerStdout{
 			FlushIntervalMs:      3000,
 			TimeoutMs:            3000,

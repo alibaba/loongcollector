@@ -29,8 +29,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/coreos/go-systemd/sdjournal"
 )
@@ -108,7 +108,7 @@ type ServiceJournal struct {
 
 	shutdown  chan struct{}
 	waitGroup sync.WaitGroup
-	context   ilogtail.Context
+	context   pipeline.Context
 }
 
 func (sj *ServiceJournal) SaveCheckpoint(forceFlag bool) {
@@ -138,7 +138,7 @@ func (sj *ServiceJournal) LoadCheckpoint() {
 	}
 }
 
-func (sj *ServiceJournal) Init(context ilogtail.Context) (int, error) {
+func (sj *ServiceJournal) Init(context pipeline.Context) (int, error) {
 	sj.context = context
 	return 0, nil
 }
@@ -184,7 +184,7 @@ func (sj *ServiceJournal) Description() string {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (sj *ServiceJournal) Collect(ilogtail.Collector) error {
+func (sj *ServiceJournal) Collect(pipeline.Collector) error {
 	return nil
 }
 
@@ -276,7 +276,7 @@ func (sj *ServiceJournal) initJournal() error {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (sj *ServiceJournal) Start(c ilogtail.Collector) error {
+func (sj *ServiceJournal) Start(c pipeline.Collector) error {
 	sj.shutdown = make(chan struct{})
 	sj.waitGroup.Add(1)
 	defer sj.waitGroup.Done()
@@ -319,7 +319,7 @@ func (sj *ServiceJournal) Stop() error {
 	return nil
 }
 
-func (sj *ServiceJournal) run(c ilogtail.Collector, shutdown chan struct{}, wg *sync.WaitGroup) {
+func (sj *ServiceJournal) run(c pipeline.Collector, shutdown chan struct{}, wg *sync.WaitGroup) {
 	defer func() {
 		sj.SaveCheckpoint(true)
 		logger.Info(sj.context.GetRuntimeContext(), "journal", "start close")
@@ -366,7 +366,7 @@ func (sj *ServiceJournal) run(c ilogtail.Collector, shutdown chan struct{}, wg *
 }
 
 func init() {
-	ilogtail.ServiceInputs["service_journal"] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs["service_journal"] = func() pipeline.ServiceInput {
 		return &ServiceJournal{
 			SeekPosition:        SeekPositionTail,
 			CursorFlushPeriodMs: 5000,

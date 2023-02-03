@@ -19,8 +19,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
@@ -41,7 +41,7 @@ type InputKafka struct {
 	wg       *sync.WaitGroup
 	shutdown chan struct{}
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 const (
@@ -49,7 +49,7 @@ const (
 	pluginName       = "service_kafka"
 )
 
-func (k *InputKafka) Init(context ilogtail.Context) (int, error) {
+func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 	k.context = context
 
 	if len(k.Brokers) == 0 {
@@ -120,7 +120,7 @@ func (k *InputKafka) Description() string {
 	return "Kafka input for logtail"
 }
 
-func (k *InputKafka) Start(collector ilogtail.Collector) error {
+func (k *InputKafka) Start(collector pipeline.Collector) error {
 	k.shutdown = make(chan struct{})
 
 	// consume errors
@@ -162,7 +162,7 @@ func (k *InputKafka) Start(collector ilogtail.Collector) error {
 	return nil
 }
 
-func (k *InputKafka) receiver(collector ilogtail.Collector) {
+func (k *InputKafka) receiver(collector pipeline.Collector) {
 	for {
 		select {
 		case msg, ok := <-k.cluster.Messages():
@@ -181,7 +181,7 @@ func (k *InputKafka) markOffset(msg *sarama.ConsumerMessage) {
 	k.cluster.MarkOffset(msg, "")
 }
 
-func (k *InputKafka) onMessage(collector ilogtail.Collector, msg *sarama.ConsumerMessage) {
+func (k *InputKafka) onMessage(collector pipeline.Collector, msg *sarama.ConsumerMessage) {
 	if len(msg.Value) > k.MaxMessageLen {
 		logger.Errorf(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Message longer than max_message_len (%d > %d)",
 			len(msg.Value), k.MaxMessageLen)
@@ -206,12 +206,12 @@ func (k *InputKafka) Stop() error {
 	return nil
 }
 
-func (k *InputKafka) Collect(collector ilogtail.Collector) error {
+func (k *InputKafka) Collect(collector pipeline.Collector) error {
 	return nil
 }
 
 func init() {
-	ilogtail.ServiceInputs[pluginName] = func() ilogtail.ServiceInput {
+	pipeline.ServiceInputs[pluginName] = func() pipeline.ServiceInput {
 		return &InputKafka{
 			ConsumerGroup: "",
 			ClientID:      "",

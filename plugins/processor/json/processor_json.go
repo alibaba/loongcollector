@@ -19,8 +19,8 @@ import (
 
 	"github.com/buger/jsonparser"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -35,13 +35,13 @@ type ProcessorJSON struct {
 	UseSourceKeyAsPrefix   bool // Should SourceKey be used as prefix for all extracted keys.
 	IgnoreFirstConnector   bool // 是否忽略第一个Connector
 
-	context ilogtail.Context
+	context pipeline.Context
 }
 
 const pluginName = "processor_json"
 
 // Init called for init some system resources, like socket, mutex...
-func (p *ProcessorJSON) Init(context ilogtail.Context) error {
+func (p *ProcessorJSON) Init(context pipeline.Context) error {
 	if p.SourceKey == "" {
 		return fmt.Errorf("must specify SourceKey for plugin %v", pluginName)
 	}
@@ -97,7 +97,7 @@ func (p *ProcessorJSON) shouldKeepSource(err error) bool {
 }
 
 func init() {
-	ilogtail.Processors[pluginName] = func() ilogtail.Processor {
+	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorJSON{
 			SourceKey:              "",
 			NoKeyError:             true,

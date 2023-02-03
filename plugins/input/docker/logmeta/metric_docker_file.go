@@ -25,10 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/logtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -77,13 +77,13 @@ type InputDockerFile struct {
 
 	FlushIntervalMs      int `comment:"the interval of container discovery, and the timeunit is millisecond. Default value is 3000."`
 	lastPathMappingCache map[string]string
-	context              ilogtail.Context
+	context              pipeline.Context
 	lastClearTime        time.Time
 	updateEmptyFlag      bool
-	avgInstanceMetric    ilogtail.CounterMetric
-	addMetric            ilogtail.CounterMetric
-	updateMetric         ilogtail.CounterMetric
-	deleteMetric         ilogtail.CounterMetric
+	avgInstanceMetric    pipeline.CounterMetric
+	addMetric            pipeline.CounterMetric
+	updateMetric         pipeline.CounterMetric
+	deleteMetric         pipeline.CounterMetric
 	lastUpdateTime       int64
 
 	// Last return of GetAllAcceptedInfoV2
@@ -108,7 +108,7 @@ func (idf *InputDockerFile) Name() string {
 	return "InputDockerFile"
 }
 
-func (idf *InputDockerFile) Init(context ilogtail.Context) (int, error) {
+func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	idf.context = context
 	idf.lastPathMappingCache = make(map[string]string)
 	idf.fullList = make(map[string]bool)
@@ -273,7 +273,7 @@ func (idf *InputDockerFile) notifyStop(id string) {
 	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "stopped", "source path", idf.lastPathMappingCache[id], "id", id)
 }
 
-func (idf *InputDockerFile) Collect(collector ilogtail.Collector) error {
+func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 	newUpdateTime := helper.GetContainersLastUpdateTime()
 	if idf.lastUpdateTime != 0 {
 		// Nothing update, just skip.
@@ -410,7 +410,7 @@ func (idf *InputDockerFile) Collect(collector ilogtail.Collector) error {
 }
 
 func init() {
-	ilogtail.MetricInputs["metric_docker_file"] = func() ilogtail.MetricInput {
+	pipeline.MetricInputs["metric_docker_file"] = func() pipeline.MetricInput {
 		return &InputDockerFile{
 			FlushIntervalMs: 3000,
 		}

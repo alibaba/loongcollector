@@ -15,12 +15,12 @@
 package aggregator
 
 import (
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
 
 func init() {
-	ilogtail.Aggregators["aggregator_default"] = func() ilogtail.Aggregator {
+	pipeline.Aggregators["aggregator_default"] = func() pipeline.Aggregator {
 		return baseagg.NewAggregatorBase()
 	}
 }

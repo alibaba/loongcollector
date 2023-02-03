@@ -18,7 +18,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -31,7 +31,7 @@ var errAggAdd = errors.New("loggroup queue is full")
 // passes log groups to associated LogstoreConfig through channel LogGroupsChan.
 // In fact, LogGroupsChan == (associated) LogstoreConfig.LogGroupsChan.
 type AggregatorWrapper struct {
-	Aggregator    ilogtail.AggregatorV1
+	Aggregator    pipeline.AggregatorV1
 	Config        *LogstoreConfig
 	LogGroupsChan chan *protocol.LogGroup
 	Interval      time.Duration
@@ -71,7 +71,7 @@ func (p *AggregatorWrapper) AddWithWait(loggroup *protocol.LogGroup, duration ti
 
 // Run calls periodically Aggregator.Flush to get log groups from associated aggregator and
 // pass them to LogstoreConfig through LogGroupsChan.
-func (p *AggregatorWrapper) Run(control *ilogtail.AsyncControl) {
+func (p *AggregatorWrapper) Run(control *pipeline.AsyncControl) {
 	defer panicRecover(p.Aggregator.Description())
 	for {
 		exitFlag := util.RandomSleep(p.Interval, 0.1, control.CancelToken())

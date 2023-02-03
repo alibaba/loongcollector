@@ -25,10 +25,10 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -522,7 +522,7 @@ func TestGetNextRetryDelay(t *testing.T) {
 }
 
 type mockContext struct {
-	ilogtail.Context
+	pipeline.Context
 }
 
 func (c mockContext) GetConfigName() string {

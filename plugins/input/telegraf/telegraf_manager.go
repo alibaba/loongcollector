@@ -25,10 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -62,7 +62,7 @@ type Manager struct {
 	bindMeta         *helper.ManagerMeta
 }
 
-func (tm *Manager) RegisterConfig(ctx ilogtail.Context, c *Config) {
+func (tm *Manager) RegisterConfig(ctx pipeline.Context, c *Config) {
 	tm.mu.Lock()
 	tm.configs[c.Name] = c
 	ltCtx, ok := ctx.GetRuntimeContext().Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
@@ -74,7 +74,7 @@ func (tm *Manager) RegisterConfig(ctx ilogtail.Context, c *Config) {
 	tm.notify()
 }
 
-func (tm *Manager) UnregisterConfig(ctx ilogtail.Context, c *Config) {
+func (tm *Manager) UnregisterConfig(ctx pipeline.Context, c *Config) {
 	tm.mu.Lock()
 	delete(tm.configs, c.Name)
 	ltCtx, ok := ctx.GetRuntimeContext().Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)

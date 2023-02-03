@@ -18,7 +18,7 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/alibaba/ilogtail"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent"
@@ -27,8 +27,8 @@ import (
 type JVMMetricServiceHandle struct {
 	RegistryInformationCache
 
-	context   ilogtail.Context
-	collector ilogtail.Collector
+	context   pipeline.Context
+	collector pipeline.Collector
 }
 
 func (j *JVMMetricServiceHandle) Collect(ctx context.Context, metrics *agent.JVMMetrics) (*agent.Downstream, error) {

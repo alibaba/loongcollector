@@ -19,17 +19,17 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/alibaba/ilogtail"
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type LocalContext struct {
-	StringMetrics  map[string]ilogtail.StringMetric
-	CounterMetrics map[string]ilogtail.CounterMetric
-	LatencyMetrics map[string]ilogtail.LatencyMetric
+	StringMetrics  map[string]pipeline.StringMetric
+	CounterMetrics map[string]pipeline.CounterMetric
+	LatencyMetrics map[string]pipeline.LatencyMetric
 	AllCheckPoint  map[string][]byte
 
 	ctx         context.Context
@@ -67,29 +67,29 @@ func (p *LocalContext) GetRuntimeContext() context.Context {
 	return p.ctx
 }
 
-func (p *LocalContext) RegisterCounterMetric(metric ilogtail.CounterMetric) {
+func (p *LocalContext) RegisterCounterMetric(metric pipeline.CounterMetric) {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 	if p.CounterMetrics == nil {
-		p.CounterMetrics = make(map[string]ilogtail.CounterMetric)
+		p.CounterMetrics = make(map[string]pipeline.CounterMetric)
 	}
 	p.CounterMetrics[metric.Name()] = metric
 }
 
-func (p *LocalContext) RegisterStringMetric(metric ilogtail.StringMetric) {
+func (p *LocalContext) RegisterStringMetric(metric pipeline.StringMetric) {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 	if p.StringMetrics == nil {
-		p.StringMetrics = make(map[string]ilogtail.StringMetric)
+		p.StringMetrics = make(map[string]pipeline.StringMetric)
 	}
 	p.StringMetrics[metric.Name()] = metric
 }
 
-func (p *LocalContext) RegisterLatencyMetric(metric ilogtail.LatencyMetric) {
+func (p *LocalContext) RegisterLatencyMetric(metric pipeline.LatencyMetric) {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 	if p.LatencyMetrics == nil {
-		p.LatencyMetrics = make(map[string]ilogtail.LatencyMetric)
+		p.LatencyMetrics = make(map[string]pipeline.LatencyMetric)
 	}
 	p.LatencyMetrics[metric.Name()] = metric
 }
