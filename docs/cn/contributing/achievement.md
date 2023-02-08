@@ -8,13 +8,11 @@
 
 - Cheng Zhang([@shabicheng](https://github.com/shabicheng))
 - Goclis Yao([@Goclis](https://github.com/Goclis))
-- Runqi Lin([@linrunqi08](https://github.com/linrunqi08))
 - Qian Sheng([@qiansheng91](https://github.com/qiansheng91))
 - Yonghua Sun([@yonghua-sun](https://github.com/yonghua-sun))
 - Weilong Pan([@panawala](https://github.com/panawala))
 - Haorui([@haoruilee](https://github.com/haoruilee))
 - Chao Lee([@chaolee50](https://github.com/chaolee50))
-- Zehua Yang([@Takuka0311](https://github.com/Takuka0311))
 - Jinchen([@pj1987111](https://github.com/pj1987111))
 - timchenxiaoyu([@timchenxiaoyu](https://github.com/timchenxiaoyu))
 - Doslin([@Doslin](https://github.com/Doslin))
@@ -24,12 +22,18 @@
 - niuttt([@tong549761863](https://github.com/tong549761863))
 - mrddz([@mrddz](https://github.com/mrddz))
 - TDAkory([@TDAkory](https://github.com/TDAkory))
-- Yu Sun([@shalousun](https://github.com/shalousun))
 - XLPE([@XLPE](https://github.com/XLPE))
+- chenxujun([@co63oc](https://github.com/co63oc))
+- william([@panawala](https://github.com/panawala))
+- codingdancer([@codingdancer](https://github.com/codingdancer))
+- timchenxiaoyu([@timchenxiaoyu](https://github.com/timchenxiaoyu))
+- urnotsally([@urnotsally](https://github.com/urnotsally))
+- Minxiang Du([@kl7sn](https://github.com/kl7sn))
+- Zhu Shunjia([@shunjiazhu](https://github.com/shunjiazhu))
 
 ## <img alt="Senior Developer" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Dev.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Developer</span>
 
-解决至少10个 PR，并被社区接受（统计commit对应PR数量）。
+解决至少10个PR或2个重大PR，并被社区接受（统计commit对应PR数量）。
 
 ---
 
@@ -39,6 +43,9 @@
 - Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
 - Haoyang Liu([@liuhaoyang](https://github.com/liuhaoyang))
 - Zehua Yang([@Takuka0311](https://github.com/Takuka0311))
+- Runqi Lin([@linrunqi08](https://github.com/linrunqi08))
+- Gangping Guo([@snakorse](https://github.com/snakorse))
+- Yu Sun([@shalousun](https://github.com/shalousun))
 
 ## <img alt="Junior Ambassador" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Amb.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Ambassador</span>
 
@@ -46,7 +53,6 @@
 
 ---
 
-- Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
 - Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
 - Weilong Pan([@panawala](https://github.com/panawala))
 - Jinchen([@pj1987111](https://github.com/pj1987111))
@@ -60,6 +66,7 @@
 
 - Kejia Xu([@messixukejia](https://github.com/messixukejia))
 - Cheng Zhang([@shabicheng](https://github.com/shabicheng))
+- Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
 
 ## <img alt="Junior Moderator" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Mod.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Junior Moderator</span>
 
@@ -67,16 +74,25 @@
 
 ---
 
-- Kejia Xu([@messixukejia](https://github.com/messixukejia))
 - Tao Yu([@yyuuttaaoo](https://github.com/yyuuttaaoo))
 - Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
 - XLPE([@XLPE](https://github.com/XLPE))
+- Gangping Guo([@snakorse](https://github.com/snakorse))
+- Jiapeng Liu([@EvanLjp](https://github.com/EvanLjp))
+- Weilong Pan([@panawala](https://github.com/panawala))
+- Yu Sun([@shalousun](https://github.com/shalousun))
+- Zehua Yang([@Takuka0311](https://github.com/Takuka0311))
+- bad-youngster([@bad-youngster](https://github.com/bad-youngster))
+- Shiyao Liu([@hanzoi](https://github.com/hanzoi))
+- mcy567([@mcy567](https://github.com/mcy567))
 
 ## <img alt="Senior Moderator" width="100" height="100" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Mod.png?x-oss-process=image/resize,h_100" align="left" style="vertical-align: middle;"/> <span style="vertical-align: middle;">Senior Moderator</span>
 
 在论坛中回答问题，并获得至少10个被接受答案（统计accepted的answer数量）。
 
 ---
+
+- Kejia Xu([@messixukejia](https://github.com/messixukejia))
 
 ## 证书展示
 
