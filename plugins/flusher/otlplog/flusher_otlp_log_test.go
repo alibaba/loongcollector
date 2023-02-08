@@ -41,7 +41,7 @@ func Test_Flusher_Init(t *testing.T) {
 		logCtx := mock.NewEmptyContext("p", "l", "c")
 
 		convey.Convey("When FlusherOTLPLog init", func() {
-			f := &FlusherOTLPLog{Version: v1, GrpcConfig: &helper.GrpcClientConfig{}}
+			f := &FlusherOTLPLog{Version: v1, GrpcConfig: &helper.GrpcClientConfig{Endpoint: ":8080"}}
 			err := f.Init(logCtx)
 			convey.So(err, convey.ShouldBeNil)
 		})

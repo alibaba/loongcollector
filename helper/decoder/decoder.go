@@ -37,6 +37,7 @@ type Decoder interface {
 	Decode(data []byte, req *http.Request) (logs []*protocol.Log, err error)
 	// DecodeV2 reader to groupEvents
 	DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error)
+	// ParseRequst gets the request's body raw data and status code.
 	ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error)
 }
 
@@ -66,6 +67,10 @@ func GetDecoderWithOptions(format string, option Option) (Decoder, error) {
 		}, nil
 	case common.ProtocolOTLPLogV1:
 		return &opentelemetry.Decoder{Format: common.ProtocolOTLPLogV1}, nil
+	case common.ProtocolOTLPMetricV1:
+		return &opentelemetry.Decoder{Format: common.ProtocolOTLPMetricV1}, nil
+	case common.ProtocolOTLPTraceV1:
+		return &opentelemetry.Decoder{Format: common.ProtocolOTLPTraceV1}, nil
 	case common.ProtocolRaw:
 		return &raw.Decoder{DisableUncompress: option.DisableUncompress}, nil
 

@@ -52,6 +52,7 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/input/mysqlbinlog"
 	_ "github.com/alibaba/ilogtail/plugins/input/netping"
 	_ "github.com/alibaba/ilogtail/plugins/input/nginx"
+	_ "github.com/alibaba/ilogtail/plugins/input/opentelemetry"
 	_ "github.com/alibaba/ilogtail/plugins/input/process"
 	_ "github.com/alibaba/ilogtail/plugins/input/prometheus"
 	_ "github.com/alibaba/ilogtail/plugins/input/rdb/mssql"

@@ -89,6 +89,7 @@ type SpanLink struct {
 type SpanEvent struct {
 	Timestamp int64
 	Name      string
+	Tags      Tags
 }
 
 // A Span represents a single operation performed by a single component of the system.

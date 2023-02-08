@@ -9,7 +9,7 @@
 | 参数                 | 类型       | 是否必选 | 说明                                                                                                                                |
 |--------------------|----------|-----|-----------------------------------------------------------------------------------------------------------------------------------|
 | Type               | String   | 是   | 插件类型，固定为`service_http_server`                                                                                                     |
-| Format             | String   | 否   | <p>数据格式。</p> <p>支持格式：`sls`、`prometheus`、`influxdb`、`otlp_logv1`、`statsd`</p>  <p>v2版本支持格式: `raw`</p><p>说明：`raw`格式以原始请求字节流传输数据</p> |
+| Format             | String   | 否   | <p>数据格式。</p> <p>支持格式：`sls`、`prometheus`、`influxdb`、`otlp_logv1`、 `otlp_metricv1`、`otlp_tracev1`、`statsd`</p>  <p>v2版本支持格式: `raw`</p><p>说明：`raw`格式以原始请求字节流传输数据</p> |
 | Address            | String   | 否   | <p>监听地址。</p><p></p>                                                                                                               |
 | ReadTimeoutSec     | String   | 否   | <p>读取超时时间。</p><p>默认取值为:`10s`。</p>                                                                                                 |
 | ShutdownTimeoutSec | String   | 否   | <p>关闭超时时间。</p><p>默认取值为:`5s`。</p>                                                                                                  |
@@ -104,6 +104,32 @@ flushers:
     "__time__": "1663913736"
 }
 ```
+
+### 接收 OTLP Logs/Metrics/Traces (v2)
+注意：目前v2 pipeline尚不支持otlp logs请求，会丢弃数据。
+
+* 采集配置
+
+```yaml
+
+enable: true
+version: v2
+inputs:
+  - Type: service_http_server
+    Format: "otlp_logv1" 
+    Address: "http://127.0.0.1:12344"
+  - Type: service_http_server
+    Format: "otlp_metricv1"
+    Address: "http://127.0.0.1:12345"
+  - Type: service_http_server
+    Format: "otlp_tracev1"
+    Address: "http://127.0.0.1:12346"
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true  
+```
+
+
 
 ### 接收字节流数据
 

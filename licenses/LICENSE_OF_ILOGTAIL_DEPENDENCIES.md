@@ -88,6 +88,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [sigs.k8s.io/structured-merge-diff](https://pkg.go.dev/sigs.k8s.io/structured-merge-diff?tab=licenses)
 - [go.opentelemetry.io/proto/otlp](https://pkg.go.dev/go.opentelemetry.io/proto/otlp?tab=licenses)
 - [go.opentelemetry.io/collector/pdata](https://pkg.go.dev/go.opentelemetry.io/collector/pdata?tab=licenses)
+- [go.opentelemetry.io/collector/consumer](https://pkg.go.dev/go.opentelemetry.io/collector/consumer?tab=licenses)
 
 ## BSD licenses
 
@@ -204,6 +205,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/cilium/ebpf](https://pkg.go.dev/github.com/cilium/ebpf?tab=licenses)
 - [go.etcd.io/bbolt](https://pkg.go.dev/go.etcd.io/bbolt?tab=licenses)
 - [github.com/grpc-ecosystem/grpc-gateway](https://pkg.go.dev/github.com/grpc-ecosystem/grpc-gateway?tab=licenses)
+- [github.com/benbjohnson/clock](https://pkg.go.dev/github.com/benbjohnson/clock?tab=licenses)
 
 ## ISC licenses
 

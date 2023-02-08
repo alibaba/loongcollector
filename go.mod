@@ -42,7 +42,7 @@ require (
 	github.com/pierrec/lz4 v2.6.0+incompatible
 	github.com/pingcap/check v0.0.0-20200212061837-5e12011dc712
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/common v0.37.0
+	github.com/prometheus/common v0.39.0
 	github.com/prometheus/procfs v0.8.0
 	github.com/prometheus/prometheus v1.8.2-0.20201119142752-3ad25a6dc3d9
 	github.com/shirou/gopsutil v3.21.3+incompatible
@@ -52,11 +52,12 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/syndtr/goleveldb v0.0.0-20170725064836-b89cc31ef797
 	github.com/xdg-go/scram v1.1.1
-	go.opentelemetry.io/collector/pdata v0.60.0
+	go.opentelemetry.io/collector/consumer v0.70.0
+	go.opentelemetry.io/collector/pdata v1.0.0-rc4
 	go.opentelemetry.io/proto/otlp v0.19.0
 	go.uber.org/atomic v1.10.0
-	golang.org/x/sys v0.2.0
-	google.golang.org/grpc v1.50.1
+	golang.org/x/sys v0.4.0
+	google.golang.org/grpc v1.52.0
 	google.golang.org/protobuf v1.28.1
 	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.22.5
@@ -74,6 +75,7 @@ require (
 	github.com/DataDog/zstd v1.5.0 // indirect
 	github.com/VictoriaMetrics/metrics v1.23.0 // indirect
 	github.com/ardielle/ardielle-go v1.5.2 // indirect
+	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cilium/ebpf v0.7.0 // indirect
@@ -103,8 +105,8 @@ require (
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
-	github.com/tklauser/go-sysconf v0.3.10 // indirect
-	github.com/tklauser/numcpus v0.4.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.11 // indirect
+	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
@@ -148,8 +150,8 @@ require (
 	github.com/emicklei/go-restful v2.15.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
-	github.com/go-logr/logr v1.2.2 // indirect
-	github.com/go-ole/go-ole v1.2.4 // indirect
+	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
@@ -181,7 +183,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
 	github.com/juju/testing v0.0.0-20200608005635-e4eedbc6f7aa // indirect
-	github.com/klauspost/compress v1.15.12 // indirect
+	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
 	github.com/moby/sys/symlink v0.2.0 // indirect
@@ -212,17 +214,17 @@ require (
 	github.com/valyala/quicktemplate v1.7.0 // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.uber.org/multierr v1.7.0
-	go.uber.org/zap v1.19.1 // indirect
+	go.uber.org/multierr v1.9.0
+	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
-	golang.org/x/net v0.2.0 // indirect
-	golang.org/x/oauth2 v0.2.0 // indirect
+	golang.org/x/net v0.5.0 // indirect
+	golang.org/x/oauth2 v0.3.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/term v0.2.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/term v0.4.0 // indirect
+	golang.org/x/text v0.6.0 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20221109142239-94d6d90a7d66
+	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6
 	gopkg.in/birkirb/loggers.v1 v1.0.3 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect

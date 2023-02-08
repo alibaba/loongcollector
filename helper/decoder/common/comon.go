@@ -28,13 +28,15 @@ import (
 )
 
 const (
-	ProtocolSLS        = "sls"
-	ProtocolPrometheus = "prometheus"
-	ProtocolInflux     = "influx"
-	ProtocolInfluxdb   = "influxdb"
-	ProtocolStatsd     = "statsd"
-	ProtocolOTLPLogV1  = "otlp_logv1"
-	ProtocolRaw        = "raw"
+	ProtocolSLS          = "sls"
+	ProtocolPrometheus   = "prometheus"
+	ProtocolInflux       = "influx"
+	ProtocolInfluxdb     = "influxdb"
+	ProtocolStatsd       = "statsd"
+	ProtocolOTLPLogV1    = "otlp_logv1"
+	ProtocolOTLPMetricV1 = "otlp_metricv1"
+	ProtocolOTLPTraceV1  = "otlp_tracev1"
+	ProtocolRaw          = "raw"
 )
 
 func CollectBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) ([]byte, int, error) {
