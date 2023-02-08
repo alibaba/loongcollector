@@ -354,3 +354,62 @@ func Test_metricReader_readTimestamp(t *testing.T) {
 		assert.Equal(t, test.wantTime, timestamp)
 	}
 }
+
+func Test_metricReader_set(t *testing.T) {
+	tests := []struct {
+		log        *protocol.Log
+		wantErr    bool
+		wantReader metricReader
+	}{
+		{
+			log: &protocol.Log{Contents: []*protocol.Log_Content{
+				{Key: metricNameKey, Value: "_metric"},
+				{Key: metricFieldKey, Value: "value"},
+				{Key: metricValueTypeKey, Value: "float"},
+				{Key: metricValueKey, Value: "1"},
+			}},
+			wantErr: false,
+			wantReader: metricReader{
+				name:      "_metric",
+				value:     "1",
+				valueType: "float",
+				fieldName: "value",
+			},
+		},
+		{
+			log: &protocol.Log{Contents: []*protocol.Log_Content{
+				{Key: metricNameKey, Value: "_metric"},
+				{Key: metricFieldKey, Value: "value"},
+				{Key: metricValueTypeKey, Value: "string"},
+				{Key: metricValueKey, Value: ""},
+			}},
+			wantErr: false,
+			wantReader: metricReader{
+				name:      "_metric",
+				value:     "",
+				valueType: "string",
+				fieldName: "value",
+			},
+		},
+		{
+			log: &protocol.Log{Contents: []*protocol.Log_Content{
+				{Key: metricNameKey, Value: "_metric"},
+				{Key: metricFieldKey, Value: "value"},
+				{Key: metricValueTypeKey, Value: "float"},
+				{Key: metricValueKey, Value: ""},
+			}},
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		reader := metricReader{}
+		err := reader.set(test.log)
+		if test.wantErr {
+			assert.NotNil(t, err)
+			continue
+		}
+		assert.Nil(t, err)
+		assert.Equal(t, test.wantReader, reader)
+	}
+}

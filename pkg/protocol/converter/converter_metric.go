@@ -211,7 +211,7 @@ func (r *metricReader) set(log *protocol.Log) error {
 			r.fieldName = v.Value
 		}
 	}
-	if len(r.name) == 0 || len(r.value) == 0 {
+	if len(r.name) == 0 || len(r.value) == 0 && r.valueType != valueTypeString {
 		return fmt.Errorf("metrics data must contains keys: %s, %s", metricNameKey, metricValueKey)
 	}
 	return nil
