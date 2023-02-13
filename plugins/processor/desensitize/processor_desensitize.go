@@ -134,23 +134,28 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 	}
 
 	var pos = 0
-	match, _ := p.regexBegin.FindStringMatchStartingAt(val, pos)
+	runeVal := []rune(val)
+	match, _ := p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
 	for match != nil {
 		pos = match.Index + match.Length
-		content, _ := p.regexContent.FindStringMatchStartingAt(val, pos)
+		content, _ := p.regexContent.FindRunesMatchStartingAt(runeVal, pos)
 		if content != nil {
 			if p.Method == "const" {
-				val, _ = p.regexContent.Replace(val, p.ReplaceString, pos, 1)
-				pos = content.Index + len(p.ReplaceString)
+				curPos := len(string(runeVal[:pos]))
+				val, _ = p.regexContent.Replace(val, p.ReplaceString, curPos, 1)
+				runeVal = []rune(val)
+				pos = content.Index + len([]rune(p.ReplaceString))
 			}
 			if p.Method == "md5" {
 				has := md5.Sum([]byte(content.String())) //nolint:gosec
 				md5str := fmt.Sprintf("%x", has)
-				val, _ = p.regexContent.Replace(val, md5str, pos, 1)
-				pos = content.Index + len(md5str)
+				curPos := len(string(runeVal[:pos]))
+				val, _ = p.regexContent.Replace(val, md5str, curPos, 1)
+				runeVal = []rune(val)
+				pos = content.Index + len([]rune(md5str))
 			}
 		}
-		match, _ = p.regexBegin.FindStringMatchStartingAt(val, pos)
+		match, _ = p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
 	}
 	return val
 }

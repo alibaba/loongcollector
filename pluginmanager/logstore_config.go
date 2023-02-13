@@ -24,13 +24,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
-
-	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/plugins/input"
 )
 
@@ -393,17 +392,17 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 						continue
 					}
 					for key, value := range detailMap {
-						if strings.Contains(key, "Include") || strings.Contains(key, "Exclude") {
+						if strings.Contains(strings.ToLower(key), "include") || strings.Contains(strings.ToLower(key), "exclude") {
 							conditionMap, valid := value.(map[string]interface{})
 							if !valid {
 								continue
 							}
-							if strings.Contains(key, "Label") {
+							if strings.Contains(strings.ToLower(key), "label") {
 								for key := range conditionMap {
 									logstoreC.LabelSet[key] = struct{}{}
 								}
 							}
-							if strings.Contains(key, "Env") {
+							if strings.Contains(strings.ToLower(key), "env") {
 								for key := range conditionMap {
 									logstoreC.EnvSet[key] = struct{}{}
 								}

@@ -24,8 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
-func newProcessor() (*ProcessorDesensitize, error) {
-	ctx := mock.NewEmptyContext("p", "l", "c")
+func newProcessor() *ProcessorDesensitize {
 	processor := &ProcessorDesensitize{
 		SourceKey:     "content",
 		Method:        "const",
@@ -34,73 +33,103 @@ func newProcessor() (*ProcessorDesensitize, error) {
 		RegexBegin:    "'password':'",
 		RegexContent:  "[^']*",
 	}
-	err := processor.Init(ctx)
-	return processor, err
+	return processor
+}
+
+func TestChineseSample(t *testing.T) {
+	Convey("Test Match = full. should not replace case with chinese", t, func() {
+		processor := newProcessor()
+		processor.Match = "regex"
+		processor.RegexBegin = "码"
+		processor.RegexContent = "XXX"
+		err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		Convey("Test const chinese", func() {
+			record := "中文电话号码有用中文电话号码有用"
+			res := processor.desensitize(record)
+			So(res, ShouldEqual, "中文电话号码有用中文电话号码有用")
+		})
+	})
+
+	Convey("Test Match = full. should replace case with chinese", t, func() {
+		processor := newProcessor()
+		processor.Match = "regex"
+		processor.RegexBegin = "号"
+		processor.RegexContent = "码"
+		err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		Convey("Test const chinese", func() {
+			record := "中文电话号码有用中文电话号码有用"
+			res := processor.desensitize(record)
+			So(res, ShouldEqual, "中文电话号***有用中文电话号***有用")
+		})
+	})
 }
 
 func TestProcessorDesensitizeInit(t *testing.T) {
 	Convey("Test load Processor Desensitize.", t, func() {
-		processor, err := newProcessor()
-		So(err, ShouldBeNil)
+		processor := newProcessor()
 
 		Convey("Test load success", func() {
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 			So(processor.Description(), ShouldEqual, "desensitize processor for logtail")
 		})
 
 		Convey("Test load fail with no SourceKey error", func() {
 			processor.SourceKey = ""
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldResemble, errors.New("parameter SourceKey should not be empty"))
 		})
 
 		Convey("Test load fail with no Method error", func() {
 			processor.Method = ""
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldResemble, errors.New("parameter Method should be \"const\" or \"md5\""))
 		})
 
 		Convey("Test load fail with wrong Method error", func() {
 			processor.Method = "Base64"
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldResemble, errors.New("parameter Method should be \"const\" or \"md5\""))
 		})
 
 		Convey("Test load fail with wrong Match error", func() {
 			processor.Match = "overwrite"
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldResemble, errors.New("parameter Match should be \"full\" or \"regex\""))
 		})
 
 		Convey("Test load fail with no RegexBegin error", func() {
 			processor.RegexBegin = ""
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldResemble, errors.New("need parameter RegexBegin"))
 		})
 
 		Convey("Test load fail with wrong RegexBegin error", func() {
 			processor.RegexBegin = "*"
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldNotBeNil)
 		})
 
 		Convey("Test load fail with no RegexContent error", func() {
 			processor.RegexContent = ""
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldResemble, errors.New("need parameter RegexContent"))
 		})
 
 		Convey("Test load fail with wrong RegexContent error", func() {
 			processor.RegexContent = "*"
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldNotBeNil)
 		})
 
 		Convey("Test load fail with no ReplaceString error", func() {
 			processor.Method = "const"
 			processor.ReplaceString = ""
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldResemble, errors.New("parameter ReplaceString should not be empty when Method is \"const\""))
 		})
 	})
@@ -108,10 +137,9 @@ func TestProcessorDesensitizeInit(t *testing.T) {
 
 func TestProcessorDesensitizeWork(t *testing.T) {
 	Convey("Test Match = full.", t, func() {
-		processor, err := newProcessor()
-		So(err, ShouldBeNil)
+		processor := newProcessor()
 		processor.Match = "full"
-		err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		So(err, ShouldBeNil)
 
 		Convey("Test const", func() {
@@ -122,7 +150,7 @@ func TestProcessorDesensitizeWork(t *testing.T) {
 
 		Convey("Test md5", func() {
 			processor.Method = "md5"
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
 			record := "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}]"
@@ -132,9 +160,8 @@ func TestProcessorDesensitizeWork(t *testing.T) {
 	})
 
 	Convey("Test Match = regex.", t, func() {
-		processor, err := newProcessor()
-		So(err, ShouldBeNil)
-		err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		processor := newProcessor()
+		err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 		So(err, ShouldBeNil)
 
 		Convey("Test const", func() {
@@ -148,7 +175,7 @@ func TestProcessorDesensitizeWork(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("Test md5", func() {
-			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+			err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
 			record := "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}]"
