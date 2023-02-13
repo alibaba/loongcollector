@@ -17,8 +17,8 @@
 | IgnoreParseFailure  | Boolean，`true`                       | 指定解析失败后的操作，不配置表示放弃解析，直接填充所返回的 content 字段。配置为 false ，表示解析失败时丢弃日志。 |
 | KeepSource          | Boolean，`true`                       | 是否保留原字段。     |
 | NoKeyError          | Boolean，`false`                      | 无匹配的原始字段时是否报错。     |
-| NoMatchError        | Boolean，`false`                      | Match 中的表达式全不匹配时是否报错。     |
-| TimeoutError        | Boolean，`false`                      | 匹配超时是否返回错误。      |
+| NoMatchError        | Boolean，`true`                      | Match 中的表达式全不匹配时是否报错。     |
+| TimeoutError        | Boolean，`true`                      | 匹配超时是否返回错误。      |
 
 ## 样例
 

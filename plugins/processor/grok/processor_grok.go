@@ -115,12 +115,12 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 			}
 
 			// tome out error
-			if parseResult == timeOut && p.TimeoutError {
+			if parseResult == matchTimeOut && p.TimeoutError {
 				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "match time out", p.SourceKey, cont.Value)
 			}
 
 			// keep source
-			if (parseResult == parseSuccess && !p.KeepSource) || (parseResult != parseSuccess && !p.IgnoreParseFailure) {
+			if (parseResult == matchSuccess && !p.KeepSource) || (parseResult != matchSuccess && !p.IgnoreParseFailure) {
 				log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
 			}
 		}
@@ -132,12 +132,12 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 	}
 }
 
-func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) string {
+func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) MatchResult {
 	findMatch := false
 	for _, gr := range p.compiledPatterns {
 		m, err := gr.FindStringMatch(*val)
 		if err != nil {
-			return timeOut
+			return matchTimeOut
 		}
 
 		names := []string{}
@@ -154,7 +154,7 @@ func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) string {
 			}
 			m, err = gr.FindNextMatch(m)
 			if err != nil {
-				return timeOut
+				return matchTimeOut
 			}
 		}
 
@@ -169,7 +169,7 @@ func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) string {
 	if !findMatch {
 		return matchFail
 	}
-	return parseSuccess
+	return matchSuccess
 }
 
 // Add patterns from path to processor_grok
@@ -346,8 +346,8 @@ func init() {
 			IgnoreParseFailure:  true,
 			KeepSource:          true,
 			NoKeyError:          false,
-			NoMatchError:        false,
-			TimeoutError:        false,
+			NoMatchError:        true,
+			TimeoutError:        true,
 		}
 	}
 }
@@ -358,10 +358,12 @@ var (
 	symbolic = regexp.MustCompile(`\W`)
 )
 
+type MatchResult int64
+
 const (
-	parseSuccess = "SUCCESS"
-	matchFail    = "MATCHFAIL"
-	timeOut      = "TIMEOUT"
+	matchSuccess MatchResult = iota
+	matchFail
+	matchTimeOut
 )
 
 type graph map[string][]string

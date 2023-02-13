@@ -562,7 +562,7 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		}
 
 		if pluginType != "global" && pluginType != "version" && pluginType != mixProcessModeFlag {
-			return nil, fmt.Errorf("error plugin name %s", pluginType)
+			return nil, fmt.Errorf("error plugin name \"%s\"", pluginType)
 		}
 	}
 	// Perform operations after pluginrunner initialization, such as adding default aggregators and flushers

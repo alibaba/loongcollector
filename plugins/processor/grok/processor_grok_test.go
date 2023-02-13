@@ -123,7 +123,7 @@ func TestProcessorGrokParse(t *testing.T) {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
 			res := processor.processGrok(log, &record)
 
-			So(res, ShouldEqual, parseSuccess)
+			So(res, ShouldEqual, matchSuccess)
 			So(len(log.Contents), ShouldEqual, 4)
 			So(log.Contents[1].Value, ShouldEqual, "begin")
 			So(log.Contents[2].Value, ShouldEqual, "123.456")
@@ -146,7 +146,7 @@ func TestProcessorGrokParse(t *testing.T) {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
 			res := processor.processGrok(log, &record)
 
-			So(res, ShouldEqual, parseSuccess)
+			So(res, ShouldEqual, matchSuccess)
 			So(len(log.Contents), ShouldEqual, 4)
 			So(log.Contents[1].Value, ShouldEqual, "begin")
 			So(log.Contents[2].Value, ShouldEqual, "123.456")
@@ -164,7 +164,7 @@ func TestProcessorGrokParse(t *testing.T) {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
 			res := processor.processGrok(log, &record)
 
-			So(res, ShouldEqual, parseSuccess)
+			So(res, ShouldEqual, matchSuccess)
 			So(len(log.Contents), ShouldEqual, 3)
 			So(log.Contents[1].Value, ShouldEqual, "hello")
 			So(log.Contents[2].Value, ShouldEqual, "こんにちは")
@@ -181,11 +181,40 @@ func TestProcessorGrokParse(t *testing.T) {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
 			res := processor.processGrok(log, &record)
 
-			So(res, ShouldEqual, parseSuccess)
+			So(res, ShouldEqual, matchSuccess)
 			So(len(log.Contents), ShouldEqual, 4)
 			So(log.Contents[1].Value, ShouldEqual, "hello")
 			So(log.Contents[2].Value, ShouldEqual, "こんにちは")
 			So(log.Contents[3].Value, ShouldEqual, "你好")
+		})
+
+		processor.Match = []string{
+			`\[%{TIMESTAMP_ISO8601:time_local}\] %{NUMBER:pid} %{QUOTEDSTRING:thread} prio=%{NUMBER:prio} tid=%{BASE16NUM:tid} nid=%{BASE16NUM:nid} %{DATA:func} \[%{BASE16NUM:addr}\]%{SPACE}(?ms)%{GREEDYDATA:stack}`,
+		}
+		err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+		Convey("Grok Pattern with multiline expression.", func() {
+			record := `[2023-02-09T00:24:43.922554223+08:00] 1 "BLOCKED_TEST pool-1-thread-2" prio=6 tid=0x0000000007673800 nid=0x260c waiting for monitor entry [0x0000000008abf000]
+java.lang.Thread.State: BLOCKED (on object monitor)
+			 at com.nbp.theplatform.threaddump.ThreadBlockedState.monitorLock(ThreadBlockedState.java:43)
+			 - waiting to lock <0x0000000780a000b0> (a com.nbp.theplatform.threaddump.ThreadBlockedState)`
+			log := &protocol.Log{Time: 0}
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
+			res := processor.processGrok(log, &record)
+
+			So(res, ShouldEqual, matchSuccess)
+			So(len(log.Contents), ShouldEqual, 10)
+			So(log.Contents[1].Value, ShouldEqual, "2023-02-09T00:24:43.922554223+08:00")
+			So(log.Contents[2].Value, ShouldEqual, "1")
+			So(log.Contents[3].Value, ShouldEqual, "\"BLOCKED_TEST pool-1-thread-2\"")
+			So(log.Contents[4].Value, ShouldEqual, "6")
+			So(log.Contents[5].Value, ShouldEqual, "0x0000000007673800")
+			So(log.Contents[6].Value, ShouldEqual, "0x260c")
+			So(log.Contents[7].Value, ShouldEqual, "waiting for monitor entry")
+			So(log.Contents[8].Value, ShouldEqual, "0x0000000008abf000")
+			So(log.Contents[9].Value, ShouldEqual, `java.lang.Thread.State: BLOCKED (on object monitor)
+			 at com.nbp.theplatform.threaddump.ThreadBlockedState.monitorLock(ThreadBlockedState.java:43)
+			 - waiting to lock <0x0000000780a000b0> (a com.nbp.theplatform.threaddump.ThreadBlockedState)`)
 		})
 	})
 

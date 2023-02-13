@@ -27,8 +27,9 @@ function os() {
 MOD=${1:-mod}
 BUILDMODE=${2:-default}
 OUT_DIR=${3:-output}
+VERSION=${4:-1.3.1}
 NAME=ilogtail
-LDFLAGS=''
+LDFLAGS='-X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion='$VERSION'"'
 
 os
 OS_FLAG=$?
@@ -38,7 +39,7 @@ mkdir -p "$ROOTDIR"/bin
 
 if [ $OS_FLAG = 1 ]; then
   if uname -m | grep x86_64; then
-    LDFLAGS='-extldflags "-Wl,--wrap=memcpy"'
+    LDFLAGS=$LDFLAGS' -extldflags "-Wl,--wrap=memcpy"'
   fi
   if [ $BUILDMODE = "c-shared" ]; then
     NAME=libPluginBase.so

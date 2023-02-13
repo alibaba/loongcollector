@@ -17,7 +17,6 @@ package pluginmanager
 import (
 	"context"
 	"encoding/json"
-	"runtime"
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -76,12 +75,8 @@ func newGlobalConfig() (cfg GlobalConfig) {
 		FlushIntervalMs:          3000,
 		DefaultLogQueueSize:      1000,
 		DefaultLogGroupQueueSize: 4,
+		LogtailSysConfDir:        ".",
 		DelayStopSec:             300,
-	}
-	if runtime.GOOS == "windows" {
-		cfg.LogtailSysConfDir = "C:\\LogtailData"
-	} else {
-		cfg.LogtailSysConfDir = "/etc/ilogtail"
 	}
 	return
 }

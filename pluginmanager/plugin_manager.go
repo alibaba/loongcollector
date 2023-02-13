@@ -41,7 +41,7 @@ var DisabledLogtailConfigLock sync.Mutex
 var DisabledLogtailConfig = make(map[string]*LogstoreConfig)
 
 // StatisticsConfigJson, AlarmConfigJson
-var BaseVersion = "0.1.0"
+var BaseVersion = "0.1.0" // will be overwritten through ldflags at compile time
 
 var statisticsConfigJSON = `{
     "global": {
@@ -51,8 +51,8 @@ var statisticsConfigJSON = `{
         "DefaultLogQueueSize": 4,
 		"DefaultLogGroupQueueSize": 4,
 		"Tags" : {
-			"base_version" : "0.1.0",
-			"logtail_version" : "0.16.19"
+			"base_version" : "` + BaseVersion + `",
+			"logtail_version" : "` + BaseVersion + `"
 		}
 	},
 	"inputs" : [
@@ -71,8 +71,8 @@ var alarmConfigJSON = `{
         "DefaultLogQueueSize": 4,
 		"DefaultLogGroupQueueSize": 4,
 		"Tags" : {
-			"base_version" : "0.1.0",
-			"logtail_version" : "0.16.19"
+			"base_version" : "` + BaseVersion + `",
+			"logtail_version" : "` + BaseVersion + `"
 		}
     },
 	"inputs" : [
@@ -91,8 +91,8 @@ var containerConfigJSON = `{
         "DefaultLogQueueSize": 4,
 		"DefaultLogGroupQueueSize": 4,
 		"Tags" : {
-			"base_version" : "0.1.0",
-			"logtail_version" : "0.16.19"
+			"base_version" : "` + BaseVersion + `",
+			"logtail_version" : "` + BaseVersion + `"
 		}
     },
 	"inputs" : [
