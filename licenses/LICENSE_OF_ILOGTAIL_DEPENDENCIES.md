@@ -88,6 +88,9 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [sigs.k8s.io/structured-merge-diff](https://pkg.go.dev/sigs.k8s.io/structured-merge-diff?tab=licenses)
 - [go.opentelemetry.io/proto/otlp](https://pkg.go.dev/go.opentelemetry.io/proto/otlp?tab=licenses)
 - [go.opentelemetry.io/collector/pdata](https://pkg.go.dev/go.opentelemetry.io/collector/pdata?tab=licenses)
+- [go.opentelemetry.io/otel](https://pkg.go.dev/go.opentelemetry.io/otel?tab=licenses)
+- [go.opentelemetry.io/otel/trace](https://pkg.go.dev/go.opentelemetry.io/otel/trace?tab=licenses)
+- [github.com/ClickHouse/ch-go](https://pkg.go.dev/github.com/ClickHouse/ch-go?tab=licenses)
 - [go.opentelemetry.io/collector/consumer](https://pkg.go.dev/go.opentelemetry.io/collector/consumer?tab=licenses)
 
 ## BSD licenses
@@ -129,6 +132,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [golang.org/x/time](https://pkg.go.dev/golang.org/x/time?tab=licenses)
 - [google.golang.org/protobuf](https://pkg.go.dev/google.golang.org/protobuf?tab=licenses)
 - [gopkg.in/inf.v0](https://pkg.go.dev/gopkg.in/inf.v0?tab=licenses)
+- [github.com/go-faster/errors](https://pkg.go.dev/github.com/go-faster/errors?tab=licenses)
 - [github.com/miekg/pkcs11](https://pkg.go.dev/github.com/miekg/pkcs11?tab=licenses)
 
 ## MIT licenses
@@ -140,7 +144,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/Microsoft/go-winio](https://pkg.go.dev/github.com/Microsoft/go-winio?tab=licenses)
 - [github.com/Microsoft/hcsshim](https://pkg.go.dev/github.com/Microsoft/hcsshim?tab=licenses)
 - [github.com/Shopify/sarama](https://pkg.go.dev/github.com/Shopify/sarama?tab=licenses)
-- [github.com/StackExchange/wmi](https://pkg.go.dev/github.com/StackExchange/wmi?tab=licenses)
 - [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
 - [github.com/VictoriaMetrics/metrics](https://pkg.go.dev/github.com/VictoriaMetrics/metrics?tab=licenses)
 - [github.com/aliyun/aliyun-log-go-sdk](https://pkg.go.dev/github.com/aliyun/aliyun-log-go-sdk?tab=licenses)
@@ -206,6 +209,13 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [go.etcd.io/bbolt](https://pkg.go.dev/go.etcd.io/bbolt?tab=licenses)
 - [github.com/grpc-ecosystem/grpc-gateway](https://pkg.go.dev/github.com/grpc-ecosystem/grpc-gateway?tab=licenses)
 - [github.com/benbjohnson/clock](https://pkg.go.dev/github.com/benbjohnson/clock?tab=licenses)
+- [github.com/ClickHouse/clickhouse-go](https://pkg.go.dev/github.com/ClickHouse/clickhouse-go?tab=licenses)
+- [github.com/andybalholm/brotli](https://pkg.go.dev/github.com/andybalholm/brotli?tab=licenses)
+- [github.com/benbjohnson/clock](https://pkg.go.dev/github.com/benbjohnson/clock?tab=licenses)
+- [github.com/go-faster/city](https://pkg.go.dev/github.com/go-faster/city?tab=licenses)
+- [github.com/paulmach/orb](https://pkg.go.dev/github.com/paulmach/orb?tab=licenses)
+- [github.com/segmentio/asm](https://pkg.go.dev/github.com/segmentio/asm?tab=licenses)
+- [github.com/yusufpapurcu/wmi](https://pkg.go.dev/github.com/yusufpapurcu/wmi?tab=licenses)
 
 ## ISC licenses
 

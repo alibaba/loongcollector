@@ -45,5 +45,7 @@ your changes, such as:
 - [public] [both] [fixed] ignore timezone adjustment when system time is used
 - [public] [both] [fixed] ignore timezone adjustment when log parse fails
 - [public] [both] [fixed] fix blocking problem caused by alwaysonline config update
+- [public] [both] [added] add a new flusher\_clickhouse plugin.
 - [public] [both] [updated] grok processor reports unmatched errors by default
+- [public] [both] [fixed] grok processor gets stuck with Chinese
 - [public] [both] [fixed] fix plugin version in logs

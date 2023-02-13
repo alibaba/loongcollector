@@ -66,6 +66,9 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [k8s.io/utils](https://pkg.go.dev/k8s.io/utils?tab=licenses)
 - [sigs.k8s.io/structured-merge-diff](https://pkg.go.dev/sigs.k8s.io/structured-merge-diff?tab=licenses)
 - [github.com/klauspost/compress](https://pkg.go.dev/github.com/klauspost/compress?tab=licenses)
+- [github.com/ClickHouse/ch-go](https://pkg.go.dev/github.com/ClickHouse/ch-go?tab=licenses)
+- [go.opentelemetry.io/otel](https://pkg.go.dev/go.opentelemetry.io/otel?tab=licenses)
+- [go.opentelemetry.io/otel/trace](https://pkg.go.dev/go.opentelemetry.io/otel/trace?tab=licenses)
 
 ## BSD licenses
 
@@ -84,7 +87,6 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [google.golang.org/protobuf](https://pkg.go.dev/google.golang.org/protobuf?tab=licenses)
 - [github.com/godbus/dbus](https://pkg.go.dev/github.com/godbus/dbus?tab=licenses)
 - [github.com/google/go-cmp](https://pkg.go.dev/github.com/google/go-cmp?tab=licenses)
-- [github.com/miekg/pkcs11](https://pkg.go.dev/github.com/miekg/pkcs11?tab=licenses)
 - [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto?tab=licenses)
 - [golang.org/x/oauth2](https://pkg.go.dev/golang.org/x/oauth2?tab=licenses)
 - [golang.org/x/sync](https://pkg.go.dev/golang.org/x/sync?tab=licenses)
@@ -92,7 +94,9 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [golang.org/x/time](https://pkg.go.dev/golang.org/x/time?tab=licenses)
 - [gopkg.in/inf.v0](https://pkg.go.dev/gopkg.in/inf.v0?tab=licenses)
 - [sigs.k8s.io/yaml](https://pkg.go.dev/sigs.k8s.io/yaml?tab=licenses)
-
+- [github.com/go-faster/errors](https://pkg.go.dev/github.com/go-faster/errors?tab=licenses)
+- [github.com/pierrec/lz4](https://pkg.go.dev/github.com/pierrec/lz4?tab=licenses)
+- [github.com/miekg/pkcs11](https://pkg.go.dev/github.com/miekg/pkcs11?tab=licenses)
 
 ## MIT licenses
 
@@ -127,6 +131,12 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/tchap/go-patricia](https://pkg.go.dev/github.com/tchap/go-patricia?tab=licenses)
 - [go.etcd.io/bbolt](https://pkg.go.dev/go.etcd.io/bbolt?tab=licenses)
 - [go.mozilla.org/pkcs7](https://pkg.go.dev/go.mozilla.org/pkcs7?tab=licenses)
+- [github.com/ClickHouse/clickhouse-go](https://pkg.go.dev/github.com/ClickHouse/clickhouse-go?tab=licenses)
+- [github.com/go-faster/city](https://pkg.go.dev/github.com/go-faster/city?tab=licenses)
+- [github.com/paulmach/orb](https://pkg.go.dev/github.com/paulmach/orb?tab=licenses)
+- [github.com/segmentio/asm](https://pkg.go.dev/github.com/segmentio/asm?tab=licenses)
+- [github.com/shopspring/decimal](https://pkg.go.dev/github.com/shopspring/decimal?tab=licenses)
+- [github.com/andybalholm/brotli](https://pkg.go.dev/github.com/andybalholm/brotli?tab=licenses)
 
 ## ISC licenses
 
