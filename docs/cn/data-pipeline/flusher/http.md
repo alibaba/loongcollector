@@ -21,6 +21,7 @@
 | Convert.Protocol             | String             | 否       | ilogtail数据转换协议，可选值：`custom_single`,`influxdb`。默认值：`custom_single`<p>v2版本可选值：`raw`</p>                                                             |
 | Convert.Encoding             | String             | 否       | ilogtail flusher数据转换编码，可选值：`json`, `custom`，默认值：`json`                                                                                            |
 | Convert.Separator            | String             | 否       | ilogtail数据转换时，PipelineGroupEvents中多个Events之间拼接使用的分隔符。如`\n`。若不设置，则默认不拼接Events，即每个Event作为独立请求向后发送。 默认值为空。<p>当前仅在`Convert.Protocol: raw`有效。</p>      |
+| Convert.IgnoreUnExpectedData | Boolean            | 否       | ilogtail数据转换时，遇到非预期的数据的行为，true 跳过，false 报错。默认值 true                                                                                               |
 | Convert.TagFieldsRename      | Map<String,String> | 否       | 对日志中tags中的json字段重命名                                                                                                                               |
 | Convert.ProtocolFieldsRename | Map<String,String> | 否       | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                                                             |
 | Concurrency                  | Int                | 否       | 向url发起请求的并发数，默认为`1`                                                                                                                               |

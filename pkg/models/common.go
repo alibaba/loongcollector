@@ -14,6 +14,8 @@
 
 package models
 
+import "sort"
+
 type EventType int
 
 const (
@@ -45,6 +47,17 @@ type TypedValue struct {
 	Value interface{}
 }
 
+type KeyValue[TValue string | float64 | *TypedValue] struct {
+	Key   string
+	Value TValue
+}
+
+type KeyValueSlice[TValue string | float64 | *TypedValue] []KeyValue[TValue]
+
+func (x KeyValueSlice[TValue]) Len() int           { return len(x) }
+func (x KeyValueSlice[TValue]) Less(i, j int) bool { return x[i].Key < x[j].Key }
+func (x KeyValueSlice[TValue]) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
+
 type KeyValues[TValue string | float64 | *TypedValue] interface {
 	Add(key string, value TValue)
 
@@ -59,6 +72,8 @@ type KeyValues[TValue string | float64 | *TypedValue] interface {
 	Merge(other KeyValues[TValue])
 
 	Iterator() map[string]TValue
+
+	SortTo(buf []KeyValue[TValue]) []KeyValue[TValue]
 
 	Len() int
 }
@@ -140,6 +155,25 @@ func (kv *keyValuesImpl[TValue]) Len() int {
 	return 0
 }
 
+func (kv *keyValuesImpl[TValue]) SortTo(buf []KeyValue[TValue]) []KeyValue[TValue] {
+	values, ok := kv.values()
+	if !ok {
+		buf = buf[:0]
+		return buf
+	}
+	if buf == nil {
+		buf = make([]KeyValue[TValue], 0, len(values))
+	} else {
+		buf = buf[:0]
+	}
+
+	for k, v := range values {
+		buf = append(buf, KeyValue[TValue]{Key: k, Value: v})
+	}
+	sort.Sort(KeyValueSlice[TValue](buf))
+	return buf
+}
+
 type keyValuesNoop[TValue string | float64 | *TypedValue] struct {
 }
 
@@ -170,4 +204,8 @@ func (kv *keyValuesNoop[TValue]) Iterator() map[string]TValue {
 
 func (kv *keyValuesNoop[TValue]) Len() int {
 	return 0
+}
+
+func (kv *keyValuesNoop[TValue]) SortTo(buf []KeyValue[TValue]) []KeyValue[TValue] {
+	return nil
 }

@@ -128,6 +128,12 @@ func NewMetricTypedValues() MetricTypedValues {
 	}
 }
 
+func NewMetricTypedValueWithMap(keyValues map[string]*TypedValue) MetricTypedValues {
+	return &keyValuesImpl[*TypedValue]{
+		keyValues: keyValues,
+	}
+}
+
 func NewSpan(name, traceID, spanID string, kind SpanKind, startTime, endTime uint64, tags Tags, events []*SpanEvent, links []*SpanLink) *Span {
 	return &Span{
 		Name:      name,

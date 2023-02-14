@@ -20,4 +20,5 @@ type ConvertConfig struct {
 	Separator            string            // Convert separator
 	Protocol             string            // Convert protocol
 	Encoding             string            // Convert encoding
+	IgnoreUnExpectedData bool              // IgnoreUnExpectedData will skip on unexpected data if set to true, or will return error and stop processing the whole batch data if set to false
 }
