@@ -64,7 +64,7 @@ type FlusherHTTP struct {
 	Convert     helper.ConvertConfig // Convert defines which protocol and format to convert to
 	Concurrency int                  // How many requests can be performed in concurrent
 
-	queryVarKeys []string
+	varKeys []string
 
 	context   pipeline.Context
 	converter *converter.Converter
@@ -114,7 +114,7 @@ func (f *FlusherHTTP) Init(context pipeline.Context) error {
 		go f.runFlushTask()
 	}
 
-	f.buildQueryVarKeys()
+	f.buildVarKeys()
 	f.fillRequestContentType()
 
 	logger.Info(f.context.GetRuntimeContext(), "http flusher init", "initialized")
@@ -177,9 +177,9 @@ func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
 	var err error
 	switch v := data.(type) {
 	case *protocol.LogGroup:
-		logs, varValues, err = f.converter.ToByteStreamWithSelectedFields(v, f.queryVarKeys)
+		logs, varValues, err = f.converter.ToByteStreamWithSelectedFields(v, f.varKeys)
 	case *models.PipelineGroupEvents:
-		logs, varValues, err = f.converter.ToByteStreamWithSelectedFieldsV2(v, f.queryVarKeys)
+		logs, varValues, err = f.converter.ToByteStreamWithSelectedFieldsV2(v, f.varKeys)
 	default:
 		return fmt.Errorf("unsupport data type")
 	}
@@ -251,7 +251,7 @@ func (f *FlusherHTTP) flush(data []byte, varValues map[string]string) (ok, retry
 	if len(f.Query) > 0 {
 		values := req.URL.Query()
 		for k, v := range f.Query {
-			if len(f.queryVarKeys) == 0 {
+			if len(f.varKeys) == 0 {
 				values.Add(k, v)
 				continue
 			}
@@ -268,6 +268,16 @@ func (f *FlusherHTTP) flush(data []byte, varValues map[string]string) (ok, retry
 	}
 
 	for k, v := range f.Headers {
+		if len(f.varKeys) == 0 {
+			req.Header.Add(k, v)
+			continue
+		}
+		fv, ferr := fmtstr.FormatTopic(varValues, v)
+		if ferr != nil {
+			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "http flusher format header fail, error", ferr)
+		} else {
+			v = *fv
+		}
 		req.Header.Add(k, v)
 	}
 	response, err := f.client.Do(req)
@@ -298,28 +308,27 @@ func (f *FlusherHTTP) flush(data []byte, varValues map[string]string) (ok, retry
 	}
 }
 
-func (f *FlusherHTTP) buildQueryVarKeys() {
-	var varKeys []string
-	for _, v := range f.Query {
-		keys, err := fmtstr.CompileKeys(v)
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "http flusher init queryVarKeys fail, err", err)
-		}
-		for _, key := range keys {
-			var exists bool
-			for _, k := range varKeys {
-				if k == v {
-					exists = true
-					break
-				}
+func (f *FlusherHTTP) buildVarKeys() {
+	cache := map[string]struct{}{}
+	defines := []map[string]string{f.Query, f.Headers}
+
+	for _, define := range defines {
+		for _, v := range define {
+			keys, err := fmtstr.CompileKeys(v)
+			if err != nil {
+				logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "http flusher init varKeys fail, err", err)
 			}
-			if exists {
-				continue
+			for _, key := range keys {
+				cache[key] = struct{}{}
 			}
-			varKeys = append(varKeys, key)
 		}
 	}
-	f.queryVarKeys = varKeys
+
+	varKeys := make([]string, 0, len(cache))
+	for k := range cache {
+		varKeys = append(varKeys, k)
+	}
+	f.varKeys = varKeys
 }
 
 func (f *FlusherHTTP) fillRequestContentType() {

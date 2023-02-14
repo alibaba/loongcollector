@@ -49,3 +49,4 @@ your changes, such as:
 - [public] [both] [updated] grok processor reports unmatched errors by default
 - [public] [both] [fixed] grok processor gets stuck with Chinese
 - [public] [both] [fixed] fix plugin version in logs
+- [public] [both] [updated] flusher http support variable config in request header   

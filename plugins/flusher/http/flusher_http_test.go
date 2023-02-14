@@ -83,7 +83,51 @@ func TestHttpFlusherInit(t *testing.T) {
 		Convey("Then Init() should build the variable keys", func() {
 			err := flusher.Init(mockContext{})
 			So(err, ShouldBeNil)
-			So(flusher.queryVarKeys, ShouldResemble, []string{"var"})
+			So(flusher.varKeys, ShouldResemble, []string{"var"})
+		})
+	})
+
+	Convey("Given a http flusher with Headers contains variable ", t, func() {
+		flusher := &FlusherHTTP{
+			RemoteURL: "http://localhost:8086/write",
+			Convert: helper.ConvertConfig{
+				Protocol: converter.ProtocolCustomSingle,
+				Encoding: converter.EncodingJSON,
+			},
+			Timeout:     defaultTimeout,
+			Concurrency: 1,
+			Headers: map[string]string{
+				"name": "_%{var}",
+			},
+		}
+		Convey("Then Init() should build the variable keys", func() {
+			err := flusher.Init(mockContext{})
+			So(err, ShouldBeNil)
+			So(flusher.varKeys, ShouldResemble, []string{"var"})
+		})
+	})
+
+	Convey("Given a http flusher with Query AND Headers contains variable ", t, func() {
+		flusher := &FlusherHTTP{
+			RemoteURL: "http://localhost:8086/write",
+			Convert: helper.ConvertConfig{
+				Protocol: converter.ProtocolCustomSingle,
+				Encoding: converter.EncodingJSON,
+			},
+			Timeout:     defaultTimeout,
+			Concurrency: 1,
+			Query: map[string]string{
+				"name": "_%{var1}",
+			},
+			Headers: map[string]string{
+				"name": "_%{var2}",
+				"tt":   "_%{var1}",
+			},
+		}
+		Convey("Then Init() should build the variable keys", func() {
+			err := flusher.Init(mockContext{})
+			So(err, ShouldBeNil)
+			So(flusher.varKeys, ShouldResemble, []string{"var1", "var2"})
 		})
 	})
 }
@@ -96,6 +140,7 @@ func TestHttpFlusherFlush(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder("POST", "http://test.com/write?db=mydb", func(req *http.Request) (*http.Response, error) {
+			assert.Equal(t, "mydb", req.Header.Get("db"))
 			body, _ := ioutil.ReadAll(req.Body)
 			actualRequests = append(actualRequests, string(body))
 			return httpmock.NewStringResponse(200, "ok"), nil
@@ -110,6 +155,9 @@ func TestHttpFlusherFlush(t *testing.T) {
 			Timeout:     defaultTimeout,
 			Concurrency: 1,
 			Query: map[string]string{
+				"db": "%{tag.db}",
+			},
+			Headers: map[string]string{
 				"db": "%{tag.db}",
 			},
 		}
