@@ -14,29 +14,61 @@
 
 package model
 
-import proto "github.com/alibaba/ilogtail/config_server/service/proto"
+import (
+	proto "github.com/alibaba/ilogtail/config_server/service/proto"
+)
 
-type Config struct {
-	Name        string `json:"Name"`
-	AgentType   string `json:"AgentType"`
-	Content     string `json:"Content"`
-	Version     int64  `json:"Version"`
-	Description string `json:"Description"`
-	DelTag      bool   `json:"DelTag"`
+var ConfigType = map[string]proto.ConfigType{
+	"PIPELINE_CONFIG": proto.ConfigType_PIPELINE_CONFIG,
+	"AGENT_CONFIG":    proto.ConfigType_AGENT_CONFIG,
 }
 
-func (c *Config) ToProto() *proto.Config {
-	pc := new(proto.Config)
-	pc.ConfigName = c.Name
-	pc.AgentType = c.AgentType
-	pc.Description = c.Description
-	pc.Content = c.Content
+type ConfigDetail struct {
+	Type    string `json:"Type"`
+	Name    string `json:"Name"`
+	Version int64  `json:"Version"`
+	Context string `json:"Context"`
+	Detail  string `json:"Detail"`
+	DelTag  bool   `json:"DelTag"`
+}
+
+func (c *ConfigDetail) ToProto() *proto.ConfigDetail {
+	pc := new(proto.ConfigDetail)
+	pc.Type = ConfigType[c.Type]
+	pc.Name = c.Name
+	pc.Version = c.Version
+	pc.Context = c.Context
+	pc.Detail = c.Detail
 	return pc
 }
 
-func (c *Config) ParseProto(pc *proto.Config) {
-	c.Name = pc.ConfigName
-	c.AgentType = pc.AgentType
-	c.Description = pc.Description
-	c.Content = pc.Content
+func (c *ConfigDetail) ParseProto(pc *proto.ConfigDetail) {
+	c.Type = pc.Type.String()
+	c.Name = pc.Name
+	c.Version = pc.Version
+	c.Context = pc.Context
+	c.Detail = pc.Detail
+}
+
+type Command struct {
+	Type string            `json:"Type"`
+	Name string            `json:"Name"`
+	ID   string            `json:"ID"`
+	Args map[string]string `json:"Args"`
+}
+
+func (c *Command) ToProto() *proto.Command {
+	pc := new(proto.Command)
+	pc.Type = c.Type
+	pc.Name = c.Name
+	pc.Id = c.ID
+	pc.Args = c.Args
+	return pc
+}
+
+func (c *Command) ParseProto(pc *proto.Command) {
+	c.Type = pc.Type
+	c.Name = pc.Name
+	c.ID = pc.Id
+	c.Args = pc.Args
 }

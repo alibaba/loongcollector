@@ -90,6 +90,7 @@ namespace sdk {
     extern const char* const MACHINES; //= "/machines"
     extern const char* const MACHINEGROUPS; //= "/machinegroups"
     extern const char* const ACLS; //= "/acls"
+    extern const char* const CONFIGSERVERAGENT; //= "/Agent"
 
     extern const char* const HTTP_GET; //= "GET";
     extern const char* const HTTP_POST; //= "POST";

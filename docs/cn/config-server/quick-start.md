@@ -9,7 +9,7 @@ ConfigServer 就是这样的一款可观测 Agent 管控工具，目前支持：
 * 采集 Agent 注册到 ConfigServer
 * 以 Agent 组的形式对采集 Agent 进行统一管理
 * 远程批量配置采集 Agent 的采集配置
-* 监控采集 Agent 的运行状态，汇总告警信息
+* 监控采集 Agent 的运行状态
 
 ## 术语表
 
@@ -26,7 +26,7 @@ ConfigServer 就是这样的一款可观测 Agent 管控工具，目前支持：
 
 * Agent启动后，定期向 ConfigServer 进行心跳注册，证明存活性。
 * 上报如下信息，供 ConfigServer 汇集后统一通过API对外呈现。
-  * Agent的instance_id，作为唯一标识。
+  * Agent 的 instance_id，作为唯一标识。
   * 版本号
   * 启动时间
   * 运行状态
@@ -45,7 +45,7 @@ ConfigServer 就是这样的一款可观测 Agent 管控工具，目前支持：
 
 ### 状态监控
 
-* Agent 定期向 ConfigServer 进行运行统计、Alarm等信息上报。
+* Agent 定期向 ConfigServer 发送心跳，上报运行信息。
 * ConfigServer 汇集后统一通过API对外呈现。
 
 ## 运行

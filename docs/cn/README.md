@@ -65,7 +65,7 @@ iLogtail 发展规划：[RoadMap](https://github.com/alibaba/ilogtail/discussion
 
 数以万计的公司在阿里云、线下IDC、其他云等多种环境中使用 iLogtail。 更多详情请看[这里](https://help.aliyun.com/document_detail/250268.html) 。
 
-目前来自同程旅行、阿里云、小红书、字节跳动、石墨文档的多位同学在参与 iLogtail 社区的共建。
+目前来自阿里云、石墨文档、同程旅行、小红书、字节跳动、哔哩哔哩的多位同学在参与 iLogtail 社区的共建。
 
 ## Licence
 

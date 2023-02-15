@@ -15,86 +15,69 @@
 package model
 
 import (
-	"fmt"
-	"strconv"
-
 	proto "github.com/alibaba/ilogtail/config_server/service/proto"
 )
 
+type AgentAttributes struct {
+	Version  string            `json:"Version"`
+	Category string            `json:"Category"`
+	IP       string            `json:"IP"`
+	Hostname string            `json:"Hostname"`
+	Region   string            `json:"Region"`
+	Zone     string            `json:"Zone"`
+	Extras   map[string]string `json:"Extras"`
+}
+
+func (a *AgentAttributes) ToProto() *proto.AgentAttributes {
+	pa := new(proto.AgentAttributes)
+	pa.Version = a.Version
+	pa.Category = a.Category
+	pa.Ip = a.IP
+	pa.Hostname = a.Hostname
+	pa.Region = a.Region
+	pa.Zone = a.Zone
+	pa.Extras = a.Extras
+	return pa
+}
+
+func (a *AgentAttributes) ParseProto(pa *proto.AgentAttributes) {
+	a.Version = pa.Version
+	a.Category = pa.Category
+	a.IP = pa.Ip
+	a.Hostname = pa.Hostname
+	a.Region = pa.Region
+	a.Zone = pa.Zone
+	a.Extras = pa.Extras
+}
+
 type Agent struct {
-	AgentID             string            `json:"AgentID"`
-	AgentType           string            `json:"AgentType"`
-	IP                  string            `json:"IP"`
-	Version             string            `json:"Version"`
-	RunningStatus       string            `json:"RunningStatus"`
-	StartupTime         int64             `json:"StartupTime"`
-	LatestHeartbeatTime int64             `json:"LatestHeartbeatTime"`
-	Tags                map[string]string `json:"Tags"`
-	RunningDetails      map[string]string `json:"RunningDetails"`
+	AgentID       string          `json:"AgentID"`
+	AgentType     string          `json:"AgentType"`
+	Attributes    AgentAttributes `json:"Attributes"`
+	Tags          []string        `json:"Tags"`
+	RunningStatus string          `json:"RunningStatus"`
+	StartupTime   int64           `json:"StartupTime"`
+	Interval      int32           `json:"Interval"`
 }
 
 func (a *Agent) ToProto() *proto.Agent {
 	pa := new(proto.Agent)
 	pa.AgentId = a.AgentID
 	pa.AgentType = a.AgentType
-	pa.Ip = a.IP
-	pa.Version = a.Version
+	pa.Attributes = a.Attributes.ToProto()
+	pa.Tags = a.Tags
 	pa.RunningStatus = a.RunningStatus
 	pa.StartupTime = a.StartupTime
-	pa.LatestHeartbeatTime = a.LatestHeartbeatTime
-	pa.Tags = a.Tags
-	pa.RunningDetails = a.RunningDetails
+	pa.Interval = a.Interval
 	return pa
 }
 
 func (a *Agent) ParseProto(pa *proto.Agent) {
 	a.AgentID = pa.AgentId
 	a.AgentType = pa.AgentType
-	a.IP = pa.Ip
-	a.Version = pa.Version
+	a.Attributes.ParseProto(pa.Attributes)
+	a.Tags = pa.Tags
 	a.RunningStatus = pa.RunningStatus
 	a.StartupTime = pa.StartupTime
-	a.LatestHeartbeatTime = pa.LatestHeartbeatTime
-	a.Tags = pa.Tags
-	a.RunningDetails = pa.RunningDetails
-}
-
-func (a *Agent) AddRunningDetails(d *RunningStatistics) {
-	if a.AgentID != d.AgentID {
-		return
-	}
-
-	a.RunningDetails["CPU"] = fmt.Sprintf("%f", d.CPU)
-	a.RunningDetails["Memory"] = strconv.FormatInt(d.Memory, 10)
-	for k, v := range d.Extras {
-		a.RunningDetails[k] = v
-	}
-}
-
-type AgentAlarm struct {
-	AlarmKey     string `json:"AlarmKey"`
-	AlarmTime    string `json:"AlarmTime"`
-	AlarmType    string `json:"AlarmType"`
-	AlarmMessage string `json:"AlarmMessage"`
-}
-
-type RunningStatistics struct {
-	AgentID string            `json:"AgentID"`
-	CPU     float32           `json:"CPU"`
-	Memory  int64             `json:"Memory"`
-	Extras  map[string]string `json:"Extras"`
-}
-
-func (r *RunningStatistics) ToProto() *proto.RunningStatistics {
-	pr := new(proto.RunningStatistics)
-	pr.Cpu = r.CPU
-	pr.Memory = r.Memory
-	pr.Extras = r.Extras
-	return pr
-}
-
-func (r *RunningStatistics) ParseProto(pr *proto.RunningStatistics) {
-	r.CPU = pr.Cpu
-	r.Memory = pr.Memory
-	r.Extras = pr.Extras
+	a.Interval = pa.Interval
 }

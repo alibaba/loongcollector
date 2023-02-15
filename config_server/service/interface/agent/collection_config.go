@@ -15,8 +15,6 @@
 package agent
 
 import (
-	"fmt"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
@@ -25,27 +23,40 @@ import (
 	proto "github.com/alibaba/ilogtail/config_server/service/proto"
 )
 
-func GetConfigList(c *gin.Context) {
-	req := proto.AgentGetConfigListRequest{}
-	res := &proto.AgentGetConfigListResponse{}
+func FetchPipelineConfig(c *gin.Context) {
+	req := proto.FetchPipelineConfigRequest{}
+	res := &proto.FetchPipelineConfigResponse{}
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
-	res.ResponseId = req.RequestId
+	res.RequestId = req.RequestId
 
-	if req.AgentId == "" {
-		res.Code = common.BadRequest.Code
-		res.Message = fmt.Sprintf("Need parameter %s.", "AgentID")
+	if req.ReqConfigs == nil {
+		req.ReqConfigs = []*proto.ConfigInfo{}
+	}
+
+	c.ProtoBuf(manager.ConfigManager().FetchPipelineConfig(&req, res))
+}
+
+func FetchAgentConfig(c *gin.Context) {
+	req := proto.FetchAgentConfigRequest{}
+	res := &proto.FetchAgentConfigResponse{}
+
+	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
+	if err != nil {
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
-	if req.ConfigVersions == nil {
-		req.ConfigVersions = make(map[string]int64)
+	res.RequestId = req.RequestId
+
+	if req.ReqConfigs == nil {
+		req.ReqConfigs = []*proto.ConfigInfo{}
 	}
 
-	c.ProtoBuf(manager.ConfigManager().GetConfigList(&req, res))
+	c.ProtoBuf(manager.ConfigManager().FetchAgentConfig(&req, res))
 }

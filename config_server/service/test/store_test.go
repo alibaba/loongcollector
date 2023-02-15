@@ -33,35 +33,35 @@ func TestStore(t *testing.T) {
 		s := store.GetStore()
 
 		Convey("First, add a config named config-test to store.", func() {
-			config := new(model.Config)
+			config := new(model.ConfigDetail)
 			config.Name = "config-test"
-			config.AgentType = "iLogtail"
-			config.Content = "test"
+			config.Type = "PIPELINE_CONFIG"
+			config.Detail = "test"
 			config.Version = 1
-			config.Description = ""
+			config.Context = ""
 			config.DelTag = false
-			s.Add(common.TypeCollectionConfig, config.Name, config)
+			s.Add(common.TypeConfigDetail, config.Name, config)
 
-			value, getErr := s.Get(common.TypeCollectionConfig, "config-test")
+			value, getErr := s.Get(common.TypeConfigDetail, "config-test")
 			So(getErr, ShouldBeNil)
-			So(value.(*model.Config), ShouldResemble, &model.Config{Name: "config-test", AgentType: "iLogtail", Content: "test", Version: 1, Description: "", DelTag: false})
+			So(value.(*model.ConfigDetail), ShouldResemble, &model.ConfigDetail{Name: "config-test", Type: "PIPELINE_CONFIG", Detail: "test", Version: 1, Context: "", DelTag: false})
 		})
 
 		Convey("Second, update config-test's content.", func() {
-			value, getErr := s.Get(common.TypeCollectionConfig, "config-test")
+			value, getErr := s.Get(common.TypeConfigDetail, "config-test")
 			So(getErr, ShouldBeNil)
-			config := value.(*model.Config)
-			config.Description = "test"
-			s.Update(common.TypeCollectionConfig, config.Name, config)
+			config := value.(*model.ConfigDetail)
+			config.Context = "test"
+			s.Update(common.TypeConfigDetail, config.Name, config)
 
-			value, getErr = s.Get(common.TypeCollectionConfig, "config-test")
+			value, getErr = s.Get(common.TypeConfigDetail, "config-test")
 			So(getErr, ShouldBeNil)
-			So(value.(*model.Config), ShouldResemble, &model.Config{Name: "config-test", AgentType: "iLogtail", Content: "test", Version: 1, Description: "test", DelTag: false})
+			So(value.(*model.ConfigDetail), ShouldResemble, &model.ConfigDetail{Name: "config-test", Type: "PIPELINE_CONFIG", Detail: "test", Version: 1, Context: "test", DelTag: false})
 		})
 
 		Convey("Third, delete config-test.", func() {
-			s.Delete(common.TypeCollectionConfig, "config-test")
-			_, getErr := s.Get(common.TypeCollectionConfig, "config-test")
+			s.Delete(common.TypeConfigDetail, "config-test")
+			_, getErr := s.Get(common.TypeConfigDetail, "config-test")
 			So(getErr, ShouldNotBeNil)
 		})
 	})

@@ -23,7 +23,9 @@
 #include <functional>
 #include <atomic>
 #include <json/json.h>
+#include "app_config/AppConfig.h"
 #include "config_manager/ConfigManagerBase.h"
+#include "config_server_pb/agent.pb.h"
 
 namespace logtail {
 
@@ -72,6 +74,21 @@ private:
     bool CheckUpdateThread(bool configExistFlag);
 
     void GetRemoteConfigUpdate();
+
+    // ConfigServer
+    google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> SendHeartbeat(
+        const AppConfig::ConfigServerAddress& configServerAddress
+    );
+
+    google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> FetchPipelineConfig(
+        const AppConfig::ConfigServerAddress& configServerAddress, 
+        const google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>& requestConfigs
+    );
+    
+    void UpdateRemoteConfig(
+        const google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>& checkResults,
+        const google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail>& configDetails
+    );
 
     /**
      * @brief CreateCustomizedFuseConfig, call this after starting, insert it into config map

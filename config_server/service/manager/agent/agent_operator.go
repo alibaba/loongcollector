@@ -16,7 +16,6 @@ package agentmanager
 
 import (
 	"log"
-	"strconv"
 	"sync"
 	"time"
 
@@ -27,45 +26,19 @@ import (
 )
 
 func (a *AgentManager) HeartBeat(req *proto.HeartBeatRequest, res *proto.HeartBeatResponse) (int, *proto.HeartBeatResponse) {
-	queryTime := time.Now().Unix()
 	agent := new(model.Agent)
 	agent.AgentID = req.AgentId
 	agent.AgentType = req.AgentType
-	agent.Version = req.AgentVersion
-	agent.IP = req.Ip
+	agent.Attributes.ParseProto(req.Attributes)
 	agent.Tags = req.Tags
 	agent.RunningStatus = req.RunningStatus
 	agent.StartupTime = req.StartupTime
-	agent.LatestHeartbeatTime = queryTime
+	agent.Interval = req.Interval
 
 	a.AgentMessageList.Push(optHeartbeat, agent)
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Send heartbeat success"
-	return common.Accept.Status, res
-}
-
-func (a *AgentManager) RunningStatistics(req *proto.RunningStatisticsRequest, res *proto.RunningStatisticsResponse) (int, *proto.RunningStatisticsResponse) {
-	agentStatus := new(model.RunningStatistics)
-	agentStatus.ParseProto(req.RunningDetails)
-	a.AgentMessageList.Push(optStatistics, agentStatus)
-
-	res.Code = common.Accept.Code
-	res.Message = "Send running statistics success"
-	return common.Accept.Status, res
-}
-
-func (a *AgentManager) Alarm(req *proto.AlarmRequest, res *proto.AlarmResponse) (int, *proto.AlarmResponse) {
-	queryTime := strconv.FormatInt(time.Now().Unix(), 10)
-	alarm := new(model.AgentAlarm)
-	alarm.AlarmKey = generateAlarmKey(queryTime, req.AgentId)
-	alarm.AlarmTime = queryTime
-	alarm.AlarmType = req.Type
-	alarm.AlarmMessage = req.Detail
-	a.AgentMessageList.Push(optAlarm, alarm)
-
-	res.Code = common.Accept.Code
-	res.Message = "Alarm success"
 	return common.Accept.Status, res
 }
 
@@ -76,64 +49,10 @@ func (a *AgentManager) updateAgentMessage(interval int) {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		wg.Add(3)
-		go a.batchAddAlarm()
+		wg.Add(1)
 		go a.batchUpdateAgentMessage()
-		go a.releaseAlarm()
 		wg.Wait()
 	}
-}
-
-func (a *AgentManager) batchAddAlarm() {
-	s := store.GetStore()
-	b := store.CreateBacth()
-
-	a.AgentMessageList.Mutex.Lock()
-	for k, v := range a.AgentMessageList.Alarm {
-		b.Add(common.TypeAgentAlarm, k, v)
-	}
-	a.AgentMessageList.Alarm = make(map[string]*model.AgentAlarm, 0)
-	a.AgentMessageList.Mutex.Unlock()
-
-	writeBatchErr := s.WriteBatch(b)
-	if writeBatchErr != nil {
-		log.Println(writeBatchErr)
-		return
-	}
-
-	wg.Done()
-}
-
-func (a *AgentManager) releaseAlarm() {
-	s := store.GetStore()
-	b := store.CreateBacth()
-
-	alarmCount, countErr := s.Count(common.TypeAgentAlarm)
-	if countErr != nil {
-		log.Println(countErr)
-		return
-	}
-	if alarmCount > 10000 {
-		alarmList, getAllErr := s.GetAll(common.TypeAgentAlarm)
-		if getAllErr != nil {
-			log.Println(getAllErr)
-			return
-		}
-		for i, v := range alarmList {
-			if i > 5000 {
-				break
-			}
-			b.Delete(common.TypeAgentAlarm, generateAlarmKey(v.(*model.AgentAlarm).AlarmTime, v.(*model.AgentAlarm).AlarmKey))
-		}
-	}
-
-	writeBatchErr := s.WriteBatch(b)
-	if writeBatchErr != nil {
-		log.Println(writeBatchErr)
-		return
-	}
-
-	wg.Done()
 }
 
 func (a *AgentManager) batchUpdateAgentMessage() {
@@ -145,10 +64,6 @@ func (a *AgentManager) batchUpdateAgentMessage() {
 		b.Update(common.TypeAgent, k, v)
 	}
 	a.AgentMessageList.Heartbeat = make(map[string]*model.Agent, 0)
-	for k, v := range a.AgentMessageList.Statistics {
-		b.Update(common.TypeRunningStatistics, k, v)
-	}
-	a.AgentMessageList.Statistics = make(map[string]*model.RunningStatistics, 0)
 	a.AgentMessageList.Mutex.Unlock()
 
 	writeBatchErr := s.WriteBatch(b)
@@ -157,8 +72,4 @@ func (a *AgentManager) batchUpdateAgentMessage() {
 	}
 
 	wg.Done()
-}
-
-func generateAlarmKey(queryTime string, agentID string) string {
-	return queryTime + ":" + agentID
 }

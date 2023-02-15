@@ -31,62 +31,22 @@ func HeartBeat(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
-	res.ResponseId = req.RequestId
+	res.RequestId = req.RequestId
 
 	if req.AgentId == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "AgentID")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 
-	c.ProtoBuf(manager.AgentManager().HeartBeat(&req, res))
-}
-
-func RunningStatistics(c *gin.Context) {
-	req := proto.RunningStatisticsRequest{}
-	res := &proto.RunningStatisticsResponse{}
-
-	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
-	if err != nil {
-		res.Code = common.BadRequest.Code
+	_, res = manager.AgentManager().HeartBeat(&req, res)
+	if res.Code != proto.RespCode_ACCEPT {
 		c.ProtoBuf(common.BadRequest.Status, res)
-		return
 	}
-	res.ResponseId = req.RequestId
-
-	if req.AgentId == "" {
-		res.Code = common.BadRequest.Code
-		res.Message = fmt.Sprintf("Need parameter %s.", "AgentID")
-		c.ProtoBuf(common.BadRequest.Status, res)
-		return
-	}
-
-	c.ProtoBuf(manager.AgentManager().RunningStatistics(&req, res))
-}
-
-func Alarm(c *gin.Context) {
-	req := proto.AlarmRequest{}
-	res := &proto.AlarmResponse{}
-
-	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
-	if err != nil {
-		res.Code = common.BadRequest.Code
-		c.ProtoBuf(common.BadRequest.Status, res)
-		return
-	}
-	res.ResponseId = req.RequestId
-
-	if req.AgentId == "" {
-		res.Code = common.BadRequest.Code
-		res.Message = fmt.Sprintf("Need parameter %s.", "AgentID")
-		c.ProtoBuf(common.BadRequest.Status, res)
-		return
-	}
-
-	c.ProtoBuf(manager.AgentManager().Alarm(&req, res))
+	c.ProtoBuf(manager.ConfigManager().CheckConfigUpdatesWhenHeartbeat(&req, res))
 }

@@ -47,7 +47,7 @@ func DeleteAgentGroup(r *gin.Engine, groupName string, requestID string) (int, *
 	return res.StatusCode, resBody
 }
 
-func CreateConfig(r *gin.Engine, config *configserverproto.Config, requestID string) (int, *configserverproto.CreateConfigResponse) {
+func CreateConfig(r *gin.Engine, config *configserverproto.ConfigDetail, requestID string) (int, *configserverproto.CreateConfigResponse) {
 	// data
 	reqBody := configserverproto.CreateConfigRequest{}
 	reqBody.RequestId = requestID
@@ -89,7 +89,7 @@ func GetConfig(r *gin.Engine, configName string, requestID string) (int, *config
 	return res.StatusCode, resBody
 }
 
-func UpdateConfig(r *gin.Engine, config *configserverproto.Config, requestID string) (int, *configserverproto.UpdateConfigResponse) {
+func UpdateConfig(r *gin.Engine, config *configserverproto.ConfigDetail, requestID string) (int, *configserverproto.UpdateConfigResponse) {
 	// data
 	reqBody := configserverproto.UpdateConfigRequest{}
 	reqBody.RequestId = requestID
@@ -264,8 +264,6 @@ func HeartBeat(r *gin.Engine, agent *configserverproto.Agent, requestID string) 
 	reqBody.RequestId = requestID
 	reqBody.AgentId = agent.AgentId
 	reqBody.AgentType = agent.AgentType
-	reqBody.AgentVersion = agent.Version
-	reqBody.Ip = agent.Ip
 	reqBody.RunningStatus = agent.RunningStatus
 	reqBody.StartupTime = agent.StartupTime
 	reqBody.Tags = agent.Tags
@@ -285,68 +283,30 @@ func HeartBeat(r *gin.Engine, agent *configserverproto.Agent, requestID string) 
 	return res.StatusCode, resBody
 }
 
-func RunningStatistics(r *gin.Engine, agentID string, runningStatistics *configserverproto.RunningStatistics, requestID string) (int, *configserverproto.RunningStatisticsResponse) {
+func FetchPipelineConfig(r *gin.Engine, configInfos []*configserverproto.ConfigCheckResult, requestID string) (int, *configserverproto.FetchPipelineConfigResponse) {
 	// data
-	reqBody := configserverproto.RunningStatisticsRequest{}
+	reqBody := configserverproto.FetchPipelineConfigRequest{}
 	reqBody.RequestId = requestID
-	reqBody.AgentId = agentID
-	reqBody.RunningDetails = runningStatistics
+	reqBody.ReqConfigs = make([]*configserverproto.ConfigInfo, 0)
+	for _, c := range configInfos {
+		conf := new(configserverproto.ConfigInfo)
+		conf.Name = c.Name
+		conf.Context = c.Context
+		conf.Type = c.Type
+		conf.Version = c.NewVersion
+		reqBody.ReqConfigs = append(reqBody.ReqConfigs, conf)
+	}
 	reqBodyByte, _ := proto.Marshal(&reqBody)
 
 	// request
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/Agent/RunningStatistics", bytes.NewBuffer(reqBodyByte))
+	req, _ := http.NewRequest("POST", "/Agent/FetchPipelineConfig", bytes.NewBuffer(reqBodyByte))
 	r.ServeHTTP(w, req)
 
 	// response
 	res := w.Result()
 	resBodyByte, _ := io.ReadAll(res.Body)
-	resBody := new(configserverproto.RunningStatisticsResponse)
-	_ = proto.Unmarshal(resBodyByte, resBody)
-
-	return res.StatusCode, resBody
-}
-
-func Alarm(r *gin.Engine, agentID string, alarmType string, alarmDetail string, requestID string) (int, *configserverproto.AlarmResponse) {
-	// data
-	reqBody := configserverproto.AlarmRequest{}
-	reqBody.RequestId = requestID
-	reqBody.AgentId = agentID
-	reqBody.Type = alarmType
-	reqBody.Detail = alarmDetail
-	reqBodyByte, _ := proto.Marshal(&reqBody)
-
-	// request
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/Agent/Alarm", bytes.NewBuffer(reqBodyByte))
-	r.ServeHTTP(w, req)
-
-	// response
-	res := w.Result()
-	resBodyByte, _ := io.ReadAll(res.Body)
-	resBody := new(configserverproto.AlarmResponse)
-	_ = proto.Unmarshal(resBodyByte, resBody)
-
-	return res.StatusCode, resBody
-}
-
-func GetConfigList(r *gin.Engine, agentID string, configVersions map[string]int64, requestID string) (int, *configserverproto.AgentGetConfigListResponse) {
-	// data
-	reqBody := configserverproto.AgentGetConfigListRequest{}
-	reqBody.RequestId = requestID
-	reqBody.AgentId = agentID
-	reqBody.ConfigVersions = configVersions
-	reqBodyByte, _ := proto.Marshal(&reqBody)
-
-	// request
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/Agent/GetConfigList", bytes.NewBuffer(reqBodyByte))
-	r.ServeHTTP(w, req)
-
-	// response
-	res := w.Result()
-	resBodyByte, _ := io.ReadAll(res.Body)
-	resBody := new(configserverproto.AgentGetConfigListResponse)
+	resBody := new(configserverproto.FetchPipelineConfigResponse)
 	_ = proto.Unmarshal(resBodyByte, resBody)
 
 	return res.StatusCode, resBody

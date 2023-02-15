@@ -24,12 +24,12 @@ import (
 )
 
 type ConfigManager struct {
-	ConfigList      map[string]*model.Config
+	ConfigList      map[string]*model.ConfigDetail
 	ConfigListMutex *sync.RWMutex
 }
 
 func (c *ConfigManager) Init() {
-	c.ConfigList = make(map[string]*model.Config)
+	c.ConfigList = make(map[string]*model.ConfigDetail)
 	c.ConfigListMutex = new(sync.RWMutex)
 	go c.updateConfigList(setting.GetSetting().ConfigSyncInterval)
 

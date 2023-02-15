@@ -31,14 +31,14 @@ func CreateAgentGroup(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.AgentGroup.GroupName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group need parameter %s.", "GroupName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -53,14 +53,14 @@ func UpdateAgentGroup(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.AgentGroup.GroupName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group need parameter %s.", "groupName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -75,14 +75,14 @@ func DeleteAgentGroup(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.GroupName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group need parameter %s.", "groupName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -97,14 +97,14 @@ func GetAgentGroup(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.GroupName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group need parameter %s.", "groupName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -119,7 +119,7 @@ func ListAgentGroups(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
@@ -134,14 +134,14 @@ func ListAgents(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.GroupName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "groupName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -156,14 +156,14 @@ func GetAppliedConfigsForAgentGroup(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.GroupName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "GroupName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -178,20 +178,20 @@ func ApplyConfigToAgentGroup(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.GroupName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "groupName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	if req.ConfigName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "configName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -206,20 +206,20 @@ func RemoveConfigFromAgentGroup(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.GroupName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "groupName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	if req.ConfigName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "configName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return

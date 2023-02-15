@@ -31,50 +31,31 @@ func (c *ConfigManager) updateConfigList(interval int) {
 
 	for range ticker.C {
 		s := store.GetStore()
-		configList, getAllErr := s.GetAll(common.TypeCollectionConfig)
+		configList, getAllErr := s.GetAll(common.TypeConfigDetail)
 		if getAllErr != nil {
 			log.Println(getAllErr)
 			continue
 		} else {
 			c.ConfigListMutex.Lock()
-			c.ConfigList = make(map[string]*model.Config, 0)
+			c.ConfigList = make(map[string]*model.ConfigDetail, 0)
 			for _, config := range configList {
-				c.ConfigList[config.(*model.Config).Name] = config.(*model.Config)
+				c.ConfigList[config.(*model.ConfigDetail).Name] = config.(*model.ConfigDetail)
 			}
 			c.ConfigListMutex.Unlock()
 		}
 	}
 }
 
-func (c *ConfigManager) GetConfigList(req *proto.AgentGetConfigListRequest, res *proto.AgentGetConfigListResponse) (int, *proto.AgentGetConfigListResponse) {
-	ans := make([]*proto.ConfigUpdateInfo, 0)
+func (c *ConfigManager) CheckConfigUpdatesWhenHeartbeat(req *proto.HeartBeatRequest, res *proto.HeartBeatResponse) (int, *proto.HeartBeatResponse) {
+	pipelineConfigs := make([]*proto.ConfigCheckResult, 0)
+	agentConfigs := make([]*proto.ConfigCheckResult, 0)
 	s := store.GetStore()
 
-	// get agent's tag
-	ok, hasErr := s.Has(common.TypeAgent, req.AgentId)
-	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
-		res.Message = hasErr.Error()
-		return common.InternalServerError.Status, res
-	} else if !ok {
-		res.Code = common.AgentNotExist.Code
-		res.Message = fmt.Sprintf("Agent %s doesn't exist.", req.AgentId)
-		return common.AgentNotExist.Status, res
-	}
-
-	value, getErr := s.Get(common.TypeAgent, req.AgentId)
-	if getErr != nil {
-		res.Code = common.InternalServerError.Code
-		res.Message = getErr.Error()
-		return common.InternalServerError.Status, res
-	}
-	agent := value.(*model.Agent)
-
 	// get all configs connected to agent group whose tag is same as agent's
-	configList := make(map[string]*model.Config)
+	SelectedConfigs := make(map[string]*model.ConfigDetail)
 	agentGroupList, getAllErr := s.GetAll(common.TypeAgentGROUP)
 	if getAllErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getAllErr.Error()
 		return common.InternalServerError.Status, res
 	}
@@ -82,9 +63,10 @@ func (c *ConfigManager) GetConfigList(req *proto.AgentGetConfigListRequest, res 
 	for _, agentGroup := range agentGroupList {
 		match := func() bool {
 			for _, v := range agentGroup.(*model.AgentGroup).Tags {
-				_, ok := agent.Tags[v.Name]
-				if ok && agent.Tags[v.Name] == v.Value {
-					return true
+				for _, tag := range req.Tags {
+					if v.Value == tag {
+						return true
+					}
 				}
 			}
 			return false
@@ -92,73 +74,153 @@ func (c *ConfigManager) GetConfigList(req *proto.AgentGetConfigListRequest, res 
 		if match || agentGroup.(*model.AgentGroup).Name == "default" {
 			for k := range agentGroup.(*model.AgentGroup).AppliedConfigs {
 				// Check if config k exist
-				ok, hasErr := s.Has(common.TypeCollectionConfig, k)
-				if hasErr != nil {
-					res.Code = common.InternalServerError.Code
-					res.Message = hasErr.Error()
-					return common.InternalServerError.Status, res
-				}
-				if !ok {
-					res.Code = common.ConfigNotExist.Code
+				config, hasErr := c.ConfigList[k]
+				if !hasErr {
+					res.Code = proto.RespCode_INVALID_PARAMETER
 					res.Message = fmt.Sprintf("Config %s doesn't exist.", k)
 					return common.ConfigNotExist.Status, res
 				}
-
-				value, getErr := s.Get(common.TypeCollectionConfig, k)
-				if getErr != nil {
-					res.Code = common.InternalServerError.Code
-					res.Message = getErr.Error()
-					return common.InternalServerError.Status, res
-				}
-				config := value.(*model.Config)
 
 				if config.DelTag {
-					res.Code = common.ConfigNotExist.Code
+					res.Code = proto.RespCode_INVALID_PARAMETER
 					res.Message = fmt.Sprintf("Config %s doesn't exist.", k)
 					return common.ConfigNotExist.Status, res
 				}
 
-				configList[k] = config
+				SelectedConfigs[k] = config
 			}
 		}
 	}
 
-	// comp config info
-	for k := range req.ConfigVersions {
-		if _, ok := configList[k]; !ok {
-			result := new(proto.ConfigUpdateInfo)
-			result.ConfigName = k
-			result.UpdateStatus = proto.ConfigUpdateInfo_DELETED
-			ans = append(ans, result)
-		}
-	}
-
-	for k, config := range configList {
-		result := new(proto.ConfigUpdateInfo)
-
-		if _, ok := req.ConfigVersions[k]; !ok {
-			result.ConfigName = k
-			result.UpdateStatus = proto.ConfigUpdateInfo_NEW
-			result.ConfigVersion = config.Version
-			result.Content = config.Content
-		} else {
-			ver := req.ConfigVersions[k]
-
-			if ver < config.Version {
-				result.ConfigName = k
-				result.UpdateStatus = proto.ConfigUpdateInfo_MODIFIED
-				result.ConfigVersion = config.Version
-				result.Content = config.Content
-			} else {
-				result.ConfigName = k
-				result.UpdateStatus = proto.ConfigUpdateInfo_SAME
+	// deleted or modified configs, and delete same configs in SelectedConfigs
+	for _, k := range req.PipelineConfigs {
+		config, ok := SelectedConfigs[k.Name]
+		if !ok {
+			result := new(proto.ConfigCheckResult)
+			result.Type = proto.ConfigType_PIPELINE_CONFIG
+			result.Name = config.Name
+			result.OldVersion = k.Version
+			result.NewVersion = config.Version
+			result.Context = config.Context
+			result.CheckStatus = proto.CheckStatus_DELETED
+			pipelineConfigs = append(pipelineConfigs, result)
+		} else if ok {
+			if config.Version > k.Version {
+				result := new(proto.ConfigCheckResult)
+				result.Type = proto.ConfigType_PIPELINE_CONFIG
+				result.Name = config.Name
+				result.OldVersion = k.Version
+				result.NewVersion = config.Version
+				result.Context = config.Context
+				result.CheckStatus = proto.CheckStatus_MODIFIED
+				pipelineConfigs = append(pipelineConfigs, result)
 			}
+			delete(SelectedConfigs, k.Name)
 		}
-		ans = append(ans, result)
 	}
 
-	res.Code = common.Accept.Code
-	res.Message = "Get config update infos success"
-	res.ConfigUpdateInfos = ans
+	for _, k := range req.AgentConfigs {
+		config, ok := SelectedConfigs[k.Name]
+		if !ok {
+			result := new(proto.ConfigCheckResult)
+			result.Type = proto.ConfigType_AGENT_CONFIG
+			result.Name = config.Name
+			result.OldVersion = k.Version
+			result.NewVersion = config.Version
+			result.Context = config.Context
+			result.CheckStatus = proto.CheckStatus_DELETED
+			agentConfigs = append(agentConfigs, result)
+		} else if ok {
+			if config.Version > k.Version {
+				result := new(proto.ConfigCheckResult)
+				result.Type = proto.ConfigType_AGENT_CONFIG
+				result.Name = config.Name
+				result.OldVersion = k.Version
+				result.NewVersion = config.Version
+				result.Context = config.Context
+				result.CheckStatus = proto.CheckStatus_DELETED
+				agentConfigs = append(agentConfigs, result)
+			}
+			delete(SelectedConfigs, k.Name)
+		}
+	}
+
+	// new configs
+	for _, config := range SelectedConfigs {
+		result := new(proto.ConfigCheckResult)
+		result.Type = model.ConfigType[config.Type]
+		result.Name = config.Name
+		result.OldVersion = 0
+		result.NewVersion = config.Version
+		result.Context = config.Context
+		result.CheckStatus = proto.CheckStatus_NEW
+		switch result.Type {
+		case proto.ConfigType_AGENT_CONFIG:
+			agentConfigs = append(agentConfigs, result)
+		case proto.ConfigType_PIPELINE_CONFIG:
+			pipelineConfigs = append(pipelineConfigs, result)
+		}
+	}
+
+	res.Code = proto.RespCode_ACCEPT
+	res.Message += "Get config update infos success"
+	res.AgentCheckResults = agentConfigs
+	res.PipelineCheckResults = pipelineConfigs
+	return common.Accept.Status, res
+}
+
+func (c *ConfigManager) FetchAgentConfig(req *proto.FetchAgentConfigRequest, res *proto.FetchAgentConfigResponse) (int, *proto.FetchAgentConfigResponse) {
+	ans := make([]*proto.ConfigDetail, 0)
+
+	// do something about attributes
+
+	for _, configInfo := range req.ReqConfigs {
+		config, ok := c.ConfigList[configInfo.Name]
+		if !ok {
+			res.Code = proto.RespCode_INVALID_PARAMETER
+			res.Message += fmt.Sprintf("Config %s doesn't exist.\n", configInfo.Name)
+			continue
+		}
+
+		if config.DelTag {
+			res.Code = proto.RespCode_INVALID_PARAMETER
+			res.Message = fmt.Sprintf("Config %s doesn't exist.\n", configInfo.Name)
+			continue
+		}
+		if config.Type == configInfo.Type.String() {
+			ans = append(ans, config.ToProto())
+		}
+	}
+
+	res.Code = proto.RespCode_ACCEPT
+	res.Message = "Get Agent Config details success"
+	res.ConfigDetails = ans
+	return common.Accept.Status, res
+}
+
+func (c *ConfigManager) FetchPipelineConfig(req *proto.FetchPipelineConfigRequest, res *proto.FetchPipelineConfigResponse) (int, *proto.FetchPipelineConfigResponse) {
+	ans := make([]*proto.ConfigDetail, 0)
+
+	for _, configInfo := range req.ReqConfigs {
+		config, ok := c.ConfigList[configInfo.Name]
+		if !ok {
+			res.Code = proto.RespCode_INVALID_PARAMETER
+			res.Message += fmt.Sprintf("Config %s doesn't exist.\n", configInfo.Name)
+			continue
+		}
+
+		if config.DelTag {
+			res.Code = proto.RespCode_INVALID_PARAMETER
+			res.Message = fmt.Sprintf("Config %s doesn't exist.\n", configInfo.Name)
+			continue
+		}
+		if config.Type == configInfo.Type.String() {
+			ans = append(ans, config.ToProto())
+		}
+	}
+
+	res.Code = proto.RespCode_ACCEPT
+	res.Message = "Get Agent Config details success"
+	res.ConfigDetails = ans
 	return common.Accept.Status, res
 }

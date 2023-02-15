@@ -33,22 +33,16 @@ func (a *AgentManager) Init() {
 // batch write message from agent to databse
 
 const (
-	optHeartbeat  string = "HEARTBEAT"
-	optAlarm      string = "ALARM"
-	optStatistics string = "STATISTICS"
+	optHeartbeat string = "HEARTBEAT"
 )
 
 type agentMessageList struct {
-	Alarm      map[string]*model.AgentAlarm
-	Heartbeat  map[string]*model.Agent
-	Statistics map[string]*model.RunningStatistics
-	Mutex      sync.RWMutex
+	Heartbeat map[string]*model.Agent
+	Mutex     sync.RWMutex
 }
 
 func (a *agentMessageList) Clear() {
-	a.Alarm = make(map[string]*model.AgentAlarm, 0)
 	a.Heartbeat = make(map[string]*model.Agent, 0)
-	a.Statistics = make(map[string]*model.RunningStatistics, 0)
 }
 
 func (a *agentMessageList) Push(opt string, data interface{}) {
@@ -56,11 +50,7 @@ func (a *agentMessageList) Push(opt string, data interface{}) {
 	defer a.Mutex.Unlock()
 
 	switch opt {
-	case optAlarm:
-		a.Alarm[data.(*model.AgentAlarm).AlarmKey] = data.(*model.AgentAlarm)
 	case optHeartbeat:
 		a.Heartbeat[data.(*model.Agent).AgentID] = data.(*model.Agent)
-	case optStatistics:
-		a.Statistics[data.(*model.RunningStatistics).AgentID] = data.(*model.RunningStatistics)
 	}
 }

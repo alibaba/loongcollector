@@ -79,7 +79,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake)
 
 # Subdirectories (modules).
 set(SUB_DIRECTORIES_LIST
-        aggregator app_config checkpoint common config config_manager
+        aggregator app_config checkpoint common config config_manager config_server_pb
         controller event event_handler event_listener helper log_pb logger monitor
         parser plugin polling processor profiler reader profile_sender sender shennong sdk
         fuse sls_control

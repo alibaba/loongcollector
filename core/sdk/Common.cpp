@@ -76,6 +76,7 @@ namespace sdk {
     const char* const MACHINES = "/machines";
     const char* const MACHINEGROUPS = "/machinegroups";
     const char* const ACLS = "/acls";
+    const char* const CONFIGSERVERAGENT = "/Agent";
 
     const char* const HTTP_GET = "GET";
     const char* const HTTP_POST = "POST";

@@ -27,24 +27,24 @@ import (
 func (c *ConfigManager) CreateConfig(req *proto.CreateConfigRequest, res *proto.CreateConfigResponse) (int, *proto.CreateConfigResponse) {
 	s := store.GetStore()
 
-	ok, hasErr := s.Has(common.TypeCollectionConfig, req.ConfigDetail.ConfigName)
+	ok, hasErr := s.Has(common.TypeConfigDetail, req.ConfigDetail.Name)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if ok {
-		value, getErr := s.Get(common.TypeCollectionConfig, req.ConfigDetail.ConfigName)
+		value, getErr := s.Get(common.TypeConfigDetail, req.ConfigDetail.Name)
 		if getErr != nil {
-			res.Code = common.InternalServerError.Code
+			res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 			res.Message = getErr.Error()
 			return common.InternalServerError.Status, res
 		}
-		config := value.(*model.Config)
+		config := value.(*model.ConfigDetail)
 
 		if !config.DelTag { // exsit
-			res.Code = common.ConfigAlreadyExist.Code
-			res.Message = fmt.Sprintf("Config %s already exists.", req.ConfigDetail.ConfigName)
+			res.Code = proto.RespCode_INVALID_PARAMETER
+			res.Message = fmt.Sprintf("Config %s already exists.", req.ConfigDetail.Name)
 			return common.ConfigAlreadyExist.Status, res
 		}
 		// exist but has delete tag
@@ -52,102 +52,102 @@ func (c *ConfigManager) CreateConfig(req *proto.CreateConfigRequest, res *proto.
 		config.Version++
 		config.DelTag = false
 
-		updateErr := s.Update(common.TypeCollectionConfig, config.Name, config)
+		updateErr := s.Update(common.TypeConfigDetail, config.Name, config)
 		if updateErr != nil {
-			res.Code = common.InternalServerError.Code
+			res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 			res.Message = updateErr.Error()
 			return common.InternalServerError.Status, res
 		}
 
-		res.Code = common.Accept.Code
+		res.Code = proto.RespCode_ACCEPT
 		res.Message = "Add config success"
 		return common.Accept.Status, res
 	}
 	// doesn't exist
-	config := new(model.Config)
+	config := new(model.ConfigDetail)
 	config.ParseProto(req.ConfigDetail)
 	config.Version = 0
 	config.DelTag = false
 
-	addErr := s.Add(common.TypeCollectionConfig, config.Name, config)
+	addErr := s.Add(common.TypeConfigDetail, config.Name, config)
 	if addErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = addErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Add config success"
 	return common.Accept.Status, res
 }
 
 func (c *ConfigManager) UpdateConfig(req *proto.UpdateConfigRequest, res *proto.UpdateConfigResponse) (int, *proto.UpdateConfigResponse) {
 	s := store.GetStore()
-	ok, hasErr := s.Has(common.TypeCollectionConfig, req.ConfigDetail.ConfigName)
+	ok, hasErr := s.Has(common.TypeConfigDetail, req.ConfigDetail.Name)
 
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.ConfigNotExist.Code
-		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigDetail.ConfigName)
+		res.Code = proto.RespCode_INVALID_PARAMETER
+		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigDetail.Name)
 		return common.ConfigNotExist.Status, res
 	}
 
-	value, getErr := s.Get(common.TypeCollectionConfig, req.ConfigDetail.ConfigName)
+	value, getErr := s.Get(common.TypeConfigDetail, req.ConfigDetail.Name)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
-	config := value.(*model.Config)
+	config := value.(*model.ConfigDetail)
 
 	if config.DelTag {
-		res.Code = common.ConfigNotExist.Code
-		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigDetail.ConfigName)
+		res.Code = proto.RespCode_INVALID_PARAMETER
+		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigDetail.Name)
 		return common.ConfigNotExist.Status, res
 	}
 	config.ParseProto(req.ConfigDetail)
 	config.Version++
 
-	updateErr := s.Update(common.TypeCollectionConfig, config.Name, config)
+	updateErr := s.Update(common.TypeConfigDetail, config.Name, config)
 	if updateErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = updateErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Update config success"
 	return common.Accept.Status, res
 }
 
 func (c *ConfigManager) DeleteConfig(req *proto.DeleteConfigRequest, res *proto.DeleteConfigResponse) (int, *proto.DeleteConfigResponse) {
 	s := store.GetStore()
-	ok, hasErr := s.Has(common.TypeCollectionConfig, req.ConfigName)
+	ok, hasErr := s.Has(common.TypeConfigDetail, req.ConfigName)
 
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
-	value, getErr := s.Get(common.TypeCollectionConfig, req.ConfigName)
+	value, getErr := s.Get(common.TypeConfigDetail, req.ConfigName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
-	config := value.(*model.Config)
+	config := value.(*model.ConfigDetail)
 
 	if config.DelTag {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
@@ -162,7 +162,7 @@ func (c *ConfigManager) DeleteConfig(req *proto.DeleteConfigRequest, res *proto.
 		return status, res
 	}
 	if len(checkRes.AgentGroupNames) > 0 {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = fmt.Sprintf("Config %s was applied to some agent groups, cannot be deleted.", req.ConfigName)
 		return common.InternalServerError.Status, res
 	}
@@ -170,47 +170,47 @@ func (c *ConfigManager) DeleteConfig(req *proto.DeleteConfigRequest, res *proto.
 	config.DelTag = true
 	config.Version++
 
-	updateErr := s.Update(common.TypeCollectionConfig, req.ConfigName, config)
+	updateErr := s.Update(common.TypeConfigDetail, req.ConfigName, config)
 	if updateErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = updateErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Delete config success"
 	return common.Accept.Status, res
 }
 
 func (c *ConfigManager) GetConfig(req *proto.GetConfigRequest, res *proto.GetConfigResponse) (int, *proto.GetConfigResponse) {
 	s := store.GetStore()
-	ok, hasErr := s.Has(common.TypeCollectionConfig, req.ConfigName)
+	ok, hasErr := s.Has(common.TypeConfigDetail, req.ConfigName)
 
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
-	value, getErr := s.Get(common.TypeCollectionConfig, req.ConfigName)
+	value, getErr := s.Get(common.TypeConfigDetail, req.ConfigName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
-	config := value.(*model.Config)
+	config := value.(*model.ConfigDetail)
 
 	if config.DelTag {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Get config success"
 	res.ConfigDetail = config.ToProto()
 	return common.Accept.Status, res
@@ -219,24 +219,24 @@ func (c *ConfigManager) GetConfig(req *proto.GetConfigRequest, res *proto.GetCon
 
 func (c *ConfigManager) ListConfigs(req *proto.ListConfigsRequest, res *proto.ListConfigsResponse) (int, *proto.ListConfigsResponse) {
 	s := store.GetStore()
-	configs, getAllErr := s.GetAll(common.TypeCollectionConfig)
+	configs, getAllErr := s.GetAll(common.TypeConfigDetail)
 
 	if getAllErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getAllErr.Error()
 		return common.InternalServerError.Status, res
 	}
-	ans := make([]model.Config, 0)
+	ans := make([]model.ConfigDetail, 0)
 	for _, value := range configs {
-		config := value.(*model.Config)
+		config := value.(*model.ConfigDetail)
 		if !config.DelTag {
 			ans = append(ans, *config)
 		}
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Get config list success"
-	res.ConfigDetails = make([]*proto.Config, 0)
+	res.ConfigDetails = make([]*proto.ConfigDetail, 0)
 	for _, v := range ans {
 		res.ConfigDetails = append(res.ConfigDetails, v.ToProto())
 	}
@@ -248,27 +248,27 @@ func (c *ConfigManager) GetAppliedAgentGroups(req *proto.GetAppliedAgentGroupsRe
 	s := store.GetStore()
 
 	// Check config exist
-	ok, hasErr := s.Has(common.TypeCollectionConfig, req.ConfigName)
+	ok, hasErr := s.Has(common.TypeConfigDetail, req.ConfigName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
-	value, getErr := s.Get(common.TypeCollectionConfig, req.ConfigName)
+	value, getErr := s.Get(common.TypeConfigDetail, req.ConfigName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
-	config := value.(*model.Config)
+	config := value.(*model.ConfigDetail)
 
 	if config.DelTag {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
@@ -276,7 +276,7 @@ func (c *ConfigManager) GetAppliedAgentGroups(req *proto.GetAppliedAgentGroupsRe
 	// Get agent group names
 	agentGroupList, getAllErr := s.GetAll(common.TypeAgentGROUP)
 	if getAllErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getAllErr.Error()
 		return common.InternalServerError.Status, res
 	}
@@ -286,7 +286,7 @@ func (c *ConfigManager) GetAppliedAgentGroups(req *proto.GetAppliedAgentGroupsRe
 		}
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Get group list success"
 	res.AgentGroupNames = ans
 	return common.Accept.Status, res
@@ -296,12 +296,12 @@ func (c *ConfigManager) CreateAgentGroup(req *proto.CreateAgentGroupRequest, res
 	s := store.GetStore()
 	ok, hasErr := s.Has(common.TypeAgentGROUP, req.AgentGroup.GroupName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if ok {
-		res.Code = common.AgentGroupAlreadyExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s already exists.", req.AgentGroup.GroupName)
 		return common.AgentGroupAlreadyExist.Status, res
 	}
@@ -311,12 +311,12 @@ func (c *ConfigManager) CreateAgentGroup(req *proto.CreateAgentGroupRequest, res
 
 	addErr := s.Add(common.TypeAgentGROUP, agentGroup.Name, agentGroup)
 	if addErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = addErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Add agent group success"
 	return common.Accept.Status, res
 }
@@ -325,18 +325,18 @@ func (c *ConfigManager) UpdateAgentGroup(req *proto.UpdateAgentGroupRequest, res
 	s := store.GetStore()
 	ok, hasErr := s.Has(common.TypeAgentGROUP, req.AgentGroup.GroupName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.AgentGroupNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s doesn't exist.", req.AgentGroup.GroupName)
 		return common.AgentGroupNotExist.Status, res
 	}
 	value, getErr := s.Get(common.TypeAgentGROUP, req.AgentGroup.GroupName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
@@ -346,12 +346,12 @@ func (c *ConfigManager) UpdateAgentGroup(req *proto.UpdateAgentGroupRequest, res
 
 	updateErr := s.Update(common.TypeAgentGROUP, req.AgentGroup.GroupName, agentGroup)
 	if updateErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = updateErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Update agent group success"
 	return common.Accept.Status, res
 }
@@ -360,19 +360,19 @@ func (c *ConfigManager) DeleteAgentGroup(req *proto.DeleteAgentGroupRequest, res
 	s := store.GetStore()
 
 	if req.GroupName == "default" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = "Cannot delete agent group 'default'"
 		return common.BadRequest.Status, res
 	}
 
 	ok, hasErr := s.Has(common.TypeAgentGROUP, req.GroupName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.AgentGroupNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s doesn't exist.", req.GroupName)
 		return common.AgentGroupNotExist.Status, res
 	}
@@ -387,19 +387,19 @@ func (c *ConfigManager) DeleteAgentGroup(req *proto.DeleteAgentGroupRequest, res
 		return status, res
 	}
 	if len(checkRes.ConfigNames) > 0 {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = fmt.Sprintf("Agent group %s was applied to some configs, cannot be deleted.", req.GroupName)
 		return common.InternalServerError.Status, res
 	}
 
 	deleteErr := s.Delete(common.TypeAgentGROUP, req.GroupName)
 	if deleteErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = deleteErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Delete agent group success"
 	return common.Accept.Status, res
 }
@@ -408,23 +408,23 @@ func (c *ConfigManager) GetAgentGroup(req *proto.GetAgentGroupRequest, res *prot
 	s := store.GetStore()
 	ok, hasErr := s.Has(common.TypeAgentGROUP, req.GroupName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.AgentGroupNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s doesn't exist.", req.GroupName)
 		return common.AgentGroupNotExist.Status, res
 	}
 	agentGroup, getErr := s.Get(common.TypeAgentGROUP, req.GroupName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Get agent group success"
 	res.AgentGroup = agentGroup.(*model.AgentGroup).ToProto()
 	return common.Accept.Status, res
@@ -434,10 +434,10 @@ func (c *ConfigManager) ListAgentGroups(req *proto.ListAgentGroupsRequest, res *
 	s := store.GetStore()
 	agentGroupList, getAllErr := s.GetAll(common.TypeAgentGROUP)
 	if getAllErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		return common.InternalServerError.Status, res
 	}
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Get agent group list success"
 	res.AgentGroups = []*proto.AgentGroup{}
 	for _, v := range agentGroupList {
@@ -455,18 +455,18 @@ func (c *ConfigManager) ListAgents(req *proto.ListAgentsRequest, res *proto.List
 	// get agent group
 	ok, hasErr := s.Has(common.TypeAgentGROUP, req.GroupName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.AgentGroupNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s doesn't exist.", req.GroupName)
 		return common.AgentGroupNotExist.Status, res
 	}
 	value, getErr := s.Get(common.TypeAgentGROUP, req.GroupName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
@@ -475,7 +475,7 @@ func (c *ConfigManager) ListAgents(req *proto.ListAgentsRequest, res *proto.List
 
 	agentList, getAllErr := s.GetAll(common.TypeAgent)
 	if getAllErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getAllErr.Error()
 		return common.InternalServerError.Status, res
 	}
@@ -484,39 +484,20 @@ func (c *ConfigManager) ListAgents(req *proto.ListAgentsRequest, res *proto.List
 		agent := v.(*model.Agent)
 		match := func() bool {
 			for _, v := range agentGroup.Tags {
-				_, ok := agent.Tags[v.Name]
-				if ok && agent.Tags[v.Name] == v.Value {
-					return true
+				for _, tag := range agent.Tags {
+					if v.Value == tag {
+						return true
+					}
 				}
 			}
 			return false
 		}()
 		if match || agentGroup.Name == "default" {
-			ok, hasErr := s.Has(common.TypeRunningStatistics, agent.AgentID)
-			if hasErr != nil {
-				res.Code = common.InternalServerError.Code
-				res.Message = hasErr.Error()
-				return common.InternalServerError.Status, res
-			}
-			if ok {
-				status, getErr := s.Get(common.TypeRunningStatistics, agent.AgentID)
-				if getErr != nil {
-					res.Code = common.InternalServerError.Code
-					res.Message = getErr.Error()
-					return common.InternalServerError.Status, res
-				}
-				if status != nil {
-					agent.AddRunningDetails(status.(*model.RunningStatistics))
-				}
-			} else {
-				agent.RunningDetails = make(map[string]string, 0)
-			}
-
 			ans = append(ans, agent.ToProto())
 		}
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Get agent list success"
 	res.Agents = ans
 	return common.Accept.Status, res
@@ -530,18 +511,18 @@ func (c *ConfigManager) GetAppliedConfigsForAgentGroup(req *proto.GetAppliedConf
 	// Get agent group
 	ok, hasErr := s.Has(common.TypeAgentGROUP, req.GroupName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.AgentGroupNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s doesn't exist.", req.GroupName)
 		return common.AgentGroupNotExist.Status, res
 	}
 	value, getErr := s.Get(common.TypeAgentGROUP, req.GroupName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
@@ -552,7 +533,7 @@ func (c *ConfigManager) GetAppliedConfigsForAgentGroup(req *proto.GetAppliedConf
 		ans = append(ans, k)
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Get agent group's applied configs success"
 	res.ConfigNames = ans
 	return common.Accept.Status, res
@@ -561,23 +542,23 @@ func (c *ConfigManager) GetAppliedConfigsForAgentGroup(req *proto.GetAppliedConf
 func (c *ConfigManager) ApplyConfigToAgentGroup(req *proto.ApplyConfigToAgentGroupRequest, res *proto.ApplyConfigToAgentGroupResponse) (int, *proto.ApplyConfigToAgentGroupResponse) {
 	s := store.GetStore()
 	var agentGroup *model.AgentGroup
-	var config *model.Config
+	var config *model.ConfigDetail
 
 	// Get agent group
 	ok, hasErr := s.Has(common.TypeAgentGROUP, req.GroupName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.AgentGroupNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s doesn't exist.", req.GroupName)
 		return common.AgentGroupNotExist.Status, res
 	}
 	value, getErr := s.Get(common.TypeAgentGROUP, req.GroupName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
@@ -585,27 +566,27 @@ func (c *ConfigManager) ApplyConfigToAgentGroup(req *proto.ApplyConfigToAgentGro
 	agentGroup = value.(*model.AgentGroup)
 
 	// Get config
-	ok, hasErr = s.Has(common.TypeCollectionConfig, req.ConfigName)
+	ok, hasErr = s.Has(common.TypeConfigDetail, req.ConfigName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
-	value, getErr = s.Get(common.TypeCollectionConfig, req.ConfigName)
+	value, getErr = s.Get(common.TypeConfigDetail, req.ConfigName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
-	config = value.(*model.Config)
+	config = value.(*model.ConfigDetail)
 
 	if config.DelTag {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
@@ -615,7 +596,7 @@ func (c *ConfigManager) ApplyConfigToAgentGroup(req *proto.ApplyConfigToAgentGro
 		agentGroup.AppliedConfigs = make(map[string]int64)
 	}
 	if _, ok := agentGroup.AppliedConfigs[config.Name]; ok {
-		res.Code = common.ConfigAlreadyExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s already has config %s.", req.GroupName, req.ConfigName)
 		return common.ConfigAlreadyExist.Status, res
 	}
@@ -623,12 +604,12 @@ func (c *ConfigManager) ApplyConfigToAgentGroup(req *proto.ApplyConfigToAgentGro
 
 	updateErr := store.GetStore().Update(common.TypeAgentGROUP, req.GroupName, agentGroup)
 	if updateErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = updateErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Add config to agent group success"
 	return common.Accept.Status, res
 }
@@ -636,23 +617,23 @@ func (c *ConfigManager) ApplyConfigToAgentGroup(req *proto.ApplyConfigToAgentGro
 func (c *ConfigManager) RemoveConfigFromAgentGroup(req *proto.RemoveConfigFromAgentGroupRequest, res *proto.RemoveConfigFromAgentGroupResponse) (int, *proto.RemoveConfigFromAgentGroupResponse) {
 	s := store.GetStore()
 	var agentGroup *model.AgentGroup
-	var config *model.Config
+	var config *model.ConfigDetail
 
 	// Get agent group
 	ok, hasErr := s.Has(common.TypeAgentGROUP, req.GroupName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.AgentGroupNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s doesn't exist.", req.GroupName)
 		return common.AgentGroupNotExist.Status, res
 	}
 	value, getErr := s.Get(common.TypeAgentGROUP, req.GroupName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
@@ -660,27 +641,27 @@ func (c *ConfigManager) RemoveConfigFromAgentGroup(req *proto.RemoveConfigFromAg
 	agentGroup = value.(*model.AgentGroup)
 
 	// Get config
-	ok, hasErr = s.Has(common.TypeCollectionConfig, req.ConfigName)
+	ok, hasErr = s.Has(common.TypeConfigDetail, req.ConfigName)
 	if hasErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = hasErr.Error()
 		return common.InternalServerError.Status, res
 	}
 	if !ok {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
-	value, getErr = s.Get(common.TypeCollectionConfig, req.ConfigName)
+	value, getErr = s.Get(common.TypeConfigDetail, req.ConfigName)
 	if getErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = getErr.Error()
 		return common.InternalServerError.Status, res
 	}
-	config = value.(*model.Config)
+	config = value.(*model.ConfigDetail)
 
 	if config.DelTag {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
@@ -689,7 +670,7 @@ func (c *ConfigManager) RemoveConfigFromAgentGroup(req *proto.RemoveConfigFromAg
 		agentGroup.AppliedConfigs = make(map[string]int64)
 	}
 	if _, ok := agentGroup.AppliedConfigs[config.Name]; !ok {
-		res.Code = common.ConfigNotExist.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Agent group %s doesn't have config %s.", req.GroupName, req.ConfigName)
 		return common.ConfigNotExist.Status, res
 	}
@@ -697,12 +678,12 @@ func (c *ConfigManager) RemoveConfigFromAgentGroup(req *proto.RemoveConfigFromAg
 
 	updateErr := store.GetStore().Update(common.TypeAgentGROUP, req.GroupName, agentGroup)
 	if updateErr != nil {
-		res.Code = common.InternalServerError.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		res.Message = updateErr.Error()
 		return common.InternalServerError.Status, res
 	}
 
-	res.Code = common.Accept.Code
+	res.Code = proto.RespCode_ACCEPT
 	res.Message = "Remove config from agent group success"
 	return common.Accept.Status, res
 }

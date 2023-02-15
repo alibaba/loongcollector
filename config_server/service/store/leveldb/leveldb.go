@@ -27,11 +27,11 @@ import (
 )
 
 var dbPath = []string{
-	common.TypeAgentAlarm,
-	common.TypeCollectionConfig,
+	common.TypeAgentAttributes,
 	common.TypeAgent,
+	common.TypeConfigDetail,
 	common.TypeAgentGROUP,
-	common.TypeRunningStatistics,
+	common.TypeCommand,
 }
 
 type Store struct {
@@ -202,16 +202,16 @@ func generateValue(entity interface{}) ([]byte, error) {
 func parseValue(table string, data []byte) interface{} {
 	var ans interface{}
 	switch table {
-	case common.TypeCollectionConfig:
-		ans = new(model.Config)
+	case common.TypeAgentAttributes:
+		ans = new(model.AgentAttributes)
 	case common.TypeAgent:
 		ans = new(model.Agent)
+	case common.TypeConfigDetail:
+		ans = new(model.ConfigDetail)
 	case common.TypeAgentGROUP:
 		ans = new(model.AgentGroup)
-	case common.TypeAgentAlarm:
-		ans = new(model.AgentAlarm)
-	case common.TypeRunningStatistics:
-		ans = new(model.RunningStatistics)
+	case common.TypeCommand:
+		ans = new(model.Command)
 	}
 	err := json.Unmarshal(data, ans)
 	if err != nil {

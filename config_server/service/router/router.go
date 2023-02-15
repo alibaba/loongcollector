@@ -61,9 +61,8 @@ func InitAgentRouter(router *gin.Engine) {
 	agentGroup := router.Group("/Agent")
 	{
 		agentGroup.POST("/HeartBeat", agent.HeartBeat)
-		agentGroup.POST("/RunningStatistics", agent.RunningStatistics)
-		agentGroup.POST("/Alarm", agent.Alarm)
 
-		agentGroup.POST("/GetConfigList", agent.GetConfigList)
+		agentGroup.POST("/FetchPipelineConfig", agent.FetchPipelineConfig)
+		agentGroup.POST("/FetchAgentConfig", agent.FetchAgentConfig)
 	}
 }

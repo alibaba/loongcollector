@@ -82,6 +82,7 @@ private:
     std::string mUserLocalConfigPath;
     std::string mUserLocalConfigDirPath;
     std::string mUserLocalYamlConfigDirPath;
+    std::string mUserRemoteYamlConfigDirPath;
     bool mLogParseAlarmFlag;
     std::string mProcessExecutionDir;
     std::string mWorkingDir;
@@ -380,6 +381,10 @@ public:
 
     const std::string& GetLocalUserYamlConfigDirPath() const {
         return mUserLocalYamlConfigDirPath;
+    }
+
+    const std::string& GetRemoteUserYamlConfigDirPath() const {
+        return mUserRemoteYamlConfigDirPath;
     }
 
     bool IgnoreDirInodeChanged() const {

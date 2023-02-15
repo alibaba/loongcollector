@@ -23,7 +23,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/alibaba/ilogtail/config_server/service/common"
-	configserverproto "github.com/alibaba/ilogtail/config_server/service/proto"
+	proto "github.com/alibaba/ilogtail/config_server/service/proto"
 	"github.com/alibaba/ilogtail/config_server/service/router"
 )
 
@@ -42,7 +42,7 @@ func TestBaseAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.BadRequest.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.BadRequest.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_INVALID_PARAMETER)
 			So(res.Message, ShouldEqual, "Cannot delete agent group 'default'")
 
 			requestID++
@@ -60,18 +60,18 @@ func TestBaseConfig(t *testing.T) {
 	Convey("Test create Config.", t, func() {
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-1. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-1"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-1"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -86,31 +86,31 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get config success")
-			So(res.ConfigDetail.ConfigName, ShouldEqual, configName)
-			So(res.ConfigDetail.AgentType, ShouldEqual, "ilogtail")
-			So(res.ConfigDetail.Content, ShouldEqual, "Content for test")
-			So(res.ConfigDetail.Description, ShouldEqual, "Description for test")
+			So(res.ConfigDetail.Name, ShouldEqual, configName)
+			So(res.ConfigDetail.Type, ShouldEqual, proto.ConfigType_PIPELINE_CONFIG)
+			So(res.ConfigDetail.Detail, ShouldEqual, "Detail for test")
+			So(res.ConfigDetail.Context, ShouldEqual, "Description for test")
 
 			requestID++
 		}
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-1. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-1"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-1"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.ConfigAlreadyExist.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.ConfigAlreadyExist.Code)
-			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s already exists.", config.ConfigName))
+			So(res.Code, ShouldEqual, proto.RespCode_INVALID_PARAMETER)
+			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s already exists.", config.Name))
 
 			requestID++
 		}
@@ -122,49 +122,49 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get config list success")
 			So(len(res.ConfigDetails), ShouldEqual, 1)
-			So(res.ConfigDetails[0].ConfigName, ShouldEqual, "config-1")
-			So(res.ConfigDetails[0].AgentType, ShouldEqual, "ilogtail")
-			So(res.ConfigDetails[0].Content, ShouldEqual, "Content for test")
-			So(res.ConfigDetails[0].Description, ShouldEqual, "Description for test")
+			So(res.ConfigDetails[0].Name, ShouldEqual, "config-1")
+			So(res.ConfigDetails[0].Type, ShouldEqual, proto.ConfigType_PIPELINE_CONFIG)
+			So(res.ConfigDetails[0].Detail, ShouldEqual, "Detail for test")
+			So(res.ConfigDetails[0].Context, ShouldEqual, "Description for test")
 
 			requestID++
 		}
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-2. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-2"
-			config.AgentType = "ilogtail"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-2"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.BadRequest.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.BadRequest.Code)
-			So(res.Message, ShouldEqual, fmt.Sprintf("Need parameter %s.", "Content"))
+			So(res.Code, ShouldEqual, proto.RespCode_INVALID_PARAMETER)
+			So(res.Message, ShouldEqual, fmt.Sprintf("Need parameter %s.", "Detail"))
 
 			requestID++
 		}
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-2. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-2"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-2"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -179,12 +179,12 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get config success")
-			So(res.ConfigDetail.ConfigName, ShouldEqual, configName)
-			So(res.ConfigDetail.AgentType, ShouldEqual, "ilogtail")
-			So(res.ConfigDetail.Content, ShouldEqual, "Content for test")
-			So(res.ConfigDetail.Description, ShouldEqual, "Description for test")
+			So(res.ConfigDetail.Name, ShouldEqual, configName)
+			So(res.ConfigDetail.Type, ShouldEqual, proto.ConfigType_PIPELINE_CONFIG)
+			So(res.ConfigDetail.Detail, ShouldEqual, "Detail for test")
+			So(res.ConfigDetail.Context, ShouldEqual, "Description for test")
 
 			requestID++
 		}
@@ -193,18 +193,18 @@ func TestBaseConfig(t *testing.T) {
 	Convey("Test update Config.", t, func() {
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test update config-1. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-1"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test-updated"
-			config.Description = "Description for test-updated"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-1"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test-updated"
+			config.Context = "Description for test-updated"
 
 			status, res := UpdateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Update config success")
 
 			requestID++
@@ -219,30 +219,30 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get config success")
-			So(res.ConfigDetail.ConfigName, ShouldEqual, configName)
-			So(res.ConfigDetail.AgentType, ShouldEqual, "ilogtail")
-			So(res.ConfigDetail.Content, ShouldEqual, "Content for test-updated")
-			So(res.ConfigDetail.Description, ShouldEqual, "Description for test-updated")
+			So(res.ConfigDetail.Name, ShouldEqual, configName)
+			So(res.ConfigDetail.Type, ShouldEqual, proto.ConfigType_PIPELINE_CONFIG)
+			So(res.ConfigDetail.Detail, ShouldEqual, "Detail for test-updated")
+			So(res.ConfigDetail.Context, ShouldEqual, "Description for test-updated")
 
 			requestID++
 		}
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test update config-2. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-2"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test-updated"
-			config.Description = "Description for test-updated"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-2"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test-updated"
+			config.Context = "Description for test-updated"
 
 			status, res := UpdateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Update config success")
 
 			requestID++
@@ -257,31 +257,31 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get config success")
-			So(res.ConfigDetail.ConfigName, ShouldEqual, configName)
-			So(res.ConfigDetail.AgentType, ShouldEqual, "ilogtail")
-			So(res.ConfigDetail.Content, ShouldEqual, "Content for test-updated")
-			So(res.ConfigDetail.Description, ShouldEqual, "Description for test-updated")
+			So(res.ConfigDetail.Name, ShouldEqual, configName)
+			So(res.ConfigDetail.Type, ShouldEqual, proto.ConfigType_PIPELINE_CONFIG)
+			So(res.ConfigDetail.Detail, ShouldEqual, "Detail for test-updated")
+			So(res.ConfigDetail.Context, ShouldEqual, "Description for test-updated")
 
 			requestID++
 		}
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test update config-3. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-3"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test-updated"
-			config.Description = "Description for test-updated"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-3"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test-updated"
+			config.Context = "Description for test-updated"
 
 			status, res := UpdateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.ConfigNotExist.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.ConfigNotExist.Code)
-			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s doesn't exist.", config.ConfigName))
+			So(res.Code, ShouldEqual, proto.RespCode_INVALID_PARAMETER)
+			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s doesn't exist.", config.Name))
 
 			requestID++
 		}
@@ -293,17 +293,17 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get config list success")
 			So(len(res.ConfigDetails), ShouldEqual, 2)
-			So(res.ConfigDetails[0].ConfigName, ShouldEqual, "config-1")
-			So(res.ConfigDetails[0].AgentType, ShouldEqual, "ilogtail")
-			So(res.ConfigDetails[0].Content, ShouldEqual, "Content for test-updated")
-			So(res.ConfigDetails[0].Description, ShouldEqual, "Description for test-updated")
-			So(res.ConfigDetails[1].ConfigName, ShouldEqual, "config-2")
-			So(res.ConfigDetails[1].AgentType, ShouldEqual, "ilogtail")
-			So(res.ConfigDetails[1].Content, ShouldEqual, "Content for test-updated")
-			So(res.ConfigDetails[1].Description, ShouldEqual, "Description for test-updated")
+			So(res.ConfigDetails[0].Name, ShouldEqual, "config-1")
+			So(res.ConfigDetails[0].Type, ShouldEqual, proto.ConfigType_PIPELINE_CONFIG)
+			So(res.ConfigDetails[0].Detail, ShouldEqual, "Detail for test-updated")
+			So(res.ConfigDetails[0].Context, ShouldEqual, "Description for test-updated")
+			So(res.ConfigDetails[1].Name, ShouldEqual, "config-2")
+			So(res.ConfigDetails[1].Type, ShouldEqual, proto.ConfigType_PIPELINE_CONFIG)
+			So(res.ConfigDetails[1].Detail, ShouldEqual, "Detail for test-updated")
+			So(res.ConfigDetails[1].Context, ShouldEqual, "Description for test-updated")
 
 			requestID++
 		}
@@ -319,7 +319,7 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++
@@ -334,7 +334,7 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.ConfigNotExist.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.ConfigNotExist.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_INVALID_PARAMETER)
 			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s doesn't exist.", configName))
 
 			requestID++
@@ -342,18 +342,18 @@ func TestBaseConfig(t *testing.T) {
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-1. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-1"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-1"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -368,12 +368,12 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get config success")
-			So(res.ConfigDetail.ConfigName, ShouldEqual, configName)
-			So(res.ConfigDetail.AgentType, ShouldEqual, "ilogtail")
-			So(res.ConfigDetail.Content, ShouldEqual, "Content for test")
-			So(res.ConfigDetail.Description, ShouldEqual, "Description for test")
+			So(res.ConfigDetail.Name, ShouldEqual, configName)
+			So(res.ConfigDetail.Type, ShouldEqual, proto.ConfigType_PIPELINE_CONFIG)
+			So(res.ConfigDetail.Detail, ShouldEqual, "Detail for test")
+			So(res.ConfigDetail.Context, ShouldEqual, "Description for test")
 
 			requestID++
 		}
@@ -387,7 +387,7 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++
@@ -402,7 +402,7 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.ConfigNotExist.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.ConfigNotExist.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_INVALID_PARAMETER)
 			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s doesn't exist.", configName))
 
 			requestID++
@@ -417,7 +417,7 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++
@@ -432,7 +432,7 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.ConfigNotExist.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.ConfigNotExist.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_INVALID_PARAMETER)
 			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s doesn't exist.", configName))
 
 			requestID++
@@ -445,7 +445,7 @@ func TestBaseConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get config list success")
 			So(len(res.ConfigDetails), ShouldEqual, 0)
 
@@ -464,18 +464,18 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 	Convey("Test apply.", t, func() {
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-1. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-1"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-1"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -483,18 +483,18 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-2. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-2"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-2"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -510,7 +510,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config to agent group success")
 
 			requestID++
@@ -525,7 +525,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get agent group's applied configs success")
 			So(len(res.ConfigNames), ShouldEqual, 1)
 			So(res.ConfigNames[0], ShouldEqual, "config-1")
@@ -542,7 +542,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get group list success")
 			So(len(res.AgentGroupNames), ShouldEqual, 1)
 			So(res.AgentGroupNames[0], ShouldEqual, "default")
@@ -559,7 +559,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.ConfigNotExist.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.ConfigNotExist.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_INVALID_PARAMETER)
 			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s doesn't exist.", configName))
 
 			requestID++
@@ -575,7 +575,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config to agent group success")
 
 			requestID++
@@ -590,7 +590,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get agent group's applied configs success")
 			So(len(res.ConfigNames), ShouldEqual, 2)
 			So(res.ConfigNames, ShouldContain, "config-1")
@@ -641,7 +641,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Remove config from agent group success")
 
 			requestID++
@@ -656,7 +656,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get agent group's applied configs success")
 			So(len(res.ConfigNames), ShouldEqual, 1)
 			So(res.ConfigNames[0], ShouldEqual, "config-1")
@@ -673,7 +673,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++
@@ -689,7 +689,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Remove config from agent group success")
 
 			requestID++
@@ -704,7 +704,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get agent group's applied configs success")
 			So(len(res.ConfigNames), ShouldEqual, 0)
 
@@ -720,7 +720,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++
@@ -739,55 +739,18 @@ func TestAgentSendMessage(t *testing.T) {
 	Convey("Test Agent send message.", t, func() {
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Heartbeat. ")
 		{
-			agent := new(configserverproto.Agent)
+			agent := new(proto.Agent)
 			agent.AgentId = "ilogtail-1"
-			agent.AgentType = "ilogtail"
-			agent.Version = "1.1.1"
-			agent.Ip = "127.0.0.1"
 			agent.RunningStatus = "good"
 			agent.StartupTime = 100
-			agent.Tags = map[string]string{}
 
 			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Send heartbeat success")
-
-			requestID++
-		}
-
-		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send RunningStatistics. ")
-		{
-			agentID := "ilogtail-1"
-			runningStatistics := &configserverproto.RunningStatistics{Cpu: 0, Memory: 0, Extras: map[string]string{}}
-
-			status, res := RunningStatistics(r, agentID, runningStatistics, fmt.Sprint(requestID))
-
-			// check
-			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
-			So(res.Message, ShouldEqual, "Send running statistics success")
-
-			requestID++
-		}
-
-		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Alarm. ")
-		{
-			agentID := "ilogtail-1"
-			alarmType := "test"
-			alarmDetail := "test"
-
-			status, res := Alarm(r, agentID, alarmType, alarmDetail, fmt.Sprint(requestID))
-
-			// check
-			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
-			So(res.Message, ShouldEqual, "Alarm success")
 
 			requestID++
 		}
@@ -801,55 +764,18 @@ func TestAgentSendMessage(t *testing.T) {
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-2 send Heartbeat. ")
 		{
-			agent := new(configserverproto.Agent)
+			agent := new(proto.Agent)
 			agent.AgentId = "ilogtail-2"
-			agent.AgentType = "ilogtail"
-			agent.Version = "1.1.0"
-			agent.Ip = "127.0.0.1"
 			agent.RunningStatus = "good"
 			agent.StartupTime = 200
-			agent.Tags = map[string]string{}
 
 			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Send heartbeat success")
-
-			requestID++
-		}
-
-		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-2 send RunningStatistics. ")
-		{
-			agentID := "ilogtail-2"
-			runningStatistics := &configserverproto.RunningStatistics{Cpu: 100, Memory: 100, Extras: map[string]string{}}
-
-			status, res := RunningStatistics(r, agentID, runningStatistics, fmt.Sprint(requestID))
-
-			// check
-			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
-			So(res.Message, ShouldEqual, "Send running statistics success")
-
-			requestID++
-		}
-
-		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-2 send Alarm. ")
-		{
-			agentID := "ilogtail-2"
-			alarmType := "test"
-			alarmDetail := "test"
-
-			status, res := Alarm(r, agentID, alarmType, alarmDetail, fmt.Sprint(requestID))
-
-			// check
-			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
-			So(res.Message, ShouldEqual, "Alarm success")
 
 			requestID++
 		}
@@ -863,21 +789,17 @@ func TestAgentSendMessage(t *testing.T) {
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Heartbeat. ")
 		{
-			agent := new(configserverproto.Agent)
+			agent := new(proto.Agent)
 			agent.AgentId = "ilogtail-1"
-			agent.AgentType = "ilogtail"
-			agent.Version = "1.1.1"
-			agent.Ip = "127.0.0.1"
 			agent.RunningStatus = "good"
 			agent.StartupTime = 100
-			agent.Tags = map[string]string{}
 
 			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Send heartbeat success")
 
 			requestID++
@@ -899,21 +821,9 @@ func TestAgentSendMessage(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Get agent list success")
 			So(len(res.Agents), ShouldEqual, 2)
-
-			var agent1, agent2 int
-			if res.Agents[0].AgentId == "ilogtail-1" {
-				agent1 = 0
-				agent2 = 1
-			} else {
-				agent1 = 1
-				agent2 = 0
-			}
-
-			So(res.Agents[agent1].LatestHeartbeatTime, ShouldBeGreaterThan, res.Agents[agent2].LatestHeartbeatTime)
-
 			requestID++
 		}
 	})
@@ -928,51 +838,28 @@ func TestAgentGetConfig(t *testing.T) {
 	var requestID int
 
 	Convey("Test Agent get config.", t, func() {
-		agent := new(configserverproto.Agent)
+		agent := new(proto.Agent)
 		agent.AgentId = "ilogtail-1"
-		agent.AgentType = "ilogtail"
-		agent.Version = "1.1.1"
-		agent.Ip = "127.0.0.1"
 		agent.RunningStatus = "good"
 		agent.StartupTime = 100
-		agent.Tags = map[string]string{}
 
 		configVersions := map[string]int64{}
-
-		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Heartbeat. ")
-		{
-			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
-
-			// check
-			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
-			So(res.Message, ShouldEqual, "Send heartbeat success")
-
-			requestID++
-		}
-
-		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Sleep 2s, wait for writing agent info to store. ")
-		{
-			time.Sleep(time.Second * 2)
-
-			requestID++
-		}
+		configInfos := make([]*proto.ConfigCheckResult, 0)
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-1. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-1"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-1"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -980,18 +867,18 @@ func TestAgentGetConfig(t *testing.T) {
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-2. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-2"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-2"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -999,18 +886,18 @@ func TestAgentGetConfig(t *testing.T) {
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-3. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-3"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-3"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -1018,18 +905,18 @@ func TestAgentGetConfig(t *testing.T) {
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test create config-4. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-4"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test"
-			config.Description = "Description for test"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-4"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test"
+			config.Context = "Description for test"
 
 			status, res := CreateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config success")
 
 			requestID++
@@ -1045,7 +932,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config to agent group success")
 
 			requestID++
@@ -1061,7 +948,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config to agent group success")
 
 			requestID++
@@ -1077,34 +964,47 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config to agent group success")
 
 			requestID++
 		}
 
-		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test get ilogtail-1's configs. ")
+		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Heartbeat. ")
 		{
-			status, res := GetConfigList(r, agent.AgentId, configVersions, fmt.Sprint(requestID))
+			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
-			So(res.Message, ShouldEqual, "Get config update infos success")
-
-			for _, info := range res.ConfigUpdateInfos {
-				configVersions[info.ConfigName] = info.ConfigVersion
-				switch info.ConfigName {
+			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
+			So(res.Message, ShouldEqual, "Send heartbeat success")
+			for _, info := range res.PipelineCheckResults {
+				configVersions[info.Name] = info.NewVersion
+				switch info.Name {
 				case "config-1":
-					So(info.UpdateStatus.String(), ShouldEqual, "NEW")
+					So(info.CheckStatus, ShouldEqual, proto.CheckStatus_NEW)
 				case "config-2":
-					So(info.UpdateStatus.String(), ShouldEqual, "NEW")
+					So(info.CheckStatus, ShouldEqual, proto.CheckStatus_NEW)
 				case "config-3":
-					So(info.UpdateStatus.String(), ShouldEqual, "NEW")
+					So(info.CheckStatus, ShouldEqual, proto.CheckStatus_NEW)
 				}
 			}
+			configInfos = res.PipelineCheckResults
 
+			requestID++
+		}
+
+		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test fetch ilogtail-1's configs. ")
+		{
+			status, res := FetchPipelineConfig(r, configInfos, fmt.Sprint(requestID))
+
+			// check
+			So(status, ShouldEqual, common.Accept.Status)
+			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
+			So(res.Message, ShouldEqual, "Get config update infos success")
+			So(len(res.ConfigDetails), ShouldEqual, 3)
 			requestID++
 		}
 
@@ -1118,7 +1018,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Add config to agent group success")
 
 			requestID++
@@ -1134,7 +1034,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Remove config from agent group success")
 
 			requestID++
@@ -1142,48 +1042,59 @@ func TestAgentGetConfig(t *testing.T) {
 
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test update config-2. ")
 		{
-			config := &configserverproto.Config{}
-			config.ConfigName = "config-2"
-			config.AgentType = "ilogtail"
-			config.Content = "Content for test-updated"
-			config.Description = "Description for test-updated"
+			config := &proto.ConfigDetail{}
+			config.Name = "config-2"
+			config.Type = proto.ConfigType_PIPELINE_CONFIG
+			config.Detail = "Detail for test-updated"
+			config.Context = "Description for test-updated"
 
 			status, res := UpdateConfig(r, config, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Update config success")
 
 			requestID++
 		}
 
-		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test get ilogtail-1's configs. ")
+		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Heartbeat. ")
 		{
-			status, res := GetConfigList(r, agent.AgentId, configVersions, fmt.Sprint(requestID))
+			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
-			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
-			So(res.Message, ShouldEqual, "Get config update infos success")
-
+			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
+			So(res.Message, ShouldEqual, "Send heartbeat success")
 			configVersions = map[string]int64{}
-			for _, info := range res.ConfigUpdateInfos {
-				configVersions[info.ConfigName] = info.ConfigVersion
-				switch info.ConfigName {
+			for _, info := range res.PipelineCheckResults {
+				configVersions[info.Name] = info.NewVersion
+				switch info.Name {
 				case "config-1":
-					So(info.UpdateStatus.String(), ShouldEqual, "DELETED")
+					So(info.CheckStatus, ShouldEqual, proto.CheckStatus_DELETED)
 				case "config-2":
-					So(info.UpdateStatus.String(), ShouldEqual, "MODIFIED")
-				case "config-3":
-					So(info.UpdateStatus.String(), ShouldEqual, "SAME")
+					So(info.CheckStatus, ShouldEqual, proto.CheckStatus_MODIFIED)
 				case "config-4":
-					So(info.UpdateStatus.String(), ShouldEqual, "NEW")
+					So(info.CheckStatus, ShouldEqual, proto.CheckStatus_NEW)
 				}
 			}
+			configInfos = res.PipelineCheckResults
 
+			requestID++
+		}
+
+		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test fetch ilogtail-1's configs. ")
+		{
+			status, res := FetchPipelineConfig(r, configInfos, fmt.Sprint(requestID))
+
+			// check
+			So(status, ShouldEqual, common.Accept.Status)
+			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
+			So(res.Message, ShouldEqual, "Get config update infos success")
+			So(len(res.ConfigDetails), ShouldEqual, 3)
 			requestID++
 		}
 
@@ -1197,7 +1108,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Remove config from agent group success")
 
 			requestID++
@@ -1213,7 +1124,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Remove config from agent group success")
 
 			requestID++
@@ -1229,7 +1140,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Remove config from agent group success")
 
 			requestID++
@@ -1244,7 +1155,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++
@@ -1259,7 +1170,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++
@@ -1274,7 +1185,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++
@@ -1289,7 +1200,7 @@ func TestAgentGetConfig(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.Accept.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
 			So(res.Message, ShouldEqual, "Delete config success")
 
 			requestID++

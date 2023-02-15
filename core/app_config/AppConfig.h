@@ -21,6 +21,16 @@
 
 namespace logtail {
 class AppConfig : public AppConfigBase {
+public:
+    struct ConfigServerAddress {
+        ConfigServerAddress() {}
+        ConfigServerAddress(const std::string& config_server_host, const std::int32_t& config_server_port)
+            : host(config_server_host), port(config_server_port) {}
+
+        std::string host;
+        std::int32_t port;
+    };
+
 private:
     void LoadAddrConfig(const Json::Value& confJson) override;
 
@@ -33,6 +43,10 @@ public:
         return &singleton;
     }
 
+    std::vector<ConfigServerAddress> mConfigServerAddresses;
+    int mConfigServerAddressId;
+    std::vector<std::string> mConfigServerTags;
+
     bool IsDebugMode() const { return false; }
 
     /**
@@ -42,6 +56,8 @@ public:
     bool IsDataServerPrivateCloud() const { return false; }
 
     const std::string& GetBindInterface() const { return mBindInterface; }
+    const ConfigServerAddress& GetOneConfigServerAddress(bool changeConfigServer);
+    const std::vector<std::string>& GetConfigServerTags() const { return mConfigServerTags; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;

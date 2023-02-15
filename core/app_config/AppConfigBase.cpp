@@ -75,6 +75,10 @@ const char* DEFAULT_ILOGTAIL_LOCAL_YAML_CONFIG_DIR_FLAG_VALUE = "user_yaml_confi
 DEFINE_FLAG_STRING(ilogtail_local_yaml_config_dir,
                    "local ilogtail yaml config file dir",
                    DEFAULT_ILOGTAIL_LOCAL_YAML_CONFIG_DIR_FLAG_VALUE);
+const char* DEFAULT_ILOGTAIL_REMOTE_YAML_CONFIG_DIR_FLAG_VALUE = "remote_yaml_config.d";
+DEFINE_FLAG_STRING(ilogtail_remote_yaml_config_dir,
+                   "remote ilogtail yaml config file dir",
+                   DEFAULT_ILOGTAIL_REMOTE_YAML_CONFIG_DIR_FLAG_VALUE);
 
 DEFINE_FLAG_BOOL(default_global_fuse_mode, "default global fuse mode", false);
 DEFINE_FLAG_BOOL(default_global_mark_offset_flag, "default global mark offset flag", false);
@@ -1114,10 +1118,14 @@ void AppConfigBase::SetLogtailSysConfDir(const std::string& dirPath) {
     mUserLocalConfigDirPath = AbsolutePath(STRING_FLAG(ilogtail_local_config_dir), mLogtailSysConfDir) + PATH_SEPARATOR;
     mUserLocalYamlConfigDirPath
         = AbsolutePath(STRING_FLAG(ilogtail_local_yaml_config_dir), mLogtailSysConfDir) + PATH_SEPARATOR;
+    mUserRemoteYamlConfigDirPath
+        = AbsolutePath(STRING_FLAG(ilogtail_remote_yaml_config_dir), mLogtailSysConfDir) + PATH_SEPARATOR;
     LOG_INFO(sLogger,
-             ("set logtail sys conf dir", mLogtailSysConfDir)("user local config path", mUserLocalConfigPath)(
-                 "user local config dir path", mUserLocalConfigDirPath)("user local yaml config dir path",
-                                                                        mUserLocalYamlConfigDirPath));
+             ("set logtail sys conf dir", mLogtailSysConfDir)
+             ("user local config path", mUserLocalConfigPath)
+             ("user local config dir path", mUserLocalConfigDirPath)
+             ("user local yaml config dir path",mUserLocalYamlConfigDirPath)
+             ("user remote yaml config dir path",mUserRemoteYamlConfigDirPath));
 }
 
 } // namespace logtail

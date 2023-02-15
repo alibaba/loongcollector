@@ -31,22 +31,22 @@ func CreateConfig(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
-	if req.ConfigDetail.ConfigName == "" {
-		res.Code = common.BadRequest.Code
+	if req.ConfigDetail.Name == "" {
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "ConfigName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 
-	if req.ConfigDetail.Content == "" {
-		res.Code = common.BadRequest.Code
-		res.Message = fmt.Sprintf("Need parameter %s.", "Content")
+	if req.ConfigDetail.Detail == "" {
+		res.Code = proto.RespCode_INVALID_PARAMETER
+		res.Message = fmt.Sprintf("Need parameter %s.", "Detail")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
@@ -60,22 +60,22 @@ func UpdateConfig(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
-	if req.ConfigDetail.ConfigName == "" {
-		res.Code = common.BadRequest.Code
+	if req.ConfigDetail.Name == "" {
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "ConfigName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 
-	if req.ConfigDetail.Content == "" {
-		res.Code = common.BadRequest.Code
-		res.Message = fmt.Sprintf("Need parameter %s.", "Content")
+	if req.ConfigDetail.Detail == "" {
+		res.Code = proto.RespCode_INVALID_PARAMETER
+		res.Message = fmt.Sprintf("Need parameter %s.", "Detail")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
@@ -89,14 +89,14 @@ func DeleteConfig(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.ConfigName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "ConfigName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -111,14 +111,14 @@ func GetConfig(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.ConfigName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "ConfigName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
@@ -133,7 +133,7 @@ func ListConfigs(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
@@ -148,14 +148,14 @@ func GetAppliedAgentGroups(c *gin.Context) {
 
 	err := c.ShouldBindBodyWith(&req, binding.ProtoBuf)
 	if err != nil {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INTERNAL_SERVER_ERROR
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
 	}
 	res.ResponseId = req.RequestId
 
 	if req.ConfigName == "" {
-		res.Code = common.BadRequest.Code
+		res.Code = proto.RespCode_INVALID_PARAMETER
 		res.Message = fmt.Sprintf("Need parameter %s.", "ConfigName")
 		c.ProtoBuf(common.BadRequest.Status, res)
 		return
