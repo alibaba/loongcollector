@@ -31,10 +31,10 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 
-	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/helper/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
 )
 
 const (
@@ -352,12 +352,12 @@ func ConvertOtlpTracesToGroupEvents(traces ptrace.Traces) (groupEventsSlice []*m
 				span.Status = models.StatusCode(otSpan.Status().Code())
 
 				if message := otSpan.Status().Message(); len(message) > 0 {
-					span.Tags.Add(TagKeySpanStatusMessage, message)
+					span.Tags.Add(otlp.TagKeySpanStatusMessage, message)
 				}
 
-				span.Tags.Add(TagKeySpanDroppedEventsCount, strconv.Itoa(int(otSpan.DroppedEventsCount())))
-				span.Tags.Add(TagKeySpanDroppedAttrsCount, strconv.Itoa(int(otSpan.DroppedAttributesCount())))
-				span.Tags.Add(TagKeySpanDroppedLinksCount, strconv.Itoa(int(otSpan.DroppedLinksCount())))
+				span.Tags.Add(otlp.TagKeySpanDroppedEventsCount, strconv.Itoa(int(otSpan.DroppedEventsCount())))
+				span.Tags.Add(otlp.TagKeySpanDroppedAttrsCount, strconv.Itoa(int(otSpan.DroppedAttributesCount())))
+				span.Tags.Add(otlp.TagKeySpanDroppedLinksCount, strconv.Itoa(int(otSpan.DroppedLinksCount())))
 
 				groupEvents.Events = append(groupEvents.Events, span)
 			}
@@ -370,9 +370,9 @@ func ConvertOtlpTracesToGroupEvents(traces ptrace.Traces) (groupEventsSlice []*m
 
 func genScopeTags(scope pcommon.InstrumentationScope) models.Tags {
 	scopeTags := attrs2Tags(scope.Attributes())
-	scopeTags.Add(TagKeyScopeName, scope.Name())
-	scopeTags.Add(TagKeyScopeVersion, scope.Version())
-	scopeTags.Add(TagKeyScopeDroppedAttributesCount, strconv.Itoa(int(scope.DroppedAttributesCount())))
+	scopeTags.Add(otlp.TagKeyScopeName, scope.Name())
+	scopeTags.Add(otlp.TagKeyScopeVersion, scope.Version())
+	scopeTags.Add(otlp.TagKeyScopeDroppedAttributesCount, strconv.Itoa(int(scope.DroppedAttributesCount())))
 	return scopeTags
 }
 
@@ -457,8 +457,8 @@ func newMetricFromSumDatapoint(datapoint pmetric.NumberDataPoint, aggregationTem
 	timestamp := int64(datapoint.Timestamp())
 	startTimestamp := datapoint.StartTimestamp()
 	tags := attrs2Tags(datapoint.Attributes())
-	tags.Add(TagKeyMetricIsMonotonic, isMonotonic)
-	tags.Add(TagKeyMetricAggregationTemporality, aggregationTemporality.String())
+	tags.Add(otlp.TagKeyMetricIsMonotonic, isMonotonic)
+	tags.Add(otlp.TagKeyMetricAggregationTemporality, aggregationTemporality.String())
 
 	value := getValue(datapoint.IntValue(), datapoint.DoubleValue())
 	var metric *models.Metric
@@ -487,8 +487,8 @@ func newMetricFromSummaryDatapoint(datapoint pmetric.SummaryDataPoint, metricNam
 		multivalue.Add(strconv.FormatFloat(quantile, 'f', -1, 64), value)
 	}
 
-	multivalue.Add(FieldCount, float64(datapoint.Count()))
-	multivalue.Add(FieldSum, datapoint.Sum())
+	multivalue.Add(otlp.FieldCount, float64(datapoint.Count()))
+	multivalue.Add(otlp.FieldSum, datapoint.Sum())
 
 	metric := models.NewMultiValuesMetric(metricName, models.MetricTypeSummary, tags, timestamp, multivalue.GetMultiValues())
 	metric.Unit = metricUnit
@@ -502,23 +502,23 @@ func newMetricFromHistogramDatapoint(datapoint pmetric.HistogramDataPoint, aggre
 	startTimestamp := datapoint.StartTimestamp()
 
 	tags := attrs2Tags(datapoint.Attributes())
-	tags.Add(TagKeyMetricAggregationTemporality, aggregationTemporality.String())
-	tags.Add(TagKeyMetricHistogramType, pmetric.MetricTypeHistogram.String())
+	tags.Add(otlp.TagKeyMetricAggregationTemporality, aggregationTemporality.String())
+	tags.Add(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeHistogram.String())
 
 	// TODO:
 	// handle datapoint's Exemplars, Flags
 	multivalue := models.NewMetricMultiValue()
-	multivalue.Add(FieldCount, float64(datapoint.Count()))
+	multivalue.Add(otlp.FieldCount, float64(datapoint.Count()))
 
 	if datapoint.HasSum() {
-		multivalue.Add(FieldSum, datapoint.Sum())
+		multivalue.Add(otlp.FieldSum, datapoint.Sum())
 	}
 	if datapoint.HasMin() {
-		multivalue.Add(FieldMin, datapoint.Min())
+		multivalue.Add(otlp.FieldMin, datapoint.Min())
 	}
 
 	if datapoint.HasMax() {
-		multivalue.Add(FieldMax, datapoint.Max())
+		multivalue.Add(otlp.FieldMax, datapoint.Max())
 	}
 
 	bucketCounts, explicitBounds := datapoint.BucketCounts(), datapoint.ExplicitBounds()
@@ -541,7 +541,7 @@ func newMetricFromHistogramDatapoint(datapoint pmetric.HistogramDataPoint, aggre
 		if m < explicitBounds.Len() {
 			upperBound = explicitBounds.At(m)
 		}
-		fieldName := helper.ComposeBucketFieldName(lowerBound, upperBound, true)
+		fieldName := otlp.ComposeBucketFieldName(lowerBound, upperBound, true)
 
 		count := bucketCounts.At(m)
 		multivalue.Add(fieldName, float64(count))
@@ -561,28 +561,28 @@ func newMetricFromExponentialHistogramDatapoint(datapoint pmetric.ExponentialHis
 	startTimestamp := datapoint.StartTimestamp()
 
 	tags := attrs2Tags(datapoint.Attributes())
-	tags.Add(TagKeyMetricAggregationTemporality, aggregationTemporality.String())
-	tags.Add(TagKeyMetricHistogramType, pmetric.MetricTypeExponentialHistogram.String())
+	tags.Add(otlp.TagKeyMetricAggregationTemporality, aggregationTemporality.String())
+	tags.Add(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeExponentialHistogram.String())
 
 	// TODO:
 	// handle datapoint's Exemplars, Flags
 	multivalue := models.NewMetricMultiValue()
-	multivalue.Add(FieldCount, float64(datapoint.Count()))
+	multivalue.Add(otlp.FieldCount, float64(datapoint.Count()))
 
 	if datapoint.HasSum() {
-		multivalue.Add(FieldSum, datapoint.Sum())
+		multivalue.Add(otlp.FieldSum, datapoint.Sum())
 	}
 	if datapoint.HasMin() {
-		multivalue.Add(FieldMin, datapoint.Min())
+		multivalue.Add(otlp.FieldMin, datapoint.Min())
 	}
 
 	if datapoint.HasMax() {
-		multivalue.Add(FieldMax, datapoint.Max())
+		multivalue.Add(otlp.FieldMax, datapoint.Max())
 	}
 
 	scale := datapoint.Scale()
 	base := math.Pow(2, math.Pow(2, float64(-scale)))
-	multivalue.Values.Add(FieldScale, float64(scale)) // store scale in multivalues
+	multivalue.Values.Add(otlp.FieldScale, float64(scale)) // store scale in multivalues
 
 	// For example, when scale is 3, base is 2 ** (2 ** -3) = 2 ** (1/8).
 	// The negative bucket bounds look like:
@@ -596,7 +596,7 @@ func newMetricFromExponentialHistogramDatapoint(datapoint pmetric.ExponentialHis
 	multivalue.Values.AddAll(postiveFields)
 	multivalue.Values.AddAll(negativeFields)
 
-	multivalue.Add(FieldZeroCount, float64(datapoint.ZeroCount()))
+	multivalue.Add(otlp.FieldZeroCount, float64(datapoint.ZeroCount()))
 
 	metric := models.NewMultiValuesMetric(metricName, models.MetricTypeHistogram, tags, timestamp, multivalue.GetMultiValues())
 	metric.Unit = metricUnit
@@ -613,13 +613,13 @@ func genExponentialHistogramValues(isPositive bool, base float64, buckets pmetri
 		bucketCount := rawbucketCounts.At(i)
 		lowerBoundary := math.Pow(base, float64(int(offset)+i))
 		upperBoundary := lowerBoundary * base
-		fieldKey := helper.ComposeBucketFieldName(lowerBoundary, upperBoundary, isPositive)
+		fieldKey := otlp.ComposeBucketFieldName(lowerBoundary, upperBoundary, isPositive)
 		res[fieldKey] = float64(bucketCount)
 	}
 	if isPositive {
-		res[FieldPositiveOffset] = float64(offset)
+		res[otlp.FieldPositiveOffset] = float64(offset)
 	} else {
-		res[FieldNegativeOffset] = float64(offset)
+		res[otlp.FieldNegativeOffset] = float64(offset)
 	}
 	return res
 }

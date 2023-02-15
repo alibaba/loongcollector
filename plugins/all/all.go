@@ -29,7 +29,7 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/flusher/http"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/kafka"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/kafkav2"
-	_ "github.com/alibaba/ilogtail/plugins/flusher/otlplog"
+	_ "github.com/alibaba/ilogtail/plugins/flusher/opentelemetry"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/pulsar"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/sleep"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/statistics"

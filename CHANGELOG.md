@@ -35,6 +35,9 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
+
+- [public] [both] [updated] flusher_otlp flushes metrics/traces to backend.
+- [public] [both] [updated] rename flusher_otlp_log to flusher_otlp.
 - [public] [both] [added] add a new service_otlp plugin.
 - [public] [both] [updated] service_http_server supports otlp metrics/traces requests.
 - [public] [both] [added] add a new flusher_pulsar plugin.

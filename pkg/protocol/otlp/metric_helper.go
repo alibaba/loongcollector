@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package otlp
 
 import (
 	"fmt"
@@ -91,4 +91,24 @@ func ReverseSlice[T comparable](s []T) {
 	sort.SliceStable(s, func(i, j int) bool {
 		return i > j
 	})
+}
+
+// When count is less than 20, direct comparison faster than map.
+func IsInternalTag(tagname string) bool {
+	return tagname == TagKeyMetricAggregationTemporality ||
+		tagname == TagKeyScopeDroppedAttributesCount ||
+		tagname == TagKeyScopeName ||
+		tagname == TagKeyScopeVersion ||
+		tagname == TagKeySpanDroppedAttrsCount ||
+		tagname == TagKeySpanDroppedEventsCount ||
+		tagname == TagKeySpanDroppedLinksCount ||
+		tagname == TagKeySpanStatusMessage ||
+		tagname == TagKeyMetricIsMonotonic
+}
+
+func IsInternalField(fieldname string) bool {
+	return fieldname == FieldCount ||
+		fieldname == FieldMax ||
+		fieldname == FieldMin ||
+		fieldname == FieldSum
 }

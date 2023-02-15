@@ -28,9 +28,9 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
-	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/helper/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
 )
 
 var textFormat = `{"resourceLogs":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"OtlpExporterExample"}},{"key":"telemetry.sdk.language","value":{"stringValue":"java"}},{"key":"telemetry.sdk.name","value":{"stringValue":"opentelemetry"}},{"key":"telemetry.sdk.version","value":{"stringValue":"1.18.0"}}]},"scopeLogs":[{"scope":{"name":"io.opentelemetry.example"},"logRecords":[{"timeUnixNano":"1663904182348000000","severityNumber":9,"severityText":"INFO","body":{"stringValue":"log body1"},"attributes":[{"key":"k1","value":{"stringValue":"v1"}},{"key":"k2","value":{"stringValue":"v2"}}],"traceId":"","spanId":""},{"timeUnixNano":"1663904182348000000","severityNumber":9,"severityText":"INFO","body":{"stringValue":"log body2"},"attributes":[{"key":"k1","value":{"stringValue":"v1"}},{"key":"k2","value":{"stringValue":"v2"}}],"traceId":"","spanId":""}]}]}]}`
@@ -202,8 +202,8 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 										assert.Equal(t, v.AsString(), event.GetTags().Get(k))
 										return true
 									})
-								assert.Equal(t, aggregationTemporality.String(), event.GetTags().Get(TagKeyMetricAggregationTemporality))
-								assert.Equal(t, isMonotonic, event.GetTags().Get(TagKeyMetricIsMonotonic))
+								assert.Equal(t, aggregationTemporality.String(), event.GetTags().Get(otlp.TagKeyMetricAggregationTemporality))
+								assert.Equal(t, isMonotonic, event.GetTags().Get(otlp.TagKeyMetricIsMonotonic))
 
 								metric, ok := event.(*models.Metric)
 								assert.True(t, ok)
@@ -257,8 +257,8 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 									assert.Equal(t, quantile.Value(), metric.Value.GetMultiValues().Get(strconv.FormatFloat(quantile.Quantile(), 'f', -1, 64)))
 								}
 
-								assert.Equal(t, float64(datapoint.Count()), metric.Value.GetMultiValues().Get(FieldCount))
-								assert.Equal(t, datapoint.Sum(), metric.Value.GetMultiValues().Get(FieldSum))
+								assert.Equal(t, float64(datapoint.Count()), metric.Value.GetMultiValues().Get(otlp.FieldCount))
+								assert.Equal(t, datapoint.Sum(), metric.Value.GetMultiValues().Get(otlp.FieldSum))
 								eventIndex++
 							}
 						case pmetric.MetricTypeHistogram:
@@ -276,8 +276,8 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 										assert.Equal(t, v.AsString(), event.GetTags().Get(k))
 										return true
 									})
-								assert.Equal(t, aggregationTemporality.String(), event.GetTags().Get(TagKeyMetricAggregationTemporality))
-								assert.Equal(t, pmetric.MetricTypeHistogram.String(), event.GetTags().Get(TagKeyMetricHistogramType))
+								assert.Equal(t, aggregationTemporality.String(), event.GetTags().Get(otlp.TagKeyMetricAggregationTemporality))
+								assert.Equal(t, pmetric.MetricTypeHistogram.String(), event.GetTags().Get(otlp.TagKeyMetricHistogramType))
 
 								metric, ok := event.(*models.Metric)
 								assert.True(t, ok)
@@ -292,7 +292,7 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 								otBucketCounts := datapoint.BucketCounts()
 								otBucketBoundarys := datapoint.ExplicitBounds()
 								assert.Equal(t, otBucketCounts.Len(), otBucketBoundarys.Len()+1)
-								bucketBounds, bucketCounts := helper.ComputeBuckets(metric.Value.GetMultiValues(), true)
+								bucketBounds, bucketCounts := otlp.ComputeBuckets(metric.Value.GetMultiValues(), true)
 								otBucketCountFloat := make([]float64, 0, len(otBucketCounts.AsRaw()))
 								for _, v := range otBucketCounts.AsRaw() {
 									otBucketCountFloat = append(otBucketCountFloat, float64(v))
@@ -300,8 +300,8 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 								assert.Equal(t, otBucketCountFloat, bucketCounts)
 								assert.Equal(t, otBucketBoundarys.AsRaw(), bucketBounds[1:])
 
-								assert.Equal(t, float64(datapoint.Count()), metric.Value.GetMultiValues().Get(FieldCount))
-								assert.Equal(t, datapoint.Sum(), metric.Value.GetMultiValues().Get(FieldSum))
+								assert.Equal(t, float64(datapoint.Count()), metric.Value.GetMultiValues().Get(otlp.FieldCount))
+								assert.Equal(t, datapoint.Sum(), metric.Value.GetMultiValues().Get(otlp.FieldSum))
 								eventIndex++
 							}
 						case pmetric.MetricTypeExponentialHistogram:
@@ -318,8 +318,8 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 										assert.Equal(t, v.AsString(), event.GetTags().Get(k))
 										return true
 									})
-								assert.Equal(t, aggregationTemporality.String(), event.GetTags().Get(TagKeyMetricAggregationTemporality))
-								assert.Equal(t, pmetric.MetricTypeExponentialHistogram.String(), event.GetTags().Get(TagKeyMetricHistogramType))
+								assert.Equal(t, aggregationTemporality.String(), event.GetTags().Get(otlp.TagKeyMetricAggregationTemporality))
+								assert.Equal(t, pmetric.MetricTypeExponentialHistogram.String(), event.GetTags().Get(otlp.TagKeyMetricHistogramType))
 								metric, ok := event.(*models.Metric)
 								assert.True(t, ok)
 								assert.Equal(t, otUnit, metric.Unit)
@@ -331,10 +331,10 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 								// check values
 								scale := datapoint.Scale()
 								base := math.Pow(2, math.Pow(2, float64(-scale)))
-								assert.Equal(t, scale, int32(metric.Value.GetMultiValues().Get(FieldScale)))
+								assert.Equal(t, scale, int32(metric.Value.GetMultiValues().Get(otlp.FieldScale)))
 
 								positiveOffset := datapoint.Positive().Offset()
-								assert.Equal(t, positiveOffset, int32(metric.Value.GetMultiValues().Get(FieldPositiveOffset)))
+								assert.Equal(t, positiveOffset, int32(metric.Value.GetMultiValues().Get(otlp.FieldPositiveOffset)))
 								otPositiveBucketCounts := datapoint.Positive().BucketCounts()
 
 								otPositiveBucketBounds, otPositiveBucketCountsFloat := make([]float64, 0), make([]float64, 0)
@@ -343,13 +343,13 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 									otPositiveBucketBounds = append(otPositiveBucketBounds, lowerBoundary)
 									otPositiveBucketCountsFloat = append(otPositiveBucketCountsFloat, float64(v))
 								}
-								postiveBucketBounds, positveBucketCounts := helper.ComputeBuckets(metric.Value.GetMultiValues(), true)
+								postiveBucketBounds, positveBucketCounts := otlp.ComputeBuckets(metric.Value.GetMultiValues(), true)
 
 								assert.Equal(t, otPositiveBucketBounds, postiveBucketBounds)
 								assert.Equal(t, otPositiveBucketCountsFloat, positveBucketCounts)
 
 								negativeOffset := datapoint.Negative().Offset()
-								assert.Equal(t, negativeOffset, int32(metric.Value.GetMultiValues().Get(FieldNegativeOffset)))
+								assert.Equal(t, negativeOffset, int32(metric.Value.GetMultiValues().Get(otlp.FieldNegativeOffset)))
 								otNegativeBucetCounts := datapoint.Negative().BucketCounts()
 
 								otNegativeBucketBounds, otNegativeBucketCountsFloat := make([]float64, 0), make([]float64, 0)
@@ -360,13 +360,13 @@ func TestDecoder_DecodeV2_MetricsAll(t *testing.T) {
 									otNegativeBucketCountsFloat = append(otNegativeBucketCountsFloat, float64(v))
 								}
 
-								netativeBucketBounds, netativeBucketCounts := helper.ComputeBuckets(metric.Value.GetMultiValues(), false)
+								netativeBucketBounds, netativeBucketCounts := otlp.ComputeBuckets(metric.Value.GetMultiValues(), false)
 								assert.Equal(t, otNegativeBucketBounds, netativeBucketBounds)
 								assert.Equal(t, otNegativeBucketCountsFloat, netativeBucketCounts)
 
-								assert.Equal(t, float64(datapoint.Count()), metric.Value.GetMultiValues().Get(FieldCount))
-								assert.Equal(t, datapoint.Sum(), metric.Value.GetMultiValues().Get(FieldSum))
-								assert.Equal(t, float64(datapoint.ZeroCount()), metric.Value.GetMultiValues().Get(FieldZeroCount))
+								assert.Equal(t, float64(datapoint.Count()), metric.Value.GetMultiValues().Get(otlp.FieldCount))
+								assert.Equal(t, datapoint.Sum(), metric.Value.GetMultiValues().Get(otlp.FieldSum))
+								assert.Equal(t, float64(datapoint.ZeroCount()), metric.Value.GetMultiValues().Get(otlp.FieldZeroCount))
 								eventIndex++
 							}
 						}
@@ -399,7 +399,7 @@ func TestDecoder_DecodeV2_TracesEmpty(t *testing.T) {
 		resource := groupEvents.Group.Metadata
 		assert.True(t, resource.Contains("host.name"))
 		scopeAttributes := groupEvents.Group.Tags
-		assert.True(t, scopeAttributes.Contains(TagKeyScopeVersion))
+		assert.True(t, scopeAttributes.Contains(otlp.TagKeyScopeVersion))
 
 		assert.Equal(t, 1, len(groupEvents.Events))
 		for _, event := range groupEvents.Events {
@@ -436,8 +436,8 @@ func TestDecoder_DecodeV2_Traces(t *testing.T) {
 		assert.Equal(t, "testService", resource.Get("service.name"))
 
 		scopeAttributes := groupEvents.Group.Tags
-		assert.Equal(t, "scope version", scopeAttributes.Get(TagKeyScopeVersion))
-		assert.Equal(t, "scope name", scopeAttributes.Get(TagKeyScopeName))
+		assert.Equal(t, "scope version", scopeAttributes.Get(otlp.TagKeyScopeVersion))
+		assert.Equal(t, "scope name", scopeAttributes.Get(otlp.TagKeyScopeName))
 
 		otlpSpans := otlpScopeSpans.ScopeSpans().At(i).Spans()
 		assert.Equal(t, 2, len(groupEvents.Events))
