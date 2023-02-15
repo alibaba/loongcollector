@@ -18,9 +18,11 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 const (
@@ -32,7 +34,7 @@ func TestInitMetadataGroupAggregator(t *testing.T) {
 		agg := NewAggregatorMetadataGroup()
 		Convey("When Init(), should return error", func() {
 			_, err := agg.Init(nil, nil)
-			So(err, ShouldNotBeNil)
+			So(err, ShouldBeNil)
 		})
 	})
 
@@ -215,9 +217,9 @@ func TestMetadataGroupAggregatorRecordWithNonexistentKey(t *testing.T) {
 func generateByteArrayEvents(count int, meta map[string]string) []*models.PipelineGroupEvents {
 	groupEventsArray := make([]*models.PipelineGroupEvents, 0, count)
 	event := models.ByteArray(RawData)
-	groupEvents := &models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadataWithMap(meta), nil),
-		Events: []models.PipelineEvent{event}}
 	for i := 0; i < count; i++ {
+		groupEvents := &models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadataWithMap(meta), nil),
+			Events: []models.PipelineEvent{event}}
 		groupEventsArray = append(groupEventsArray, groupEvents)
 	}
 	return groupEventsArray
@@ -259,4 +261,93 @@ func TestMetadataGroupAggregatorGetResult(t *testing.T) {
 		})
 
 	})
+}
+
+func TestMetadataGroupGroup_Record_Directly(t *testing.T) {
+	p := new(AggregatorMetadataGroup)
+	p.GroupMaxEventLength = 5
+	ctx := pipeline.NewObservePipelineConext(100)
+
+	err := p.Record(constructEvents(104, map[string]string{}, map[string]string{}), ctx)
+	require.NoError(t, err)
+	require.Equal(t, 20, len(ctx.Collector().ToArray()))
+}
+
+func TestMetadataGroupGroup_Record_Tag(t *testing.T) {
+	p := new(AggregatorMetadataGroup)
+	p.GroupMaxEventLength = 5
+	p.GroupMetadataKeys = []string{"meta"}
+	events := constructEvents(104, map[string]string{
+		"meta": "metaval",
+	}, map[string]string{
+		"tag": "tagval",
+	})
+	ctx := pipeline.NewObservePipelineConext(100)
+	p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
+	err := p.Record(events, ctx)
+	require.NoError(t, err)
+	array := ctx.Collector().ToArray()
+	require.Equal(t, 20, len(array))
+	require.Equal(t, 1, len(array[0].Group.Metadata.Iterator()))
+	require.Equal(t, "metaval", array[0].Group.Metadata.Get("meta"))
+}
+
+func TestMetadataGroupGroup_Record_Timer(t *testing.T) {
+	p := new(AggregatorMetadataGroup)
+	p.GroupMaxEventLength = 500
+	ctx := pipeline.NewObservePipelineConext(100)
+	p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
+	err := p.Record(constructEvents(104, map[string]string{}, map[string]string{}), ctx)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(ctx.Collector().ToArray()))
+	_ = p.GetResult(ctx)
+	array := ctx.Collector().ToArray()
+	require.Equal(t, 1, len(array))
+	require.Equal(t, 104, len(array[0].Events))
+}
+
+func TestMetadataGroupGroup_Oversize(t *testing.T) {
+	{
+		p := new(AggregatorMetadataGroup)
+		p.GroupMaxEventLength = 500
+		p.GroupMaxByteLength = 1
+		p.DropOversizeEvent = true
+		ctx := pipeline.NewObservePipelineConext(100)
+		p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
+
+		events := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
+		for _, event := range events {
+			require.NoError(t, p.Record(event, ctx))
+		}
+		require.Equal(t, 0, len(ctx.Collector().ToArray()))
+		_ = p.GetResult(ctx)
+		require.Equal(t, 0, len(ctx.Collector().ToArray()))
+	}
+	{
+		p := new(AggregatorMetadataGroup)
+		p.GroupMaxEventLength = 500
+		p.GroupMaxByteLength = 1
+		p.DropOversizeEvent = false
+		ctx := pipeline.NewObservePipelineConext(100)
+		p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
+
+		events := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
+		for _, event := range events {
+			require.NoError(t, p.Record(event, ctx))
+		}
+		require.Equal(t, 5, len(ctx.Collector().ToArray()))
+		_ = p.GetResult(ctx)
+		require.Equal(t, 0, len(ctx.Collector().ToArray()))
+	}
+
+}
+
+func constructEvents(num int, meta, tags map[string]string) *models.PipelineGroupEvents {
+	group := models.NewGroup(models.NewMetadataWithMap(meta), models.NewTagsWithMap(tags))
+	e := new(models.PipelineGroupEvents)
+	e.Group = group
+	for i := 0; i < num; i++ {
+		e.Events = append(e.Events, &models.Metric{})
+	}
+	return e
 }

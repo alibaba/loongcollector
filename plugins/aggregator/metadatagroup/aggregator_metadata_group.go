@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
@@ -31,13 +32,15 @@ const (
 )
 
 type metadataGroup struct {
-	group  *models.GroupInfo
-	events []models.PipelineEvent
+	context pipeline.Context
+	group   *models.GroupInfo
+	events  []models.PipelineEvent
 
 	nowEventsLength     int
 	nowEventsByteLength int
 	maxEventsLength     int
 	maxEventsByteLength int
+	dropOversizeEvent   bool
 
 	lock *sync.Mutex
 }
@@ -45,30 +48,113 @@ type metadataGroup struct {
 func (g *metadataGroup) Record(group *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	eventsLen := len(group.Events)
-	bytesLen := g.evaluateByteLength(group.Events)
+	// check by bytes size, currently only works at `models.ByteArray`
+	t := group.Events[0].GetType()
+	switch t {
+	case models.EventTypeByteArray:
+		g.collectByLengthAndBytesChecker(group, ctx)
+	default:
+		g.collectByLengthChecker(group, ctx)
+	}
+	return nil
+}
 
-	// when current events is full, make a quick flush.
-	if len(g.events) > 0 && (g.nowEventsLength+eventsLen > g.maxEventsLength || g.nowEventsByteLength+bytesLen > g.maxEventsByteLength) {
-		ctx.Collector().Collect(g.group, g.events...)
-		// reset length
-		g.Reset()
+func (g *metadataGroup) collectByLengthChecker(group *models.PipelineGroupEvents, ctx pipeline.PipelineContext) {
+	for {
+		if len(group.Events) == 0 {
+			break
+		}
+		inputSize := len(group.Events)
+		availableSize := g.maxEventsLength - g.nowEventsLength
+		if availableSize < 0 {
+			logger.Error(g.context.GetRuntimeContext(), "RUNTIME_ALARM", "availableSize is negative")
+			_ = g.GetResultWithoutLock(ctx)
+			continue
+		}
+
+		if availableSize >= inputSize {
+			g.events = append(g.events, group.Events...)
+			g.nowEventsLength += inputSize
+			break
+		} else {
+			g.events = append(g.events, group.Events[0:availableSize]...)
+			_ = g.GetResultWithoutLock(ctx)
+			group.Events = group.Events[availableSize:]
+		}
 	}
 
-	// add events
-	g.nowEventsLength += eventsLen
-	g.nowEventsByteLength += bytesLen
-	g.events = append(g.events, group.Events...)
-	return nil
+}
+
+func (g *metadataGroup) collectByLengthAndBytesChecker(group *models.PipelineGroupEvents, ctx pipeline.PipelineContext) {
+	for {
+		if len(group.Events) == 0 {
+			break
+		}
+		availableBytesSize := g.maxEventsByteLength - g.nowEventsByteLength
+		availableLenSize := g.maxEventsLength - g.nowEventsLength
+		if availableLenSize < 0 || availableBytesSize < 0 {
+			logger.Error(g.context.GetRuntimeContext(), "RUNTIME_ALARM", "availableSize or availableLength is negative")
+			_ = g.GetResultWithoutLock(ctx)
+			continue
+		}
+
+		bytes := 0
+		num := 0
+		oversize := false
+		for _, event := range group.Events {
+			byteArray, ok := event.(models.ByteArray)
+			if !ok {
+				continue
+			}
+			if bytes+len(byteArray) > availableBytesSize || num+1 > availableLenSize {
+				break
+			}
+			bytes += len(byteArray)
+			num++
+		}
+		if len(g.events) == 0 && num == 0 {
+			// means the first event oversize the maximum group size
+			if !g.dropOversizeEvent {
+				num = 1
+				oversize = true
+			} else {
+				logger.Errorf(g.context.GetRuntimeContext(), "AGGREGATE_OVERSIZE_ALARM", "event[%s] size [%d] is over the limit size %d, the event would be dropped",
+					group.Events[0].GetName(),
+					len(group.Events[0].(models.ByteArray)),
+					g.maxEventsByteLength)
+				group.Events = group.Events[1:]
+				continue
+			}
+
+		}
+
+		if num >= len(group.Events) {
+			g.events = append(g.events, group.Events...)
+			g.nowEventsByteLength += bytes
+			g.nowEventsLength += num
+			if oversize {
+				_ = g.GetResultWithoutLock(ctx)
+			}
+			break
+		} else {
+			g.events = append(g.events, group.Events[0:num]...)
+			_ = g.GetResultWithoutLock(ctx)
+			group.Events = group.Events[num:]
+		}
+	}
+
 }
 
 func (g *metadataGroup) GetResult(ctx pipeline.PipelineContext) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
+	return g.GetResultWithoutLock(ctx)
+}
+
+func (g *metadataGroup) GetResultWithoutLock(ctx pipeline.PipelineContext) error {
 	if len(g.events) == 0 {
 		return nil
 	}
-
 	// reset
 	ctx.Collector().Collect(g.group, g.events...)
 	g.Reset()
@@ -81,33 +167,18 @@ func (g *metadataGroup) Reset() {
 	g.events = make([]models.PipelineEvent, 0, g.maxEventsLength)
 }
 
-func (g *metadataGroup) evaluateByteLength(events []models.PipelineEvent) int {
-	if len(events) == 0 {
-		return 0
-	}
-	length := 0
-	for _, event := range events {
-		byteArray, ok := event.(models.ByteArray)
-		if !ok {
-			continue
-		}
-		length += len(byteArray)
-	}
-	return length
-}
-
 type AggregatorMetadataGroup struct {
+	context             pipeline.Context
 	GroupMetadataKeys   []string `json:"GroupMetadataKeys,omitempty" comment:"group by metadata keys"`
 	GroupMaxEventLength int      `json:"GroupMaxEventLength,omitempty" comment:"max count of events in a pipelineGroupEvents"`
 	GroupMaxByteLength  int      `json:"GroupMaxByteLength,omitempty" comment:"max sum of byte length of events in a pipelineGroupEvents"`
+	DropOversizeEvent   bool     `json:"DropOversizeEvent,omitempty" comment:"drop event when the event over GroupMaxByteLength"`
 
 	groupAgg sync.Map
 }
 
 func (g *AggregatorMetadataGroup) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
-	if len(g.GroupMetadataKeys) == 0 {
-		return 0, fmt.Errorf("must specify GroupMetadataKeys")
-	}
+	g.context = context
 	if g.GroupMaxEventLength <= 0 {
 		return 0, fmt.Errorf("unknown GroupMaxEventLength")
 	}
@@ -149,7 +220,9 @@ func (g *AggregatorMetadataGroup) getOrCreateMetadataGroup(event *models.Pipelin
 			group:               &models.GroupInfo{Metadata: metadata},
 			maxEventsLength:     g.GroupMaxEventLength,
 			maxEventsByteLength: g.GroupMaxByteLength,
+			dropOversizeEvent:   g.DropOversizeEvent,
 			lock:                &sync.Mutex{},
+			context:             g.context,
 		}
 		group, _ = g.groupAgg.LoadOrStore(aggKey, newGroup)
 	}
@@ -175,6 +248,7 @@ func NewAggregatorMetadataGroup() *AggregatorMetadataGroup {
 		GroupMetadataKeys:   make([]string, 0),
 		GroupMaxByteLength:  maxBytesLength,
 		GroupMaxEventLength: maxEventsLength,
+		DropOversizeEvent:   true,
 	}
 }
 
