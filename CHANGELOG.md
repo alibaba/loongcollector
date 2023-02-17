@@ -53,4 +53,5 @@ your changes, such as:
 - [public] [both] [updated] grok processor reports unmatched errors by default
 - [public] [both] [fixed] grok processor gets stuck with Chinese
 - [public] [both] [fixed] fix plugin version in logs
-- [public] [both] [updated] flusher http support variable config in request header   
+- [public] [both] [updated] flusher http support variable config in request header
+- [public] [both] [fixed] fix memory leak in container list maintainance introduced in v1.2.1

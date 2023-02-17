@@ -1080,12 +1080,15 @@ func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error 
 	return err
 }
 
-// We should mark container removed only if we cannot access its metadata
+// We mark container removed if it is exited or its metadata cannot be accessed
 // e.g. cannot docker inspect / crictl inspect it.
 func (dc *DockerCenter) markRemove(containerID string) {
 	dc.lock.Lock()
 	defer dc.lock.Unlock()
 	if container, ok := dc.containerMap[containerID]; ok {
+		if container.deleteFlag {
+			return
+		}
 		logger.Debugf(context.Background(), "mark remove container: id:%v\tname:%v\tcreated:%v\tstatus:%v detail=%+v",
 			container.IDPrefix(), container.ContainerInfo.Name, container.ContainerInfo.Created, container.Status(), container.ContainerInfo)
 		container.ContainerInfo.State.Status = ContainerStatusExited
