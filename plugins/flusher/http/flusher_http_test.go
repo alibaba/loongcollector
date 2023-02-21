@@ -18,6 +18,7 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"sort"
 	"testing"
 	"time"
 
@@ -126,6 +127,7 @@ func TestHttpFlusherInit(t *testing.T) {
 		}
 		Convey("Then Init() should build the variable keys", func() {
 			err := flusher.Init(mockContext{})
+			sort.Strings(flusher.varKeys)
 			So(err, ShouldBeNil)
 			So(flusher.varKeys, ShouldResemble, []string{"var1", "var2"})
 		})

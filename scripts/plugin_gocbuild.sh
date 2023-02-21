@@ -25,7 +25,10 @@ if [ $? != 0 ]; then
 fi
 
 OUT_DIR=${1:-output}
+PLUGINS_CONFIG_FILE=${2:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml}}
+GO_MOD_FILE=${3:-${GO_MOD_FILE:-go.mod}}
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
+CURRDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 if [ -d "$ROOTDIR/$OUT_DIR" ]; then
   rm -rf "$ROOTDIR/$OUT_DIR"
 fi
@@ -39,7 +42,9 @@ if uname -s | grep Linux; then
   if uname -m | grep x86_64; then
     LDFLAGS='-extldflags "-Wl,--wrap=memcpy"'
   fi
-  goc build '--buildflags=-mod=mod -buildmode=c-shared -ldflags="'"$LDFLAGS"'"' --center=http://goc:7777 -o "$ROOTDIR/$OUT_DIR/${NAME}"
+  # make plugins stuffs
+  "$CURRDIR/import_plugins.sh" "$PLUGINS_CONFIG_FILE" "$GO_MOD_FILE"
+  goc build '--buildflags=-mod=mod -modfile="'"$ROOTDIR/$GO_MOD_FILE"'" -buildmode=c-shared -ldflags="'"$LDFLAGS"'"' --center=http://goc:7777 -o "$ROOTDIR/$OUT_DIR/${NAME}"
 else
   echo "goc build only build a dynamic library in linux platform"
   exit 1

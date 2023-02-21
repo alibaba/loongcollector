@@ -1,0 +1,5 @@
+plugins:
+  common:
+    - gomod: "github.com/mock/ilogtail_plugin1 v1.0.0"
+    - gomod: "github.com/mock/ilogtail_plugin2 v1.0.0"
+      import: "github.com/mock/ilogtail_plugin"

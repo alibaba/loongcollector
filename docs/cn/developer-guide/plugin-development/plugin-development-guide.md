@@ -11,7 +11,7 @@ ilogtail 插件的开发主要有以下步骤：
 1. 创建Issue，描述开发插件功能，会有社区同学参与讨论插件开发的可行性，如果社区review 通过，请参考步骤2继续进行。
 2. 实现相应接口。
 3. 通过init函数注册插件。
-4. 将插件加入[全局插件定义中心](https://github.com/alibaba/ilogtail/blob/main/plugins/all/all.go), 如果仅运行于指定系统，请添加到[Linux插件定义中心](https://github.com/alibaba/ilogtail/blob/main/plugins/all/all_linux.go) 或 [Windows插件定义中心](https://github.com/alibaba/ilogtail/blob/main/plugins/all/all_windows.go).
+4. 将插件加入[插件引用配置文件](https://github.com/alibaba/ilogtail/blob/main/plugins.yml)的`common`配置节, 如果仅运行于指定系统，请添加到`linux`或`windows`配置节.
 5. 进行单测或者E2E测试，请参考[如何使用单测](../test/unit-test.md) 与 [如何使用E2E测试](../test/e2e-test.md).
 6. 使用 *make lint* 检查代码规范。
 7. 提交Pull Request。

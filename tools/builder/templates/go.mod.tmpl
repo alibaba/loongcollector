@@ -1,0 +1,30 @@
+{{.GoModContent}}
+
+{{range .Config.Plugins.Common}}
+{{if .GoMod}}require {{.GoMod}}{{end}}
+{{- end}}
+{{- range .Config.Plugins.Windows}}
+{{if .GoMod}}require {{.GoMod}}{{end}}
+{{- end}}
+{{- range .Config.Plugins.Linux}}
+{{if .GoMod}}require {{.GoMod}}{{end}}
+{{- end}}
+{{- range .Config.Plugins.Debug}}
+{{if .GoMod}}require {{.GoMod}}{{end}}
+{{- end}}
+
+{{- range .Config.Plugins.Common}}
+{{if ne .Path ""}}replace {{.GoMod}} => {{.Path}}{{- end}}
+{{- end}}
+{{- range .Config.Plugins.Windows}}
+{{if ne .Path ""}}replace {{.GoMod}} => {{.Path}}{{- end}}
+{{- end}}
+{{- range .Config.Plugins.Linux}}
+{{if ne .Path ""}}replace {{.GoMod}} => {{.Path}}{{- end}}
+{{- end}}
+{{- range .Config.Plugins.Debug}}
+{{if ne .Path ""}}replace {{.GoMod}} => {{.Path}}{{- end}}
+{{- end}}
+{{- range .Config.Project.Replaces}}
+replace {{.}}
+{{- end}}
