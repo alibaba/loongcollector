@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -49,4 +50,40 @@ func NormalizeWindowsPath(path string) string {
 		}
 	}
 	return path
+}
+
+func GetFileListByPrefix(dirPath, prefix string, needDir bool, num int) ([]string, error) {
+	stat, err := os.Stat(dirPath)
+	if err != nil {
+		return nil, err
+	}
+	if !stat.IsDir() {
+		return []string{dirPath}, nil
+	}
+
+	dir, err := os.Open(dirPath) //nolint:gosec
+	if err != nil {
+		return nil, err
+	}
+	fis, err := dir.Readdir(0)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]string, 0, len(fis))
+	for _, fi := range fis {
+		if !fi.IsDir() && strings.HasPrefix(fi.Name(), prefix) {
+			if needDir {
+				files = append(files, filepath.Join(dirPath, fi.Name()))
+			} else {
+				files = append(files, fi.Name())
+			}
+		}
+
+	}
+	if num == 0 || num > len(files) {
+		num = len(files)
+	}
+	sort.Strings(files)
+	return files[0:num], nil
 }

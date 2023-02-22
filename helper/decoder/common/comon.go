@@ -37,6 +37,7 @@ const (
 	ProtocolOTLPMetricV1 = "otlp_metricv1"
 	ProtocolOTLPTraceV1  = "otlp_tracev1"
 	ProtocolRaw          = "raw"
+	ProtocolPyroscope    = "pyroscope"
 )
 
 func CollectBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) ([]byte, int, error) {

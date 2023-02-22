@@ -75,7 +75,7 @@ func parseLabels(metric model.Metric) (metricName, labelsValue string) {
 }
 
 // Decode impl
-func (d *Decoder) Decode(data []byte, req *http.Request) (logs []*protocol.Log, err error) {
+func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
 	if req.Header.Get("Content-Encoding") == "snappy" && strings.HasPrefix(req.Header.Get("Content-Type"), "application/x-protobuf") {
 		return d.decodeInRemoteWriteFormat(data, req)
 	}

@@ -48,7 +48,7 @@ type Decoder struct {
 }
 
 // Decode impl
-func (d *Decoder) Decode(data []byte, req *http.Request) (logs []*protocol.Log, err error) {
+func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
 	switch d.Format {
 	case common.ProtocolOTLPLogV1:
 		otlpLogReq := plogotlp.NewExportRequest()

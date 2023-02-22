@@ -24,6 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/helper/decoder/influxdb"
 	"github.com/alibaba/ilogtail/helper/decoder/opentelemetry"
 	"github.com/alibaba/ilogtail/helper/decoder/prometheus"
+	"github.com/alibaba/ilogtail/helper/decoder/pyroscope"
 	"github.com/alibaba/ilogtail/helper/decoder/raw"
 	"github.com/alibaba/ilogtail/helper/decoder/sls"
 	"github.com/alibaba/ilogtail/helper/decoder/statsd"
@@ -34,7 +35,7 @@ import (
 // Decoder used to parse buffer to sls logs
 type Decoder interface {
 	// Decode reader to logs
-	Decode(data []byte, req *http.Request) (logs []*protocol.Log, err error)
+	Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error)
 	// DecodeV2 reader to groupEvents
 	DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error)
 	// ParseRequst gets the request's body raw data and status code.
@@ -74,6 +75,8 @@ func GetDecoderWithOptions(format string, option Option) (Decoder, error) {
 	case common.ProtocolRaw:
 		return &raw.Decoder{DisableUncompress: option.DisableUncompress}, nil
 
+	case common.ProtocolPyroscope:
+		return &pyroscope.Decoder{}, nil
 	}
 	return nil, errDecoderNotFound
 }

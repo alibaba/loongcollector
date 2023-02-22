@@ -4,6 +4,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 ## Apache 2.0 licenses
 
+- [github.com/pyroscope-io/jfr-parser](https://pkg.go.dev/github.com/pyroscope-io/jfr-parser?tab=licenses)
+- [github.com/pyroscope-io/pyroscope](https://pkg.go.dev/github.com/pyroscope-io/pyroscope?tab=licenses)
 - [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/aliyun/alibaba-cloud-sdk-go](https://pkg.go.dev/github.com/aliyun/alibaba-cloud-sdk-go?tab=licenses)
 - [github.com/containerd/cgroups](https://pkg.go.dev/github.com/containerd/cgroups?tab=licenses)
@@ -136,6 +138,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 ## MIT licenses
 
+- [github.com/gofrs/uuid](https://pkg.go.dev/github.com/gofrs/uuid?tab=licenses)
 - [github.com/go-kit/log](https://pkg.go.dev/github.com/go-kit/log?tab=licenses)
 - [github.com/narqo/go-dogstatsd-parser](https://pkg.go.dev/github.com/narqo/go-dogstatsd-parser?tab=licenses)
 - [sigs.k8s.io/yaml](https://pkg.go.dev/sigs.k8s.io/yaml?tab=licenses)

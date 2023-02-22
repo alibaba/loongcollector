@@ -47,6 +47,8 @@ func main() {
 	fmt.Printf("load config %s %s %s\n", *flags.GlobalConfig, *flags.PluginConfig, *flags.FlusherConfig)
 
 	globalCfg, pluginCfgs, err := flags.LoadConfig()
+	fmt.Println("global config : ", globalCfg)
+	fmt.Println("plugin config : ", pluginCfgs)
 	if err != nil {
 		return
 	} else if InitPluginBaseV2(globalCfg) != 0 {

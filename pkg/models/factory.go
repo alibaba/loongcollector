@@ -72,7 +72,6 @@ func NewGroup(meta Metadata, tags Tags) *GroupInfo {
 		Tags:     tags,
 	}
 }
-
 func NewMetric(name string, metricType MetricType, tags Tags, timestamp int64, value MetricValue, typedValues MetricTypedValues) *Metric {
 	return &Metric{
 		Name:       name,

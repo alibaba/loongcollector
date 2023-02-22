@@ -137,7 +137,7 @@ func TestFieldsExtend(t *testing.T) {
 
 	for _, testCase := range cases {
 		decoder := &Decoder{FieldsExtend: testCase.enableFieldsExtend}
-		logs, err := decoder.Decode([]byte(txtWithDotNames), &http.Request{})
+		logs, err := decoder.Decode([]byte(txtWithDotNames), &http.Request{}, nil)
 		if testCase.wantErr {
 			assert.NotNil(t, err)
 			continue
@@ -162,7 +162,7 @@ func convertLog2Map(logs []*protocol.Log) (mapLogs []map[string]string) {
 func TestNormal(t *testing.T) {
 	decoder := &Decoder{}
 	req := &http.Request{}
-	logs, err := decoder.Decode([]byte(textFormat), req)
+	logs, err := decoder.Decode([]byte(textFormat), req, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, len(logs), 15)
 	for _, log := range logs {
@@ -173,7 +173,7 @@ func TestNormal(t *testing.T) {
 func TestMySQL(t *testing.T) {
 	decoder := &Decoder{}
 	req := &http.Request{}
-	logs, err := decoder.Decode([]byte(mySQLFormat), req)
+	logs, err := decoder.Decode([]byte(mySQLFormat), req, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, len(logs), 38)
 	for _, log := range logs {

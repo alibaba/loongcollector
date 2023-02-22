@@ -51,7 +51,7 @@ type Decoder struct {
 	FieldsExtend bool
 }
 
-func (d *Decoder) Decode(data []byte, req *http.Request) (logs []*protocol.Log, decodeErr error) {
+func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, decodeErr error) {
 	precision := req.FormValue("precision")
 	var points []models.Point
 	var err error

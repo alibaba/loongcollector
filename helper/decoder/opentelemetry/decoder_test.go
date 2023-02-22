@@ -40,7 +40,7 @@ func TestNormal(t *testing.T) {
 	httpReq.Header.Set("Content-Type", jsonContentType)
 	decoder := &Decoder{Format: common.ProtocolOTLPLogV1}
 
-	logs, err := decoder.Decode([]byte(textFormat), httpReq)
+	logs, err := decoder.Decode([]byte(textFormat), httpReq, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, len(logs), 2)
 	log := logs[1]

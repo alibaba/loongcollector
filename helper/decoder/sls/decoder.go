@@ -27,7 +27,7 @@ type Decoder struct {
 }
 
 // Decode impl
-func (d *Decoder) Decode(data []byte, req *http.Request) ([]*protocol.Log, error) {
+func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) ([]*protocol.Log, error) {
 	logGroup := &protocol.LogGroup{}
 	if err := logGroup.Unmarshal(data); err != nil {
 		return nil, err

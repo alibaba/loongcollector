@@ -63,7 +63,7 @@ telemetry_requests_metrics_latency_microseconds_count 2693
 func TestNormal(t *testing.T) {
 	decoder := &Decoder{}
 	req, _ := http.NewRequest("GET", "http://localhost", nil)
-	logs, err := decoder.Decode([]byte(textFormat), req)
+	logs, err := decoder.Decode([]byte(textFormat), req, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, len(logs), 20)
 	for _, log := range logs {

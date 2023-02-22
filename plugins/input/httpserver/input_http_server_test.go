@@ -29,7 +29,6 @@ import (
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 
 	"github.com/stretchr/testify/require"
-
 	"gotest.tools/assert"
 )
 

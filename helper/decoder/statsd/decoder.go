@@ -69,7 +69,7 @@ func parseLabels(metric *dogstatsd.Metric) (labelsValue string) {
 	return builder.String()
 }
 
-func (d *Decoder) Decode(data []byte, req *http.Request) (logs []*protocol.Log, err error) {
+func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
 	now := time.Now()
 	parts := bytes.Split(data, []byte("\n"))
 	for _, part := range parts {
