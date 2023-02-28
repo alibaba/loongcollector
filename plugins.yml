@@ -40,7 +40,6 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/input/nginx"
     - import: "github.com/alibaba/ilogtail/plugins/input/opentelemetry"
     - import: "github.com/alibaba/ilogtail/plugins/input/process"
-    - import: "github.com/alibaba/ilogtail/plugins/input/prometheus"
     - import: "github.com/alibaba/ilogtail/plugins/input/rdb/mssql"
     - import: "github.com/alibaba/ilogtail/plugins/input/rdb/pgsql"
     - import: "github.com/alibaba/ilogtail/plugins/input/redis"
@@ -87,6 +86,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/input/journal"
     - import: "github.com/alibaba/ilogtail/plugins/input/snmp"
     - import: "github.com/alibaba/ilogtail/plugins/input/telegraf"
+    - import: "github.com/alibaba/ilogtail/plugins/input/prometheus"
   windows:
     - import: "github.com/alibaba/ilogtail/plugins/flusher/sls"
     - import: "github.com/alibaba/ilogtail/plugins/input/docker/logmeta"

@@ -44,6 +44,7 @@ type ServiceStaticPrometheus struct {
 	ConfigFilePath    string            `comment:"the prometheus configuration path, and the param would be ignored when Yaml param is configured."`
 	AuthorizationPath string            `comment:"the prometheus authorization path, only using in authorization files. When Yaml param is configured, the default value is the current binary path. However, the default value is the ConfigFilePath directory when ConfigFilePath is working."`
 	ExtraFlags        map[string]string `comment:"the prometheus extra configuration flags, like promscrape.maxScrapeSize, for more flags please see [here](https://docs.victoriametrics.com/vmagent.html#advanced-usage)"`
+	NoStaleMarkers    bool              `comment:"Whether to disable sending Prometheus stale markers for metrics when scrape target disappears. This option may reduce memory usage if stale markers aren't needed for your setup. This option also disables populating the scrape_series_added metric. See https://prometheus.io/docs/concepts/jobs_instances/#automatically-generated-labels-and-time-series"`
 
 	scraper         *promscrape.Scraper //nolint:typecheck
 	shutdown        chan struct{}
@@ -71,12 +72,16 @@ func (p *ServiceStaticPrometheus) Init(context pipeline.Context) (int, error) {
 		logger.Info(context.GetRuntimeContext(), "set config maxScrapeSize to 256MB, error", err)
 		liblogger.Init()
 		common.StartUnmarshalWorkers()
+		if p.NoStaleMarkers {
+			err := flag.Set("promscrape.noStaleMarkers", "true")
+			logger.Info(context.GetRuntimeContext(), "set config", "promscrape.noStaleMarkers", "value", "true", "error", err)
+		}
+		for k, v := range p.ExtraFlags {
+			err := flag.Set(k, v)
+			logger.Info(context.GetRuntimeContext(), "set config", k, "value", v, "error", err)
+		}
 	})
 	p.context = context
-	for k, v := range p.ExtraFlags {
-		err := flag.Set(k, v)
-		logger.Info(context.GetRuntimeContext(), "set config", k, "value", v, "error", err)
-	}
 	var detail []byte
 	switch {
 	case p.Yaml != "":
@@ -143,6 +148,8 @@ func (p *ServiceStaticPrometheus) Stop() error {
 
 func init() {
 	pipeline.ServiceInputs["service_prometheus"] = func() pipeline.ServiceInput {
-		return &ServiceStaticPrometheus{}
+		return &ServiceStaticPrometheus{
+			NoStaleMarkers: true,
+		}
 	}
 }

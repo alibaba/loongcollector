@@ -119,6 +119,7 @@ require (
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
+	github.com/valyala/gozstd v1.17.0 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
@@ -254,7 +255,7 @@ require (
 )
 
 replace (
-	github.com/VictoriaMetrics/VictoriaMetrics => github.com/iLogtail/VictoriaMetrics v1.83.2-ilogtail
+	github.com/VictoriaMetrics/VictoriaMetrics => github.com/iLogtail/VictoriaMetrics v1.83.3-ilogtail
 	github.com/VictoriaMetrics/metrics => github.com/iLogtail/metrics v1.23.0-ilogtail
 	github.com/alibaba/ilogtail/pkg => ./pkg
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner => ./external/github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner
