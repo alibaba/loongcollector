@@ -23,6 +23,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
+const ContainerIDPrefixSize = 12
+
 var addedContainerMutex sync.Mutex
 
 var addedConfigResultMutex sync.Mutex
@@ -256,6 +258,9 @@ func SerializeConfigResultToPb(logGroup *protocol.LogGroup) {
 }
 
 func GetShortID(fullID string) string {
+	if len(fullID) < ContainerIDPrefixSize {
+		return fullID
+	}
 	return fullID[0:12]
 }
 

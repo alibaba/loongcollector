@@ -17,6 +17,8 @@ package pluginmanager
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"runtime"
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -63,6 +65,7 @@ func LoadGlobalConfig(jsonStr string) int {
 					util.SetNetworkIdentification(LogtailGlobalConfig.HostIP, LogtailGlobalConfig.Hostname)
 				}
 			}
+			UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", BaseVersion, runtime.GOOS, LogtailGlobalConfig.HostIP)
 		}
 	})
 	return rst

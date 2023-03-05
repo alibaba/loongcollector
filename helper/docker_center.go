@@ -40,7 +40,6 @@ var onceDocker sync.Once
 // set default value to aliyun_logs_
 var envConfigPrefix = "aliyun_logs_"
 
-const ContainerIDPrefixSize = 12
 const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 
 var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
@@ -245,10 +244,7 @@ type DockerInfoDetail struct {
 }
 
 func (did *DockerInfoDetail) IDPrefix() string {
-	if len(did.ContainerInfo.ID) < ContainerIDPrefixSize {
-		return did.ContainerInfo.ID
-	}
-	return did.ContainerInfo.ID[:ContainerIDPrefixSize]
+	return util.GetShortID(did.ContainerInfo.ID)
 }
 
 func (did *DockerInfoDetail) PodName() string {

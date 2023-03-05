@@ -27,6 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/pluginmanager"
 )
 
 // nolint:unused
@@ -94,6 +95,7 @@ func createAliyunLogOperationWrapper(endpoint, project, accessKeyID, accessKeySe
 	} else {
 		clientInterface = aliyunlog.CreateNormalInterface(endpoint, accessKeyID, accessKeySecret, stsToken)
 	}
+	clientInterface.SetUserAgent(pluginmanager.UserAgent)
 	wrapper := &operationWrapper{
 		logClient: clientInterface,
 		project:   project,

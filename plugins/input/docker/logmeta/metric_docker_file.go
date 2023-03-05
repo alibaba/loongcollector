@@ -264,13 +264,13 @@ func (idf *InputDockerFile) updateMapping(info *helper.DockerInfoDetail, sourceP
 
 func (idf *InputDockerFile) deleteMapping(id string) {
 	idf.deleteMappingFromLogtail(id)
-	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "deleted", "source path", idf.lastPathMappingCache[id], "id", id)
+	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "deleted", "source path", idf.lastPathMappingCache[id], "id", util.GetShortID(id))
 	delete(idf.lastPathMappingCache, id)
 }
 
 func (idf *InputDockerFile) notifyStop(id string) {
 	idf.notifyStopToLogtail(id)
-	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "stopped", "source path", idf.lastPathMappingCache[id], "id", id)
+	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "stopped", "source path", idf.lastPathMappingCache[id], "id", util.GetShortID(id))
 }
 
 func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {

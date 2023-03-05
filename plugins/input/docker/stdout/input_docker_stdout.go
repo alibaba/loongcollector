@@ -327,6 +327,8 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 		}
 		if _, ok := sds.synerMap[id]; !ok || firstStart {
 			syner := NewDockerFileSyner(sds, info, sds.checkpointMap)
+			logger.Info(sds.context.GetRuntimeContext(), "docker stdout", "added", "source host path", info.ContainerInfo.LogPath,
+				"id", info.IDPrefix(), "name", info.ContainerInfo.Name, "created", info.ContainerInfo.Created, "status", info.Status())
 			sds.addMetric.Add(1)
 			sds.synerMap[id] = syner
 			syner.dockerFileReader.Start()
@@ -336,7 +338,7 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 	// delete container
 	for id, syner := range sds.synerMap {
 		if _, ok := dockerInfos[id]; !ok {
-			logger.Info(sds.context.GetRuntimeContext(), "delete docker stdout, id", id, "name", syner.info.ContainerInfo.Name)
+			logger.Info(sds.context.GetRuntimeContext(), "docker stdout", "deleted", "id", util.GetShortID(id), "name", syner.info.ContainerInfo.Name)
 			syner.dockerFileReader.Stop()
 			delete(sds.synerMap, id)
 			sds.deleteMetric.Add(1)

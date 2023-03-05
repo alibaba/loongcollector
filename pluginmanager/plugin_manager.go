@@ -15,6 +15,8 @@
 package pluginmanager
 
 import (
+	"fmt"
+
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -41,7 +43,8 @@ var DisabledLogtailConfigLock sync.Mutex
 var DisabledLogtailConfig = make(map[string]*LogstoreConfig)
 
 // StatisticsConfigJson, AlarmConfigJson
-var BaseVersion = "0.1.0" // will be overwritten through ldflags at compile time
+var BaseVersion = "0.1.0"                                                  // will be overwritten through ldflags at compile time
+var UserAgent = fmt.Sprintf("ilogtail/%v (%v)", BaseVersion, runtime.GOOS) // set in global config
 
 var statisticsConfigJSON = `{
     "global": {
