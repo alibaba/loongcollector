@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/pyroscope-io/pyroscope/pkg/structs/transporttrie"
@@ -79,6 +80,11 @@ func (p *Profile) extractProfileV1(meta *profile.Meta, tags map[string]string) f
 		name, stack := p.extractNameAndStacks(k, meta.SpyName)
 		stackID := strconv.FormatUint(xxhash.Sum64(k), 16)
 		var content []*protocol.Log_Content
+		u := meta.Units
+		if meta.Units == profile.SamplesUnits {
+			u = profile.NanosecondsUnit
+			v *= int(time.Second.Nanoseconds() / int64(meta.SampleRate))
+		}
 		content = append(content,
 			&protocol.Log_Content{
 				Key:   "name",
@@ -102,7 +108,7 @@ func (p *Profile) extractProfileV1(meta *profile.Meta, tags map[string]string) f
 			},
 			&protocol.Log_Content{
 				Key:   "units",
-				Value: string(meta.Units),
+				Value: string(u),
 			},
 			&protocol.Log_Content{
 				Key:   "valueTypes",

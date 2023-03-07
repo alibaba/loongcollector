@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
-
 	"github.com/gofrs/uuid"
+
+	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type Input struct {
@@ -89,7 +89,7 @@ const (
 	BytesUnit            Units = "bytes"
 	GoroutinesUnits      Units = "goroutines"
 	LockNanosecondsUnits Units = "lock_nanoseconds"
-	LockSamplesUnits     Units = "local_samples"
+	LockSamplesUnits     Units = "lock_samples"
 )
 
 func DetectProfileType(valType string) Kind {

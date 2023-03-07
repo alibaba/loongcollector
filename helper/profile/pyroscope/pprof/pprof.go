@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/pprof"
@@ -23,7 +24,7 @@ import (
 )
 
 const (
-	formFieldProfile, formFieldSampleTypeConfig = "profile", "sample_type_config"
+	formFieldProfile, formFieldSampleTypeConfig, formFieldPreviousProfile = "profile", "sample_type_config", "prev_profile"
 )
 
 var DefaultSampleTypeMapping = map[string]*tree.SampleTypeConfig{
@@ -69,7 +70,9 @@ type RawProfile struct {
 	RawData             []byte
 	FormDataContentType string
 	profile             []byte
+	previousProfile     []byte
 	sampleTypeConfig    map[string]*tree.SampleTypeConfig
+	parser              *Parser
 
 	logs []*protocol.Log // v1 result
 }
@@ -102,31 +105,70 @@ func (r *RawProfile) doParse(ctx context.Context, meta *profile.Meta, cb profile
 	if meta.SampleRate > 0 {
 		meta.Tags["_sample_rate_"] = strconv.FormatUint(uint64(meta.SampleRate), 10)
 	}
-	return pprof.DecodePool(bytes.NewReader(r.profile), func(tf *tree.Profile) error {
-		if logger.DebugFlag() {
-			var keys []string
-			for k := range r.sampleTypeConfig {
-				keys = append(keys, k)
-			}
-			logger.Debug(ctx, "pprof default sampleTypeConfig: ", r.sampleTypeConfig == nil, "config:", strings.Join(keys, ","))
-		}
+	if r.parser == nil {
 		if r.sampleTypeConfig == nil {
+			if logger.DebugFlag() {
+				var keys []string
+				for k := range r.sampleTypeConfig {
+					keys = append(keys, k)
+				}
+				logger.Debug(ctx, "pprof default sampleTypeConfig: ", r.sampleTypeConfig == nil, "config:", strings.Join(keys, ","))
+			}
 			r.sampleTypeConfig = DefaultSampleTypeMapping
 		}
-		p := Parser{
+		r.parser = &Parser{
 			stackFrameFormatter: Formatter{},
 			sampleTypesFilter:   filterKnownSamples(r.sampleTypeConfig),
 			sampleTypes:         r.sampleTypeConfig,
 		}
+		if len(r.previousProfile) > 0 {
+			filter := r.parser.sampleTypesFilter
+			r.parser.sampleTypesFilter = func(s string) bool {
+				if filter != nil {
+					return filter(s) && r.parser.sampleTypes[s].Cumulative
+				}
+				return r.parser.sampleTypes[s].Cumulative
+			}
+			err := pprof.DecodePool(bytes.NewReader(r.previousProfile), func(tf *tree.Profile) error {
+				if err := r.extractLogs(ctx, tf, meta, cb); err != nil {
+					return err
+				}
+				return nil
+			})
+			if err != nil {
+				return err
 
-		if err := r.extractLogs(ctx, tf, p, meta, cb); err != nil {
+			}
+
+		}
+	}
+
+	return pprof.DecodePool(bytes.NewReader(r.profile), func(tf *tree.Profile) error {
+
+		if err := r.extractLogs(ctx, tf, meta, cb); err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func (r *RawProfile) extractLogs(ctx context.Context, tp *tree.Profile, p Parser, meta *profile.Meta, cb profile.CallbackFunc) error {
+func sampleRate(p *tree.Profile) int64 {
+	if p.Period <= 0 || p.PeriodType == nil {
+		return 0
+	}
+	sampleUnit := time.Nanosecond
+	switch p.StringTable[p.PeriodType.Unit] {
+	case "microseconds":
+		sampleUnit = time.Microsecond
+	case "milliseconds":
+		sampleUnit = time.Millisecond
+	case "seconds":
+		sampleUnit = time.Second
+	}
+	return p.Period * sampleUnit.Nanoseconds()
+}
+
+func (r *RawProfile) extractLogs(ctx context.Context, tp *tree.Profile, meta *profile.Meta, cb profile.CallbackFunc) error {
 
 	stackMap := make(map[uint64]*profile.Stack)
 	valMap := make(map[uint64][]uint64)
@@ -138,14 +180,31 @@ func (r *RawProfile) extractLogs(ctx context.Context, tp *tree.Profile, p Parser
 	if len(tp.SampleType) > 0 {
 		meta.Units = profile.Units(tp.StringTable[tp.SampleType[0].Type])
 	}
-
+	p := r.parser
 	err := p.iterate(tp, func(vt *tree.ValueType, tl tree.Labels, t *tree.Tree) (keep bool, err error) {
 		if len(tp.StringTable) <= int(vt.Type) || len(tp.StringTable) <= int(vt.Unit) {
 			return true, errors.New("invalid type or unit")
 		}
 		stype := tp.StringTable[vt.Type]
 		sunit := tp.StringTable[vt.Unit]
-
+		sconfig, ok := p.sampleTypes[stype]
+		if !ok {
+			return false, errors.New("unknown type")
+		}
+		if sconfig.Cumulative {
+			prev, found := p.load(vt.Type, tl)
+			if !found {
+				// Keep the current entry in cache.
+				return true, nil
+			}
+			// Take diff with the previous tree.
+			// The result is written to prev, t is not changed.
+			t = prev.Diff(t)
+		}
+		var sampleDuration int64
+		if sconfig.Sampled {
+			sampleDuration = sampleRate(tp)
+		}
 		t.IterateStacks(func(name string, self uint64, stack []string) {
 			if name == "" {
 				return
@@ -157,6 +216,10 @@ func (r *RawProfile) extractLogs(ctx context.Context, tp *tree.Profile, p Parser
 			}
 			aggtypeMap[id] = append(aggtypeMap[id], p.getAggregationType(stype, string(meta.AggregationType)))
 			typeMap[id] = append(typeMap[id], p.getDisplayName(stype))
+			if sconfig.Sampled && sampleDuration != 0 && stype == string(profile.SamplesUnits) {
+				sunit = string(profile.NanosecondsUnit)
+				self *= uint64(sampleDuration)
+			}
 			unitMap[id] = append(unitMap[id], sunit)
 			valMap[id] = append(valMap[id], self)
 			labelMap[id] = buildKey(meta.Tags, tl, tp.StringTable).Labels()
@@ -298,6 +361,10 @@ func (r *RawProfile) extractProfileRaw() error {
 	}()
 
 	if r.profile, err = form.ReadField(f, formFieldProfile); err != nil {
+		return err
+	}
+	r.previousProfile, err = form.ReadField(f, formFieldPreviousProfile)
+	if err != nil {
 		return err
 	}
 	if c, err := form.ReadField(f, formFieldSampleTypeConfig); err != nil {
