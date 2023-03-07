@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	aliyunlog "github.com/aliyun/aliyun-log-go-sdk"
 	"github.com/gogo/protobuf/proto"
 
 	"github.com/alibaba/ilogtail/helper"
@@ -89,26 +90,35 @@ import (
 
 // AliyunLogConfigSpec logtail config struct for wrapper
 type AliyunLogConfigSpec struct {
-	Project       string                `json:"project"`
-	Logstore      string                `json:"logstore"`
-	ShardCount    *int32                `json:"shardCount"`
-	LifeCycle     *int32                `json:"lifeCycle"`
-	MachineGroups []string              `json:"machineGroups"`
-	LogtailConfig AliyunLogConfigDetail `json:"logtailConfig"`
-	ContainerName string                `json:"containerName"`
-	HashCode      []byte                `json:"hashCode"`
-	ErrorCount    int                   `json:"errorCount"`
-	NextTryTime   int64                 `json:"nextTryTime"`
-	SimpleConfig  bool                  `json:"simpleConfig"`
-	LastFetchTime int64                 `json:"lastFetchTime"`
-	ProductCode   string                `json:"productCode"`
-	ProductLang   string                `json:"productLang"`
-	LogstoreMode  string                `json:"logstoreMode"`
+	Project                string                `json:"project"`
+	Logstore               string                `json:"logstore"`
+	ShardCount             *int32                `json:"shardCount"`
+	LifeCycle              *int32                `json:"lifeCycle"`
+	MachineGroups          []string              `json:"machineGroups"`
+	LogtailConfig          AliyunLogConfigDetail `json:"logtailConfig"`
+	ContainerName          string                `json:"containerName"`
+	HashCode               []byte                `json:"hashCode"`
+	ErrorCount             int                   `json:"errorCount"`
+	NextTryTime            int64                 `json:"nextTryTime"`
+	SimpleConfig           bool                  `json:"simpleConfig"`
+	LastFetchTime          int64                 `json:"lastFetchTime"`
+	ProductCode            string                `json:"productCode"`
+	ProductLang            string                `json:"productLang"`
+	LogstoreMode           string                `json:"logstoreMode"`
+	LogstoreHotTTL         *int32                `json:"logstoreHotTTL"`
+	LogstoreTelemetryType  string                `json:"logstoreTelemetryType"`
+	LogstoreAppendMeta     bool                  `json:"logstoreAppendMeta"`
+	LogstoreMaxSplitShard  *int32                `json:"logstoreMaxSplitShard"`
+	LogstoreEnableTracking bool                  `json:"logstoreEnableTracking"`
+	LogstoreAutoSplit      bool                  `json:"logstoreAutoSplit"`
+	LogstoreEncryptConf    aliyunlog.EncryptConf `json:"logstoreEncryptConf"`
 }
 
 const (
-	QueryMode    string = "query"
-	StandardMode string = "standard"
+	QueryMode            string = "query"
+	StandardMode         string = "standard"
+	NoneTelemetryType    string = "None"
+	MetricsTelemetryType string = "Metrics"
 )
 
 // AliyunLogConfigDetail logtail config detail
@@ -328,7 +338,60 @@ func makeLogConfigSpec(dockerInfo *helper.DockerInfoDetail, envConfigInfo *helpe
 	}
 
 	if val, ok := envConfigInfo.ConfigItemMap["logstoremode"]; ok {
+		totalConfig += val
 		config.LogstoreMode = val
+	}
+
+	if val, ok := envConfigInfo.ConfigItemMap["logstorehotttl"]; ok {
+		totalConfig += val
+		hotTTL, _ := strconv.Atoi(val)
+		if hotTTL >= 30 {
+			config.LogstoreHotTTL = proto.Int32((int32)(hotTTL))
+		}
+	}
+
+	if val, ok := envConfigInfo.ConfigItemMap["logstoretelemetrytype"]; ok {
+		totalConfig += val
+		config.LogstoreTelemetryType = val
+	}
+
+	if val, ok := envConfigInfo.ConfigItemMap["logstoreappendmeta"]; ok {
+		totalConfig += val
+		booVal, err := strconv.ParseBool(val)
+		if err == nil {
+			config.LogstoreAppendMeta = booVal
+		}
+	}
+
+	if val, ok := envConfigInfo.ConfigItemMap["logstoremaxsplitshard"]; ok {
+		totalConfig += val
+		maxSplitShard, _ := strconv.Atoi(val)
+		if maxSplitShard >= 1 && maxSplitShard <= 64 {
+			config.LogstoreMaxSplitShard = proto.Int32((int32)(maxSplitShard))
+		}
+	}
+
+	if val, ok := envConfigInfo.ConfigItemMap["logstoreenabletracking"]; ok {
+		totalConfig += val
+		booVal, err := strconv.ParseBool(val)
+		if err == nil {
+			config.LogstoreEnableTracking = booVal
+		}
+	}
+
+	if val, ok := envConfigInfo.ConfigItemMap["logstoreautosplit"]; ok {
+		totalConfig += val
+		booVal, err := strconv.ParseBool(val)
+		if err == nil {
+			config.LogstoreAutoSplit = booVal
+		}
+	}
+
+	if val, ok := envConfigInfo.ConfigItemMap["logstoreencryptconf"]; ok {
+		totalConfig += val
+		if err := json.Unmarshal([]byte(val), &config.LogstoreEncryptConf); err != nil {
+			logger.Error(context.Background(), "INVALID_ENV_CONFIG_DETAIL", "unmarshal error", err, "logstoreencryptconf", val)
+		}
 	}
 
 	// config

@@ -57,6 +57,7 @@ your changes, such as:
 - [public] [both] [fixed] fix memory leak in container list maintainance introduced in v1.2.1
 - [public] [both] [added] support pyroscope input datasource
 - [public] [both] [added] support config plugins to included in build, plugins.yml for builtin plugins, external_plugins.yml for external plugins
+- [public] [both] [updated] env config support more logstore config
 - [public] [both] [added] add logs for container matching in stdout plugin
 - [public] [both] [updated] set user agent for SLS client
 - [public] [both] [updated] prometheus input add staleness output

@@ -18,6 +18,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	productAPI "github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -52,7 +53,7 @@ func recorrectRegion(region string) string {
 //	"audit-logstore"
 //	"k8s-audit"
 //	"cn"
-func CreateProductLogstore(region, project, logstore, product, lang string) error {
+func CreateProductLogstore(region, project, logstore, product, lang string, hotTTL int) error {
 	client, err := createProductClient()
 	if err != nil {
 		return err
@@ -75,6 +76,9 @@ func CreateProductLogstore(region, project, logstore, product, lang string) erro
 	// not refresh index and dashboard
 	request.VariableMap = "{\"overwriteIndex\":\"no_overwrite\", \"overwriteDashboard\":\"no_overwrite\"}"
 	request.Lang = lang
+	if hotTTL >= 30 {
+		request.HotTTL = requests.NewInteger(hotTTL)
+	}
 	resp, err := client.AnalyzeProductLog(request)
 	if err != nil {
 		return err

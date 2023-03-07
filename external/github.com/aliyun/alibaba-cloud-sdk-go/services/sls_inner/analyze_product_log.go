@@ -85,6 +85,7 @@ type AnalyzeProductLogRequest struct {
 	Overwrite     string           `position:"Query" name:"Overwrite"`
 	VariableMap   string           `position:"Query" name:"VariableMap"`
 	TTL           requests.Integer `position:"Query" name:"TTL"`
+	HotTTL        requests.Integer `position:"Query" name:"HotTTL"`
 }
 
 // AnalyzeProductLogResponse is the response struct for api AnalyzeProductLog
