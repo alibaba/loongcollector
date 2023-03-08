@@ -17,6 +17,7 @@
 #include "logger/Logger.h"
 #include "common/util.h"
 #include "common/StringTools.h"
+#include "random"
 
 using namespace std;
 
