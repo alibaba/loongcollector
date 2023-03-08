@@ -166,7 +166,7 @@ func (s *inputProcessorTestSuite) TearDownTest(c *check.C) {
 func (s *inputProcessorTestSuite) TestNormal(c *check.C) {
 	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 	bytes := []byte(s.allLog)
-	str := helper.ZeroCopyString(bytes)
+	str := util.ZeroCopyBytesToString(bytes)
 	n := processor.Process(bytes, time.Duration(0))
 	c.Assert(n, check.Equals, len(s.allLog))
 	c.Assert(len(s.collector.Logs), check.Equals, len(s.allLogContent))
@@ -186,7 +186,7 @@ func (s *inputProcessorTestSuite) TestNormal(c *check.C) {
 		} else {
 			c.Assert(value, check.Equals, "2017-09-12T22:32:21.212861448Z")
 		}
-		c.Assert(helper.IsSafeString(str, value), check.IsTrue)
+		c.Assert(util.IsSafeString(str, value), check.IsTrue)
 		switch s.collector.Logs[index].Contents[3].GetKey() {
 		case "container_id":
 			c.Assert(s.collector.Logs[index].Contents[3].GetKey(), check.Equals, "container_id")
@@ -205,18 +205,18 @@ func (s *inputProcessorTestSuite) TestNormal(c *check.C) {
 func (s *inputProcessorTestSuite) TestSplitedLine(c *check.C) {
 	processor := NewDockerStdoutProcessor(nil, time.Second, 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 	splitedlog1Bytes := []byte(splitedlog1)
-	str1 := helper.ZeroCopyString(splitedlog1Bytes)
+	str1 := util.ZeroCopyBytesToString(splitedlog1Bytes)
 	splited2og1Bytes := []byte(splitedlog2)
-	str2 := helper.ZeroCopyString(splited2og1Bytes)
+	str2 := util.ZeroCopyBytesToString(splited2og1Bytes)
 	splited3og1Bytes := []byte(splitedlog3)
-	str3 := helper.ZeroCopyString(splited3og1Bytes)
+	str3 := util.ZeroCopyBytesToString(splited3og1Bytes)
 
 	n1 := processor.Process(splitedlog1Bytes, time.Duration(0))
-	c.Assert(helper.IsSafeString(str1, helper.ZeroCopyString(processor.lastLogs[0].Content)), check.IsTrue)
+	c.Assert(util.IsSafeString(str1, util.ZeroCopyBytesToString(processor.lastLogs[0].Content)), check.IsTrue)
 	c.Assert(n1, check.Equals, len(splitedlog1))
 
 	n2 := processor.Process(splited2og1Bytes, time.Duration(0))
-	c.Assert(helper.IsSafeString(str2, helper.ZeroCopyString(processor.lastLogs[1].Content)), check.IsTrue)
+	c.Assert(util.IsSafeString(str2, util.ZeroCopyBytesToString(processor.lastLogs[1].Content)), check.IsTrue)
 	c.Assert(n2, check.Equals, len(splitedlog2))
 
 	n3 := processor.Process(splited3og1Bytes, time.Duration(0))
@@ -226,23 +226,23 @@ func (s *inputProcessorTestSuite) TestSplitedLine(c *check.C) {
 	value := s.collector.Logs[0].Contents[0].GetValue()
 	c.Assert(len(value), check.Equals, 1+2+3)
 	c.Assert(value, check.Equals, "122333")
-	c.Assert(helper.IsSafeString(str1, value), check.IsTrue)
-	c.Assert(helper.IsSafeString(str2, value), check.IsTrue)
-	c.Assert(helper.IsSafeString(str3, value), check.IsTrue)
+	c.Assert(util.IsSafeString(str1, value), check.IsTrue)
+	c.Assert(util.IsSafeString(str2, value), check.IsTrue)
+	c.Assert(util.IsSafeString(str3, value), check.IsTrue)
 
 	nTimeout := processor.Process(splitedlog1Bytes, time.Minute)
 	c.Assert(nTimeout, check.Equals, len(splitedlog1))
 	c.Assert(len(s.collector.Logs), check.Equals, 2)
 	value = s.collector.Logs[1].Contents[0].GetValue()
 	c.Assert(value, check.Equals, "1")
-	c.Assert(helper.IsSafeString(str1, value), check.IsTrue)
+	c.Assert(util.IsSafeString(str1, value), check.IsTrue)
 }
 
 func (s *inputProcessorTestSuite) TestError(c *check.C) {
 	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 
 	bytes := []byte(logErrorJSON)
-	str := helper.ZeroCopyString(bytes)
+	str := util.ZeroCopyBytesToString(bytes)
 
 	n := processor.Process(bytes, time.Duration(0))
 	c.Assert(n, check.Equals, len(logErrorJSON))
@@ -251,10 +251,10 @@ func (s *inputProcessorTestSuite) TestError(c *check.C) {
 	c.Assert(s.collector.Logs[0].Contents[2].GetKey(), check.Equals, "_source_")
 	value := s.collector.Logs[0].Contents[0].GetValue()
 	c.Assert(value, check.Equals, logErrorJSON)
-	c.Assert(helper.IsSafeString(value, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value, str), check.IsTrue)
 
 	bytes = []byte(logErrorJSON + "\n")
-	str = helper.ZeroCopyString(bytes)
+	str = util.ZeroCopyBytesToString(bytes)
 	n = processor.Process(bytes, time.Duration(0))
 	c.Assert(n, check.Equals, len(logErrorJSON)+1)
 	c.Assert(s.collector.Logs[1].Contents[0].GetKey(), check.Equals, "content")
@@ -262,10 +262,10 @@ func (s *inputProcessorTestSuite) TestError(c *check.C) {
 	c.Assert(s.collector.Logs[1].Contents[2].GetKey(), check.Equals, "_source_")
 	value = s.collector.Logs[1].Contents[0].GetValue()
 	c.Assert(value, check.Equals, logErrorJSON)
-	c.Assert(helper.IsSafeString(value, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value, str), check.IsTrue)
 
 	bytes = []byte(logErrorContainerd1)
-	str = helper.ZeroCopyString(bytes)
+	str = util.ZeroCopyBytesToString(bytes)
 	n = processor.Process(bytes, time.Duration(0))
 	c.Assert(n, check.Equals, len(logErrorContainerd1))
 	c.Assert(s.collector.Logs[2].Contents[0].GetKey(), check.Equals, "content")
@@ -273,10 +273,10 @@ func (s *inputProcessorTestSuite) TestError(c *check.C) {
 	c.Assert(s.collector.Logs[2].Contents[2].GetKey(), check.Equals, "_source_")
 	value = s.collector.Logs[2].Contents[0].GetValue()
 	c.Assert(value, check.Equals, logErrorContainerd1)
-	c.Assert(helper.IsSafeString(value, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value, str), check.IsTrue)
 
 	bytes = []byte(logErrorContainerd1 + "\n")
-	str = helper.ZeroCopyString(bytes)
+	str = util.ZeroCopyBytesToString(bytes)
 	n = processor.Process(bytes, time.Duration(0))
 	c.Assert(n, check.Equals, len(logErrorContainerd1)+1)
 	c.Assert(s.collector.Logs[3].Contents[0].GetKey(), check.Equals, "content")
@@ -284,10 +284,10 @@ func (s *inputProcessorTestSuite) TestError(c *check.C) {
 	c.Assert(s.collector.Logs[3].Contents[2].GetKey(), check.Equals, "_source_")
 	value = s.collector.Logs[3].Contents[0].GetValue()
 	c.Assert(value, check.Equals, logErrorContainerd1)
-	c.Assert(helper.IsSafeString(value, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value, str), check.IsTrue)
 
 	bytes = []byte(logErrorContainerd2 + "\n")
-	str = helper.ZeroCopyString(bytes)
+	str = util.ZeroCopyBytesToString(bytes)
 	n = processor.Process(bytes, time.Duration(0))
 	c.Assert(n, check.Equals, len(logErrorContainerd2)+1)
 	c.Assert(s.collector.Logs[4].Contents[0].GetKey(), check.Equals, "content")
@@ -295,10 +295,10 @@ func (s *inputProcessorTestSuite) TestError(c *check.C) {
 	c.Assert(s.collector.Logs[4].Contents[2].GetKey(), check.Equals, "_source_")
 	value = s.collector.Logs[4].Contents[0].GetValue()
 	c.Assert(value, check.Equals, logErrorContainerd2)
-	c.Assert(helper.IsSafeString(value, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value, str), check.IsTrue)
 
 	bytes = []byte(logErrorContainerd3 + "\n")
-	str = helper.ZeroCopyString(bytes)
+	str = util.ZeroCopyBytesToString(bytes)
 	n = processor.Process(bytes, time.Duration(0))
 	c.Assert(n, check.Equals, len(logErrorContainerd3)+1)
 	c.Assert(s.collector.Logs[5].Contents[0].GetKey(), check.Equals, "content")
@@ -306,33 +306,33 @@ func (s *inputProcessorTestSuite) TestError(c *check.C) {
 	c.Assert(s.collector.Logs[5].Contents[2].GetKey(), check.Equals, "_source_")
 	value = s.collector.Logs[5].Contents[0].GetValue()
 	c.Assert(value, check.Equals, logErrorContainerd3)
-	c.Assert(helper.IsSafeString(value, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value, str), check.IsTrue)
 }
 
 func (s *inputProcessorTestSuite) TestMultiLine(c *check.C) {
 	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 
 	bytes := []byte(s.allLog)
-	str := helper.ZeroCopyString(bytes)
+	str := util.ZeroCopyBytesToString(bytes)
 	n := processor.Process(bytes, time.Second*time.Duration(0))
 	c.Assert(n, check.Equals, s.multiLineLen)
 
 	c.Assert(len(s.collector.Logs), check.Equals, 4)
 	value0 := s.collector.Logs[0].Contents[0].GetValue()
 	c.Assert(value0, check.Equals, context1+"\n"+context2)
-	c.Assert(helper.IsSafeString(value0, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value0, str), check.IsTrue)
 
 	value1 := s.collector.Logs[1].Contents[0].GetValue()
 	c.Assert(value1, check.Equals, context3)
-	c.Assert(helper.IsSafeString(value1, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value1, str), check.IsTrue)
 
 	value2 := s.collector.Logs[2].Contents[0].GetValue()
 	c.Assert(value2, check.Equals, context4)
-	c.Assert(helper.IsSafeString(value2, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value2, str), check.IsTrue)
 
 	value3 := s.collector.Logs[3].Contents[0].GetValue()
 	c.Assert(value3, check.Equals, context5)
-	c.Assert(helper.IsSafeString(value3, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value3, str), check.IsTrue)
 }
 
 func (s *inputProcessorTestSuite) TestMultiLineTimeout(c *check.C) {
@@ -340,7 +340,7 @@ func (s *inputProcessorTestSuite) TestMultiLineTimeout(c *check.C) {
 	lastLine := strings.LastIndexByte(s.allLog, '\n')
 	lastLine = strings.LastIndexByte(s.allLog[0:lastLine], '\n')
 	originBytes := []byte(s.allLog)
-	str := helper.ZeroCopyString(originBytes)
+	str := util.ZeroCopyBytesToString(originBytes)
 	bytes := originBytes[0 : lastLine+1]
 
 	n := processor.Process(bytes, time.Second*time.Duration(0))
@@ -349,19 +349,19 @@ func (s *inputProcessorTestSuite) TestMultiLineTimeout(c *check.C) {
 
 	value0 := s.collector.Logs[0].Contents[0].GetValue()
 	c.Assert(value0, check.Equals, context1+"\n"+context2)
-	c.Assert(helper.IsSafeString(value0, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value0, str), check.IsTrue)
 
 	value1 := s.collector.Logs[1].Contents[0].GetValue()
 	c.Assert(value1, check.Equals, context3)
-	c.Assert(helper.IsSafeString(value1, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value1, str), check.IsTrue)
 
 	value2 := s.collector.Logs[2].Contents[0].GetValue()
 	c.Assert(value2, check.Equals, context4)
-	c.Assert(helper.IsSafeString(value2, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value2, str), check.IsTrue)
 
 	value3 := s.collector.Logs[3].Contents[0].GetValue()
 	c.Assert(value3, check.Equals, context5)
-	c.Assert(helper.IsSafeString(value3, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value3, str), check.IsTrue)
 
 	bytes = originBytes[lastLine+1:]
 	n = processor.Process(bytes, time.Second*time.Duration(0))
@@ -372,13 +372,13 @@ func (s *inputProcessorTestSuite) TestMultiLineTimeout(c *check.C) {
 	c.Assert(len(s.collector.Logs), check.Equals, 5)
 	value4 := s.collector.Logs[4].Contents[0].GetValue()
 	c.Assert(value4, check.Equals, context6)
-	c.Assert(helper.IsSafeString(value3, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value3, str), check.IsTrue)
 }
 
 func (s *inputProcessorTestSuite) TestMultiLineMaxLength(c *check.C) {
 	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1056, true, true, &s.context, &s.collector, s.tag, s.source)
 	bytes := make([]byte, 3000)
-	str := helper.ZeroCopyString(bytes)
+	str := util.ZeroCopyBytesToString(bytes)
 	content := util.RandomString(1024)
 	for i := 0; i < 513; i++ {
 		realLine := fmt.Sprintf("2017-09-12T22:32:21.212861448Z stdout [%d] %s\n", i, content)
@@ -387,28 +387,28 @@ func (s *inputProcessorTestSuite) TestMultiLineMaxLength(c *check.C) {
 		c.Assert(n, check.Equals, len(realLine))
 		if i != 512 {
 			c.Assert(len(s.collector.Logs), check.Equals, 0)
-			c.Assert(helper.IsSafeString(helper.ZeroCopyString(processor.lastLogs[i].Content), str), check.IsTrue)
+			c.Assert(util.IsSafeString(util.ZeroCopyBytesToString(processor.lastLogs[i].Content), str), check.IsTrue)
 		}
 	}
 
 	c.Assert(len(s.collector.Logs), check.Equals, 1)
 	value := s.collector.Logs[0].Contents[0].GetValue()
 	c.Assert(len(value), check.Greater, 500*1000)
-	c.Assert(helper.IsSafeString(value, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value, str), check.IsTrue)
 }
 
 func (s *inputProcessorTestSuite) TestMultiLineError(c *check.C) {
 	processor := NewDockerStdoutProcessor(regexp.MustCompile(`\d+-\d+-\d+.*`), time.Second, 12, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 
 	bytes := []byte(logErrorJSON)
-	str := helper.ZeroCopyString(bytes)
+	str := util.ZeroCopyBytesToString(bytes)
 	n := processor.Process(bytes, time.Second*time.Duration(0))
 	c.Assert(n, check.Equals, len(logErrorJSON))
 
 	c.Assert(len(s.collector.Logs), check.Equals, 1)
 	value := s.collector.Logs[0].Contents[0].GetValue()
 	c.Assert(value, check.Equals, logErrorJSON)
-	c.Assert(helper.IsSafeString(value, str), check.IsTrue)
+	c.Assert(util.IsSafeString(value, str), check.IsTrue)
 }
 
 func (s *inputProcessorTestSuite) TestBigLine(c *check.C) {
@@ -419,7 +419,7 @@ func (s *inputProcessorTestSuite) TestBigLine(c *check.C) {
 	processor := NewDockerStdoutProcessor(nil, time.Duration(0), 0, 512*1024, true, true, &s.context, &s.collector, s.tag, s.source)
 	for i := 0; i < 1000; i++ {
 		processor.Process(bigline, time.Second*time.Duration(0))
-		c.Assert(helper.IsSafeString(s.collector.Logs[i].Contents[0].GetValue(), helper.ZeroCopyString(bigline)), check.IsTrue)
+		c.Assert(util.IsSafeString(s.collector.Logs[i].Contents[0].GetValue(), util.ZeroCopyBytesToString(bigline)), check.IsTrue)
 	}
 	c.Assert(len(s.collector.Logs), check.Equals, 1000)
 }
@@ -447,7 +447,7 @@ func TestParseCRILine(t *testing.T) {
 	// Single line.
 	{
 		bytes := make([]byte, 100)
-		str := helper.ZeroCopyString(bytes)
+		str := util.ZeroCopyBytesToString(bytes)
 
 		processor := NewDockerStdoutProcessor(nil, time.Duration(0),
 			0, 512*1024, true, true, &context, &collector, tags, source)
@@ -457,26 +457,26 @@ func TestParseCRILine(t *testing.T) {
 		processor.Process(bytes[:len(single)], duration)
 		require.Equal(t, len(collector.Logs), 1)
 		assertKeyValue(collector.Logs[0], "content", "full line")
-		assert.True(t, helper.IsSafeString(collector.Logs[0].Contents[0].GetValue(), str))
+		assert.True(t, util.IsSafeString(collector.Logs[0].Contents[0].GetValue(), str))
 
 		single = "2021-07-13T16:32:21.212861448Z stdout P partial line:\n"
 		copy(bytes, single)
 		processor.Process(bytes[:len(single)], duration)
-		assert.True(t, helper.IsSafeString(helper.ZeroCopyString(processor.lastLogs[0].Content), str))
+		assert.True(t, util.IsSafeString(util.ZeroCopyBytesToString(processor.lastLogs[0].Content), str))
 
 		single = "2021-07-13T16:32:21.212861448Z stdout F full line of partial line\n"
 		copy(bytes, single)
 		processor.Process(bytes[:len(single)], duration)
 		require.Equal(t, len(collector.Logs), 2)
 		assertKeyValue(collector.Logs[1], "content", "partial line:full line of partial line")
-		assert.True(t, helper.IsSafeString(collector.Logs[1].Contents[0].GetValue(), str))
+		assert.True(t, util.IsSafeString(collector.Logs[1].Contents[0].GetValue(), str))
 	}
 
 	// Multiple lines.
 	collector.Logs = nil
 	{
 		bytes := make([]byte, 100)
-		str := helper.ZeroCopyString(bytes)
+		str := util.ZeroCopyBytesToString(bytes)
 
 		timeoutDuration := time.Duration(1) * time.Second
 		processor := NewDockerStdoutProcessor(
@@ -487,40 +487,40 @@ func TestParseCRILine(t *testing.T) {
 		copy(bytes, single)
 
 		processor.Process(bytes[:len(single)], duration)
-		assert.True(t, helper.IsSafeString(helper.ZeroCopyString(processor.lastLogs[0].Content), str))
+		assert.True(t, util.IsSafeString(util.ZeroCopyBytesToString(processor.lastLogs[0].Content), str))
 
 		single = "2021-07-13T16:32:21.212861448Z stdout F   full line line end\n"
 		copy(bytes, single)
 		processor.Process(bytes[:len(single)], duration)
 		require.Equal(t, len(collector.Logs), 0)
-		assert.True(t, helper.IsSafeString(helper.ZeroCopyString(processor.lastLogs[1].Content), str))
+		assert.True(t, util.IsSafeString(util.ZeroCopyBytesToString(processor.lastLogs[1].Content), str))
 
 		single = "2021-07-13T16:32:21.212861448Z stdout P 2021-07-13 partial line line 1 partial\n"
 		copy(bytes, single)
 		processor.Process(bytes[:len(single)], duration)
 		require.Equal(t, len(collector.Logs), 1)
 		assertKeyValue(collector.Logs[0], "content", "2021-07-13 full line line 1\n  full line line end")
-		assert.True(t, helper.IsSafeString(collector.Logs[0].Contents[0].GetValue(), str))
+		assert.True(t, util.IsSafeString(collector.Logs[0].Contents[0].GetValue(), str))
 		assert.Equal(t, len(processor.lastLogs), 1)
-		assert.True(t, helper.IsSafeString(helper.ZeroCopyString(processor.lastLogs[0].Content), str))
+		assert.True(t, util.IsSafeString(util.ZeroCopyBytesToString(processor.lastLogs[0].Content), str))
 
 		single = "2021-07-13T16:32:21.212861448Z stdout F   partial line line 1 full\n"
 		copy(bytes, single)
 		processor.Process(bytes[:len(single)], duration)
 		assert.Equal(t, len(processor.lastLogs), 2)
-		assert.True(t, helper.IsSafeString(helper.ZeroCopyString(processor.lastLogs[1].Content), str))
+		assert.True(t, util.IsSafeString(util.ZeroCopyBytesToString(processor.lastLogs[1].Content), str))
 
 		single = "2021-07-13T16:32:21.212861448Z stdout P   partial line line 2 partial\n"
 		copy(bytes, single)
 		processor.Process(bytes[:len(single)], duration)
 		assert.Equal(t, len(processor.lastLogs), 3)
-		assert.True(t, helper.IsSafeString(helper.ZeroCopyString(processor.lastLogs[2].Content), str))
+		assert.True(t, util.IsSafeString(util.ZeroCopyBytesToString(processor.lastLogs[2].Content), str))
 
 		single = "2021-07-13T16:32:21.212861448Z stdout F   partial line line 2 full\n"
 		copy(bytes, single)
 		processor.Process(bytes[:len(single)], duration)
 		assert.Equal(t, len(processor.lastLogs), 4)
-		assert.True(t, helper.IsSafeString(helper.ZeroCopyString(processor.lastLogs[3].Content), str))
+		assert.True(t, util.IsSafeString(util.ZeroCopyBytesToString(processor.lastLogs[3].Content), str))
 
 		require.Equal(t, len(collector.Logs), 1)
 
@@ -529,7 +529,7 @@ func TestParseCRILine(t *testing.T) {
 		assertKeyValue(collector.Logs[1], "content",
 			"2021-07-13 partial line line 1 partial  partial line line 1 full\n"+
 				"  partial line line 2 partial  partial line line 2 full")
-		assert.True(t, helper.IsSafeString(collector.Logs[1].Contents[0].GetValue(), str))
+		assert.True(t, util.IsSafeString(collector.Logs[1].Contents[0].GetValue(), str))
 	}
 }
 
@@ -547,27 +547,27 @@ func TestSingleLineChangeBlock(t *testing.T) {
 	// valid single line when change block
 	{
 		str := "{\"log\":\"1:M 09 Nov 13:27:36.276 # User requested shutdown...\\n\",\"stream\":\"stdout\", \"time\":\"2018-05-16T06:28:41.2195434Z\"}\n"
-		dockerSingleLine := helper.ZeroCopySlice(str)
+		dockerSingleLine := util.ZeroCopyStringToBytes(str)
 		assert.Equal(t, processor.Process(dockerSingleLine, time.Hour), len(dockerSingleLine))
 		value := collector.Logs[0].Contents[0].GetValue()
 		assert.Equal(t, value, "1:M 09 Nov 13:27:36.276 # User requested shutdown...")
-		assert.True(t, helper.IsSafeString(str, value))
+		assert.True(t, util.IsSafeString(str, value))
 
 		assert.Equal(t, collector.Logs[0].Contents[0].GetValue(), "1:M 09 Nov 13:27:36.276 # User requested shutdown...")
 
 		str = "2021-07-13T16:32:21.212861448Z stdout F full line line end\n"
-		contianerdSingleLine := helper.ZeroCopySlice(str)
+		contianerdSingleLine := util.ZeroCopyStringToBytes(str)
 		assert.Equal(t, processor.Process(contianerdSingleLine, time.Hour), len(contianerdSingleLine))
 		value = collector.Logs[1].Contents[0].GetValue()
 		assert.Equal(t, value, "full line line end")
-		assert.True(t, helper.IsSafeString(str, value))
+		assert.True(t, util.IsSafeString(str, value))
 		collector.Logs = collector.Logs[:0]
 	}
 
 	// valid split line when change block
 	{
 		part1 := []byte("2021-07-13T16:32:21.212861448Z stdout P partial line:\n")
-		str := helper.ZeroCopyString(part1)
+		str := util.ZeroCopyBytesToString(part1)
 		assert.Equal(t, processor.Process(part1, 0), len(part1))
 		assert.Equal(t, string(processor.lastLogs[0].Content), "partial line:")
 		assert.Equal(t, len(collector.Logs), 0)
@@ -576,7 +576,7 @@ func TestSingleLineChangeBlock(t *testing.T) {
 		assert.Equal(t, len(collector.Logs), 1)
 		value := collector.Logs[0].Contents[0].GetValue()
 		assert.Equal(t, value, "partial line:partial line:")
-		assert.True(t, helper.IsSafeString(str, value))
+		assert.True(t, util.IsSafeString(str, value))
 		collector.Logs = collector.Logs[:0]
 	}
 
@@ -585,7 +585,7 @@ func TestSingleLineChangeBlock(t *testing.T) {
 		processor := NewDockerStdoutProcessor(regexp.MustCompile(`^\d+-\d+-\d+.*`), time.Duration(0),
 			10, 512*1024, true, true, &context, &collector, tags, source)
 		part1 := []byte("2017-09-12T22:32:21.212861448Z stderr 2017-09-12 22:32:21.212 [INFO][88] exception 1: \n")
-		str := helper.ZeroCopyString(part1)
+		str := util.ZeroCopyBytesToString(part1)
 
 		assert.Equal(t, processor.Process(part1, 0), len(part1))
 		assert.Equal(t, len(collector.Logs), 0)
@@ -597,7 +597,7 @@ func TestSingleLineChangeBlock(t *testing.T) {
 		assert.Equal(t, len(collector.Logs), 1)
 		value := collector.Logs[0].Contents[0].GetValue()
 		assert.Equal(t, value, "2017-09-12 22:32:21.212 [INFO][88] exception 1: \nZ017-09-12 22:32:21.212 [INFO][88] exception 1: ")
-		assert.True(t, helper.IsSafeString(str, value))
+		assert.True(t, util.IsSafeString(str, value))
 		collector.Logs = collector.Logs[:0]
 	}
 
@@ -606,7 +606,7 @@ func TestSingleLineChangeBlock(t *testing.T) {
 		processor := NewDockerStdoutProcessor(regexp.MustCompile(`^\d+-\d+-\d+.*`), time.Duration(0),
 			10, 512*1024, true, true, &context, &collector, tags, source)
 		part1 := []byte("{\"log\":\"2017-09-12 22:32:21.212 13:27:36.276 # User requested shutdown...\\n\",\"stream\":\"stdout\", \"time\":\"2018-05-16T06:28:41.2195434Z\"}\n")
-		str := helper.ZeroCopyString(part1)
+		str := util.ZeroCopyBytesToString(part1)
 
 		assert.Equal(t, processor.Process(part1, 0), len(part1))
 		assert.Equal(t, len(collector.Logs), 0)
@@ -618,7 +618,7 @@ func TestSingleLineChangeBlock(t *testing.T) {
 		assert.Equal(t, len(collector.Logs), 1)
 		value := collector.Logs[0].Contents[0].GetValue()
 		assert.Equal(t, value, "2017-09-12 22:32:21.212 13:27:36.276 # User requested shutdown...\nZ017-09-12 22:32:21.212 13:27:36.276 # User requested shutdown...")
-		assert.True(t, helper.IsSafeString(str, value))
+		assert.True(t, util.IsSafeString(str, value))
 		collector.Logs = collector.Logs[:0]
 	}
 

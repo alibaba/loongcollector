@@ -28,6 +28,8 @@ type PipelineEvent interface {
 	GetObservedTimestamp() uint64
 
 	SetObservedTimestamp(uint64)
+
+	Clone() PipelineEvent
 }
 
 type GroupInfo struct {
@@ -39,14 +41,14 @@ func (g *GroupInfo) GetMetadata() Metadata {
 	if g != nil && g.Metadata != nil {
 		return g.Metadata
 	}
-	return noopStringValues
+	return NilStringValues
 }
 
 func (g *GroupInfo) GetTags() Tags {
 	if g != nil && g.Tags != nil {
 		return g.Tags
 	}
-	return noopStringValues
+	return NilStringValues
 }
 
 type PipelineGroupEvents struct {

@@ -109,7 +109,7 @@
     * [单条协议](developer-guide/log-protocol/protocol-spec/single.md)
 * [代码风格](developer-guide/codestyle.md)
 
-* [数据结构](developer-guide/data-structure.md)
+* [数据模型](developer-guide/data-model.md)
 * [插件开发](developer-guide/plugin-development/README.md)
   * [开源插件开发引导](docs/cn/developer-guide/plugin-development/plugin-development-guide.md)
   * [Checkpoint接口](developer-guide/plugin-development/checkpoint-api.md)

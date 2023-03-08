@@ -15,11 +15,20 @@
 package pluginmanager
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
+)
+
+var (
+	tagPrefix     = "__tag__:"
+	fileOffsetKey = tagPrefix + "__file_offset__"
+	contentKey    = "content"
 )
 
 type pluginv2Runner struct {
@@ -382,8 +391,36 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	return nil
 }
 
-func (p *pluginv2Runner) ReceiveRawLog(log *pipeline.LogWithContext) {
-	// TODO
+func (p *pluginv2Runner) ReceiveRawLog(in *pipeline.LogWithContext) {
+	md := models.NewMetadata()
+	if in.Context != nil {
+		for k, v := range in.Context {
+			md.Add(k, v.(string))
+		}
+	}
+	log := &models.Log{}
+	log.Tags = models.NewTags()
+	for i, content := range in.Log.Contents {
+		switch {
+		case content.Key == contentKey || i == 0:
+			log.Body = util.ZeroCopyStringToBytes(content.Value)
+		case content.Key == fileOffsetKey:
+			if offset, err := strconv.ParseInt(content.Value, 10, 64); err == nil {
+				log.Offset = uint64(offset)
+			}
+		case strings.Contains(content.Key, tagPrefix):
+			log.Tags.Add(content.Key[len(tagPrefix)-1:], content.Value)
+		default:
+			log.Tags.Add(content.Key, content.Value)
+		}
+	}
+	if in.Log.Time != uint32(0) {
+		log.Timestamp = uint64(time.Second * time.Duration(in.Log.Time))
+	} else {
+		log.Timestamp = uint64(time.Now().UnixNano())
+	}
+	group := models.NewGroup(md, models.NewTags())
+	p.InputPipeContext.Collector().Collect(group, log)
 }
 
 func (p *pluginv2Runner) Merge(r PluginRunner) {

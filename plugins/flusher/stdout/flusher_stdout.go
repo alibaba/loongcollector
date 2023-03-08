@@ -185,14 +185,14 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 				i++
 			}
 			writer.WriteObjectEnd()
-
+			_, _ = writer.Write([]byte{','})
 			switch event.GetType() {
 			case models.EventTypeMetric:
 				p.writeMetricValues(writer, event.(*models.Metric))
 			case models.EventTypeSpan:
 				p.writeSpan(writer, nil)
 			case models.EventTypeLogging:
-				p.writeLogBody(writer, nil)
+				p.writeLogBody(writer, event.(*models.Log))
 			case models.EventTypeByteArray:
 				p.writeByteArray(writer, event.(models.ByteArray))
 			}
@@ -210,7 +210,6 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 }
 
 func (p *FlusherStdout) writeMetricValues(writer *jsoniter.Stream, metric *models.Metric) {
-	_, _ = writer.Write([]byte{','})
 	writer.WriteObjectField("metricType")
 	writer.WriteString(models.MetricTypeTexts[metric.GetMetricType()])
 	_, _ = writer.Write([]byte{','})
@@ -255,15 +254,31 @@ func (p *FlusherStdout) writeSpan(writer *jsoniter.Stream, metric *models.Span) 
 	// TODO
 }
 
-func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, metric *models.Metric) {
-	// TODO
+func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, log *models.Log) {
+	writer.WriteObjectField("offset")
+	writer.WriteInt64(int64(log.GetOffset()))
+	writer.WriteObjectField("level")
+	writer.WriteString(log.GetLevel())
+	_, _ = writer.Write([]byte{','})
+	writer.WriteObjectField("traceID")
+	writer.WriteString(log.GetTraceID())
+	_, _ = writer.Write([]byte{','})
+	writer.WriteObjectField("traceID")
+	writer.WriteString(log.GetTraceID())
+	_, _ = writer.Write([]byte{','})
+	writer.WriteObjectField("spanID")
+	writer.WriteString(log.GetSpanID())
+	_, _ = writer.Write([]byte{','})
+	writer.WriteObjectField("body")
+	_, _ = writer.Write([]byte{'"'})
+	_, _ = writer.Write(log.GetBody())
+	_, _ = writer.Write([]byte{'"'})
 }
 
-func (p FlusherStdout) writeByteArray(writer *jsoniter.Stream, metric models.ByteArray) {
-	_, _ = writer.Write([]byte{','})
+func (p FlusherStdout) writeByteArray(writer *jsoniter.Stream, bytes models.ByteArray) {
 	writer.WriteObjectField("byteArray")
 	_, _ = writer.Write([]byte{'"'})
-	_, _ = writer.Write(metric)
+	_, _ = writer.Write(bytes)
 	_, _ = writer.Write([]byte{'"'})
 }
 

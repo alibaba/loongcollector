@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helper
+package util
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ import (
 
 func TestZeroCopyString(t *testing.T) {
 	slice := []byte("jkdfjksdfj")
-	newStr := ZeroCopyString(slice)
+	newStr := ZeroCopyBytesToString(slice)
 	bytes := *(*[]byte)(unsafe.Pointer(&newStr))
 	assert.Equal(t, &bytes[0], &slice[0])
 }
@@ -31,7 +31,7 @@ func TestZeroCopyString(t *testing.T) {
 func TestZeroCopySlice(t *testing.T) {
 	str := "dfdsfdsf"
 	bytes := *(*[]byte)(unsafe.Pointer(&str))
-	slice := ZeroCopySlice(str)
+	slice := ZeroCopyStringToBytes(str)
 	assert.Equal(t, &bytes[0], &slice[0])
 }
 
@@ -59,7 +59,7 @@ func BenchmarkZeroCopyString(b *testing.B) {
 		{
 			"zero-copy",
 			func() string {
-				return ZeroCopyString(slice)
+				return ZeroCopyBytesToString(slice)
 			},
 		},
 	}
@@ -96,7 +96,7 @@ func BenchmarkZeroCopySlice(b *testing.B) {
 		{
 			"zero-copy",
 			func() []byte {
-				return ZeroCopySlice(str)
+				return ZeroCopyStringToBytes(str)
 			},
 		},
 	}
@@ -112,7 +112,7 @@ func BenchmarkZeroCopySlice(b *testing.B) {
 func TestIsSafeString(t *testing.T) {
 	str1 := "123456"
 	str2 := "123"
-	unsafeStr := ZeroCopyString(ZeroCopySlice(str1)[:4])
+	unsafeStr := ZeroCopyBytesToString(ZeroCopyStringToBytes(str1)[:4])
 	assert.True(t, IsSafeString(str2, str1))
 	assert.False(t, IsSafeString(str1, unsafeStr))
 	assert.False(t, IsSafeString(unsafeStr, str1))

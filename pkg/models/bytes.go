@@ -28,7 +28,7 @@ func (ByteArray) SetName(name string) {
 }
 
 func (ByteArray) GetTags() Tags {
-	return noopStringValues
+	return NilStringValues
 }
 
 func (ByteArray) GetType() EventType {
@@ -44,4 +44,8 @@ func (ByteArray) GetObservedTimestamp() uint64 {
 }
 
 func (ByteArray) SetObservedTimestamp(timestamp uint64) {
+}
+
+func (b ByteArray) Clone() PipelineEvent {
+	return b
 }
