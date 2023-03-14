@@ -64,7 +64,7 @@ type ContainerDetail struct {
 	Hostname         string
 	HostsPath        string
 	Env              map[string]string
-	Labels           map[string]string
+	ContainerLabels  map[string]string
 	K8sLabels        map[string]string
 }
 
@@ -210,7 +210,7 @@ func SerializeContainerToPb(logGroup *protocol.LogGroup) {
 		if err == nil {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "env", Value: string(envStr)})
 		}
-		labelsStr, err := json.Marshal(item.Labels)
+		labelsStr, err := json.Marshal(item.ContainerLabels)
 		if err == nil {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "labels", Value: string(labelsStr)})
 		}

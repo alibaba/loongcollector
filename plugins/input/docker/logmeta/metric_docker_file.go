@@ -87,8 +87,9 @@ type InputDockerFile struct {
 	lastUpdateTime       int64
 
 	// Last return of GetAllAcceptedInfoV2
-	fullList  map[string]bool
-	matchList map[string]*helper.DockerInfoDetail
+	fullList              map[string]bool
+	matchList             map[string]*helper.DockerInfoDetail
+	CollectContainersFlag bool
 }
 
 func formatPath(path string) string {
@@ -297,19 +298,21 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 		idf.IncludeEnvRegex, idf.ExcludeEnvRegex,
 		idf.K8sFilter)
 	idf.lastUpdateTime = newUpdateTime
-	// record added container id
-	if len(addFullList) > 0 {
-		for _, id := range addFullList {
-			if len(id) > 0 {
-				util.RecordAddedContainerIDs(id)
+	if idf.CollectContainersFlag {
+		// record added container id
+		if len(addFullList) > 0 {
+			for _, id := range addFullList {
+				if len(id) > 0 {
+					util.RecordAddedContainerIDs(id)
+				}
 			}
 		}
-	}
-	// record deleted container id
-	if len(deleteFullList) > 0 {
-		for _, id := range deleteFullList {
-			if len(id) > 0 {
-				util.RecordDeletedContainerIDs(util.GetShortID(id))
+		// record deleted container id
+		if len(deleteFullList) > 0 {
+			for _, id := range deleteFullList {
+				if len(id) > 0 {
+					util.RecordDeletedContainerIDs(util.GetShortID(id))
+				}
 			}
 		}
 	}
@@ -356,8 +359,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 			logger.Warning(idf.context.GetRuntimeContext(), "DOCKER_FILE_MATCH_ALARM", "unknow error", "can't find path from this container", "path", idf.LogPath, "container", info.ContainerInfo.Name)
 		}
 	}
-
-	{
+	if idf.CollectContainersFlag {
 		configResult := &util.ConfigResult{
 			DataType:                      "container_config_result",
 			Project:                       idf.context.GetProject(),

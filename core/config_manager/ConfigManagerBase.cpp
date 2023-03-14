@@ -241,6 +241,9 @@ void ConfigManagerBase::MappingPluginConfig(const Json::Value& configValue, Conf
     if (configValue.isMember("docker_exclude_env") && configValue["docker_exclude_env"].isObject()) {
         detail["ExcludeEnv"] = configValue["docker_exclude_env"];
     }
+    if (configValue.isMember("advanced") && configValue["advanced"].isObject() && configValue["advanced"].isMember("collect_containers_flag")) {
+        detail["CollectContainersFlag"] = configValue["advanced"]["collect_containers_flag"];
+    }
     // parse k8s flags
     if (configValue.isMember("advanced") && configValue["advanced"].isObject()
         && configValue["advanced"].isMember("k8s") && configValue["advanced"]["k8s"].isObject()) {

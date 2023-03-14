@@ -46,33 +46,37 @@ func (s *containerConfigTestSuite) TestRefreshEnvAndLabel() {
 	refreshEnvAndLabel()
 	s.Equal(1, len(LogtailConfig))
 	s.Equal(1, len(envSet))
-	s.Equal(1, len(labelSet))
+	s.Equal(1, len(containerLabelSet))
 }
 
 func (s *containerConfigTestSuite) TestCompareEnvAndLabel() {
 	envSet = make(map[string]struct{})
-	labelSet = make(map[string]struct{})
+	containerLabelSet = make(map[string]struct{})
+	k8sLabelSet = make(map[string]struct{})
 
 	s.NoError(loadMockConfig(), "got err when logad config")
 
 	envSet["testEnv1"] = struct{}{}
-	labelSet["testLebel1"] = struct{}{}
+	containerLabelSet["testLabel1"] = struct{}{}
+	k8sLabelSet["testK8sLabel1"] = struct{}{}
 
-	diffEnvSet, diffLabelSet := compareEnvAndLabel()
+	diffEnvSet, diffLabelSet, diffK8sLabelSet := compareEnvAndLabel()
 	s.Equal(1, len(diffEnvSet))
 	s.Equal(1, len(diffLabelSet))
 	s.Equal(2, len(envSet))
-	s.Equal(2, len(labelSet))
+	s.Equal(2, len(containerLabelSet))
+	s.Equal(0, len(diffK8sLabelSet))
 }
 
 func (s *containerConfigTestSuite) TestCompareEnvAndLabelAndRecordContainer() {
 	envSet = make(map[string]struct{})
-	labelSet = make(map[string]struct{})
+	containerLabelSet = make(map[string]struct{})
+	k8sLabelSet = make(map[string]struct{})
 
 	s.NoError(loadMockConfig(), "got err when logad config")
 
 	envSet["testEnv1"] = struct{}{}
-	labelSet["testLebel1"] = struct{}{}
+	containerLabelSet["testLabel1"] = struct{}{}
 
 	envList := []string{0: "test=111"}
 	info := mockDockerInfoDetail("testConfig", envList)
@@ -132,6 +136,7 @@ func loadMockConfig() error {
 		"inputs": [{
 			"detail": {
 				"Stderr": true,
+				"CollectContainersFlag": true,
 				"IncludeLabel": {
 					"app": "^.*$"
 				},

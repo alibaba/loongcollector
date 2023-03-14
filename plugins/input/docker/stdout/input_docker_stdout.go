@@ -172,9 +172,10 @@ type ServiceDockerStdout struct {
 	collector pipeline.Collector
 
 	// Last return of GetAllAcceptedInfoV2
-	fullList       map[string]bool
-	matchList      map[string]*helper.DockerInfoDetail
-	lastUpdateTime int64
+	fullList              map[string]bool
+	matchList             map[string]*helper.DockerInfoDetail
+	lastUpdateTime        int64
+	CollectContainersFlag bool
 }
 
 func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
@@ -268,46 +269,48 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 		sds.K8sFilter)
 	sds.lastUpdateTime = newUpdateTime
 
-	// record added container id
-	if len(addFullList) > 0 {
-		for _, id := range addFullList {
-			if len(id) > 0 {
-				util.RecordAddedContainerIDs(id)
+	if sds.CollectContainersFlag {
+		// record added container id
+		if len(addFullList) > 0 {
+			for _, id := range addFullList {
+				if len(id) > 0 {
+					util.RecordAddedContainerIDs(id)
+				}
 			}
 		}
-	}
-	// record deleted container id
-	if len(deleteFullList) > 0 {
-		for _, id := range deleteFullList {
-			if len(id) > 0 {
-				util.RecordDeletedContainerIDs(util.GetShortID(id))
+		// record deleted container id
+		if len(deleteFullList) > 0 {
+			for _, id := range deleteFullList {
+				if len(id) > 0 {
+					util.RecordDeletedContainerIDs(util.GetShortID(id))
+				}
 			}
 		}
-	}
-	// record config result
-	{
-		keys := make([]string, 0, len(sds.matchList))
-		for k := range sds.matchList {
-			if len(k) > 0 {
-				keys = append(keys, util.GetShortID(k))
+		// record config result
+		{
+			keys := make([]string, 0, len(sds.matchList))
+			for k := range sds.matchList {
+				if len(k) > 0 {
+					keys = append(keys, util.GetShortID(k))
+				}
 			}
+			configResult := &util.ConfigResult{
+				DataType:                   "container_config_result",
+				Project:                    sds.context.GetProject(),
+				Logstore:                   sds.context.GetLogstore(),
+				ConfigName:                 sds.context.GetConfigName(),
+				PathExistInputContainerIDs: util.GetStringFromList(keys),
+				SourceAddress:              "stdout",
+				InputType:                  input.ServiceDockerStdoutPluginName,
+				FlusherType:                "flusher_sls",
+				FlusherTargetAddress:       fmt.Sprintf("%s/%s", sds.context.GetProject(), sds.context.GetLogstore()),
+			}
+			util.RecordConfigResultMap(configResult)
+			if newCount != 0 || delCount != 0 {
+				util.RecordConfigResultIncrement(configResult)
+			}
+			logger.Debugf(sds.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v, addFullList: %v, deleteFullList: %v", addResultList, deleteResultList, addFullList, deleteFullList)
 		}
-		configResult := &util.ConfigResult{
-			DataType:                   "container_config_result",
-			Project:                    sds.context.GetProject(),
-			Logstore:                   sds.context.GetLogstore(),
-			ConfigName:                 sds.context.GetConfigName(),
-			PathExistInputContainerIDs: util.GetStringFromList(keys),
-			SourceAddress:              "stdout",
-			InputType:                  input.ServiceDockerStdoutPluginName,
-			FlusherType:                "flusher_sls",
-			FlusherTargetAddress:       fmt.Sprintf("%s/%s", sds.context.GetProject(), sds.context.GetLogstore()),
-		}
-		util.RecordConfigResultMap(configResult)
-		if newCount != 0 || delCount != 0 {
-			util.RecordConfigResultIncrement(configResult)
-		}
-		logger.Debugf(sds.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v, addFullList: %v, deleteFullList: %v", addResultList, deleteResultList, addFullList, deleteFullList)
 	}
 
 	if !firstStart && newCount == 0 && delCount == 0 {
