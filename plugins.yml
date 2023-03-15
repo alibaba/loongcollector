@@ -55,6 +55,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/processor/base64/decoding"
     - import: "github.com/alibaba/ilogtail/plugins/processor/base64/encoding"
     - import: "github.com/alibaba/ilogtail/plugins/processor/csv"
+    - import: "github.com/alibaba/ilogtail/plugins/processor/cloudmeta"
     - import: "github.com/alibaba/ilogtail/plugins/processor/defaultone"
     - import: "github.com/alibaba/ilogtail/plugins/processor/desensitize"
     - import: "github.com/alibaba/ilogtail/plugins/processor/dictmap"

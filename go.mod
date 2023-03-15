@@ -137,7 +137,7 @@ require (
 	github.com/Microsoft/hcsshim v0.9.4 // indirect
 	github.com/VictoriaMetrics/fasthttp v1.1.0 // indirect
 	github.com/VictoriaMetrics/metricsql v0.45.0 // indirect
-	github.com/aliyun/alibaba-cloud-sdk-go v0.0.0-20181127062202-5462e9f9dc05 // indirect
+	github.com/aliyun/alibaba-cloud-sdk-go v0.0.0-20181127062202-5462e9f9dc05
 	github.com/andrewkroh/sys v0.0.0-20151128191922-287798fe3e43 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect

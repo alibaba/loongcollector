@@ -84,7 +84,12 @@ func TestDecoder_DecodePprofCumulative(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(logs), 4)
 	sort.Slice(logs, func(i, j int) bool {
-		return test.ReadLogVal(logs[i], "name") < test.ReadLogVal(logs[j], "name") || test.ReadLogVal(logs[i], "valueTypes") < test.ReadLogVal(logs[j], "valueTypes")
+		if test.ReadLogVal(logs[i], "name") < test.ReadLogVal(logs[j], "name") {
+			return true
+		} else if test.ReadLogVal(logs[i], "name") == test.ReadLogVal(logs[j], "name") {
+			return test.ReadLogVal(logs[i], "valueTypes") < test.ReadLogVal(logs[j], "valueTypes")
+		}
+		return false
 	})
 	require.Equal(t, test.ReadLogVal(logs[0], "name"), "compress/flate.NewWriter /Users/evan/sdk/go1.19.4/src/compress/flate/deflate.go")
 	require.Equal(t, test.ReadLogVal(logs[0], "valueTypes"), "alloc_objects")

@@ -16,10 +16,13 @@ package appender
 
 import (
 	"fmt"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/helper/platformmeta"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -29,9 +32,13 @@ type ProcessorAppender struct {
 	Key        string
 	Value      string
 	SortLabels bool
+	Platform   platformmeta.Platform
+	ReadOnce   bool
 
-	realValue string
-	context   pipeline.Context
+	cloudmetaManager platformmeta.Manager
+	realValue        string
+	replaceFuncs     []func(val string) string
+	context          pipeline.Context
 }
 
 const pluginName = "processor_appender"
@@ -44,8 +51,13 @@ func (p *ProcessorAppender) Init(context pipeline.Context) error {
 		return fmt.Errorf("must specify Key and Value for plugin %v", pluginName)
 	}
 	p.context = context
+	manager := platformmeta.GetManager(p.Platform)
+	if manager != nil {
+		p.cloudmetaManager = manager
+		p.cloudmetaManager.StartCollect()
+	}
 	p.realValue = replaceReg.ReplaceAllStringFunc(p.Value, func(s string) string {
-		return util.ParseVariableValue(s[2 : len(s)-2])
+		return p.ParseVariableValue(s[2 : len(s)-2])
 	})
 	return nil
 }
@@ -73,7 +85,11 @@ func (p *ProcessorAppender) processLog(log *protocol.Log) {
 }
 
 func (p *ProcessorAppender) processField(c *protocol.Log_Content) {
-	c.Value += p.realValue
+	r := p.realValue
+	for _, replaceFunc := range p.replaceFuncs {
+		r = replaceFunc(r)
+	}
+	c.Value += r
 	if p.SortLabels {
 		labels := strings.Split(c.Value, "|")
 		var keyValue helper.KeyValues
@@ -99,8 +115,86 @@ func (p *ProcessorAppender) find(log *protocol.Log, key string) *protocol.Log_Co
 	return nil
 }
 
+// ParseVariableValue parse specific key with logic:
+//  1. if key start with '$', the get from env
+//  2. if key == __ip__, return local ip address
+//  3. if key == __host__, return hostName
+//     others return key
+func (p *ProcessorAppender) ParseVariableValue(key string) string {
+	if len(key) == 0 {
+		return key
+	}
+	if key[0] == '$' {
+		return os.Getenv(key[1:])
+	}
+	switch key {
+	case "__ip__":
+		return util.GetIPAddress()
+	case "__host__":
+		return util.GetHostName()
+	}
+	if p.cloudmetaManager == nil {
+		return key
+	}
+	switch key {
+	case platformmeta.FlagInstanceID:
+		return p.cloudmetaManager.GetInstanceID()
+	case platformmeta.FlagInstanceName:
+		if p.ReadOnce {
+			return p.cloudmetaManager.GetInstanceName()
+		}
+		p.replaceFuncs = append(p.replaceFuncs, func(val string) string {
+			return strings.ReplaceAll(val, platformmeta.FlagInstanceNameWrapper, p.cloudmetaManager.GetInstanceName())
+		})
+		return platformmeta.FlagInstanceNameWrapper
+	case platformmeta.FlagInstanceImageID:
+		return p.cloudmetaManager.GetInstanceImageID()
+	case platformmeta.FlagInstanceRegion:
+		return p.cloudmetaManager.GetInstanceRegion()
+	case platformmeta.FlagInstanceType:
+		return p.cloudmetaManager.GetInstanceType()
+	case platformmeta.FlagInstanceZone:
+		return p.cloudmetaManager.GetInstanceZone()
+	case platformmeta.FlagInstanceVpcID:
+		if p.ReadOnce {
+			return p.cloudmetaManager.GetInstanceVpcID()
+		}
+		p.replaceFuncs = append(p.replaceFuncs, func(val string) string {
+			return strings.ReplaceAll(val, platformmeta.FlagInstanceVpcIDWrapper, p.cloudmetaManager.GetInstanceVpcID())
+		})
+		return platformmeta.FlagInstanceVpcIDWrapper
+	case platformmeta.FlagInstanceMaxEgress:
+		if p.ReadOnce {
+			return strconv.FormatInt(p.cloudmetaManager.GetInstanceMaxNetEgress(), 10)
+		}
+		p.replaceFuncs = append(p.replaceFuncs, func(val string) string {
+			return strings.ReplaceAll(val, platformmeta.FlagInstanceMaxEgressWrapper, strconv.FormatInt(p.cloudmetaManager.GetInstanceMaxNetEgress(), 10))
+		})
+		return platformmeta.FlagInstanceMaxEgressWrapper
+	case platformmeta.FlagInstanceMaxIngress:
+		if p.ReadOnce {
+			return strconv.FormatInt(p.cloudmetaManager.GetInstanceMaxNetIngress(), 10)
+		}
+		p.replaceFuncs = append(p.replaceFuncs, func(val string) string {
+			return strings.ReplaceAll(val, platformmeta.FlagInstanceMaxIngressWrapper, strconv.FormatInt(p.cloudmetaManager.GetInstanceMaxNetIngress(), 10))
+		})
+		return platformmeta.FlagInstanceMaxIngressWrapper
+	case platformmeta.FlagInstanceVswitchID:
+		if p.ReadOnce {
+			return p.cloudmetaManager.GetInstanceVswitchID()
+		}
+		p.replaceFuncs = append(p.replaceFuncs, func(val string) string {
+			return strings.ReplaceAll(val, platformmeta.FlagInstanceVswitchIDWrapper, p.cloudmetaManager.GetInstanceVswitchID())
+		})
+		return platformmeta.FlagInstanceVswitchIDWrapper
+	}
+	return key
+}
+
 func init() {
 	pipeline.Processors[pluginName] = func() pipeline.Processor {
-		return &ProcessorAppender{}
+		return &ProcessorAppender{
+			Platform: platformmeta.Mock,
+		}
 	}
 }

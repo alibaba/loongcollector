@@ -366,27 +366,6 @@ func NewLogTagForPackID(prefix string, seqNum *int64) *protocol.LogTag {
 	return tag
 }
 
-// ParseVariableValue parse specific key with logic:
-//  1. if key start with '$', the get from env
-//  2. if key == __ip__, return local ip address
-//  3. if key == __host__, return hostName
-//     others return key
-func ParseVariableValue(key string) string {
-	if len(key) == 0 {
-		return key
-	}
-	if key[0] == '$' {
-		return os.Getenv(key[1:])
-	}
-	if key == "__ip__" {
-		return ipAddress
-	}
-	if key == "__host__" {
-		return hostName
-	}
-	return key
-}
-
 // Label for metric label
 type Label struct {
 	Name  string

@@ -61,3 +61,4 @@ your changes, such as:
 - [public] [both] [added] add logs for container matching in stdout plugin
 - [public] [both] [updated] set user agent for SLS client
 - [public] [both] [updated] prometheus input add staleness output
+- [public] [both] [updated] processor_cloud_meta, processor_appender support collect aliyun ecs metadata
