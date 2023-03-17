@@ -285,6 +285,9 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
 
     AddLogContent(logPtr, "metric_json", MetricToString());
     AddLogContent(logPtr, "status", CheckLogtailStatus());
+    AddLogContent(logPtr, "ecs_instance_id", LogFileProfiler::mECSInstanceID);
+    AddLogContent(logPtr, "ecs_user_id", LogFileProfiler::mECSUserID);
+    AddLogContent(logPtr, "ecs_regioon_id", LogFileProfiler::mECSRegionID);
     ClearMetric();
 
     if (!mMonitorRunning)

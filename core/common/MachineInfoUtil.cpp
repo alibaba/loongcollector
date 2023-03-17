@@ -30,6 +30,10 @@
 #include "logger/Logger.h"
 #include "StringTools.h"
 #include "FileSystemUtil.h"
+#include <thread>
+#include <curl/curl.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 
 #if defined(_MSC_VER)
@@ -436,6 +440,71 @@ bool IsDigitsDotsHostname(const char* hostname) {
         return true;
     }
     return false;
+}
+
+
+size_t FetchECSMetaCallback(char* buffer, size_t size, size_t nmemb, std::string* res) {
+    if (NULL == buffer) {
+        return 0;
+    }
+ 
+    size_t sizes = size * nmemb;
+    res->append(buffer, sizes);
+    return sizes;
+}
+ 
+ECSMeta FetchECSMeta() {
+    CURL* curl;
+    for (size_t retryTimes = 1; retryTimes <= 5; retryTimes++) {
+        curl = curl_easy_init();
+        if (curl) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    ECSMeta metaObj;
+    metaObj.instanceID = "";
+    metaObj.userID = "";
+    metaObj.regionID = "";
+    if (curl) {
+        std::string meta;
+        curl_easy_setopt(curl, CURLOPT_URL, "http://100.100.100.200/latest/dynamic/instance-identity/document");
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &meta);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
+        CURLcode res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            LOG_DEBUG(sLogger, ("fetch ecs meta fail", curl_easy_strerror(res)));
+        } else {
+            rapidjson::Document doc;
+            doc.Parse(meta.c_str());
+            if (doc.HasParseError() || !doc.IsObject()) {
+                LOG_DEBUG(sLogger, ("fetch ecs meta fail", meta));
+            } else {
+                rapidjson::Value::ConstMemberIterator instanceItr = doc.FindMember("instance-id");
+                if (instanceItr != doc.MemberEnd() && (instanceItr->value.IsString())) {
+                    metaObj.instanceID = instanceItr->value.GetString();
+                }
+        
+                rapidjson::Value::ConstMemberIterator userItr = doc.FindMember("owner-account-id");
+                if (userItr != doc.MemberEnd() && userItr->value.IsString()) {
+                    metaObj.userID = userItr->value.GetString();
+                }
+
+                rapidjson::Value::ConstMemberIterator regionItr = doc.FindMember("region-id");
+                if (regionItr != doc.MemberEnd() && regionItr->value.IsString()) {
+                    metaObj.regionID = regionItr->value.GetString();
+                }
+            }
+        }
+        curl_easy_cleanup(curl);
+        return metaObj;
+    }
+    LOG_WARNING(
+        sLogger,
+        ("curl handler cannot be initialized during user environment identification", "ecs meta may be mislabeled"));
+    return metaObj;
 }
 
 } // namespace logtail

@@ -17,9 +17,16 @@
 #pragma once
 #include <string>
 #include <unordered_set>
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/document.h>
 
 namespace logtail {
 
+struct ECSMeta {
+    std::string instanceID;
+    std::string userID;
+    std::string regionID;
+};
 std::string GetOsDetail();
 std::string GetUsername();
 std::string GetHostName();
@@ -31,6 +38,7 @@ void GetAllPids(std::unordered_set<int32_t>& pids);
 bool GetKernelInfo(std::string& kernelRelease, int64_t& kernelVersion);
 bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashPath = "");
 bool IsDigitsDotsHostname(const char *hostname);
+ECSMeta FetchECSMeta();
 
 // GetAnyAvailableIP walks through all interfaces (AF_INET) to find an available IP.
 // Priority:
