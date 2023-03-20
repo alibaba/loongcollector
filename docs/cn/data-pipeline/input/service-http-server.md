@@ -4,12 +4,16 @@
 
 `service_http_server` `input`插件可以接收来自unix socket、http/https、tcp的请求，并支持sls协议、otlp等多种协议。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数                 | 类型                | 是否必选 | 说明                                                                                                                                                                            |
 |--------------------|-------------------|------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Type               | String            | 是    | 插件类型，固定为`service_http_server`                                                                                                                                                 |
-| Format             | String            | 否    | <p>数据格式。</p> <p>支持格式：`sls`、`prometheus`、`influxdb`、`otlp_logv1`、 `otlp_metricv1`、`otlp_tracev1`, `pyroscope`,statsd`</p>  <p>v2版本支持格式: `raw`</p><p>说明：`raw`格式以原始请求字节流传输数据</p> |
+| Format             | String            | 否    | <p>数据格式。</p> <p>支持格式：`sls`、`prometheus`、`influxdb`、`otlp_logv1`、 `otlp_metricv1`、`otlp_tracev1`, `pyroscope`,statsd`</p>  <p>v2版本支持格式:`raw`</p><p>说明：`raw`格式以原始请求字节流传输数据</p> |
 | Address            | String            | 否    | <p>监听地址。</p><p></p>                                                                                                                                                           |
 | Path               | String            | 否    | <p>接收端点, 如Format 为 `otlp_logv1` 时, 默认端点为`/v1/logs` 。</p><p></p>                                                                                                               |
 | ReadTimeoutSec     | String            | 否    | <p>读取超时时间。</p><p>默认取值为:`10s`。</p>                                                                                                                                             |
@@ -100,7 +104,7 @@ opentelemetry-java-sdk构造数据，基于[ExampleConfiguration.java](https://g
 
 * 输出
 
-```
+```json
 {
     "time_unix_nano": "1663913736115000000",
     "severity_number": "9",
@@ -170,7 +174,7 @@ curl --location --request POST 'http://127.0.0.1:12345?QueryKey=queryValue' --he
 
 * 输出
 
-```
+```plain
 [Event] event 1, metadata map[_header_prefix_HeaderKey:headerValue _param_prefix_QueryKey:queryValue], tags map[__hostname__:579ce1e01dea]
 
 {
@@ -203,6 +207,7 @@ curl --location --request POST 'http://127.0.0.1:12345?QueryKey=queryValue' --he
 
 * 采集配置
 *使用v1 版本表述使用protocol.Log 传递数据*
+
 ```yaml
 enable: true
 version: v1
@@ -223,10 +228,13 @@ flushers:
 
 1. 进入[Pyroscope Golang Example](https://github.com/pyroscope-io/pyroscope/tree/main/examples/golang-push)
 2. 编译 Pyroscope Golang Example
+
     ```shell
     go build -o main .
     ```
+
 3. 启动Pyroscope Golang Example
+
     ```shell
     ./main
     ```

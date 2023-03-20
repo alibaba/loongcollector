@@ -4,6 +4,10 @@
 
 `metric_meta_host` `input`插件用于采集主机的Meta信息（例如CPU型号、内存大小、进程等）。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数          | 类型      | 是否必选 | 说明                                                                                         |
@@ -22,9 +26,9 @@
 
 采集主机上CPU、Memory、Net、Disk、Process等Meta信息。
 
-#### 采集配置
+### 采集配置
 
-```
+```yaml
 enable: true
 inputs:
   - Type: metric_meta_host
@@ -46,8 +50,10 @@ flushers:
 ```
 
 #### 输出
+
 * 主机Meta信息
-```
+
+```json
 {
     "__time__": 1658364854,
     "type": "HOST",
@@ -60,8 +66,9 @@ flushers:
 }
 ```
 
-* 进程Meta信息 
-```
+* 进程Meta信息
+
+```json
 {
     "__time__": 1658364348,
     "type": "PROCESS",

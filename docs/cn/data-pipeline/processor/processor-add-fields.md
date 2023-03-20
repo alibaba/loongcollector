@@ -4,6 +4,10 @@
 
 `processor_add_fields processor`插件可以添加日志字段。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数          | 类型    | 是否必选 | 说明                                                                 |
@@ -53,4 +57,4 @@ flushers:
     "service": "A",
     "__time__": "1657354602"
 }
-``` 
+```

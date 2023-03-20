@@ -4,6 +4,10 @@
 
 `aggregator_metadata_group` `aggregator`插件可以实现对PipelineGroupEvents按照指定的 Metadata Key 进行重新聚合。仅支持v2版本。
 
+## 版本
+
+[Alpha](../stability-level.md)
+
 ## 配置参数
 
 | 参数                  | 类型       | 是否必选 | 说明                                                           |

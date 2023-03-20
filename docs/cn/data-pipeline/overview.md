@@ -48,6 +48,7 @@
 |----------------------------------|-----------------------------------------------------|---------------------------------------------|
 | `aggregator_content_value_group` | 社区<br>[`snakorse`](https://github.com/snakorse)     | 按照指定的Key对采集到的数据进行分组聚合           |
 | `aggregator_metadata_group`      | 社区<br>[`urnotsally`](https://github.com/urnotsally) | 按照指定的Metadata Keys对采集到的数据进行重新分组聚合|
+
 ## 输出
 
 | 名称                           | 提供方                                                 | 简介                                        |

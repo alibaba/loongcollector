@@ -4,6 +4,10 @@
 
 `observer_ilogtail_network` 插件支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以识别七层网络调用细节。此功能核心网络观测能力基于eBPF技术实现，具有高性能、无侵入等核心优势。
 
+## 版本
+
+[Beta](../stability-level.md)
+
 ## 前提
 
 1. Linux 内核 4.19+
@@ -13,7 +17,6 @@
 ## 配置参数
 
 ### 基础参数
-
 
 | 参数                          | 类型              | 是否必选 | 说明                                                         |
 |-----------------------------| ----------------- | -------- |------------------------------------------------------------|
@@ -32,7 +35,6 @@
 | EBPF.Enabled                | map[string]string | 是       | 开启Ebpf 功能                                                  |
 
 ### 高级参数
-
 
 | 参数                             | 类型              | 是否必选 | 说明                                                                                                                                              |
 | -------------------------------- | ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -54,11 +56,11 @@
 
 ## 样例：收集HTTP 请求调用
 
-#### 采集配置
+### 采集配置
 
 *observer_ilogtail_network_v1 程序运行与C++ 核心部分，需要增加processor_default 插件，才可以选取社区多种输出插件，如Kafka*
 
-```
+```yaml
 enable: true
 inputs:
   - Type: observer_ilogtail_network_v1
@@ -75,11 +77,9 @@ flushers:
 
 #### 输出
 
-```
-2022-08-25 16:44:01 [INF] [flusher_stdout.go:119] [Flush] [config#/root/workspace/ilogtail/output/./user_yaml_config.d/demo.yaml,]	{"type":"protocols","_process_pid_":"605","_process_cmd_":"/usr/sbin/nscd","_running_mode_":"host","protocol":"dns","query_record":"ilogtail-community-edition.cn-shanghai.log.aliyuncs.com","query_type":"A","success":"1","role":"client","remote_info":"{\"remote_ip\":\"100.100.2.136\",\"remote_port\":\"53\",\"remote_type\":\"dns\"}\n","total_count":"1","total_latency_ns":"387138","total_req_bytes":"73","total_resp_bytes":"272","__time__":"1661417038"}:
-2022-08-25 16:44:01 [INF] [flusher_stdout.go:119] [Flush] [config#/root/workspace/ilogtail/output/./user_yaml_config.d/demo.yaml,]	{"type":"protocols","_process_pid_":"1945","_process_cmd_":"/usr/local/cloudmonitor/bin/argusagent","_running_mode_":"host","protocol":"http","version":"1","host":"metrichub-cn-beijing.aliyun.com","method":"POST","url":"/agent/metrics/putLines","resp_code":"200","role":"client","remote_info":"{\"remote_ip\":\"100.100.105.70\",\"remote_port\":\"80\",\"remote_type\":\"server\"}\n","total_count":"1","total_latency_ns":"3492453","total_req_bytes":"13661","total_resp_bytes":"165","__time__":"1661417038"}:
-2022-08-25 16:44:01 [INF] [flusher_stdout.go:119] [Flush] [config#/root/workspace/ilogtail/output/./user_yaml_config.d/demo.yaml,]	{"type":"statistics","_process_pid_":"1945","_process_cmd_":"/usr/local/cloudmonitor/bin/argusagent","_running_mode_":"host","remote_info":"{\"remote_ip\":\"100.100.105.70\",\"remote_port\":\"80\",\"remote_type\":\"server\"}\n","socket_type":"inet_socket","role":"client","send_bytes":"13661","recv_bytes":"165","send_packets":"1","recv_packets":"1","send_total_latency":"0","recv_total_latency":"0","__time__":"1661417038"}:
-2022-08-25 16:44:01 [INF] [flusher_stdout.go:119] [Flush] [config#/root/workspace/ilogtail/output/./user_yaml_config.d/demo.yaml,]	{"type":"statistics","_process_pid_":"605","_process_cmd_":"/usr/sbin/nscd","_running_mode_":"host","remote_info":"{\"remote_ip\":\"100.100.2.136\",\"remote_port\":\"53\",\"remote_type\":\"dns\"}\n","socket_type":"inet_socket","role":"client","send_bytes":"73","recv_bytes":"272","send_packets":"1","recv_packets":"1","send_total_latency":"0","recv_total_latency":"0","__time__":"1661417038"}:
-
-
+```plain
+2022-08-25 16:44:01 [INF] [flusher_stdout.go:119] [Flush] [config#/root/workspace/ilogtail/output/./user_yaml_config.d/demo.yaml,] {"type":"protocols","_process_pid_":"605","_process_cmd_":"/usr/sbin/nscd","_running_mode_":"host","protocol":"dns","query_record":"ilogtail-community-edition.cn-shanghai.log.aliyuncs.com","query_type":"A","success":"1","role":"client","remote_info":"{\"remote_ip\":\"100.100.2.136\",\"remote_port\":\"53\",\"remote_type\":\"dns\"}\n","total_count":"1","total_latency_ns":"387138","total_req_bytes":"73","total_resp_bytes":"272","__time__":"1661417038"}:
+2022-08-25 16:44:01 [INF] [flusher_stdout.go:119] [Flush] [config#/root/workspace/ilogtail/output/./user_yaml_config.d/demo.yaml,] {"type":"protocols","_process_pid_":"1945","_process_cmd_":"/usr/local/cloudmonitor/bin/argusagent","_running_mode_":"host","protocol":"http","version":"1","host":"metrichub-cn-beijing.aliyun.com","method":"POST","url":"/agent/metrics/putLines","resp_code":"200","role":"client","remote_info":"{\"remote_ip\":\"100.100.105.70\",\"remote_port\":\"80\",\"remote_type\":\"server\"}\n","total_count":"1","total_latency_ns":"3492453","total_req_bytes":"13661","total_resp_bytes":"165","__time__":"1661417038"}:
+2022-08-25 16:44:01 [INF] [flusher_stdout.go:119] [Flush] [config#/root/workspace/ilogtail/output/./user_yaml_config.d/demo.yaml,] {"type":"statistics","_process_pid_":"1945","_process_cmd_":"/usr/local/cloudmonitor/bin/argusagent","_running_mode_":"host","remote_info":"{\"remote_ip\":\"100.100.105.70\",\"remote_port\":\"80\",\"remote_type\":\"server\"}\n","socket_type":"inet_socket","role":"client","send_bytes":"13661","recv_bytes":"165","send_packets":"1","recv_packets":"1","send_total_latency":"0","recv_total_latency":"0","__time__":"1661417038"}:
+2022-08-25 16:44:01 [INF] [flusher_stdout.go:119] [Flush] [config#/root/workspace/ilogtail/output/./user_yaml_config.d/demo.yaml,] {"type":"statistics","_process_pid_":"605","_process_cmd_":"/usr/sbin/nscd","_running_mode_":"host","remote_info":"{\"remote_ip\":\"100.100.2.136\",\"remote_port\":\"53\",\"remote_type\":\"dns\"}\n","socket_type":"inet_socket","role":"client","send_bytes":"73","recv_bytes":"272","send_packets":"1","recv_packets":"1","send_total_latency":"0","recv_total_latency":"0","__time__":"1661417038"}:
 ```

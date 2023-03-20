@@ -37,6 +37,7 @@
 ## 数据流水线 <a href="#data-pipeline" id="data-pipeline"></a>
 
 * [概览](data-pipeline/overview.md)
+* [插件版本管理](data-pipeline/stability-level.md)
 * [输入](data-pipeline/input/README.md)
   * [文本日志](data-pipeline/input/file-log.md)
   * [容器标准输出](data-pipeline/input/input-docker-stdout.md)

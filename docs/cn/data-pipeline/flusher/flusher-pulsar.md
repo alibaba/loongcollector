@@ -4,7 +4,12 @@
 
 `flusher_pulsar` `flusher`插件可以实现将采集到的数据，经过处理后，发送到`Pulsar`。
 
+## 版本
+
+[Alpha](../stability-level.md)
+
 ## 配置参数
+
 | 参数                                    | 类型       | 是否必选 | 说明                                                                                 |
 |---------------------------------------|----------|------|------------------------------------------------------------------------------------|
 | Type                                  | String   | 是    | 插件类型                                                                               |
@@ -43,7 +48,6 @@
 | MaxCacheProducers                     | int      | 否    | 动态topic情况下最大Producer数量 ，默认最大数量：8,使用动态topic的使用可以根据自己的情况调整。                          |
 | PartitionKeys                         | String数组 | 否    | 指定消息分区分发的key。                                                                      |
 | ClientID                              | String   | 否    | 写入Pulsar的Client ID，默认取值：`iLogtail`。                                                |
-
 
 ## 样例
 
@@ -184,16 +188,21 @@ flushers:
 - `content.application`中表示从`contents`中取数据`application`字段数据，如果对`contents`协议字段做了重命名，
   例如重名为`messege`，则应该配置为`messege.application`
 
-# 安全连接配置
+## 安全连接配置
+
 `flusher_pulsar`支持多种安全认证连接`pulsar`服务端。
+
 - `TLS`认证;
 - `Token`JWT Token认证;
 - `Athenz` pulsar租户域认证;
 - `OAuth2`认证；
 
 JWT Token认证配置比较简单，参照前面的配置表配置即可，下面主要介绍下`OAuth2`,`TLS`和`Athenz`两种认证的配置。
+
 ## OAuth2认证配置参考(待验证)
+
 下面配置仅供参考，请根据服务器实际部署情况配置
+
 ```yaml
 enable: true
 inputs:
@@ -212,7 +221,9 @@ flushers:
         Scope: api://pulsar-cluster-1/.default
     Topic: PulsarTestTopic
 ```
+
 credentials_file.json配置内容样例
+
 ```json
 {
   "type": "client_credentials",
@@ -222,8 +233,11 @@ credentials_file.json配置内容样例
   "issuer_url": "https://accounts.google.com"
 }
 ```
+
 ## TLS配置参考(待验证)
+
 下面配置仅供参考，请根据服务器实际部署情况配置
+
 ```yaml
 enable: true
 inputs:
@@ -241,11 +255,15 @@ flushers:
         KeyFile: /data/cert/client.key
     Topic: PulsarTestTopic
 ```
+
 - `EnableTLS` 如果要启用`TLS`必须设置为`true`。开始`TLS`的情况下，URL头部为`pulsar+ssl://`
 - `TLSTrustCertsFilePath`根证书需要设置。
 **注:** 配置仅供参考，证书文件请自行生成后根据事情情况配置。
+
 ## Athenz认证配置参考(待验证)
+
 下面配置仅供参考，请根据服务器实际部署情况配置
+
 ```yaml
 enable: true
 inputs:
@@ -266,5 +284,6 @@ flushers:
         KeyId: v1
     Topic: PulsarTestTopic
 ```
+
 - `EnableTLS` 如果要启用`Athenz`认证必须设置为`true`。开始`TLS`的情况下，`URL`头部为`pulsar+ssl://`
 - `TLSTrustCertsFilePath`根证书需要设置。

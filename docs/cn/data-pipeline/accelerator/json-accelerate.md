@@ -1,11 +1,17 @@
 # json加速
 
 ## 简介
+
 `processor_json_accelerate processor`插件以加速模式实现`Json`格式日志的字段提取。
 
 备注：该插件目前仅支持与输入插件file_log和输出插件flusher_sls配套使用，且不得与其它加速插件混用。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
+
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
 | Type | String | 是 | 插件类型，指定为`processor_json_accelerate`。 |
@@ -73,12 +79,14 @@
 
 采集`/home/test-log/`路径下的`json.log`文件。
 
-* 输入
+- 输入
+
 ```json
 {"url": "POST /PutData?Category=YunOsAccountOpLog HTTP/1.1", "ip": "10.200.98.220", "user-agent": "aliyun-sdk-java", "request": {"status": "200", "latency": "18204"}, "time": "07/Jul/2022:10:30:28"}
 ```
 
-* 采集配置
+- 采集配置
+
 ```yaml
 enable: true
 inputs:
@@ -94,7 +102,8 @@ flushers:
     LogstoreName: test_logstore
 ```
 
-* 输出
+- 输出
+
 ```json
 {
     "__tag__:__path__": "/home/test-log/json.log",

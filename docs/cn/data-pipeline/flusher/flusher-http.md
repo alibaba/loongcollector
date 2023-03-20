@@ -4,6 +4,10 @@
 
 `flusher_http` `flusher`插件可以实现将采集到的数据，经过处理后，通过http格式发送到指定的地址。
 
+## 版本
+
+[Alpha](../stability-level.md)
+
 ## 配置参数
 
 | 参数                           | 类型                 | 是否必选 | 说明                                                                                                                                                                                         |
@@ -31,7 +35,7 @@
 采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果以 `custom_single` 协议、`json`格式提交到 `http://localhost:8086/write`。
 且提交时，附加 header x-filepath，其值使用log中的 __Tag__:__path__ 的值
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log
@@ -46,6 +50,3 @@ flushers:
       Protocol: custom_single
       Encoding: json
 ```
-
-
-

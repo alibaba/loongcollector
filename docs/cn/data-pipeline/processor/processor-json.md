@@ -4,6 +4,10 @@
 
 `processor_json processor`插件可以实现对`Json`格式日志的解析。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数                     | 类型      | 是否必选 | 说明                                                |
@@ -24,13 +28,13 @@
 
 * 输入
 
-```
+```bash
 echo '{"key1": 123456, "key2": "abcd"}' >> /home/test-log/json.log
 ```
 
 * 采集配置
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log
@@ -53,7 +57,7 @@ flushers:
 
 * 输出
 
-```
+```json
 {
     "__tag__:__path__": "/home/test-dir/test_log/json.log",
     "key1": "123456",

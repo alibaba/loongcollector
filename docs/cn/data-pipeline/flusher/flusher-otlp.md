@@ -1,7 +1,12 @@
 # OTLP Log
 
 ## 简介
+
 `flusher_otlp` `flusher`插件可以实现将采集到的数据，经过处理后，发送到支持`Opentelemetry Protocol`的后端。
+
+## 版本
+
+[Alpha](../stability-level.md)
 
 ## 配置参数
 
@@ -32,7 +37,7 @@
 
 采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果发送到 `Opentelemetry` Log后端。
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log
@@ -48,12 +53,11 @@ flushers:
         MaxCount: 3
 ```
 
-
 ### v2 Pipeline
 
-监听4316端口的`Opentelemetry`的gRPC请求，并将采集结果发送到 `Opentelemetry` 后端。其中Logs发送到http://192.168.xx.xx:4317，Metrics发送到http://192.168.xx.xx:4319，Traces不发送。
+监听4316端口的`Opentelemetry`的gRPC请求，并将采集结果发送到 `Opentelemetry` 后端。其中Logs发送到<http://192.168.xx.xx:4317，Metrics发送到http://192.168.xx.xx:4319，Traces不发送。>
 
-```
+```yaml
 enable: true
 version: v2
 inputs:
@@ -69,10 +73,9 @@ flushers:
       Endpoint: http://192.168.xx.xx:4319   
 ```
 
-
 监听4316端口的`Opentelemetry`的gRPC请求，并将采集结果发送到 `Opentelemetry` 后端。Logs、Metrics、Traces发送到不同的后端。
 
-```
+```yaml
 enable: true
 version: v2
 inputs:

@@ -4,6 +4,10 @@
 
 `processor_split_key_value processor`插件可以通过切分键值对的方式提取字段。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数                         | 类型    | 是否必选 | 说明                                                                                                                                                                        |
@@ -20,20 +24,19 @@
 | ErrIfSourceKeyNotFound       | Boolean | 否       | 无匹配的原始字段时是否告警。如果未添加该参数，则默认使用true，表示告警。                                                                                                    |
 | ErrIfSeparatorNotFound       | Boolean | 否       | 当指定的分隔符（Separator）不存在时是否告警。如果未添加该参数，则默认使用true，表示告警。                                                                                   |
 
-
 ## 样例
 
 采集`/home/test-log/`路径下的`key_value.log`文件，并按照键值对间分隔符为制表符`\t`，键值对中的分隔符为冒号`:` 的格式进行日志解析。
 
 * 输入
 
-```
+```bash
 echo -e 'class:main\tuserid:123456\tmethod:get\tmessage:\"wrong user\"' >> /home/test-log/key_value.log
 ```
 
 * 采集配置
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log
@@ -55,7 +58,7 @@ flushers:
 
 * 输出
 
-```
+```json
 {
     "__tag__:__path__": "/home/test_log/key_value.log",
     "class": "main",
@@ -64,4 +67,4 @@ flushers:
     "message": "\"wrong user\"",
     "__time__": "1657354602"
 }
-``` 
+```

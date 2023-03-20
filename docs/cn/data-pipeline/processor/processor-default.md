@@ -4,6 +4,10 @@
 
 `processor_default`插件不对数据任何操作，只是简单的数据透传。[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/processor/defaultone/processor_default.go)
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数 | 类型，默认值 | 说明 |
@@ -41,6 +45,7 @@ flushers:
 ```
 
 * 输出
+
 ```json
 {
     "__tag__:__path__":"/home/test-log/default.log",

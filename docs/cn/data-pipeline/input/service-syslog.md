@@ -1,9 +1,15 @@
 # Syslog数据
 
 ## 简介
+
 `service_syslog` 插件通过Logtail插件对指定的地址和端口进行监听后，Logtail开始采集数据，包括通过rsyslog采集的系统日志、 Nginx转发的访问日志或错误日志，以及通过syslog客户端转发的日志。[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/input/syslog/syslog.go)
 
+## 版本
+
+[Beta](../stability-level.md)
+
 ## 配置参数
+
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
 | Type | String，无默认值（必填） | 插件类型，固定为`service_syslog`。 |
@@ -21,6 +27,7 @@
 本样例采用了udp协议监听9009端口。
 
 * 采集配置
+
 ```yaml
 enable: true
 inputs:
@@ -32,6 +39,7 @@ flushers:
 ```
 
 * 输出
+
 ```json
 {
     "_program_":"",

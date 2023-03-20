@@ -4,6 +4,10 @@
 
 `processor_filter_regex processor`插件可以实现对日志的过滤。一条日志只有完全匹配Include中的正则表达式，且不匹配Exclude中的正则表达式时才会被采集，否则直接丢弃。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数                     | 类型，默认值 | 说明                                                |

@@ -4,6 +4,10 @@
 
 `aggregator_context` `aggregator`插件可以实现根据日志来源对单条日志进行聚合。
 
+## 版本
+
+[Beta](../stability-level.md)
+
 ## 配置参数
 
 | 参数 | 类型 | 是否必选 | 说明 |

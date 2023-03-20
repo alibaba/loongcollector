@@ -4,6 +4,10 @@
 
 `service_mssql` `input`插件可以采集Sql Server查询数据。
 
+## 版本
+
+[Beta](../stability-level.md)
+
 ## 配置参数
 
 | 参数 | 类型，默认值 | 说明 |
@@ -26,7 +30,6 @@
 | CheckPointStart | String，无默认值| checkpoint初始值。CheckPoint为true时必须配置。|
 | CheckPointSavePerPage | Boolean，无默认值| 设置为true，则每次分页时保存一次checkpoint；设置为false，则每次同步完后保存checkpoint。|
 | IntervalMs | Interger，无默认值| 同步间隔，单位：ms。|
-
 
 ## 样例
 
@@ -60,7 +63,6 @@ INSERT INTO LogtailTestTable (name, quantity) values('banana', 4);
 SELECT * FROM LogtailTestTable;
 GO
 ```
-
 
 * 采集配置
 

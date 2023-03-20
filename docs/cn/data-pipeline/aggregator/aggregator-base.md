@@ -4,6 +4,10 @@
 
 `aggregator_base` `aggregator`插件可以实现对单条日志的聚合。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数 | 类型 | 是否必选 | 说明 |

@@ -3,6 +3,10 @@
 ## 简介
 `metric_debug_file` 插件是一个用于调试的插件，它可以读取指定文件的内容，并将其与指定的名称绑定在一起成为一个字段，用于Metric模拟输入。（注：该插件由于一些原因，暂时无法直接使用）[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/input/debugfile/input_debug_file.go)
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |

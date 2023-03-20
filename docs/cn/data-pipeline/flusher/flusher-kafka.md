@@ -1,8 +1,12 @@
 # Kafka
 
 ## 简介
-`flusher_kafka`已弃用，后续不再维护，请使用`flusher_kafka_v2`。
+
 `flusher_kafka` `flusher`插件可以实现将采集到的数据，经过处理后，发送到Kafka。
+
+## 版本
+
+[Deprecated](../stability-level.md)，请使用`flusher_kafka_v2`
 
 ## 配置参数
 
@@ -22,7 +26,7 @@
 
 采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果发送到Kafka。
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log

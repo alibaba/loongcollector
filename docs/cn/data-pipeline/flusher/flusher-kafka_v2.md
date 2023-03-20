@@ -4,6 +4,10 @@
 
 `flusher_kafka_v2` `flusher`插件可以实现将采集到的数据，经过处理后，发送到Kafka。
 
+## 版本
+
+[Beta](../stability-level.md)
+
 ## 配置参数
 
 | 参数                                    | 类型       | 是否必选 | 说明                                                                                                 |
@@ -58,13 +62,14 @@
 - `Version`需要填写的是`kafka protocol version`版本号，`flusher_kafka_v2`当前支持的`kafka`版本范围：`0.8.2.x~2.7.0`。
 请根据自己的`kafka`版本号参照下面的`kafka protocol version`规则进行配置。**建议根据自己的`kafka`版本指定对应`protocol version`**,
 `kafka protocol version`配置规则如下：
-```
+
+```plain
 // x代表小版本号
 0.8.2.x,0.9.0.x,0.10.0.x,0.10.1.x,0.10.2.x,0.11.0.x,1.0.0,1.1.0,1.1.1,2.0.0,2.0.1,2.1.0,2.2.0,2.3.0,2.4.0,2.5.0,2.6.0,2.7.0
 ```
 
-
 - `Brokers`是个数组，多个`Broker`地址不能使用`;`或者`,`来隔开放在一行里，`yaml`配置文件中正确的多个`Broker`地址配置参考如下：
+
 ```yaml
 enable: true
 inputs:
@@ -79,8 +84,6 @@ flushers:
       - 192.XX.XX.3:9092
     Topic: KafkaTestTopic
 ```
-
-
 
 ## 样例
 
@@ -240,14 +243,17 @@ flushers:
 - `content.application`中表示从`contents`中取数据`application`字段数据，如果对`contents`协议字段做了重命名，
 例如重名为`messege`，则应该配置为`messege.application`
 
-# 安全连接配置
+## 安全连接配置
+
 `flusher_kafka_v2`支持多种安全认证连接`kafka`服务端。
+
 - `PlainText`认证，`ilogtail v1.3.0`开始支持;
 - `SASL`认证，`ilogtail v1.3.0`开始支持;
 - `TLS`认证，`ilogtail v1.4.0`开始支持;
 - `Kerberos`认证(待测试验证)，`ilogtail v1.4.0`开始支持;
 
 前面两种配置比较简单，下面主要介绍下`TLS`和`Kerberos`两种认证的配置。
+
 ## TLS配置参考
 
 ```yaml
@@ -275,8 +281,11 @@ flushers:
         MaxVersion: "1.2"
     Topic: KafkaTestTopic
 ```
+
 **注:** 配置仅供参考，证书文件请自行生成后根据事情情况配置。
+
 ## Kerberos配置参考(待验证)
+
 ```yaml
 enable: true
 inputs:
@@ -301,4 +310,5 @@ flushers:
         KeyTabPath: "/etc/security/kafka.keytab"
     Topic: KafkaTestTopic
 ```
+
 **注:** Kerberos认证由于缺乏环境，目前待测试验证，使用中如有问题请及时向社区反馈修复。

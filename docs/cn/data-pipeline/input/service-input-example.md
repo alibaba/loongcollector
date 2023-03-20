@@ -4,6 +4,10 @@
 
 `service_input_example` 可作为编写`ServiceInput`类插件的参考示例样例，可以在指定端口接收模拟HTTP请求。[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/input/example/service_example.go)
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数 | 类型，默认值 | 说明 |

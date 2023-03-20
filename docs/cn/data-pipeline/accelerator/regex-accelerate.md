@@ -1,11 +1,17 @@
 # 正则加速
 
 ## 简介
+
 `processor_regex_accelerate processor`插件通过正则匹配以加速模式实现文本日志的字段提取。
 
 备注：该插件目前仅支持与输入插件file_log和输出插件flusher_sls配套使用，且不得与其它加速插件混用。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
+
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
 | Type | String | 是 | 插件类型，指定为`processor_regex_accelerate`。 |
@@ -24,7 +30,6 @@
 | DiscardUnmatch | Boolean | 否 | 是否丢弃匹配失败的日志。如果未添加该参数，则默认使用true，表示丢弃匹配失败的日志。|
 | MergeType | String | 否 | 日志聚合方式。可选值包括“topic”和“logstore”。如果未添加该参数，则默认使用topic，表示根据topic聚合。 |
 | SensitiveKeys | Map<String, Object> | 否 | 脱敏功能，具体信息参见表2。 |
-
 
 - 表1:时间格式
 
@@ -75,12 +80,15 @@
 ## 样例
 
 ### 单行日志采集
+
 采集`/home/test-log/`路径下的`reg.log`文件，日志内容按照提取字段。
 
-* 输入
+- 输入
+
 > 127.0.0.1 - - [07/Jul/2022:10:43:30 +0800] "POST /PutData?Category=YunOsAccountOpLog" 0.024 18204 200 37 "-" "aliyun-sdk-java"' >> /home/test-log/reg.log
 
-* 采集配置
+- 采集配置
+
 ```yaml
 enable: true
 inputs:
@@ -108,7 +116,8 @@ flushers:
     LogstoreName: test_logstore
 ```
 
-* 输出
+- 输出
+
 ```json
 {
     "__tag__:__path__": "/home/test-log/reg.log",
@@ -125,17 +134,21 @@ flushers:
     "__time__": "1657161810"
 }
 ```
+
 ### 多行日志采集
+
 采集`/home/test-log/`路径下的`regMulti.log`文件，日志内容按照提取字段。
 
-* 输入
-```
-[2022-07-07T10:43:27.360266763]	[INFO]	java.lang.Exception: exception happened
+- 输入
+
+```plain
+[2022-07-07T10:43:27.360266763] [INFO] java.lang.Exception: exception happened
     at com.aliyun.sls.devops.logGenerator.type.RegexMultiLog.f2(RegexMultiLog.java:108)
     at java.base/java.lang.Thread.run(Thread.java:833)
 ```
 
-* 采集配置
+- 采集配置
+
 ```yaml
 enable: true
 inputs:
@@ -157,7 +170,8 @@ flushers:
     LogstoreName: test_logstore
 ```
 
-* 输出
+- 输出
+
 ```json
 {
     "__tag__:__path__": "/home/test-log/regMulti.log",

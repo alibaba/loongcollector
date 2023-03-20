@@ -1,9 +1,15 @@
 # Mock数据-Metric
 
 ## 简介
+
 `metric_mock` 插件是用于模拟采集Metric类型输入数据的插件，可以通过调整参数获取不同的模拟输入。[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/input/mock/input_mock.go)
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
+
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
 | Type | String，无默认值（必填） | 插件类型，固定为`metric_mock`。 |
@@ -15,6 +21,7 @@
 ## 样例
 
 * 采集配置1
+
 ```yaml
 enable: true
 inputs:
@@ -28,6 +35,7 @@ flushers:
 ```
 
 * 输出1
+
 ```json
 {
     "field2":"field2",
@@ -44,6 +52,7 @@ flushers:
 ```
 
 * 采集配置2
+
 ```yaml
 enable: true
 inputs:
@@ -62,6 +71,7 @@ flushers:
 ```
 
 * 输出2
+
 ```json
 {
     "__name__":"metrics_mock",

@@ -4,6 +4,10 @@
 
 `aggregator_content_value_group` `aggregator`插件可以实现对单条日志按照指定的 Key 进行聚合。
 
+## 版本
+
+[Alpha](../stability-level.md)
+
 ## 配置参数
 
 | 参数             | 类型     | 是否必选 | 说明                                                                                                               |
@@ -18,13 +22,11 @@
 
 采集`/home/test-log/`路径下的所有文件名匹配`reg.log`规则的文件，使用`processor_regex`提取字段后，再按照字段`url`、`method`字段聚合，并将采集结果发送到SLS。
 
-
 * 输入
 
 ```bash
 echo '127.0.0.1 - - [10/Aug/2017:14:57:51 +0800] "POST /PutData?Category=YunOsAccountOpLog" 0.024 18204 200 37 "-" "aliyun-sdk-java"' >> /home/test-log/reg.log
 ```
-
 
 * 采集配置
 

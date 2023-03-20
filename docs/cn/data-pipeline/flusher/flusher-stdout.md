@@ -4,6 +4,10 @@
 
 `flusher_stdout` `flusher`插件可以实现将采集到的数据，经过处理后，打印到标准输出或者自定义文件。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数            | 类型      | 是否必选 | 说明                                |
@@ -20,7 +24,7 @@
 
 采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果打印到标准输出。
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log

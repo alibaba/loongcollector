@@ -4,6 +4,10 @@
 
 `service_pgsql` `input`插件可以采集PostgreSQL 查询数据。
 
+## 版本
+
+[Beta](../stability-level.md)
+
 ## 配置参数
 
 | 参数 | 类型，默认值 | 说明 |
@@ -26,7 +30,6 @@
 | CheckPointSavePerPage | Boolean，无默认值| 设置为true，则每次分页时保存一次checkpoint；设置为false，则每次同步完后保存checkpoint。|
 | IntervalMs | Interger，无默认值| 同步间隔，单位：ms。|
 
-
 ## 样例
 
 对postgres数据库下的specialalarmtest进行读取。
@@ -36,11 +39,11 @@
 ```sql
 CREATE TABLE IF NOT EXISTS specialalarmtest (
     id BIGSERIAL NOT NULL, 
-	time TIMESTAMP NOT NULL, 
-	alarmtype varchar(64) NOT NULL, 
-	ip varchar(16) NOT NULL, 
-	COUNT INT NOT NULL, 
-	PRIMARY KEY (id)
+ time TIMESTAMP NOT NULL, 
+ alarmtype varchar(64) NOT NULL, 
+ ip varchar(16) NOT NULL, 
+ COUNT INT NOT NULL, 
+ PRIMARY KEY (id)
 );
 
 insert into specialalarmtest (time, alarmtype, ip, count) values(now(), 'NO_ALARM', '10.10.***.***', 0);
@@ -48,8 +51,6 @@ insert into specialalarmtest (time, alarmtype, ip, count) values(now(), 'NO_ALAR
 insert into specialalarmtest (time, alarmtype, ip, count) values(now(), 'NO_ALARM', '10.10.***.***', 2);
 insert into specialalarmtest (time, alarmtype, ip, count) values(now(), 'NO_ALARM', '10.10.***.***', 3);
 ```
-
-
 
 * 采集配置
 

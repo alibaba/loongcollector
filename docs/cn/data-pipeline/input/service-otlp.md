@@ -4,6 +4,10 @@
 
 `service_otlp` `input`插件实现了`ServiceInputV2`接口，可以接受`Opentelemetry log/metric/trace protocol`的http/gRPC请求，并且转换输出PipelineGroupEvents。
 
+## 版本
+
+[Beta](../stability-level.md)
+
 ## 配置参数
 
 | 参数               | 类型      | 是否必选 | 说明                                       |
@@ -22,11 +26,7 @@
 | Protocals.HTTP.ReadTimeoutSec | int   | 否    |  <p>HTTP 请求读取超时时间。</p><p>默认取值为:`10s`。</p>                           |
 | Protocals.HTTP.ShutdownTimeoutSec       | int   | 否    | <p>HTTP Server关闭超时时间。</p><p>默认取值为:`5s`。</p> |
 
-
-
 ## 样例
-
-
 
 * 只接收gRPC请求。
   

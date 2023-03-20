@@ -4,6 +4,10 @@
 
 `service_kafka` `input`插件可以采集Kafka的消息。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数 | 类型 | 是否必选 | 说明 |

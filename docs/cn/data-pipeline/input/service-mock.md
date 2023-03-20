@@ -1,9 +1,15 @@
 # Mock数据-Service
 
 ## 简介
+
 `service_mock` 插件是用于模拟采集Service类型输入数据的插件，可以通过调整参数获取不同的模拟输入。[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/input/mockd/input_mockd.go)
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
+
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
 | Type | String，无默认值（必填） | 插件类型，固定为`service_mock` |
@@ -17,6 +23,7 @@
 ## 样例
 
 * 采集配置
+
 ```yaml
 enable: true
 inputs:
@@ -36,6 +43,7 @@ flushers:
 ```
 
 * 输出
+
 ```json
 {
     "tag1":"tag1",

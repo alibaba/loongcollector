@@ -6,6 +6,10 @@
 
 `processor_split_string processor`插件可以通过多字符的分隔符提取字段，该方式不支持使用引用符对分隔符进行包裹。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 ### `processor_split_char`配置
@@ -43,13 +47,13 @@
 
 * 输入
 
-```
+```bash
 echo "127.0.0.1|10/Aug/2017:14:57:51 +0800|POST|PutData?Category=YunOsAccountOpLog|0.024|18204|200|37|-|aliyun-sdk-java" >> /home/test-log/delimiter.log
 ```
 
 * 采集配置
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log
@@ -81,7 +85,7 @@ flushers:
 
 * 输出
 
-```
+```json
 {
     "__tag__:__path__": "/home/test-log/delimiter.log",
     "ip": "127.0.0.1",
