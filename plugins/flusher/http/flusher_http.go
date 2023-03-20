@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -281,10 +282,17 @@ func (f *FlusherHTTP) flush(data []byte, varValues map[string]string) (ok, retry
 		req.Header.Add(k, v)
 	}
 	response, err := f.client.Do(req)
-	logger.Debugf(f.context.GetRuntimeContext(), "request [method]: %v; [header]: %v; [url]: %v; [body]: %v", req.Method, req.Header, req.URL, string(data))
+	if logger.DebugFlag() {
+		logger.Debugf(f.context.GetRuntimeContext(), "request [method]: %v; [header]: %v; [url]: %v; [body]: %v", req.Method, req.Header, req.URL, string(data))
+	}
 	if err != nil {
+		urlErr, ok := err.(*url.Error)
+		retry := false
+		if ok && (urlErr.Timeout() || urlErr.Temporary()) {
+			retry = true
+		}
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALRAM", "http flusher send request fail, error", err)
-		return false, false, err
+		return false, retry, err
 	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
