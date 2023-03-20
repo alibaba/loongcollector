@@ -31,6 +31,14 @@ func (p *pluginConfig) Merge(conf *pluginConfig) {
 	p.Plugins.Debug = append(p.Plugins.Debug, conf.Plugins.Debug...)
 	p.Plugins.Common = append(p.Plugins.Common, conf.Plugins.Common...)
 
+	if p.Project.GoEnvs == nil {
+		p.Project.GoEnvs = make(map[string]string)
+	}
+
+	if p.Project.GitConfigs == nil {
+		p.Project.GitConfigs = make(map[string]string)
+	}
+
 	for k, v := range conf.Project.GoEnvs {
 		p.Project.GoEnvs[k] = v
 	}
