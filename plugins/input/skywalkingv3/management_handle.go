@@ -63,6 +63,12 @@ func (r *ResourcePropertiesCache) filterProperties(properties map[string]string)
 	delete(properties, "Start Time")
 	delete(properties, "JVM Arguments")
 	delete(properties, "Jar Dependencies")
+
+	if properties["namespace"] != "" {
+		properties[AttributeServiceNamespace] = properties["namespace"]
+		delete(properties, "namespace")
+	}
+
 	return properties
 }
 

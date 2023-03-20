@@ -176,6 +176,8 @@ func (r *registryInformationCacheImpl) registryApplicationInstances(instances []
 				properties[skywalkingv3.AttributeProcessID] = item.Value
 			case "language":
 				properties[skywalkingv3.AttributeTelemetrySDKLanguage] = item.Value
+			case "namespace":
+				properties[skywalkingv3.AttributeServiceNamespace] = item.Value
 			}
 		}
 
