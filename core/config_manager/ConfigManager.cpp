@@ -238,8 +238,8 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> Confi
     heartBeatReq.set_agent_type("iLogtail");
     attributes.set_version(ILOGTAIL_VERSION);
     attributes.set_ip(LogFileProfiler::mIpAddr);
-    heartBeatReq.set_allocated_attributes(&attributes);
-    heartBeatReq.mutable_tags()->CopyFrom({AppConfig::GetInstance()->GetConfigServerTags().begin(), AppConfig::GetInstance()->GetConfigServerTags().end()});
+    heartBeatReq.mutable_attributes()->MergeFrom(attributes);
+    heartBeatReq.mutable_tags()->MergeFrom({AppConfig::GetInstance()->GetConfigServerTags().begin(), AppConfig::GetInstance()->GetConfigServerTags().end()});
     heartBeatReq.set_running_status("");
     heartBeatReq.set_startup_time(0);
     heartBeatReq.set_interval(INT32_FLAG(config_update_interval));
@@ -252,7 +252,7 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> Confi
         info.set_version(it->second);
         pipelineConfigs.AddAllocated(&info);
     }
-    heartBeatReq.mutable_pipeline_configs()->CopyFrom(pipelineConfigs);
+    heartBeatReq.mutable_pipeline_configs()->MergeFrom(pipelineConfigs);
 
     string operation = sdk::CONFIGSERVERAGENT;
     operation.append("/").append("HeartBeat");
@@ -261,6 +261,7 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> Confi
     std::string reqBody;
     heartBeatReq.SerializeToString(&reqBody);
     sdk::HttpMessage httpResponse;
+    httpResponse.header[sdk::X_LOG_REQUEST_ID] = "ConfigServer";
 
     sdk::CurlClient client;
     google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> emptyResult;
@@ -312,7 +313,7 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> ConfigMana
             configInfos.AddAllocated(&info);
         }
     }
-    fetchConfigReq.mutable_req_configs()->CopyFrom(configInfos);
+    fetchConfigReq.mutable_req_configs()->MergeFrom(configInfos);
 
     string operation = sdk::CONFIGSERVERAGENT;
     operation.append("/").append("GetConfigList");

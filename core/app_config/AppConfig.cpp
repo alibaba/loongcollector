@@ -38,13 +38,12 @@ void AppConfig::LoadAddrConfig(const Json::Value& confJson) {
     }
 
     // configserver path
-    if (confJson.isMember("ilogtail_configserver_address") && confJson["ilogtail_configserver_address"].isObject()) {
-        Json::Value::Members members = confJson["ilogtail_configserver_address"].getMemberNames();
-        for (Json::Value::Members::iterator it = members.begin(); it != members.end(); it++) {
-            vector<string> configServerAddress = SplitString(TrimString(confJson["ilogtail_configserver_address"][*it].asString()), ":");
+    if (confJson.isMember("ilogtail_configserver_address") && confJson["ilogtail_configserver_address"].isArray()) {
+        for (Json::Value::ArrayIndex i = 0; i < confJson["ilogtail_configserver_address"].size(); ++i) {
+            vector<string> configServerAddress = SplitString(TrimString(confJson["ilogtail_configserver_address"][i].asString()), ":");
      
             if (configServerAddress.size() !=2) {
-                LOG_WARNING(sLogger, ("ilogtail_configserver_address", "format error")("wrong address", TrimString(confJson["ilogtail_configserver_address"][*it].asString())));  
+                LOG_WARNING(sLogger, ("ilogtail_configserver_address", "format error")("wrong address", TrimString(confJson["ilogtail_configserver_address"][i].asString())));  
                 continue;
             } 
 
@@ -53,7 +52,7 @@ void AppConfig::LoadAddrConfig(const Json::Value& confJson) {
 
             std::string exception;
             // regular expressions to verify ip
-            boost::regex reg_ip = boost::regex(" (?:(?:1[0-9][0-9]\\.)|(?:2[0-4][0-9]\\.)|(?:25[0-5]\\.)|(?:[1-9][0-9]\\.)|(?:[0-9]\\.)){3}(?:(?:1[0-9][0-9])|(?:2[0-4][0-9])|(?:25[0-5])|(?:[1-9][0-9])|(?:[0-9]))");      
+            boost::regex reg_ip = boost::regex("(?:(?:1[0-9][0-9]\.)|(?:2[0-4][0-9]\.)|(?:25[0-5]\.)|(?:[1-9][0-9]\.)|(?:[0-9]\.)){3}(?:(?:1[0-9][0-9])|(?:2[0-4][0-9])|(?:25[0-5])|(?:[1-9][0-9])|(?:[0-9]))");      
             if (!BoostRegexMatch(host.c_str(), reg_ip, exception))
                 LOG_WARNING(sLogger, ("ilogtail_configserver_address", "parse fail")("exception", exception));
             else if (port < 1 || port > 65535)
@@ -74,7 +73,7 @@ void AppConfig::LoadAddrConfig(const Json::Value& confJson) {
     }
 }
 
-const AppConfig::ConfigServerAddress& AppConfig::GetOneConfigServerAddress(bool changeConfigServer) {
+AppConfig::ConfigServerAddress AppConfig::GetOneConfigServerAddress(bool changeConfigServer) {
     if (0 == mConfigServerAddresses.size()) return AppConfig::ConfigServerAddress("", -1); // No address available
 
     // Return a random address

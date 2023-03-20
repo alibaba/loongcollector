@@ -56,7 +56,7 @@ public:
     bool IsDataServerPrivateCloud() const { return false; }
 
     const std::string& GetBindInterface() const { return mBindInterface; }
-    const ConfigServerAddress& GetOneConfigServerAddress(bool changeConfigServer);
+    ConfigServerAddress GetOneConfigServerAddress(bool changeConfigServer);
     const std::vector<std::string>& GetConfigServerTags() const { return mConfigServerTags; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
