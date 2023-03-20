@@ -51,16 +51,17 @@
 
 ## 输出
 
-| 名称                           | 提供方                                                 | 简介                                        |
-|------------------------------|-----------------------------------------------------|-------------------------------------------|
-| `flusher_kafka`<br>Kafka     | 社区                                                  | 将采集到的数据输出到Kafka。推荐使用下面的flusher_kafka_v2   |
-| `flusher_kafka_v2`<br>Kafka  | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Kafka。                          |
-| `flusher_sls`<br>SLS         | SLS官方                                               | 将采集到的数据输出到SLS。                            |
-| `flusher_stdout`<br>标准输出/文件  | SLS官方                                               | 将采集到的数据输出到标准输出或文件。                        |
-| `flusher_otlp_log`<br>OTLP日志 | 社区<br>[`liuhaoyang`](https://github.com/liuhaoyang) | 将采集到的数据支持`Opentelemetry log protocol`的后端。 |
-| `flusher_http`<br>HTTP       | 社区<br>[`snakorse`](https://github.com/snakorse)     | 将采集到的数据以http方式输出到指定的后端。                   |
-| `flusher_pulsar`<br>Kafka    | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Pulsar。                         |
-| `flusher_clickhouse`<br>ClickHouse | 社区<br>[`kl7sn`](https://github.com/kl7sn)           | 将采集到的数据输出到ClickHouse。                     |
+| 名称                                       | 提供方                                                 | 简介                                        |
+|------------------------------------------|-----------------------------------------------------|-------------------------------------------|
+| `flusher_kafka`<br>Kafka                 | 社区                                                  | 将采集到的数据输出到Kafka。推荐使用下面的flusher_kafka_v2   |
+| `flusher_kafka_v2`<br>Kafka              | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Kafka。                          |
+| `flusher_sls`<br>SLS                     | SLS官方                                               | 将采集到的数据输出到SLS。                            |
+| `flusher_stdout`<br>标准输出/文件              | SLS官方                                               | 将采集到的数据输出到标准输出或文件。                        |
+| `flusher_otlp_log`<br>OTLP日志             | 社区<br>[`liuhaoyang`](https://github.com/liuhaoyang) | 将采集到的数据支持`Opentelemetry log protocol`的后端。 |
+| `flusher_http`<br>HTTP                   | 社区<br>[`snakorse`](https://github.com/snakorse)     | 将采集到的数据以http方式输出到指定的后端。                   |
+| `flusher_pulsar`<br>Kafka                | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Pulsar。                         |
+| `flusher_clickhouse`<br>ClickHouse       | 社区<br>[`kl7sn`](https://github.com/kl7sn)           | 将采集到的数据输出到ClickHouse。                     |
+| `flusher_elasticsearch`<br>ElasticSearch | 社区<br>[`joeCarf`](https://github.com/joeCarf)       | 将采集到的数据输出到ElasticSearch。                  |
 
 ## 加速
 

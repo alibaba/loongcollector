@@ -80,6 +80,7 @@
   * [Kafka（Deprecated）](data-pipeline/flusher/kafka.md)
   * [kafkaV2](data-pipeline/flusher/kafka_v2.md)
   * [ClickHouse](data-pipeline/flusher/clickhouse.md)
+  * [ElasticSearch](data-pipeline/flusher/elasticsearch.md)
   * [SLS](data-pipeline/flusher/sls.md)
   * [标准输出/文件](data-pipeline/flusher/stdout.md)
   * [OTLP日志](data-pipeline/flusher/otlp-log.md)

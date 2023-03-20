@@ -20,6 +20,7 @@ require (
 	github.com/denisenkom/go-mssqldb v0.12.2
 	github.com/eclipse/paho.mqtt.golang v1.2.0
 	github.com/elastic/beats/v7 v7.7.1
+	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	github.com/elastic/go-lumber v0.1.0
 	github.com/go-kit/kit v0.12.0
 	github.com/go-mysql-org/go-mysql v1.3.0
@@ -91,6 +92,7 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.0.0-20211216131617-bbee439d559c // indirect
 	github.com/frankban/quicktest v1.14.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.6.1 // indirect

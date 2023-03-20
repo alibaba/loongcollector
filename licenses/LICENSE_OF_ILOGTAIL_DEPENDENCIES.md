@@ -92,6 +92,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [go.opentelemetry.io/otel](https://pkg.go.dev/go.opentelemetry.io/otel?tab=licenses)
 - [go.opentelemetry.io/otel/trace](https://pkg.go.dev/go.opentelemetry.io/otel/trace?tab=licenses)
 - [github.com/ClickHouse/ch-go](https://pkg.go.dev/github.com/ClickHouse/ch-go?tab=licenses)
+- [github.com/elastic/go-elasticsearch](https://pkg.go.dev/github.com/elastic/go-elasticsearch?tab=licenses)
+- [github.com/elastic/elastic-transport-go](https://pkg.go.dev/github.com/elastic/elastic-transport-go?tab=licenses)
 - [go.opentelemetry.io/collector/consumer](https://pkg.go.dev/go.opentelemetry.io/collector/consumer?tab=licenses)
 
 ## BSD licenses
