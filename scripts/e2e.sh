@@ -20,6 +20,11 @@ function run() {
   echo "========================================="
   echo "$name testing case"
   echo "========================================="
+  # currently, latest github runner cannot run ebpf program, skip it.
+  if echo "$name" | grep 'observer'; then
+   exit 0
+  fi
+  
   eval "$command"
   if [ $? = 1 ]; then
       echo "========================================="
