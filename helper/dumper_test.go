@@ -1,3 +1,17 @@
+// Copyright 2023 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package helper
 
 import (
@@ -77,8 +91,9 @@ func TestServiceHTTP_doDumpFile(t *testing.T) {
 	s.Init()
 	ch = s.InputChannel()
 	s.Start()
+	s.Begin(func() {})
 	insertFun(100, 0)
-	time.Sleep(time.Millisecond * 100)
+	require.NoError(t, s.End(time.Second*2, 100))
 	s.Close()
 	readFunc(s.dumpDataKeepFiles[len(s.dumpDataKeepFiles)-1], 100)
 
@@ -87,8 +102,9 @@ func TestServiceHTTP_doDumpFile(t *testing.T) {
 	s2.Init()
 	ch = s2.InputChannel()
 	s2.Start()
+	s2.Begin(func() {})
 	insertFun(100, 100)
-	time.Sleep(time.Millisecond * 100)
+	require.NoError(t, s2.End(time.Second*2, 100))
 	s2.Close()
 	readFunc(s.dumpDataKeepFiles[len(s.dumpDataKeepFiles)-1], 200)
 }

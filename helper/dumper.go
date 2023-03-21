@@ -1,3 +1,17 @@
+// Copyright 2023 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package helper
 
 import (
@@ -13,6 +27,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/plugins/test/async"
 )
 
 type DumpDataReq struct {
@@ -38,6 +53,8 @@ type Dumper struct {
 	maxKeepFiles      int
 	wg                sync.WaitGroup
 	stop              chan struct{}
+	// unittest
+	writeCounter *async.UnitTestCounterHelper
 }
 
 func (d *Dumper) Init() {
@@ -109,6 +126,7 @@ func (d *Dumper) doDumpFile() {
 				}
 			}
 			if f != nil {
+				d.AddDelta(1)
 				buffer := bytes.NewBuffer([]byte{})
 				b, _ := json.Marshal(data)
 				if err = binary.Write(buffer, binary.BigEndian, uint32(len(b))); err != nil {
@@ -136,5 +154,21 @@ func NewDumper(prefix string, maxFiles int) *Dumper {
 	return &Dumper{
 		prefix:       prefix,
 		maxKeepFiles: maxFiles,
+	}
+}
+
+func (d *Dumper) Begin(callback func()) bool {
+	d.writeCounter = new(async.UnitTestCounterHelper)
+	d.writeCounter.Begin(callback)
+	return true
+}
+
+func (d *Dumper) End(timeout time.Duration, expectNum int64) error {
+	return d.writeCounter.End(timeout, expectNum)
+}
+
+func (d *Dumper) AddDelta(num int64) {
+	if d.writeCounter != nil {
+		d.writeCounter.AddDelta(num)
 	}
 }
