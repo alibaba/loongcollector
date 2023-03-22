@@ -35,7 +35,7 @@ Makefile
 /core/installer/public/
 !/Makefile
 !core/dependencies.cmake
-!core/utils.cmakels
+!core/utils.cmake
 !core/libulogfs.a
 
 # output
