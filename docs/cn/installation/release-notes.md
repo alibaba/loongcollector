@@ -1,5 +1,53 @@
 # 发布记录
 
+## 1.4.0
+
+### 发布记录
+
+发版日期：2023 年 3 月 21 日
+
+新功能
+
+* 新增Pulsar输出插件flusher\_pulsar [#540](https://github.com/alibaba/ilogtail/issues/540)
+* 新增ClickHouse输出插件flusher\_clickhouse [#112](https://github.com/alibaba/ilogtail/issues/112)
+* 新增Elasticsearch输出插件flusher\_elasticsearch [#202](https://github.com/alibaba/ilogtail/issues/202)
+* 新增Open Telemetry输入插件service\_otlp [#637](https://github.com/alibaba/ilogtail/issues/637)
+* 新增使用plugins.yml裁剪插件和external\_plugins.yml引入外部插件库 [#625](https://github.com/alibaba/ilogtail/issues/625)
+* 新增云主机实例元信息处理插件processor\_cloud\_meta [#692](https://github.com/alibaba/ilogtail/pull/692)
+* 更新Open Telemetry输出插件新增Metric/Trace支持，同时重命名为flusher\_otlp [#646](https://github.com/alibaba/ilogtail/pull/646)
+* 更新HTTP输入服务新增Pyroscope协议支持 [#653](https://github.com/alibaba/ilogtail/issues/653)
+
+优化
+
+* 更新Kafka V2 flusher支持TLS和Kerberos认证 [#601](https://github.com/alibaba/ilogtail/issues/601)
+* 更新HTTP输出支持添加动态Header [#643](https://github.com/alibaba/ilogtail/pull/643)
+* 更新通过ENV配置SLS Config新增冷存等Logstore参数支持 [#687](https://github.com/alibaba/ilogtail/issues/687)
+
+问题修复
+
+* 修复时区相关问题，使用系统时间和解析日志时间失败时忽略时区调整选项 [#550](https://github.com/alibaba/ilogtail/issues/550)
+* 修复因inode复用导致的日志重复采集问题 [#597](https://github.com/alibaba/ilogtail/issues/597)
+* 修复Prometheus输入插件自动切换到streaming模式卡死的问题 [#684](https://github.com/alibaba/ilogtail/pull/684)
+* 修复Grok插件解析中文会可能卡死的问题 [#644](https://github.com/alibaba/ilogtail/issues/644)
+* 修复1.2.1版本中引入的容器发现内存使用过高的问题 [#661](https://github.com/alibaba/ilogtail/issues/661)
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.4.0.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.4.0.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.4.0/ilogtail-1.4.0.linux-amd64.tar.gz) | Linux | x86-64 | d48fc6e8c76f117651487a33648ab6de0e2d8dd24ae399d9a7f534b81d639a61 |
+| [ilogtail-1.4.0.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.4.0/ilogtail-1.4.0.linux-arm64.tar.gz) | Linux | arm64  | 1d488d0905e0fb89678e256c980e491e9c1c0d3ef579ecbbc18360afdcc1a853 |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+```
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.4.0
+```
+
 ## 1.3.1
 
 ### 发布记录

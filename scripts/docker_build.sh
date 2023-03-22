@@ -37,7 +37,7 @@ function arch() {
 ARCH=$(arch)
 CATEGORY=$1
 GENERATED_HOME=$2
-VERSION=${3:-1.3.1}
+VERSION=${3:-1.4.0}
 REPOSITORY=${4:-aliyun/ilogtail}
 PUSH=${5:-false}
 USE_DOCKER_BUILDKIT=${6:-${DOCKER_BUILD_USE_BUILDKIT:-$(if [[ -n "${SSH_AUTH_SOCK}" ]];then echo "true";else echo "false";fi)}}
