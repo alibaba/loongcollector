@@ -18,7 +18,7 @@
 | `service_mssql`<br>SqlServer查询数据            | SLS官方                                                      | 将Sql Server数据输入到iLogtail。                 |
 | `service_pgsql`<br>PostgreSQL查询数据           | SLS官方                                                      | 将PostgresSQL数据输入到iLogtail。                |
 | `service_syslog`<br>Syslog数据                | SLS官方                                                      | 采集syslog数据。                               |
-| `service_gpu_metric`<br>GPU数据               | SLS官方                                                      | 支持手机英伟达GPU指标。                             |
+| `service_gpu_metric`<br>GPU数据               | SLS官方                                                      | 支持收集英伟达GPU指标。                             |
 | `observer_ilogtail_network`<br>无侵入网络调用数据    | SLS官方                                                      | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。 |
 | `service_http_server otlp`<br>HTTP OTLP数据 | SLS官方 | 通过http协议，接收OTLP数据。 |
 
