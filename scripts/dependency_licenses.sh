@@ -34,9 +34,19 @@ function find_go_dependencies() {
   		*) continue;;
   	esac
     cd  $main_path
-  	GOOS=${target%%/*} GOARCH=${target##*/} go list -deps -f '{{with .Module}}{{.Path}}{{end}}' . >> "${output_file}"
+  	GOOS=${target%%/*} GOARCH=${target##*/} go list -deps -f '{{with .Module}}{{.Path}}@@@{{.Replace}}{{end}}' . >> "${output_file}-temp"
   	cd -
   done
+  for dep in $(LC_ALL=C sort -u "${output_file}-temp"); do
+   module=`echo $dep|awk -F '@@@' '{print $1}'`
+   replace=`echo $dep|awk -F '@@@' '{print $2}'|awk '{print $1}'`
+   if [[ "$replace" = '<nil>' ]]; then
+       echo "$module" >>"${output_file}"
+   elif [[ "$replace" != ./external* ]]; then
+        echo "$replace" >>"${output_file}"
+   fi
+  done
+   rm -f "${output_file}-temp"
 }
 
 
@@ -48,9 +58,10 @@ function filter_dependencies() {
   	case "${dep}" in
   		# ignore ourselves
   		github.com/alibaba/ilogtail) continue;;
-  		github.com/alibaba/ilogtail/pkg) continue;;
   		github.com/alibaba/ilogtail/test) continue;;
-      github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner) continue;;
+  		./pkg) continue;;
+  		../pkg) continue;;
+  		../) continue;;
   	esac
     dep="${dep%%/v[0-9]}"
     dep="${dep%%/v[0-9][0-9]}"
@@ -70,15 +81,27 @@ function find_licenses() {
   tmpdir="$(mktemp -d)"
   cat $input_file | while read line
   do
-    url="https://pkg.go.dev/$line?tab=licenses"
+    if [[ $line == *iLogtail* ]]; then
+        url="http://$line"
+    else
+       url="https://pkg.go.dev/$line?tab=licenses"
+    fi
     wget $url -O "$tmpdir"/LICENSE
     if [ ! -s "$tmpdir"/LICENSE ]; then
        echo "NOT_SUPPORT_SEARCH: - $line"
        echo "NOT_SUPPORT_SEARCH: - $line"  >> "$output_file_prefix-NOT_FOUND"
        continue
     fi
-    license_type=`cat "$tmpdir"/LICENSE|grep "#lic-0"|cut -f 2 -d ">"|cut -f 1 -d "<"`
+
     line=$(echo $line | sed 's/_/\\_/g')
+    if [[ $line == *iLogtail* ]]; then
+      license_type=`cat "$tmpdir"/LICENSE|grep "license"|sort|uniq|grep -v "\""| awk '{print $1}'`
+    else
+      license_type=`cat "$tmpdir"/LICENSE|grep "#lic-0"|cut -f 2 -d ">"|cut -f 1 -d "<"`
+    fi
+
+
+
     echo "- [$line]($url)" >> "$output_file_prefix-$license_type"
   done
 }

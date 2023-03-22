@@ -4,8 +4,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 ## Apache 2.0 licenses
 
-- [github.com/pyroscope-io/jfr-parser](https://pkg.go.dev/github.com/pyroscope-io/jfr-parser?tab=licenses)
-- [github.com/pyroscope-io/pyroscope](https://pkg.go.dev/github.com/pyroscope-io/pyroscope?tab=licenses)
 - [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/aliyun/alibaba-cloud-sdk-go](https://pkg.go.dev/github.com/aliyun/alibaba-cloud-sdk-go?tab=licenses)
 - [github.com/containerd/cgroups](https://pkg.go.dev/github.com/containerd/cgroups?tab=licenses)
@@ -56,7 +54,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/opencontainers/runtime-spec](https://pkg.go.dev/github.com/opencontainers/runtime-spec?tab=licenses)
 - [github.com/opencontainers/selinux](https://pkg.go.dev/github.com/opencontainers/selinux?tab=licenses)
 - [github.com/pingcap/log](https://pkg.go.dev/github.com/pingcap/log?tab=licenses)
-- [github.com/pingcap/parser](https://pkg.go.dev/github.com/pingcap/parser?tab=licenses)
 - [github.com/prometheus/client\_golang](https://pkg.go.dev/github.com/prometheus/client_golang?tab=licenses)
 - [github.com/prometheus/client\_model](https://pkg.go.dev/github.com/prometheus/client_model?tab=licenses)
 - [github.com/prometheus/common](https://pkg.go.dev/github.com/prometheus/common?tab=licenses)
@@ -150,7 +147,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/Microsoft/hcsshim](https://pkg.go.dev/github.com/Microsoft/hcsshim?tab=licenses)
 - [github.com/Shopify/sarama](https://pkg.go.dev/github.com/Shopify/sarama?tab=licenses)
 - [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
-- [github.com/VictoriaMetrics/metrics](https://pkg.go.dev/github.com/VictoriaMetrics/metrics?tab=licenses)
 - [github.com/aliyun/aliyun-log-go-sdk](https://pkg.go.dev/github.com/aliyun/aliyun-log-go-sdk?tab=licenses)
 - [github.com/bsm/sarama-cluster](https://pkg.go.dev/github.com/bsm/sarama-cluster?tab=licenses)
 - [github.com/buger/jsonparser](https://pkg.go.dev/github.com/buger/jsonparser?tab=licenses)
@@ -240,8 +236,9 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 ## EPL V2 licenses
 
 ## iLogtail used or modified source code from these projects
-
-- [github.com/elastic/beats](./LICENSE-beats)
-- [github.com/jeromer/syslogparser](./LICENSE-syslogparser)
-- [github.com/siddontang/go-mysql](./LICENSE-go-mysql)
-- [github.com/VictoriaMetrics/VictoriaMetrics](./LICENSE-VictoriaMetrics)
+- [github.com/iLogtail/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics)
+- [github.com/iLogtail/jfr-parser](http://github.com/iLogtail/jfr-parser)
+- [github.com/iLogtail/parser](http://github.com/iLogtail/parser)
+- [github.com/iLogtail/pyroscope-lib](http://github.com/iLogtail/pyroscope-lib)
+- [github.com/iLogtail/go-mysql](http://github.com/iLogtail/go-mysql)
+- [github.com/iLogtail/metrics](http://github.com/iLogtail/metrics)
