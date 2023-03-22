@@ -236,9 +236,9 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 ## EPL V2 licenses
 
 ## iLogtail used or modified source code from these projects
-- [github.com/iLogtail/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics)
-- [github.com/iLogtail/jfr-parser](http://github.com/iLogtail/jfr-parser)
-- [github.com/iLogtail/parser](http://github.com/iLogtail/parser)
-- [github.com/iLogtail/pyroscope-lib](http://github.com/iLogtail/pyroscope-lib)
-- [github.com/iLogtail/go-mysql](http://github.com/iLogtail/go-mysql)
-- [github.com/iLogtail/metrics](http://github.com/iLogtail/metrics)
+- [github.com/iLogtail/VictoriaMetrics fork from github.com/VictoriaMetrics/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics) based on Apache-2.0
+- [github.com/iLogtail/go-mysql fork from github.com/siddontang/go-mysql](http://github.com/iLogtail/go-mysql) based on MIT
+- [github.com/iLogtail/jfr-parser fork from github.com/pyroscope-io/jfr-parser](http://github.com/iLogtail/jfr-parser) based on Apache-2.0
+- [github.com/iLogtail/metrics fork from github.com/VictoriaMetrics/metrics](http://github.com/iLogtail/metrics) based on MIT
+- [github.com/iLogtail/parser fork from github.com/pingcap/parser](http://github.com/iLogtail/parser) based on Apache-2.0
+- [github.com/iLogtail/pyroscope-lib fork from github.com/pyroscope-io/pyroscope](http://github.com/iLogtail/pyroscope-lib) based on Apache-2.0
