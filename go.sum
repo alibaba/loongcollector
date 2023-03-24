@@ -906,6 +906,8 @@ github.com/iLogtail/VictoriaMetrics v1.83.3-ilogtail h1:s+EJg7iLTsnnrD1ivVl7YtGM
 github.com/iLogtail/VictoriaMetrics v1.83.3-ilogtail/go.mod h1:JagjwAO58g1WNpyr6x/lrQqMTf99d/WU/yxjADxBz8E=
 github.com/iLogtail/go-mysql v0.0.0-20180725024449-535abe8f2eba-ilogtail h1:iCXW1UHQjf2nokNAG3qjzHLdkkobIjUWhD67wVprauI=
 github.com/iLogtail/go-mysql v0.0.0-20180725024449-535abe8f2eba-ilogtail/go.mod h1:YImGVfNUet1+WXaKgnSIoS+qFSmnlB5SpDshXbgrPsU=
+github.com/iLogtail/gonvml v1.0.0 h1:NPXkQ7kRH4b799oBP4SrKDVzWZpe+97m3A1Uvvfpd+8=
+github.com/iLogtail/gonvml v1.0.0/go.mod h1:5YZmsLORwZSHVK8KATd52/YDZm2lmZ1IYh9dL+P4Q6Y=
 github.com/iLogtail/jfr-parser v0.6.0 h1:dNaQ0Ng2BLE5uxrhUQwtx1q7O9LIQFpMthl3SV326AU=
 github.com/iLogtail/jfr-parser v0.6.0/go.mod h1:ZMcbJjfDkOwElEK8CvUJbpetztRWRXszCmf5WU0erV8=
 github.com/iLogtail/metrics v1.23.0-ilogtail h1:WHhiXtMy5+HWiPpDwO7a0zkMjPd7IPa5euF07LH5h6g=
@@ -1154,8 +1156,6 @@ github.com/miekg/dns v1.1.35/go.mod h1:KNUDUusw/aVsxyTYZM1oqvCicbwhgbNgztCETuNZ7
 github.com/miekg/pkcs11 v1.0.3/go.mod h1:XsNlhZGX73bx86s2hdc/FuaLm2CPZJemRLMA+WTFxgs=
 github.com/miekg/pkcs11 v1.1.1 h1:Ugu9pdy6vAYku5DEpVWVFPYnzV+bxB+iRdbuFSu7TvU=
 github.com/miekg/pkcs11 v1.1.1/go.mod h1:XsNlhZGX73bx86s2hdc/FuaLm2CPZJemRLMA+WTFxgs=
-github.com/mindprince/gonvml v0.0.0-20180514031326-b364b296c732 h1:Dl/79RxNt1t6AYIMhKzyofqooXgw6+LZtAN4EIXRLCk=
-github.com/mindprince/gonvml v0.0.0-20180514031326-b364b296c732/go.mod h1:2eu9pRWp8mo84xCg6KswZ+USQHjwgRhNp06sozOdsTY=
 github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible/go.mod h1:8AuVvqP/mXw1px98n46wfvcGfQ4ci2FwoAjKYxuo3Z4=
 github.com/mitchellh/cli v1.0.0/go.mod h1:hNIlj7HEI86fIcpObd7a0FcrxTWetlwJDGcceTlRvqc=
 github.com/mitchellh/cli v1.1.0/go.mod h1:xcISNoH86gajksDmfB23e/pu+B+GeFRMYmoHXxx3xhI=

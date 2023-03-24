@@ -40,7 +40,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/jcmturner/rpc](https://pkg.go.dev/github.com/jcmturner/rpc?tab=licenses)
 - [github.com/jmespath/go-jmespath](https://pkg.go.dev/github.com/jmespath/go-jmespath?tab=licenses)
 - [github.com/matttproud/golang\_protobuf\_extensions](https://pkg.go.dev/github.com/matttproud/golang_protobuf_extensions?tab=licenses)
-- [github.com/mindprince/gonvml](https://pkg.go.dev/github.com/mindprince/gonvml?tab=licenses)
 - [github.com/moby/locker](https://pkg.go.dev/github.com/moby/locker?tab=licenses)
 - [github.com/moby/spdystream](https://pkg.go.dev/github.com/moby/spdystream?tab=licenses)
 - [github.com/moby/sys/mountinfo](https://pkg.go.dev/github.com/moby/sys/mountinfo?tab=licenses)
@@ -242,3 +241,4 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/iLogtail/metrics fork from github.com/VictoriaMetrics/metrics](http://github.com/iLogtail/metrics) based on MIT
 - [github.com/iLogtail/parser fork from github.com/pingcap/parser](http://github.com/iLogtail/parser) based on Apache-2.0
 - [github.com/iLogtail/pyroscope-lib fork from github.com/pyroscope-io/pyroscope](http://github.com/iLogtail/pyroscope-lib) based on Apache-2.0
+- [github.com/iLogtail/gonvml fork from github.com/mindprince/gonvml](https://github.com/iLogtail/gonvml) based on Apache-2.0

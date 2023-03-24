@@ -263,6 +263,7 @@ replace (
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner => ./external/github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner
 	github.com/elastic/beats/v7 => ./external/github.com/elastic/beats/v7
 	github.com/jeromer/syslogparser => ./external/github.com/jeromer/syslogparser
+	github.com/mindprince/gonvml => github.com/iLogtail/gonvml v1.0.0
 	github.com/pingcap/parser => github.com/iLogtail/parser v0.0.0-20210415081931-48e7f467fd74-ilogtail
 	github.com/pyroscope-io/jfr-parser => github.com/iLogtail/jfr-parser v0.6.0
 	github.com/pyroscope-io/pyroscope => github.com/iLogtail/pyroscope-lib v0.35.1-ilogtail
