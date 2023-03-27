@@ -16,6 +16,7 @@ package httpserver
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,11 +26,11 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/helper"
-	"github.com/alibaba/ilogtail/helper/decoder"
 	"github.com/alibaba/ilogtail/helper/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
 )
 
 const (
@@ -43,7 +44,7 @@ const name = "service_http_server"
 type ServiceHTTP struct {
 	context     pipeline.Context
 	collector   pipeline.Collector
-	decoder     decoder.Decoder
+	decoder     extensions.Decoder
 	server      *http.Server
 	listener    net.Listener
 	wg          sync.WaitGroup
@@ -53,7 +54,8 @@ type ServiceHTTP struct {
 	dumper      *helper.Dumper
 
 	DumpDataKeepFiles  int
-	DumpData           bool // would dump the received data to a local file, which is only used to valid data by the developers.
+	DumpData           bool   // would dump the received data to a local file, which is only used to valid data by the developers.
+	Decoder            string // the decoder to use, default is "ext_default_decoder"
 	Format             string
 	Address            string
 	Path               string
@@ -76,9 +78,25 @@ type ServiceHTTP struct {
 func (s *ServiceHTTP) Init(context pipeline.Context) (int, error) {
 	s.context = context
 	var err error
-	if s.decoder, err = decoder.GetDecoderWithOptions(s.Format, decoder.Option{FieldsExtend: s.FieldsExtend, DisableUncompress: s.DisableUncompress}); err != nil {
+
+	options := &struct {
+		Format            string
+		FieldsExtend      bool
+		DisableUncompress bool
+	}{
+		Format:            s.Format,
+		FieldsExtend:      s.FieldsExtend,
+		DisableUncompress: s.DisableUncompress,
+	}
+	ext, err := context.GetExtension(s.Decoder, options)
+	if err != nil {
 		return 0, err
 	}
+	decoder, ok := ext.(extensions.Decoder)
+	if !ok {
+		return 0, fmt.Errorf("extension %s with type %T not implement extensions.Decoder", s.Decoder, ext)
+	}
+	s.decoder = decoder
 
 	if s.Path == "" {
 		switch s.Format {
@@ -315,6 +333,7 @@ func (s *ServiceHTTP) Stop() error {
 func init() {
 	pipeline.ServiceInputs[name] = func() pipeline.ServiceInput {
 		return &ServiceHTTP{
+			Decoder:            "ext_default_decoder",
 			ReadTimeoutSec:     10,
 			ShutdownTimeoutSec: 5,
 			MaxBodySize:        64 * 1024 * 1024,

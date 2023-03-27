@@ -15,18 +15,17 @@
 package pluginmanager
 
 import (
+	"context"
 	"fmt"
+	"runtime"
+	"runtime/debug"
+	"sync"
+	"time"
 
 	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugin_main/flags"
-
-	"context"
-	"runtime"
-	"runtime/debug"
-	"sync"
-	"time"
 )
 
 // Following variables are exported so that tests of main package can reference them.

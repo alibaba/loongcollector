@@ -17,6 +17,7 @@ package pluginmanager
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg"
@@ -34,12 +35,43 @@ type ContextImp struct {
 	common      *pkg.LogtailContextMeta
 	pluginNames string
 	ctx         context.Context
+	logstoreC   *LogstoreConfig
 }
 
 var contextMutex sync.Mutex
 
 func (p *ContextImp) GetRuntimeContext() context.Context {
 	return p.ctx
+}
+
+func (p *ContextImp) GetExtension(name string, cfg any) (pipeline.Extension, error) {
+	if p.logstoreC == nil || p.logstoreC.PluginRunner == nil {
+		return nil, fmt.Errorf("pipeline not initialized")
+	}
+	// try to find in extensions that explicitly defined in pipeline
+	exists, ok := p.logstoreC.PluginRunner.GetExtension(name)
+	if ok {
+		return exists, nil
+	}
+
+	// if it's a naming extension, we won't do further create
+	if getPluginType(name) != getPluginTypeWithID(name) {
+		return nil, fmt.Errorf("not found extension: %s", name)
+	}
+
+	// create if not found
+	typeWithID := genEmbeddedPluginName(getPluginType(name))
+	err := loadExtension(typeWithID, p.logstoreC, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the new created extension
+	exists, ok = p.logstoreC.PluginRunner.GetExtension(typeWithID)
+	if !ok {
+		return nil, fmt.Errorf("failed to load extension: %s", typeWithID)
+	}
+	return exists, nil
 }
 
 func (p *ContextImp) GetConfigName() string {

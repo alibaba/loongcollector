@@ -30,11 +30,11 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	"google.golang.org/grpc"
 
-	"github.com/alibaba/ilogtail/helper/decoder"
 	"github.com/alibaba/ilogtail/helper/decoder/common"
 	"github.com/alibaba/ilogtail/helper/decoder/opentelemetry"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
 	"github.com/alibaba/ilogtail/plugins/input/httpserver"
 )
 
@@ -201,7 +201,7 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func (s *Server) registerHTTPLogsComsumer(serveMux *http.ServeMux, decoder decoder.Decoder, maxBodySize int64, routing string) {
+func (s *Server) registerHTTPLogsComsumer(serveMux *http.ServeMux, decoder extensions.Decoder, maxBodySize int64, routing string) {
 	serveMux.HandleFunc(routing, func(w http.ResponseWriter, r *http.Request) {
 		data, err := handleInvalidRequest(w, r, maxBodySize, decoder)
 		if err != nil {
@@ -236,7 +236,7 @@ func (s *Server) registerHTTPLogsComsumer(serveMux *http.ServeMux, decoder decod
 	})
 }
 
-func (s *Server) registerHTTPMetricsComsumer(serveMux *http.ServeMux, decoder decoder.Decoder, maxBodySize int64, routing string) {
+func (s *Server) registerHTTPMetricsComsumer(serveMux *http.ServeMux, decoder extensions.Decoder, maxBodySize int64, routing string) {
 	serveMux.HandleFunc(routing, func(w http.ResponseWriter, r *http.Request) {
 		data, err := handleInvalidRequest(w, r, maxBodySize, decoder)
 		if err != nil {
@@ -270,7 +270,7 @@ func (s *Server) registerHTTPMetricsComsumer(serveMux *http.ServeMux, decoder de
 	})
 }
 
-func (s *Server) registerHTTPTracesComsumer(serveMux *http.ServeMux, decoder decoder.Decoder, maxBodySize int64, routing string) {
+func (s *Server) registerHTTPTracesComsumer(serveMux *http.ServeMux, decoder extensions.Decoder, maxBodySize int64, routing string) {
 	serveMux.HandleFunc(routing, func(w http.ResponseWriter, r *http.Request) {
 		data, err := handleInvalidRequest(w, r, maxBodySize, decoder)
 		if err != nil {
@@ -362,7 +362,7 @@ func marshalResp[
 	return msg, contentType, err
 }
 
-func handleInvalidRequest(w http.ResponseWriter, r *http.Request, maxBodySize int64, decoder decoder.Decoder) (data []byte, err error) {
+func handleInvalidRequest(w http.ResponseWriter, r *http.Request, maxBodySize int64, decoder extensions.Decoder) (data []byte, err error) {
 	if r.Method != http.MethodPost {
 		handleUnmatchedMethod(w)
 		err = errInvalidMethod

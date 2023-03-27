@@ -26,6 +26,7 @@ const (
 	pluginProcessor    pluginCategory = "Porcessor"
 	pluginAggregator   pluginCategory = "Aggregator"
 	pluginFlusher      pluginCategory = "Flusher"
+	pluginExtension    pluginCategory = "Extension"
 )
 
 type PluginRunner interface {
@@ -36,6 +37,8 @@ type PluginRunner interface {
 	ReceiveRawLog(log *pipeline.LogWithContext)
 
 	AddPlugin(pluginName string, category pluginCategory, plugin interface{}, config map[string]interface{}) error
+
+	GetExtension(name string) (pipeline.Extension, bool)
 
 	Run()
 

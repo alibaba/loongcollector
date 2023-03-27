@@ -19,7 +19,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -210,7 +210,7 @@ func InitHTTPServer() {
 				logger.Info(context.Background(), "#####################################")
 				logger.Info(context.Background(), "start http server for logtail plugin profile or control")
 				logger.Info(context.Background(), "#####################################")
-				logger.Error(context.Background(), "INIT_HTTP_SERVER_ALARM", "err", http.ListenAndServe(*flags.HTTPAddr, mux))
+				logger.Error(context.Background(), "INIT_HTTP_SERVER_ALARM", "err", http.ListenAndServe(*flags.HTTPAddr, mux)) //nolint
 			}()
 		}
 	})

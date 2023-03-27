@@ -62,3 +62,11 @@ var Flushers = map[string]FlusherCreator{}
 func AddFlusherCreator(name string, creator FlusherCreator) {
 	Flushers[name] = creator
 }
+
+type ExtensionCreator func() Extension
+
+var Extensions = map[string]ExtensionCreator{}
+
+func AddExtensionCreator(name string, creator ExtensionCreator) {
+	Extensions[name] = creator
+}

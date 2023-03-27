@@ -70,3 +70,32 @@
 | `processor_delimiter_accelerate`<br>分隔符加速 | SLS官方 | 以加速模式实现分隔符日志的字段提取。           |
 | `processor_json_accelerate`<br>Json加速        | SLS官方 | 以加速模式实现`Json`格式日志的字段提取。       |
 | `processor_regex_accelerate`<br>正则加速       | SLS官方 | 通过正则匹配以加速模式实现文本日志的字段提取。 |
+
+
+## 扩展
+
+### ClientAuthenticator
+
+| 名称                                                        | 提供方                                             | 简介                             |
+|-----------------------------------------------------------|-------------------------------------------------|--------------------------------|
+| [`ext_basicauth`](extension/ext-basicauth.md)<br> Basic认证 | 社区<br>[`snakorse`](https://github.com/snakorse) | 为 http_flusher 插件提供 basic 认证能力 |
+
+### FlushInterceptor
+
+| 名称                                                                          | 提供方                                             | 简介                                        |
+|-----------------------------------------------------------------------------|-------------------------------------------------|-------------------------------------------|
+| [`ext_groupinfo_filter`](extension/ext-groupinfo-filter.md)<br> GroupInfo过滤 | 社区<br>[`snakorse`](https://github.com/snakorse) | 为 http_flusher 插件提供根据GroupInfo筛选最终提交数据的能力 |
+
+
+### RequestInterceptor
+
+| 名称                                                                  | 提供方                                             | 简介                        |
+|---------------------------------------------------------------------|-------------------------------------------------|---------------------------|
+| [`ext_request_breaker`](extension/ext-request-breaker.md)<br> 请求熔断器 | 社区<br>[`snakorse`](https://github.com/snakorse) | 为 http_flusher 插件提供请求熔断能力 |
+
+
+### Decoder
+
+| 名称                                                                         | 提供方                                             | 简介                          |
+|----------------------------------------------------------------------------|-------------------------------------------------|-----------------------------|
+| [`ext_default_decoder`](extension/ext-default-decoder.md)<br> 默认的decoder扩展 | 社区<br>[`snakorse`](https://github.com/snakorse) | 将内置支持的Format以Decoder扩展的形式封装 |

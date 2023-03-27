@@ -16,6 +16,7 @@ package httpserver
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -24,12 +25,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
+
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
-
-	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
+	_ "github.com/alibaba/ilogtail/plugins/extension/default_decoder"
 )
 
 type ContextTest struct {
@@ -50,6 +52,24 @@ func (p *ContextTest) LogWarn(alarmType string, kvPairs ...interface{}) {
 	fmt.Println(alarmType, kvPairs)
 }
 
+func (p *ContextTest) GetExtension(name string, cfg any) (pipeline.Extension, error) {
+	creator, ok := pipeline.Extensions[name]
+	if !ok {
+		return nil, fmt.Errorf("extension not found")
+	}
+	extension := creator()
+	config, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(config, extension)
+	if err != nil {
+		return nil, err
+	}
+	extension.Init(&p.ContextImp)
+	return extension, nil
+}
+
 func newInputWithOpts(format string, option func(input *ServiceHTTP)) (*ServiceHTTP, error) {
 	ctx := &ContextTest{}
 	ctx.ContextImp.InitContext("a", "b", "c")
@@ -59,11 +79,12 @@ func newInputWithOpts(format string, option func(input *ServiceHTTP)) (*ServiceH
 		MaxBodySize:        64 * 1024 * 1024,
 		Address:            ":0",
 		Format:             format,
+		Decoder:            "ext_default_decoder",
 	}
 	if option != nil {
 		option(input)
 	}
-	_, err := input.Init(&ctx.ContextImp)
+	_, err := input.Init(ctx)
 	return input, err
 }
 
@@ -287,8 +308,9 @@ func TestUnlinkUnixSock(t *testing.T) {
 		Address:        "unix://" + sockPath,
 		Format:         "influx",
 		UnlinkUnixSock: true,
+		Decoder:        "ext_default_decoder",
 	}
-	_, err = input.Init(&ctx.ContextImp)
+	_, err = input.Init(ctx)
 	require.NoError(t, err)
 
 	collector := &mockCollector{}

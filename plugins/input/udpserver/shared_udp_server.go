@@ -36,8 +36,9 @@ type SharedUDPServer struct {
 	lock        sync.RWMutex // mutex for register collector
 }
 
-func NewSharedUDPServer(context pipeline.Context, format, addr, dispatchKey string, maxBufferSize int) (*SharedUDPServer, error) {
+func NewSharedUDPServer(context pipeline.Context, decoder, format, addr, dispatchKey string, maxBufferSize int) (*SharedUDPServer, error) {
 	server := pipeline.ServiceInputs["service_udp_server"]().(*UDPServer)
+	server.Decoder = decoder
 	server.Format = format
 	server.Address = addr
 	server.MaxBufferSize = maxBufferSize

@@ -6,6 +6,7 @@ require (
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575
 	github.com/gogo/protobuf v1.3.2
 	github.com/influxdata/line-protocol/v2 v2.2.1
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/stretchr/testify v1.8.1
 	go.opentelemetry.io/collector/pdata v0.66.0

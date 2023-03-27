@@ -39,6 +39,9 @@ ilogtail:
               Convert:
                 Protocol: influxdb
                 Encoding: custom
+              RequestInterceptors:
+                - Type: ext_request_breaker
+                  FailureRatio: 0.1
   close_wait: 5s
   depends_on:
     influxdb:

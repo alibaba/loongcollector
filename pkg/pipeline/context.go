@@ -34,6 +34,7 @@ type Context interface {
 	GetProject() string
 	GetLogstore() string
 	GetRuntimeContext() context.Context
+	GetExtension(name string, cfg any) (Extension, error)
 	RegisterCounterMetric(metric CounterMetric)
 	RegisterStringMetric(metric StringMetric)
 	RegisterLatencyMetric(metric LatencyMetric)

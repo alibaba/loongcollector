@@ -35,6 +35,7 @@ type pluginv1Runner struct {
 	ProcessorPlugins  []*ProcessorWrapper
 	AggregatorPlugins []*AggregatorWrapper
 	FlusherPlugins    []*FlusherWrapper
+	ExtensionPlugins  map[string]pipeline.Extension
 
 	FlushOutStore  *FlushOutStore[protocol.LogGroup]
 	LogstoreConfig *LogstoreConfig
@@ -55,6 +56,7 @@ func (p *pluginv1Runner) Init(inputQueueSize int, flushQueueSize int) error {
 	p.ProcessorPlugins = make([]*ProcessorWrapper, 0)
 	p.AggregatorPlugins = make([]*AggregatorWrapper, 0)
 	p.FlusherPlugins = make([]*FlusherWrapper, 0)
+	p.ExtensionPlugins = make(map[string]pipeline.Extension, 0)
 	p.LogsChan = make(chan *pipeline.LogWithContext, inputQueueSize)
 	p.LogGroupsChan = make(chan *protocol.LogGroup, helper.Max(flushQueueSize, p.FlushOutStore.Len()))
 	p.FlushOutStore.Write(p.LogGroupsChan)
@@ -100,10 +102,19 @@ func (p *pluginv1Runner) AddPlugin(pluginName string, category pluginCategory, p
 		if flusher, ok := plugin.(pipeline.FlusherV1); ok {
 			return p.addFlusher(flusher)
 		}
+	case pluginExtension:
+		if extension, ok := plugin.(pipeline.Extension); ok {
+			return p.addExtension(pluginName, extension)
+		}
 	default:
 		return pluginCategoryUndefinedError(category)
 	}
 	return pluginUnImplementError(category, v1, pluginName)
+}
+
+func (p *pluginv1Runner) GetExtension(name string) (pipeline.Extension, bool) {
+	extension, ok := p.ExtensionPlugins[name]
+	return extension, ok
 }
 
 func (p *pluginv1Runner) Run() {
@@ -176,6 +187,11 @@ func (p *pluginv1Runner) addFlusher(flusher pipeline.FlusherV1) error {
 	wrapper.LogGroupsChan = p.LogGroupsChan
 	wrapper.Interval = time.Millisecond * time.Duration(p.LogstoreConfig.GlobalConfig.FlushIntervalMs)
 	p.FlusherPlugins = append(p.FlusherPlugins, &wrapper)
+	return nil
+}
+
+func (p *pluginv1Runner) addExtension(name string, extension pipeline.Extension) error {
+	p.ExtensionPlugins[name] = extension
 	return nil
 }
 
@@ -395,6 +411,15 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 		}
 	}
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "flusher plugins stop", "done")
+
+	for _, extension := range p.ExtensionPlugins {
+		err := extension.Stop()
+		if err != nil {
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "STOP_EXTENSION_ALARM",
+				"failed to stop extension (description: %v): %v", extension.Description(), err)
+		}
+	}
+	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "extension plugins stop", "done")
 
 	return nil
 }

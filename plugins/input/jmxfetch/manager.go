@@ -35,6 +35,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/udpserver"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
+
+	_ "github.com/alibaba/ilogtail/plugins/extension/default_decoder" // jmxfetch depends on the statsd format from ext_default_decoder
 )
 
 var once sync.Once
@@ -168,7 +170,7 @@ func (m *Manager) startServer() {
 	logger.Debug(m.managerMeta.GetContext(), "start", "server")
 	if m.server == nil {
 		m.port, _ = helper.GetFreePort()
-		m.server, _ = udpserver.NewSharedUDPServer(mock.NewEmptyContext("", "", "jmxfetchserver"), "statsd", ":"+strconv.Itoa(m.port), dispatchKey, 65535)
+		m.server, _ = udpserver.NewSharedUDPServer(mock.NewEmptyContext("", "", "jmxfetchserver"), "ext_default_decoder", "statsd", ":"+strconv.Itoa(m.port), dispatchKey, 65535)
 	}
 	if !m.server.IsRunning() {
 		if err := m.server.Start(); err != nil {
