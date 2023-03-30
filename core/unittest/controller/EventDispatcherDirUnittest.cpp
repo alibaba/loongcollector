@@ -34,7 +34,7 @@ class MockHandler : public EventHandler {
 public:
     virtual void Handle(const Event& event) { ++handle_count; }
     virtual void HandleTimeOut() { ++handle_timeout_count; }
-    virtual bool DumpReaderMeta(bool checkConfigFlag = false) { return true; }
+    virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) { return true; }
     void Reset() {
         handle_count = 0;
         handle_timeout_count = 0;
