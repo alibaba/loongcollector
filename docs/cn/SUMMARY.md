@@ -44,6 +44,7 @@
   * [文本日志（debug）](data-pipeline/input/metric-debug-file.md)
   * [MetricInput示例插件](data-pipeline/input/metric-input-example.md)
   * [主机Meta数据](data-pipeline/input/metric-meta-host.md)
+  * [主机监控数据](data-pipeline/input/metric-system.md)
   * [Mock数据-Metric](data-pipeline/input/metric-mock.md)
   * [MySQL Binlog](data-pipeline/input/service-canal.md)
   * [ServiceInput示例插件](data-pipeline/input/service-input-example.md)
