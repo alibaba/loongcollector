@@ -4,6 +4,10 @@
 
 `processor_regex processor`插件可以通过正则匹配的模式实现文本日志的字段提取。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数           | 类型       | 是否必选 | 说明                                                                        |
@@ -23,13 +27,13 @@
 
 * 输入
 
-```
+```bash
 echo '127.0.0.1 - - [10/Aug/2017:14:57:51 +0800] "POST /PutData?Category=YunOsAccountOpLog" 0.024 18204 200 37 "-" "aliyun-sdk-java"' >> /home/test-log/reg.log
 ```
 
 * 采集配置
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log
@@ -61,7 +65,7 @@ flushers:
 
 * 输出
 
-```
+```json
 {
     "__tag__:__path__": "/home/test-log/reg.log",
     "ip": "127.0.0.1",
@@ -77,4 +81,3 @@ flushers:
     "__time__": "1657362166"
 }
 ```
-

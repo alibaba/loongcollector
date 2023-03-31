@@ -5,6 +5,10 @@
 `processor_split_log_regex processor`插件实现多行日志（例如Java程序日志）的采集。
 备注：该插件必须设置为`processor`的第一个插件。
 
+## 版本
+
+[Stable](../stability-level.md)
+
 ## 配置参数
 
 | 参数             | 类型      | 是否必选 | 说明                                                     |
@@ -21,13 +25,13 @@
 
 * 输入
 
-```
+```bash
 echo -e  '[2022-03-03 18:00:00] xxx1\nyyyyy\nzzzzzz\n[2022-03-03 18:00:01] xxx2\nyyyyy\nzzzzzz' >> /home/test-log/multiline.log
 ```
 
 * 采集配置
 
-```
+```yaml
 enable: true
 inputs:
   - Type: file_log
@@ -49,7 +53,7 @@ flushers:
 
 * 输出
 
-```
+```json
 {
     "__tag__:__path__": "/home/test-log/multiline.log",
     "content": "[2022-03-03 18:00:00] xxx1\nyyyyy\nzzzzzz\n",

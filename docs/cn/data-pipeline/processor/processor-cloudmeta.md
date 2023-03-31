@@ -4,6 +4,10 @@
 
 `processor_cloud_meta`插件可以添加为日志增加云平台元数据信息。
 
+## 版本
+
+[Alpha](../stability-level.md)
+
 ## 配置参数
 
 | 参数             | 类型                | 是否必选 | 说明                                                                                                                                                    |
@@ -80,7 +84,7 @@ flushers:
 2023-03-13 20:42:04 {"content":"{\"a\":{\"b\":{}}}","Index":"6","instance_id_name":"id_xxx","instance_tag_prefix_tag_key":"tag_val","__time__":"1678711324"}
 }
 
-``` 
+```
 
 ### json 模式
 
