@@ -63,6 +63,7 @@
 | `flusher_pulsar`<br>Kafka                | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Pulsar。                         |
 | `flusher_clickhouse`<br>ClickHouse       | 社区<br>[`kl7sn`](https://github.com/kl7sn)           | 将采集到的数据输出到ClickHouse。                     |
 | `flusher_elasticsearch`<br>ElasticSearch | 社区<br>[`joeCarf`](https://github.com/joeCarf)       | 将采集到的数据输出到ElasticSearch。                  |
+| `flusher_loki`<br>Loki | 社区<br>[`abingcbc`](https://github.com/abingcbc) | 将采集到的数据输出到Loki。
 
 ## 加速
 

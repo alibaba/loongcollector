@@ -33,6 +33,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/flusher/http"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/kafka"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/kafkav2"
+    - import: "github.com/alibaba/ilogtail/plugins/flusher/loki"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/opentelemetry"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/pulsar"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/sleep"

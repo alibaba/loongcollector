@@ -86,7 +86,6 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [golang.org/x/text](https://pkg.go.dev/golang.org/x/text?tab=licenses)
 - [google.golang.org/protobuf](https://pkg.go.dev/google.golang.org/protobuf?tab=licenses)
 - [github.com/godbus/dbus](https://pkg.go.dev/github.com/godbus/dbus?tab=licenses)
-- [github.com/google/go-cmp](https://pkg.go.dev/github.com/google/go-cmp?tab=licenses)
 - [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto?tab=licenses)
 - [golang.org/x/oauth2](https://pkg.go.dev/golang.org/x/oauth2?tab=licenses)
 - [golang.org/x/sync](https://pkg.go.dev/golang.org/x/sync?tab=licenses)
@@ -99,6 +98,7 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/miekg/pkcs11](https://pkg.go.dev/github.com/miekg/pkcs11?tab=licenses)
 - [github.com/elastic/elastic-transport-go](https://pkg.go.dev/github.com/elastic/elastic-transport-go?tab=licenses)
 - [github.com/elastic/go-elasticsearch](https://pkg.go.dev/github.com/elastic/go-elasticsearch?tab=licenses)
+- [sigs.k8s.io/json](https://pkg.go.dev/sigs.k8s.io/json?tab=licenses)
 
 ## MIT licenses
 

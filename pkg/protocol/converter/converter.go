@@ -197,6 +197,17 @@ func PutPooledByteBuf(buf *[]byte) {
 	byteBufPool.Put(buf)
 }
 
+func TrimPrefix(str string) string {
+	switch {
+	case strings.HasPrefix(str, targetContentPrefix):
+		return strings.TrimPrefix(str, targetContentPrefix)
+	case strings.HasPrefix(str, targetTagPrefix):
+		return strings.TrimPrefix(str, targetTagPrefix)
+	default:
+		return str
+	}
+}
+
 func convertLogToMap(log *protocol.Log, logTags []*protocol.LogTag, src, topic string, tagKeyRenameMap map[string]string) (map[string]string, map[string]string) {
 	contents, tags := make(map[string]string), make(map[string]string)
 	for _, logContent := range log.Contents {
