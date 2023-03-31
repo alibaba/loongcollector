@@ -145,7 +145,7 @@ flushers:
 
 ### 动态topic
 
-针对上面写入的这种日志格式，如果想根据`application`名称针对不用的应用推送到不通的`topic`，
+针对上面写入的这种日志格式，如果想根据`application`名称针对不用的应用推送到不同的`topic`，
 则`topic`可以这样配置。
 
 ```yaml
@@ -153,12 +153,78 @@ Topic: test_%{content.application}
 ```
 
 最后`ilogtail`就自动将日志推送到`test_springboot-docker`这个`topic`中。
-
 `topic`动态表达式规则：
-
 - `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
 - `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
+- `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。
 - 其它方式暂不支持
+
+#### 动态topic中使用系统变量
+
+动态`topic`绑定系统变量的两种场景：
+- 将系统变量采集添加到日志的`tag`中，然后使用`%{tag.fieldname}`规则完成绑定。
+- 对系统变量无采集存储需求，只是想根据设定的系统变量将日志推送到指定的`topic`中，直接采用`${env_name}`规则完成绑定，此方式需要`1.5.0`才支持。
+
+由于上面提到的两种系统变量的采集绑定都需要做一些特殊配置，因此下面将分别介绍下相关的配置操作。
+
+
+**（1）将系统变量采集到日志中完成动态`topic`绑定**
+
+将系统变量采集添加到日志中有两种方式，一种是在`ilogtail`容器`env`添加，另一种是通过`processor_add_fields` 插件添加，
+两种方式不同的配置参考下面的介绍
+
+- 在`daemonset`或者`sidecar`方式部署的`ilogtail`容器`env`配置部分添加自定义的系统变量，配置参考案例如下：
+
+```yaml
+env:
+  - name: ALIYUN_LOG_ENV_TAGS       # add log tags from env
+    value: _node_name_|_node_ip_|_app_name_ 
+  - name: _app_name_  # 添加自定义_app_name_变量，
+    value: kafka
+```
+
+自定义的变量`_app_name_`被添加到`ALIYUN_LOG_ENV_TAGS`中，日志的`tags`中会看到自定义的变量， 此时动态 `topic`采用`%{tag.fieldname}`规则配置即可。
+
+- 使用`processor_add_fields` 插件系统变量添加到日志中，配置参考如下：
+
+```yaml
+processors:
+ - Type: processor_add_fields
+   Fields:
+     service: ${env_name}
+   IgnoreIfExist: false
+```
+
+这里`${env_name}`生效依赖于`ilogtail`的`enable_env_ref_in_config`配置，从`ilogtail 1.5.0`开始支持。
+
+**（2）直接采用`$`符将系统变量绑定动态`topic`中**
+
+在`daemonset`或者`sidecar`方式部署的`ilogtail`容器`env`配置部分添加自定义的系统变量，配置参考案例如下：
+```yaml
+env:
+  - name: ALIYUN_LOG_ENV_TAGS       # add log tags from env
+    value: _node_name_|_node_ip_
+  - name: app_name  # 添加自定义app_name变量，
+    value: kafka
+```
+`app_name`添加到系统变量中后，直接采用动态topic的：`${env_name}`规则即可绑定。
+
+```yaml
+enable: true
+inputs:
+  - Type: file_log
+    LogPath: /home/test_log
+    FilePattern: "*.log"
+flushers:
+  - Type: flusher_kafka
+    Brokers: 
+      - 192.XX.XX.1:9092
+      - 192.XX.XX.2:9092
+      - 192.XX.XX.3:9092
+    Topic: ilogtail_${app_name}
+```
+- `${app_name}`就是我们上面添加的系统变量。
+
 
 ### TagFieldsRename
 

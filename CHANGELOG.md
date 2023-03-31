@@ -36,5 +36,7 @@ your changes, such as:
 
 ## [Unreleased]
 
+- [public] [both] [updated] Enable enable_env_ref_in_config configuration to support system variable binding
+- [public] [both] [fixed] When using the TagFieldsRename configuration in flusher_kafka_v2/flusher_pulsar, some fields in tags cannot be renamed
 - [public] [both] [added] add new plugin type: extension
 - [public] [both] [updated] http flusher support custom authenticator, filter and request circuit-breaker via the extension plugin mechanism
