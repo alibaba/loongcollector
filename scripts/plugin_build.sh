@@ -57,6 +57,12 @@ elif [ $OS_FLAG = 2 ]; then
   BUILDMODE=default
 fi
 
+# if not vendor mod, update plugin registry and go tidy
+# otherwise you should have done it and go vendor
+if [[ $MOD != "vendor" ]]; then
+    "$CURRDIR/import_plugins.sh" "$PLUGINS_CONFIG_FILE" "$GO_MOD_FILE"
+fi
+
 # rebuild gozstd's libzstd.a, because it is not compatible in some env
 GOOS=$(go env GOOS)
 GOARCH=$(go env GOARCH)
