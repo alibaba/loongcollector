@@ -57,7 +57,27 @@ elif [ $OS_FLAG = 2 ]; then
   BUILDMODE=default
 fi
 
-# make plugins stuffs
-"$CURRDIR/import_plugins.sh" "$PLUGINS_CONFIG_FILE" "$GO_MOD_FILE"
+# rebuild gozstd's libzstd.a, because it is not compatible in some env
+GOOS=$(go env GOOS)
+GOARCH=$(go env GOARCH)
+if [[ $MOD = "vendor" ]]; then
+  cd vendor/github.com/valyala/gozstd
+else
+  "$CURRDIR/import_plugins.sh" "$PLUGINS_CONFIG_FILE" "$GO_MOD_FILE"
+  cd $(go env GOPATH)/pkg/mod/github.com/valyala/gozstd@*
+fi
 
+# if libzstd.a is available in the image, copy instead of rebuild
+lib_name=libzstd_${GOOS}_${GOARCH}.a
+if [[ -f /opt/logtail/deps/lib64/libzstd.a ]]; then
+  sudo cp /opt/logtail/deps/lib64/libzstd.a libzstd_${GOOS}_${GOARCH}.a
+else
+  sudo MOREFLAGS=-fPIC make clean libzstd.a
+  sudo mv libzstd__.a ${lib_name}
+fi
+GROUP=$(id -gn $USER)
+sudo chown ${USER}:${GROUP} ${lib_name}
+cd -
+
+# make plugins stuffs
 go build -mod="$MOD" -modfile="$GO_MOD_FILE" -buildmode="$BUILDMODE" -ldflags="$LDFLAGS" -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main

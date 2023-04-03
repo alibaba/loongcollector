@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build
+name: Build Core
 
 on:
   pull_request:
@@ -57,14 +57,10 @@ jobs:
       - name: Build Binary
         if: matrix.runner == 'ubuntu-latest'
         env:
-          BUILD_LOGTAIL_UT: OFF
+          BUILD_LOGTAIL_UT: ON
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
-        run: make dist && scripts/check_glibc.sh
-
-      - name: Build Docker
-        if: matrix.runner == 'ubuntu-latest'
-        run: make docker
+        run: make core
 
   result:
     runs-on: ubuntu-latest
