@@ -25,8 +25,8 @@ import (
 	"github.com/pyroscope-io/pyroscope/pkg/storage/tree"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/helper/profile"
-	"github.com/alibaba/ilogtail/plugins/test"
+	"github.com/alibaba/ilogtail/pkg/helper/profile"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 func readPprofFixture(path string) (*tree.Profile, error) {
@@ -90,18 +90,38 @@ func TestRawProfile_Parse(t *testing.T) {
 	require.NoError(t, err)
 	logs := r.logs
 	require.Equal(t, len(logs), 6)
-	picks := test.PickLogs(logs, "stackID", stackID)
+	picks := PickLogs(logs, "stackID", stackID)
 	require.Equal(t, len(picks), 1)
 	log := picks[0]
-	require.Equal(t, test.ReadLogVal(log, "name"), name)
-	require.Equal(t, test.ReadLogVal(log, "stack"), stack)
-	require.Equal(t, test.ReadLogVal(log, "language"), lanuage)
-	require.Equal(t, test.ReadLogVal(log, "type"), profileType)
-	require.Equal(t, test.ReadLogVal(log, "units"), unitType)
-	require.Equal(t, test.ReadLogVal(log, "valueTypes"), valType)
-	require.Equal(t, test.ReadLogVal(log, "aggTypes"), aggType)
-	require.Equal(t, test.ReadLogVal(log, "dataType"), dataType)
-	require.Equal(t, test.ReadLogVal(log, "durationNs"), strconv.Itoa(endTime-startTime))
-	require.Equal(t, test.ReadLogVal(log, "labels"), "{\"_app_name_\":\"12\",\"cluster\":\"cluster2\"}")
-	require.Equal(t, test.ReadLogVal(log, "val"), "250000000.00")
+	require.Equal(t, ReadLogVal(log, "name"), name)
+	require.Equal(t, ReadLogVal(log, "stack"), stack)
+	require.Equal(t, ReadLogVal(log, "language"), lanuage)
+	require.Equal(t, ReadLogVal(log, "type"), profileType)
+	require.Equal(t, ReadLogVal(log, "units"), unitType)
+	require.Equal(t, ReadLogVal(log, "valueTypes"), valType)
+	require.Equal(t, ReadLogVal(log, "aggTypes"), aggType)
+	require.Equal(t, ReadLogVal(log, "dataType"), dataType)
+	require.Equal(t, ReadLogVal(log, "durationNs"), strconv.Itoa(endTime-startTime))
+	require.Equal(t, ReadLogVal(log, "labels"), "{\"_app_name_\":\"12\",\"cluster\":\"cluster2\"}")
+	require.Equal(t, ReadLogVal(log, "val"), "250000000.00")
+}
+
+// ReadLogVal returns the log content value for the input key, and returns empty string when not found.
+func ReadLogVal(log *protocol.Log, key string) string {
+	for _, content := range log.Contents {
+		if content.Key == key {
+			return content.Value
+		}
+	}
+	return ""
+}
+
+// PickLogs select some of original logs to new res logs by the specific pickKey and pickVal.
+func PickLogs(logs []*protocol.Log, pickKey string, pickVal string) (res []*protocol.Log) {
+	for _, log := range logs {
+		if ReadLogVal(log, pickKey) == pickVal {
+			res = append(res, log)
+		}
+	}
+	return res
 }

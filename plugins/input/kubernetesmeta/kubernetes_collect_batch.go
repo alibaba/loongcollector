@@ -20,7 +20,7 @@ import (
 	batch "k8s.io/client-go/listers/batch/v1"
 	batchbeta "k8s.io/client-go/listers/batch/v1beta1"
 
-	"github.com/alibaba/ilogtail/helper"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 

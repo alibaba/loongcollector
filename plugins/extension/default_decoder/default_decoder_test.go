@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail/helper/decoder/influxdb"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/influxdb"
 )
 
 func TestInit_Should_Pass_The_Config_To_Real_Decoder(t *testing.T) {

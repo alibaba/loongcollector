@@ -28,11 +28,10 @@ import (
 	otlpv1 "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	"google.golang.org/grpc"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -382,14 +381,15 @@ func Test_Flusher_Export_All_Disable_Trace(t *testing.T) {
 
 func Test_Flusher_Flush_Timeout(t *testing.T) {
 	convey.Convey("When init grpc service", t, func() {
-		_, server := newTestGrpcService(t, ":8176", time.Second*2)
+		Addr := test.GetAvailableLocalAddress(t)
+		_, server := newTestGrpcService(t, Addr, time.Second*2)
 		defer func() {
 			server.Stop()
 		}()
 		logCtx := mock.NewEmptyContext("p", "l", "c")
 
 		convey.Convey("When FlusherOTLP init", func() {
-			f := &FlusherOTLP{Version: v1, Logs: &helper.GrpcClientConfig{Endpoint: ":8176", WaitForReady: true, Timeout: 1000}}
+			f := &FlusherOTLP{Version: v1, Logs: &helper.GrpcClientConfig{Endpoint: Addr, WaitForReady: true, Timeout: 1000}}
 			err := f.Init(logCtx)
 			convey.So(err, convey.ShouldBeNil)
 

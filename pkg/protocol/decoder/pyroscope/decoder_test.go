@@ -23,8 +23,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/alibaba/ilogtail/helper"
-	"github.com/alibaba/ilogtail/plugins/test"
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/pyroscope-io/pyroscope/pkg/structs/transporttrie"
 	"github.com/stretchr/testify/assert"
@@ -68,17 +68,17 @@ func TestDecoder_DecodeTire(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, len(logs) == 9)
 	log := logs[1]
-	require.Equal(t, test.ReadLogVal(log, "name"), "baz")
-	require.Equal(t, test.ReadLogVal(log, "stack"), "bar\nfoo")
-	require.Equal(t, test.ReadLogVal(log, "language"), "ebpf")
-	require.Equal(t, test.ReadLogVal(log, "type"), "profile_cpu")
-	require.Equal(t, test.ReadLogVal(log, "units"), "nanoseconds")
-	require.Equal(t, test.ReadLogVal(log, "valueTypes"), "cpu")
-	require.Equal(t, test.ReadLogVal(log, "aggTypes"), "sum")
-	require.Equal(t, test.ReadLogVal(log, "dataType"), "CallStack")
-	require.Equal(t, test.ReadLogVal(log, "durationNs"), "10000000000")
-	require.Equal(t, test.ReadLogVal(log, "labels"), "{\"__name__\":\"demo\",\"a\":\"b\",\"cluster\":\"sls-mall\"}")
-	require.Equal(t, test.ReadLogVal(log, "val"), "10000000.00")
+	require.Equal(t, ReadLogVal(log, "name"), "baz")
+	require.Equal(t, ReadLogVal(log, "stack"), "bar\nfoo")
+	require.Equal(t, ReadLogVal(log, "language"), "ebpf")
+	require.Equal(t, ReadLogVal(log, "type"), "profile_cpu")
+	require.Equal(t, ReadLogVal(log, "units"), "nanoseconds")
+	require.Equal(t, ReadLogVal(log, "valueTypes"), "cpu")
+	require.Equal(t, ReadLogVal(log, "aggTypes"), "sum")
+	require.Equal(t, ReadLogVal(log, "dataType"), "CallStack")
+	require.Equal(t, ReadLogVal(log, "durationNs"), "10000000000")
+	require.Equal(t, ReadLogVal(log, "labels"), "{\"__name__\":\"demo\",\"a\":\"b\",\"cluster\":\"sls-mall\"}")
+	require.Equal(t, ReadLogVal(log, "val"), "10000000.00")
 }
 
 func TestDecoder_DecodePprofCumulative(t *testing.T) {
@@ -98,26 +98,36 @@ func TestDecoder_DecodePprofCumulative(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(logs), 4)
 	sort.Slice(logs, func(i, j int) bool {
-		if test.ReadLogVal(logs[i], "name") < test.ReadLogVal(logs[j], "name") {
+		if ReadLogVal(logs[i], "name") < ReadLogVal(logs[j], "name") {
 			return true
-		} else if test.ReadLogVal(logs[i], "name") == test.ReadLogVal(logs[j], "name") {
-			return test.ReadLogVal(logs[i], "valueTypes") < test.ReadLogVal(logs[j], "valueTypes")
+		} else if ReadLogVal(logs[i], "name") == ReadLogVal(logs[j], "name") {
+			return ReadLogVal(logs[i], "valueTypes") < ReadLogVal(logs[j], "valueTypes")
 		}
 		return false
 	})
-	require.Equal(t, test.ReadLogVal(logs[0], "name"), "compress/flate.NewWriter /Users/evan/sdk/go1.19.4/src/compress/flate/deflate.go")
-	require.Equal(t, test.ReadLogVal(logs[0], "valueTypes"), "alloc_objects")
-	require.Equal(t, test.ReadLogVal(logs[0], "val"), "1.00")
+	require.Equal(t, ReadLogVal(logs[0], "name"), "compress/flate.NewWriter /Users/evan/sdk/go1.19.4/src/compress/flate/deflate.go")
+	require.Equal(t, ReadLogVal(logs[0], "valueTypes"), "alloc_objects")
+	require.Equal(t, ReadLogVal(logs[0], "val"), "1.00")
 
-	require.Equal(t, test.ReadLogVal(logs[1], "name"), "compress/flate.NewWriter /Users/evan/sdk/go1.19.4/src/compress/flate/deflate.go")
-	require.Equal(t, test.ReadLogVal(logs[1], "valueTypes"), "alloc_space")
-	require.Equal(t, test.ReadLogVal(logs[1], "val"), "924248.00")
+	require.Equal(t, ReadLogVal(logs[1], "name"), "compress/flate.NewWriter /Users/evan/sdk/go1.19.4/src/compress/flate/deflate.go")
+	require.Equal(t, ReadLogVal(logs[1], "valueTypes"), "alloc_space")
+	require.Equal(t, ReadLogVal(logs[1], "val"), "924248.00")
 
-	require.Equal(t, test.ReadLogVal(logs[2], "name"), "runtime/pprof.WithLabels /Users/evan/sdk/go1.19.4/src/runtime/pprof/label.go")
-	require.Equal(t, test.ReadLogVal(logs[2], "valueTypes"), "alloc_objects")
-	require.Equal(t, test.ReadLogVal(logs[2], "val"), "1820.00")
+	require.Equal(t, ReadLogVal(logs[2], "name"), "runtime/pprof.WithLabels /Users/evan/sdk/go1.19.4/src/runtime/pprof/label.go")
+	require.Equal(t, ReadLogVal(logs[2], "valueTypes"), "alloc_objects")
+	require.Equal(t, ReadLogVal(logs[2], "val"), "1820.00")
 
-	require.Equal(t, test.ReadLogVal(logs[3], "name"), "runtime/pprof.WithLabels /Users/evan/sdk/go1.19.4/src/runtime/pprof/label.go")
-	require.Equal(t, test.ReadLogVal(logs[3], "valueTypes"), "alloc_space")
-	require.Equal(t, test.ReadLogVal(logs[3], "val"), "524432.00")
+	require.Equal(t, ReadLogVal(logs[3], "name"), "runtime/pprof.WithLabels /Users/evan/sdk/go1.19.4/src/runtime/pprof/label.go")
+	require.Equal(t, ReadLogVal(logs[3], "valueTypes"), "alloc_space")
+	require.Equal(t, ReadLogVal(logs[3], "val"), "524432.00")
+}
+
+// ReadLogVal returns the log content value for the input key, and returns empty string when not found.
+func ReadLogVal(log *protocol.Log, key string) string {
+	for _, content := range log.Contents {
+		if content.Key == key {
+			return content.Value
+		}
+	}
+	return ""
 }

@@ -20,12 +20,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/helper"
-	"github.com/alibaba/ilogtail/helper/decoder/common"
+	"github.com/influxdata/influxdb/models"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
 	imodels "github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"github.com/influxdata/influxdb/models"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
 const (

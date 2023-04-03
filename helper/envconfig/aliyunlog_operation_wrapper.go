@@ -23,8 +23,8 @@ import (
 
 	aliyunlog "github.com/aliyun/aliyun-log-go-sdk"
 
-	k8s_event "github.com/alibaba/ilogtail/helper/eventrecorder"
 	"github.com/alibaba/ilogtail/pkg/flags"
+	k8s_event "github.com/alibaba/ilogtail/pkg/helper/eventrecorder"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"

@@ -25,12 +25,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alibaba/ilogtail/helper"
-	"github.com/alibaba/ilogtail/helper/decoder/common"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
 const (

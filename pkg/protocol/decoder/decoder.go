@@ -19,15 +19,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/helper/decoder/common"
-	"github.com/alibaba/ilogtail/helper/decoder/influxdb"
-	"github.com/alibaba/ilogtail/helper/decoder/opentelemetry"
-	"github.com/alibaba/ilogtail/helper/decoder/prometheus"
-	"github.com/alibaba/ilogtail/helper/decoder/pyroscope"
-	"github.com/alibaba/ilogtail/helper/decoder/raw"
-	"github.com/alibaba/ilogtail/helper/decoder/sls"
-	"github.com/alibaba/ilogtail/helper/decoder/statsd"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/influxdb"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/opentelemetry"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/prometheus"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/pyroscope"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/raw"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/sls"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/statsd"
 )
 
 type Option struct {

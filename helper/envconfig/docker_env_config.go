@@ -26,8 +26,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 
-	"github.com/alibaba/ilogtail/helper"
-	k8s_event "github.com/alibaba/ilogtail/helper/eventrecorder"
+	"github.com/alibaba/ilogtail/pkg/helper"
+	k8s_event "github.com/alibaba/ilogtail/pkg/helper/eventrecorder"
 )
 
 var dockerEnvConfigManager = &Manager{}

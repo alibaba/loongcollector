@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/alibaba/ilogtail/helper"
 	"github.com/alibaba/ilogtail/pkg/flags"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 
 	"github.com/docker/docker/api/types"

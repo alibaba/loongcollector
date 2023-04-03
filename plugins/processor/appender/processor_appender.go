@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/helper"
-	"github.com/alibaba/ilogtail/helper/platformmeta"
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/platformmeta"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"

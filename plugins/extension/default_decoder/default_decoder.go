@@ -20,9 +20,9 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/alibaba/ilogtail/helper/decoder"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder"
 )
 
 // ensure ExtensionDefaultDecoder implements the extensions.Decoder interface

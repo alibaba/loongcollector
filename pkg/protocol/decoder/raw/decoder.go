@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2022 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,34 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sls
+package raw
 
 import (
-	"github.com/alibaba/ilogtail/helper/decoder/common"
+	"net/http"
+
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"net/http"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
-// Decoder impl
 type Decoder struct {
+	DisableUncompress bool
 }
 
-// Decode impl
-func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) ([]*protocol.Log, error) {
-	logGroup := &protocol.LogGroup{}
-	if err := logGroup.Unmarshal(data); err != nil {
-		return nil, err
-	}
-	return logGroup.Logs, nil
+func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, decodeErr error) {
+	groupEvents := &models.PipelineGroupEvents{}
+	groupEvents.Group = models.NewGroup(models.NewMetadata(), models.NewTags())
+	groupEvents.Events = []models.PipelineEvent{models.ByteArray(data)}
+	return []*models.PipelineGroupEvents{groupEvents}, nil
 }
 
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
+	if d.DisableUncompress {
+		return common.CollectRawBody(res, req, maxBodySize)
+	}
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
-	//TODO: Implement DecodeV2
+func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
 	return nil, nil
 }

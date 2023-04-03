@@ -37,7 +37,7 @@ func TestZeroCopySlice(t *testing.T) {
 
 // goos: darwin
 // goarch: amd64
-// pkg: github.com/alibaba/ilogtail/helper
+// pkg: github.com/alibaba/ilogtail/pkg/helper
 // cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
 // BenchmarkZeroCopyString
 // BenchmarkZeroCopyString/no-zero-copy
@@ -74,7 +74,7 @@ func BenchmarkZeroCopyString(b *testing.B) {
 
 // goos: darwin
 // goarch: amd64
-// pkg: github.com/alibaba/ilogtail/helper
+// pkg: github.com/alibaba/ilogtail/pkg/helper
 // cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
 // BenchmarkZeroCopySlice
 // BenchmarkZeroCopySlice/no-zero-copy
