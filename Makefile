@@ -39,9 +39,17 @@ else
 endif
 
 ifndef DOCKER_BUILD_USE_BUILDKIT
-	ifdef SSH_AUTH_SOCK
-		DOCKER_BUILD_USE_BUILDKIT = true
-	else
+	DOCKER_BUILD_USE_BUILDKIT = true
+
+	# docker BuildKit supported start from 19.03
+	docker_version := $(shell docker version --format '{{.Server.Version}}')
+	least_version := "19.03"
+	ifeq ($(shell printf "$(least_version)\n$(docker_version)" | sort -V | tail -n 1),$(least_version))
+		DOCKER_BUILD_USE_BUILDKIT = false
+	endif
+
+	# check if SSH_AUTH_SOCK env set which means ssh-agent running
+	ifndef SSH_AUTH_SOCK
 		DOCKER_BUILD_USE_BUILDKIT = false
 	endif
 endif

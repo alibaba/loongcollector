@@ -27,6 +27,25 @@ function arch() {
   fi
 }
 
+function check_docker_buildkit_support {
+  support="true"
+
+  # docker BuildKit supported start from 19.03
+    docker_version=$(docker version --format '{{.Server.Version}}' | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
+    least_version="19.03"
+  if [[ $(printf "%s\n%s" "$least_version" "$docker_version" | sort -V | tail -n 1) == "$least_version" ]]; then
+    support="false"
+  fi
+
+  # check if SSH_AUTH_SOCK env set which means ssh-agent running
+  ssh_agent_running="${SSH_AUTH_SOCK:-}"
+  if [[ -z "$ssh_agent_running" ]]; then
+    support="false"
+  fi
+
+  echo "$support"
+}
+
 # Currently, there are 4 supported docker categories, which are goc, build, development and production.
 #
 # goc: build goc server with Dockerfile_doc
@@ -40,7 +59,7 @@ GENERATED_HOME=$2
 VERSION=${3:-1.4.0}
 REPOSITORY=${4:-aliyun/ilogtail}
 PUSH=${5:-false}
-USE_DOCKER_BUILDKIT=${6:-${DOCKER_BUILD_USE_BUILDKIT:-$(if [[ -n "${SSH_AUTH_SOCK}" ]];then echo "true";else echo "false";fi)}}
+USE_DOCKER_BUILDKIT=${6:-${DOCKER_BUILD_USE_BUILDKIT:-$(check_docker_buildkit_support)}}
 
 HOST_OS=`uname -s`
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
@@ -71,15 +90,16 @@ else
   REMOVE_SSH_MOUNT='sed s/--mount=type=ssh//'
 fi
 
+echo "# syntax=docker/dockerfile:1.5" > $GEN_DOCKERFILE;
 if [[ $CATEGORY = "goc" || $CATEGORY = "build" ]]; then
-    cat $ROOTDIR/docker/Dockerfile_$CATEGORY | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT > $GEN_DOCKERFILE;
+    cat $ROOTDIR/docker/Dockerfile_$CATEGORY | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT >> $GEN_DOCKERFILE;
 elif [[ $CATEGORY = "development" ]]; then
-    cat $ROOTDIR/docker/Dockerfile_build | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT > $GEN_DOCKERFILE;
+    cat $ROOTDIR/docker/Dockerfile_build | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT >> $GEN_DOCKERFILE;
     cat $ROOTDIR/docker/Dockerfile_development_part |grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" >> $GEN_DOCKERFILE;
 elif [[ $CATEGORY = "production" ]]; then
-    cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" | sed 's/ --platform=$TARGETPLATFORM//' > $GEN_DOCKERFILE;
+    cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" | sed 's/ --platform=$TARGETPLATFORM//' >> $GEN_DOCKERFILE;
 elif [[ $CATEGORY = "multi-arch-production" ]]; then
-    cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" > $GEN_DOCKERFILE;
+    cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" >> $GEN_DOCKERFILE;
 fi
 
 echo "=============DOCKERFILE=================="
