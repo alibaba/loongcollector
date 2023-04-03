@@ -97,7 +97,15 @@ func (s *KeyValueSplitter) processLog(log *protocol.Log) {
 func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 	emptyKeyIndex := 0
 	noSeparatorKeyIndex := 0
-	for _, pair := range strings.Split(content, s.Delimiter) {
+	for {
+		dIdx := strings.Index(content, s.Delimiter)
+		var pair string
+		if dIdx == -1 {
+			pair = content
+		} else {
+			pair = content[:dIdx]
+		}
+
 		pos := strings.Index(pair, s.Separator)
 		if pos == -1 {
 			if s.ErrIfSeparatorNotFound {
@@ -110,20 +118,24 @@ func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 				})
 				noSeparatorKeyIndex++
 			}
-			continue
+		} else {
+			key := pair[:pos]
+			value := pair[pos+len(s.Separator):]
+			if len(key) == 0 {
+				key = s.EmptyKeyPrefix + strconv.Itoa(emptyKeyIndex)
+				emptyKeyIndex++
+				if s.ErrIfKeyIsEmpty {
+					logger.Warningf(s.context.GetRuntimeContext(), "KV_SPLITTER_ALARM",
+						"the key of pair with value (%v) is empty", value)
+				}
+			}
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
 		}
 
-		key := pair[:pos]
-		value := pair[pos+len(s.Separator):]
-		if len(key) == 0 {
-			key = s.EmptyKeyPrefix + strconv.Itoa(emptyKeyIndex)
-			emptyKeyIndex++
-			if s.ErrIfKeyIsEmpty {
-				logger.Warningf(s.context.GetRuntimeContext(), "KV_SPLITTER_ALARM",
-					"the key of pair with value (%v) is empty", value)
-			}
+		if dIdx == -1 {
+			break
 		}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
+		content = content[dIdx+len(s.Delimiter):]
 	}
 }
 
