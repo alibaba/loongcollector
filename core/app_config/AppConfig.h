@@ -43,6 +43,7 @@ public:
         return &singleton;
     }
 
+    bool mConfigServerAvailable;
     std::vector<ConfigServerAddress> mConfigServerAddresses;
     int mConfigServerAddressId;
     std::vector<std::string> mConfigServerTags;
@@ -56,6 +57,8 @@ public:
     bool IsDataServerPrivateCloud() const { return false; }
 
     const std::string& GetBindInterface() const { return mBindInterface; }
+    bool GetConfigServerAvailable() { return mConfigServerAvailable; }
+    void StopUsingConfigServer() { mConfigServerAvailable = false; }
     ConfigServerAddress GetOneConfigServerAddress(bool changeConfigServer);
     const std::vector<std::string>& GetConfigServerTags() const { return mConfigServerTags; }
 

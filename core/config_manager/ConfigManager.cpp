@@ -14,6 +14,7 @@
 
 #include "ConfigManager.h"
 #include <curl/curl.h>
+#include <boost/filesystem/operations.hpp>
 #include <cctype>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -58,6 +59,7 @@
 #include "sender/Sender.h"
 #include "processor/LogProcess.h"
 #include "processor/LogFilter.h"
+#include <boost/filesystem.hpp>
 
 using namespace std;
 using namespace logtail;
@@ -145,22 +147,24 @@ bool ConfigManager::CheckUpdateThread(bool configExistFlag) {
         int32_t curTime = time(NULL);
 
         if (curTime - lastCheckTime >= checkInterval) {
-            AppConfig::ConfigServerAddress configServerAddress = AppConfig::GetInstance()->GetOneConfigServerAddress(false);
-            if ("" != configServerAddress.host) {
+            if (AppConfig::GetInstance()->GetConfigServerAvailable()) {
+                AppConfig::ConfigServerAddress configServerAddress
+                    = AppConfig::GetInstance()->GetOneConfigServerAddress(false);
                 google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> checkResults;
                 google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> configDetails;
 
                 checkResults = SendHeartbeat(configServerAddress);
                 if (checkResults.size() > 0) {
+                    LOG_DEBUG(sLogger, ("fetch pipeline config, config file number", checkResults.size()));
                     configDetails = FetchPipelineConfig(configServerAddress, checkResults);
                     if (configDetails.size() > 0) {
                         UpdateRemoteConfig(checkResults, configDetails);
-                    }
-                    else configServerAddress = AppConfig::GetInstance()->GetOneConfigServerAddress(true);
-                }  
-                else configServerAddress = AppConfig::GetInstance()->GetOneConfigServerAddress(true);
+                    } else
+                        configServerAddress = AppConfig::GetInstance()->GetOneConfigServerAddress(true);
+                } else
+                    configServerAddress = AppConfig::GetInstance()->GetOneConfigServerAddress(true);
             }
-            
+
             if (!IsUpdate()) {
                 // DeleteHandlers is used to remove handlers deleted in main thread by
                 // EventDispatcherBase::DumpAllHandlersMeta after new configs are loaded.
@@ -227,9 +231,8 @@ Json::Value& ConfigManager::CheckPluginProcessor(Json::Value& pluginConfigJson, 
 }
 
 // ConfigServer
-google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> ConfigManager::SendHeartbeat(
-    const AppConfig::ConfigServerAddress& configServerAddress
-) {
+google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>
+ConfigManager::SendHeartbeat(const AppConfig::ConfigServerAddress& configServerAddress) {
     configserver::proto::HeartBeatRequest heartBeatReq;
     configserver::proto::AgentAttributes attributes;
     std::string requestID = sdk::Base64Enconde(string("heartbeat").append(to_string(time(NULL))));
@@ -239,18 +242,20 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> Confi
     attributes.set_version(ILOGTAIL_VERSION);
     attributes.set_ip(LogFileProfiler::mIpAddr);
     heartBeatReq.mutable_attributes()->MergeFrom(attributes);
-    heartBeatReq.mutable_tags()->MergeFrom({AppConfig::GetInstance()->GetConfigServerTags().begin(), AppConfig::GetInstance()->GetConfigServerTags().end()});
+    heartBeatReq.mutable_tags()->MergeFrom({AppConfig::GetInstance()->GetConfigServerTags().begin(),
+                                            AppConfig::GetInstance()->GetConfigServerTags().end()});
     heartBeatReq.set_running_status("");
     heartBeatReq.set_startup_time(0);
     heartBeatReq.set_interval(INT32_FLAG(config_update_interval));
 
     google::protobuf::RepeatedPtrField<configserver::proto::ConfigInfo> pipelineConfigs;
-    for (std::unordered_map<std::string, int64_t>::iterator it = mServerYamlConfigVersionMap.begin(); it != mServerYamlConfigVersionMap.end(); it++) {
-        configserver::proto::ConfigInfo info;
-        info.set_type(configserver::proto::PIPELINE_CONFIG);
-        info.set_name(it->first);
-        info.set_version(it->second);
-        pipelineConfigs.AddAllocated(&info);
+    for (std::unordered_map<std::string, int64_t>::iterator it = mServerYamlConfigVersionMap.begin();
+         it != mServerYamlConfigVersionMap.end();
+         it++) {
+        configserver::proto::ConfigInfo* info = pipelineConfigs.Add();
+        info->set_type(configserver::proto::PIPELINE_CONFIG);
+        info->set_name(it->first);
+        info->set_version(it->second);
     }
     heartBeatReq.mutable_pipeline_configs()->MergeFrom(pipelineConfigs);
 
@@ -276,52 +281,54 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> Confi
                     INT32_FLAG(sls_client_send_timeout),
                     httpResponse,
                     "",
-                    false
-        );
+                    false);
         configserver::proto::HeartBeatResponse heartBeatResp;
         heartBeatResp.ParseFromString(httpResponse.content);
 
-        if (0 != strcmp(heartBeatResp.request_id().c_str(), requestID.c_str())) return emptyResult;
+        if (0 != strcmp(heartBeatResp.request_id().c_str(), requestID.c_str()))
+            return emptyResult;
 
-        LOG_DEBUG(sLogger, ("SendHeartBeat","success")("reqBody", reqBody)
-                  ("requestId", heartBeatResp.request_id())("statusCode", heartBeatResp.code()));
+        LOG_DEBUG(sLogger,
+                  ("SendHeartBeat", "success")("reqBody", reqBody)("requestId", heartBeatResp.request_id())(
+                      "statusCode", heartBeatResp.code()));
 
         return heartBeatResp.pipeline_check_results();
     } catch (const sdk::LOGException& e) {
-        LOG_WARNING(sLogger, ("SendHeartBeat", "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())("errMsg", e.GetMessage()));
+        LOG_WARNING(
+            sLogger,
+            ("SendHeartBeat", "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())("errMsg", e.GetMessage()));
         return emptyResult;
     }
 }
 
 google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> ConfigManager::FetchPipelineConfig(
     const AppConfig::ConfigServerAddress& configServerAddress,
-    const google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>& requestConfigs
-) {
+    const google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>& requestConfigs) {
     configserver::proto::FetchPipelineConfigRequest fetchConfigReq;
-    string requestID = sdk::Base64Enconde(GetInstanceId().append("_").append(to_string(time(NULL)))); 
+    string requestID = sdk::Base64Enconde(GetInstanceId().append("_").append(to_string(time(NULL))));
     fetchConfigReq.set_request_id(requestID);
     fetchConfigReq.set_agent_id(GetInstanceId());
 
     google::protobuf::RepeatedPtrField<configserver::proto::ConfigInfo> configInfos;
     for (int i = 0; i < requestConfigs.size(); i++) {
         if (requestConfigs[i].check_status() != configserver::proto::DELETED) {
-            configserver::proto::ConfigInfo info;
-            info.set_type(configserver::proto::PIPELINE_CONFIG);
-            info.set_name(requestConfigs[i].name());
-            info.set_version(requestConfigs[i].new_version());
-            info.set_context(requestConfigs[i].context());
-            configInfos.AddAllocated(&info);
+            configserver::proto::ConfigInfo* info = configInfos.Add();
+            info->set_type(configserver::proto::PIPELINE_CONFIG);
+            info->set_name(requestConfigs[i].name());
+            info->set_version(requestConfigs[i].new_version());
+            info->set_context(requestConfigs[i].context());
         }
     }
     fetchConfigReq.mutable_req_configs()->MergeFrom(configInfos);
 
     string operation = sdk::CONFIGSERVERAGENT;
-    operation.append("/").append("GetConfigList");
+    operation.append("/").append("FetchPipelineConfig");
     map<string, string> httpHeader;
     httpHeader[sdk::CONTENT_TYPE] = sdk::TYPE_LOG_PROTOBUF;
     string reqBody;
     fetchConfigReq.SerializeToString(&reqBody);
     sdk::HttpMessage httpResponse;
+    httpResponse.header[sdk::X_LOG_REQUEST_ID] = "ConfigServer";
 
     sdk::CurlClient client;
     google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> emptyResult;
@@ -336,29 +343,40 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> ConfigMana
                     INT32_FLAG(sls_client_send_timeout),
                     httpResponse,
                     "",
-                    false
-        );
+                    false);
 
         configserver::proto::FetchPipelineConfigResponse fetchConfigResp;
         fetchConfigResp.ParseFromString(httpResponse.content);
 
-        if (0 != strcmp(fetchConfigResp.request_id().c_str(), requestID.c_str())) return emptyResult;
+        if (0 != strcmp(fetchConfigResp.request_id().c_str(), requestID.c_str()))
+            return emptyResult;
 
-        LOG_DEBUG(sLogger, ("GetConfigUpdateInfos","success")("reqBody", reqBody)
-                  ("requestId", fetchConfigResp.request_id())("statusCode", fetchConfigResp.code()));
+        LOG_DEBUG(sLogger,
+                  ("GetConfigUpdateInfos", "success")("reqBody", reqBody)("requestId", fetchConfigResp.request_id())(
+                      "statusCode", fetchConfigResp.code()));
         
         return fetchConfigResp.config_details();
     } catch (const sdk::LOGException& e) {
-        LOG_WARNING(sLogger, ("GetConfigUpdateInfos", "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())("errMsg", e.GetMessage()));
+        LOG_WARNING(sLogger,
+                    ("GetConfigUpdateInfos", "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())("errMsg",
+                                                                                                      e.GetMessage()));
         return emptyResult;
     }
 }
 
 void ConfigManager::UpdateRemoteConfig(
     const google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>& checkResults,
-    const google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail>& configDetails
-) {
+    const google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail>& configDetails) {
     static string serverConfigDirPath = AppConfig::GetInstance()->GetRemoteUserYamlConfigDirPath();
+
+    if (!boost::filesystem::exists(serverConfigDirPath)) {
+        bool res = boost::filesystem::create_directories(serverConfigDirPath);
+        if (!res) {
+            LOG_ERROR(sLogger, ("create remote config directory failed", serverConfigDirPath));
+            AppConfig::GetInstance()->StopUsingConfigServer();
+            return;
+        }
+    }
 
     string configName, oldConfigPath, newConfigPath;
     ofstream newConfig;
@@ -371,7 +389,7 @@ void ConfigManager::UpdateRemoteConfig(
             oldConfigPath = serverConfigDirPath + configName + "@" + to_string(checkResults[i].old_version()) + ".yaml";
         }
         if (configserver::proto::DELETED != checkResults[i].check_status()) {
-            for (int j = 0; j < configDetails.size(); j++) 
+            for (int j = 0; j < configDetails.size(); j++)
                 if (configDetails[j].name() == configName) {
                     configDetail = configDetails[j];
                     break;
@@ -380,17 +398,17 @@ void ConfigManager::UpdateRemoteConfig(
         newConfigPath = serverConfigDirPath + configName + "@" + to_string(checkResults[i].new_version()) + ".yaml";
 
         switch (checkResults[i].check_status()) {
-            case configserver::proto::DELETED: 
+            case configserver::proto::DELETED:
                 remove(oldConfigPath.c_str());
                 break;
             case configserver::proto::MODIFIED:
                 remove(oldConfigPath.c_str());
-                newConfig.open(newConfigPath.c_str(),ios::out);
+                newConfig.open(newConfigPath.c_str(), ios::out);
                 newConfig << configDetail.detail();
                 newConfig.close();
                 break;
-            case configserver::proto::NEW: 
-                newConfig.open(newConfigPath.c_str(),ios::out);
+            case configserver::proto::NEW:
+                newConfig.open(newConfigPath.c_str(), ios::out);
                 newConfig << configDetail.detail();
                 newConfig.close();
                 break;
