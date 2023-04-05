@@ -31,3 +31,9 @@ Processor 的开发分为以下步骤:
 5. 进行单测或者E2E测试，请参考[如何使用单测](../test/unit-test.md) 与 [如何使用E2E测试](../test/e2e-test.md).
 6. 使用 *make lint* 检查代码规范。
 7. 提交Pull Request。
+
+## Processor 准入性能规范
+
+*基础case参考*：512随机字符作为内容，完整执行一次processor中的逻辑。
+
+*处理速度准入条件*：4w/s。

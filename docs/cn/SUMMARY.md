@@ -73,6 +73,7 @@
   * [键值对](data-pipeline/processor/processor-split-key-value.md)
   * [多行切分](data-pipeline/processor/processor-split-log-regex.md)
   * [云平台元数据](data-pipeline/processor/processor-cloudmeta.md)
+  * [字符串替换](data-pipeline/processor/processor-string-replace.md)
 * [聚合](data-pipeline/aggregator/README.md)
   * [基础](data-pipeline/aggregator/aggregator-base.md)
   * [上下文](data-pipeline/aggregator/aggregator-context.md)

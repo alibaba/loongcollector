@@ -100,6 +100,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/processor/split/logstring"
     - import: "github.com/alibaba/ilogtail/plugins/processor/split/string"
     - import: "github.com/alibaba/ilogtail/plugins/processor/strptime"
+    - import: "github.com/alibaba/ilogtail/plugins/processor/stringreplace"
   linux:
     - import: "github.com/alibaba/ilogtail/plugins/flusher/sls"
     - import: "github.com/alibaba/ilogtail/plugins/input/docker/logmeta"
