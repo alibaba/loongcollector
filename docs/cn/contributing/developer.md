@@ -58,10 +58,12 @@ iLogtail 社区包含 Maintainer、Committer、Contributor、User 等角色，�
 ### Committer
 
 * Runqi Lin([@linrunqi08](https://github.com/linrunqi08))
-* Qian Sheng([@qiansheng91](https://github.com/qiansheng91))
+* Qiansheng([@qiansheng91](https://github.com/qiansheng91))
 * Yonghua Sun([@yonghua-sun](https://github.com/yonghua-sun))
 * Haoxiang Zhang([@henryzhx8](https://github.com/henryzhx8))
 * Haoyang Liu([@liuhaoyang](https://github.com/liuhaoyang))
+* Gangping Guo([@snakorse](https://github.com/snakorse))
+* Yu Sun([@shalousun](https://github.com/shalousun))
 
 ### Contributor
 
