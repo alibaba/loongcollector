@@ -20,7 +20,7 @@
 | NoMatchError | Boolean  | 否    | 正则表达式与原始字段的值不匹配时是否报错。如果未添加该参数，则默认使用false，表示不报错。                           |
 | KeepSource   | Boolean  | 否    | 是否保留原始字段。如果未添加该参数，则默认使用false，表示不保留。                                       |
 | FullMatch    | Boolean  | 否    | 如果未添加该参数，则默认使用true，表示只有字段完全匹配Regex参数中的正则表达式时才被提取。配置为false，表示部分字段匹配也会进行提取。 |
-
+| KeepSourceIfParseError | Boolean | 否    | 解析失败时，是否保留原始日志。如果未添加该参数，则默认使用true，表示保留原始日志。       |
 ## 样例
 
 采集`/home/test-log/`路径下的`reg.log`文件，日志内容按照提取字段。
