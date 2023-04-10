@@ -219,6 +219,75 @@ func TestSplitWithChineseCharacter(t *testing.T) {
 	}
 }
 
+func buildQValue(value string, quote string) string {
+	return quote + value + quote
+}
+
+func TestSplitWithQuote(t *testing.T) {
+	s := newKeyValueSplitter()
+	s.KeepSource = true
+	s.SourceKey = "content"
+	s.NoSeparatorKeyPrefix = "MySeparatorPrefix_"
+	s.Delimiter = " "
+	Quotes := []string{"\"", "\"\"", "\"\"\""}
+	for _, quote := range Quotes {
+		s.Quote = quote
+		ctx := &pm.ContextImp{}
+		ctx.InitContext("test", "test", "test")
+		_ = s.Init(ctx)
+		log := &protocol.Log{}
+		log.Contents = append(log.Contents, &protocol.Log_Content{
+			Key: s.SourceKey,
+			Value: "a1:" + buildQValue("b \\\" c", quote) +
+				" a2:" + buildQValue("b \\\" \\\" c \\\\", quote) +
+				" class:main userid:123456" +
+				" half_quote:\" " +
+				buildQValue("多  分  隔 ", quote) +
+				" method:get " + buildQValue("中文", quote) +
+				" chinesekey:" + buildQValue("中文", quote) +
+				" " + buildQValue("", quote) +
+				" nullval:" + buildQValue("", quote) +
+				" http_user_agent:" + buildQValue("User Agent", quote) +
+				" message:" + buildQValue("wrong user", quote) +
+				" 100 empty key\n\nhello " +
+				buildQValue("no separator again", quote) + " \"123",
+		})
+		logArray := []*protocol.Log{log}
+
+		outLogArray := s.ProcessLogs(logArray)
+		require.Equal(t, len(outLogArray), 1)
+		outLog := logArray[0]
+		require.Equalf(t, len(outLog.Contents), 19, "%v", outLog.Contents)
+		contents := outLog.Contents
+		expectedPairs := []struct {
+			Key   string
+			Value string
+		}{
+			{"a1", "b \\\" c"},
+			{"a2", "b \\\" \\\" c \\\\"},
+			{"class", "main"},
+			{"userid", "123456"},
+			{"method", "get"},
+			{"http_user_agent", "User Agent"},
+			{"message", "wrong user"},
+			{"nullval", ""},
+			{"chinesekey", "中文"},
+			{"half_quote", "\""},
+			{s.NoSeparatorKeyPrefix + "0", "多  分  隔 "},
+			{s.NoSeparatorKeyPrefix + "1", "中文"},
+			{s.NoSeparatorKeyPrefix + "2", ""},
+			{s.NoSeparatorKeyPrefix + "3", "100"},
+			{s.NoSeparatorKeyPrefix + "4", "empty"},
+			{s.NoSeparatorKeyPrefix + "5", "key\n\nhello"},
+			{s.NoSeparatorKeyPrefix + "6", "no separator again"},
+			{s.NoSeparatorKeyPrefix + "7", "\"123"},
+		}
+		for _, p := range expectedPairs {
+			require.Truef(t, searchPair(contents, p.Key, p.Value), "%v:%v", p, contents)
+		}
+	}
+}
+
 func benchmarkSplit(b *testing.B, s *KeyValueSplitter, totalPartCount int, partLength int) {
 	value := ""
 	for countIdx := 0; countIdx < totalPartCount; countIdx++ {
@@ -264,7 +333,7 @@ func BenchmarkSplit_S_S_10_30(b *testing.B) {
 }
 
 // split-range 252682              4816 ns/op            3544 B/op         59 allocs/op
-// slice-index 271048              4104 ns/op            2648 B/op         58 allocs/op
+// slice-index 264661              4090 ns/op            2648 B/op         58 allocs/op
 func BenchmarkSplit_S_S_50_100(b *testing.B) {
 	s := newKeyValueSplitter()
 	s.KeepSource = true
@@ -277,7 +346,7 @@ func BenchmarkSplit_S_S_50_100(b *testing.B) {
 }
 
 // split-range 105076              9728 ns/op            7064 B/op        110 allocs/op
-// slice-index 127370              8742 ns/op            5272 B/op        109 allocs/op
+// slice-index 150987              7647 ns/op            5272 B/op        109 allocs/op
 func BenchmarkSplit_S_S_100_100(b *testing.B) {
 	s := newKeyValueSplitter()
 	s.KeepSource = true
@@ -290,7 +359,7 @@ func BenchmarkSplit_S_S_100_100(b *testing.B) {
 }
 
 // split-range 239517	      	   5873 ns/op	    	 3544 B/op	       59 allocs/op
-// slice-index 248164              4972 ns/op            2648 B/op         58 allocs/op
+// slice-index 253881              4824 ns/op            2648 B/op         58 allocs/op
 func BenchmarkSplit_S_S_50_500(b *testing.B) {
 	s := newKeyValueSplitter()
 	s.KeepSource = true
@@ -303,7 +372,7 @@ func BenchmarkSplit_S_S_50_500(b *testing.B) {
 }
 
 // split-range 172878              6370 ns/op            3544 B/op         59 allocs/op
-// slice-index 195397              5795 ns/op            2648 B/op         58 allocs/op
+// slice-index 194558              5837 ns/op            2648 B/op         58 allocs/op
 func BenchmarkSplit_S_S_50_1000(b *testing.B) {
 	s := newKeyValueSplitter()
 	s.KeepSource = true

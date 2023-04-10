@@ -15,12 +15,12 @@
 package kvsplitter
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"strconv"
-	"strings"
 )
 
 type KeyValueSplitter struct {
@@ -32,6 +32,7 @@ type KeyValueSplitter struct {
 	KeepSource           bool
 	EmptyKeyPrefix       string
 	NoSeparatorKeyPrefix string
+	Quote                string
 
 	DiscardWhenSeparatorNotFound bool
 	ErrIfSourceKeyNotFound       bool
@@ -106,6 +107,7 @@ func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 			pair = content[:dIdx]
 		}
 
+		pair, dIdx = s.concatQuotePair(pair, content, dIdx)
 		pos := strings.Index(pair, s.Separator)
 		if pos == -1 {
 			if s.ErrIfSeparatorNotFound {
@@ -114,13 +116,13 @@ func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 			if !s.DiscardWhenSeparatorNotFound {
 				log.Contents = append(log.Contents, &protocol.Log_Content{
 					Key:   s.NoSeparatorKeyPrefix + strconv.Itoa(noSeparatorKeyIndex),
-					Value: pair,
+					Value: s.getValue(pair),
 				})
 				noSeparatorKeyIndex++
 			}
 		} else {
 			key := pair[:pos]
-			value := pair[pos+len(s.Separator):]
+			value := s.getValue(pair[pos+len(s.Separator):])
 			if len(key) == 0 {
 				key = s.EmptyKeyPrefix + strconv.Itoa(emptyKeyIndex)
 				emptyKeyIndex++
@@ -132,11 +134,61 @@ func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
 		}
 
-		if dIdx == -1 {
+		if dIdx == -1 || dIdx+len(s.Delimiter) > len(content) {
 			break
+		} else {
+			content = content[dIdx+len(s.Delimiter):]
 		}
-		content = content[dIdx+len(s.Delimiter):]
 	}
+}
+
+func (s *KeyValueSplitter) concatQuotePair(pair string, content string, dIdx int) (string, int) {
+	// If Pair not end with quote,try to reIndex the pair
+	// Separator+Quote or Quote in prefix
+	if dIdx >= 0 && len(s.Quote) > 0 && !strings.HasSuffix(pair, s.Quote) &&
+		(strings.Index(pair, s.Separator+s.Quote) > 0 || strings.HasPrefix(pair, s.Quote)) {
+		// ReIndex from last delimiter to find next quote index
+		// Ignore \Quote situation
+		if lastQuote := s.getNearestQuote(content, dIdx); lastQuote >= 0 {
+			dIdx = lastQuote
+			pair = content[:dIdx]
+		}
+	}
+	return pair, dIdx
+}
+
+func (s *KeyValueSplitter) getNearestQuote(content string, startPos int) int {
+	for startPos < len(content) {
+		if len(s.Quote) == 1 {
+			lastQuoteContent := strings.Index(content[startPos:], " \\"+s.Quote)
+			lastQuote := strings.Index(content[startPos+1:], s.Quote)
+			// relate to last quote real position
+			startPos = (lastQuote + startPos + 1 + len(s.Quote))
+			if lastQuoteContent >= 0 {
+				if lastQuoteContent+1 == lastQuote { // hit latent content
+					continue
+				} else if lastQuote >= 0 { // hit latent content,but quote comes first
+					return startPos
+				}
+			} else { // no \\quote and has next quote
+				return startPos
+			}
+		} else {
+			startPos += (strings.Index(content[startPos+1:], s.Quote) + len(s.Separator+s.Quote))
+			return startPos
+		}
+	}
+	return startPos
+}
+
+func (s *KeyValueSplitter) getValue(value string) string {
+	if lenQ := len(s.Quote); lenQ > 0 {
+		// remove quote
+		if len(value) >= 2*lenQ && strings.HasPrefix(value, s.Quote) && strings.HasSuffix(value, s.Quote) {
+			value = value[lenQ : len(value)-lenQ]
+		}
+	}
+	return value
 }
 
 func newKeyValueSplitter() *KeyValueSplitter {
