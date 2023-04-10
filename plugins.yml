@@ -55,6 +55,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/input/mockd"
     - import: "github.com/alibaba/ilogtail/plugins/input/mqtt"
     - import: "github.com/alibaba/ilogtail/plugins/input/mysql"
+    - import: "github.com/alibaba/ilogtail/plugins/input/goprofile"
     - import: "github.com/alibaba/ilogtail/plugins/input/mysqlbinlog"
     - import: "github.com/alibaba/ilogtail/plugins/input/netping"
     - import: "github.com/alibaba/ilogtail/plugins/input/nginx"

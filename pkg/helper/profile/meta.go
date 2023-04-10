@@ -34,32 +34,27 @@ type Stack struct {
 	Stack []string
 }
 
-type Kind int
+type Type struct {
+	Name string
+	Kind string
+}
 
-const (
-	_ Kind = iota
-	CPUKind
-	MemKind
-	MutexKind
-	GoRoutinesKind
-	ExceptionKind
-	UnknownKind
+var (
+	CPUType       = Type{Name: "cpu", Kind: "profile_cpu"}
+	MemType       = Type{Name: "mem", Kind: "profile_mem"}
+	MutexType     = Type{Name: "mutex", Kind: "profile_mutex"}
+	BlockType     = Type{Name: "block", Kind: "profile_block"}
+	ExceptionType = Type{Name: "exception", Kind: "profile_exception"}
+	GoroutineType = Type{Name: "goroutines", Kind: "profile_goroutines"}
+	UnknownType   = Type{Name: "unknown", Kind: "profile_unknown"}
 )
 
-func (p Kind) String() string {
-	switch p {
-	case CPUKind:
-		return "profile_cpu"
-	case MemKind:
-		return "profile_mem"
-	case MutexKind:
-		return "profile_mutex"
-	case GoRoutinesKind:
-		return "profile_goroutines"
-	case ExceptionKind:
-		return "profile_exception"
+func IsLegalType(t Type) bool {
+	switch t {
+	case CPUType, MemType, MutexType, BlockType, ExceptionType, GoroutineType:
+		return true
 	default:
-		return "profile_unknown"
+		return false
 	}
 }
 
@@ -106,20 +101,20 @@ const (
 	LockSamplesUnits     Units = "lock_samples"
 )
 
-func DetectProfileType(valType string) Kind {
+func DetectProfileType(valType string) Type {
 	switch valType {
 	case "inuse_space", "inuse_objects", "alloc_space", "alloc_objects", "alloc-size", "alloc-samples", "alloc_in_new_tlab_objects", "alloc_in_new_tlab_bytes", "alloc_outside_tlab_objects", "alloc_outside_tlab_bytes":
-		return MemKind
+		return MemType
 	case "samples", "cpu", "itimer", "lock_count", "lock_duration", "wall":
-		return CPUKind
+		return CPUType
 	case "mutex_count", "mutex_duration", "block_duration", "block_count", "contentions", "delay", "lock-time", "lock-count":
-		return MemKind
+		return MutexType
 	case "goroutines", "goroutine":
-		return GoRoutinesKind
+		return GoroutineType
 	case "exception":
-		return ExceptionKind
+		return ExceptionType
 	default:
-		return UnknownKind
+		return UnknownType
 	}
 }
 

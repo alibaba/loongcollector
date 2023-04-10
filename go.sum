@@ -895,8 +895,8 @@ github.com/iLogtail/metrics v1.23.0-ilogtail h1:WHhiXtMy5+HWiPpDwO7a0zkMjPd7IPa5
 github.com/iLogtail/metrics v1.23.0-ilogtail/go.mod h1:rAr/llLpEnAdTehiNlUxKgnjcOuROSzpw0GvjpEbvFc=
 github.com/iLogtail/parser v0.0.0-20210415081931-48e7f467fd74-ilogtail h1:HTafOET9UvmNpjFY/Z/E1YvLFpku4HSKP9V4PrzaWwE=
 github.com/iLogtail/parser v0.0.0-20210415081931-48e7f467fd74-ilogtail/go.mod h1:xZC8I7bug4GJ5KtHhgAikjTfU4kBv1Sbo3Pf1MZ6lVw=
-github.com/iLogtail/pyroscope-lib v0.35.1-ilogtail h1:ykz2XWHVp5ZBvb7OZ1xWSJ5HHeX/WcU6IybRopc3dGw=
-github.com/iLogtail/pyroscope-lib v0.35.1-ilogtail/go.mod h1:0XCJ3eS5qviq+PNhjBB5T/MPE54OUejhsxdL0405mOQ=
+github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail h1:n+om7Idv1ftoVOiqmL4CRWGeoj1v8TTQa7V809XiHT4=
+github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail/go.mod h1:IpElNUA9ousagl2w05BZbzGxmd8cOERYA2vZ+DoznlQ=
 github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
@@ -905,8 +905,9 @@ github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJ
 github.com/imdario/mergo v0.3.8/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.10/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
-github.com/imdario/mergo v0.3.12 h1:b6R2BslTbIEToALKP7LxUvijTsNI9TAe80pLWN2g/HU=
 github.com/imdario/mergo v0.3.12/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
+github.com/imdario/mergo v0.3.15 h1:M8XP7IuFNsqUx6VPK2P9OSmsYsI/YFaGil0uD21V3dM=
+github.com/imdario/mergo v0.3.15/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/influxdata/go-syslog v1.0.1 h1:a/ARpnCDr/sX/hVH7dyQVi+COXlEzM4bNIoolOfw99Y=
 github.com/influxdata/go-syslog v1.0.1/go.mod h1:zAVA46ROTGBUi5zyIJODjMJYJKy+ooglXp0X3LgoIUE=

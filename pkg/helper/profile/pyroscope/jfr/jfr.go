@@ -85,7 +85,7 @@ func (r *RawProfile) extractProfileV1(meta *profile.Meta, tags map[string]string
 			},
 			&protocol.Log_Content{
 				Key:   "type",
-				Value: profile.DetectProfileType(types[0]).String(),
+				Value: profile.DetectProfileType(types[0]).Kind,
 			},
 			&protocol.Log_Content{
 				Key:   "dataType",

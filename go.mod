@@ -69,7 +69,7 @@ require (
 require (
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/pyroscope-io/jfr-parser v0.6.0 // indirect
-	github.com/pyroscope-io/pyroscope v0.37.2 // indirect
+	github.com/pyroscope-io/pyroscope v0.37.2
 	k8s.io/cri-api v0.23.1 // indirect
 )
 
@@ -130,7 +130,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.17 // indirect
 	github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63 // indirect
 	github.com/pingcap/parser v0.0.0-20210415081931-48e7f467fd74 // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
+	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/prometheus v1.8.2-0.20201119142752-3ad25a6dc3d9 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
@@ -200,7 +200,7 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
-	github.com/imdario/mergo v0.3.12 // indirect
+	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.12.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
@@ -285,7 +285,7 @@ replace (
 	github.com/pingcap/parser => github.com/iLogtail/parser v0.0.0-20210415081931-48e7f467fd74-ilogtail
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.35.0
 	github.com/pyroscope-io/jfr-parser => github.com/iLogtail/jfr-parser v0.6.0
-	github.com/pyroscope-io/pyroscope => github.com/iLogtail/pyroscope-lib v0.35.1-ilogtail
+	github.com/pyroscope-io/pyroscope => github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 	github.com/siddontang/go-mysql => github.com/iLogtail/go-mysql v0.0.0-20180725024449-535abe8f2eba-ilogtail
 	github.com/streadway/handy => github.com/iLogtail/handy v0.0.0-20230327021402-6a47ec586270

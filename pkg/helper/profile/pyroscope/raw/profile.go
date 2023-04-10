@@ -118,7 +118,7 @@ func (p *Profile) extractProfileV1(meta *profile.Meta, tags map[string]string) f
 			},
 			&protocol.Log_Content{
 				Key:   "type",
-				Value: profile.DetectProfileType(meta.Units.DetectValueType()).String(),
+				Value: profile.DetectProfileType(meta.Units.DetectValueType()).Kind,
 			},
 			&protocol.Log_Content{
 				Key:   "units",

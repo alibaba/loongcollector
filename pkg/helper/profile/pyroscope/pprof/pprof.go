@@ -81,20 +81,29 @@ var DefaultSampleTypeMapping = map[string]*tree.SampleTypeConfig{
 }
 
 type RawProfile struct {
-	RawData             []byte
-	FormDataContentType string
+	rawData             []byte
+	formDataContentType string
 	profile             []byte
 	previousProfile     []byte
 	sampleTypeConfig    map[string]*tree.SampleTypeConfig
 	parser              *Parser
+	pushMode            bool
 
 	logs []*protocol.Log // v1 result
 }
 
+func NewRawProfileByPull(current, pre []byte, config map[string]*tree.SampleTypeConfig) *RawProfile {
+	return &RawProfile{
+		profile:         current,
+		previousProfile: pre,
+	}
+}
+
 func NewRawProfile(data []byte, format string) *RawProfile {
 	return &RawProfile{
-		RawData:             data,
-		FormDataContentType: format,
+		rawData:             data,
+		formDataContentType: format,
+		pushMode:            true,
 	}
 }
 
@@ -109,9 +118,12 @@ func (r *RawProfile) Parse(ctx context.Context, meta *profile.Meta, tags map[str
 }
 
 func (r *RawProfile) doParse(ctx context.Context, meta *profile.Meta, cb profile.CallbackFunc) error {
-	if err := r.extractProfileRaw(); err != nil {
-		return fmt.Errorf("cannot extract profile: %w", err)
+	if r.pushMode {
+		if err := r.extractProfileRaw(); err != nil {
+			return fmt.Errorf("cannot extract profile: %w", err)
+		}
 	}
+
 	if len(r.profile) == 0 {
 		return errors.New("empty profile")
 	}
@@ -284,7 +296,7 @@ func (r *RawProfile) extractProfileV1(meta *profile.Meta, tags map[string]string
 			},
 			&protocol.Log_Content{
 				Key:   "type",
-				Value: profile.DetectProfileType(types[0]).String(),
+				Value: profile.DetectProfileType(types[0]).Kind,
 			},
 			&protocol.Log_Content{
 				Key:   "dataType",
@@ -358,15 +370,15 @@ func buildKey(appLabels map[string]string, labels tree.Labels, table []string) *
 }
 
 func (r *RawProfile) extractProfileRaw() error {
-	if r.FormDataContentType == "" {
-		r.profile = r.RawData
+	if r.formDataContentType == "" {
+		r.profile = r.rawData
 		return nil
 	}
-	boundary, err := form.ParseBoundary(r.FormDataContentType)
+	boundary, err := form.ParseBoundary(r.formDataContentType)
 	if err != nil {
 		return err
 	}
-	f, err := multipart.NewReader(bytes.NewReader(r.RawData), boundary).ReadForm(32 << 20)
+	f, err := multipart.NewReader(bytes.NewReader(r.rawData), boundary).ReadForm(32 << 20)
 	if err != nil {
 		return err
 	}
