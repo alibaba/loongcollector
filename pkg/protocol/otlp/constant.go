@@ -15,6 +15,7 @@
 package otlp
 
 // internal event tag keys of otlp logs/metrics/traces.
+// don't forget to update IsInternalTag when adding new tag keys.
 const (
 	TagKeyScopeName                    = "otlp.scope.name"
 	TagKeyScopeVersion                 = "otlp.scope.version"
@@ -26,9 +27,11 @@ const (
 	TagKeySpanDroppedEventsCount       = "otlp.span.dropped.events.count"
 	TagKeySpanDroppedLinksCount        = "otlp.span.dropped.links.count"
 	TagKeySpanDroppedAttrsCount        = "otlp.span.dropped.attributes.count"
+	TagKeyLogFlag                      = "otlp.log.flag"
 )
 
 // internal field names of otlp metrics.
+// don't forget to update IsInternalField when adding new tag keys.
 const (
 	FieldCount          = "count"
 	FieldSum            = "sum"

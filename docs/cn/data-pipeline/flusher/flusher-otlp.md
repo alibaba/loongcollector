@@ -3,6 +3,7 @@
 ## 简介
 
 `flusher_otlp` `flusher`插件可以实现将采集到的数据，经过处理后，发送到支持`Opentelemetry Protocol`的后端。
+v1流水线目前只支持Logs数据，v2流水线支持Logs/Metrics/Traces三种数据。
 
 ## 版本
 

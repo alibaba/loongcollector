@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
@@ -56,6 +57,96 @@ func TestNormal(t *testing.T) {
 	fmt.Printf("%s\n", string(data))
 	data = []byte("")
 	fmt.Printf("empty = [%s]\n", string(data))
+}
+
+func TestConvertOtlpLogsToGroupEvents(t *testing.T) {
+	plogs := plog.NewLogs()
+	rsLogs := plogs.ResourceLogs().AppendEmpty()
+	rsLogs.Resource().Attributes().PutStr("meta_attr1", "attr_value1")
+	rsLogs.Resource().Attributes().PutStr("meta_attr2", "attr_value2")
+	scopeLog := rsLogs.ScopeLogs().AppendEmpty()
+	scopeLog.Scope().Attributes().PutStr("scope_key1", "scope_value1")
+
+	logRecord := scopeLog.LogRecords().AppendEmpty()
+	logRecord.Body().SetStr("some log message")
+	logRecord.SetSeverityNumber(plog.SeverityNumberInfo)
+	logRecord.SetTimestamp(1234567890)
+	logRecord.Attributes().PutStr("process", "process_name")
+	logRecord.SetTraceID(pcommon.TraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}))
+	logRecord.SetSpanID(pcommon.SpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8}))
+
+	groupEventsSlice, err := ConvertOtlpLogsToGroupEvents(plogs)
+
+	// Check the results
+	assert.Nil(t, err)
+	assert.NotNil(t, groupEventsSlice)
+	assert.Equal(t, 1, len(groupEventsSlice))
+	group := groupEventsSlice[0].Group
+	assert.NotNil(t, group)
+	assert.Equal(t, 2, group.Metadata.Len())
+	assert.Equal(t, "attr_value1", group.Metadata.Get("meta_attr1"))
+	assert.Equal(t, "attr_value2", group.Metadata.Get("meta_attr2"))
+
+	assert.Equal(t, 1+3, group.Tags.Len())
+	assert.Equal(t, "scope_value1", group.Tags.Get("scope_key1"))
+
+	events := groupEventsSlice[0].Events
+	assert.Equal(t, 1, len(events))
+	actualLog := events[0].(*models.Log)
+	assert.Equal(t, models.EventTypeLogging, events[0].GetType())
+	assert.Equal(t, []byte("some log message"), actualLog.Body)
+	assert.Equal(t, "Info", actualLog.Level)
+	assert.Equal(t, "0102030405060708", actualLog.SpanID)
+	assert.Equal(t, "0102030405060708090a0b0c0d0e0f10", actualLog.TraceID)
+	assert.Equal(t, uint64(1234567890), actualLog.Timestamp)
+	assert.Equal(t, "process_name", actualLog.Tags.Get("process"))
+}
+
+func TestDecoder_DecodeV2_Logs(t *testing.T) {
+	// complcated case
+	encoder := &plog.JSONMarshaler{}
+	jsonBuf, err := encoder.MarshalLogs(logsOTLP)
+	assert.NoError(t, err)
+	httpReq, _ := http.NewRequest("Post", "", nil)
+	httpReq.Header.Set("Content-Type", jsonContentType)
+	decoder := &Decoder{Format: common.ProtocolOTLPLogV1}
+
+	pipelineGrouptEventsSlice, err := decoder.DecodeV2(jsonBuf, httpReq)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(pipelineGrouptEventsSlice))
+	otlpResLogs := logsOTLP.ResourceLogs().At(0)
+
+	for i, groupEvents := range pipelineGrouptEventsSlice {
+		resource := groupEvents.Group.Metadata
+		assert.Equal(t, "testHost", resource.Get("host.name"))
+
+		scopeAttributes := groupEvents.Group.Tags
+		assert.Equal(t, "version", scopeAttributes.Get(otlp.TagKeyScopeVersion))
+		assert.Equal(t, "name", scopeAttributes.Get(otlp.TagKeyScopeName))
+
+		otlpLogs := otlpResLogs.ScopeLogs().At(i).LogRecords()
+		assert.Equal(t, 1, len(groupEvents.Events))
+
+		for j, event := range groupEvents.Events {
+			otlpLog := otlpLogs.At(j)
+			name := event.GetName()
+			assert.Equal(t, logEventName, name)
+
+			eventType := event.GetType()
+			assert.Equal(t, models.EventTypeLogging, eventType)
+			log, ok := event.(*models.Log)
+			assert.True(t, ok)
+			assert.Equal(t, otlpLog.TraceID().String(), log.TraceID)
+			assert.Equal(t, otlpLog.SpanID().String(), log.SpanID)
+
+			otlpLog.Attributes().Range(
+				func(k string, v pcommon.Value) bool {
+					assert.True(t, log.Tags.Contains(k))
+					return true
+				},
+			)
+		}
+	}
 }
 
 func TestDecoder_DecodeV2_MetricsUntyped(t *testing.T) {
@@ -485,6 +576,35 @@ func TestDecoder_DecodeV2_Traces(t *testing.T) {
 		}
 	}
 }
+
+// reference: https://github.com/open-telemetry/opentelemetry-collector/blob/main/pdata/plog/json_test.go#L28
+var logsOTLP = func() plog.Logs {
+	ld := plog.NewLogs()
+	rl := ld.ResourceLogs().AppendEmpty()
+	rl.Resource().Attributes().PutStr("host.name", "testHost")
+	rl.Resource().SetDroppedAttributesCount(1)
+	rl.SetSchemaUrl("testSchemaURL")
+	il := rl.ScopeLogs().AppendEmpty()
+	il.Scope().SetName("name")
+	il.Scope().SetVersion("version")
+	il.Scope().SetDroppedAttributesCount(1)
+	il.SetSchemaUrl("ScopeLogsSchemaURL")
+	lg := il.LogRecords().AppendEmpty()
+	lg.SetSeverityNumber(plog.SeverityNumberError)
+	lg.SetSeverityText("Error")
+	lg.SetDroppedAttributesCount(1)
+	lg.SetFlags(plog.DefaultLogRecordFlags)
+	traceID := pcommon.TraceID([16]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10})
+	spanID := pcommon.SpanID([8]byte{0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18})
+	lg.SetTraceID(traceID)
+	lg.SetSpanID(spanID)
+	lg.Body().SetStr("hello world")
+	t := pcommon.NewTimestampFromTime(time.Now())
+	lg.SetTimestamp(t)
+	lg.SetObservedTimestamp(t)
+	lg.Attributes().PutStr("sdkVersion", "1.0.1")
+	return ld
+}()
 
 // reference: https://github.com/open-telemetry/opentelemetry-collector/blob/main/pdata/pmetric/json_test.go#L60
 var metricsSumOTLPFull = func() pmetric.Metrics {

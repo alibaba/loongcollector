@@ -125,7 +125,7 @@ func Test_Flusher_Flush(t *testing.T) {
 	})
 }
 
-func Test_Flusher_Export_Logs(t *testing.T) {
+func Test_Flusher_Export_Logs_Empty(t *testing.T) {
 	convey.Convey("When init grpc service", t, func() {
 		addr := test.GetAvailableLocalAddress(t)
 		service, _, _, server := newTestGrpcMetricServiceV2(t, addr, time.Nanosecond*1)
@@ -139,6 +139,51 @@ func Test_Flusher_Export_Logs(t *testing.T) {
 			err := f.Init(logCtx)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(0, convey.ShouldEqual, len(service.ch))
+		})
+	})
+}
+
+func Test_Flusher_Export_Logs(t *testing.T) {
+	convey.Convey("When init grpc service", t, func() {
+		addr := test.GetAvailableLocalAddress(t)
+		service, _, _, server := newTestGrpcMetricServiceV2(t, addr, time.Nanosecond*0)
+		defer func() {
+			server.Stop()
+		}()
+		logCtx := mock.NewEmptyContext("p", "l", "c")
+
+		convey.Convey("When FlusherOTLP init", func() {
+			f := &FlusherOTLP{Version: v1, Logs: &helper.GrpcClientConfig{Endpoint: addr, WaitForReady: true}}
+			err := f.Init(logCtx)
+			convey.So(err, convey.ShouldBeNil)
+
+			convey.Convey("When FlusherOTLP flush", func() {
+				PipelineGroupEventsSlice := makeTestPipelineGroupEventsLogSlice()
+				err := f.Export(PipelineGroupEventsSlice, pipeline.NewNoopPipelineConext())
+				convey.So(err, convey.ShouldBeNil)
+				r := <-service.ch
+				r2, _, _ := f.convertPipelinesGroupeEventsToRequest(PipelineGroupEventsSlice)
+				convey.So(r.Logs().ResourceLogs().Len(), convey.ShouldEqual, r2.Logs().ResourceLogs().Len())
+
+				for i := 0; i < r.Logs().ResourceLogs().Len(); i++ {
+					resourceSpan := r.Logs().ResourceLogs().At(i)
+					for j := 0; j < resourceSpan.ScopeLogs().Len(); j++ {
+						scopemetric := resourceSpan.ScopeLogs().At(j)
+
+						for m := 0; m < scopemetric.LogRecords().Len(); m++ {
+							span := scopemetric.LogRecords().At(m)
+							expected := span
+							actual := r2.Logs().ResourceLogs().At(i).ScopeLogs().At(j).LogRecords().At(m)
+							convey.So(3, convey.ShouldEqual, actual.Attributes().Len())
+							convey.So(expected.Attributes().Len(), convey.ShouldEqual, actual.Attributes().Len())
+							convey.So(expected.Timestamp(), convey.ShouldEqual, actual.Timestamp())
+							convey.So(expected.Body().Bytes().AsRaw(), convey.ShouldResemble, actual.Body().Bytes().AsRaw())
+						}
+					}
+				}
+
+			})
+
 		})
 	})
 }
@@ -606,6 +651,53 @@ func makeTestPipelineGroupEventsTraceSlice() []*models.PipelineGroupEvents {
 				nil,
 				nil,
 			)
+			pipelineGroupEvent.Events = append(pipelineGroupEvent.Events, event)
+		}
+
+		slice = append(slice, pipelineGroupEvent)
+
+	}
+	return slice
+}
+
+func makeTestPipelineGroupEventsLogSlice() []*models.PipelineGroupEvents {
+	slice := make([]*models.PipelineGroupEvents, 0, 10)
+
+	for i := 1; i <= 10; i++ {
+		pipelineGroupEvent := &models.PipelineGroupEvents{
+			Group: &models.GroupInfo{
+				Metadata: models.NewMetadata(),
+				Tags:     models.NewTags(),
+			},
+		}
+
+		for j := 0; j < 5; j++ {
+			pipelineGroupEvent.Group.Metadata.Add("meta_key_"+strconv.Itoa(j), "meta_value_"+strconv.Itoa(j))
+		}
+
+		for j := 0; j < 5; j++ {
+			pipelineGroupEvent.Group.Tags.Add("common_tags_"+strconv.Itoa(j), "common_value_"+strconv.Itoa(j))
+		}
+
+		for j := 0; j < 10; j++ {
+			tags := models.NewTagsWithMap(
+				map[string]string{
+					"__tag__:__path__": "/root/test/origin/example.log",
+					"__log_topic__":    "file",
+					"content":          "test log content" + strconv.Itoa(j),
+				},
+			)
+
+			event := models.NewLog(
+				"log_name_"+strconv.Itoa(i),
+				[]byte("message"),
+				"INFO",
+				"",
+				"",
+				tags,
+				uint64(time.Now().UnixNano()),
+			)
+			event.ObservedTimestamp = uint64(time.Now().Add(-time.Second).UnixNano())
 			pipelineGroupEvent.Events = append(pipelineGroupEvent.Events, event)
 		}
 

@@ -116,6 +116,7 @@ func ConvertPipelineEventToOtlpEvent[
 	return
 }
 
+// PipelineGroupEvents -> OTLP Logs/Metrics/Traces
 func (c *Converter) ConvertPipelineGroupEventsToOTLPEventsV1(ps *models.PipelineGroupEvents) (plog.ResourceLogs, pmetric.ResourceMetrics, ptrace.ResourceSpans, error) {
 	var err error
 	rsLogs := plog.NewResourceLogs()
@@ -147,6 +148,7 @@ func ConvertPipelineGroupEvenstsToOtlpEvents(ps *models.PipelineGroupEvents, rsL
 				setScope(scopeLog, groupTags)
 				hasLogs = true
 			}
+			err = ConvertPipelineEventToOtlpLog(v, scopeLog)
 		case models.EventTypeMetric:
 			if !hasMetrics {
 				setAttributes(rsMetrics.Resource().Attributes(), meta)
@@ -184,7 +186,43 @@ func ConvertPipelineGroupEvenstsToOtlpEvents(ps *models.PipelineGroupEvents, rsL
 	return err
 }
 
-// metric event -> datapoint
+func ConvertPipelineEventToOtlpLog(event models.PipelineEvent, scopeLog plog.ScopeLogs) (err error) {
+	if event.GetType() != models.EventTypeLogging {
+		return fmt.Errorf("pipeline_event:%s is not a log", event.GetName())
+	}
+
+	logEvent, ok := event.(*models.Log)
+
+	if !ok {
+		return fmt.Errorf("pipeline_event:%s is not a log", event.GetName())
+	}
+
+	log := scopeLog.LogRecords().AppendEmpty()
+	setAttributes(log.Attributes(), logEvent.Tags)
+
+	// set body as bytes
+	log.Body().SetEmptyBytes().Append(logEvent.GetBody()...)
+	log.SetTimestamp(pcommon.Timestamp(logEvent.Timestamp))
+	log.SetObservedTimestamp(pcommon.Timestamp(logEvent.ObservedTimestamp))
+	log.SetSeverityText(logEvent.Level)
+	log.SetSeverityNumber(otlp.SeverityTextToSeverityNumber(logEvent.Level))
+
+	if logEvent.Tags.Contains(otlp.TagKeyLogFlag) {
+		if flag, errConvert := strconv.Atoi(logEvent.Tags.Get(otlp.TagKeyLogFlag)); errConvert == nil {
+			log.SetFlags(plog.LogRecordFlags(flag))
+		}
+	}
+
+	if traceID, errConvert := convertTraceID(logEvent.TraceID); errConvert == nil {
+		log.SetTraceID(traceID)
+	}
+
+	if spanID, errConvert := convertSpanID(logEvent.SpanID); errConvert == nil {
+		log.SetSpanID(spanID)
+	}
+	return err
+}
+
 func ConvertPipelineEventToOtlpMetric(event models.PipelineEvent, scopeMetric pmetric.ScopeMetrics) (err error) {
 	if event.GetType() != models.EventTypeMetric {
 		return fmt.Errorf("pipeline_event:%s is not a metric", event.GetName())

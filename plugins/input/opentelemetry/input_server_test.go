@@ -25,6 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/pmetric/pmetricotlp"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -75,6 +77,44 @@ func newInput(enableGRPC, enableHTTP bool, grpcEndpoint, httpEndpoint string) (*
 	}
 	_, err := s.Init(&ctx.ContextImp)
 	return s, err
+}
+
+func TestOtlpGRPC_Logs(t *testing.T) {
+	endpointGrpc := test.GetAvailableLocalAddress(t)
+	input, err := newInput(true, false, endpointGrpc, "")
+	assert.NoError(t, err)
+
+	queueSize := 10
+	pipelineCxt := pipeline.NewObservePipelineConext(queueSize)
+	input.StartService(pipelineCxt)
+	t.Cleanup(func() {
+		require.NoError(t, input.Stop())
+	},
+	)
+
+	cc, err := grpc.Dial(endpointGrpc, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, cc.Close())
+	}()
+
+	for i := 0; i < queueSize; i++ {
+		err = exportLogs(cc, GenerateLogs(i+1))
+		assert.NoError(t, err)
+	}
+
+	count := 0
+
+	for groupEvent := range pipelineCxt.Collector().Observe() {
+		assert.Equal(t, "resource-attr-val-1", groupEvent.Group.Metadata.Get("resource-attr"))
+		for _, v := range groupEvent.Events {
+			assert.Equal(t, models.EventTypeLogging, v.GetType())
+		}
+		count++
+		if count == queueSize {
+			break
+		}
+	}
 }
 
 func TestOtlpGRPC_Trace(t *testing.T) {
@@ -260,6 +300,13 @@ func httpExport[P interface {
 	return err
 }
 
+func exportLogs(cc *grpc.ClientConn, ld plog.Logs) error {
+	acc := plogotlp.NewGRPCClient(cc)
+	req := plogotlp.NewExportRequestFromLogs(ld)
+	_, err := acc.Export(context.Background(), req)
+	return err
+}
+
 func exportTraces(cc *grpc.ClientConn, td ptrace.Traces) error {
 	acc := ptraceotlp.NewGRPCClient(cc)
 	req := ptraceotlp.NewExportRequestFromTraces(td)
@@ -273,6 +320,17 @@ func exportMetrics(cc *grpc.ClientConn, md pmetric.Metrics) error {
 	req := pmetricotlp.NewExportRequestFromMetrics(md)
 	_, err := acc.Export(context.Background(), req)
 	return err
+}
+
+func GenerateLogs(logCount int) plog.Logs {
+	ld := plog.NewLogs()
+	initResource(ld.ResourceLogs().AppendEmpty().Resource())
+	slog := ld.ResourceLogs().At(0).ScopeLogs().AppendEmpty().LogRecords()
+	for i := 0; i < logCount; i++ {
+		newLogs := slog.AppendEmpty()
+		newLogs.Body().SetStr(fmt.Sprintf("log body %d", i))
+	}
+	return ld
 }
 
 func GenerateTraces(spanCount int) ptrace.Traces {

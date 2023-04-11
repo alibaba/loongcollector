@@ -103,12 +103,17 @@ func IsInternalTag(tagname string) bool {
 		tagname == TagKeySpanDroppedEventsCount ||
 		tagname == TagKeySpanDroppedLinksCount ||
 		tagname == TagKeySpanStatusMessage ||
-		tagname == TagKeyMetricIsMonotonic
+		tagname == TagKeyMetricIsMonotonic ||
+		tagname == TagKeyLogFlag
 }
 
 func IsInternalField(fieldname string) bool {
 	return fieldname == FieldCount ||
 		fieldname == FieldMax ||
 		fieldname == FieldMin ||
-		fieldname == FieldSum
+		fieldname == FieldSum ||
+		fieldname == FieldScale ||
+		fieldname == FieldPositiveOffset ||
+		fieldname == FieldNegativeOffset ||
+		fieldname == FieldZeroCount
 }

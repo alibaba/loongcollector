@@ -74,6 +74,82 @@ func TestNewConvertToOtlpLogs(t *testing.T) {
 	})
 }
 
+func TestConvertPipelineGroupEventsToOtlpLogs(t *testing.T) {
+	convey.Convey("When constructing converter with supported encoding", t, func() {
+		c, err := NewConverter(ProtocolOtlpV1, EncodingNone, nil, nil)
+		convey.So(err, convey.ShouldBeNil)
+
+		convey.Convey("When the logGroup is generated from files", func() {
+			time := []uint32{1662434209, 1662434487}
+			method := []string{"PUT", "GET"}
+			status := []string{"200", "404"}
+			pipelineGroupEvent := &models.PipelineGroupEvents{
+				Group: &models.GroupInfo{
+					Metadata: models.NewMetadata(),
+					Tags:     models.NewTags(),
+				},
+			}
+
+			pipelineGroupEvent.Group.Metadata.Add("__hostname__", "alje834hgf")
+			pipelineGroupEvent.Group.Metadata.Add("__pack_id__", "AEDCFGHNJUIOPLMN-1E")
+			for i := 0; i < 2; i++ {
+				tags := models.NewTagsWithMap(
+					map[string]string{
+						"method":           method[i],
+						"status":           status[i],
+						"__tag__:__path__": "/root/test/origin/example.log",
+						"__log_topic__":    "file",
+						"content":          "test log content",
+					},
+				)
+
+				event := models.NewLog(
+					"log_name_"+strconv.Itoa(i),
+					[]byte("message"),
+					"INFO",
+					"",
+					"",
+					tags,
+					uint64(time[i]),
+				)
+				event.ObservedTimestamp = uint64(time[i] + 100)
+				pipelineGroupEvent.Events = append(pipelineGroupEvent.Events, event)
+			}
+
+			logs, metrics, traces, err := c.ConvertPipelineGroupEventsToOTLPEventsV1(pipelineGroupEvent)
+			convey.Convey("Then the converted logs should be valid", func() {
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(1, convey.ShouldEqual, logs.ScopeLogs().Len())
+				convey.So(2, convey.ShouldEqual, logs.Resource().Attributes().Len())
+				convey.So(0, convey.ShouldEqual, metrics.ScopeMetrics().Len())
+				convey.So(0, convey.ShouldEqual, traces.ScopeSpans().Len())
+
+				convey.Convey("Then the logs should be valid", func() {
+					for i := 0; i < logs.ScopeLogs().Len(); i++ {
+						scope := logs.ScopeLogs().At(i)
+						convey.So(2, convey.ShouldEqual, scope.LogRecords().Len())
+
+						for j := 0; j < scope.LogRecords().Len(); j++ {
+							log := scope.LogRecords().At(j)
+							event := pipelineGroupEvent.Events[j].(*models.Log)
+							convey.So(event.GetTimestamp(), convey.ShouldEqual, uint64(log.Timestamp()))
+							convey.So(event.GetObservedTimestamp(), convey.ShouldEqual, uint64(log.ObservedTimestamp()))
+							convey.So(event.Body, convey.ShouldResemble, log.Body().Bytes().AsRaw())
+
+							for k, v := range pipelineGroupEvent.Events[j].GetTags().Iterator() {
+								otTagValue, ok := log.Attributes().Get(k)
+								convey.So(ok, convey.ShouldBeTrue)
+								convey.So(v, convey.ShouldEqual, otTagValue.AsString())
+							}
+
+						}
+					}
+				})
+			})
+		})
+	})
+}
+
 func TestConvertPipelineGroupEventsToOtlpMetrics(t *testing.T) {
 	convey.Convey("When constructing converter with supported encoding", t, func() {
 		c, err := NewConverter(ProtocolOtlpV1, EncodingNone, nil, nil)
