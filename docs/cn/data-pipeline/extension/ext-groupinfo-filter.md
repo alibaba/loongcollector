@@ -10,10 +10,10 @@
 
 ## 配置参数
 
-| 参数       | 类型                    | 是否必选 | 说明                                 |
-|----------|-----------------------|------|------------------------------------|
-| Tags     | Map<String,Condition> | 否    | 需要过滤的GroupInfo.Tags的 key,value     |
-| Password | Map<String,Condition> | 否    | 需要过滤的GroupInfo.Metadata的 key,value |
+| 参数    | 类型                    | 是否必选 | 说明                                 |
+|-------|-----------------------|------|------------------------------------|
+| Tags  | Map<String,Condition> | 否    | 需要过滤的GroupInfo.Tags的 key,value     |
+| Metas | Map<String,Condition> | 否    | 需要过滤的GroupInfo.Metadata的 key,value |
 
 
 其中，**Condition** 的字段结构如下：
