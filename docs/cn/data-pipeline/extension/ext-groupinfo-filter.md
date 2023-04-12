@@ -56,7 +56,8 @@ flushers:
 extensions:
   - Type: ext_groupinfo_filter
     Tags:
-      tag1: tag1
+      tag1: 
+        Pattern: tag1
 ```
 
 ## 使用命名扩展
@@ -96,10 +97,12 @@ flushers:
 extensions:
   - Type: ext_groupinfo_filter/tag1
     Tags:
-      tag1: tag1
+      tag1: 
+        Pattern: tag1
   - Type: ext_groupinfo_filter/tag2
     Tags:
-      tag2: tag2
+      tag2:
+        Pattern: tag2
 ```
 
 
