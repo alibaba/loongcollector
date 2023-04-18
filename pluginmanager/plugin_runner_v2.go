@@ -429,7 +429,7 @@ func (p *pluginv2Runner) ReceiveRawLog(in *pipeline.LogWithContext) {
 	for i, content := range in.Log.Contents {
 		switch {
 		case content.Key == contentKey || i == 0:
-			log.Body = util.ZeroCopyStringToBytes(content.Value)
+			log.SetBody(util.ZeroCopyStringToBytes(content.Value))
 		case content.Key == fileOffsetKey:
 			if offset, err := strconv.ParseInt(content.Value, 10, 64); err == nil {
 				log.Offset = uint64(offset)

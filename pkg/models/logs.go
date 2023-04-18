@@ -14,7 +14,9 @@
 
 package models
 
-type Indices KeyValues[interface{}]
+import "github.com/alibaba/ilogtail/pkg/util"
+
+type LogContents KeyValues[interface{}]
 
 type Log struct {
 	Name              string
@@ -25,8 +27,7 @@ type Log struct {
 	Timestamp         uint64
 	ObservedTimestamp uint64
 	Offset            uint64
-	Body              []byte
-	Indices           Indices
+	Contents          LogContents
 }
 
 func (m *Log) GetName() string {
@@ -126,27 +127,36 @@ func (m *Log) SetTraceID(traceID string) {
 }
 
 func (m *Log) GetBody() []byte {
-	if m != nil {
-		return m.Body
+	if m != nil && m.Contents != nil {
+		v := m.Contents.Get(BodyKey)
+		if body, ok := v.([]byte); ok {
+			return body
+		}
+		if body, ok := v.(string); ok {
+			return util.ZeroCopyStringToBytes(body)
+		}
 	}
 	return nil
 }
 
 func (m *Log) SetBody(body []byte) {
 	if m != nil {
-		m.Body = body
+		if m.Contents == nil {
+			m.Contents = NewLogContents()
+		}
+		m.Contents.Add(BodyKey, body)
 	}
 }
 
-func (m *Log) SetIndices(indices Indices) {
+func (m *Log) SetIndices(indices LogContents) {
 	if m != nil {
-		m.Indices = indices
+		m.Contents = indices
 	}
 }
 
-func (m *Log) GetIndices() Indices {
+func (m *Log) GetIndices() LogContents {
 	if m != nil {
-		return m.Indices
+		return m.Contents
 	}
 	return NilInterfaceValues
 }
@@ -161,8 +171,7 @@ func (m *Log) Clone() PipelineEvent {
 			Tags:              m.Tags,
 			Timestamp:         m.Timestamp,
 			ObservedTimestamp: m.ObservedTimestamp,
-			Body:              m.Body,
-			Indices:           m.Indices,
+			Contents:          m.Contents,
 			Offset:            m.Offset,
 		}
 	}

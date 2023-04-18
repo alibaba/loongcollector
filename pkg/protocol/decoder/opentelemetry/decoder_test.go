@@ -94,7 +94,7 @@ func TestConvertOtlpLogsToGroupEvents(t *testing.T) {
 	assert.Equal(t, 1, len(events))
 	actualLog := events[0].(*models.Log)
 	assert.Equal(t, models.EventTypeLogging, events[0].GetType())
-	assert.Equal(t, []byte("some log message"), actualLog.Body)
+	assert.Equal(t, []byte("some log message"), actualLog.GetBody())
 	assert.Equal(t, "Info", actualLog.Level)
 	assert.Equal(t, "0102030405060708", actualLog.SpanID)
 	assert.Equal(t, "0102030405060708090a0b0c0d0e0f10", actualLog.TraceID)

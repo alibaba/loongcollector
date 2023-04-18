@@ -35,6 +35,19 @@ func TestZeroCopySlice(t *testing.T) {
 	assert.Equal(t, &bytes[0], &slice[0])
 }
 
+func TestZeroCopyStringNil(t *testing.T) {
+	newStr := ZeroCopyBytesToString(nil)
+	newStr2 := ZeroCopyBytesToString([]byte(""))
+	assert.Equal(t, newStr, newStr2)
+}
+
+func TestZeroCopySliceEmpty(t *testing.T) {
+	str := ""
+	bytes := *(*[]byte)(unsafe.Pointer(&str))
+	slice := ZeroCopyStringToBytes(str)
+	assert.Equal(t, &bytes, &slice)
+}
+
 // goos: darwin
 // goarch: amd64
 // pkg: github.com/alibaba/ilogtail/pkg/helper

@@ -36,6 +36,9 @@ const (
 	ValueTypeBoolean
 	ValueTypeArray
 	ValueTypeMap
+
+	ContentKey = "content"
+	BodyKey    = ContentKey
 )
 
 var (

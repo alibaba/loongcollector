@@ -134,7 +134,7 @@ func TestConvertPipelineGroupEventsToOtlpLogs(t *testing.T) {
 							event := pipelineGroupEvent.Events[j].(*models.Log)
 							convey.So(event.GetTimestamp(), convey.ShouldEqual, uint64(log.Timestamp()))
 							convey.So(event.GetObservedTimestamp(), convey.ShouldEqual, uint64(log.ObservedTimestamp()))
-							convey.So(event.Body, convey.ShouldResemble, log.Body().Bytes().AsRaw())
+							convey.So(event.GetBody(), convey.ShouldResemble, log.Body().Bytes().AsRaw())
 
 							for k, v := range pipelineGroupEvent.Events[j].GetTags().Iterator() {
 								otTagValue, ok := log.Attributes().Get(k)

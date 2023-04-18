@@ -21,6 +21,9 @@ import (
 
 //nolint:gosec
 func ZeroCopyBytesToString(b []byte) (s string) {
+	if b == nil {
+		return
+	}
 	pbytes := (*reflect.SliceHeader)(unsafe.Pointer(&b))
 	pstring := (*reflect.StringHeader)(unsafe.Pointer(&s))
 	pstring.Data = pbytes.Data
@@ -30,6 +33,9 @@ func ZeroCopyBytesToString(b []byte) (s string) {
 
 //nolint:gosec
 func ZeroCopyStringToBytes(s string) (b []byte) {
+	if s == "" {
+		return
+	}
 	pbytes := (*reflect.SliceHeader)(unsafe.Pointer(&b))
 	pstring := (*reflect.StringHeader)(unsafe.Pointer(&s))
 	pbytes.Data = pstring.Data

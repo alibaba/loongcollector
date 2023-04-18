@@ -107,16 +107,16 @@ func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipelin
 	for _, event := range in.Events {
 		if log, ok := event.(*models.Log); ok {
 			tmpLog := &models.Log{
-				Body:      log.Body,
 				Name:      log.Name,
 				Level:     log.Level,
 				Timestamp: log.Timestamp,
-				Indices:   log.Indices,
 				SpanID:    log.SpanID,
 				TraceID:   log.TraceID,
+				Contents:  log.Contents,
 			}
+			tmpLog.SetBody(log.GetBody())
 			tmpLog.Tags = models.NewTags()
-			body := util.ZeroCopyBytesToString(log.Body)
+			body := util.ZeroCopyBytesToString(log.GetBody())
 			for k, v := range log.GetTags().Iterator() {
 				if len(body) == 0 && k == p.SplitKey {
 					body = v
@@ -143,7 +143,7 @@ func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipelin
 					} else {
 						newLog = tmpLog
 					}
-					newLog.Body = util.ZeroCopyStringToBytes(strArray[i])
+					newLog.SetBody(util.ZeroCopyStringToBytes(strArray[i]))
 					newLog.Offset += uint64(offset)
 					offset += int64(len(strArray[i]) + len(p.SplitSep))
 					context.Collector().Collect(in.Group, newLog)

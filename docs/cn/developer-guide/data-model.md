@@ -150,9 +150,9 @@ Log 模型可以兼容非结构化和结构化日志，并且预留链路信息�
 - 其中 Offset 记录了日志文件采集时，日志在文件中的偏移量，可选
 - Name 对 Log 也是可选的
 - SpanID 、TraceID 在数据关联时使用，可选
-- Indices 在日志结构化的场景使用，存储从 Body 原始日志文本分析的KV，避免和 Tags 混淆
+- Contents 在日志结构化的场景使用，存储从 Body 原始日志文本分析的 KV
 ```
-type Indices KeyValues[string]
+type LonContents KeyValues[string]
 
 type Log struct {
     Name              string
@@ -163,8 +163,7 @@ type Log struct {
     Timestamp         uint64
     ObservedTimestamp uint64
     Offset            uint64
-    Body              string
-    Indices           Indices
+    Contents          LonContents
 }
 ```
 其中Level字段，对齐Open Telemetry Logs，支持以下等级：
