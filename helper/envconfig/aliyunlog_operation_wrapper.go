@@ -44,12 +44,13 @@ type operationWrapper struct {
 	configCacheMap   map[string]time.Time
 }
 
-func createDefaultK8SIndex() *aliyunlog.Index {
+func createDefaultK8SIndex(logstoremode string) *aliyunlog.Index {
+	docvalue := logstoremode == StandardMode
 	normalIndexKey := aliyunlog.IndexKey{
 		Token:         []string{" ", "\n", "\t", "\r", ",", ";", "[", "]", "{", "}", "(", ")", "&", "^", "*", "#", "@", "~", "=", "<", ">", "/", "\\", "?", ":", "'", "\""},
 		CaseSensitive: false,
 		Type:          "text",
-		DocValue:      true,
+		DocValue:      docvalue,
 	}
 	return &aliyunlog.Index{
 		Line: &aliyunlog.IndexLine{
@@ -172,9 +173,9 @@ func (o *operationWrapper) removeConfigCache(project, config string) {
 }
 
 // nolint:unused
-func (o *operationWrapper) retryCreateIndex(project, logstore string) {
+func (o *operationWrapper) retryCreateIndex(project, logstore, logstoremode string) {
 	time.Sleep(time.Second * 10)
-	index := createDefaultK8SIndex()
+	index := createDefaultK8SIndex(logstoremode)
 	// create index, create index do not return error
 	for i := 0; i < 10; i++ {
 		err := o.logClient.CreateIndex(project, logstore, *index)
@@ -342,7 +343,7 @@ func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec) er
 	// after create logstore success, wait 1 sec
 	time.Sleep(time.Second)
 	// use default k8s index
-	index := createDefaultK8SIndex()
+	index := createDefaultK8SIndex(mode)
 	// create index, create index do not return error
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
 		err = o.logClient.CreateIndex(project, logstore, *index)
