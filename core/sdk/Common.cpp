@@ -136,6 +136,13 @@ namespace sdk {
     const char* const LOG_SHARD_STATUS_READWRITE = "readwrite";
     const char* const LOG_SHARD_STATUS_READONLY = "readonly";
 
+    bool caseInsensitiveComp(const char lhs, const char rhs) {
+        return tolower(lhs) < tolower(rhs);
+    }
+
+    bool compareHeader(const std::string& lhs, const std::string& rhs) {
+        return std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), caseInsensitiveComp);
+    }
 
     bool HttpMessage::IsLogServiceResponse() const {
         if (!AppConfig::GetInstance()->IsResponseVerificationEnabled()) {

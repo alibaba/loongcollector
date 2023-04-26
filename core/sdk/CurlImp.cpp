@@ -43,7 +43,10 @@ namespace sdk {
         return sizes;
     }
 
-    static size_t header_write_callback(char* buffer, size_t size, size_t nmemb, map<string, string>* write_buf) {
+    static size_t header_write_callback(char* buffer,
+                                        size_t size,
+                                        size_t nmemb,
+                                        map<string, string, decltype(compareHeader)*>* write_buf) {
         unsigned long sizes = size * nmemb;
 
         if (buffer == NULL) {

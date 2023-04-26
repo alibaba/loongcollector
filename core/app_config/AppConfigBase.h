@@ -217,6 +217,8 @@ private:
     // logtail is in purage container mode when STRING_FLAG(ilogtail_user_defined_id_env_name) exist and /logtail_host
     // exist
     void CheckPurageContainerMode();
+    bool CheckAndResetProxyEnv();
+    bool CheckAndResetProxyAddress(const char* envKey, std::string& address);
 
     static void InitEnvMapping(const std::string& envStr, std::map<std::string, std::string>& envMapping);
     static void SetConfigFlag(const std::string& flagName, const std::string& value);
@@ -236,255 +238,137 @@ public:
 
     void LoadAppConfig(const std::string& ilogtailConfigFile);
 
-    bool NoInotify() const {
-        return mNoInotify;
-    }
+    bool NoInotify() const { return mNoInotify; }
 
     bool IsInInotifyBlackList(const std::string& path) const;
 
-    bool IsLogParseAlarmValid() const {
-        return mLogParseAlarmFlag;
-    }
+    bool IsLogParseAlarmValid() const { return mLogParseAlarmFlag; }
 
-    bool IsSendRandomSleep() const {
-        return mSendRandomSleep;
-    }
+    bool IsSendRandomSleep() const { return mSendRandomSleep; }
 
-    bool IsSendFlowControl() const {
-        return mSendFlowControl;
-    }
+    bool IsSendFlowControl() const { return mSendFlowControl; }
 
     std::string GetDefaultRegion() const;
 
     void SetDefaultRegion(const std::string& region);
 
-    uint32_t GetStreamLogTcpPort() const {
-        return mStreamLogTcpPort;
-    }
+    uint32_t GetStreamLogTcpPort() const { return mStreamLogTcpPort; }
 
-    const std::string& GetStreamLogAddress() const {
-        return mStreamLogAddress;
-    }
+    const std::string& GetStreamLogAddress() const { return mStreamLogAddress; }
 
-    uint32_t GetStreamLogPoolSizeInMb() const {
-        return mStreamLogPoolSizeInMb;
-    }
+    uint32_t GetStreamLogPoolSizeInMb() const { return mStreamLogPoolSizeInMb; }
 
-    uint32_t GetStreamLogRcvLenPerCall() const {
-        return mStreamLogRcvLenPerCall;
-    }
+    uint32_t GetStreamLogRcvLenPerCall() const { return mStreamLogRcvLenPerCall; }
 
-    bool GetOpenStreamLog() const {
-        return mOpenStreamLog;
-    }
+    bool GetOpenStreamLog() const { return mOpenStreamLog; }
 
     std::string GetIlogtailConfigJson() {
         ScopedSpinLock lock(mAppConfigLock);
         return mIlogtailConfigJson;
     }
 
-    bool IsAcceptMultiConfig() const {
-        return mAcceptMultiConfigFlag;
-    }
+    bool IsAcceptMultiConfig() const { return mAcceptMultiConfigFlag; }
 
-    void SetAcceptMultiConfig(bool flag) {
-        mAcceptMultiConfigFlag = flag;
-    }
+    void SetAcceptMultiConfig(bool flag) { mAcceptMultiConfigFlag = flag; }
 
-    int32_t GetMaxMultiConfigSize() const {
-        return mMaxMultiConfigSize;
-    }
+    int32_t GetMaxMultiConfigSize() const { return mMaxMultiConfigSize; }
 
-    void SetMaxMultiConfigSize(int32_t maxSize) {
-        mMaxMultiConfigSize = maxSize;
-    }
+    void SetMaxMultiConfigSize(int32_t maxSize) { mMaxMultiConfigSize = maxSize; }
 
-    const std::string& GetCheckPointFilePath() const {
-        return mCheckPointFilePath;
-    }
+    const std::string& GetCheckPointFilePath() const { return mCheckPointFilePath; }
 
-    bool IsInputFlowControl() const {
-        return mInputFlowControl;
-    }
+    bool IsInputFlowControl() const { return mInputFlowControl; }
 
-    bool IsResourceAutoScale() const {
-        return mResourceAutoScale;
-    }
+    bool IsResourceAutoScale() const { return mResourceAutoScale; }
 
-    float GetMachineCpuUsageThreshold() const {
-        return mMachineCpuUsageThreshold;
-    }
+    float GetMachineCpuUsageThreshold() const { return mMachineCpuUsageThreshold; }
 
-    float GetScaledCpuUsageUpLimit() const {
-        return mScaledCpuUsageUpLimit;
-    }
+    float GetScaledCpuUsageUpLimit() const { return mScaledCpuUsageUpLimit; }
 
-    float GetCpuUsageUpLimit() const {
-        return mCpuUsageUpLimit;
-    }
+    float GetCpuUsageUpLimit() const { return mCpuUsageUpLimit; }
 
-    int64_t GetMemUsageUpLimit() const {
-        return mMemUsageUpLimit;
-    }
+    int64_t GetMemUsageUpLimit() const { return mMemUsageUpLimit; }
 
-    int32_t GetMaxHoldedDataSize() const {
-        return mMaxHoldedDataSize;
-    }
+    int32_t GetMaxHoldedDataSize() const { return mMaxHoldedDataSize; }
 
-    uint32_t GetMaxBufferNum() const {
-        return mMaxBufferNum;
-    }
+    uint32_t GetMaxBufferNum() const { return mMaxBufferNum; }
 
-    int32_t GetMaxBytePerSec() const {
-        return mMaxBytePerSec;
-    }
+    int32_t GetMaxBytePerSec() const { return mMaxBytePerSec; }
 
-    int32_t GetBytePerSec() const {
-        return mBytePerSec;
-    }
+    int32_t GetBytePerSec() const { return mBytePerSec; }
 
-    int32_t GetNumOfBufferFile() const {
-        return mNumOfBufferFile;
-    }
+    int32_t GetNumOfBufferFile() const { return mNumOfBufferFile; }
 
-    int32_t GetLocalFileSize() const {
-        return mLocalFileSize;
-    }
+    int32_t GetLocalFileSize() const { return mLocalFileSize; }
 
-    const std::string& GetBufferFilePath() const {
-        return mBufferFilePath;
-    }
+    const std::string& GetBufferFilePath() const { return mBufferFilePath; }
 
-    int32_t GetSendRequestConcurrency() const {
-        return mSendRequestConcurrency;
-    }
+    int32_t GetSendRequestConcurrency() const { return mSendRequestConcurrency; }
 
-    int32_t GetProcessThreadCount() const {
-        return mProcessThreadCount;
-    }
+    int32_t GetProcessThreadCount() const { return mProcessThreadCount; }
 
-    const std::string& GetMappingConfigPath() const {
-        return mMappingConfigPath;
-    }
+    const std::string& GetMappingConfigPath() const { return mMappingConfigPath; }
 
-    const std::string& GetUserConfigPath() const {
-        return mUserConfigPath;
-    }
+    const std::string& GetUserConfigPath() const { return mUserConfigPath; }
 
-    const std::string& GetLocalUserConfigPath() const {
-        return mUserLocalConfigPath;
-    }
+    const std::string& GetLocalUserConfigPath() const { return mUserLocalConfigPath; }
 
-    const std::string& GetLocalUserConfigDirPath() const {
-        return mUserLocalConfigDirPath;
-    }
+    const std::string& GetLocalUserConfigDirPath() const { return mUserLocalConfigDirPath; }
 
-    const std::string& GetLocalUserYamlConfigDirPath() const {
-        return mUserLocalYamlConfigDirPath;
-    }
+    const std::string& GetLocalUserYamlConfigDirPath() const { return mUserLocalYamlConfigDirPath; }
 
-    const std::string& GetRemoteUserYamlConfigDirPath() const {
-        return mUserRemoteYamlConfigDirPath;
-    }
+    const std::string& GetRemoteUserYamlConfigDirPath() const { return mUserRemoteYamlConfigDirPath; }
 
-    bool IgnoreDirInodeChanged() const {
-        return mIgnoreDirInodeChanged;
-    }
+    bool IgnoreDirInodeChanged() const { return mIgnoreDirInodeChanged; }
 
-    void SetProcessExecutionDir(const std::string& dir) {
-        mProcessExecutionDir = dir;
-    }
+    void SetProcessExecutionDir(const std::string& dir) { mProcessExecutionDir = dir; }
 
-    const std::string& GetProcessExecutionDir() {
-        return mProcessExecutionDir;
-    }
+    const std::string& GetProcessExecutionDir() { return mProcessExecutionDir; }
 
-    void SetWorkingDir(const std::string& dir) {
-        mWorkingDir = dir;
-    }
+    void SetWorkingDir(const std::string& dir) { mWorkingDir = dir; }
 
-    const std::string& GetWorkingDir() const {
-        return mWorkingDir;
-    }
+    const std::string& GetWorkingDir() const { return mWorkingDir; }
 
-    bool IsContainerMode() const {
-        return mContainerMode;
-    }
+    bool IsContainerMode() const { return mContainerMode; }
 
-    const std::string& GetContainerMountConfigPath() const {
-        return mContainerMountConfigPath;
-    }
+    const std::string& GetContainerMountConfigPath() const { return mContainerMountConfigPath; }
 
-    const std::string& GetConfigIP() const {
-        return mConfigIP;
-    }
+    const std::string& GetConfigIP() const { return mConfigIP; }
 
-    const std::string& GetCustomizedConfigIp() const {
-        return mCustomizedConfigIP;
-    }
+    const std::string& GetCustomizedConfigIp() const { return mCustomizedConfigIP; }
 
-    const std::string& GetConfigHostName() const {
-        return mConfigHostName;
-    }
+    const std::string& GetConfigHostName() const { return mConfigHostName; }
 
-    int32_t GetSystemBootTime() const {
-        return mSystemBootTime;
-    }
+    int32_t GetSystemBootTime() const { return mSystemBootTime; }
 
-    const std::string& GetDockerFilePathConfig() const {
-        return mDockerFilePathConfig;
-    }
+    const std::string& GetDockerFilePathConfig() const { return mDockerFilePathConfig; }
 
-    int32_t GetDataServerPort() const {
-        return mSendDataPort;
-    }
+    int32_t GetDataServerPort() const { return mSendDataPort; }
 
-    bool ShennongSocketEnabled() const {
-        return mShennongSocket;
-    }
+    bool ShennongSocketEnabled() const { return mShennongSocket; }
 
-    const std::vector<sls_logs::LogTag>& GetEnvTags() const {
-        return mEnvTags;
-    }
+    const std::vector<sls_logs::LogTag>& GetEnvTags() const { return mEnvTags; }
 
-    bool IsPurageContainerMode() const {
-        return mPurageContainerMode;
-    }
+    bool IsPurageContainerMode() const { return mPurageContainerMode; }
 
-    int32_t GetForceQuitReadTimeout() const {
-        return mForceQuitReadTimeout;
-    }
+    int32_t GetForceQuitReadTimeout() const { return mForceQuitReadTimeout; }
 
-    const std::string& GetAlipayZone() const {
-        return mAlipayZone;
-    }
+    const std::string& GetAlipayZone() const { return mAlipayZone; }
 
     // If @dirPath is not accessible, GetProcessExecutionDir will be set.
     void SetLogtailSysConfDir(const std::string& dirPath);
 
-    const std::string& GetLogtailSysConfDir() const {
-        return mLogtailSysConfDir;
-    }
+    const std::string& GetLogtailSysConfDir() const { return mLogtailSysConfDir; }
 
-    inline bool IsHostIPReplacePolicyEnabled() const {
-        return mEnableHostIPReplace;
-    }
+    inline bool IsHostIPReplacePolicyEnabled() const { return mEnableHostIPReplace; }
 
-    inline bool IsResponseVerificationEnabled() const {
-        return mEnableResponseVerification;
-    }
+    inline bool IsResponseVerificationEnabled() const { return mEnableResponseVerification; }
 
-    EndpointAddressType GetConfigServerAddressNetType() const {
-        return mConfigServerAddressNetType;
-    }
+    EndpointAddressType GetConfigServerAddressNetType() const { return mConfigServerAddressNetType; }
 
-    inline bool EnableCheckpointSyncWrite() const {
-        return mEnableCheckpointSyncWrite;
-    }
+    inline bool EnableCheckpointSyncWrite() const { return mEnableCheckpointSyncWrite; }
 
-    inline bool EnableLogTimeAutoAdjust() const {
-        return mEnableLogTimeAutoAdjust;
-    }
+    inline bool EnableLogTimeAutoAdjust() const { return mEnableLogTimeAutoAdjust; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;

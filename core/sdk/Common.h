@@ -27,6 +27,7 @@
 #include <mutex>
 #include <cstring>
 #include <cassert>
+#include <algorithm>
 
 namespace logtail {
 namespace sdk {
@@ -145,25 +146,30 @@ namespace sdk {
     extern const char* const LOG_LZ4; //= "lz4";
     extern const char* const LOG_DEFLATE; //= "deflate";
     extern const char* const LOG_ZSTD; //= "zstd";
-    
+
     extern const char* const LOG_ERROR_CODE; //= "errorCode";
     extern const char* const LOG_ERROR_MESSAGE; //= "errorMessage";
 
     extern const char* const LOG_SHARD_STATUS_READWRITE; // "readwrite";
     extern const char* const LOG_SHARD_STATUS_READONLY; // "readonly";
 
+    bool caseInsensitiveComp(const char lhs, const char rhs);
+
+    bool compareHeader(const std::string& lhs, const std::string& rhs);
+
     /**
      * HTTP message structure includes three parts: http status code, http header, and http content.
      */
     struct HttpMessage {
         int32_t statusCode = 0; ///< Http status code
-        std::map<std::string, std::string> header; ///< Only contains the header lines which have key:value pair
+        std::map<std::string, std::string, decltype(compareHeader)*>
+            header; ///< Only contains the header lines which have key:value pair
         std::string content; ///< Http content
         /** Constructor with no parameter.
          * @param void None.
          * @return The objcect pointer.
          */
-        HttpMessage() {}
+        HttpMessage() : header(compareHeader) {}
         /** Constructor with header and content.
     * @param para_header A map structure which contains the key:value pair of http header lines.
     Those header lines which do not contains key:value pair are not included.
@@ -171,7 +177,7 @@ namespace sdk {
     * @return The objcect pointer.
     */
         HttpMessage(const std::map<std::string, std::string>& para_header, const std::string& para_content)
-            : header(para_header), content(para_content) {}
+            : header(para_header.begin(), para_header.end(), compareHeader), content(para_content) {}
         /** Constructor with status code, header and content.
     * @param para_statusCode Http status code.
     * @param para_header A map structure which contains the key:value pair of http header lines.
@@ -182,7 +188,9 @@ namespace sdk {
         HttpMessage(const int32_t para_statusCode,
                     const std::map<std::string, std::string>& para_header,
                     const std::string& para_content)
-            : statusCode(para_statusCode), header(para_header), content(para_content) {}
+            : statusCode(para_statusCode),
+              header(para_header.begin(), para_header.end(), compareHeader),
+              content(para_content) {}
 
         bool IsLogServiceResponse() const;
 

@@ -27,6 +27,7 @@
 #include "common/RuntimeUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
+#include "common/EnvUtil.h"
 #include "config_manager/ConfigManager.h"
 #include "logger/Logger.h"
 #include "reader/LogFileReader.h"
@@ -297,6 +298,7 @@ void AppConfigBase::LoadAppConfig(const std::string& ilogtailConfigFile) {
     LoadOtherConf(confJson);
 
     LoadGlobalFuseConf(confJson);
+    CheckAndResetProxyEnv();
 }
 
 std::string AppConfigBase::GetDefaultRegion() const {
@@ -580,9 +582,9 @@ void AppConfigBase::LoadResourceConf(const Json::Value& confJson) {
     // first set buffer_file_path, if buffer_file_path is null then set default_buffer_file_path
     if (confJson.isMember("buffer_file_path") && confJson["buffer_file_path"].isString())
         mBufferFilePath = confJson["buffer_file_path"].asString();
-    else if (STRING_FLAG(buffer_file_path) != "") 
+    else if (STRING_FLAG(buffer_file_path) != "")
         mBufferFilePath = STRING_FLAG(buffer_file_path);
-    else 
+    else
         mBufferFilePath = STRING_FLAG(default_buffer_file_path);
 
     if (confJson.isMember("check_point_filename") && confJson["check_point_filename"].isString())
@@ -777,6 +779,101 @@ void AppConfigBase::LoadResourceConf(const Json::Value& confJson) {
 
     LoadEnvResourceLimit();
     CheckAndAdjustParameters();
+}
+
+bool AppConfigBase::CheckAndResetProxyEnv() {
+    // envs capitalized prioritize those in lower case
+    string httpProxy = ToString(getenv("HTTP_PROXY"));
+    if (httpProxy.empty()) {
+        httpProxy = ToString(getenv("http_proxy"));
+        if (!CheckAndResetProxyAddress("http_proxy", httpProxy)) {
+            UnsetEnv("http_proxy");
+            LOG_WARNING(sLogger,
+                        ("proxy mode", "off")("reason", "http proxy env value not valid")("http proxy", httpProxy));
+            return false;
+        }
+    } else {
+        if (!CheckAndResetProxyAddress("HTTP_PROXY", httpProxy)) {
+            UnsetEnv("http_proxy");
+            UnsetEnv("HTTP_PROXY");
+            LOG_WARNING(sLogger,
+                        ("proxy mode", "off")("reason", "http proxy env value not valid")("http proxy", httpProxy));
+            return false;
+        }
+        // libcurl do not recognize env HTTP_PROXY, thus env http_proxy need to be copied to env HTTP_PROXY if present
+        SetEnv("http_proxy", httpProxy.c_str());
+    }
+
+    char* httpsProxyKey = "HTTPS_PROXY";
+    string httpsProxyValue = ToString(getenv(httpsProxyKey));
+    if (httpsProxyValue.empty()) {
+        httpsProxyKey = "https_proxy";
+        httpsProxyValue = ToString(getenv(httpsProxyKey));
+    } else {
+        UnsetEnv("https_proxy");
+    }
+    if (!CheckAndResetProxyAddress(httpsProxyKey, httpsProxyValue)) {
+        UnsetEnv("https_proxy");
+        UnsetEnv("HTTPS_PROXY");
+        LOG_WARNING(sLogger,
+                    ("proxy mode", "off")("reason", "https proxy env value not valid")("https proxy", httpsProxyValue));
+        return false;
+    }
+
+    char *allProxyKey = "ALL_PROXY";
+    string allProxy = ToString(getenv(allProxyKey));
+    if (allProxy.empty()) {
+        char *allProxyKey = "all_proxy";
+        allProxy = ToString(getenv(allProxyKey));
+    } else {
+        UnsetEnv("all_proxy");
+    }
+    if (!CheckAndResetProxyAddress(allProxyKey, allProxy)) {
+        UnsetEnv("all_proxy");
+        UnsetEnv("ALL_PROXY");
+        LOG_WARNING(sLogger, ("proxy mode", "off")("reason", "all proxy env value not valid")("all proxy", allProxy));
+        return false;
+    }
+
+    string noProxy = ToString(getenv("NO_PROXY"));
+    if (noProxy.empty()) {
+        noProxy = ToString(getenv("no_proxy"));
+    } else {
+        UnsetEnv("no_proxy");
+    }
+
+    if (!httpProxy.empty() || !httpsProxyValue.empty() || !allProxy.empty()) {
+        mEnableHostIPReplace = false;
+        LOG_INFO(sLogger,
+                 ("proxy mode", "on")("http proxy", httpProxy)("https proxy", httpsProxyValue)("all proxy", allProxy)(
+                     "no proxy", noProxy));
+    }
+    return true;
+}
+
+// valid proxy address format: [scheme://[user:pwd\@]]address[:port], 'http' and '80' assumed if no scheme or port
+// provided
+bool AppConfigBase::CheckAndResetProxyAddress(const char* envKey, string& address) {
+    if (address.empty()) {
+        return true;
+    }
+
+    size_t pos = 0, tmp = 0;
+    if ((tmp = address.find("://")) != string::npos) {
+        string scheme = address.substr(0, tmp);
+        if (scheme != "http" && scheme != "https" && scheme != "socks5") {
+            return false;
+        }
+        pos = tmp + 3;
+    }
+    if ((tmp = address.find("@", pos)) != string::npos) {
+        pos = tmp + 1;
+    }
+    if (address.find(":", pos) == string::npos) {
+        address += ":80";
+        SetEnv(envKey, address.c_str());
+    }
+    return true;
 }
 
 void AppConfigBase::LoadOtherConf(const Json::Value& confJson) {
@@ -1121,11 +1218,10 @@ void AppConfigBase::SetLogtailSysConfDir(const std::string& dirPath) {
     mUserRemoteYamlConfigDirPath
         = AbsolutePath(STRING_FLAG(ilogtail_remote_yaml_config_dir), mLogtailSysConfDir) + PATH_SEPARATOR;
     LOG_INFO(sLogger,
-             ("set logtail sys conf dir", mLogtailSysConfDir)
-             ("user local config path", mUserLocalConfigPath)
-             ("user local config dir path", mUserLocalConfigDirPath)
-             ("user local yaml config dir path",mUserLocalYamlConfigDirPath)
-             ("user remote yaml config dir path",mUserRemoteYamlConfigDirPath));
+             ("set logtail sys conf dir", mLogtailSysConfDir)("user local config path", mUserLocalConfigPath)(
+                 "user local config dir path", mUserLocalConfigDirPath)(
+                 "user local yaml config dir path", mUserLocalYamlConfigDirPath)("user remote yaml config dir path",
+                                                                                 mUserRemoteYamlConfigDirPath));
 }
 
 } // namespace logtail

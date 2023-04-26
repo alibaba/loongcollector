@@ -51,6 +51,10 @@ public:
 
     void TestLoadJsonAndEnvParameters();
 
+    void TestCheckProxyAddress();
+
+    void TestCheckProxyEnv();
+
 private:
     void writeLogtailConfigJSON(const Json::Value& v) {
         LOG_INFO(sLogger, ("writeLogtailConfigJSON", v.toStyledString()));
@@ -83,6 +87,7 @@ private:
 APSARA_UNIT_TEST_CASE(AppConfigUnittest, TestLoadEnvParameters, 0);
 APSARA_UNIT_TEST_CASE(AppConfigUnittest, TestLoadFileParameters, 0);
 APSARA_UNIT_TEST_CASE(AppConfigUnittest, TestLoadJsonAndEnvParameters, 0);
+APSARA_UNIT_TEST_CASE(AppConfigUnittest, TestCheckProxyAddress, 0);
 
 const bool kAccessMultiConfig = true;
 const int32_t kMaxMultiConfig = 11;
@@ -326,6 +331,207 @@ void AppConfigUnittest::TestLoadJsonAndEnvParameters() {
     APSARA_TEST_EQUAL(DOUBLE_FLAG(test_param_double_error), 1.1);
     APSARA_TEST_EQUAL(STRING_FLAG(test_param_string_error), "str");
 }
+
+void AppConfigUnittest::TestCheckProxyAddress() {
+    const char* envKey = "http_proxy";
+    std::string address;
+    bool res;
+
+    address = "127.0.0.1";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv(envKey)), "127.0.0.1:80");
+
+    address = "127.0.0.1:9090";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv(envKey)), "127.0.0.1:9090");
+
+    address = "http://127.0.0.1";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv(envKey)), "http://127.0.0.1:80");
+
+    address = "http://127.0.0.1:9090";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv(envKey)), "http://127.0.0.1:9090");
+
+    address = "http://user:123@127.0.0.1";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv(envKey)), "http://user:123@127.0.0.1:80");
+
+    address = "http://user:123@127.0.0.1:9090";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv(envKey)), "http://user:123@127.0.0.1:9090");
+
+    address = "https://127.0.0.1:9090";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv(envKey)), "https://127.0.0.1:9090");
+
+    address = "socks5://127.0.0.1:9090";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv(envKey)), "socks5://127.0.0.1:9090");
+
+    address = "socks4://127.0.0.1:9090";
+    SetEnv(envKey, address.c_str());
+    res = AppConfig::GetInstance()->CheckAndResetProxyAddress(envKey, address);
+    APSARA_TEST_EQUAL(res, false);
+}
+
+void AppConfigUnittest::TestCheckProxyEnv() {
+    bool res;
+    SetEnv("http_proxy", "127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("http_proxy")), "127.0.0.1:80");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTP_PROXY")), "");
+    UnsetEnv("http_proxy");
+
+    SetEnv("HTTP_PROXY", "127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("http_proxy")), "127.0.0.1:80");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTP_PROXY")), "127.0.0.1:80");
+    UnsetEnv("HTTP_PROXY");
+
+    SetEnv("http_proxy", "127.0.0.1");
+    SetEnv("HTTP_PROXY", "127.0.0.2");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("http_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTP_PROXY")), "127.0.0.2:80");
+    UnsetEnv("http_proxy");
+    UnsetEnv("HTTP_PROXY");
+
+    SetEnv("https_proxy", "127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("https_proxy")), "127.0.0.1:80");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTPS_PROXY")), "");
+    UnsetEnv("https_proxy");
+
+    SetEnv("HTTPS_PROXY", "127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("https_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTPS_PROXY")), "127.0.0.1:80");
+    UnsetEnv("HTTPS_PROXY");
+
+    SetEnv("https_proxy", "127.0.0.1");
+    SetEnv("HTTPS_PROXY", "127.0.0.2");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("https_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTPS_PROXY")), "127.0.0.2:80");
+    UnsetEnv("https_proxy");
+    UnsetEnv("HTTPS_PROXY");
+
+    SetEnv("all_proxy", "127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("all_proxy")), "127.0.0.1:80");
+    APSARA_TEST_EQUAL(ToString(getenv("ALL_PROXY")), "");
+    UnsetEnv("all_proxy");
+
+    SetEnv("ALL_PROXY", "127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("all_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("ALL_PROXY")), "127.0.0.1:80");
+    UnsetEnv("ALL_PROXY");
+
+    SetEnv("all_proxy", "127.0.0.1");
+    SetEnv("ALL_PROXY", "127.0.0.2");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, true);
+    APSARA_TEST_EQUAL(ToString(getenv("all_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("ALL_PROXY")), "127.0.0.2:80");
+    UnsetEnv("all_proxy");
+    UnsetEnv("ALL_PROXY");
+
+    SetEnv("http_proxy", "socks4://127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("http_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTP_PROXY")), "");
+    UnsetEnv("http_proxy");
+
+    SetEnv("HTTP_PROXY", "socks4://127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("http_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTP_PROXY")), "");
+    UnsetEnv("HTTP_PROXY");
+
+    SetEnv("http_proxy", "socks4://127.0.0.1");
+    SetEnv("HTTP_PROXY", "socks4://127.0.0.2");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("http_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTP_PROXY")), "");
+    UnsetEnv("http_proxy");
+    UnsetEnv("HTTP_PROXY");
+
+    SetEnv("https_proxy", "socks4://127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("https_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTPS_PROXY")), "");
+    UnsetEnv("https_proxy");
+
+    SetEnv("HTTPS_PROXY", "socks4://127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("https_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTPS_PROXY")), "");
+    UnsetEnv("HTTPS_PROXY");
+
+    SetEnv("https_proxy", "socks4://127.0.0.1");
+    SetEnv("HTTPS_PROXY", "socks4://127.0.0.2");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("https_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("HTTPS_PROXY")), "");
+    UnsetEnv("https_proxy");
+    UnsetEnv("HTTPS_PROXY");
+
+    SetEnv("all_proxy", "socks4://127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("all_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("ALL_PROXY")), "");
+    UnsetEnv("all_proxy");
+
+    SetEnv("ALL_PROXY", "socks4://127.0.0.1");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("all_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("ALL_PROXY")), "");
+    UnsetEnv("ALL_PROXY");
+
+    SetEnv("all_proxy", "socks4://127.0.0.1");
+    SetEnv("ALL_PROXY", "socks4://127.0.0.2");
+    res = AppConfig::GetInstance()->CheckAndResetProxyEnv();
+    APSARA_TEST_EQUAL(res, false);
+    APSARA_TEST_EQUAL(ToString(getenv("all_proxy")), "");
+    APSARA_TEST_EQUAL(ToString(getenv("ALL_PROXY")), "");
+    UnsetEnv("all_proxy");
+    UnsetEnv("ALL_PROXY");
+}
+
 } // namespace logtail
 
 UNIT_TEST_MAIN
