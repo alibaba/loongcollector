@@ -43,6 +43,7 @@ std::string CalculateRandomUUID();
 // 2. .log.aliyuncs.com excluding -share.log.aliyuncs.com: PUBLIC.
 // 3. others including -share.log.aliyuncs.com: INNER.
 enum class EndpointAddressType { INNER, INTRANET, PUBLIC };
+bool IsHttpsEndpoint(const std::string& endpoint);
 
 namespace util {
 

@@ -61,6 +61,13 @@ std::string CalculateRandomUUID() {
 #endif
 }
 
+bool IsHttpsEndpoint(const string& endpoint) {
+    if (endpoint.find("https://") == 0) {
+        return true;
+    }
+    return false;
+}
+
 namespace util {
 
     const std::string kConfigPrefix = "/etc/ilogtail/conf/";

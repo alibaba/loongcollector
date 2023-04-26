@@ -100,6 +100,7 @@ DEFINE_FLAG_INT32(sending_cost_time_alarm_interval, "sending log group cost too 
 DEFINE_FLAG_INT32(log_group_wait_in_queue_alarm_interval,
                   "log group wait in queue alarm interval, may blocked by concurrency or quota, second",
                   3);
+DEFINE_FLAG_STRING(data_endpoint_policy, "policy for switching between data server endpoints, possible options include 'designated_first'(default) and 'designated_locked'", "designated_first");
 
 namespace logtail {
 const string Sender::BUFFER_FILE_NAME_PREFIX = "logtail_buffer_file_";
@@ -212,7 +213,9 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                 if (!BOOL_FLAG(send_prefer_real_ip) || !mDataPtr->mRealIpFlag) {
                     Sender::Instance()->SetNetworkStat(mDataPtr->mRegion, mDataPtr->mCurrentEndpoint, false);
                     recordRst = LogstoreSenderInfo::SendResult_NetworkFail;
-                    Sender::Instance()->ResetSendClientEndpoint(mDataPtr->mAliuid, mDataPtr->mRegion, curTime);
+                    if (Sender::Instance()->mDataServerSwitchPolicy == dataServerSwitchPolicy::DESIGNATED_FIRST) {
+                        Sender::Instance()->ResetSendClientEndpoint(mDataPtr->mAliuid, mDataPtr->mRegion, curTime);
+                    }
                 }
             }
             operation = mDataPtr->mBufferOrNot ? RECORD_ERROR_WHEN_FAIL : DISCARD_WHEN_FAIL;
@@ -433,6 +436,7 @@ SendResult ConvertErrorCode(const std::string& errorCode) {
 }
 
 Sender::Sender() {
+    setupServerSwitchPolicy();
     srand(time(NULL));
     mFlushLog = false;
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
@@ -473,6 +477,16 @@ Sender::Sender() {
 Sender* Sender::Instance() {
     static Sender* senderPtr = new Sender();
     return senderPtr;
+}
+
+void Sender::setupServerSwitchPolicy() {
+    if (STRING_FLAG(data_endpoint_policy) == "designated_locked") {
+        mDataServerSwitchPolicy = dataServerSwitchPolicy::DESIGNATED_LOCKED;
+    } else if (STRING_FLAG(data_endpoint_policy) == "designated_first") {
+        mDataServerSwitchPolicy = dataServerSwitchPolicy::DESIGNATED_FIRST;
+    } else {
+        mDataServerSwitchPolicy = dataServerSwitchPolicy::DESIGNATED_FIRST;
+    }
 }
 
 ///////////////////////////////for debug & ut//////////////////////////////////
@@ -707,7 +721,7 @@ bool Sender::HasNetworkAvailable() {
     return false;
 }
 
-sdk::Client* Sender::GetSendClient(const std::string& region, const std::string& aliuid) {
+sdk::Client* Sender::GetSendClient(const std::string& region, const std::string& aliuid, bool createIfNotFound) {
     string key = region + "_" + aliuid;
     {
         PTScopedLock lock(mSendClientLock);
@@ -718,15 +732,21 @@ sdk::Client* Sender::GetSendClient(const std::string& region, const std::string&
             return (iter->second)->sendClient;
         }
     }
+    if (!createIfNotFound) {
+        return nullptr;
+    }
 
     int32_t lastUpdateTime;
-    sdk::Client* sendClient = new sdk::Client(GetRegionCurrentEndpoint(region),
+    string endpoint = GetRegionCurrentEndpoint(region);
+    sdk::Client* sendClient = new sdk::Client(endpoint,
                                               "",
                                               "",
                                               INT32_FLAG(sls_client_send_timeout),
                                               LogFileProfiler::mIpAddr,
                                               AppConfig::GetInstance()->GetBindInterface());
     SLSControl::Instance()->SetSlsSendClientCommonParam(sendClient);
+    ResetPort(region, sendClient);
+    LOG_INFO(sLogger, ("init endpoint for sender, region", region)("uid", aliuid)("endpoint", endpoint)("use https",ToString(sendClient->IsUsingHTTPS())));
     SLSControl::Instance()->SetSlsSendClientAuth(aliuid, true, sendClient, lastUpdateTime);
     SlsClientInfo* clientInfo = new SlsClientInfo(sendClient, time(NULL));
     {
@@ -737,18 +757,43 @@ sdk::Client* Sender::GetSendClient(const std::string& region, const std::string&
 }
 
 bool Sender::ResetSendClientEndpoint(const std::string aliuid, const std::string region, int32_t curTime) {
-    sdk::Client* sendClient = GetSendClient(region, aliuid);
+    sdk::Client* sendClient = GetSendClient(region, aliuid, false);
+    if (sendClient == nullptr) {
+        return false;
+    }
     if (curTime - sendClient->GetSlsHostUpdateTime() < INT32_FLAG(sls_host_update_interval))
         return false;
     sendClient->SetSlsHostUpdateTime(curTime);
     string endpoint = GetRegionCurrentEndpoint(region);
     if (endpoint.empty())
         return false;
-    if (sendClient->GetRawSlsHost() != endpoint) {
-        mSenderQueue.OnRegionRecover(region);
+    string originalEndpoint = sendClient->GetRawSlsHost();
+    if (originalEndpoint == endpoint) {
+        return false;
     }
+    mSenderQueue.OnRegionRecover(region);
     sendClient->SetSlsHost(endpoint);
+    ResetPort(region, sendClient);
+    LOG_INFO(sLogger, ("reset endpoint for sender, region", region)("uid", aliuid)("from", originalEndpoint)("to", endpoint)("use https",ToString(sendClient->IsUsingHTTPS())));
     return true;
+}
+
+void Sender::ResetPort(const string& region, sdk::Client* sendClient) {
+    if (AppConfig::GetInstance()->GetDataServerPort() == 80) {
+        PTScopedLock lock(mRegionEndpointEntryMapLock);
+        if (mRegionEndpointEntryMap.find(region) != mRegionEndpointEntryMap.end()) {
+            string defaultEndpoint = mRegionEndpointEntryMap.at(region)->mDefaultEndpoint;
+            if (defaultEndpoint.size() != 0) {
+                if (IsHttpsEndpoint(defaultEndpoint)) {
+                    sendClient->SetPort(443);
+                }
+            } else {
+                if (IsHttpsEndpoint(sendClient->GetRawSlsHost())) {
+                    sendClient->SetPort(443);
+                }
+            }
+        }
+    }
 }
 
 void Sender::CleanTimeoutSendClient() {
@@ -1657,13 +1702,38 @@ void Sender::AddEndpointEntry(const std::string& region, const std::string& endp
     if (iter == mRegionEndpointEntryMap.end()) {
         entryPtr = new RegionEndpointEntry();
         mRegionEndpointEntryMap.insert(std::make_pair(region, entryPtr));
+        // if (!isDefault && region.size() > 2) {
+        //     string possibleMainRegion = region.substr(0, region.size() - 2);
+        //     if (mRegionEndpointEntryMap.find(possibleMainRegion) != mRegionEndpointEntryMap.end()) {
+        //         string mainRegionEndpoint = mRegionEndpointEntryMap[possibleMainRegion]->mDefaultEndpoint;
+        //         string subRegionEndpoint = mainRegionEndpoint;
+        //         size_t pos = mainRegionEndpoint.find(possibleMainRegion);
+        //         if (pos != string::npos) {
+        //             subRegionEndpoint = mainRegionEndpoint.substr(0, pos) + region
+        //                 + mainRegionEndpoint.substr(pos + possibleMainRegion.size());
+        //         }
+        //         if (entryPtr->AddDefaultEndpoint(subRegionEndpoint)) {
+        //             LOG_INFO(sLogger,
+        //                      ("add default data server endpoint, region", region)("endpoint", endpoint)(
+        //                          "isProxy", "false")("#endpoint", entryPtr->mEndpointDetailMap.size()));
+        //         }
+        //     }
+        // }
     } else
         entryPtr = iter->second;
 
-    if (isDefault)
-        entryPtr->AddDefaultEndpoint(endpoint);
-    else {
-        entryPtr->AddEndpoint(endpoint, true, -1, isProxy);
+    if (isDefault) {
+        if (entryPtr->AddDefaultEndpoint(endpoint)) {
+            LOG_INFO(sLogger,
+                     ("add default data server endpoint, region", region)("endpoint", endpoint)("isProxy", "false")(
+                         "#endpoint", entryPtr->mEndpointDetailMap.size()));
+        }
+    } else {
+        if (entryPtr->AddEndpoint(endpoint, true, -1, isProxy)) {
+            LOG_INFO(sLogger,
+                     ("add data server endpoint, region", region)("endpoint", endpoint)("isProxy", ToString(isProxy))(
+                         "#endpoint", entryPtr->mEndpointDetailMap.size()));
+        }
     }
 }
 
@@ -1671,8 +1741,9 @@ void Sender::TestNetwork() {
 #ifdef LOGTAIL_RUNTIME_PLUGIN
     return;
 #endif
-    vector<std::string> unavaliableEndpoints;
-    set<std::string> unavaliableRegions;
+    // pair<int32_t, string> represents the weight of each endpoint
+    map<string, vector<pair<int32_t, string>>> unavaliableEndpoints;
+    set<string> unavaliableRegions;
     int32_t lastCheckAllTime = 0;
     while (true) {
         unavaliableEndpoints.clear();
@@ -1688,11 +1759,20 @@ void Sender::TestNetwork() {
                      epIter != ((iter->second)->mEndpointDetailMap).end();
                      ++epIter) {
                     if (!(epIter->second).mStatus) {
-                        unavaliableEndpoints.push_back(iter->first);
-                        unavaliableEndpoints.push_back(epIter->first);
-                    } else
+                        if (mDataServerSwitchPolicy == dataServerSwitchPolicy::DESIGNATED_FIRST) {
+                            if (epIter->first == iter->second->mDefaultEndpoint) {
+                                unavaliableEndpoints[iter->first].emplace_back(0, epIter->first);
+                            } else {
+                                unavaliableEndpoints[iter->first].emplace_back(10, epIter->first);
+                            }
+                        } else {
+                            unavaliableEndpoints[iter->first].emplace_back(10, epIter->first);
+                        }
+                    } else {
                         unavaliable = false;
+                    }
                 }
+                sort(unavaliableEndpoints[iter->first].begin(), unavaliableEndpoints[iter->first].end());
                 if (unavaliable)
                     unavaliableRegions.insert(iter->first);
             }
@@ -1704,19 +1784,39 @@ void Sender::TestNetwork() {
         int32_t curTime = time(NULL);
         bool flag = false;
         bool wakeUp = false;
-        for (size_t i = 0; i < unavaliableEndpoints.size(); i += 2) {
-            const string& region = unavaliableEndpoints[i];
-            const string& endpoint = unavaliableEndpoints[i + 1];
-            if (unavaliableRegions.find(region) == unavaliableRegions.end()) {
-                if (curTime - lastCheckAllTime >= 1800) {
-                    TestEndpoint(region, endpoint);
-                    flag = true;
-                }
-            } else {
-                if (TestEndpoint(region, endpoint)) {
-                    LOG_DEBUG(sLogger, ("Region recover success", "")(region, endpoint));
-                    wakeUp = true;
-                    mSenderQueue.OnRegionRecover(region);
+        for (const auto& value : unavaliableEndpoints) {
+            const string& region = value.first;
+            bool endpointChanged = false;
+            set<string> uids = ConfigManager::GetInstance()->GetRegionAliuids(region);
+            for (const auto& item : value.second) {
+                const string& endpoint = item.second;
+                const int32_t priority = item.first;
+                if (unavaliableRegions.find(region) == unavaliableRegions.end()) {
+                    if (!endpointChanged && priority != 10) {
+                        if (TestEndpoint(region, endpoint)) {
+                            for (const auto& uid : uids) {
+                                ResetSendClientEndpoint(uid, region, curTime);
+                            }
+                            endpointChanged = true;
+                        }
+                    } else {
+                        if (curTime - lastCheckAllTime >= 1800) {
+                            TestEndpoint(region, endpoint);
+                            flag = true;
+                        }
+                    }
+                } else {
+                    if (TestEndpoint(region, endpoint)) {
+                        LOG_DEBUG(sLogger, ("Region recover success", "")(region, endpoint));
+                        wakeUp = true;
+                        mSenderQueue.OnRegionRecover(region);
+                        if (!endpointChanged && priority != 10) {
+                            for (const auto& uid : uids) {
+                                ResetSendClientEndpoint(uid, region, curTime);
+                            }
+                            endpointChanged = true;
+                        }
+                    }
                 }
             }
         }
@@ -1740,6 +1840,7 @@ bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint
         return false;
     static LogGroup logGroup;
     mTestNetworkClient->SetSlsHost(endpoint);
+    ResetPort(region, mTestNetworkClient);
     bool status = true;
     int64_t beginTime = GetCurrentTimeInMicroSeconds();
     try {
@@ -2433,7 +2534,7 @@ double Sender::UpdateSendStatistic(const std::string& key, int32_t curTime, bool
     int32_t curBeginTime = curTime - second + window * WINDOW_SIZE; // normalize to 10s
     {
         PTScopedLock lock(mSendStatisticLock);
-        std::unordered_map<std::string, std::vector<SendStatistic*> >::iterator iter = mSendStatisticMap.find(key);
+        std::unordered_map<std::string, std::vector<SendStatistic*>>::iterator iter = mSendStatisticMap.find(key);
         if (iter == mSendStatisticMap.end()) {
             std::vector<SendStatistic*> value;
             for (int32_t idx = 0; idx < WINDOW_COUNT; ++idx) {
@@ -2478,7 +2579,7 @@ double Sender::UpdateSendStatistic(const std::string& key, int32_t curTime, bool
 void Sender::CleanTimeoutSendStatistic() {
     PTScopedLock lock(mSendStatisticLock);
     int32_t curTime = time(NULL);
-    for (std::unordered_map<std::string, std::vector<SendStatistic*> >::iterator iter = mSendStatisticMap.begin();
+    for (std::unordered_map<std::string, std::vector<SendStatistic*>>::iterator iter = mSendStatisticMap.begin();
          iter != mSendStatisticMap.end();) {
         bool timeout = true;
         for (vector<SendStatistic*>::iterator winIter = iter->second.begin(); winIter != iter->second.end();

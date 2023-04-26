@@ -13,7 +13,6 @@
       "extensions": [
         "golang.Go",
         "ms-vscode.cpptools-extension-pack",
-        "xaver.clang-format",
         "DavidAnson.vscode-markdownlint",
         "redhat.vscode-yaml",
         "bmalehorn.shell-syntax"

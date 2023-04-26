@@ -42,6 +42,8 @@ enum SEND_THREAD_TYPE { REALTIME_SEND_THREAD = 0, REPLAY_SEND_THREAD = 1, SEND_T
 
 enum EndpointStatus { STATUS_OK_WITH_IP = 0, STATUS_OK_WITH_ENDPOINT, STATUS_ERROR };
 
+enum dataServerSwitchPolicy { DESIGNATED_FIRST, DESIGNATED_LOCKED };
+
 struct EndpointDetail {
     bool mStatus;
     bool mProxyFlag;
@@ -75,14 +77,17 @@ struct RegionEndpointEntry {
         mEndpointDetailMap.clear();
     }
 
-    void AddDefaultEndpoint(const std::string& endpoint) {
+    bool AddDefaultEndpoint(const std::string& endpoint) {
         mDefaultEndpoint = endpoint;
-        AddEndpoint(endpoint, true, 0, false);
+        return AddEndpoint(endpoint, true, 0, false);
     }
 
-    void AddEndpoint(const std::string& endpoint, bool status, int32_t latency, bool proxy = false) {
-        if (mEndpointDetailMap.find(endpoint) == mEndpointDetailMap.end())
+    bool AddEndpoint(const std::string& endpoint, bool status, int32_t latency, bool proxy = false) {
+        if (mEndpointDetailMap.find(endpoint) == mEndpointDetailMap.end()) {
             mEndpointDetailMap.insert(std::make_pair(endpoint, EndpointDetail(status, latency, proxy)));
+            return true;
+        }
+        return false;
     }
 
     void RemoveEndpoint(const std::string& endpoint) {
@@ -160,6 +165,7 @@ private:
     Sender();
     Sender(const Sender&);
     Sender& operator=(const Sender&);
+    void setupServerSwitchPolicy();
     bool WriteToFile(const std::string& projectName, const sls_logs::LogGroup& logGroup, bool sendPerformance);
     bool WriteToFile(LoggroupTimeValue* value, bool sendPerformance);
     bool DumpDebugFile(LoggroupTimeValue* value, bool sendPerformance = false);
@@ -242,6 +248,7 @@ private:
 
     int64_t mCheckPeriod;
     SpinLock mBufferFileLock; // get set bufferfilepath and buffer filename
+    dataServerSwitchPolicy mDataServerSwitchPolicy;
 
     struct RealIpInfo {
         RealIpInfo() : mLastUpdateTime(0), mForceFlushFlag(false) {}
@@ -332,9 +339,7 @@ private:
     std::string GetRegionCurrentEndpoint(const std::string& region);
     std::string GetRegionFromEndpoint(const std::string& endpoint);
 
-    void AddTruncateInfo(int64_t key, const std::string& truncateinfo);
-    std::string GetTruncateInfo(int64_t key);
-    void DelTruncateInfo(int64_t key);
+    void ResetPort(const std::string& region, sdk::Client* sendClient);
 
 public:
     static Sender* Instance();
@@ -370,7 +375,7 @@ public:
     bool HasNetworkAvailable();
     void SetNetworkStat(const std::string& region, const std::string& endpoint, bool status, int32_t latency = -1);
 
-    sdk::Client* GetSendClient(const std::string& region, const std::string& aliuid);
+    sdk::Client* GetSendClient(const std::string& region, const std::string& aliuid, bool createIfNotFound = true);
 
     bool ResetSendClientEndpoint(const std::string aliuid, const std::string region, int32_t curTime);
     void CleanTimeoutSendClient();
