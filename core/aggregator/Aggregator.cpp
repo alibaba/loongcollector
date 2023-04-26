@@ -285,7 +285,7 @@ bool Aggregator::Add(const std::string& projectName,
                     itr->second = value;
                     initFlag = true;
 
-                    value->mLastUpdateTime = curTime;
+                    value->mLastUpdateTime = curTime; // set the last update time before enqueue
                     (value->mLogGroup).mutable_logs()->Reserve(INT32_FLAG(merge_log_count_limit));
                     (value->mLogGroup).set_category(category);
                     (value->mLogGroup).set_topic(topic);

@@ -62,6 +62,7 @@ struct LoggroupTimeValue {
     std::string mTruncateInfo;
 
     int32_t mSendRetryTimes;
+    int32_t mLastSendTime;
     std::string mAliuid;
     std::string mRegion;
     std::string mShardHashKey;
@@ -100,6 +101,7 @@ struct LoggroupTimeValue {
         mRawSize = rawSize;
         mLastUpdateTime = lastUpdateTime;
         mSendRetryTimes = 0;
+        mLastSendTime = 0;
         mLogData.clear();
         mShardHashKey = shardHashKey;
         mStatus = LoggroupSendStatus_Idle;

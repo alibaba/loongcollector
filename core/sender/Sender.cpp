@@ -112,10 +112,19 @@ void SendClosure::OnSuccess(sdk::Response* response) {
     Sender::Instance()->SubSendingBufferCount();
     Sender::Instance()->DescSendingCount();
 
-    LOG_DEBUG(
-        sLogger,
-        ("StatusCode", response->statusCode)("RequestId", response->requestId)("projectName", mDataPtr->mProjectName)(
-            "logstore", mDataPtr->mLogstore)("logs", mDataPtr->mLogLines)("bytes", mDataPtr->mLogData.size()));
+    if (sLogger->should_log(spdlog::level::debug)) {
+        time_t curTime = time(NULL);
+        bool isProfileData = Sender::IsProfileData(mDataPtr->mRegion, mDataPtr->mProjectName, mDataPtr->mLogstore);
+        LOG_DEBUG(
+            sLogger,
+            ("SendSucess", "OK")("RequestId", response->requestId)("StatusCode", response->statusCode)(
+                "ResponseTime", curTime - mDataPtr->mLastSendTime)("Region", mDataPtr->mRegion)(
+                "Project", mDataPtr->mProjectName)("Logstore", mDataPtr->mLogstore)("Config", mDataPtr->mConfigName)(
+                "RetryTimes", mDataPtr->mSendRetryTimes)("TotalSendCost", curTime - mDataPtr->mLastUpdateTime)(
+                "LogLines", mDataPtr->mLogLines)("Bytes", mDataPtr->mLogData.size())(
+                "Endpoint", mDataPtr->mCurrentEndpoint)("IsProfileData", isProfileData));
+    }
+
     if (BOOL_FLAG(e2e_send_throughput_test))
         Sender::Instance()->DumpDebugFile(mDataPtr, true);
 
@@ -346,11 +355,12 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
 
 #define LOG_PATTERN \
     ("SendFail", failDetail.str())("Operation", GetOperationString(operation))("Suggestion", suggestion.str())( \
-        "RequestId", response->requestId)("StatusCode", response->statusCode)("ErrorCode", errorCode)("ErrorMessage", \
-                                                                                                      errorMessage)( \
-        "Region", mDataPtr->mRegion)("Project", mDataPtr->mProjectName)("Logstore", mDataPtr->mLogstore)( \
-        "Config", mDataPtr->mConfigName)("RetryTimes", mDataPtr->mSendRetryTimes)("LogLines", mDataPtr->mLogLines)( \
-        "Bytes", mDataPtr->mLogData.size())("Endpoint", mDataPtr->mCurrentEndpoint)("IsProfileData", isProfileData)
+        "RequestId", response->requestId)("StatusCode", response->statusCode)("ErrorCode", errorCode)( \
+        "ErrorMessage", errorMessage)("ResponseTime", curTime - mDataPtr->mLastSendTime)("Region", mDataPtr->mRegion)( \
+        "Project", mDataPtr->mProjectName)("Logstore", mDataPtr->mLogstore)("Config", mDataPtr->mConfigName)( \
+        "RetryTimes", mDataPtr->mSendRetryTimes)("TotalSendCost", curTime - mDataPtr->mLastUpdateTime)( \
+        "LogLines", mDataPtr->mLogLines)("Bytes", mDataPtr->mLogData.size())("Endpoint", mDataPtr->mCurrentEndpoint)( \
+        "IsProfileData", isProfileData)
 
     // Log warning if retry for too long or will discard data
     switch (operation) {
@@ -1400,11 +1410,13 @@ void Sender::DaemonSender() {
                 int32_t sendCostTime = afterSleepTime - beforeSleepTime;
                 if (sendCostTime > INT32_FLAG(sending_cost_time_alarm_interval)) {
                     LOG_WARNING(sLogger,
-                                ("sending log group blocked too long because of on flying buffer",
-                                 "")("send cost time", sendCostTime)("sending buffer count", GetSendingBufferCount())(
-                                    "send request concurrency", AppConfig::GetInstance()->GetSendRequestConcurrency()));
+                                ("sending log group blocked too long because send concurrency reached limit. current "
+                                 "concurrency used",
+                                 GetSendingBufferCount())("max concurrency",
+                                                          AppConfig::GetInstance()->GetSendRequestConcurrency())(
+                                    "blocked time", sendCostTime));
                     LogtailAlarm::GetInstance()->SendAlarm(SENDING_COSTS_TOO_MUCH_TIME_ALARM,
-                                                           "sending log group costs too much time, send cost time "
+                                                           "sending log group costs too much time, blocked time "
                                                                + ToString(sendCostTime),
                                                            data->mProjectName,
                                                            data->mLogstore,
@@ -1415,7 +1427,7 @@ void Sender::DaemonSender() {
                 sendBufferBytes += data->mRawSize;
                 sendNetBodyBytes += data->mLogData.size();
                 sendLines += data->mLogLines;
-                data->mLastUpdateTime = time(NULL);
+                data->mLastUpdateTime = time(NULL); // set last update time before sending
                 SendToNetAsync(data);
             }
         }
@@ -1946,6 +1958,7 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
     }
 
     SendClosure* sendClosure = new SendClosure;
+    dataPtr->mLastSendTime = curTime;
     sendClosure->mDataPtr = dataPtr;
     LOG_DEBUG(sLogger,
               ("region", dataPtr->mRegion)("endpoint", dataPtr->mCurrentEndpoint)("project", dataPtr->mProjectName)(
