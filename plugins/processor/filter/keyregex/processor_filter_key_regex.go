@@ -76,8 +76,8 @@ func (*ProcessorKeyFilter) Description() string {
 func (p *ProcessorKeyFilter) IsLogMatch(log *protocol.Log) bool {
 	if p.includeRegex != nil {
 	ForBlock:
-		for _, cont := range log.Contents {
-			for _, reg := range p.includeRegex {
+		for _, reg := range p.includeRegex {
+			for _, cont := range log.Contents {
 				if reg.MatchString(cont.Key) {
 					continue ForBlock
 				}
