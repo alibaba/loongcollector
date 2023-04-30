@@ -41,6 +41,7 @@ sed -i "s/VERSION=\${2:-.*}/VERSION=\${2:-$version}/g" scripts/*.sh
 sed -i "s/VERSION=\${3:-.*}/VERSION=\${3:-$version}/g" scripts/*.sh
 sed -i "s/VERSION=\${4:-.*}/VERSION=\${4:-$version}/g" scripts/*.sh
 sed -i "s/DIST_DIR=\${2:-ilogtail-.*}/DIST_DIR=\${2:-ilogtail-$version}/g" scripts/dist.sh
+sed -i "s/^set ILOGTAIL_VERSION=.*/set ILOGTAIL_VERSION=$version/g" scripts/*.bat
 sed -i "s/image: aliyun\\/ilogtail:.*/image: aliyun\\/ilogtail:$version/g" test/engine/boot/compose.go
 
 # Docs
