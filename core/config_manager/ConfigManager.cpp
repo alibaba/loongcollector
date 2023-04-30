@@ -72,6 +72,8 @@ DEFINE_FLAG_STRING(default_access_key, "", "");
 
 DEFINE_FLAG_INT32(config_update_interval, "second", 10);
 
+DEFINE_FLAG_INT32(file_tags_update_interval, "second", 1);
+
 namespace logtail {
 void ConfigManager::CleanUnusedUserAK() {
 }
@@ -143,6 +145,8 @@ bool ConfigManager::CheckUpdateThread(bool configExistFlag) {
     usleep((rand() % 10) * 100 * 1000);
     int32_t lastCheckTime = 0;
     int32_t checkInterval = INT32_FLAG(config_update_interval);
+    int32_t lastCheckTagsTime = 0;
+    int32_t checkTagsInterval = INT32_FLAG(file_tags_update_interval);
     while (mThreadIsRunning) {
         int32_t curTime = time(NULL);
 
@@ -175,6 +179,11 @@ bool ConfigManager::CheckUpdateThread(bool configExistFlag) {
                 StartUpdateConfig();
             }
             lastCheckTime = curTime;
+        }
+
+        if (curTime - lastCheckTagsTime >= checkTagsInterval) {
+            ConfigManagerBase::UpdateFileTags();
+            lastCheckTagsTime = curTime;
         }
 
         if (mThreadIsRunning)
