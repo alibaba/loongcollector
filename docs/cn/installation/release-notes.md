@@ -38,13 +38,13 @@
 | -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
 | [ilogtail-1.5.0.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.5.0/ilogtail-1.5.0.linux-amd64.tar.gz) | Linux | x86-64 | ccb7e637bc7edc4e9fe22ab3ac79cedee63d80678711e0efc77122387ec73882 |
 | [ilogtail-1.5.0.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.5.0/ilogtail-1.5.0.linux-arm64.tar.gz) | Linux | arm64  | f1d7940e08ee51f2c66d963d91c16903658ab1e0fc856002351248c94d0e6b0a |
-| [ilogtail-1.5.0.windows-amd64.zip](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.5.0/ilogtail-1.5.0.windows-amd64.zip)   | Linux | x86-64 | f7ba5c913839f86d4b589b6573e4f87f13b36fa61db246abf652734500b76ec3 |
+| [ilogtail-1.5.0.windows-amd64.zip](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.5.0/ilogtail-1.5.0.windows-amd64.zip)   | Windows | x86-64 | 7b3ccbfcca18e1ffeb2e5db06b32fbcac3e8b7ecf8113a7006891bbe3c1a5a84 |
 
 ### Docker 镜像
 
 **Docker Pull 命令**&#x20;
 
-```
+``` bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.5.0
 ```
 
