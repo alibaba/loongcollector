@@ -155,7 +155,7 @@ var dockerEnvConfigInfoList = []*helper.DockerInfoDetail{}
 
 // dockerInfoEnvConfigProcessFunc process all docker info, get all config spec list
 func dockerInfoEnvConfigProcessFunc(dockerInfo *helper.DockerInfoDetail) {
-	if len(dockerInfo.EnvConfigInfoMap) > 0 {
+	if dockerInfo.Status() == helper.ContainerStatusRunning && len(dockerInfo.EnvConfigInfoMap) > 0 {
 		dockerEnvConfigInfoList = append(dockerEnvConfigInfoList, dockerInfo)
 	}
 }
