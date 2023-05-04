@@ -32,6 +32,6 @@ your changes, such as:
 
 ## Example
 
-- [public] [both] [updated] add a new feature
+- [public] [both] [fix] do not read env config from exited containers
 
 ## [Unreleased]
