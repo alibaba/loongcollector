@@ -13,7 +13,7 @@
 * [快速开始](installation/quick-start.md)
 * [Docker使用](installation/start-with-container.md)
 * [Kubernetes使用](installation/start-with-k8s.md)
-* [使用Supervised管理](installation/supervised.md)
+* [守护进程](installation/daemon.md)
 * [发布记录](installation/release-notes.md)
 * [支持的操作系统](installation/os.md)
 * [源代码](installation/sources/README.md)
