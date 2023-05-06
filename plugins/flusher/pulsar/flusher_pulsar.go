@@ -35,11 +35,17 @@ type FlusherPulsar struct {
 	URL string
 	// SendTimeout send timeout
 	SendTimeout time.Duration
-	// The name of the pulsar topic
+	// OperationTimeout sets producer-create, subscribe and unsubscribe operations timeout (default: 30 seconds)
+	OperationTimeout time.Duration
+	// ConnectionTimeout timeout for the establishment of a TCP connection (default: 5 seconds)
+	ConnectionTimeout time.Duration
+	// MaxConnectionsPerBroker max number of connections to a single broker that will kept in the pool. (default: 1 connection)
+	MaxConnectionsPerBroker int
+	// Topic The name of the pulsar topic
 	Topic string
-	// The producer name
+	// Name  The producer name
 	Name string
-	// ilogtail data convert config
+	// Convert  ilogtail data convert config
 	Convert convertConfig
 	// Configure whether the Pulsar client accept untrusted TLS certificate from broker (default: false)
 	// EnableTLS
@@ -49,14 +55,17 @@ type FlusherPulsar struct {
 	// Authentication support tls
 	Authentication Authentication
 
+	// MaxReconnectToBroker specifies the maximum retry number of reconnectToBroker. (default: ultimate)
+	MaxReconnectToBroker *uint
+	// DisableBlockIfQueueFull controls whether Send and SendAsync block if producer's message queue is full
 	DisableBlockIfQueueFull bool
 	// CompressionType  Codec used to produce messages,NONE,LZ4,ZLIB,ZSTD
 	CompressionType string
 	// HashingScheme is used to define the partition on where to publish a particular message
 	HashingScheme string
-	// the batch push delay
+	// BatchingMaxPublishDelay the batch push delay
 	BatchingMaxPublishDelay time.Duration
-	// maximum number of messages in a batch
+	// BatchingMaxMessages maximum number of messages in a batch
 	BatchingMaxMessages uint
 	// MaxCacheProducers Specify the max cache(lru) producers of dynamic topic
 	MaxCacheProducers int
@@ -72,6 +81,7 @@ type FlusherPulsar struct {
 	producers       *Producers
 	producerOptions pulsar.ProducerOptions
 	hashKeyMap      map[string]interface{}
+	selectFields    []string
 }
 type convertConfig struct {
 	// Rename one or more fields from tags.
@@ -133,7 +143,6 @@ func (f *FlusherPulsar) Init(context pipeline.Context) error {
 		return err
 	}
 	f.producerOptions = producerOptions
-
 	// Init partition keys
 	if f.PartitionKeys != nil {
 		f.hashKeyMap = make(map[string]interface{})
@@ -141,6 +150,8 @@ func (f *FlusherPulsar) Init(context pipeline.Context) error {
 			f.hashKeyMap[key] = struct{}{}
 		}
 	}
+	// Merge topicKeys and HashKeys,Only one convert after merge
+	f.selectFields = util.UniqueStrings(f.topicKeys, f.PartitionKeys)
 	return nil
 }
 
@@ -172,23 +183,26 @@ func (f *FlusherPulsar) Validate() error {
 }
 
 func (f *FlusherPulsar) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	topic := f.Topic
 	for _, logGroup := range logGroupList {
 		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-		// Merge topicKeys and HashKeys,Only one convert after merge
-		selectFields := util.UniqueStrings(f.topicKeys, f.PartitionKeys)
-		logs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, selectFields)
+		logs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.selectFields)
 		if err != nil {
 			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush pulsar convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
 			valueMap := values[index]
-			topic, err := fmtstr.FormatTopic(valueMap, f.Topic)
-			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush pulsar format topic fail, error", err)
+			if len(f.topicKeys) > 0 {
+				formattedTopic, err := fmtstr.FormatTopic(valueMap, f.Topic)
+				if err != nil {
+					logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush pulsar format topic fail, error", err)
+				} else {
+					topic = *formattedTopic
+				}
 			}
-			producer, err := f.producers.GetProducer(*topic, f.pulsarClient, f.producerOptions)
+			producer, err := f.producers.GetProducer(topic, f.pulsarClient, f.producerOptions)
 			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "load pulsar producer fail,topic", *topic, "err", err)
+				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "load pulsar producer fail,topic", topic, "err", err)
 				return err
 			}
 
@@ -238,7 +252,10 @@ func (f *FlusherPulsar) getConverter() (*converter.Converter, error) {
 
 func (f *FlusherPulsar) initClientOptions() pulsar.ClientOptions {
 	options := pulsar.ClientOptions{
-		URL: f.URL,
+		URL:                     f.URL,
+		OperationTimeout:        f.OperationTimeout,
+		ConnectionTimeout:       f.ConnectionTimeout,
+		MaxConnectionsPerBroker: f.MaxConnectionsPerBroker,
 	}
 	options.TLSAllowInsecureConnection = f.EnableTLS
 	if len(f.TLSTrustCertsFilePath) > 0 {
@@ -251,7 +268,8 @@ func (f *FlusherPulsar) initClientOptions() pulsar.ClientOptions {
 
 func (f *FlusherPulsar) initProducerOptions() (pulsar.ProducerOptions, error) {
 	producerOptions := pulsar.ProducerOptions{
-		Topic: f.Topic,
+		Topic:                f.Topic,
+		MaxReconnectToBroker: f.MaxReconnectToBroker,
 	}
 	if len(f.Name) > 0 {
 		producerOptions.Name = f.Name
@@ -268,6 +286,10 @@ func (f *FlusherPulsar) initProducerOptions() (pulsar.ProducerOptions, error) {
 		return pulsar.ProducerOptions{}, err
 	}
 	producerOptions.CompressionType = compressType
+
+	if f.SendTimeout > 0 {
+		producerOptions.SendTimeout = f.SendTimeout
+	}
 
 	if f.BatchingMaxPublishDelay > 0 {
 		producerOptions.BatchingMaxPublishDelay = f.BatchingMaxPublishDelay
@@ -337,8 +359,12 @@ func init() {
 				Protocol: converter.ProtocolCustomSingle,
 				Encoding: converter.EncodingJSON,
 			},
-			CompressionType: "NONE",
-			HashingScheme:   "JavaStringHash",
+			CompressionType:         "NONE",
+			HashingScheme:           "JavaStringHash",
+			MaxConnectionsPerBroker: 1,
+			ConnectionTimeout:       5 * time.Second,
+			OperationTimeout:        30 * time.Second,
+			MaxReconnectToBroker:    nil,
 		}
 	}
 }

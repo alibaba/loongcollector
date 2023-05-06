@@ -35,3 +35,5 @@ your changes, such as:
 - [public] [both] [fix] do not read env config from exited containers
 
 ## [Unreleased]
+
+- [public] [both] [updated] Optimize flusher pulsar to improve performance in static topic scenarios

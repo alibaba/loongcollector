@@ -9,7 +9,7 @@ require (
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner v0.0.0
 	github.com/aliyun/aliyun-log-go-sdk v0.1.37
-	github.com/apache/pulsar-client-go v0.9.0
+	github.com/apache/pulsar-client-go v0.10.0
 	github.com/bsm/sarama-cluster v2.1.15+incompatible
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash v1.1.0 // indirect
@@ -29,7 +29,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/gosnmp/gosnmp v1.31.0
 	github.com/grafana/loki-client-go v0.0.0-20230116142646-e7494d0ef70c
-	github.com/hashicorp/golang-lru v0.6.0
+	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/influxdata/go-syslog v1.0.1
 	github.com/jackc/pgx/v4 v4.16.1
 	github.com/jarcoal/httpmock v1.2.0
@@ -67,6 +67,7 @@ require (
 )
 
 require (
+	github.com/bits-and-blooms/bitset v1.4.0 // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/pyroscope-io/jfr-parser v0.6.0 // indirect
 	github.com/pyroscope-io/pyroscope v0.37.2
@@ -274,6 +275,7 @@ require (
 	github.com/valyala/gozstd v1.17.0 // indirect
 	github.com/valyala/histogram v1.2.0 // indirect
 	github.com/valyala/quicktemplate v1.7.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
 )
 
 replace (

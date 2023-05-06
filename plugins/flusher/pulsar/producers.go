@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/hashicorp/golang-lru/simplelru"
+	"github.com/hashicorp/golang-lru/v2/simplelru"
 	"go.uber.org/multierr"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -28,12 +28,12 @@ import (
 
 type Producers struct {
 	mu    sync.RWMutex
-	cache *simplelru.LRU
+	cache *simplelru.LRU[string, pulsar.Producer]
 }
 
 func NewProducers(context context.Context, maxProducers int) *Producers {
-	cache, err := simplelru.NewLRU(maxProducers, func(key interface{}, value interface{}) {
-		producer := value.(pulsar.Producer)
+	cache, err := simplelru.NewLRU[string, pulsar.Producer](maxProducers, func(key string, value pulsar.Producer) {
+		producer := value
 		err := close(producer)
 		if err != nil {
 			logger.Error(context, "close pulsar producer error", err)
@@ -55,9 +55,9 @@ func (p *Producers) GetProducer(topic string, client pulsar.Client, producerOpti
 func (p *Producers) Close() error {
 	var errs error
 	p.mu.Lock()
-	for key := range p.cache.Keys() {
+	for _, key := range p.cache.Keys() {
 		if value, ok := p.cache.Peek(key); ok {
-			producer := value.(pulsar.Producer)
+			producer := value
 			if err := close(producer); err != nil {
 				errs = multierr.Append(errs, err)
 			}
@@ -72,7 +72,7 @@ func (p *Producers) getOrCreateProducer(topic string, client pulsar.Client, prod
 	value, ok := p.cache.Get(topic)
 	if ok {
 		p.mu.Unlock()
-		return value.(pulsar.Producer), nil
+		return value, nil
 	}
 	newProducerOptions := pulsar.ProducerOptions{
 		Topic:                   topic,

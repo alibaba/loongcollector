@@ -42,6 +42,10 @@
 | CompressionType                       | String   | 否    | 压缩算法，`NONE,LZ4,ZLIB,ZSTD`，默认值`NONE`                                                |
 | BlockIfQueueFull                      | Boolean  | 否    | 队列满的时候是否阻塞，默认值:`false`                                                             |
 | SendTimeout                           | Int      | 否    | 发送超时时间，默认`30s`                                                                     |
+| OperationTimeout                      | Int      | 否    | pulsar producer创建、订阅、取消订阅的超时时间，默认`30s`                                             |
+| ConnectionTimeout                     | Int      | 否    | tcp连接建立超时时间，默认`5s`                                                                 |
+| MaxConnectionsPerBroker               | Int      | 否    | 单个broker连接池保持的连接数，默认`1`                                                            |
+| MaxReconnectToBroker                  | Int      | 否    | 重连broker的最大重试次数，默认为无限                                                              |
 | HashingScheme                         | Int      | 否    | 消息push分区的分发方式：`JavaStringHash`,`Murmur3_32Hash`,默认值：`JavaStringHash`               |
 | BatchingMaxPublishDelay               | int      | 否    | 提交时延，默认值：`1ms`                                                                     |
 | BatchingMaxMessages                   | int      | 否    | 批量提交最大消息数，默认值：`1000`                                                               |
@@ -119,6 +123,7 @@ Topic: test_%{content.application}
 
 - `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
 - `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
+- `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。可以参考`flusher-kafka_v2`中的使用。
 - 其它方式暂不支持
 
 ### TagFieldsRename
