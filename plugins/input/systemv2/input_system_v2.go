@@ -233,6 +233,14 @@ func (r *InputSystem) CollectDisk(collector pipeline.Collector) {
 	if err == nil {
 		totalIoCount := disk.IOCountersStat{}
 		for _, ioCount := range allIoCounters {
+			if ioCount.Name == "" {
+				continue
+			}
+			lastChar := ioCount.Name[len(ioCount.Name)-1]
+			if lastChar >= '0' && lastChar <= '9' {
+				// means disk partition, don't need to record to total metrics
+				continue
+			}
 			totalIoCount.ReadBytes += ioCount.ReadBytes
 			totalIoCount.WriteBytes += ioCount.WriteBytes
 			totalIoCount.ReadCount += ioCount.ReadCount
