@@ -159,3 +159,31 @@ func TestSourceFormatTimestampMicroseconds(t *testing.T) {
 	assert.Equal(t, "d_key", log.Contents[1].Key)
 	assert.Equal(t, "2022/02/23 14:47:36.807000", log.Contents[1].Value)
 }
+
+func TestEmptyTimezone(t *testing.T) {
+	ctx := mock.NewEmptyContext("p", "l", "c")
+	processor := &ProcessorGotime{
+		SourceKey:      "s_key",
+		SourceFormat:   "2006-01-02 15:04:05",
+		SourceLocation: machineTimeZone,
+		DestKey:        "d_key",
+		DestFormat:     "2006/01/02 15:04:05",
+		DestLocation:   9,
+		SetTime:        true,
+		KeepSource:     true,
+		NoKeyError:     true,
+		AlarmIfFail:    true,
+	}
+	err := processor.Init(ctx)
+	require.NoError(t, err)
+
+	log := &protocol.Log{Time: 0}
+	timeStr := "2019-07-05 19:28:01"
+	localTime, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr, time.Local)
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: localTime.Format(processor.SourceFormat)})
+	processor.processLog(log)
+	destLocation := time.FixedZone("SpecifiedTimezone", 9*60*60)
+	processedTime := localTime.In(destLocation)
+	assert.Equal(t, "d_key", log.Contents[1].Key)
+	assert.Equal(t, processedTime.Format(processor.DestFormat), log.Contents[1].Value)
+}

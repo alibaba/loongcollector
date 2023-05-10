@@ -49,7 +49,10 @@ type ProcessorGotime struct {
 	timestampParseFunc func(timestamp int64) time.Time
 }
 
-const pluginName = "processor_gotime"
+const (
+	pluginName      = "processor_gotime"
+	machineTimeZone = -100
+)
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorGotime) Init(context pipeline.Context) error {
@@ -66,11 +69,11 @@ func (p *ProcessorGotime) Init(context pipeline.Context) error {
 		return fmt.Errorf("must specify DestFormat for plugin %v", pluginName)
 	}
 	p.sourceLocation = time.Local
-	if p.SourceLocation != 0 {
+	if p.SourceLocation != machineTimeZone {
 		p.sourceLocation = time.FixedZone("SpecifiedTimezone", p.SourceLocation*60*60)
 	}
 	p.destLocation = time.Local
-	if p.DestLocation != 0 {
+	if p.DestLocation != machineTimeZone {
 		p.destLocation = time.FixedZone("SpecifiedTimezone", p.DestLocation*60*60)
 	}
 
@@ -157,10 +160,10 @@ func init() {
 		return &ProcessorGotime{
 			SourceKey:      "",
 			SourceFormat:   "",
-			SourceLocation: 0,
+			SourceLocation: machineTimeZone,
 			DestKey:        "",
 			DestFormat:     "",
-			DestLocation:   0,
+			DestLocation:   machineTimeZone,
 			SetTime:        true,
 			KeepSource:     true,
 			NoKeyError:     true,

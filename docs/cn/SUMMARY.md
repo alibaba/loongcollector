@@ -68,6 +68,7 @@
   * [字段加密](data-pipeline/processor/processor-encrypy.md)
   * [条件字段处理](data-pipeline/processor/processor-fields-with-condition.md)
   * [日志过滤](data-pipeline/processor/processor-filter-regex.md)
+  * [Go时间格式解析](date-pipeline/processor/processor-gotime.md)
   * [Grok](data-pipeline/processor/processor-grok.md)
   * [Json](data-pipeline/processor/processor-json.md)
   * [正则](data-pipeline/processor/processor-regex.md)

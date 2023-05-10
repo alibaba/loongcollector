@@ -37,6 +37,7 @@
 | [`processor_encrypt`](processor/processor-encrypy.md)<br>字段加密                   | SLS官方 | 加密字段                                  |
 | [`processor_fields_with_conditions`](processor/processor-fields-with-condition.md)<br>条件字段处理 | 社区<br>[`pj1987111`](https://github.com/pj1987111) | 根据日志部分字段的取值，动态进行字段扩展或删除。 |
 | [`processor_filter_regex`](processor/processor-filter-regex.md)<br>日志过滤               | SLS官方 | 通过正则匹配过滤日志。                           |
+| [`processor_gotime`](processor/processor-gotime.md)<br>Gotime                     | SLS官方 | 以 Go 语言时间格式解析原始日志中的时间字段。         |
 | [`processor_grok`](processor/processor-grok.md)<br>Grok                          | SLS官方<br>[`Takuka0311`](https://github.com/Takuka0311) | 通过 Grok 语法对数据进行处理              |
 | [`processor_json`](processor/processor-json.md)<br>Json                           | SLS官方 | 实现对Json格式日志的解析。                       |
 | [`processor_regex`](processor/processor-regex.md)<br>正则                          | SLS官方 | 通过正则匹配的模式实现文本日志的字段提取。       |

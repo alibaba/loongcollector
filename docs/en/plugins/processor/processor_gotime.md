@@ -1,16 +1,58 @@
 # processor_gotime
+
 ## Description
+
 the time format processor to parse time field with golang format pattern. More details please see [here](https://golang.org/pkg/time/#Time.Format)
+
 ## Config
-|  field   |   type   |   description   | default value   |
-| ---- | ---- | ---- | ---- |
-|SourceKey|string|the source key prepared to be formatted|""|
-|SourceFormat|string|the source key formatted pattern, more details please see [here](https://golang.org/pkg/time/#Time.Format). Furthermore，there are 3 fixed pattern supported to parse timestamp, which are 'seconds','milliseconds' and 'microseconds'.|""|
-|SourceLocation|int|the source key time zone, such beijing timezone is 8. And the parameter would be ignored when 'SourceFormat' configured with timestamp format pattern.|0|
-|DestKey|string|the generated key name.|""|
-|DestFormat|string|the generated key formatted pattern, more details please see [here](https://golang.org/pkg/time/#Time.Format).|""|
-|DestLocation|int|the generated key time zone, such beijing timezone is 8.|0|
-|SetTime|bool|Whether to config the unix time of the source key to the log time. |true|
-|KeepSource|bool|Whether to keep the source key in the log content after the processing.|true|
-|NoKeyError|bool|Whether to alarm when not found the source key to parse and format.|true|
-|AlarmIfFail|bool|Whether to alarm when the source key is failed to parse.|true|
+
+| Parameter | Type | Required | Description |
+| - | - | - | - |
+| SourceKey | String | Yes | The name of the original field. |
+| SourceFormat | String | Yes | The format of the original time. |
+| SourceLocation | Int | Yes | The time zone of the original time. If the parameter value is empty, it indicates the time zone of the host or container where iLogtail is located. |
+| DestKey | String | Yes | The name of the target field after parsing. |
+| DestFormat | String | Yes | The format of the parsed time. |
+| DestLocation | Int | No | The time zone of the parsed time. If the parameter value is empty, it indicates the local time zone. |
+| SetTime | Boolean | No | Whether to set the parsed time as the log time. true (default): yes. false: no. |
+| KeepSource | Boolean | No | Whether to keep the original field in the parsed log. true (default): keep. false: not keep. |
+| NoKeyError | Boolean | No | Whether to report an error if the specified original field is missing in the original log. true (default): report an error. false: not report an error. |
+| AlarmIfFail | Boolean | No | Whether to report an error if parsing the log time fails. true (default): report an error. false: not report an error. |
+
+## Example
+
+Collect the log information from the `simple.log` file in the current path according to the specified configuration options.
+
+```yaml
+enable: true
+inputs:
+  - Type: file_log
+    LogPath: .
+    FilePattern: simple.log
+processors:
+  - Type: processor_gotime
+    SourceKey: "content"
+    SourceFormat: "2006-01-02 15:04:05"
+    SourceLocation: 8
+    DestKey: "d_key"
+    DestFormat: "2006/01/02 15:04:05"
+    DestLocation: 9
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true
+```
+
+* Input
+
+```bash
+echo "2006-01-02 15:04:05" >> simple.log
+```
+
+* Output
+
+```json
+{
+    "content":"2006-01-02 15:04:05",
+    "d_key":"2006/01/02 16:04:05"
+}
+```
