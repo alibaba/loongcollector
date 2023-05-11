@@ -17,13 +17,11 @@ package envconfig
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 )
 
 var envConfigCacheCleanInterval = time.Hour
@@ -41,7 +39,6 @@ func (decm *Manager) update(config *AliyunLogConfigSpec) *AliyunLogConfigSpec {
 		// if hash code is same, skip
 		if bytes.Equal(lastConfig.HashCode, config.HashCode) {
 			logger.Debug(context.Background(), "old env config, key", config.Key(), "detail", *config)
-			lastConfig.LastFetchTime = config.LastFetchTime
 			if lastConfig.ErrorCount > 0 {
 				logger.Info(context.Background(), "old env config but last sync error, key", config.Key(), "error count", lastConfig.ErrorCount, "last fetch time", lastConfig.LastFetchTime)
 				return lastConfig
@@ -67,25 +64,6 @@ func (decm *Manager) removeUselessCache() {
 	logger.Debug(context.Background(), "end check useless cache", len(decm.AllConfigMap))
 }
 
-func (decm *Manager) loadCheckpoint() {
-	decm.AllConfigMap = make(map[string]*AliyunLogConfigSpec)
-	val, err := pluginmanager.CheckPointManager.GetCheckpoint("docker_env_config", "v1")
-	if err != nil {
-		return
-	}
-	if err = json.Unmarshal(val, &decm.AllConfigMap); err != nil {
-		logger.Error(context.Background(), "DOCKER_ENV_CONFIG_CHECKPOINT_ALARM", "load checkpoint error, err", err, "content", string(val))
-	}
-}
-
-func (decm *Manager) saveCheckpoint() {
-	checkpoint, err := json.Marshal(decm.AllConfigMap)
-	if err != nil {
-		logger.Error(context.Background(), "DOCKER_ENV_CONFIG_CHECKPOINT_ALARM", "save checkpoint error, err", err)
-	}
-	_ = pluginmanager.CheckPointManager.SaveCheckpoint("docker_env_config", "v1", checkpoint)
-}
-
 func (decm *Manager) run() {
 	decm.shutdown = make(chan struct{})
 	var err error
@@ -107,7 +85,7 @@ func (decm *Manager) run() {
 		return
 	}
 	lastCleanTime := time.Now()
-	decm.loadCheckpoint()
+	decm.AllConfigMap = make(map[string]*AliyunLogConfigSpec)
 	for {
 		errorFlag := false
 		fetchAllEnvConfig()
@@ -139,9 +117,6 @@ func (decm *Manager) run() {
 				config.ErrorCount = 0
 				logger.Info(context.Background(), "update config success, config key", config.Key(), "detail", fmt.Sprintf("%+v", *config))
 			}
-		}
-		if len(updateConfigList) > 0 {
-			decm.saveCheckpoint()
 		}
 		if !errorFlag && flags.SelfEnvConfigFlag {
 			logger.Info(context.Background(), "create config success when self env flag", "prepare exit")
