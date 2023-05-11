@@ -735,6 +735,7 @@ void ModifyHandler::Handle(const Event& event) {
                                                                       reader->GetProjectName(),
                                                                       reader->GetCategory(),
                                                                       reader->GetConvertedPath(),
+                                                                      reader->GetExtraTags(),
                                                                       reader->GetDevInode().dev,
                                                                       reader->GetDevInode().inode,
                                                                       reader->GetFileSize(),

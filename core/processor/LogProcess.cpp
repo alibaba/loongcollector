@@ -592,6 +592,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                                              projectName,
                                                              category,
                                                              logPath,
+                                                             logFileReader->GetExtraTags(),
                                                              readBytes,
                                                              skipBytes,
                                                              splitLines,
