@@ -1547,11 +1547,13 @@ bool EventDispatcherBase::ReadDSPacket(int eventFd) {
                     Config* config = ConfigManager::GetInstance()->FindDSConfigByCategory(logGroup.category());
                     MetricSender::SendMetric(logGroup); // Sender::Send() will erase log group
                     if (config != NULL) {
+                        std::vector<sls_logs::LogTag> empty;
                         LogFileProfiler::GetInstance()->AddProfilingData(config->mConfigName,
                                                                          config->mRegion,
                                                                          config->mProjectName,
                                                                          config->mCategory,
                                                                          "",
+                                                                         empty,
                                                                          msgStr.size(),
                                                                          0,
                                                                          logGroup.logs_size(),

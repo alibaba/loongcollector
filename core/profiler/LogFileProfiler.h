@@ -22,6 +22,7 @@
 #include <map>
 #include <json/json.h>
 #include "profile_sender/ProfileSender.h"
+#include "log_pb/sls_logs.pb.h"
 
 namespace sls_logs {
 class LogGroup;
@@ -45,6 +46,7 @@ public:
                           const std::string& projectName,
                           const std::string& category,
                           const std::string& filename,
+                          const std::vector<sls_logs::LogTag>& tags,
                           uint64_t readBytes,
                           uint64_t skipBytes,
                           uint64_t splitLines,
@@ -59,6 +61,7 @@ public:
                                const std::string& projectName,
                                const std::string& category,
                                const std::string& filename,
+                               const std::vector<sls_logs::LogTag>& tags,
                                uint64_t skipBytes);
 
     void AddProfilingReadBytes(const std::string& configName,
@@ -66,6 +69,7 @@ public:
                                const std::string& projectName,
                                const std::string& category,
                                const std::string& filename,
+                               const std::vector<sls_logs::LogTag>& tags,
                                uint64_t dev,
                                uint64_t inode,
                                uint64_t fileSize,
@@ -94,6 +98,7 @@ private:
                           const std::string& projectName,
                           const std::string& category,
                           const std::string& filename,
+                          const std::vector<sls_logs::LogTag>& tags,
                           uint64_t readBytes = 0,
                           uint64_t skipBytes = 0,
                           uint64_t splitLines = 0,
@@ -107,6 +112,7 @@ private:
               mProjectName(projectName),
               mCategory(category),
               mFilename(filename),
+              mTags(tags),
               mReadBytes(readBytes),
               mSkipBytes(skipBytes),
               mSplitLines(splitLines),
@@ -160,6 +166,7 @@ private:
         std::string mProjectName;
         std::string mCategory;
         std::string mFilename;
+        std::vector<sls_logs::LogTag> mTags;
         // how many bytes processed
         uint64_t mReadBytes;
         // how many bytes skiped
