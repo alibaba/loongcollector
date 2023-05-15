@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -179,4 +180,32 @@ func TestMySQL(t *testing.T) {
 	for _, log := range logs {
 		fmt.Printf("%s \n", log.String())
 	}
+}
+
+func TestDecodeV2(t *testing.T) {
+	decoder := &Decoder{}
+	groups, err := decoder.DecodeV2([]byte(txtWithDotNames), &http.Request{Form: map[string][]string{"db": {"mydb"}}})
+	assert.Nil(t, err)
+	assert.Len(t, groups, 1) // should convert to one eventGroup
+
+	want := &models.PipelineGroupEvents{
+		Group: models.NewGroup(models.NewMetadataWithKeyValues("db", "mydb"), models.NewTags()),
+		Events: []models.PipelineEvent{
+			models.NewMetric("cpu.load",
+				models.MetricTypeUntyped,
+				models.NewTagsWithKeyValues("host", "server01", "region", "uswest"),
+				1434055562000000000,
+				models.NewMetricMultiValueWithMap(map[string]float64{"value": float64(1)}),
+				models.NewMetricTypedValues(),
+			),
+			models.NewMetric("cpu.load",
+				models.MetricTypeUntyped,
+				models.NewTagsWithKeyValues("host.dd", "server02", "region", "uswest"),
+				1434055562000010000,
+				models.NewMetricMultiValueWithMap(map[string]float64{"value": float64(3)}),
+				models.NewMetricTypedValueWithMap(map[string]*models.TypedValue{"tt": {Type: models.ValueTypeString, Value: "xx"}}),
+			),
+		},
+	}
+	assert.Equal(t, want, groups[0])
 }
