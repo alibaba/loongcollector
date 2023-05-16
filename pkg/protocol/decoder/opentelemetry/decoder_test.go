@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
@@ -57,6 +58,435 @@ func TestNormal(t *testing.T) {
 	fmt.Printf("%s\n", string(data))
 	data = []byte("")
 	fmt.Printf("empty = [%s]\n", string(data))
+}
+
+func TestConvertOtlpLogV1(t *testing.T) {
+	logs := plog.NewLogs()
+	resourceLogs := logs.ResourceLogs()
+
+	resourceLog := resourceLogs.AppendEmpty()
+	resource := resourceLog.Resource()
+	resource.Attributes().PutStr("serviceName", "test-service")
+
+	scopeLog := resourceLog.ScopeLogs().AppendEmpty()
+	scopeLog.Scope().Attributes().PutStr("scope_key1", "scope_value1")
+
+	now := pcommon.NewTimestampFromTime(time.Now())
+
+	logRecord := scopeLog.LogRecords().AppendEmpty()
+	logRecord.SetTimestamp(now)
+	logRecord.Body().SetStr("test-message")
+	logRecord.Attributes().PutInt("attr1", 123)
+	logRecord.Attributes().PutBool("attr2", true)
+
+	otlpLogReq := plogotlp.NewExportRequestFromLogs(logs)
+
+	result, err := ConvertOtlpLogV1(otlpLogReq.Logs())
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	// Check if the result is not nil
+	assert.NotNil(t, result)
+
+	// Check if the number of logs is correct
+	assert.Equal(t, 1, len(result))
+
+	// Check if the contents of the log are correct
+	log1 := result[0]
+	assert.Equal(t, uint32(now/1e9), log1.Time)
+
+	assert.Equal(t, "time_unix_nano", log1.Contents[0].Key)
+	assert.Equal(t, strconv.FormatInt(int64(now), 10), log1.Contents[0].Value)
+
+	assert.Equal(t, "severity_number", log1.Contents[1].Key)
+	assert.Equal(t, "0", log1.Contents[1].Value)
+
+	assert.Equal(t, "severity_text", log1.Contents[2].Key)
+	assert.Equal(t, "", log1.Contents[2].Value)
+
+	assert.Equal(t, "content", log1.Contents[3].Key)
+	assert.Equal(t, "test-message", log1.Contents[3].Value)
+
+	// Check if the attribute is correct
+	assert.Equal(t, "attributes", log1.Contents[4].Key)
+
+	expectedAttr := make(map[string]interface{})
+	expectedAttr["attr1"] = float64(123)
+	expectedAttr["attr2"] = true
+
+	expectedAttrBytes, err := json.Marshal(expectedAttr)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+	assert.Equal(t, string(expectedAttrBytes), log1.Contents[4].Value)
+
+	// Check if the resources is correct
+	assert.Equal(t, "resources", log1.Contents[5].Key)
+
+	expectedRes := make(map[string]interface{})
+	expectedRes["serviceName"] = "test-service"
+
+	expectedResBytes, err := json.Marshal(expectedRes)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+	assert.Equal(t, string(expectedResBytes), log1.Contents[5].Value)
+}
+
+func TestDecoder_Decode_Logs(t *testing.T) {
+	// complcated case
+	encoder := &plog.JSONMarshaler{}
+	jsonBuf, err := encoder.MarshalLogs(logsOTLP)
+	assert.NoError(t, err)
+	httpReq, _ := http.NewRequest("Post", "", nil)
+	httpReq.Header.Set("Content-Type", jsonContentType)
+	decoder := &Decoder{Format: common.ProtocolOTLPLogV1}
+
+	logs, err := decoder.Decode(jsonBuf, httpReq, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(logs))
+
+	for _, log := range logs {
+		assert.Equal(t, 6, len(log.Contents))
+		assert.Equal(t, "time_unix_nano", log.Contents[0].Key)
+
+		assert.Equal(t, "severity_number", log.Contents[1].Key)
+		assert.Equal(t, "17", log.Contents[1].Value)
+
+		assert.Equal(t, "severity_text", log.Contents[2].Key)
+		assert.Equal(t, "Error", log.Contents[2].Value)
+
+		assert.Equal(t, "content", log.Contents[3].Key)
+		assert.Equal(t, "hello world", log.Contents[3].Value)
+
+		assert.Equal(t, "attributes", log.Contents[4].Key)
+		expectedAttr := make(map[string]interface{})
+		expectedAttr["sdkVersion"] = "1.0.1"
+		expectedAttrBytes, err := json.Marshal(expectedAttr)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		assert.Equal(t, string(expectedAttrBytes), log.Contents[4].Value)
+
+		assert.Equal(t, "resources", log.Contents[5].Key)
+		expectedRes := make(map[string]interface{})
+		expectedRes["host.name"] = "testHost"
+		expectedResBytes, err := json.Marshal(expectedRes)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		assert.Equal(t, string(expectedResBytes), log.Contents[5].Value)
+	}
+}
+
+func TestDecoder_Decode_MetricsUntyped(t *testing.T) {
+	var metricsJSON = `{"resourceMetrics":[{"resource":{"attributes":[{"key":"host.name","value":{"stringValue":"testHost"}}]},"scopeMetrics":[{"scope":{"name":"name","version":"version"},"metrics":[{"name":"testMetric"}]}]}]}`
+	httpReq, _ := http.NewRequest("Post", "", nil)
+	httpReq.Header.Set("Content-Type", jsonContentType)
+	decoder := &Decoder{Format: common.ProtocolOTLPMetricV1}
+
+	logs, err := decoder.Decode([]byte(metricsJSON), httpReq, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(logs))
+
+	for _, log := range logs {
+		assert.Equal(t, "__name__", log.Contents[0].Key)
+		assert.Equal(t, "testMetric", log.Contents[0].Value)
+		assert.Equal(t, "__labels__", log.Contents[1].Key)
+		assert.Equal(t, "Empty", log.Contents[1].Value)
+		assert.Equal(t, "__time_nano__", log.Contents[2].Key)
+		assert.Equal(t, "__value__", log.Contents[3].Key)
+		assert.Equal(t, "", log.Contents[3].Value)
+	}
+}
+
+func TestDecoder_Decode_MetricsAll(t *testing.T) {
+	type args struct {
+		md func() pmetric.Metrics
+	}
+
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "sum",
+			args: args{
+				md: metricsSumOTLPFull,
+			}},
+		{
+			name: "gauge",
+			args: args{
+				md: metricsGaugeOTLPFull,
+			},
+		},
+		{
+			name: "Histogram",
+			args: args{
+				md: metricsHistogramOTLPFull,
+			},
+		},
+		{
+			name: "ExponentialHistogram",
+			args: args{
+				md: metricsExponentialHistogramOTLPFull,
+			},
+		},
+		{
+			name: "Summary",
+			args: args{
+				md: metricsSummaryOTLPFull,
+			},
+		},
+	}
+
+	encoder := &pmetric.JSONMarshaler{}
+	httpReq, _ := http.NewRequest("Post", "", nil)
+	httpReq.Header.Set("Content-Type", jsonContentType)
+	decoder := &Decoder{Format: common.ProtocolOTLPMetricV1}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := tt.args.md()
+			jsonBuf, err := encoder.MarshalMetrics(m)
+			assert.NoError(t, err)
+			logs, err := decoder.Decode(jsonBuf, httpReq, nil)
+			assert.NoError(t, err)
+
+			expectedLogsLen := func() int {
+				count := 0
+				for i := 0; i < m.ResourceMetrics().Len(); i++ {
+					resourceMetric := m.ResourceMetrics().At(i)
+					for j := 0; j < resourceMetric.ScopeMetrics().Len(); j++ {
+						metrics := resourceMetric.ScopeMetrics().At(j).Metrics()
+						for k := 0; k < metrics.Len(); k++ {
+							metric := metrics.At(k)
+							switch metric.Type() {
+							case pmetric.MetricTypeGauge:
+								count += metric.Gauge().DataPoints().Len()
+								for i := 0; i < metric.Gauge().DataPoints().Len(); i++ {
+									count += metric.Gauge().DataPoints().At(i).Exemplars().Len()
+								}
+							case pmetric.MetricTypeSum:
+								count += metric.Sum().DataPoints().Len()
+								for i := 0; i < metric.Sum().DataPoints().Len(); i++ {
+									count += metric.Sum().DataPoints().At(i).Exemplars().Len()
+								}
+							case pmetric.MetricTypeSummary:
+								for l := 0; l < metric.Summary().DataPoints().Len(); l++ {
+									dataPoint := metric.Summary().DataPoints().At(l)
+									count += 2
+									count += dataPoint.QuantileValues().Len()
+								}
+							case pmetric.MetricTypeHistogram:
+								for l := 0; l < metric.Histogram().DataPoints().Len(); l++ {
+									dataPoint := metric.Histogram().DataPoints().At(l)
+									count += dataPoint.Exemplars().Len()
+									if dataPoint.HasSum() {
+										count++
+									}
+									if dataPoint.HasMin() {
+										count++
+									}
+									if dataPoint.HasMax() {
+										count++
+									}
+									count += dataPoint.BucketCounts().Len() + 1
+								}
+							case pmetric.MetricTypeExponentialHistogram:
+								for l := 0; l < metric.ExponentialHistogram().DataPoints().Len(); l++ {
+									dataPoint := metric.ExponentialHistogram().DataPoints().At(l)
+									count += dataPoint.Exemplars().Len()
+									if dataPoint.HasSum() {
+										count++
+									}
+									if dataPoint.HasMin() {
+										count++
+									}
+									if dataPoint.HasMax() {
+										count++
+									}
+									count += dataPoint.Negative().BucketCounts().Len() + dataPoint.Positive().BucketCounts().Len() + 4
+								}
+							}
+						}
+					}
+				}
+				return count
+			}()
+			assert.Equal(t, expectedLogsLen, len(logs))
+
+			metric := m.ResourceMetrics().At(0).ScopeMetrics().At(0).Metrics().At(0)
+			switch metric.Type() {
+			case pmetric.MetricTypeGauge:
+				assert.Equal(t, "__name__", logs[0].Contents[0].Key)
+				assert.Equal(t, "test_gauge_exemplars", logs[0].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[0].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|service_name#$#testService|service_name#$#testService|spanId#$#1112131415161718|string#$#value|traceId#$#0102030405060708090a0b0c0d0e0f10", logs[0].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[0].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[0].Contents[3].Key)
+				assert.Equal(t, "99.3", logs[0].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[1].Contents[0].Key)
+				assert.Equal(t, "test_gauge", logs[1].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[1].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|service_name#$#testService|string#$#value", logs[1].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[1].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[1].Contents[3].Key)
+				assert.Equal(t, "10.2", logs[1].Contents[3].Value)
+			case pmetric.MetricTypeSum:
+				assert.Equal(t, "__name__", logs[0].Contents[0].Key)
+				assert.Equal(t, "test_sum_exemplars", logs[0].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[0].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_ismonotonic#$#true|service_name#$#testService|service_name#$#testService|spanId#$#1112131415161718|string#$#value|traceId#$#0102030405060708090a0b0c0d0e0f10", logs[0].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[0].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[0].Contents[3].Key)
+				assert.Equal(t, "99.3", logs[0].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[1].Contents[0].Key)
+				assert.Equal(t, "test_sum", logs[1].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[1].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_ismonotonic#$#true|service_name#$#testService|string#$#value", logs[1].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[1].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[1].Contents[3].Key)
+				assert.Equal(t, "100", logs[1].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[2].Contents[0].Key)
+				assert.Equal(t, "test_sum", logs[2].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[2].Contents[1].Key)
+				assert.Equal(t, "bool#$#false|bytes#$#YmFy|double#$#2.2|host_name#$#testHost|int#$#2|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_ismonotonic#$#true|service_name#$#testService|string#$#value2", logs[2].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[2].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[2].Contents[3].Key)
+				assert.Equal(t, "50", logs[2].Contents[3].Value)
+			case pmetric.MetricTypeSummary:
+				assert.Equal(t, "__name__", logs[0].Contents[0].Key)
+				assert.Equal(t, "test_summary_sum", logs[0].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[0].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|service_name#$#testService|string#$#value", logs[0].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[0].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[0].Contents[3].Key)
+				assert.Equal(t, "1000", logs[0].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[1].Contents[0].Key)
+				assert.Equal(t, "test_summary_count", logs[1].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[1].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|service_name#$#testService|string#$#value", logs[1].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[1].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[1].Contents[3].Key)
+				assert.Equal(t, "100", logs[1].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[2].Contents[0].Key)
+				assert.Equal(t, "test_summary", logs[2].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[2].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|quantile#$#0.5|service_name#$#testService|string#$#value", logs[2].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[2].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[2].Contents[3].Key)
+				assert.Equal(t, "1.2", logs[2].Contents[3].Value)
+			case pmetric.MetricTypeHistogram:
+				assert.Equal(t, "__name__", logs[0].Contents[0].Key)
+				assert.Equal(t, "test_Histogram_sum", logs[0].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[0].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#Histogram|service_name#$#testService|string#$#value", logs[0].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[0].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[0].Contents[3].Key)
+				assert.Equal(t, fmt.Sprint(metric.Histogram().DataPoints().At(0).Sum()), logs[0].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[1].Contents[0].Key)
+				assert.Equal(t, "test_Histogram_min", logs[1].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[1].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#Histogram|service_name#$#testService|string#$#value", logs[1].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[1].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[1].Contents[3].Key)
+				assert.Equal(t, fmt.Sprint(metric.Histogram().DataPoints().At(0).Min()), logs[1].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[2].Contents[0].Key)
+				assert.Equal(t, "test_Histogram_max", logs[2].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[2].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#Histogram|service_name#$#testService|string#$#value", logs[2].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[2].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[2].Contents[3].Key)
+				assert.Equal(t, fmt.Sprint(metric.Histogram().DataPoints().At(0).Max()), logs[2].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[3].Contents[0].Key)
+				assert.Equal(t, "test_Histogram_count", logs[3].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[3].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#Histogram|service_name#$#testService|string#$#value", logs[3].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[3].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[3].Contents[3].Key)
+				assert.Equal(t, fmt.Sprint(metric.Histogram().DataPoints().At(0).Count()), logs[3].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[4].Contents[0].Key)
+				assert.Equal(t, "test_Histogram_exemplars", logs[4].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[4].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#Histogram|service_name#$#testService|service_name#$#testService|spanId#$#1112131415161718|string#$#value|traceId#$#0102030405060708090a0b0c0d0e0f10", logs[4].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[4].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[4].Contents[3].Key)
+				assert.Equal(t, "99.3", logs[4].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[5].Contents[0].Key)
+				assert.Equal(t, "test_Histogram_bucket", logs[5].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[5].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|le#$#10|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#Histogram|service_name#$#testService|string#$#value", logs[5].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[5].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[5].Contents[3].Key)
+				assert.Equal(t, "1", logs[5].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[6].Contents[0].Key)
+				assert.Equal(t, "test_Histogram_bucket", logs[6].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[6].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|le#$#100|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#Histogram|service_name#$#testService|string#$#value", logs[6].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[6].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[6].Contents[3].Key)
+				assert.Equal(t, "2", logs[6].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[7].Contents[0].Key)
+				assert.Equal(t, "test_Histogram_bucket", logs[7].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[7].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|le#$#+Inf|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#Histogram|service_name#$#testService|string#$#value", logs[7].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[7].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[7].Contents[3].Key)
+				assert.Equal(t, "4", logs[7].Contents[3].Value)
+			case pmetric.MetricTypeExponentialHistogram:
+				assert.Equal(t, "__name__", logs[0].Contents[0].Key)
+				assert.Equal(t, "test_ExponentialHistogram_sum", logs[0].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[0].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#ExponentialHistogram|service_name#$#testService|string#$#value", logs[0].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[0].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[0].Contents[3].Key)
+				assert.Equal(t, fmt.Sprint(metric.ExponentialHistogram().DataPoints().At(0).Sum()), logs[0].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[1].Contents[0].Key)
+				assert.Equal(t, "test_ExponentialHistogram_min", logs[1].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[1].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#ExponentialHistogram|service_name#$#testService|string#$#value", logs[1].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[1].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[1].Contents[3].Key)
+				assert.Equal(t, fmt.Sprint(metric.ExponentialHistogram().DataPoints().At(0).Min()), logs[1].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[2].Contents[0].Key)
+				assert.Equal(t, "test_ExponentialHistogram_max", logs[2].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[2].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#ExponentialHistogram|service_name#$#testService|string#$#value", logs[2].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[2].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[2].Contents[3].Key)
+				assert.Equal(t, fmt.Sprint(metric.ExponentialHistogram().DataPoints().At(0).Max()), logs[2].Contents[3].Value)
+
+				assert.Equal(t, "__name__", logs[3].Contents[0].Key)
+				assert.Equal(t, "test_ExponentialHistogram_count", logs[3].Contents[0].Value)
+				assert.Equal(t, "__labels__", logs[3].Contents[1].Key)
+				assert.Equal(t, "bool#$#true|bytes#$#Zm9v|double#$#1.1|host_name#$#testHost|int#$#1|otlp_metric_aggregation_temporality#$#Cumulative|otlp_metric_histogram_type#$#ExponentialHistogram|service_name#$#testService|string#$#value", logs[3].Contents[1].Value)
+				assert.Equal(t, "__time_nano__", logs[3].Contents[2].Key)
+				assert.Equal(t, "__value__", logs[3].Contents[3].Key)
+				assert.Equal(t, fmt.Sprint(metric.ExponentialHistogram().DataPoints().At(0).Count()), logs[3].Contents[3].Value)
+			}
+		})
+	}
 }
 
 func TestConvertOtlpLogsToGroupEvents(t *testing.T) {

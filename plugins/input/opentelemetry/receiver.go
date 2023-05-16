@@ -34,6 +34,19 @@ type tracesReceiverFunc consumer.ConsumeTracesFunc
 type metricsReceiverFunc consumer.ConsumeMetricsFunc
 type logsReceiverFunc consumer.ConsumeLogsFunc
 
+func newTracesReceiverV1(c pipeline.Collector) tracesReceiverFunc {
+	return func(ctx context.Context, td ptrace.Traces) error {
+		logs, err := opentelemetry.ConvertOtlpTraceV1(td)
+		if err != nil {
+			return err
+		}
+		for _, log := range logs {
+			c.AddRawLog(log)
+		}
+		return nil
+	}
+}
+
 func newTracesReceiver(pctx pipeline.PipelineContext) tracesReceiverFunc {
 	return func(ctx context.Context, td ptrace.Traces) error {
 		groupEvents, err := opentelemetry.ConvertOtlpTracesToGroupEvents(td)
@@ -45,6 +58,19 @@ func newTracesReceiver(pctx pipeline.PipelineContext) tracesReceiverFunc {
 	}
 }
 
+func newMetricsReceiverV1(c pipeline.Collector) metricsReceiverFunc {
+	return func(ctx context.Context, md pmetric.Metrics) error {
+		logs, err := opentelemetry.ConvertOtlpMetricV1(md)
+		if err != nil {
+			return err
+		}
+		for _, log := range logs {
+			c.AddRawLog(log)
+		}
+		return nil
+	}
+}
+
 func newMetricsReceiver(pctx pipeline.PipelineContext) metricsReceiverFunc {
 	return func(ctx context.Context, md pmetric.Metrics) error {
 		groupEvents, err := opentelemetry.ConvertOtlpMetricsToGroupEvents(md)
@@ -52,6 +78,19 @@ func newMetricsReceiver(pctx pipeline.PipelineContext) metricsReceiverFunc {
 			return err
 		}
 		pctx.Collector().CollectList(groupEvents...)
+		return nil
+	}
+}
+
+func newLogsReceiverV1(c pipeline.Collector) logsReceiverFunc {
+	return func(ctx context.Context, ld plog.Logs) error {
+		logs, err := opentelemetry.ConvertOtlpLogV1(ld)
+		if err != nil {
+			return err
+		}
+		for _, log := range logs {
+			c.AddRawLog(log)
+		}
 		return nil
 	}
 }
