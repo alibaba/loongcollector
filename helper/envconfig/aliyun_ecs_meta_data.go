@@ -207,33 +207,32 @@ func UpdateTokenFunction() (accessKeyID, accessKeySecret, securityToken string, 
 			return accessKeyID, accessKeySecret, securityToken, expireTime, err
 		}
 	}
-	var tokenResultBuffer []byte
-	for tryTime := 0; tryTime < 3; tryTime++ {
+	{
+		var tokenResultBuffer []byte
 		tokenResultBuffer, err = getToken()
 		if err != nil {
-			continue
+			return accessKeyID, accessKeySecret, securityToken, expireTime, err
 		}
 		var tokenResult SecurityTokenResult
 		err = json.Unmarshal(tokenResultBuffer, &tokenResult)
 		if err != nil {
 			logger.Warning(context.Background(), "UPDATE_STS_ALARM", "unmarshal token error", err, "token", string(tokenResultBuffer))
-			continue
+			return accessKeyID, accessKeySecret, securityToken, expireTime, err
 		}
 		if strings.ToLower(tokenResult.Code) != "success" {
 			tokenResult.AccessKeySecret = "xxxxx"
 			tokenResult.SecurityToken = "xxxxx"
 			logger.Warning(context.Background(), "UPDATE_STS_ALARM", "token code not success", err, "result", tokenResult)
-			continue
+			return accessKeyID, accessKeySecret, securityToken, expireTime, errors.New("token code not success")
 		}
 		expireTime, err = time.Parse(expirationTimeFormat, tokenResult.Expiration)
 		if err != nil {
 			tokenResult.AccessKeySecret = "xxxxx"
 			tokenResult.SecurityToken = "xxxxx"
 			logger.Warning(context.Background(), "UPDATE_STS_ALARM", "parse time error", err, "result", tokenResult)
-			continue
+			return accessKeyID, accessKeySecret, securityToken, expireTime, err
 		}
 		logger.Info(context.Background(), "get security token success, id", tokenResult.AccessKeyID, "expire", tokenResult.Expiration, "last update", tokenResult.LastUpdated)
 		return tokenResult.AccessKeyID, tokenResult.AccessKeySecret, tokenResult.SecurityToken, expireTime, nil
 	}
-	return accessKeyID, accessKeySecret, securityToken, expireTime, err
 }
