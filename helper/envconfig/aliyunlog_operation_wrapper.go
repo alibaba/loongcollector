@@ -84,11 +84,10 @@ func addNecessaryInputConfigField(inputConfigDetail map[string]interface{}) map[
 	return *inputConfigDetailCopy
 }
 
-func createAliyunLogOperationWrapper(endpoint, project, accessKeyID, accessKeySecret, stsToken string, shutdown <-chan struct{}) (*operationWrapper, error) {
+func createClientInterface(endpoint, accessKeyID, accessKeySecret, stsToken string, shutdown <-chan struct{}) (aliyunlog.ClientInterface, error) {
 	var clientInterface aliyunlog.ClientInterface
 	var err error
 	if *flags.AliCloudECSFlag {
-		// use UpdateTokenFunction to update token
 		clientInterface, err = aliyunlog.CreateTokenAutoUpdateClient(endpoint, UpdateTokenFunction, shutdown)
 		if err != nil {
 			return nil, err
@@ -97,6 +96,11 @@ func createAliyunLogOperationWrapper(endpoint, project, accessKeyID, accessKeySe
 		clientInterface = aliyunlog.CreateNormalInterface(endpoint, accessKeyID, accessKeySecret, stsToken)
 	}
 	clientInterface.SetUserAgent(pluginmanager.UserAgent)
+	return clientInterface, err
+}
+
+func createAliyunLogOperationWrapper(project string, clientInterface aliyunlog.ClientInterface) (*operationWrapper, error) {
+	var err error
 	wrapper := &operationWrapper{
 		logClient: clientInterface,
 		project:   project,
@@ -112,7 +116,7 @@ func createAliyunLogOperationWrapper(endpoint, project, accessKeyID, accessKeySe
 		time.Sleep(time.Second * time.Duration(30))
 	}
 
-	// retry when make project fail
+	// retry when make machine group fail
 	for i := 0; i < 3; i++ {
 		err = wrapper.makesureMachineGroupExist(project, *flags.DefaultLogMachineGroup)
 		if err == nil {
