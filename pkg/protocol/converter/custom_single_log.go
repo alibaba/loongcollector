@@ -15,6 +15,7 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -70,7 +71,7 @@ func (c *Converter) ConvertToSingleProtocolStream(logGroup *protocol.LogGroup, t
 	for i, log := range convertedLogs {
 		switch c.Encoding {
 		case EncodingJSON:
-			b, err := json.Marshal(log)
+			b, err := marshalWithoutHTMLEscaped(log)
 			if err != nil {
 				return nil, nil, fmt.Errorf("unable to marshal log: %v", log)
 			}
@@ -80,4 +81,15 @@ func (c *Converter) ConvertToSingleProtocolStream(logGroup *protocol.LogGroup, t
 		}
 	}
 	return marshaledLogs, desiredValues, nil
+}
+
+func marshalWithoutHTMLEscaped(data interface{}) ([]byte, error) {
+	bf := bytes.NewBuffer([]byte{})
+	jsonEncoder := json.NewEncoder(bf)
+	jsonEncoder.SetEscapeHTML(false)
+	if err := jsonEncoder.Encode(data); err != nil {
+		return nil, err
+	}
+	b := bytes.TrimRight(bf.Bytes(), "\n")
+	return b, nil
 }

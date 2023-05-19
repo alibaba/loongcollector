@@ -16,6 +16,7 @@ package protocol
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -878,6 +879,40 @@ func TestConvertToSimple(t *testing.T) {
 			Convey("Then error should be returned", func() {
 				So(err, ShouldNotBeNil)
 			})
+		})
+	})
+}
+
+func TestJsonMarshalAndMarshalWithoutHTMLEscaped(t *testing.T) {
+	type TestData struct {
+		ID   int
+		Msg  string
+		Data interface{}
+	}
+
+	Convey("test json marshal and marchal without html escaped", t, func() {
+		data := TestData{
+			ID:   0,
+			Msg:  ">>>><<<)(*&^%$#@!$@#hello+1447138058167839254",
+			Data: nil,
+		}
+
+		Convey("test marshalWithoutHTMLEscaped", func() {
+			v, _ := marshalWithoutHTMLEscaped(data)
+
+			str := string(v)
+			fmt.Println(str)
+
+			So(str, ShouldEqual, `{"ID":0,"Msg":">>>><<<)(*&^%$#@!$@#hello+1447138058167839254","Data":null}`)
+		})
+
+		Convey("test json marshal", func() {
+			v, _ := json.Marshal(data)
+
+			str := string(v)
+			fmt.Println(str)
+
+			So(str, ShouldNotEqual, `{"ID":0,"Msg":">>>><<<)(*&^%$#@!$@#hello+1447138058167839254","Data":null}`)
 		})
 	})
 }

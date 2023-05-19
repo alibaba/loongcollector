@@ -40,3 +40,4 @@ your changes, such as:
 - [public] [both] [fixed] Resolved issue of double counting disk total metrics in the disk partition condition of metric_system_v2
 - [public] [both] [fixed] do not read env config from exited containers
 - [public] [both] [updated] Optimize flusher pulsar to improve performance in static topic scenarios
+- [public] [both] [fix] json converter marshal without HTML escaped
