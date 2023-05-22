@@ -158,7 +158,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/Shopify/sarama](https://pkg.go.dev/github.com/Shopify/sarama?tab=licenses)
 - [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
 - [github.com/aliyun/aliyun-log-go-sdk](https://pkg.go.dev/github.com/aliyun/aliyun-log-go-sdk?tab=licenses)
-- [github.com/bsm/sarama-cluster](https://pkg.go.dev/github.com/bsm/sarama-cluster?tab=licenses)
 - [github.com/buger/jsonparser](https://pkg.go.dev/github.com/buger/jsonparser?tab=licenses)
 - [github.com/cenkalti/backoff](https://pkg.go.dev/github.com/cenkalti/backoff?tab=licenses)
 - [github.com/cespare/xxhash](https://pkg.go.dev/github.com/cespare/xxhash?tab=licenses)
@@ -245,6 +244,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/go-sql-driver/mysql](https://pkg.go.dev/github.com/go-sql-driver/mysql?tab=licenses)
 - [github.com/hashicorp/go-uuid](https://pkg.go.dev/github.com/hashicorp/go-uuid?tab=licenses)
 - [github.com/hashicorp/golang-lru](https://pkg.go.dev/github.com/hashicorp/golang-lru?tab=licenses)
+- [github.com/hashicorp/go-multierror](https://pkg.go.dev/github.com/hashicorp/go-multierror?tab=licenses)
+- [github.com/hashicorp/errwrap](https://pkg.go.dev/github.com/hashicorp/errwrap?tab=licenses)
 
 ## LGPL v3 licenses
 

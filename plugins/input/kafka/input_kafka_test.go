@@ -21,11 +21,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 )
 
 type ContextTest struct {
@@ -98,7 +99,8 @@ func InvalidTestInputKafka(t *testing.T) {
 	_, input, err := newInput()
 	require.NoError(t, err)
 	collector := &mockCollector{}
-	err = input.Start(collector)
+	pipelineCxt := pipeline.NewGroupedPipelineConext()
+	err = input.StartService(pipelineCxt)
 	require.NoError(t, err)
 	time.Sleep(time.Second * 2)
 	assert.Equal(t, 2, len(collector.logs))

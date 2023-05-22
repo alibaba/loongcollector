@@ -166,7 +166,7 @@ func (kerberosConfig *KerberosConfig) configureKerberos(saramaConfig *sarama.Con
 		if kerberosConfig.Username == "" {
 			return fmt.Errorf("password authentication is selected for Kerberos, but username is not configured")
 		}
-		if kerberosConfig.Username == "" {
+		if kerberosConfig.Password == "" {
 			return fmt.Errorf("password authentication is selected for Kerberos, but password is not configured")
 		}
 		saramaConfig.Net.SASL.GSSAPI.AuthType = sarama.KRB5_USER_AUTH

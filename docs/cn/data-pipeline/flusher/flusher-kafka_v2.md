@@ -42,7 +42,7 @@
 | Authentication.Kerberos.ConfigPath    | Boolean  | 否    | Kerberos krb5.conf                                                                                 |
 | Authentication.Kerberos.KeyTabPath    | String   | 否    | keytab的路径                                                                                          |
 | PartitionerType                       | String   | 否    | Partitioner类型。取值：`roundrobin`、`hash`、`random`。默认为：`random`。                                        |
-| QequiredAcks                          | int      | 否    | ACK的可靠等级.0=无响应,1=等待本地消息,-1=等待所有副本提交.默认1，                                                           |
+| RequiredAcks                          | int      | 否    | ACK的可靠等级.0=无响应,1=等待本地消息,-1=等待所有副本提交.默认1，                                                           |
 | Compression                           | String   | 否    | 压缩算法，可选值：`none`, `snappy`，`lz4`和`gzip`，默认值`none`                                                   |
 | CompressionLevel                      | Int      | 否    | 压缩级别，可选值：`1~9`，默认值：`4`,设置为`0`则禁用`Compression`                                                      |
 | MaxMessageBytes                       | Int      | 否    | 一个批次提交的大小限制，配置和`message.max.bytes`对应，默认值：`1000000`                                                 |
@@ -61,11 +61,16 @@
 
 - `Version`需要填写的是`kafka protocol version`版本号，`flusher_kafka_v2`当前支持的`kafka`版本范围：`0.8.2.x~2.7.0`。
 请根据自己的`kafka`版本号参照下面的`kafka protocol version`规则进行配置。**建议根据自己的`kafka`版本指定对应`protocol version`**,
-`kafka protocol version`配置规则如下：
+`kafka protocol version`支持版本号如下：
 
 ```plain
-// x代表小版本号
-0.8.2.x,0.9.0.x,0.10.0.x,0.10.1.x,0.10.2.x,0.11.0.x,1.0.0,1.1.0,1.1.1,2.0.0,2.0.1,2.1.0,2.2.0,2.3.0,2.4.0,2.5.0,2.6.0,2.7.0
+0.8.2.0,0.8.2.1,0.8.2.2
+0.9.0.0,0.9.0.1
+0.10.0.0,0.10.0.1,0.10.1.0,0.10.1.1,0.10.2.0,0.10.2.1,0.10.2.2
+0.11.0.0,0.11.0.1,0.11.0.2
+1.0.0,1.0.1,1.0.2,1.1.0,1.1.1,
+2.0.0,2.0.1,2.1.0,2.1.1,2.2.0,2.2.1,2.2.2,2.3.0,2.3.1,2.4.0,2.4.1,2.5.0,2.5.1,2.6.0,2.6.1,2.6.2,2.7.0,2.7.1,2.8.0,2.8.1,2.8.2
+3.0.0,3.0.1,3.0.2,3.1.0,3.1.1,3.1.2,3.2.0,3.2.1,3.2.2,3.2.3,3.3.0,3.3.1
 ```
 
 - `Brokers`是个数组，多个`Broker`地址不能使用`;`或者`,`来隔开放在一行里，`yaml`配置文件中正确的多个`Broker`地址配置参考如下：
@@ -350,7 +355,7 @@ flushers:
 
 **注:** 配置仅供参考，证书文件请自行生成后根据事情情况配置。
 
-## Kerberos配置参考(待验证)
+## Kerberos配置参考
 
 ```yaml
 enable: true
@@ -376,5 +381,3 @@ flushers:
         KeyTabPath: "/etc/security/kafka.keytab"
     Topic: KafkaTestTopic
 ```
-
-**注:** Kerberos认证由于缺乏环境，目前待测试验证，使用中如有问题请及时向社区反馈修复。

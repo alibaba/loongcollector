@@ -102,12 +102,13 @@ type FlusherKafka struct {
 	ClientID string
 
 	// obtain from Topic
-	topicKeys  []string
-	isTerminal chan bool
-	producer   sarama.AsyncProducer
-	hashKeyMap map[string]interface{}
-	hashKey    sarama.StringEncoder
-	flusher    FlusherFunc
+	topicKeys    []string
+	isTerminal   chan bool
+	producer     sarama.AsyncProducer
+	hashKeyMap   map[string]struct{}
+	hashKey      sarama.StringEncoder
+	flusher      FlusherFunc
+	selectFields []string
 }
 
 type backoffConfig struct {
@@ -243,6 +244,9 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
 		return err
 	}
+	// Merge topicKeys and HashKeys,Only one convert after merge
+	k.selectFields = util.UniqueStrings(k.topicKeys, k.HashKeys)
+
 	SIGTERM := make(chan bool)
 	go func(p sarama.AsyncProducer, SIGTERM chan bool) {
 		errors := p.Errors()
@@ -275,6 +279,7 @@ func (k *FlusherKafka) Flush(projectName string, logstoreName string, configName
 }
 
 func (k *FlusherKafka) NormalFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	topic := k.Topic
 	for _, logGroup := range logGroupList {
 		logger.Debug(k.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
 		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, k.topicKeys)
@@ -282,13 +287,17 @@ func (k *FlusherKafka) NormalFlush(projectName string, logstoreName string, conf
 			logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
-			valueMap := values[index]
-			topic, err := fmtstr.FormatTopic(valueMap, k.Topic)
-			if err != nil {
-				logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka format topic fail, error", err)
+			if len(k.topicKeys) > 0 {
+				valueMap := values[index]
+				formattedTopic, err := fmtstr.FormatTopic(valueMap, k.Topic)
+				if err != nil {
+					logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka format topic fail, error", err)
+				} else {
+					topic = *formattedTopic
+				}
 			}
 			m := &sarama.ProducerMessage{
-				Topic: *topic,
+				Topic: topic,
 				Value: sarama.ByteEncoder(log),
 			}
 			k.producer.Input() <- m
@@ -298,22 +307,25 @@ func (k *FlusherKafka) NormalFlush(projectName string, logstoreName string, conf
 }
 
 func (k *FlusherKafka) HashFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	topic := k.Topic
 	for _, logGroup := range logGroupList {
 		logger.Debug(k.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-		// Merge topicKeys and HashKeys,Only one convert after merge
-		selectFields := util.UniqueStrings(k.topicKeys, k.HashKeys)
-		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, selectFields)
+		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, k.selectFields)
 		if err != nil {
 			logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
 			selectedValueMap := values[index]
-			topic, err := fmtstr.FormatTopic(selectedValueMap, k.Topic)
-			if err != nil {
-				logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka format topic fail, error", err)
+			if len(k.topicKeys) > 0 {
+				formattedTopic, err := fmtstr.FormatTopic(selectedValueMap, k.Topic)
+				if err != nil {
+					logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka format topic fail, error", err)
+				} else {
+					topic = *formattedTopic
+				}
 			}
 			m := &sarama.ProducerMessage{
-				Topic: *topic,
+				Topic: topic,
 				Value: sarama.ByteEncoder(log),
 			}
 			// set key when partition type is hash
@@ -491,7 +503,7 @@ func makePartitioner(k *FlusherKafka) (partitioner sarama.PartitionerConstructor
 		partitioner = sarama.NewRoundRobinPartitioner
 	case PartitionerTypeRoundHash:
 		partitioner = sarama.NewHashPartitioner
-		k.hashKeyMap = make(map[string]interface{})
+		k.hashKeyMap = make(map[string]struct{})
 		k.hashKey = ""
 		for _, key := range k.HashKeys {
 			k.hashKeyMap[key] = struct{}{}
