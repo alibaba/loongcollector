@@ -677,7 +677,7 @@ func loadMetric(pluginType string, logstoreConfig *LogstoreConfig, configInterfa
 	}
 	metric := creator()
 	if err = applyPluginConfig(metric, configInterface); err != nil {
-		return nil
+		return err
 	}
 	interval, err := metric.Init(logstoreConfig.Context)
 	if err != nil {
@@ -709,7 +709,7 @@ func loadService(pluginType string, logstoreConfig *LogstoreConfig, configInterf
 	}
 	service := creator()
 	if err = applyPluginConfig(service, configInterface); err != nil {
-		return nil
+		return err
 	}
 	if _, err = service.Init(logstoreConfig.Context); err != nil {
 		return err
@@ -725,7 +725,7 @@ func loadProcessor(pluginType string, priority int, logstoreConfig *LogstoreConf
 	}
 	processor := creator()
 	if err = applyPluginConfig(processor, configInterface); err != nil {
-		return nil
+		return err
 	}
 	if err = processor.Init(logstoreConfig.Context); err != nil {
 		return err
@@ -753,7 +753,7 @@ func loadFlusher(pluginType string, logstoreConfig *LogstoreConfig, configInterf
 	}
 	flusher := creator()
 	if err = applyPluginConfig(flusher, configInterface); err != nil {
-		return nil
+		return err
 	}
 	if err = flusher.Init(logstoreConfig.Context); err != nil {
 		return err
