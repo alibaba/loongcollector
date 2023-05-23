@@ -255,6 +255,11 @@ func getGoModules(ctx *buildContext) error {
 		return fmt.Errorf("failed to download go modules, err: %w, output: %s", err, out)
 	}
 
+	mods, err := ioutil.ReadFile(ctx.ModFile)
+	if err != nil {
+		return fmt.Errorf("failed to read file content, err: %v", err)
+	}
+	fmt.Printf("generated gomod file content:\n%s", string(mods))
 	return nil
 }
 
