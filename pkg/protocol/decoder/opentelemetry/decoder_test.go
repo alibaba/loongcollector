@@ -496,6 +496,8 @@ func TestConvertOtlpLogsToGroupEvents(t *testing.T) {
 	rsLogs.Resource().Attributes().PutStr("meta_attr2", "attr_value2")
 	scopeLog := rsLogs.ScopeLogs().AppendEmpty()
 	scopeLog.Scope().Attributes().PutStr("scope_key1", "scope_value1")
+	scopeLog.Scope().Attributes().PutStr(otlp.TagKeyScopeVersion, "")        // skip
+	scopeLog.Scope().Attributes().PutStr(otlp.TagKeyScopeName, "scope_name") // keep
 
 	logRecord := scopeLog.LogRecords().AppendEmpty()
 	logRecord.Body().SetStr("some log message")
@@ -517,7 +519,7 @@ func TestConvertOtlpLogsToGroupEvents(t *testing.T) {
 	assert.Equal(t, "attr_value1", group.Metadata.Get("meta_attr1"))
 	assert.Equal(t, "attr_value2", group.Metadata.Get("meta_attr2"))
 
-	assert.Equal(t, 1+3, group.Tags.Len())
+	assert.Equal(t, 1+2, group.Tags.Len())
 	assert.Equal(t, "scope_value1", group.Tags.Get("scope_key1"))
 
 	events := groupEventsSlice[0].Events
@@ -551,7 +553,7 @@ func TestDecoder_DecodeV2_Logs(t *testing.T) {
 		assert.Equal(t, "testHost", resource.Get("host.name"))
 
 		scopeAttributes := groupEvents.Group.Tags
-		assert.Equal(t, "version", scopeAttributes.Get(otlp.TagKeyScopeVersion))
+		assert.False(t, scopeAttributes.Contains(otlp.TagKeyScopeVersion))
 		assert.Equal(t, "name", scopeAttributes.Get(otlp.TagKeyScopeName))
 
 		otlpLogs := otlpResLogs.ScopeLogs().At(i).LogRecords()
@@ -1016,7 +1018,7 @@ var logsOTLP = func() plog.Logs {
 	rl.SetSchemaUrl("testSchemaURL")
 	il := rl.ScopeLogs().AppendEmpty()
 	il.Scope().SetName("name")
-	il.Scope().SetVersion("version")
+	il.Scope().SetVersion("")
 	il.Scope().SetDroppedAttributesCount(1)
 	il.SetSchemaUrl("ScopeLogsSchemaURL")
 	lg := il.LogRecords().AppendEmpty()

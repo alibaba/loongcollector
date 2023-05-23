@@ -359,8 +359,13 @@ func setScope[T interface {
 	Scope() pcommon.InstrumentationScope
 }](t T, groupTags models.Tags) {
 	scope := t.Scope()
-	scope.SetName(groupTags.Get(otlp.TagKeyScopeName))
-	scope.SetVersion(groupTags.Get(otlp.TagKeyScopeVersion))
+	if groupTags.Contains(otlp.TagKeyScopeName) {
+		scope.SetName(groupTags.Get(otlp.TagKeyScopeName))
+	}
+
+	if groupTags.Contains(otlp.TagKeyScopeVersion) {
+		scope.SetVersion(groupTags.Get(otlp.TagKeyScopeVersion))
+	}
 	scopeDroppedAttributesCount, err := strconv.Atoi(groupTags.Get(otlp.TagKeyScopeDroppedAttributesCount))
 	if err == nil {
 		scope.SetDroppedAttributesCount(uint32(scopeDroppedAttributesCount))

@@ -21,8 +21,14 @@ import (
 
 func genScopeTags(scope pcommon.InstrumentationScope) models.Tags {
 	scopeTags := attrs2Tags(scope.Attributes())
-	scopeTags.Add(otlp.TagKeyScopeName, scope.Name())
-	scopeTags.Add(otlp.TagKeyScopeVersion, scope.Version())
+	if scope.Name() != "" {
+		scopeTags.Add(otlp.TagKeyScopeName, scope.Name())
+	}
+
+	if scope.Version() != "" {
+		scopeTags.Add(otlp.TagKeyScopeVersion, scope.Version())
+	}
+
 	scopeTags.Add(otlp.TagKeyScopeDroppedAttributesCount, strconv.Itoa(int(scope.DroppedAttributesCount())))
 	return scopeTags
 }
@@ -59,24 +65,30 @@ func convertSpanEvents(srcEvents ptrace.SpanEventSlice) []*models.SpanEvent {
 	return events
 }
 
+// attrs2Tags converts otlp attributes to tags, it skips empty values.
 func attrs2Tags(attributes pcommon.Map) models.Tags {
 	tags := models.NewTags()
 
 	attributes.Range(
 		func(k string, v pcommon.Value) bool {
-			tags.Add(k, v.AsString())
+			if tagValue := v.AsString(); tagValue != "" {
+				tags.Add(k, tagValue)
+			}
 			return true
 		},
 	)
 	return tags
 }
 
+// attrs2Tags converts otlp attributes to metadata, it skips empty values.
 func attrs2Meta(attributes pcommon.Map) models.Metadata {
 	meta := models.NewMetadata()
 
 	attributes.Range(
 		func(k string, v pcommon.Value) bool {
-			meta.Add(k, v.AsString())
+			if tagValue := v.AsString(); tagValue != "" {
+				meta.Add(k, tagValue)
+			}
 			return true
 		},
 	)

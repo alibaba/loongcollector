@@ -9,6 +9,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
 )
 
 func TestNewConvertToOtlpLogs(t *testing.T) {
@@ -240,6 +241,8 @@ func TestConvertPipelineGroupEventsToOtlpTraces(t *testing.T) {
 
 			pipelineGroupEvent.Group.Metadata.Add("__hostname__", "alje834hgf")
 			pipelineGroupEvent.Group.Metadata.Add("__pack_id__", "AEDCFGHNJUIOPLMN-1E")
+			pipelineGroupEvent.Group.Tags.Add(otlp.TagKeyScopeName, "scopename")
+			pipelineGroupEvent.Group.Tags.Add(otlp.TagKeyScopeVersion, "")
 			for i := 0; i < 2; i++ {
 				tags := models.NewTagsWithMap(
 					map[string]string{
@@ -276,6 +279,8 @@ func TestConvertPipelineGroupEventsToOtlpTraces(t *testing.T) {
 				convey.Convey("Then the traces should be valid", func() {
 					for i := 0; i < traces.ScopeSpans().Len(); i++ {
 						scope := traces.ScopeSpans().At(i)
+						convey.So(scope.Scope().Version(), convey.ShouldEqual, "")
+						convey.So(scope.Scope().Name(), convey.ShouldEqual, "scopename")
 						convey.So(2, convey.ShouldEqual, scope.Spans().Len())
 
 						for j := 0; j < scope.Spans().Len(); j++ {
