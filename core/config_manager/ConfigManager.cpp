@@ -161,7 +161,7 @@ bool ConfigManager::CheckUpdateThread(bool configExistFlag) {
                 if (checkResults.size() > 0) {
                     LOG_DEBUG(sLogger, ("fetch pipeline config, config file number", checkResults.size()));
                     configDetails = FetchPipelineConfig(configServerAddress, checkResults);
-                    if (configDetails.size() > 0) {
+                    if (checkResults.size() > 0) {
                         UpdateRemoteConfig(checkResults, configDetails);
                     } else
                         configServerAddress = AppConfig::GetInstance()->GetOneConfigServerAddress(true);
@@ -391,7 +391,7 @@ void ConfigManager::UpdateRemoteConfig(
     ofstream newConfig;
     configserver::proto::ConfigDetail configDetail;
 
-    for (int i = 0; i < checkResults.size(); i++) {
+    for (int i = 0; i < checkResults.size(); i++) {    
         configName = checkResults[i].name();
 
         if (configserver::proto::NEW != checkResults[i].check_status()) {

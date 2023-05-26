@@ -48,8 +48,9 @@ func (c *ConfigManager) CreateConfig(req *proto.CreateConfigRequest, res *proto.
 			return common.ConfigAlreadyExist.Status, res
 		}
 		// exist but has delete tag
+		verison := config.Version
 		config.ParseProto(req.ConfigDetail)
-		config.Version++
+		config.Version = verison + 1
 		config.DelTag = false
 
 		updateErr := s.Update(common.TypeConfigDetail, config.Name, config)
@@ -109,8 +110,9 @@ func (c *ConfigManager) UpdateConfig(req *proto.UpdateConfigRequest, res *proto.
 		res.Message = fmt.Sprintf("Config %s doesn't exist.", req.ConfigDetail.Name)
 		return common.ConfigNotExist.Status, res
 	}
+	version := config.Version
 	config.ParseProto(req.ConfigDetail)
-	config.Version++
+	config.Version = version + 1
 
 	updateErr := s.Update(common.TypeConfigDetail, config.Name, config)
 	if updateErr != nil {

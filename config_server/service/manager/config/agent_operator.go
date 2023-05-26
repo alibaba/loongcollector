@@ -98,10 +98,10 @@ func (c *ConfigManager) CheckConfigUpdatesWhenHeartbeat(req *proto.HeartBeatRequ
 		if !ok {
 			result := new(proto.ConfigCheckResult)
 			result.Type = proto.ConfigType_PIPELINE_CONFIG
-			result.Name = config.Name
+			result.Name = k.Name
 			result.OldVersion = k.Version
-			result.NewVersion = config.Version
-			result.Context = config.Context
+			result.NewVersion = k.Version
+			result.Context = k.Context
 			result.CheckStatus = proto.CheckStatus_DELETED
 			pipelineConfigs = append(pipelineConfigs, result)
 		} else if ok {
@@ -124,10 +124,10 @@ func (c *ConfigManager) CheckConfigUpdatesWhenHeartbeat(req *proto.HeartBeatRequ
 		if !ok {
 			result := new(proto.ConfigCheckResult)
 			result.Type = proto.ConfigType_AGENT_CONFIG
-			result.Name = config.Name
+			result.Name = k.Name
 			result.OldVersion = k.Version
-			result.NewVersion = config.Version
-			result.Context = config.Context
+			result.NewVersion = k.Version
+			result.Context = k.Context
 			result.CheckStatus = proto.CheckStatus_DELETED
 			agentConfigs = append(agentConfigs, result)
 		} else if ok {
