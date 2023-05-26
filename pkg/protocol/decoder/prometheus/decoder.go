@@ -16,20 +16,23 @@ package prometheus
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
+	"github.com/richardartoul/molecule"
+	"github.com/richardartoul/molecule/src/codec"
+
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
 const (
@@ -48,8 +51,21 @@ const (
 	snappyEncoding     = "snappy"
 )
 
+// field index of the proto message models
+// ref: https://github.com/prometheus/prometheus/blob/cb045c0e4b94bbf3eee174d91b5ef2b8553948d5/prompb/types.proto#L123
+const (
+	promPbFieldIndexTimeSeries      = 1
+	promPbFieldIndexLabels          = 1
+	promPbFieldIndexSamples         = 2
+	promPbFieldIndexLabelName       = 1
+	promPbFieldIndexLabelValue      = 2
+	promPbFieldIndexSampleValue     = 1
+	promPbFieldIndexSampleTimestamp = 2
+)
+
 // Decoder impl
 type Decoder struct {
+	AllowUnsafeMode bool
 }
 
 func parseLabels(metric model.Metric) (metricName, labelsValue string) {
@@ -214,20 +230,18 @@ func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.Pip
 
 	meta := models.NewMetadata()
 	commonTags := models.NewTags()
-
 	if db := req.FormValue(metaDBKey); len(db) > 0 {
 		meta.Add(metaDBKey, db)
 	}
 
 	if req.Header.Get(contentEncodingKey) == snappyEncoding &&
 		strings.HasPrefix(req.Header.Get(contentTypeKey), pbContentType) {
-		var promRequest prompb.WriteRequest
-		err = proto.Unmarshal(data, &promRequest)
-		if err != nil {
-			return nil, err
+		var groupEvents *models.PipelineGroupEvents
+		if d.AllowUnsafeMode {
+			groupEvents, err = ParsePromPbToPipelineGroupEventsUnsafe(data, meta, commonTags)
+		} else {
+			groupEvents, err = ConvertPromRequestToPipelineGroupEvents(data, meta, commonTags)
 		}
-
-		groupEvents, err := ConvertPromRequestToPipelineGroupEvents(&promRequest, meta, commonTags)
 		if err != nil {
 			return nil, err
 		}
@@ -300,7 +314,13 @@ func parseModelMetric(metric model.Metric) (string, models.Tags) {
 	return metricName, tags
 }
 
-func ConvertPromRequestToPipelineGroupEvents(promRequest *prompb.WriteRequest, metaInfo models.Metadata, commonTags models.Tags) (*models.PipelineGroupEvents, error) {
+func ConvertPromRequestToPipelineGroupEvents(data []byte, metaInfo models.Metadata, commonTags models.Tags) (*models.PipelineGroupEvents, error) {
+	var promRequest prompb.WriteRequest
+	err := proto.Unmarshal(data, &promRequest)
+	if err != nil {
+		return nil, err
+	}
+
 	groupEvent := &models.PipelineGroupEvents{
 		Group: models.NewGroup(metaInfo, commonTags),
 	}
@@ -328,5 +348,115 @@ func ConvertPromRequestToPipelineGroupEvents(promRequest *prompb.WriteRequest, m
 		}
 	}
 
+	return groupEvent, nil
+}
+
+func ParsePromPbToPipelineGroupEventsUnsafe(data []byte, metaInfo models.Metadata, commonTags models.Tags) (*models.PipelineGroupEvents, error) {
+	groupEvent := &models.PipelineGroupEvents{
+		Group: models.NewGroup(metaInfo, commonTags),
+	}
+
+	buffer := codec.NewBuffer(data)
+	err1 := molecule.MessageEach(buffer, func(fieldNum int32, v molecule.Value) (bool, error) {
+		if fieldNum == promPbFieldIndexTimeSeries {
+			serieBytes, err2 := v.AsBytesUnsafe()
+			if err2 != nil {
+				return false, err2
+			}
+
+			var metricName string
+			metricTags := models.NewTags()
+
+			serieBuffer := codec.NewBuffer(serieBytes)
+			err2 = molecule.MessageEach(serieBuffer, func(fieldNum int32, v molecule.Value) (bool, error) {
+				switch fieldNum {
+				case promPbFieldIndexLabels: // Labels
+					labelBytes, err3 := v.AsBytesUnsafe()
+					if err3 != nil {
+						return false, err3
+					}
+
+					var name, value string
+
+					labelBuffer := codec.NewBuffer(labelBytes)
+					err3 = molecule.MessageEach(labelBuffer, func(fieldNum int32, v molecule.Value) (bool, error) {
+						var err4 error
+						switch fieldNum {
+						case promPbFieldIndexLabelName: // Name
+							name, err4 = v.AsStringUnsafe()
+							if err4 != nil {
+								return false, err4
+							}
+						case promPbFieldIndexLabelValue: // Value
+							value, err4 = v.AsStringUnsafe()
+							if err4 != nil {
+								return false, err4
+							}
+						}
+						return true, nil
+					})
+					if err3 != nil {
+						return false, err3
+					}
+
+					if name == metricNameKey {
+						metricName = value
+					} else {
+						metricTags.Add(name, value)
+					}
+				case promPbFieldIndexSamples: // Samples
+					sampleBytes, err3 := v.AsBytesUnsafe()
+					if err3 != nil {
+						return false, err3
+					}
+
+					var value float64
+					var timestamp int64
+
+					sampleBuffer := codec.NewBuffer(sampleBytes)
+					err3 = molecule.MessageEach(sampleBuffer, func(fieldNum int32, v molecule.Value) (bool, error) {
+						var err4 error
+						switch fieldNum {
+						case promPbFieldIndexSampleValue: // Value
+							value, err4 = v.AsDouble()
+							if err4 != nil {
+								return false, err4
+							}
+						case promPbFieldIndexSampleTimestamp: // Timestamp
+							timestamp, err4 = v.AsInt64()
+							if err4 != nil {
+								return false, err4
+							}
+						}
+						return true, nil
+					})
+					if err3 != nil {
+						return false, err3
+					}
+
+					if metricName == "" {
+						return false, fmt.Errorf("fields in mix order")
+					}
+
+					metric := models.NewSingleValueMetric(
+						metricName,
+						models.MetricTypeGauge,
+						metricTags,
+						timestamp*1e6,
+						value,
+					)
+					groupEvent.Events = append(groupEvent.Events, metric)
+				}
+				return true, nil
+			})
+			if err2 != nil {
+				return false, err2
+			}
+		}
+		return true, nil
+	})
+	if err1 != nil {
+		return nil, err1
+	}
 	return groupEvent, nil
 }

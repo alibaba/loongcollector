@@ -65,6 +65,7 @@ type ServiceHTTP struct {
 	UnlinkUnixSock     bool
 	FieldsExtend       bool
 	DisableUncompress  bool
+	AllowUnsafeMode    bool
 	Tags               map[string]string // todo for v2
 
 	// params below works only for version v2
@@ -83,10 +84,12 @@ func (s *ServiceHTTP) Init(context pipeline.Context) (int, error) {
 		Format            string
 		FieldsExtend      bool
 		DisableUncompress bool
+		AllowUnsafeMode   bool
 	}{
 		Format:            s.Format,
 		FieldsExtend:      s.FieldsExtend,
 		DisableUncompress: s.DisableUncompress,
+		AllowUnsafeMode:   s.AllowUnsafeMode,
 	}
 	ext, err := context.GetExtension(s.Decoder, options)
 	if err != nil {

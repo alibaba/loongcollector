@@ -22,6 +22,7 @@ require (
 	github.com/prometheus/prometheus v1.8.2-0.20201119142752-3ad25a6dc3d9
 	github.com/pyroscope-io/jfr-parser v0.6.0
 	github.com/pyroscope-io/pyroscope v0.0.0-00010101000000-000000000000
+	github.com/richardartoul/molecule v1.0.0
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/stretchr/testify v1.8.2
 	go.opentelemetry.io/collector/pdata v0.66.0

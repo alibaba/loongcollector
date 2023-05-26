@@ -15,6 +15,7 @@
 package common
 
 import (
+	"bytes"
 	"compress/gzip"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/golang/snappy"
 	"github.com/pierrec/lz4"
@@ -40,6 +42,23 @@ const (
 	ProtocolPyroscope    = "pyroscope"
 )
 
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		buf := bytes.NewBuffer(make([]byte, 0, 32*1024))
+		return buf
+	},
+}
+
+func GetPooledBuf() *bytes.Buffer {
+	buf := bufPool.Get().(*bytes.Buffer)
+	return buf
+}
+
+func PutPooledBuf(buf *bytes.Buffer) {
+	buf.Reset()
+	bufPool.Put(buf)
+}
+
 func CollectBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) ([]byte, int, error) {
 	body := req.Body
 
@@ -54,16 +73,25 @@ func CollectBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) 
 	}
 
 	body = http.MaxBytesReader(res, body, maxBodySize)
-	bytes, err := ioutil.ReadAll(body)
-	if err != nil {
-		return nil, http.StatusRequestEntityTooLarge, err
-	}
 
 	if req.Header.Get("Content-Encoding") == "snappy" {
-		bytes, err = snappy.Decode(nil, bytes)
+		// for snappy encoding, use pooled buf to read compressed request body
+		buf := GetPooledBuf()
+		defer PutPooledBuf(buf)
+		_, err := io.Copy(buf, body) // nolint
 		if err != nil {
 			return nil, http.StatusBadRequest, err
 		}
+		data, err := snappy.Decode(nil, buf.Bytes())
+		if err != nil {
+			return nil, http.StatusBadRequest, err
+		}
+		return data, http.StatusOK, nil
+	}
+
+	bytes, err := ioutil.ReadAll(body)
+	if err != nil {
+		return nil, http.StatusRequestEntityTooLarge, err
 	}
 
 	if req.Header.Get("x-log-compresstype") == "lz4" {

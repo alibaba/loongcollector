@@ -186,6 +186,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/mailru/easyjson](https://pkg.go.dev/github.com/mailru/easyjson?tab=licenses)
 - [github.com/mitchellh/mapstructure](https://pkg.go.dev/github.com/mitchellh/mapstructure?tab=licenses)
 - [github.com/paulbellamy/ratecounter](https://pkg.go.dev/github.com/paulbellamy/ratecounter?tab=licenses)
+- [github.com/richardartoul/molecule](https://pkg.go.dev/github.com/richardartoul/molecule?tab=licenses)
 - [github.com/satori/go.uuid](https://pkg.go.dev/github.com/satori/go.uuid?tab=licenses)
 - [github.com/shopspring/decimal](https://pkg.go.dev/github.com/shopspring/decimal?tab=licenses)
 - [github.com/siddontang/go](https://pkg.go.dev/github.com/siddontang/go?tab=licenses)

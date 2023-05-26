@@ -33,6 +33,7 @@ import (
 type Option struct {
 	FieldsExtend      bool
 	DisableUncompress bool
+	AllowUnsafeMode   bool
 }
 
 // GetDecoder return a new decoder for specific format
@@ -45,7 +46,7 @@ func GetDecoderWithOptions(format string, option Option) (extensions.Decoder, er
 	case common.ProtocolSLS:
 		return &sls.Decoder{}, nil
 	case common.ProtocolPrometheus:
-		return &prometheus.Decoder{}, nil
+		return &prometheus.Decoder{AllowUnsafeMode: option.AllowUnsafeMode}, nil
 	case common.ProtocolInflux, common.ProtocolInfluxdb:
 		return &influxdb.Decoder{FieldsExtend: option.FieldsExtend}, nil
 	case common.ProtocolStatsd:
