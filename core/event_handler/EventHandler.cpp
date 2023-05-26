@@ -238,8 +238,14 @@ void CreateModifyHandler::Handle(const Event& event) {
     }
     if ((event.IsCreate() || event.IsMoveTo()) && isDir) {
         mCreateHandlerPtr->Handle(event);
-    } else if (event.IsCreate() || event.IsModify() || event.IsMoveFrom() || event.IsMoveTo() || event.IsDeleted()
-               || event.IsContainerStopped()) {
+    } else if (event.IsContainerStopped() && isDir) {
+        for (auto& pair : mModifyHandlerPtrMap) {
+            LOG_DEBUG(sLogger,
+                      ("Handle container stopped event, config", pair.first)("Source", event.GetSource())(
+                          "Object", event.GetObject())("Dev", event.GetDev())("Inode", event.GetInode()));
+            pair.second->Handle(event);
+        }
+    } else if (event.IsCreate() || event.IsModify() || event.IsMoveFrom() || event.IsMoveTo() || event.IsDeleted()) {
         if (!event.GetConfigName().empty()) {
             Config* pConfig = ConfigManager::GetInstance()->FindConfigByName(event.GetConfigName());
             if (pConfig != NULL) {
@@ -953,10 +959,10 @@ void ModifyHandler::DeleteTimeoutReader(int32_t timeoutInterval) {
             if (interval > timeoutInterval) {
                 LOG_INFO(sLogger,
                          ("remove the corresponding reader from the log reader queue",
-                          "current file has not been updated for a long time")(
-                             "project", (*iter)->GetProjectName())("logstore", (*iter)->GetCategory())(
-                             "config", mConfigName)("log reader queue name", (*iter)->GetLogPath())(
-                             "log reader queue size", readerArray.size() - 1)(
+                          "current file has not been updated for a long time")("project", (*iter)->GetProjectName())(
+                             "logstore", (*iter)->GetCategory())("config", mConfigName)(
+                             "log reader queue name", (*iter)->GetLogPath())("log reader queue size",
+                                                                             readerArray.size() - 1)(
                              "file device", (*iter)->GetDevInode().dev)("file inode", (*iter)->GetDevInode().inode)(
                              "file size", (*iter)->GetFileSize())("last file position", (*iter)->GetLastFilePos()));
                 mDevInodeReaderMap.erase((*iter)->GetDevInode());
@@ -990,9 +996,9 @@ void ModifyHandler::DeleteRollbackReader() {
             LOG_INFO(
                 sLogger,
                 ("remove the corresponding reader from the reader rotator pool",
-                 "current file has not been updated for a long time")(
-                    "project", readerIter->second->GetProjectName())("logstore", readerIter->second->GetCategory())(
-                    "config", mConfigName)("file name", readerIter->second->GetRealLogPath())(
+                 "current file has not been updated for a long time")("project", readerIter->second->GetProjectName())(
+                    "logstore", readerIter->second->GetCategory())("config", mConfigName)(
+                    "file name", readerIter->second->GetRealLogPath())(
                     "file device", readerIter->second->GetDevInode().dev)("file inode",
                                                                           readerIter->second->GetDevInode().inode)(
                     "file size", readerIter->second->GetFileSize())("last file position",
