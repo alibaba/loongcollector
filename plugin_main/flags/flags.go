@@ -46,6 +46,11 @@ var (
 	Doc              = flag.Bool("doc", false, "generate plugin docs")
 	DocPath          = flag.String("docpath", "./docs/en/plugins", "generate plugin docs")
 	HTTPLoadFlag     = flag.Bool("http-load", false, "export http endpoint for load plugin config.")
+	FileIOFlag       = flag.Bool("file-io", false, "use file for input or output.")
+	InputFile        = flag.String("input-file", "./input.log", "input file")
+	InputField       = flag.String("input-field", "content", "input file")
+	InputLineLimit   = flag.Int("input-line-limit", 1000, "input file")
+	OutputFile       = flag.String("output-file", "./output.log", "output file")
 )
 
 var (
@@ -82,12 +87,12 @@ func LoadConfig() (globalCfg string, pluginCfgs []string, err error) {
 	var cfgs []map[string]interface{}
 	errUnmarshal := json.Unmarshal([]byte(pluginCfg), &cfgs)
 	if errUnmarshal != nil {
-		pluginCfgs = append(pluginCfgs, pluginCfg)
+		pluginCfgs = append(pluginCfgs, changePluginConfigIO(pluginCfg))
 		return
 	}
 	for _, cfg := range cfgs {
 		bytes, _ := json.Marshal(cfg)
-		pluginCfgs = append(pluginCfgs, string(bytes))
+		pluginCfgs = append(pluginCfgs, changePluginConfigIO(string(bytes)))
 	}
 	return
 }
@@ -133,4 +138,59 @@ func OverrideByEnv() {
 	_ = util.InitFromEnvBool("LOGTAIL_AUTO_PROF", AutoProfile, *AutoProfile)
 	_ = util.InitFromEnvBool("LOGTAIL_FORCE_COLLECT_SELF_TELEMETRY", ForceSelfCollect, *ForceSelfCollect)
 	_ = util.InitFromEnvBool("LOGTAIL_HTTP_LOAD_CONFIG", HTTPLoadFlag, *HTTPLoadFlag)
+}
+
+type pipelineConfig struct {
+	Inputs      []interface{} `json:"inputs"`
+	Processors  []interface{} `json:"processors"`
+	Aggregators []interface{} `json:"aggregators"`
+	Flushers    []interface{} `json:"flushers"`
+}
+
+var (
+	fileInput = map[string]interface{}{
+		"type": "metric_debug_file",
+		"detail": map[string]interface{}{
+			"InputFilePath": "./input.log",
+			"FieldName":     "content",
+			"LineLimit":     1000,
+		},
+	}
+	fileOutput = map[string]interface{}{
+		"type": "flusher_stdout",
+		"detail": map[string]interface{}{
+			"FileName": "./output.log",
+		},
+	}
+)
+
+func changePluginConfigIO(pluginCfg string) string {
+	if *FileIOFlag {
+		var newCfg pipelineConfig
+		if err := json.Unmarshal([]byte(pluginCfg), &newCfg); err == nil {
+			// Input
+			fileInput["detail"].(map[string]interface{})["InputFilePath"] = *InputFile
+			fileInput["detail"].(map[string]interface{})["FieldName"] = *InputField
+			fileInput["detail"].(map[string]interface{})["LineLimit"] = *InputLineLimit
+			newCfg.Inputs = []interface{}{fileInput}
+			// Processors
+			if newCfg.Processors == nil {
+				newCfg.Processors = make([]interface{}, 0)
+			}
+			// Aggregators
+			if newCfg.Aggregators == nil {
+				newCfg.Aggregators = make([]interface{}, 0)
+			}
+			// Flushers
+			fileOutput["detail"].(map[string]interface{})["FileName"] = *OutputFile
+			newCfg.Flushers = append(newCfg.Flushers, fileOutput)
+
+			cfg, _ := json.Marshal(newCfg)
+			pluginCfg = string(cfg)
+		} else {
+			logger.Error(context.Background(), "PLUGIN_UNMARSHAL_ALARM", "err", err)
+		}
+		return pluginCfg
+	}
+	return pluginCfg
 }

@@ -13,9 +13,10 @@
 
 ## 配置
 
-iLogtail 目前提供以下3种模式进行配置设置：
+iLogtail 目前提供以下4种模式进行配置设置：
 
 * 指定配置文件模式启动。
+* 文件至文件快速测试
 * iLogtail 暴露Http 端口，可以进行配置变更。
 * iLogtail-C程序通过程序API进行配置变更。
 
@@ -105,6 +106,56 @@ iLogtail 目前提供以下3种模式进行配置设置：
 ```
 
 执行 `./output/ilogtail --plugin=plugin.quickstart.json`，在一段时间后，使用 ctrl+c 中断运行。通过查看目录，会发现生成了 quickstart\_1.stdout 和 quickstart\_2.stdout 两个文件，并且它们的内容一致。查看内容可以发现，其中的每条数据都包含 Index 和 Content 两个键，并且由于有两个输入插件，Content 会有所不同。
+
+### 文件至文件快速测试
+
+可以使用如下指令，从文件输入数据并输出到文件，快速进行配置测试
+
+```shell
+./output/ilogtail --plugin=plugin.json --file-io=true
+```
+
+在测试前，需要创建上文所说的json格式的配置文件。与上文不同的是，这里的配置文件不需要配置inputs和flushers（如果配置，inputs会失效，flushers会保留）。当file-io开关被打开时，会自动指定为文件输入，并输出到文件。默认的输入文件是input.log，默认的输出文件是output.log，也可以设置input-file和output-file参数来修改输入和输出文件。
+
+需要说明的是，读取的每行数据的fieldKey默认都是content，可以通过input-field参数来修改Field名称。输入文件并不是全部读入，而是默认从头读取1000行，可以通过修改input-line-limit参数读取需要的行数。
+
+下面是一个简单的例子，创建一个采集配置plugin.file2filetest.json进行json解析，输入源文件是stdin.log，输出结果到stdout.log文件。
+
+配置文件plugin.file2filetest.json如下：
+
+```json
+{
+    "processors": [
+        {
+            "detail": {
+                "SourceKey": "content",
+                "KeepSource": false,
+                "ExpandDepth": 1,
+                "ExpandConnector": ""
+            },
+            "type": "processor_json"
+        }
+    ]
+}
+```
+
+stdin.log内容如下：
+
+```text
+{"inputs":[{"type":"metric_mock","detail":{"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"content":"xxxxx","time":"2017.09.12 20:55:36"}}}],"flushers":[{"type":"flusher_stdout"}]}
+```
+
+执行如下命令：
+
+```shell
+./output/ilogtail --plugin=plugin.file2filetest.json --file-io=true --input-file=stdin.log --output-file=stdout.log
+```
+
+可以发现生成了一个stdout.log文件，内容如下：
+
+```text
+2023-05-23 11:33:48 {"inputs":"[{\"type\":\"metric_mock\",\"detail\":{\"Tags\":{\"tag1\":\"aaaa\",\"tag2\":\"bbb\"},\"Fields\":{\"content\":\"xxxxx\",\"time\":\"2017.09.12 20:55:36\"}}}]","flushers":"[{\"type\":\"flusher_stdout\"}]","__time__":"1684841628"}
+```
 
 ### HTTP API 配置变更
 

@@ -102,6 +102,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/processor/split/string"
     - import: "github.com/alibaba/ilogtail/plugins/processor/strptime"
     - import: "github.com/alibaba/ilogtail/plugins/processor/stringreplace"
+    - import: "github.com/alibaba/ilogtail/plugins/input/debugfile"
   linux:
     - import: "github.com/alibaba/ilogtail/plugins/flusher/sls"
     - import: "github.com/alibaba/ilogtail/plugins/input/docker/logmeta"
@@ -114,5 +115,3 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/flusher/sls"
     - import: "github.com/alibaba/ilogtail/plugins/input/docker/logmeta"
     - import: "github.com/alibaba/ilogtail/plugins/input/input_wineventlog"
-  debug:
-    - import: "github.com/alibaba/ilogtail/plugins/input/debugfile"

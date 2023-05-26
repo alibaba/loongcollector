@@ -43,4 +43,5 @@ your changes, such as:
 - [public] [both] [updated] upgrade sarama version to 1.38.1, Rewrite service_kafka input plugin
 - [public] [both] [updated] Optimize flusher kafka v2 to improve performance in static topic scenarios
 - [public] [both] [fix] json converter marshal without HTML escaped
+- [public] [both] [updated] plugin_main support file-to-file test
 

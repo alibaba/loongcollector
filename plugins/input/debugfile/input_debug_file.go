@@ -15,28 +15,44 @@
 package debugfile
 
 import (
-	"io/ioutil"
+	"bufio"
+	"os"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
-// InputDebugFile can reads all data in specified file, and set them as single field.
+// InputDebugFile can reads some lines from head in specified file, then set them as same field.
 type InputDebugFile struct {
 	InputFilePath string
 	FieldName     string
+	LineLimit     int
 
 	context pipeline.Context
-	content string
+	logs    []string
 }
 
 // Init ...
 func (r *InputDebugFile) Init(context pipeline.Context) (int, error) {
 	r.context = context
-	content, err := ioutil.ReadFile(r.InputFilePath)
+	file, err := os.Open(r.InputFilePath)
 	if err != nil {
 		return 0, err
 	}
-	r.content = string(content)
+	defer file.Close() //nolint:gosec
+
+	scanner := bufio.NewScanner(file)
+	var count int
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		r.logs = append(r.logs, line)
+		count++
+
+		if count == r.LineLimit {
+			break
+		}
+	}
+
 	return 0, nil
 }
 
@@ -47,14 +63,20 @@ func (r *InputDebugFile) Description() string {
 
 // Collect ...
 func (r *InputDebugFile) Collect(collector pipeline.Collector) error {
-	log := map[string]string{}
-	log[r.FieldName] = r.content
-	collector.AddData(nil, log)
+	for _, l := range r.logs {
+		log := map[string]string{}
+		log[r.FieldName] = l
+		collector.AddData(nil, log)
+	}
+
 	return nil
 }
 
 func init() {
 	pipeline.MetricInputs["metric_debug_file"] = func() pipeline.MetricInput {
-		return &InputDebugFile{FieldName: "content"}
+		return &InputDebugFile{
+			FieldName: "content",
+			LineLimit: 1000,
+		}
 	}
 }
