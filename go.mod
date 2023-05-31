@@ -270,6 +270,7 @@ require (
 	github.com/VictoriaMetrics/metricsql v0.45.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/openkruise/kruise-api v1.4.0
 	github.com/richardartoul/molecule v1.0.0 // indirect
 	github.com/valyala/fastjson v1.6.3 // indirect
 	github.com/valyala/fastrand v1.1.0 // indirect
@@ -278,6 +279,7 @@ require (
 	github.com/valyala/histogram v1.2.0 // indirect
 	github.com/valyala/quicktemplate v1.7.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect
+	sigs.k8s.io/gateway-api v0.6.2 // indirect
 )
 
 replace (

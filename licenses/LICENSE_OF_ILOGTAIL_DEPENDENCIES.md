@@ -3,6 +3,8 @@
 When distributed in a binary form, iLogtail may contain portions of the following works:
 
 ## Apache 2.0 licenses
+- [github.com/openkruise/kruise-api](https://pkg.go.dev/github.com/openkruise/kruise-api?tab=licenses)
+- [sigs.k8s.io/gateway-api](https://pkg.go.dev/sigs.k8s.io/gateway-api?tab=licenses)
 - [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/aliyun/alibaba-cloud-sdk-go](https://pkg.go.dev/github.com/aliyun/alibaba-cloud-sdk-go?tab=licenses)
 - [github.com/containerd/cgroups](https://pkg.go.dev/github.com/containerd/cgroups?tab=licenses)

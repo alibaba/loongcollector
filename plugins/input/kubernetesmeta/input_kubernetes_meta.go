@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"time"
 
+	kruise "github.com/openkruise/kruise-api/client/informers/externalversions"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
@@ -57,9 +58,12 @@ type InputKubernetesMeta struct {
 	SelectedNamespaces     []string
 	LabelSelectors         string
 	IntervalMs             int
+	EnableOpenKruise       bool
 	Labels                 map[string]string
 	context                pipeline.Context
 	informerFactory        informers.SharedInformerFactory
+	kuriseInformerFactory  kruise.SharedInformerFactory
+	clientset              *kubernetes.Clientset
 	selector               labels.Selector
 	collectors             []*collector
 	informerStopChan       chan struct{}
@@ -97,6 +101,7 @@ func (in *InputKubernetesMeta) Init(context pipeline.Context) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("error in creating kubernetes client: %v", err)
 	}
+	in.clientset = client
 	var options []informers.SharedInformerOption
 	if len(in.SelectedNamespaces) == 0 {
 		options = append(options, informers.WithNamespace(api.NamespaceAll))
@@ -107,6 +112,9 @@ func (in *InputKubernetesMeta) Init(context pipeline.Context) (int, error) {
 	}
 	in.informerFactory = informers.NewSharedInformerFactoryWithOptions(client, time.Minute*30, options...)
 	in.addInformerListerCollectors()
+	if in.EnableOpenKruise {
+		in.InitKruise(c)
+	}
 	if in.LabelSelectors == "" {
 		in.selector = labels.Everything()
 	} else {

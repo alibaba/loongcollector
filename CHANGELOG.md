@@ -44,4 +44,5 @@ your changes, such as:
 - [public] [both] [updated] Optimize flusher kafka v2 to improve performance in static topic scenarios
 - [public] [both] [fix] json converter marshal without HTML escaped
 - [public] [both] [updated] plugin_main support file-to-file test
+- [public] [both] [updated] `metric_meta_kubernetes` support collect [kruise](github.com/openkruise/kruise) CRD meta
 
