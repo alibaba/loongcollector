@@ -34,6 +34,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pluginmanager"
@@ -58,14 +59,32 @@ func (p *ContextTest) LogWarn(alarmType string, kvPairs ...interface{}) {
 	fmt.Println(alarmType, kvPairs)
 }
 
-func newInput(enableGRPC, enableHTTP bool, grpcEndpoint, httpEndpoint string) (*Server, error) {
+type op func(*Server)
+
+func setCompression(cp string) op {
+	return func(s *Server) {
+		if s.Protocals.GRPC != nil {
+			s.Protocals.GRPC.Compression = cp
+		}
+	}
+}
+
+func setDecompression(cp string) op {
+	return func(s *Server) {
+		if s.Protocals.GRPC != nil {
+			s.Protocals.GRPC.Decompression = cp
+		}
+	}
+}
+
+func newInput(enableGRPC, enableHTTP bool, grpcEndpoint, httpEndpoint string, ops ...op) (*Server, error) {
 	ctx := &ContextTest{}
 	ctx.ContextImp.InitContext("a", "b", "c")
 	s := &Server{
 		Protocals: Protocals{},
 	}
 	if enableGRPC {
-		s.Protocals.GRPC = &GRPCServerSettings{
+		s.Protocals.GRPC = &helper.GRPCServerSettings{
 			Endpoint: grpcEndpoint,
 		}
 	}
@@ -74,6 +93,10 @@ func newInput(enableGRPC, enableHTTP bool, grpcEndpoint, httpEndpoint string) (*
 		s.Protocals.HTTP = &HTTPServerSettings{
 			Endpoint: httpEndpoint,
 		}
+	}
+
+	for _, op := range ops {
+		op(s)
 	}
 	_, err := s.Init(&ctx.ContextImp)
 	return s, err

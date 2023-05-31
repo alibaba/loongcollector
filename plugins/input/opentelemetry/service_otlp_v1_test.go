@@ -124,6 +124,60 @@ func TestOtlpGRPC_Metrics_V1(t *testing.T) {
 	assert.Equal(t, types["exponential_histogram_max"]*2, types["exponential_histogram_sum"])
 }
 
+func TestOtlpGRPC_Metrics_V1_Compress(t *testing.T) {
+	endpointGrpc := test.GetAvailableLocalAddress(t)
+	input, err := newInput(true, false, endpointGrpc, "", setCompression("gzip"), setDecompression("gzip"))
+	assert.NoError(t, err)
+
+	queueSize := 10
+	collector := &helper.LocalCollector{}
+	input.Start(collector)
+	t.Cleanup(func() {
+		require.NoError(t, input.Stop())
+	},
+	)
+
+	cc, err := grpc.Dial(endpointGrpc, grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithCompressor(grpc.NewGZIPCompressor()),
+		grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
+	)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, cc.Close())
+	}()
+
+	for i := 0; i < queueSize; i++ {
+		err = exportMetrics(cc, GenerateMetrics(i+1))
+		assert.NoError(t, err)
+	}
+
+	types := make(map[string]int, 0)
+	for _, log := range collector.Logs {
+		assert.Equal(t, "__name__", log.Contents[0].Key)
+		assert.Equal(t, "__labels__", log.Contents[1].Key)
+		types[log.Contents[0].Value]++
+	}
+	assert.Equal(t, 26, types["gauge_int"])
+	assert.Equal(t, 22, types["gauge_double"])
+	assert.Equal(t, 18, types["sum_int"])
+	assert.Equal(t, 14, types["sum_double"])
+	assert.Equal(t, 8, types["summary_count"])
+	assert.Equal(t, 8, types["summary_sum"])
+	assert.Equal(t, types["summary_count"]/2, types["summary"])
+	assert.Equal(t, 6, types["histogram_max"])
+	assert.Equal(t, 6, types["histogram_min"])
+	assert.Equal(t, 6, types["histogram_exemplars"])
+	assert.Equal(t, types["histogram_max"]*2, types["histogram_bucket"])
+	assert.Equal(t, types["histogram_max"]*2, types["histogram_count"])
+	assert.Equal(t, types["histogram_max"]*2, types["histogram_sum"])
+	assert.Equal(t, 5, types["exponential_histogram_max"])
+	assert.Equal(t, 5, types["exponential_histogram_min"])
+	assert.Equal(t, 5, types["exponential_histogram_exemplars"])
+	assert.Equal(t, types["exponential_histogram_max"]*(5+7), types["exponential_histogram_bucket"])
+	assert.Equal(t, types["exponential_histogram_max"]*2, types["exponential_histogram_count"])
+	assert.Equal(t, types["exponential_histogram_max"]*2, types["exponential_histogram_sum"])
+}
+
 func TestOtlpGRPC_Trace_V1(t *testing.T) {
 	endpointGrpc := test.GetAvailableLocalAddress(t)
 	input, err := newInput(true, false, endpointGrpc, "")

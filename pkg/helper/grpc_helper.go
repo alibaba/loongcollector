@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	tls_helper "github.com/influxdata/telegraf/plugins/common/tls"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -79,7 +80,8 @@ func (cfg *GrpcClientConfig) GetDialOptions() ([]grpc.DialOption, error) {
 
 	cred := insecure.NewCredentials()
 	if strings.HasPrefix(cfg.Endpoint, "https://") {
-		cred = credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})
+		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
+		cred = credentials.NewTLS(tlsConfig)
 	}
 	opts = append(opts, grpc.WithTransportCredentials(cred))
 
@@ -193,4 +195,73 @@ func getThrottleDuration(t *errdetails.RetryInfo) time.Duration {
 		return time.Duration(t.RetryDelay.Seconds)*time.Second + time.Duration(t.RetryDelay.Nanos)*time.Nanosecond
 	}
 	return 0
+}
+
+type GRPCServerSettings struct {
+	Endpoint string `json:"Endpoint"`
+
+	MaxRecvMsgSizeMiB int `json:"MaxRecvMsgSizeMiB"`
+
+	MaxConcurrentStreams int `json:"MaxConcurrentStreams"`
+
+	ReadBufferSize int `json:"ReadBufferSize"`
+
+	WriteBufferSize int `json:"WriteBufferSize"`
+
+	Compression string `json:"Compression"`
+
+	Decompression string `json:"Decompression"`
+
+	TLSConfig tls_helper.ServerConfig `json:"TLSConfig"`
+}
+
+func (cfg *GRPCServerSettings) GetServerOption() ([]grpc.ServerOption, error) {
+	var opts []grpc.ServerOption
+	var err error
+	if cfg != nil {
+		if cfg.MaxRecvMsgSizeMiB > 0 {
+			opts = append(opts, grpc.MaxRecvMsgSize(cfg.MaxRecvMsgSizeMiB*1024*1024))
+		}
+		if cfg.MaxConcurrentStreams > 0 {
+			opts = append(opts, grpc.MaxConcurrentStreams(uint32(cfg.MaxConcurrentStreams)))
+		}
+
+		if cfg.ReadBufferSize > 0 {
+			opts = append(opts, grpc.ReadBufferSize(cfg.ReadBufferSize))
+		}
+
+		if cfg.WriteBufferSize > 0 {
+			opts = append(opts, grpc.WriteBufferSize(cfg.WriteBufferSize))
+		}
+
+		var tlsConfig *tls.Config
+		tlsConfig, err = cfg.TLSConfig.TLSConfig()
+		if err == nil && tlsConfig != nil {
+			opts = append(opts, grpc.Creds(credentials.NewTLS(tlsConfig)))
+		}
+
+		dc := strings.ToLower(cfg.Decompression)
+		if dc != "" && dc != "none" {
+			dc := strings.ToLower(cfg.Decompression)
+			switch dc {
+			case "gzip":
+				opts = append(opts, grpc.RPCDecompressor(grpc.NewGZIPDecompressor()))
+			default:
+				err = fmt.Errorf("invalid decompression: %s", cfg.Decompression)
+			}
+		}
+
+		cp := strings.ToLower(cfg.Compression)
+		if cp != "" && cp != "none" {
+			switch cp {
+			case "gzip":
+				opts = append(opts, grpc.RPCCompressor(grpc.NewGZIPCompressor()))
+			default:
+				err = fmt.Errorf("invalid compression: %s", cfg.Compression)
+			}
+		}
+
+	}
+
+	return opts, err
 }
