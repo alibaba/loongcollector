@@ -32,6 +32,7 @@ PLUGINS_CONFIG_FILE=${5:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml
 GO_MOD_FILE=${6:-${GO_MOD_FILE:-go.mod}}
 NAME=ilogtail
 LDFLAGS='-X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion='$VERSION'"'
+BUILD_FLAG=${BUILD_FLAG:-}
 
 os
 OS_FLAG=$?
@@ -86,4 +87,4 @@ sudo chown ${USER}:${GROUP} ${lib_name}
 cd -
 
 # make plugins stuffs
-go build -mod="$MOD" -modfile="$GO_MOD_FILE" -buildmode="$BUILDMODE" -ldflags="$LDFLAGS" -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main
+go build -mod="$MOD" -modfile="$GO_MOD_FILE" -buildmode="$BUILDMODE" -ldflags="$LDFLAGS" $BUILD_FLAG -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main
