@@ -121,6 +121,8 @@ func (p *ProcessorDesensitize) ProcessLogs(logArray []*protocol.Log) []*protocol
 	return logArray
 }
 
+type runes []rune
+
 func (p *ProcessorDesensitize) desensitize(val string) string {
 	if p.Match == "full" {
 		if p.Method == "const" {
@@ -134,30 +136,24 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 	}
 
 	var pos = 0
-	runeVal := []rune(val)
-	match, _ := p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
-	for match != nil {
-		pos = match.Index + match.Length
+	runeVal := runes(val)
+	runeReplace := runes(p.ReplaceString)
+	beginMatch, _ := p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
+	for beginMatch != nil {
+		pos = beginMatch.Index + beginMatch.Length
 		content, _ := p.regexContent.FindRunesMatchStartingAt(runeVal, pos)
 		if content != nil {
-			if p.Method == "const" {
-				curPos := len(string(runeVal[:pos]))
-				val, _ = p.regexContent.Replace(val, p.ReplaceString, curPos, 1)
-				runeVal = []rune(val)
-				pos = content.Index + len([]rune(p.ReplaceString))
-			}
 			if p.Method == "md5" {
 				has := md5.Sum([]byte(content.String())) //nolint:gosec
-				md5str := fmt.Sprintf("%x", has)
-				curPos := len(string(runeVal[:pos]))
-				val, _ = p.regexContent.Replace(val, md5str, curPos, 1)
-				runeVal = []rune(val)
-				pos = content.Index + len([]rune(md5str))
+				p.ReplaceString = fmt.Sprintf("%x", has)
+				runeReplace = runes(p.ReplaceString)
 			}
+			runeVal = append(runeVal[:pos], append(runeReplace, runeVal[pos+content.Length:]...)...)
+			pos = content.Index + len(runeReplace)
 		}
-		match, _ = p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
+		beginMatch, _ = p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
 	}
-	return val
+	return string(runeVal)
 }
 
 func init() {
