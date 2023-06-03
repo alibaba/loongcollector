@@ -130,6 +130,27 @@ func TestProcessorStringReplaceWork(t *testing.T) {
 			So(logs[0].Contents[0].Key, ShouldEqual, `ip`)
 			So(logs[0].Contents[0].Value, ShouldEqual, `10.10.239.0/24 10.10.238.0/24 `)
 		})
+
+		processor = &ProcessorStringReplace{
+			SourceKey:     "attribute",
+			Method:        MethodRegex,
+			Match:         "(?<!(\\d|\\w))(13[0-9]|14[5-9]|15[0-35-9]|16[25-7]|17[0-8]|18[0-9]|19[0135689])(\\d{4})(\\d{4})(?!(\\d|\\w))",
+			ReplaceString: "$2****$4",
+		}
+		err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		Convey("Test regex4 Group(match fail)", func() {
+			ipRecord := "{\"http.method\":\"GET\",\"http.status_code\":\"200\",\"http.url\":\"http://\",\"requestClientIp\":\"0.0.0.0\",\"requestHeader\":\"Accept=[text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7]\\nAuth=null\\nHost=[]\",\"requestParams\":\"{\\\"userId\\\":\\\"666666\\\"}\",\"responseBody\":\"{\\\"msg\\\":\\\"OK\\\",\\\"code\\\":0,\\\"data\\\":[],\\\"success\\\":true,\\\"error\\\":false}\"}"
+			log := &protocol.Log{Time: 0}
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "attribute", Value: ipRecord})
+			logs := []*protocol.Log{}
+			logs = append(logs, log)
+			logs = processor.ProcessLogs(logs)
+			So(len(logs[0].Contents), ShouldEqual, 1)
+			So(logs[0].Contents[0].Key, ShouldEqual, `attribute`)
+			So(logs[0].Contents[0].Value, ShouldEqual, "{\"http.method\":\"GET\",\"http.status_code\":\"200\",\"http.url\":\"http://\",\"requestClientIp\":\"0.0.0.0\",\"requestHeader\":\"Accept=[text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7]\\nAuth=null\\nHost=[]\",\"requestParams\":\"{\\\"userId\\\":\\\"666666\\\"}\",\"responseBody\":\"{\\\"msg\\\":\\\"OK\\\",\\\"code\\\":0,\\\"data\\\":[],\\\"success\\\":true,\\\"error\\\":false}\"}")
+		})
 	})
 }
 

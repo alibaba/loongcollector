@@ -98,6 +98,8 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 			case MethodRegex:
 				if ok, _ := p.re.MatchString(cont.Value); ok {
 					newContVal, err = p.re.Replace(cont.Value, p.ReplaceString, -1, -1)
+				} else {
+					newContVal = cont.Value
 				}
 			case MethodUnquote:
 				if strings.HasPrefix(cont.Value, "\"") && strings.HasSuffix(cont.Value, "\"") {
