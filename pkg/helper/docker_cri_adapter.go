@@ -30,13 +30,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/logger"
-
 	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"google.golang.org/grpc"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 const (
@@ -500,6 +500,7 @@ func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
 	if err != nil {
 		return err
 	}
+
 	cw.wrapperK8sInfoByID(sandboxID, dockerContainer)
 
 	if logger.DebugFlag() {
@@ -509,6 +510,7 @@ func (cw *CRIRuntimeWrapper) fetchOne(containerID string) error {
 			dockerContainer.IDPrefix(), dockerContainer.ContainerInfo.Name, dockerContainer.ContainerInfo.Created, dockerContainer.Status(), dockerContainer.ContainerInfo)
 	}
 
+	// cri场景下会拼接好k8s信息，然后再单个updateContainer
 	cw.dockerCenter.updateContainer(containerID, dockerContainer)
 	cw.containerHistory[containerID] = true
 	cw.containers[containerID] = &innerContainerInfo{

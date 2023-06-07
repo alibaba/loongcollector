@@ -669,19 +669,14 @@ func (dc *DockerCenter) readStaticConfig(forceFlush bool) {
 		forceFlush = true
 	}
 
-	if forceFlush {
+	// 静态文件读取容器信息的时候，只能全量读取，因此使用updateContainers全量更新
+	if forceFlush || changed {
 		containerMap := make(map[string]*DockerInfoDetail)
 		for _, info := range containerInfo {
 			dockerInfoDetail := dockerCenterInstance.CreateInfoDetail(info, envConfigPrefix, false)
 			containerMap[info.ID] = dockerInfoDetail
 		}
 		dockerCenterInstance.updateContainers(containerMap)
-	} else if changed {
-		logger.Info(context.Background(), "read static container info success, count", len(containerInfo), "removed", removedIDs)
-		for _, info := range containerInfo {
-			dockerInfoDetail := dockerCenterInstance.CreateInfoDetail(info, envConfigPrefix, false)
-			dockerCenterInstance.updateContainer(info.ID, dockerInfoDetail)
-		}
 	}
 
 	if len(removedIDs) > 0 {
@@ -1057,6 +1052,9 @@ func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error 
 	if containerDetail.State.Status == ContainerStatusRunning && !ContainerProcessAlive(containerDetail.State.Pid) {
 		containerDetail.State.Status = ContainerStatusExited
 	}
+	// docker 场景下
+	// tryFindSandbox如果是false, 那么fetchOne的地方应该会调用两次，一次是sandbox的id，一次是业务容器的id
+	// tryFindSandbox如果是true, 调用的地方只会有一个业务容器的id，然后依赖fetchOne内部把sandbox信息补全
 	dc.updateContainer(containerID, dc.CreateInfoDetail(containerDetail, envConfigPrefix, false))
 	logger.Debug(context.Background(), "update container", containerID, "detail", containerDetail)
 	if tryFindSandbox && containerDetail.Config != nil {
