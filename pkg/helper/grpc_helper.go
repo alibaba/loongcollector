@@ -80,8 +80,8 @@ func (cfg *GrpcClientConfig) GetDialOptions() ([]grpc.DialOption, error) {
 
 	cred := insecure.NewCredentials()
 	if strings.HasPrefix(cfg.Endpoint, "https://") {
-		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
-		cred = credentials.NewTLS(tlsConfig)
+		/* #nosec G402 - it is a false positive since tls.VersionTLS13 is the latest version */
+		cred = credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS13})
 	}
 	opts = append(opts, grpc.WithTransportCredentials(cred))
 
