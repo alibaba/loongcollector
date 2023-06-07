@@ -45,4 +45,5 @@ your changes, such as:
 - [public] [both] [fix] json converter marshal without HTML escaped
 - [public] [both] [updated] plugin_main support file-to-file test
 - [public] [both] [updated] `metric_meta_kubernetes` support collect [kruise](github.com/openkruise/kruise) CRD meta
+- [public] [both] [fixed] Config Server's GET method replaced by POST in order to carry payload for browser
 

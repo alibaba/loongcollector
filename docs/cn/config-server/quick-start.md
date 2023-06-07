@@ -118,4 +118,17 @@ nohup ./ConfigServer > stdout.log 2> stderr.log &
 
 ### UI
 
-UI 为一个 Web 可视化界面，与 Service 链接，方便用户对采集 Agent 进行管理。
+UI 为一个 Web 可视化界面，与 Service 连接，方便用户对采集 Agent 进行管理。
+
+#### 快速开始
+
+```shell
+git clone https://github.com/iLogtail/config-server-ui
+cd config-server-ui
+yarn install
+yarn start
+```
+
+#### 更多信息
+
+请参考[这里](https://github.com/iLogtail/config-server-ui/blob/master/README.md)

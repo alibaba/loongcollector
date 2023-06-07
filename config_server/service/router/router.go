@@ -40,20 +40,20 @@ func InitUserRouter(router *gin.Engine) {
 		userGroup.POST("/CreateAgentGroup", user.CreateAgentGroup)
 		userGroup.PUT("/UpdateAgentGroup", user.UpdateAgentGroup)
 		userGroup.DELETE("/DeleteAgentGroup", user.DeleteAgentGroup)
-		userGroup.GET("/GetAgentGroup", user.GetAgentGroup)
-		userGroup.GET("/ListAgentGroups", user.ListAgentGroups)
+		userGroup.POST("/GetAgentGroup", user.GetAgentGroup)
+		userGroup.POST("/ListAgentGroups", user.ListAgentGroups)
 
 		userGroup.POST("/CreateConfig", user.CreateConfig)
 		userGroup.PUT("/UpdateConfig", user.UpdateConfig)
 		userGroup.DELETE("/DeleteConfig", user.DeleteConfig)
-		userGroup.GET("/GetConfig", user.GetConfig)
-		userGroup.GET("/ListConfigs", user.ListConfigs)
+		userGroup.POST("/GetConfig", user.GetConfig)
+		userGroup.POST("/ListConfigs", user.ListConfigs)
 
 		userGroup.PUT("/ApplyConfigToAgentGroup", user.ApplyConfigToAgentGroup)
 		userGroup.DELETE("/RemoveConfigFromAgentGroup", user.RemoveConfigFromAgentGroup)
-		userGroup.GET("/GetAppliedConfigsForAgentGroup", user.GetAppliedConfigsForAgentGroup)
-		userGroup.GET("/GetAppliedAgentGroups", user.GetAppliedAgentGroups)
-		userGroup.GET("/ListAgents", user.ListAgents)
+		userGroup.POST("/GetAppliedConfigsForAgentGroup", user.GetAppliedConfigsForAgentGroup)
+		userGroup.POST("/GetAppliedAgentGroups", user.GetAppliedAgentGroups)
+		userGroup.POST("/ListAgents", user.ListAgents)
 	}
 }
 
