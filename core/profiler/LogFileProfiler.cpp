@@ -285,7 +285,7 @@ void LogFileProfiler::AddProfilingData(const std::string& configName,
                          sendFailures,
                          "");
     }
-    string key = projectName + "_" + category + "_" + filename;
+    string key = projectName + "_" + category + "_" + configName + "_" + filename;
     std::lock_guard<std::mutex> lock(mStatisticLock);
     LogstoreSenderStatisticsMap& statisticsMap = *MakesureRegionStatisticsMapUnlocked(region);
     std::unordered_map<string, LogStoreStatistic*>::iterator iter = statisticsMap.find(key);
@@ -350,7 +350,7 @@ void LogFileProfiler::AddProfilingSkipBytes(const std::string& configName,
         // logstore statistics
         AddProfilingSkipBytes(configName, region, projectName, category, "", tags, skipBytes);
     }
-    string key = projectName + "_" + category + "_" + filename;
+    string key = projectName + "_" + category + "_" + configName + "_" + filename;
     std::lock_guard<std::mutex> lock(mStatisticLock);
     LogstoreSenderStatisticsMap& statisticsMap = *MakesureRegionStatisticsMapUnlocked(region);
     std::unordered_map<string, LogStoreStatistic*>::iterator iter = statisticsMap.find(key);
@@ -386,7 +386,7 @@ void LogFileProfiler::AddProfilingReadBytes(const std::string& configName,
         AddProfilingReadBytes(
             configName, region, projectName, category, "", tags, dev, inode, fileSize, readOffset, lastReadTime);
     }
-    string key = projectName + "_" + category + "_" + filename;
+    string key = projectName + "_" + category + "_" + configName + "_" + filename;
     std::lock_guard<std::mutex> lock(mStatisticLock);
     LogstoreSenderStatisticsMap& statisticsMap = *MakesureRegionStatisticsMapUnlocked(region);
     std::unordered_map<string, LogStoreStatistic*>::iterator iter = statisticsMap.find(key);
