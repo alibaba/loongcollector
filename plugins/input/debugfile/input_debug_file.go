@@ -17,6 +17,7 @@ package debugfile
 import (
 	"bufio"
 	"os"
+	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
@@ -63,11 +64,9 @@ func (r *InputDebugFile) Description() string {
 
 // Collect ...
 func (r *InputDebugFile) Collect(collector pipeline.Collector) error {
-	for _, l := range r.logs {
-		log := map[string]string{}
-		log[r.FieldName] = l
-		collector.AddData(nil, log)
-	}
+	log := map[string]string{}
+	log[r.FieldName] = strings.Join(r.logs, "\n")
+	collector.AddData(nil, log)
 
 	return nil
 }

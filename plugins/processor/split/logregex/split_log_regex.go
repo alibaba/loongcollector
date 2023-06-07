@@ -65,7 +65,7 @@ func (p *ProcessorSplitRegex) SplitLog(logArray []*protocol.Log, rawLog *protoco
 			if fullMatch(p.regex, valueStr[lastCheckIndex:i]) && (lastLineIndex != 0 || lastCheckIndex != 0) {
 				copyLog := protocol.CloneLog(rawLog)
 				copyLog.Contents = append(copyLog.Contents, &protocol.Log_Content{
-					Key: cont.GetKey(), Value: valueStr[lastLineIndex:lastCheckIndex]})
+					Key: cont.GetKey(), Value: valueStr[lastLineIndex : lastCheckIndex-1]})
 				helper.ReviseFileOffset(copyLog, int64(lastLineIndex), p.EnableLogPositionMeta)
 				logArray = append(logArray, copyLog)
 				lastLineIndex = lastCheckIndex
@@ -81,7 +81,7 @@ func (p *ProcessorSplitRegex) SplitLog(logArray []*protocol.Log, rawLog *protoco
 		if fullMatch(p.regex, valueStr[lastCheckIndex:]) {
 			copyLog := protocol.CloneLog(rawLog)
 			copyLog.Contents = append(copyLog.Contents, &protocol.Log_Content{
-				Key: cont.GetKey(), Value: valueStr[lastLineIndex:lastCheckIndex]})
+				Key: cont.GetKey(), Value: valueStr[lastLineIndex : lastCheckIndex-1]})
 			helper.ReviseFileOffset(copyLog, int64(lastLineIndex), p.EnableLogPositionMeta)
 			logArray = append(logArray, copyLog)
 			lastLineIndex = lastCheckIndex
