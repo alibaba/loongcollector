@@ -17,3 +17,6 @@ project(log_file_reader_unittest)
 
 add_executable(log_file_reader_deleted_file_unittest DeletedFileUnittest.cpp)
 target_link_libraries(log_file_reader_deleted_file_unittest unittest_base)
+
+add_executable(log_file_reader_unittest LogFileReaderUnittest.cpp)
+target_link_libraries(log_file_reader_unittest unittest_base)

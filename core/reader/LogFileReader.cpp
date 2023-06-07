@@ -1353,18 +1353,23 @@ vector<int32_t> LogFileReader::LogSplit(char* buffer, int32_t size, int32_t& lin
                 if (begIndex > 0) {
                     buffer[begIndex - 1] = '\0';
                 }
-            } else if (!exception.empty()) {
-                if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
-                    if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
-                        LOG_ERROR(sLogger,
-                                  ("regex_match in LogSplit fail, exception",
-                                   exception)("project", mProjectName)("logstore", mCategory)("file", mLogPath));
+            } else {
+                if (!exception.empty()) {
+                    if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
+                        if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+                            LOG_ERROR(sLogger,
+                                    ("regex_match in LogSplit fail, exception",
+                                    exception)("project", mProjectName)("logstore", mCategory)("file", mLogPath));
+                        }
+                        LogtailAlarm::GetInstance()->SendAlarm(REGEX_MATCH_ALARM,
+                                                            "regex_match in LogSplit fail:" + exception,
+                                                            mProjectName,
+                                                            mCategory,
+                                                            mRegion);
                     }
-                    LogtailAlarm::GetInstance()->SendAlarm(REGEX_MATCH_ALARM,
-                                                           "regex_match in LogSplit fail:" + exception,
-                                                           mProjectName,
-                                                           mCategory,
-                                                           mRegion);
+                }
+                if (begIndex == 0 && !mDiscardUnmatch) {
+                    index.push_back(begIndex);
                 }
             }
             buffer[endIndex] = '\n';
