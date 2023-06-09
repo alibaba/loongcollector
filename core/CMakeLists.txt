@@ -22,7 +22,7 @@ option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF)
 
 # Name/Version information.
 if (NOT DEFINED LOGTAIL_VERSION)
-    set(LOGTAIL_VERSION "1.5.2")
+    set(LOGTAIL_VERSION "1.6.0")
 endif ()
 message(STATUS "Version: ${LOGTAIL_VERSION}")
 

@@ -25,7 +25,6 @@ fi
 INITPWD=$PWD
 ROOTDIR=$(cd $(dirname $0) && cd .. && pwd)
 
-
 function createReleaseFile() {
     local version=$1
     local mileston=$2
@@ -37,51 +36,65 @@ function createReleaseFile() {
         rm -rf ${doc}
     fi
     touch $doc
-    echo "# ${version}" >> $doc
-    echo "## Changes" >> $doc
-    echo  "All issues and pull requests are [here](https://github.com/alibaba/ilogtail/milestone/${mileston})." >> $doc
+    echo "# ${version}" >>$doc
+    echo >>$doc
+    echo "## Changes" >>$doc
+    echo >>$doc
+    echo "All issues and pull requests are [here](https://github.com/alibaba/ilogtail/milestone/${mileston})." >>$doc
+    echo >>$doc
     appendUnreleaseChanges $doc
+    echo >>$doc
 
-    echo "## Download" >> $doc
+    echo "## Download" >>$doc
+    echo >>$doc
     appendDownloadLinks $doc $version
-    echo "## Docker Image" >> $doc
+    echo >>$doc
+    echo "## Docker Image" >>$doc
+    echo >>$doc
     appendDockerImageLinks $doc $version
 }
 
-
-function appendUnreleaseChanges () {
+function appendUnreleaseChanges() {
     local doc=$1
     local changeDoc=$ROOTDIR/CHANGELOG.md
     local tempFile=$(mktemp temp.XXXXXX)
-    cat $changeDoc | grep "Unreleased" -A 500 |grep -v "Unreleased"|grep -v '^$' >> $tempFile || :
-    echo "### Features" >> $doc
-    cat $tempFile | grep -E '\[added\]|\[updated\]|\[deprecated\]|\[removed\]' >> $doc || :
-    echo "### Fixed" >> $doc
-    cat $tempFile | grep -E '\[fixed\]|\[security\]' >> $doc || :
-    echo "### Doc" >> $doc
-    cat $tempFile | grep -E '\[doc\]' >> $doc || :
+    cat $changeDoc | grep "Unreleased" -A 500 | grep -v "Unreleased" | grep -v '^$' >>$tempFile || :
+    echo "### Features" >>$doc
+    echo >>$doc
+    cat $tempFile | grep -E '\[added\]|\[updated\]|\[deprecated\]|\[removed\]' >>$doc || :
+    echo >>$doc
+    echo "### Fixed" >>$doc
+    echo >>$doc
+    cat $tempFile | grep -E '\[fixed\]|\[security\]' >>$doc || :
+    echo >>$doc
+    echo "### Doc" >>$doc
+    echo >>$doc
+    cat $tempFile | grep -E '\[doc\]' >>$doc || :
     rm -rf $tempFile
 }
 
-function appendDownloadLinks () {
+function appendDownloadLinks() {
     local doc=$1
     local version=$2
     local linux_amd64_url="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-amd64.tar.gz"
     local linux_amd64_sig="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-amd64.tar.gz.sha256"
     local linux_arm64_url="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-arm64.tar.gz"
     local linux_arm64_sig="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.linux-arm64.tar.gz.sha256"
-cat >> $doc <<- EOF
+    local windows_amd64_url="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.windows-amd64.zip"
+    local windows_amd64_sig="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/${version}/ilogtail-${version}.windows-amd64.zip.sha256"
+    cat >>$doc <<-EOF
 | **Filename** | **OS** | **Arch** | **SHA256 Checksum** |
 |  ----  | ----  | ----  | ----  |
 |[ilogtail-${version}.linux-amd64.tar.gz](${linux_amd64_url})|Linux|x86-64|[ilogtail-${version}.linux-amd64.tar.gz.sha256](${linux_amd64_sig})|
 |[ilogtail-${version}.linux-arm64.tar.gz](${linux_arm64_url})|Linux|arm64|[ilogtail-${version}.linux-arm64.tar.gz.sha256](${linux_arm64_sig})|
+|[ilogtail-${version}.windows-amd64.zip](${windows_amd64_url})|Windows|x86-64|[ilogtail-${version}.windows-amd64.zip.sha256](${windows_amd64_sig})|
 EOF
 }
 
-function appendDockerImageLinks () {
+function appendDockerImageLinks() {
     local doc=$1
     local version=$2
-    cat >> $doc <<- EOF
+    cat >>$doc <<-EOF
 **Docker Pull Command**
 \`\`\` bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:${version}
@@ -89,11 +102,11 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 EOF
 }
 
-function removeHistoryUnrelease () {
+function removeHistoryUnrelease() {
     local changeDoc=$ROOTDIR/CHANGELOG.md
     local tempFile=$(mktemp temp.XXXXXX)
-    cat $changeDoc|grep "Unreleased" -B 500 > $tempFile
-    cat $tempFile > $ROOTDIR/CHANGELOG.md
+    cat $changeDoc | grep "Unreleased" -B 500 >$tempFile
+    cat $tempFile >$ROOTDIR/CHANGELOG.md
     rm -rf $tempFile
 }
 

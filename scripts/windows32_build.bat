@@ -6,7 +6,7 @@ REM 2. Build iLogtail.
 REM 3. Build iLogtail plugin.
 REM 4. Make package.
 
-set ILOGTAIL_VERSION=1.5.2
+set ILOGTAIL_VERSION=1.6.0
 if not "%1" == "" set ILOGTAIL_VERSION=%1
 set CurrentPath=%~dp0
 set P1Path=
@@ -92,6 +92,8 @@ echo Build plugins success
 REM Copy artifacts
 xcopy /Y %ILOGTAIL_CORE_BUILD_PATH%\Release\ilogtail.exe %OUTPUT_DIR%
 xcopy /Y %ILOGTAIL_CORE_BUILD_PATH%\plugin\Release\PluginAdapter.dll %OUTPUT_DIR%
+echo { >  %OUTPUT_DIR%\ilogtail_config.json & echo } >> %OUTPUT_DIR%\ilogtail_config.json
+mkdir %OUTPUT_DIR%\user_yaml_config.d
 cd %OUTPUT_DIR%
 dir
 

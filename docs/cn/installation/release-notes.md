@@ -1,4 +1,61 @@
-# 发布记录
+# 发布历史
+
+## 1.6.0
+
+### 发布记录
+
+发版日期：2023 年 6 月 8 日
+
+新功能
+
+* 新增OpenTelemetry指标格式转换SLS指标格式，支持将service_otlp和service_http_server插件采集的OpenTelemetry指标数据写入SLS时序库 [#577](https://github.com/alibaba/ilogtail/issues/577)
+* 新增InfluxDB格式DecodeV2解码方法 [#846](https://github.com/alibaba/ilogtail/pull/846)
+* 纯Go运行模式支持文件输入到文件文件输出测试 [#869](https://github.com/alibaba/ilogtail/pull/869)
+* `metric_meta_kubernetes`插件支持采集[kruise](github.com/openkruise/kruise) CRD元数据 [#878](https://github.com/alibaba/ilogtail/pull/878)
+* ConfigServer UI支持和协议使用POST方式替代GET方式传递数据 [#894](https://github.com/alibaba/ilogtail/pull/894)
+* `service-otlp-input`插件支持gzip解压缩 [#875](https://github.com/alibaba/ilogtail/issues/875)
+* 支持Prometheus更多服务发现 [#890](https://github.com/alibaba/ilogtail/pull/890)
+
+优化
+
+* 优化`flusher_pulsar`、`flusher_kafka_v2`在静态topic下场景性能 [#824](https://github.com/alibaba/ilogtail/pull/824)
+* 升级Kafka客户端sarama版本到1.38.1，并对Kafka相关插件进行匹配改造 [#600](https://github.com/alibaba/ilogtail/issues/600)
+* 优化Prometheus协议解析性能约20% [#866](https://github.com/alibaba/ilogtail/pull/866)
+* 优化`processor_desensitize`性能 20-80% [#981](https://github.com/alibaba/ilogtail/pull/891)
+* SLS监控统计日志中增加ConfigName和Tag，以区分不同配置和容器 [#905](https://github.com/alibaba/ilogtail/pull/905) [#840](https://github.com/alibaba/ilogtail/pull/840)
+
+问题修复
+
+* 修复网络异常时，异常高频访问ECS Meta的问题 [851](https://github.com/alibaba/ilogtail/issues/851)
+* 修复`metric_system_v2`插件在多分区情况下采集磁盘容量重复计算的问题 [#835](https://github.com/alibaba/ilogtail/pull/835)
+* 修复会应用已退出容器env采集配置的问题 [#825](https://github.com/alibaba/ilogtail/pull/825)
+* 修复Converter将日志转为JSON时，误将字符HTML转义的问题 [#857](https://github.com/alibaba/ilogtail/pull/857)
+* 修复ConfigServer Bug [#876](https://github.com/alibaba/ilogtail/pull/876)
+* 修复多个容器文件采集配置指向同一个目录时，容器无法退出的问题 [#872](https://github.com/alibaba/ilogtail/issues/872)
+* 修复`processor_gotime`插件无法表达0时区的问题 [#829](https://github.com/alibaba/ilogtail/issues/829)
+* 修复env采集配置缓存无法过期的问题 [#845](https://github.com/alibaba/ilogtail/issues/845)
+* 修复多行正则加速模式下，读取到的起始行无法匹配时被抛弃的问题 [#902](https://github.com/alibaba/ilogtail/issues/902)
+* 修复多行正则模式下，行尾多余回车的问题 [#896](https://github.com/alibaba/ilogtail/issues/896)
+* 修复通过文件获取容器信息时，文件更新导致容器Label丢失的问题 [#906](https://github.com/alibaba/ilogtail/pull/906)
+* 修复`processor_string_replace`正则不匹配时字段丢失问题 [#892](https://github.com/alibaba/ilogtail/pull/892)
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.6.0.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.6.0.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.6.0/ilogtail-1.6.0.linux-amd64.tar.gz) | Linux | x86-64 | 392766fc6b2f96df2da4bbd1ffcfc48e2027fc4613138236c7df72dde84d077f |
+| [ilogtail-1.6.0.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.6.0/ilogtail-1.6.0.linux-arm64.tar.gz) | Linux | arm64  | 50993809b1b741aad4779be7cce3798adb12c1aa8b455538129c15607e186642 |
+| [ilogtail-1.6.0.windows-amd64.zip](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.6.0/ilogtail-1.6.0.windows-amd64.zip)   | Windows | x86-64 | f0da617f09ed1db2cd41135a581fddff64c0572a708fba0ae1b1fc27540b817f |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+``` bash
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.6.0
+```
 
 ## 1.5.0
 

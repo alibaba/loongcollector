@@ -29,21 +29,10 @@ your changes, such as:
 - `fixed` for any bug fixes.
 - `security` in case of vulnerabilities.
 - `doc` for doc changes.
+- `test` for tests.
 
 ## Example
 
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
-
-- [public] [both] [updated] Decoder support Opentelemetry metric to SLS Log Protocol, service_otlp supports v1 pipeline, service_http_server v1 pipeline supports otlp metric
-- [public] [both] [fixed] Resolved issue of double counting disk total metrics in the disk partition condition of metric_system_v2
-- [public] [both] [fixed] do not read env config from exited containers
-- [public] [both] [updated] Optimize flusher pulsar to improve performance in static topic scenarios
-- [public] [both] [updated] upgrade sarama version to 1.38.1, Rewrite service_kafka input plugin
-- [public] [both] [updated] Optimize flusher kafka v2 to improve performance in static topic scenarios
-- [public] [both] [fix] json converter marshal without HTML escaped
-- [public] [both] [updated] plugin_main support file-to-file test
-- [public] [both] [updated] `metric_meta_kubernetes` support collect [kruise](github.com/openkruise/kruise) CRD meta
-- [public] [both] [fixed] Config Server's GET method replaced by POST in order to carry payload for browser
-
