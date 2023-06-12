@@ -1633,6 +1633,15 @@ void LogFileReader::ReadUTF8(char*& bufferptr, size_t* size, int64_t end, bool& 
 
     if (moreData && nbytes == 0) {
         nbytes = READ_BYTE;
+        LOG_WARNING(sLogger, ("Log is too long and forced to be split at offset: ", mLastFilePos + nbytes)("file: ", mLogPath)("inode: ", mDevInode.inode)("first 1024B log: ", std::string(bufferptr, 1024)));
+        std::ostringstream oss;
+        oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos + nbytes) << " file: " << mLogPath << " inode: " << ToString(mDevInode.inode) << " first 1024B log: " << std::string(bufferptr, 1024) << std::endl;
+        LogtailAlarm::GetInstance()->SendAlarm(
+            SPLIT_LOG_FAIL_ALARM,
+            oss.str(),
+            mProjectName,
+            mCategory,
+            mRegion);
     }
     if (nbytes == 0)
         bufferptr[0] = '\0';
@@ -1658,14 +1667,18 @@ void LogFileReader::ReadGBK(char*& bufferptr, size_t* size, int64_t end, bool& m
     size_t originReadCount = readCharCount;
     moreData = (readCharCount == BUFFER_SIZE);
     bool adjustFlag = false;
+    bool logTooLongSplitFlag = false;
     while (readCharCount > 0 && gbkBuffer[readCharCount - 1] != '\n') {
         readCharCount--;
         adjustFlag = true;
     }
 
     if (readCharCount == 0) {
-        if (moreData)
+        if (moreData) {
             readCharCount = READ_BYTE;
+            // Cannot get the split position here, so just mark a flag and send alarm later
+            logTooLongSplitFlag = moreData;
+        }
         else {
             delete[] gbkBuffer;
             *size = 0;
@@ -1700,6 +1713,8 @@ void LogFileReader::ReadGBK(char*& bufferptr, size_t* size, int64_t end, bool& m
         if (resultCharCount == 0) {
             resultCharCount = bakResultCharCount;
             rollbackLineFeedCount = 0;
+            // Cannot get the split position here, so just mark a flag and send alarm later
+            logTooLongSplitFlag = moreData;
         }
     }
 
@@ -1714,6 +1729,17 @@ void LogFileReader::ReadGBK(char*& bufferptr, size_t* size, int64_t end, bool& m
     *size = resultCharCount;
     setExactlyOnceCheckpointAfterRead(*size);
     mLastFilePos += readCharCount;
+    if (logTooLongSplitFlag) {
+        LOG_WARNING(sLogger, ("Log is too long and forced to be split at offset: ", mLastFilePos)("file: ", mLogPath)("inode: ", mDevInode.inode)("first 1024B log: ", std::string(bufferptr, 1024)));
+        std::ostringstream oss;
+        oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos) << " file: " << mLogPath << " inode: " << ToString(mDevInode.inode) << " first 1024B log: " << std::string(bufferptr, 1024) << std::endl;
+        LogtailAlarm::GetInstance()->SendAlarm(
+            SPLIT_LOG_FAIL_ALARM,
+            oss.str(),
+            mProjectName,
+            mCategory,
+            mRegion);
+    }
     LOG_DEBUG(sLogger,
               ("read gbk buffer, offset", mLastFilePos)("origin read", originReadCount)("at last read", readCharCount));
 }
