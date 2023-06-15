@@ -1,0 +1,34 @@
+FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-toolchain-linux:1.2.0 as dep-build
+
+ARG TARGETPLATFORM
+
+RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz -o goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz && \
+    tar -xzf goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz
+
+RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz -o ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz && \
+    tar -xzf ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz && \
+    mv ilogtail-deps.linux-${TARGETPLATFORM##*/} ilogtail-deps
+
+FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-toolchain-linux:1.2.0
+RUN mkdir -p /usr/local/bin /opt/logtail
+# install goc for coverage
+COPY --from=dep-build goc /usr/local/bin
+# install c++ deps
+COPY --from=dep-build ilogtail-deps /opt/logtail/deps
+
+ARG USERNAME=admin
+ARG USER_UID=500
+ARG GROUPNAME=$USERNAME
+ARG GROUP_GID=$USER_UID
+
+# Create the user
+RUN if getent passwd $USERNAME; then userdel -f $USERNAME; fi && \
+    if getent group $GROUPNAME; then groupdel $GROUPNAME; fi && \
+    groupadd --gid $GROUP_GID $USERNAME && \
+    useradd --uid $USER_UID --gid $GROUP_GID -m $USERNAME && \
+    echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME && \
+    chmod 0440 /etc/sudoers.d/$USERNAME && \
+    chown -R $USERNAME:$GROUPNAME $(eval echo ~$USERNAME) && \
+    chmod 755 $(eval echo ~$USERNAME)
+
+USER $USERNAME

@@ -2,9 +2,9 @@
 
 ## Dockerfiles to build build image
 
-Dockerfile.c7-systemd-linux: base system
-Dockerfile.ilogtail-toolchain-linux-amd64: install toolchain
-Dockerfile.ilogtail-build-linux-amd64: add dependencies
+Dockerfile.centos7-cve-fix: base system
+Dockerfile.ilogtail-toolchain-linux: install toolchain
+Dockerfile.ilogtail-build-linux: add dependencies
 
 ## Dockerfiles to build iLogtail
 

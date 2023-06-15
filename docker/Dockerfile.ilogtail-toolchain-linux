@@ -1,4 +1,6 @@
-FROM local/c7-systemd-linux-amd64 as toolchain-build
+FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/centos7-cve-fix:1.0.0 as toolchain-build
+
+ARG TARGETPLATFORM
 
 # install dependencies
 RUN yum -y install epel-release centos-release-scl
@@ -20,10 +22,12 @@ ENV MANPATH=/opt/rh/devtoolset-8/root/usr/share/man \
 WORKDIR /
 
 # prepare cmake
-RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/cmake-3.23.2-linux-x86_64.tar.gz && \
-    tar -xzf cmake-3.23.2-linux-x86_64.tar.gz
-ENV CMAKE_ROOT=/cmake-3.23.2-linux-x86_64 \
-    PATH=/cmake-3.23.2-linux-x86_64/bin:$PATH
+RUN [[ ${TARGETPLATFORM##*/} == 'amd64' ]] && ARCH='x86_64' || ARCH='aarch64' && \
+    wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/cmake-3.23.2-linux-${ARCH}.tar.gz && \
+    tar -xzf cmake-3.23.2-linux-${ARCH}.tar.gz && \
+    mv cmake-3.23.2-linux-${ARCH} cmake-3.23.2
+ENV CMAKE_ROOT=/cmake-3.23.2 \
+    PATH=/cmake-3.23.2/bin:$PATH
 
 # build clang
 RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/llvm-project-14.0.0.src.tar.xz && \
@@ -45,22 +49,24 @@ RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/too
     cd /
 
 # prepare go
-RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/go1.18.5.linux-amd64.tar.gz && \
-    tar -xzf go1.18.5.linux-amd64.tar.gz
+RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/go1.19.10.linux-${TARGETPLATFORM##*/}.tar.gz && \
+    tar -xzf go1.19.10.linux-${TARGETPLATFORM##*/}.tar.gz
 
 # prepare golangci-lint
-RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/golangci-lint-1.49.0-linux-amd64.tar.gz && \
-    tar -xzf golangci-lint-1.49.0-linux-amd64.tar.gz
+RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/golangci-lint-1.53.2-linux-${TARGETPLATFORM##*/}.tar.gz && \
+    tar -xzf golangci-lint-1.53.2-linux-${TARGETPLATFORM##*/}.tar.gz && \
+    mv golangci-lint-1.53.2-linux-${TARGETPLATFORM##*/} golangci-lint-1.53.2
 
-FROM local/c7-systemd-linux-amd64
+FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/centos7-cve-fix:1.0.0
 
 # install dev tool set and debug utilities
 RUN yum -y install gcc gcc-c++ make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients sudo && \
     yum -y clean all && rm -fr /var/cache && rm -rf /core.*
-RUN debuginfo-install -y glibc-2.17-326.el7_9.x86_64 libuuid-2.23.2-65.el7_9.1.x86_64
+RUN [[ ${TARGETPLATFORM##*/} == 'amd64' ]] && ARCH='x86_64' || ARCH='aarch64' && \
+    debuginfo-install -y glibc-2.17-326.el7_9.${ARCH} libuuid-2.23.2-65.el7_9.1.${ARCH}
 
 # install cmake
-COPY --from=toolchain-build /cmake-3.23.2-linux-x86_64 /usr/
+COPY --from=toolchain-build /cmake-3.23.2 /usr/
 
 # install clang-format
 COPY --from=toolchain-build /llvm-project-14.0.0.src/build/bin/clang-format /usr/bin/
@@ -68,20 +74,20 @@ RUN chmod +x /usr/bin/clang-format
 
 # install golang
 WORKDIR /
-COPY --from=toolchain-build /go /go
-ENV GOROOT=/go GOPATH=/opt/go PATH=/go/bin:$PATH
+COPY --from=toolchain-build /go /usr/local/go
+ENV GOROOT=/usr/local/go GOPATH=/opt/go PATH=/usr/local/go/bin:$PATH
 
 # install golangci-lint
-COPY --from=toolchain-build /golangci-lint-1.49.0-linux-amd64/golangci-lint /opt/go/bin/
+COPY --from=toolchain-build /golangci-lint-1.53.2/golangci-lint /opt/go/bin/
 
 # install go language server
 RUN go env -w GOPROXY="https://goproxy.cn,direct"
-RUN go install golang.org/x/tools/gopls@v0.10.1 && \
-    go install github.com/go-delve/delve/cmd/dlv@v1.6.1 && \
-    go install github.com/josharian/impl@v1.1.0 && \
+RUN go install golang.org/x/tools/gopls@v0.12.2 && \
+    go install github.com/go-delve/delve/cmd/dlv@v1.20.2 && \
+    go install github.com/josharian/impl@v1.2.0 && \
     go install github.com/fatih/gomodifytags@v1.16.0 && \
     go install github.com/cweill/gotests/gotests@v1.6.0 && \
-    go install honnef.co/go/tools/cmd/staticcheck@v0.2.2
+    go install honnef.co/go/tools/cmd/staticcheck@v0.4.3
 
 # install git
 COPY --from=toolchain-build /git-2.29.3/git /usr/bin
