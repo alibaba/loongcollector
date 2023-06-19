@@ -394,7 +394,14 @@ func (r *InputSystem) Collect(collector pipeline.Collector) error {
 		r.CollectMem(collector)
 	}
 	if r.Disk {
-		r.CollectDisk(collector)
+		err := util.DoFuncWithTimeout(time.Second*3, func() error {
+			r.CollectDisk(collector)
+			return nil
+		})
+		if err != nil {
+			logger.Error(r.context.GetRuntimeContext(), "READ_DISK_ALARM", "read disk metrics timeout, would skip disk collection", err)
+			r.Disk = false
+		}
 	}
 	if r.Net {
 		r.CollectNet(collector)

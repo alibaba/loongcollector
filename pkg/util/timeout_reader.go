@@ -17,6 +17,7 @@ package util
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"runtime"
 	"time"
@@ -70,4 +71,17 @@ func (r *TimeoutReader) Read(b []byte) (n int, err error) {
 		n, _ = r.b.Read(b)
 	}
 	return
+}
+
+func DoFuncWithTimeout(timeout time.Duration, workFunc func() error) error {
+	ch := make(chan error, 1)
+	go func() {
+		ch <- workFunc()
+	}()
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(timeout):
+		return fmt.Errorf("operation timed out after %v", timeout)
+	}
 }
