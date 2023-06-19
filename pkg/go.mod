@@ -1,6 +1,6 @@
 module github.com/alibaba/ilogtail/pkg
 
-go 1.18
+go 1.19
 
 require (
 	github.com/alibaba/ilogtail v1.4.0
