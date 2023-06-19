@@ -64,6 +64,9 @@ flushers:
 ```
 ### 采集配置（v2）
 
+`v2`是`ilogtail 1.6.0`新增的实现，主要是支持配置`Format`指定一些特定的数据格式化方式`raw`, `prometheus`,  `otlp_metricv1`、`otlp_tracev1`，
+其它配置变更可查看【配置参数】表。如果没有特殊的需求，使用默认的`v1`即可。
+
 ```yaml
 enable: true
 version: v2
