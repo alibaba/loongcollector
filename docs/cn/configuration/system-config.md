@@ -24,3 +24,4 @@
     "mem_usage_limit" : 384
 }
 ```
+> 因为k8s本身自带资源限制的功能，所以如果你要将ilogtail部署到k8s中，可以通过将`cpu_usage_limit` 和 `mem_usage_limit` 设置为一个很大的值（比如99999999），以此来达到“关闭”ilogtail自身熔断功能的目的。
