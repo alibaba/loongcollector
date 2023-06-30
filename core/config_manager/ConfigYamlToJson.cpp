@@ -95,6 +95,7 @@ ConfigYamlToJson::ConfigYamlToJson() {
     mFileAdvancedConfigMap["ForceMultiConfig"] = "force_multiconfig";
     mFileAdvancedConfigMap["TailSizeKB"] = "tail_size_kb";
     mFileAdvancedConfigMap["EnableLogPositionMeta"] = "enable_log_position_meta";
+    mFileAdvancedConfigMap["RawLogTag"] = "raw_log_tag";
 
     mFileK8sConfigMap["K8sNamespaceRegex"] = "K8sNamespaceRegex";
     mFileK8sConfigMap["K8sPodRegex"] = "K8sPodRegex";

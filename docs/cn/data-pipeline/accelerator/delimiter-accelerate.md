@@ -29,6 +29,7 @@
 | PreciseTimestampKey | String | 否 | 保存高精度时间戳的字段。如果未添加该参数，则默认使用precise_timestamp字段。 |
 | PreciseTimestampUnit | String | 否 | 高精度时间戳的单位，取值包括ms（毫秒）、us（微秒）、ns（纳秒）。如果未添加该参数，则默认为ms。 |
 | EnableRawLog | Boolean | 否 | 是否上传原始日志。如果未添加该参数，则默认使用false，表示不上传原始日志。 |
+| RawLogTag | String | 否 | 上传原始日志时，用于存放原始日志的字段，默认值：`__raw__`。 |
 | DiscardUnmatch | Boolean | 否 | 是否丢弃匹配失败的日志。如果未添加该参数，则默认使用true，表示丢弃匹配失败的日志。 |
 | MergeType | String | 否 | 日志聚合方式。可选值包括“topic”和“logstore”。如果未添加该参数，则默认使用topic，表示根据topic聚合。 |
 | SensitiveKeys | Map<String, Object> | 否 | 脱敏功能，具体信息参见表2。 |
