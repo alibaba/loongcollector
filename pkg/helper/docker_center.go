@@ -244,7 +244,7 @@ type DockerInfoDetail struct {
 }
 
 func (did *DockerInfoDetail) IDPrefix() string {
-	return util.GetShortID(did.ContainerInfo.ID)
+	return GetShortID(did.ContainerInfo.ID)
 }
 
 func (did *DockerInfoDetail) PodName() string {

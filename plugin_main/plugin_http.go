@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg"
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/plugin_main/flags"
 )
@@ -105,7 +105,7 @@ func HandleLoadConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Infof(context.Background(), "%s", string(bytes))
-	loadConfigs, err := pkg.DeserializeLoadedConfig(bytes)
+	loadConfigs, err := config.DeserializeLoadedConfig(bytes)
 	if err != nil {
 		logger.Error(context.Background(), "LOAD_CONFIG_ALARM", "stage", "parse", "err", err)
 		w.WriteHeader(500)

@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -28,7 +29,7 @@ import (
 
 // init change the logtail config dir to avoid change the config on the production when testing.
 func init() {
-	LogtailGlobalConfig.LogtailSysConfDir = "."
+	config.LogtailGlobalConfig.LogtailSysConfDir = "."
 }
 
 func TestAlwaysOnlineManager(t *testing.T) {

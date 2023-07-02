@@ -18,6 +18,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
 )
@@ -136,8 +137,13 @@ func formatMetricName(name string) string {
 
 func newMetricLogFromRaw(name string, labels KeyValues, nsec int64, value float64) *protocol.Log {
 	labels.Sort()
+	timeNs := uint32(0)
+	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+		timeNs = uint32(nsec % 1e9)
+	}
 	return &protocol.Log{
-		Time: uint32(nsec / 1e9),
+		Time:   uint32(nsec / 1e9),
+		TimeNs: timeNs,
 		Contents: []*protocol.Log_Content{
 			{
 				Key:   metricNameKey,
@@ -209,7 +215,7 @@ func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels 
 	}
 
 	labels.Sort()
-	return &protocol.Log{
+	log := &protocol.Log{
 		Time: uint32(exemplar.Timestamp() / 1e9),
 		Contents: []*protocol.Log_Content{
 			{
@@ -229,6 +235,10 @@ func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels 
 			},
 		},
 	}
+	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+		log.TimeNs = uint32(exemplar.Timestamp() % 1e9)
+	}
+	return log
 }
 
 func GaugeToLogs(name string, data pmetric.NumberDataPointSlice, defaultLabels KeyValues) (logs []*protocol.Log) {
@@ -447,6 +457,9 @@ func ConvertOtlpLogV1(otlpLogs plog.Logs) (logs []*protocol.Log, err error) {
 					Time:     uint32(logRecord.Timestamp().AsTime().Unix()),
 					Contents: protoContents,
 				}
+				if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+					protoLog.TimeNs = uint32(logRecord.Timestamp().AsTime().Nanosecond())
+				}
 				logs = append(logs, protoLog)
 			}
 		}
@@ -528,6 +541,9 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 								Value: otMetric.Description(),
 							},
 						},
+					}
+					if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+						log.TimeNs = uint32(time.Now().Nanosecond())
 					}
 					logs = append(logs, log)
 				}

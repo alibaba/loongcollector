@@ -18,9 +18,9 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	skywalking "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
@@ -52,8 +52,8 @@ func (h *JVMMetricHandler) Collect(ctx context.Context, req *skywalking.JVMMetri
 
 func (h *JVMMetricHandler) toMetricStoreFormat(metric *skywalking.JVMMetric, service string, serviceInstance string) []*protocol.Log {
 	var logs []*protocol.Log
-	cpuUsage := util.NewMetricLog("skywalking_jvm_cpu_usage", metric.Time,
-		strconv.FormatFloat(metric.GetCpu().UsagePercent, 'f', 6, 64), []util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+	cpuUsage := helper.NewMetricLog("skywalking_jvm_cpu_usage", metric.Time,
+		strconv.FormatFloat(metric.GetCpu().UsagePercent, 'f', 6, 64), []helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
 	logs = append(logs, cpuUsage)
 
 	for _, mem := range metric.Memory {
@@ -63,71 +63,71 @@ func (h *JVMMetricHandler) toMetricStoreFormat(metric *skywalking.JVMMetric, ser
 		} else {
 			memType = "nonheap"
 		}
-		memCommitted := util.NewMetricLog("skywalking_jvm_memory_committed", metric.GetTime(),
+		memCommitted := helper.NewMetricLog("skywalking_jvm_memory_committed", metric.GetTime(),
 			strconv.FormatInt(mem.Committed, 10),
-			[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memType}})
+			[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memType}})
 		logs = append(logs, memCommitted)
 
-		memInit := util.NewMetricLog("skywalking_jvm_memory_init", metric.GetTime(),
+		memInit := helper.NewMetricLog("skywalking_jvm_memory_init", metric.GetTime(),
 			strconv.FormatInt(mem.Init, 10),
-			[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memType}})
+			[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memType}})
 		logs = append(logs, memInit)
 
-		memMax := util.NewMetricLog("skywalking_jvm_memory_max", metric.GetTime(),
+		memMax := helper.NewMetricLog("skywalking_jvm_memory_max", metric.GetTime(),
 			strconv.FormatInt(mem.Max, 10),
-			[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memType}})
+			[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memType}})
 		logs = append(logs, memMax)
 
-		memUsed := util.NewMetricLog("skywalking_jvm_memory_used", metric.GetTime(),
+		memUsed := helper.NewMetricLog("skywalking_jvm_memory_used", metric.GetTime(),
 			strconv.FormatInt(mem.Used, 10),
-			[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memType}})
+			[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memType}})
 		logs = append(logs, memUsed)
 	}
 	for _, gc := range metric.Gc {
-		gcTime := util.NewMetricLog("skywalking_jvm_gc_time", metric.GetTime(),
+		gcTime := helper.NewMetricLog("skywalking_jvm_gc_time", metric.GetTime(),
 			strconv.FormatInt(gc.Time, 10),
-			[]util.Label{{Name: "phrase", Value: gc.Phrase.String()}, {Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+			[]helper.MetricLabel{{Name: "phrase", Value: gc.Phrase.String()}, {Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
 		logs = append(logs, gcTime)
 
-		gcCount := util.NewMetricLog("skywalking_jvm_gc_count", metric.GetTime(),
+		gcCount := helper.NewMetricLog("skywalking_jvm_gc_count", metric.GetTime(),
 			strconv.FormatInt(gc.Count, 10),
-			[]util.Label{{Name: "phrase", Value: gc.Phrase.String()}, {Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+			[]helper.MetricLabel{{Name: "phrase", Value: gc.Phrase.String()}, {Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
 		logs = append(logs, gcCount)
 	}
 
 	for _, memPool := range metric.MemoryPool {
-		memPoolCommitted := util.NewMetricLog("skywalking_jvm_memory_pool_committed", metric.GetTime(),
+		memPoolCommitted := helper.NewMetricLog("skywalking_jvm_memory_pool_committed", metric.GetTime(),
 			strconv.FormatInt(memPool.Committed, 10),
-			[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memPool.Type.String()}})
+			[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memPool.Type.String()}})
 		logs = append(logs, memPoolCommitted)
 
-		memPoolInit := util.NewMetricLog("skywalking_jvm_memory_pool_init", metric.GetTime(),
+		memPoolInit := helper.NewMetricLog("skywalking_jvm_memory_pool_init", metric.GetTime(),
 			strconv.FormatInt(memPool.Init, 10),
-			[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memPool.Type.String()}})
+			[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memPool.Type.String()}})
 		logs = append(logs, memPoolInit)
 
-		memPoolMax := util.NewMetricLog("skywalking_jvm_memory_pool_max", metric.GetTime(),
+		memPoolMax := helper.NewMetricLog("skywalking_jvm_memory_pool_max", metric.GetTime(),
 			strconv.FormatInt(memPool.Max, 10),
-			[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memPool.Type.String()}})
+			[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memPool.Type.String()}})
 		logs = append(logs, memPoolMax)
 
-		memPoolUsed := util.NewMetricLog("skywalking_jvm_memory_pool_used",
+		memPoolUsed := helper.NewMetricLog("skywalking_jvm_memory_pool_used",
 			metric.GetTime(), strconv.FormatInt(memPool.Used, 10),
-			[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memPool.Type.String()}})
+			[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: memPool.Type.String()}})
 		logs = append(logs, memPoolUsed)
 	}
 
-	threadsLive := util.NewMetricLog("skywalking_jvm_threads_live", metric.GetTime(),
+	threadsLive := helper.NewMetricLog("skywalking_jvm_threads_live", metric.GetTime(),
 		strconv.FormatInt(metric.Thread.LiveCount, 10),
-		[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+		[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
 	logs = append(logs, threadsLive)
-	threadsDaemon := util.NewMetricLog("skywalking_jvm_threads_daemon", metric.GetTime(),
+	threadsDaemon := helper.NewMetricLog("skywalking_jvm_threads_daemon", metric.GetTime(),
 		strconv.FormatInt(metric.Thread.DaemonCount, 10),
-		[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+		[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
 	logs = append(logs, threadsDaemon)
-	threadsPeak := util.NewMetricLog("skywalking_jvm_threads_peak", metric.GetTime(),
+	threadsPeak := helper.NewMetricLog("skywalking_jvm_threads_peak", metric.GetTime(),
 		strconv.FormatInt(metric.Thread.PeakCount, 10),
-		[]util.Label{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+		[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
 	logs = append(logs, threadsPeak)
 	return logs
 }

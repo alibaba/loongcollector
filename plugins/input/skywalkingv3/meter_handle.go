@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/util"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
@@ -69,8 +69,8 @@ func (m *MeterHandler) Collect(srv agent.MeterReportService_CollectServer) error
 	}
 }
 
-func convertHistogramData(histogramData *agent.MeterHistogram) *util.HistogramData {
-	hd := &util.HistogramData{}
+func convertHistogramData(histogramData *agent.MeterHistogram) *helper.HistogramData {
+	hd := &helper.HistogramData{}
 	var totalCount int64
 	var sum float64
 	for index, v := range histogramData.Values {
@@ -79,13 +79,13 @@ func convertHistogramData(histogramData *agent.MeterHistogram) *util.HistogramDa
 			totalCount = v.Count
 			continue
 		}
-		hd.Buckets = append(hd.Buckets, util.DefBucket{
+		hd.Buckets = append(hd.Buckets, helper.DefBucket{
 			Le:    v.Bucket,
 			Count: totalCount,
 		})
 		totalCount += v.Count
 	}
-	hd.Buckets = append(hd.Buckets, util.DefBucket{
+	hd.Buckets = append(hd.Buckets, helper.DefBucket{
 		Le:    math.Inf(0),
 		Count: totalCount,
 	})
@@ -100,26 +100,26 @@ func handleMeterData(context pipeline.Context, collector pipeline.Collector, met
 	if singleValue != nil {
 		value := singleValue.Value
 		name := singleValue.Name
-		labels := make(util.Labels, 0, len(singleValue.Labels)+2)
+		labels := make(helper.MetricLabels, 0, len(singleValue.Labels)+2)
 		for _, l := range singleValue.Labels {
-			labels = append(labels, util.Label{Name: l.Name, Value: l.Value})
+			labels = append(labels, helper.MetricLabel{Name: l.Name, Value: l.Value})
 		}
-		labels = append(labels, util.Label{Name: "service", Value: service})
-		labels = append(labels, util.Label{Name: "serviceInstance", Value: serviceInstance})
+		labels = append(labels, helper.MetricLabel{Name: "service", Value: service})
+		labels = append(labels, helper.MetricLabel{Name: "serviceInstance", Value: serviceInstance})
 		sort.Sort(labels)
-		metricLog := util.NewMetricLog(name, ts, strconv.FormatFloat(value, 'g', -1, 64), labels)
+		metricLog := helper.NewMetricLog(name, ts, strconv.FormatFloat(value, 'g', -1, 64), labels)
 		// logger.Info("meter", meterData)
 		collector.AddRawLog(metricLog)
 	}
 	histogramData := meterData.GetHistogram()
 
 	if histogramData != nil {
-		labels := make(util.Labels, 0, len(histogramData.Labels)+2)
+		labels := make(helper.MetricLabels, 0, len(histogramData.Labels)+2)
 		for _, l := range histogramData.Labels {
-			labels = append(labels, util.Label{Name: l.Name, Value: l.Value})
+			labels = append(labels, helper.MetricLabel{Name: l.Name, Value: l.Value})
 		}
-		labels = append(labels, util.Label{Name: "service", Value: service})
-		labels = append(labels, util.Label{Name: "serviceInstance", Value: serviceInstance})
+		labels = append(labels, helper.MetricLabel{Name: "service", Value: service})
+		labels = append(labels, helper.MetricLabel{Name: "serviceInstance", Value: serviceInstance})
 
 		hd := convertHistogramData(histogramData)
 		logs := hd.ToMetricLogs(histogramData.Name, ts, labels)

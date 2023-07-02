@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pluginmanager"
 )
 
 type Instance struct {
@@ -95,7 +95,7 @@ func (m *Jmx) Init(context pipeline.Context) (int, error) {
 	m.context = context
 	m.key = m.context.GetProject() + m.context.GetLogstore() + m.context.GetConfigName()
 	helper.ReplaceInvalidChars(&m.key)
-	m.jvmHome = path.Join(pluginmanager.LogtailGlobalConfig.LogtailSysConfDir, "jvm")
+	m.jvmHome = path.Join(config.LogtailGlobalConfig.LogtailSysConfDir, "jvm")
 	for _, f := range m.Filters {
 		m.filters = append(m.filters, NewFilterInner(f))
 	}

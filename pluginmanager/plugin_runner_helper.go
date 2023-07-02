@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -76,7 +77,7 @@ func flushOutStore[T FlushData, F pipeline.Flusher](lc *LogstoreConfig, store *F
 	return true
 }
 
-func loadAdditionalTags(globalConfig *GlobalConfig) models.Tags {
+func loadAdditionalTags(globalConfig *config.GlobalConfig) models.Tags {
 	tags := models.NewTagsWithKeyValues("__hostname__", util.GetHostName())
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		tags.Add(helper.EnvTags[i], helper.EnvTags[i+1])

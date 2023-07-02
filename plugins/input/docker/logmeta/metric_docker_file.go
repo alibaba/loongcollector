@@ -265,13 +265,13 @@ func (idf *InputDockerFile) updateMapping(info *helper.DockerInfoDetail, sourceP
 
 func (idf *InputDockerFile) deleteMapping(id string) {
 	idf.deleteMappingFromLogtail(id)
-	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "deleted", "source path", idf.lastPathMappingCache[id], "id", util.GetShortID(id))
+	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "deleted", "source path", idf.lastPathMappingCache[id], "id", helper.GetShortID(id))
 	delete(idf.lastPathMappingCache, id)
 }
 
 func (idf *InputDockerFile) notifyStop(id string) {
 	idf.notifyStopToLogtail(id)
-	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "stopped", "source path", idf.lastPathMappingCache[id], "id", util.GetShortID(id))
+	logger.Info(idf.context.GetRuntimeContext(), "container mapping", "stopped", "source path", idf.lastPathMappingCache[id], "id", helper.GetShortID(id))
 }
 
 func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
@@ -303,7 +303,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 		if len(addFullList) > 0 {
 			for _, id := range addFullList {
 				if len(id) > 0 {
-					util.RecordAddedContainerIDs(id)
+					helper.RecordAddedContainerIDs(id)
 				}
 			}
 		}
@@ -311,7 +311,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 		if len(deleteFullList) > 0 {
 			for _, id := range deleteFullList {
 				if len(id) > 0 {
-					util.RecordDeletedContainerIDs(util.GetShortID(id))
+					helper.RecordDeletedContainerIDs(helper.GetShortID(id))
 				}
 			}
 		}
@@ -322,7 +322,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 	if newCount != 0 || delCount != 0 {
 		logger.Infof(idf.context.GetRuntimeContext(), "update match list, new: %v, delete: %v", newCount, delCount)
 		// Can not return here because we should notify empty update to clear
-		//  cache in docker_path_config.json.
+		//  cache in docker_path_helper.json.
 	} else {
 		logger.Debugf(idf.context.GetRuntimeContext(), "update match list, new: %v, delete: %v", newCount, delCount)
 	}
@@ -340,12 +340,12 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 
 		if ok, err := util.PathExists(destPath); err == nil {
 			if !ok {
-				nothavingPathkeys = append(nothavingPathkeys, util.GetShortID(k))
+				nothavingPathkeys = append(nothavingPathkeys, helper.GetShortID(k))
 			} else {
-				havingPathkeys = append(havingPathkeys, util.GetShortID(k))
+				havingPathkeys = append(havingPathkeys, helper.GetShortID(k))
 			}
 		} else {
-			nothavingPathkeys = append(nothavingPathkeys, util.GetShortID(k))
+			nothavingPathkeys = append(nothavingPathkeys, helper.GetShortID(k))
 			logger.Warning(idf.context.GetRuntimeContext(), "check docker mount path error", err.Error())
 		}
 
@@ -360,22 +360,22 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 		}
 	}
 	if idf.CollectContainersFlag {
-		configResult := &util.ConfigResult{
+		configResult := &helper.ContainerConfigResult{
 			DataType:                      "container_config_result",
 			Project:                       idf.context.GetProject(),
 			Logstore:                      idf.context.GetLogstore(),
 			ConfigName:                    idf.context.GetConfigName(),
 			SourceAddress:                 fmt.Sprintf("%s/**/%s", idf.LogPath, idf.FileParttern),
-			PathExistInputContainerIDs:    util.GetStringFromList(havingPathkeys),
-			PathNotExistInputContainerIDs: util.GetStringFromList(nothavingPathkeys),
+			PathExistInputContainerIDs:    helper.GetStringFromList(havingPathkeys),
+			PathNotExistInputContainerIDs: helper.GetStringFromList(nothavingPathkeys),
 			InputType:                     "file_log",
 			InputIsContainerFile:          "true",
 			FlusherType:                   "flusher_sls",
 			FlusherTargetAddress:          fmt.Sprintf("%s/%s", idf.context.GetProject(), idf.context.GetLogstore()),
 		}
-		util.RecordConfigResultMap(configResult)
+		helper.RecordContainerConfigResultMap(configResult)
 		if newCount != 0 || delCount != 0 {
-			util.RecordConfigResultIncrement(configResult)
+			helper.RecordContainerConfigResultIncrement(configResult)
 		}
 		logger.Debugf(idf.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v, addFullList: %v, deleteFullList: %v", addResultList, deleteResultList, addFullList, deleteFullList)
 	}

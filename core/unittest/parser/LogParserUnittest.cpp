@@ -480,19 +480,20 @@ void LogParserUnittest::TestRegexLogLineParser() {
     struct tm sTm;
     memset(&sTm, 0, sizeof(tm));
     strptime(timeStr.c_str(), timeFormat, &sTm);
-    uint32_t logTime = mktime(&sTm);
+    time_t logTime = mktime(&sTm);
+    long timeNs = 0;
     LogGroup logGroup;
     ParseLogError error;
     uint32_t logGroupSize;
     bool flag = LogParser::RegexLogLineParser(
-        bufferStr.c_str(), wrongReg, logGroup, true, keys, metricName, logTime, "", "", "", error, logGroupSize);
+        bufferStr.c_str(), wrongReg, logGroup, true, keys, metricName, logTime, timeNs, "", "", "", error, logGroupSize);
     APSARA_TEST_EQUAL(flag, false);
     APSARA_TEST_EQUAL(logGroup.logs_size(), 0);
 
     // case 1: specified time
     logGroupSize = 0;
     flag = LogParser::RegexLogLineParser(
-        bufferStr.c_str(), rightReg, logGroup, true, keys, metricName, logTime, "", "", "", error, logGroupSize);
+        bufferStr.c_str(), rightReg, logGroup, true, keys, metricName, logTime, timeNs, "", "", "", error, logGroupSize);
     APSARA_TEST_EQUAL(flag, true);
     const Log& firstLog = logGroup.logs(0);
     APSARA_TEST_EQUAL(firstLog.contents_size(), 2);
@@ -531,6 +532,7 @@ void LogParserUnittest::TestRegexLogLineParser() {
     const Log& secondLog = logGroup.logs(1);
     APSARA_TEST_EQUAL(secondLog.contents_size(), 3);
     APSARA_TEST_EQUAL(secondLog.time(), secondLogTime);
+    APSARA_TEST_EQUAL(secondLog.time_ns(), 123000000);
     APSARA_TEST_EQUAL(secondLog.contents(0).key(), "time");
     APSARA_TEST_EQUAL(secondLog.contents(0).value(), timeStr);
     APSARA_TEST_EQUAL(secondLog.contents(1).key(), "message");
@@ -568,6 +570,7 @@ void LogParserUnittest::TestRegexLogLineParser() {
     const Log& thirdLog = logGroup.logs(2);
     APSARA_TEST_EQUAL(thirdLog.contents_size(), 3);
     APSARA_TEST_EQUAL(thirdLog.time(), thirdLogTime);
+    APSARA_TEST_EQUAL(thirdLog.time_ns(), 100000000);
     APSARA_TEST_EQUAL(thirdLog.contents(0).key(), "time");
     APSARA_TEST_EQUAL(thirdLog.contents(0).value(), timeStr);
     APSARA_TEST_EQUAL(thirdLog.contents(1).key(), "message");
@@ -792,6 +795,7 @@ void LogParserUnittest::TestRegexLogLineParserWithTimeIndex() {
     ParseLogError error;
     PreciseTimestampConfig preciseTimestampConfig;
     preciseTimestampConfig.enabled = true;
+    preciseTimestampConfig.unit = TimeStampUnit::MICROSECOND;
     bool flag = LogParser::RegexLogLineParser(bufferStr.c_str(),
                                               reg,
                                               logGroup,
@@ -814,6 +818,7 @@ void LogParserUnittest::TestRegexLogLineParserWithTimeIndex() {
     const Log& log = logGroup.logs(0);
     APSARA_TEST_EQUAL(log.time(), myLogTime);
     APSARA_TEST_EQUAL(log.time(), logTime + 1);
+    APSARA_TEST_EQUAL(log.time_ns(), 123400000);
     APSARA_TEST_EQUAL(log.contents(0).key(), "time");
     APSARA_TEST_EQUAL(log.contents(0).value(), timeStr);
     APSARA_TEST_EQUAL(log.contents(1).key(), "message");
@@ -821,7 +826,7 @@ void LogParserUnittest::TestRegexLogLineParserWithTimeIndex() {
     APSARA_TEST_EQUAL(log.contents(2).key(), "mytime");
     APSARA_TEST_EQUAL(log.contents(2).value(), mytimeStr);
     APSARA_TEST_EQUAL(log.contents(3).key(), "precise_timestamp");
-    APSARA_TEST_EQUAL(log.contents(3).value(), "1383224630123");
+    APSARA_TEST_EQUAL(log.contents(3).value(), "1383224630123400");
 
     LOG_INFO(sLogger, ("TestRegexLogLineParserWithTimeIndex() end", time(NULL)));
 }
@@ -910,6 +915,7 @@ void LogParserUnittest::TestLogParsingError() {
     memset(&sTm, 0, sizeof(tm));
     strptime(timeStr.c_str(), correctTimeFormat, &sTm);
     time_t logTime = mktime(&sTm);
+    long timeNs = 0;
 
     bool flag = LogParser::ApsaraEasyReadLogLineParser(
             apasaraStr.c_str(), logGroup, false, lastTimeStr, lastLogTime, "", "", "", "", error, logGroupSize, 0, false);
@@ -921,7 +927,7 @@ void LogParserUnittest::TestLogParsingError() {
     logGroup.Clear();
     logGroupSize = 0;
     flag = LogParser::RegexLogLineParser(
-        regexStr.c_str(), wrongReg, logGroup, false, keys, logstore, logTime, "", "", "", error, logGroupSize);
+        regexStr.c_str(), wrongReg, logGroup, false, keys, logstore, logTime, timeNs, "", "", "", error, logGroupSize);
     APSARA_TEST_EQUAL(flag, false);
     APSARA_TEST_EQUAL(logGroup.logs_size(), 1);
     APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__raw_log__");

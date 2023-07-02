@@ -23,6 +23,7 @@
 #include "profiler/LogFileProfiler.h"
 #include "app_config/AppConfig.h"
 #include "common/DynamicLibHelper.h"
+#include "common/LogtailCommonFlags.h"
 using namespace std;
 using namespace logtail;
 
@@ -50,6 +51,7 @@ LogtailPlugin::LogtailPlugin() {
     mPluginCfg["LogtailSysConfDir"] = AppConfig::GetInstance()->GetLogtailSysConfDir();
     mPluginCfg["HostIP"] = LogFileProfiler::mIpAddr;
     mPluginCfg["Hostname"] = LogFileProfiler::mHostname;
+    mPluginCfg["EnableTimestampNanosecond"] = BOOL_FLAG(enable_timestamp_nanosecond);
 }
 
 LogtailPlugin::~LogtailPlugin() {

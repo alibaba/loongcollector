@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	global_config "github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -136,7 +137,7 @@ func (s *logstoreConfigTestSuite) TestLoadConfig() {
 		s.Equal(len(config.PluginRunner.(*pluginv1Runner).AggregatorPlugins), 1)
 		s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
 		// global config
-		s.Equal(config.GlobalConfig, &LogtailGlobalConfig)
+		s.Equal(config.GlobalConfig, &global_config.LogtailGlobalConfig)
 
 		// check plugin inner info
 		reg, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
@@ -252,7 +253,7 @@ func (s *logstoreConfigTestSuite) TestLoadConfigWithExtension() {
 	s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
 	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ExtensionPlugins), 1)
 	// global config
-	s.Equal(config.GlobalConfig, &LogtailGlobalConfig)
+	s.Equal(config.GlobalConfig, &global_config.LogtailGlobalConfig)
 
 	// check plugin inner info
 	_, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
@@ -339,7 +340,7 @@ func (s *logstoreConfigTestSuite) TestGetExtension() {
 	s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
 	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ExtensionPlugins), 1)
 	// global config
-	s.Equal(config.GlobalConfig, &LogtailGlobalConfig)
+	s.Equal(config.GlobalConfig, &global_config.LogtailGlobalConfig)
 
 	// check plugin inner info
 	_, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)

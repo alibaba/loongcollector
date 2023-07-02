@@ -26,12 +26,12 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/flusher/checker"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/sls"
 	_ "github.com/alibaba/ilogtail/plugins/input/docker/stdout"
@@ -84,8 +84,8 @@ func (s *containerConfigTestSuite) TestCompareEnvAndLabelAndRecordContainer() {
 	cMap["test"] = info
 
 	compareEnvAndLabelAndRecordContainer()
-	s.Equal(1, len(util.AddedContainers))
-	util.AddedContainers = util.AddedContainers[:0]
+	s.Equal(1, len(helper.AddedContainers))
+	helper.AddedContainers = helper.AddedContainers[:0]
 }
 
 func (s *containerConfigTestSuite) TestRecordContainers() {
@@ -96,8 +96,8 @@ func (s *containerConfigTestSuite) TestRecordContainers() {
 	containerIDs := make(map[string]struct{})
 	containerIDs["test"] = struct{}{}
 	recordContainers(containerIDs)
-	s.Equal(1, len(util.AddedContainers))
-	util.AddedContainers = util.AddedContainers[:0]
+	s.Equal(1, len(helper.AddedContainers))
+	helper.AddedContainers = helper.AddedContainers[:0]
 }
 
 type containerConfigTestSuite struct {
@@ -181,7 +181,7 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 			}
 		]
 	}`
-	nowTime := (uint32)(time.Now().Unix())
+	nowTime := time.Now()
 	ContainerConfig, err := loadBuiltinConfig("container", "sls-test", "logtail_containers", "logtail_containers", configStr)
 	s.NoError(err)
 	ContainerConfig.Start()
@@ -189,7 +189,10 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 	for i := 1; i <= 100000; i++ {
 		log := &protocol.Log{}
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test", Value: "123"})
-		log.Time = nowTime
+		log.Time = (uint32)(nowTime.Unix())
+		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+			log.TimeNs = (uint32)(nowTime.Nanosecond())
+		}
 		loggroup.Logs = append(loggroup.Logs, log)
 	}
 

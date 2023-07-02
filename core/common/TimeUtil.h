@@ -18,6 +18,7 @@
 #include <string>
 #include <ctime>
 #include <thread>
+#include "log_pb/sls_logs.pb.h"
 
 // Time and timestamp utility.
 namespace logtail {
@@ -76,6 +77,11 @@ uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
                              const char* preciseTimeSuffix,
                              const PreciseTimestampConfig& preciseTimestampConfig,
                              int32_t tzOffsetSecond);
+
+long GetNanoSecondsFromPreciseTimestamp(uint64_t preciseTimestamp, TimeStampUnit unit);
+
+void SetLogTime(sls_logs::Log* log, time_t second, long nanosecond);
+
 } // namespace logtail
 
 #if defined(_MSC_VER)

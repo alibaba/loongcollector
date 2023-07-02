@@ -82,7 +82,9 @@ void CheckpointManagerV2Unittest::TestProtobufMethod() {
 
     const std::string key = "test";
     sls_logs::Log log;
-    log.set_time(time(NULL));
+    timespec ts;
+    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+    SetLogTime(&log, ts.tv_sec, ts.tv_nsec);
     for (int idx = 0; idx < 10; ++idx) {
         auto content = log.add_contents();
         content->set_key(std::to_string(idx));

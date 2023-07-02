@@ -17,11 +17,13 @@
 #include <chrono>
 #include <limits>
 #include <atomic>
+#include <cmath>
 #if defined(__linux__)
 #include <sys/sysinfo.h>
 #include <utmp.h>
 #endif
 #include "logger/Logger.h"
+#include "common/LogtailCommonFlags.h"
 
 namespace logtail {
 
@@ -314,6 +316,24 @@ uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
     return adjustSecondTimestamp + preciseTimeDigit;
 }
 
+int64_t GetNanoSecondsFromPreciseTimestamp(uint64_t preciseTimestamp, TimeStampUnit unit) {
+    switch (unit) {
+        case TimeStampUnit::NANOSECOND:
+            return preciseTimestamp % 1000000000;
+        case TimeStampUnit::MICROSECOND:
+            return preciseTimestamp % 1000000;
+        case TimeStampUnit::MILLISECOND:
+            return preciseTimestamp % 1000;
+    }
+    return 0;
+}
+
+void SetLogTime(sls_logs::Log* log, time_t second, long nanosecond) {
+    log->set_time(second);
+    if (BOOL_FLAG(enable_timestamp_nanosecond)) {
+        log->set_time_ns(nanosecond);
+    }
+}
 
 uint64_t GetCurrentTimeInNanoSeconds() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())

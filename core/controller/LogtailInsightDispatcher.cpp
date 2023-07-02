@@ -17,6 +17,7 @@
 #include "common/Flags.h"
 #include "common/TimeUtil.h"
 #include "common/LogFileCollectOffsetIndicator.h"
+#include "common/LogtailCommonFlags.h"
 
 DEFINE_FLAG_INT32(default_wait_second, "default wait time for non-block fd, milliseconds", 50);
 
@@ -56,7 +57,9 @@ static void SendErrorToFD(int fd, const std::string& errorMessage) {
     MessageInsightHdr header;
     header.type = INSIGHT_CMD_TYPE;
     sls_logs::Log outLog;
-    outLog.set_time(time(NULL));
+    timespec ts;
+    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+    SetLogTime(&outLog, ts.tv_sec, ts.tv_nsec);
     sls_logs::Log_Content* content = outLog.add_contents();
     content->set_key("error");
     content->set_value(errorMessage);
@@ -108,7 +111,9 @@ int32_t LogtailInsightDispatcher::ExecuteCommand(int fd, const char* cmdBuf, int
                 finishedFlag = GetAllFileProgress(NULL);
 
                 sls_logs::Log* log = logGroup.add_logs();
-                log->set_time(time(NULL));
+                timespec ts;
+                clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+                SetLogTime(log, ts.tv_sec, ts.tv_nsec);
                 sls_logs::Log_Content* content = log->add_contents();
                 content->set_key("isFinished");
                 content->set_value(ToString(finishedFlag));
@@ -121,7 +126,9 @@ int32_t LogtailInsightDispatcher::ExecuteCommand(int fd, const char* cmdBuf, int
                 result = GetFileProgress(filename, NULL);
 
                 sls_logs::Log* log = logGroup.add_logs();
-                log->set_time(time(NULL));
+                timespec ts;
+                clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+                SetLogTime(log, ts.tv_sec, ts.tv_nsec);
                 sls_logs::Log_Content* content = log->add_contents();
                 content->set_key("isFinished");
                 if (result == -1) {
@@ -208,7 +215,9 @@ void LogtailInsightDispatcher::BuildLogGroup(sls_logs::LogGroup* logGroup,
                                              const LogFileInfo& info,
                                              const LogFileCollectProgress& progress) {
     sls_logs::Log* log = logGroup->add_logs();
-    log->set_time(time(NULL));
+    timespec ts;
+    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+    SetLogTime(log, ts.tv_sec, ts.tv_nsec);
 
     sls_logs::Log_Content* content = log->add_contents();
     content->set_key("project");

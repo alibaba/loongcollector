@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pluginmanager
+package config
 
 import (
 	"context"
@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // GlobalConfig represents global configurations of plugin system.
@@ -40,10 +39,16 @@ type GlobalConfig struct {
 	Hostname     string
 	AlwaysOnline bool
 	DelayStopSec int
+
+	EnableTimestampNanosecond bool
 }
 
 // LogtailGlobalConfig is the singleton instance of GlobalConfig.
 var LogtailGlobalConfig = newGlobalConfig()
+
+// StatisticsConfigJson, AlarmConfigJson
+var BaseVersion = "0.1.0"                                                  // will be overwritten through ldflags at compile time
+var UserAgent = fmt.Sprintf("ilogtail/%v (%v)", BaseVersion, runtime.GOOS) // set in global config
 
 var loadOnce sync.Once
 
@@ -57,13 +62,6 @@ func LoadGlobalConfig(jsonStr string) int {
 			if err := json.Unmarshal([]byte(jsonStr), &LogtailGlobalConfig); err != nil {
 				logger.Error(context.Background(), "LOAD_PLUGIN_ALARM", "load global config error", err)
 				rst = 1
-			} else {
-				// Update when both of them are not empty.
-				logger.Debugf(context.Background(), "host IP: %v, hostname: %v",
-					LogtailGlobalConfig.HostIP, LogtailGlobalConfig.Hostname)
-				if len(LogtailGlobalConfig.Hostname) > 0 && len(LogtailGlobalConfig.HostIP) > 0 {
-					util.SetNetworkIdentification(LogtailGlobalConfig.HostIP, LogtailGlobalConfig.Hostname)
-				}
 			}
 			UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", BaseVersion, runtime.GOOS, LogtailGlobalConfig.HostIP)
 		}

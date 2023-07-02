@@ -25,6 +25,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -95,7 +96,7 @@ type LogstoreConfig struct {
 	FlushOutFlag bool
 	// Each LogstoreConfig can have its independent GlobalConfig if the "global" field
 	//   is offered in configuration, see build-in StatisticsConfig and AlarmConfig.
-	GlobalConfig *GlobalConfig
+	GlobalConfig *config.GlobalConfig
 
 	Version      ConfigVersion
 	Context      pipeline.Context
@@ -432,11 +433,11 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		}
 	}
 
-	logstoreC.GlobalConfig = &LogtailGlobalConfig
+	logstoreC.GlobalConfig = &config.LogtailGlobalConfig
 	// If plugins config has "global" field, then override the logstoreC.GlobalConfig
 	if pluginConfigInterface, flag := plugins["global"]; flag || enableAlwaysOnline {
-		pluginConfig := &GlobalConfig{}
-		*pluginConfig = LogtailGlobalConfig
+		pluginConfig := &config.GlobalConfig{}
+		*pluginConfig = config.LogtailGlobalConfig
 		if flag {
 			configJSONStr, err := json.Marshal(pluginConfigInterface) //nolint:govet
 			if err != nil {

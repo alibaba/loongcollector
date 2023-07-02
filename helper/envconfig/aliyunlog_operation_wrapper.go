@@ -23,11 +23,11 @@ import (
 
 	aliyunlog "github.com/aliyun/aliyun-log-go-sdk"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	k8s_event "github.com/alibaba/ilogtail/pkg/helper/eventrecorder"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/pluginmanager"
 )
 
 // nolint:unused
@@ -95,7 +95,7 @@ func createClientInterface(endpoint, accessKeyID, accessKeySecret, stsToken stri
 	} else {
 		clientInterface = aliyunlog.CreateNormalInterface(endpoint, accessKeyID, accessKeySecret, stsToken)
 	}
-	clientInterface.SetUserAgent(pluginmanager.UserAgent)
+	clientInterface.SetUserAgent(config.UserAgent)
 	return clientInterface, err
 }
 

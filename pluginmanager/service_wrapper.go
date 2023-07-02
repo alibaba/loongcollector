@@ -15,10 +15,10 @@
 package pluginmanager
 
 import (
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 
 	"time"
 )
@@ -76,7 +76,7 @@ func (p *ServiceWrapper) AddDataWithContext(tags map[string]string, fields map[s
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := util.CreateLog(logTime, p.Tags, tags, fields)
+	slsLog, _ := helper.CreateLog(logTime, p.Tags, tags, fields)
 	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
@@ -91,7 +91,7 @@ func (p *ServiceWrapper) AddDataArrayWithContext(tags map[string]string,
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := util.CreateLogByArray(logTime, p.Tags, tags, columns, values)
+	slsLog, _ := helper.CreateLogByArray(logTime, p.Tags, tags, columns, values)
 	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 

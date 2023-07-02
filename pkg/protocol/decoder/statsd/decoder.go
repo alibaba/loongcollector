@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -106,6 +107,9 @@ func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string)
 					Value: strconv.FormatFloat(m.Value.(float64), 'g', -1, 64),
 				},
 			},
+		}
+		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+			log.TimeNs = uint32(now.Nanosecond())
 		}
 		logs = append(logs, log)
 	}

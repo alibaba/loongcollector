@@ -30,7 +30,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -364,80 +363,6 @@ func NewLogTagForPackID(prefix string, seqNum *int64) *protocol.LogTag {
 	}
 	atomic.AddInt64(seqNum, 1)
 	return tag
-}
-
-// Label for metric label
-type Label struct {
-	Name  string
-	Value string
-}
-
-// Labels for metric labels
-type Labels []Label
-
-func (l Labels) Len() int {
-	return len(l)
-}
-
-func (l Labels) Swap(i int, j int) {
-	l[i], l[j] = l[j], l[i]
-}
-
-func (l Labels) Less(i int, j int) bool {
-	return l[i].Name < l[j].Name
-}
-
-// DefBucket ...
-type DefBucket struct {
-	Le    float64
-	Count int64
-}
-
-// HistogramData ...
-type HistogramData struct {
-	Buckets []DefBucket
-	Count   int64
-	Sum     float64
-}
-
-// ToMetricLogs ..
-func (hd *HistogramData) ToMetricLogs(name string, timeMs int64, labels Labels) []*protocol.Log {
-	logs := make([]*protocol.Log, 0, len(hd.Buckets)+2)
-	sort.Sort(labels)
-	for _, v := range hd.Buckets {
-		newLabels := make(Labels, len(labels), len(labels)+1)
-		copy(newLabels, labels)
-		newLabels = append(newLabels, Label{Name: "le", Value: strconv.FormatFloat(v.Le, 'g', -1, 64)})
-		sort.Sort(newLabels)
-		logs = append(logs, NewMetricLog(name+"_bucket", timeMs, strconv.FormatInt(v.Count, 10), newLabels))
-	}
-	logs = append(logs, NewMetricLog(name+"_count", timeMs, strconv.FormatInt(hd.Count, 10), labels))
-	logs = append(logs, NewMetricLog(name+"_sum", timeMs, strconv.FormatFloat(hd.Sum, 'g', -1, 64), labels))
-	return logs
-}
-
-// NewMetricLog caller must sort labels
-func NewMetricLog(name string, timeMs int64, value string, labels []Label) *protocol.Log {
-	strTime := strconv.FormatInt(timeMs, 10)
-	metric := &protocol.Log{Time: uint32(timeMs / 1000)}
-	metric.Contents = []*protocol.Log_Content{}
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__name__", Value: name})
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__time_nano__", Value: strTime})
-
-	builder := strings.Builder{}
-	for index, l := range labels {
-		if index != 0 {
-			builder.WriteString("|")
-		}
-		builder.WriteString(l.Name)
-		builder.WriteString("#$#")
-		builder.WriteString(l.Value)
-
-	}
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__labels__", Value: builder.String()})
-
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__value__", Value: value})
-	return metric
 }
 
 func MinInt(a, b int) int {

@@ -25,10 +25,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/checker"
@@ -156,7 +156,7 @@ func (m *MockMetricCollector) AddDataWithContext(tags map[string]string, fields 
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := util.CreateLog(logTime, m.Tags, tags, fields)
+	slsLog, _ := helper.CreateLog(logTime, m.Tags, tags, fields)
 	m.Logs = append(m.Logs, slsLog)
 }
 
@@ -170,7 +170,7 @@ func (m *MockMetricCollector) AddDataArrayWithContext(tags map[string]string, co
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := util.CreateLogByArray(logTime, m.Tags, tags, columns, values)
+	slsLog, _ := helper.CreateLogByArray(logTime, m.Tags, tags, columns, values)
 	m.Logs = append(m.Logs, slsLog)
 }
 

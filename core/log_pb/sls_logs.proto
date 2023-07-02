@@ -32,7 +32,8 @@ message Log
         required string Value = 2;
     }  
     repeated Content Contents= 2;
-
+    repeated string values = 3;
+    optional fixed32 Time_ns = 4;
 }
 message LogTag
 {

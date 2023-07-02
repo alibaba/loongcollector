@@ -30,12 +30,14 @@ public:
     void TestStrptime();
     void TestNativeStrptimeFormat();
     void TestGetPreciseTimestamp();
+    void TestGetNanoSecondsFromPreciseTimestamp();
 };
 
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestDeduceYear, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptime, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestNativeStrptimeFormat, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestamp, 0);
+APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetNanoSecondsFromPreciseTimestamp, 0);
 
 void TimeUtilUnittest::TestDeduceYear() {
     struct Case {
@@ -175,6 +177,24 @@ void TimeUtilUnittest::TestGetPreciseTimestamp() {
     EXPECT_EQ(1640970061123400000, GetPreciseTimestamp(1640970061, ":1234 MST", preciseTimestampConfig, 0));
     EXPECT_EQ(1640970061123456000, GetPreciseTimestamp(1640970061, ".123456 MST", preciseTimestampConfig, 0));
     EXPECT_EQ(1640970061000000000, GetPreciseTimestamp(1640970061, " -0700", preciseTimestampConfig, 0));
+}
+
+void TimeUtilUnittest::TestGetNanoSecondsFromPreciseTimestamp() {
+    uint64_t preciseTimestampSecond = 1551053999;
+    auto result = GetNanoSecondsFromPreciseTimestamp(preciseTimestampSecond, TimeStampUnit::SECOND);
+    EXPECT_EQ(0, result);
+
+    uint64_t preciseTimestampMilliSecond = 1551053999123;
+    result = GetNanoSecondsFromPreciseTimestamp(preciseTimestampMilliSecond, TimeStampUnit::MILLISECOND);
+    EXPECT_EQ(123000000, result);
+
+    uint64_t preciseTimestampMicroSecond = 1551053999123456;
+    result = GetNanoSecondsFromPreciseTimestamp(preciseTimestampMicroSecond, TimeStampUnit::MICROSECOND);
+    EXPECT_EQ(123456000, result);
+
+    uint64_t preciseTimestampNanoSecond = 1551053999123456789;
+    result = GetNanoSecondsFromPreciseTimestamp(preciseTimestampNanoSecond, TimeStampUnit::NANOSECOND);
+    EXPECT_EQ(123456789, result);
 }
 
 } // namespace logtail

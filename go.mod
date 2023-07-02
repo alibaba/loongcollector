@@ -58,7 +58,7 @@ require (
 	go.uber.org/atomic v1.10.0
 	golang.org/x/sys v0.6.0
 	google.golang.org/grpc v1.53.0
-	google.golang.org/protobuf v1.29.0
+	google.golang.org/protobuf v1.31.0
 	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1

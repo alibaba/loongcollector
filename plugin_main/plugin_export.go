@@ -22,6 +22,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -72,7 +73,16 @@ func InitPluginBaseV2(cfgStr string) int {
 
 //export LoadGlobalConfig
 func LoadGlobalConfig(jsonStr string) int {
-	return pluginmanager.LoadGlobalConfig(jsonStr)
+	retcode := config.LoadGlobalConfig(jsonStr)
+	if retcode == 0 {
+		// Update when both of them are not empty.
+		logger.Debugf(context.Background(), "host IP: %v, hostname: %v",
+			config.LogtailGlobalConfig.HostIP, config.LogtailGlobalConfig.Hostname)
+		if len(config.LogtailGlobalConfig.Hostname) > 0 && len(config.LogtailGlobalConfig.HostIP) > 0 {
+			util.SetNetworkIdentification(config.LogtailGlobalConfig.HostIP, config.LogtailGlobalConfig.Hostname)
+		}
+	}
+	return retcode
 }
 
 //export LoadConfig
@@ -230,7 +240,7 @@ func initPluginBase(cfgStr string) int {
 		flags.OverrideByEnv()
 		InitHTTPServer()
 		setGCPercentForSlowStart()
-		logger.Info(context.Background(), "init plugin base, version", pluginmanager.BaseVersion)
+		logger.Info(context.Background(), "init plugin base, version", config.BaseVersion)
 		LoadGlobalConfig(cfgStr)
 		if err := pluginmanager.Init(); err != nil {
 			logger.Error(context.Background(), "PLUGIN_ALARM", "init plugin error", err)

@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg"
+	global_config "github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/boot"
@@ -70,9 +70,9 @@ func (c *LogtailPluginController) Start() error {
 
 	for i, cfgs := range c.cfg.Config {
 		logger.Infof(context.Background(), "the %d times load config operation is starting ...", i+1)
-		var loadConfigs []*pkg.LoadedConfig
+		var loadConfigs []*global_config.LoadedConfig
 		for j := 0; j < len(cfgs.Content); j++ {
-			loadConfigs = append(loadConfigs, &pkg.LoadedConfig{
+			loadConfigs = append(loadConfigs, &global_config.LoadedConfig{
 				Project:     E2EProjectName,
 				Logstore:    E2ELogstoreName,
 				ConfigName:  cfgs.Name + "_" + strconv.Itoa(j),
@@ -82,7 +82,7 @@ func (c *LogtailPluginController) Start() error {
 		}
 		cfg, _ := json.Marshal(loadConfigs)
 		// load test case configuration
-		resp, err := http.Post(endpointPrefix+pkg.EnpointLoadconfig, "application/json", bytes.NewReader(cfg))
+		resp, err := http.Post(endpointPrefix+global_config.EnpointLoadconfig, "application/json", bytes.NewReader(cfg))
 		if err != nil {
 			return fmt.Errorf("error when posting the new logtail plugin configuration: %v", err)
 		}

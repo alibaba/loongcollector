@@ -16,7 +16,6 @@ package helper
 
 import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 
 	"time"
 )
@@ -49,7 +48,7 @@ func (p *LocalCollector) AddDataWithContext(tags map[string]string, fields map[s
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := util.CreateLog(logTime, nil, tags, fields)
+	slsLog, _ := CreateLog(logTime, nil, tags, fields)
 	p.Logs = append(p.Logs, slsLog)
 }
 
@@ -64,7 +63,7 @@ func (p *LocalCollector) AddDataArrayWithContext(tags map[string]string,
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := util.CreateLogByArray(logTime, nil, tags, columns, values)
+	slsLog, _ := CreateLogByArray(logTime, nil, tags, columns, values)
 	p.Logs = append(p.Logs, slsLog)
 }
 

@@ -19,6 +19,7 @@
 #include "metas/ContainerProcessGroup.h"
 #include "sources/pcap/PCAPWrapper.h"
 #include "sources/ebpf/EBPFWrapper.h"
+#include "common/LogtailCommonFlags.h"
 #include "config_manager/ConfigManager.h"
 #include "MachineInfoUtil.h"
 #include "FileSystemUtil.h"
@@ -518,9 +519,10 @@ inline void NetworkObserver::StartEventLoop() {
 }
 int NetworkObserver::OutputPluginProcess(std::vector<sls_logs::Log>& logs, Config* config) {
     static auto sPlugin = LogtailPlugin::GetInstance();
-    uint32_t nowTime = time(nullptr);
+    timespec ts;
+    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
     for (auto& item : logs) {
-        item.set_time(nowTime);
+        SetLogTime(&item, ts.tv_sec, ts.tv_nsec);
         sPlugin->ProcessLog(config->mConfigName, item, "", config->mGroupTopic, "");
     }
     return 0;
@@ -528,7 +530,8 @@ int NetworkObserver::OutputPluginProcess(std::vector<sls_logs::Log>& logs, Confi
 
 int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, Config* config) {
     static auto sSenderInstance = Sender::Instance();
-    uint32_t nowTime = time(nullptr);
+    timespec ts;
+    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
     const size_t maxCount = INT32_FLAG(merge_log_count_limit) / 4;
     for (size_t beginIndex = 0; beginIndex < logs.size(); beginIndex += maxCount) {
         size_t endIndex = beginIndex + maxCount;
@@ -553,7 +556,7 @@ int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, Config* co
         for (size_t i = beginIndex; i < endIndex; ++i) {
             sls_logs::Log* log = logGroup.add_logs();
             log->mutable_contents()->CopyFrom(*(logs[i].mutable_contents()));
-            log->set_time(nowTime);
+            SetLogTime(log, ts.tv_sec, ts.tv_nsec);
         }
         if (!sSenderInstance->Send(config->mProjectName,
                                    "",

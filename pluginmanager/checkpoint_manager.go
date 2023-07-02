@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 
@@ -78,7 +79,7 @@ func (p *checkPointManager) Init() error {
 		return nil
 	}
 	p.shutdown = make(chan struct{}, 1)
-	logtailConfigDir := LogtailGlobalConfig.LogtailSysConfDir
+	logtailConfigDir := config.LogtailGlobalConfig.LogtailSysConfDir
 	pathExist, err := util.PathExists(logtailConfigDir)
 	var dbPath string
 	if err == nil && pathExist {

@@ -15,6 +15,7 @@
 #include "DelimiterLogFileReader.h"
 #include <string.h>
 #include <ctime>
+#include "common/LogtailCommonFlags.h"
 #include "profiler/LogtailAlarm.h"
 #include "parser/LogParser.h"
 #include "parser/DelimiterModeFsmParser.h"
@@ -210,7 +211,13 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
 
     if (parseSuccess) {
         Log* logPtr = logGroup.add_logs();
-        logPtr->set_time(mUseSystemTime || lastLogLineTime <= 0 ? time(NULL) : lastLogLineTime);
+        timespec ts;
+        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+        if (mUseSystemTime || lastLogLineTime <= 0) {
+            SetLogTime(logPtr, ts.tv_sec, ts.tv_nsec);
+        } else {
+            SetLogTime(logPtr, lastLogLineTime, GetNanoSecondsFromPreciseTimestamp(preciseTimestamp, mPreciseTimestampConfig.unit));
+        }
 
         for (uint32_t idx = 0; idx < parsedColCount; idx++) {
             if (mColumnKeys.size() > idx) {
