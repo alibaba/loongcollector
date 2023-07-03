@@ -321,9 +321,9 @@ int64_t GetNanoSecondsFromPreciseTimestamp(uint64_t preciseTimestamp, TimeStampU
         case TimeStampUnit::NANOSECOND:
             return preciseTimestamp % 1000000000;
         case TimeStampUnit::MICROSECOND:
-            return preciseTimestamp % 1000000;
+            return preciseTimestamp * 1000 % 1000000000;
         case TimeStampUnit::MILLISECOND:
-            return preciseTimestamp % 1000;
+            return preciseTimestamp * 1000000 % 1000000000;
     }
     return 0;
 }
