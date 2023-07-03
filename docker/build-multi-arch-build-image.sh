@@ -8,7 +8,7 @@
 #        -o type=registry \
 #        --no-cache -f Dockerfile.ilogtail-toolchain-linux .
 
-#docker buildx build --platform linux/amd64,linux/arm64 \
+#docker buildx build --sbom=false --provenance=false --platform linux/amd64,linux/arm64 \
 #        -t sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:1.2.0 \
 #        -o type=registry \
 #        --no-cache -f Dockerfile.ilogtail-build-linux .

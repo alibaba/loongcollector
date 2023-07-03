@@ -98,8 +98,8 @@ inputs:
     FilePattern: delimiter.log
 processors:
   - Type: processor_delimiter_accelerate
-    Seperator: ,
-    Quote: ‘“’
+    Separator: ','
+    Quote: '"'
     ColumnKeys:
         - ip
         - time

@@ -1,5 +1,38 @@
 # 发布历史
 
+## 1.7.0
+
+### 发布记录
+
+发版日期：2023 年 7 月 2 日
+
+新功能
+
+* 写入SLS支持纳秒级高精度时间 [#952](https://github.com/alibaba/ilogtail/pull/952)
+
+优化
+
+* Go版本升级到1.19 [#936](https://github.com/alibaba/ilogtail/issues/415)
+* 为metric_system_v2收集磁盘指标添加超时，避免影响其他指标采集 [#933](https://github.com/alibaba/ilogtail/pull/933)
+* 增加日志超长切分失败告警 [#915](https://github.com/alibaba/ilogtail/pull/915)
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.7.0.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.7.0.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.7.0/ilogtail-1.7.0.linux-amd64.tar.gz) | Linux | x86-64 | d64061f9b5dc33e40f385c5514000157cc530c5b1f325afb3552267231334cd8 |
+| [ilogtail-1.7.0.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.7.0/ilogtail-1.7.0.linux-arm64.tar.gz) | Linux | arm64  | 27f9a34df79869bffb1c1be639c3602f1bd021c068e97fc3e287ef9cbabb3834 |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+``` bash
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.7.0
+```
+
 ## 1.6.0
 
 ### 发布记录
