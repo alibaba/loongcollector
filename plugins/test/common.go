@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -75,7 +76,11 @@ func CreateLogs(kvs ...string) *protocol.Log {
 		cont := &protocol.Log_Content{Key: kvs[i], Value: kvs[i+1]}
 		slsLog.Contents = append(slsLog.Contents, cont)
 	}
-	slsLog.Time = uint32(time.Now().Unix())
+	nowTime := time.Now()
+	slsLog.Time = uint32(nowTime.Unix())
+	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+		slsLog.TimeNs = uint32(nowTime.Nanosecond())
+	}
 	return &slsLog
 }
 
@@ -85,7 +90,11 @@ func CreateLogByFields(fields map[string]string) *protocol.Log {
 		cont := &protocol.Log_Content{Key: key, Value: val}
 		slsLog.Contents = append(slsLog.Contents, cont)
 	}
-	slsLog.Time = uint32(time.Now().Unix())
+	nowTime := time.Now()
+	slsLog.Time = uint32(nowTime.Unix())
+	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+		slsLog.TimeNs = uint32(nowTime.Nanosecond())
+	}
 	return &slsLog
 }
 

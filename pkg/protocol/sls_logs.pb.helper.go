@@ -9,6 +9,7 @@ import (
 func CloneLog(log *Log) *Log {
 	cloneLog := &Log{
 		Time:     log.Time,
+		TimeNs:   log.TimeNs,
 		Contents: make([]*Log_Content, len(log.Contents), cap(log.Contents)),
 	}
 	for i, content := range log.Contents {

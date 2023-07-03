@@ -521,8 +521,9 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 				default:
 					// TODO:
 					// find a better way to handle metric with type MetricTypeEmpty.
+					nowTime := time.Now()
 					log := &protocol.Log{
-						Time: uint32(time.Now().Unix()),
+						Time: uint32(nowTime.Unix()),
 						Contents: []*protocol.Log_Content{
 							{
 								Key:   metricNameKey,
@@ -534,7 +535,7 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 							},
 							{
 								Key:   timeNanoKey,
-								Value: strconv.FormatInt(time.Now().UnixNano(), 10),
+								Value: strconv.FormatInt(nowTime.UnixNano(), 10),
 							},
 							{
 								Key:   valueKey,
@@ -543,7 +544,7 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 						},
 					}
 					if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-						log.TimeNs = uint32(time.Now().Nanosecond())
+						log.TimeNs = uint32(nowTime.Nanosecond())
 					}
 					logs = append(logs, log)
 				}

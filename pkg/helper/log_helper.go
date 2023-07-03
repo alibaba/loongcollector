@@ -53,6 +53,9 @@ func CreateLog(t time.Time, configTag map[string]string, logTags map[string]stri
 	}
 
 	slsLog.Time = uint32(t.Unix())
+	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+		slsLog.TimeNs = uint32(t.Nanosecond())
+	}
 	return &slsLog, nil
 }
 
@@ -89,6 +92,9 @@ func CreateLogByArray(t time.Time, configTag map[string]string, logTags map[stri
 	}
 
 	slsLog.Time = uint32(t.Unix())
+	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+		slsLog.TimeNs = uint32(t.Nanosecond())
+	}
 	return &slsLog, nil
 }
 
