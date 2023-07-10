@@ -4,6 +4,12 @@
 
 `processor_json processor`插件可以实现对`Json`格式日志的解析。
 
+## 支持的Event类型
+
+| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
+| ------------ | ---------------- | --------------- | ------------- |
+|      ✅      |      ✅           |       ❌        |      ❌       |
+
 ## 版本
 
 [Stable](../stability-level.md)
