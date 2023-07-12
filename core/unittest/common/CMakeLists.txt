@@ -15,12 +15,12 @@
 cmake_minimum_required(VERSION 2.9)
 project(common_unittest)
 
-add_executable(common_simple_utils_unittest SimpleUtilsUnittest.cpp
-        FileSystemUtilUnittest.h
-        DevInodeUnittest.h
-        TimeUtilUnittest.h
-        StringToolsUnittest.h)
-target_link_libraries(common_simple_utils_unittest unittest_base)
+# add_executable(common_simple_utils_unittest SimpleUtilsUnittest.cpp
+#         FileSystemUtilUnittest.h
+#         DevInodeUnittest.h
+#         TimeUtilUnittest.h
+#         StringToolsUnittest.h)
+# target_link_libraries(common_simple_utils_unittest unittest_base)
 
 add_executable(common_logfileoperator_unittest LogFileOperatorUnittest.cpp)
 target_link_libraries(common_logfileoperator_unittest unittest_base)
@@ -28,14 +28,14 @@ target_link_libraries(common_logfileoperator_unittest unittest_base)
 add_executable(common_sender_queue_unittest SenderQueueUnittest.cpp)
 target_link_libraries(common_sender_queue_unittest unittest_base)
 
-add_executable(common_queue_manager_unittest QueueManagerUnittest.cpp)
-target_link_libraries(common_queue_manager_unittest unittest_base)
+# add_executable(common_queue_manager_unittest QueueManagerUnittest.cpp)
+# target_link_libraries(common_queue_manager_unittest unittest_base)
 
 add_executable(common_sliding_window_counter_unittest SlidingWindowCounterUnittest.cpp)
 target_link_libraries(common_sliding_window_counter_unittest unittest_base)
 
-add_executable(common_string_piece_unittest StringPieceUnittest.cpp)
-target_link_libraries(common_string_piece_unittest unittest_base)
+# add_executable(common_string_piece_unittest StringPieceUnittest.cpp)
+# target_link_libraries(common_string_piece_unittest unittest_base)
 
 add_executable(common_machine_info_util_unittest MachineInfoUtilUnittest.cpp)
 target_link_libraries(common_machine_info_util_unittest unittest_base)

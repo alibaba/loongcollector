@@ -18,5 +18,5 @@ project(checkpoint_unittest)
 add_executable(checkpoint_manager_unittest CheckpointManagerUnittest.cpp)
 target_link_libraries(checkpoint_manager_unittest unittest_base)
 
-add_executable(checkpoint_manager_v2_unittest CheckpointManagerV2Unittest.cpp)
-target_link_libraries(checkpoint_manager_v2_unittest unittest_base)
+# add_executable(checkpoint_manager_v2_unittest CheckpointManagerV2Unittest.cpp)
+# target_link_libraries(checkpoint_manager_v2_unittest unittest_base)

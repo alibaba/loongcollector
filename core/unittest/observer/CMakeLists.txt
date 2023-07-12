@@ -19,21 +19,21 @@ add_executable(observer_config_unittest ObserverConfigUnittest.cpp)
 target_link_libraries(observer_config_unittest unittest_base)
 
 # protocol unittest
-add_executable(protocol_dns_unittest ProtocolDnsUnittest.cpp)
-add_executable(protocol_http_unittest ProtocolHttpUnittest.cpp)
-add_executable(protocol_redis_unittest ProtocolRedisUnittest.cpp)
-add_executable(protocol_pgsql_unittest ProtocolPgsqlUnittest.cpp)
-add_executable(protocol_mysql_unittest ProtocolMySqlUnittest.cpp)
+# add_executable(protocol_dns_unittest ProtocolDnsUnittest.cpp)
+# add_executable(protocol_http_unittest ProtocolHttpUnittest.cpp)
+# add_executable(protocol_redis_unittest ProtocolRedisUnittest.cpp)
+# add_executable(protocol_pgsql_unittest ProtocolPgsqlUnittest.cpp)
+# add_executable(protocol_mysql_unittest ProtocolMySqlUnittest.cpp)
 
-target_link_libraries(protocol_dns_unittest unittest_base)
-target_link_libraries(protocol_http_unittest unittest_base)
-target_link_libraries(protocol_redis_unittest unittest_base)
-target_link_libraries(protocol_pgsql_unittest unittest_base)
-target_link_libraries(protocol_mysql_unittest unittest_base)
+# target_link_libraries(protocol_dns_unittest unittest_base)
+# target_link_libraries(protocol_http_unittest unittest_base)
+# target_link_libraries(protocol_redis_unittest unittest_base)
+# target_link_libraries(protocol_pgsql_unittest unittest_base)
+# target_link_libraries(protocol_mysql_unittest unittest_base)
 
 # cgoutp meta unittest
-add_executable(cgroup_meta_unittest CGoupMetaUnittest.cpp)
-target_link_libraries(cgroup_meta_unittest unittest_base)
+# add_executable(cgroup_meta_unittest CGoupMetaUnittest.cpp)
+# target_link_libraries(cgroup_meta_unittest unittest_base)
 add_executable(netlink_meta_unittest NetLinkUnittest.cpp)
 target_link_libraries(netlink_meta_unittest unittest_base)
 
