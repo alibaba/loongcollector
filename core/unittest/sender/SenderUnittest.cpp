@@ -428,6 +428,7 @@ struct AsyncRequest {
     const std::string mLogData;
     SEND_DATA_TYPE mDataType;
     int32_t mRawSize;
+    SlsCompressType mCompressType;
     SendClosure* mSendClosure;
     int64_t mBeginTime;
     int32_t mSendIndex;
@@ -436,12 +437,14 @@ struct AsyncRequest {
                  const std::string& logData,
                  SEND_DATA_TYPE dataType,
                  int32_t rawSize,
+                 SlsCompressType compressType,
                  SendClosure* sendClosure)
         : mProjectName(projectName),
           mLogstore(logstore),
           mLogData(logData),
           mDataType(dataType),
           mRawSize(rawSize),
+          mCompressType(compressType),
           mSendClosure(sendClosure) {
         static int32_t s_sendIndex = 0;
         mSendIndex = s_sendIndex++;
@@ -519,6 +522,7 @@ protected:
                                    pReq->mLogData,
                                    pReq->mDataType,
                                    pReq->mRawSize,
+                                   pReq->mCompressType,
                                    pReq->mSendClosure);
                 delete pReq;
             }
@@ -545,7 +549,8 @@ protected:
                              const std::string& logstore,
                              const std::string& logData,
                              SEND_DATA_TYPE dataType,
-                             int32_t rawSize) {
+                             int32_t rawSize,
+                             sls_logs::SlsCompressType compressType) {
         if (projectName == string("logtail-test-network-project")) {
             // printf("test network %d.\n", gTestNetWorkStat ? 1 : 0);
             if (gTestNetWorkStat) {
@@ -555,7 +560,7 @@ protected:
         }
         LOG_INFO(sLogger, ("MockSyncSend, projectName", projectName)("logstore", logstore)("dataType", dataType));
         vector<LogGroup> logGroupVec;
-        Sender::ParseLogGroupFromString(logData, dataType, rawSize, logGroupVec);
+        Sender::ParseLogGroupFromString(logData, dataType, rawSize, compressType, logGroupVec);
 
         for (vector<LogGroup>::iterator iter = logGroupVec.begin(); iter != logGroupVec.end(); ++iter) {
             bool projectDisabled = true;
@@ -638,15 +643,16 @@ protected:
 
     static void MockAsyncSend(const std::string& projectName,
                               const std::string& logstore,
-                              sls_logs::SlsCompressType compressType,
                               const std::string& logData,
                               SEND_DATA_TYPE dataType,
                               int32_t rawSize,
+                              sls_logs::SlsCompressType compressType,
                               SendClosure* sendClosure) {
         // printf("Insert request.\n");
         // gSenderTest->MockAsyncSendInner(projectName, logstore, logData, dataType, rawSize, sendClosure);
         // return;
-        AsyncRequest* pReq = new AsyncRequest(projectName, logstore, logData, dataType, rawSize, sendClosure);
+        AsyncRequest* pReq
+            = new AsyncRequest(projectName, logstore, logData, dataType, rawSize, compressType, sendClosure);
 
         {
             PTScopedLock lock(mQueueLock);
@@ -666,10 +672,11 @@ protected:
                                    const std::string& logData,
                                    SEND_DATA_TYPE dataType,
                                    int32_t rawSize,
+                                   sls_logs::SlsCompressType compressType,
                                    SendClosure* sendClosure) {
         LOG_INFO(sLogger, ("MockAsyncSend, projectName", projectName)("logstore", logstore)("dataType", dataType));
         vector<LogGroup> logGroupVec;
-        Sender::ParseLogGroupFromString(logData, dataType, rawSize, logGroupVec);
+        Sender::ParseLogGroupFromString(logData, dataType, rawSize, compressType, logGroupVec);
 
         if (gDisableIpFlag && gClient != NULL && gDisabledIp.size() > 0) {
             if (gClient->GetRawSlsHost().find(gDisabledIp) != std::string::npos) {
@@ -3105,7 +3112,13 @@ void SenderUnittest::MockExactlyOnceSend(LoggroupTimeValue* data) {
 
     gRangeCheckpoints.push_back(RangeCheckpointPtr(new RangeCheckpoint(*(cpt.get()))));
     LOG_INFO(sLogger, ("checkpoint key", cpt->key)("checkpoint", cpt->data.DebugString()));
-    MockAsyncSend(data->mProjectName, data->mLogstore, data->mLogGroupContext.mCompressType, data->mLogData, data->mDataType, data->mRawSize, closure);
+    MockAsyncSend(data->mProjectName,
+                  data->mLogstore,
+                  data->mLogData,
+                  data->mDataType,
+                  data->mRawSize,
+                  data->mLogGroupContext.mCompressType,
+                  closure);
 }
 
 // Test if data's sequence is generated orderly:

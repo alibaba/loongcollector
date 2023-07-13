@@ -138,6 +138,8 @@ public:
     virtual void OnSuccess(sdk::Response* response);
     virtual void OnFail(sdk::Response* response, const std::string& errorCode, const std::string& errorMessage);
     OperationOnFail DefaultOperation();
+    OperationOnFail
+    RecompressData(sdk::Response* response, const std::string& errorCode, const std::string& errorMessage);
     LoggroupTimeValue* mDataPtr;
 };
 
@@ -383,27 +385,33 @@ public:
     // for debug & ut
     void (*MockAsyncSend)(const std::string& projectName,
                           const std::string& logstore,
-                          sls_logs::SlsCompressType compressType,
                           const std::string& logData,
                           SEND_DATA_TYPE dataType,
                           int32_t rawSize,
+                          sls_logs::SlsCompressType compressType,
                           SendClosure* sendClosure);
     void (*MockSyncSend)(const std::string& projectName,
                          const std::string& logstore,
                          const std::string& logData,
                          SEND_DATA_TYPE dataType,
-                         int32_t rawSize);
+                         int32_t rawSize,
+                         sls_logs::SlsCompressType compressType);
     void (*MockTestEndpoint)(const std::string& projectName,
                              const std::string& logstore,
                              const std::string& logData,
                              SEND_DATA_TYPE dataType,
-                             int32_t rawSize);
+                             int32_t rawSize,
+                             sls_logs::SlsCompressType compressType);
     void (*MockIntegritySend)(LoggroupTimeValue* data);
     sdk::GetRealIpResponse (*MockGetRealIp)(const std::string& projectName, const std::string& logstore);
-    static bool ParseLogGroupFromLZ4(const std::string& logData, int32_t rawSize, sls_logs::LogGroup& logGroupPb);
+    static bool ParseLogGroupFromCompressedData(const std::string& logData,
+                                                int32_t rawSize,
+                                                sls_logs::SlsCompressType compressType,
+                                                sls_logs::LogGroup& logGroupPb);
     static void ParseLogGroupFromString(const std::string& logData,
                                         SEND_DATA_TYPE dataType,
                                         int32_t rawSize,
+                                        sls_logs::SlsCompressType compressType,
                                         std::vector<sls_logs::LogGroup>& logGroupVec);
     static bool LZ4CompressLogGroup(const sls_logs::LogGroup& logGroup, std::string& compressed, int32_t& rawSize);
 

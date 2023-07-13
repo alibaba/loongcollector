@@ -141,10 +141,10 @@ private:
                                  const std::string& caCert);
     static void MockAsyncSend(const std::string& projectName,
                               const std::string& logstore,
-                              sls_logs::SlsCompressType compressType,
                               const std::string& logData,
                               SEND_DATA_TYPE dataType,
                               int32_t rawSize,
+                              sls_logs::SlsCompressType compressType,
                               SendClosure* sendClosure);
     static string GetConfigResponse();
     static void SetConfigResponse(const string& response);
@@ -2172,10 +2172,10 @@ string ConfigUpdatorUnittest::GetConfigResponse() {
 
 void ConfigUpdatorUnittest::MockAsyncSend(const std::string& projectName,
                                           const std::string& logstore,
-                                          sls_logs::SlsCompressType compressType,
                                           const std::string& logData,
                                           SEND_DATA_TYPE dataType,
                                           int32_t rawSize,
+                                          sls_logs::SlsCompressType compressType,
                                           SendClosure* sendClosure) {
     if (logstore == "logtail_alarm") {
         PostLogStoreLogsResponse* sr = new PostLogStoreLogsResponse;
@@ -2185,7 +2185,7 @@ void ConfigUpdatorUnittest::MockAsyncSend(const std::string& projectName,
         return;
     }
     vector<LogGroup> logGroupVec;
-    Sender::ParseLogGroupFromString(logData, dataType, rawSize, logGroupVec);
+    Sender::ParseLogGroupFromString(logData, dataType, rawSize, compressType, logGroupVec);
 
     LOG_INFO(
         sLogger,
