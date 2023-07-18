@@ -1088,6 +1088,7 @@ func (dc *DockerCenter) markRemove(containerID string) {
 		container.ContainerInfo.State.Status = ContainerStatusExited
 		container.deleteFlag = true
 		container.lastUpdateTime = time.Now()
+		dc.refreshLastUpdateMapTime()
 	}
 }
 
