@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -181,12 +180,8 @@ func SerializeDeleteContainerToPb(logGroup *protocol.LogGroup, project string, c
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "type", Value: "delete_containers"})
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project", Value: project})
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "container_ids", Value: containerIDsStr})
-
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
-	log.Time = (uint32)(nowTime.Unix())
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		log.TimeNs = (uint32)(nowTime.Nanosecond())
-	}
+	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 	logGroup.Logs = append(logGroup.Logs, log)
 	deletedContainerMutex.Unlock()
 }
@@ -225,10 +220,7 @@ func SerializeContainerToPb(logGroup *protocol.LogGroup) {
 		}
 
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
-		log.Time = (uint32)(nowTime.Unix())
-		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-			log.TimeNs = (uint32)(nowTime.Nanosecond())
-		}
+		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 		logGroup.Logs = append(logGroup.Logs, log)
 	}
 	AddedContainers = AddedContainers[:0]
@@ -256,11 +248,7 @@ func SerializeContainerConfigResultToPb(logGroup *protocol.LogGroup) {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "input.container_file", Value: item.InputIsContainerFile})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "flusher.type", Value: item.FlusherType})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "flusher.target_addresses", Value: item.FlusherTargetAddress})
-
-		log.Time = (uint32)(nowTime.Unix())
-		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-			log.TimeNs = (uint32)(nowTime.Nanosecond())
-		}
+		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
 		logGroup.Logs = append(logGroup.Logs, log)
 	}

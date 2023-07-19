@@ -1,6 +1,8 @@
 syntax = "proto2";
 package sls_logs;
 
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
 option go_package = "github.com/alibaba/ilogtail/pkg/protocol";
 
 message Log
@@ -13,7 +15,7 @@ message Log
   }
   repeated Content Contents = 2;
   repeated string values = 3;
-  optional fixed32 Time_ns = 4;
+  optional fixed32 Time_ns = 4 [(gogoproto.nullable) = true];
 }
 message LogTag
 {

@@ -15,13 +15,8 @@
 package config
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"runtime"
-	"sync"
-
-	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 // GlobalConfig represents global configurations of plugin system.
@@ -49,25 +44,6 @@ var LogtailGlobalConfig = newGlobalConfig()
 // StatisticsConfigJson, AlarmConfigJson
 var BaseVersion = "0.1.0"                                                  // will be overwritten through ldflags at compile time
 var UserAgent = fmt.Sprintf("ilogtail/%v (%v)", BaseVersion, runtime.GOOS) // set in global config
-
-var loadOnce sync.Once
-
-// LoadGlobalConfig updates LogtailGlobalConfig according to jsonStr (only once).
-func LoadGlobalConfig(jsonStr string) int {
-	// Only the first call will return non-zero.
-	rst := 0
-	loadOnce.Do(func() {
-		logger.Info(context.Background(), "load global config", jsonStr)
-		if len(jsonStr) >= 2 { // For invalid JSON, use default value and return 0
-			if err := json.Unmarshal([]byte(jsonStr), &LogtailGlobalConfig); err != nil {
-				logger.Error(context.Background(), "LOAD_PLUGIN_ALARM", "load global config error", err)
-				rst = 1
-			}
-			UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", BaseVersion, runtime.GOOS, LogtailGlobalConfig.HostIP)
-		}
-	})
-	return rst
-}
 
 func newGlobalConfig() (cfg GlobalConfig) {
 	cfg = GlobalConfig{

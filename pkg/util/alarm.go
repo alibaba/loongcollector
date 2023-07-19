@@ -40,11 +40,11 @@ func DeleteAlarm(key string) {
 	delete(RegisterAlarms, key)
 }
 
-func RegisterAlarmsSerializeToPb(logGroup *protocol.LogGroup, enableTimestampNanosecond bool) {
+func RegisterAlarmsSerializeToPb(logGroup *protocol.LogGroup) {
 	regMu.Lock()
 	defer regMu.Unlock()
 	for _, alarm := range RegisterAlarms {
-		alarm.SerializeToPb(logGroup, enableTimestampNanosecond)
+		alarm.SerializeToPb(logGroup)
 	}
 }
 
@@ -90,7 +90,7 @@ func (p *Alarm) Record(alarmType, message string) {
 	mu.Unlock()
 }
 
-func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup, enableTimestampNanosecond bool) {
+func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
 	nowTime := time.Now()
 	mu.Lock()
 	for alarmType, item := range p.AlarmMap {
@@ -104,10 +104,7 @@ func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup, enableTimestampNanose
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_count", Value: strconv.Itoa(item.Count)})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_message", Value: item.Message})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: GetIPAddress()})
-		log.Time = (uint32)(nowTime.Unix())
-		if enableTimestampNanosecond {
-			log.TimeNs = (uint32)(nowTime.Nanosecond())
-		}
+		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 		logGroup.Logs = append(logGroup.Logs, log)
 		// clear after serialize
 		item.Count = 0

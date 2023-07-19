@@ -26,7 +26,6 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/pyroscope-io/pyroscope/pkg/structs/transporttrie"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/profile"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -156,12 +155,9 @@ func (p *Profile) extractProfileV1(meta *profile.Meta, tags map[string]string) f
 		)
 
 		log := &protocol.Log{
-			Time:     uint32(meta.StartTime.Unix()),
 			Contents: content,
 		}
-		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-			log.TimeNs = uint32(meta.StartTime.Nanosecond())
-		}
+		protocol.SetLogTime(log, uint32(meta.StartTime.Unix()), uint32(meta.StartTime.Nanosecond()))
 		p.logs = append(p.logs, log)
 	}
 

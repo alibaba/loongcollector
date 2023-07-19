@@ -26,7 +26,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -189,10 +188,7 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 	for i := 1; i <= 100000; i++ {
 		log := &protocol.Log{}
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test", Value: "123"})
-		log.Time = (uint32)(nowTime.Unix())
-		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-			log.TimeNs = (uint32)(nowTime.Nanosecond())
-		}
+		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 		loggroup.Logs = append(loggroup.Logs, log)
 	}
 

@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -51,11 +50,7 @@ func CreateLog(t time.Time, configTag map[string]string, logTags map[string]stri
 		}
 		slsLog.Contents = append(slsLog.Contents, cont)
 	}
-
-	slsLog.Time = uint32(t.Unix())
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		slsLog.TimeNs = uint32(t.Nanosecond())
-	}
+	protocol.SetLogTime(&slsLog, uint32(t.Unix()), uint32(t.Nanosecond()))
 	return &slsLog, nil
 }
 
@@ -90,11 +85,7 @@ func CreateLogByArray(t time.Time, configTag map[string]string, logTags map[stri
 		}
 		slsLog.Contents = append(slsLog.Contents, cont)
 	}
-
-	slsLog.Time = uint32(t.Unix())
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		slsLog.TimeNs = uint32(t.Nanosecond())
-	}
+	protocol.SetLogTime(&slsLog, uint32(t.Unix()), uint32(t.Nanosecond()))
 	return &slsLog, nil
 }
 
@@ -158,12 +149,8 @@ func (hd *HistogramData) ToMetricLogs(name string, timeMs int64, labels MetricLa
 // NewMetricLog caller must sort labels
 func NewMetricLog(name string, timeMs int64, value string, labels []MetricLabel) *protocol.Log {
 	strTime := strconv.FormatInt(timeMs, 10)
-	metric := &protocol.Log{
-		Time: uint32(timeMs / 1000),
-	}
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		metric.TimeNs = uint32((timeMs * 1e6) % 1e9)
-	}
+	metric := &protocol.Log{}
+	protocol.SetLogTime(metric, uint32(timeMs/1000), uint32((timeMs*1e6)%1e9))
 	metric.Contents = []*protocol.Log_Content{}
 	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__name__", Value: name})
 	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__time_nano__", Value: strTime})

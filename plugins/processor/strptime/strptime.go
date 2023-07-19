@@ -22,7 +22,6 @@ import (
 
 	"github.com/knz/strtime"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -146,10 +145,7 @@ func (s *Strptime) processLog(log *protocol.Log) {
 			logTime = logTime.In(s.location).Add(time.Second * time.Duration(-s.UTCOffset))
 		}
 
-		log.Time = uint32(logTime.Unix())
-		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-			log.TimeNs = uint32(logTime.Nanosecond())
-		}
+		protocol.SetLogTime(log, uint32(logTime.Unix()), uint32(logTime.Nanosecond()))
 		if !s.KeepSource {
 			log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
 		}
