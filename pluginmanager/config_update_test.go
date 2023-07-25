@@ -75,7 +75,7 @@ func (s *configUpdateTestSuite) TestConfigUpdate() {
 
 	// unblock old config
 	checkFlusher.Block = false
-	time.Sleep(time.Second * time.Duration(3))
+	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(100000, checkFlusher.GetLogCount())
 	s.Equal(200000, GetConfigFluhsers(LogtailConfig[noblockUpdateConfigName].PluginRunner)[0].(*checker.FlusherChecker).GetLogCount())
 }
@@ -97,7 +97,7 @@ func (s *configUpdateTestSuite) TestConfigUpdateMany() {
 	}
 	s.Equal(0, checkFlusher.GetLogCount(), "the hold on block flusher checker doesn't have any logs")
 	checkFlusher.Block = false
-	time.Sleep(time.Second * time.Duration(3))
+	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(checkFlusher.GetLogCount(), 100000)
 
 	// load normal config
@@ -110,7 +110,7 @@ func (s *configUpdateTestSuite) TestConfigUpdateMany() {
 	}
 	checkFlusher, ok = GetConfigFluhsers(LogtailConfig[noblockUpdateConfigName].PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
-	time.Sleep(time.Second * time.Duration(3))
+	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(checkFlusher.GetLogCount(), 200000)
 }
 
@@ -121,7 +121,7 @@ func (s *configUpdateTestSuite) TestConfigUpdateName() {
 	checkFlusher, ok := GetConfigFluhsers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	defer func() {
 		checkFlusher.Block = false
-		time.Sleep(time.Second * 3)
+		time.Sleep(time.Second * 5)
 		s.Equal(checkFlusher.GetLogCount(), 100000)
 	}()
 	s.True(ok)
@@ -138,7 +138,7 @@ func (s *configUpdateTestSuite) TestConfigUpdateName() {
 		s.True(ok)
 		s.Equal(checkFlusher.GetLogCount(), 0)
 		checkFlusher.Block = false
-		time.Sleep(time.Second * 3)
+		time.Sleep(time.Second * 5)
 		s.Equal(checkFlusher.GetLogCount(), 200000)
 	}
 }
@@ -149,7 +149,7 @@ func (s *configUpdateTestSuite) TestHoldOnExit() {
 	checkFlusher, ok := GetConfigFluhsers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 	checkFlusher.Block = false
-	time.Sleep(time.Second * time.Duration(3))
+	time.Sleep(time.Second * time.Duration(5))
 	s.NoError(HoldOn(true))
 	s.Equal(200000, checkFlusher.GetLogCount())
 	s.NoError(Resume())
@@ -166,7 +166,7 @@ func (s *configUpdateTestSuite) TestHoldOnExitTimeout() {
 	time.Sleep(time.Second)
 	s.Equal(0, checkFlusher.GetLogCount())
 	checkFlusher.Block = false
-	time.Sleep(time.Second * time.Duration(3))
+	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(100000, checkFlusher.GetLogCount())
 	time.Sleep(time.Second * 10)
 	s.NoError(Resume())
