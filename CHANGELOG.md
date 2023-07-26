@@ -36,3 +36,7 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
+
+- [public] [both] [updated] elasticsearch flusher new features: send batch request by bulk api and format index
+- [public] [both] [fixed] elasticsearch flusher panic
+- [public] [both] [doc] elasticsearch flusher config examples
