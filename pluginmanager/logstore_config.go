@@ -509,9 +509,12 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 					if ok {
 						if typeName, ok := input["type"]; ok {
 							if typeNameStr, ok := typeName.(string); ok {
-								if strings.HasPrefix(typeNameStr, "metric_") {
+								if _, isMetricInput := pipeline.MetricInputs[typeNameStr]; isMetricInput {
+									// Load MetricInput plugin defined in pipeline.MetricInputs
+									// pipeline.MetricInputs will be renamed in a future version
 									err = loadMetric(getPluginTypeWithID(typeNameStr), logstoreC, input["detail"])
-								} else if strings.HasPrefix(typeNameStr, "service_") {
+								} else if _, isServiceInput := pipeline.ServiceInputs[typeNameStr]; isServiceInput {
+									// Load ServiceInput plugin defined in pipeline.ServiceInputs
 									err = loadService(getPluginTypeWithID(typeNameStr), logstoreC, input["detail"])
 								}
 								if err != nil {

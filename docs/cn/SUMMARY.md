@@ -40,6 +40,7 @@
 * [插件版本管理](data-pipeline/stability-level.md)
 * [输入](data-pipeline/input/README.md)
   * [文本日志](data-pipeline/input/file-log.md)
+  * [脚本执行数据](data-pipeline/input/input-command.md)
   * [容器标准输出](data-pipeline/input/service-docker-stdout.md)
   * [文本日志（debug）](data-pipeline/input/metric-debug-file.md)
   * [MetricInput示例插件](data-pipeline/input/metric-input-example.md)
