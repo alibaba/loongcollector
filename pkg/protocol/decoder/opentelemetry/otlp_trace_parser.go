@@ -241,6 +241,17 @@ func statusCodeToShortString(code ptrace.StatusCode) string {
 	}
 }
 
+func v1StatusCodeToShortString(code v1.Status_StatusCode) string {
+	switch code {
+	case 2:
+		return "ERROR"
+	case 1:
+		return "OK"
+	default:
+		return "UNSET"
+	}
+}
+
 func eventsToString(events ptrace.SpanEventSlice) string {
 	eventArray := make([]map[string]interface{}, 0, events.Len())
 	for i := 0; i < events.Len(); i++ {
@@ -445,7 +456,7 @@ func v1SpanToLogServiceData(span *v1.Span, resourceContents, instrumentationLibr
 
 	contentsBuffer = append(contentsBuffer, protocol.Log_Content{
 		Key:   statusCodeField,
-		Value: span.Status.String(),
+		Value: v1StatusCodeToShortString(span.Status.Code),
 	})
 
 	contentsBuffer = append(contentsBuffer, protocol.Log_Content{
