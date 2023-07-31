@@ -72,6 +72,7 @@
   * [Go时间格式解析](date-pipeline/processor/processor-gotime.md)
   * [Grok](data-pipeline/processor/processor-grok.md)
   * [Json](data-pipeline/processor/processor-json.md)
+  * [日志转SLS Metric](data-pipeline/processor/processor-log-to-sls-metric.md)
   * [正则](data-pipeline/processor/processor-regex.md)
   * [重命名字段](data-pipeline/processor/processor-rename.md)
   * [分隔符](data-pipeline/processor/processor-delimiter.md)

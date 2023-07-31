@@ -137,33 +137,33 @@ func Test_metricReader_readNames(t *testing.T) {
 func Test_metricReader_readSortedLabels(t *testing.T) {
 	tests := []struct {
 		reader     *metricReader
-		wantLabels []metricLabel
+		wantLabels []MetricLabel
 		wantErr    bool
 	}{
 		{
 			reader: &metricReader{
 				labels: "bb#$#aa|aa#$#bb",
 			},
-			wantLabels: []metricLabel{
-				{key: "aa", value: "bb"},
-				{key: "bb", value: "aa"},
+			wantLabels: []MetricLabel{
+				{Key: "aa", Value: "bb"},
+				{Key: "bb", Value: "aa"},
 			},
 		},
 		{
 			reader: &metricReader{
 				labels: "bb#$#aa",
 			},
-			wantLabels: []metricLabel{
-				{key: "bb", value: "aa"},
+			wantLabels: []MetricLabel{
+				{Key: "bb", Value: "aa"},
 			},
 		},
 		{
 			reader: &metricReader{
 				labels: "bb#$#aa|aa#$#",
 			},
-			wantLabels: []metricLabel{
-				{key: "aa", value: ""},
-				{key: "bb", value: "aa"},
+			wantLabels: []MetricLabel{
+				{Key: "aa", Value: ""},
+				{Key: "bb", Value: "aa"},
 			},
 		},
 		{
@@ -176,9 +176,9 @@ func Test_metricReader_readSortedLabels(t *testing.T) {
 			reader: &metricReader{
 				labels: "bb#$#aa|aa#$#bb|",
 			},
-			wantLabels: []metricLabel{
-				{key: "aa", value: "bb"},
-				{key: "bb", value: "aa"},
+			wantLabels: []MetricLabel{
+				{Key: "aa", Value: "bb"},
+				{Key: "bb", Value: "aa"},
 			},
 		},
 		{
@@ -191,35 +191,35 @@ func Test_metricReader_readSortedLabels(t *testing.T) {
 			reader: &metricReader{
 				labels: "bb#$#aa|eee",
 			},
-			wantLabels: []metricLabel{
-				{key: "bb", value: "aa|eee"},
+			wantLabels: []MetricLabel{
+				{Key: "bb", Value: "aa|eee"},
 			},
 		},
 		{
 			reader: &metricReader{
 				labels: "bb#$#aa|eee|aa#$#bb",
 			},
-			wantLabels: []metricLabel{
-				{key: "aa", value: "bb"},
-				{key: "bb", value: "aa|eee"},
+			wantLabels: []MetricLabel{
+				{Key: "aa", Value: "bb"},
+				{Key: "bb", Value: "aa|eee"},
 			},
 		},
 		{
 			reader: &metricReader{
 				labels: "bb#$#aa||eee||aa#$#bb",
 			},
-			wantLabels: []metricLabel{
-				{key: "aa", value: "bb"},
-				{key: "bb", value: "aa||eee|"},
+			wantLabels: []MetricLabel{
+				{Key: "aa", Value: "bb"},
+				{Key: "bb", Value: "aa||eee|"},
 			},
 		},
 		{
 			reader: &metricReader{
 				labels: "cc||bb#$#aa||eee||aa#$#bb",
 			},
-			wantLabels: []metricLabel{
-				{key: "aa", value: "bb"},
-				{key: "cc||bb", value: "aa||eee|"},
+			wantLabels: []MetricLabel{
+				{Key: "aa", Value: "bb"},
+				{Key: "cc||bb", Value: "aa||eee|"},
 			},
 		},
 	}
