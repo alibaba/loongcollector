@@ -111,7 +111,7 @@ func NewManager(collector pipeline.Collector) *Manager {
 	}
 	m := new(Manager)
 	m.discoveryManager = discovery.NewManager(logrusLogger)
-	m.scrapeManager = scrape.NewManager(logrusLogger, &Ingestion{collector: collector}, prometheus.DefaultRegisterer, false)
+	m.scrapeManager = scrape.NewManager(logrusLogger, &Ingestion{collector: collector}, new(Register), false)
 	return m
 }
 
