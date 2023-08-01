@@ -15,12 +15,12 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 var metricKeys []string

@@ -67,7 +67,7 @@ func (c *Converter) ConvertToInfluxdbProtocolStream(logGroup *protocol.LogGroup,
 
 		encoder.StartLine(metricName)
 		for _, v := range labels {
-			encoder.AddTag(v.key, v.value)
+			encoder.AddTag(v.Key, v.Value)
 		}
 		encoder.AddField(fieldName, value)
 		encoder.EndLine(timestamp)

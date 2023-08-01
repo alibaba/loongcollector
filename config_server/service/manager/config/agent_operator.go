@@ -138,7 +138,7 @@ func (c *ConfigManager) CheckConfigUpdatesWhenHeartbeat(req *proto.HeartBeatRequ
 				result.OldVersion = k.Version
 				result.NewVersion = config.Version
 				result.Context = config.Context
-				result.CheckStatus = proto.CheckStatus_DELETED
+				result.CheckStatus = proto.CheckStatus_MODIFIED
 				agentConfigs = append(agentConfigs, result)
 			}
 			delete(SelectedConfigs, k.Name)
