@@ -1,6 +1,7 @@
 package otel
 
 import (
+	"errors"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -15,7 +16,6 @@ type ProcessorOtelTraceParser struct {
 	SourceKey              string
 	Format                 string
 	NoKeyError             bool
-	KeepSource             bool
 	context                pipeline.Context
 	TraceIDNeedDecode      bool
 	SpanIDNeedDecode       bool
@@ -28,7 +28,7 @@ func (p *ProcessorOtelTraceParser) Init(context pipeline.Context) error {
 	p.context = context
 	if p.Format == "" {
 		logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_OTEL_TRACE_DATA_FORMAT", "data format is empty, use protobuf")
-		p.Format = "protobuf"
+		return errors.New("The format field is empty")
 	}
 	return nil
 }
@@ -138,9 +138,8 @@ func init() {
 	pipeline.Processors[pluginName] = func() pipeline.Processor {
 		return &ProcessorOtelTraceParser{
 			SourceKey:  "",
-			NoKeyError: true,
-			KeepSource: false,
-			Format:     "protobuf",
+			NoKeyError: false,
+			Format:     "",
 		}
 	}
 }
