@@ -47,7 +47,7 @@ func newProcessor() (*ProcessorJSON, error) {
 	return processor, err
 }
 
-var jsonVal = "{\"k1\":{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}}"
+var jsonVal = "{\"k1\":{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}},\"k6\":[{\"x\":\"a\"},{\"x\":\"b\"}],\"k7\":[]}"
 
 func TestSourceKey(t *testing.T) {
 	processor, err := newProcessor()
@@ -145,10 +145,14 @@ func TestKeepSourceIfParseError(t *testing.T) {
 		log := &protocol.Log{Time: 0}
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: jsonVal})
 		processor.processLog(log)
-		require.Equal(t, 1, len(log.Contents))
+		require.Equal(t, 3, len(log.Contents))
 		require.Equal(t, "js_key-k1", log.Contents[0].Key)
 		require.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}",
 			log.Contents[0].Value)
+		require.Equal(t, "js_key-k6", log.Contents[1].Key)
+		require.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[1].Value)
+		require.Equal(t, "js_key-k7", log.Contents[2].Key)
+		require.Equal(t, "[]", log.Contents[2].Value)
 	}
 
 	// Case 2: Invalid log, keep source key in output log.
@@ -282,9 +286,13 @@ func TestKeepSourceIfParseErrorV2(t *testing.T) {
 		contents := log.GetIndices()
 		contents.Add("s_key", jsonVal)
 		processor.processEvent(log)
-		assert.Equal(t, 1, contents.Len())
+		assert.Equal(t, 3, contents.Len())
 		assert.True(t, contents.Contains("js_key-k1"))
+		assert.True(t, contents.Contains("js_key-k6"))
+		assert.True(t, contents.Contains("js_key-k7"))
 		assert.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}", contents.Get("js_key-k1"))
+		assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", contents.Get("js_key-k6"))
+		assert.Equal(t, "[]", contents.Get("js_key-k7"))
 	}
 
 	// Case 2: Invalid log, keep source key in output log.

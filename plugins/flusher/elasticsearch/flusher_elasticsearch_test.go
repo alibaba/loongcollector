@@ -15,54 +15,91 @@
 package elasticsearch
 
 import (
-	"strconv"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
-	"github.com/alibaba/ilogtail/plugins/test/mock"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
-// Invalid Test
-func InvalidTestConnectAndWrite(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	f := NewFlusherElasticSearch()
-	f.Addresses = []string{"http://localhost:9200"}
-	f.Authentication.PlainText.Username = ""
-	f.Authentication.PlainText.Password = ""
-	f.Index = ""
-	// Verify that we can connect to the ElasticSearch
-	lctx := mock.NewEmptyContext("p", "l", "c")
-	err := f.Init(lctx)
-	require.NoError(t, err)
-
-	// Verify that we can successfully write data to the ElasticSearch buffer engine table
-	lgl := makeTestLogGroupList()
-	err = f.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
-	require.NoError(t, err)
-}
-
-func makeTestLogGroupList() *protocol.LogGroupList {
-	f := map[string]string{}
-	lgl := &protocol.LogGroupList{
-		LogGroupList: make([]*protocol.LogGroup, 0, 10),
-	}
-	for i := 1; i <= 10; i++ {
-		lg := &protocol.LogGroup{
-			Logs: make([]*protocol.Log, 0, 10),
+func TestGetIndexKeys(t *testing.T) {
+	Convey("Given an empty index", t, func() {
+		flusher := &FlusherElasticSearch{
+			Index: "",
 		}
-		for j := 1; j <= 10; j++ {
-			f["group"] = strconv.Itoa(i)
-			f["message"] = "The message: " + strconv.Itoa(j)
-			l := test.CreateLogByFields(f)
-			lg.Logs = append(lg.Logs, l)
+		Convey("When getIndexKeys is called", func() {
+			keys, isDynamicIndex, err := flusher.getIndexKeys()
+			Convey("Then the keys should not be extracted correctly", func() {
+				So(err, ShouldNotBeNil)
+				So(isDynamicIndex, ShouldBeFalse)
+				So(keys, ShouldBeNil)
+			})
+		})
+	})
+	Convey("Given a normal index", t, func() {
+		flusher := &FlusherElasticSearch{
+			Index: "normal_index",
 		}
-		lgl.LogGroupList = append(lgl.LogGroupList, lg)
-	}
-	return lgl
+		Convey("When getIndexKeys is called", func() {
+			keys, isDynamicIndex, err := flusher.getIndexKeys()
+			Convey("Then the keys should be extracted correctly", func() {
+				So(err, ShouldBeNil)
+				So(isDynamicIndex, ShouldBeFalse)
+				So(len(keys), ShouldEqual, 0)
+			})
+		})
+	})
+	Convey("Given a variable index", t, func() {
+		flusher := &FlusherElasticSearch{
+			Index: "index_${var}",
+		}
+		Convey("When getIndexKeys is called", func() {
+			keys, isDynamicIndex, err := flusher.getIndexKeys()
+			Convey("Then the keys should be extracted correctly", func() {
+				So(err, ShouldBeNil)
+				So(isDynamicIndex, ShouldBeFalse)
+				So(len(keys), ShouldEqual, 0)
+			})
+		})
+	})
+	Convey("Given a field dynamic index expression", t, func() {
+		flusher := &FlusherElasticSearch{
+			Index: "index_%{content.field}",
+		}
+		Convey("When getIndexKeys is called", func() {
+			keys, isDynamicIndex, err := flusher.getIndexKeys()
+			Convey("Then the keys should be extracted correctly", func() {
+				So(err, ShouldBeNil)
+				So(isDynamicIndex, ShouldBeTrue)
+				So(len(keys), ShouldEqual, 1)
+				So(keys[0], ShouldEqual, "content.field")
+			})
+		})
+	})
+	Convey("Given a timestamp dynamic index expression", t, func() {
+		flusher := &FlusherElasticSearch{
+			Index: "index_%{+yyyyMM}",
+		}
+		Convey("When getIndexKeys is called", func() {
+			keys, isDynamicIndex, err := flusher.getIndexKeys()
+			Convey("Then the keys should be extracted correctly", func() {
+				So(err, ShouldBeNil)
+				So(isDynamicIndex, ShouldBeTrue)
+				So(len(keys), ShouldEqual, 0)
+			})
+		})
+	})
+	Convey("Given a composite dynamic index expression", t, func() {
+		flusher := &FlusherElasticSearch{
+			Index: "index_%{content.field}_%{tag.host.ip}_%{+yyyyMMdd}",
+		}
+		Convey("When getIndexKeys is called", func() {
+			keys, isDynamicIndex, err := flusher.getIndexKeys()
+			Convey("Then the keys should be extracted correctly", func() {
+				So(err, ShouldBeNil)
+				So(isDynamicIndex, ShouldBeTrue)
+				So(len(keys), ShouldEqual, 2)
+				So(keys[0], ShouldEqual, "content.field")
+				So(keys[1], ShouldEqual, "tag.host.ip")
+			})
+		})
+	})
 }

@@ -31,6 +31,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/plugin_main/flags"
+	"github.com/alibaba/ilogtail/pluginmanager"
 )
 
 var (
@@ -192,6 +193,9 @@ func InitHTTPServer() {
 				go DumpCPUInfo(100)
 				go DumpMemInfo(100)
 			}
+		}
+		if *flags.StatefulSetFlag {
+			handlers["/export/port"] = &handler{handlerFunc: pluginmanager.FindPort, description: "export ilogtail's LISTEN ports"}
 		}
 		if len(handlers) != 0 {
 			handlers["/"] = &handler{handlerFunc: HelpServer, description: "handlers help description"}

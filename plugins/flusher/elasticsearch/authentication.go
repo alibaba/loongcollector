@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -45,8 +46,13 @@ func (config *Authentication) ConfigureAuthenticationAndHTTP(httpcfg *HTTPConfig
 			return err
 		}
 	}
-	if config.TLS != nil || httpcfg != nil {
-		if err := configureTLSandHTTP(httpcfg, config.TLS, opts); err != nil {
+	if config.TLS != nil {
+		if err := configureTLS(config.TLS, opts); err != nil {
+			return err
+		}
+	}
+	if httpcfg != nil {
+		if err := configureHTTP(httpcfg, opts); err != nil {
 			return err
 		}
 	}
@@ -63,35 +69,60 @@ func (plainTextConfig *PlainTextConfig) ConfigurePlaintext(opts *elasticsearch.C
 	return nil
 }
 
-func configureTLSandHTTP(httpcfg *HTTPConfig, config *tlscommon.TLSConfig, opts *elasticsearch.Config) error {
+func configureTLS(config *tlscommon.TLSConfig, opts *elasticsearch.Config) error {
 	tlsConfig, err := config.LoadTLSConfig()
 	if err != nil {
 		return fmt.Errorf("error loading tls config: %w", err)
 	}
-	transport := http.Transport{}
+	transport := &http.Transport{}
 	if tlsConfig != nil && tlsConfig.InsecureSkipVerify {
 		transport.TLSClientConfig = tlsConfig
 	}
-	if httpcfg.MaxIdleConnsPerHost != 0 {
-		transport.MaxIdleConnsPerHost = httpcfg.MaxIdleConnsPerHost
-	}
-	if httpcfg.ResponseHeaderTimeout != "" {
-		var unit time.Duration
-		unit, err = convertTimeUnit(httpcfg.ResponseHeaderTimeout)
-		if err == nil {
-			transport.ResponseHeaderTimeout = unit
-		} else {
-			return err
-		}
-	}
-	opts.Transport = &transport
 	if config.CAFile != "" {
 		opts.CACert, err = ioutil.ReadFile(config.CAFile)
 		if err != nil {
 			return err
 		}
 	}
+	mergeTransports(opts, transport)
 	return nil
+}
+
+func configureHTTP(httpcfg *HTTPConfig, opts *elasticsearch.Config) error {
+	transport := &http.Transport{}
+	if httpcfg.MaxIdleConnsPerHost != 0 {
+		transport.MaxIdleConnsPerHost = httpcfg.MaxIdleConnsPerHost
+	}
+	if httpcfg.ResponseHeaderTimeout != "" {
+		var unit time.Duration
+		unit, err := convertTimeUnit(httpcfg.ResponseHeaderTimeout)
+		if err != nil {
+			return err
+		}
+		transport.ResponseHeaderTimeout = unit
+	}
+	mergeTransports(opts, transport)
+	return nil
+}
+
+func mergeTransports(opts *elasticsearch.Config, transport *http.Transport) {
+	if opts.Transport == nil {
+		opts.Transport = transport
+		return
+	}
+
+	existing, _ := opts.Transport.(*http.Transport)
+	// Use reflection to copy fields from transport to existing Transport
+	transportValue := reflect.ValueOf(transport).Elem()
+	existingValue := reflect.ValueOf(existing).Elem()
+	for i := 0; i < transportValue.NumField(); i++ {
+		field := transportValue.Type().Field(i)
+		fieldValue := transportValue.Field(i)
+		existingField := existingValue.FieldByName(field.Name)
+		if existingField.IsValid() && existingField.Type() == fieldValue.Type() {
+			existingField.Set(fieldValue)
+		}
+	}
 }
 
 func convertTimeUnit(unit string) (time.Duration, error) {

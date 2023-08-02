@@ -35,6 +35,8 @@
 
 ## 样例
 
+### 常规索引
+
 采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果发送到 ElasticSearch。
 
 ```yaml
@@ -46,9 +48,29 @@ inputs:
 flushers:
   - Type: flusher_elasticsearch
     Addresses: 
-      - 192.XX.XX.1:9092
-      - 192.XX.XX.2:9092
+      - http://192.XX.XX.1:9092
+      - http://192.XX.XX.2:9092
     Index: default
+    Authentication:
+      PlainText:
+        Username: user
+        Password: 123456
+    HTTPConfig:
+        MaxIdleConnsPerHost: 10
+        ResponseHeaderTimeout: Second
+```
+
+### 动态索引
+
+采集结果支持写入`ElasticSearch`动态索引，例如，数据写入到一个名字包含当前日期的索引，可以这样写（只提供`flushers`），更多关于动态索引格式化的信息请[参考这里](../../developer-guide/format-string/format-index.md)
+
+```yaml
+flushers:
+  - Type: flusher_elasticsearch
+    Addresses:
+      - http://192.XX.XX.1:9092
+      - http://192.XX.XX.2:9092
+    Index: log_%{+yyyyMMdd}
     Authentication:
       PlainText:
         Username: user

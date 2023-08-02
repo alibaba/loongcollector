@@ -15,10 +15,11 @@
 package elasticsearch
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 
@@ -43,10 +44,11 @@ type FlusherElasticSearch struct {
 	// HTTP config
 	HTTPConfig *HTTPConfig
 
-	indexKeys []string
-	context   pipeline.Context
-	converter *converter.Converter
-	esClient  *elasticsearch.Client
+	indexKeys      []string
+	isDynamicIndex bool
+	context        pipeline.Context
+	converter      *converter.Converter
+	esClient       *elasticsearch.Client
 }
 
 type HTTPConfig struct {
@@ -105,17 +107,14 @@ func (f *FlusherElasticSearch) Init(context pipeline.Context) error {
 	}
 	f.converter = convert
 
-	if f.Index == "" {
-		return errors.New("index can't be empty")
-	}
-
-	// Obtain index keys from dynamic index expression
-	indexKeys, err := fmtstr.CompileKeys(f.Index)
+	// Init index keys
+	indexKeys, isDynamicIndex, err := f.getIndexKeys()
 	if err != nil {
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init elasticsearch flusher index fail, error", err)
 		return err
 	}
 	f.indexKeys = indexKeys
+	f.isDynamicIndex = isDynamicIndex
 
 	cfg := elasticsearch.Config{
 		Addresses: f.Addresses,
@@ -153,6 +152,29 @@ func (f *FlusherElasticSearch) getConverter() (*converter.Converter, error) {
 	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
 }
 
+func (f *FlusherElasticSearch) getIndexKeys() ([]string, bool, error) {
+	if f.Index == "" {
+		return nil, false, errors.New("index can't be empty")
+	}
+
+	// Obtain index keys from dynamic index expression
+	compileKeys, err := fmtstr.CompileKeys(f.Index)
+	if err != nil {
+		return nil, false, err
+	}
+	// CompileKeys() parse all variables inside %{}
+	// but indexKeys is used to find field express starting with 'content.' or 'tag.'
+	// so date express starting with '+' should be ignored
+	indexKeys := make([]string, 0, len(compileKeys))
+	for _, key := range compileKeys {
+		if key[0] != '+' {
+			indexKeys = append(indexKeys, key)
+		}
+	}
+	isDynamicIndex := len(compileKeys) > 0
+	return indexKeys, isDynamicIndex, nil
+}
+
 func (f *FlusherElasticSearch) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
 	return f.esClient != nil
 }
@@ -164,27 +186,50 @@ func (f *FlusherElasticSearch) Stop() error {
 }
 
 func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	nowTime := time.Now().Local()
 	for _, logGroup := range logGroupList {
 		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
 		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.indexKeys)
 		if err != nil {
 			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch convert log fail, error", err)
+			return err
 		}
+		var buffer []string
 		for index, log := range serializedLogs.([][]byte) {
-			valueMap := values[index]
-			ESIndex, err := FormatIndex(valueMap, f.Index)
-			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch format index fail, error", err)
+			ESIndex := &f.Index
+			if f.isDynamicIndex {
+				valueMap := values[index]
+				ESIndex, err = fmtstr.FormatIndex(valueMap, f.Index, uint32(nowTime.Unix()))
+				if err != nil {
+					logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch format index fail, error", err)
+					return err
+				}
 			}
-			req := esapi.IndexRequest{
-				Index: *ESIndex,
-				Body:  bytes.NewReader(log),
-			}
-			res, err := req.Do(context.Background(), f.esClient)
-			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request fail, error", err)
-			}
-			defer res.Body.Close()
+			var builder strings.Builder
+			builder.WriteString(`{"index": {"_index": "`)
+			builder.WriteString(*ESIndex)
+			builder.WriteString(`"}}`)
+			buffer = append(buffer, builder.String())
+			buffer = append(buffer, string(log))
+		}
+		body := strings.Join(buffer, "\n")
+		req := esapi.BulkRequest{
+			Body: strings.NewReader(body + "\n"),
+		}
+
+		res, err := req.Do(context.Background(), f.esClient)
+		if err != nil {
+			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request fail, error", err)
+			return err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode >= 400 && res.StatusCode <= 499 {
+			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request client error", res)
+			return fmt.Errorf("err status returned: %v", res.Status())
+		} else if res.StatusCode >= 500 && res.StatusCode <= 599 {
+			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush elasticsearch request server error", res)
+			return fmt.Errorf("err status returned: %v", res.Status())
 		}
 		logger.Debug(f.context.GetRuntimeContext(), "elasticsearch success send events: messageID")
 	}
@@ -197,10 +242,4 @@ func init() {
 		f := NewFlusherElasticSearch()
 		return f
 	}
-}
-
-// FormatIndex return elasticsearch index dynamically by using a format string
-func FormatIndex(targetValues map[string]string, topicPattern string) (*string, error) {
-	// TODO this is not completed yet, should return dynamic index
-	return &topicPattern, nil
 }

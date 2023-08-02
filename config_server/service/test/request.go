@@ -77,7 +77,7 @@ func GetConfig(r *gin.Engine, configName string, requestID string) (int, *config
 
 	// request
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/User/GetConfig", bytes.NewBuffer(reqBodyByte))
+	req, _ := http.NewRequest("POST", "/User/GetConfig", bytes.NewBuffer(reqBodyByte))
 	r.ServeHTTP(w, req)
 
 	// response
@@ -139,7 +139,7 @@ func ListConfigs(r *gin.Engine, requestID string) (int, *configserverproto.ListC
 
 	// request
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/User/ListConfigs", bytes.NewBuffer(reqBodyByte))
+	req, _ := http.NewRequest("POST", "/User/ListConfigs", bytes.NewBuffer(reqBodyByte))
 	r.ServeHTTP(w, req)
 
 	// response
@@ -204,7 +204,7 @@ func GetAppliedConfigsForAgentGroup(r *gin.Engine, groupName string, requestID s
 
 	// request
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/User/GetAppliedConfigsForAgentGroup", bytes.NewBuffer(reqBodyByte))
+	req, _ := http.NewRequest("POST", "/User/GetAppliedConfigsForAgentGroup", bytes.NewBuffer(reqBodyByte))
 	r.ServeHTTP(w, req)
 
 	// response
@@ -225,7 +225,7 @@ func GetAppliedAgentGroups(r *gin.Engine, configName string, requestID string) (
 
 	// request
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/User/GetAppliedAgentGroups", bytes.NewBuffer(reqBodyByte))
+	req, _ := http.NewRequest("POST", "/User/GetAppliedAgentGroups", bytes.NewBuffer(reqBodyByte))
 	r.ServeHTTP(w, req)
 
 	// response
@@ -246,7 +246,7 @@ func ListAgents(r *gin.Engine, groupName string, requestID string) (int, *config
 
 	// request
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/User/ListAgents", bytes.NewBuffer(reqBodyByte))
+	req, _ := http.NewRequest("POST", "/User/ListAgents", bytes.NewBuffer(reqBodyByte))
 	r.ServeHTTP(w, req)
 
 	// response
@@ -258,15 +258,25 @@ func ListAgents(r *gin.Engine, groupName string, requestID string) (int, *config
 	return res.StatusCode, resBody
 }
 
-func HeartBeat(r *gin.Engine, agent *configserverproto.Agent, requestID string) (int, *configserverproto.HeartBeatResponse) {
+func HeartBeat(r *gin.Engine, agent *configserverproto.Agent, configInfos []*configserverproto.ConfigCheckResult, requestID string) (int, *configserverproto.HeartBeatResponse) {
 	// data
 	reqBody := configserverproto.HeartBeatRequest{}
 	reqBody.RequestId = requestID
 	reqBody.AgentId = agent.AgentId
 	reqBody.AgentType = agent.AgentType
+	reqBody.Attributes = agent.Attributes
 	reqBody.RunningStatus = agent.RunningStatus
 	reqBody.StartupTime = agent.StartupTime
 	reqBody.Tags = agent.Tags
+	pipelineConfigs := make([]*configserverproto.ConfigInfo, 0)
+	for _, c := range configInfos {
+		conf := new(configserverproto.ConfigInfo)
+		conf.Type = c.Type
+		conf.Name = c.Name
+		conf.Version = c.OldVersion
+		pipelineConfigs = append(pipelineConfigs, conf)
+	}
+	reqBody.PipelineConfigs = pipelineConfigs
 	reqBodyByte, _ := proto.Marshal(&reqBody)
 
 	// request
