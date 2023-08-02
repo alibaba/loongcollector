@@ -16,6 +16,11 @@ name: E2E Test
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'example_config/**'
+      - 'docker/**'
+      - 'k8s_template/**'
   push:
     branches:
       - main
