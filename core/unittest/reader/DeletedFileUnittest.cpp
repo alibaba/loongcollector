@@ -25,17 +25,17 @@ namespace logtail {
 class DeletedFileUnittest : public ::testing::Test {
 public:
     void SetUp() override {
-        logPathDir = ".";
-        logPathFile = "DeletedFileUnittest.txt";
+        hostLogPathDir = ".";
+        hostLogPathFile = "DeletedFileUnittest.txt";
         reader.reset(new CommonRegLogFileReader(
-            "testProject", "testLogstore", logPathDir, logPathFile, 0, "%Y-%m-%d %H:%M:%S", ""));
+            "testProject", "testLogstore", hostLogPathDir, hostLogPathFile, 0, "%Y-%m-%d %H:%M:%S", ""));
     }
     void TearDown() override { INT32_FLAG(force_release_deleted_file_fd_timeout) = -1; }
     void TestShouldForceReleaseDeletedFileFdDeleted();
     void TestShouldForceReleaseDeletedFileFdStopped();
     LogFileReaderPtr reader;
-    std::string logPathDir;
-    std::string logPathFile;
+    std::string hostLogPathDir;
+    std::string hostLogPathFile;
 };
 
 void DeletedFileUnittest::TestShouldForceReleaseDeletedFileFdDeleted() {

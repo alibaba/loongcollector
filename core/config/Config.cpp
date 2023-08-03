@@ -570,7 +570,7 @@ LogFileReader* Config::CreateLogFileReader(const std::string& dir,
         reader->SetFuseMode(mIsFuseMode);
         reader->SetMarkOffsetFlag(mMarkOffsetFlag);
         if (mIsFuseMode) {
-            reader->SetFuseTrimedFilename(reader->GetLogPath().substr((STRING_FLAG(fuse_root_dir)).size() + 1));
+            reader->SetFuseTrimedFilename(reader->GetHostLogPath().substr((STRING_FLAG(fuse_root_dir)).size() + 1));
         }
         if (mLogDelayAlarmBytes > 0) {
             reader->SetDelayAlarmBytes(mLogDelayAlarmBytes);
@@ -616,10 +616,10 @@ LogFileReader* Config::CreateLogFileReader(const std::string& dir,
 
 #ifndef _MSC_VER // Unnecessary on platforms without symbolic.
         fsutil::PathStat buf;
-        if (!fsutil::PathStat::lstat(reader->GetLogPath(), buf)) {
+        if (!fsutil::PathStat::lstat(reader->GetHostLogPath(), buf)) {
             // should not happen
             reader->SetSymbolicLinkFlag(false);
-            LOG_ERROR(sLogger, ("failed to stat file", reader->GetLogPath())("set symbolic link flag to false", ""));
+            LOG_ERROR(sLogger, ("failed to stat file", reader->GetHostLogPath())("set symbolic link flag to false", ""));
         } else {
             reader->SetSymbolicLinkFlag(buf.IsLink());
         }

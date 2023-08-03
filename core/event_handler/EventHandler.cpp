@@ -400,7 +400,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(
 
     // new log
     bool backFlag = false;
-    if (readerPtr->GetRealLogPath().empty() || readerPtr->GetRealLogPath() == readerPtr->GetLogPath()) {
+    if (readerPtr->GetRealLogPath().empty() || readerPtr->GetRealLogPath() == readerPtr->GetHostLogPath()) {
         backFlag = true;
         // if reader is a new file(not from checkpoint), and file is rotate file, reset file pos
         if (readerArray.size() > 0 && !readerPtr->IsFromCheckPoint()) {
@@ -495,7 +495,7 @@ void ModifyHandler::Handle(const Event& event) {
                              "delete event has come, and only one reader exists in the corresponding log queue, and "
                              "the queue header file has been read or is forced to close")(
                                 "project", readerArray[0]->GetProjectName())("logstore", readerArray[0]->GetCategory())(
-                                "config", mConfigName)("log reader queue name", readerArray[0]->GetLogPath())(
+                                "config", mConfigName)("log reader queue name", readerArray[0]->GetHostLogPath())(
                                 "file device", readerArray[0]->GetDevInode().dev)(
                                 "file inode", readerArray[0]->GetDevInode().inode)("file size",
                                                                                    readerArray[0]->GetFileSize()));
@@ -518,7 +518,7 @@ void ModifyHandler::Handle(const Event& event) {
                              "the container has been stopped, and current file has been read or is forced to close")(
                                 "project", reader->GetProjectName())("logstore", reader->GetCategory())(
                                 "config", mConfigName)("log reader queue name",
-                                                       reader->GetLogPath())("file device", reader->GetDevInode().dev)(
+                                                       reader->GetHostLogPath())("file device", reader->GetDevInode().dev)(
                                 "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
                         // release fd as quick as possible
                         reader->CloseFilePtr();
@@ -543,7 +543,7 @@ void ModifyHandler::Handle(const Event& event) {
                 LogFileReader::FileCompareResult cmpRst = rotatorReader->CompareToFile(logPath);
                 LOG_DEBUG(sLogger,
                           ("find rotator reader", logPath)("compare result", (int)cmpRst)(
-                              rotatorReader->GetLogPath(), rotatorReader->GetRealLogPath())(
+                              rotatorReader->GetHostLogPath(), rotatorReader->GetRealLogPath())(
                               ToString(rotatorReader->GetLastFilePos()), devInode.inode)("this", (uint64_t)this));
                 switch (cmpRst) {
                     case LogFileReader::FileCompareResult_DevInodeChange:
@@ -554,9 +554,9 @@ void ModifyHandler::Handle(const Event& event) {
                         break;
                     case LogFileReader::FileCompareResult_SigSameSizeChange: {
                         rotatorReader->UpdateLogPath(logPath);
-                        LogFileReaderPtrArray& readerArray = mNameReaderMap[rotatorReader->GetLogPathFile()];
+                        LogFileReaderPtrArray& readerArray = mNameReaderMap[rotatorReader->GetHostLogPathFile()];
                         // new log
-                        if (rotatorReader->GetRealLogPath() == rotatorReader->GetLogPath()) {
+                        if (rotatorReader->GetRealLogPath() == rotatorReader->GetHostLogPath()) {
                             readerArray.push_back(rotatorReader);
                         } else {
                             // rotate log, push front
@@ -635,7 +635,7 @@ void ModifyHandler::Handle(const Event& event) {
         while (!reader->UpdateFilePtr()) {
             if (errno == EMFILE) {
                 LOG_WARNING(sLogger,
-                            ("too many open files", "skip this read operation")("log path", reader->GetLogPath()));
+                            ("too many open files", "skip this read operation")("log path", reader->GetHostLogPath()));
                 return;
             }
             // eg: a.log rotate to a.log1, event sequece : a.log write 2min ago, file ptr closed -> a.log rotate a.log1
@@ -648,7 +648,7 @@ void ModifyHandler::Handle(const Event& event) {
                 sLogger,
                 ("open file failed", "move the corresponding reader to the rotator reader pool")(
                     "project", reader->GetProjectName())("logstore", reader->GetCategory())("config", mConfigName)(
-                    "log reader queue name", reader->GetLogPath())("log reader queue size", readerArrayPtr->size() - 1)(
+                    "log reader queue name", reader->GetHostLogPath())("log reader queue size", readerArrayPtr->size() - 1)(
                     "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
                     "file size", reader->GetFileSize())("rotator reader pool size", mRotatorReaderMap.size() + 1));
             readerArrayPtr->pop_front();
@@ -667,21 +667,21 @@ void ModifyHandler::Handle(const Event& event) {
         // if dev inode changed, delete this reader and create reader
         if (!reader->CheckDevInode()) {
             LOG_INFO(sLogger,
-                     ("file dev inode changed, create new reader. new path", logPath)("old path", reader->GetLogPath())(
+                     ("file dev inode changed, create new reader. new path", logPath)("old path", reader->GetHostLogPath())(
                          ToString(readerArrayPtr->size()), mRotatorReaderMap.size())(
                          ToString(reader->GetDevInode().inode), reader->GetLastFilePos())("DevInode map size",
                                                                                           mDevInodeReaderMap.size()));
             recreateReaderFlag = true;
             LogtailAlarm::GetInstance()->SendAlarm(INNER_PROFILE_ALARM,
                                                    string("file dev inode changed, create new reader. new path:")
-                                                       + reader->GetLogPath() + " ,project:" + reader->GetProjectName()
+                                                       + reader->GetHostLogPath() + " ,project:" + reader->GetProjectName()
                                                        + " ,logstore:" + reader->GetCategory());
         }
         // if signature is different and logpath is different, delete this reader and create reader
-        else if (!reader->CheckFileSignatureAndOffset(fileSize) && logPath != reader->GetLogPath()) {
+        else if (!reader->CheckFileSignatureAndOffset(fileSize) && logPath != reader->GetHostLogPath()) {
             LOG_INFO(sLogger,
                      ("file sig and name both changed, create new reader. new path", logPath)(
-                         "old path", reader->GetLogPath())(ToString(readerArrayPtr->size()), mRotatorReaderMap.size())(
+                         "old path", reader->GetHostLogPath())(ToString(readerArrayPtr->size()), mRotatorReaderMap.size())(
                          ToString(reader->GetDevInode().inode), reader->GetLastFilePos())("DevInode map size",
                                                                                           mDevInodeReaderMap.size()));
             recreateReaderFlag = true;
@@ -690,7 +690,7 @@ void ModifyHandler::Handle(const Event& event) {
             LOG_INFO(sLogger,
                      ("need to recreate reader", "remove the corresponding reader from the log reader queue")(
                          "project", reader->GetProjectName())("logstore", reader->GetCategory())("config", mConfigName)(
-                         "log reader queue name", reader->GetLogPath())(
+                         "log reader queue name", reader->GetHostLogPath())(
                          "log reader queue size", readerArrayPtr->size() - 1)("file device", reader->GetDevInode().dev)(
                          "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
             readerArrayPtr->pop_front();
@@ -705,7 +705,7 @@ void ModifyHandler::Handle(const Event& event) {
         if (reader->ShouldForceReleaseDeletedFileFd()) {
             LOG_INFO(sLogger,
                      ("force closing the file, project", reader->GetProjectName())("logstore", reader->GetCategory())(
-                         "config", mConfigName)("log reader queue name", reader->GetLogPath())(
+                         "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
                          "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
                          "file size", reader->GetFileSize())("last file position", reader->GetLastFilePos()));
             reader->CloseFilePtr();
@@ -719,12 +719,12 @@ void ModifyHandler::Handle(const Event& event) {
                     s_lastOutPutTime = curTime;
                     LOG_WARNING(sLogger,
                                 ("logprocess queue is full, put modify event to event queue again",
-                                 reader->GetLogPath())(reader->GetProjectName(), reader->GetCategory()));
+                                 reader->GetHostLogPath())(reader->GetProjectName(), reader->GetCategory()));
 
                     LogtailAlarm::GetInstance()->SendAlarm(
                         PROCESS_QUEUE_BUSY_ALARM,
                         string("logprocess queue is full, put modify event to event queue again, file:")
-                            + reader->GetLogPath() + " ,project:" + reader->GetProjectName()
+                            + reader->GetHostLogPath() + " ,project:" + reader->GetProjectName()
                             + " ,logstore:" + reader->GetCategory());
                 }
 
@@ -741,6 +741,7 @@ void ModifyHandler::Handle(const Event& event) {
                                                                       reader->GetProjectName(),
                                                                       reader->GetCategory(),
                                                                       reader->GetConvertedPath(),
+                                                                      reader->GetHostLogPath(),
                                                                       reader->GetExtraTags(),
                                                                       reader->GetDevInode().dev,
                                                                       reader->GetDevInode().inode,
@@ -764,7 +765,7 @@ void ModifyHandler::Handle(const Event& event) {
                               "current file has been read, and is marked deleted or the relative container has been "
                               "stopped")("project", reader->GetProjectName())("logstore", reader->GetCategory())(
                                  "config", mConfigName)("log reader queue name",
-                                                        reader->GetLogPath())("file device", reader->GetDevInode().dev)(
+                                                        reader->GetHostLogPath())("file device", reader->GetDevInode().dev)(
                                  "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
                     reader->CloseFilePtr();
                 }
@@ -814,7 +815,7 @@ void ModifyHandler::Handle(const Event& event) {
                 ("close the file and move the corresponding reader to the rotator reader pool",
                  "current file has been read and more files are waiting in the log reader queue")(
                     "project", reader->GetProjectName())("logstore", reader->GetCategory())("config", mConfigName)(
-                    "log reader queue name", reader->GetLogPath())("log reader queue size", readerArrayPtr->size() - 1)(
+                    "log reader queue name", reader->GetHostLogPath())("log reader queue size", readerArrayPtr->size() - 1)(
                     "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
                     "file size", reader->GetFileSize())("rotator reader pool size", mRotatorReaderMap.size() + 1));
             reader->CloseFilePtr();
@@ -867,7 +868,7 @@ void ModifyHandler::HandleTimeOut() {
         // donot check file delete flag or close ptr when array size > 1
         if (readerArray.size() > 1) {
             LOG_DEBUG(sLogger,
-                      ("HandleTimeOut filename", readerIter->first)("dir", readerArray[0]->GetLogPath().c_str())(
+                      ("HandleTimeOut filename", readerIter->first)("dir", readerArray[0]->GetHostLogPath().c_str())(
                           "action", "continue")("reason", "reader array size > 1"));
             ++readerIter;
             actioned = true;
@@ -886,7 +887,7 @@ void ModifyHandler::HandleTimeOut() {
                     ("current file is marked deleted with no more readers in the log reader queue for some time",
                      "remove the corresponding reader from the log reader queue")("project", (*iter)->GetProjectName())(
                         "logstore", (*iter)->GetCategory())("config", mConfigName)(
-                        "log reader queue name", (*iter)->GetLogPath())("log reader queue size", 0)(
+                        "log reader queue name", (*iter)->GetHostLogPath())("log reader queue size", 0)(
                         "file device", (*iter)->GetDevInode().dev)("file inode", (*iter)->GetDevInode().inode)(
                         "file size", (*iter)->GetFileSize())("last file position", (*iter)->GetLastFilePos()));
                 mDevInodeReaderMap.erase((*iter)->GetDevInode());
@@ -900,13 +901,13 @@ void ModifyHandler::HandleTimeOut() {
                 ++closeFilePtrCount;
                 actioned = true;
                 LOG_DEBUG(sLogger,
-                          ("HandleTimeOut filename", readerIter->first)("dir", readerArray[0]->GetLogPath().c_str())(
+                          ("HandleTimeOut filename", readerIter->first)("dir", readerArray[0]->GetHostLogPath().c_str())(
                               "action", "close")("reason", "file no new data timeout"));
             }
         }
         if (!actioned && readerArray.size() > 0) {
             LOG_DEBUG(sLogger,
-                      ("HandleTimeOut filename", readerIter->first)("dir", readerArray[0]->GetLogPath().c_str())(
+                      ("HandleTimeOut filename", readerIter->first)("dir", readerArray[0]->GetHostLogPath().c_str())(
                           "action", "continue")("reason", "nothing to do"));
         }
         if (readerArray.empty()) {
@@ -961,7 +962,7 @@ void ModifyHandler::DeleteTimeoutReader(int32_t timeoutInterval) {
                          ("remove the corresponding reader from the log reader queue",
                           "current file has not been updated for a long time")("project", (*iter)->GetProjectName())(
                              "logstore", (*iter)->GetCategory())("config", mConfigName)(
-                             "log reader queue name", (*iter)->GetLogPath())("log reader queue size",
+                             "log reader queue name", (*iter)->GetHostLogPath())("log reader queue size",
                                                                              readerArray.size() - 1)(
                              "file device", (*iter)->GetDevInode().dev)("file inode", (*iter)->GetDevInode().inode)(
                              "file size", (*iter)->GetFileSize())("last file position", (*iter)->GetLastFilePos()));
