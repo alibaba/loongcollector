@@ -38,7 +38,7 @@ using namespace sls_logs;
 DEFINE_FLAG_INT64(read_file_time_slice, "microseconds", 50 * 1000);
 DEFINE_FLAG_INT32(logreader_timeout_interval,
                   "reader hasn't updated for a long time will be removed, seconds",
-                  86400 * 30);
+                  86400 * 30000); // roughly equivalent to not releasing logReader when timed out
 DEFINE_FLAG_INT32(cookie_timeout_interval,
                   "rotate cookie hasn't updated for a long time will be removed, seconds",
                   1800);
