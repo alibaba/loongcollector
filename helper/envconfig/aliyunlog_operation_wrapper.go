@@ -279,7 +279,7 @@ func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec) er
 		o.addLogstoreCache(project, logstore)
 		return nil
 	}
-	ttl := 180
+	ttl := 90
 	if lifeCycle > 0 {
 		ttl = lifeCycle
 	}
