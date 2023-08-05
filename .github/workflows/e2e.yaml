@@ -21,6 +21,9 @@ on:
       - 'example_config/**'
       - 'docker/**'
       - 'k8s_template/**'
+      - 'changes/**'
+      - 'licenses/**'
+      - 'CHANGELOG.md'
   push:
     branches:
       - main
