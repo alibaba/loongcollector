@@ -1555,6 +1555,7 @@ bool EventDispatcherBase::ReadDSPacket(int eventFd) {
                                                                          config->mProjectName,
                                                                          config->mCategory,
                                                                          "",
+                                                                         "",
                                                                          empty,
                                                                          msgStr.size(),
                                                                          0,

@@ -281,10 +281,12 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             s_processCount++;
             s_processBytes += (logBuffer->bufferSize);
             LogFileReaderPtr logFileReader = logBuffer->logFileReader;
-            auto logPath = logFileReader->GetConvertedPath();
+            auto convertedPath = logFileReader->GetConvertedPath();
+            auto hostLogPath = logFileReader->GetHostLogPath();
 #if defined(_MSC_VER)
             if (BOOL_FLAG(enable_chinese_tag_path)) {
-                logPath = EncodingConverter::GetInstance()->FromACPToUTF8(logPath);
+                convertedPath = EncodingConverter::GetInstance()->FromACPToUTF8(convertedPath);
+                hostLogPath = EncodingConverter::GetInstance()->FromACPToUTF8(hostLogPath);
             }
 #endif
 
@@ -319,7 +321,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                     passingTags.append(TAG_PREFIX)
                         .append(LOG_RESERVED_KEY_PATH)
                         .append(TAG_SEPARATOR)
-                        .append(logPath.substr(0, 511));
+                        .append(convertedPath.substr(0, 511));
 
                     std::string userDefinedId = ConfigManager::GetInstance()->GetUserDefinedIdSet();
                     if (!userDefinedId.empty()) {
@@ -386,14 +388,14 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                     if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
                         LogtailAlarm::GetInstance()->SendAlarm(
                             SPLIT_LOG_FAIL_ALARM,
-                            "split log lines fail, please check log_begin_regex, file:" + logPath
+                            "split log lines fail, please check log_begin_regex, file:" + convertedPath
                                 + ", logs:" + string(buffer, 0, 1024),
                             projectName,
                             category,
                             config->mRegion);
                     }
                     LOG_ERROR(sLogger,
-                              ("split log lines fail", "please check log_begin_regex")("file_name", logPath)(
+                              ("split log lines fail", "please check log_begin_regex")("file_name", convertedPath)(
                                   "read bytes", readBytes)("first 1KB log", string(buffer, 0, 1024)));
                 }
                 // if not discard unmatch data, we add whole data block when data splitted fail
@@ -494,7 +496,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                     logTagPtr->set_value(LogFileProfiler::mHostname.substr(0, 99));
                     logTagPtr = logGroup.add_logtags();
                     logTagPtr->set_key(LOG_RESERVED_KEY_PATH);
-                    logTagPtr->set_value(logPath.substr(0, 511));
+                    logTagPtr->set_value(convertedPath.substr(0, 511));
 
                     // zone info for ant
                     const std::string& alipayZone = AppConfig::GetInstance()->GetAlipayZone();
@@ -573,7 +575,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                                   config->mMergeType,
                                                   (uint32_t)(logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
                                                   "",
-                                                  logPath,
+                                                  convertedPath,
                                                   context)) {
                         LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
                                                                "push file data into batch map fail",
@@ -582,7 +584,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                                                config->mRegion);
                         LOG_ERROR(sLogger,
                                   ("push file data into batch map fail, discard logs", logGroup.logs_size())(
-                                      "project", projectName)("logstore", category)("filename", logPath));
+                                      "project", projectName)("logstore", category)("filename", convertedPath));
                     }
                 }
             }
@@ -591,7 +593,8 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                                              config->mRegion,
                                                              projectName,
                                                              category,
-                                                             logPath,
+                                                             convertedPath,
+                                                             hostLogPath,
                                                              logFileReader->GetExtraTags(),
                                                              readBytes,
                                                              skipBytes,
@@ -603,7 +606,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                                              sendFailures,
                                                              errorLine);
             LOG_DEBUG(sLogger,
-                      ("project", projectName)("logstore", category)("filename", logPath)("read_bytes", readBytes)(
+                      ("project", projectName)("logstore", category)("filename", convertedPath)("hostFilename", hostLogPath)("read_bytes", readBytes)(
                           "line_feed", lineFeed)("split_lines", splitLines)("parse_failures", parseFailures)(
                           "parse_time_failures", parseTimeFailures)("regex_match_failures", regexMatchFailures)(
                           "history_failures", historyFailures));
