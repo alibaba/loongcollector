@@ -18,7 +18,9 @@
 package helper
 
 import (
+	"io/fs"
 	"os"
+	"strings"
 )
 
 var DefaultLogtailMountPath string
@@ -29,6 +31,43 @@ func GetMountedFilePath(logPath string) string {
 
 func GetMountedFilePathWithBasePath(basePath, logPath string) string {
 	return basePath + logPath
+}
+
+func TryGetRealPath(path string) (string, fs.FileInfo) {
+	sepLen := len(string(os.PathSeparator))
+	index := 0 // assume path is absolute
+	for i := 0; i < 10; i++ {
+		if f, err := os.Stat(path); err == nil {
+			return path, f
+		}
+		for {
+			j := strings.IndexRune(path[index+sepLen:], os.PathSeparator)
+			if j == -1 {
+				index = len(path)
+			} else {
+				index += j + sepLen
+			}
+
+			f, err := os.Lstat(path[:index])
+			if err != nil {
+				return "", nil
+			}
+			if f.Mode()&os.ModeSymlink != 0 {
+				// path[:index] is a symlink
+				target, _ := os.Readlink(path[:index])
+				partialPath := GetMountedFilePath(target)
+				path = partialPath + path[index:]
+				if _, err := os.Stat(partialPath); err != nil {
+					// path referenced by partialPath does not exist or has symlink
+					index = 0
+				} else {
+					index = len(partialPath)
+				}
+				break
+			}
+		}
+	}
+	return "", nil
 }
 
 func init() {

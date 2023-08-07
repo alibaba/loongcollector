@@ -43,4 +43,5 @@ your changes, such as:
 - [public] [both] [added] add new plugin: input_command
 - [public] [both] [added] add new plugin: processor_log_to_sls_metric
 - [public] [both] [fixed] fix service_go_profile nil panic
+- [public] [both] [fixed] fix broken container log path link
 - [public] [both] [fixed] service_prometheus support scale in kubernetes

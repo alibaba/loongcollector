@@ -16,7 +16,6 @@ package stdout
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -85,9 +84,9 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 		}
 
 		// first watch this container
-		stat, err := os.Stat(checkpoint.Path)
-		if err != nil {
-			logger.Warning(sds.context.GetRuntimeContext(), "DOCKER_STDOUT_STAT_ALARM", "stat log file error, path", checkpoint.Path, "error", err.Error())
+		realPath, stat := helper.TryGetRealPath(checkpoint.Path)
+		if realPath == "" {
+			logger.Warning(sds.context.GetRuntimeContext(), "DOCKER_STDOUT_STAT_ALARM", "stat log file error, path", checkpoint.Path, "error", "path not found")
 		} else {
 			checkpoint.Offset = stat.Size()
 			if checkpoint.Offset > sds.StartLogMaxOffset {
