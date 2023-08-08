@@ -87,35 +87,45 @@ func (p *ProcessorOtelTraceParser) processLog(log *protocol.Log) (logs []*protoc
 
 func (p *ProcessorOtelTraceParser) processJSONTraceData(data string) ([]*protocol.Log, error) {
 	jsonUnmarshaler := ptrace.JSONUnmarshaler{}
-	if trace, err := jsonUnmarshaler.UnmarshalTraces([]byte(data)); err != nil {
+	var trace ptrace.Traces
+	var err error
+
+	if trace, err = jsonUnmarshaler.UnmarshalTraces([]byte(data)); err != nil {
 		return nil, err
-	} else {
-		log, _ := opentelemetry.ConvertTrace(trace)
-		return log, nil
 	}
+
+	log, _ := opentelemetry.ConvertTrace(trace)
+	return log, nil
 }
 
 func (p *ProcessorOtelTraceParser) processProtobufTraceData(val string) ([]*protocol.Log, error) {
 	protoUnmarshaler := ptrace.ProtoUnmarshaler{}
-	if trace, err := protoUnmarshaler.UnmarshalTraces([]byte(val)); err != nil {
+	var trace ptrace.Traces
+	var err error
+
+	if trace, err = protoUnmarshaler.UnmarshalTraces([]byte(val)); err != nil {
 		return nil, err
-	} else {
-		log, _ := opentelemetry.ConvertTrace(trace)
-		return log, nil
 	}
+
+	log, _ := opentelemetry.ConvertTrace(trace)
+	return log, nil
 }
 
 func (p *ProcessorOtelTraceParser) processProtoJSONTraceData(val string) ([]*protocol.Log, error) {
 	resourceSpans := &v1.ResourceSpans{}
-	if err := protojson.Unmarshal([]byte(val), resourceSpans); err != nil {
+	var err error
+
+	if err = protojson.Unmarshal([]byte(val), resourceSpans); err != nil {
 		return nil, err
-	} else {
-		if log, e := opentelemetry.ConvertResourceSpans(resourceSpans, p.TraceIDNeedDecode, p.SpanIDNeedDecode, p.ParentSpanIDNeedDecode); e != nil {
-			return nil, e
-		} else {
-			return log, nil
-		}
 	}
+
+	var log []*protocol.Log
+
+	if log, err = opentelemetry.ConvertResourceSpans(resourceSpans, p.TraceIDNeedDecode, p.SpanIDNeedDecode, p.ParentSpanIDNeedDecode); err != nil {
+		return nil, err
+	}
+
+	return log, nil
 }
 
 func init() {
