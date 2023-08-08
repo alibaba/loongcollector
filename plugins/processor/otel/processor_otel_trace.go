@@ -60,7 +60,7 @@ func (p *ProcessorOtelTraceParser) processLog(log *protocol.Log) ([]*protocol.Lo
 
 			switch strings.ToLower(p.Format) {
 			case "json":
-				if l, err := p.processJsonTraceData(objectVal); err != nil {
+				if l, err := p.processJSONTraceData(objectVal); err != nil {
 					return logs, err
 				} else {
 					logs = append(logs, l...)
@@ -72,12 +72,14 @@ func (p *ProcessorOtelTraceParser) processLog(log *protocol.Log) ([]*protocol.Lo
 				} else {
 					logs = append(logs, l...)
 				}
+				break
 			case "protojson":
-				if l, err := p.processProtoJsonTraceData(objectVal); err != nil {
+				if l, err := p.processProtoJSONTraceData(objectVal); err != nil {
 					return logs, err
 				} else {
 					logs = append(logs, l...)
 				}
+				break
 			}
 		}
 	}
@@ -90,7 +92,7 @@ func (p *ProcessorOtelTraceParser) processLog(log *protocol.Log) ([]*protocol.Lo
 	return logs, nil
 }
 
-func (p *ProcessorOtelTraceParser) processJsonTraceData(data string) ([]*protocol.Log, error) {
+func (p *ProcessorOtelTraceParser) processJSONTraceData(data string) ([]*protocol.Log, error) {
 	var logs = make([]*protocol.Log, 0)
 	jsonUnmarshaler := ptrace.JSONUnmarshaler{}
 	if trace, err := jsonUnmarshaler.UnmarshalTraces([]byte(data)); err != nil {
@@ -119,7 +121,7 @@ func (p *ProcessorOtelTraceParser) processProtobufTraceData(val string) ([]*prot
 	return logs, nil
 }
 
-func (p *ProcessorOtelTraceParser) processProtoJsonTraceData(val string) ([]*protocol.Log, error) {
+func (p *ProcessorOtelTraceParser) processProtoJSONTraceData(val string) ([]*protocol.Log, error) {
 	var logs = make([]*protocol.Log, 0)
 	resourceSpans := &v1.ResourceSpans{}
 	if err := protojson.Unmarshal([]byte(val), resourceSpans); err != nil {
