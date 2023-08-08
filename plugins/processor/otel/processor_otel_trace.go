@@ -49,38 +49,31 @@ func (p *ProcessorOtelTraceParser) ProcessLogs(logArray []*protocol.Log) []*prot
 	return logs
 }
 
-func (p *ProcessorOtelTraceParser) processLog(log *protocol.Log) ([]*protocol.Log, error) {
-	var logs = make([]*protocol.Log, 0)
+func (p *ProcessorOtelTraceParser) processLog(log *protocol.Log) (logs []*protocol.Log, err error) {
+	logs = make([]*protocol.Log, 0)
 
 	findKey := false
 	for idx := range log.Contents {
 		if log.Contents[idx].Key == p.SourceKey {
 			findKey = true
 			objectVal := log.Contents[idx].Value
+			var l []*protocol.Log
 
 			switch strings.ToLower(p.Format) {
 			case "json":
-				if l, err := p.processJSONTraceData(objectVal); err != nil {
+				if l, err = p.processJSONTraceData(objectVal); err != nil {
 					return logs, err
-				} else {
-					logs = append(logs, l...)
 				}
-				break
 			case "protobuf":
-				if l, err := p.processProtobufTraceData(objectVal); err != nil {
+				if l, err = p.processProtobufTraceData(objectVal); err != nil {
 					return logs, err
-				} else {
-					logs = append(logs, l...)
 				}
-				break
 			case "protojson":
-				if l, err := p.processProtoJSONTraceData(objectVal); err != nil {
+				if l, err = p.processProtoJSONTraceData(objectVal); err != nil {
 					return logs, err
-				} else {
-					logs = append(logs, l...)
 				}
-				break
 			}
+			logs = append(logs, l...)
 		}
 	}
 
