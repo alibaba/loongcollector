@@ -2,14 +2,16 @@ package otel
 
 import (
 	"errors"
+	"strings"
+
+	"go.opentelemetry.io/collector/pdata/ptrace"
+	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/encoding/protojson"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/opentelemetry"
-	"go.opentelemetry.io/collector/pdata/ptrace"
-	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
-	"google.golang.org/protobuf/encoding/protojson"
-	"strings"
 )
 
 type ProcessorOtelTraceParser struct {

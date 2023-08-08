@@ -4,14 +4,16 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"strconv"
+	"time"
+
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	v1Common "go.opentelemetry.io/proto/otlp/common/v1"
 	v1Resource "go.opentelemetry.io/proto/otlp/resource/v1"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
-	"strconv"
-	"time"
+
+	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 const (
