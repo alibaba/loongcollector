@@ -1,3 +1,5 @@
+package opentelemetry
+
 import (
 	"encoding/json"
 	"fmt"
