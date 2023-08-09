@@ -87,7 +87,7 @@ func resourceToLogContents(resource pcommon.Resource) []*protocol.Log_Content {
 		}
 	}
 
-	attributeBuffer, _ := json.Marshal(attrs)
+	attributeBuffer, _ := json.Marshal(attrs.AsRaw())
 	logContents[2] = &protocol.Log_Content{
 		Key:   slsLogResource,
 		Value: string(attributeBuffer),
