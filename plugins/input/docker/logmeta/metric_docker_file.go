@@ -90,6 +90,7 @@ type InputDockerFile struct {
 	fullList              map[string]bool
 	matchList             map[string]*helper.DockerInfoDetail
 	CollectContainersFlag bool
+	firstStart            bool
 }
 
 func formatPath(path string) string {
@@ -112,6 +113,7 @@ func (idf *InputDockerFile) Name() string {
 func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	idf.context = context
 	idf.lastPathMappingCache = make(map[string]string)
+	idf.firstStart = true
 	idf.fullList = make(map[string]bool)
 	idf.matchList = make(map[string]*helper.DockerInfoDetail)
 	// Because docker on Windows will convert all mounted path to lowercase (see
@@ -289,7 +291,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 	if len(idf.lastPathMappingCache) == 0 {
 		allCmd = new(DockerFileUpdateCmdAll)
 	}
-	newCount, delCount, addResultList, deleteResultList, addFullList, deleteFullList := helper.GetContainerByAcceptedInfoV2(
+	newCount, delCount, addResultList, deleteResultList := helper.GetContainerByAcceptedInfoV2(
 
 		idf.fullList, idf.matchList,
 		idf.IncludeLabel, idf.ExcludeLabel,
@@ -298,24 +300,6 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 		idf.IncludeEnvRegex, idf.ExcludeEnvRegex,
 		idf.K8sFilter)
 	idf.lastUpdateTime = newUpdateTime
-	if idf.CollectContainersFlag {
-		// record added container id
-		if len(addFullList) > 0 {
-			for _, id := range addFullList {
-				if len(id) > 0 {
-					helper.RecordAddedContainerIDs(id)
-				}
-			}
-		}
-		// record deleted container id
-		if len(deleteFullList) > 0 {
-			for _, id := range deleteFullList {
-				if len(id) > 0 {
-					helper.RecordDeletedContainerIDs(helper.GetShortID(id))
-				}
-			}
-		}
-	}
 	// record config result
 	havingPathkeys := make([]string, 0)
 	nothavingPathkeys := make([]string, 0)
@@ -374,10 +358,11 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 			FlusherTargetAddress:          fmt.Sprintf("%s/%s", idf.context.GetProject(), idf.context.GetLogstore()),
 		}
 		helper.RecordContainerConfigResultMap(configResult)
-		if newCount != 0 || delCount != 0 {
+		if newCount != 0 || delCount != 0 || idf.firstStart {
 			helper.RecordContainerConfigResultIncrement(configResult)
+			idf.firstStart = false
 		}
-		logger.Debugf(idf.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v, addFullList: %v, deleteFullList: %v", addResultList, deleteResultList, addFullList, deleteFullList)
+		logger.Debugf(idf.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v", addResultList, deleteResultList)
 	}
 
 	for id := range idf.lastPathMappingCache {

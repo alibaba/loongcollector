@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
@@ -160,10 +161,14 @@ func GetContainerByAcceptedInfoV2(
 	includeEnvRegex map[string]*regexp.Regexp,
 	excludeEnvRegex map[string]*regexp.Regexp,
 	k8sFilter *K8SFilter,
-) (newCount, delCount int, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList []string) {
+) (newCount, delCount int, matchAddedList, matchDeletedList []string) {
 	return getDockerCenterInstance().getAllAcceptedInfoV2(
 		fullList, matchList, includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, k8sFilter)
 
+}
+
+func GetDiffContainers(fullList map[string]struct{}) (fullAddedList, fullDeletedList []string) {
+	return getDockerCenterInstance().getDiffContainers(fullList)
 }
 
 // SplitRegexFromMap extract regex from user config
@@ -189,9 +194,17 @@ func SplitRegexFromMap(input map[string]string) (staticResult map[string]string,
 func CreateDockerClient(opt ...docker.Opt) (client *docker.Client, err error) {
 	opt = append(opt, docker.FromEnv)
 	client, err = docker.NewClientWithOpts(opt...)
-	if err == nil {
-		client.NegotiateAPIVersion(context.Background())
+	if err != nil {
+		return nil, err
 	}
+	// add dockerClient connectivity tests
+	pingCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	ping, err := client.Ping(pingCtx)
+	if err != nil {
+		return nil, err
+	}
+	client.NegotiateAPIVersionPing(ping)
 	return
 }
 

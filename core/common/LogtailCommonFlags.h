@@ -70,3 +70,4 @@ DECLARE_FLAG_STRING(fuse_root_dir);
 DECLARE_FLAG_BOOL(enable_root_path_collection);
 DECLARE_FLAG_INT32(logtail_alarm_interval);
 DECLARE_FLAG_BOOL(enable_timestamp_nanosecond);
+DECLARE_FLAG_BOOL(enable_containerd_upper_dir_detect);

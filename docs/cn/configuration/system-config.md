@@ -14,7 +14,7 @@
 | `data_server_port`    | Int |<p>用于控制 `flusher_sls` 往 `SLS` 发送的协议类型。</p> <p>取值范围：443（默认），表示使用 `HTTPS` 协议发送；80表示使用 `HTTP` 协议发送。</p><p>如果使用`SLS`内网域名写入，建议使用`HTTP`协议发送，提高传输性能。</p> |
 | `send_running_status`    | Bool | 为了更好的了解 `iLogtail` 的使用情况，以便做出更有针对性的发展规划，`iLogtail` 会上报一些脱敏后的运行统计信息。您也可以手动关闭此开关。                                              |
 
-## 典型配置
+### 典型配置
 
 ```json
 {
@@ -24,4 +24,13 @@
     "mem_usage_limit" : 384
 }
 ```
+## 环境变量
+
+### containerd runtime相关环境变量配置
+| 参数                      | 类型     | 说明                                                                                                         |
+| ----------------------- |--------|------------------------------------------------------------------------------------------------------------|
+| `USE_CONTAINERD`       | Bool   | 是否使用containerd runtime，非必选。ilogtail会自动通过接口探测。                                                              |
+| `CONTAINERD_SOCK_PATH`       | String | 自定义containerd sock路径，非必选。默认为/run/containerd/containerd.sock。自定义取值可以通过查看/etc/containerd/config.toml grpc.address字段获取。 |
+| `CONTAINERD_STATE_DIR` | String | 自定义containerd 数据目录，非必选。自定义取值可以通过查看/etc/containerd/config.toml state字段获取。                                             |
+
 > 因为k8s本身自带资源限制的功能，所以如果你要将ilogtail部署到k8s中，可以通过将`cpu_usage_limit` 和 `mem_usage_limit` 设置为一个很大的值（比如99999999），以此来达到“关闭”ilogtail自身熔断功能的目的。

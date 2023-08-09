@@ -16,7 +16,6 @@ package pluginmanager
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -24,82 +23,80 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-// 24h
-var FetchAllInterval = time.Second * time.Duration(24*60*60)
-
-// 30min
-var FirstFetchAllInterval = time.Second * time.Duration(30*60)
-
-var timerFetchRunning = false
-
-var envAndLabelMutex sync.Mutex
+// 12h
+var FetchAllInterval = time.Second * time.Duration(12*60*60)
 
 var envSet map[string]struct{}
 var containerLabelSet map[string]struct{}
 var k8sLabelSet map[string]struct{}
 
-func timerRecordData() {
-	recordContainers(make(map[string]struct{}))
-	// record all container config result at same time
-	helper.RecordContainerConfigResult()
-}
-
-// 记录增量的容器
-func recordAddedContainers() {
-	containerIDs := helper.GetAddedContainerIDs()
-	if len(containerIDs) > 0 {
-		recordContainers(containerIDs)
-	}
-}
-
-func recordContainers(containerIDs map[string]struct{}) {
-	projectSet := make(map[string]struct{})
-	for _, logstoreConfig := range LogtailConfig {
-		projectSet[logstoreConfig.ProjectName] = struct{}{}
-	}
-	keys := make([]string, 0, len(projectSet))
-	for k := range projectSet {
-		if len(k) > 0 {
-			keys = append(keys, k)
-		}
-	}
-	projectStr := helper.GetStringFromList(keys)
-	// get add container
-	envAndLabelMutex.Lock()
-	result := helper.GetAllContainerToRecord(envSet, containerLabelSet, k8sLabelSet, containerIDs)
-	envAndLabelMutex.Unlock()
-	for _, containerInfo := range result {
-		var containerDetailToRecord helper.ContainerDetail
-		containerDetailToRecord.Project = projectStr
-		containerDetailToRecord.DataType = "all_container_info"
-		containerDetailToRecord.ContainerID = containerInfo.Detail.ContainerInfo.ID
-		containerDetailToRecord.ContainerIP = containerInfo.Detail.ContainerIP
-		containerDetailToRecord.ContainerName = containerInfo.Detail.K8SInfo.ContainerName
-		containerDetailToRecord.Driver = containerInfo.Detail.ContainerInfo.Driver
-		containerDetailToRecord.HostsPath = containerInfo.Detail.ContainerInfo.HostsPath
-		containerDetailToRecord.Hostname = containerInfo.Detail.ContainerInfo.Config.Hostname
-		containerDetailToRecord.ImageName = containerInfo.Detail.ContainerInfo.Config.Image
-		containerDetailToRecord.Namespace = containerInfo.Detail.K8SInfo.Namespace
-		containerDetailToRecord.PodName = containerInfo.Detail.K8SInfo.Pod
-		containerDetailToRecord.LogPath = containerInfo.Detail.ContainerInfo.LogPath
-		containerDetailToRecord.RootPath = containerInfo.Detail.DefaultRootPath
-		containerDetailToRecord.RawContainerName = containerInfo.Detail.ContainerInfo.Name
-
-		containerDetailToRecord.Env = containerInfo.Env
-		containerDetailToRecord.ContainerLabels = containerInfo.ContainerLabels
-		containerDetailToRecord.K8sLabels = containerInfo.K8sLabels
-		helper.RecordAddedContainer(&containerDetailToRecord)
-	}
-}
+var cachedFullList map[string]struct{}
+var lastFetchAllTime time.Time
 
 func CollectContainers(logGroup *protocol.LogGroup) {
-	recordAddedContainers()
-	helper.SerializeContainerToPb(logGroup)
+	if isCollectContainers() {
+		if time.Since(lastFetchAllTime) >= FetchAllInterval {
+			logger.Info(context.Background(), "CollectAllContainers running", time.Since(lastFetchAllTime))
+			refreshEnvAndLabel()
+			collectAllContainers(logGroup)
+			lastFetchAllTime = time.Now()
+		} else {
+			logger.Debugf(context.Background(), "CollectDiffContainers running", time.Since(lastFetchAllTime))
+			collectDiffContainers(logGroup)
+		}
+	}
 }
 
-func CollectDeleteContainers(logGroup *protocol.LogGroup) {
-	containerIDs := helper.GetDeletedContainerIDs()
-	logger.Debugf(context.Background(), "GetDeletedContainerIDs", containerIDs)
+func CollectConfigResult(logGroup *protocol.LogGroup) {
+	helper.SerializeContainerConfigResultToPb(logGroup)
+}
+
+func collectAllContainers(logGroup *protocol.LogGroup) {
+	fullList, containerDetailToRecords := getContainersToRecord(make(map[string]struct{}))
+	cachedFullList = fullList
+	helper.SerializeContainerToPb(logGroup, containerDetailToRecords)
+	logger.Debugf(context.Background(), "reset cachedFullList")
+}
+
+func collectDiffContainers(logGroup *protocol.LogGroup) {
+	if cachedFullList == nil {
+		cachedFullList = make(map[string]struct{})
+	}
+	fullAddedList, fullDeletedList := helper.GetDiffContainers(cachedFullList)
+	logger.Debugf(context.Background(), "fullDeletedList: %v, fullAddedList: %v", fullDeletedList, fullAddedList)
+
+	if len(fullDeletedList) > 0 {
+		shortDeletedIDs := make(map[string]struct{})
+		for _, containerID := range fullDeletedList {
+			if len(containerID) > 0 {
+				shortDeletedIDs[helper.GetShortID(containerID)] = struct{}{}
+			}
+		}
+		if len(shortDeletedIDs) > 0 {
+			recordDeleteContainers(logGroup, shortDeletedIDs)
+		}
+	}
+	if len(fullAddedList) > 0 {
+		containerIDs := make(map[string]struct{})
+		for _, containerID := range fullAddedList {
+			containerIDs[containerID] = struct{}{}
+		}
+		if len(containerIDs) > 0 {
+			_, containers := getContainersToRecord(containerIDs)
+			if len(containers) > 0 {
+				helper.SerializeContainerToPb(logGroup, containers)
+			}
+		}
+	}
+	{
+		containers := compareEnvAndLabelAndRecordContainer()
+		if len(containers) > 0 {
+			helper.SerializeContainerToPb(logGroup, containers)
+		}
+	}
+}
+
+func recordDeleteContainers(logGroup *protocol.LogGroup, containerIDs map[string]struct{}) {
 	if len(containerIDs) > 0 {
 		projectSet := make(map[string]struct{})
 
@@ -125,13 +122,7 @@ func CollectDeleteContainers(logGroup *protocol.LogGroup) {
 	}
 }
 
-func CollectConfigResult(logGroup *protocol.LogGroup) {
-	helper.SerializeContainerConfigResultToPb(logGroup)
-}
-
 func refreshEnvAndLabel() {
-	envAndLabelMutex.Lock()
-	defer envAndLabelMutex.Unlock()
 	envSet = make(map[string]struct{})
 	containerLabelSet = make(map[string]struct{})
 	k8sLabelSet = make(map[string]struct{})
@@ -148,7 +139,7 @@ func refreshEnvAndLabel() {
 			}
 		}
 	}
-	logger.Debugf(context.Background(), "refreshEnvAndLabel", envSet, containerLabelSet, k8sLabelSet)
+	logger.Info(context.Background(), "envSet", envSet, "containerLabelSet", containerLabelSet, "k8sLabelSet", k8sLabelSet)
 }
 
 func compareEnvAndLabel() (diffEnvSet, diffContainerLabelSet, diffK8sLabelSet map[string]struct{}) {
@@ -181,12 +172,56 @@ func compareEnvAndLabel() (diffEnvSet, diffContainerLabelSet, diffK8sLabelSet ma
 	return diffEnvSet, diffContainerLabelSet, diffK8sLabelSet
 }
 
-func compareEnvAndLabelAndRecordContainer() {
-	envAndLabelMutex.Lock()
-	defer envAndLabelMutex.Unlock()
+func getContainersToRecord(containerIDs map[string]struct{}) (map[string]struct{}, []*helper.ContainerDetail) {
+	projectSet := make(map[string]struct{})
+	recordedContainerIds := make(map[string]struct{})
 
+	for _, logstoreConfig := range LogtailConfig {
+		projectSet[logstoreConfig.ProjectName] = struct{}{}
+	}
+	keys := make([]string, 0, len(projectSet))
+	for k := range projectSet {
+		if len(k) > 0 {
+			keys = append(keys, k)
+		}
+	}
+	projectStr := helper.GetStringFromList(keys)
+	// get add container
+	result := helper.GetAllContainerToRecord(envSet, containerLabelSet, k8sLabelSet, containerIDs)
+
+	containerDetailToRecords := make([]*helper.ContainerDetail, 0)
+	for _, containerInfo := range result {
+		var containerDetailToRecord helper.ContainerDetail
+		containerDetailToRecord.Project = projectStr
+		containerDetailToRecord.DataType = "all_container_info"
+		containerDetailToRecord.ContainerID = containerInfo.Detail.ContainerInfo.ID
+		recordedContainerIds[containerInfo.Detail.ContainerInfo.ID] = struct{}{}
+		containerDetailToRecord.ContainerIP = containerInfo.Detail.ContainerIP
+		containerDetailToRecord.ContainerName = containerInfo.Detail.K8SInfo.ContainerName
+		containerDetailToRecord.Driver = containerInfo.Detail.ContainerInfo.Driver
+		containerDetailToRecord.HostsPath = containerInfo.Detail.ContainerInfo.HostsPath
+		containerDetailToRecord.Hostname = containerInfo.Detail.ContainerInfo.Config.Hostname
+		containerDetailToRecord.ImageName = containerInfo.Detail.ContainerInfo.Config.Image
+		containerDetailToRecord.Namespace = containerInfo.Detail.K8SInfo.Namespace
+		containerDetailToRecord.PodName = containerInfo.Detail.K8SInfo.Pod
+		containerDetailToRecord.LogPath = containerInfo.Detail.ContainerInfo.LogPath
+		containerDetailToRecord.RootPath = containerInfo.Detail.DefaultRootPath
+		containerDetailToRecord.RawContainerName = containerInfo.Detail.ContainerInfo.Name
+
+		containerDetailToRecord.Env = containerInfo.Env
+		containerDetailToRecord.ContainerLabels = containerInfo.ContainerLabels
+		containerDetailToRecord.K8sLabels = containerInfo.K8sLabels
+		containerDetailToRecords = append(containerDetailToRecords, &containerDetailToRecord)
+
+	}
+	return recordedContainerIds, containerDetailToRecords
+}
+
+func compareEnvAndLabelAndRecordContainer() []*helper.ContainerDetail {
 	diffEnvSet, diffContainerLabelSet, diffK8sLabelSet := compareEnvAndLabel()
 	logger.Debugf(context.Background(), "compareEnvAndLabel", diffEnvSet, diffContainerLabelSet, diffK8sLabelSet)
+
+	containerDetailToRecords := make([]*helper.ContainerDetail, 0)
 
 	if len(diffEnvSet) != 0 || len(diffContainerLabelSet) != 0 || len(diffK8sLabelSet) != 0 {
 		projectSet := make(map[string]struct{})
@@ -223,9 +258,10 @@ func compareEnvAndLabelAndRecordContainer() {
 			containerDetailToRecord.Env = containerInfo.Env
 			containerDetailToRecord.ContainerLabels = containerInfo.ContainerLabels
 			containerDetailToRecord.K8sLabels = containerInfo.K8sLabels
-			helper.RecordAddedContainer(&containerDetailToRecord)
+			containerDetailToRecords = append(containerDetailToRecords, &containerDetailToRecord)
 		}
 	}
+	return containerDetailToRecords
 }
 
 func isCollectContainers() bool {
@@ -235,38 +271,4 @@ func isCollectContainers() bool {
 		}
 	}
 	return false
-}
-
-func TimerFetchFuction() {
-	timerFetch := func() {
-		lastFetchAllTime := time.Now()
-		flagFirst := true
-		refreshEnvAndLabel()
-		for {
-			logger.Debugf(context.Background(), "timerFetchFuction", time.Since(lastFetchAllTime))
-			time.Sleep(time.Duration(10) * time.Second)
-			if isCollectContainers() {
-				fetchInterval := FetchAllInterval
-				if flagFirst {
-					// 第一次时间跟后面的周期性时间不同
-					fetchInterval = FirstFetchAllInterval
-				}
-				if time.Since(lastFetchAllTime) >= fetchInterval {
-					logger.Info(context.Background(), "timerFetchFuction running", time.Since(lastFetchAllTime))
-					refreshEnvAndLabel()
-					timerRecordData()
-					lastFetchAllTime = time.Now()
-					if flagFirst {
-						flagFirst = false
-					}
-				} else {
-					compareEnvAndLabelAndRecordContainer()
-				}
-			}
-		}
-	}
-	if !timerFetchRunning {
-		go timerFetch()
-		timerFetchRunning = true
-	}
 }

@@ -51,7 +51,7 @@ your changes, such as:
 - [inner] [both] [updated] Logtail containers monitor refine code
 
 - [public] [both] [fixed] Fix service_go_profile nil panic
-- [public] [both] [fixed] Fix broken container log path link
+- [public] [both] [fixed] Fix broken container stdout log path link
 - [public] [both] [fixed] Fix zstd batch send error
 - [public] [both] [fixed] Fix go pb has TimeNs when not set
 - [public] [both] [fixed] Fix elasticsearch flusher panic

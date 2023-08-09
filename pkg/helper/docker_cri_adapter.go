@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -30,12 +29,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/containerd"
+
 	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"google.golang.org/grpc"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
@@ -60,8 +62,8 @@ type innerContainerInfo struct {
 	Status string
 }
 type CRIRuntimeWrapper struct {
-	dockerCenter *DockerCenter
-
+	dockerCenter   *DockerCenter
+	nativeClient   *containerd.Client
 	client         cri.RuntimeServiceClient
 	runtimeVersion *cri.VersionResponse
 
@@ -223,9 +225,22 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 		return nil, err
 	}
 
+	var containerdClient *containerd.Client
+	if config.LogtailGlobalConfig.EnableContainerdUpperDirDetect {
+		containerdClient, err = containerd.New(containerdUnixSocket, containerd.WithDefaultNamespace("k8s.io"))
+		if err == nil {
+			_, err = containerdClient.Version(context.Background())
+		}
+		if err != nil {
+			logger.Warning(context.Background(), "CONTAINERD_CLIENT_ALARM", "Connect containerd failed", err)
+			containerdClient = nil
+		}
+	}
+
 	return &CRIRuntimeWrapper{
 		dockerCenter:           dockerCenter,
 		client:                 client,
+		nativeClient:           containerdClient,
 		runtimeVersion:         runtimeVersion,
 		containers:             make(map[string]*innerContainerInfo),
 		containerHistory:       make(map[string]bool),
@@ -335,9 +350,16 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 			})
 		}
 	}
-
+	if ci.Snapshotter != "" && ci.SnapshotKey != "" {
+		uppDir := cw.getContainerUpperDir(ci.SnapshotKey, ci.Snapshotter)
+		if uppDir != "" {
+			dockerContainer.GraphDriver.Data = map[string]string{
+				"UpperDir": uppDir,
+			}
+		}
+	}
 	if len(hostnamePath) > 0 {
-		hn, _ := ioutil.ReadFile(GetMountedFilePath(hostnamePath))
+		hn, _ := os.ReadFile(GetMountedFilePath(hostnamePath))
 		dockerContainer.Config.Hostname = strings.Trim(string(hn), "\t \n")
 	}
 	dockerContainer.HostnamePath = hostnamePath
@@ -370,19 +392,19 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 	allContainerMap := make(map[string]bool)           // all listable containers
 	runningMap := make(map[string]bool)                // status running
 	containerMap := make(map[string]*DockerInfoDetail) // pid exists
-	for i, container := range containersResp.Containers {
-		logger.Debugf(context.Background(), "CRIRuntime ListContainers [%v]: %+v", i, container)
-		allContainerMap[container.GetId()] = true
-		switch container.State {
+	for i, c := range containersResp.Containers {
+		logger.Debugf(context.Background(), "CRIRuntime ListContainers [%v]: %+v", i, c)
+		allContainerMap[c.GetId()] = true
+		switch c.State {
 		case cri.ContainerState_CONTAINER_RUNNING:
-			runningMap[container.GetId()] = true
+			runningMap[c.GetId()] = true
 		case cri.ContainerState_CONTAINER_EXITED:
-			runningMap[container.GetId()] = false
+			runningMap[c.GetId()] = false
 		default:
 			continue
 		}
 
-		dockerContainer, _, _, err := cw.createContainerInfo(container.GetId())
+		dockerContainer, _, _, err := cw.createContainerInfo(c.GetId())
 		if dockerContainer.Status() != ContainerStatusRunning {
 			continue
 		}
@@ -390,21 +412,21 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 			logger.Debug(context.Background(), "Create container info from cri-runtime error", err)
 			continue
 		}
-		cw.containers[container.GetId()] = &innerContainerInfo{
-			State:  container.State,
+		cw.containers[c.GetId()] = &innerContainerInfo{
+			State:  c.State,
 			Pid:    dockerContainer.ContainerInfo.State.Pid,
 			Name:   dockerContainer.ContainerInfo.Name,
 			Status: dockerContainer.Status(),
 		}
-		cw.containerHistory[container.GetId()] = true
-		containerMap[container.GetId()] = dockerContainer
+		cw.containerHistory[c.GetId()] = true
+		containerMap[c.GetId()] = dockerContainer
 
 		// append the pod labels to the k8s info.
-		if sandbox, ok := sandboxMap[container.PodSandboxId]; ok {
+		if sandbox, ok := sandboxMap[c.PodSandboxId]; ok {
 			cw.wrapperK8sInfoByLabels(sandbox.GetLabels(), dockerContainer)
 		}
 		logger.Debugf(context.Background(), "Create container info, id:%v\tname:%v\tcreated:%v\tstatus:%v\tdetail:%+v",
-			dockerContainer.IDPrefix(), container.Metadata.Name, dockerContainer.ContainerInfo.Created, dockerContainer.Status(), container)
+			dockerContainer.IDPrefix(), c.Metadata.Name, dockerContainer.ContainerInfo.Created, dockerContainer.Status(), c)
 	}
 	cw.dockerCenter.updateContainers(containerMap)
 
@@ -453,12 +475,12 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 	}
 
 	newContainers := map[string]*cri.Container{}
-	for i, container := range containersResp.Containers {
+	for i, c := range containersResp.Containers {
 		// https://github.com/containerd/containerd/blob/main/pkg/cri/store/container/status.go
 		// We only care RUNNING and EXITED
 		// This is only an early prune, accurate status must be detected by ContainerProcessAlive
-		if container.State != cri.ContainerState_CONTAINER_RUNNING &&
-			(container.State != cri.ContainerState_CONTAINER_EXITED || container.GetCreatedAt() < cw.listContainerStartTime) {
+		if c.State != cri.ContainerState_CONTAINER_RUNNING &&
+			(c.State != cri.ContainerState_CONTAINER_EXITED || c.GetCreatedAt() < cw.listContainerStartTime) {
 			continue
 		}
 		id := containersResp.Containers[i].GetId()
@@ -471,7 +493,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 				status = ContainerStatusRunning
 			}
 			if oldInfo.State != cri.ContainerState_CONTAINER_RUNNING || // not running
-				(oldInfo.State == container.State && oldInfo.Name == container.Metadata.Name && oldInfo.Status == status) { // no state change
+				(oldInfo.State == c.State && oldInfo.Name == c.Metadata.Name && oldInfo.Status == status) { // no state change
 				continue
 			}
 		} else if inHistory {
@@ -600,9 +622,23 @@ func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(info types.ContainerJSO
 	}
 
 	// Example: /run/containerd/io.containerd.runtime.v1.linux/k8s.io/{ContainerID}/rootfs/
-	aDirs := []string{
-		"/run/containerd",
-		"/var/run/containerd",
+
+	var aDirs []string
+	customStateDir := os.Getenv("CONTAINERD_STATE_DIR")
+	if len(customStateDir) > 0 {
+		// /etc/containerd/config.toml
+		// state = "/home/containerd"
+		// Example /home/containerd/io.containerd.runtime.v2.task/k8s.io/{ContainerID}/rootfs
+		aDirs = []string{
+			customStateDir,
+			"/run/containerd",
+			"/var/run/containerd",
+		}
+	} else {
+		aDirs = []string{
+			"/run/containerd",
+			"/var/run/containerd",
+		}
 	}
 
 	bDirs := []string{
@@ -637,6 +673,40 @@ func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(info types.ContainerJSO
 		}
 	}
 
+	return ""
+}
+
+func (cw *CRIRuntimeWrapper) getContainerUpperDir(containerid, snapshotter string) string {
+	// For Containerd
+
+	if cw.nativeClient == nil {
+		return ""
+	}
+
+	if dir, ok := cw.lookupRootfsCache(containerid); ok {
+		return dir
+	}
+
+	si := cw.nativeClient.SnapshotService(snapshotter)
+	mounts, err := si.Mounts(context.Background(), containerid)
+	if err != nil {
+		logger.Warning(context.Background(), "CONTAINERD_CLIENT_ALARM", "cannot get snapshot info, containerID", containerid, "errInfo", err)
+		return ""
+	}
+	for _, m := range mounts {
+		if len(m.Options) != 0 {
+			for _, i := range m.Options {
+				s := strings.Split(i, "=")
+				if s[0] == "upperdir" {
+					cw.rootfsLock.Lock()
+					cw.rootfsCache[containerid] = s[1]
+					cw.rootfsLock.Unlock()
+					return s[1]
+				}
+				continue
+			}
+		}
+	}
 	return ""
 }
 
