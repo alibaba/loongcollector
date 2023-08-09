@@ -74,7 +74,7 @@ func saveContent(dataDir string, content string, configName, scriptType string) 
 	return filePath, nil
 }
 
-func convertGidToUint32(user *user.User) (uint32, uint32, error) {
+func convertStringToUint32(user *user.User) (uint32, uint32, error) {
 	// set uid and gid
 	uid, err := strconv.Atoi(user.Uid)
 	if err != nil {
@@ -110,7 +110,7 @@ func RunCommandWithTimeOut(timeout int, user *user.User, command string, environ
 	cmd.Stderr = &stderrBuf
 
 	// set uid and gid
-	uid, gid, err := convertGidToUint32(user)
+	uid, gid, err := convertStringToUint32(user)
 	if err != nil {
 		return
 	}
