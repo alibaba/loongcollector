@@ -82,9 +82,8 @@ func (s *containerConfigTestSuite) TestCompareEnvAndLabelAndRecordContainer() {
 	cMap := helper.GetContainerMap()
 	cMap["test"] = info
 
-	compareEnvAndLabelAndRecordContainer()
-	s.Equal(1, len(helper.AddedContainers))
-	helper.AddedContainers = helper.AddedContainers[:0]
+	containers := compareEnvAndLabelAndRecordContainer()
+	s.Equal(1, len(containers))
 }
 
 func (s *containerConfigTestSuite) TestRecordContainers() {
@@ -94,9 +93,8 @@ func (s *containerConfigTestSuite) TestRecordContainers() {
 
 	containerIDs := make(map[string]struct{})
 	containerIDs["test"] = struct{}{}
-	recordContainers(containerIDs)
-	s.Equal(1, len(helper.AddedContainers))
-	helper.AddedContainers = helper.AddedContainers[:0]
+	recordedIds, _ := getContainersToRecord(containerIDs)
+	s.Equal(1, len(recordedIds))
 }
 
 type containerConfigTestSuite struct {

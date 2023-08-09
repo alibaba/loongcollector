@@ -26,28 +26,13 @@ import (
 
 const ContainerIDPrefixSize = 12
 
-var addedContainerMutex sync.Mutex
-
 var addedContainerConfigResultMutex sync.Mutex
-
-var addedContainerMapMutex sync.Mutex
-
-var deletedContainerMutex sync.Mutex
-
-// 新增的容器
-var AddedContainers []*ContainerDetail
 
 // 新增的采集配置结果
 var AddedContainerConfigResult []*ContainerConfigResult
 
 // 采集配置结果内存存储
 var AddedContainerConfigResultMap map[string]*ContainerConfigResult
-
-// 容器信息内存存储
-var AddedContainerMap map[string]struct{}
-
-// 删除的容器信息
-var DeletedContainerMap map[string]struct{}
 
 type ContainerDetail struct {
 	DataType         string
@@ -84,98 +69,38 @@ type ContainerConfigResult struct {
 }
 
 func InitContainer() {
-	addedContainerMutex.Lock()
-	AddedContainers = make([]*ContainerDetail, 0)
-	addedContainerMutex.Unlock()
-
 	addedContainerConfigResultMutex.Lock()
 	AddedContainerConfigResult = make([]*ContainerConfigResult, 0)
 	AddedContainerConfigResultMap = make(map[string]*ContainerConfigResult)
 	addedContainerConfigResultMutex.Unlock()
-
-	addedContainerMapMutex.Lock()
-	AddedContainerMap = make(map[string]struct{})
-	addedContainerMapMutex.Unlock()
-
-	deletedContainerMutex.Lock()
-	DeletedContainerMap = make(map[string]struct{})
-	deletedContainerMutex.Unlock()
-}
-
-// 记录容器信息
-func RecordAddedContainer(message *ContainerDetail) {
-	addedContainerMutex.Lock()
-	AddedContainers = append(AddedContainers, message)
-	addedContainerMutex.Unlock()
 }
 
 // 将内存Map中的数据转化到list中，用于输出
 func RecordContainerConfigResult() {
 	addedContainerConfigResultMutex.Lock()
+	defer addedContainerConfigResultMutex.Unlock()
 	for _, value := range AddedContainerConfigResultMap {
 		AddedContainerConfigResult = append(AddedContainerConfigResult, value)
 	}
 	AddedContainerConfigResultMap = make(map[string]*ContainerConfigResult)
-	addedContainerConfigResultMutex.Unlock()
 }
 
 // 内存中记录每个采集配置的结果，用于RecordContainerConfigResult的时候全量输出一遍
 func RecordContainerConfigResultMap(message *ContainerConfigResult) {
 	addedContainerConfigResultMutex.Lock()
+	defer addedContainerConfigResultMutex.Unlock()
 	AddedContainerConfigResultMap[message.ConfigName] = message
-	addedContainerConfigResultMutex.Unlock()
 }
 
 // 增量记录采集配置结果
 func RecordContainerConfigResultIncrement(message *ContainerConfigResult) {
 	addedContainerConfigResultMutex.Lock()
+	defer addedContainerConfigResultMutex.Unlock()
 	AddedContainerConfigResult = append(AddedContainerConfigResult, message)
-	addedContainerConfigResultMutex.Unlock()
-}
-
-// 记录新增容器ID
-func RecordAddedContainerIDs(containerID string) {
-	addedContainerMapMutex.Lock()
-	defer addedContainerMapMutex.Unlock()
-	AddedContainerMap[containerID] = struct{}{}
-}
-
-// 获取新增容器ID列表
-func GetAddedContainerIDs() map[string]struct{} {
-	addedContainerMapMutex.Lock()
-	defer addedContainerMapMutex.Unlock()
-	result := make(map[string]struct{})
-	for key := range AddedContainerMap {
-		result[key] = struct{}{}
-	}
-	AddedContainerMap = make(map[string]struct{})
-	return result
-}
-
-// 记录删除容器ID
-func RecordDeletedContainerIDs(containerID string) {
-	deletedContainerMutex.Lock()
-	defer deletedContainerMutex.Unlock()
-	DeletedContainerMap[containerID] = struct{}{}
-}
-
-// 获取删除容器ID列表
-func GetDeletedContainerIDs() map[string]struct{} {
-	deletedContainerMutex.Lock()
-	defer deletedContainerMutex.Unlock()
-	result := make(map[string]struct{})
-	for key := range DeletedContainerMap {
-		if len(key) > 0 {
-			result[key] = struct{}{}
-		}
-	}
-	DeletedContainerMap = make(map[string]struct{})
-	return result
 }
 
 func SerializeDeleteContainerToPb(logGroup *protocol.LogGroup, project string, containerIDsStr string) {
 	nowTime := time.Now()
-	deletedContainerMutex.Lock()
 	log := &protocol.Log{}
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "type", Value: "delete_containers"})
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project", Value: project})
@@ -183,13 +108,11 @@ func SerializeDeleteContainerToPb(logGroup *protocol.LogGroup, project string, c
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
 	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 	logGroup.Logs = append(logGroup.Logs, log)
-	deletedContainerMutex.Unlock()
 }
 
-func SerializeContainerToPb(logGroup *protocol.LogGroup) {
+func SerializeContainerToPb(logGroup *protocol.LogGroup, addedContainers []*ContainerDetail) {
 	nowTime := time.Now()
-	addedContainerMutex.Lock()
-	for _, item := range AddedContainers {
+	for _, item := range addedContainers {
 		log := &protocol.Log{}
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "type", Value: item.DataType})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project", Value: item.Project})
@@ -223,13 +146,12 @@ func SerializeContainerToPb(logGroup *protocol.LogGroup) {
 		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 		logGroup.Logs = append(logGroup.Logs, log)
 	}
-	AddedContainers = AddedContainers[:0]
-	addedContainerMutex.Unlock()
 }
 
 func SerializeContainerConfigResultToPb(logGroup *protocol.LogGroup) {
 	nowTime := time.Now()
 	addedContainerConfigResultMutex.Lock()
+	defer addedContainerConfigResultMutex.Unlock()
 	for _, item := range AddedContainerConfigResult {
 		log := &protocol.Log{}
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "type", Value: item.DataType})
@@ -253,7 +175,6 @@ func SerializeContainerConfigResultToPb(logGroup *protocol.LogGroup) {
 		logGroup.Logs = append(logGroup.Logs, log)
 	}
 	AddedContainerConfigResult = AddedContainerConfigResult[:0]
-	addedContainerConfigResultMutex.Unlock()
 }
 
 func GetShortID(fullID string) string {
