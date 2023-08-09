@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"os/user"
@@ -74,27 +73,6 @@ func saveContent(dataDir string, content string, configName, scriptType string) 
 	return filePath, nil
 }
 
-func convertStringToUint32(user *user.User) (uint32, uint32, error) {
-	// set uid and gid
-	uid, err := strconv.Atoi(user.Uid)
-	if err != nil {
-		return 0, 0, err
-	}
-	if uid < 0 || uid > math.MaxUint32 {
-		return 0, 0, fmt.Errorf("Gid value out of range")
-	}
-
-	gid, err := strconv.Atoi(user.Gid)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	if gid < 0 || gid > math.MaxUint32 {
-		return 0, 0, fmt.Errorf("Gid value out of range")
-	}
-	return uint32(uid), uint32(gid), nil
-}
-
 func RunCommandWithTimeOut(timeout int, user *user.User, command string, environments []string, args ...string) (stdout, stderr string, isKilled bool, err error) {
 	cmd := exec.Command(command, args...)
 
@@ -113,15 +91,18 @@ func RunCommandWithTimeOut(timeout int, user *user.User, command string, environ
 	cmd.Stderr = &stderrBuf
 
 	// set uid and gid
-	uid, gid, err := convertStringToUint32(user)
+	uid, err := strconv.ParseUint(user.Uid, 10, 32)
 	if err != nil {
 		return
 	}
-
+	gid, err := strconv.ParseUint(user.Gid, 10, 32)
+	if err != nil {
+		return
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	cmd.SysProcAttr.Credential = &syscall.Credential{
-		Uid: uid,
-		Gid: gid,
+		Uid: uint32(uid),
+		Gid: uint32(gid),
 	}
 	defer func() {
 		stdout = strings.TrimSpace(stdoutBuf.String())
