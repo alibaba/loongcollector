@@ -27,7 +27,7 @@ function os() {
 MOD=${1:-mod}
 BUILDMODE=${2:-default}
 OUT_DIR=${3:-output}
-VERSION=${4:-1.7.0}
+VERSION=${4:-1.7.1}
 PLUGINS_CONFIG_FILE=${5:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml}}
 GO_MOD_FILE=${6:-${GO_MOD_FILE:-go.mod}}
 NAME=ilogtail

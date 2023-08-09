@@ -114,8 +114,8 @@ program written by yourself.
 ### Run [Logtail AlibabaCloud](https://help.aliyun.com/document_detail/28979.html) on container
 
 1. Run `make docker` to compile [Logtail AlibabaCloud](https://help.aliyun.com/document_detail/28979.html) docker
-   images named `aliyun/ilogtail:1.7.0`.
-2. Rename `aliyun/ilogtail:1.7.0` to a custom name and push to the remotes, such
-   as `registry.cn-beijing.aliyuncs.com/aliyun/ilogtail:1.7.0`.
+   images named `aliyun/ilogtail:1.7.1`.
+2. Rename `aliyun/ilogtail:1.7.1` to a custom name and push to the remotes, such
+   as `registry.cn-beijing.aliyuncs.com/aliyun/ilogtail:1.7.1`.
 3. Replace the mirror of `logtail-ds` of [ACK](https://www.aliyun.com/product/list/alibabacloudnative) or your self
    platform and restart.
