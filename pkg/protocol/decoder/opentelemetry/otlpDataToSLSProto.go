@@ -546,6 +546,5 @@ func ConvertOtlpTraceRequestV1(otlpTraceReq ptraceotlp.ExportRequest) (logs []*p
 }
 
 func ConvertOtlpTraceV1(otlpTrace ptrace.Traces) (logs []*protocol.Log, err error) {
-	result, _ := ConvertTrace(otlpTrace)
-	return result, nil
+	return logs, fmt.Errorf("does_not_support_otlptraces")
 }
