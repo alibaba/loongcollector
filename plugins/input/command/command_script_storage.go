@@ -91,8 +91,14 @@ func RunCommandWithTimeOut(timeout int, user *user.User, command string, environ
 	cmd.Stderr = &stderrBuf
 
 	// set uid and gid
-	uid, _ := strconv.Atoi(user.Uid)
-	gid, _ := strconv.Atoi(user.Gid)
+	uid, err := strconv.ParseUint(user.Uid, 10, 32)
+	if err != nil {
+		return
+	}
+	gid, err := strconv.ParseUint(user.Gid, 10, 32)
+	if err != nil {
+		return
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	cmd.SysProcAttr.Credential = &syscall.Credential{
 		Uid: uint32(uid),
