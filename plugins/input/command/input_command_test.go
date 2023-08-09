@@ -29,6 +29,19 @@ import (
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
+func TestConvertStringToUint32(t *testing.T) {
+	u, err := user.Current()
+	if err != nil {
+		t.Errorf("get user.Current() error %s", err)
+		return
+	}
+	if uid, gid, err := convertStringToUint32(u); err != nil {
+		t.Errorf("convertStringToUint32 error %s", err)
+	} else {
+		fmt.Printf("uid: %v, gid: %v\n", uid, gid)
+	}
+}
+
 func TestCommandTestCollecetUserBase64WithTimeout(t *testing.T) {
 	u, err := user.Current()
 	if err != nil {
