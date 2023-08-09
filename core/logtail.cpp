@@ -211,7 +211,7 @@ void do_worker_process() {
     ConfigManager::GetInstance()->GetLocalConfigUpdate();
     ConfigManager::GetInstance()->LoadConfig(AppConfig::GetInstance()->GetUserConfigPath());
     ConfigManager::GetInstance()->LoadDockerConfig();
-    // mNameCoonfigMap is empty, configExistFlag is false
+    // mNameConfigMap is empty, configExistFlag is false
     bool configExistFlag = !ConfigManager::GetInstance()->GetAllConfig().empty();
 
     // set max open file limit
