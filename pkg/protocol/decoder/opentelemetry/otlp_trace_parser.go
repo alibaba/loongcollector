@@ -288,11 +288,11 @@ func ConvertTrace(td ptrace.Traces) ([]*protocol.Log, int) {
 	return traceDataToLogServiceData(td)
 }
 
-func ConvertResourceSpans(rs *v1.ResourceSpans, traceIDNeedDecode, spanIDNeedDecode, ParentSpanIDNeedDecode bool) ([]*protocol.Log, error) {
-	return convertResourceSpansToLogData(rs, traceIDNeedDecode, spanIDNeedDecode, ParentSpanIDNeedDecode)
+func ConvertResourceSpans(rs *v1.ResourceSpans, traceIDNeedDecode, spanIDNeedDecode, parentSpanIDNeedDecode bool) ([]*protocol.Log, error) {
+	return convertResourceSpansToLogData(rs, traceIDNeedDecode, spanIDNeedDecode, parentSpanIDNeedDecode)
 }
 
-func convertResourceSpansToLogData(rs *v1.ResourceSpans, traceIDNeedDecode, spanIDNeedDecode, ParentSpanIDNeedDecode bool) (slsLogs []*protocol.Log, e error) {
+func convertResourceSpansToLogData(rs *v1.ResourceSpans, traceIDNeedDecode, spanIDNeedDecode, parentSpanIDNeedDecode bool) (slsLogs []*protocol.Log, e error) {
 	resourceContents := v1ResourceToLogContents(rs.GetResource())
 	scopeSpans := rs.GetScopeSpans()
 
@@ -311,7 +311,7 @@ func convertResourceSpansToLogData(rs *v1.ResourceSpans, traceIDNeedDecode, span
 				}
 			}
 
-			if ParentSpanIDNeedDecode && s.ParentSpanId != nil {
+			if parentSpanIDNeedDecode && s.ParentSpanId != nil {
 				if s.ParentSpanId, e = hex.DecodeString(base64.StdEncoding.EncodeToString(s.GetParentSpanId())); e != nil {
 					return nil, e
 				}
@@ -335,19 +335,20 @@ func v1ResourceToLogContents(resource *v1Resource.Resource) []*protocol.Log_Cont
 	fields := map[string]interface{}{}
 
 	for _, attr := range attrs {
-		if attr.Key == "host.name" {
+		switch attr.Key {
+		case "host.name":
 			logContents[0] = &protocol.Log_Content{
 				Key:   slsLogHost,
 				Value: attr.Value.GetStringValue(),
 			}
 			hostfined = true
-		} else if attr.Key == "service.name" {
+		case "service.name":
 			logContents[1] = &protocol.Log_Content{
 				Key:   slsLogService,
 				Value: attr.Value.GetStringValue(),
 			}
 			serviceName = true
-		} else {
+		default:
 			fields[attr.Key] = attr.Value.GetStringValue()
 		}
 	}
@@ -453,7 +454,7 @@ func v1SpanToLogServiceData(span *v1.Span, resourceContents, instrumentationLibr
 	})
 	contentsBuffer = append(contentsBuffer, protocol.Log_Content{
 		Key:   attributeField,
-		Value: string(keyValueToString(span.GetAttributes())),
+		Value: keyValueToString(span.GetAttributes()),
 	})
 
 	contentsBuffer = append(contentsBuffer, protocol.Log_Content{
@@ -505,11 +506,13 @@ func keyValueToString(keyValues []*v1Common.KeyValue) string {
 		results[keyValue.Key] = keyValue.Value.GetStringValue()
 	}
 
-	if d, e := json.Marshal(results); e != nil {
+	var d []byte
+	var e error
+	if d, e = json.Marshal(results); e != nil {
 		return ""
-	} else {
-		return string(d)
 	}
+
+	return string(d)
 }
 
 func v1SpanKindToShortString(kind v1.Span_SpanKind) string {
