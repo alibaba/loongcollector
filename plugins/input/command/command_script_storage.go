@@ -85,6 +85,9 @@ func convertStringToUint32(user *user.User) (uint32, uint32, error) {
 	}
 
 	gid, err := strconv.Atoi(user.Gid)
+	if err != nil {
+		return 0, 0, err
+	}
 
 	if gid < 0 || gid > math.MaxUint32 {
 		return 0, 0, fmt.Errorf("Gid value out of range")
