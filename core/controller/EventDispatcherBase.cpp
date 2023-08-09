@@ -779,8 +779,10 @@ bool EventDispatcherBase::Dispatch() {
         SyncWindowsSignalObject();
 #endif
 
-        if (LogtailGlobalPara::Instance()->GetSigtermFlag())
+        if (LogtailGlobalPara::Instance()->GetSigtermFlag()) {
+            LOG_INFO(sLogger, ("received SIGTERM signal", "exit process"));
             ExitProcess();
+        }
 
 #if defined(__linux__)
         int nfd = epoll_wait(
@@ -1216,8 +1218,10 @@ void EventDispatcherBase::UpdateConfig() {
 void EventDispatcherBase::ExitProcess() {
 #if defined(__linux__)
     if (mStreamLogManagerPtr != NULL) {
+        LOG_INFO(sLogger, ("StreamLogManager", "shutdown"));
         ((StreamLogManager*)mStreamLogManagerPtr)->Shutdown();
     }
+    ObserverManager::GetInstance()->HoldOn(true);
 #endif
 
     LOG_INFO(sLogger, ("LogInput", "hold on"));
@@ -1243,13 +1247,11 @@ void EventDispatcherBase::ExitProcess() {
     LOG_INFO(sLogger, ("flush log process buffer", "start"));
 
     // resume log process thread to process last buffer
+    // previously hold on by LogInput
     LogProcess::GetInstance()->Resume();
     Sender::Instance()->SetQueueUrgent();
     // exit logtail plugin
     LogtailPlugin::GetInstance()->HoldOn(true);
-#if defined(__linux__)
-    ObserverManager::GetInstance()->HoldOn(true);
-#endif
 
     bool logProcessFlushFlag = false;
 
@@ -1552,6 +1554,7 @@ bool EventDispatcherBase::ReadDSPacket(int eventFd) {
                                                                          config->mRegion,
                                                                          config->mProjectName,
                                                                          config->mCategory,
+                                                                         "",
                                                                          "",
                                                                          empty,
                                                                          msgStr.size(),

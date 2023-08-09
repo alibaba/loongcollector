@@ -16,7 +16,6 @@ package stdout
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -85,9 +84,9 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 		}
 
 		// first watch this container
-		stat, err := os.Stat(checkpoint.Path)
-		if err != nil {
-			logger.Warning(sds.context.GetRuntimeContext(), "DOCKER_STDOUT_STAT_ALARM", "stat log file error, path", checkpoint.Path, "error", err.Error())
+		realPath, stat := helper.TryGetRealPath(checkpoint.Path)
+		if realPath == "" {
+			logger.Warning(sds.context.GetRuntimeContext(), "DOCKER_STDOUT_STAT_ALARM", "stat log file error, path", checkpoint.Path, "error", "path not found")
 		} else {
 			checkpoint.Offset = stat.Size()
 			if checkpoint.Offset > sds.StartLogMaxOffset {
@@ -184,6 +183,7 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	sds.fullList = make(map[string]bool)
 	sds.matchList = make(map[string]*helper.DockerInfoDetail)
 	sds.synerMap = make(map[string]*DockerFileSyner)
+
 	if sds.MaxLogSize < 1024 {
 		sds.MaxLogSize = 1024
 	}
@@ -239,7 +239,6 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
 	}
 	sds.K8sFilter, err = helper.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
-
 	return 0, err
 }
 
@@ -260,7 +259,7 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 	}
 
 	var err error
-	newCount, delCount, addResultList, deleteResultList, addFullList, deleteFullList := helper.GetContainerByAcceptedInfoV2(
+	newCount, delCount, addResultList, deleteResultList := helper.GetContainerByAcceptedInfoV2(
 		sds.fullList, sds.matchList,
 		sds.IncludeLabel, sds.ExcludeLabel,
 		sds.IncludeLabelRegex, sds.ExcludeLabelRegex,
@@ -270,22 +269,6 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 	sds.lastUpdateTime = newUpdateTime
 
 	if sds.CollectContainersFlag {
-		// record added container id
-		if len(addFullList) > 0 {
-			for _, id := range addFullList {
-				if len(id) > 0 {
-					helper.RecordAddedContainerIDs(id)
-				}
-			}
-		}
-		// record deleted container id
-		if len(deleteFullList) > 0 {
-			for _, id := range deleteFullList {
-				if len(id) > 0 {
-					helper.RecordDeletedContainerIDs(helper.GetShortID(id))
-				}
-			}
-		}
 		// record config result
 		{
 			keys := make([]string, 0, len(sds.matchList))
@@ -306,10 +289,10 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 				FlusherTargetAddress:       fmt.Sprintf("%s/%s", sds.context.GetProject(), sds.context.GetLogstore()),
 			}
 			helper.RecordContainerConfigResultMap(configResult)
-			if newCount != 0 || delCount != 0 {
+			if newCount != 0 || delCount != 0 || firstStart {
 				helper.RecordContainerConfigResultIncrement(configResult)
 			}
-			logger.Debugf(sds.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v, addFullList: %v, deleteFullList: %v", addResultList, deleteResultList, addFullList, deleteFullList)
+			logger.Debugf(sds.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v", addResultList, deleteResultList)
 		}
 	}
 

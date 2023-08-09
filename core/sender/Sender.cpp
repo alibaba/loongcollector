@@ -280,23 +280,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                 mDataPtr->mLogstore,
                 mDataPtr->mRegion);
             // uncompress data
-            std::string oriData;
-            if (!UncompressData(sls_logs::SLS_CMP_ZSTD, mDataPtr->mLogData, mDataPtr->mRawSize, oriData)
-                || !CompressData(sls_logs::SLS_CMP_LZ4, oriData, mDataPtr->mLogData)) {
-                LOG_ERROR(sLogger,
-                          ("compress data fail",
-                           "discard data")("projectName", mDataPtr->mProjectName)("logstore", mDataPtr->mLogstore));
-                LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
-                                                       "discard data. error_code: " + errorCode + ", error_message: "
-                                                           + errorMessage + ", request_id:" + response->requestId,
-                                                       mDataPtr->mProjectName,
-                                                       mDataPtr->mLogstore,
-                                                       mDataPtr->mRegion);
-                operation = DISCARD_WHEN_FAIL;
-            } else {
-                mDataPtr->mLogGroupContext.mCompressType = sls_logs::SLS_CMP_LZ4;
-                operation = RETRY_ASYNC_WHEN_FAIL;
-            }
+            operation = RecompressData(response, errorCode, errorMessage);
         }
     } else if (sendResult == SEND_INVALID_SEQUENCE_ID) {
         failDetail << "invalid exactly-once sequence id";
@@ -435,6 +419,57 @@ SendResult ConvertErrorCode(const std::string& errorCode) {
     }
 }
 
+OperationOnFail
+SendClosure::RecompressData(sdk::Response* response, const string& errorCode, const string& errorMessage) {
+    std::string oriData;
+    if (mDataPtr->mDataType == LOGGROUP_COMPRESSED) {
+        if (!UncompressData(sls_logs::SLS_CMP_ZSTD, mDataPtr->mLogData, mDataPtr->mRawSize, oriData)
+            || !CompressData(sls_logs::SLS_CMP_LZ4, oriData, mDataPtr->mLogData)) {
+            LOG_ERROR(sLogger,
+                      ("compress data fail", "discard data")("projectName",
+                                                             mDataPtr->mProjectName)("logstore", mDataPtr->mLogstore));
+            LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
+                                                   "discard data. error_code: " + errorCode + ", error_message: "
+                                                       + errorMessage + ", request_id:" + response->requestId,
+                                                   mDataPtr->mProjectName,
+                                                   mDataPtr->mLogstore,
+                                                   mDataPtr->mRegion);
+            return DISCARD_WHEN_FAIL;
+        }
+    } else {
+        SlsLogPackageList logPackageList;
+        if (!logPackageList.ParseFromString(mDataPtr->mLogData)) {
+            LOG_ERROR(sLogger,
+                      ("parse package list fail",
+                       "discard data")("projectName", mDataPtr->mProjectName)("logstore", mDataPtr->mLogstore));
+            LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
+                                                   "discard data. error_code: " + errorCode + ", error_message: "
+                                                       + errorMessage + ", request_id:" + response->requestId,
+                                                   mDataPtr->mProjectName,
+                                                   mDataPtr->mLogstore,
+                                                   mDataPtr->mRegion);
+        }
+        for (int32_t pIdx = 0; pIdx < logPackageList.packages_size(); ++pIdx) {
+            auto package = logPackageList.mutable_packages(pIdx);
+            if (!UncompressData(sls_logs::SLS_CMP_ZSTD, package->data(), package->uncompress_size(), oriData)
+                || !CompressData(sls_logs::SLS_CMP_LZ4, oriData, *package->mutable_data())) {
+                LOG_ERROR(sLogger,
+                          ("compress data fail",
+                           "discard data")("projectName", mDataPtr->mProjectName)("logstore", mDataPtr->mLogstore));
+                LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
+                                                       "discard data. error_code: " + errorCode + ", error_message: "
+                                                           + errorMessage + ", request_id:" + response->requestId,
+                                                       mDataPtr->mProjectName,
+                                                       mDataPtr->mLogstore,
+                                                       mDataPtr->mRegion);
+                return DISCARD_WHEN_FAIL;
+            }
+        }
+    }
+    mDataPtr->mLogGroupContext.mCompressType = sls_logs::SLS_CMP_LZ4;
+    return RETRY_ASYNC_WHEN_FAIL;
+}
+
 Sender::Sender() {
     setupServerSwitchPolicy();
     srand(time(NULL));
@@ -490,9 +525,12 @@ void Sender::setupServerSwitchPolicy() {
 }
 
 ///////////////////////////////for debug & ut//////////////////////////////////
-bool Sender::ParseLogGroupFromLZ4(const std::string& logData, int32_t rawSize, LogGroup& logGroupPb) {
+bool Sender::ParseLogGroupFromCompressedData(const std::string& logData,
+                                             int32_t rawSize,
+                                             SlsCompressType compressType,
+                                             LogGroup& logGroupPb) {
     string uncompressed;
-    if (!UncompressLz4(logData, rawSize, uncompressed)) {
+    if (!UncompressData(compressType, logData, rawSize, uncompressed)) {
         LOG_ERROR(sLogger, ("uncompress logData", "fail")("rawSize", rawSize));
         return false;
     }
@@ -506,24 +544,26 @@ bool Sender::ParseLogGroupFromLZ4(const std::string& logData, int32_t rawSize, L
 void Sender::ParseLogGroupFromString(const std::string& logData,
                                      SEND_DATA_TYPE dataType,
                                      int32_t rawSize,
+                                     SlsCompressType compressType,
                                      std::vector<sls_logs::LogGroup>& logGroupVec) {
     if (dataType == LOGGROUP_COMPRESSED) {
         LogGroup logGroupPb;
-        if (Sender::ParseLogGroupFromLZ4(logData, rawSize, logGroupPb))
+        if (Sender::ParseLogGroupFromCompressedData(logData, rawSize, compressType, logGroupPb))
             logGroupVec.push_back(logGroupPb);
         else
-            LOG_ERROR(sLogger, ("ParseLogGroupFromLZ4", "fail")("dataType", dataType));
+            LOG_ERROR(sLogger, ("ParseLogGroupFromCompressedData", "fail")("dataType", dataType));
     } else {
         SlsLogPackageList logPackageList;
         if (logPackageList.ParseFromString(logData)) {
             for (int32_t pIdx = 0; pIdx < logPackageList.packages_size(); ++pIdx) {
                 LogGroup logGroupPb;
-                if (Sender::ParseLogGroupFromLZ4(logPackageList.packages(pIdx).data(),
-                                                 logPackageList.packages(pIdx).uncompress_size(),
-                                                 logGroupPb))
+                if (Sender::ParseLogGroupFromCompressedData(logPackageList.packages(pIdx).data(),
+                                                            logPackageList.packages(pIdx).uncompress_size(),
+                                                            logPackageList.packages(pIdx).compress_type(),
+                                                            logGroupPb))
                     logGroupVec.push_back(logGroupPb);
                 else
-                    LOG_ERROR(sLogger, ("ParseLogGroupFromLZ4", "fail")("dataType", dataType));
+                    LOG_ERROR(sLogger, ("ParseLogGroupFromCompressedData", "fail")("dataType", dataType));
             }
         } else
             LOG_ERROR(sLogger, ("logPackageList parseFromString", "fail")("dataType", dataType));
@@ -590,7 +630,8 @@ bool Sender::DumpDebugFile(LoggroupTimeValue* value, bool sendPerformance) {
         return WriteToFile(value, sendPerformance);
     else {
         vector<LogGroup> logGroupVec;
-        Sender::ParseLogGroupFromString(value->mLogData, value->mDataType, value->mRawSize, logGroupVec);
+        Sender::ParseLogGroupFromString(
+            value->mLogData, value->mDataType, value->mRawSize, value->mLogGroupContext.mCompressType, logGroupVec);
         for (vector<LogGroup>::iterator iter = logGroupVec.begin(); iter != logGroupVec.end(); ++iter) {
             if (!WriteToFile(value->mProjectName, *iter, sendPerformance))
                 return false;
@@ -1847,7 +1888,7 @@ bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint
         if (BOOL_FLAG(enable_mock_send) && MockTestEndpoint) {
             string logData;
             MockTestEndpoint(
-                "logtail-test-network-project", "logtail-test-network-logstore", logData, LOGGROUP_COMPRESSED, 0);
+                "logtail-test-network-project", "logtail-test-network-logstore", logData, LOGGROUP_COMPRESSED, 0, SLS_CMP_LZ4);
         } else
             status = mTestNetworkClient->TestNetwork();
     } catch (sdk::LOGException& ex) {
@@ -1918,7 +1959,8 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
                                  bufferMeta.logstore(),
                                  logData,
                                  (SEND_DATA_TYPE)bufferMeta.datatype(),
-                                 bufferMeta.rawsize());
+                                 bufferMeta.rawsize(),
+                                 bufferMeta.compresstype());
                 else
                     LOG_ERROR(sLogger, ("MockSyncSend", "uninitialized"));
             } else if (bufferMeta.datatype() == LOGGROUP_COMPRESSED) {
@@ -2068,10 +2110,10 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
         if (MockAsyncSend && !MockIntegritySend)
             MockAsyncSend(dataPtr->mProjectName,
                           dataPtr->mLogstore,
-                          dataPtr->mLogGroupContext.mCompressType,
                           dataPtr->mLogData,
                           dataPtr->mDataType,
                           dataPtr->mRawSize,
+                          dataPtr->mLogGroupContext.mCompressType,
                           sendClosure);
         else if (MockIntegritySend)
             MockIntegritySend(dataPtr);
@@ -2322,6 +2364,7 @@ void Sender::SendLogPackageList(std::vector<MergeItem*>& sendDataVec) {
         SlsLogPackage* package = logPackageList.add_packages();
         package->set_data(compressedData);
         package->set_uncompress_size(oriData.size());
+        package->set_compress_type(sendDataVec[idx]->mLogGroupContext.mCompressType);
         lines += sendDataVec[idx]->mLines;
         bytes += sendDataVec[idx]->mRawBytes;
         if (bytes >= AppConfig::GetInstance()->GetMaxHoldedDataSize() || idx == totalLogGroupCount - 1) {

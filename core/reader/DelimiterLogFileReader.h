@@ -27,8 +27,8 @@ class DelimiterLogFileReader : public LogFileReader {
 public:
     DelimiterLogFileReader(const std::string& projectName,
                            const std::string& category,
-                           const std::string& logPathDir,
-                           const std::string& logPathFile,
+                           const std::string& hostLogPathDir,
+                           const std::string& hostLogPathFile,
                            int32_t tailLimit,
                            const std::string& timeFormat,
                            const std::string& topicFormat,

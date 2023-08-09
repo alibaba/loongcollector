@@ -19,7 +19,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/pkg/errors"
@@ -70,16 +69,10 @@ type OtSpanRef struct {
 func (ot *OtSpan) ToLog() (*protocol.Log, error) {
 	log := &protocol.Log{}
 	if ot.End != 0 {
-		log.Time = uint32(ot.End / int64(1000000))
-		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-			log.TimeNs = uint32((ot.End * 1000) % 1e9)
-		}
+		protocol.SetLogTime(log, uint32(ot.End/int64(1000000)), uint32((ot.End*1000)%1e9))
 	} else {
 		nowTime := time.Now()
-		log.Time = uint32(nowTime.Unix())
-		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-			log.TimeNs = uint32(nowTime.Nanosecond())
-		}
+		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 	}
 	log.Contents = make([]*protocol.Log_Content, 0)
 	linksJSON, err := json.Marshal(ot.Links)

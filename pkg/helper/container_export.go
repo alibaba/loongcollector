@@ -160,10 +160,14 @@ func GetContainerByAcceptedInfoV2(
 	includeEnvRegex map[string]*regexp.Regexp,
 	excludeEnvRegex map[string]*regexp.Regexp,
 	k8sFilter *K8SFilter,
-) (newCount, delCount int, matchAddedList, matchDeletedList, fullAddedList, fullDeletedList []string) {
+) (newCount, delCount int, matchAddedList, matchDeletedList []string) {
 	return getDockerCenterInstance().getAllAcceptedInfoV2(
 		fullList, matchList, includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, k8sFilter)
 
+}
+
+func GetDiffContainers(fullList map[string]struct{}) (fullAddedList, fullDeletedList []string) {
+	return getDockerCenterInstance().getDiffContainers(fullList)
 }
 
 // SplitRegexFromMap extract regex from user config

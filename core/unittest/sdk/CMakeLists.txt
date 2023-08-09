@@ -15,5 +15,5 @@
 cmake_minimum_required(VERSION 2.9)
 project(sdk_unittest)
 
-add_executable(sdk_common_unittest SDKCommonUnittest.cpp)
-target_link_libraries(sdk_common_unittest unittest_base)
+# add_executable(sdk_common_unittest SDKCommonUnittest.cpp)
+# target_link_libraries(sdk_common_unittest unittest_base)

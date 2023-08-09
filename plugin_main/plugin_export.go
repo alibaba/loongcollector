@@ -17,6 +17,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"runtime"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -59,6 +61,7 @@ struct containerMeta{
 import "C" //nolint:typecheck
 
 var initOnce sync.Once
+var loadOnce sync.Once
 var started bool
 
 //export InitPluginBase
@@ -73,7 +76,18 @@ func InitPluginBaseV2(cfgStr string) int {
 
 //export LoadGlobalConfig
 func LoadGlobalConfig(jsonStr string) int {
-	retcode := config.LoadGlobalConfig(jsonStr)
+	// Only the first call will return non-zero.
+	retcode := 0
+	loadOnce.Do(func() {
+		logger.Info(context.Background(), "load global config", jsonStr)
+		if len(jsonStr) >= 2 { // For invalid JSON, use default value and return 0
+			if err := json.Unmarshal([]byte(jsonStr), &config.LogtailGlobalConfig); err != nil {
+				logger.Error(context.Background(), "LOAD_PLUGIN_ALARM", "load global config error", err)
+				retcode = 1
+			}
+			config.UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", config.BaseVersion, runtime.GOOS, config.LogtailGlobalConfig.HostIP)
+		}
+	})
 	if retcode == 0 {
 		// Update when both of them are not empty.
 		logger.Debugf(context.Background(), "host IP: %v, hostname: %v",

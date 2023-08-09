@@ -38,7 +38,6 @@ func (r *InputContainer) Collect(collector pipeline.Collector) error {
 	loggroup := &protocol.LogGroup{}
 
 	CollectContainers(loggroup)
-	CollectDeleteContainers(loggroup)
 	CollectConfigResult(loggroup)
 
 	if len(loggroup.Logs) > 0 && ContainerConfig != nil {

@@ -63,7 +63,7 @@ iLogtail 发展规划：[RoadMap](https://github.com/alibaba/ilogtail/discussion
 
 ## 我们的用户
 
-目前来自阿里云、石墨文档、同程旅行、小红书、字节跳动、哔哩哔哩的多位同学在参与 iLogtail 社区的共建。
+目前来自阿里云、石墨文档、同程旅行、小红书、字节跳动、哔哩哔哩、嘀嗒出行的多位同学在参与 iLogtail 社区的共建。
 
 ## Licence
 

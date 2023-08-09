@@ -16,6 +16,14 @@ name: Static Check
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'example_config/**'
+      - 'docker/**'
+      - 'k8s_template/**'
+      - 'changes/**'
+      - 'licenses/**'
+      - 'CHANGELOG.md'
   push:
     branches:
       - main
@@ -64,10 +72,10 @@ jobs:
         run: make lint
 
       - name: UnitTest
-        run: make unittest_plugin
+        run: sudo make unittest_plugin
 
       - name: UnitTest PluginManager
-        run: make unittest_pluginmanager
+        run: sudo make unittest_pluginmanager
 
 
   result:

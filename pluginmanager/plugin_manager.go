@@ -131,7 +131,6 @@ func Init() (err error) {
 		return
 	}
 	logger.Info(context.Background(), "loadBuiltinConfig container")
-	TimerFetchFuction()
 	return
 }
 

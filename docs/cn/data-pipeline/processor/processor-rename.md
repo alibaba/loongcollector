@@ -4,6 +4,12 @@
 
 `processor_rename processor`插件可以将日志字段重命名。
 
+## 支持的Event类型
+
+| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
+| ------------ | ---------------- | --------------- | ------------- |
+|      ✅      |      ✅           |  ✅ 重命名Tag    | ✅ 重命名Tag   |
+
 ## 版本
 
 [Stable](../stability-level.md)

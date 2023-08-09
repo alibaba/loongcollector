@@ -17,6 +17,7 @@ package helper
 import (
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -117,4 +118,11 @@ func GetMountedFilePathWithBasePath(basePath, filePath string) string {
 		return ""
 	}
 	return basePath + filePath[colonPos+1:]
+}
+
+func TryGetRealPath(path string) (string, fs.FileInfo) {
+	if f, err := os.Stat(path); err == nil {
+		return path, f
+	}
+	return "", nil
 }

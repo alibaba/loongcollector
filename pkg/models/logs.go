@@ -144,7 +144,9 @@ func (m *Log) SetBody(body []byte) {
 		if m.Contents == nil {
 			m.Contents = NewLogContents()
 		}
-		m.Contents.Add(BodyKey, body)
+		if body != nil {
+			m.Contents.Add(BodyKey, body)
+		}
 	}
 }
 

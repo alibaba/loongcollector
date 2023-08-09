@@ -19,7 +19,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -133,10 +132,7 @@ func (p *ProcessorGotime) processLog(log *protocol.Log) {
 				parsedTime = parsedStringTime
 			}
 			if p.SetTime {
-				log.Time = uint32(parsedTime.Unix())
-				if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-					log.TimeNs = uint32(parsedTime.Nanosecond())
-				}
+				protocol.SetLogTime(log, uint32(parsedTime.Unix()), uint32(parsedTime.Nanosecond()))
 			}
 			if !p.KeepSource {
 				log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)

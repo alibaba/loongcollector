@@ -15,7 +15,6 @@
 package logregex
 
 import (
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -113,16 +112,14 @@ func (p *ProcessorSplitRegex) ProcessLogs(logArray []*protocol.Log) []*protocol.
 			}
 		}
 		if log.Time != uint32(0) {
-			newLog.Time = log.Time
-			if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-				newLog.TimeNs = log.TimeNs
+			if log.TimeNs != nil {
+				protocol.SetLogTime(newLog, log.Time, *log.TimeNs)
+			} else {
+				protocol.SetLogTime(newLog, log.Time, 0)
 			}
 		} else {
 			nowTime := time.Now()
-			newLog.Time = (uint32)(nowTime.Unix())
-			if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-				newLog.TimeNs = (uint32)(nowTime.Nanosecond())
-			}
+			protocol.SetLogTime(newLog, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 		}
 		if destCont != nil {
 			destArray = p.SplitLog(destArray, newLog, destCont)

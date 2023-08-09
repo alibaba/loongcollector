@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # If you want to investigate in the container, you may set env
-# PORT_CHECK_INTERVAL=3600 to keep it running when ilogtail exits.
+# LIVENESS_CHECK_INTERVAL=3600 to keep it running when ilogtail exits.
 
 set -ue
 set -o pipefail
@@ -27,7 +27,7 @@ pid_file="$ilogtail_dir/ilogtail.pid"
 kill_timeout=10
 port=${HTTP_PROBE_PORT:-7953}
 port_initial_delay_sec=${PORT_INITIAL_DELAY_SEC:-3}
-port_check_interval=${PORT_CHECK_INTERVAL:-3}
+liveness_check_interval=${LIVENESS_CHECK_INTERVAL:-3}
 port_retry_count=${PORT_RETRY_COUNT:-3}
 port_retry_interval=${PORT_RETRY_INTERVAL:-1}
 exit_flag=0
@@ -83,15 +83,26 @@ check_liveness_by_port() {
     return 1
 }
 
+block_on_check_liveness_by_pid() {
+    while [[ $exit_flag -eq 0 ]]
+    do
+        check_liveness_by_pid || {
+            echo "ilogtail exited unexpectedly"
+            exit 1
+        }
+        sleep $liveness_check_interval
+    done
+}
+
 block_on_check_liveness_by_port() {
     sleep $port_initial_delay_sec
     while [[ $exit_flag -eq 0 ]]
     do
         check_liveness_by_port || {
-            echo "ilogtail exited unexpectedly"
+            echo "ilogtail plugin exited unexpectedly"
             exit 1
         }
-        sleep $port_check_interval
+        sleep $liveness_check_interval
     done
 }
 
@@ -164,9 +175,13 @@ case "$1" in
     status)
     check_liveness_by_pid && exit 0 || exit $?
     ;;
+    plugin_status)
+    check_liveness_by_port && exit 0 || exit $?
+    ;;
     start_and_block)
     start_ilogtail
-    block_on_check_liveness_by_port
+    block_on_check_liveness_by_pid
+    stop_ilogtail $stop_delay_sec
     ;;
     -h)
     usage

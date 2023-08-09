@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
@@ -97,12 +96,9 @@ func (l *loggingHandler) sendLogging(data *loggingV3.LogData) {
 
 func (l *loggingHandler) convertFormat(data *loggingV3.LogData) *protocol.Log {
 	r := &protocol.Log{
-		Time:     uint32(data.Timestamp / 1000),
 		Contents: make([]*protocol.Log_Content, 0),
 	}
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		r.TimeNs = uint32((data.Timestamp * 1e6) % 1e9)
-	}
+	protocol.SetLogTime(r, uint32(data.Timestamp/1000), uint32((data.Timestamp*1e6)%1e9))
 
 	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "otlp.name", Value: "apache-skywalking"})
 	r.Contents = append(r.Contents, &protocol.Log_Content{
@@ -122,12 +118,9 @@ func (l *loggingHandler) convertFormat(data *loggingV3.LogData) *protocol.Log {
 
 func (l *loggingHandler) convertBrowserErrorLog(data *agent.BrowserErrorLog) *protocol.Log {
 	r := &protocol.Log{
-		Time:     uint32(data.Time / 1000),
 		Contents: make([]*protocol.Log_Content, 0),
 	}
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		r.TimeNs = uint32((data.Time * 1e6) % 1e9)
-	}
+	protocol.SetLogTime(r, uint32(data.Time/1000), uint32((data.Time*1e6)%1e9))
 
 	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "otlp.name", Value: "apache-skywalking"})
 	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "service", Value: data.Service})

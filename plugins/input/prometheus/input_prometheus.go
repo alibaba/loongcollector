@@ -24,17 +24,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/util"
+	"time"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/auth"
 	liblogger "github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/protoparser/common"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var libLoggerOnce sync.Once
@@ -46,22 +46,20 @@ type ServiceStaticPrometheus struct {
 	ExtraFlags        map[string]string `comment:"the prometheus extra configuration flags, like promscrape.maxScrapeSize, for more flags please see [here](https://docs.victoriametrics.com/vmagent.html#advanced-usage)"`
 	NoStaleMarkers    bool              `comment:"Whether to disable sending Prometheus stale markers for metrics when scrape target disappears. This option may reduce memory usage if stale markers aren't needed for your setup. This option also disables populating the scrape_series_added metric. See https://prometheus.io/docs/concepts/jobs_instances/#automatically-generated-labels-and-time-series"`
 
-	scraper         *promscrape.Scraper //nolint:typecheck
-	shutdown        chan struct{}
-	waitGroup       sync.WaitGroup
-	context         pipeline.Context
-	clusterReplicas int
-	clusterNum      int
+	scraper   *promscrape.Scraper //nolint:typecheck
+	shutdown  chan struct{}
+	waitGroup sync.WaitGroup
+	context   pipeline.Context
+	lock      sync.Mutex
+	running   bool
+	collector pipeline.Collector
+	kubeMeta  *KubernetesMeta
 }
 
 func (p *ServiceStaticPrometheus) Init(context pipeline.Context) (int, error) {
-	// check running with cluster mode
-	env := os.Getenv("ILOGTAIL_PROMETHEUS_CLUSTER_REPLICAS")
-	num := helper.ExtractStatefulSetNum(os.Getenv("POD_NAME"))
-	if env != "" && num != -1 {
-		p.clusterReplicas, _ = strconv.Atoi(env)
-		p.clusterNum = num
-		promscrape.ConfigMemberInfo(p.clusterReplicas, strconv.Itoa(p.clusterNum)) // nolint:typecheck
+	p.kubeMeta = NewKubernetesMeta(context)
+	if p.kubeMeta.readKubernetesWorkloadMeta() {
+		promscrape.ConfigMemberInfo(int(p.kubeMeta.replicas), strconv.Itoa(p.kubeMeta.currentNum))
 	}
 	libLoggerOnce.Do(func() {
 		if f := flag.Lookup("loggerOutput"); f != nil {
@@ -126,14 +124,15 @@ func (p *ServiceStaticPrometheus) Description() string {
 
 // Start starts the ServiceInput's service, whatever that may be
 func (p *ServiceStaticPrometheus) Start(c pipeline.Collector) error {
+	p.collector = c
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	defer p.waitGroup.Done()
-	p.scraper.Init(func(_ *auth.Token, wr *prompbmarshal.WriteRequest) {
-		logger.Debug(p.context.GetRuntimeContext(), "append new metrics", wr.Size())
-		appendTSDataToSlsLog(c, wr)
-		logger.Debug(p.context.GetRuntimeContext(), "append done", wr.Size())
-	})
+	p.scraper.Init(p.slsPushData)
+	p.running = true
+	if p.kubeMeta.isWorkingOnClusterMode() {
+		p.StartKubeReloadScraper()
+	}
 	<-p.shutdown
 	p.scraper.Stop()
 	return nil
@@ -141,9 +140,39 @@ func (p *ServiceStaticPrometheus) Start(c pipeline.Collector) error {
 
 // Stop stops the services and closes any necessary channels and connections
 func (p *ServiceStaticPrometheus) Stop() error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.running = false
 	close(p.shutdown)
 	p.waitGroup.Wait()
 	return nil
+}
+
+func (p *ServiceStaticPrometheus) StartKubeReloadScraper() {
+	go func() {
+		ticker := time.NewTicker(time.Second * 10)
+		for {
+			select {
+			case <-p.shutdown:
+				return
+			case <-ticker.C:
+				change, err := p.kubeMeta.getPrometheusReplicas()
+				if !change || err != nil {
+					continue
+				}
+				logger.Info(p.context.GetRuntimeContext(), "found change replicas, would start reload prometheus scraper", p.kubeMeta.replicas)
+				p.lock.Lock()
+				if !p.running {
+					return
+				}
+				promscrape.ConfigMemberInfo(int(p.kubeMeta.replicas), strconv.Itoa(p.kubeMeta.currentNum))
+				p.scraper.Stop()
+				p.scraper.Init(p.slsPushData)
+				p.lock.Unlock()
+				logger.Info(p.context.GetRuntimeContext(), "reload prometheus scraper done")
+			}
+		}
+	}()
 }
 
 func init() {
@@ -152,4 +181,10 @@ func init() {
 			NoStaleMarkers: true,
 		}
 	}
+}
+
+func (p *ServiceStaticPrometheus) slsPushData(_ *auth.Token, wr *prompbmarshal.WriteRequest) {
+	logger.Debug(p.context.GetRuntimeContext(), "append new metrics", wr.Size())
+	appendTSDataToSlsLog(p.collector, wr)
+	logger.Debug(p.context.GetRuntimeContext(), "append done", wr.Size())
 }

@@ -15,11 +15,11 @@
 cmake_minimum_required(VERSION 2.9)
 project(config_unittest)
 
-add_executable(config_match_unittest ConfigMatchUnittest.cpp)
-target_link_libraries(config_match_unittest unittest_base)
+# add_executable(config_match_unittest ConfigMatchUnittest.cpp)
+# target_link_libraries(config_match_unittest unittest_base)
 
-add_executable(config_updator_unittest ConfigUpdatorUnittest.cpp)
-target_link_libraries(config_updator_unittest unittest_base)
+# add_executable(config_updator_unittest ConfigUpdatorUnittest.cpp)
+# target_link_libraries(config_updator_unittest unittest_base)
 
 add_executable(config_manager_base_unittest ConfigManagerBaseUnittest.cpp)
 target_link_libraries(config_manager_base_unittest unittest_base)

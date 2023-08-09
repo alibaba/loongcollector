@@ -18,9 +18,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 var data = `
@@ -40,4 +40,16 @@ func TestNormal(t *testing.T) {
 		t.Errorf("raw decoder needs ByteArray")
 	}
 	assert.Equal(t, len(event), len(byteData))
+}
+
+func TestNormalV1(t *testing.T) {
+	decoder := &Decoder{}
+	req := &http.Request{}
+	byteData := []byte(data)
+	logs, err := decoder.Decode(byteData, req, make(map[string]string))
+	assert.Nil(t, err)
+	assert.Equal(t, len(logs), 1)
+	assert.Equal(t, len(logs[0].Contents), 1)
+	logContent := logs[0].Contents[0].Value
+	assert.Equal(t, len(logContent), len(byteData))
 }

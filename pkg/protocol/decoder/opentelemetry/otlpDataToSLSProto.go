@@ -18,7 +18,6 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
 )
@@ -137,13 +136,7 @@ func formatMetricName(name string) string {
 
 func newMetricLogFromRaw(name string, labels KeyValues, nsec int64, value float64) *protocol.Log {
 	labels.Sort()
-	timeNs := uint32(0)
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		timeNs = uint32(nsec % 1e9)
-	}
-	return &protocol.Log{
-		Time:   uint32(nsec / 1e9),
-		TimeNs: timeNs,
+	log := &protocol.Log{
 		Contents: []*protocol.Log_Content{
 			{
 				Key:   metricNameKey,
@@ -163,6 +156,8 @@ func newMetricLogFromRaw(name string, labels KeyValues, nsec int64, value float6
 			},
 		},
 	}
+	protocol.SetLogTime(log, uint32(nsec/1e9), uint32(nsec%1e9))
+	return log
 }
 
 func sanitize(s string) string {
@@ -216,7 +211,6 @@ func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels 
 
 	labels.Sort()
 	log := &protocol.Log{
-		Time: uint32(exemplar.Timestamp() / 1e9),
 		Contents: []*protocol.Log_Content{
 			{
 				Key:   metricNameKey,
@@ -235,9 +229,7 @@ func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels 
 			},
 		},
 	}
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		log.TimeNs = uint32(exemplar.Timestamp() % 1e9)
-	}
+	protocol.SetLogTime(log, uint32(exemplar.Timestamp()/1e9), uint32(exemplar.Timestamp()%1e9))
 	return log
 }
 
@@ -454,12 +446,9 @@ func ConvertOtlpLogV1(otlpLogs plog.Logs) (logs []*protocol.Log, err error) {
 				}
 
 				protoLog := &protocol.Log{
-					Time:     uint32(logRecord.Timestamp().AsTime().Unix()),
 					Contents: protoContents,
 				}
-				if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-					protoLog.TimeNs = uint32(logRecord.Timestamp().AsTime().Nanosecond())
-				}
+				protocol.SetLogTime(protoLog, uint32(logRecord.Timestamp().AsTime().Unix()), uint32(logRecord.Timestamp().AsTime().Nanosecond()))
 				logs = append(logs, protoLog)
 			}
 		}
@@ -523,7 +512,6 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 					// find a better way to handle metric with type MetricTypeEmpty.
 					nowTime := time.Now()
 					log := &protocol.Log{
-						Time: uint32(nowTime.Unix()),
 						Contents: []*protocol.Log_Content{
 							{
 								Key:   metricNameKey,
@@ -543,9 +531,7 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 							},
 						},
 					}
-					if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-						log.TimeNs = uint32(nowTime.Nanosecond())
-					}
+					protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 					logs = append(logs, log)
 				}
 			}

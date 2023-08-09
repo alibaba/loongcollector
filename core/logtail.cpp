@@ -71,10 +71,12 @@ DECLARE_FLAG_INT32(data_server_port);
 DECLARE_FLAG_BOOL(enable_env_ref_in_config);
 
 void HandleSighupSignal(int signum, siginfo_t* info, void* context) {
+    APSARA_LOG_INFO(sLogger, ("received signal", "SIGHUP"));
     ConfigManager::GetInstance()->SetMappingPathsChanged();
 }
 
 void HandleSigtermSignal(int signum, siginfo_t* info, void* context) {
+    APSARA_LOG_INFO(sLogger, ("received signal", "SIGTERM"));
     LogtailGlobalPara::Instance()->SetSigtermFlag(true);
 }
 
@@ -105,6 +107,7 @@ static void overwrite_community_edition_flags() {
     STRING_FLAG(ilogtail_docker_file_path_config) = "checkpoint/docker_path_config.json";
     INT32_FLAG(data_server_port) = 443;
     BOOL_FLAG(enable_env_ref_in_config) = true;
+    BOOL_FLAG(enable_containerd_upper_dir_detect) = true;
 }
 
 // Main routine of worker process.
@@ -209,7 +212,7 @@ void do_worker_process() {
     ConfigManager::GetInstance()->GetLocalConfigUpdate();
     ConfigManager::GetInstance()->LoadConfig(AppConfig::GetInstance()->GetUserConfigPath());
     ConfigManager::GetInstance()->LoadDockerConfig();
-    // mNameCoonfigMap is empty, configExistFlag is false
+    // mNameConfigMap is empty, configExistFlag is false
     bool configExistFlag = !ConfigManager::GetInstance()->GetAllConfig().empty();
 
     // set max open file limit

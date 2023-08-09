@@ -20,8 +20,10 @@ import (
 	"github.com/buger/jsonparser"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorJSON struct {
@@ -66,6 +68,7 @@ func (p *ProcessorJSON) processLog(log *protocol.Log) {
 		if log.Contents[idx].Key == p.SourceKey {
 			objectVal := log.Contents[idx].Value
 			param := ExpandParam{
+				sourceKey:            p.SourceKey,
 				log:                  log,
 				nowDepth:             0,
 				maxDepth:             p.ExpandDepth,
@@ -112,13 +115,16 @@ func init() {
 }
 
 type ExpandParam struct {
-	log                  *protocol.Log
-	preKey               string
-	nowDepth             int
-	maxDepth             int
-	connector            string
-	prefix               string
-	ignoreFirstConnector bool
+	sourceKey              string
+	log                    *protocol.Log
+	contents               models.LogContents
+	preKey                 string
+	nowDepth               int
+	maxDepth               int
+	connector              string
+	prefix                 string
+	ignoreFirstConnector   bool
+	isSourceKeyOverwritten bool
 }
 
 func (p *ExpandParam) getConnector(depth int) string {
@@ -128,30 +134,77 @@ func (p *ExpandParam) getConnector(depth int) string {
 	return p.connector
 }
 
-func (p *ExpandParam) ExpandJSONCallBack(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+func (p *ExpandParam) ExpandJSONCallBack(key []byte, value []byte, dataType jsonparser.ValueType, _ int) error {
 	p.nowDepth++
-	if p.nowDepth == p.maxDepth || dataType != jsonparser.Object {
-		if dataType == jsonparser.String {
-			// unescape string
-			if strValue, err := jsonparser.ParseString(value); err == nil {
-				p.appendNewContent(p.preKey+p.getConnector(p.nowDepth)+(string)(key), strValue)
-			} else {
-				p.appendNewContent(p.preKey+p.getConnector(p.nowDepth)+(string)(key), (string)(value))
-			}
-		} else {
-			p.appendNewContent(p.preKey+p.getConnector(p.nowDepth)+(string)(key), (string)(value))
-		}
-	} else {
-		backKey := p.preKey
-		p.preKey = p.preKey + p.getConnector(p.nowDepth) + (string)(key)
-		_ = jsonparser.ObjectEach(value, p.ExpandJSONCallBack)
-		p.preKey = backKey
+
+	switch dataType {
+	case jsonparser.Object:
+		p.flattenObject(key, value)
+	case jsonparser.Array:
+		p.flattenArray(key, value)
+	default:
+		p.flattenValue(key, value)
 	}
+
 	p.nowDepth--
 	return nil
 }
 
+func (p *ExpandParam) flattenObject(key []byte, value []byte) {
+	if p.nowDepth == p.maxDepth {
+		// If reach max depth, add it directly to the result
+		newKey := p.preKey + p.getConnector(p.nowDepth) + (string)(key)
+		p.appendNewContent(newKey, (string)(value))
+		return
+	}
+
+	backKey := p.preKey
+	p.preKey = p.preKey + p.getConnector(p.nowDepth) + (string)(key)
+	_ = jsonparser.ObjectEach(value, p.ExpandJSONCallBack)
+	p.preKey = backKey
+}
+
+func (p *ExpandParam) flattenArray(key []byte, value []byte) {
+	if p.nowDepth == p.maxDepth {
+		// If reach max depth, add it directly to the result
+		newKey := p.preKey + p.getConnector(p.nowDepth) + (string)(key)
+		p.appendNewContent(newKey, (string)(value))
+		return
+	}
+
+	index := 0
+	_, _ = jsonparser.ArrayEach(value, func(val []byte, dataType jsonparser.ValueType, offset int, err error) {
+		newKey := make([]byte, len(key), len(key)+10)
+		copy(newKey, key)
+		newKey = append(newKey, fmt.Sprintf("[%d]", index)...)
+		if dataType == jsonparser.Object {
+			p.flattenObject(newKey, val)
+		} else {
+			p.flattenValue(newKey, val)
+		}
+		index++
+	})
+}
+
+func (p *ExpandParam) flattenValue(key []byte, value []byte) {
+	// If the current value is not a JSON object, nor a JSON array, add it directly to the result
+	newKey := p.preKey + p.getConnector(p.nowDepth) + (string)(key)
+	if strValue, err := jsonparser.ParseString(value); err == nil {
+		p.appendNewContent(newKey, strValue)
+	} else {
+		p.appendNewContent(newKey, (string)(value))
+	}
+}
+
 func (p *ExpandParam) appendNewContent(key string, value string) {
+	if p.log != nil {
+		p.appendNewContentV1(key, value)
+	} else {
+		p.appendNewContentV2(key, value)
+	}
+}
+
+func (p *ExpandParam) appendNewContentV1(key string, value string) {
 	if len(p.prefix) > 0 {
 		newContent := &protocol.Log_Content{
 			Key:   p.prefix + key,
@@ -165,5 +218,64 @@ func (p *ExpandParam) appendNewContent(key string, value string) {
 		}
 		p.log.Contents = append(p.log.Contents, newContent)
 	}
+}
 
+func (p *ExpandParam) appendNewContentV2(key string, value string) {
+	if len(p.prefix) > 0 {
+		key = p.prefix + key
+	}
+	p.contents.Add(key, value)
+	if key == p.sourceKey {
+		p.isSourceKeyOverwritten = true
+	}
+}
+
+func (p *ProcessorJSON) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	for _, event := range in.Events {
+		p.processEvent(event)
+	}
+	context.Collector().Collect(in.Group, in.Events...)
+}
+
+func (p *ProcessorJSON) processEvent(event models.PipelineEvent) {
+	if event.GetType() != models.EventTypeLogging {
+		return
+	}
+	contents := event.(*models.Log).GetIndices()
+	if !contents.Contains(p.SourceKey) {
+		if p.NoKeyError {
+			logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_FIND_ALARM", "cannot find key %v", p.SourceKey)
+		}
+		return
+	}
+	objectVal := contents.Get(p.SourceKey)
+	bytesVal, ok := objectVal.([]byte)
+	if !ok {
+		var stringVal string
+		stringVal, ok = objectVal.(string)
+		bytesVal = util.ZeroCopyStringToBytes(stringVal)
+	}
+	if !ok {
+		logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_FIND_ALARM", "key %v is not string", p.SourceKey)
+		return
+	}
+	param := ExpandParam{
+		sourceKey:            p.SourceKey,
+		contents:             contents,
+		nowDepth:             0,
+		maxDepth:             p.ExpandDepth,
+		connector:            p.ExpandConnector,
+		prefix:               p.Prefix,
+		ignoreFirstConnector: p.IgnoreFirstConnector,
+	}
+	if p.UseSourceKeyAsPrefix {
+		param.preKey = p.SourceKey
+	}
+	err := jsonparser.ObjectEach(bytesVal, param.ExpandJSONCallBack)
+	if err != nil {
+		logger.Errorf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_PARSER_ALARM", "parser json error %v", err)
+	}
+	if !p.shouldKeepSource(err) && !param.isSourceKeyOverwritten {
+		contents.Delete(p.SourceKey)
+	}
 }

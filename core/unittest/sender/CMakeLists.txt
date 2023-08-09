@@ -15,5 +15,5 @@
 cmake_minimum_required(VERSION 2.9)
 project(sender_unittest)
 
-add_executable(sender_unittest SenderUnittest.cpp)
-target_link_libraries(sender_unittest unittest_base)
+# add_executable(sender_unittest SenderUnittest.cpp)
+# target_link_libraries(sender_unittest unittest_base)

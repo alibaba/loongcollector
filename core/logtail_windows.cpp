@@ -62,6 +62,7 @@ static void overwrite_community_edition_flags() {
     STRING_FLAG(ilogtail_docker_file_path_config) = "checkpoint/docker_path_config.json";
     INT32_FLAG(data_server_port) = 443;
     BOOL_FLAG(enable_env_ref_in_config) = true;
+    BOOL_FLAG(enable_containerd_upper_dir_detect) = true;
 }
 
 void do_worker_process() {

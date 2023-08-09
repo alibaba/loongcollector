@@ -16,14 +16,23 @@ name: Build Core
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'example_config/**'
+      - 'docker/**'
+      - 'k8s_template/**'
+      - 'changes/**'
+      - 'licenses/**'
+      - 'CHANGELOG.md'
   push:
     branches:
       - main
       - 1.*
+
 jobs:
   CI:
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       matrix:
         go-version: [1.19]
@@ -61,6 +70,10 @@ jobs:
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
         run: make core
+
+      - name: Unit Test
+        if: matrix.runner == 'ubuntu-latest'
+        run: make unittest_core
 
   result:
     runs-on: ubuntu-latest

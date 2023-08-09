@@ -24,12 +24,13 @@ import (
 )
 
 type ProcessorRename struct {
-	NoKeyError          bool
-	SourceKeys          []string
-	DestKeys            []string
-	keyDictionary       map[string]int
-	noKeyErrorBoolArray []bool
-	context             pipeline.Context
+	NoKeyError         bool
+	SourceKeys         []string
+	DestKeys           []string
+	keyDictionary      map[string]string // use map to eliminate duplicate keys and invalid renames
+	existKeyDictionary map[string]bool   // not necessary in v2 pipeline
+	noKeyErrorArray    []string
+	context            pipeline.Context
 }
 
 const pluginName = "processor_rename"
@@ -46,12 +47,20 @@ func (p *ProcessorRename) Init(context pipeline.Context) error {
 	if len(p.SourceKeys) != len(p.DestKeys) {
 		return fmt.Errorf("The length of SourceKeys does not match the length of DestKeys for plugin %v", pluginName)
 	}
-	p.keyDictionary = make(map[string]int)
+	p.keyDictionary = make(map[string]string)
 	for i, source := range p.SourceKeys {
-		p.keyDictionary[source] = i
+		if source != p.DestKeys[i] {
+			p.keyDictionary[source] = p.DestKeys[i]
+		}
 	}
 	if p.NoKeyError {
-		p.noKeyErrorBoolArray = make([]bool, len(p.SourceKeys))
+		p.existKeyDictionary = make(map[string]bool)
+		for i, source := range p.SourceKeys {
+			if source != p.DestKeys[i] {
+				p.existKeyDictionary[source] = false
+			}
+		}
+		p.noKeyErrorArray = make([]string, len(p.SourceKeys))
 	}
 	return nil
 }
@@ -67,60 +76,72 @@ func (p *ProcessorRename) ProcessLogs(logArray []*protocol.Log) []*protocol.Log 
 	return logArray
 }
 
-func (p *ProcessorRename) checkNoKeyError() []string {
-	var errorArray []string
-	for idx, isError := range p.noKeyErrorBoolArray {
-		if !isError {
-			errorArray = append(errorArray, p.SourceKeys[idx])
-		}
-	}
-	return errorArray
-}
-
 func (p *ProcessorRename) processLog(log *protocol.Log) {
 	if p.NoKeyError {
-		for idx := range p.noKeyErrorBoolArray {
-			p.noKeyErrorBoolArray[idx] = false
+		p.noKeyErrorArray = p.noKeyErrorArray[:0]
+		for k := range p.existKeyDictionary {
+			p.existKeyDictionary[k] = false
 		}
 	}
 	for _, content := range log.Contents {
 		oldKey := content.Key
-		if idx, exists := p.keyDictionary[oldKey]; exists {
-			content.Key = p.DestKeys[idx]
+		if newKey, exists := p.keyDictionary[oldKey]; exists {
+			content.Key = newKey
 			if p.NoKeyError {
-				p.noKeyErrorBoolArray[idx] = true
+				p.existKeyDictionary[oldKey] = true
 			}
 		}
 	}
 	if p.NoKeyError {
-		if errorArray := p.checkNoKeyError(); errorArray != nil {
-			logger.Warningf(p.context.GetRuntimeContext(), "RENAME_FIND_ALARM", "cannot find key %v", errorArray)
+		for k, v := range p.existKeyDictionary {
+			if !v {
+				p.noKeyErrorArray = append(p.noKeyErrorArray, k)
+			}
+		}
+		if len(p.noKeyErrorArray) != 0 {
+			logger.Warningf(p.context.GetRuntimeContext(), "RENAME_FIND_ALARM", "cannot find key %v", p.noKeyErrorArray)
 		}
 	}
 }
 
 func (p *ProcessorRename) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if p.NoKeyError {
-		for idx := range p.noKeyErrorBoolArray {
-			p.noKeyErrorBoolArray[idx] = false
-		}
+		p.noKeyErrorArray = p.noKeyErrorArray[:0]
 	}
 	for _, event := range in.Events {
-		tags := event.GetTags()
-		for idx, key := range p.SourceKeys {
-			if tags.Contains(key) {
-				tags.Add(p.DestKeys[idx], tags.Get(key))
-				tags.Delete(key)
-				if p.NoKeyError {
-					p.noKeyErrorBoolArray[idx] = true
-				}
-			}
+		if event.GetType() == models.EventTypeLogging {
+			logEvent := event.(*models.Log)
+			p.processLogEvent(logEvent)
+		} else {
+			p.processOtherEvent(event)
 		}
 	}
 	context.Collector().Collect(in.Group, in.Events...)
-	if p.NoKeyError {
-		if errorArray := p.checkNoKeyError(); errorArray != nil {
-			logger.Warningf(p.context.GetRuntimeContext(), "RENAME_FIND_ALARM", "cannot find key %v", errorArray)
+	if p.NoKeyError && len(p.noKeyErrorArray) != 0 {
+		logger.Warningf(p.context.GetRuntimeContext(), "RENAME_FIND_ALARM", "cannot find key %v", p.noKeyErrorArray)
+	}
+}
+
+func (p *ProcessorRename) processLogEvent(logEvent *models.Log) {
+	contents := logEvent.GetIndices()
+	for oldKey, newKey := range p.keyDictionary {
+		if contents.Contains(oldKey) {
+			contents.Add(newKey, contents.Get(oldKey))
+			contents.Delete(oldKey)
+		} else if p.NoKeyError {
+			p.noKeyErrorArray = append(p.noKeyErrorArray, oldKey)
+		}
+	}
+}
+
+func (p *ProcessorRename) processOtherEvent(event models.PipelineEvent) {
+	tags := event.GetTags()
+	for oldKey, newKey := range p.keyDictionary {
+		if tags.Contains(oldKey) {
+			tags.Add(newKey, tags.Get(oldKey))
+			tags.Delete(oldKey)
+		} else if p.NoKeyError {
+			p.noKeyErrorArray = append(p.noKeyErrorArray, oldKey)
 		}
 	}
 }

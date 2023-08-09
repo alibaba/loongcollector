@@ -92,6 +92,9 @@ function generateCopyScript() {
   echo 'BINDIR=$(cd $(dirname "${BASH_SOURCE[0]}")&& cd .. && pwd)/'${OUT_DIR}'/' >>$COPY_SCRIPT_FILE
   echo 'rm -rf $BINDIR && mkdir $BINDIR' >>$COPY_SCRIPT_FILE
   echo "id=\$(docker create ${REPOSITORY}:${VERSION})" >>$COPY_SCRIPT_FILE
+  if [ $BUILD_LOGTAIL_UT = "ON" ]; then
+    echo 'docker cp "$id":/src/core/build core/build' >>$COPY_SCRIPT_FILE
+  fi
 
   if [ $CATEGORY = "plugin" ]; then
     echo 'docker cp "$id":/src/'${OUT_DIR}'/libPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE

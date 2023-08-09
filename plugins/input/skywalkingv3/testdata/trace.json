@@ -70,8 +70,7 @@
                 "Key": "statusMessage",
                 "Value": ""
             }
-        ],
-        "Time_ns": 0
+        ]
     },
     {
         "Time": 1234567890,
@@ -144,7 +143,6 @@
                 "Key": "statusMessage",
                 "Value": ""
             }
-        ],
-        "Time_ns": 0
+        ]
     }
 ]

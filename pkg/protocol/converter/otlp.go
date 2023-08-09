@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
@@ -82,7 +83,11 @@ func (c *Converter) ConvertToOtlpResourseLogs(logGroup *protocol.LogGroup, targe
 		}
 
 		logRecord.SetObservedTimestamp(pcommon.Timestamp(time.Now().UnixNano()))
-		logRecord.SetTimestamp(pcommon.Timestamp(uint64(log.Time) * uint64(time.Second)))
+		if config.LogtailGlobalConfig.EnableTimestampNanosecond {
+			logRecord.SetTimestamp(pcommon.Timestamp(uint64(log.Time)*uint64(time.Second)) + pcommon.Timestamp(uint64(*log.TimeNs)*uint64(time.Nanosecond)))
+		} else {
+			logRecord.SetTimestamp(pcommon.Timestamp(uint64(log.Time) * uint64(time.Second)))
+		}
 
 		if body, has := contents[bodyKey]; has {
 			logRecord.Body().SetStr(body)

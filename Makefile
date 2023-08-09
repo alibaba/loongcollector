@@ -200,6 +200,10 @@ unittest_plugin: clean import_plugins
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
 	rm -rf plugins/input/jmxfetch/test/
 
+.PHONY: unittest_core
+unittest_core:
+	./scripts/run_core_ut.sh
+
 .PHONY: unittest_pluginmanager
 unittest_pluginmanager: clean import_plugins
 	cp pkg/logtail/libPluginAdapter.so ./plugin_main

@@ -16,7 +16,6 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/pkg"
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -41,16 +40,16 @@ func (r *InputAlarm) Collect(collector pipeline.Collector) error {
 	for _, config := range LogtailConfig {
 		alarm := config.Context.GetRuntimeContext().Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 		if alarm != nil {
-			alarm.SerializeToPb(loggroup, config.GlobalConfig.EnableTimestampNanosecond)
+			alarm.SerializeToPb(loggroup)
 		}
 	}
-	util.GlobalAlarm.SerializeToPb(loggroup, config.LogtailGlobalConfig.EnableTimestampNanosecond)
+	util.GlobalAlarm.SerializeToPb(loggroup)
 	if len(loggroup.Logs) > 0 && AlarmConfig != nil {
 		for _, log := range loggroup.Logs {
 			AlarmConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
 		}
 	}
-	util.RegisterAlarmsSerializeToPb(loggroup, config.LogtailGlobalConfig.EnableTimestampNanosecond)
+	util.RegisterAlarmsSerializeToPb(loggroup)
 	logger.Debug(r.context.GetRuntimeContext(), "InputAlarm", *loggroup)
 	return nil
 }

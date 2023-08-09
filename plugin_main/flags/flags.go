@@ -51,6 +51,7 @@ var (
 	InputField       = flag.String("input-field", "content", "input file")
 	InputLineLimit   = flag.Int("input-line-limit", 1000, "input file")
 	OutputFile       = flag.String("output-file", "./output.log", "output file")
+	StatefulSetFlag  = flag.Bool("ALICLOUD_LOG_STATEFULSET_FLAG", false, "alibaba log export ports flag, set true if you want to use it")
 )
 
 var (
@@ -138,6 +139,7 @@ func OverrideByEnv() {
 	_ = util.InitFromEnvBool("LOGTAIL_AUTO_PROF", AutoProfile, *AutoProfile)
 	_ = util.InitFromEnvBool("LOGTAIL_FORCE_COLLECT_SELF_TELEMETRY", ForceSelfCollect, *ForceSelfCollect)
 	_ = util.InitFromEnvBool("LOGTAIL_HTTP_LOAD_CONFIG", HTTPLoadFlag, *HTTPLoadFlag)
+	_ = util.InitFromEnvBool("ALICLOUD_LOG_STATEFULSET_FLAG", StatefulSetFlag, *StatefulSetFlag)
 }
 
 type pipelineConfig struct {

@@ -17,7 +17,6 @@ package pluginmanager
 import (
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -256,10 +255,7 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 							continue
 						}
 						if l.Time == uint32(0) {
-							l.Time = (uint32)(nowTime.Unix())
-							if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-								l.TimeNs = (uint32)(nowTime.Nanosecond())
-							}
+							protocol.SetLogTime(l, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 						}
 						for tryCount := 1; true; tryCount++ {
 							err := aggregator.Aggregator.Add(l, logCtx.Context)

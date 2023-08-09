@@ -41,6 +41,11 @@ const (
 	valueTypeString = "string"
 )
 
+const (
+	KeyValueSeparator = "#$#"
+	LabelSeparator    = "|"
+)
+
 var readerPool = sync.Pool{
 	New: func() any {
 		return &metricReader{}
@@ -56,23 +61,33 @@ type metricReader struct {
 	fieldName string
 }
 
-type metricLabel struct {
-	key   string
-	value string
+type MetricLabel struct {
+	Key   string
+	Value string
 }
 
-type metricLabels []metricLabel
+type MetricLabels []MetricLabel
 
-func (m metricLabels) Len() int {
+func (m MetricLabels) Len() int {
 	return len(m)
 }
 
-func (m metricLabels) Less(i, j int) bool {
-	return m[i].key < m[j].key
+func (m MetricLabels) Less(i, j int) bool {
+	return m[i].Key < m[j].Key
 }
 
-func (m metricLabels) Swap(i, j int) {
+func (m MetricLabels) Swap(i, j int) {
 	m[i], m[j] = m[j], m[i]
+}
+
+func (m MetricLabels) GetLabel() string {
+	// sort label
+	sort.Sort(m)
+	var res []string
+	for _, label := range m {
+		res = append(res, label.Key+KeyValueSeparator+label.Value)
+	}
+	return strings.Join(res, LabelSeparator)
 }
 
 func (r *metricReader) readNames() (metricName, fieldName string) {
@@ -83,13 +98,13 @@ func (r *metricReader) readNames() (metricName, fieldName string) {
 	return name, r.fieldName
 }
 
-func (r *metricReader) readSortedLabels() ([]metricLabel, error) {
+func (r *metricReader) readSortedLabels() ([]MetricLabel, error) {
 	n := r.countLabels()
 	if n == 0 {
 		return nil, nil
 	}
 
-	labels := make([]metricLabel, 0, n)
+	labels := make([]MetricLabel, 0, n)
 	remainLabels := r.labels
 	lastIndex := -1
 	label := ""
@@ -107,8 +122,8 @@ func (r *metricReader) readSortedLabels() ([]metricLabel, error) {
 		splitIdx := strings.Index(label, "#$#")
 		if splitIdx < 0 {
 			if lastIndex >= 0 {
-				labels[lastIndex].value += "|"
-				labels[lastIndex].value += label
+				labels[lastIndex].Value += "|"
+				labels[lastIndex].Value += label
 				continue
 			}
 			if len(key) == 0 {
@@ -127,7 +142,7 @@ func (r *metricReader) readSortedLabels() ([]metricLabel, error) {
 			key = label[:splitIdx]
 		}
 
-		labels = append(labels, metricLabel{key: key, value: label[splitIdx+3:]})
+		labels = append(labels, MetricLabel{Key: key, Value: label[splitIdx+3:]})
 
 		lastIndex++
 		key = ""
@@ -137,7 +152,7 @@ func (r *metricReader) readSortedLabels() ([]metricLabel, error) {
 		}
 	}
 
-	sort.Sort(metricLabels(labels))
+	sort.Sort(MetricLabels(labels))
 
 	if len(key) > 0 {
 		return labels, fmt.Errorf("found miss matching key: %s", key)

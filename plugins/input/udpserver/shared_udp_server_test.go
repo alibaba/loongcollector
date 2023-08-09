@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -63,7 +62,6 @@ func TestSharedUDPServer_cutDispatchTag(t *testing.T) {
 			}
 			nowTime := time.Now()
 			log := &protocol.Log{
-				Time: uint32(nowTime.Unix()),
 				Contents: []*protocol.Log_Content{
 					{
 						Key:   labelName,
@@ -71,9 +69,7 @@ func TestSharedUDPServer_cutDispatchTag(t *testing.T) {
 					},
 				},
 			}
-			if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-				log.TimeNs = uint32(nowTime.Nanosecond())
-			}
+			protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 
 			if gotTag := s.cutDispatchTag(log); gotTag != tt.wantTag || log.Contents[0].Value != tt.wantVal {
 				t.Errorf("cutDispatchTag() = %v, want %v, got val = %v, want val= %v",

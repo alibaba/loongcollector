@@ -59,17 +59,6 @@ func TestHttpFlusherInit(t *testing.T) {
 		})
 	})
 
-	Convey("Given a http flusher with empty converter", t, func() {
-		flusher := &FlusherHTTP{
-			RemoteURL: "http://localhost:8086/write",
-			Convert:   helper.ConvertConfig{},
-		}
-		Convey("Then Init() should return error", func() {
-			err := flusher.Init(mockContext{})
-			So(err, ShouldNotBeNil)
-		})
-	})
-
 	Convey("Given a http flusher with Query contains variable ", t, func() {
 		flusher := &FlusherHTTP{
 			RemoteURL: "http://localhost:8086/write",

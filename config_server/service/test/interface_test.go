@@ -608,7 +608,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.InternalServerError.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.InternalServerError.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_INTERNAL_SERVER_ERROR)
 			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s was applied to some agent groups, cannot be deleted.", configName))
 
 			requestID++
@@ -625,7 +625,7 @@ func TestOperationsBetweenConfigAndAgentGroup(t *testing.T) {
 			// check
 			So(status, ShouldEqual, common.InternalServerError.Status)
 			So(res.ResponseId, ShouldEqual, fmt.Sprint(requestID))
-			So(res.Code, ShouldEqual, common.InternalServerError.Code)
+			So(res.Code, ShouldEqual, proto.RespCode_INTERNAL_SERVER_ERROR)
 			So(res.Message, ShouldEqual, fmt.Sprintf("Config %s was applied to some agent groups, cannot be deleted.", configName))
 
 			requestID++
@@ -737,20 +737,23 @@ func TestAgentSendMessage(t *testing.T) {
 	var requestID int
 
 	Convey("Test Agent send message.", t, func() {
+		configInfos := make([]*proto.ConfigCheckResult, 0)
+
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Heartbeat. ")
 		{
 			agent := new(proto.Agent)
 			agent.AgentId = "ilogtail-1"
+			agent.Attributes = &proto.AgentAttributes{}
 			agent.RunningStatus = "good"
 			agent.StartupTime = 100
 
-			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
+			status, res := HeartBeat(r, agent, configInfos, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
 			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
-			So(res.Message, ShouldEqual, "Send heartbeat success")
+			So(res.Message, ShouldEqual, "Send heartbeat successGet config update infos success")
 
 			requestID++
 		}
@@ -766,16 +769,17 @@ func TestAgentSendMessage(t *testing.T) {
 		{
 			agent := new(proto.Agent)
 			agent.AgentId = "ilogtail-2"
+			agent.Attributes = &proto.AgentAttributes{}
 			agent.RunningStatus = "good"
 			agent.StartupTime = 200
 
-			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
+			status, res := HeartBeat(r, agent, configInfos, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
 			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
-			So(res.Message, ShouldEqual, "Send heartbeat success")
+			So(res.Message, ShouldEqual, "Send heartbeat successGet config update infos success")
 
 			requestID++
 		}
@@ -791,16 +795,17 @@ func TestAgentSendMessage(t *testing.T) {
 		{
 			agent := new(proto.Agent)
 			agent.AgentId = "ilogtail-1"
+			agent.Attributes = &proto.AgentAttributes{}
 			agent.RunningStatus = "good"
 			agent.StartupTime = 100
 
-			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
+			status, res := HeartBeat(r, agent, configInfos, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
 			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
-			So(res.Message, ShouldEqual, "Send heartbeat success")
+			So(res.Message, ShouldEqual, "Send heartbeat successGet config update infos success")
 
 			requestID++
 		}
@@ -840,6 +845,7 @@ func TestAgentGetConfig(t *testing.T) {
 	Convey("Test Agent get config.", t, func() {
 		agent := new(proto.Agent)
 		agent.AgentId = "ilogtail-1"
+		agent.Attributes = &proto.AgentAttributes{}
 		agent.RunningStatus = "good"
 		agent.StartupTime = 100
 
@@ -970,15 +976,23 @@ func TestAgentGetConfig(t *testing.T) {
 			requestID++
 		}
 
+		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Sleep 3s, wait for writing config info to store. ")
+		{
+			time.Sleep(time.Second * 3)
+
+			requestID++
+		}
+
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Heartbeat. ")
 		{
-			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
+			status, res := HeartBeat(r, agent, configInfos, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
 			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
-			So(res.Message, ShouldEqual, "Send heartbeat success")
+			So(res.Message, ShouldEqual, "Send heartbeat successGet config update infos success")
+			So(len(res.PipelineCheckResults), ShouldEqual, 3)
 			for _, info := range res.PipelineCheckResults {
 				configVersions[info.Name] = info.NewVersion
 				switch info.Name {
@@ -1003,7 +1017,7 @@ func TestAgentGetConfig(t *testing.T) {
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
 			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
-			So(res.Message, ShouldEqual, "Get config update infos success")
+			So(res.Message, ShouldEqual, "Get Agent Config details success")
 			So(len(res.ConfigDetails), ShouldEqual, 3)
 			requestID++
 		}
@@ -1059,15 +1073,23 @@ func TestAgentGetConfig(t *testing.T) {
 			requestID++
 		}
 
+		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Sleep 3s, wait for writing config info to store. ")
+		{
+			time.Sleep(time.Second * 3)
+
+			requestID++
+		}
+
 		fmt.Print("\n\t" + fmt.Sprint(requestID) + ":Test ilogtail-1 send Heartbeat. ")
 		{
-			status, res := HeartBeat(r, agent, fmt.Sprint(requestID))
+			status, res := HeartBeat(r, agent, configInfos, fmt.Sprint(requestID))
 
 			// check
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
 			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
-			So(res.Message, ShouldEqual, "Send heartbeat success")
+			So(res.Message, ShouldEqual, "Send heartbeat successGet config update infos success")
+			So(len(res.PipelineCheckResults), ShouldEqual, 3)
 			configVersions = map[string]int64{}
 			for _, info := range res.PipelineCheckResults {
 				configVersions[info.Name] = info.NewVersion
@@ -1093,7 +1115,7 @@ func TestAgentGetConfig(t *testing.T) {
 			So(status, ShouldEqual, common.Accept.Status)
 			So(res.RequestId, ShouldEqual, fmt.Sprint(requestID))
 			So(res.Code, ShouldEqual, proto.RespCode_ACCEPT)
-			So(res.Message, ShouldEqual, "Get config update infos success")
+			So(res.Message, ShouldEqual, "Get Agent Config details success")
 			So(len(res.ConfigDetails), ShouldEqual, 3)
 			requestID++
 		}

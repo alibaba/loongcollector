@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -284,12 +283,9 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 func (p *DockerStdoutProcessor) newRawLogBySingleLine(msg *LogMessage) *protocol.Log {
 	nowTime := time.Now()
 	log := &protocol.Log{
-		Time:     uint32(nowTime.Unix()),
 		Contents: make([]*protocol.Log_Content, 0, p.fieldNum),
 	}
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		log.TimeNs = uint32(nowTime.Nanosecond())
-	}
+	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 	if len(msg.Content) > 0 && msg.Content[len(msg.Content)-1] == '\n' {
 		msg.Content = msg.Content[0 : len(msg.Content)-1]
 	}
@@ -333,12 +329,9 @@ func (p *DockerStdoutProcessor) newRawLogByMultiLine() *protocol.Log {
 
 	nowTime := time.Now()
 	log := &protocol.Log{
-		Time:     uint32(nowTime.Unix()),
 		Contents: make([]*protocol.Log_Content, 0, p.fieldNum),
 	}
-	if config.LogtailGlobalConfig.EnableTimestampNanosecond {
-		log.TimeNs = uint32(nowTime.Nanosecond())
-	}
+	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 	log.Contents = append(log.Contents, &protocol.Log_Content{
 		Key:   "content",
 		Value: multiLine.String(),

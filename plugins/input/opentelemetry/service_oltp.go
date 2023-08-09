@@ -191,7 +191,6 @@ func (s *Server) start() error {
 			logger.Info(s.context.GetRuntimeContext(), "otlp http server shutdown", s.Protocals.HTTP.Endpoint)
 			s.wg.Done()
 		}()
-
 	}
 	return nil
 }
@@ -201,14 +200,13 @@ func (s *Server) Stop() error {
 	if s.grpcListener != nil {
 		_ = s.grpcListener.Close()
 		logger.Info(s.context.GetRuntimeContext(), "otlp grpc server stop", s.Protocals.GRPC.Endpoint)
-		s.wg.Wait()
 	}
 
 	if s.httpListener != nil {
 		_ = s.httpListener.Close()
 		logger.Info(s.context.GetRuntimeContext(), "otlp http server stop", s.Protocals.HTTP.Endpoint)
-		s.wg.Wait()
 	}
+	s.wg.Wait()
 	return nil
 }
 

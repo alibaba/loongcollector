@@ -4,6 +4,12 @@
 
 `flusher_stdout` `flusher`插件可以实现将采集到的数据，经过处理后，打印到标准输出或者自定义文件。
 
+## 支持的Event类型
+
+| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
+| ------------ | ---------------- | --------------- | ------------- |
+|      ✅      |      ✅           |       ✅        |      ✅       |
+
 ## 版本
 
 [Stable](../stability-level.md)

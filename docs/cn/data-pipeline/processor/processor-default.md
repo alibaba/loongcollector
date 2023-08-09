@@ -4,6 +4,12 @@
 
 `processor_default`插件不对数据任何操作，只是简单的数据透传。[源代码](https://github.com/alibaba/ilogtail/blob/main/plugins/processor/defaultone/processor_default.go)
 
+## 支持的Event类型
+
+| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
+| ------------ | ---------------- | --------------- | ------------- |
+|      ✅      |      ✅           |       ✅        |       ✅      |
+
 ## 版本
 
 [Stable](../stability-level.md)
