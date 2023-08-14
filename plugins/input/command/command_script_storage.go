@@ -142,6 +142,10 @@ func WaitTimeout(cmd *exec.Cmd, timeout time.Duration) (isKilled bool, err error
 
 	err = cmd.Wait()
 
+	if err != nil && (err.Error() == errWaitNoChild || err.Error() == errWaitIDNoChild) {
+		err = nil
+	}
+
 	if kill != nil {
 		kill.Stop()
 	}

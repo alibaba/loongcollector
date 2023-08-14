@@ -19,7 +19,7 @@
 | Type                | String   | 是    | 插件类型，指定为`input_command`                                                                                                                                                        |
 | ScriptType          | String   | 是    | 指定脚本内容的类型，目前支持:bash、shell、python2、python3                                                                                                                                      |
 | User                | String   | 是    | 运行命令使用的用户名，只支持非Root用户(建议配置最小权限，只给需要关注的目录/文件rwx权限)                                                                                                                              |
-| ScriptContent       | String   | 是    | 脚本内容, 支持PlainText和base64加密的内容, 跟ContentEncoding的字段对应                                                                                                                           |
+| ScriptContent       | String   | 是    | 脚本内容, 支持PlainText和base64加密的内容, 跟ContentEncoding的字段对应, ScriptContent长度不能超过512*1024                                                                                              |
 | ContentEncoding     | String   | 否    | 脚本内容的文本格式 <br/> 支持PlainText(纯文本，不编码)\|Base64编码 默认:PlainText                                                                                                                    |
 | LineSplitSep        | String   | 否    | 脚本输出内容的分隔符，为空时不进行分割，全部作为一条数据返回                                                                                                                                                 |
 | CmdPath             | String   | 否    | 执行脚本命令的路径，如果为空，则使用默认路径。bash、shell、python2、python3对应的默认路径如下：<br/>- bash: /usr/bin/bash<br/>- shell: /usr/bin/sh<br/>- python2: /usr/bin/python2<br/>- python3: /usr/bin/python3 |
