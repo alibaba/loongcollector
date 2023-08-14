@@ -55,3 +55,8 @@ var SupportContentType = map[string]bool{
 	ContentTypePlainText: true,
 	ContentTypeBase64:    true,
 }
+
+const (
+	errWaitNoChild   = "wait: no child processes"
+	errWaitIDNoChild = "waitid: no child processes"
+)

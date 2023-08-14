@@ -132,6 +132,12 @@ func (in *InputCommand) Validate() (bool, error) {
 		return false, err
 	}
 
+	if len(in.ScriptContent) > 512*1024 {
+		err := fmt.Errorf("ScriptContent size is greater than 512K")
+		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		return false, err
+	}
+
 	if in.TimeoutMilliSeconds > in.IntervalMs {
 		in.TimeoutMilliSeconds = in.IntervalMs
 		logger.Warning(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command warning", "TimeoutMilliSeconds > IntervalMs", "set TimeoutMilliSeconds = IntervalMs")
