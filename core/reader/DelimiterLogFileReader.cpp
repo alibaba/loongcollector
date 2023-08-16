@@ -95,7 +95,7 @@ void DelimiterLogFileReader::SetColumnKeys(const std::vector<std::string>& colum
 bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
                                           sls_logs::LogGroup& logGroup,
                                           ParseLogError& error,
-                                          time_t& lastLogLineTime,
+                                          LogtailTime& lastLogLineTime,
                                           std::string& lastLogTimeStr,
                                           uint32_t& logGroupSize) {
     int32_t endIdx = strlen(buffer);
@@ -211,12 +211,11 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
 
     if (parseSuccess) {
         Log* logPtr = logGroup.add_logs();
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-        if (mUseSystemTime || lastLogLineTime <= 0) {
-            SetLogTime(logPtr, ts.tv_sec, ts.tv_nsec);
+        auto now = GetCurrentLogtailTime();
+        if (mUseSystemTime || lastLogLineTime.tv_sec <= 0) {
+            SetLogTime(logPtr, now.tv_sec, now.tv_nsec);
         } else {
-            SetLogTime(logPtr, lastLogLineTime, GetNanoSecondsFromPreciseTimestamp(preciseTimestamp, mPreciseTimestampConfig.unit));
+            SetLogTime(logPtr, lastLogLineTime.tv_sec, lastLogLineTime.tv_nsec);
         }
 
         for (uint32_t idx = 0; idx < parsedColCount; idx++) {

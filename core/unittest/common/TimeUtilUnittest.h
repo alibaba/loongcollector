@@ -19,6 +19,7 @@
 #include <vector>
 #include "common/TimeUtil.h"
 #include "common/StringTools.h"
+#include "common/Strptime.h"
 
 namespace logtail {
 
@@ -29,15 +30,15 @@ public:
     void TestDeduceYear();
     void TestStrptime();
     void TestNativeStrptimeFormat();
-    void TestGetPreciseTimestamp();
-    void TestGetNanoSecondsFromPreciseTimestamp();
+    void TestStrptimeNanosecond();
+    void TestGetPreciseTimestampFromLogtailTime();
 };
 
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestDeduceYear, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptime, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestNativeStrptimeFormat, 0);
-APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestamp, 0);
-APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetNanoSecondsFromPreciseTimestamp, 0);
+APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptimeNanosecond, 0);
+APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestampFromLogtailTime, 0);
 
 void TimeUtilUnittest::TestDeduceYear() {
     struct Case {
@@ -91,16 +92,15 @@ void TimeUtilUnittest::TestStrptime() {
 
     for (auto& c : cases) {
         struct tm o1 = {0};
-        struct tm o2 = {0};
+        LogtailTime o2;
+        int nanosecondLength;
         auto ret1 = strptime(c.buf.c_str(), c.format.c_str(), &o1);
-        auto ret2 = Strptime(c.buf.c_str(), c.format.c_str(), &o2, c.specifiedYear);
+        auto ret2 = Strptime(c.buf.c_str(), c.format.c_str(), &o2, nanosecondLength, c.specifiedYear);
 
         EXPECT_TRUE(ret1 != NULL);
         EXPECT_TRUE(ret2 != NULL);
-        EXPECT_EQ(o1.tm_mon, o2.tm_mon);
-        EXPECT_EQ(o1.tm_mday, o2.tm_mday);
-
-        EXPECT_EQ(c.expectedYear, 1900 + o2.tm_year);
+        o1.tm_year = c.expectedYear - 1900;
+        EXPECT_EQ(mktime(&o1), o2.tv_sec) << "FAILED: " + c.buf;
     }
 }
 
@@ -116,85 +116,106 @@ void TimeUtilUnittest::TestNativeStrptimeFormat() {
     EXPECT_EQ(2019, result.tm_year + 1900);
     EXPECT_EQ(2, result.tm_mon + 1);
     EXPECT_EQ(25, result.tm_mday);
-    EXPECT_EQ(8, result.tm_hour);
+    EXPECT_EQ(0, result.tm_hour - result.tm_gmtoff / 3600);
     EXPECT_EQ(19, result.tm_min);
     EXPECT_EQ(59, result.tm_sec);
 }
 
-void TimeUtilUnittest::TestGetPreciseTimestamp() {
+void TimeUtilUnittest::TestStrptimeNanosecond() {
+    struct Case {
+        std::string buf1;
+        std::string format1;
+        std::string buf2;
+        std::string format2;
+        long expectedNanosecond;
+    };
+
+    std::vector<Case> cases{
+        {"2012-01-01 15:05:07.123456", "%Y-%m-%d %H:%M:%S.%f", "2012-01-01 15:05:07", "%Y-%m-%d %H:%M:%S", 123456000},
+        {"[2012-01-01 15:05:07.123456]", "[%Y-%m-%d %H:%M:%S.%f]", "[2012-01-01 15:05:07]", "[%Y-%m-%d %H:%M:%S]", 123456000},
+        {"01 Jan 12 15:05:07.123456 MST", "%d %b %y %H:%M:%S.%f", "01 Jan 12 15:05:07 MST", "%d %b %y %H:%M:%S", 123456000},
+        {"01 Jan 12 15:05:07.123456 -0700", "%d %b %y %H:%M:%S.%f", "01 Jan 12 15:05:07 -0700", "%d %b %y %H:%M:%S", 123456000},
+        {"Sunday, 01-Jan-12 15:05:07.123456 MST", "%A, %d-%b-%y %H:%M:%S.%f", "Sunday, 01-Jan-12 15:05:07 MST", "%A, %d-%b-%y %H:%M:%S", 123456000},
+        {"Sun, 01 Jan 12 15:05:07.123456 MST", "%A, %d %b %Y %H:%M:%S.%f", "Sun, 01 Jan 12 15:05:07 MST", "%A, %d %b %Y %H:%M:%S", 123456000},
+        {"2012-01-01T15:05:07.123456Z07:00", "%Y-%m-%dT%H:%M:%S.%f", "2012-01-01T15:05:07Z07:00", "%Y-%m-%dT%H:%M:%S", 123456000},
+        {"1325430307", "%s", "1325430307", "%s", 0},
+        {"325430307", "%s", "325430307", "%s", 0},
+        // the behavior of `strptime_ns` is different with C++ `strptime` in this case
+        // {"1325430307123456", "%s", "1325430307123456", "%s", 123456000},
+        {"15:05:07.123456 2012-01-01", "%H:%M:%S.%f %Y-%m-%d", "15:05:07 2012-01-01", "%H:%M:%S %Y-%m-%d", 123456000},
+    };
+
+    for (auto& c : cases) {
+        struct tm o1 = {0};
+        struct tm o2 = {0};
+        long nanosecond = 0;
+        int nanosecondLength;
+        auto ret1 = strptime_ns(c.buf1.c_str(), c.format1.c_str(), &o1, &nanosecond, &nanosecondLength);
+        auto ret2 = strptime(c.buf2.c_str(), c.format2.c_str(), &o2);
+
+        EXPECT_TRUE(ret1 != NULL) << "FAILED: " + c.buf1;
+        EXPECT_TRUE(ret2 != NULL) << "FAILED: " + c.buf2;
+        EXPECT_EQ(mktime(&o1), mktime(&o2)) << "FAILED: " + c.buf1;
+        EXPECT_EQ(nanosecond, c.expectedNanosecond) << "FAILED: " + c.buf1;
+    }
+}
+
+void TimeUtilUnittest::TestGetPreciseTimestampFromLogtailTime() {
     PreciseTimestampConfig preciseTimestampConfig;
     preciseTimestampConfig.enabled = true;
     preciseTimestampConfig.unit = TimeStampUnit::SECOND;
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, NULL, preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, "", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, ".", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, " MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, " -0700", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, ".123", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, ".123", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, ",123Z07:00", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, " 123", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, ":123", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061, GetPreciseTimestamp(1640970061, ":123 MST", preciseTimestampConfig, 0));
+    LogtailTime lt;
+    lt.tv_sec = 1640970061;
+    lt.tv_nsec = 123456789;
+    EXPECT_EQ(1640970061, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
 
     preciseTimestampConfig.unit = TimeStampUnit::MILLISECOND;
-    EXPECT_EQ(1640970061000, GetPreciseTimestamp(1640970061, "", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061000, GetPreciseTimestamp(1640970061, ".", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061100, GetPreciseTimestamp(1640970061, ".1", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061120, GetPreciseTimestamp(1640970061, ",12 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123, GetPreciseTimestamp(1640970061, ".123", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123, GetPreciseTimestamp(1640970061, ",123Z07:00", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123, GetPreciseTimestamp(1640970061, " 123", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123, GetPreciseTimestamp(1640970061, ":123", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123, GetPreciseTimestamp(1640970061, ":123 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123, GetPreciseTimestamp(1640970061, ".123456 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061000, GetPreciseTimestamp(1640970061, " -0700", preciseTimestampConfig, 0));
+    lt.tv_nsec = 0;
+    EXPECT_EQ(1640970061000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 100000000;
+    EXPECT_EQ(1640970061100, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 120000000;
+    EXPECT_EQ(1640970061120, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123000000;
+    EXPECT_EQ(1640970061123, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
 
     preciseTimestampConfig.unit = TimeStampUnit::MICROSECOND;
-    EXPECT_EQ(1640970061000000, GetPreciseTimestamp(1640970061, "", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061000000, GetPreciseTimestamp(1640970061, ".", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061100000, GetPreciseTimestamp(1640970061, ".1", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061120000, GetPreciseTimestamp(1640970061, ",12 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123000, GetPreciseTimestamp(1640970061, ".123 4", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123000, GetPreciseTimestamp(1640970061, ",123Z07:00", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123400, GetPreciseTimestamp(1640970061, ",1234Z07:00", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123450, GetPreciseTimestamp(1640970061, " 12345", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123456, GetPreciseTimestamp(1640970061, ":1234567", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123400, GetPreciseTimestamp(1640970061, ":1234 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123456, GetPreciseTimestamp(1640970061, ".123456 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061000000, GetPreciseTimestamp(1640970061, " -0700", preciseTimestampConfig, 0));
+    lt.tv_nsec = 0;
+    EXPECT_EQ(1640970061000000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 100000000;
+    EXPECT_EQ(1640970061100000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 120000000;
+    EXPECT_EQ(1640970061120000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123000000;
+    EXPECT_EQ(1640970061123000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123400000;
+    EXPECT_EQ(1640970061123400, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123450000;
+    EXPECT_EQ(1640970061123450, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123456000;
+    EXPECT_EQ(1640970061123456, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
 
     preciseTimestampConfig.unit = TimeStampUnit::NANOSECOND;
-    EXPECT_EQ(1640970061000000000, GetPreciseTimestamp(1640970061, "", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061000000000, GetPreciseTimestamp(1640970061, ".", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061100000000, GetPreciseTimestamp(1640970061, ".1", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061120000000, GetPreciseTimestamp(1640970061, ",12 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123000000, GetPreciseTimestamp(1640970061, ".123 4", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123000000, GetPreciseTimestamp(1640970061, ",123Z07:00", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123400000, GetPreciseTimestamp(1640970061, ",1234Z07:00", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123450000, GetPreciseTimestamp(1640970061, " 12345", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123456700, GetPreciseTimestamp(1640970061, ":1234567", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123400000, GetPreciseTimestamp(1640970061, ":1234 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061123456000, GetPreciseTimestamp(1640970061, ".123456 MST", preciseTimestampConfig, 0));
-    EXPECT_EQ(1640970061000000000, GetPreciseTimestamp(1640970061, " -0700", preciseTimestampConfig, 0));
-}
-
-void TimeUtilUnittest::TestGetNanoSecondsFromPreciseTimestamp() {
-    uint64_t preciseTimestampSecond = 1551053999;
-    auto result = GetNanoSecondsFromPreciseTimestamp(preciseTimestampSecond, TimeStampUnit::SECOND);
-    EXPECT_EQ(0, result);
-
-    uint64_t preciseTimestampMilliSecond = 1551053999123;
-    result = GetNanoSecondsFromPreciseTimestamp(preciseTimestampMilliSecond, TimeStampUnit::MILLISECOND);
-    EXPECT_EQ(123000000, result);
-
-    uint64_t preciseTimestampMicroSecond = 1551053999123456;
-    result = GetNanoSecondsFromPreciseTimestamp(preciseTimestampMicroSecond, TimeStampUnit::MICROSECOND);
-    EXPECT_EQ(123456000, result);
-
-    uint64_t preciseTimestampNanoSecond = 1551053999123456789;
-    result = GetNanoSecondsFromPreciseTimestamp(preciseTimestampNanoSecond, TimeStampUnit::NANOSECOND);
-    EXPECT_EQ(123456789, result);
+    lt.tv_nsec = 0;
+    EXPECT_EQ(1640970061000000000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 100000000;
+    EXPECT_EQ(1640970061100000000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 120000000;
+    EXPECT_EQ(1640970061120000000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123000000;
+    EXPECT_EQ(1640970061123000000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123400000;
+    EXPECT_EQ(1640970061123400000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123450000;
+    EXPECT_EQ(1640970061123450000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123456000;
+    EXPECT_EQ(1640970061123456000, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123456700;
+    EXPECT_EQ(1640970061123456700, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123456780;
+    EXPECT_EQ(1640970061123456780, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+    lt.tv_nsec = 123456789;
+    EXPECT_EQ(1640970061123456789, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
 }
 
 } // namespace logtail

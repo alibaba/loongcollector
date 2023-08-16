@@ -19,6 +19,7 @@
 #include <ctime>
 #include <thread>
 #include "log_pb/sls_logs.pb.h"
+#include "common/Strptime.h"
 
 // Time and timestamp utility.
 namespace logtail {
@@ -32,6 +33,8 @@ struct PreciseTimestampConfig {
     std::string key = PRECISE_TIMESTAMP_DEFAULT_KEY;
     TimeStampUnit unit = TimeStampUnit::MILLISECOND;
 };
+
+typedef timespec LogtailTime;
 
 // Convert @tm to string accroding to @format. TODO: Merge ConvertToTimeStamp and GetTimeStamp.
 std::string ConvertToTimeStamp(const time_t& tm, const std::string& format = "%Y%m%d%H%M%S");
@@ -65,7 +68,7 @@ inline void sleep(uint64_t s) {
 //   2. You can set to 0 to ask Strptime to make a deduction according to current date.
 //     This mode only suits for real-time logs which lack of year information, for
 //     example, syslog following RFC3164 does not generate year information.
-const char* Strptime(const char* buf, const char* fmt, struct tm* tm, int32_t specifiedYear = -1);
+const char* Strptime(const char* buf, const char* fmt, LogtailTime* ts, int& nanosecondLength, int32_t specifiedYear = -1);
 
 int32_t GetSystemBootTime();
 
@@ -73,17 +76,14 @@ int32_t GetSystemBootTime();
 time_t GetTimeDelta();
 void UpdateTimeDelta(time_t serverTime);
 
-uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
-                             const char* preciseTimeSuffix,
-                             const PreciseTimestampConfig& preciseTimestampConfig,
-                             int32_t tzOffsetSecond);
-
-long GetNanoSecondsFromPreciseTimestamp(uint64_t preciseTimestamp, TimeStampUnit unit);
+uint64_t GetPreciseTimestampFromLogtailTime(LogtailTime logTime,
+                                            const PreciseTimestampConfig& preciseTimestampConfig);
 
 void SetLogTime(sls_logs::Log* log, time_t second, long nanosecond);
 
-} // namespace logtail
+LogtailTime GetCurrentLogtailTime();
 
-#if defined(_MSC_VER)
-extern "C" const char* strptime(const char* buf, const char* fmt, struct tm* tm);
-#endif
+uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
+                             const char* preciseTimeSuffix,
+                             const PreciseTimestampConfig& preciseTimestampConfig);
+} // namespace logtail

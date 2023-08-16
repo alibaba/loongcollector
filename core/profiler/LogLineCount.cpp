@@ -101,9 +101,8 @@ void LogLineCount::InsertLineCountDataToLogGroup(sls_logs::LogGroup& logGroup,
                                                  int32_t minuteTime,
                                                  int32_t count) {
     Log* logPtr = logGroup.add_logs();
-    timespec ts;
-    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-    SetLogTime(logPtr, ts.tv_sec, ts.tv_nsec);
+    auto now = GetCurrentLogtailTime();
+    SetLogTime(logPtr, now.tv_sec, now.tv_nsec);
 
     Log_Content* contentPtr = logPtr->add_contents();
     contentPtr->set_key("region");

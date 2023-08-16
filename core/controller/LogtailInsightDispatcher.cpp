@@ -57,9 +57,8 @@ static void SendErrorToFD(int fd, const std::string& errorMessage) {
     MessageInsightHdr header;
     header.type = INSIGHT_CMD_TYPE;
     sls_logs::Log outLog;
-    timespec ts;
-    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-    SetLogTime(&outLog, ts.tv_sec, ts.tv_nsec);
+    auto now = GetCurrentLogtailTime();
+    SetLogTime(&outLog, now.tv_sec, now.tv_nsec);
     sls_logs::Log_Content* content = outLog.add_contents();
     content->set_key("error");
     content->set_value(errorMessage);
@@ -111,8 +110,7 @@ int32_t LogtailInsightDispatcher::ExecuteCommand(int fd, const char* cmdBuf, int
                 finishedFlag = GetAllFileProgress(NULL);
 
                 sls_logs::Log* log = logGroup.add_logs();
-                timespec ts;
-                clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+                auto ts = GetCurrentLogtailTime();
                 SetLogTime(log, ts.tv_sec, ts.tv_nsec);
                 sls_logs::Log_Content* content = log->add_contents();
                 content->set_key("isFinished");
@@ -126,9 +124,8 @@ int32_t LogtailInsightDispatcher::ExecuteCommand(int fd, const char* cmdBuf, int
                 result = GetFileProgress(filename, NULL);
 
                 sls_logs::Log* log = logGroup.add_logs();
-                timespec ts;
-                clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-                SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+                auto now = GetCurrentLogtailTime();
+                SetLogTime(log, now.tv_sec, now.tv_nsec);
                 sls_logs::Log_Content* content = log->add_contents();
                 content->set_key("isFinished");
                 if (result == -1) {
@@ -215,9 +212,8 @@ void LogtailInsightDispatcher::BuildLogGroup(sls_logs::LogGroup* logGroup,
                                              const LogFileInfo& info,
                                              const LogFileCollectProgress& progress) {
     sls_logs::Log* log = logGroup->add_logs();
-    timespec ts;
-    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-    SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+    auto now = GetCurrentLogtailTime();
+    SetLogTime(log, now.tv_sec, now.tv_nsec);
 
     sls_logs::Log_Content* content = log->add_contents();
     content->set_key("project");

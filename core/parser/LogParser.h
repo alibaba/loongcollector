@@ -67,8 +67,7 @@ public:
     static bool WholeLineModeParser(const char* buffer,
                                     sls_logs::LogGroup& logGroup,
                                     const std::string& key,
-                                    time_t logTime,
-                                    long timeNs,
+                                    LogtailTime& logTime,
                                     uint32_t& logGroupSize);
 
     // RegexLogLineParser parses @buffer according to @reg.
@@ -85,7 +84,7 @@ public:
                                    const PreciseTimestampConfig& preciseTimestampConfig,
                                    const uint32_t timeIndex,
                                    std::string& timeStr,
-                                   time_t& logTime,
+                                   LogtailTime& logTime,
                                    int32_t specifiedYear,
                                    const std::string& projectName,
                                    const std::string& region,
@@ -100,8 +99,7 @@ public:
                                    bool discardUnmatch,
                                    const std::vector<std::string>& keys,
                                    const std::string& category,
-                                   time_t logTime,
-                                   long timeNs,
+                                   LogtailTime logTime,
                                    const std::string& projectName,
                                    const std::string& region,
                                    const std::string& logPath,
@@ -120,7 +118,7 @@ public:
 
     static bool ParseLogTime(const char* buffer,
                              std::string& timeStr,
-                             time_t& logTime,
+                             LogtailTime& logTime,
                              uint64_t& preciseTimestamp,
                              const std::string& curTimeStr,
                              const char* timeFormat,
@@ -133,7 +131,7 @@ public:
                              ParseLogError& error,
                              int32_t tzOffsetSecond);
 
-    static void AdjustLogTime(sls_logs::Log* logPtr, int logTimeZoneOffsetSecond, int localTimeZoneOffsetSecond);
+    static void AdjustLogTime(LogtailTime& logTime, int timeZoneOffsetSecond);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class LogParserUnittest;

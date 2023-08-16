@@ -29,9 +29,10 @@
 
 #include <ctype.h>
 #include <string.h>
-#include <time.h>
 #include <stdlib.h>
+#include "Strptime.h"
 
+namespace logtail {
 /*
  * We do not implement alternate representations. However, we always
  * check whether a given modifier is allowed for a certain conversion.
@@ -45,9 +46,7 @@
     }
 
 static char gmt[] = {"GMT"};
-#ifdef TM_ZONE
 static char utc[] = {"UTC"};
-#endif
 
 /* RFC-822/RFC-2822 */
 static const char* const nast[5] = {"EST", "CST", "MST", "PST", "\0\0\0"};
@@ -73,27 +72,44 @@ static const char* abmon[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
 static const char* am_pm[2] = {"AM", "PM"};
 
 static const unsigned char* conv_num(const unsigned char*, int*, unsigned int, unsigned int);
+static const unsigned char* conv_nanosecond(const unsigned char*, long*, int*);
 static const unsigned char* find_string(const unsigned char*, int*, const char* const*, const char* const*, int);
 
-
-const char* strptime(const char* buf, const char* fmt, struct tm* tm) {
+// Parse time string into two part: second and nanosecond
+const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* nanosecond, int* nanosecondLength) {
     // Replenish %s support.
     if (0 == strcmp("%s", fmt)) {
         char* cp;
         long long n;
         n = strtoll(buf, &cp, 10);
+        // Assert the length of second timestamp to be less than 10.
+        size_t bufLength = strlen(buf);
+        size_t secondTimestampLength = bufLength >= 10 ? 10 : bufLength;
+        for (size_t i = 0; i < bufLength - secondTimestampLength; ++i) {
+            n /= 10;
+        }
         time_t t;
-        if ((long long)(t = n) != n)
+        if (n == 0 || (long long)(t = n) != n)
             return NULL;
+        #ifdef _MSC_VER
         if (localtime_s(tm, &t) != 0)
             return NULL;
-        return cp;
+        #else
+        if (NULL == localtime_r(&t, tm))
+            return NULL;
+        #endif
+
+        *nanosecond = 0;
+        *nanosecondLength = 0;
+        conv_nanosecond((const unsigned char*)(buf + secondTimestampLength), nanosecond, nanosecondLength);
+        return ((const char*)cp);
     }
 
     unsigned char c;
     const unsigned char *bp, *ep;
     int alt_format, i, split_year = 0, neg = 0, offs;
     const char* new_fmt;
+    *nanosecond = 0;
 
     bp = (const unsigned char*)buf;
 
@@ -175,7 +191,7 @@ const char* strptime(const char* buf, const char* fmt, struct tm* tm) {
             case 'x': /* The date, using the locale's format. */
                 new_fmt = "%m/%d/%y";
             recurse:
-                bp = (const unsigned char*)strptime((const char*)bp, new_fmt, tm);
+                bp = (const unsigned char*)strptime_ns((const char*)bp, new_fmt, tm, nanosecond, nanosecondLength);
                 LEGAL_ALT(ALT_E);
                 continue;
 
@@ -210,6 +226,11 @@ const char* strptime(const char* buf, const char* fmt, struct tm* tm) {
             case 'd': /* The day of month. */
             case 'e':
                 bp = conv_num(bp, &tm->tm_mday, 1, 31);
+                LEGAL_ALT(ALT_O);
+                continue;
+
+            case 'f': /* Nanosecond */
+                bp = conv_nanosecond(bp, nanosecond, nanosecondLength);
                 LEGAL_ALT(ALT_O);
                 continue;
 
@@ -331,7 +352,7 @@ const char* strptime(const char* buf, const char* fmt, struct tm* tm) {
                 continue;
 
             case 'Z':
-                if (strncmp((const char*)bp, gmt, 3) == 0) {
+                if (strncasecmp((const char*)bp, gmt, 3) == 0 || strncasecmp((const char *)bp, utc, 3) == 0) {
                     tm->tm_isdst = 0;
 #ifdef TM_GMTOFF
                     tm->TM_GMTOFF = 0;
@@ -500,7 +521,6 @@ const char* strptime(const char* buf, const char* fmt, struct tm* tm) {
                 return NULL;
         }
     }
-
     return ((const char*)bp);
 }
 
@@ -527,6 +547,30 @@ static const unsigned char* conv_num(const unsigned char* buf, int* dest, unsign
         return NULL;
 
     *dest = result;
+    return buf;
+}
+
+static const unsigned char* conv_nanosecond(const unsigned char* buf, long* dest, int* nanosecondLength) {
+    unsigned int result = 0;
+    unsigned char ch;
+    int digitNum = 0;
+    const unsigned char* start = buf;
+
+    ch = *buf;
+    if (ch < '0' || ch > '9')
+        return NULL;
+
+    do {
+        result *= 10;
+        result += ch - '0';
+        ++digitNum;
+        ch = *++buf;
+    } while (ch >= '0' && ch <= '9');
+    for (int i = 0; i < 9 - digitNum; i++) {
+        result *= 10;
+    }
+    *dest = result;
+    *nanosecondLength = buf - start;
     return buf;
 }
 
@@ -563,3 +607,5 @@ find_string(const unsigned char* bp, int* tgt, const char* const* n1, const char
     /* Nothing matched */
     return NULL;
 }
+
+} // namespace logtail

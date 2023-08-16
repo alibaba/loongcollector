@@ -15,12 +15,12 @@
 cmake_minimum_required(VERSION 2.9)
 project(common_unittest)
 
-# add_executable(common_simple_utils_unittest SimpleUtilsUnittest.cpp
-#         FileSystemUtilUnittest.h
-#         DevInodeUnittest.h
-#         TimeUtilUnittest.h
-#         StringToolsUnittest.h)
-# target_link_libraries(common_simple_utils_unittest unittest_base)
+add_executable(common_simple_utils_unittest SimpleUtilsUnittest.cpp
+        FileSystemUtilUnittest.h
+        DevInodeUnittest.h
+        TimeUtilUnittest.h
+        StringToolsUnittest.h)
+target_link_libraries(common_simple_utils_unittest unittest_base)
 
 add_executable(common_logfileoperator_unittest LogFileOperatorUnittest.cpp)
 target_link_libraries(common_logfileoperator_unittest unittest_base)

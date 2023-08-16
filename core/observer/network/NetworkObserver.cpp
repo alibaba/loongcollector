@@ -519,10 +519,9 @@ inline void NetworkObserver::StartEventLoop() {
 }
 int NetworkObserver::OutputPluginProcess(std::vector<sls_logs::Log>& logs, Config* config) {
     static auto sPlugin = LogtailPlugin::GetInstance();
-    timespec ts;
-    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+    auto now = GetCurrentLogtailTime();
     for (auto& item : logs) {
-        SetLogTime(&item, ts.tv_sec, ts.tv_nsec);
+        SetLogTime(&item, now.tv_sec, now.tv_nsec);
         sPlugin->ProcessLog(config->mConfigName, item, "", config->mGroupTopic, "");
     }
     return 0;
@@ -530,8 +529,6 @@ int NetworkObserver::OutputPluginProcess(std::vector<sls_logs::Log>& logs, Confi
 
 int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, Config* config) {
     static auto sSenderInstance = Sender::Instance();
-    timespec ts;
-    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
     const size_t maxCount = INT32_FLAG(merge_log_count_limit) / 4;
     for (size_t beginIndex = 0; beginIndex < logs.size(); beginIndex += maxCount) {
         size_t endIndex = beginIndex + maxCount;
@@ -553,10 +550,11 @@ int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, Config* co
         if (!config->mGroupTopic.empty()) {
             logGroup.set_topic(config->mGroupTopic);
         }
+        auto now = GetCurrentLogtailTime();
         for (size_t i = beginIndex; i < endIndex; ++i) {
             sls_logs::Log* log = logGroup.add_logs();
             log->mutable_contents()->CopyFrom(*(logs[i].mutable_contents()));
-            SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+            SetLogTime(log, now.tv_sec, now.tv_nsec);
         }
         if (!sSenderInstance->Send(config->mProjectName,
                                    "",

@@ -691,7 +691,9 @@ int LogFileReader::ParseAllLines(
 int32_t LogFileReader::ParseTime(const char* buffer, const std::string& timeFormat) {
     struct tm tm;
     memset(&tm, 0, sizeof(tm));
-    const char* result = strptime(buffer, timeFormat.c_str(), &tm);
+    long nanosecond = 0;
+    int nanosecondLength;
+    const char* result = strptime_ns(buffer, timeFormat.c_str(), &tm, &nanosecond, &nanosecondLength);
     tm.tm_isdst = -1;
     if (result != NULL) {
         time_t logTime = mktime(&tm);
@@ -1402,7 +1404,7 @@ vector<int32_t> LogFileReader::LogSplit(char* buffer, int32_t size, int32_t& lin
 
 bool LogFileReader::ParseLogTime(const char* buffer,
                                  const boost::regex* reg,
-                                 time_t& logTime,
+                                 LogtailTime& logTime,
                                  const std::string& timeFormat,
                                  const std::string& region,
                                  const std::string& project,
@@ -1416,7 +1418,8 @@ bool LogFileReader::ParseLogTime(const char* buffer,
             // convert log time
             struct tm t;
             memset(&t, 0, sizeof(t));
-            if (strptime(timeStr.c_str(), timeFormat.c_str(), &t) == NULL) {
+            int nanosecondLength;
+            if (strptime_ns(timeStr.c_str(), timeFormat.c_str(), &t, &logTime.tv_nsec, &nanosecondLength) == NULL) {
                 LOG_ERROR(sLogger,
                           ("convert time failed, time str", timeStr)("time format", timeFormat)("project", project)(
                               "logstore", logStore)("file", logPath));
@@ -1424,7 +1427,7 @@ bool LogFileReader::ParseLogTime(const char* buffer,
             }
 
             t.tm_isdst = -1;
-            logTime = mktime(&t);
+            logTime.tv_sec = mktime(&t);
             return true;
         }
     }
@@ -1442,7 +1445,7 @@ bool LogFileReader::ParseLogTime(const char* buffer,
 
 bool LogFileReader::GetLogTimeByOffset(const char* buffer,
                                        int32_t pos,
-                                       time_t& logTime,
+                                       LogtailTime& logTime,
                                        const std::string& timeFormat,
                                        const std::string& region,
                                        const std::string& project,
@@ -1463,7 +1466,7 @@ bool LogFileReader::GetLogTimeByOffset(const char* buffer,
         return false;
     }
     t.tm_isdst = -1;
-    logTime = mktime(&t);
+    logTime.tv_sec = mktime(&t);
     return true;
 }
 
@@ -1935,7 +1938,7 @@ bool CommonRegLogFileReader::AddUserDefinedFormat(const string& regStr, const st
 bool CommonRegLogFileReader::ParseLogLine(const char* buffer,
                                           LogGroup& logGroup,
                                           ParseLogError& error,
-                                          time_t& lastLogLineTime,
+                                          LogtailTime& lastLogLineTime,
                                           std::string& lastLogTimeStr,
                                           uint32_t& logGroupSize) {
     if (logGroup.logs_size() == 0) {
@@ -1967,14 +1970,12 @@ bool CommonRegLogFileReader::ParseLogLine(const char* buffer,
                                                 mTzOffsetSecond);
         } else {
             // if "time" field not exist in user config or timeformat empty, set current system time for logs
-            timespec ts;
-            clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+            LogtailTime ts = GetCurrentLogtailTime();
             if (format.mIsWholeLineMode) {
                 res = LogParser::WholeLineModeParser(buffer,
                                                      logGroup,
                                                      format.mKeys.empty() ? DEFAULT_CONTENT_KEY : format.mKeys[0],
-                                                     ts.tv_sec,
-                                                     ts.tv_nsec,
+                                                     ts,
                                                      logGroupSize);
             } else {
                 res = LogParser::RegexLogLineParser(buffer,
@@ -1983,8 +1984,7 @@ bool CommonRegLogFileReader::ParseLogLine(const char* buffer,
                                                     mDiscardUnmatch,
                                                     format.mKeys,
                                                     mCategory,
-                                                    ts.tv_sec,
-                                                    ts.tv_nsec,
+                                                    ts,
                                                     mProjectName,
                                                     mRegion,
                                                     mHostLogPath,
@@ -2047,7 +2047,7 @@ ApsaraLogFileReader::ApsaraLogFileReader(const std::string& projectName,
 bool ApsaraLogFileReader::ParseLogLine(const char* buffer,
                                        sls_logs::LogGroup& logGroup,
                                        ParseLogError& error,
-                                       time_t& lastLogLineTime,
+                                       LogtailTime& lastLogLineTime,
                                        std::string& lastLogTimeStr,
                                        uint32_t& logGroupSize) {
     if (logGroup.logs_size() == 0) {
@@ -2059,7 +2059,7 @@ bool ApsaraLogFileReader::ParseLogLine(const char* buffer,
                                                   logGroup,
                                                   mDiscardUnmatch,
                                                   lastLogTimeStr,
-                                                  lastLogLineTime,
+                                                  lastLogLineTime.tv_sec,
                                                   mProjectName,
                                                   mCategory,
                                                   mRegion,

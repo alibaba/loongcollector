@@ -24,6 +24,7 @@
 #endif
 #include "logger/Logger.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/Strptime.h"
 
 namespace logtail {
 
@@ -96,22 +97,37 @@ int DeduceYear(const struct tm* tm, const struct tm* currentTm) {
     return currentTm->tm_year;
 }
 
-const char* Strptime(const char* buf, const char* fmt, struct tm* tm, int32_t specifiedYear /* = -1 */) {
-    if (specifiedYear < 0)
-        return strptime(buf, fmt, tm);
-
+/*
+    Parse time (local timezone) from log
+    return the position of the parsing ends. If parsing fails, return NULL.
+*/
+const char* Strptime(const char* buf, const char* fmt, LogtailTime* ts, int& nanosecondLength, int32_t specifiedYear /* = -1 */) {
+    struct tm tm_ = {0};
+    struct tm* tm = &tm_;
     const int32_t MIN_YEAR = std::numeric_limits<decltype(tm->tm_year)>::min();
     auto bakYear = tm->tm_year;
     tm->tm_year = MIN_YEAR;
 
-    // Do not specify: already got year information.
-    auto ret = strptime(buf, fmt, tm);
-    if (tm->tm_year != MIN_YEAR)
+    auto ret = strptime_ns(buf, fmt, tm, &ts->tv_nsec, &nanosecondLength);
+    if (0 == strcmp("%f", fmt)) {
         return ret;
+    }
+
+    if (specifiedYear < 0) {
+        ts->tv_sec = mktime(tm);
+        return ret;
+    }
+
+    // Do not specify: already got year information.
+    if (tm->tm_year != MIN_YEAR) {
+        ts->tv_sec = mktime(tm);
+        return ret;
+    }
 
     // Mode 1.
     if (specifiedYear > 0) {
         tm->tm_year = specifiedYear - 1900;
+        ts->tv_sec = mktime(tm);
         return ret;
     }
 
@@ -131,6 +147,7 @@ const char* Strptime(const char* buf, const char* fmt, struct tm* tm, int32_t sp
     auto deduction = DeduceYear(tm, &currentTm);
     if (deduction != -1)
         tm->tm_year = deduction;
+    ts->tv_sec = mktime(tm);
     return ret;
 }
 
@@ -258,17 +275,42 @@ void UpdateTimeDelta(time_t serverTime) {
     APSARA_LOG_INFO(sLogger, ("update time delta by server time", serverTime)("delta", sTimeDelta));
 }
 
+// DEPRECATED: only for the compability of PreciseTimestamp
+uint64_t GetPreciseTimestampFromLogtailTime(LogtailTime logTime,
+                                            const PreciseTimestampConfig& preciseTimestampConfig) {
+    uint64_t preciseTimestamp = logTime.tv_sec;
+    TimeStampUnit timeUnit = preciseTimestampConfig.unit;
+
+    if (TimeStampUnit::MILLISECOND == timeUnit) {
+        return preciseTimestamp * 1000 + logTime.tv_nsec / 1000000;
+    } else if (TimeStampUnit::MICROSECOND == timeUnit) {
+        return preciseTimestamp * 1000000 + logTime.tv_nsec / 1000;
+    } else if (TimeStampUnit::NANOSECOND == timeUnit) {
+        return preciseTimestamp * 1000000000 + logTime.tv_nsec;
+    }
+    return preciseTimestamp;
+}
+
+void SetLogTime(sls_logs::Log* log, time_t second, long nanosecond) {
+    log->set_time(second);
+    if (BOOL_FLAG(enable_timestamp_nanosecond)) {
+        log->set_time_ns(nanosecond);
+    }
+}
+
+LogtailTime GetCurrentLogtailTime() {
+    LogtailTime ts;
+    auto now = std::chrono::system_clock::now().time_since_epoch();
+    ts.tv_sec = std::chrono::duration_cast<std::chrono::seconds>(now).count();
+    ts.tv_nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count() % 1000000000;
+    return ts;
+}
+
 // Parse ms/us/ns suffix from preciseTimeSuffix, joining with the input second timestamp.
 // Will return value the precise timestamp.
 uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
                              const char* preciseTimeSuffix,
-                             const PreciseTimestampConfig& preciseTimestampConfig,
-                             int32_t tzOffsetSecond) {
-    uint64_t adjustSecondTimestamp = secondTimestamp  - tzOffsetSecond;
-    if (!preciseTimestampConfig.enabled) {
-        return adjustSecondTimestamp;
-    }
-
+                             const PreciseTimestampConfig& preciseTimestampConfig) {
     bool endFlag = false;
     TimeStampUnit timeUnit = preciseTimestampConfig.unit;
 
@@ -310,35 +352,15 @@ uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
             preciseTimeDigit = preciseTimeDigit * 10;
             endFlag = true;
         }
-        adjustSecondTimestamp *= 10;
+        secondTimestamp *= 10;
     }
 
-    return adjustSecondTimestamp + preciseTimeDigit;
-}
-
-int64_t GetNanoSecondsFromPreciseTimestamp(uint64_t preciseTimestamp, TimeStampUnit unit) {
-    switch (unit) {
-        case TimeStampUnit::NANOSECOND:
-            return preciseTimestamp % 1000000000;
-        case TimeStampUnit::MICROSECOND:
-            return preciseTimestamp * 1000 % 1000000000;
-        case TimeStampUnit::MILLISECOND:
-            return preciseTimestamp * 1000000 % 1000000000;
-    }
-    return 0;
-}
-
-void SetLogTime(sls_logs::Log* log, time_t second, long nanosecond) {
-    log->set_time(second);
-    if (BOOL_FLAG(enable_timestamp_nanosecond)) {
-        log->set_time_ns(nanosecond);
-    }
+    return secondTimestamp + preciseTimeDigit;
 }
 
 uint64_t GetCurrentTimeInNanoSeconds() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
 }
-
 
 } // namespace logtail
