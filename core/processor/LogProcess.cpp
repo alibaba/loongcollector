@@ -412,7 +412,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 // linesCount += lines;
                 // LOG_INFO(sLogger, ("Logprocess lines", lines)("Total lines", linesCount));
                 LogGroup logGroup;
-                time_t lastLogLineTime = 0;
+                LogtailTime lastLogLineTime = {0, 0};
                 string lastLogTimeStr = "";
                 uint32_t logGroupSize = 0;
                 int32_t successLogSize = 0;
@@ -438,10 +438,6 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                             if (config->mUploadRawLog) {
                                 LogParser::AddLog(
                                     logPtr, config->mAdvancedConfig.mRawLogTag, buffer + logIndex[i], logGroupSize);
-                            }
-                            if (successful && config->mTimeZoneAdjust) {
-                                LogParser::AdjustLogTime(
-                                    logPtr, config->mLogTimeZoneOffsetSecond, localTimeZoneOffsetSecond);
                             }
                             if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
                                 logPtr->set_time(logPtr->time() + GetTimeDelta());

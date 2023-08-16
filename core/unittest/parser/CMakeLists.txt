@@ -17,3 +17,6 @@ project(parser_unittest)
 
 # add_executable(parser_unittest LogParserUnittest.cpp)
 # target_link_libraries(parser_unittest unittest_base)
+
+add_executable(log_time_parse_unittest LogTimeParserUnittest.cpp)
+target_link_libraries(log_time_parse_unittest unittest_base)

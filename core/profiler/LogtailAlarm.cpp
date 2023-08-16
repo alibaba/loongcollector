@@ -176,6 +176,7 @@ bool LogtailAlarm::SendAlarmLoop() {
                 // mMessageType[sendAlarmTypeIndex]));
                 logGroup.set_source(LogFileProfiler::mIpAddr);
                 logGroup.set_category("logtail_alarm");
+                auto now = GetCurrentLogtailTime();
                 for (map<string, LogtailAlarmMessage*>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
                      ++mapIter) {
                     messagePtr = mapIter->second;
@@ -184,12 +185,7 @@ bool LogtailAlarm::SendAlarmLoop() {
                     // sendAlarmTypeIndex)("msg", messagePtr->mMessage));
 
                     Log* logPtr = logGroup.add_logs();
-                    timespec ts;
-                    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-                    SetLogTime(logPtr,
-                               AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? ts.tv_sec + GetTimeDelta()
-                                                                                   : ts.tv_sec,
-                               ts.tv_nsec);
+                    SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec, now.tv_nsec);
                     Log_Content* contentPtr = logPtr->add_contents();
                     contentPtr->set_key("alarm_type");
                     contentPtr->set_value(messagePtr->mMessageType);

@@ -44,9 +44,8 @@ public:
         keys.push_back("key3");
         keys.push_back("");
 
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-        RawLog* rawLog = RawLog::AddLogFull(ts.tv_sec, keys, what);
+        auto now = GetCurrentLogtailTime();
+        RawLog* rawLog = RawLog::AddLogFull(now.tv_sec, keys, what);
 
         LogGroup loggroup;
         Log* log = loggroup.add_logs();
@@ -62,7 +61,7 @@ public:
         kv = log->add_contents();
         kv->set_key("");
         kv->set_value("890xyz");
-        SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+        SetLogTime(log, now.tv_sec, now.tv_nsec);
 
         string rawLogStr;
         rawLog->AppendToString(&rawLogStr);
@@ -76,9 +75,8 @@ public:
 
     void TestNormalWrite() {
         RawLog rawLog;
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-        rawLog.AddLogStart(ts.tv_sec);
+        auto now = GetCurrentLogtailTime();
+        rawLog.AddLogStart(now.tv_sec);
         rawLog.AddKeyValue("key1", strlen("key1"), "value", strlen("value"));
         rawLog.AddKeyValue("key2", strlen("key2"), "", 0);
         rawLog.AddKeyValue("key3", strlen("key3"), "value3", strlen("value3"));
@@ -99,7 +97,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value("value");
-        SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+        SetLogTime(log, now.tv_sec, now.tv_nsec);
 
         string rawLogStr;
         rawLog.AppendToString(&rawLogStr);
@@ -110,9 +108,8 @@ public:
 
     void TestBigLog() {
         RawLog rawLog;
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-        rawLog.AddLogStart(ts.tv_sec);
+        auto now = GetCurrentLogtailTime();
+        rawLog.AddLogStart(now.tv_sec);
         rawLog.AddKeyValue("key1", strlen("key1"), "value", strlen("value"));
         rawLog.AddKeyValue("key2", strlen("key2"), longLogValue100.c_str(), longLogValue100.size());
         rawLog.AddKeyValue("key3", strlen("key3"), longLogValue10.c_str(), longLogValue10.size());
@@ -133,7 +130,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value(longLogValue1000);
-        SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+        SetLogTime(log, now.tv_sec, now.tv_nsec);
 
         string rawLogStr;
         rawLog.AppendToString(&rawLogStr);
@@ -171,9 +168,8 @@ public:
 
     void TestUpdateDeleteAppend() {
         RawLog rawLog;
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-        rawLog.AddLogStart(ts.tv_sec);
+        auto now = GetCurrentLogtailTime();
+        rawLog.AddLogStart(now.tv_sec);
         rawLog.AddKeyValue("key1", strlen("key1"), "value1", strlen("value1"));
         rawLog.AddKeyValue("k", strlen("k"), "value", strlen("value"));
         rawLog.AddKeyValue("k", strlen("k"), "value", strlen("value"));
@@ -221,7 +217,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value("value4");
-        SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+        SetLogTime(log, now.tv_sec, now.tv_nsec);
 
         string rawLogStr;
         rawLog.AppendToString(&rawLogStr);
@@ -233,9 +229,8 @@ public:
     void TestLogGroup() {
         RawLog* pRawLog = new RawLog();
         RawLog& rawLog = *pRawLog;
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-        rawLog.AddLogStart(ts.tv_sec);
+        auto now = GetCurrentLogtailTime();
+        rawLog.AddLogStart(now.tv_sec);
         rawLog.AddKeyValue("key1", strlen("key1"), "value", strlen("value"));
         rawLog.AddKeyValue("key2", strlen("key2"), "", 0);
         rawLog.AddKeyValue("key3", strlen("key3"), "value3", strlen("value3"));
@@ -256,7 +251,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value("value");
-        SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+        SetLogTime(log, now.tv_sec, now.tv_nsec);
 
 
         RawLogGroup* pRawLogGroup = new RawLogGroup;
@@ -295,9 +290,8 @@ public:
     void TestNoOptionLogGroup() {
         RawLog* pRawLog = new RawLog();
         RawLog& rawLog = *pRawLog;
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-        rawLog.AddLogStart(ts.tv_sec);
+        auto now = GetCurrentLogtailTime();
+        rawLog.AddLogStart(now.tv_sec);
         rawLog.AddKeyValue("key1", strlen("key1"), "value", strlen("value"));
         rawLog.AddKeyValue("key2", strlen("key2"), "", 0);
         rawLog.AddKeyValue("key3", strlen("key3"), "value3", strlen("value3"));
@@ -318,7 +312,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value("value");
-        SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+        SetLogTime(log, now.tv_sec, now.tv_nsec);
 
 
         RawLogGroup* pRawLogGroup = new RawLogGroup;
@@ -349,14 +343,13 @@ public:
     }
 
     void TestMultiLog() {
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+        auto now = GetCurrentLogtailTime();
         string rawLogStr;
         auto c1 = clock();
         for (int i = 0; i < 1000000; ++i) {
             RawLog rawLog;
 
-            rawLog.AddLogStart(ts.tv_sec);
+            rawLog.AddLogStart(now.tv_sec);
             rawLog.AddKeyValue("key1", strlen("key1"), "value", strlen("value"));
             rawLog.AddKeyValue("key2", strlen("key2"), "", 0);
             rawLog.AddKeyValue("key3", strlen("key3"), "value3", strlen("value3"));
@@ -382,7 +375,7 @@ public:
             kv = log->add_contents();
             kv->set_key("key4");
             kv->set_value("value");
-            SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+            SetLogTime(log, now.tv_sec, now.tv_nsec);
             logStr.clear();
             loggroup.AppendToString(&logStr);
         }

@@ -210,12 +210,10 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     else
         return false;
 
-    timespec ts;
-    clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-
+    auto now = GetCurrentLogtailTime();
     // Check input thread.
     int32_t lastReadEventTime = LogInput::GetInstance()->GetLastReadEventTime();
-    if (lastReadEventTime > 0 && (ts.tv_sec - lastReadEventTime > AppConfig::GetInstance()->GetForceQuitReadTimeout())) {
+    if (lastReadEventTime > 0 && (now.tv_sec - lastReadEventTime > AppConfig::GetInstance()->GetForceQuitReadTimeout())) {
         LOG_ERROR(sLogger, ("last read event time is too old", lastReadEventTime)("prepare force exit", ""));
         LogtailAlarm::GetInstance()->SendAlarm(
             LOGTAIL_CRASH_ALARM, "last read event time is too old: " + ToString(lastReadEventTime) + " force exit");
@@ -233,7 +231,7 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     logGroup.set_category(category);
     logGroup.set_source(LogFileProfiler::mIpAddr);
     Log* logPtr = logGroup.add_logs();
-    SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? ts.tv_sec + GetTimeDelta() : ts.tv_sec, ts.tv_nsec);
+    SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec, now.tv_nsec);
     // CPU usage of Logtail process.
     AddLogContent(logPtr, "cpu", mCpuStat.mCpuUsage);
 #if defined(__linux__) // TODO: Remove this if auto scale is available on Windows.

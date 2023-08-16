@@ -180,13 +180,14 @@ namespace sdk {
             return 0;
         }
         // Date sample: Thu, 18 Feb 2021 03:09:29 GMT
-        struct tm tm = {0};
-        if (Strptime(iter->second.c_str(), "%a, %d %b %Y %H:%M:%S", &tm) == NULL) {
+        LogtailTime ts;
+        int nanosecondLength;
+        if (Strptime(iter->second.c_str(), "%a, %d %b %Y %H:%M:%S", &ts, nanosecondLength) == NULL) {
             LOG_ERROR(sLogger,
                       METHOD_LOG_PATTERN("parse Date error", ErrnoToString(GetErrno()))("value", iter->second));
             return 0;
         }
-        time_t serverTime = mktime(&tm);
+        time_t serverTime = ts.tv_sec;
         static auto sOffset = GetLocalTimeZoneOffsetSecond();
         return serverTime + sOffset;
 #undef METHOD_LOG_PATTERN

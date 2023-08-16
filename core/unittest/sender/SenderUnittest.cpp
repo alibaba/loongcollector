@@ -2072,11 +2072,10 @@ public:
         return noneUTF8Chars[index];
     }
     void GenerateNoneUTF8Char(LogGroup& logGroup) {
+        auto now = GetCurrentLogtailTime();
         for (int i = 0; i < 10; ++i) {
             Log* logPtr = logGroup.add_logs();
-            timespec ts;
-            clock_gettime(CLOCK_REALTIME_COARSE, &ts);
-            SetLogTime(logPtr, ts.tv_sec, ts.tv_nsec);
+            SetLogTime(logPtr, now.tv_sec, now.tv_nsec);
             for (int j = 0; j < 10; ++j) {
                 Log_Content* contentPtr = logPtr->add_contents();
                 if (j == i) {
