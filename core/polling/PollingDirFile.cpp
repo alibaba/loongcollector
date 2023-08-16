@@ -20,6 +20,7 @@
 #include <Shlwapi.h>
 #endif
 #include <sys/stat.h>
+#include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/ErrorUtil.h"
@@ -342,6 +343,10 @@ bool PollingDirFile::PollingNormalConfigPath(
         return false;
 
     string dirPath = obj.empty() ? srcPath : PathJoin(srcPath, obj);
+    if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(dirPath)) {
+        LOG_INFO(sLogger, ("ignore path matching host path blacklist", dirPath));
+        return false;
+    }
     bool isNewDirectory = false;
     if (!CheckAndUpdateDirMatchCache(dirPath, statBuf, isNewDirectory))
         return true;
@@ -464,6 +469,10 @@ bool PollingDirFile::PollingNormalConfigPath(
 // corresponding value in mConstWildcardPaths, call PollingNormalConfigPath or call
 // PollingWildcardConfigPath recursively.
 bool PollingDirFile::PollingWildcardConfigPath(const Config* pConfig, const string& dirPath, int depth) {
+    if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(dirPath)) {
+        LOG_INFO(sLogger, ("ignore path matching host path blacklist", dirPath));
+        return false;
+    }
     auto const wildcardPathSize = static_cast<int>(pConfig->mWildcardPaths.size());
     if (depth - wildcardPathSize > pConfig->mMaxDepth)
         return false;

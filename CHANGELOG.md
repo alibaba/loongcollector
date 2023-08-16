@@ -40,6 +40,7 @@ your changes, such as:
 - [public] [both] [updated] Elasticsearch flusher new features: send batch request by bulk api and format index
 - [public] [both] [added] Add new plugin: input_command
 - [public] [both] [added] Add new plugin: processor_log_to_sls_metric
+- [public] [both] [added] Support global hostpath blacklist (match by substring)
 - [public] [both] [updated] Service_http_server support raw type on v1
 - [public] [both] [updated] Add v2 interface to processor_json
 - [public] [both] [updated] Json processor support parsing array

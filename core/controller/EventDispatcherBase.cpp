@@ -161,6 +161,10 @@ EventDispatcherBase::~EventDispatcherBase() {
 }
 
 bool EventDispatcherBase::RegisterEventHandler(const char* path, Config* config, EventHandler*& handler) {
+    if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(path)) {
+        LOG_INFO(sLogger, ("ignore path matching host path blacklist", path));
+        return false;
+    }
     // @todo
     // if this path belong to many config, if register one config with max_depth 0, then it will register fail
     if (!config->WithinMaxDepth(path)) {
