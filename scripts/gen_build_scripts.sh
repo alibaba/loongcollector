@@ -60,7 +60,7 @@ ram_limit_nproc=\$((ram_size / 1024 / 768))
 EOF
 
   if [ $EXPORT_GO_ENVS ]; then
-    envs=($(go env | grep -E 'GOPRIVATE=".+"|GOPROXY=".+"'))
+    envs=($(go env | grep -E 'GOPRIVATE=(".+"|'\''.+'\'')|GOPROXY=(".+"|'\''.+'\'')'))
     for v in ${envs[@]}; do
       echo "go env -w $v" >> $BUILD_SCRIPT_FILE
     done
