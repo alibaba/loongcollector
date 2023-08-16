@@ -305,7 +305,7 @@ ConfigManager::SendHeartbeat(const AppConfig::ConfigServerAddress& configServerA
     } catch (const sdk::LOGException& e) {
         LOG_WARNING(
             sLogger,
-            ("SendHeartBeat", "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())("errMsg", e.GetMessage()));
+            ("SendHeartBeat", "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())("errMsg", e.GetMessage())("host", configServerAddress.host)("port", configServerAddress.port));
         return emptyResult;
     }
 }
