@@ -149,6 +149,7 @@ DECLARE_FLAG_INT32(polling_dir_first_watch_timeout);
 DECLARE_FLAG_INT32(polling_file_first_watch_timeout);
 DECLARE_FLAG_INT32(modify_check_interval);
 DECLARE_FLAG_INT32(ignore_file_modify_timeout);
+DEFINE_FLAG_STRING(host_path_blacklist, "host path matches substring in blacklist will be ignored", "");
 
 
 namespace logtail {
@@ -720,6 +721,21 @@ void AppConfigBase::LoadResourceConf(const Json::Value& confJson) {
         }
     }
 
+    if (!STRING_FLAG(host_path_blacklist).empty()) {
+#ifdef _MSC_VER
+        static const std::string delim = ";";
+#else
+        static const std::string delim = ":";
+#endif
+        auto blacklist = SplitString(TrimString(STRING_FLAG(host_path_blacklist)), delim);
+        for (const auto& s : blacklist) {
+            auto s1 = TrimString(s);
+            if (!s1.empty()) {
+                mHostPathBlacklist.emplace_back(std::move(s1));
+            }
+        }
+    }
+
     if (!LoadInt32Parameter(mSendDataPort, confJson, "data_server_port", "ALIYUN_LOGTAIL_DATA_SERVER_PORT")) {
         mSendDataPort = INT32_FLAG(data_server_port);
     }
@@ -1224,4 +1240,12 @@ void AppConfigBase::SetLogtailSysConfDir(const std::string& dirPath) {
                                                                                  mUserRemoteYamlConfigDirPath));
 }
 
+bool AppConfigBase::IsHostPathMatchBlacklist(const string& dirPath) const {
+    for (auto& dp : mHostPathBlacklist) {
+        if (dirPath.find(dp) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace logtail

@@ -137,6 +137,8 @@ private:
     //   local time to adjust logs' time automatically.
     bool mEnableLogTimeAutoAdjust = false;
 
+    std::vector<std::string> mHostPathBlacklist;
+
     /**
      * @brief Load ConfigServer, DataServer and network interface
      *
@@ -369,6 +371,8 @@ public:
     inline bool EnableCheckpointSyncWrite() const { return mEnableCheckpointSyncWrite; }
 
     inline bool EnableLogTimeAutoAdjust() const { return mEnableLogTimeAutoAdjust; }
+
+    bool IsHostPathMatchBlacklist(const std::string& dirPath) const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;
