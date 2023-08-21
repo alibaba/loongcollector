@@ -1,5 +1,60 @@
 # 发布历史
 
+## 1.7.1
+
+### 发布记录
+
+发版日期：2023 年 8 月 20 日
+
+新功能
+
+* 新增命令执行结果采集插件 input_command [#925](https://github.com/alibaba/ilogtail/pull/925)
+* 新增log转sls metric插件 processor_log_to_sls_metric [#955](https://github.com/alibaba/ilogtail/pull/955)
+* 新增log转sls trace插件 processor_otel_trace [#1028](https://github.com/alibaba/ilogtail/pull/1028)
+* Elasticsearch flusher支持动态索引 [#979](https://github.com/alibaba/ilogtail/pull/979)
+* HTTP Server支持接受原始文本 [#976](https://github.com/alibaba/ilogtail/issues/976)
+* Json processor支持解析数组 [#972](https://github.com/alibaba/ilogtail/pull/972)
+
+优化
+
+* Service_prometheus支持K8s中自动伸缩 [#932](https://github.com/alibaba/ilogtail/pull/932)
+* containerd容器采集支持自定义rootfs路径和自动发现路径 [#985](https://github.com/alibaba/ilogtail/pull/985)
+* 纳秒级高精度时间性能优化和windows支持 [#1026](https://github.com/alibaba/ilogtail/pull/1026)
+* 避免文件30天无更新后写入导致的重复采集问题 [#1039](https://github.com/alibaba/ilogtail/pull/1039)
+* 添加C++ Core UT流水线 [#951](https://github.com/alibaba/ilogtail/pull/951)
+
+问题修复
+
+* 修复 service_go_profile可能panic的问题 [#1036](https://github.com/alibaba/ilogtail/pull/1036)
+* 修复stdout文件路径为软链时无法采集容器stdout的问题 [#1037](https://github.com/alibaba/ilogtail/issues/1037)
+* 修复zstd批量发送问题 [#1006](https://github.com/alibaba/ilogtail/pull/1006)
+* 修复service_otlp插件无法退出的问题 [#1040](https://github.com/alibaba/ilogtail/pull/1040)
+* 修复env创建配置时ttl值非法与空行为不一致的问题 [#1045](https://github.com/alibaba/ilogtail/issues/1045)
+* 修复当只有容器删除事件时容器因fd所得无法退出的问题 [#986](https://github.com/alibaba/ilogtail/issues/986)
+* 为system_v2插件采集disk metrics增加超时避免卡死 [#933](https://github.com/alibaba/ilogtail/pull/933)
+* 修复profile中相同的容器内文件路径数据互相覆盖的问题 [#1034](https://github.com/alibaba/ilogtail/issues/1034)
+* 修复apsara_log_conf.json文件存在时不创建snapshot目录的问题 [#944](https://github.com/alibaba/ilogtail/issues/944)
+* 修复otlp flusher时间戳总为1970-01-01的问题 [#1031](https://github.com/alibaba/ilogtail/issues/1031)
+* 修复config更新后config server下发为删除的问题 [#1023](https://github.com/alibaba/ilogtail/pull/1023)
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.7.1.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.7.1.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.7.1/ilogtail-1.7.1.linux-amd64.tar.gz) | Linux | x86-64 | 13029900e0bdd4f6db858d97b31d30f1659145fc40bfceb97f7946f35c94c232 |
+| [ilogtail-1.7.1.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.7.1/ilogtail-1.7.1.linux-arm64.tar.gz) | Linux | arm64  | fe5e2e2b69cb664ed0fc0578d1fdec95e94ab00711b547c7b90591f0a07853e1 |
+| [ilogtail-1.7.1.windows-amd64.zip](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.7.1/ilogtail-1.7.1.windows-amd64.zip)   | Windows | x86-64 | 593f734035f4c808654b638492f1e0d79205b2080a8975305f7f86b988841166 |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+``` bash
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.7.1
+```
+
 ## 1.7.0
 
 ### 发布记录

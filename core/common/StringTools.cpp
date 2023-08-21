@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "StringTools.h"
+#include <string.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/xpressive/xpressive.hpp>
 #include "logger/Logger.h"
@@ -27,6 +28,14 @@ std::string ToLowerCaseString(const std::string& orig) {
     auto copy = orig;
     std::transform(copy.begin(), copy.end(), copy.begin(), ::tolower);
     return copy;
+}
+
+int CStringNCaseInsensitiveCmp(const char* s1, const char* s2, size_t n) {
+#if defined(_MSC_VER)
+    return _strnicmp(s1, s2, n);
+#else
+    return strncasecmp(s1, s2, n);
+#endif
 }
 
 std::string ToString(const std::vector<std::string>& vec) {

@@ -1453,7 +1453,9 @@ bool LogFileReader::GetLogTimeByOffset(const char* buffer,
                                        const std::string& logPath) {
     struct tm t;
     memset(&t, 0, sizeof(t));
-    if (strptime(buffer + pos, timeFormat.c_str(), &t) == NULL) {
+    long nanosecond = 0;
+    int nanosecondLength = 0;
+    if (strptime_ns(buffer + pos, timeFormat.c_str(), &t, &nanosecond, &nanosecondLength) == NULL) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
             if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
                 LOG_WARNING(sLogger,

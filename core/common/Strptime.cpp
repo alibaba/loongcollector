@@ -27,10 +27,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "Strptime.h"
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
-#include "Strptime.h"
+#include "common/StringTools.h"
 
 namespace logtail {
 /*
@@ -352,7 +353,7 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                 continue;
 
             case 'Z':
-                if (strncasecmp((const char*)bp, gmt, 3) == 0 || strncasecmp((const char *)bp, utc, 3) == 0) {
+                if (CStringNCaseInsensitiveCmp((const char*)bp, gmt, 3) == 0 || CStringNCaseInsensitiveCmp((const char *)bp, utc, 3) == 0) {
                     tm->tm_isdst = 0;
 #ifdef TM_GMTOFF
                     tm->TM_GMTOFF = 0;
@@ -574,20 +575,6 @@ static const unsigned char* conv_nanosecond(const unsigned char* buf, long* dest
     return buf;
 }
 
-static int strncasecmp(const char* s1, const char* s2, size_t n) {
-    if (n == 0)
-        return 0;
-
-    while (n-- != 0 && tolower(*s1) == tolower(*s2)) {
-        if (n == 0 || *s1 == '\0' || *s2 == '\0')
-            break;
-        s1++;
-        s2++;
-    }
-
-    return tolower(*(const unsigned char*)s1) - tolower(*(const unsigned char*)s2);
-}
-
 static const unsigned char*
 find_string(const unsigned char* bp, int* tgt, const char* const* n1, const char* const* n2, int c) {
     int i;
@@ -597,7 +584,7 @@ find_string(const unsigned char* bp, int* tgt, const char* const* n1, const char
     for (; n1 != NULL; n1 = n2, n2 = NULL) {
         for (i = 0; i < c; i++, n1++) {
             len = strlen(*n1);
-            if (strncasecmp(*n1, (const char*)bp, len) == 0) {
+            if (CStringNCaseInsensitiveCmp(*n1, (const char*)bp, len) == 0) {
                 *tgt = i;
                 return bp + len;
             }

@@ -36,3 +36,4 @@ cd %DIST_DIR%
 del /f/s/q %PACKAGE_DIR%.windows-%ARCH%.zip
 %Z_BIN% a -tzip %PACKAGE_DIR%.windows-%ARCH%.zip %PACKAGE_DIR%
 rd /s /q %PACKAGE_DIR%
+certUtil -hashfile %PACKAGE_DIR%.windows-%ARCH%.zip SHA256 | findstr /v "SHA256" | findstr /v CertUtil > %PACKAGE_DIR%.windows-%ARCH%.zip.sha256
