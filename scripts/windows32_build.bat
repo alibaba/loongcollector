@@ -6,7 +6,7 @@ REM 2. Build iLogtail.
 REM 3. Build iLogtail plugin.
 REM 4. Make package.
 
-set ILOGTAIL_VERSION=1.7.0
+set ILOGTAIL_VERSION=1.7.1
 if not "%1" == "" set ILOGTAIL_VERSION=%1
 set CurrentPath=%~dp0
 set P1Path=

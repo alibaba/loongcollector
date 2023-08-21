@@ -104,7 +104,9 @@ LogParser::ApsaraEasyReadLogTimeParser(const char* buffer, string& timeStr, time
         }
         struct tm tm;
         memset(&tm, 0, sizeof(tm));
-        if (NULL == strptime(buffer + beg_index + 1, "%Y-%m-%d %H:%M:%S", &tm)) {
+        long nanosecond = 0;
+        int nanosecondLength = 0;
+        if (NULL == strptime_ns(buffer + beg_index + 1, "%Y-%m-%d %H:%M:%S", &tm, &nanosecond, &nanosecondLength)) {
             LOG_WARNING(sLogger,
                         ("parse apsara log time", "fail")("string", buffer)("timeformat", "%Y-%m-%d %H:%M:%S"));
             return 0;

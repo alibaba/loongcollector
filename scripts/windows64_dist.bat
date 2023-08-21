@@ -5,7 +5,7 @@ REM 1. Set environments.
 REM 2. Copy output to dist package dir.
 REM 3. Pack dir to zip archive.
 
-set ILOGTAIL_VERSION=1.7.0
+set ILOGTAIL_VERSION=1.7.1
 if not "%1" == "" set ILOGTAIL_VERSION=%1
 set CurrentPath=%~dp0
 set P1Path=
@@ -36,3 +36,4 @@ cd %DIST_DIR%
 del /f/s/q %PACKAGE_DIR%.windows-%ARCH%.zip
 %Z_BIN% a -tzip %PACKAGE_DIR%.windows-%ARCH%.zip %PACKAGE_DIR%
 rd /s /q %PACKAGE_DIR%
+certUtil -hashfile %PACKAGE_DIR%.windows-%ARCH%.zip SHA256 | findstr /v "SHA256" | findstr /v CertUtil > %PACKAGE_DIR%.windows-%ARCH%.zip.sha256
