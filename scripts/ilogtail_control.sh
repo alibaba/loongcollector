@@ -53,7 +53,7 @@ start_ilogtail() {
         local ilogtail_pid=$(load_pid)
         echo "ilogtail already started. pid: $ilogtail_pid"
     } || {
-        ($bin_file) &
+        ($bin_file $@) &
         local ilogtail_pid=$!
         save_pid $ilogtail_pid
         echo "ilogtail started. pid: $ilogtail_pid"
@@ -112,10 +112,10 @@ stop_ilogtail() {
     [[ ! -z $ilogtail_pid ]] || {
         echo "ilogtail not started"
         return
-    } 
+    }
 
     local delaySec=${1:-0}
-    echo 'delay stop ilogtail, sleep ' $delaySec
+    echo 'delay stop ilogtail, sleep' $delaySec
     sleep $delaySec
     echo "stop ilogtail"
     # try to kill with SIGTERM, and wait for process to exit
@@ -153,24 +153,26 @@ if [ $# -lt 1 ];then
     exit
 fi
 
-stop_delay_sec=0
+command="$1"
+args=""
 if [ $# -gt 1 ];then
-    stop_delay_sec=$2
+    shift
+    args="$@"
 fi
 
 trap 'exit_handler' SIGTERM
 trap 'exit_handler' SIGINT
 
-case "$1" in
+case "$command" in
     start)
-    start_ilogtail
+    start_ilogtail $args
     ;;
     stop)
-    stop_ilogtail $stop_delay_sec
+    stop_ilogtail $args
     ;;
     restart)
-    stop_ilogtail $stop_delay_sec
-    start_ilogtail
+    stop_ilogtail $args
+    start_ilogtail $args
     ;;
     status)
     check_liveness_by_pid && exit 0 || exit $?
@@ -179,9 +181,9 @@ case "$1" in
     check_liveness_by_port && exit 0 || exit $?
     ;;
     start_and_block)
-    start_ilogtail
+    start_ilogtail $args
     block_on_check_liveness_by_pid
-    stop_ilogtail $stop_delay_sec
+    stop_ilogtail $args
     ;;
     -h)
     usage

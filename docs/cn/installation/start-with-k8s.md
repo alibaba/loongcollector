@@ -202,6 +202,18 @@ spec:
 wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/start_with_k8s/ilogtail-daemonset.yaml
 ```
 
+添加参数示例
+```
+        - name: logtail
+          command:
+          - /usr/local/ilogtail/ilogtail_control.sh
+          args:
+          - "start_and_block"
+          - "-enable_containerd_upper_dir_detect=true"
+          - "-dirfile_check_interval_ms=5000"
+          - "-logtail_checkpoint_check_gc_interval_sec=120"
+```
+
 应用上述配置
 
 ```bash
