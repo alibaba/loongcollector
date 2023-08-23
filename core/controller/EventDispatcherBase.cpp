@@ -474,7 +474,7 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
 
     int wd = pathIter->second;
     DevInode devInode = GetFileDevInode(realFilePath);
-    if (devInode.IsValid() && checkpoint->mDevInode == devInode) {
+    if (devInode.IsValid() && checkpoint->mDevInode.inode == devInode.inode) {
         if (!CheckFileSignature(
                 realFilePath, checkpoint->mSignatureHash, checkpoint->mSignatureSize, config->mIsFuseMode)) {
             LOG_INFO(sLogger,
@@ -483,6 +483,10 @@ EventDispatcherBase::validateCheckpoint(CheckPointPtr& checkpoint,
                          "real file path", checkpoint->mRealFileName)("file device", checkpoint->mDevInode.inode)(
                          "file inode", checkpoint->mDevInode.inode));
             return ValidateCheckpointResult::kSigChanged;
+        }
+        if (checkpoint->mDevInode.dev != devInode.dev) {
+            // all other checks passed. dev may be a statefulset pv remounted on another node
+            checkpoint->mDevInode.dev = devInode.dev;
         }
 
         LOG_INFO(sLogger,
