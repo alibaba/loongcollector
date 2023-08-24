@@ -43,8 +43,8 @@
 #include <boost/regex.hpp>
 #include "log_pb/metric.pb.h"
 #include "log_pb/sls_logs.pb.h"
-#include "profiler/LogtailAlarm.h"
-#include "profiler/LogIntegrity.h"
+#include "monitor/LogtailAlarm.h"
+#include "monitor/LogIntegrity.h"
 #include "event_handler/LogInput.h"
 #include "common/FileEncryption.h"
 #include "processor/LogProcess.h"

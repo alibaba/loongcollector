@@ -15,7 +15,7 @@
 #include "LogstoreSenderQueue.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 
 
 DEFINE_FLAG_INT32(max_client_send_error_count, "set disabled if last send is all failed", 60);

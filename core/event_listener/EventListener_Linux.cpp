@@ -17,7 +17,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include "logger/Logger.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "common/ErrorUtil.h"
 #include "common/Flags.h"
 #include "controller/EventDispatcher.h"

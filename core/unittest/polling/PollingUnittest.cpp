@@ -48,7 +48,7 @@
 #include <boost/regex.hpp>
 #include "log_pb/metric.pb.h"
 #include "log_pb/sls_logs.pb.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "event_handler/LogInput.h"
 #include "common/FileEncryption.h"
 #include "common/FileSystemUtil.h"

@@ -17,7 +17,7 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 #include "common/LogtailCommonFlags.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "parser/LogParser.h"
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"

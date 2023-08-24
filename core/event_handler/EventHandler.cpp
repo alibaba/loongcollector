@@ -25,7 +25,7 @@
 #include "event/BlockEventManager.h"
 #include "controller/EventDispatcher.h"
 #include "config_manager/ConfigManager.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "processor/LogProcess.h"
 #include "logger/Logger.h"
 #include "fuse/FuseFileBlacklist.h"

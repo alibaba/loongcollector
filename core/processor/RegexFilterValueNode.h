@@ -21,7 +21,7 @@
 #include "BaseFilterNode.h"
 #include "common/util.h"
 #include "app_config/AppConfig.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "logger/Logger.h"
 
 namespace logtail {

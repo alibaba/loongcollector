@@ -19,8 +19,8 @@
 #endif
 #include "shennong/MetricSender.h"
 #include "sender/Sender.h"
-#include "profiler/LogFileProfiler.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogFileProfiler.h"
+#include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
 #include "common/util.h"
 #include "common/LogtailCommonFlags.h"

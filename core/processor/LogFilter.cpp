@@ -14,7 +14,7 @@
 
 #include "LogFilter.h"
 #include <re2/re2.h>
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "app_config/AppConfig.h"
 #include "common/util.h"
 #include "sdk/Common.h"

@@ -15,7 +15,7 @@
 #include "LogFileCollectOffsetIndicator.h"
 #include <vector>
 #include <algorithm>
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "common/Flags.h"
 #include "common/LogstoreSenderQueue.h"
 #include "sender/Sender.h"

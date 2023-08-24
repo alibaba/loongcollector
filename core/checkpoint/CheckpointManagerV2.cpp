@@ -19,7 +19,7 @@
 #include "common/ScopeInvoker.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "app_config/AppConfig.h"
 #include "config/Config.h"
 #include "config_manager/ConfigManager.h"

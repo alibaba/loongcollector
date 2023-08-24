@@ -29,7 +29,7 @@
 #include "event/Event.h"
 #include "logger/Logger.h"
 #include "config_manager/ConfigManager.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
 #include "PollingModify.h"
 #include "PollingEventQueue.h"

@@ -24,7 +24,7 @@
 #include "monitor/Monitor.h"
 #include "processor/LogProcess.h"
 #include "controller/EventDispatcher.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "checkpoint/CheckPointManager.h"
 #include "polling/PollingDirFile.h"
 #include "polling/PollingModify.h"

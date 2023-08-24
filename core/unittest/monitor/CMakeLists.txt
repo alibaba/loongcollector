@@ -13,14 +13,11 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 2.9)
-project(profiler)
+project(logtail_metric_unittest)
 
-file(GLOB LIB_SOURCE_FILES *.cpp *.h)
-append_source_files(LIB_SOURCE_FILES)
-add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} common)
-target_link_libraries(${PROJECT_NAME} log_pb)
-target_link_libraries(${PROJECT_NAME} sender)
-target_link_libraries(${PROJECT_NAME} config_manager)
-target_link_libraries(${PROJECT_NAME} fuse)
-link_jsoncpp(${PROJECT_NAME})
+add_executable(logtail_metric_unittest LogtailMetricUnittest.cpp)
+target_link_libraries(logtail_metric_unittest unittest_base)
+
+
+add_executable(profiler_data_integrity_unittest DataIntegrityUnittest.cpp)
+target_link_libraries(profiler_data_integrity_unittest unittest_base)

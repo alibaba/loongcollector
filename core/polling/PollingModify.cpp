@@ -24,7 +24,7 @@
 #include "common/FileSystemUtil.h"
 #include "event/Event.h"
 #include "logger/Logger.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
 
 using namespace std;

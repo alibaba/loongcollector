@@ -16,7 +16,7 @@
 
 #pragma once
 #include "config/IntegrityConfig.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "FileInfo.h"
 #include "RangeCheckpoint.h"
 

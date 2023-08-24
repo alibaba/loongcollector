@@ -16,7 +16,7 @@
 #include <string.h>
 #include <ctime>
 #include "common/LogtailCommonFlags.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "parser/LogParser.h"
 #include "parser/DelimiterModeFsmParser.h"
 #include "log_pb/sls_logs.pb.h"

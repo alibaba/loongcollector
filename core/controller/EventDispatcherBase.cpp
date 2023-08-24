@@ -51,10 +51,11 @@
 #include "event/Event.h"
 #include "processor/LogProcess.h"
 #include "sender/Sender.h"
-#include "profiler/LogFileProfiler.h"
-#include "profiler/LogtailAlarm.h"
-#include "profiler/LogIntegrity.h"
-#include "profiler/LogLineCount.h"
+#include "monitor/LogFileProfiler.h"
+#include "monitor/LogtailAlarm.h"
+#include "monitor/LogIntegrity.h"
+#include "monitor/LogLineCount.h"
+#include "monitor/MetricExportor.h"
 #include "log_pb/metric.pb.h"
 #include "log_pb/sls_logs.pb.h"
 #include "checkpoint/CheckPointManager.h"
@@ -878,6 +879,7 @@ bool EventDispatcherBase::Dispatch() {
         DumpCheckPointPeriod(curTime);
         if (curTime - lastCheckDir >= INT32_FLAG(main_loop_check_interval)) {
             LogFileProfiler::GetInstance()->SendProfileData();
+            MetricExportor::GetInstance()->PushMetrics(false);
 #if defined(__linux__)
             CheckShennong();
 #endif

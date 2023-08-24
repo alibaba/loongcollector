@@ -38,10 +38,10 @@
 #include "controller/EventDispatcher.h"
 #include "monitor/Monitor.h"
 #include "sender/Sender.h"
-#include "profiler/LogtailAlarm.h"
-#include "profiler/LogFileProfiler.h"
-#include "profiler/LogIntegrity.h"
-#include "profiler/LogLineCount.h"
+#include "monitor/LogtailAlarm.h"
+#include "monitor/LogFileProfiler.h"
+#include "monitor/LogIntegrity.h"
+#include "monitor/LogLineCount.h"
 #include "app_config/AppConfig.h"
 using namespace logtail;
 

@@ -25,8 +25,8 @@
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
 #include "config/LogType.h"
-#include "profiler/LogFileProfiler.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogFileProfiler.h"
+#include "monitor/LogtailAlarm.h"
 #include "app_config/AppConfig.h"
 #include "config_manager/ConfigManager.h"
 

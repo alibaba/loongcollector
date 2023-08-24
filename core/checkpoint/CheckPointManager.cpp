@@ -17,7 +17,7 @@
 #include <fstream>
 #include <thread>
 #include <fcntl.h>
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "app_config/AppConfig.h"
 #include "config_manager/ConfigManager.h"
 #include "common/Flags.h"

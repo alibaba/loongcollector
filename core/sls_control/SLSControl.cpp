@@ -22,7 +22,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/version.h"
 #include "logger/Logger.h"
-#include "profiler/LogFileProfiler.h"
+#include "monitor/LogFileProfiler.h"
 // for windows compatability, to avoid conflict with the same function defined in windows.h
 #ifdef SetPort
 #undef SetPort

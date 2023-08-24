@@ -18,7 +18,7 @@
 
 #include "Monitor.h"
 #include "iostream"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include <cstdint>
 #include <sstream>
 

@@ -16,7 +16,7 @@
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "CGroupPathResolver.h"
-#include "profiler/LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
 #include "FileSystemUtil.h"
 #include "StringTools.h"
 #include "plugin/LogtailPlugin.h"

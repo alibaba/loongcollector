@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <processor/LogFilter.h>
-#include <profiler/LogFileProfiler.h>
+#include <monitor/LogFileProfiler.h>
 #include <common/Constants.h>
 #include <config_manager/ConfigManager.h>
 #include <common/StringTools.h>
