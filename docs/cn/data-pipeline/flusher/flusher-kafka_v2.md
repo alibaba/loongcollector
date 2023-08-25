@@ -16,6 +16,7 @@
 | Brokers                               | String数组 | 是    | Kafka Brokers                                                                                      |
 | Topic                                 | String   | 是    | Kafka Topic,支持动态topic, 例如: `test_%{content.appname}`                                               |
 | Version                               | String   | 否    | Kafka协议版本号 ,例如：`2.0.0`，默认值：`1.0.0`                                                                 |
+| Headers                               | header数组 | 否    | kafka消息头 ，配置使用请参考本文中`Headers`配置用例                                                                  |
 | Convert                               | Struct   | 否    | ilogtail数据转换协议配置                                                                                   |
 | Convert.Protocol                      | String   | 否    | ilogtail数据转换协议，kafka flusher 可选值：`custom_single`,`otlp_log_v1`。默认值：`custom_single`                 |
 | Convert.Encoding                      | String   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                     |
@@ -313,6 +314,29 @@ flushers:
 
 - `content.application`中表示从`contents`中取数据`application`字段数据，如果对`contents`协议字段做了重命名，
 例如重名为`messege`，则应该配置为`messege.application`
+
+### 配置Headers
+
+`iLogtail`中`Kafka`的消息头是以键值对数组的形式配置的。`header`中`value`仅支持字符串类型。
+```yaml
+enable: true
+inputs:
+  - Type: file_log
+    LogPath: /home/test_log
+    FilePattern: "*.log"
+flushers:
+  - Type: flusher_kafka
+    Brokers:
+      - 192.XX.XX.1:9092
+      - 192.XX.XX.2:9092
+      - 192.XX.XX.3:9092
+    Topic: KafkaTestTopic
+    Headers:
+      - key: "key1"
+        value: "value1"
+      - key: "key2"
+        value: "value2"
+```
 
 ## 安全连接配置
 

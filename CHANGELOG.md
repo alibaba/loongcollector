@@ -37,10 +37,12 @@ your changes, such as:
 
 ## [Unreleased]
 
-- [public] [both] [updated] support continue/end regex patterns to split multiline log
-- [public] [both] [updated] support reader flush timeout
-- [public] [both] [added] add new logtail metric module
-- [public] [both] [fixed] fix multiline is splitted if not flushed to disk together
-- [public] [both] [fixed] fix line is truncated if \0 is in the middle of line
 - [public] [both] [added] refactoried C++ process pipeline
 - [public] [both] [added] support use accelerate processors with go processors
+- [public] [both] [added] add new logtail metric module
+- [public] [both] [updated] support continue/end regex patterns to split multiline log
+- [public] [both] [updated] support reader flush timeout
+- [public] [both] [updated] Flusher Kafka V2: support send the message with headers to kafka
+- [public] [both] [fixed] fix multiline is splitted if not flushed to disk together
+- [public] [both] [fixed] fix line is truncated if \0 is in the middle of line
+
