@@ -2107,7 +2107,7 @@ public:
         LogGroup srcLog;
         srcLog.set_category(category);
         GenerateNoneUTF8Char(srcLog);
-        Config* config = new Config("", "", APSARA_LOG, "", "", "1000000_proj", false, 2, -1, category);
+        Config* config = new Config("", "", APSARA_LOG, "", "", "", "", "", "1000000_proj", false, 2, -1, category);
         config->mFilterRule = NULL;
         config->mDiscardNoneUtf8 = true;
         Sender::Instance()->Send("1000000_proj", "", srcLog, config, MERGE_BY_TOPIC, srcLog.ByteSize());

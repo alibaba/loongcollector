@@ -19,7 +19,8 @@
 #include "common/Constants.h"
 #include "common/FileSystemUtil.h"
 #include "common/LogtailCommonFlags.h"
-#include "reader/LogFileReader.h"
+#include "reader/CommonRegLogFileReader.h"
+#include "reader/ApsaraLogFileReader.h"
 #include "reader/DelimiterLogFileReader.h"
 #include "reader/JsonLogFileReader.h"
 #include "logger/Logger.h"
@@ -86,6 +87,8 @@ Config::Config(const std::string& basePath,
                LogType logType,
                const std::string& logName,
                const std::string& logBeginReg,
+               const std::string& logContinueReg,
+               const std::string& logEndReg,
                const std::string& projectName,
                bool isPreserve,
                int preserveDepth,
@@ -94,6 +97,7 @@ Config::Config(const std::string& basePath,
                bool uploadRawLog /*= false*/,
                const std::string& StreamLogTag /*= ""*/,
                bool discardUnmatch /*= true*/,
+               int readerFlushTimeout /*= 5*/,
                std::list<std::string>* regs /*= NULL*/,
                std::list<std::string>* keys /*= NULL*/,
                std::string timeFormat /* = ""*/)
@@ -102,6 +106,8 @@ Config::Config(const std::string& basePath,
       mLogType(logType),
       mConfigName(logName),
       mLogBeginReg(logBeginReg),
+      mLogContinueReg(logContinueReg),
+      mLogEndReg(logEndReg),
       mProjectName(projectName),
       mIsPreserve(isPreserve),
       mPreserveDepth(preserveDepth),
@@ -112,7 +118,8 @@ Config::Config(const std::string& basePath,
       mCategory(category),
       mStreamLogTag(StreamLogTag),
       mDiscardUnmatch(discardUnmatch),
-      mUploadRawLog(uploadRawLog) {
+      mUploadRawLog(uploadRawLog),
+      mReaderFlushTimeout(readerFlushTimeout) {
 #if defined(_MSC_VER)
     mBasePath = EncodingConverter::GetInstance()->FromUTF8ToACP(mBasePath);
     mFilePattern = EncodingConverter::GetInstance()->FromUTF8ToACP(mFilePattern);
@@ -559,7 +566,9 @@ LogFileReader* Config::CreateLogFileReader(const std::string& dir,
         JsonLogFileReader* jsonLogFileReader = static_cast<JsonLogFileReader*>(reader);
         jsonLogFileReader->SetTimeKey(mTimeKey);
     } else {
-        LOG_ERROR(sLogger, ("log reader creation failed, unknown log type", mLogType)("project", GetProjectName())("logstore", GetCategory())("config", mConfigName));
+        LOG_ERROR(sLogger,
+                  ("log reader creation failed, unknown log type",
+                   mLogType)("project", GetProjectName())("logstore", GetCategory())("config", mConfigName));
     }
 
     if (reader != NULL) {
@@ -578,10 +587,13 @@ LogFileReader* Config::CreateLogFileReader(const std::string& dir,
         reader->SetDelaySkipBytes(mLogDelaySkipBytes);
         reader->SetConfigName(mConfigName);
         reader->SetRegion(mRegion);
-        reader->SetLogBeginRegex(STRING_DEEP_COPY(mLogBeginReg));
+        reader->SetLogMultilinePolicy(STRING_DEEP_COPY(mLogBeginReg),
+                                       STRING_DEEP_COPY(mLogContinueReg),
+                                       STRING_DEEP_COPY(mLogEndReg));
+        reader->SetReaderFlushTimeout(mReaderFlushTimeout);
+        reader->SetDevInode(devInode);
         if (forceFromBeginning)
             reader->SetReadFromBeginning();
-        reader->SetDevInode(devInode);
         if (mAdvancedConfig.mEnableLogPositionMeta) {
             sls_logs::LogTag inodeTag;
             inodeTag.set_key(LOG_RESERVED_KEY_INODE);
@@ -598,7 +610,7 @@ LogFileReader* Config::CreateLogFileReader(const std::string& dir,
                                           mAdvancedConfig.mPreciseTimestampUnit);
         reader->SetTzOffsetSecond(mTimeZoneAdjust, mLogTimeZoneOffsetSecond);
         reader->SetAdjustApsaraMicroTimezone(mAdvancedConfig.mAdjustApsaraMicroTimezone);
-        
+
         if (mDockerFileFlag) {
             DockerContainerPath* containerPath = GetContainerPathByLogPath(dir);
             if (containerPath == NULL) {

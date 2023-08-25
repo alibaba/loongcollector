@@ -46,7 +46,7 @@ namespace logtail {
 
 class ConfigYamlToJsonUnittest : public ::testing::Test {
 public:
-    static void SetUpTestCase() {}
+    static void SetUpTestCase() { BOOL_FLAG(enable_new_pipeline) = true; }
     static void TearDownTestCase() {}
 
     void CaseSetUp() {}
@@ -194,7 +194,7 @@ public:
         generateYamlConfig("processors", {"processor_regex_accelerate"}, yamlConfig);
         generateYamlConfig("flushers", {"flusher_sls", "flusher_stdout"}, yamlConfig);
         ret = ConfigYamlToJson::GetInstance()->CheckPluginConfig("", yamlConfig, workMode);
-        EXPECT_EQ(ret, false);
+        EXPECT_EQ(ret, true);
 
         // accelerate processor with non-sls flusher
         yamlConfig.reset();
@@ -202,7 +202,7 @@ public:
         generateYamlConfig("processors", {"processor_regex_accelerate"}, yamlConfig);
         generateYamlConfig("flushers", {"flusher_stdout"}, yamlConfig);
         ret = ConfigYamlToJson::GetInstance()->CheckPluginConfig("", yamlConfig, workMode);
-        EXPECT_EQ(ret, false);
+        EXPECT_EQ(ret, true);
 
         // processor_split_log_regex is not the first processor
         yamlConfig.reset();
@@ -210,7 +210,7 @@ public:
         generateYamlConfig("processors", {"processor_regex", "processor_split_log_regex"}, yamlConfig);
         generateYamlConfig("flushers", {"flusher_sls"}, yamlConfig);
         ret = ConfigYamlToJson::GetInstance()->CheckPluginConfig("", yamlConfig, workMode);
-        EXPECT_EQ(ret, false);
+        EXPECT_EQ(ret, true);
     }
 
     void TestYamlToJsonForPurelyDigitValue() {
@@ -275,10 +275,8 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["regex"][0].asString(), "(.*)");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"].size(), 0);
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 2);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 1);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"][0]["type"],
-                  "processor_split_log_string");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"][1]["type"],
                   "processor_regex");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"].size(), 2);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"][0]["type"], "flusher_sls");
@@ -302,10 +300,8 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"].size(), 0);
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 2);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 1);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"][0]["type"],
-                  "processor_split_log_string");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"][1]["type"],
                   "processor_json");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"].size(), 2);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"][0]["type"], "flusher_sls");
@@ -329,10 +325,8 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["inputs"].size(), 0);
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 2);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 1);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"][0]["type"],
-                  "processor_split_log_string");
-        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"][1]["type"],
                   "processor_json");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"].size(), 2);
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"][0]["type"], "flusher_sls");
@@ -381,6 +375,34 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["keys"][0].asString(), "time,msg");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["regex"][0].asString(), "(\\S+)\\s(\\w+).*");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
+    }
+
+    // input: file; processor: regex accelerate; flusher: stdout
+    void TestYamlToJsonForFileRegexAccelerateStdout() {
+        LOG_INFO(sLogger, ("TestYamlToJsonForFileRegexAccelerateStdout() begin", time(NULL)));
+
+        Json::Value inputJsonConfig;
+        const std::string file = "testConfigDir/file_regex_accelerate_stdout.yaml";
+        YAML::Node yamlConfig = YAML::LoadFile(file);
+
+        Json::Value userLocalJsonConfig;
+        ConfigYamlToJson::GetInstance()->GenerateLocalJsonConfig(file, yamlConfig, userLocalJsonConfig);
+
+        ConfigManager::GetInstance()->LoadJsonConfig(userLocalJsonConfig, false);
+
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["keys"][0].asString(), "content");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["regex"][0].asString(), "(.*)");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
+        APSARA_TEST_TRUE_FATAL(userLocalJsonConfig["metrics"]["config#" + file]["plugin"].isObject());
+        APSARA_TEST_TRUE_FATAL(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"].isArray());
+        APSARA_TEST_EQUAL_FATAL(1L, userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"].size());
+        APSARA_TEST_STREQ_FATAL(
+            "flusher_stdout",
+            userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["flushers"][0]["type"].asCString());
+        APSARA_TEST_TRUE_FATAL(userLocalJsonConfig["metrics"]["config#" + file]["force_enable_pipeline"].isBool());
+        APSARA_TEST_TRUE_FATAL(userLocalJsonConfig["metrics"]["config#" + file]["force_enable_pipeline"].asBool());
     }
 
     // input: file; processor: delimiter accelerate
@@ -478,51 +500,47 @@ public:
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["category"], "test_logstore");
         EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["compressType"], "zstd");
     }
+
+    // input: file; processor: accelerate
+    void TestYamlToJsonForFileMultiline() {
+        bool oldFlag = BOOL_FLAG(enable_new_pipeline);
+        BOOL_FLAG(enable_new_pipeline) = true;
+        LOG_INFO(sLogger, ("TestYamlToJsonForFileMultiline() begin", time(NULL)));
+
+        Json::Value inputJsonConfig;
+        const std::string file = "testConfigDir/file_multiline.yaml";
+        YAML::Node yamlConfig = YAML::LoadFile(file);
+
+        Json::Value userLocalJsonConfig;
+        ConfigYamlToJson::GetInstance()->GenerateLocalJsonConfig(file, yamlConfig, userLocalJsonConfig);
+
+        ConfigManager::GetInstance()->LoadJsonConfig(userLocalJsonConfig, false);
+
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["enable"].asBool(), true);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["max_depth"].asInt(), 0);
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["keys"][0].asString(), "content");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["regex"][0].asString(), "(.*)");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_begin_reg"].asString(),
+                  R"(\[\d+-\d+-\d+\s\d+:\d+:\d+]\s.*)");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["log_type"].asString(), "common_reg_log");
+        EXPECT_EQ(userLocalJsonConfig["metrics"]["config#" + file]["plugin"]["processors"].size(), 0);
+        BOOL_FLAG(enable_new_pipeline) = oldFlag;
+    }
 };
 
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForCheckConfig) {
-    TestYamlToJsonForCheckConfig();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForPluginMode) {
-    TestYamlToJsonForPluginMode();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForPurelyDigitValue) {
-    TestYamlToJsonForPurelyDigitValue();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileRegMode) {
-    TestYamlToJsonForFileRegMode();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileJsonMode) {
-    TestYamlToJsonForFileJsonMode();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileDelimiterMode) {
-    TestYamlToJsonForFileDelimiterMode();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileRegexAccelerateMode) {
-    TestYamlToJsonForFileRegexAccelerateMode();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileRegexAccelerateFullMode) {
-    TestYamlToJsonForFileRegexAccelerateFullMode();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileDelimiterAccelerateMode) {
-    TestYamlToJsonForFileDelimiterAccelerateMode();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForFileJsonAccelerateMode) {
-    TestYamlToJsonForFileJsonAccelerateMode();
-}
-
-TEST_F(ConfigYamlToJsonUnittest, TestYamlToJsonForAggregatorsAndGlobalConfig) {
-    TestYamlToJsonForAggregatorsAndGlobalConfig();
-}
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForCheckConfig);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForPluginMode);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForPurelyDigitValue);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileRegMode);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileJsonMode);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileDelimiterMode);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileRegexAccelerateMode);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileRegexAccelerateFullMode);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileRegexAccelerateStdout);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileDelimiterAccelerateMode);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileJsonAccelerateMode);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForAggregatorsAndGlobalConfig);
+UNIT_TEST_CASE(ConfigYamlToJsonUnittest, TestYamlToJsonForFileMultiline);
 
 } // end of namespace logtail
 

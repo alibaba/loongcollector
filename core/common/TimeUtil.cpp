@@ -101,7 +101,8 @@ int DeduceYear(const struct tm* tm, const struct tm* currentTm) {
     Parse time (local timezone) from log
     return the position of the parsing ends. If parsing fails, return NULL.
 */
-const char* Strptime(const char* buf, const char* fmt, LogtailTime* ts, int& nanosecondLength, int32_t specifiedYear /* = -1 */) {
+const char*
+Strptime(const char* buf, const char* fmt, LogtailTime* ts, int& nanosecondLength, int32_t specifiedYear /* = -1 */) {
     struct tm tm_ = {0};
     struct tm* tm = &tm_;
     const int32_t MIN_YEAR = std::numeric_limits<decltype(tm->tm_year)>::min();
@@ -276,8 +277,7 @@ void UpdateTimeDelta(time_t serverTime) {
 }
 
 // DEPRECATED: only for the compability of PreciseTimestamp
-uint64_t GetPreciseTimestampFromLogtailTime(LogtailTime logTime,
-                                            const PreciseTimestampConfig& preciseTimestampConfig) {
+uint64_t GetPreciseTimestampFromLogtailTime(LogtailTime logTime, const PreciseTimestampConfig& preciseTimestampConfig) {
     uint64_t preciseTimestamp = logTime.tv_sec;
     TimeStampUnit timeUnit = preciseTimestampConfig.unit;
 
@@ -328,9 +328,9 @@ uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
     if (NULL == preciseTimeSuffix || strlen(preciseTimeSuffix) <= 1) {
         endFlag = true;
     } else {
-        std::string supprotSeparators = ".,: ";
+        static std::string supportedSeparators = ".,: ";
         const char separator = preciseTimeSuffix[0];
-        std::size_t found = supprotSeparators.find(separator);
+        std::size_t found = supportedSeparators.find(separator);
         if (found == std::string::npos) {
             endFlag = true;
         }

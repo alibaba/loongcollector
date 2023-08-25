@@ -55,6 +55,7 @@ LogFileProfiler::LogFileProfiler() {
     mIpAddr = GetHostIp();
     mOsDetail = GetOsDetail();
     mUsername = GetUsername();
+    // TODO: This may take up to 3s to construct the object. This is bad.
     ECSMeta ecsMeta = FetchECSMeta();
     mECSInstanceID = ecsMeta.instanceID;
     mECSUserID = ecsMeta.userID;

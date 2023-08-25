@@ -353,7 +353,7 @@ void LogParserUnittest::TestApsaraEasyReadLogTimeParser() {
 
 void LogParserUnittest::TestAdjustLogTime() {
     LOG_INFO(sLogger, ("TestAdjustLogTime() begin", time(NULL)));
-    Config* config = new Config("", "", APSARA_LOG, "", "", "1000000_proj", false, 2, -1, "category");
+    Config* config = new Config("", "", APSARA_LOG, "", "", "", "", "1000000_proj", false, 2, -1, "category");
     config->mAdvancedConfig.mAdjustApsaraMicroTimezone = true;
 
     {

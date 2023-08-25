@@ -54,9 +54,14 @@ protected:
             }
             mEvent = pEvent;
             mLogstoreKey = logstoreKey;
-            mTimeout = (curTime - mInvalidTime) * 2 + 1;
-            if (mTimeout > INT32_FLAG(max_block_event_timeout)) {
-                mTimeout = INT32_FLAG(max_block_event_timeout);
+            // will become traditional block event if processor queue is not ready
+            if (mEvent->IsReaderFlushTimeout()) {
+                mTimeout = curTime - mInvalidTime;
+            } else {
+                mTimeout = (curTime - mInvalidTime) * 2 + 1;
+                if (mTimeout > INT32_FLAG(max_block_event_timeout)) {
+                    mTimeout = INT32_FLAG(max_block_event_timeout);
+                }
             }
         }
         void SetInvalidAgain(int32_t curTime) {

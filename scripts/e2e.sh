@@ -17,6 +17,7 @@
 function run() {
   name=$1
   command=$2
+  test_home=$3
   echo "========================================="
   echo "$name testing case"
   echo "========================================="
@@ -27,6 +28,7 @@ function run() {
   
   eval "$command"
   if [ $? = 1 ]; then
+      cat $test_home/report/"$name"_report.json
       echo "========================================="
       echo "$name testing case failed"
       echo "========================================="
@@ -67,14 +69,14 @@ if [ "$TEST_SCOPE" = "all" ]; then
   ls "$TESTDIR"/case/"$TYPE" | while read case
   do
     command=$prefix" -c $TESTDIR/case/$TYPE/$case"
-    run "$case" "$command"
+    run "$case" "$command" "$TEST_HOME"
     if [ $? = 1 ]; then
       exit 1
     fi
   done
 else
   command=$prefix" -c $TESTDIR/case/$TYPE/$TEST_SCOPE"
-  run "$TEST_SCOPE" "$command"
+  run "$TEST_SCOPE" "$command" "$TEST_HOME"
 fi
 
 if [ $? = 0 ]; then

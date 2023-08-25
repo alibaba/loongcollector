@@ -88,7 +88,7 @@ private:
     bool FillupMustMultiLinesSplitProcessor(const WorkMode& workMode, Json::Value& splitProcessor);
     bool GenerateLocalJsonConfigForCommonPluginMode(const YAML::Node& yamlConfig, Json::Value& userJsonConfig);
     bool GenerateLocalJsonConfigForFileMode(const YAML::Node& yamlConfig, Json::Value& userJsonConfig);
-    bool GenerateLocalJsonConfigForSLSFulsher(const YAML::Node& yamlConfig,
+    bool GenerateLocalJsonConfigForSLSFlusher(const YAML::Node& yamlConfig,
                                               Json::Value& pluginJsonConfig,
                                               Json::Value& userJsonConfig);
     bool FillupDefaultUserJsonConfig(const WorkMode& workMode, Json::Value& userJsonConfig);

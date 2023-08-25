@@ -34,6 +34,8 @@
 #include "plugin/LogtailRuntimePlugin.h"
 #endif
 #include "plugin/LogtailPlugin.h"
+#include "plugin/PluginRegistry.h"
+#include "pipeline/PipelineManager.h"
 #include "config_manager/ConfigManager.h"
 #include "checkpoint/CheckPointManager.h"
 #include "processor/LogFilter.h"
@@ -204,6 +206,7 @@ void do_worker_process() {
         APSARA_LOG_INFO(sLogger, ("get none dmi uuid", "maybe this is a docker runtime"));
     }
 
+    PluginRegistry::GetInstance()->LoadPlugins();
 #ifdef LOGTAIL_RUNTIME_PLUGIN
     LogtailRuntimePlugin::GetInstance()->LoadPluginBase();
 #endif
@@ -211,6 +214,7 @@ void do_worker_process() {
     // load local config first
     ConfigManager::GetInstance()->GetLocalConfigUpdate();
     ConfigManager::GetInstance()->LoadConfig(AppConfig::GetInstance()->GetUserConfigPath());
+    PipelineManager::GetInstance()->LoadAllPipelines();
     ConfigManager::GetInstance()->LoadDockerConfig();
     // mNameConfigMap is empty, configExistFlag is false
     bool configExistFlag = !ConfigManager::GetInstance()->GetAllConfig().empty();

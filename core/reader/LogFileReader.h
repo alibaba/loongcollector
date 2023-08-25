@@ -28,10 +28,12 @@
 #include "common/EncodingConverter.h"
 #include "common/DevInode.h"
 #include "common/LogFileOperator.h"
+#include "logger/Logger.h"
 #include "log_pb/sls_logs.pb.h"
 #include "config/LogType.h"
 #include "common/FileInfo.h"
 #include "checkpoint/RangeCheckpoint.h"
+#include "reader/SourceBuffer.h"
 
 namespace logtail {
 
@@ -42,6 +44,38 @@ class DevInode;
 typedef std::shared_ptr<LogFileReader> LogFileReaderPtr;
 typedef std::deque<LogFileReaderPtr> LogFileReaderPtrArray;
 
+enum SplitState { SPLIT_UNMATCH, SPLIT_BEGIN, SPLIT_CONTINUE };
+
+// Only get the currently written log file, it will choose the last modified file to read. There are several condition
+// to choose the lastmodify file:
+// 1. if the last read file don't exist
+// 2. if the file's first 100 bytes(file signature) is not same with the last read file's signature, which meaning the
+// log file has be rolled
+//
+// when a new file is choosen, it will set the read position
+// 1. if the time in the file's first line >= the last read log time , then set the file read position to 0 (which mean
+// the file is new created)
+// 2. other wise , set the position to the end of the file
+// *bufferptr is null terminated.
+/*
+ * 1. for multiline log, "xxx" mean a string without '\n'
+ * 1-1. bufferSize = 512KB:
+ * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\n" -> "MultiLineLog_1\nMultiLineLog_2\0"
+ * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3_Line_1\n" -> "MultiLineLog_1\nMultiLineLog_2\0"
+ * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3_Line_1\nxxx" -> "MultiLineLog_1\nMultiLineLog_2\0"
+ * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\nxxx" -> "MultiLineLog_1\nMultiLineLog_2\0"
+ *
+ * 1-2. bufferSize < 512KB:
+ * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\n" -> "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\0"
+ * "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3_Line_1\n" -> "MultiLineLog_1\nMultiLineLog_2\MultiLineLog_3_Line_1\0"
+ * **this is not expected !** "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3_Line_1\nxxx" ->
+ * "MultiLineLog_1\nMultiLineLog_2\0" "MultiLineLog_1\nMultiLineLog_2\nMultiLineLog_3\nxxx" ->
+ * "MultiLineLog_1\nMultiLineLog_2\0"
+ *
+ * 2. for singleline log, "xxx" mean a string without '\n'
+ * "SingleLineLog_1\nSingleLineLog_2\nSingleLineLog_3\n" -> "SingleLineLog_1\nSingleLineLog_2\nSingleLineLog_3\0"
+ * "SingleLineLog_1\nSingleLineLog_2\nxxx" -> "SingleLineLog_1\nSingleLineLog_2\0"
+ */
 class LogFileReader {
 public:
     enum FileCompareResult {
@@ -79,21 +113,19 @@ public:
                   bool discardUnmatch,
                   bool dockerFileFlag);
 
-    virtual bool ReadLog(LogBuffer*& logBuffer);
+    bool ReadLog(LogBuffer& logBuffer, const Event* event);
     time_t GetLastUpdateTime() const // actually it's the time whenever ReadLogs is called
     {
         return mLastUpdateTime;
     }
     // this function should only be called once
-    void SetLogBeginRegex(const std::string& reg) {
-        if (mLogBeginRegPtr != NULL) {
-            delete mLogBeginRegPtr;
-            mLogBeginRegPtr = NULL;
-        }
-        if (reg.empty() == false && reg != ".*") {
-            mLogBeginRegPtr = new boost::regex(reg.c_str());
-        }
+    void SetLogMultilinePolicy(const std::string& begReg, const std::string& conReg, const std::string& endReg);
+
+    bool IsMultiLine() {
+        return mLogBeginRegPtr != NULL || mLogContinueRegPtr != NULL || mLogEndRegPtr != NULL;
     }
+
+    void SetReaderFlushTimeout(int timeout) { mReaderFlushTimeout = timeout; }
 
     std::string GetTopicName(const std::string& topicConfig, const std::string& path);
 
@@ -103,29 +135,33 @@ public:
 
     virtual int32_t LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount);
 
+    size_t AlignLastCharacter(char* buffer, size_t size);
+
     virtual ~LogFileReader();
 
-    std::string GetRegion() const { return mRegion; }
+    const std::string& GetRegion() const { return mRegion; }
 
     void SetRegion(const std::string& region) { mRegion = region; }
 
-    std::string GetConfigName() const { return mConfigName; }
+    const std::string& GetConfigName() const { return mConfigName; }
 
     void SetConfigName(const std::string& configName) { mConfigName = configName; }
 
-    std::string GetProjectName() const { return mProjectName; }
+    const std::string& GetProjectName() const { return mProjectName; }
 
-    std::string GetTopicName() const { return mTopicName; }
+    const std::string& GetTopicName() const { return mTopicName; }
 
-    std::string GetCategory() const { return mCategory; }
+    const std::string& GetCategory() const { return mCategory; }
 
-    std::string GetHostLogPath() const { return mHostLogPath; }
+    /// @return e.g. `/logtail_host/var/xxx/home/admin/access.log`,
+    const std::string& GetHostLogPath() const { return mHostLogPath; }
 
     bool GetSymbolicLinkFlag() const { return mSymbolicLinkFlag; }
 
-    std::string GetConvertedPath() const { return mDockerPath.empty() ? mHostLogPath : mDockerPath; }
+    /// @return e.g. `/home/admin/access.log`
+    const std::string& GetConvertedPath() const { return mDockerPath.empty() ? mHostLogPath : mDockerPath; }
 
-    std::string GetHostLogPathFile() const { return mHostLogPathFile; }
+    const std::string& GetHostLogPathFile() const { return mHostLogPathFile; }
 
     int64_t GetFileSize() const { return mLastFileSize; }
 
@@ -220,19 +256,25 @@ public:
 
     bool IsReadToEnd() const { return mLastReadPos == mLastFileSize; }
 
+    bool HasDataInCache() const { return mLastFilePos != mLastReadPos; }
+
     LogFileReaderPtrArray* GetReaderArray();
 
     void SetReaderArray(LogFileReaderPtrArray* readerArray);
 
     // some Reader will overide these functions (eg. JsonLogFileReader)
-    virtual bool ParseLogLine(const char* buffer,
+    virtual bool ParseLogLine(StringView buffer,
                               sls_logs::LogGroup& logGroup,
                               ParseLogError& error,
                               LogtailTime& lastLogLineTime,
                               std::string& lastLogTimeStr,
                               uint32_t& logGroupSize)
         = 0;
-    virtual std::vector<int32_t> LogSplit(char* buffer, int32_t size, int32_t& lineFeed);
+    virtual bool LogSplit(const char* buffer,
+                          int32_t size,
+                          int32_t& lineFeed,
+                          std::vector<StringView>& logIndex,
+                          std::vector<StringView>& discardIndex);
 
     // added by xianzhi(bowen.gbw@antfin.com)
     static bool ParseLogTime(const char* buffer,
@@ -307,11 +349,12 @@ public:
         mAdjustApsaraMicroTimezone = adjustApsaraMicroTimezone;
     }
 
+    std::unique_ptr<Event> CreateFlushTimeoutEvent();
+
 protected:
-    virtual bool
-    GetRawData(char*& bufferptr, size_t* size, int64_t fileSize, FileInfo*& fileInfo, TruncateInfo*& trncateInfo);
-    void ReadUTF8(char*& bufferptr, size_t* size, int64_t end, bool& moreData, TruncateInfo*& truncateInfo);
-    void ReadGBK(char*& bufferptr, size_t* size, int64_t end, bool& moreData, TruncateInfo*& truncateInfo);
+    bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool allowRollback = true);
+    void ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool allowRollback = true);
+    void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool allowRollback = true);
 
     size_t
     ReadFile(LogFileOperator& logFileOp, void* buf, size_t size, int64_t& offset, TruncateInfo** truncateInfo = NULL);
@@ -335,6 +378,7 @@ protected:
     std::string mCategory;
     std::string mConfigName;
     std::string mHostLogPath;
+    std::string mHostLogPathDir;
     std::string mHostLogPathFile;
     std::string mRealLogPath; // real log path
     bool mSymbolicLinkFlag = false;
@@ -342,13 +386,17 @@ protected:
     int32_t mTailLimit; // KB
     uint64_t mLastFileSignatureHash;
     uint32_t mLastFileSignatureSize;
-    int64_t mLastFilePos;
-    int64_t mLastReadPos = 0;
+    int64_t mLastFilePos; // pos read and consumed, used for next read begin
+    int64_t mLastReadPos = 0; // pos read but may not consumed, used for read needed
     int64_t mLastFileSize;
     std::string mProjectName;
     std::string mTopicName;
     time_t mLastUpdateTime;
     boost::regex* mLogBeginRegPtr;
+    boost::regex* mLogContinueRegPtr;
+    boost::regex* mLogEndRegPtr;
+    int mReaderFlushTimeout;
+    bool mLastForceRead;
     FileEncoding mFileEncoding;
     bool mDiscardUnmatch;
     LogType mLogType;
@@ -374,8 +422,9 @@ protected:
     std::string mFuseTrimedFilename;
     LogFileReaderPtrArray* mReaderArray;
     uint64_t mLogstoreKey;
-    // path in other docker container. eg, logtail path `/host_all/xxxxx/home/admin/access.log`, docker path is
-    // `/home/admin/access.log` we should use mDockerPath to extract topic and set it to __tag__:__path__
+    // mHostLogPath is `/logtail_host/var/xxx/home/admin/access.log`,
+    // mDockerPath is `/home/admin/access.log`
+    // we should use mDockerPath to extract topic and set it to __tag__:__path__
     std::string mDockerPath;
     std::vector<sls_logs::LogTag> mExtraTags;
     int32_t mCloseUnusedInterval;
@@ -503,20 +552,33 @@ private:
     void updatePrimaryCheckpointSignature();
     void updatePrimaryCheckpointRealPath();
 
+    void handleUnmatchLogs(const char* buffer,
+                                   int& multiBeginIndex,
+                                   int endIndex,
+                                   std::vector<StringView>& logIndex,
+                                   std::vector<StringView>& discardIndex);
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class EventDispatcherTest;
     friend class LogFileReaderUnittest;
+    friend class LogMultiBytesUnittest;
     friend class ExactlyOnceReaderUnittest;
     friend class SenderUnittest;
     friend class AppConfigUnittest;
     friend class ModifyHandlerUnittest;
+    friend class LogSplitUnittest;
+    friend class LogSplitDiscardUnmatchUnittest;
+    friend class LogSplitNoDiscardUnmatchUnittest;
+    friend class LastMatchedLineDiscardUnmatchUnittest;
+    friend class LastMatchedLineNoDiscardUnmatchUnittest;
+
+protected:
     void UpdateReaderManual();
 #endif
 };
 
-struct LogBuffer {
-    char* buffer;
-    int32_t bufferSize;
+struct LogBuffer : public SourceBuffer {
+    StringView rawBuffer;
     LogFileReaderPtr logFileReader;
     FileInfoPtr fileInfo;
     TruncateInfoPtr truncateInfo;
@@ -525,74 +587,8 @@ struct LogBuffer {
     // Current buffer's offset in file, for log position meta feature.
     uint64_t beginOffset;
 
-    LogBuffer(char* buf,
-              int32_t size,
-              const FileInfoPtr& fileInfo = FileInfoPtr(),
-              const TruncateInfoPtr& truncateInfo = TruncateInfoPtr())
-        : buffer(buf), bufferSize(size), fileInfo(fileInfo), truncateInfo(truncateInfo) {}
+    LogBuffer() {}
     void SetDependecy(const LogFileReaderPtr& reader) { logFileReader = reader; }
-};
-
-class CommonRegLogFileReader : public LogFileReader {
-public:
-    CommonRegLogFileReader(const std::string& projectName,
-                           const std::string& category,
-                           const std::string& hostLogPathDir,
-                           const std::string& hostLogPathFile,
-                           int32_t tailLimit,
-                           const std::string& timeFormat,
-                           const std::string& topicFormat,
-                           const std::string& groupTopic = "",
-                           FileEncoding fileEncoding = ENCODING_UTF8,
-                           bool discardUnmatch = true,
-                           bool dockerFileFlag = false);
-
-    void SetTimeKey(const std::string& timeKey);
-
-    bool AddUserDefinedFormat(const std::string& regStr, const std::string& keys);
-
-protected:
-    bool ParseLogLine(const char* buffer,
-                      sls_logs::LogGroup& logGroup,
-                      ParseLogError& error,
-                      LogtailTime& lastLogLineTime,
-                      std::string& lastLogTimeStr,
-                      uint32_t& logGroupSize);
-
-    std::string mTimeKey;
-    std::string mTimeFormat;
-    std::vector<UserDefinedFormat> mUserDefinedFormat;
-    std::vector<int32_t> mTimeIndex;
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class LogFileReaderUnittest;
-#endif
-};
-
-class ApsaraLogFileReader : public LogFileReader {
-public:
-    ApsaraLogFileReader(const std::string& projectName,
-                        const std::string& category,
-                        const std::string& hostLogPathDir,
-                        const std::string& hostLogPathFile,
-                        int32_t tailLimit,
-                        const std::string topicFormat,
-                        const std::string& groupTopic = "",
-                        FileEncoding fileEncoding = ENCODING_UTF8,
-                        bool discardUnmatch = true,
-                        bool dockerFileFlag = false);
-
-private:
-    bool ParseLogLine(const char* buffer,
-                      sls_logs::LogGroup& logGroup,
-                      ParseLogError& error,
-                      LogtailTime& lastLogLineTime,
-                      std::string& lastLogTimeStr,
-                      uint32_t& logGroupSize);
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class LogFileReaderUnittest;
-#endif
 };
 
 } // namespace logtail

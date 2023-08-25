@@ -21,6 +21,7 @@
 namespace logtail {
 
 bool IsValidJson(const char* buffer, int32_t size);
+std::string CompactJson(const std::string& inJson);
 void CheckNameExist(const Json::Value& value, const std::string& name);
 bool GetBoolValue(const Json::Value& value, const std::string& name);
 bool GetBoolValue(const Json::Value& value, const std::string& name, const bool defValue);

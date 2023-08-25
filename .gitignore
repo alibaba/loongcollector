@@ -37,6 +37,7 @@ Makefile
 !core/dependencies.cmake
 !core/utils.cmake
 !core/libulogfs.a
+core/unittest/ut.output/
 
 # output
 e2e-test

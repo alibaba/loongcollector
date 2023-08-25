@@ -92,25 +92,25 @@ void DelimiterLogFileReader::SetColumnKeys(const std::vector<std::string>& colum
     }
 }
 
-bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
+bool DelimiterLogFileReader::ParseLogLine(StringView buffer,
                                           sls_logs::LogGroup& logGroup,
                                           ParseLogError& error,
                                           LogtailTime& lastLogLineTime,
                                           std::string& lastLogTimeStr,
                                           uint32_t& logGroupSize) {
-    int32_t endIdx = strlen(buffer);
+    int32_t endIdx = buffer.size();
     if (endIdx == 0)
         return true;
 
     for (int32_t i = endIdx - 1; i >= 0; --i) {
-        if (buffer[i] == ' ' || '\r' == buffer[i])
+        if (buffer.data()[i] == ' ' || '\r' == buffer.data()[i])
             endIdx = i;
         else
             break;
     }
     int32_t begIdx = 0;
     for (int32_t i = 0; i < endIdx; ++i) {
-        if (buffer[i] == ' ')
+        if (buffer.data()[i] == ' ')
             begIdx = i + 1;
         else
             break;
@@ -134,7 +134,7 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
     if (mColumnKeys.size() > 0) {
         if (useQuote) {
             columnValues.reserve(reserveSize);
-            parseSuccess = mDelimiterModeFsmParserPtr->ParseDelimiterLine(buffer, begIdx, endIdx, columnValues);
+            parseSuccess = mDelimiterModeFsmParserPtr->ParseDelimiterLine(buffer.data(), begIdx, endIdx, columnValues);
             // handle auto extend
             if (!mAutoExtend && columnValues.size() > mColumnKeys.size()) {
                 std::string extraFields;
@@ -149,7 +149,7 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
         } else {
             colBegIdxs.reserve(reserveSize);
             colLens.reserve(reserveSize);
-            parseSuccess = SplitString(buffer, begIdx, endIdx, colBegIdxs, colLens);
+            parseSuccess = SplitString(buffer.data(), begIdx, endIdx, colBegIdxs, colLens);
             parsedColCount = colBegIdxs.size();
         }
 
@@ -160,22 +160,23 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
                              "columns count, parsed",
                              parsedColCount)("required", mColumnKeys.size())("log", buffer)("project", mProjectName)(
                                 "logstore", mCategory)("file", mHostLogPath));
-                LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
-                                                       string("keys count unmatch columns count :")
-                                                           + ToString(parsedColCount) + ", required:"
-                                                           + ToString(mColumnKeys.size()) + ", logs:" + string(buffer),
-                                                       mProjectName,
-                                                       mCategory,
-                                                       mRegion);
+                LogtailAlarm::GetInstance()->SendAlarm(
+                    PARSE_LOG_FAIL_ALARM,
+                    string("keys count unmatch columns count :") + ToString(parsedColCount)
+                        + ", required:" + ToString(mColumnKeys.size()) + ", logs:" + buffer.to_string(),
+                    mProjectName,
+                    mCategory,
+                    mRegion);
                 error = PARSE_LOG_FORMAT_ERROR;
                 parseSuccess = false;
             } else if (!mUseSystemTime && parsedColCount > mTimeIndex) {
-                if (!LogParser::ParseLogTime(buffer,
+                if (!LogParser::ParseLogTime(buffer.data(),
                                              lastLogTimeStr,
                                              lastLogLineTime,
                                              preciseTimestamp,
-                                             useQuote ? columnValues[mTimeIndex]
-                                                      : string(buffer + colBegIdxs[mTimeIndex], colLens[mTimeIndex]),
+                                             useQuote
+                                                 ? columnValues[mTimeIndex]
+                                                 : string(buffer.data() + colBegIdxs[mTimeIndex], colLens[mTimeIndex]),
                                              mTimeFormat.c_str(),
                                              mPreciseTimestampConfig,
                                              mSpecifiedYear,
@@ -192,7 +193,7 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
             }
         } else {
             LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
-                                                   string("parse delimiter log fail") + ", logs:" + string(buffer),
+                                                   string("parse delimiter log fail") + ", logs:" + buffer.to_string(),
                                                    mProjectName,
                                                    mCategory,
                                                    mRegion);
@@ -226,7 +227,7 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
 
                 LogParser::AddLog(logPtr,
                                   mColumnKeys[idx],
-                                  useQuote ? columnValues[idx] : string(buffer + colBegIdxs[idx], colLens[idx]),
+                                  useQuote ? columnValues[idx] : string(buffer.data() + colBegIdxs[idx], colLens[idx]),
                                   logGroupSize);
             } else {
                 if (mExtractPartialFields) {
@@ -235,7 +236,7 @@ bool DelimiterLogFileReader::ParseLogLine(const char* buffer,
 
                 LogParser::AddLog(logPtr,
                                   string("__column") + ToString(idx) + "__",
-                                  useQuote ? columnValues[idx] : string(buffer + colBegIdxs[idx], colLens[idx]),
+                                  useQuote ? columnValues[idx] : string(buffer.data() + colBegIdxs[idx], colLens[idx]),
                                   logGroupSize);
             }
         }

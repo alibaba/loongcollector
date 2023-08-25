@@ -21,6 +21,7 @@
 #include <numeric>
 #include <json/json.h>
 #include "config/Config.h"
+#include "reader/SourceBuffer.h"
 #if defined(_MSC_VER)
 #include <stddef.h>
 #endif
@@ -119,6 +120,7 @@ typedef void (*ResumeFun)();
 typedef GoInt (*InitPluginBaseFun)();
 typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
 typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
+typedef GoInt (*ProcessLogGroupFun)(GoString c, GoSlice l, GoString p);
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
 
 // Methods export by adapter.
@@ -190,14 +192,12 @@ public:
     bool IsPluginOpened() { return mPluginValid; }
 
     void ProcessRawLog(const std::string& configName,
-                       char* rawLog,
-                       int32_t rawLogSize,
+                       logtail::StringView rawLog,
                        const std::string& packId,
                        const std::string& topic);
 
     void ProcessRawLogV2(const std::string& configName,
-                         char* rawLog,
-                         int32_t rawLogSize,
+                         logtail::StringView rawLog,
                          const std::string& packId,
                          const std::string& topic,
                          const std::string& tags);
@@ -207,6 +207,8 @@ public:
                     const std::string& packId,
                     const std::string& topic,
                     const std::string& tags);
+
+    void ProcessLogGroup(const std::string& configName, sls_logs::LogGroup& logGroup, const std::string& packId);
 
     static int IsValidToSend(long long logstoreKey);
 
@@ -248,6 +250,7 @@ private:
     logtail::Config mPluginProfileConfig;
     logtail::Config mPluginContainerConfig;
     ProcessLogsFun mProcessLogsFun;
+    ProcessLogGroupFun mProcessLogGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
 
     // Configuration for plugin system in JSON format.

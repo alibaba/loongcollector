@@ -59,6 +59,34 @@ bool IsValidJson(const char* buffer, int32_t size) {
     return braceCount == 0;
 }
 
+std::string CompactJson(const std::string& inJson) {
+    std::stringstream outJson;
+    bool inQuote = false;
+    for (auto ch = inJson.begin(); ch != inJson.end(); ++ch) {
+        switch (*ch) {
+            case '\n':
+            case '\t':
+            case ' ':
+                if (!inQuote) {
+                    continue;
+                }
+                break;
+            case '"':
+                inQuote = !inQuote;
+                break;
+            case '\\':
+                if (++ch == inJson.end()) { // skip next char after escape char
+                    --ch;
+                }
+                break;
+            default:
+                break;
+        }
+        outJson << *ch;
+    }
+    return outJson.str();
+}
+
 void CheckNameExist(const Json::Value& value, const std::string& name) {
     if (value.isMember(name) == false) {
         throw ExceptionBase(std::string("The key '") + name + "' not exist");

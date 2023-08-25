@@ -40,6 +40,7 @@ inline bool EndWith(const std::string& input, const std::string& pattern) {
 
 std::string ToLowerCaseString(const std::string& orig);
 
+int StringCaseInsensitiveCmp(const std::string& s1, const std::string& s2);
 int CStringNCaseInsensitiveCmp(const char* s1, const char* s2, size_t n);
 
 inline std::string LeftTrimString(const std::string& str, const char trimChar = ' ') {
@@ -120,10 +121,12 @@ bool BoostRegexSearch(const char* buffer,
                       boost::match_results<const char*>& what,
                       boost::match_flag_type flags = boost::match_default);
 bool BoostRegexMatch(const char* buffer,
+                     size_t length,
                      const boost::regex& reg,
                      std::string& exception,
                      boost::match_results<const char*>& what,
                      boost::match_flag_type flags = boost::match_default);
+bool BoostRegexMatch(const char* buffer, size_t size, const boost::regex& reg, std::string& exception);
 bool BoostRegexMatch(const char* buffer, const boost::regex& reg, std::string& exception);
 
 // GetLittelEndianValue32 converts @buffer in little endian to uint32_t.

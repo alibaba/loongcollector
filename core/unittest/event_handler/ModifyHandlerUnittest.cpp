@@ -23,6 +23,8 @@
 #include "common/FileSystemUtil.h"
 #include "event/Event.h"
 #include "event_handler/EventHandler.h"
+#include "reader/CommonRegLogFileReader.h"
+
 using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);
@@ -75,7 +77,7 @@ protected:
 public:
     void TestHandleContainerStoppedEventWhenReadToEnd() {
         LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
-        LogBuffer* logbuf = nullptr;
+        LogBuffer logbuf;
         APSARA_TEST_TRUE_FATAL(!mReaderPtr->ReadLog(logbuf)); // false means no more data
         APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
 

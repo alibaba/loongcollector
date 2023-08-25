@@ -45,35 +45,36 @@ EncodingConverter::~EncodingConverter() {
 }
 
 // TODO: Refactor it, do not use the output params to do calculations, set them before return.
-bool EncodingConverter::ConvertGbk2Utf8(
-    char* src, size_t* srcLength, char*& desOut, size_t* desLength, const std::vector<size_t>& linePosVec) {
-    desOut = NULL;
-    *desLength = 0;
-
+size_t EncodingConverter::ConvertGbk2Utf8(
+    const char* src, size_t* srcLength, char* desOut, size_t desLength, const std::vector<size_t>& linePosVec) const {
 #if defined(__linux__)
     if (src == NULL || *srcLength == 0 || mGbk2Utf8Cd == (iconv_t)(-1)) {
         LOG_ERROR(sLogger, ("invalid iconv descriptor fail or invalid buffer pointer, cd", mGbk2Utf8Cd));
-        return false;
+        return 0;
     }
-    *desLength = *srcLength * 2;
-    char* des = new char[*srcLength * 2 + 1];
+    size_t maxRequire = *srcLength * 2;
+    if (desOut == nullptr) {
+        return maxRequire;
+    }
+    if (desLength < maxRequire + 1) {
+        return 0;
+    }
+    char* des = desOut;
     des[*srcLength * 2] = '\0';
-    desOut = des;
-    bool rst = true;
-    char* originSrc = src;
+    const char* originSrc = src;
     char* originDes = des;
     size_t beginIndex = 0;
     size_t endIndex = *srcLength;
     size_t destIndex = 0;
-    size_t maxDestSize = *desLength;
+    size_t maxDestSize = desLength;
     for (size_t i = 0; i < linePosVec.size(); ++i) {
         endIndex = linePosVec[i];
         src = originSrc + beginIndex;
         des = originDes + destIndex;
         // include '\n'
         *srcLength = endIndex - beginIndex + 1;
-        *desLength = maxDestSize - destIndex;
-        size_t ret = iconv(mGbk2Utf8Cd, &src, srcLength, &des, desLength);
+        desLength = maxDestSize - destIndex;
+        size_t ret = iconv(mGbk2Utf8Cd, const_cast<char**>(&src), srcLength, &des, &desLength);
         if (ret == (size_t)(-1)) {
             LOG_ERROR(sLogger, ("convert GBK to UTF8 fail, errno", strerror(errno)));
             iconv(mGbk2Utf8Cd, NULL, NULL, NULL, NULL); // Clear status.
@@ -86,16 +87,15 @@ bool EncodingConverter::ConvertGbk2Utf8(
         }
         beginIndex = endIndex + 1;
     }
-    *desLength = destIndex;
+    return destIndex;
 
-    return rst;
 #elif defined(_MSC_VER)
     int wcLen = MultiByteToWideChar(CP_ACP, 0, src, *srcLength, NULL, 0);
     if (wcLen == 0) {
         LOG_ERROR(sLogger,
                   ("convert GBK to UTF8 fail, MultiByteToWideChar error", GetLastError())("sample",
                                                                                           std::string(src, 0, 1024)));
-        return false;
+        return 0;
     }
     wchar_t* wszUtf8 = new wchar_t[wcLen + 1];
     if (MultiByteToWideChar(CP_ACP, 0, src, *srcLength, (LPWSTR)wszUtf8, wcLen) == 0) {
@@ -103,43 +103,39 @@ bool EncodingConverter::ConvertGbk2Utf8(
                   ("convert GBK to UTF8 fail, MultiByteToWideChar error", GetLastError())("sample",
                                                                                           std::string(src, 0, 1024)));
         delete[] wszUtf8;
-        return false;
+        return 0;
     }
     wszUtf8[wcLen] = '\0';
-    int len = WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)wszUtf8, wcLen, NULL, 0, NULL, NULL);
-    if (len == 0) {
-        LOG_ERROR(sLogger,
-                  ("convert GBK to UTF8 fail, WideCharToMultiByte error", GetLastError())("sample",
-                                                                                          std::string(src, 0, 1024)));
-        delete[] wszUtf8;
-        return false;
+    if (desOut == nullptr) {
+        int len = WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)wszUtf8, wcLen, NULL, 0, NULL, NULL);
+        if (len == 0) {
+            LOG_ERROR(sLogger,
+                      ("convert GBK to UTF8 fail, WideCharToMultiByte error",
+                       GetLastError())("sample", std::string(src, 0, 1024)));
+            delete[] wszUtf8;
+            return 0;
+        }
+        return len;
     }
-    char* des = new char[len + 1];
+    char* des = desOut;
+    len = desLength - 1;
     des[len] = '\0';
-    if (WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)wszUtf8, wcLen, des, len, NULL, NULL) == 0) {
-        LOG_ERROR(sLogger,
-                  ("convert GBK to UTF8 fail, WideCharToMultiByte error", GetLastError())("sample",
-                                                                                          std::string(src, 0, 1024)));
-        delete[] wszUtf8;
-        delete[] des;
-        return false;
-    }
-    desOut = des;
-    *desLength = len;
+    int outLen = WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)wszUtf8, wcLen, des, len, NULL, NULL);
+    if (outLen) == 0) {
+            LOG_ERROR(sLogger,
+                      ("convert GBK to UTF8 fail, WideCharToMultiByte error",
+                       GetLastError())("sample", std::string(src, 0, 1024)));
+            delete[] wszUtf8;
+            delete[] des;
+            return 0;
+        }
     delete[] wszUtf8;
-    return true;
+    return outLen;
 #endif
 }
 
-std::string EncodingConverter::FromUTF8ToACP(const std::string& s) {
-    if (s.empty())
-        return s;
-
-#if defined(__linux__)
-    return s;
-#endif
-
 #if defined(_MSC_VER)
+std::string EncodingConverter::FromUTF8ToACP(const std::string& s) const {
     auto input = s.c_str();
     auto requiredLen = MultiByteToWideChar(CP_UTF8, 0, input, -1, NULL, 0);
     if (requiredLen <= 0) {
@@ -175,26 +171,31 @@ std::string EncodingConverter::FromUTF8ToACP(const std::string& s) {
     std::string ret(acpStr, requiredLen - 1);
     delete[] acpStr;
     return ret;
-#endif
 }
 
-std::string EncodingConverter::FromACPToUTF8(const std::string& s) {
+std::string EncodingConverter::FromACPToUTF8(const std::string& s) const {
     if (s.empty())
         return s;
 
     auto input = const_cast<char*>(s.c_str());
     auto inputLen = s.length();
-    char* output = NULL;
-    size_t outputLen = 0;
     std::vector<size_t> ignore;
 
-    if (!ConvertGbk2Utf8(input, &inputLen, output, &outputLen, ignore)) {
+    size_t outputLen = ConvertGbk2Utf8(input, &inputLen, nullptr, 0, ignore);
+    if (outputLen == 0) {
         LOG_WARNING(sLogger, ("Convert ACP to UTF8 failed", s.substr(0, 1024)));
         return s;
     }
-    std::string ret(output, outputLen);
-    delete[] output;
+    std::string ret;
+    ret.resize(outputLen + 1);
+    if (!ConvertGbk2Utf8(input, &inputLen, const_cast<char*>(ret.data()), outputLen + 1, ignore)) {
+        LOG_WARNING(sLogger, ("Convert ACP to UTF8 failed", s.substr(0, 1024)));
+        return s;
+    }
+    ret.resize(outputLen);
+    ret.c_str();
     return ret;
 }
+#endif
 
 } // namespace logtail

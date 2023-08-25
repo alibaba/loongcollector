@@ -21,6 +21,7 @@ import (
 )
 
 var FileOffsetKey = "__tag__:__file_offset__"
+var ReservedFileOffsetKey = "__file_offset__"
 
 func ReviseFileOffset(log *protocol.Log, offset int64, enableMeta bool) {
 	if enableMeta {
@@ -36,7 +37,7 @@ func ReviseFileOffset(log *protocol.Log, offset int64, enableMeta bool) {
 func GetFileOffsetTag(log *protocol.Log) *protocol.Log_Content {
 	for i := len(log.Contents) - 1; i >= 0; i-- {
 		cont := log.Contents[i]
-		if cont.Key == FileOffsetKey {
+		if cont.Key == FileOffsetKey || cont.Key == ReservedFileOffsetKey {
 			return cont
 		}
 	}

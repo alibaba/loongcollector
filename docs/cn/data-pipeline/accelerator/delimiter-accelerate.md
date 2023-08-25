@@ -2,7 +2,7 @@
 
 ## 简介
 
-`processor_json_accelerate processor`插件以加速模式实现分隔符日志的字段提取。该方式支持使用引用符对分隔符进行包裹。
+`processor_delimiter_accelerate processor`插件以加速模式实现分隔符日志的字段提取。该方式支持使用引用符对分隔符进行包裹。
 
 备注：该插件目前仅支持与输入插件file_log和输出插件flusher_sls配套使用，且不得与其它加速插件混用。
 
@@ -15,7 +15,7 @@
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
 | Type | String | 是 | 插件类型，指定为`processor_delimiter_accelerate`。 |
-| Seperator | Char | 是 | 分隔符。若分隔符为不可见字符，则值为"0x不可见字符在ASCII码中对应的十六进制数"。例如,若分隔符为ASCII码中排行为1的不可见字符，则值为0x01。 |
+| Separator | Char | 是 | 分隔符。若分隔符为不可见字符，则值为"0x不可见字符在ASCII码中对应的十六进制数"。例如,若分隔符为ASCII码中排行为1的不可见字符，则值为0x01。 |
 | Quote | Char | 是 | 包裹分隔符的引用符。若引用符为不可见字符，则值为"0x不可见字符在ASCII码中对应的十六进制数"。例如,若引用符为ASCII码中排行为1的不可见字符，则值为0x01。 |
 | ColumnKeys | Array | 是 | 解析后的字段名列表。 |
 | AcceptNoEnoughKeys | Boolean | 否 | 如果日志中分割出的字段数少于ColumnKeys的元素个数，是否上传已解析的字段。如果未添加该参数，则默认使用false，表示不上传已解析的字段。 |

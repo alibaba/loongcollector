@@ -928,6 +928,16 @@ void AppConfigBase::LoadOtherConf(const Json::Value& confJson) {
         }
     }
 
+    // dynamic plugins
+    if (confJson.isMember("dynamic_plugins")) {
+        auto& dynamic_plugins = confJson["dynamic_plugins"];
+        if (dynamic_plugins.isArray()) {
+            for (Json::Value::ArrayIndex i = 0; i < dynamic_plugins.size(); ++i) {
+                mDynamicPlugins.insert(TrimString(dynamic_plugins[i].asString()));
+            }
+        }
+    }
+
     LoadBooleanParameter(mEnableCheckpointSyncWrite,
                          confJson,
                          "enable_checkpoint_sync_write",
@@ -991,9 +1001,9 @@ void AppConfigBase::SetConfigFlag(const std::string& flagName, const std::string
         string beforeValue = info.current_value;
         string setrst = GFLAGS_NAMESPACE::SetCommandLineOption(flagName.c_str(), value.c_str());
         GetCommandLineFlagInfo(flagName.c_str(), &info);
-        APSARA_LOG_DEBUG(sLogger,
-                         ("Set config flag", flagName)("before value", beforeValue)("after value", info.current_value)(
-                             "result", setrst.size() == 0 ? ("error with value " + value) : setrst));
+        APSARA_LOG_INFO(sLogger,
+                        ("Set config flag", flagName)("before value", beforeValue)("after value", info.current_value)(
+                            "result", setrst.size() == 0 ? ("error with value " + value) : setrst));
     } else {
         APSARA_LOG_DEBUG(sLogger, ("Flag not define", flagName));
     }

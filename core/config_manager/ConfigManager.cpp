@@ -218,7 +218,8 @@ std::string ConfigManager::CheckPluginFlusher(Json::Value& configJSON) {
 }
 
 Json::Value& ConfigManager::CheckPluginProcessor(Json::Value& pluginConfigJson, const Json::Value& rootConfigJson) {
-    if (pluginConfigJson.isMember("processors")
+    string logTypeStr = GetStringValue(rootConfigJson, "log_type", "plugin");
+    if (pluginConfigJson.isMember("processors") // delete this branch if legacy log process can be removed
         && (pluginConfigJson["processors"].isObject() || pluginConfigJson["processors"].isArray())) {
         // patch enable_log_position_meta to split processor if exists ...
         if (rootConfigJson["advanced"] && rootConfigJson["advanced"]["enable_log_position_meta"]) {
@@ -232,10 +233,37 @@ Json::Value& ConfigManager::CheckPluginProcessor(Json::Value& pluginConfigJson, 
                     }
                     break;
                 }
-                pluginConfigJson["processors"][int(i)] = processorConfigJson;
             }
         }
     }
+    /*
+    if (rootConfigJson["plugin"]
+        && !(rootConfigJson["advanced"] && rootConfigJson["force_enable_pipeline"])) {
+        return pluginConfigJson;
+    }
+    // when pipline is used, no need to split/parse/time using plugin
+    if (pluginConfigJson.isMember("processors") && !pluginConfigJson.isMember("processors")
+        && pluginConfigJson["processors"].size() > 0 && (pluginConfigJson["processors"][0]["type"] ==
+    "processor_split_log_string"
+            || pluginConfigJson["processors"][0]["type"] == "processor_split_log_regex")) {
+        Json::Value& processorConfigJson = pluginConfigJson["processors"][0];
+        Json::Value removed;
+        pluginConfigJson["processors"].removeIndex(0, &removed);
+        if (pluginConfigJson.isMember("processors") && !pluginConfigJson.isMember("processors")
+            && pluginConfigJson["processors"].size() > 0 && (pluginConfigJson["processors"][0]["type"] ==
+    "processor_regex"
+                || pluginConfigJson["processors"][0]["type"] == "processor_json")) {
+            Json::Value& processorConfigJson = pluginConfigJson["processors"][0];
+            Json::Value removed;
+            pluginConfigJson["processors"].removeIndex(0, &removed);
+            if (pluginConfigJson.isMember("processors") && !pluginConfigJson.isMember("processors")
+                && pluginConfigJson["processors"].size() > 0 && pluginConfigJson["processors"][0]["type"] ==
+    "processor_strptime") { Json::Value& processorConfigJson = pluginConfigJson["processors"][0]; Json::Value removed;
+                pluginConfigJson["processors"].removeIndex(0, &removed);
+            }
+        }
+    }
+    */
     return pluginConfigJson;
 }
 
@@ -363,7 +391,7 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> ConfigMana
         LOG_DEBUG(sLogger,
                   ("GetConfigUpdateInfos", "success")("reqBody", reqBody)("requestId", fetchConfigResp.request_id())(
                       "statusCode", fetchConfigResp.code()));
-        
+
         return fetchConfigResp.config_details();
     } catch (const sdk::LOGException& e) {
         LOG_WARNING(sLogger,
@@ -391,7 +419,7 @@ void ConfigManager::UpdateRemoteConfig(
     ofstream newConfig;
     configserver::proto::ConfigDetail configDetail;
 
-    for (int i = 0; i < checkResults.size(); i++) {    
+    for (int i = 0; i < checkResults.size(); i++) {
         configName = checkResults[i].name();
 
         if (configserver::proto::NEW != checkResults[i].check_status()) {

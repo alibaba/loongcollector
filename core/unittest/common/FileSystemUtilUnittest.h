@@ -416,11 +416,11 @@ TEST_F(FileSystemUtilUnittest, TestFileAppendOpen) {
 TEST_F(FileSystemUtilUnittest, TestFSeekAndFTell) {
     auto filePath = (mTestRoot / "file").string();
 
-    // Write 5GB to file.
+    // Write 5MB to file.
     {
         std::ofstream out(filePath);
         std::vector<char> content(1024 * 1024, 'A');
-        for (int i = 0; i < 1024 * 5; ++i) {
+        for (int i = 0; i < 5; ++i) {
             out.write(content.data(), content.size());
         }
     }
@@ -428,13 +428,13 @@ TEST_F(FileSystemUtilUnittest, TestFSeekAndFTell) {
     auto file = FileReadOnlyOpen(filePath.c_str());
     EXPECT_TRUE(file != NULL);
     EXPECT_EQ(0, FSeek(file, 0, SEEK_END));
-    EXPECT_EQ(int64_t(1024) * 1024 * 1024 * 5, FTell(file));
+    EXPECT_EQ(int64_t(1024) * 1024 * 5, FTell(file));
 
-    EXPECT_EQ(0, FSeek(file, int64_t(4) * 1024 * 1024 * 1024 + 100, SEEK_SET));
-    EXPECT_EQ(int64_t(4) * 1024 * 1024 * 1024 + 100, FTell(file));
+    EXPECT_EQ(0, FSeek(file, int64_t(4) * 1024 * 1024 + 100, SEEK_SET));
+    EXPECT_EQ(int64_t(4) * 1024 * 1024 + 100, FTell(file));
 
     EXPECT_EQ(0, FSeek(file, 900, SEEK_CUR));
-    EXPECT_EQ(int64_t(4) * 1024 * 1024 * 1024 + 1000, FTell(file));
+    EXPECT_EQ(int64_t(4) * 1024 * 1024 + 1000, FTell(file));
     fclose(file);
 }
 

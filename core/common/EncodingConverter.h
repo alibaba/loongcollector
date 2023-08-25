@@ -20,6 +20,7 @@
 #include <vector>
 #include <string>
 #include <cstddef>
+#include "reader/SourceBuffer.h"
 
 namespace logtail {
 enum FileEncoding { ENCODING_UTF8, ENCODING_GBK };
@@ -37,26 +38,30 @@ public:
     }
 
     // ConvertGbk2Utf8 converts src (in GBK) to des (in UTF-8).
-    // @des: output param to store the result. If the return value is true, the memory
-    //   of @des should be released by caller (with delete[]).
-    // @return: return true/false to indicate if the converting succeeds or not.
-    //   Output params follow: @des == NULL <=> *@desLength == 0.
+    // @des: output param to store the result.
+    // @return: If input param des is NULL, then it returns the max byte size (\0 not included) required to do the
+    // conversion.
+    //          If input param des is not null, then it returns the number of bytes converted in the destination buffer.
+    //          Returning 0 means error occurred.
+    //          This API design mimics snprintf.
     //
     // Different platforms have different implementations:
     // - For Linux, ConvertGbk2Utf8 converts line by line according to @linePosVec.
     //   If there is error happened during converting, corresponding line will be copied
     //   to @des without converting.
     // - For Windows, ConvertGbk2Utf8 converts whole @src, if any errors happened,
-    //   @des will be set to NULL (ignore @linePosVec).
-    bool
-    ConvertGbk2Utf8(char* src, size_t* srcLength, char*& des, size_t* desLength, const std::vector<size_t>& linePosVec);
+    //   0 will be returned (ignore @linePosVec).
+    size_t ConvertGbk2Utf8(
+        const char* src, size_t* srcLength, char* des, size_t desLength, const std::vector<size_t>& linePosVec) const;
 
+#if defined(_MSC_VER)
     // FromUTF8ToACP converts @s encoded in UTF8 to ACP.
     // @return ACP string if convert successfully, otherwise @s will be returned.
-    std::string FromUTF8ToACP(const std::string& s);
+    std::string FromUTF8ToACP(const std::string& s) const;
 
     // FromACPToUTF8 converts @s encoded in ACP (locale) to UTF8.
-    std::string FromACPToUTF8(const std::string& s);
+    std::string FromACPToUTF8(const std::string& s) const;
+#endif
 };
 
 } // namespace logtail

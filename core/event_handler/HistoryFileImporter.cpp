@@ -99,12 +99,13 @@ void HistoryFileImporter::ProcessEvent(const HistoryFileEvent& event, const std:
             while (!logProcess->IsValidToReadLog(readerSharePtr->GetLogstoreKey())) {
                 usleep(1000 * 10);
             }
-            LogBuffer* logBuffer = NULL;
-            readerSharePtr->ReadLog(logBuffer);
-            if (logBuffer != NULL) {
+            LogBuffer* logBuffer = new LogBuffer;
+            readerSharePtr->ReadLog(*logBuffer, nullptr);
+            if (!logBuffer->rawBuffer.empty()) {
                 logBuffer->logFileReader = readerSharePtr;
                 logProcess->PushBuffer(logBuffer, 100000000);
             } else {
+                delete logBuffer;
                 // when ReadLog return false, retry once
                 if (doneFlag) {
                     break;

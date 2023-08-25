@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "LogtailPlugin.h"
-//#include "LogtailPluginAdapter.h"
+// #include "LogtailPluginAdapter.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
@@ -126,13 +126,12 @@ void LogtailPlugin::Resume() {
 }
 
 void LogtailPlugin::ProcessRawLog(const std::string& configName,
-                                  char* rawLog,
-                                  int32_t rawLogSize,
+                                  StringView rawLog,
                                   const std::string& packId,
                                   const std::string& topic) {
-    if (rawLogSize <= 0)
+    if (rawLog.empty()) {
         return;
-
+    }
     if (mPluginValid && mProcessRawLogFun != NULL) {
         GoString goConfigName;
         GoSlice goRawLog;
@@ -141,9 +140,9 @@ void LogtailPlugin::ProcessRawLog(const std::string& configName,
 
         goConfigName.n = configName.size();
         goConfigName.p = configName.c_str();
-        goRawLog.len = rawLogSize - 1;
-        goRawLog.cap = rawLogSize - 1;
-        goRawLog.data = (void*)rawLog;
+        goRawLog.len = rawLog.size();
+        goRawLog.cap = rawLog.size();
+        goRawLog.data = (void*)rawLog.data();
         goPackId.n = packId.size();
         goPackId.p = packId.c_str();
         goTopic.n = topic.size();
@@ -160,12 +159,11 @@ const std::string tagSeparator = "~=~";
 const std::string tagPrefix = "__tag__:";
 
 void LogtailPlugin::ProcessRawLogV2(const std::string& configName,
-                                    char* rawLog,
-                                    int32_t rawLogSize,
+                                    StringView rawLog,
                                     const std::string& packId,
                                     const std::string& topic,
                                     const std::string& tags) {
-    if (rawLogSize <= 0 || !(mPluginValid && mProcessRawLogV2Fun != NULL)) {
+    if (rawLog.empty() || !(mPluginValid && mProcessRawLogV2Fun != NULL)) {
         return;
     }
 
@@ -177,9 +175,9 @@ void LogtailPlugin::ProcessRawLogV2(const std::string& configName,
 
     goConfigName.n = configName.size();
     goConfigName.p = configName.c_str();
-    goRawLog.data = (void*)rawLog;
-    goRawLog.len = rawLogSize - 1;
-    goRawLog.cap = rawLogSize - 1;
+    goRawLog.data = (void*)rawLog.data();
+    goRawLog.len = rawLog.size();
+    goRawLog.cap = rawLog.size();
     goPackId.n = packId.size();
     goPackId.p = packId.c_str();
     goTopic.n = topic.size();
@@ -261,7 +259,8 @@ int LogtailPlugin::SendPbV2(const char* configName,
         return Sender::Instance()->SendPb(pConfig, pbBuffer, pbSize, lines, logstore, shardHashStr) ? 0 : -1;
     } else {
         LOG_INFO(sLogger,
-                 ("error", "SendPbV2 can not find config, maybe config updated")("config", configNameStr)("logstore", logstore));
+                 ("error", "SendPbV2 can not find config, maybe config updated")("config", configNameStr)("logstore",
+                                                                                                          logstore));
     }
     return -2;
 }
@@ -431,7 +430,11 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load ProcessLogs error, Message", error));
             return false;
         }
-
+        mProcessLogGroupFun = (ProcessLogGroupFun)loader.LoadMethod("ProcessLogGroup", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load ProcessLogGroup error, Message", error));
+            return false;
+        }
 
         mPluginBasePtr = loader.Release();
     }
@@ -485,6 +488,28 @@ void LogtailPlugin::ProcessLog(const std::string& configName,
     GoInt rst = mProcessLogsFun(goConfigName, goLog, goPackId, goTopic, goTags);
     if (rst != (GoInt)0) {
         LOG_WARNING(sLogger, ("process log error", configName)("result", rst));
+    }
+}
+
+void LogtailPlugin::ProcessLogGroup(const std::string& configName,
+                                    sls_logs::LogGroup& logGroup,
+                                    const std::string& packId) {
+    if (!logGroup.logs_size() || !(mPluginValid && mProcessLogsFun != NULL)) {
+        return;
+    }
+    GoString goConfigName;
+    GoSlice goLog;
+    GoString goPackId;
+    goConfigName.n = configName.size();
+    goConfigName.p = configName.c_str();
+    goPackId.n = packId.size();
+    goPackId.p = packId.c_str();
+    std::string sLog = logGroup.SerializeAsString();
+    goLog.len = goLog.cap = sLog.length();
+    goLog.data = (void*)sLog.c_str();
+    GoInt rst = mProcessLogGroupFun(goConfigName, goLog, goPackId);
+    if (rst != (GoInt)0) {
+        LOG_WARNING(sLogger, ("process loggroup error", configName)("result", rst));
     }
 }
 

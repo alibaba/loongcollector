@@ -19,6 +19,8 @@
 #include "logger/Logger.h"
 #if defined(_MSC_VER)
 #include <Shlwapi.h>
+#else
+#include <strings.h>
 #endif
 using namespace std;
 
@@ -28,6 +30,14 @@ std::string ToLowerCaseString(const std::string& orig) {
     auto copy = orig;
     std::transform(copy.begin(), copy.end(), copy.begin(), ::tolower);
     return copy;
+}
+
+int StringCaseInsensitiveCmp(const std::string& s1, const std::string& s2) {
+#if defined(_MSC_VER)
+    return _stricmp(s1.c_str(), s2.c_str());
+#else
+    return strcasecmp(s1.c_str(), s2.c_str());
+#endif
 }
 
 int CStringNCaseInsensitiveCmp(const char* s1, const char* s2, size_t n) {
@@ -121,12 +131,13 @@ bool BoostRegexSearch(const char* buffer,
 }
 
 bool BoostRegexMatch(const char* buffer,
+                     size_t length,
                      const boost::regex& reg,
                      string& exception,
                      boost::match_results<const char*>& what,
                      boost::match_flag_type flags) {
     try {
-        if (boost::regex_match(buffer, what, reg, flags))
+        if (boost::regex_match(buffer, buffer + length, what, reg, flags))
             return true;
         else
             return false;
@@ -144,6 +155,31 @@ bool BoostRegexMatch(const char* buffer,
         return false;
     } catch (...) {
         exception.append("unknown exception; buffer: ");
+        exception.append(buffer);
+        return false;
+    }
+}
+
+bool BoostRegexMatch(const char* buffer, size_t size, const boost::regex& reg, string& exception) {
+    try {
+        if (boost::regex_match(buffer, buffer + size, reg))
+            return true;
+        else
+            return false;
+    } catch (boost::regex_error& e) {
+        exception.append("regex_error code is ");
+        exception.append(ToString(e.code()));
+        exception.append("; buffer is ");
+        exception.append(buffer);
+        return false;
+    } catch (std::exception& e) {
+        exception.append("exception message is ");
+        exception.append(e.what());
+        exception.append("; buffer is ");
+        exception.append(buffer);
+        return false;
+    } catch (...) {
+        exception.append("unknown exception; buffer is ");
         exception.append(buffer);
         return false;
     }

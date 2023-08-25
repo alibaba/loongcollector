@@ -1,3 +1,4 @@
 # ignore build artifacts
 build/
+core/build/
 output/

@@ -284,6 +284,31 @@ func (lc *LogstoreConfig) ProcessLog(logByte []byte, packID string, topic string
 	return 0
 }
 
+func (lc *LogstoreConfig) ProcessLogGroup(logByte []byte, packID string) int {
+	logGroup := &protocol.LogGroup{}
+	err := logGroup.Unmarshal(logByte)
+	if err != nil {
+		logger.Error(lc.Context.GetRuntimeContext(), "WRONG_PROTOBUF_ALARM",
+			"cannot process log group passed by core, err", err)
+		return -1
+	}
+	topic := logGroup.GetTopic()
+	// TODO: use v2 pipeline
+	for _, log := range logGroup.Logs {
+		if len(topic) > 0 {
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
+		}
+		for _, tag := range logGroup.LogTags {
+			log.Contents = append(log.Contents, &protocol.Log_Content{
+				Key:   tagPrefix + tag.GetKey(),
+				Value: tag.GetValue(),
+			})
+		}
+		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
+	}
+	return 0
+}
+
 func hasDockerStdoutInput(plugins map[string]interface{}) bool {
 	inputs, exists := plugins["inputs"]
 	if !exists {

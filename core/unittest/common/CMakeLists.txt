@@ -39,3 +39,6 @@ target_link_libraries(common_sliding_window_counter_unittest unittest_base)
 
 add_executable(common_machine_info_util_unittest MachineInfoUtilUnittest.cpp)
 target_link_libraries(common_machine_info_util_unittest unittest_base)
+
+add_executable(encoding_converter_unittest EncodingConverterUnittest.cpp)
+target_link_libraries(encoding_converter_unittest unittest_base)

@@ -23,6 +23,7 @@
 | FilepathBlackList | Array | 否 | 文件路径（绝对路径）黑名单。支持使用通配符星号（*）匹配多个文件。 |
 | ContainerFile | Boolean | 是 | iLogtail与待采集日志是否处于不同环境中。若待采集的日志和iLogtail在不同的容器中，请将参数值置为true，其余情况请置为false。 |
 | ContainerInfo | Map<String, Object> | 否 | 容器相关参数，仅当ContainerFile参数为true时有效：<br><ul><li>若您的容器部署于K8s环境中，则可配置表1和表2所示参数来选择待采集容器；<br><li>其它情况下，可配置表2所示参数来选择待采集容器。<p></ul>除此以外，您还可以使用表3所示参数对日志标签进行富化。</p> |
+| ReaderFlushTimeout | Boolean | 否 | 发送超时时间（秒），超时会强制读取剩余日志。默认为5秒。|
 
 表1：K8s容器发现相关参数
 

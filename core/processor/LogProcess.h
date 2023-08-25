@@ -26,11 +26,14 @@
 #include "common/Thread.h"
 #include "common/Lock.h"
 #include "log_pb/sls_logs.pb.h"
+#include "pipeline/PipelineContext.h"
+#include "reader/LogFileReader.h"
 
 namespace logtail {
 // forward declaration
 struct LogBuffer;
 class Config;
+class PipelineEventGroup;
 
 class LogProcess : public LogRunnable {
 public:
@@ -86,10 +89,32 @@ public:
 private:
     LogProcess();
     ~LogProcess();
-
+    /**
+     * @retval 0 if continue processing by C++, 1 if processed by Go
+     */
+    int ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
+                      LogFileReaderPtr& logFileReader,
+                      sls_logs::LogGroup& logGroup,
+                      ProcessProfile& profile);
+    /**
+     * @retval 0 if continue processing by C++, 1 if processed by Go
+     */
+    int ProcessBufferLegacy(std::shared_ptr<LogBuffer>& logBuffer,
+                            LogFileReaderPtr& logFileReader,
+                            sls_logs::LogGroup& logGroup,
+                            ProcessProfile& profile,
+                            Config& config);
     void DoFuseHandling();
+    void FillLogGroupLogs(const PipelineEventGroup& eventGroup, sls_logs::LogGroup& resultGroup);
+    void FillLogGroupForPlugin(const PipelineEventGroup& eventGroup,
+                               LogFileReaderPtr& logFileReader,
+                               sls_logs::LogGroup& resultGroup);
+    void FillLogGroupAllNative(const PipelineEventGroup& eventGroup,
+                               LogFileReaderPtr& logFileReader,
+                               sls_logs::LogGroup& resultGroup);
 
     bool mInitialized;
+    int mLocalTimeZoneOffsetSecond;
     ThreadPtr* mProcessThreads;
     int32_t mThreadCount;
     LogstoreFeedbackQueue<LogBuffer*> mLogFeedbackQueue;

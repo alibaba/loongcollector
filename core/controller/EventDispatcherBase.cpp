@@ -67,6 +67,8 @@
 #include "polling/PollingEventQueue.h"
 #endif
 #include "plugin/LogtailPlugin.h"
+#include "plugin/PluginRegistry.h"
+#include "pipeline/PipelineManager.h"
 #include "config_manager/ConfigManager.h"
 #if !defined(_MSC_VER)
 #include "LogtailInsightDispatcher.h"
@@ -1174,9 +1176,11 @@ void EventDispatcherBase::UpdateConfig() {
     mBrokenLinkSet.clear();
 
     PollingDirFile::GetInstance()->ClearCache();
+    PipelineManager::GetInstance()->RemoveAllPipelines();
     ConfigManager::GetInstance()->RemoveAllConfigs();
     if (ConfigManager::GetInstance()->LoadAllConfig() == false) {
         LOG_ERROR(sLogger, ("LoadConfig fail", ""));
+        PipelineManager::GetInstance()->LoadAllPipelines();
         ConfigManager::GetInstance()->LoadDockerConfig();
         ConfigManager::GetInstance()->DoUpdateContainerPaths();
         DumpAllHandlersMeta(true);
@@ -1194,6 +1198,7 @@ void EventDispatcherBase::UpdateConfig() {
     }
     ConfigManager::GetInstance()->CleanUnusedUserAK();
 
+    PipelineManager::GetInstance()->LoadAllPipelines();
     ConfigManager::GetInstance()->LoadDockerConfig();
     ConfigManager::GetInstance()->DoUpdateContainerPaths();
     ConfigManager::GetInstance()->SaveDockerConfig();
@@ -1288,6 +1293,7 @@ void EventDispatcherBase::ExitProcess() {
 #ifdef LOGTAIL_RUNTIME_PLUGIN
     LogtailRuntimePlugin::GetInstance()->UnLoadPluginBase();
 #endif
+    PluginRegistry::GetInstance()->UnloadPlugins();
 
 #if defined(_MSC_VER)
     ReleaseWindowsSignalObject();

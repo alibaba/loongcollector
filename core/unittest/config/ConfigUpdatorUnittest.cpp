@@ -3065,7 +3065,7 @@ void ConfigUpdatorUnittest::TestContainerModeConfigUpdate() {
 void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     // No wildcard.
     Config* cfg_1
-        = new Config(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "prj", true, 0, 0, "cat");
+        = new Config(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 0, "cat");
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
     EXPECT_EQ(cfg_1->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "fx"), false);
@@ -3073,7 +3073,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     delete cfg_1;
     // To be compatible with old settings
     Config* cfg_2
-        = new Config(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "prj", true, 0, -1, "cat");
+        = new Config(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, -1, "cat");
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc"), true);
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
     EXPECT_EQ(cfg_2->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "fx"), true);
@@ -3082,7 +3082,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     delete cfg_2;
 
     Config* cfg_3
-        = new Config(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "prj", true, 0, 3, "cat");
+        = new Config(PS + "abc" + PS + "de" + PS + "f", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
     EXPECT_EQ(cfg_3->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_3->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
     EXPECT_EQ(cfg_3->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "fx"), false);
@@ -3099,7 +3099,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
 
     // Wildcard.
     Config* cfg_4
-        = new Config(PS + "ab?" + PS + "de" + PS + "*", "x.log", REGEX_LOG, "a", "", "prj", true, 0, 0, "cat");
+        = new Config(PS + "ab?" + PS + "de" + PS + "*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 0, "cat");
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "xyz"), true);
@@ -3107,7 +3107,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     delete cfg_4;
     // To be compatible with old settings.
     Config* cfg_5 = new Config(
-        PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz", "x.log", REGEX_LOG, "a", "", "prj", true, 0, -1, "cat", "");
+        PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, -1, "cat", "");
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz" + PS + "xyz0"), true);
@@ -3119,7 +3119,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     delete cfg_5;
 
     Config* cfg_6
-        = new Config(PS + "abc" + PS + "d?" + PS + "f*", "x.log", REGEX_LOG, "a", "", "prj", true, 0, 3, "cat");
+        = new Config(PS + "abc" + PS + "d?" + PS + "f*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
     EXPECT_EQ(cfg_6->WithinMaxDepth(PS + "abc"), false);
     EXPECT_EQ(cfg_6->WithinMaxDepth(PS + "abc" + PS + "de"), false);
     EXPECT_EQ(cfg_6->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f"), true);
@@ -3139,7 +3139,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     // Wildcard on root path, only Windows works.
     {
 #if defined(__linux__)
-        Config cfg("/*", "x.log", REGEX_LOG, "a", "", "prj", true, 0, 3, "cat");
+        Config cfg("/*", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, 3, "cat");
         EXPECT_TRUE(cfg.WithinMaxDepth("/var"));
         BOOL_FLAG(enable_root_path_collection) = true;
         EXPECT_TRUE(cfg.WithinMaxDepth("/var"));
@@ -3154,7 +3154,7 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
 }
 
 void ConfigUpdatorUnittest::TestParseWildcardPath() {
-    Config cfg(PS, "*.log", APSARA_LOG, "x", "", "prj", true, 0, 0, "cat");
+    Config cfg(PS, "*.log", APSARA_LOG, "x", "", "", "", "prj", true, 0, 0, "cat");
 
     std::string pathRoot = "";
 #if defined(_MSC_VER)
@@ -3215,7 +3215,7 @@ void ConfigUpdatorUnittest::TestParseWildcardPath() {
 }
 
 void ConfigUpdatorUnittest::TestIsWildcardPathMatch() {
-    Config cfg(PS, "*.log", APSARA_LOG, "x", "", "prj", true, 100, 100, "cat");
+    Config cfg(PS, "*.log", APSARA_LOG, "x", "", "", "", "prj", true, 100, 100, "cat");
 
     cfg.mBasePath = PS + "usr" + PS + "?" + PS + "abc" + PS + "*" + PS + "def";
     cfg.ParseWildcardPath();

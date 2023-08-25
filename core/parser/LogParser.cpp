@@ -121,11 +121,11 @@ LogParser::ApsaraEasyReadLogTimeParser(const char* buffer, string& timeStr, time
     }
 }
 
-void LogParser::AddUnmatchLog(const char* buffer, sls_logs::LogGroup& logGroup, uint32_t& logGroupSize) {
+void LogParser::AddUnmatchLog(StringView buffer, sls_logs::LogGroup& logGroup, uint32_t& logGroupSize) {
     Log* logPtr = logGroup.add_logs();
     auto now = GetCurrentLogtailTime();
     SetLogTime(logPtr, now.tv_sec, now.tv_nsec);
-    AddLog(logPtr, UNMATCH_LOG_KEY, buffer, logGroupSize);
+    AddLog(logPtr, UNMATCH_LOG_KEY, buffer.to_string(), logGroupSize);
 }
 
 #if defined(_MSC_VER)
@@ -265,7 +265,7 @@ static bool StdRegexLogLineParser(const char* buffer,
 }
 #endif
 
-bool LogParser::RegexLogLineParser(const char* buffer,
+bool LogParser::RegexLogLineParser(StringView buffer,
                                    const boost::regex& reg,
                                    LogGroup& logGroup,
                                    bool discardUnmatch,
@@ -287,9 +287,9 @@ bool LogParser::RegexLogLineParser(const char* buffer,
     string exception;
     uint64_t preciseTimestamp = 0;
     bool parseSuccess = true;
-    if (!BoostRegexMatch(buffer, reg, exception, what, boost::match_default)) {
+    if (!BoostRegexMatch(buffer.data(), buffer.size(), reg, exception, what, boost::match_default)) {
 #if defined(_MSC_VER) // Try std::regex on Windows.
-        return StdRegexLogLineParser(buffer,
+        return StdRegexLogLineParser(buffer.data(),
                                      reg.str(),
                                      logGroup,
                                      discardUnmatch,
@@ -317,7 +317,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
                                   "logstore", category)("file", logPath));
                 }
                 LogtailAlarm::GetInstance()->SendAlarm(REGEX_MATCH_ALARM,
-                                                       "errorlog:" + string(buffer)
+                                                       "errorlog:" + buffer.to_string()
                                                            + " | exception:" + string(exception),
                                                        projectName,
                                                        category,
@@ -331,7 +331,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
                                                                                          category)("file", logPath));
                 }
                 LogtailAlarm::GetInstance()->SendAlarm(
-                    REGEX_MATCH_ALARM, "errorlog:" + string(buffer), projectName, category, region);
+                    REGEX_MATCH_ALARM, "errorlog:" + buffer.to_string(), projectName, category, region);
             }
         }
         error = PARSE_LOG_REGEX_ERROR;
@@ -345,7 +345,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
             }
             LogtailAlarm::GetInstance()->SendAlarm(REGEX_MATCH_ALARM,
                                                    "parse key count not match" + ToString(what.size())
-                                                       + "errorlog:" + string(buffer),
+                                                       + "errorlog:" + buffer.to_string(),
                                                    projectName,
                                                    category,
                                                    region);
@@ -353,7 +353,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
 
         error = PARSE_LOG_REGEX_ERROR;
         parseSuccess = false;
-    } else if (!ParseLogTime(buffer,
+    } else if (!ParseLogTime(buffer.data(),
                              timeStr,
                              logTime,
                              preciseTimestamp,
@@ -388,7 +388,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
     return false;
 }
 
-bool LogParser::RegexLogLineParser(const char* buffer,
+bool LogParser::RegexLogLineParser(StringView buffer,
                                    const boost::regex& reg,
                                    LogGroup& logGroup,
                                    bool discardUnmatch,
@@ -403,7 +403,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
     boost::match_results<const char*> what;
     string exception;
     bool parseSuccess = true;
-    if (!BoostRegexMatch(buffer, reg, exception, what, boost::match_default)) {
+    if (!BoostRegexMatch(buffer.data(), buffer.size(), reg, exception, what, boost::match_default)) {
         if (!exception.empty()) {
             if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
                 if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
@@ -412,7 +412,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
                                   "logstore", category)("file", logPath));
                 }
                 LogtailAlarm::GetInstance()->SendAlarm(REGEX_MATCH_ALARM,
-                                                       "errorlog:" + string(buffer)
+                                                       "errorlog:" + buffer.to_string()
                                                            + " | exception:" + string(exception),
                                                        projectName,
                                                        category,
@@ -426,7 +426,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
                                                                                          category)("file", logPath));
                 }
                 LogtailAlarm::GetInstance()->SendAlarm(
-                    REGEX_MATCH_ALARM, string("errorlog:") + string(buffer), projectName, category, region);
+                    REGEX_MATCH_ALARM, string("errorlog:") + buffer.to_string(), projectName, category, region);
             }
         }
 
@@ -442,7 +442,7 @@ bool LogParser::RegexLogLineParser(const char* buffer,
             }
             LogtailAlarm::GetInstance()->SendAlarm(REGEX_MATCH_ALARM,
                                                    "parse key count not match" + ToString(what.size())
-                                                       + "errorlog:" + string(buffer),
+                                                       + "errorlog:" + buffer.to_string(),
                                                    projectName,
                                                    category,
                                                    region);
@@ -497,7 +497,7 @@ bool LogParser::ParseLogTime(const char* buffer,
         }
     } else {
         strptimeResult = Strptime(curTimeStr.c_str(), timeFormat, &logTime, nanosecondLength, specifiedYear);
-        timeStr = curTimeStr.substr(0, curTimeStr.length()-nanosecondLength);
+        timeStr = curTimeStr.substr(0, curTimeStr.length() - nanosecondLength);
         AdjustLogTime(logTime, tzOffsetSecond);
     }
     if (NULL == strptimeResult) {
@@ -521,8 +521,10 @@ bool LogParser::ParseLogTime(const char* buffer,
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
             if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
                 LOG_WARNING(sLogger,
-                            ("discard history data", buffer)("time now", time(NULL))("timestamp", logTime.tv_sec)("nanosecond", logTime.tv_nsec)("tzOffsetSecond", tzOffsetSecond)("INT32_FLAG(ilogtail_discard_interval)", INT32_FLAG(ilogtail_discard_interval))("project", projectName)(
-                                "logstore", category)("file", logPath));
+                            ("discard history data", buffer)("time now", time(NULL))("timestamp", logTime.tv_sec)(
+                                "nanosecond", logTime.tv_nsec)("tzOffsetSecond", tzOffsetSecond)(
+                                "INT32_FLAG(ilogtail_discard_interval)", INT32_FLAG(ilogtail_discard_interval))(
+                                "project", projectName)("logstore", category)("file", logPath));
             }
             LogtailAlarm::GetInstance()->SendAlarm(
                 OUTDATED_LOG_ALARM, string("logTime: ") + ToString(logTime.tv_sec), projectName, category, region);
@@ -541,17 +543,16 @@ bool LogParser::ParseLogTime(const char* buffer,
 }
 
 bool LogParser::WholeLineModeParser(
-    const char* buffer, LogGroup& logGroup, const string& key, LogtailTime& logTime, uint32_t& logGroupSize) {
+    logtail::StringView buffer, LogGroup& logGroup, const string& key, LogtailTime& logTime, uint32_t& logGroupSize) {
     Log* logPtr = logGroup.add_logs();
     SetLogTime(logPtr, logTime.tv_sec, logTime.tv_nsec); // current system time, no need history check
-    AddLog(logPtr, key, buffer, logGroupSize);
+    AddLog(logPtr, key, buffer.to_string(), logGroupSize);
     return true;
 }
 
 int32_t LogParser::GetApsaraLogMicroTime(const char* buffer) {
     int begIndex = 0;
-    char tmp[7];
-    tmp[6] = '\0';
+    char tmp[6];
     while (buffer[begIndex]) {
         if (buffer[begIndex] == '.') {
             begIndex++;
@@ -662,7 +663,7 @@ static int32_t ParseApsaraBaseFields(const char* buffer, Log* logPtr, uint32_t& 
     return endIndexArray[baseFieldNum - 1]; // return ']' position
 }
 
-bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,
+bool LogParser::ApsaraEasyReadLogLineParser(StringView buffer,
                                             LogGroup& logGroup,
                                             bool discardUnmatch,
                                             string& timeStr,
@@ -676,12 +677,12 @@ bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,
                                             int32_t tzOffsetSecond,
                                             bool adjustApsaraMicroTimezone) {
     int64_t logTime_in_micro = 0;
-    time_t logTime = LogParser::ApsaraEasyReadLogTimeParser(buffer, timeStr, lastLogTime, logTime_in_micro);
+    time_t logTime = LogParser::ApsaraEasyReadLogTimeParser(buffer.data(), timeStr, lastLogTime, logTime_in_micro);
     if (logTime <= 0) // this case will handle empty apsara log line
     {
-        string bufOut(buffer);
-        if (bufOut.size() > (size_t)(1024)) {
-            bufOut.resize(1024);
+        StringView bufOut(buffer);
+        if (buffer.size() > (size_t)(1024)) {
+            bufOut = buffer.substr(0, 1024);
         }
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
             if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
@@ -692,7 +693,7 @@ bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,
         }
 
         LogtailAlarm::GetInstance()->SendAlarm(
-            PARSE_TIME_FAIL_ALARM, bufOut + " $ " + ToString(logTime), projectName, category, region);
+            PARSE_TIME_FAIL_ALARM, bufOut.to_string() + " $ " + ToString(logTime), projectName, category, region);
         error = PARSE_LOG_TIMEFORMAT_ERROR;
 
         if (!discardUnmatch) {
@@ -703,9 +704,9 @@ bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,
     if (BOOL_FLAG(ilogtail_discard_old_data)
         && (time(NULL) - logTime + tzOffsetSecond) > INT32_FLAG(ilogtail_discard_interval)) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
-            string bufOut(buffer);
-            if (bufOut.size() > (size_t)(1024)) {
-                bufOut.resize(1024);
+            StringView bufOut(buffer);
+            if (buffer.size() > (size_t)(1024)) {
+                bufOut = buffer.substr(0, 1024);
             }
             if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
                 LOG_WARNING(sLogger,
@@ -713,7 +714,8 @@ bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,
                                 "logstore", category)("file", logPath));
             }
             LogtailAlarm::GetInstance()->SendAlarm(OUTDATED_LOG_ALARM,
-                                                   string("logTime: ") + ToString(logTime) + ", log:" + bufOut,
+                                                   string("logTime: ") + ToString(logTime)
+                                                       + ", log:" + bufOut.to_string(),
                                                    projectName,
                                                    category,
                                                    region);
@@ -728,23 +730,23 @@ bool LogParser::ApsaraEasyReadLogLineParser(const char* buffer,
     int32_t beg_index = 0;
     int32_t colon_index = -1;
     int32_t index = -1;
-    index = ParseApsaraBaseFields(buffer, logPtr, logGroupSize);
-    if (buffer[index] != 0) {
+    index = ParseApsaraBaseFields(buffer.data(), logPtr, logGroupSize);
+    if (buffer.data()[index] != 0) {
         do {
             ++index;
-            if (buffer[index] == '\t' || buffer[index] == '\0') {
+            if (buffer.data()[index] == '\t' || buffer.data()[index] == '\0') {
                 if (colon_index >= 0) {
                     AddLog(logPtr,
-                           string(buffer + beg_index, colon_index - beg_index),
-                           string(buffer + colon_index + 1, index - colon_index - 1),
+                           string(buffer.data() + beg_index, colon_index - beg_index),
+                           string(buffer.data() + colon_index + 1, index - colon_index - 1),
                            logGroupSize);
                     colon_index = -1;
                 }
                 beg_index = index + 1;
-            } else if (buffer[index] == ':' && colon_index == -1) {
+            } else if (buffer.data()[index] == ':' && colon_index == -1) {
                 colon_index = index;
             }
-        } while (buffer[index]);
+        } while (buffer.data()[index]);
     }
     if (adjustApsaraMicroTimezone) {
         logTime_in_micro = (int64_t)logTime_in_micro - (int64_t)tzOffsetSecond * (int64_t)1000000;

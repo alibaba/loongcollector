@@ -31,9 +31,7 @@ namespace bfs = boost::filesystem;
 
 #define APSARA_TEST_TRUE(condition) \
     do { \
-        bool _rst_inner = (condition); \
-        APSARA_LOG_INFO(sLogger, ("APSARA_TEST_TRUE", _rst_inner)("condition", #condition)); \
-        EXPECT_TRUE(_rst_inner); \
+        EXPECT_TRUE(condition); \
     } while (0)
 
 #define APSARA_TEST_TRUE_DESC(condition, desc) \
@@ -45,16 +43,12 @@ namespace bfs = boost::filesystem;
 
 #define APSARA_TEST_TRUE_FATAL(condition) \
     do { \
-        bool _rst_inner = (condition); \
-        APSARA_LOG_INFO(sLogger, ("APSARA_TEST_TRUE_FATAL", _rst_inner)("condition", #condition)); \
-        ASSERT_TRUE(_rst_inner); \
+        ASSERT_TRUE(condition); \
     } while (0)
 
 #define APSARA_TEST_FALSE(condition) \
     do { \
-        bool _rst_inner = (condition); \
-        APSARA_LOG_INFO(sLogger, ("APSARA_TEST_FALSE", _rst_inner)("condition", #condition)); \
-        EXPECT_FALSE(_rst_inner); \
+        EXPECT_FALSE(condition); \
     } while (0)
 
 #define APSARA_TEST_FALSE_DESC(condition, desc) \
@@ -66,19 +60,12 @@ namespace bfs = boost::filesystem;
 
 #define APSARA_TEST_FALSE_FATAL(condition) \
     do { \
-        bool _rst_inner = (condition); \
-        APSARA_LOG_INFO(sLogger, ("APSARA_TEST_FALSE_FATAL", _rst_inner)("condition", #condition)); \
-        ASSERT_FALSE(_rst_inner); \
+        ASSERT_FALSE(condition); \
     } while (0)
 
-#define APSARA_TEST_EQUAL(val1, val2) \
+#define APSARA_TEST_EQUAL(expected, actual) \
     do { \
-        auto _v1_inner = val1; \
-        auto _v2_inner = val2; \
-        auto _rst_inner = ::testing::internal::EqHelper<GTEST_IS_NULL_LITERAL_(_v1_inner)>::Compare( \
-            #val1, #val2, _v1_inner, _v2_inner); \
-        APSARA_LOG_INFO(sLogger, ("APSARA_TEST_EQUAL", (bool)_rst_inner)(#val1, _v1_inner)(#val2, _v2_inner)); \
-        EXPECT_EQ(_v1_inner, _v2_inner); \
+        EXPECT_EQ(expected, actual); \
     } while (0)
 
 #define APSARA_TEST_EQUAL_DESC(val1, val2, desc) \
@@ -92,14 +79,9 @@ namespace bfs = boost::filesystem;
         EXPECT_EQ(_v1_inner, _v2_inner); \
     } while (0)
 
-#define APSARA_TEST_EQUAL_FATAL(val1, val2) \
+#define APSARA_TEST_EQUAL_FATAL(expected, actual) \
     do { \
-        auto _v1_inner = val1; \
-        auto _v2_inner = val2; \
-        auto _rst_inner = ::testing::internal::EqHelper<GTEST_IS_NULL_LITERAL_(_v1_inner)>::Compare( \
-            #val1, #val2, _v1_inner, _v2_inner); \
-        APSARA_LOG_INFO(sLogger, ("APSARA_TEST_EQUAL_FATAL", (bool)_rst_inner)(#val1, _v1_inner)(#val2, _v2_inner)); \
-        ASSERT_EQ(_v1_inner, _v2_inner); \
+        ASSERT_EQ(expected, actual); \
     } while (0)
 
 #define APSARA_TEST_NOT_EQUAL_DESC(val1, val2, desc) \
@@ -113,33 +95,19 @@ namespace bfs = boost::filesystem;
         EXPECT_NE(_v1_inner, _v2_inner); \
     } while (0)
 
-#define APSARA_TEST_NOT_EQUAL(val1, val2) \
+#define APSARA_TEST_NOT_EQUAL(expected, actual) \
     do { \
-        auto _v1_inner = val1; \
-        auto _v2_inner = val2; \
-        auto _rst_inner = ::testing::internal::EqHelper<GTEST_IS_NULL_LITERAL_(_v1_inner)>::Compare( \
-            #val1, #val2, _v1_inner, _v2_inner); \
-        APSARA_LOG_INFO(sLogger, ("APSARA_TEST_NOT_EQUAL", !_rst_inner)(#val1, _v1_inner)(#val2, _v2_inner)); \
-        EXPECT_NE(_v1_inner, _v2_inner); \
+        EXPECT_NE(expected, actual); \
     } while (0)
 
-#define APSARA_TEST_NOT_EQUAL_FATAL(val1, val2) \
+#define APSARA_TEST_NOT_EQUAL_FATAL(expected, actual) \
     do { \
-        auto _v1_inner = val1; \
-        auto _v2_inner = val2; \
-        auto _rst_inner = ::testing::internal::EqHelper<GTEST_IS_NULL_LITERAL_(_v1_inner)>::Compare( \
-            #val1, #val2, _v1_inner, _v2_inner); \
-        APSARA_LOG_INFO(sLogger, \
-                        ("APSARA_TEST_NOT_EQUAL_FATAL", (bool)_rst_inner)(#val1, _v1_inner)(#val2, _v2_inner)); \
-        ASSERT_NE(_v1_inner, _v2_inner); \
+        ASSERT_NE(expected, actual); \
     } while (0)
 
-#define APSARA_TEST_STREQ(val1, val2) \
+#define APSARA_TEST_STREQ(expected, actual) \
     do { \
-        std::string _v1_inner = val1; \
-        std::string _v2_inner = val2; \
-        APSARA_LOG_INFO(sLogger, ("APSARA_TEST_STREQ", _v1_inner == _v2_inner)(#val1, _v1_inner)(#val2, _v2_inner)); \
-        EXPECT_STREQ(_v1_inner.c_str(), _v2_inner.c_str()); \
+        EXPECT_STREQ(expected, actual); \
     } while (0)
 
 #define APSARA_TEST_STREQ_DESC(val1, val2, desc) \
@@ -151,13 +119,9 @@ namespace bfs = boost::filesystem;
         EXPECT_STREQ(_v1_inner.c_str(), _v2_inner.c_str()); \
     } while (0)
 
-#define APSARA_TEST_STREQ_FATAL(val1, val2) \
+#define APSARA_TEST_STREQ_FATAL(expected, actual) \
     do { \
-        std::string _v1_inner = val1; \
-        std::string _v2_inner = val2; \
-        APSARA_LOG_INFO(sLogger, \
-                        ("APSARA_TEST_STREQ_FATAL", _v1_inner == _v2_inner)(#val1, _v1_inner)(#val2, _v2_inner)); \
-        ASSERT_STREQ(_v1_inner.c_str(), _v2_inner.c_str()); \
+        ASSERT_STREQ(expected, actual); \
     } while (0)
 
 #define APSARA_TEST_STRNE_DESC(val1, val2, desc) \
@@ -183,6 +147,46 @@ namespace bfs = boost::filesystem;
         std::string _v2_inner = val2; \
     APSARA_LOG_INFO(sLogger, ("APSARA_TEST_STRNE_FATAL", _v1_inner != _v2_inner) != 0) (#val1, _v1_inner) (#val2, _v2_inner)); \
         ASSERT_STRNE(_v1_inner.c_str(), _v2_inner.c_str()); \
+    } while (0)
+
+#define APSARA_TEST_GT(big, small) \
+    do { \
+        EXPECT_GT(big, small); \
+    } while (0)
+
+#define APSARA_TEST_GT_FATAL(big, small) \
+    do { \
+        ASSERT_GT(big, small); \
+    } while (0)
+
+#define APSARA_TEST_LT(small, big) \
+    do { \
+        EXPECT_LT(small, big); \
+    } while (0)
+
+#define APSARA_TEST_LT_FATAL(small, big) \
+    do { \
+        ASSERT_LT(small, big); \
+    } while (0)
+
+#define APSARA_TEST_GE(big, small) \
+    do { \
+        EXPECT_GE(big, small); \
+    } while (0)
+
+#define APSARA_TEST_GE_FATAL(big, small) \
+    do { \
+        ASSERT_GE(big, small); \
+    } while (0)
+
+#define APSARA_TEST_LE(small, big) \
+    do { \
+        EXPECT_LE(small, big); \
+    } while (0)
+
+#define APSARA_TEST_LE_FATAL(small, big) \
+    do { \
+        ASSERT_LE(small, big); \
     } while (0)
 
 #define APSARA_UNIT_TEST_CASE(suite, case, id) \
