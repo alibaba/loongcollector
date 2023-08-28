@@ -4,14 +4,14 @@
         "AggregatIntervalMs": 300,
         "FlushIntervalMs": 300,
         "DefaultLogQueueSize": 2,
-        "DefaultLogGroupQueueSize": 3
+        "DefaultLogGroupQueueSize": 1
     },
     "inputs" : [
         {
             "type" : "service_mock",
             "detail" : {
-                "LogsPerSecond" : 100000,
-                "MaxLogCount" : 200000,
+                "LogsPerSecond": 10000,
+                "MaxLogCount": 20000,
                 "Fields" : {
                     "content" : "time:2017.09.12 20:55:36\tjson:{\"array\" : [1, 2, 3, 4], \"key1\" : \"xx\", \"key2\": false, \"key3\":123.456, \"key4\" : { \"inner1\" : 1, \"inner2\" : {\"xxxx\" : \"yyyy\", \"zzzz\" : \"中文\"}}}\n"
                 }
@@ -41,6 +41,15 @@
                         "ExpondConnecter" : "#"
                     }
                 ]
+            }
+        }
+    ],
+    "aggregators": [
+        {
+            "type": "aggregator_base",
+            "detail": {
+                "MaxLogGroupCount": 1,
+                "MaxLogCount": 100
             }
         }
     ],

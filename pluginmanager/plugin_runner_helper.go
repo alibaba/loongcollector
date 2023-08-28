@@ -108,7 +108,7 @@ func GetFlushCancelToken(runner PluginRunner) <-chan struct{} {
 	return make(<-chan struct{})
 }
 
-func GetConfigFluhsers(runner PluginRunner) []pipeline.Flusher {
+func GetConfigFlushers(runner PluginRunner) []pipeline.Flusher {
 	flushers := make([]pipeline.Flusher, 0)
 	if r, ok := runner.(*pluginv1Runner); ok {
 		for _, f := range r.FlusherPlugins {

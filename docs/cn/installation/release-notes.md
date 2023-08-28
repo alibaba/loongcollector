@@ -219,7 +219,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 问题修复
 
 * 修复时区相关问题，使用系统时间和解析日志时间失败时忽略时区调整选项 [#550](https://github.com/alibaba/ilogtail/issues/550)
-* 修复因inode复用导致的日志重复采集问题 [#597](https://github.com/alibaba/ilogtail/issues/597)
+* 修复因inode复用导致的日志重复采集或文件名错乱问题 [#597](https://github.com/alibaba/ilogtail/issues/597)
 * 修复Prometheus输入插件自动切换到streaming模式卡死的问题 [#684](https://github.com/alibaba/ilogtail/pull/684)
 * 修复Grok插件解析中文会可能卡死的问题 [#644](https://github.com/alibaba/ilogtail/issues/644)
 * 修复1.2.1版本中引入的容器发现内存使用过高的问题 [#661](https://github.com/alibaba/ilogtail/issues/661)

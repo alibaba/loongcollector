@@ -183,7 +183,7 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 	s.NoError(err)
 	ContainerConfig.Start()
 	loggroup := &protocol.LogGroup{}
-	for i := 1; i <= 100000; i++ {
+	for i := 1; i <= 10000; i++ {
 		log := &protocol.Log{}
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test", Value: "123"})
 		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
@@ -193,9 +193,9 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 	for _, log := range loggroup.Logs {
 		ContainerConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
 	}
-	s.Equal(1, len(GetConfigFluhsers(ContainerConfig.PluginRunner)))
+	s.Equal(1, len(GetConfigFlushers(ContainerConfig.PluginRunner)))
 	time.Sleep(time.Millisecond * time.Duration(1500))
-	c, ok := GetConfigFluhsers(ContainerConfig.PluginRunner)[0].(*checker.FlusherChecker)
+	c, ok := GetConfigFlushers(ContainerConfig.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
-	s.Equal(100000, c.GetLogCount())
+	s.Equal(10000, c.GetLogCount())
 }
