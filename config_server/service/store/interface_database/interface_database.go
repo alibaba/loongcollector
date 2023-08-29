@@ -15,7 +15,7 @@
 package database
 
 import (
-	"github.com/alibaba/ilogtail/config_server/service/common"
+	"config-server/common"
 )
 
 /*

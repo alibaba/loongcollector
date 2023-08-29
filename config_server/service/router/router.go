@@ -17,9 +17,9 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/alibaba/ilogtail/config_server/service/interface/agent"
-	"github.com/alibaba/ilogtail/config_server/service/interface/user"
-	"github.com/alibaba/ilogtail/config_server/service/setting"
+	"config-server/interface/agent"
+	"config-server/interface/user"
+	"config-server/setting"
 )
 
 func InitRouter() {

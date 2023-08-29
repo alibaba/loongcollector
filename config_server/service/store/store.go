@@ -15,9 +15,9 @@
 package store
 
 import (
-	"github.com/alibaba/ilogtail/config_server/service/setting"
-	database "github.com/alibaba/ilogtail/config_server/service/store/interface_database"
-	"github.com/alibaba/ilogtail/config_server/service/store/leveldb"
+	"config-server/setting"
+	database "config-server/store/interface_database"
+	"config-server/store/leveldb"
 )
 
 // Data in database

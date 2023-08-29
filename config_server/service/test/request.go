@@ -23,7 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"google.golang.org/protobuf/proto"
 
-	configserverproto "github.com/alibaba/ilogtail/config_server/service/proto"
+	configserverproto "config-server/proto"
 )
 
 func DeleteAgentGroup(r *gin.Engine, groupName string, requestID string) (int, *configserverproto.DeleteAgentGroupResponse) {

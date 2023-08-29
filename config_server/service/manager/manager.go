@@ -15,8 +15,8 @@
 package manager
 
 import (
-	agentManager "github.com/alibaba/ilogtail/config_server/service/manager/agent"
-	configManager "github.com/alibaba/ilogtail/config_server/service/manager/config"
+	agentManager "config-server/manager/agent"
+	configManager "config-server/manager/config"
 )
 
 var myAgentManager *agentManager.AgentManager

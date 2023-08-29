@@ -20,9 +20,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/alibaba/ilogtail/config_server/service/common"
-	"github.com/alibaba/ilogtail/config_server/service/manager"
-	proto "github.com/alibaba/ilogtail/config_server/service/proto"
+	"config-server/common"
+	"config-server/manager"
+	proto "config-server/proto"
 )
 
 func CreateAgentGroup(c *gin.Context) {

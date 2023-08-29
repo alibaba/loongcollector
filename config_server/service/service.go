@@ -15,8 +15,8 @@
 package main
 
 import (
-	"github.com/alibaba/ilogtail/config_server/service/router"
-	"github.com/alibaba/ilogtail/config_server/service/store"
+	"config-server/router"
+	"config-server/store"
 )
 
 func main() {

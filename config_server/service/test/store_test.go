@@ -19,9 +19,9 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/alibaba/ilogtail/config_server/service/common"
-	"github.com/alibaba/ilogtail/config_server/service/model"
-	"github.com/alibaba/ilogtail/config_server/service/store"
+	"config-server/common"
+	"config-server/model"
+	"config-server/store"
 )
 
 func TestStore(t *testing.T) {

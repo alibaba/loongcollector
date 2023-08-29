@@ -20,10 +20,10 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 
-	"github.com/alibaba/ilogtail/config_server/service/common"
-	"github.com/alibaba/ilogtail/config_server/service/model"
-	"github.com/alibaba/ilogtail/config_server/service/setting"
-	database "github.com/alibaba/ilogtail/config_server/service/store/interface_database"
+	"config-server/common"
+	"config-server/model"
+	"config-server/setting"
+	database "config-server/store/interface_database"
 )
 
 var dbPath = []string{

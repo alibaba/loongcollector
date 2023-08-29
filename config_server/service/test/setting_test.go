@@ -19,7 +19,7 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/alibaba/ilogtail/config_server/service/setting"
+	"config-server/setting"
 )
 
 func TestSetting(t *testing.T) {

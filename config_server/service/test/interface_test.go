@@ -22,9 +22,9 @@ import (
 	"github.com/gin-gonic/gin"
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/alibaba/ilogtail/config_server/service/common"
-	proto "github.com/alibaba/ilogtail/config_server/service/proto"
-	"github.com/alibaba/ilogtail/config_server/service/router"
+	"config-server/common"
+	proto "config-server/proto"
+	"config-server/router"
 )
 
 func TestBaseAgentGroup(t *testing.T) {

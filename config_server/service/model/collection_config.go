@@ -15,7 +15,7 @@
 package model
 
 import (
-	proto "github.com/alibaba/ilogtail/config_server/service/proto"
+	proto "config-server/proto"
 )
 
 var ConfigType = map[string]proto.ConfigType{

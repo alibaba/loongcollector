@@ -19,10 +19,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/config_server/service/common"
-	"github.com/alibaba/ilogtail/config_server/service/model"
-	proto "github.com/alibaba/ilogtail/config_server/service/proto"
-	"github.com/alibaba/ilogtail/config_server/service/store"
+	"config-server/common"
+	"config-server/model"
+	proto "config-server/proto"
+	"config-server/store"
 )
 
 func (a *AgentManager) HeartBeat(req *proto.HeartBeatRequest, res *proto.HeartBeatResponse) (int, *proto.HeartBeatResponse) {

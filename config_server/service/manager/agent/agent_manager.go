@@ -17,8 +17,8 @@ package agentmanager
 import (
 	"sync"
 
-	"github.com/alibaba/ilogtail/config_server/service/model"
-	"github.com/alibaba/ilogtail/config_server/service/setting"
+	"config-server/model"
+	"config-server/setting"
 )
 
 type AgentManager struct {

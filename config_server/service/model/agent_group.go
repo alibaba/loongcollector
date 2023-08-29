@@ -14,7 +14,7 @@
 
 package model
 
-import proto "github.com/alibaba/ilogtail/config_server/service/proto"
+import proto "config-server/proto"
 
 type AgentGroupTag struct {
 	Name  string `json:"Name"`

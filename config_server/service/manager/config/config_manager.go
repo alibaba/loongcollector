@@ -17,10 +17,10 @@ package configmanager
 import (
 	"sync"
 
-	"github.com/alibaba/ilogtail/config_server/service/common"
-	"github.com/alibaba/ilogtail/config_server/service/model"
-	"github.com/alibaba/ilogtail/config_server/service/setting"
-	"github.com/alibaba/ilogtail/config_server/service/store"
+	"config-server/common"
+	"config-server/model"
+	"config-server/setting"
+	"config-server/store"
 )
 
 type ConfigManager struct {
