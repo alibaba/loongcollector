@@ -45,4 +45,5 @@ your changes, such as:
 - [public] [both] [updated] Flusher Kafka V2: support send the message with headers to kafka
 - [public] [both] [fixed] fix multiline is splitted if not flushed to disk together
 - [public] [both] [fixed] fix line is truncated if \0 is in the middle of line
+- [public] [both] [fixed] fix config server panic caused by concurrent read and write shared object
 

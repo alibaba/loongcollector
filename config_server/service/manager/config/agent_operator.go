@@ -74,8 +74,10 @@ func (c *ConfigManager) CheckConfigUpdatesWhenHeartbeat(req *proto.HeartBeatRequ
 		if match || agentGroup.(*model.AgentGroup).Name == "default" {
 			for k := range agentGroup.(*model.AgentGroup).AppliedConfigs {
 				// Check if config k exist
-				config, hasErr := c.ConfigList[k]
-				if !hasErr {
+				c.ConfigListMutex.RLock()
+				config, ok := c.ConfigList[k]
+				c.ConfigListMutex.RUnlock()
+				if !ok {
 					res.Code = proto.RespCode_INVALID_PARAMETER
 					res.Message = fmt.Sprintf("Config %s doesn't exist.", k)
 					return common.ConfigNotExist.Status, res
@@ -175,7 +177,9 @@ func (c *ConfigManager) FetchAgentConfig(req *proto.FetchAgentConfigRequest, res
 	// do something about attributes
 
 	for _, configInfo := range req.ReqConfigs {
+		c.ConfigListMutex.RLock()
 		config, ok := c.ConfigList[configInfo.Name]
+		c.ConfigListMutex.RUnlock()
 		if !ok {
 			res.Code = proto.RespCode_INVALID_PARAMETER
 			res.Message += fmt.Sprintf("Config %s doesn't exist.\n", configInfo.Name)
@@ -202,7 +206,9 @@ func (c *ConfigManager) FetchPipelineConfig(req *proto.FetchPipelineConfigReques
 	ans := make([]*proto.ConfigDetail, 0)
 
 	for _, configInfo := range req.ReqConfigs {
+		c.ConfigListMutex.RLock()
 		config, ok := c.ConfigList[configInfo.Name]
+		c.ConfigListMutex.RUnlock()
 		if !ok {
 			res.Code = proto.RespCode_INVALID_PARAMETER
 			res.Message += fmt.Sprintf("Config %s doesn't exist.\n", configInfo.Name)
