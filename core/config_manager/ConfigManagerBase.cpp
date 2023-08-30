@@ -822,7 +822,7 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                     GetRegexAndKeys(value, config);
                     if (config->mRegs && config->mKeys && config->mRegs->size() == (size_t)1
                         && config->mKeys->size() == (size_t)1) {
-                        if ((config->mLogBeginReg.empty() || config->mLogBeginReg == ".*")
+                        if ((!config->IsMultiline())
                             && *(config->mKeys->begin()) == DEFAULT_CONTENT_KEY
                             && *(config->mRegs->begin()) == DEFAULT_REG) {
                             LOG_DEBUG(sLogger,

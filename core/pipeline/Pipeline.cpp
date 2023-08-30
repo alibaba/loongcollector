@@ -55,7 +55,7 @@ bool Pipeline::Init(const PipelineConfig& config) {
     }
 
     std::unique_ptr<ProcessorInstance> pluginDecoder;
-    if (config.mLogType == JSON_LOG || config.mLogBeginReg.empty() || config.mLogBeginReg == ".*") {
+    if (config.mLogType == JSON_LOG || !config.IsMultiline()) {
         pluginDecoder = PluginRegistry::GetInstance()->CreateProcessor(
             ProcessorSplitLogStringNative::Name(),
             std::string(ProcessorSplitLogStringNative::Name()) + "/" + std::to_string(pluginIndex++));

@@ -40,16 +40,29 @@ private:
                   std::vector<StringView>& logIndex,
                   std::vector<StringView>& discardIndex,
                   const StringView& logPath);
+    void SetLogMultilinePolicy(const std::string& begReg, const std::string& conReg, const std::string& endReg);
+    void HandleUnmatchLogs(const char* buffer,
+                           int& multiBeginIndex,
+                           int endIndex,
+                           std::vector<StringView>& logIndex,
+                           std::vector<StringView>& discardIndex);
 
     int* mFeedLines = nullptr;
     int* mSplitLines = nullptr;
     std::string mSplitKey;
+    bool mIsMultline;
     std::string mLogBeginReg;
+    std::string mLogContinueReg;
+    std::string mLogEndReg;
     std::unique_ptr<boost::regex> mLogBeginRegPtr;
+    std::unique_ptr<boost::regex> mLogContinueRegPtr;
+    std::unique_ptr<boost::regex> mLogEndRegPtr;
     bool mDiscardUnmatch = false;
     bool mEnableLogPositionMeta = false;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorSplitRegexNativeUnittest;
+    friend class ProcessorSplitRegexDisacardUnmatchUnittest;
+    friend class ProcessorSplitRegexKeepUnmatchUnittest;
 #endif
 };
 

@@ -24,10 +24,8 @@ namespace logtail {
 
 bool ProcessorSplitRegexNative::Init(const ComponentConfig& config) {
     mSplitKey = DEFAULT_CONTENT_KEY;
-    mLogBeginReg = config.mLogBeginReg;
-    if (mLogBeginReg.empty() == false && mLogBeginReg != ".*") {
-        mLogBeginRegPtr.reset(new boost::regex(mLogBeginReg));
-    }
+    mIsMultline = config.IsMultiline();
+    SetLogMultilinePolicy(config.mLogBeginReg, config.mLogContinueReg, config.mLogEndReg);
     mDiscardUnmatch = config.mDiscardUnmatch;
     mEnableLogPositionMeta = config.mAdvancedConfig.mEnableLogPositionMeta;
     mFeedLines = &(GetContext().GetProcessProfile().feedLines);
@@ -100,32 +98,31 @@ void ProcessorSplitRegexNative::ProcessEvent(PipelineEventGroup& logGroup,
                     "log bytes", sourceVal.size() + 1)("first 1KB log", discardData.substr(0, 1024).to_string()));
         }
     }
-    if (splitSuccess) {
-        long sourceoffset = 0L;
-        if (sourceEvent.HasContent(EVENT_META_LOG_FILE_OFFSET)) {
-            sourceoffset = atol(sourceEvent.GetContent(EVENT_META_LOG_FILE_OFFSET).data()); // use safer method
+    if (logIndex.size() == 0) {
+        return;
+    }
+    long sourceoffset = 0L;
+    if (sourceEvent.HasContent(EVENT_META_LOG_FILE_OFFSET)) {
+        sourceoffset = atol(sourceEvent.GetContent(EVENT_META_LOG_FILE_OFFSET).data()); // use safer method
+    }
+    StringBuffer splitKey = logGroup.GetSourceBuffer()->CopyString(mSplitKey);
+    for (auto& content : logIndex) {
+        std::unique_ptr<LogEvent> targetEvent = LogEvent::CreateEvent(logGroup.GetSourceBuffer());
+        targetEvent->SetTimestamp(sourceEvent.GetTimestamp()); // it is easy to forget other fields, better solution?
+        targetEvent->SetContentNoCopy(StringView(splitKey.data, splitKey.size), content);
+        if (mEnableLogPositionMeta) {
+            auto const offset = sourceoffset + (content.data() - sourceVal.data());
+            StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(std::to_string(offset));
+            targetEvent->SetContentNoCopy(EVENT_META_LOG_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
         }
-        StringBuffer splitKey = logGroup.GetSourceBuffer()->CopyString(mSplitKey);
-        for (auto& content : logIndex) {
-            std::unique_ptr<LogEvent> targetEvent = LogEvent::CreateEvent(logGroup.GetSourceBuffer());
-            targetEvent->SetTimestamp(sourceEvent.GetTimestamp()); // it is easy to forget other fields, better solution?
-            targetEvent->SetContentNoCopy(StringView(splitKey.data, splitKey.size), content);
-            if (mEnableLogPositionMeta) {
-                auto const offset = sourceoffset + (content.data() - sourceVal.data());
-                StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(std::to_string(offset));
-                targetEvent->SetContentNoCopy(EVENT_META_LOG_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
-            }
-            if (sourceEvent.GetContents().size() > 1) { // copy other fields
-                for (auto& kv : sourceEvent.GetContents()) {
-                    if (kv.first != mSplitKey && kv.first != EVENT_META_LOG_FILE_OFFSET) {
-                        targetEvent->SetContentNoCopy(kv.first, kv.second);
-                    }
+        if (sourceEvent.GetContents().size() > 1) { // copy other fields
+            for (auto& kv : sourceEvent.GetContents()) {
+                if (kv.first != mSplitKey && kv.first != EVENT_META_LOG_FILE_OFFSET) {
+                    targetEvent->SetContentNoCopy(kv.first, kv.second);
                 }
             }
-            newEvents.emplace_back(std::move(targetEvent));
         }
-    } else {
-        newEvents.emplace_back(e);
+        newEvents.emplace_back(std::move(targetEvent));
     }
 }
 
@@ -135,71 +132,249 @@ bool ProcessorSplitRegexNative::LogSplit(const char* buffer,
                                          std::vector<StringView>& logIndex,
                                          std::vector<StringView>& discardIndex,
                                          const StringView& logPath) {
-    SplitState state = SPLIT_UNMATCH;
-    int multiBegIndex = 0;
+    /*
+               | -------------- | -------- \n
+        multiBeginIndex      begIndex   endIndex
+
+        multiBeginIndex: used to cache current parsing log. Clear when starting the next log.
+        begIndex: the begin index of the current line
+        endIndex: the end index of the current line
+
+        Supported regex combination:
+        1. begin
+        2. begin + continue
+        3. begin + end
+        4. continue + end
+        5. end
+    */
+    int multiBeginIndex = 0;
     int begIndex = 0;
     int endIndex = 0;
     bool anyMatched = false;
     lineFeed = 0;
     std::string exception;
-    while (endIndex < size) {
-        if (buffer[endIndex] == '\n' || endIndex == size - 1) {
-            ++lineFeed;
+    SplitState state = SPLIT_UNMATCH;
+    while (endIndex <= size) {
+        if (endIndex == size || buffer[endIndex] == '\n') {
+            lineFeed++;
             exception.clear();
-            if (mLogBeginRegPtr == NULL
-                || BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogBeginRegPtr, exception)) {
-                anyMatched = true;
-                if (multiBegIndex < begIndex) {
-                    if (state == SPLIT_UNMATCH && mDiscardUnmatch) {
-                        discardIndex.emplace_back(buffer + multiBegIndex, begIndex - 1 - multiBegIndex);
-                    } else {
-                        logIndex.emplace_back(buffer + multiBegIndex, begIndex - 1 - multiBegIndex);
+            // State machine with three states (SPLIT_UNMATCH, SPLIT_BEGIN, SPLIT_CONTINUE)
+            switch (state) {
+                case SPLIT_UNMATCH:
+                    if (!mIsMultline) {
+                        // Single line log
+                        anyMatched = true;
+                        logIndex.emplace_back(buffer + begIndex, endIndex - begIndex);
+                        multiBeginIndex = endIndex + 1;
+                        break;
+                    } else if (mLogBeginRegPtr != nullptr) {
+                        if (BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogBeginRegPtr, exception)) {
+                            // Just clear old cache, task current line as the new cache
+                            if (multiBeginIndex != begIndex) {
+                                anyMatched = true;
+                                logIndex[logIndex.size() - 1] = StringView(logIndex[logIndex.size() - 1].begin(),
+                                                                           logIndex[logIndex.size() - 1].length()
+                                                                               + begIndex - 1 - multiBeginIndex);
+                                multiBeginIndex = begIndex;
+                            }
+                            state = SPLIT_BEGIN;
+                            break;
+                        }
+                        HandleUnmatchLogs(buffer, multiBeginIndex, endIndex, logIndex, discardIndex);
+                        break;
                     }
-                    multiBegIndex = begIndex;
-                }
-                state = SPLIT_BEGIN;
-            } else {
-                if (state == SPLIT_BEGIN || state == SPLIT_CONTINUE) {
-                    state = SPLIT_CONTINUE;
-                }
-                if (!exception.empty() && AppConfig::GetInstance()->IsLogParseAlarmValid()) {
+                    // mLogContinueRegPtr can be matched 0 or multiple times, if not match continue to try mLogEndRegPtr
+                    if (mLogContinueRegPtr != nullptr
+                        && BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogContinueRegPtr, exception)) {
+                        state = SPLIT_CONTINUE;
+                        break;
+                    }
+                    if (mLogEndRegPtr != nullptr
+                        && BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogEndRegPtr, exception)) {
+                        // output logs in cache from multiBeginIndex to endIndex
+                        anyMatched = true;
+                        logIndex.emplace_back(buffer + multiBeginIndex, endIndex - multiBeginIndex);
+                        multiBeginIndex = endIndex + 1;
+                        break;
+                    }
+                    HandleUnmatchLogs(buffer, multiBeginIndex, endIndex, logIndex, discardIndex);
+                    break;
+
+                case SPLIT_BEGIN:
+                    // mLogContinueRegPtr can be matched 0 or multiple times, if not match continue to try others.
+                    if (mLogContinueRegPtr != nullptr && BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogContinueRegPtr, exception)) {
+                        state = SPLIT_CONTINUE;
+                        break;
+                    }
+                    if (mLogEndRegPtr != nullptr) {
+                        if (BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogEndRegPtr, exception)) {
+                            anyMatched = true;
+                            logIndex.emplace_back(buffer + multiBeginIndex, endIndex - multiBeginIndex);
+                            multiBeginIndex = endIndex + 1;
+                            state = SPLIT_UNMATCH;
+                        }
+                        // for case: begin unmatch end
+                        // so logs cannot be handled as unmatch even if not match LogEngReg
+                    } else if (mLogBeginRegPtr != nullptr) {
+                        anyMatched = true;
+                        if (BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogBeginRegPtr, exception)) {
+                            if (multiBeginIndex != begIndex) {
+                                logIndex.emplace_back(buffer + multiBeginIndex, begIndex - 1 - multiBeginIndex);
+                                multiBeginIndex = begIndex;
+                            }
+                        } else if (mLogContinueRegPtr != nullptr) {
+                            // case: begin+continue, but we meet unmatch log here
+                            logIndex.emplace_back(buffer + multiBeginIndex, begIndex - 1 - multiBeginIndex);
+                            multiBeginIndex = begIndex;
+                            HandleUnmatchLogs(buffer, multiBeginIndex, endIndex, logIndex, discardIndex);
+                            state = SPLIT_UNMATCH;
+                        }
+                        // else case: begin+end or begin, we should keep unmatch log in the cache
+                    }
+                    break;
+
+                case SPLIT_CONTINUE:
+                    // mLogContinueRegPtr can be matched 0 or multiple times, if not match continue to try others.
+                    if (mLogContinueRegPtr != nullptr && BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogContinueRegPtr, exception)) {
+                        break;
+                    }
+                    if (mLogEndRegPtr != nullptr) {
+                        if (BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogEndRegPtr, exception)) {
+                            anyMatched = true;
+                            logIndex.emplace_back(buffer + multiBeginIndex, endIndex - multiBeginIndex);
+                            multiBeginIndex = endIndex + 1;
+                            state = SPLIT_UNMATCH;
+                        } else {
+                            HandleUnmatchLogs(buffer, multiBeginIndex, endIndex, logIndex, discardIndex);
+                            state = SPLIT_UNMATCH;
+                        }
+                    } else if (mLogBeginRegPtr != nullptr) {
+                        if (BoostRegexMatch(buffer + begIndex, endIndex - begIndex, *mLogBeginRegPtr, exception)) {
+                            anyMatched = true;
+                            logIndex.emplace_back(buffer + multiBeginIndex, begIndex - 1 - multiBeginIndex);
+                            multiBeginIndex = begIndex;
+                            state = SPLIT_BEGIN;
+                        } else {
+                            anyMatched = true;
+                            logIndex.emplace_back(buffer + multiBeginIndex, begIndex - 1 - multiBeginIndex);
+                            multiBeginIndex = begIndex;
+                            HandleUnmatchLogs(buffer, multiBeginIndex, endIndex, logIndex, discardIndex);
+                            state = SPLIT_UNMATCH;
+                        }
+                    } else {
+                        anyMatched = true;
+                        logIndex.emplace_back(buffer + multiBeginIndex, begIndex - 1 - multiBeginIndex);
+                        multiBeginIndex = begIndex;
+                        HandleUnmatchLogs(buffer, multiBeginIndex, endIndex, logIndex, discardIndex);
+                        state = SPLIT_UNMATCH;
+                    }
+                    break;
+            }
+            begIndex = endIndex + 1;
+            if (!exception.empty()) {
+                if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
                     if (GetContext().GetAlarm().IsLowLevelAlarmValid()) {
                         LOG_ERROR(GetContext().GetLogger(),
                                   ("regex_match in LogSplit fail, exception", exception)("project",
                                                                                          GetContext().GetProjectName())(
                                       "logstore", GetContext().GetLogstoreName())("file", logPath));
-                        GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
-                                                          "regex_match in LogSplit fail:" + exception + ", file"
-                                                              + logPath.to_string(),
-                                                          GetContext().GetProjectName(),
-                                                          GetContext().GetLogstoreName(),
-                                                          GetContext().GetRegion());
                     }
+                    GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
+                                                      "regex_match in LogSplit fail:" + exception + ", file"
+                                                          + logPath.to_string(),
+                                                      GetContext().GetProjectName(),
+                                                      GetContext().GetLogstoreName(),
+                                                      GetContext().GetRegion());
                 }
             }
-            begIndex = endIndex + 1;
         }
         endIndex++;
     }
-    if (state == SPLIT_UNMATCH && mDiscardUnmatch) {
-        discardIndex.emplace_back(buffer + multiBegIndex, begIndex - multiBegIndex);
-    } else {
-        logIndex.emplace_back(buffer + multiBegIndex, begIndex - multiBegIndex);
-    }
-    if (!exception.empty()) {
-        if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
-            if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
-                LOG_ERROR(GetContext().GetLogger(),
-                          ("regex_match in LogSplit fail, exception", exception)("project", GetContext().GetProjectName())(
-                              "logstore", GetContext().GetLogstoreName())("file", logPath));
+    // We should clear the log from `multiBeginIndex` to `size`.
+    if (multiBeginIndex < size) {
+        if (!mIsMultline) {
+            logIndex.emplace_back(buffer + multiBeginIndex, size - multiBeginIndex);
+        } else {
+            endIndex = buffer[size-1] == '\n' ? size -1 : size;
+            if (mLogBeginRegPtr != NULL && mLogEndRegPtr == NULL) {
+                anyMatched = true;
+                // If logs is unmatched, they have been handled immediately. So logs must be matched here.
+                logIndex.emplace_back(buffer + multiBeginIndex, endIndex - multiBeginIndex);
+            } else if (mLogBeginRegPtr == NULL && mLogContinueRegPtr == NULL && mLogEndRegPtr != NULL) {
+                // If there is still logs in cache, it means that there is no end line. We can handle them as unmatched.
+                if (mDiscardUnmatch) {
+                    for (int i = multiBeginIndex; i <= endIndex; i++) {
+                        if (i == endIndex || buffer[i] == '\n') {
+                            discardIndex.emplace_back(buffer + multiBeginIndex, i - multiBeginIndex);
+                            multiBeginIndex = i + 1;
+                        }
+                    }
+                } else {
+                    for (int i = multiBeginIndex; i <= endIndex; i++) {
+                        if (i == endIndex || buffer[i] == '\n') {
+                            logIndex.emplace_back(buffer + multiBeginIndex, i - multiBeginIndex);
+                            multiBeginIndex = i + 1;
+                        }
+                    }
+                }
+            } else {
+                HandleUnmatchLogs(buffer, multiBeginIndex, endIndex, logIndex, discardIndex);
             }
-            GetContext().GetAlarm().SendAlarm(REGEX_MATCH_ALARM,
-                                              "regex_match in LogSplit fail:" + exception,
-                                              GetContext().GetProjectName(),
-                                              GetContext().GetLogstoreName(),
-                                              GetContext().GetRegion());
         }
     }
     return anyMatched;
 }
+
+void ProcessorSplitRegexNative::HandleUnmatchLogs(const char* buffer,
+                                                  int& multiBeginIndex,
+                                                  int endIndex,
+                                                  std::vector<StringView>& logIndex,
+                                                  std::vector<StringView>& discardIndex) {
+    // Cannot determine where log is unmatched here where there is only mLogEndRegPtr
+    if (mLogBeginRegPtr == nullptr && mLogContinueRegPtr == nullptr && mLogEndRegPtr != nullptr) {
+        return;
+    }
+    if (mDiscardUnmatch) {
+        for (int i = multiBeginIndex; i <= endIndex; i++) {
+            if (i == endIndex || buffer[i] == '\n') {
+                discardIndex.emplace_back(buffer + multiBeginIndex, i - multiBeginIndex);
+                multiBeginIndex = i + 1;
+            }
+        }
+    } else {
+        for (int i = multiBeginIndex; i <= endIndex; i++) {
+            if (i == endIndex || buffer[i] == '\n') {
+                logIndex.emplace_back(buffer + multiBeginIndex, i - multiBeginIndex);
+                multiBeginIndex = i + 1;
+            }
+        }
+    }
+}
+
+void ProcessorSplitRegexNative::SetLogMultilinePolicy(const std::string& begReg,
+                                                      const std::string& conReg,
+                                                      const std::string& endReg) {
+    mLogBeginReg = begReg;
+    if (mLogBeginRegPtr != nullptr) {
+        mLogBeginRegPtr.release();
+    }
+    if (begReg.empty() == false && begReg != ".*") {
+        mLogBeginRegPtr.reset(new boost::regex(begReg));
+    }
+    mLogContinueReg = conReg;
+    if (mLogContinueRegPtr != nullptr) {
+        mLogContinueRegPtr.release();
+    }
+    if (conReg.empty() == false && conReg != ".*") {
+        mLogContinueRegPtr.reset(new boost::regex(conReg));
+    }
+    mLogEndReg = endReg;
+    if (mLogEndRegPtr != nullptr) {
+        mLogEndRegPtr.release();
+    }
+    if (endReg.empty() == false && endReg != ".*") {
+        mLogEndRegPtr.reset(new boost::regex(endReg));
+    }
+}
+
 } // namespace logtail

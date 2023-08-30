@@ -293,6 +293,8 @@ public:
 
     void SetTailLimit(int32_t size);
 
+    bool IsMultiline() const;
+
 private:
     bool IsWildcardPathMatch(const std::string& path, const std::string& name = "");
 

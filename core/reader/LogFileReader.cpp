@@ -1514,7 +1514,8 @@ bool LogFileReader::LogSplit(const char* buffer,
             logIndex.emplace_back(buffer + multiBeginIndex, size - multiBeginIndex);
         } else {
             endIndex = buffer[size-1] == '\n' ? size -1 : size;
-            if (mLogBeginRegPtr != NULL && mLogContinueRegPtr == NULL && mLogEndRegPtr == NULL) {
+            if (mLogBeginRegPtr != NULL && mLogEndRegPtr == NULL) {
+                anyMatched = true;
                 // If logs is unmatched, they have been handled immediately. So logs must be matched here.
                 logIndex.emplace_back(buffer + multiBeginIndex, endIndex - multiBeginIndex);
             } else if (mLogBeginRegPtr == NULL && mLogContinueRegPtr == NULL && mLogEndRegPtr != NULL) {
