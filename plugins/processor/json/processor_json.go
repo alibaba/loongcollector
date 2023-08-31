@@ -36,6 +36,7 @@ type ProcessorJSON struct {
 	KeepSourceIfParseError bool
 	UseSourceKeyAsPrefix   bool // Should SourceKey be used as prefix for all extracted keys.
 	IgnoreFirstConnector   bool // 是否忽略第一个Connector
+	ExpandArray            bool // 是否展开数组类型
 
 	context pipeline.Context
 }
@@ -75,6 +76,7 @@ func (p *ProcessorJSON) processLog(log *protocol.Log) {
 				connector:            p.ExpandConnector,
 				prefix:               p.Prefix,
 				ignoreFirstConnector: p.IgnoreFirstConnector,
+				expandArray:          p.ExpandArray,
 			}
 			if p.UseSourceKeyAsPrefix {
 				param.preKey = p.SourceKey
@@ -110,6 +112,7 @@ func init() {
 			KeepSource:             true,
 			KeepSourceIfParseError: true,
 			UseSourceKeyAsPrefix:   false,
+			ExpandArray:            false,
 		}
 	}
 }
@@ -125,6 +128,7 @@ type ExpandParam struct {
 	prefix                 string
 	ignoreFirstConnector   bool
 	isSourceKeyOverwritten bool
+	expandArray            bool
 }
 
 func (p *ExpandParam) getConnector(depth int) string {
@@ -165,10 +169,10 @@ func (p *ExpandParam) flattenObject(key []byte, value []byte) {
 }
 
 func (p *ExpandParam) flattenArray(key []byte, value []byte) {
-	if p.nowDepth == p.maxDepth {
-		// If reach max depth, add it directly to the result
-		newKey := p.preKey + p.getConnector(p.nowDepth) + (string)(key)
-		p.appendNewContent(newKey, (string)(value))
+	defaultKey := p.preKey + p.getConnector(p.nowDepth) + (string)(key)
+	if !p.expandArray || p.nowDepth == p.maxDepth {
+		// If get value error, or not expand array, or reach max depth, add it directly to the result
+		p.appendNewContent(defaultKey, (string)(value))
 		return
 	}
 
@@ -267,6 +271,7 @@ func (p *ProcessorJSON) processEvent(event models.PipelineEvent) {
 		connector:            p.ExpandConnector,
 		prefix:               p.Prefix,
 		ignoreFirstConnector: p.IgnoreFirstConnector,
+		expandArray:          p.ExpandArray,
 	}
 	if p.UseSourceKeyAsPrefix {
 		param.preKey = p.SourceKey

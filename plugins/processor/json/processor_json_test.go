@@ -61,6 +61,10 @@ func TestSourceKey(t *testing.T) {
 	assert.Equal(t, "52", log.Contents[2].Value)
 	assert.Equal(t, "js_key-k1-k2-k3-k41", log.Contents[3].Key)
 	assert.Equal(t, "41", log.Contents[3].Value)
+	assert.Equal(t, "js_key-k6", log.Contents[4].Key)
+	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[4].Value)
+	assert.Equal(t, "js_key-k7", log.Contents[5].Key)
+	assert.Equal(t, "[]", log.Contents[5].Value)
 }
 
 func TestIgnoreFirstConnector(t *testing.T) {
@@ -79,6 +83,10 @@ func TestIgnoreFirstConnector(t *testing.T) {
 	assert.Equal(t, "52", log.Contents[2].Value)
 	assert.Equal(t, "jk1-k2-k3-k41", log.Contents[3].Key)
 	assert.Equal(t, "41", log.Contents[3].Value)
+	assert.Equal(t, "jk6", log.Contents[4].Key)
+	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[4].Value)
+	assert.Equal(t, "jk7", log.Contents[5].Key)
+	assert.Equal(t, "[]", log.Contents[5].Value)
 }
 
 func TestExpandDepth(t *testing.T) {
@@ -93,6 +101,10 @@ func TestExpandDepth(t *testing.T) {
 	processor.processLog(log)
 	assert.Equal(t, "js_key-k1", log.Contents[1].Key)
 	assert.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}", log.Contents[1].Value)
+	assert.Equal(t, "js_key-k6", log.Contents[2].Key)
+	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[2].Value)
+	assert.Equal(t, "js_key-k7", log.Contents[3].Key)
+	assert.Equal(t, "[]", log.Contents[3].Value)
 }
 
 func TestKeepSource(t *testing.T) {
@@ -108,6 +120,10 @@ func TestKeepSource(t *testing.T) {
 	processor.processLog(log)
 	assert.Equal(t, "js_key-k1", log.Contents[0].Key)
 	assert.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}", log.Contents[0].Value)
+	assert.Equal(t, "js_key-k6", log.Contents[1].Key)
+	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[1].Value)
+	assert.Equal(t, "js_key-k7", log.Contents[2].Key)
+	assert.Equal(t, "[]", log.Contents[2].Value)
 }
 
 func TestExpandKeySameToSource(t *testing.T) {
@@ -184,6 +200,29 @@ func TestNoKeyError(t *testing.T) {
 	assert.True(t, strings.Contains(memoryLog, "PROCESSOR_JSON_FIND_ALARM\tcannot find key s_key"))
 }
 
+func TestExpandArray(t *testing.T) {
+	processor, err := newProcessor()
+	if processor == nil {
+		return
+	}
+	processor.ExpandArray = true
+	require.NoError(t, err)
+	log := &protocol.Log{Time: 0}
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: jsonVal})
+	processor.processLog(log)
+	assert.Equal(t, "js_key-k1-k2-k3-k4-k51", log.Contents[1].Key)
+	assert.Equal(t, "51", log.Contents[1].Value)
+	assert.Equal(t, "js_key-k1-k2-k3-k4-k52", log.Contents[2].Key)
+	assert.Equal(t, "52", log.Contents[2].Value)
+	assert.Equal(t, "js_key-k1-k2-k3-k41", log.Contents[3].Key)
+	assert.Equal(t, "41", log.Contents[3].Value)
+	assert.Equal(t, "js_key-k6[0]-x", log.Contents[4].Key)
+	assert.Equal(t, "a", log.Contents[4].Value)
+	assert.Equal(t, "js_key-k6[1]-x", log.Contents[5].Key)
+	assert.Equal(t, "b", log.Contents[5].Value)
+	assert.Equal(t, 6, len(log.Contents))
+}
+
 func TestSourceKeyV2(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
@@ -197,6 +236,10 @@ func TestSourceKeyV2(t *testing.T) {
 	assert.Equal(t, "52", contents.Get("js_key-k1-k2-k3-k4-k52"))
 	assert.True(t, contents.Contains("js_key-k1-k2-k3-k41"))
 	assert.Equal(t, "41", contents.Get("js_key-k1-k2-k3-k41"))
+	assert.True(t, contents.Contains("js_key-k6"))
+	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", contents.Get("js_key-k6"))
+	assert.True(t, contents.Contains("js_key-k7"))
+	assert.Equal(t, "[]", contents.Get("js_key-k7"))
 }
 
 func TestIgnoreFirstConnectorV2(t *testing.T) {
@@ -216,6 +259,10 @@ func TestIgnoreFirstConnectorV2(t *testing.T) {
 	assert.Equal(t, "52", contents.Get("jk1-k2-k3-k4-k52"))
 	assert.True(t, contents.Contains("jk1-k2-k3-k41"))
 	assert.Equal(t, "41", contents.Get("jk1-k2-k3-k41"))
+	assert.True(t, contents.Contains("jk6"))
+	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", contents.Get("jk6"))
+	assert.True(t, contents.Contains("jk7"))
+	assert.Equal(t, "[]", contents.Get("jk7"))
 }
 
 func TestExpandDepthV2(t *testing.T) {
@@ -231,6 +278,10 @@ func TestExpandDepthV2(t *testing.T) {
 	processor.processEvent(log)
 	assert.True(t, contents.Contains("js_key-k1"))
 	assert.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}", contents.Get("js_key-k1"))
+	assert.True(t, contents.Contains("js_key-k6"))
+	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", contents.Get("js_key-k6"))
+	assert.True(t, contents.Contains("js_key-k7"))
+	assert.Equal(t, "[]", contents.Get("js_key-k7"))
 }
 
 func TestKeepSourceV2(t *testing.T) {
@@ -247,6 +298,10 @@ func TestKeepSourceV2(t *testing.T) {
 	processor.processEvent(log)
 	assert.True(t, contents.Contains("js_key-k1"))
 	assert.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}", contents.Get("js_key-k1"))
+	assert.True(t, contents.Contains("js_key-k6"))
+	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", contents.Get("js_key-k6"))
+	assert.True(t, contents.Contains("js_key-k7"))
+	assert.Equal(t, "[]", contents.Get("js_key-k7"))
 }
 
 func TestExpandKeySameToSourceV2(t *testing.T) {
@@ -324,4 +379,25 @@ func TestNoKeyErrorV2(t *testing.T) {
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.True(t, strings.Contains(memoryLog, "PROCESSOR_JSON_FIND_ALARM\tcannot find key s_key"))
+}
+
+func TestExpandArrayV2(t *testing.T) {
+	processor, err := newProcessor()
+	processor.ExpandArray = true
+	require.NoError(t, err)
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	contents := log.GetIndices()
+	contents.Add("s_key", jsonVal)
+	processor.processEvent(log)
+	assert.True(t, contents.Contains("js_key-k1-k2-k3-k4-k51"))
+	assert.Equal(t, "51", contents.Get("js_key-k1-k2-k3-k4-k51"))
+	assert.True(t, contents.Contains("js_key-k1-k2-k3-k4-k52"))
+	assert.Equal(t, "52", contents.Get("js_key-k1-k2-k3-k4-k52"))
+	assert.True(t, contents.Contains("js_key-k1-k2-k3-k41"))
+	assert.Equal(t, "41", contents.Get("js_key-k1-k2-k3-k41"))
+	assert.True(t, contents.Contains("js_key-k6[0]-x"))
+	assert.Equal(t, "a", contents.Get("js_key-k6[0]-x"))
+	assert.True(t, contents.Contains("js_key-k6[1]-x"))
+	assert.Equal(t, "b", contents.Get("js_key-k6[1]-x"))
+	assert.False(t, contents.Contains("js_key-k7"))
 }
