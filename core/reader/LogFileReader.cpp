@@ -1792,6 +1792,10 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     TruncateInfo* truncateInfo = nullptr;
     size_t nbytes = ReadFile(mLogFileOp, stringMemory.data, READ_BYTE, mLastFilePos, &truncateInfo);
     char* stringBuffer = stringMemory.data;
+    if (nbytes == 0) {
+        stringBuffer[0] = '\0';
+        return;
+    }
     // Ignore \n if last is force read
     if (stringBuffer[0] == '\n' && mLastForceRead) {
         ++stringBuffer;
@@ -1860,6 +1864,9 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         }
     }
     gbkBuffer[readCharCount] = '\0';
+    if (readCharCount == 0) {
+        return;
+    }
 
     vector<size_t> lineFeedPos = {0};
     for (size_t idx = 0; idx < readCharCount - 1; ++idx) {
@@ -2240,6 +2247,7 @@ void LogFileReader::UpdateReaderManual() {
     }
     mLogFileOp.Open(mHostLogPath.c_str(), mIsFuseMode);
     mDevInode = GetFileDevInode(mHostLogPath);
+    mRealLogPath = mHostLogPath;
 }
 #endif
 

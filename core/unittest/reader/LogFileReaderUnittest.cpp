@@ -220,6 +220,26 @@ void LogFileReaderUnittest::TestReadGBK() {
         expectedPart = expectedPart.substr(expectedPart.rfind("iLogtail"));
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
     }
+    { // empty file
+        CommonRegLogFileReader reader(projectName,
+                                      category,
+                                      logPathDir,
+                                      gbkFile,
+                                      INT32_FLAG(default_tail_limit_kb),
+                                      timeFormat,
+                                      topicFormat,
+                                      groupTopic,
+                                      FileEncoding::ENCODING_GBK,
+                                      false,
+                                      false);
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadGBK(logBuffer, 0, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_STREQ_FATAL(NULL, logBuffer.rawBuffer.data());
+    }
 }
 
 void LogFileReaderUnittest::TestReadUTF8() {
@@ -356,6 +376,26 @@ void LogFileReaderUnittest::TestReadUTF8() {
         expectedPart = expectedContent.get();
         expectedPart.resize(expectedPart.rfind("iLogtail") - 1);
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+    }
+    { // empty
+        CommonRegLogFileReader reader(projectName,
+                                      category,
+                                      logPathDir,
+                                      utf8File,
+                                      INT32_FLAG(default_tail_limit_kb),
+                                      timeFormat,
+                                      topicFormat,
+                                      groupTopic,
+                                      FileEncoding::ENCODING_UTF8,
+                                      false,
+                                      false);
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadUTF8(logBuffer, 0, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_STREQ_FATAL(NULL, logBuffer.rawBuffer.data());
     }
 }
 
