@@ -200,11 +200,12 @@ void do_worker_process() {
     appInfoJson["update_time"] = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
     std::string appInfo = appInfoJson.toStyledString();
     OverwriteFile(GetProcessExecutionDir() + STRING_FLAG(app_info_file), appInfo);
-    APSARA_LOG_INFO(sLogger, ("Logtail started, appInfo", appInfo));
+    APSARA_LOG_INFO(sLogger, ("appInfo", appInfo));
 
     ConfigManager::GetInstance()->InitUpdateConfig(configExistFlag);
     ConfigManager::GetInstance()->RegisterHandlers();
     EventDispatcher::GetInstance()->AddExistedCheckPointFileEvents();
+    APSARA_LOG_INFO(sLogger, ("Logtail started", "initialization completed"));
 
     EventDispatcher::GetInstance()->Dispatch();
 }
