@@ -73,7 +73,7 @@ Our official **User Manual** is located here:
 
 [All Plugins](https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/overview)
 
-[Getting Started](https://ilogtail.gitbook.io/ilogtail-docs/getting-started/)
+[Getting Started](https://ilogtail.gitbook.io/ilogtail-docs/awesome-ilogtail/getting-started)
 
 [Developer Guide](https://ilogtail.gitbook.io/ilogtail-docs/developer-guide/)
 
