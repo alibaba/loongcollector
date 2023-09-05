@@ -20,9 +20,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
+
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -268,10 +269,22 @@ func setLogConf(logConfig string) {
 	path := filepath.Clean(logConfig)
 	if _, err := os.Stat(path); err != nil {
 		logConfigContent := generateDefaultConfig()
-		_ = ioutil.WriteFile(path, []byte(logConfigContent), os.ModePerm)
+		_ = os.WriteFile(path, []byte(logConfigContent), os.ModePerm)
 	}
 	fmt.Fprintf(os.Stderr, "load log config %s \n", path)
-	logger, err := seelog.LoggerFromConfigAsFile(path)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "init logger error", err)
+		return
+	}
+	dat := string(content)
+	aliyunLogtailLogLevel := strings.ToLower(os.Getenv("LOGTAIL_LOG_LEVEL"))
+	if aliyunLogtailLogLevel != "" {
+		pattern := `(?mi)(minlevel=")([^"]*)(")`
+		regExp := regexp.MustCompile(pattern)
+		dat = regExp.ReplaceAllString(dat, `${1}`+aliyunLogtailLogLevel+`${3}`)
+	}
+	logger, err := seelog.LoggerFromConfigAsString(dat)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "init logger error", err)
 		return
@@ -281,8 +294,8 @@ func setLogConf(logConfig string) {
 		return
 	}
 	logtailLogger = logger
-	dat, _ := ioutil.ReadFile(path)
-	if strings.Contains(string(dat), "minlevel=\"debug\"") {
+
+	if aliyunLogtailLogLevel == "debug" || strings.Contains(dat, "minlevel=\"debug\"") {
 		debugFlag = 1
 	}
 }

@@ -39,6 +39,7 @@ inline bool EndWith(const std::string& input, const std::string& pattern) {
 }
 
 std::string ToLowerCaseString(const std::string& orig);
+std::string ToUpperCaseString(const std::string& orig);
 
 int StringCaseInsensitiveCmp(const std::string& s1, const std::string& s2);
 int CStringNCaseInsensitiveCmp(const char* s1, const char* s2, size_t n);
