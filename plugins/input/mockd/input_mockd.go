@@ -71,11 +71,11 @@ func (p *ServiceMock) Start(c pipeline.Collector) error {
 			p.MockOneLog(c)
 		}
 		nowTime := time.Now()
-		sleepTime := time.Duration(0)
+		sleepTime := time.Millisecond // make sure p.shutdown has high priority
 		if nowTime.Sub(beginTime) < time.Second {
 			sleepTime = time.Second - nowTime.Sub(beginTime)
 		}
-		logger.Info(p.context.GetRuntimeContext(), "input logs", p.LogsPerSecond, "const", nowTime.Sub(beginTime), "sleep", sleepTime)
+		logger.Info(p.context.GetRuntimeContext(), "input logs", p.LogsPerSecond, "cost", nowTime.Sub(beginTime), "sleep", sleepTime)
 		p.nowLogCount += p.LogsPerSecond
 		if p.MaxLogCount > 0 && p.nowLogCount >= p.MaxLogCount {
 			logger.Info(p.context.GetRuntimeContext(), "input logs", p.nowLogCount, "done")

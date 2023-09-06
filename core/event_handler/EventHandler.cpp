@@ -650,13 +650,13 @@ void ModifyHandler::Handle(const Event& event) {
             //     -> cannot find reader, treat as new file -> read log tail(1MB)
             // so when open file ptr faild, put this reader into rotator map, when process a.log1 modify event, we can
             // find it in rotator map
-            LOG_INFO(
-                sLogger,
-                ("open file failed", "move the corresponding reader to the rotator reader pool")(
-                    "project", reader->GetProjectName())("logstore", reader->GetCategory())("config", mConfigName)(
-                    "log reader queue name", reader->GetHostLogPath())("log reader queue size", readerArrayPtr->size() - 1)(
-                    "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
-                    "file size", reader->GetFileSize())("rotator reader pool size", mRotatorReaderMap.size() + 1));
+            LOG_INFO(sLogger,
+                     ("open the file failed", "move the corresponding reader to the rotator reader pool")(
+                         "project", reader->GetProjectName())("logstore", reader->GetCategory())("config", mConfigName)(
+                         "log reader queue name", reader->GetHostLogPath())("log reader queue size",
+                                                                            readerArrayPtr->size() - 1)(
+                         "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
+                         "file size", reader->GetFileSize())("rotator reader pool size", mRotatorReaderMap.size() + 1));
             readerArrayPtr->pop_front();
             mDevInodeReaderMap.erase(reader->GetDevInode());
             mRotatorReaderMap[reader->GetDevInode()] = reader;

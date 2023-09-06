@@ -197,6 +197,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             string filePath = meta["file_name"].asString();
             string realFilePath;
             int32_t fileOpenFlag = 0; // default, we close file ptr
+            int32_t containerStopped = 0;
             if (meta.isMember("real_file_name")) {
                 realFilePath = meta["real_file_name"].asString();
             }
@@ -228,7 +229,9 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             if (meta.isMember("file_open")) {
                 fileOpenFlag = meta["file_open"].asInt();
             }
-
+            if (meta.isMember("container_stopped")) {
+                containerStopped = meta["container_stopped"].asInt();
+            }
             // can not get file's dev inode
             if (!devInode.IsValid()) {
                 LOG_WARNING(sLogger, ("can not find check point dev inode, discard it", filePath));
@@ -239,8 +242,15 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             if (meta.isMember("config_name") && meta["config_name"].isString()) {
                 // No need to check if the config still matches the file here.
                 configName = meta["config_name"].asString();
-                CheckPoint* ptr = new CheckPoint(
-                    filePath, offset, sigSize, sigHash, devInode, configName, realFilePath, fileOpenFlag);
+                CheckPoint* ptr = new CheckPoint(filePath,
+                                                 offset,
+                                                 sigSize,
+                                                 sigHash,
+                                                 devInode,
+                                                 configName,
+                                                 realFilePath,
+                                                 fileOpenFlag != 0,
+                                                 containerStopped != 0);
                 ptr->mLastUpdateTime = update_time;
                 AddCheckPoint(ptr);
             } else {
@@ -270,7 +280,8 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
                                                      devInode,
                                                      allConfig[i]->mConfigName,
                                                      realFilePath,
-                                                     fileOpenFlag);
+                                                     fileOpenFlag != 0,
+                                                     containerStopped != 0);
                     ptr->mLastUpdateTime = update_time;
                     AddCheckPoint(ptr);
                 }
@@ -312,7 +323,8 @@ bool CheckPointManager::DumpCheckPointToLocal() {
             leaf["update_time"] = Json::Value(checkPointPtr->mLastUpdateTime);
             leaf["inode"] = Json::Value(Json::UInt64(checkPointPtr->mDevInode.inode));
             leaf["dev"] = Json::Value(Json::UInt64(checkPointPtr->mDevInode.dev));
-            leaf["file_open"] = Json::Value(checkPointPtr->mFileOpenFlag);
+            leaf["file_open"] = Json::Value(checkPointPtr->mFileOpenFlag ? 1 : 0);
+            leaf["container_stopped"] = Json::Value(checkPointPtr->mContainerStopped ? 1 : 0);
             leaf["config_name"] = Json::Value(checkPointPtr->mConfigName);
             // forward compatible
             leaf["sig"] = Json::Value(string(""));
@@ -339,7 +351,8 @@ bool CheckPointManager::DumpCheckPointToLocal() {
             leaf["update_time"] = Json::Value(checkPointPtr->mLastUpdateTime);
             leaf["inode"] = Json::Value(Json::UInt64(checkPointPtr->mDevInode.inode));
             leaf["dev"] = Json::Value(Json::UInt64(checkPointPtr->mDevInode.dev));
-            leaf["file_open"] = Json::Value(checkPointPtr->mFileOpenFlag);
+            leaf["file_open"] = Json::Value(checkPointPtr->mFileOpenFlag ? 1 : 0);
+            leaf["container_stopped"] = Json::Value(checkPointPtr->mContainerStopped ? 1 : 0);
             leaf["config_name"] = Json::Value(checkPointPtr->mConfigName);
             // forward compatible
             leaf["sig"] = Json::Value(string(""));
