@@ -20,6 +20,7 @@
 #include "common/Flags.h"
 #include "config/Config.h"
 #include "interface/type.h"
+#include "bits/stl_numeric.h"
 
 
 DECLARE_FLAG_INT64(sls_observer_network_gc_interval);

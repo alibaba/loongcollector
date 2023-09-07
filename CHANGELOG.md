@@ -44,6 +44,9 @@ your changes, such as:
 - [public] [both] [updated] support continue/end regex patterns to split multiline log
 - [public] [both] [updated] support reader flush timeout
 - [public] [both] [updated] Flusher Kafka V2: support send the message with headers to kafka
+- [public] [both] [updated] update gcc version to 9.3.1
+- [public] [both] [updated] add make flag WITHOUTGDB
+- [public] [both] [fixed] Add APSARA_LOG_TRACE to solve the problem of not being able to find LOG_TRACE.
 - [public] [both] [fixed] fix multiline is splitted if not flushed to disk together
 - [public] [both] [fixed] fix line is truncated if \0 is in the middle of line
 - [public] [both] [fixed] container cannot exit for file reopened by checkpoint

@@ -16,4 +16,4 @@
 #curl -L https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64 >regctl
 
 regctl image copy sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:1.2.0 \
-        sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:latest
+        sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:gcc_9.3.1-1

@@ -4,20 +4,20 @@ ARG TARGETPLATFORM
 
 # install dependencies
 RUN yum -y install epel-release centos-release-scl
-RUN yum -y install devtoolset-8-gcc devtoolset-8-gcc-c++ make
+RUN yum -y install devtoolset-9-gcc devtoolset-9-gcc-c++ make
 RUN yum -y install curl-devel expat-devel gettext-devel openssl-devel perl-devel python3-devel zlib-devel \
-    asciidoc xmlto docbook2X wget
+    asciidoc xmlto docbook2X wget bison
 
-# using gcc8
-ENV MANPATH=/opt/rh/devtoolset-8/root/usr/share/man \
-    PERL5LIB=/opt/rh/devtoolset-8/root//usr/lib64/perl5/vendor_perl:/opt/rh/devtoolset-8/root/usr/lib/perl5:/opt/rh/devtoolset-8/root//usr/share/perl5/vendor_perl \
-    X_SCLS=devtoolset-8 \
-    PCP_DIR=/opt/rh/devtoolset-8/root \
-    LD_LIBRARY_PATH=/opt/rh/devtoolset-8/root/usr/lib64:/opt/rh/devtoolset-8/root/usr/lib:/opt/rh/devtoolset-8/root/usr/lib64/dyninst:/opt/rh/devtoolset-8/root/usr/lib/dyninst:/opt/rh/devtoolset-8/root/usr/lib64:/opt/rh/devtoolset-8/root/usr/lib \
-    PATH=/usr/ali/bin:/opt/rh/devtoolset-8/root/usr/bin:$PATH \
-    PYTHONPATH=/opt/rh/devtoolset-8/root/usr/lib64/python2.7/site-packages:/opt/rh/devtoolset-8/root/usr/lib/python2.7/site-packages \
-    PKG_CONFIG_PATH=/opt/rh/devtoolset-8/root/usr/lib64/pkgconfig \
-    INFOPATH=/opt/rh/devtoolset-8/root/usr/share/info
+# using gcc9
+ENV MANPATH=/opt/rh/devtoolset-9/root/usr/share/man \
+    PERL5LIB=/opt/rh/devtoolset-9/root//usr/lib64/perl5/vendor_perl:/opt/rh/devtoolset-9/root/usr/lib/perl5:/opt/rh/devtoolset-9/root//usr/share/perl5/vendor_perl \
+    X_SCLS=devtoolset-9 \
+    PCP_DIR=/opt/rh/devtoolset-9/root \
+    LD_LIBRARY_PATH=/opt/rh/devtoolset-9/root/usr/lib64:/opt/rh/devtoolset-9/root/usr/lib:/opt/rh/devtoolset-9/root/usr/lib64/dyninst:/opt/rh/devtoolset-9/root/usr/lib/dyninst:/opt/rh/devtoolset-9/root/usr/lib64:/opt/rh/devtoolset-9/root/usr/lib \
+    PATH=/usr/ali/bin:/opt/rh/devtoolset-9/root/usr/bin:$PATH \
+    PYTHONPATH=/opt/rh/devtoolset-9/root/usr/lib64/python2.7/site-packages:/opt/rh/devtoolset-9/root/usr/lib/python2.7/site-packages \
+    PKG_CONFIG_PATH=/opt/rh/devtoolset-9/root/usr/lib64/pkgconfig \
+    INFOPATH=/opt/rh/devtoolset-9/root/usr/share/info
 
 WORKDIR /
 
@@ -34,8 +34,8 @@ RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/too
     tar -xf llvm-project-14.0.0.src.tar.xz && \
     mkdir llvm-project-14.0.0.src/build && \
     cd llvm-project-14.0.0.src/build && \
-    cmake -G 'Unix Makefiles' -D CMAKE_C_COMPILER=/opt/rh/devtoolset-8/root/usr/bin/gcc \
-        -D CMAKE_CXX_COMPILER=/opt/rh/devtoolset-8/root/usr/bin/g++ \
+    cmake -G 'Unix Makefiles' -D CMAKE_C_COMPILER=/opt/rh/devtoolset-9/root/usr/bin/gcc \
+        -D CMAKE_CXX_COMPILER=/opt/rh/devtoolset-9/root/usr/bin/g++ \
         -D LLVM_ENABLE_PROJECTS='clang' \
         -D CMAKE_BUILD_TYPE=Release ../llvm && \
     make -sj$(nproc) clang-format && \
@@ -60,7 +60,9 @@ RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/too
 FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/centos7-cve-fix:1.0.0
 
 # install dev tool set and debug utilities
-RUN yum -y install gcc gcc-c++ make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients sudo && \
+RUN yum -y install centos-release-scl
+RUN yum -y install devtoolset-9-gcc devtoolset-9-gcc-c++ make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients sudo 
+RUN yum remove -y centos-release-scl centos-release-scl-rh && \
     yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 RUN [[ ${TARGETPLATFORM##*/} == 'amd64' ]] && ARCH='x86_64' || ARCH='aarch64' && \
     debuginfo-install -y glibc-2.17-326.el7_9.${ARCH} libuuid-2.23.2-65.el7_9.1.${ARCH}
@@ -91,5 +93,16 @@ RUN go install golang.org/x/tools/gopls@v0.12.2 && \
 
 # install git
 COPY --from=toolchain-build /git-2.29.3/git /usr/bin
+
+# using gcc9
+ENV MANPATH=/opt/rh/devtoolset-9/root/usr/share/man \
+    PERL5LIB=/opt/rh/devtoolset-9/root//usr/lib64/perl5/vendor_perl:/opt/rh/devtoolset-9/root/usr/lib/perl5:/opt/rh/devtoolset-9/root//usr/share/perl5/vendor_perl \
+    X_SCLS=devtoolset-9 \
+    PCP_DIR=/opt/rh/devtoolset-9/root \
+    LD_LIBRARY_PATH=/opt/rh/devtoolset-9/root/usr/lib64:/opt/rh/devtoolset-9/root/usr/lib:/opt/rh/devtoolset-9/root/usr/lib64/dyninst:/opt/rh/devtoolset-9/root/usr/lib/dyninst:/opt/rh/devtoolset-9/root/usr/lib64:/opt/rh/devtoolset-9/root/usr/lib \
+    PATH=/usr/ali/bin:/opt/rh/devtoolset-9/root/usr/bin:$PATH \
+    PYTHONPATH=/opt/rh/devtoolset-9/root/usr/lib64/python2.7/site-packages:/opt/rh/devtoolset-9/root/usr/lib/python2.7/site-packages \
+    PKG_CONFIG_PATH=/opt/rh/devtoolset-9/root/usr/lib64/pkgconfig \
+    INFOPATH=/opt/rh/devtoolset-9/root/usr/share/info
 RUN chmod +x /usr/bin/git
 

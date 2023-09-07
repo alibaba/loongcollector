@@ -46,7 +46,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 ```shell
 $ gcc --version
-gcc (GCC) 4.8.5 20150623 (Red Hat 4.8.5-44)
+gcc (GCC) 9.3.1 20200408 (Red Hat 9.3.1-2)
 $ go version
 go version go1.16.15 linux/amd64
 $ git --version
@@ -82,7 +82,7 @@ go install ...
 
 ```json
 {
-  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:latest",
+  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:gcc_9.3.1-1",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -186,7 +186,7 @@ cp -a ./core/build/plugin/libPluginAdapter.so ./output
 ```bash
 docker run --name ilogtail-build -d \
   -v `pwd`:/src -w /src \
-  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:latest \
+  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:gcc_9.3.1-1 \
   bash -c "sleep infinity"
 ```
 

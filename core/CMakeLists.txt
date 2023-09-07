@@ -19,6 +19,7 @@ project(logtail)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail" OFF)
 option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF)
 option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF)
+option(WITHOUTGDB "Build Logtail without gdb" OFF)
 
 # Name/Version information.
 if (NOT DEFINED LOGTAIL_VERSION)
@@ -46,8 +47,13 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/common/Version.cpp.in ${VERSION_CPP_F
 
 # Default C/CXX flags.
 if (UNIX)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    if (WITHOUTGDB)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    else ()
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    endif ()
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")

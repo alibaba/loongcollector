@@ -132,6 +132,7 @@ public:
 #define APSARA_LOG_WARNING(logger, fields) LOG_X_IF(logger, true, fields, spdlog::level::warn)
 #define APSARA_LOG_ERROR(logger, fields) LOG_X_IF(logger, true, fields, spdlog::level::err)
 #define APSARA_LOG_FATAL(logger, fields) LOG_X_IF(logger, true, fields, spdlog::level::info)
+#define APSARA_LOG_TRACE(logger, fields) LOG_X_IF(logger, true, fields, spdlog::level::trace)
 
 // Global loggers.
 // NOTE: Please call Logger::Instance().InitGlobalLoggers() to init these loggers in main().

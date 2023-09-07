@@ -86,10 +86,10 @@ endforeach (DEP_NAME)
 
 # spdlog, replace implementation.
 if (spdlog_${INCLUDE_DIR_SUFFIX})
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/deps/spdlog/sinks/rotating_file_sink.h
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/deps/spdlog/sinks/rotating_file_sink-inl.h
             DESTINATION "${spdlog_${INCLUDE_DIR_SUFFIX}}/spdlog/sinks")
 else ()
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/deps/spdlog/sinks/rotating_file_sink.h
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/deps/spdlog/sinks/rotating_file_sink-inl.h
             DESTINATION ${DEPS_INCLUDE_ROOT}/spdlog/sinks)
 endif ()
 
