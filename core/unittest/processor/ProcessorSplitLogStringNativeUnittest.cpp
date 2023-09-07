@@ -48,9 +48,12 @@ void ProcessorSplitLogStringNativeUnittest::TestInit() {
     config.mLogType = REGEX_LOG;
     config.mLogBeginReg = ".*";
     config.mAdvancedConfig.mEnableLogPositionMeta = false;
+
+    std::string pluginId = "testID";
+    ComponentConfig componentConfig(pluginId, config);
     ProcessorSplitLogStringNative processor;
     processor.SetContext(mContext);
-    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
 }
 
 void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
@@ -81,7 +84,10 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
     // run function
     ProcessorSplitLogStringNative processor;
     processor.SetContext(mContext);
-    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+
+    std::string pluginId = "testID";
+    ComponentConfig componentConfig(pluginId, config);
+    APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
     processor.Process(eventGroup);
     // judge result
     std::stringstream expectJson;
@@ -153,7 +159,9 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
     // run function
     ProcessorSplitLogStringNative processor;
     processor.SetContext(mContext);
-    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    std::string pluginId = "testID";
+    ComponentConfig componentConfig(pluginId, config);
+    APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
     processor.Process(eventGroup);
     // judge result
     std::string expectJson = R"({

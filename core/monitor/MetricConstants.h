@@ -19,18 +19,27 @@
 
 namespace logtail {
 
-const std::string METRIC_FIELD_REGION = "region";
-const std::string METRIC_REGION_DEFAULT = "default";
-const std::string METRIC_SLS_LOGSTORE_NAME = "shennong_log_profile";
-const std::string METRIC_TOPIC_TYPE = "logtail_metric";
-const std::string METRIC_TOPIC_FIELD_NAME = "__topic__";
+extern const std::string METRIC_FIELD_REGION;
+extern const std::string METRIC_REGION_DEFAULT;
+extern const std::string METRIC_SLS_LOGSTORE_NAME;
+extern const std::string METRIC_TOPIC_TYPE;
+extern const std::string METRIC_TOPIC_FIELD_NAME;
 
-const std::string LABEL_PREFIX = "label.";
-const std::string VALUE_PREFIX = "value.";
+extern const std::string LABEL_PREFIX;
+extern const std::string VALUE_PREFIX;
 
+// processor common metrics
+extern const std::string METRIC_PROC_IN_RECORDS_TOTAL;
+extern const std::string METRIC_PROC_IN_RECORDS_SIZE_BYTES;
+extern const std::string METRIC_PROC_OUT_RECORDS_TOTAL;
+extern const std::string METRIC_PROC_OUT_RECORDS_SIZE_BYTES;
+extern const std::string METRIC_PROC_DISCARD_RECORDS_TOTAL;
+extern const std::string METRIC_PROC_TIME_MS;
 
-
-const std::string METRIC_FILE_READ_COUNT = "file_read_count";
-const std::string METRIC_FILE_READ_BYTES = "file_read_bytes";
+// processor custom metrics
+extern const std::string METRIC_PROC_PARSE_IN_SIZE_BYTES;
+extern const std::string METRIC_PROC_PARSE_OUT_SIZE_BYTES;
+extern const std::string METRIC_PROC_PARSE_ERROR_TOTAL;
+extern const std::string METRIC_PROC_KEY_COUNT_NOT_MATCH_ERROR_TOTAL;
 
 } // namespace logtail

@@ -39,4 +39,9 @@ bool SpanEvent::FromJson(const Json::Value& root) {
     return true;
 }
 
+uint64_t SpanEvent::EventsSizeBytes() {
+    // TODO
+    return 0;
+}
+
 } // namespace logtail

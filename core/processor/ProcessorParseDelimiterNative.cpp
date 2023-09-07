@@ -17,10 +17,13 @@
 #include "processor/ProcessorParseDelimiterNative.h"
 #include "common/Constants.h"
 #include "models/LogEvent.h"
+#include "plugin/ProcessorInstance.h"
+
 
 namespace logtail {
 
-bool ProcessorParseDelimiterNative::Init(const ComponentConfig& config) {
+bool ProcessorParseDelimiterNative::Init(const ComponentConfig& componentConfig) {
+    SetMetricsRecordRef(Name(), componentConfig.GetId());
     return true;
 }
 

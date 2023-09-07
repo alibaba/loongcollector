@@ -22,7 +22,7 @@ namespace logtail {
 class ProcessorFillGroupInfoNative : public Processor {
 public:
     static const char* Name() { return "processor_fill_group_info_native"; }
-    bool Init(const ComponentConfig& config) override;
+    bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
 
 protected:

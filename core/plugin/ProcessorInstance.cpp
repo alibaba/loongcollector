@@ -15,19 +15,38 @@
  */
 
 #include "plugin/ProcessorInstance.h"
+#include "monitor/MetricConstants.h"
 
 namespace logtail {
 
 bool ProcessorInstance::Init(const ComponentConfig& config, PipelineContext& context) {
     mContext = &context;
     mPlugin->SetContext(context);
-    return mPlugin->Init(config);
+    bool inited = mPlugin->Init(config);
+    if (!inited) {
+        return inited;
+    }
+    // should init plugin first， then could GetMetricsRecordRef from plugin
+    mProcInRecordsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_IN_RECORDS_TOTAL);
+    mProcOutRecordsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_OUT_RECORDS_TOTAL);
+    mProcTimeMS = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_TIME_MS);
+    
+    return inited;
 }
 
 void ProcessorInstance::Process(PipelineEventGroup& logGroup) {
     size_t inSize = logGroup.GetEvents().size();
+
+    mProcInRecordsTotal->Add(inSize);
+
+    uint64_t startTime = GetCurrentTimeInMicroSeconds();
     mPlugin->Process(logGroup);
+    uint64_t durationTime = GetCurrentTimeInMicroSeconds() - startTime;
+    
+    mProcTimeMS->Add(durationTime);
+
     size_t outSize = logGroup.GetEvents().size();
+    mProcOutRecordsTotal->Add(outSize);
     LOG_DEBUG(mContext->GetLogger(), ("Processor", Id())("InSize", inSize)("OutSize", outSize));
 }
 

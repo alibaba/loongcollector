@@ -53,7 +53,9 @@ void ProcessorFillGroupInfoNativeUnittest::TestInit() {
     {
         ProcessorFillGroupInfoNative processor;
         processor.SetContext(mContext);
-        APSARA_TEST_TRUE_FATAL(processor.Init(config));
+        std::string pluginId = "testID";
+    ComponentConfig componentConfig(pluginId, config);
+        APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
         APSARA_TEST_EQUAL_FATAL("none", processor.mTopicFormat);
         APSARA_TEST_EQUAL_FATAL(config.mGroupTopic, processor.mGroupTopic);
         APSARA_TEST_EQUAL_FATAL(std::string(), processor.mStaticTopic);
@@ -63,7 +65,9 @@ void ProcessorFillGroupInfoNativeUnittest::TestInit() {
         config.mLogType = APSARA_LOG;
         ProcessorFillGroupInfoNative processor;
         processor.SetContext(mContext);
-        APSARA_TEST_TRUE_FATAL(processor.Init(config));
+        std::string pluginId = "testID";
+    ComponentConfig componentConfig(pluginId, config);
+        APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
         APSARA_TEST_EQUAL_FATAL("default", processor.mTopicFormat);
     }
 }
@@ -78,7 +82,9 @@ void ProcessorFillGroupInfoNativeUnittest::TestGetTopicName() {
         config.mTopicFormat = "/var/log/(.*)";
         ProcessorFillGroupInfoNative processor;
         processor.SetContext(mContext);
-        APSARA_TEST_TRUE_FATAL(processor.Init(config));
+        std::string pluginId = "testID";
+    ComponentConfig componentConfig(pluginId, config);
+        APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
         tags.clear();
         APSARA_TEST_EQUAL_FATAL(std::string("message"), processor.GetTopicName("/var/log/message", tags));
         APSARA_TEST_EQUAL_FATAL(0L, tags.size());
@@ -88,7 +94,9 @@ void ProcessorFillGroupInfoNativeUnittest::TestGetTopicName() {
         config.mTopicFormat = "/var/(.*)/(.*)";
         ProcessorFillGroupInfoNative processor;
         processor.SetContext(mContext);
-        APSARA_TEST_TRUE_FATAL(processor.Init(config));
+        std::string pluginId = "testID";
+    ComponentConfig componentConfig(pluginId, config);
+        APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
         tags.clear();
         APSARA_TEST_EQUAL_FATAL(std::string("log_message"), processor.GetTopicName("/var/log/message", tags));
         APSARA_TEST_EQUAL_FATAL(2L, tags.size());
@@ -108,7 +116,9 @@ void ProcessorFillGroupInfoNativeUnittest::TestProcess() {
 
     ProcessorFillGroupInfoNative processor;
     processor.SetContext(mContext);
-    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    std::string pluginId = "testID";
+    ComponentConfig componentConfig(pluginId, config);
+    APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
 
     auto sourceBuffer = std::make_shared<logtail::SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);

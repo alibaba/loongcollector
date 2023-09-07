@@ -19,9 +19,12 @@
 #include "common/Constants.h"
 #include "common/FileSystemUtil.h"
 #include "reader/LogFileReader.h"
+#include "plugin/ProcessorInstance.h"
+
 namespace logtail {
 
-bool ProcessorFillGroupInfoNative::Init(const ComponentConfig& config) {
+bool ProcessorFillGroupInfoNative::Init(const ComponentConfig& componentConfig) {
+    Config config = componentConfig.GetConfig();
     mTopicFormat = config.mTopicFormat;
     if (config.mLogType != APSARA_LOG && ToLowerCaseString(mTopicFormat) == "default") {
         mTopicFormat = "none";
@@ -31,6 +34,7 @@ bool ProcessorFillGroupInfoNative::Init(const ComponentConfig& config) {
         mStaticTopic = config.mCustomizedTopic;
         mIsStaticTopic = true;
     }
+    SetMetricsRecordRef(Name(), componentConfig.GetId());
     return true;
 }
 

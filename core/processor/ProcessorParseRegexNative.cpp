@@ -18,14 +18,22 @@
 
 #include "parser/LogParser.h" // for UNMATCH_LOG_KEY
 #include "common/Constants.h"
+#include "monitor/LogtailMetric.h"
+#include "monitor/MetricConstants.h"
+#include "common/TimeUtil.h"
+#include "plugin/ProcessorInstance.h"
 
 namespace logtail {
 
-bool ProcessorParseRegexNative::Init(const ComponentConfig& config) {
+bool ProcessorParseRegexNative::Init(const ComponentConfig& componentConfig) {
+
+    PipelineConfig config = componentConfig.GetConfig();
+
     mSourceKey = DEFAULT_CONTENT_KEY;
     mDiscardUnmatch = config.mDiscardUnmatch;
     mUploadRawLog = config.mUploadRawLog;
     mRawLogTag = config.mAdvancedConfig.mRawLogTag;
+
     if (config.mRegs && config.mKeys) {
         std::list<std::string>::iterator regitr = config.mRegs->begin();
         std::list<std::string>::iterator keyitr = config.mKeys->begin();
@@ -45,8 +53,15 @@ bool ProcessorParseRegexNative::Init(const ComponentConfig& config) {
     mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
     mRegexMatchFailures = &(GetContext().GetProcessProfile().regexMatchFailures);
     mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
+    SetMetricsRecordRef(Name(), componentConfig.GetId());
+    mProcParseInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_IN_SIZE_BYTES);
+    mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
+    mProcDiscardRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DISCARD_RECORDS_TOTAL);
+    mProcParseErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_ERROR_TOTAL);
+    mProcKeyCountNotMatchErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_KEY_COUNT_NOT_MATCH_ERROR_TOTAL);
     return true;
 }
+
 
 void ProcessorParseRegexNative::Process(PipelineEventGroup& logGroup) {
     if (logGroup.GetEvents().empty() || mUserDefinedFormat.empty()) {
@@ -103,6 +118,7 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath, Pipeline
         }
         return true;
     }
+    mProcDiscardRecordsTotal->Add(1);
     return false;
 }
 
@@ -114,13 +130,17 @@ void ProcessorParseRegexNative::AddUserDefinedFormat(const std::string& regStr, 
 }
 
 bool ProcessorParseRegexNative::WholeLineModeParser(LogEvent& sourceEvent, const std::string& key) {
-    AddLog(StringView(key), sourceEvent.GetContent(mSourceKey), sourceEvent);
+    StringView buffer = sourceEvent.GetContent(mSourceKey);
+    AddLog(StringView(key), buffer, sourceEvent);
+    mProcParseInSizeBytes->Add(buffer.size());
     return true;
 }
 
 void ProcessorParseRegexNative::AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent) {
     targetEvent.SetContentNoCopy(key, value);
-    *mLogGroupSize += key.size() + value.size() + 5;
+    size_t keyValueSize = key.size() + value.size();
+    *mLogGroupSize += keyValueSize + 5;
+    mProcParseOutSizeBytes->Add(keyValueSize);
 }
 
 bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
@@ -131,6 +151,7 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
     std::string exception;
     StringView buffer = sourceEvent.GetContent(mSourceKey);
     bool parseSuccess = true;
+    mProcParseInSizeBytes->Add(buffer.size());
     if (!BoostRegexMatch(buffer.data(), buffer.size(), reg, exception, what, boost::match_default)) {
         if (!exception.empty()) {
             if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
@@ -162,6 +183,7 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
         }
         ++(*mRegexMatchFailures);
         ++(*mParseFailures);
+        mProcParseErrorTotal->Add(1);
         parseSuccess = false;
     } else if (what.size() <= keys.size()) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
@@ -180,6 +202,7 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
         }
         ++(*mRegexMatchFailures);
         ++(*mParseFailures);
+        mProcKeyCountNotMatchErrorTotal->Add(1);
         parseSuccess = false;
     }
     if (!parseSuccess) {

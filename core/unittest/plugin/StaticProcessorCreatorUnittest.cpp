@@ -21,7 +21,7 @@ namespace logtail {
 class ProcessorMock : public Processor {
 public:
     static const char* Name() { return "processor_mock"; }
-    bool Init(const ComponentConfig&) override { return true; }
+    bool Init(const ComponentConfig& config) override { return true; }
     void Process(PipelineEventGroup&) override {}
     bool IsSupportedEvent(const PipelineEventPtr& e) override { return true; }
 };

@@ -30,8 +30,8 @@ const char* DynamicCProcessorProxy::Name() const {
     return _name.c_str();
 }
 
-bool DynamicCProcessorProxy::Init(const ComponentConfig& config) {
-    return _c_ins->plugin->init(_c_ins, (void*)(&config), (void*)(&GetContext())) == 0;
+bool DynamicCProcessorProxy::Init(const ComponentConfig& componentConfig) {
+    return _c_ins->plugin->init(_c_ins, (void*)(&componentConfig), (void*)(&GetContext())) == 0;
 }
 
 void DynamicCProcessorProxy::Process(PipelineEventGroup& logGroup) {

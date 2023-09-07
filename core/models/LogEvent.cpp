@@ -83,4 +83,9 @@ bool LogEvent::FromJson(const Json::Value& root) {
     return true;
 }
 
+uint64_t LogEvent::EventsSizeBytes() {
+    // TODO
+    return 0;
+}
+
 } // namespace logtail

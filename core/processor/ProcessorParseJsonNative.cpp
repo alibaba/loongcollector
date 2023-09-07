@@ -17,10 +17,13 @@
 #include "processor/ProcessorParseJsonNative.h"
 #include "common/Constants.h"
 #include "models/LogEvent.h"
+#include "plugin/ProcessorInstance.h"
+
 
 namespace logtail {
 
-bool ProcessorParseJsonNative::Init(const ComponentConfig& config) {
+bool ProcessorParseJsonNative::Init(const ComponentConfig& componentConfig) {
+    SetMetricsRecordRef(Name(), componentConfig.GetId());
     return true;
 }
 

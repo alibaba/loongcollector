@@ -40,4 +40,9 @@ bool MetricEvent::FromJson(const Json::Value& root) {
     return true;
 }
 
+uint64_t MetricEvent::EventsSizeBytes() {
+    // TODO
+    return 0;
+}
+
 } // namespace logtail

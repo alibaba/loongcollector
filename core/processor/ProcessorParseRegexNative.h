@@ -24,7 +24,7 @@ namespace logtail {
 class ProcessorParseRegexNative : public Processor {
 public:
     static const char* Name() { return "processor_parse_regex_native"; }
-    bool Init(const ComponentConfig& config) override;
+    bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
 
 protected:
@@ -51,6 +51,14 @@ private:
     int* mParseFailures = nullptr;
     int* mRegexMatchFailures = nullptr;
     int* mLogGroupSize = nullptr;
+
+    CounterPtr mProcParseInSizeBytes;
+    CounterPtr mProcParseOutSizeBytes;
+
+    CounterPtr mProcDiscardRecordsTotal;
+    CounterPtr mProcParseErrorTotal;
+    CounterPtr mProcKeyCountNotMatchErrorTotal;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseRegexNativeUnittest;
 #endif

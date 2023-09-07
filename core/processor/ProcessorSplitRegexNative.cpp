@@ -19,10 +19,13 @@
 #include "reader/LogFileReader.h" //SplitState
 #include "models/LogEvent.h"
 #include "logger/Logger.h"
+#include "plugin/ProcessorInstance.h"
+
 
 namespace logtail {
 
-bool ProcessorSplitRegexNative::Init(const ComponentConfig& config) {
+bool ProcessorSplitRegexNative::Init(const ComponentConfig& componentConfig) {
+    PipelineConfig config = componentConfig.GetConfig();
     mSplitKey = DEFAULT_CONTENT_KEY;
     mIsMultline = config.IsMultiline();
     SetLogMultilinePolicy(config.mLogBeginReg, config.mLogContinueReg, config.mLogEndReg);
@@ -30,6 +33,7 @@ bool ProcessorSplitRegexNative::Init(const ComponentConfig& config) {
     mEnableLogPositionMeta = config.mAdvancedConfig.mEnableLogPositionMeta;
     mFeedLines = &(GetContext().GetProcessProfile().feedLines);
     mSplitLines = &(GetContext().GetProcessProfile().splitLines);
+    SetMetricsRecordRef(Name(), componentConfig.GetId());
     return true;
 }
 

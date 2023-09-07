@@ -27,7 +27,7 @@ public:
     DynamicCProcessorProxy(const char* name);
     ~DynamicCProcessorProxy();
     const char* Name() const;
-    bool Init(const ComponentConfig& config) override;
+    bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
     void SetCProcessor(const processor_interface_t* c_ins);
 

@@ -174,4 +174,9 @@ bool PipelineEventGroup::FromJsonString(const std::string& inJson) {
     return FromJson(root);
 }
 
+uint64_t PipelineEventGroup::EventGroupSizeBytes() {
+    // TODO
+    return 0;
+}
+
 } // namespace logtail

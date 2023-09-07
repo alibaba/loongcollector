@@ -90,6 +90,13 @@ public:
         static WriteMetrics* ptr = new WriteMetrics();
         return ptr;
     }
+    void PreparePluginCommonLabels(const std::string& projectName,
+                                   const std::string& logstoreName,
+                                   const std::string& region,
+                                   const std::string& configName,
+                                   const std::string& pluginName,
+                                   const std::string& pluginID,
+                                   MetricLabels& labels);
     void PrepareMetricsRecordRef(MetricsRecordRef& ref, MetricLabels&& labels);
     MetricsRecord* DoSnapshot();
 

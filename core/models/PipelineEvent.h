@@ -44,6 +44,8 @@ public:
     std::string ToJsonString() const;
     bool FromJsonString(const std::string&);
 
+    virtual uint64_t EventsSizeBytes() = 0;
+
 protected:
     void SetSourceBuffer(std::shared_ptr<SourceBuffer> sourceBuffer) { mSourceBuffer = sourceBuffer; }
 

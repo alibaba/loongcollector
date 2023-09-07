@@ -30,7 +30,7 @@ public:
     PipelineContext& GetContext() { return mContext; }
 
 private:
-    bool InitAndAddProcessor(std::unique_ptr<ProcessorInstance>&& processor, const ComponentConfig& config);
+    bool InitAndAddProcessor(std::unique_ptr<ProcessorInstance>&& processor, const PipelineConfig& config);
 
     std::string mName;
     std::vector<std::unique_ptr<ProcessorInstance> > mProcessorLine;

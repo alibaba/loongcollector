@@ -74,6 +74,7 @@ public:
     bool FromJson(const Json::Value&);
     std::string ToJsonString() const;
     bool FromJsonString(const std::string&);
+    uint64_t EventGroupSizeBytes();
 
 private:
     GroupInfo mGroup;
