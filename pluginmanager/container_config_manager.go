@@ -39,6 +39,8 @@ func CollectContainers(logGroup *protocol.LogGroup) {
 			logger.Info(context.Background(), "CollectAllContainers running", time.Since(lastFetchAllTime))
 			refreshEnvAndLabel()
 			collectAllContainers(logGroup)
+			// timer config result
+			helper.RecordContainerConfigResult()
 			lastFetchAllTime = time.Now()
 		} else {
 			logger.Debugf(context.Background(), "CollectDiffContainers running", time.Since(lastFetchAllTime))
