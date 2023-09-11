@@ -96,6 +96,7 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 				checkpoint.Offset = 0
 			}
 			checkpoint.State = helper.GetOSState(stat)
+			checkpoint.Path = realPath
 		}
 	}
 	if sds.CloseUnChangedSec < 10 {
