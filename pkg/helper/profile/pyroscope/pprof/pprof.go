@@ -344,7 +344,7 @@ func (r *RawProfile) extractProfileV1(meta *profile.Meta, tags map[string]string
 			log := &protocol.Log{
 				Contents: res,
 			}
-			protocol.SetLogTime(log, uint32(startTime/1e9), uint32(startTime%1e9))
+			protocol.SetLogTimeWithNano(log, uint32(startTime/1e9), uint32(startTime%1e9))
 			r.logs = append(r.logs, log)
 		}
 	}

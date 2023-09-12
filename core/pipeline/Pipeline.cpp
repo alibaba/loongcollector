@@ -31,6 +31,7 @@ namespace logtail {
 
 bool Pipeline::Init(const PipelineConfig& config) {
     mName = config.mConfigName;
+    mConfig = config;
 
     mContext.SetConfigName(config.mConfigName);
     mContext.SetLogstoreName(config.mCategory);

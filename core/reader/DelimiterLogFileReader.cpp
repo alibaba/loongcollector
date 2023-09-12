@@ -214,9 +214,9 @@ bool DelimiterLogFileReader::ParseLogLine(StringView buffer,
         Log* logPtr = logGroup.add_logs();
         auto now = GetCurrentLogtailTime();
         if (mUseSystemTime || lastLogLineTime.tv_sec <= 0) {
-            SetLogTime(logPtr, now.tv_sec, now.tv_nsec);
+            SetLogTimeWithNano(logPtr, now.tv_sec, now.tv_nsec);
         } else {
-            SetLogTime(logPtr, lastLogLineTime.tv_sec, lastLogLineTime.tv_nsec);
+            SetLogTimeWithNano(logPtr, lastLogLineTime.tv_sec, lastLogLineTime.tv_nsec);
         }
 
         for (uint32_t idx = 0; idx < parsedColCount; idx++) {

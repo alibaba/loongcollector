@@ -231,7 +231,7 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     logGroup.set_category(category);
     logGroup.set_source(LogFileProfiler::mIpAddr);
     Log* logPtr = logGroup.add_logs();
-    SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec, now.tv_nsec);
+    SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec);
     // CPU usage of Logtail process.
     AddLogContent(logPtr, "cpu", mCpuStat.mCpuUsage);
 #if defined(__linux__) // TODO: Remove this if auto scale is available on Windows.

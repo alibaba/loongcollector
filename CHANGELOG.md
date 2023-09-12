@@ -52,4 +52,4 @@ your changes, such as:
 - [public] [both] [fixed] container cannot exit for file reopened by checkpoint
 - [public] [both] [fixed] fix filename being mismatched to the deleted file if the deleted file size is 0 and their inode is same
 - [public] [both] [fixed] fix config server panic caused by concurrent read and write shared object
-
+- [public] [both] [added] support plugin ProcessorParseTimestampNative

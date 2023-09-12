@@ -62,6 +62,7 @@ Json::Value LogEvent::ToJson() const {
     Json::Value root;
     root["type"] = GetType();
     root["timestamp"] = GetTimestamp();
+    root["timestampNanosecond"] = GetTimestampNanosecond();
     if (!GetContents().empty()) {
         Json::Value contents;
         for (const auto& content : this->GetContents()) {
@@ -73,7 +74,11 @@ Json::Value LogEvent::ToJson() const {
 }
 
 bool LogEvent::FromJson(const Json::Value& root) {
-    SetTimestamp(root["timestamp"].asInt64());
+    if (root.isMember("timestampNanosecond")) {
+        SetTimestamp(root["timestamp"].asInt64(), root["timestampNanosecond"].asInt64());
+    } else {
+        SetTimestamp(root["timestamp"].asInt64());
+    }
     if (root.isMember("contents")) {
         Json::Value contents = root["contents"];
         for (const auto& key : contents.getMemberNames()) {

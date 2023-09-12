@@ -41,5 +41,6 @@ extern const std::string METRIC_PROC_PARSE_IN_SIZE_BYTES;
 extern const std::string METRIC_PROC_PARSE_OUT_SIZE_BYTES;
 extern const std::string METRIC_PROC_PARSE_ERROR_TOTAL;
 extern const std::string METRIC_PROC_KEY_COUNT_NOT_MATCH_ERROR_TOTAL;
+extern const std::string METRIC_PROC_HISTORY_FAILURE_TOTAL;
 
 } // namespace logtail

@@ -152,6 +152,10 @@ void UserLogConfigParser::ParseAdvancedConfig(const Json::Value& originalVal, Co
     }
     // precise_timestamp
     {
+        if (advancedVal.isMember("enable_timestamp_nanosecond") && advancedVal["enable_timestamp_nanosecond"].isBool()) {
+            cfg.mAdvancedConfig.mEnableTimestampNanosecond = GetBoolValue(advancedVal, "enable_timestamp_nanosecond");
+        }
+        // Deprecated
         if (advancedVal.isMember("enable_precise_timestamp") && advancedVal["enable_precise_timestamp"].isBool()) {
             cfg.mAdvancedConfig.mEnablePreciseTimestamp = GetBoolValue(advancedVal, "enable_precise_timestamp");
         }

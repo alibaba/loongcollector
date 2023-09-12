@@ -61,7 +61,7 @@ public:
         kv = log->add_contents();
         kv->set_key("");
         kv->set_value("890xyz");
-        SetLogTime(log, now.tv_sec, now.tv_nsec);
+        SetLogTime(log, now.tv_sec);
 
         string rawLogStr;
         rawLog->AppendToString(&rawLogStr);
@@ -97,7 +97,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value("value");
-        SetLogTime(log, now.tv_sec, now.tv_nsec);
+        SetLogTime(log, now.tv_sec);
 
         string rawLogStr;
         rawLog.AppendToString(&rawLogStr);
@@ -130,7 +130,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value(longLogValue1000);
-        SetLogTime(log, now.tv_sec, now.tv_nsec);
+        SetLogTime(log, now.tv_sec);
 
         string rawLogStr;
         rawLog.AppendToString(&rawLogStr);
@@ -217,7 +217,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value("value4");
-        SetLogTime(log, now.tv_sec, now.tv_nsec);
+        SetLogTime(log, now.tv_sec);
 
         string rawLogStr;
         rawLog.AppendToString(&rawLogStr);
@@ -251,7 +251,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value("value");
-        SetLogTime(log, now.tv_sec, now.tv_nsec);
+        SetLogTime(log, now.tv_sec);
 
 
         RawLogGroup* pRawLogGroup = new RawLogGroup;
@@ -312,7 +312,7 @@ public:
         kv = log->add_contents();
         kv->set_key("key4");
         kv->set_value("value");
-        SetLogTime(log, now.tv_sec, now.tv_nsec);
+        SetLogTime(log, now.tv_sec);
 
 
         RawLogGroup* pRawLogGroup = new RawLogGroup;
@@ -375,7 +375,7 @@ public:
             kv = log->add_contents();
             kv->set_key("key4");
             kv->set_value("value");
-            SetLogTime(log, now.tv_sec, now.tv_nsec);
+            SetLogTime(log, now.tv_sec);
             logStr.clear();
             loggroup.AppendToString(&logStr);
         }

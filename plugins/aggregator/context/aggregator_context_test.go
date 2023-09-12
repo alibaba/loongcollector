@@ -178,7 +178,7 @@ func generateLogs(agg *AggregatorContext, logNum int, withCtx bool, logNo []int,
 		index := i % len(packIDPrefix)
 		nowTime := time.Now()
 		log := &protocol.Log{}
-		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+		protocol.SetLogTime(log, uint32(nowTime.Unix()))
 		if isShort {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: shortLog + fmt.Sprintf("%d", index)})
 		} else {
@@ -271,7 +271,7 @@ func BenchmarkAdd(b *testing.B) {
 	log := &protocol.Log{
 		Contents: []*protocol.Log_Content{{Key: "content", Value: mediumLog}},
 	}
-	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTime(log, uint32(nowTime.Unix()))
 	ctx := make([]map[string]interface{}, 10)
 	packIDPrefix := make([]byte, 8)
 	for i := 0; i < 10; i++ {
@@ -302,7 +302,7 @@ func benchmarkLogSource(b *testing.B, num int) {
 	log := &protocol.Log{
 		Contents: []*protocol.Log_Content{{Key: "content", Value: mediumLog}},
 	}
-	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTime(log, uint32(nowTime.Unix()))
 	ctx := make([]map[string]interface{}, num)
 	packIDPrefix := make([]byte, 8)
 	for i := 0; i < num; i++ {
@@ -334,7 +334,7 @@ func benchmarkLogProducingPace(b *testing.B, num int) {
 	log := &protocol.Log{
 		Contents: []*protocol.Log_Content{{Key: "content", Value: mediumLog}},
 	}
-	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTime(log, uint32(nowTime.Unix()))
 	ctx := make([]map[string]interface{}, 10)
 	packIDPrefix := make([]byte, 8)
 	for i := 0; i < 10; i++ {
@@ -373,7 +373,7 @@ func benchmarkLogLength(b *testing.B, len string) {
 	log := &protocol.Log{
 		Contents: []*protocol.Log_Content{{Key: "content", Value: value}},
 	}
-	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTime(log, uint32(nowTime.Unix()))
 	ctx := make([]map[string]interface{}, 10)
 	packIDPrefix := make([]byte, 8)
 	for i := 0; i < 10; i++ {

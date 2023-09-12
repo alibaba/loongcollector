@@ -108,6 +108,7 @@ void PipelineEventGroupUnittest::TestFromJsonToJson() {
                     "key2" : "value2"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ],

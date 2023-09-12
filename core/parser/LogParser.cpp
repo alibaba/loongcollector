@@ -124,7 +124,7 @@ LogParser::ApsaraEasyReadLogTimeParser(const char* buffer, string& timeStr, time
 void LogParser::AddUnmatchLog(StringView buffer, sls_logs::LogGroup& logGroup, uint32_t& logGroupSize) {
     Log* logPtr = logGroup.add_logs();
     auto now = GetCurrentLogtailTime();
-    SetLogTime(logPtr, now.tv_sec, now.tv_nsec);
+    SetLogTimeWithNano(logPtr, now.tv_sec, now.tv_nsec);
     AddLog(logPtr, UNMATCH_LOG_KEY, buffer.to_string(), logGroupSize);
 }
 
@@ -374,7 +374,7 @@ bool LogParser::RegexLogLineParser(StringView buffer,
 
     if (parseSuccess) {
         Log* logPtr = logGroup.add_logs();
-        SetLogTime(logPtr, logTime.tv_sec, logTime.tv_nsec);
+        SetLogTimeWithNano(logPtr, logTime.tv_sec, logTime.tv_nsec);
         for (uint32_t i = 0; i < keys.size(); i++) {
             AddLog(logPtr, keys[i], what[i + 1].str(), logGroupSize);
         }
@@ -459,7 +459,7 @@ bool LogParser::RegexLogLineParser(StringView buffer,
     }
 
     Log* logPtr = logGroup.add_logs();
-    SetLogTime(logPtr, logTime.tv_sec, logTime.tv_nsec); // current system time, no need history check
+    SetLogTimeWithNano(logPtr, logTime.tv_sec, logTime.tv_nsec); // current system time, no need history check
     for (uint32_t i = 0; i < keys.size(); i++) {
         AddLog(logPtr, keys[i], what[i + 1].str(), logGroupSize);
     }
@@ -489,7 +489,8 @@ bool LogParser::ParseLogTime(const char* buffer,
     int nanosecondLength = -1;
     const char* strptimeResult = NULL;
     if ((!haveNanosecond || endWithNanosecond) && IsPrefixString(curTimeStr, timeStr)) {
-        if (endWithNanosecond) {
+        bool isTimestampNanosecond = (strcmp(timeFormat, "%s") == 0) && (curTimeStr.length() > timeStr.length());
+        if (endWithNanosecond || isTimestampNanosecond) {
             strptimeResult = Strptime(curTimeStr.c_str() + timeStr.length(), "%f", &logTime, nanosecondLength);
         } else {
             strptimeResult = curTimeStr.data() + timeStr.length();
@@ -497,8 +498,10 @@ bool LogParser::ParseLogTime(const char* buffer,
         }
     } else {
         strptimeResult = Strptime(curTimeStr.c_str(), timeFormat, &logTime, nanosecondLength, specifiedYear);
-        timeStr = curTimeStr.substr(0, curTimeStr.length() - nanosecondLength);
-        AdjustLogTime(logTime, tzOffsetSecond);
+        if (NULL != strptimeResult) {
+            timeStr = curTimeStr.substr(0, curTimeStr.length() - nanosecondLength);
+            AdjustLogTime(logTime, tzOffsetSecond);
+        }
     }
     if (NULL == strptimeResult) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
@@ -545,7 +548,7 @@ bool LogParser::ParseLogTime(const char* buffer,
 bool LogParser::WholeLineModeParser(
     logtail::StringView buffer, LogGroup& logGroup, const string& key, LogtailTime& logTime, uint32_t& logGroupSize) {
     Log* logPtr = logGroup.add_logs();
-    SetLogTime(logPtr, logTime.tv_sec, logTime.tv_nsec); // current system time, no need history check
+    SetLogTimeWithNano(logPtr, logTime.tv_sec, logTime.tv_nsec); // current system time, no need history check
     AddLog(logPtr, key, buffer.to_string(), logGroupSize);
     return true;
 }
@@ -726,7 +729,7 @@ bool LogParser::ApsaraEasyReadLogLineParser(StringView buffer,
     }
 
     Log* logPtr = logGroup.add_logs();
-    SetLogTime(logPtr, logTime, logTime_in_micro * 1000 % 1000000000);
+    SetLogTimeWithNano(logPtr, logTime, logTime_in_micro * 1000 % 1000000000);
     int32_t beg_index = 0;
     int32_t colon_index = -1;
     int32_t index = -1;

@@ -105,7 +105,7 @@ private:
                             ProcessProfile& profile,
                             Config& config);
     void DoFuseHandling();
-    void FillLogGroupLogs(const PipelineEventGroup& eventGroup, sls_logs::LogGroup& resultGroup);
+    void FillLogGroupLogs(const PipelineEventGroup& eventGroup, sls_logs::LogGroup& resultGroup, bool enableTimestampNanosecond);
     void FillLogGroupForPlugin(const PipelineEventGroup& eventGroup,
                                LogFileReaderPtr& logFileReader,
                                sls_logs::LogGroup& resultGroup);

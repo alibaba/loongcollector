@@ -186,13 +186,42 @@ void LogParserUnittest::TestParseLogTimeSecondCache() {
             }
         }
     }
-    { // case: timestamp
+    { // case: timestamp second
+        std::string preTimeStr = "1484147106";
+        std::string timeFormat = "%s";
+        time_t expectLogTimeBase = 1484147107;
+        long expectLogTimeNanosecondBase = 1484147107000000;
+        for (size_t i = 0; i < 5; ++i) {
+            std::string second = to_string(expectLogTimeBase + i);
+            for (size_t j = 0; j < 5; ++j) {
+                std::string inputTimeStr = second;
+                bool ret = LogParser::ParseLogTime("TestData",
+                                                preTimeStr,
+                                                outTime,
+                                                preciseTimestamp,
+                                                inputTimeStr,
+                                                timeFormat.c_str(),
+                                                preciseTimestampConfig,
+                                                -1,
+                                                "",
+                                                "",
+                                                "",
+                                                "",
+                                                error,
+                                                0);
+                APSARA_TEST_EQUAL(ret, true);
+                APSARA_TEST_EQUAL(outTime.tv_sec, expectLogTimeBase + i);
+                APSARA_TEST_EQUAL(preciseTimestamp, expectLogTimeNanosecondBase + i * 1000000);
+            }
+        }
+    }
+    { // case: timestamp nanosecond
         std::string preTimeStr = "1484147107123";
         std::string timeFormat = "%s";
         time_t expectLogTimeBase = 1484147107;
         long expectLogTimeNanosecondBase = 1484147107000000;
         for (size_t i = 0; i < 5; ++i) {
-            std::string second = to_string(1484147107 + i);
+            std::string second = to_string(expectLogTimeBase + i);
             for (size_t j = 0; j < 5; ++j) {
                 std::string inputTimeStr = second + to_string(j);
                 bool ret = LogParser::ParseLogTime("TestData",
@@ -211,7 +240,7 @@ void LogParserUnittest::TestParseLogTimeSecondCache() {
                                                 0);
                 APSARA_TEST_EQUAL(ret, true);
                 APSARA_TEST_EQUAL(outTime.tv_sec, expectLogTimeBase + i);
-                APSARA_TEST_EQUAL(preciseTimestamp, expectLogTimeNanosecondBase + i * 1000000);
+                APSARA_TEST_EQUAL(preciseTimestamp, expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
             }
         }
     }

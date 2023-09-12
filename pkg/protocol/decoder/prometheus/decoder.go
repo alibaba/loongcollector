@@ -146,7 +146,7 @@ func (d *Decoder) decodeInExpFmt(data []byte, _ *http.Request) (logs []*protocol
 					},
 				},
 			}
-			protocol.SetLogTime(log, uint32(sample.Timestamp.Unix()), uint32(sample.Timestamp.UnixNano()%1e9))
+			protocol.SetLogTimeWithNano(log, uint32(sample.Timestamp.Unix()), uint32(sample.Timestamp.UnixNano()%1e9))
 			logs = append(logs, log)
 		}
 	}
@@ -198,7 +198,7 @@ func (d *Decoder) decodeInRemoteWriteFormat(data []byte, req *http.Request) (log
 			log := &protocol.Log{
 				Contents: contents,
 			}
-			protocol.SetLogTime(log, uint32(model.Time(sample.Timestamp).Unix()), uint32(model.Time(sample.Timestamp).UnixNano()%1e9))
+			protocol.SetLogTimeWithNano(log, uint32(model.Time(sample.Timestamp).Unix()), uint32(model.Time(sample.Timestamp).UnixNano()%1e9))
 			logs = append(logs, log)
 		}
 	}

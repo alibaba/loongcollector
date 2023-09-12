@@ -97,6 +97,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventSingleLine() {
                     "log.file.offset": "0"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -117,6 +118,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventSingleLine() {
                     "content" : "line1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -125,6 +127,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventSingleLine() {
                     "content" : "line2"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -161,6 +164,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultiline() {
            << R"("
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -184,6 +188,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultiline() {
                << R"("
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -194,6 +199,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultiline() {
                << R"("
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -229,6 +235,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineKeepUnmatch() {
            << R"("
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -250,6 +257,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineKeepUnmatch() {
                     "content" : "first."
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -258,6 +266,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineKeepUnmatch() {
                     "content" : "multiline1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -266,6 +275,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineKeepUnmatch() {
                     "content" : "multiline2"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -276,6 +286,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineKeepUnmatch() {
                << R"("
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -310,6 +321,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineDiscardUnmatch(
            << R"(first.\nmultiline1\nmultiline2\n)" << LOG_BEGIN_STRING << R"(second.\nmultiline1\nmultiline2"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -332,6 +344,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineDiscardUnmatch(
                << LOG_BEGIN_STRING << R"(second.\nmultiline1\nmultiline2"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -365,6 +378,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineAllNotMatchKeep
                     "content" : "first.\nmultiline1\nsecond.\nmultiline1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -386,6 +400,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineAllNotMatchKeep
                     "content" : "first."
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -394,6 +409,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineAllNotMatchKeep
                     "content" : "multiline1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -402,6 +418,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineAllNotMatchKeep
                     "content" : "second."
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -410,6 +427,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineAllNotMatchKeep
                     "content" : "multiline1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -443,6 +461,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineAllNotMatchDisc
                     "content" : "first.\nmultiline1\nsecond.\nmultiline1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -483,6 +502,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcess() {
                     "log.file.offset": "0"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -502,6 +522,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcess() {
                     "log.file.offset": "0"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -512,6 +533,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcess() {
                << strlen(R"(line1ncontinuen)") << R"("
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -576,6 +598,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
                << LOG_CONTINUE_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -598,6 +621,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
                    << LOG_BEGIN_STRING << R"(\n)" << LOG_CONTINUE_STRING << R"(\n)" << LOG_CONTINUE_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -620,6 +644,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
                << LOG_UNMATCH << R"(\n)" << LOG_BEGIN_STRING << R"(\n)" << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -642,6 +667,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
                    << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -651,6 +677,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
                    << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -673,6 +700,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
                << LOG_UNMATCH << R"(\n)" << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -717,6 +745,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_BEGIN_STRING << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -739,6 +768,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_BEGIN_STRING << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -762,6 +792,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
                << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -784,6 +815,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_BEGIN_STRING << R"(\n)" << LOG_UNMATCH << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -806,6 +838,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_BEGIN_STRING << R"(\n)" << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -835,6 +868,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -878,6 +912,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBegin() {
                << LOG_UNMATCH << R"(\n)" << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -900,6 +935,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBegin() {
                    << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -922,6 +958,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBegin() {
                << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -967,6 +1004,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithContinueEnd() {
                << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -989,6 +1027,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithContinueEnd() {
                    << LOG_CONTINUE_STRING << R"(\n)" << LOG_CONTINUE_STRING << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1011,6 +1050,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithContinueEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1033,6 +1073,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithContinueEnd() {
                    << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1055,6 +1096,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithContinueEnd() {
                << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1098,6 +1140,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1120,6 +1163,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithEnd() {
                    << LOG_UNMATCH << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1142,6 +1186,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithEnd() {
                << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1211,6 +1256,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                << LOG_CONTINUE_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1233,6 +1279,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1242,6 +1289,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                    << LOG_BEGIN_STRING << R"(\n)" << LOG_CONTINUE_STRING << R"(\n)" << LOG_CONTINUE_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1264,6 +1312,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                << LOG_UNMATCH << R"(\n)" << LOG_BEGIN_STRING << R"(\n)" << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1286,6 +1335,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1295,6 +1345,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                    << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1304,6 +1355,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                    << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1326,6 +1378,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                << LOG_UNMATCH << R"(\n)" << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1348,6 +1401,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1357,6 +1411,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1394,6 +1449,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_BEGIN_STRING << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1416,6 +1472,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1425,6 +1482,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_BEGIN_STRING << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1448,6 +1506,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1470,6 +1529,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1479,6 +1539,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_BEGIN_STRING << R"(\n)" << LOG_UNMATCH << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1501,6 +1562,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_BEGIN_STRING << R"(\n)" << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1523,6 +1585,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1532,6 +1595,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1541,6 +1605,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1563,6 +1628,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1585,6 +1651,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1594,6 +1661,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1630,6 +1698,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBegin() {
                << LOG_UNMATCH << R"(\n)" << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1652,6 +1721,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBegin() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1661,6 +1731,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBegin() {
                    << LOG_BEGIN_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1683,6 +1754,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBegin() {
                << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1705,6 +1777,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBegin() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1743,6 +1816,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
                << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1765,6 +1839,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1774,6 +1849,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
                    << LOG_CONTINUE_STRING << R"(\n)" << LOG_CONTINUE_STRING << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1796,6 +1872,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1818,6 +1895,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 },
                 {
@@ -1827,6 +1905,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
                    << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1849,6 +1928,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
                << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1871,6 +1951,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1907,6 +1988,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithEnd() {
                << LOG_UNMATCH << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1929,6 +2011,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithEnd() {
                    << LOG_UNMATCH << R"(\n)" << LOG_END_STRING << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1951,6 +2034,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithEnd() {
                << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]
@@ -1973,6 +2057,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithEnd() {
                    << LOG_UNMATCH << R"("
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
                     "type" : 1
                 }
             ]

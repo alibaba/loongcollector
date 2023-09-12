@@ -99,6 +99,7 @@ void ProcessorParseRegexNativeUnittest::TestProcessWholeLine() {
                     "log.file.offset": "0"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -108,6 +109,7 @@ void ProcessorParseRegexNativeUnittest::TestProcessWholeLine() {
                     "log.file.offset": "0"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -195,6 +197,7 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegex() {
                     "log.file.offset": "0"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -206,6 +209,7 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegex() {
                     "log.file.offset": "0"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]

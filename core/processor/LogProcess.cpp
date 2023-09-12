@@ -458,7 +458,7 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
     processProfile.Reset();
 
     // fill protobuf
-    FillLogGroupLogs(eventGroup, resultGroup);
+    FillLogGroupLogs(eventGroup, resultGroup, pipeline->GetPipelineConfig().mAdvancedConfig.mEnableTimestampNanosecond);
     if (logFileReader->GetPluginFlag()) {
         FillLogGroupForPlugin(eventGroup, logFileReader, resultGroup);
         LogtailPlugin::GetInstance()->ProcessLogGroup(
@@ -469,14 +469,18 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
     return 0;
 }
 
-void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup, sls_logs::LogGroup& resultGroup) {
+void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup, sls_logs::LogGroup& resultGroup, bool enableTimestampNanosecond) {
     for (auto& event : eventGroup.GetEvents()) {
         if (!event.Is<LogEvent>()) {
             continue;
         }
         sls_logs::Log* log = resultGroup.add_logs();
         auto& logEvent = event.Cast<LogEvent>();
-        log->set_time(logEvent.GetTimestamp());
+        if (enableTimestampNanosecond) {
+            SetLogTimeWithNano(log, logEvent.GetTimestamp(), logEvent.GetTimestampNanosecond());
+        } else {
+            SetLogTime(log, logEvent.GetTimestamp());
+        }
         for (auto& kv : logEvent.GetContents()) {
             sls_logs::Log_Content* contPtr = log->add_contents();
             // need to rename EVENT_META_LOG_FILE_OFFSET
@@ -691,6 +695,10 @@ int LogProcess::ProcessBufferLegacy(std::shared_ptr<LogBuffer>& logBuffer,
                     ++profile.historyFailures;
                 if (errorLine.empty())
                     errorLine = logIndex[i].to_string();
+            }
+            if (!config.mAdvancedConfig.mEnableTimestampNanosecond) {
+                sls_logs::Log* logPtr = logGroup.mutable_logs(successLogSize);
+                logPtr->clear_time_ns();
             }
             // add source raw line, time zone adjust
             if (successLogSize < logGroup.logs_size()) {

@@ -156,7 +156,7 @@ func newMetricLogFromRaw(name string, labels KeyValues, nsec int64, value float6
 			},
 		},
 	}
-	protocol.SetLogTime(log, uint32(nsec/1e9), uint32(nsec%1e9))
+	protocol.SetLogTimeWithNano(log, uint32(nsec/1e9), uint32(nsec%1e9))
 	return log
 }
 
@@ -229,7 +229,7 @@ func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels 
 			},
 		},
 	}
-	protocol.SetLogTime(log, uint32(exemplar.Timestamp()/1e9), uint32(exemplar.Timestamp()%1e9))
+	protocol.SetLogTimeWithNano(log, uint32(exemplar.Timestamp()/1e9), uint32(exemplar.Timestamp()%1e9))
 	return log
 }
 
@@ -448,7 +448,7 @@ func ConvertOtlpLogV1(otlpLogs plog.Logs) (logs []*protocol.Log, err error) {
 				protoLog := &protocol.Log{
 					Contents: protoContents,
 				}
-				protocol.SetLogTime(protoLog, uint32(logRecord.Timestamp().AsTime().Unix()), uint32(logRecord.Timestamp().AsTime().Nanosecond()))
+				protocol.SetLogTimeWithNano(protoLog, uint32(logRecord.Timestamp().AsTime().Unix()), uint32(logRecord.Timestamp().AsTime().Nanosecond()))
 				logs = append(logs, protoLog)
 			}
 		}
@@ -531,7 +531,7 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 							},
 						},
 					}
-					protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+					protocol.SetLogTimeWithNano(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 					logs = append(logs, log)
 				}
 			}

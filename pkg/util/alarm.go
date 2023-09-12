@@ -104,7 +104,7 @@ func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_count", Value: strconv.Itoa(item.Count)})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_message", Value: item.Message})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: GetIPAddress()})
-		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+		protocol.SetLogTime(log, uint32(nowTime.Unix()))
 		logGroup.Logs = append(logGroup.Logs, log)
 		// clear after serialize
 		item.Count = 0

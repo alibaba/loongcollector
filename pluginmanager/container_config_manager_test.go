@@ -186,7 +186,7 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 	for i := 1; i <= 10000; i++ {
 		log := &protocol.Log{}
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test", Value: "123"})
-		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+		protocol.SetLogTime(log, uint32(nowTime.Unix()))
 		loggroup.Logs = append(loggroup.Logs, log)
 	}
 

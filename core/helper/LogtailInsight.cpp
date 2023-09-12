@@ -183,7 +183,7 @@ int LogtailInsight::ExecuteCommand(const string& serverAddress,
     }
     sls_logs::Log cmdLog;
     auto now = GetCurrentLogtailTime();
-    SetLogTime(&cmdLog, now.tv_sec, now.tv_nsec);
+    SetLogTime(&cmdLog, now.tv_sec);
     sls_logs::Log_Content* cmdTypeContent = cmdLog.add_contents();
     cmdTypeContent->set_key("type");
     cmdTypeContent->set_value(cmdType);

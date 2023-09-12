@@ -91,6 +91,8 @@ public:
         int32_t mSpecifiedYear = -1; // Year deduction.
         uint16_t mSearchCheckpointDirDepth = 0; // Max directory depth when search checkpoint.
 
+        bool mEnableTimestampNanosecond = false;
+        // Deprecated
         bool mEnablePreciseTimestamp = false;
         std::string mPreciseTimestampKey;
         TimeStampUnit mPreciseTimestampUnit;

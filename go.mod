@@ -263,26 +263,29 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.18.0 // indirect
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	github.com/VictoriaMetrics/fasthttp v1.1.0 // indirect
-	github.com/VictoriaMetrics/metrics v1.23.0 // indirect
-	github.com/VictoriaMetrics/metricsql v0.45.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/influxdata/telegraf v1.20.0 // indirect
 	github.com/openkruise/kruise-api v1.4.0
 	github.com/richardartoul/molecule v1.0.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
+	gopkg.in/ini.v1 v1.66.2 // indirect
+	sigs.k8s.io/gateway-api v0.6.2 // indirect
+)
+
+require (
+	cloud.google.com/go/compute v1.18.0 // indirect
+	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	github.com/VictoriaMetrics/fasthttp v1.1.0 // indirect
+	github.com/VictoriaMetrics/metrics v1.23.0 // indirect
+	github.com/VictoriaMetrics/metricsql v0.45.0 // indirect
 	github.com/valyala/fastjson v1.6.3 // indirect
 	github.com/valyala/fastrand v1.1.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/valyala/gozstd v1.17.0 // indirect
 	github.com/valyala/histogram v1.2.0 // indirect
 	github.com/valyala/quicktemplate v1.7.0 // indirect
-	golang.org/x/mod v0.8.0 // indirect
-	gopkg.in/ini.v1 v1.66.2 // indirect
-	sigs.k8s.io/gateway-api v0.6.2 // indirect
 )
 
 replace (

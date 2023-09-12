@@ -838,9 +838,22 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                 config->mTailExisted = GetBoolValue(value, "tail_existed", false);
                 int32_t tailLimit = GetIntValue(value, "tail_limit", INT32_FLAG(default_tail_limit_kb));
                 config->SetTailLimit(tailLimit);
-
-                UserLogConfigParser::ParseAdvancedConfig(value, *config);
             }
+
+            UserLogConfigParser::ParseAdvancedConfig(value, *config);
+            if (pluginConfigJson.isMember("global")) {
+                SetNotFoundJsonMember(pluginConfigJson["global"],
+                                      "EnableTimestampNanosecond",
+                                      config->mAdvancedConfig.mEnableTimestampNanosecond);
+            } else {
+                Json::Value pluginGlobalConfigJson;
+                SetNotFoundJsonMember(pluginGlobalConfigJson,
+                                      "EnableTimestampNanosecond",
+                                      config->mAdvancedConfig.mEnableTimestampNanosecond);
+                pluginConfigJson["global"] = pluginGlobalConfigJson;
+            }
+            config->mPluginConfig = pluginConfigJson.toStyledString();
+
             if (logType == DELIMITER_LOG) {
                 config->mTimeFormat = GetStringValue(value, "timeformat", "");
                 string separatorStr = GetStringValue(value, "delimiter_separator");

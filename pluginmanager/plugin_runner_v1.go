@@ -255,7 +255,10 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 							continue
 						}
 						if l.Time == uint32(0) {
-							protocol.SetLogTime(l, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+							protocol.SetLogTimeWithNano(l, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+						}
+						if !p.LogstoreConfig.GlobalConfig.EnableTimestampNanosecond {
+							l.TimeNs = nil
 						}
 						for tryCount := 1; true; tryCount++ {
 							err := aggregator.Aggregator.Add(l, logCtx.Context)

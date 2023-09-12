@@ -285,7 +285,7 @@ func (p *DockerStdoutProcessor) newRawLogBySingleLine(msg *LogMessage) *protocol
 	log := &protocol.Log{
 		Contents: make([]*protocol.Log_Content, 0, p.fieldNum),
 	}
-	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTimeWithNano(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 	if len(msg.Content) > 0 && msg.Content[len(msg.Content)-1] == '\n' {
 		msg.Content = msg.Content[0 : len(msg.Content)-1]
 	}
@@ -331,7 +331,7 @@ func (p *DockerStdoutProcessor) newRawLogByMultiLine() *protocol.Log {
 	log := &protocol.Log{
 		Contents: make([]*protocol.Log_Content, 0, p.fieldNum),
 	}
-	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTimeWithNano(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
 	log.Contents = append(log.Contents, &protocol.Log_Content{
 		Key:   "content",
 		Value: multiLine.String(),

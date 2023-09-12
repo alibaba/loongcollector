@@ -102,7 +102,7 @@ void LogLineCount::InsertLineCountDataToLogGroup(sls_logs::LogGroup& logGroup,
                                                  int32_t count) {
     Log* logPtr = logGroup.add_logs();
     auto now = GetCurrentLogtailTime();
-    SetLogTime(logPtr, now.tv_sec, now.tv_nsec);
+    SetLogTime(logPtr, now.tv_sec);
 
     Log_Content* contentPtr = logPtr->add_contents();
     contentPtr->set_key("region");

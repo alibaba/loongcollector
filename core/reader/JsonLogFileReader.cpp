@@ -148,9 +148,9 @@ bool JsonLogFileReader::ParseLogLine(StringView buffer,
         Log* logPtr = logGroup.add_logs();
         auto now = GetCurrentLogtailTime();
         if (mUseSystemTime) {
-            SetLogTime(logPtr, now.tv_sec, now.tv_nsec);
+            SetLogTimeWithNano(logPtr, now.tv_sec, now.tv_nsec);
         } else {
-            SetLogTime(logPtr, lastLogLineTime.tv_sec, lastLogLineTime.tv_nsec);
+            SetLogTimeWithNano(logPtr, lastLogLineTime.tv_sec, lastLogLineTime.tv_nsec);
         }
         for (rapidjson::Value::ConstMemberIterator itr = doc.MemberBegin(); itr != doc.MemberEnd(); ++itr) {
             const rapidjson::Value& contentKey = itr->name;

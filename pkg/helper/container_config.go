@@ -106,7 +106,7 @@ func SerializeDeleteContainerToPb(logGroup *protocol.LogGroup, project string, c
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project", Value: project})
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "container_ids", Value: containerIDsStr})
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
-	protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTime(log, uint32(nowTime.Unix()))
 	logGroup.Logs = append(logGroup.Logs, log)
 }
 
@@ -143,7 +143,7 @@ func SerializeContainerToPb(logGroup *protocol.LogGroup, addedContainers []*Cont
 		}
 
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
-		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+		protocol.SetLogTime(log, uint32(nowTime.Unix()))
 		logGroup.Logs = append(logGroup.Logs, log)
 	}
 }
@@ -170,7 +170,7 @@ func SerializeContainerConfigResultToPb(logGroup *protocol.LogGroup) {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "input.container_file", Value: item.InputIsContainerFile})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "flusher.type", Value: item.FlusherType})
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "flusher.target_addresses", Value: item.FlusherTargetAddress})
-		protocol.SetLogTime(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+		protocol.SetLogTime(log, uint32(nowTime.Unix()))
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
 		logGroup.Logs = append(logGroup.Logs, log)
 	}

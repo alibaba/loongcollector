@@ -31,11 +31,16 @@ Json::Value SpanEvent::ToJson() const {
     Json::Value root;
     root["type"] = GetType();
     root["timestamp"] = GetTimestamp();
+    root["timestampNanosecond"] = GetTimestampNanosecond();
     return root;
 }
 
 bool SpanEvent::FromJson(const Json::Value& root) {
-    SetTimestamp(root["timestamp"].asInt64());
+    if (root.isMember("timestampNanosecond")) {
+        SetTimestamp(root["timestamp"].asInt64(), root["timestampNanosecond"].asInt64());
+    } else {
+        SetTimestamp(root["timestamp"].asInt64());
+    }
     return true;
 }
 

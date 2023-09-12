@@ -157,7 +157,7 @@ func (p *Profile) extractProfileV1(meta *profile.Meta, tags map[string]string) f
 		log := &protocol.Log{
 			Contents: content,
 		}
-		protocol.SetLogTime(log, uint32(meta.StartTime.Unix()), uint32(meta.StartTime.Nanosecond()))
+		protocol.SetLogTimeWithNano(log, uint32(meta.StartTime.Unix()), uint32(meta.StartTime.Nanosecond()))
 		p.logs = append(p.logs, log)
 	}
 

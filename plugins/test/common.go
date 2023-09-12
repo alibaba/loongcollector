@@ -76,7 +76,7 @@ func CreateLogs(kvs ...string) *protocol.Log {
 		slsLog.Contents = append(slsLog.Contents, cont)
 	}
 	nowTime := time.Now()
-	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()))
 	return &slsLog
 }
 
@@ -87,7 +87,7 @@ func CreateLogByFields(fields map[string]string) *protocol.Log {
 		slsLog.Contents = append(slsLog.Contents, cont)
 	}
 	nowTime := time.Now()
-	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()))
 	return &slsLog
 }
 

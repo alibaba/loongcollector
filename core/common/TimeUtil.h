@@ -79,7 +79,9 @@ void UpdateTimeDelta(time_t serverTime);
 
 uint64_t GetPreciseTimestampFromLogtailTime(LogtailTime logTime, const PreciseTimestampConfig& preciseTimestampConfig);
 
-void SetLogTime(sls_logs::Log* log, time_t second, long nanosecond);
+void SetLogTime(sls_logs::Log* log, time_t second);
+
+void SetLogTimeWithNano(sls_logs::Log* log, time_t second, long nanosecond);
 
 LogtailTime GetCurrentLogtailTime();
 

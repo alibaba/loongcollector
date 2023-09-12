@@ -58,7 +58,7 @@ static void SendErrorToFD(int fd, const std::string& errorMessage) {
     header.type = INSIGHT_CMD_TYPE;
     sls_logs::Log outLog;
     auto now = GetCurrentLogtailTime();
-    SetLogTime(&outLog, now.tv_sec, now.tv_nsec);
+    SetLogTime(&outLog, now.tv_sec);
     sls_logs::Log_Content* content = outLog.add_contents();
     content->set_key("error");
     content->set_value(errorMessage);
@@ -111,7 +111,7 @@ int32_t LogtailInsightDispatcher::ExecuteCommand(int fd, const char* cmdBuf, int
 
                 sls_logs::Log* log = logGroup.add_logs();
                 auto ts = GetCurrentLogtailTime();
-                SetLogTime(log, ts.tv_sec, ts.tv_nsec);
+                SetLogTime(log, ts.tv_sec);
                 sls_logs::Log_Content* content = log->add_contents();
                 content->set_key("isFinished");
                 content->set_value(ToString(finishedFlag));
@@ -125,7 +125,7 @@ int32_t LogtailInsightDispatcher::ExecuteCommand(int fd, const char* cmdBuf, int
 
                 sls_logs::Log* log = logGroup.add_logs();
                 auto now = GetCurrentLogtailTime();
-                SetLogTime(log, now.tv_sec, now.tv_nsec);
+                SetLogTime(log, now.tv_sec);
                 sls_logs::Log_Content* content = log->add_contents();
                 content->set_key("isFinished");
                 if (result == -1) {
@@ -213,7 +213,7 @@ void LogtailInsightDispatcher::BuildLogGroup(sls_logs::LogGroup* logGroup,
                                              const LogFileCollectProgress& progress) {
     sls_logs::Log* log = logGroup->add_logs();
     auto now = GetCurrentLogtailTime();
-    SetLogTime(log, now.tv_sec, now.tv_nsec);
+    SetLogTime(log, now.tv_sec);
 
     sls_logs::Log_Content* content = log->add_contents();
     content->set_key("project");

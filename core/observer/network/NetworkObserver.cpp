@@ -521,7 +521,8 @@ int NetworkObserver::OutputPluginProcess(std::vector<sls_logs::Log>& logs, Confi
     static auto sPlugin = LogtailPlugin::GetInstance();
     auto now = GetCurrentLogtailTime();
     for (auto& item : logs) {
-        SetLogTime(&item, now.tv_sec, now.tv_nsec);
+        // nanosecond of observer will not be discard after processors, so here is default to no nanosecond
+        SetLogTime(&item, now.tv_sec);
         sPlugin->ProcessLog(config->mConfigName, item, "", config->mGroupTopic, "");
     }
     return 0;
@@ -554,7 +555,7 @@ int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, Config* co
         for (size_t i = beginIndex; i < endIndex; ++i) {
             sls_logs::Log* log = logGroup.add_logs();
             log->mutable_contents()->CopyFrom(*(logs[i].mutable_contents()));
-            SetLogTime(log, now.tv_sec, now.tv_nsec);
+            SetLogTime(log, now.tv_sec);
         }
         if (!sSenderInstance->Send(config->mProjectName,
                                    "",
