@@ -154,12 +154,17 @@ public:
     }
 
     void TestTimeZoneAdjustment() {
+        /* xxx-{last} is valid time zone config,
+           others are invalid because either timeformat, timekey or log_tz is empty.
+           apasra-{last} should be valid regardless with timeformat and timekey.
+         */
         std::string configStr = R""""({
     "metrics" : 
     {
         "##1.0##test$regex-1" : 
 		{
 			"category" : "test",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"keys" : 
 			[
@@ -181,6 +186,7 @@ public:
         "##1.0##test$regex-2" : 
 		{
 			"category" : "test",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"keys" : 
 			[
@@ -202,6 +208,7 @@ public:
         "##1.0##test$regex-3" : 
 		{
 			"category" : "test",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"keys" : 
 			[
@@ -223,6 +230,7 @@ public:
         "##1.0##test$json-1" : 
 		{
 			"category" : "test",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "json_log",
@@ -236,6 +244,7 @@ public:
         "##1.0##test$json-2" : 
 		{
 			"category" : "test",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "json_log",
@@ -249,6 +258,7 @@ public:
         "##1.0##test$json-3" : 
 		{
 			"category" : "test",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "json_log",
@@ -262,6 +272,7 @@ public:
         "##1.0##test$json-4" : 
 		{
 			"category" : "test",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "json_log",
@@ -275,6 +286,7 @@ public:
         "##1.0##test$json-5" : 
 		{
 			"category" : "test",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "json_log",
@@ -295,6 +307,7 @@ public:
 			],
 			"delimiter_quote": "'",
 			"delimiter_separator": " ",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "delimiter_log",
@@ -315,6 +328,7 @@ public:
 			],
 			"delimiter_quote": "'",
 			"delimiter_separator": " ",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "delimiter_log",
@@ -335,6 +349,7 @@ public:
 			],
 			"delimiter_quote": "'",
 			"delimiter_separator": " ",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "delimiter_log",
@@ -355,6 +370,7 @@ public:
 			],
 			"delimiter_quote": "'",
 			"delimiter_separator": " ",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "delimiter_log",
@@ -375,6 +391,7 @@ public:
 			],
 			"delimiter_quote": "'",
 			"delimiter_separator": " ",
+			"enable": true,
 			"file_pattern" : "*.log",
 			"log_path" : ".",
 			"log_type" : "delimiter_log",
@@ -383,6 +400,60 @@ public:
 			"project_name" : "test",
 			"time_key": "time",
 			"timeformat" : "%Y-%M-%dT%h:%m:%s",
+			"tz_adjust" : true
+		},
+		"##1.0##test$apsara-1" : 
+		{
+			"category" : "test",
+			"enable": true,
+			"file_pattern" : "*.log",
+			"log_begin_reg" : ".*",
+			"log_path" : ".",
+			"log_type" : "apsara_log",
+			"log_tz" : "",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"regex" : 
+			[
+				"\\[([^]]+)]\\s(.*)"
+			],
+			"timeformat" : "",
+			"tz_adjust" : false
+		},
+		"##1.0##test$apsara-2" : 
+		{
+			"category" : "test",
+			"enable": true,
+			"file_pattern" : "*.log",
+			"log_begin_reg" : ".*",
+			"log_path" : ".",
+			"log_type" : "apsara_log",
+			"log_tz" : "",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"regex" : 
+			[
+				"\\[([^]]+)]\\s(.*)"
+			],
+			"timeformat" : "",
+			"tz_adjust" : true
+		},
+		"##1.0##test$apsara-3" : 
+		{
+			"category" : "test",
+			"enable": true,
+			"file_pattern" : "*.log",
+			"log_begin_reg" : ".*",
+			"log_path" : ".",
+			"log_type" : "apsara_log",
+			"log_tz" : "GMT+08:00",
+			"max_depth" : 0,
+			"project_name" : "test",
+			"regex" : 
+			[
+				"\\[([^]]+)]\\s(.*)"
+			],
+			"timeformat" : "",
 			"tz_adjust" : true
 		}
     }
@@ -406,20 +477,16 @@ public:
         APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$delimiter-3"]->mTimeZoneAdjust);
         APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$delimiter-4"]->mTimeZoneAdjust);
         APSARA_TEST_TRUE(configNameEntityMap["##1.0##test$delimiter-5"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$apsara-1"]->mTimeZoneAdjust);
+        APSARA_TEST_FALSE(configNameEntityMap["##1.0##test$apsara-2"]->mTimeZoneAdjust);
+        APSARA_TEST_TRUE(configNameEntityMap["##1.0##test$apsara-3"]->mTimeZoneAdjust);
     }
 };
 
-TEST_F(ConfigManagerBaseUnittest, TestReplaceEnvVarRefInStr) {
-    TestReplaceEnvVarRefInStr();
-}
+UNIT_TEST_CASE(ConfigManagerBaseUnittest, TestReplaceEnvVarRefInStr);
+UNIT_TEST_CASE(ConfigManagerBaseUnittest, TestReplaceEnvVarRefInConf);
+UNIT_TEST_CASE(ConfigManagerBaseUnittest, TestTimeZoneAdjustment);
 
-TEST_F(ConfigManagerBaseUnittest, TestReplaceEnvVarRefInConf) {
-    TestReplaceEnvVarRefInConf();
-}
-
-TEST_F(ConfigManagerBaseUnittest, TestTimeZoneAdjustment) {
-    TestReplaceEnvVarRefInConf();
-}
 
 } // end of namespace logtail
 

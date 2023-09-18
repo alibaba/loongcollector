@@ -881,6 +881,10 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
             } else if (logType == JSON_LOG) {
                 config->mTimeFormat = GetStringValue(value, "timeformat", "");
                 config->mTimeKey = GetStringValue(value, "time_key", "");
+            } else if (logType == APSARA_LOG) {
+                // APSARA_LOG is a fix format, setting timeformat and timekey to pass adjust time zone validation
+                config->mTimeFormat = "%Y-%m-%d %H%:M:%S";
+                config->mTimeKey = "time";
             }
 
             if (value.isMember("merge_type") && value["merge_type"].isString()) {
