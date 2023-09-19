@@ -48,6 +48,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseRegexNativeUnittest;
     friend class ProcessorParseTimestampNativeUnittest;
+    friend class ProcessorParseJsonNativeUnittest;
 #endif
 };
 
