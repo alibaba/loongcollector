@@ -20,7 +20,7 @@ set -o pipefail
 function arch() {
   if uname -m | grep x86_64 &>/dev/null; then
     echo amd64
-  elif uname -m | grep aarch64 &>/dev/null; then
+  elif uname -m | grep -E "aarch64|arm64" &>/dev/null; then
     echo arm64
   else
     echo sw64

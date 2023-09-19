@@ -77,7 +77,7 @@ EOF
 
   chmod 755 $BUILD_SCRIPT_FILE
   if [ $CATEGORY = "plugin" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s PluginAdapter && cd ../../.. && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s PluginAdapter && cd ../../.. && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "core" ]; then
     echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "all" ]; then
