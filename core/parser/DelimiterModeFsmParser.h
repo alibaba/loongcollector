@@ -19,6 +19,7 @@
 
 #include <string>
 #include <vector>
+#include "models/StringView.h"
 
 /*
  * FSM(finite state machine) for csv parser
@@ -57,12 +58,17 @@ public:
 
 public:
     static bool HandleSeparator(char ch, DelimiterModeFsm& fsm, std::vector<std::string>& columnValues);
+    static bool HandleSeparator(const char* ch, int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, std::vector<StringView>& columnValues);
     static bool HandleQuote(char ch, DelimiterModeFsm& fsm);
+    static bool HandleQuote(int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm);
     static bool HandleData(char ch, DelimiterModeFsm& fsm);
+    static bool HandleData(int& fieldEnd, DelimiterModeFsm& fsm);
     static bool HandleEOF(DelimiterModeFsm& fsm, std::vector<std::string>& columnValues);
+    static bool HandleEOF(const char* ch, int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, std::vector<StringView>& columnValues);
 
 public:
     bool ParseDelimiterLine(const char* buffer, int begin, int end, std::vector<std::string>& columnValues);
+    bool ParseDelimiterLine(StringView buffer, int begin, int end, std::vector<StringView>& columnValues);
 
 private:
     const char quote;

@@ -17,6 +17,7 @@
 #include "processor/Processor.h"
 #include <string>
 #include <boost/regex.hpp>
+#include "parser/DelimiterModeFsmParser.h"
 
 namespace logtail {
 
@@ -28,6 +29,34 @@ public:
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) override;
+
+private:
+    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
+    bool SplitString(const char* buffer, int32_t begIdx, int32_t endIdx, std::vector<size_t>& colBegIdxs, std::vector<size_t>& colLens);
+    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent);
+    std::string mSourceKey;
+    std::string mSeparator;
+    std::string mRawLogTag;
+    std::vector<std::string> mColumnKeys;
+    bool mExtractPartialFields = false;
+    bool mAutoExtend = false;
+    bool mAcceptNoEnoughKeys = false;
+    bool mDiscardUnmatch = false;
+    bool mUploadRawLog = false;
+    bool mSourceKeyOverwritten = false;
+    bool mRawLogTagOverwritten = false;
+    char mQuote;
+    char mSeparatorChar;
+    DelimiterModeFsmParser* mDelimiterModeFsmParserPtr;
+
+    int* mLogGroupSize = nullptr;
+    int* mParseFailures = nullptr;
+
+    static const std::string s_mDiscardedFieldKey;
+    CounterPtr mProcParseInSizeBytes;
+    CounterPtr mProcParseOutSizeBytes;
+    CounterPtr mProcDiscardRecordsTotal;
+    CounterPtr mProcParseErrorTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseDelimiterNativeUnittest;

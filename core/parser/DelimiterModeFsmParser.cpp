@@ -46,6 +46,32 @@ bool DelimiterModeFsmParser::HandleSeparator(char ch, DelimiterModeFsm& fsm, std
     }
 }
 
+bool DelimiterModeFsmParser::HandleSeparator(const char* ch, int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, std::vector<StringView>& columnValues) {
+    switch (fsm.currentState) {
+        case STATE_INITIAL:
+            columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+            fieldStart = ++fieldEnd;
+            return true;
+        case STATE_QUOTE:
+            fieldEnd++;
+            return true;
+        case STATE_DATA:
+            fsm.currentState = STATE_INITIAL;
+            columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+            fieldStart = ++fieldEnd;
+            return true;
+        case STATE_DOUBLE_QUOTE:
+            fsm.currentState = STATE_INITIAL;
+            columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+            // Skip the quote
+            fieldEnd += 2;
+            fieldStart = fieldEnd;
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool DelimiterModeFsmParser::HandleQuote(char ch, DelimiterModeFsm& fsm) {
     switch (fsm.currentState) {
         case STATE_INITIAL:
@@ -59,6 +85,26 @@ bool DelimiterModeFsmParser::HandleQuote(char ch, DelimiterModeFsm& fsm) {
         case STATE_DOUBLE_QUOTE:
             fsm.currentState = STATE_QUOTE;
             fsm.field.append(1, ch);
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool DelimiterModeFsmParser::HandleQuote(int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm) {
+    switch (fsm.currentState) {
+        case STATE_INITIAL:
+            fsm.currentState = STATE_QUOTE;
+            fieldStart++;
+            return true;
+        case STATE_QUOTE:
+            fsm.currentState = STATE_DOUBLE_QUOTE;
+            fieldEnd++;
+            return true;
+        case STATE_DATA:
+            return false;
+        case STATE_DOUBLE_QUOTE:
+            fsm.currentState = STATE_QUOTE;
             return true;
         default:
             return false;
@@ -81,12 +127,42 @@ bool DelimiterModeFsmParser::HandleData(char ch, DelimiterModeFsm& fsm) {
     }
 }
 
+bool DelimiterModeFsmParser::HandleData(int& fieldEnd, DelimiterModeFsm& fsm) {
+    switch (fsm.currentState) {
+        case STATE_INITIAL:
+            fsm.currentState = STATE_DATA;
+            fieldEnd++;
+            return true;
+        case STATE_QUOTE:
+        case STATE_DATA:
+            fieldEnd++;
+            return true;
+        case STATE_DOUBLE_QUOTE:
+        default:
+            return false;
+    }
+}
+
 bool DelimiterModeFsmParser::HandleEOF(DelimiterModeFsm& fsm, std::vector<std::string>& columnValues) {
     switch (fsm.currentState) {
         case STATE_INITIAL:
         case STATE_DATA:
         case STATE_DOUBLE_QUOTE:
             columnValues.push_back(fsm.field);
+            return true;
+        case STATE_QUOTE:
+        default:
+            return false;
+    }
+}
+
+bool DelimiterModeFsmParser::HandleEOF(const char* ch, int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, std::vector<StringView>& columnValues) {
+    switch (fsm.currentState) {
+        case STATE_INITIAL:
+        case STATE_DATA:
+        case STATE_DOUBLE_QUOTE:
+            columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+            fieldStart = ++fieldEnd;
             return true;
         case STATE_QUOTE:
         default:
@@ -122,6 +198,43 @@ bool DelimiterModeFsmParser::ParseDelimiterLine(const char* buffer,
     }
 
     result = HandleEOF(fsm, columnValues);
+    // clear all columns if failed to parse
+    if (!result) {
+        columnValues.clear();
+    }
+    return result;
+}
+
+bool DelimiterModeFsmParser::ParseDelimiterLine(StringView buffer,
+                                                int begin,
+                                                int end,
+                                                std::vector<StringView>& columnValues) {
+    bool result = true;
+    DelimiterModeFsm fsm(STATE_INITIAL, "");
+
+    // here we won't check whether element in buffer is '\0',
+    // because we consider that all element in this buffer is valid,
+    // despite some '\0' elements which are brought from file system due to system crash
+    const char* ch = buffer.data();
+    int fieldStart = 0;
+    int fieldEnd = 0;
+    for (int i = begin; i < end; ++i) {
+        if (ch[i] == separator) {
+            result = HandleSeparator(ch, fieldStart, fieldEnd, fsm, columnValues);
+        } else if (ch[i] == quote) {
+            result = HandleQuote(fieldStart, fieldEnd, fsm);
+        } else // data
+        {
+            result = HandleData(fieldEnd, fsm);
+        }
+
+        if (!result) {
+            columnValues.clear();
+            return false;
+        }
+    }
+
+    result = HandleEOF(ch, fieldStart, fieldEnd, fsm, columnValues);
     // clear all columns if failed to parse
     if (!result) {
         columnValues.clear();
