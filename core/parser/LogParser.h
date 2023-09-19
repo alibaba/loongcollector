@@ -47,7 +47,11 @@ enum ParseLogError {
 class LogParser {
 public:
     static const char* UNMATCH_LOG_KEY;
-
+    static const char* SLS_KEY_LEVEL;
+    static const char* SLS_KEY_THREAD;
+    static const char* SLS_KEY_FILE;
+    static const char* SLS_KEY_LINE;
+    static const int32_t MAX_BASE_FIELD_NUM;
     static time_t
     ApsaraEasyReadLogTimeParser(const char* buffer, std::string& timeStr, time_t& lastLogTime, int64_t& microTime);
     static bool ApsaraEasyReadLogLineParser(StringView buffer,

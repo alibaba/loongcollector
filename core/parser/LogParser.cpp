@@ -35,11 +35,11 @@ using namespace sls_logs;
 
 namespace logtail {
 
-static const char* SLS_KEY_LEVEL = "__LEVEL__";
-static const char* SLS_KEY_THREAD = "__THREAD__";
-static const char* SLS_KEY_FILE = "__FILE__";
-static const char* SLS_KEY_LINE = "__LINE__";
-static const int32_t MAX_BASE_FIELD_NUM = 10;
+const char* LogParser::SLS_KEY_LEVEL = "__LEVEL__";
+const char* LogParser::SLS_KEY_THREAD = "__THREAD__";
+const char* LogParser::SLS_KEY_FILE = "__FILE__";
+const char* LogParser::SLS_KEY_LINE = "__LINE__";
+const int32_t LogParser::MAX_BASE_FIELD_NUM = 10;
 const char* LogParser::UNMATCH_LOG_KEY = "__raw_log__";
 
 bool LogParser::IsPrefixString(const string& all, const string& prefix) {
@@ -591,7 +591,7 @@ static int32_t FindBaseFields(const char* buffer, int32_t beginIndexArray[], int
                 endIndexArray[baseFieldNum] = i;
                 baseFieldNum++;
             }
-            if (baseFieldNum >= MAX_BASE_FIELD_NUM) {
+            if (baseFieldNum >= LogParser::MAX_BASE_FIELD_NUM) {
                 break;
             }
             if (buffer[i + 1] == '\t' && buffer[i + 2] != '[') {
@@ -635,8 +635,8 @@ static int32_t FindColonIndex(const char* buffer, int32_t beginIndex, int32_t en
 }
 
 static int32_t ParseApsaraBaseFields(const char* buffer, Log* logPtr, uint32_t& logGroupSize) {
-    int32_t beginIndexArray[MAX_BASE_FIELD_NUM] = {0};
-    int32_t endIndexArray[MAX_BASE_FIELD_NUM] = {0};
+    int32_t beginIndexArray[LogParser::MAX_BASE_FIELD_NUM] = {0};
+    int32_t endIndexArray[LogParser::MAX_BASE_FIELD_NUM] = {0};
     int32_t baseFieldNum = FindBaseFields(buffer, beginIndexArray, endIndexArray);
     if (baseFieldNum == 0) {
         return 0;
@@ -649,17 +649,17 @@ static int32_t ParseApsaraBaseFields(const char* buffer, Log* logPtr, uint32_t& 
         endIndex = endIndexArray[i];
         if ((findFieldBitMap & 0x1) == 0 && IsFieldLevel(buffer, beginIndex, endIndex)) {
             findFieldBitMap |= 0x1;
-            LogParser::AddLog(logPtr, SLS_KEY_LEVEL, string(buffer + beginIndex, endIndex - beginIndex), logGroupSize);
+            LogParser::AddLog(logPtr, LogParser::SLS_KEY_LEVEL, string(buffer + beginIndex, endIndex - beginIndex), logGroupSize);
         } else if ((findFieldBitMap & 0x10) == 0 && IsFieldThread(buffer, beginIndex, endIndex)) {
             findFieldBitMap |= 0x10;
-            LogParser::AddLog(logPtr, SLS_KEY_THREAD, string(buffer + beginIndex, endIndex - beginIndex), logGroupSize);
+            LogParser::AddLog(logPtr, LogParser::SLS_KEY_THREAD, string(buffer + beginIndex, endIndex - beginIndex), logGroupSize);
         } else if ((findFieldBitMap & 0x100) == 0 && IsFieldFileLine(buffer, beginIndex, endIndex)) {
             findFieldBitMap |= 0x100;
             int32_t colonIndex = FindColonIndex(buffer, beginIndex, endIndex);
-            LogParser::AddLog(logPtr, SLS_KEY_FILE, string(buffer + beginIndex, colonIndex - beginIndex), logGroupSize);
+            LogParser::AddLog(logPtr, LogParser::SLS_KEY_FILE, string(buffer + beginIndex, colonIndex - beginIndex), logGroupSize);
             if (colonIndex < endIndex) {
                 LogParser::AddLog(
-                    logPtr, SLS_KEY_LINE, string(buffer + colonIndex + 1, endIndex - colonIndex - 1), logGroupSize);
+                    logPtr, LogParser::SLS_KEY_LINE, string(buffer + colonIndex + 1, endIndex - colonIndex - 1), logGroupSize);
             }
         }
     }

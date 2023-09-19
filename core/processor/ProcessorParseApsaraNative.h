@@ -29,6 +29,30 @@ public:
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) override;
 
+private:
+    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e, LogtailTime& lastLogTime, StringView& timeStrCache);
+    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent);
+    time_t ApsaraEasyReadLogTimeParser(StringView& buffer, StringView& timeStr, LogtailTime& lastLogTime, int64_t& microTime);
+    int32_t GetApsaraLogMicroTime(StringView& buffer);
+    bool IsPrefixString(const char* all, const StringView& prefix);
+    int32_t ParseApsaraBaseFields(StringView& buffer, LogEvent& sourceEvent);
+
+    std::string mSourceKey;
+    std::string mRawLogTag;
+    bool mDiscardUnmatch = false;
+    bool mUploadRawLog = false;
+    bool mAdjustApsaraMicroTimezone = false;
+    bool mSourceKeyOverwritten = false;
+    int mLogTimeZoneOffsetSecond = 0;
+
+    int* mLogGroupSize = nullptr;
+    int* mParseFailures = nullptr;
+    int* mHistoryFailures = nullptr;
+    CounterPtr mProcParseInSizeBytes;
+    CounterPtr mProcParseOutSizeBytes;
+    CounterPtr mProcDiscardRecordsTotal;
+    CounterPtr mProcParseErrorTotal;
+    CounterPtr mProcHistoryFailureTotal;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseApsaraNativeUnittest;
 #endif

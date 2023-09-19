@@ -84,14 +84,16 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
         long long n;
         n = strtoll(buf, &cp, 10);
         // Assert the length of second timestamp to be less than 10.
-        size_t bufLength = strlen(buf);
+        // Input buf may contains other contents, so get bufLength from n.
+        size_t bufLength = std::to_string(n).length();
         size_t secondTimestampLength = bufLength >= 10 ? 10 : bufLength;
         for (size_t i = 0; i < bufLength - secondTimestampLength; ++i) {
             n /= 10;
         }
         time_t t;
-        if (n == 0 || (long long)(t = n) != n)
+        if (n == 0 || (long long)(t = n) != n) {
             return NULL;
+        }
         #ifdef _MSC_VER
         if (localtime_s(tm, &t) != 0)
             return NULL;
