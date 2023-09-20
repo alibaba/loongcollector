@@ -112,11 +112,12 @@ c, err := protocol.NewConverter("custom_single", "json", map[string]string{"host
 
 - 可选协议名
 
-    | 协议名           | 意义                                       |
+    | 协议名                   | 意义                                       |
     |------------------------------------------| ------ |
-    | custom_single | 单条协议                                     |
-    | influxdb      | Influxdb协议                               |
-    | raw           | 原始Byte流协议，仅支持v2版本中ByteArray类型的Event的协议转换 |
+    | custom_single         | 单条协议                                     |
+    | custom_single_flatten | 单条协议，数据平铺 ，如写入kafka的json消息体              |
+    | influxdb              | Influxdb协议                               |
+    | raw                   | 原始Byte流协议，仅支持v2版本中ByteArray类型的Event的协议转换 |
 
 
 - 可选编码方式

@@ -25,10 +25,11 @@ import (
 )
 
 const (
-	ProtocolCustomSingle = "custom_single"
-	ProtocolOtlpV1       = "otlp_v1"
-	ProtocolInfluxdb     = "influxdb"
-	ProtocolRaw          = "raw"
+	ProtocolCustomSingle        = "custom_single"
+	ProtocolCustomSingleFlatten = "custom_single_flatten"
+	ProtocolOtlpV1              = "otlp_v1"
+	ProtocolInfluxdb            = "influxdb"
+	ProtocolRaw                 = "raw"
 )
 
 const (
@@ -99,6 +100,10 @@ var supportedEncodingMap = map[string]map[string]bool{
 		EncodingJSON:     true,
 		EncodingProtobuf: false,
 	},
+	ProtocolCustomSingleFlatten: {
+		EncodingJSON:     true,
+		EncodingProtobuf: false,
+	},
 	ProtocolOtlpV1: {
 		EncodingNone: true,
 	},
@@ -154,6 +159,8 @@ func (c *Converter) DoWithSelectedFields(logGroup *protocol.LogGroup, targetFiel
 	switch c.Protocol {
 	case ProtocolCustomSingle:
 		return c.ConvertToSingleProtocolLogs(logGroup, targetFields)
+	case ProtocolCustomSingleFlatten:
+		return c.ConvertToSingleProtocolLogsFlatten(logGroup, targetFields)
 	case ProtocolOtlpV1:
 		return c.ConvertToOtlpResourseLogs(logGroup, targetFields)
 	default:
@@ -170,6 +177,8 @@ func (c *Converter) ToByteStreamWithSelectedFields(logGroup *protocol.LogGroup, 
 	switch c.Protocol {
 	case ProtocolCustomSingle:
 		return c.ConvertToSingleProtocolStream(logGroup, targetFields)
+	case ProtocolCustomSingleFlatten:
+		return c.ConvertToSingleProtocolStreamFlatten(logGroup, targetFields)
 	case ProtocolInfluxdb:
 		return c.ConvertToInfluxdbProtocolStream(logGroup, targetFields)
 	default:

@@ -40,6 +40,7 @@ your changes, such as:
 - [public] [both] [added] refactoried C++ process pipeline
 - [public] [both] [added] support use accelerate processors with go processors
 - [public] [both] [added] add new logtail metric module
+- [public] [both] [added] ddd JSON flatten protocol, data can be flattened and then brushed into storage such as Kafka and ES.
 - [public] [both] [added] use env `LOGTAIL_LOG_LEVEL` to control ilogtail log level
 - [public] [both] [updated] support continue/end regex patterns to split multiline log
 - [public] [both] [updated] support reader flush timeout
