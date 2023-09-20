@@ -1,0 +1,58 @@
+{
+    "inputs": [
+        {
+            "detail": {
+                "Environments": [
+                    "DEBUG=true"
+                ],
+                "IntervalMs": 100000,
+                "ScriptType": "shell",
+                "ScriptContent": "IyEvYmluL2Jhc2gKCiMj6Ieq5a6a5LmJ5oyH5qCH6ISa5pysCiMj6I635Y+W5L+h5oGvOgojIyAg56uv5Y+j5pWw6YeP5qOA5rWLCiMjICDlg7XlsLjov5vnqIvmlbDph48KIyMgIOS4juaXtumXtOacjeWKoeWZqOeahOajgOafpeW3rgoKCiMjIOiOt+WPluS4u+acuuWQjeensApob3N0bmFtZT0kKGhvc3RuYW1lKQojIyDojrflj5bkuLvmnLrlnLDlnYAKaXBfbGlzdD0kKC9zYmluL2lmY29uZmlnIC1hIHwgZ3JlcCBpbmV0IHwgZ3JlcCAtdiAxMjcuMC4wLjEgfCBncmVwIC12IGluZXQ2IHwgYXdrICd7cHJpbnQgJDJ9JyB8IHRyIC1kICJhZGRyOiIpCmNvdW50PSQoZWNobyAiJGlwX2xpc3QiIHwgd2MgLWwpCmV4cG9ydCBpcD0iIgoKaWYgWyAkY291bnQgLWVxIDEgXTsgdGhlbgogIGlwPSRpcF9saXN0CmVsc2UKICBnYXRld2F5X2lwPSQocm91dGUgLW4gfCBhd2sgJyQxID09ICIwLjAuMC4wIiB7cHJpbnQgJDJ9JyB8IGN1dCAtZCAiLiIgLWYgMSwyfGhlYWQgLTEpCiAgZm9yIGhvc3RfaXAgaW4gJGlwX2xpc3Q7IGRvCiAgICBpcF9wcmVmaXg9JChlY2hvICIkaG9zdF9pcCIgfCBjdXQgLWQgIi4iIC1mIDEsMikKICAgIGlmIFtbICRpcF9wcmVmaXggPT0gJGdhdGV3YXlfaXAgXV07IHRoZW4KICAgICAgaXA9JGhvc3RfaXAKICAgICAgYnJlYWsgCiAgICBmaQogIGRvbmUKZmkKCiMjIOiOt+WPluerr+WPo+S9v+eUqOeKtuaAgQp1c2VkX3BvcnQ9JChzcyAtYW50IHwgZ3JlcCAtdiAnU3RhdGUnIHwgYXdrICd7cHJpbnQgJDR9JyB8IGN1dCAtZCc6JyAtZjIgfCBzb3J0IC11IHwgd2MgLWwpCiMjIOiOt+WPluWDteWwuOi/m+ihjOaVsOmHjwpwcm9jZXNzX3pvbWJpZT0kKHBzIC1BIC1vIHN0YXQscHBpZCxwaWQsY21kIHwgZ3JlcCAtZSAnXltael0nIHx3YyAtbCkKCiAgIAojIOajgOafpeezu+e7n+S4reaYr+WQpuWuieijheS6hm50cGRhdGXlkb3ku6QKaWYgISB3aGljaCBudHBkYXRlICAmPiAgL2Rldi9udWxsOyB0aGVuCiAgICBzdWRvIHl1bSBpbnN0YWxsIC15IG50cGRhdGUgJj4gL2Rldi9udWxsCmZpCgppZiB3aGljaCBudHBkYXRlICY+IC9kZXYvbnVsbDsgdGhlbgogICAgIyDojrflj5ZOVFDmnI3liqHlmajml7bpl7TlubborqHnrpfml7bpl7Tlt64KICAgIG50cF9zZXJ2ZXI9ImlwYWRkciIKICAgIHRpbWVfZGlmZmVyZW5jZT0kKG50cGRhdGUgLXEgJG50cF9zZXJ2ZXIgMj4vZGV2L251bGwgfCB0YWlsIC0xIHwgYXdrICd7cHJpbnQgJChORi0xKX0nKQogICAgYWJzb2x1dGVfZGlmZmVyZW5jZT0kKGVjaG8gJHRpbWVfZGlmZmVyZW5jZSB8IGF3ayAne3ByaW50ZiAiJS4yZiIsICQxfScgfCBzZWQgJ3MvWy0rXS8vZycpCmZpCgppZiAhIFtbICIkdGltZV9kaWZmZXJlbmNlIiA9fiBeLT9bMC05XSsoXC5bMC05XSspPyQgXV07IHRoZW4KICAgICMgbnRwZGF0ZeWRveS7pOaJp+ihjOWksei0pe+8jOajgOafpWNocm9ueWTmnI3liqHnirbmgIEKICAgIHN5c3RlbWN0bCBzdGF0dXMgY2hyb255ZC5zZXJ2aWNlICY+IC9kZXYvbnVsbAogICAgaWYgWyAkPyAtZXEgMCBdOyB0aGVuCiAgICAgICAgIyBjaHJvbnlk5pyN5Yqh5a2Y5rS777yM6I635Y+W5pyN5Yqh5Zmo5LiO5pe26Ze05pyN5Yqh5Zmo55qE5beu5byCCiAgICAgICAgb2Zmc2V0PSQoY2hyb255YyB0cmFja2luZyB8IGdyZXAgJ0xhc3Qgb2Zmc2V0JyB8IGF3ayAne3ByaW50ICQ0fScpCiAgICAgICAgYWJzb2x1dGVfZGlmZmVyZW5jZT0kKGVjaG8gJG9mZnNldCB8IGF3ayAne3ByaW50ZiAiJS4yZiIsICQxfScgfCBzZWQgJ3MvWy0rXS8vZycpCiAgICBlbHNlCiAgICAgICAgZWNobyAi5peg5rOV6I635Y+W5pe26Ze05beu77yM6K+356Gu5L+dbnRwZGF0ZeWSjGNocm9ueWTmnI3liqHlnYflt7Llronoo4Xlkozov5DooYzjgIIiCiAgICAgICAgZXhpdCAxCiAgICBmaQpmaQoKCgojIOi+k+WHuue7k+aenAplY2hvICIkaG9zdG5hbWUgJGlwIHBvcnRfdXNlZCAkdXNlZF9wb3J0IgplY2hvICIkaG9zdG5hbWUgJGlwIHByb196b21iaWUgJHByb2Nlc3Nfem9tYmllIgplY2hvICIkaG9zdG5hbWUgJGlwIHRpbWVfZGlmZiAkYWJzb2x1dGVfZGlmZmVyZW5jZSI=",
+                "User": "op",
+                "LineSplitSep": "\n",
+                "CmdPath": "/bin/sh",
+                "IgnoreError": false,
+                "ContentEncoding": "Base64",
+                "TimeoutMilliseconds": 30000
+            },
+            "type": "input_command"
+        }
+    ],
+    "processors": [
+        {
+            "detail": {
+                "SourceKey": "content",
+                "Regex": "(\\S+) (\\d+.\\d+.\\d+.\\d+) (\\w+) (\\d.*)",
+                "Keys": [
+                    "hostname",
+                    "ip",
+                    "metrics_type",
+                    "value"
+                ]
+            },
+            "type": "processor_regex"
+        },
+        {
+            "detail": {
+                "Fields": {
+                    "Metric": "op_metrics"
+                }
+            },
+            "type": "processor_add_fields"
+        },
+        {
+            "detail": {
+                "IgnoreError": false,
+                "MetricLabelKeys": [
+                    "hostname",
+                    "ip",
+                    "metrics_type"
+                ],
+                "MetricValues": {
+                    "Metric": "value"
+                }
+            },
+            "type": "processor_log_to_sls_metric"
+        }
+    ]
+}
