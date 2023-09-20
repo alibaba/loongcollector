@@ -1871,7 +1871,10 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             nbytes = AlignLastCharacter(stringBuffer, nbytes);
         }
         int32_t rollbackLineFeedCount;
-        nbytes = LastMatchedLine(stringBuffer, nbytes, rollbackLineFeedCount);
+        nbytes = LastMatchedLine(stringBuffer, nbytes, rollbackLineFeedCount, allowRollback);
+    } else if (mLogType == JSON_LOG) {
+        int32_t rollbackLineFeedCount;
+        LastMatchedLine(stringBuffer, nbytes, rollbackLineFeedCount, allowRollback); // split
     }
 
     if (nbytes == 0) {
@@ -1960,7 +1963,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     if (allowRollback) {
         if (moreData || mLogType == JSON_LOG) {
             int32_t bakResultCharCount = resultCharCount;
-            resultCharCount = LastMatchedLine(stringBuffer, resultCharCount, rollbackLineFeedCount);
+            resultCharCount = LastMatchedLine(stringBuffer, resultCharCount, rollbackLineFeedCount, allowRollback);
             if (resultCharCount == 0) {
                 resultCharCount = bakResultCharCount;
                 rollbackLineFeedCount = 0;
@@ -1968,6 +1971,9 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
                 logTooLongSplitFlag = moreData;
             }
         }
+    } else if (mLogType == JSON_LOG) {
+        int32_t ignoredRollbackLineFeedCount;
+        LastMatchedLine(stringBuffer, resultCharCount, ignoredRollbackLineFeedCount, allowRollback); // split
     }
 
     int32_t lineFeedCount = lineFeedPos.size();
@@ -2111,14 +2117,17 @@ LogFileReader::FileCompareResult LogFileReader::CompareToFile(const string& file
         1. xxx\nend\n -> xxx\nend
         1. xxx\nend\nxxx\n -> xxx\nend
 */
-int32_t LogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount) {
+int32_t LogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount, bool allowRollback) {
+    if (!allowRollback) {
+        return size;
+    }
     int endPs = size - 1; // buffer[size] = 0 , buffer[size-1] = '\n'
     rollbackLineFeedCount = 0;
     // Single line rollback
     if (!IsMultiLine()) {
         while (endPs >= 0) {
             if (buffer[endPs] == '\n') {
-                if (endPs != size - 1) {
+                if (endPs != size - 1) { // if last line dose not end with '\n', rollback
                     ++rollbackLineFeedCount;
                 }
                 buffer[endPs + 1] = '\0';

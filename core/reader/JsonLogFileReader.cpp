@@ -211,46 +211,45 @@ bool JsonLogFileReader::LogSplit(const char* buffer,
 }
 
 // split log & find last match in this function
-int32_t JsonLogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount) {
+int32_t
+JsonLogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount, bool allowRollback) {
     int32_t readBytes = 0;
     int32_t endIdx = 0;
     int32_t beginIdx = 0;
     rollbackLineFeedCount = 0;
+    bool startWithBlock = false;
     // check if has json block in this buffer
-    bool noJsonBlockFlag = true;
     do {
-        bool startWithBlock = false;
-        if (FindJsonMatch(buffer, beginIdx, size, endIdx, startWithBlock)) {
-            noJsonBlockFlag = false;
-            buffer[endIdx] = '\0';
-            beginIdx = endIdx + 1;
-            readBytes = endIdx + 1;
-            rollbackLineFeedCount = 0;
-        } else {
-            char* pos = strchr(buffer + beginIdx, '\n');
-            if (pos == NULL)
+        if (!FindJsonMatch(buffer, beginIdx, size, endIdx, startWithBlock, allowRollback)) {
+            if (startWithBlock && allowRollback) { // may be the ending } has not been read, rollback
                 break;
-            ++rollbackLineFeedCount;
-            endIdx = pos - buffer;
-            buffer[endIdx] = '\0'; // invalid json line
-            beginIdx = endIdx + 1;
-            if (noJsonBlockFlag) {
-                // if no json block in this buffer and now line has no block, force read this line
-                // if no json block in this buffer and now line has block, set noJsonBlockFlag false
-                if (!startWithBlock) {
-                    readBytes = endIdx + 1;
-                    rollbackLineFeedCount = 0;
-                } else {
-                    noJsonBlockFlag = false;
-                }
             }
+            // else impossible to be a valid json line, advance and skip
+            char* pos = strchr(buffer + beginIdx, '\n');
+            if (pos == NULL) {
+                break;
+            }
+            endIdx = pos - buffer;
         }
+        // advance if json is valid or impossible to be valid
+        beginIdx = endIdx + 1;
+        buffer[endIdx] = '\0';
     } while (beginIdx < size);
+    readBytes = beginIdx;
+
+    if (allowRollback) {
+        rollbackLineFeedCount = std::count(buffer + beginIdx, buffer + size, '\n');
+        if (beginIdx < size && buffer[size - 1] != '\n') {
+            ++rollbackLineFeedCount;
+        }
+    } else {
+        return size;
+    }
     return readBytes;
 }
 
 bool JsonLogFileReader::FindJsonMatch(
-    char* buffer, int32_t beginIdx, int32_t size, int32_t& endIdx, bool& startWithBlock) {
+    char* buffer, int32_t beginIdx, int32_t size, int32_t& endIdx, bool& startWithBlock, bool allowRollback) {
     int32_t idx = beginIdx;
     while (idx < size) {
         if (buffer[idx] == ' ' || buffer[idx] == '\n' || buffer[idx] == '\t' || buffer[idx] == '\0')
@@ -308,6 +307,11 @@ bool JsonLogFileReader::FindJsonMatch(
             default:
                 break;
         }
+    }
+    if (!allowRollback && braceCount == 0) {
+        // when !allowRollback, we can return true because the tailing \n will be ignored in the next read
+        endIdx = idx; // assert idx == size
+        return true;
     }
     LOG_DEBUG(sLogger,
               ("find no match, beginIdx",

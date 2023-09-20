@@ -52,10 +52,12 @@ protected:
                       std::string& lastLogTimeStr,
                       uint32_t& logGroupSize) override;
 
-    int32_t LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount) override;
+    int32_t
+    LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount, bool allowRollback = true) override;
 
 private:
-    bool FindJsonMatch(char* buffer, int32_t beginIdx, int32_t size, int32_t& endIdx, bool& startWithBlock);
+    bool FindJsonMatch(
+        char* buffer, int32_t beginIdx, int32_t size, int32_t& endIdx, bool& startWithBlock, bool allowRollback = true);
     std::string RapidjsonValueToString(const rapidjson::Value& value);
 
     std::string mTimeKey;
@@ -65,6 +67,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class JsonLogFileReaderUnittest;
     friend class JsonParseLogLineUnittest;
+    friend class LastMatchedLineUnittest;
 #endif
 };
 
