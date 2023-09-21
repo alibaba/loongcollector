@@ -107,6 +107,7 @@ private:
     friend class FuseFileUnittest;
     friend class MultiServerConfigUpdatorUnitest;
     friend class PipelineManagerUnittest;
+    friend class ProcessorDesensitizeNativeUnittest;
 #endif
 };
 
