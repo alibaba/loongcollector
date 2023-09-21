@@ -38,6 +38,7 @@
 #include "pipeline/PipelineManager.h"
 #include "config_manager/ConfigManager.h"
 #include "checkpoint/CheckPointManager.h"
+#include "checkpoint/AdhocCheckpointManager.h"
 #include "processor/LogFilter.h"
 #include "controller/EventDispatcher.h"
 #include "monitor/Monitor.h"
@@ -265,6 +266,7 @@ void do_worker_process() {
     }
     ObserverManager::GetInstance()->Reload();
     CheckPointManager::Instance()->LoadCheckPoint();
+    // AdhocCheckpointManager::GetInstance()->LoadAdhocCheckpoint();
 
     // added by xianzhi(bowen.gbw@antfin.com)
     // read local data_integrity json file and line count file
