@@ -25,7 +25,8 @@
 
 namespace logtail {
 bool ProcessorParseTimestampNative::Init(const ComponentConfig& componentConfig) {
-    PipelineConfig config = componentConfig.GetConfig();
+    const PipelineConfig& config = componentConfig.GetConfig();
+
     mTimeFormat = config.mTimeFormat;
     mTimeKey = config.mTimeKey;
     mSpecifiedYear = config.mAdvancedConfig.mSpecifiedYear;

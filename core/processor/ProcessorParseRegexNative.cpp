@@ -26,8 +26,7 @@
 namespace logtail {
 
 bool ProcessorParseRegexNative::Init(const ComponentConfig& componentConfig) {
-
-    PipelineConfig config = componentConfig.GetConfig();
+    const PipelineConfig& config = componentConfig.GetConfig();
 
     mSourceKey = DEFAULT_CONTENT_KEY;
     mDiscardUnmatch = config.mDiscardUnmatch;
@@ -39,12 +38,6 @@ bool ProcessorParseRegexNative::Init(const ComponentConfig& componentConfig) {
         std::list<std::string>::iterator keyitr = config.mKeys->begin();
         for (; regitr != config.mRegs->end() && keyitr != config.mKeys->end(); ++regitr, ++keyitr) {
             AddUserDefinedFormat(*regitr, *keyitr);
-            if (*keyitr == mSourceKey) {
-                mSourceKeyOverwritten = true;
-            }
-            if (*keyitr == mRawLogTag) {
-                mRawLogTagOverwritten = true;
-            }
         }
         if (mUploadRawLog && mRawLogTag == mSourceKey) {
             mSourceKeyOverwritten = true;
@@ -92,6 +85,7 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath, Pipeline
     if (!sourceEvent.HasContent(mSourceKey)) {
         return true;
     }
+    auto rawContent = sourceEvent.GetContent(mSourceKey);
     bool res = true;
     for (uint32_t i = 0; i < mUserDefinedFormat.size(); ++i) { // support multiple patterns
         const UserDefinedFormat& format = mUserDefinedFormat[i];
@@ -106,12 +100,12 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath, Pipeline
     }
     if (!res && !mDiscardUnmatch) {
         AddLog(LogParser::UNMATCH_LOG_KEY, // __raw_log__
-               sourceEvent.GetContent(mSourceKey),
+               rawContent,
                sourceEvent); // legacy behavior, should use sourceKey
     }
     if (res || !mDiscardUnmatch) {
         if (mUploadRawLog && (!res || !mRawLogTagOverwritten)) {
-            AddLog(mRawLogTag, sourceEvent.GetContent(mSourceKey), sourceEvent); // __raw__
+            AddLog(mRawLogTag, rawContent, sourceEvent); // __raw__
         }
         if (res && !mSourceKeyOverwritten) {
             sourceEvent.DelContent(mSourceKey);
@@ -124,6 +118,14 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath, Pipeline
 
 void ProcessorParseRegexNative::AddUserDefinedFormat(const std::string& regStr, const std::string& keys) {
     std::vector<std::string> keyParts = StringSpliter(keys, ",");
+    for (auto& it : keyParts) {
+        if (it == mSourceKey) {
+            mSourceKeyOverwritten = true;
+        }
+        if (it == mRawLogTag) {
+            mRawLogTagOverwritten = true;
+        }
+    }
     boost::regex reg(regStr);
     bool isWholeLineMode = regStr == "(.*)";
     mUserDefinedFormat.push_back(UserDefinedFormat(reg, keyParts, isWholeLineMode));

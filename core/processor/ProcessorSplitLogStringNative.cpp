@@ -23,7 +23,7 @@
 namespace logtail {
 
 bool ProcessorSplitLogStringNative::Init(const ComponentConfig& componentConfig) {
-    PipelineConfig config = componentConfig.GetConfig();
+    const PipelineConfig& config = componentConfig.GetConfig();
 
     mSplitKey = DEFAULT_CONTENT_KEY;
     mSplitChar = config.mLogType == JSON_LOG ? '\0' : '\n';

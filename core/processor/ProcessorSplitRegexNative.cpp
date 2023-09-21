@@ -25,7 +25,8 @@
 namespace logtail {
 
 bool ProcessorSplitRegexNative::Init(const ComponentConfig& componentConfig) {
-    PipelineConfig config = componentConfig.GetConfig();
+    const PipelineConfig& config = componentConfig.GetConfig();
+
     mSplitKey = DEFAULT_CONTENT_KEY;
     mIsMultline = config.IsMultiline();
     SetLogMultilinePolicy(config.mLogBeginReg, config.mLogContinueReg, config.mLogEndReg);

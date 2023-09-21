@@ -24,7 +24,7 @@
 namespace logtail {
 
 bool ProcessorFillGroupInfoNative::Init(const ComponentConfig& componentConfig) {
-    Config config = componentConfig.GetConfig();
+    const PipelineConfig& config = componentConfig.GetConfig();
     mTopicFormat = config.mTopicFormat;
     if (config.mLogType != APSARA_LOG && ToLowerCaseString(mTopicFormat) == "default") {
         mTopicFormat = "none";
