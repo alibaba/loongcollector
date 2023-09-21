@@ -37,6 +37,13 @@ public:
         return false;
     }
 
+    virtual bool Match(const LogContents& contents, PipelineContext& mContext) {
+        if (BOOST_LIKELY(child.get() != NULL)) {
+            return !child->Match(contents, mContext);
+        }
+        return false;
+    }
+
 private:
     FilterOperator op;
     BaseFilterNodePtr child;

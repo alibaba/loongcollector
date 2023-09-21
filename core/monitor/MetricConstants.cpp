@@ -29,6 +29,13 @@ const std::string METRIC_PROC_PARSE_ERROR_TOTAL = "proc_parse_error_total";
 const std::string METRIC_PROC_KEY_COUNT_NOT_MATCH_ERROR_TOTAL = "proc_key_count_not_match_error_total";
 const std::string METRIC_PROC_HISTORY_FAILURE_TOTAL = "proc_history_failure_total";
 
+// processor filter metrics
+const std::string METRIC_PROC_FILTER_IN_SIZE_BYTES = "proc_filter_in_size_bytes";
+const std::string METRIC_PROC_FILTER_OUT_SIZE_BYTES = "proc_filter_out_size_bytes";
+const std::string METRIC_PROC_FILTER_ERROR_TOTAL = "proc_filter_error_total";
+const std::string METRIC_PROC_FILTER_RECORDS_TOTAL = "proc_filter_records_total";
+
+
 // processore plugin name
 const std::string PLUGIN_PROCESSOR_PARSE_REGEX_NATIVE = "processor_parse_regex_native";
 

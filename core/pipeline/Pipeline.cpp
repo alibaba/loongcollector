@@ -27,6 +27,7 @@
 #include "processor/ProcessorParseTimestampNative.h"
 #include "processor/ProcessorDesensitizeNative.h"
 #include "processor/ProcessorFillGroupInfoNative.h"
+#include "processor/ProcessorFilterNative.h"
 
 namespace logtail {
 
@@ -111,6 +112,13 @@ bool Pipeline::Init(const PipelineConfig& config) {
         ProcessorParseTimestampNative::Name(),
         std::string(ProcessorParseTimestampNative::Name()) + "/" + std::to_string(pluginIndex++));
     if (!InitAndAddProcessor(std::move(pluginTime), config)) {
+        return false;
+    }
+
+    std::unique_ptr<ProcessorInstance> pluginFilter = PluginRegistry::GetInstance()->CreateProcessor(
+        ProcessorFilterNative::Name(),
+        std::string(ProcessorFilterNative::Name()) + "/" + std::to_string(pluginIndex++));
+    if (!InitAndAddProcessor(std::move(pluginFilter), config)) {
         return false;
     }
 

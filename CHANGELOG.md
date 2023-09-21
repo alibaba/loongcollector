@@ -57,3 +57,5 @@ your changes, such as:
 - [public] [both] [added] support plugin ProcessorParseTimestampNative
 - [public] [both] [added] support plugin ProcessorParseApsaraNative
 - [public] [both] [added] support plugin ProcessorParseDelimiterNative
+- [public] [both] [added] support plugin ProcessorFilterNative
+- [public] [both] [added] support plugin ProcessorDesensitizeNative

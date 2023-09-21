@@ -51,6 +51,7 @@ private:
     friend class ProcessorParseJsonNativeUnittest;
     friend class ProcessorParseApsaraNativeUnittest;
     friend class ProcessorParseDelimiterNativeUnittest;
+    friend class ProcessorFilterNativeUnittest;
     friend class ProcessorDesensitizeNativeUnittest;
 #endif
 };

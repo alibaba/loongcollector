@@ -18,6 +18,9 @@
 #include "pipeline/PipelineManager.h"
 #include "plugin/PluginRegistry.h"
 
+DECLARE_FLAG_STRING(user_log_config);
+using namespace std;
+
 namespace logtail {
 
 class PipelineManagerUnittest : public ::testing::Test {
@@ -40,6 +43,14 @@ public:
 APSARA_UNIT_TEST_CASE(PipelineManagerUnittest, TestLoadAllPipelines, 0);
 
 void PipelineManagerUnittest::TestLoadAllPipelines() {
+    string config = "{\"filters\" : [{\"project_name\" : \"123_proj\", \"category\" : \"test\", \"keys\" : [\"key1\", "
+                    "\"key2\"], \"regs\" : [\"value1\",\"value2\"]}, {\"project_name\" : \"456_proj\", \"category\" : "
+                    "\"test_1\", \"keys\" : [\"key1\", \"key2\"], \"regs\" : [\"value1\",\"value2\"]}]}";
+    string path = GetProcessExecutionDir() + "user_log_config.json";
+    ofstream file(path.c_str());
+    file << config;
+    file.close();
+
     auto manager = PipelineManager::GetInstance();
     manager->LoadAllPipelines();
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, manager->FindPipelineByName("project##config_0").get());

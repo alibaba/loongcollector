@@ -41,6 +41,7 @@ private:
 
 #if defined(APSARA_UNIT_TEST_MAIN)
     friend class LogFilterUnittest;
+    friend class ProcessorFilterNativeUnittest;
 #endif
 };
 

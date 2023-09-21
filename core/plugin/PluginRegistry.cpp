@@ -39,6 +39,7 @@
 #include "processor/ProcessorParseTimestampNative.h"
 #include "processor/ProcessorDesensitizeNative.h"
 #include "processor/ProcessorFillGroupInfoNative.h"
+#include "processor/ProcessorFilterNative.h"
 
 namespace logtail {
 
@@ -94,6 +95,8 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseRegexNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseTimestampNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorFillGroupInfoNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorFilterNative>());
+
     /* more native plugin registers here */
 }
 

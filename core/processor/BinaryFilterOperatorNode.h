@@ -40,6 +40,17 @@ public:
         return false;
     }
 
+    virtual bool Match(const LogContents& contents, PipelineContext& mContext) {
+        if (BOOST_LIKELY(left && right)) {
+            if (op == AND_OPERATOR) {
+                return left->Match(contents, mContext) && right->Match(contents, mContext);
+            } else if (op == OR_OPERATOR) {
+                return left->Match(contents, mContext) || right->Match(contents, mContext);
+            }
+        }
+        return false;
+    }
+
 private:
     FilterOperator op;
     BaseFilterNodePtr left;
