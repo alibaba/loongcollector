@@ -118,6 +118,7 @@ func (t *TraceSegmentHandle) parseSpan(span *agent.SpanObject, applicationInstan
 		otSpan.Kind = skywalkingv3.OpenTracingSpanKindServer
 	case span.SpanType == agent.SpanType_Exit:
 		otSpan.Kind = skywalkingv3.OpenTracingSpanKindClient
+		mappingDatabaseTag(span, otSpan)
 	case span.SpanType == agent.SpanType_Local:
 		otSpan.Kind = skywalkingv3.OpenTracingSpanKindInternal
 	default:
@@ -193,6 +194,30 @@ func (t *TraceSegmentHandle) parseSpan(span *agent.SpanObject, applicationInstan
 		otSpan.StatusCode = skywalkingv3.StatusCodeOk
 	}
 	return otSpan
+}
+
+func mappingDatabaseTag(span *agent.SpanObject, otSpan *skywalkingv3.OtSpan) {
+	if span.GetPeer() == "" {
+		return
+	}
+
+	if span.SpanLayer != agent.SpanLayer_Database {
+		return
+	}
+
+	var dbType string
+	for _, tag := range span.GetTags() {
+		if tag.Key == "db.type" {
+			dbType = tag.Value
+			break
+		}
+	}
+
+	if dbType == "" {
+		return
+	}
+
+	otSpan.Attribute[skywalkingv3.AttributeDBConnectionString] = dbType + "://" + span.GetPeer()
 }
 
 func convertUniIDToString(u *agent.UniqueId) string {

@@ -82,6 +82,7 @@ func ParseSegment(span *v3.SpanObject, segment *v3.SegmentObject, cache *Resourc
 		otSpan.Kind = OpenTracingSpanKindServer
 	case span.SpanType == v3.SpanType_Exit:
 		otSpan.Kind = OpenTracingSpanKindClient
+		mappingDatabaseTag(span, otSpan)
 	case span.SpanType == v3.SpanType_Local:
 		otSpan.Kind = OpenTracingSpanKindInternal
 	default:
@@ -155,6 +156,30 @@ func ParseSegment(span *v3.SpanObject, segment *v3.SegmentObject, cache *Resourc
 		otSpan.StatusCode = StatusCodeOk
 	}
 	return otSpan
+}
+
+func mappingDatabaseTag(span *v3.SpanObject, otSpan *OtSpan) {
+	if span.GetPeer() == "" {
+		return
+	}
+
+	if span.SpanLayer != v3.SpanLayer_Database {
+		return
+	}
+
+	var dbType string
+	for _, tag := range span.GetTags() {
+		if tag.Key == "db.type" {
+			dbType = tag.Value
+			break
+		}
+	}
+
+	if dbType == "" {
+		return
+	}
+
+	otSpan.Attribute[AttributeDBConnectionString] = dbType + "://" + span.GetPeer()
 }
 
 func mappingMessageSystemTag(span *v3.SpanObject, otSpan *OtSpan, mapping map[int32]string) {
