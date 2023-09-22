@@ -89,7 +89,7 @@ std::vector<std::string> StringSpliter(const std::string& str, const std::string
             tokens.push_back(token);
         prev = pos + delim.length();
     } while (pos < str.length() && prev < str.length());
-    return std::move(tokens);
+    return tokens;
 }
 
 void ReplaceString(std::string& raw, const std::string& src, const std::string& dst) {

@@ -86,6 +86,14 @@ std::string AbsolutePath(const std::string& path, const std::string& basepath) {
     return boost::filesystem::absolute(path, basepath).string();
 }
 
+std::string NormalizePath(const std::string& path) {
+    boost::filesystem::path abs(path);
+    if (abs.filename_is_dot() || abs.filename_is_dot_dot()) {
+        abs.remove_filename();
+    }
+    return abs.string();
+}
+
 int FSeek(FILE* stream, int64_t offset, int origin) {
 #if defined(_MSC_VER)
     return _fseeki64(stream, offset, origin);

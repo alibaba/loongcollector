@@ -320,7 +320,7 @@ bool Aggregator::Add(const std::string& projectName,
                     auto& logPosition = context.mExactlyOnceCheckpoint->positions[logIdx];
                     auto& cpt = value->mLogGroupContext.mExactlyOnceCheckpoint->data;
 
-                    // First log, upodate read_offset.
+                    // First log, update read_offset.
                     if (1 == value->mLogGroup.logs_size()) {
                         cpt.set_read_offset(logPosition.first);
                     }

@@ -121,9 +121,7 @@ public:
     // this function should only be called once
     void SetLogMultilinePolicy(const std::string& begReg, const std::string& conReg, const std::string& endReg);
 
-    bool IsMultiLine() {
-        return mLogBeginRegPtr != NULL || mLogContinueRegPtr != NULL || mLogEndRegPtr != NULL;
-    }
+    bool IsMultiLine() { return mLogBeginRegPtr != NULL || mLogContinueRegPtr != NULL || mLogEndRegPtr != NULL; }
 
     void SetReaderFlushTimeout(int timeout) { mReaderFlushTimeout = timeout; }
 
@@ -255,9 +253,9 @@ public:
 
     std::string GetTimeFormat() const { return mTimeFormat; }
 
-    bool IsReadToEnd() const { return mLastReadPos == mLastFileSize; }
+    bool IsReadToEnd() const { return GetLastReadPos() == mLastFileSize; }
 
-    bool HasDataInCache() const { return mLastFilePos != mLastReadPos; }
+    bool HasDataInCache() const { return mCache.size(); }
 
     LogFileReaderPtrArray* GetReaderArray();
 
@@ -373,6 +371,9 @@ protected:
 
     bool CheckForFirstOpen(FileReadPolicy policy = BACKWARD_TO_FIXED_POS);
     void FixLastFilePos(LogFileOperator& logFileOp, int64_t endOffset);
+    inline int64_t GetLastReadPos() const { // pos read but may not consumed, used for read needed
+        return mLastFilePos + mCache.size();
+    }
 
     static size_t BUFFER_SIZE;
     std::string mRegion;
@@ -387,9 +388,9 @@ protected:
     int32_t mTailLimit; // KB
     uint64_t mLastFileSignatureHash;
     uint32_t mLastFileSignatureSize;
-    int64_t mLastFilePos; // pos read and consumed, used for next read begin
-    int64_t mLastReadPos = 0; // pos read but may not consumed, used for read needed
-    int64_t mLastFileSize;
+    int64_t mLastFilePos = 0; // pos read and consumed, used for next read begin
+    int64_t mLastFileSize = 0;
+    std::string mCache;
     std::string mProjectName;
     std::string mTopicName;
     time_t mLastUpdateTime;
@@ -525,7 +526,7 @@ private:
     // Adjust parameters for first read by range checkpoints.
     //
     // Includes:
-    // - mLastFilePos, mLastReadPos
+    // - mLastFilePos, GetLastReadPos
     // - mFirstWatched
     // - mEOOption->toReplayCheckpoints
     // - mEOOption->lastComittedOffset
@@ -539,13 +540,13 @@ private:
     //  3.2. uncommitted checkpoints are found:
     //   - Sort them by read offset
     //   - Set them as toReplayCheckpoints
-    //   - Set mLastReadPos = mLastFilePos = ReadOffsetOfFirstCheckpoint
+    //   - Set GetLastReadPos = mLastFilePos = ReadOffsetOfFirstCheckpoint
     //   - Set mFirstWatched = false
     //   - If maximum is found and the checkpoint is committed, use it to update
     //    the last committed offset
     //  3.3. no minimum but maximum is found, it means all data in checkpoints have
     //   already been committed, so read should start from the position after it.
-    //   - Set mLastReadPos = mLastFilePos = ReadOffset(maxOffset) + ReadLength(maxOffset)
+    //   - Set GetLastReadPos = mLastFilePos = ReadOffset(maxOffset) + ReadLength(maxOffset)
     //   - Set mFirstWatched = false
     void adjustParametersByRangeCheckpoints();
 
@@ -554,10 +555,10 @@ private:
     void updatePrimaryCheckpointRealPath();
 
     void handleUnmatchLogs(const char* buffer,
-                                   int& multiBeginIndex,
-                                   int endIndex,
-                                   std::vector<StringView>& logIndex,
-                                   std::vector<StringView>& discardIndex);
+                           int& multiBeginIndex,
+                           int endIndex,
+                           std::vector<StringView>& logIndex,
+                           std::vector<StringView>& discardIndex);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class EventDispatcherTest;

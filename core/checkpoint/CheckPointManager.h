@@ -35,16 +35,18 @@ namespace logtail {
 #define NO_CHECKPOINT_VERSION 0
 class CheckPoint {
 public:
+    DevInode mDevInode;
+    int64_t mOffset = 0;
+    uint64_t mSignatureHash = 0;
+    uint32_t mSignatureSize = 0;
+    int32_t mLastUpdateTime = 0;
+    bool mFileOpenFlag = false;
+    bool mContainerStopped = false;
+    bool mLastForceRead = false;
+    std::string mCache;
     std::string mConfigName;
     std::string mFileName;
     std::string mRealFileName;
-    DevInode mDevInode;
-    int64_t mOffset;
-    uint64_t mSignatureHash;
-    uint32_t mSignatureSize;
-    int32_t mLastUpdateTime;
-    bool mFileOpenFlag;
-    bool mContainerStopped;
 
     CheckPoint() {}
 
@@ -56,17 +58,19 @@ public:
                const std::string& configName,
                const std::string& realFileName,
                bool fileOpenFlag,
-               bool containerStopped)
-        : mConfigName(configName),
-          mFileName(filename),
-          mRealFileName(realFileName),
-          mDevInode(devInode),
+               bool containerStopped,
+               bool lastForceRead)
+        : mDevInode(devInode),
           mOffset(offset),
           mSignatureHash(signatureHash),
           mSignatureSize(signatureSize),
           mLastUpdateTime(0),
           mFileOpenFlag(fileOpenFlag),
-          mContainerStopped(containerStopped) {}
+          mContainerStopped(containerStopped),
+          mLastForceRead(lastForceRead),
+          mConfigName(configName),
+          mFileName(filename),
+          mRealFileName(realFileName) {}
 };
 
 class DirCheckPoint {

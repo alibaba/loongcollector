@@ -15,6 +15,7 @@
 #include "unittest/Unittest.h"
 #include <stdio.h>
 #include <fstream>
+#include "checkpoint/CheckPointManager.h"
 #include "reader/CommonRegLogFileReader.h"
 #include "reader/SourceBuffer.h"
 #include "common/RuntimeUtil.h"
@@ -38,10 +39,7 @@ public:
         utf8File = "utf8.txt"; // content of utf8.txt is equivalent to gbk.txt
     }
 
-    static void TearDownTestCase() {
-        remove(gbkFile.c_str());
-        remove(utf8File.c_str());
-    }
+    static void TearDownTestCase() {}
 
     void SetUp() override {
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
@@ -129,9 +127,9 @@ void LogFileReaderUnittest::TestReadGBK() {
         APSARA_TEST_FALSE_FATAL(moreData);
         char* expectedContentAll = expectedContent.get();
         size_t tmp = strlen(expectedContentAll);
-        expectedContentAll[tmp+1] = '\n';
+        expectedContentAll[tmp + 1] = '\n';
         APSARA_TEST_STREQ_FATAL(expectedContent.get(), logBuffer.rawBuffer.data());
-        expectedContentAll[tmp+1] = '\0';
+        expectedContentAll[tmp + 1] = '\0';
     }
     { // buffer size not big enough and not match pattern
         CommonRegLogFileReader reader(projectName,
@@ -186,7 +184,7 @@ void LogFileReaderUnittest::TestReadGBK() {
         expectedPart.resize(expectedPart.rfind("iLogtail") - 1); // exclude tailing \n
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
     }
-    { // read twice
+    { // read twice, multiline
         CommonRegLogFileReader reader(projectName,
                                       category,
                                       logPathDir,
@@ -207,18 +205,54 @@ void LogFileReaderUnittest::TestReadGBK() {
         LogFileReader::BUFFER_SIZE = fileSize - 11;
         LogBuffer logBuffer;
         bool moreData = false;
-        // first read
+        // first read, first part should be read
         reader.ReadGBK(logBuffer, fileSize, moreData);
         APSARA_TEST_TRUE_FATAL(moreData);
         std::string expectedPart(expectedContent.get());
         expectedPart.resize(expectedPart.rfind("iLogtail") - 1);
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
-        // second read
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        auto lastFilePos = reader.mLastFilePos;
+        // second read, end of second part cannot be determined, nothing read
+        reader.ReadGBK(logBuffer, fileSize, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_EQUAL_FATAL(lastFilePos, reader.mLastFilePos);
+    }
+    { // read twice, single line
+        CommonRegLogFileReader reader(projectName,
+                                      category,
+                                      logPathDir,
+                                      gbkFile,
+                                      INT32_FLAG(default_tail_limit_kb),
+                                      timeFormat,
+                                      topicFormat,
+                                      groupTopic,
+                                      FileEncoding::ENCODING_GBK,
+                                      false,
+                                      false);
+        reader.mDiscardUnmatch = false;
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = 0;
+        reader.CheckFileSignatureAndOffset(fileSize);
+        LogFileReader::BUFFER_SIZE = fileSize - 11;
+        LogBuffer logBuffer;
+        bool moreData = false;
+        // first read, first part should be read
+        reader.ReadGBK(logBuffer, fileSize, moreData);
+        APSARA_TEST_TRUE_FATAL(moreData);
+        std::string expectedPart(expectedContent.get());
+        expectedPart.resize(expectedPart.rfind("iLogtail") - 1); // -1 for \n
+        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        // second read, second part should be read
         reader.ReadGBK(logBuffer, fileSize, moreData);
         APSARA_TEST_FALSE_FATAL(moreData);
         expectedPart = expectedContent.get();
         expectedPart = expectedPart.substr(expectedPart.rfind("iLogtail"));
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_EQUAL_FATAL(0UL, reader.mCache.size());
     }
     { // empty file
         CommonRegLogFileReader reader(projectName,
@@ -287,9 +321,9 @@ void LogFileReaderUnittest::TestReadUTF8() {
         APSARA_TEST_FALSE_FATAL(moreData);
         char* expectedContentAll = expectedContent.get();
         size_t tmp = strlen(expectedContentAll);
-        expectedContentAll[tmp+1] = '\n';
+        expectedContentAll[tmp + 1] = '\n';
         APSARA_TEST_STREQ_FATAL(expectedContent.get(), logBuffer.rawBuffer.data());
-        expectedContentAll[tmp+1] = '\0';
+        expectedContentAll[tmp + 1] = '\0';
     }
     { // buffer size not big enough and not match pattern
         // should read buffer size
@@ -344,7 +378,7 @@ void LogFileReaderUnittest::TestReadUTF8() {
         expectedPart.resize(expectedPart.rfind("iLogtail") - 1);
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
     }
-    { // read twice
+    { // read twice, multiline
         CommonRegLogFileReader reader(projectName,
                                       category,
                                       logPathDir,
@@ -368,14 +402,49 @@ void LogFileReaderUnittest::TestReadUTF8() {
         reader.ReadUTF8(logBuffer, fileSize, moreData);
         APSARA_TEST_TRUE_FATAL(moreData);
         std::string expectedPart(expectedContent.get());
+        expectedPart.resize(expectedPart.rfind("iLogtail") - 1); // -1 for \n
+        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        auto lastFilePos = reader.mLastFilePos;
+        // second read, end of second part cannot be determined, nothing read
+        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_EQUAL_FATAL(lastFilePos, reader.mLastFilePos);
+    }
+    { // read twice, singleline
+        CommonRegLogFileReader reader(projectName,
+                                      category,
+                                      logPathDir,
+                                      utf8File,
+                                      INT32_FLAG(default_tail_limit_kb),
+                                      timeFormat,
+                                      topicFormat,
+                                      groupTopic,
+                                      FileEncoding::ENCODING_UTF8,
+                                      false,
+                                      false);
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = 0;
+        reader.CheckFileSignatureAndOffset(fileSize);
+        LogFileReader::BUFFER_SIZE = fileSize - 13;
+        LogBuffer logBuffer;
+        bool moreData = false;
+        // first read
+        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_TRUE_FATAL(moreData);
+        std::string expectedPart(expectedContent.get());
         expectedPart.resize(expectedPart.rfind("iLogtail") - 1);
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
-        // second read
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        // second read, second part should be read
         reader.ReadUTF8(logBuffer, fileSize, moreData);
         APSARA_TEST_FALSE_FATAL(moreData);
         expectedPart = expectedContent.get();
-        expectedPart.resize(expectedPart.rfind("iLogtail") - 1);
+        expectedPart = expectedPart.substr(expectedPart.rfind("iLogtail"));
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_EQUAL_FATAL(0UL, reader.mCache.size());
     }
     { // empty
         CommonRegLogFileReader reader(projectName,
@@ -411,10 +480,7 @@ public:
         utf8File = "utf8.txt"; // content of utf8.txt is equivalent to gbk.txt
     }
 
-    static void TearDownTestCase() {
-        remove(gbkFile.c_str());
-        remove(utf8File.c_str());
-    }
+    static void TearDownTestCase() {}
 
     void SetUp() override {
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
@@ -465,16 +531,16 @@ std::string LogMultiBytesUnittest::utf8File;
 void LogMultiBytesUnittest::TestAlignLastCharacterUTF8() {
     { // case: no align
         CommonRegLogFileReader logFileReader(projectName,
-                                            category,
-                                            "",
-                                            "",
-                                            INT32_FLAG(default_tail_limit_kb),
-                                            timeFormat,
-                                            topicFormat,
-                                            groupTopic,
-                                            FileEncoding::ENCODING_UTF8,
-                                            false,
-                                            false);
+                                             category,
+                                             "",
+                                             "",
+                                             INT32_FLAG(default_tail_limit_kb),
+                                             timeFormat,
+                                             topicFormat,
+                                             groupTopic,
+                                             FileEncoding::ENCODING_UTF8,
+                                             false,
+                                             false);
         std::string expectedLog = "为可观测场景而";
         std::string testLog = expectedLog + "生";
         size_t result = logFileReader.AlignLastCharacter(const_cast<char*>(testLog.data()), expectedLog.size());
@@ -482,22 +548,21 @@ void LogMultiBytesUnittest::TestAlignLastCharacterUTF8() {
     }
     { // case: cut off
         CommonRegLogFileReader logFileReader(projectName,
-                                            category,
-                                            "",
-                                            "",
-                                            INT32_FLAG(default_tail_limit_kb),
-                                            timeFormat,
-                                            topicFormat,
-                                            groupTopic,
-                                            FileEncoding::ENCODING_UTF8,
-                                            false,
-                                            false);
+                                             category,
+                                             "",
+                                             "",
+                                             INT32_FLAG(default_tail_limit_kb),
+                                             timeFormat,
+                                             topicFormat,
+                                             groupTopic,
+                                             FileEncoding::ENCODING_UTF8,
+                                             false,
+                                             false);
         std::string expectedLog = "为可观测场景而";
         std::string testLog = expectedLog + "生";
         size_t result = logFileReader.AlignLastCharacter(const_cast<char*>(testLog.data()), expectedLog.size() + 1);
         APSARA_TEST_EQUAL_FATAL(expectedLog.size(), result);
     }
-    
 }
 
 void LogMultiBytesUnittest::TestAlignLastCharacterGBK() {
@@ -513,13 +578,15 @@ void LogMultiBytesUnittest::TestAlignLastCharacterGBK() {
                                          false,
                                          false);
     { // case: no align
-        std::string expectedLog = "\xce\xaa\xbf\xc9\xb9\xdb\xb2\xe2\xb3\xa1\xbe\xb0\xb6\xf8"; // equal to "为可观测场景而"
+        std::string expectedLog
+            = "\xce\xaa\xbf\xc9\xb9\xdb\xb2\xe2\xb3\xa1\xbe\xb0\xb6\xf8"; // equal to "为可观测场景而"
         std::string testLog = expectedLog + "\xc9";
         size_t result = logFileReader.AlignLastCharacter(const_cast<char*>(testLog.data()), expectedLog.size());
         APSARA_TEST_EQUAL_FATAL(expectedLog.size(), result);
     }
     { // case: GBK
-        std::string expectedLog = "\xce\xaa\xbf\xc9\xb9\xdb\xb2\xe2\xb3\xa1\xbe\xb0\xb6\xf8"; // equal to "为可观测场景而"
+        std::string expectedLog
+            = "\xce\xaa\xbf\xc9\xb9\xdb\xb2\xe2\xb3\xa1\xbe\xb0\xb6\xf8"; // equal to "为可观测场景而"
         std::string testLog = expectedLog + "\xc9";
         size_t result = logFileReader.AlignLastCharacter(const_cast<char*>(testLog.data()), expectedLog.size() + 1);
         APSARA_TEST_EQUAL_FATAL(expectedLog.size(), result);
@@ -528,16 +595,16 @@ void LogMultiBytesUnittest::TestAlignLastCharacterGBK() {
 
 void LogMultiBytesUnittest::TestReadUTF8() {
     CommonRegLogFileReader reader(projectName,
-                                      category,
-                                      logPathDir,
-                                      utf8File,
-                                      INT32_FLAG(default_tail_limit_kb),
-                                      timeFormat,
-                                      topicFormat,
-                                      groupTopic,
-                                      FileEncoding::ENCODING_UTF8,
-                                      false,
-                                      false);
+                                  category,
+                                  logPathDir,
+                                  utf8File,
+                                  INT32_FLAG(default_tail_limit_kb),
+                                  timeFormat,
+                                  topicFormat,
+                                  groupTopic,
+                                  FileEncoding::ENCODING_UTF8,
+                                  false,
+                                  false);
     LogFileReader::BUFFER_SIZE = 13; // equal to "iLogtail 为" plus one illegal byte
     reader.UpdateReaderManual();
     reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
@@ -576,6 +643,87 @@ void LogMultiBytesUnittest::TestReadGBK() {
     std::string expectedPart(expectedContent.get());
     expectedPart = expectedPart.substr(0, BUFFER_SIZE_UTF8);
     APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+}
+
+class LogFileReaderCheckpointUnittest : public ::testing::Test {
+public:
+    static void SetUpTestCase() {
+        logPathDir = GetProcessExecutionDir();
+        if (PATH_SEPARATOR[0] == logPathDir.back()) {
+            logPathDir.resize(logPathDir.size() - 1);
+        }
+        logPathDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "LogFileReaderUnittest";
+        utf8File = "utf8.txt"; // content of utf8.txt is equivalent to gbk.txt
+    }
+
+    void TearDown() override {
+        CheckPointManager::Instance()->RemoveAllCheckPoint();
+        LogFileReader::BUFFER_SIZE = 1024 * 512;
+    }
+
+    void TestDumpMetaToMem();
+
+    std::string projectName = "projectName";
+    std::string category = "logstoreName";
+    std::string timeFormat = "";
+    std::string topicFormat = "";
+    std::string groupTopic = "";
+    static std::string logPathDir;
+    static std::string utf8File;
+};
+
+UNIT_TEST_CASE(LogFileReaderCheckpointUnittest, TestDumpMetaToMem);
+
+std::string LogFileReaderCheckpointUnittest::logPathDir;
+std::string LogFileReaderCheckpointUnittest::utf8File;
+
+void LogFileReaderCheckpointUnittest::TestDumpMetaToMem() {
+    { // read twice with checkpoint, singleline
+        CommonRegLogFileReader reader1(projectName,
+                                       category,
+                                       logPathDir,
+                                       utf8File,
+                                       INT32_FLAG(default_tail_limit_kb),
+                                       timeFormat,
+                                       topicFormat,
+                                       groupTopic,
+                                       FileEncoding::ENCODING_UTF8,
+                                       false,
+                                       false);
+        reader1.UpdateReaderManual();
+        reader1.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = 0;
+        reader1.CheckFileSignatureAndOffset(fileSize);
+        LogFileReader::BUFFER_SIZE = fileSize - 13;
+        LogBuffer logBuffer;
+        bool moreData = false;
+        // first read
+        reader1.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_TRUE_FATAL(moreData);
+        APSARA_TEST_GE_FATAL(reader1.mCache.size(), 0UL);
+        reader1.DumpMetaToMem(false);
+        // second read
+        CommonRegLogFileReader reader2(projectName,
+                                       category,
+                                       logPathDir,
+                                       utf8File,
+                                       INT32_FLAG(default_tail_limit_kb),
+                                       timeFormat,
+                                       topicFormat,
+                                       groupTopic,
+                                       FileEncoding::ENCODING_UTF8,
+                                       false,
+                                       false);
+        reader2.UpdateReaderManual();
+        reader2.InitReader(false, LogFileReader::BACKWARD_TO_BEGINNING);
+        reader2.CheckFileSignatureAndOffset(fileSize);
+        APSARA_TEST_EQUAL_FATAL(reader1.mLastFilePos, reader2.mLastFilePos);
+        APSARA_TEST_EQUAL_FATAL(reader1.mCache, reader2.mCache); // cache should recoverd from checkpoint
+        reader2.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_EQUAL_FATAL(0UL, reader2.mCache.size());
+        reader1.DumpMetaToMem(false);
+    }
 }
 
 } // namespace logtail

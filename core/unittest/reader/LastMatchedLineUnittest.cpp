@@ -103,8 +103,8 @@ void LastMatchedLineUnittest::TestSingleline() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize
             = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
-        APSARA_TEST_EQUAL_FATAL(expectMatch.size(), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
     { // case single line, buffer size not big enough (no new line at the end of line)
@@ -116,8 +116,8 @@ void LastMatchedLineUnittest::TestSingleline() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize
             = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
-        APSARA_TEST_EQUAL_FATAL(expectMatch.size(), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case single line, cannot be split, buffer size not big enough (no new line at the end of line)
@@ -151,7 +151,7 @@ void LastMatchedLineUnittest::TestMultiline() {
         int32_t matchSize
             = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(3, rollbackLineFeedCount);
     }
     { // case multi line, buffer size not big enough (no new line at the end of line)
@@ -163,7 +163,7 @@ void LastMatchedLineUnittest::TestMultiline() {
         int32_t matchSize
             = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(3, rollbackLineFeedCount);
     }
     { // case multi line not match
@@ -208,7 +208,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithBeginContinue
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(2, rollbackLineFeedCount);
     }
     { // case: end with begin
@@ -217,7 +217,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithBeginContinue
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -226,7 +226,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithBeginContinue
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
 }
@@ -242,7 +242,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithBeginEnd() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
     { // case: end with begin
@@ -251,7 +251,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithBeginEnd() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -260,7 +260,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithBeginEnd() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
 }
@@ -276,7 +276,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithBegin() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -285,7 +285,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithBegin() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(2, rollbackLineFeedCount);
     }
 }
@@ -301,7 +301,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithContinueEnd()
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
     { // case: end with continue
@@ -310,7 +310,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithContinueEnd()
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -319,7 +319,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithContinueEnd()
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
 }
@@ -335,7 +335,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithEnd() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -344,7 +344,7 @@ void LastMatchedLineDiscardUnmatchUnittest::TestLastMatchedLineWithEnd() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
 }
@@ -375,7 +375,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithBeginContin
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(2, rollbackLineFeedCount);
     }
     { // case: end with begin
@@ -384,7 +384,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithBeginContin
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -393,7 +393,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithBeginContin
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
 }
@@ -409,7 +409,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithBeginEnd() 
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
     { // case: end with begin
@@ -418,7 +418,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithBeginEnd() 
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -427,7 +427,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithBeginEnd() 
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(2, rollbackLineFeedCount);
     }
 }
@@ -443,7 +443,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithBegin() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -452,7 +452,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithBegin() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(2, rollbackLineFeedCount);
     }
 }
@@ -468,7 +468,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithContinueEnd
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
     { // case: end with continue
@@ -477,7 +477,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithContinueEnd
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -486,7 +486,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithContinueEnd
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
 }
@@ -502,7 +502,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithEnd() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
     { // case: end with unmatch
@@ -511,7 +511,7 @@ void LastMatchedLineNoDiscardUnmatchUnittest::TestLastMatchedLineWithEnd() {
         int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.LastMatchedLine(const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
-        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data()), expectMatch);
+        APSARA_TEST_EQUAL_FATAL(std::string(testLog.data(), matchSize), expectMatch);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
 }

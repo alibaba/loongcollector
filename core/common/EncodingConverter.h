@@ -52,7 +52,7 @@ public:
     // - For Windows, ConvertGbk2Utf8 converts whole @src, if any errors happened,
     //   0 will be returned (ignore @linePosVec).
     size_t ConvertGbk2Utf8(
-        const char* src, size_t* srcLength, char* des, size_t desLength, const std::vector<size_t>& linePosVec) const;
+        const char* src, size_t* srcLength, char* des, size_t desLength, const std::vector<long>& linePosVec) const;
 
 #if defined(_MSC_VER)
     // FromUTF8ToACP converts @s encoded in UTF8 to ACP.

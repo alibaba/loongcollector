@@ -152,7 +152,9 @@ void do_worker_process() {
         APSARA_LOG_ERROR(sLogger, ("last logtail crash stack", backTraceStr)("stack size", backTraceStr.length()));
         LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
     }
-    InitCrashBackTrace();
+    if (BOOL_FLAG(ilogtail_disable_core)) {
+        InitCrashBackTrace();
+    }
 
     auto& startupHints = STRING_FLAG(ilogtail_daemon_startup_hints);
     if (!startupHints.empty()) {

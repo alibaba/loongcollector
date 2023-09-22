@@ -658,6 +658,7 @@ void EventDispatcherBase::AddExistedCheckPointFileEvents() {
                                                       cpt.config_name(),
                                                       cpt.real_path(),
                                                       1,
+                                                      0,
                                                       0);
             const auto result = validateCheckpoint(v1Cpt, cachePathDevInodeMap, eventVec);
             switch (result) {

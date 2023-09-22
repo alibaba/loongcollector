@@ -46,7 +46,7 @@ EncodingConverter::~EncodingConverter() {
 
 // TODO: Refactor it, do not use the output params to do calculations, set them before return.
 size_t EncodingConverter::ConvertGbk2Utf8(
-    const char* src, size_t* srcLength, char* desOut, size_t desLength, const std::vector<size_t>& linePosVec) const {
+    const char* src, size_t* srcLength, char* desOut, size_t desLength, const std::vector<long>& linePosVec) const {
 #if defined(__linux__)
     if (src == NULL || *srcLength == 0 || mGbk2Utf8Cd == (iconv_t)(-1)) {
         LOG_ERROR(sLogger, ("invalid iconv descriptor fail or invalid buffer pointer, cd", mGbk2Utf8Cd));

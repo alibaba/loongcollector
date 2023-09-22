@@ -466,10 +466,19 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
         return 1;
     }
     FillLogGroupAllNative(eventGroup, logFileReader, resultGroup);
+    // record log positions for exactly once.
+    if (logBuffer->exactlyOnceCheckpoint) {
+        // I think one just record buffer offset and length is enough
+        // There is no need to record offset and length for each event
+        std::pair<size_t, size_t> pos(logBuffer->beginOffset, logBuffer->rawBuffer.size());
+        logBuffer->exactlyOnceCheckpoint->positions.assign(eventGroup.GetEvents().size(), pos);
+    }
     return 0;
 }
 
-void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup, sls_logs::LogGroup& resultGroup, bool enableTimestampNanosecond) {
+void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup,
+                                  sls_logs::LogGroup& resultGroup,
+                                  bool enableTimestampNanosecond) {
     for (auto& event : eventGroup.GetEvents()) {
         if (!event.Is<LogEvent>()) {
             continue;
@@ -725,18 +734,16 @@ int LogProcess::ProcessBufferLegacy(std::shared_ptr<LogBuffer>& logBuffer,
                 }
                 // record log positions for exactly once.
                 if (logBuffer->exactlyOnceCheckpoint && logPtr != nullptr) {
-                    if (logBuffer->exactlyOnceCheckpoint) {
-                        int32_t length = 0;
-                        if (1 == lines) {
-                            length = rawBuffer.size() + 1;
-                        } else if (i != lines - 1) {
-                            length = logIndex[i].size() + 1;
-                        } else {
-                            length = rawBuffer.size() - (logIndex[i].data() - rawBuffer.data());
-                        }
-                        logBuffer->exactlyOnceCheckpoint->positions.emplace_back(
-                            std::make_pair(offset, static_cast<size_t>(length)));
+                    int32_t length = 0;
+                    if (1 == lines) {
+                        length = rawBuffer.size();
+                    } else if (i != lines - 1) {
+                        length = logIndex[i + 1].data() - logIndex[i].data();
+                    } else {
+                        length = rawBuffer.size() - (logIndex[i].data() - rawBuffer.data());
                     }
+                    logBuffer->exactlyOnceCheckpoint->positions.emplace_back(
+                        std::make_pair(offset, static_cast<size_t>(length)));
                 }
             }
         }

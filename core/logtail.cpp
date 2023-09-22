@@ -255,7 +255,9 @@ void do_worker_process() {
         LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
     }
 
-    InitCrashBackTrace();
+    if (BOOL_FLAG(ilogtail_disable_core)) {
+        InitCrashBackTrace();
+    }
 
     LogtailMonitor::Instance()->InitMonitor();
     LogFilter::Instance()->InitFilter(STRING_FLAG(user_log_config));

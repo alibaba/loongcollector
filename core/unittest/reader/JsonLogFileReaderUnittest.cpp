@@ -172,7 +172,7 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
                                  timeFormat,
                                  topicFormat,
                                  groupTopic,
-                                 FileEncoding::ENCODING_GBK,
+                                 FileEncoding::ENCODING_UTF8,
                                  false,
                                  false);
         reader.UpdateReaderManual();
@@ -197,7 +197,7 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
                                  timeFormat,
                                  topicFormat,
                                  groupTopic,
-                                 FileEncoding::ENCODING_GBK,
+                                 FileEncoding::ENCODING_UTF8,
                                  false,
                                  false);
         LogFileReader::BUFFER_SIZE = 25;
@@ -217,12 +217,12 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
         JsonLogFileReader reader(projectName,
                                  category,
                                  logPathDir,
-                                 gbkFile,
+                                 utf8File,
                                  INT32_FLAG(default_tail_limit_kb),
                                  timeFormat,
                                  topicFormat,
                                  groupTopic,
-                                 FileEncoding::ENCODING_GBK,
+                                 FileEncoding::ENCODING_UTF8,
                                  false,
                                  false);
         reader.UpdateReaderManual();
@@ -232,11 +232,45 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
         LogFileReader::BUFFER_SIZE = fileSize - 11;
         LogBuffer logBuffer;
         bool moreData = false;
-        reader.ReadGBK(logBuffer, fileSize, moreData);
+        reader.ReadUTF8(logBuffer, fileSize, moreData);
         APSARA_TEST_TRUE_FATAL(moreData);
         std::string expectedPart(expectedContent.get());
         expectedPart.resize(expectedPart.rfind(R"({"second")") - 1); // exclude tailing \n
         APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+    }
+    { // read twice
+        JsonLogFileReader reader(projectName,
+                                 category,
+                                 logPathDir,
+                                 utf8File,
+                                 INT32_FLAG(default_tail_limit_kb),
+                                 timeFormat,
+                                 topicFormat,
+                                 groupTopic,
+                                 FileEncoding::ENCODING_UTF8,
+                                 false,
+                                 false);
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = 0;
+        reader.CheckFileSignatureAndOffset(fileSize);
+        LogFileReader::BUFFER_SIZE = fileSize - 11;
+        LogBuffer logBuffer;
+        bool moreData = false;
+        // first read
+        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_TRUE_FATAL(moreData);
+        std::string expectedPart(expectedContent.get());
+        expectedPart.resize(expectedPart.rfind(R"({"second")") - 1); // exclude tailing \n
+        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        // second read
+        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        expectedPart = expectedContent.get();
+        expectedPart = expectedPart.substr(expectedPart.rfind(R"({"second")"));
+        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_EQUAL_FATAL(0UL, reader.mCache.size());
     }
 }
 

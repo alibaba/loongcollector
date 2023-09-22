@@ -30,13 +30,13 @@ APSARA_UNIT_TEST_CASE(EncodingConverterUnittest, ConvertGbk2Utf8, 0);
 void EncodingConverterUnittest::ConvertGbk2Utf8() {
     char gbkStr[] = "ilogtail\xbf\xc9\xb9\xdb\xb2\xe2\xd0\xd4\xb2\xc9\xbc\xaf\xc6\xf7";
     size_t srcLen = strlen(gbkStr);
-    std::vector<size_t> linePosVec = {srcLen};
+    std::vector<long> linePosVec = {long(srcLen)};
     size_t requireSize = EncodingConverter::GetInstance()->ConvertGbk2Utf8(gbkStr, &srcLen, nullptr, 0, linePosVec) + 1;
-    APSARA_TEST_GT(requireSize, 1);
+    APSARA_TEST_GT(requireSize, 1UL);
     std::unique_ptr<char[]> destChar(new char[requireSize]);
     size_t actualSize
         = EncodingConverter::GetInstance()->ConvertGbk2Utf8(gbkStr, &srcLen, destChar.get(), requireSize, linePosVec);
-    APSARA_TEST_GT(actualSize, 0);
+    APSARA_TEST_GT(actualSize, 0UL);
     destChar[actualSize + 1] = '\0';
     APSARA_TEST_STREQ("ilogtail可观测性采集器", destChar.get());
 }
