@@ -23,6 +23,8 @@
 #include "sender/Sender.h"
 #include "config/Config.h"
 #include <app_config/AppConfig.h>
+#include <numeric>
+#include <vector>
 
 using namespace std;
 using namespace sls_logs;
@@ -140,32 +142,38 @@ bool Aggregator::Add(const std::string& projectName,
     int32_t logSize = (int32_t)logGroup.logs_size();
     if (logSize == 0)
         return true;
-    static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
-    if (!sEnvTags.empty()) {
-        for (size_t i = 0; i < sEnvTags.size(); ++i) {
-            sls_logs::LogTag* logTagPtr = logGroup.add_logtags();
-            logTagPtr->set_key(sEnvTags[i].key());
-            logTagPtr->set_value(sEnvTags[i].value());
-        }
-    }
-
-    if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
-        vector<sls_logs::LogTag>& sFileTags = ConfigManager::GetInstance()->GetFileTags();
-        if (!sFileTags.empty()) {
-            for (size_t i = 0; i < sFileTags.size(); ++i) {
+    vector<int32_t> neededLogs;
+    int32_t neededLogSize;
+    if (!BOOL_FLAG(enable_new_pipeline)) {
+        static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
+        if (!sEnvTags.empty()) {
+            for (size_t i = 0; i < sEnvTags.size(); ++i) {
                 sls_logs::LogTag* logTagPtr = logGroup.add_logtags();
-                logTagPtr->set_key(sFileTags[i].key());
-                logTagPtr->set_value(sFileTags[i].value());
+                logTagPtr->set_key(sEnvTags[i].key());
+                logTagPtr->set_value(sEnvTags[i].value());
             }
         }
-    }
 
-    vector<int32_t> neededLogs;
-    int32_t neededLogSize = FilterNoneUtf8Metric(logGroup, config, neededLogs, context);
-    if (neededLogSize == 0)
-        return true;
-    if (config != NULL && config->mSensitiveWordCastOptions.size() > (size_t)0) {
-        LogFilter::CastSensitiveWords(logGroup, config);
+        if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
+            vector<sls_logs::LogTag>& sFileTags = ConfigManager::GetInstance()->GetFileTags();
+            if (!sFileTags.empty()) {
+                for (size_t i = 0; i < sFileTags.size(); ++i) {
+                    sls_logs::LogTag* logTagPtr = logGroup.add_logtags();
+                    logTagPtr->set_key(sFileTags[i].key());
+                    logTagPtr->set_value(sFileTags[i].value());
+                }
+            }
+        }
+        neededLogSize = FilterNoneUtf8Metric(logGroup, config, neededLogs, context);
+        if (neededLogSize == 0)
+            return true;
+        if (config != NULL && config->mSensitiveWordCastOptions.size() > (size_t)0) {
+            LogFilter::CastSensitiveWords(logGroup, config);
+        }
+    } else {
+        std::vector<int> v(logGroup.logs_size());
+        std::iota(std::begin(neededLogs), std::end(neededLogs), 0);
+        neededLogSize = (int32_t)neededLogs.size();
     }
 
     static Sender* sender = Sender::Instance();
