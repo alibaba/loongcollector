@@ -27,7 +27,7 @@ type processCache interface {
 	GetExe() string
 	GetCmdLine() string
 	FetchCoreCount() int64
-	Labels(values helper.KeyValues) string
+	Labels(values *helper.MetricLabels) *helper.MetricLabels
 	GetProcessStatus() *processStatus
 	// FetchCore fetch the core exported status, such as CPU and Memory.
 	FetchCore() bool
@@ -41,12 +41,12 @@ type (
 	// processMeta contains the stable process meta data.
 	processMeta struct {
 		maxLabelLength int
-		labels         string    // The custom labels
-		lastFetchTime  time.Time // The last fetch stat time
-		nowFetchTime   time.Time // The fetch stat time
-		fetchCoreCount int64     // Auto increment, the max value supports running 1462356043387 years when the fetching frequency is 5s
-		cmdline        string    // The command line
-		exe            string    // The absolute path of the executable command
+		labels         *helper.MetricLabels // The custom labels
+		lastFetchTime  time.Time            // The last fetch stat time
+		nowFetchTime   time.Time            // The fetch stat time
+		fetchCoreCount int64                // Auto increment, the max value supports running 1462356043387 years when the fetching frequency is 5s
+		cmdline        string               // The command line
+		exe            string               // The absolute path of the executable command
 	}
 
 	// processStatus contains the dynamic process status.

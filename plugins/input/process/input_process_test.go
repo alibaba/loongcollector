@@ -58,8 +58,8 @@ func (t *TestProcessCache) FetchCoreCount() int64 {
 	return t.fetchCoreCount
 }
 
-func (t *TestProcessCache) Labels(values helper.KeyValues) string {
-	return ""
+func (t *TestProcessCache) Labels(values *helper.MetricLabels) *helper.MetricLabels {
+	return nil
 }
 
 func (t *TestProcessCache) GetProcessStatus() *processStatus { // nolint:revive

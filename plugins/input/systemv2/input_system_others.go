@@ -30,7 +30,7 @@ func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 }
 
 func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.ProtoCountersStat) {
-	r.addMetric(collector, "protocol_tcp_established", r.commonLabelsStr, float64(stat.Stats["CurrEstab"]))
+	r.addMetric(collector, "protocol_tcp_established", &r.commonLabels, float64(stat.Stats["CurrEstab"]))
 }
 
 func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
@@ -48,12 +48,10 @@ func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 				logger.Debug(r.context.GetRuntimeContext(), "ignore disk path", part.Mountpoint)
 				continue
 			}
-			newLabels := r.commonLabels.Clone()
-			newLabels.Append("path", part.Mountpoint)
-			newLabels.Append("device", part.Device)
-			newLabels.Append("fs_type", part.Fstype)
-			newLabels.Sort()
-			labels := newLabels.String()
+			labels := r.commonLabels.Clone()
+			labels.Append("path", part.Mountpoint)
+			labels.Append("device", part.Device)
+			labels.Append("fs_type", part.Fstype)
 
 			usage, err := disk.Usage(part.Mountpoint)
 			if err == nil {

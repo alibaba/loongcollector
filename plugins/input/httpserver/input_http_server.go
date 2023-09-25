@@ -197,7 +197,7 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case common.ProtocolSLS:
 		w.Header().Set("x-log-requestid", "1234567890abcde")
 		w.WriteHeader(http.StatusOK)
-	case common.ProtocolPyroscope:
+	case common.ProtocolPyroscope, common.ProtocolPrometheus:
 		// do nothing
 	default:
 		w.WriteHeader(http.StatusNoContent)
@@ -275,8 +275,11 @@ func (s *ServiceHTTP) start() error {
 	s.listener = listener
 	s.server = server
 	go func() {
-		logger.Info(s.context.GetRuntimeContext(), "http server start", s.Address)
-		_ = server.Serve(listener)
+		logger.Info(s.context.GetRuntimeContext(), "http server start", s.Address, "listener", listener.Addr().String())
+		err := server.Serve(listener)
+		if err != nil {
+			logger.Error(s.context.GetRuntimeContext(), "INIT_SERVER_ARMAR", "err", err.Error())
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.ShutdownTimeoutSec)*time.Second)
 		defer cancel()
 		_ = server.Shutdown(ctx)

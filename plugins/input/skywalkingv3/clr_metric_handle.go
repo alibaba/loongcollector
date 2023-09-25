@@ -16,7 +16,6 @@ package skywalkingv3
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -52,50 +51,45 @@ func (c *CLRMetricHandler) Collect(ctx context.Context, req *agent.CLRMetricColl
 
 func (c *CLRMetricHandler) toMetricStoreFormat(metric *agent.CLRMetric, service string, serviceInstance string) []*protocol.Log {
 	var logs []*protocol.Log
-	cpuUsage := helper.NewMetricLog("skywalking_clr_cpu_usage", metric.Time,
-		strconv.FormatFloat(metric.GetCpu().UsagePercent, 'f', 6, 64), []helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+	var labels helper.MetricLabels
+	labels.Append("service", service)
+	labels.Append("serviceInstance", serviceInstance)
+	cpuUsage := helper.NewMetricLog("skywalking_clr_cpu_usage", metric.Time, metric.GetCpu().UsagePercent, &labels)
 	logs = append(logs, cpuUsage)
 
 	gc := metric.Gc
-	gen0GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(),
-		strconv.FormatInt(gc.Gen0CollectCount, 10),
-		[]helper.MetricLabel{{Name: "gen", Value: "gen0"}, {Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+	gcLabels := labels.Clone()
+	gcLabels.Append("gen", "gen0")
+	gen0GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen0CollectCount), gcLabels)
 	logs = append(logs, gen0GcCount)
 
-	gen1GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(),
-		strconv.FormatInt(gc.Gen1CollectCount, 10),
-		[]helper.MetricLabel{{Name: "gen", Value: "gen1"}, {Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+	gcLabels.Replace("gen", "gen1")
+	gen1GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen1CollectCount), gcLabels)
 	logs = append(logs, gen1GcCount)
 
-	gen2GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(),
-		strconv.FormatInt(gc.Gen2CollectCount, 10),
-		[]helper.MetricLabel{{Name: "gen", Value: "gen2"}, {Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+	gcLabels.Replace("gen", "gen2")
+	gen2GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen2CollectCount), gcLabels)
 	logs = append(logs, gen2GcCount)
 
-	heapMemory := helper.NewMetricLog("skywalking_clr_heap_memory", metric.GetTime(),
-		strconv.FormatInt(gc.HeapMemory, 10),
-		[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}})
+	heapMemory := helper.NewMetricLog("skywalking_clr_heap_memory", metric.GetTime(), float64(gc.HeapMemory), &labels)
 	logs = append(logs, heapMemory)
 
 	thread := metric.Thread
-	availableCompletionPortThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(),
-		strconv.FormatInt(int64(thread.AvailableCompletionPortThreads), 10),
-		[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: "availableCompletionPortThreads"}})
+	threadLabels := labels.CloneInto(gcLabels)
+	threadLabels.Append("type", "availableCompletionPortThreads")
+	availableCompletionPortThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(), float64(thread.AvailableCompletionPortThreads), threadLabels)
 	logs = append(logs, availableCompletionPortThreads)
 
-	availableWorkerThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(),
-		strconv.FormatInt(int64(thread.AvailableWorkerThreads), 10),
-		[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: "availableWorkerThreads"}})
+	threadLabels.Replace("type", "availableWorkerThreads")
+	availableWorkerThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(), float64(thread.AvailableWorkerThreads), threadLabels)
 	logs = append(logs, availableWorkerThreads)
 
-	maxCompletionPortThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(),
-		strconv.FormatInt(int64(thread.MaxCompletionPortThreads), 10),
-		[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: "maxCompletionPortThreads"}})
+	threadLabels.Replace("type", "maxCompletionPortThreads")
+	maxCompletionPortThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(), float64(thread.MaxCompletionPortThreads), threadLabels)
 	logs = append(logs, maxCompletionPortThreads)
 
-	maxWorkerThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(),
-		strconv.FormatInt(int64(thread.MaxWorkerThreads), 10),
-		[]helper.MetricLabel{{Name: "service", Value: service}, {Name: "serviceInstance", Value: serviceInstance}, {Name: "type", Value: "maxWorkerThreads"}})
+	threadLabels.Replace("type", "maxWorkerThreads")
+	maxWorkerThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(), float64(thread.MaxWorkerThreads), threadLabels)
 	logs = append(logs, maxWorkerThreads)
 	return logs
 }

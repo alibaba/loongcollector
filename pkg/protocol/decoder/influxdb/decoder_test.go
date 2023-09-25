@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
@@ -69,10 +70,11 @@ cpu.load,host.dd=server02,region=uswest tt="xx",value=3 1434055562000010000
 
 func TestFieldsExtend(t *testing.T) {
 	cases := []struct {
-		enableFieldsExtend bool
-		data               string
-		wantLogs           []*protocol.Log
-		wantErr            bool
+		enableFieldsExtend     bool
+		enableSlsMetricsFormat bool
+		data                   string
+		wantLogs               []*protocol.Log
+		wantErr                bool
 	}{
 		{
 			enableFieldsExtend: true,
@@ -112,9 +114,10 @@ func TestFieldsExtend(t *testing.T) {
 			},
 		},
 		{
-			enableFieldsExtend: false,
-			data:               txtWithDotNames,
-			wantErr:            false,
+			enableFieldsExtend:     false,
+			enableSlsMetricsFormat: true,
+			data:                   txtWithDotNames,
+			wantErr:                false,
 			wantLogs: []*protocol.Log{
 				{
 					Contents: []*protocol.Log_Content{
@@ -138,6 +141,7 @@ func TestFieldsExtend(t *testing.T) {
 
 	for _, testCase := range cases {
 		decoder := &Decoder{FieldsExtend: testCase.enableFieldsExtend}
+		config.LogtailGlobalConfig.EnableSlsMetricsFormat = testCase.enableSlsMetricsFormat
 		logs, err := decoder.Decode([]byte(txtWithDotNames), &http.Request{}, nil)
 		if testCase.wantErr {
 			assert.NotNil(t, err)

@@ -141,10 +141,10 @@ func (pc *processCacheLinux) GetCmdLine() string {
 	return pc.meta.cmdline
 }
 
-func (pc *processCacheLinux) Labels(customLabels helper.KeyValues) string {
-	if len(pc.meta.labels) == 0 {
+func (pc *processCacheLinux) Labels(customLabels *helper.MetricLabels) *helper.MetricLabels {
+	if pc.meta.labels == nil {
 		if pc.stat == nil && !pc.fetchStat() {
-			return ""
+			return nil
 		}
 		processLabels := customLabels.Clone()
 		processLabels.Append("pid", strconv.Itoa(pc.GetPid()))
@@ -155,8 +155,7 @@ func (pc *processCacheLinux) Labels(customLabels helper.KeyValues) string {
 		} else {
 			processLabels.Append("comm", comm)
 		}
-		processLabels.Sort()
-		pc.meta.labels = processLabels.String()
+		pc.meta.labels = processLabels
 	}
 	return pc.meta.labels
 }

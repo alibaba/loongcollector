@@ -111,7 +111,7 @@ func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 
 func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.ProtoCountersStat) {
 	if !r.TCP {
-		r.addMetric(collector, "protocol_tcp_established", r.commonLabelsStr, float64(stat.Stats["CurrEstab"]))
+		r.addMetric(collector, "protocol_tcp_established", &r.commonLabels, float64(stat.Stats["CurrEstab"]))
 		return
 	}
 
@@ -138,7 +138,7 @@ func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.Pr
 		tcpStats[tcpRxQueuedBytes] += line.RxQueue
 	}
 	for s, num := range tcpStats {
-		r.addMetric(collector, "protocol_tcp_"+s.String(), r.commonLabelsStr, float64(num))
+		r.addMetric(collector, "protocol_tcp_"+s.String(), &r.commonLabels, float64(num))
 	}
 }
 
@@ -164,8 +164,8 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 	}
 	allocated, _ := strconv.ParseFloat(string(parts[0]), 64)
 	maximum, _ := strconv.ParseFloat(string(parts[2]), 64)
-	r.addMetric(collector, "fd_allocated", r.commonLabelsStr, allocated)
-	r.addMetric(collector, "fd_max", r.commonLabelsStr, maximum)
+	r.addMetric(collector, "fd_allocated", &r.commonLabels, allocated)
+	r.addMetric(collector, "fd_max", &r.commonLabels, maximum)
 }
 
 // CollectDiskUsage use `/proc/1/mounts` to find the device rather than `proc/self/mounts`
@@ -198,12 +198,10 @@ func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 			logger.Debug(r.context.GetRuntimeContext(), "ignore disk path", text)
 			continue
 		}
-		newLabels := r.commonLabels.Clone()
-		newLabels.Append("path", parts[1])
-		newLabels.Append("device", parts[0])
-		newLabels.Append("fs_type", parts[2])
-		newLabels.Sort()
-		labels := newLabels.String()
+		labels := r.commonLabels.Clone()
+		labels.Append("path", parts[1])
+		labels.Append("device", parts[0])
+		labels.Append("fs_type", parts[2])
 		// wrapper with mountedpath because of using unix statfs rather than proc file system.
 		usage, err := disk.Usage(helper.GetMountedFilePath(parts[1]))
 		if err == nil {

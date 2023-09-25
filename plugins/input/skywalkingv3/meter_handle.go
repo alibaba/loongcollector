@@ -17,8 +17,6 @@ package skywalkingv3
 import (
 	"io"
 	"math"
-	"sort"
-	"strconv"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -100,29 +98,29 @@ func handleMeterData(context pipeline.Context, collector pipeline.Collector, met
 	if singleValue != nil {
 		value := singleValue.Value
 		name := singleValue.Name
-		labels := make(helper.MetricLabels, 0, len(singleValue.Labels)+2)
+		var labels helper.MetricLabels
 		for _, l := range singleValue.Labels {
-			labels = append(labels, helper.MetricLabel{Name: l.Name, Value: l.Value})
+			labels.Append(l.Name, l.Value)
 		}
-		labels = append(labels, helper.MetricLabel{Name: "service", Value: service})
-		labels = append(labels, helper.MetricLabel{Name: "serviceInstance", Value: serviceInstance})
-		sort.Sort(labels)
-		metricLog := helper.NewMetricLog(name, ts, strconv.FormatFloat(value, 'g', -1, 64), labels)
+		labels.Append("service", service)
+		labels.Append("serviceInstance", serviceInstance)
+
+		metricLog := helper.NewMetricLog(name, ts, value, &labels)
 		// logger.Info("meter", meterData)
 		collector.AddRawLog(metricLog)
 	}
 	histogramData := meterData.GetHistogram()
 
 	if histogramData != nil {
-		labels := make(helper.MetricLabels, 0, len(histogramData.Labels)+2)
+		var labels helper.MetricLabels
+		labels.Append("service", service)
+		labels.Append("serviceInstance", serviceInstance)
 		for _, l := range histogramData.Labels {
-			labels = append(labels, helper.MetricLabel{Name: l.Name, Value: l.Value})
+			labels.Append(l.Name, l.Value)
 		}
-		labels = append(labels, helper.MetricLabel{Name: "service", Value: service})
-		labels = append(labels, helper.MetricLabel{Name: "serviceInstance", Value: serviceInstance})
 
 		hd := convertHistogramData(histogramData)
-		logs := hd.ToMetricLogs(histogramData.Name, ts, labels)
+		logs := hd.ToMetricLogs(histogramData.Name, ts, &labels)
 		for _, logIns := range logs {
 			collector.AddRawLog(logIns)
 		}

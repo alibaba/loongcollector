@@ -92,7 +92,7 @@ func (p *ProcessorAppender) processField(c *protocol.Log_Content) {
 	c.Value += r
 	if p.SortLabels {
 		labels := strings.Split(c.Value, "|")
-		var keyValue helper.KeyValues
+		var keyValue helper.MetricLabels
 		for _, labelStr := range labels {
 			kv := strings.SplitN(labelStr, "#$#", 2)
 			if len(kv) == 2 {
@@ -100,7 +100,6 @@ func (p *ProcessorAppender) processField(c *protocol.Log_Content) {
 			}
 		}
 		if keyValue.Len() > 0 {
-			keyValue.Sort()
 			c.Value = keyValue.String()
 		}
 	}

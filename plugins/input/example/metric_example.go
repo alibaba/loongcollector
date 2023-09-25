@@ -29,7 +29,7 @@ import (
 type MetricsExample struct {
 	counter      int
 	gauge        int
-	commonLabels helper.KeyValues
+	commonLabels helper.MetricLabels
 	labels       string
 }
 
@@ -58,8 +58,8 @@ func (m *MetricsExample) Collect(collector pipeline.Collector) error {
 	m.gauge = rand.Intn(100) //nolint:gosec
 
 	// collect the metrics
-	helper.AddMetric(collector, "example_counter", time.Now(), m.labels, float64(m.counter))
-	helper.AddMetric(collector, "example_gauge", time.Now(), m.labels, float64(m.gauge))
+	collector.AddRawLog(helper.NewMetricLog("example_counter", time.Now().UnixNano(), float64(m.counter), &m.commonLabels))
+	collector.AddRawLog(helper.NewMetricLog("example_gauge", time.Now().UnixNano(), float64(m.gauge), &m.commonLabels))
 	return nil
 }
 

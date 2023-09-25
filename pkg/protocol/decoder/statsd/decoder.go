@@ -18,9 +18,6 @@ import (
 	"bytes"
 	"context"
 	"net/http"
-	"sort"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -30,43 +27,18 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 
 	dogstatsd "github.com/narqo/go-dogstatsd-parser"
-	"github.com/prometheus/common/model"
-)
-
-const (
-	metricNameKey = "__name__"
-	labelsKey     = "__labels__"
-	timeNanoKey   = "__time_nano__"
-	valueKey      = "__value__"
 )
 
 type Decoder struct {
 	Time time.Time
 }
 
-func parseLabels(metric *dogstatsd.Metric) (labelsValue string) {
-	lns := make(model.LabelPairs, 0, len(metric.Tags))
+func parseLabels(metric *dogstatsd.Metric) *helper.MetricLabels {
+	var labels helper.MetricLabels
 	for k, v := range metric.Tags {
-		lns = append(lns, &model.LabelPair{
-			Name:  model.LabelName(k),
-			Value: model.LabelValue(v),
-		})
+		labels.Append(k, v)
 	}
-	sort.Sort(lns)
-	var builder strings.Builder
-	labelCount := 0
-	for _, label := range lns {
-		if labelCount != 0 {
-			builder.WriteByte('|')
-		}
-		k := string(label.Name)
-		helper.ReplaceInvalidChars(&k)
-		builder.WriteString(k)
-		builder.WriteString("#$#")
-		builder.WriteString(string(label.Value))
-		labelCount++
-	}
-	return builder.String()
+	return &labels
 }
 
 func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
@@ -85,28 +57,7 @@ func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string)
 			}
 			continue
 		}
-		helper.ReplaceInvalidChars(&m.Name)
-		log := &protocol.Log{
-			Contents: []*protocol.Log_Content{
-				{
-					Key:   metricNameKey,
-					Value: m.Name,
-				},
-				{
-					Key:   labelsKey,
-					Value: parseLabels(m),
-				},
-				{
-					Key:   timeNanoKey,
-					Value: strconv.FormatInt(now.UnixNano(), 10),
-				},
-				{
-					Key:   valueKey,
-					Value: strconv.FormatFloat(m.Value.(float64), 'g', -1, 64),
-				},
-			},
-		}
-		protocol.SetLogTimeWithNano(log, uint32(now.Unix()), uint32(now.Nanosecond()))
+		log := helper.NewMetricLog(m.Name, now.UnixNano(), m.Value.(float64), parseLabels(m))
 		logs = append(logs, log)
 	}
 	return

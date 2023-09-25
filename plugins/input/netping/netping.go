@@ -51,7 +51,7 @@ const (
 
 type Result struct {
 	Valid   bool // if the result is meaningful for count
-	Label   string
+	Label   *helper.MetricLabels
 	Type    string
 	Total   int
 	Success int
@@ -68,12 +68,12 @@ type Result struct {
 	HTTPRTMs         int
 	HTTPResponseSize int
 	HasHTTPSCert     bool
-	HTTPSCertLabels  string
+	HTTPSCertLabels  *helper.MetricLabels
 	HTTPSCertTTLDay  int
 }
 
 type ResolveResult struct {
-	Label   string
+	Label   *helper.MetricLabels
 	Success bool
 	RTMs    float64
 }
@@ -283,12 +283,12 @@ func (m *NetPing) Collect(collector pipeline.Collector) error {
 		for i := 0; i < resolveCounter; i++ {
 			result := <-m.resolveChannel
 			if result.Success {
-				helper.AddMetric(collector, "dns_resolve_rt_ms", nowTs, result.Label, result.RTMs)
-				helper.AddMetric(collector, "dns_resolve_success", nowTs, result.Label, 1)
-				helper.AddMetric(collector, "dns_resolve_failed", nowTs, result.Label, 0)
+				m.addMetric(collector, "dns_resolve_rt_ms", &nowTs, result.Label, result.RTMs)
+				m.addMetric(collector, "dns_resolve_success", &nowTs, result.Label, 1)
+				m.addMetric(collector, "dns_resolve_failed", &nowTs, result.Label, 0)
 			} else {
-				helper.AddMetric(collector, "dns_resolve_success", nowTs, result.Label, 0)
-				helper.AddMetric(collector, "dns_resolve_failed", nowTs, result.Label, 1)
+				m.addMetric(collector, "dns_resolve_success", &nowTs, result.Label, 0)
+				m.addMetric(collector, "dns_resolve_failed", &nowTs, result.Label, 1)
 			}
 		}
 	}
@@ -320,29 +320,33 @@ func (m *NetPing) Collect(collector pipeline.Collector) error {
 			continue
 		}
 
-		helper.AddMetric(collector, fmt.Sprintf("%s_total", result.Type), nowTs, result.Label, float64(result.Total))
-		helper.AddMetric(collector, fmt.Sprintf("%s_success", result.Type), nowTs, result.Label, float64(result.Success))
-		helper.AddMetric(collector, fmt.Sprintf("%s_failed", result.Type), nowTs, result.Label, float64(result.Failed))
+		m.addMetric(collector, fmt.Sprintf("%s_total", result.Type), &nowTs, result.Label, float64(result.Total))
+		m.addMetric(collector, fmt.Sprintf("%s_success", result.Type), &nowTs, result.Label, float64(result.Success))
+		m.addMetric(collector, fmt.Sprintf("%s_failed", result.Type), &nowTs, result.Label, float64(result.Failed))
 
 		if (result.Type == PingTypeIcmp || result.Type == PingTypeTcping) && result.Success > 0 {
-			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_min_ms", result.Type), nowTs, result.Label, result.MinRTTMs)
-			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_max_ms", result.Type), nowTs, result.Label, result.MaxRTTMs)
-			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_avg_ms", result.Type), nowTs, result.Label, result.AvgRTTMs)
-			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_total_ms", result.Type), nowTs, result.Label, result.TotalRTTMs)
-			helper.AddMetric(collector, fmt.Sprintf("%s_rtt_stddev_ms", result.Type), nowTs, result.Label, result.StdDevRTTMs)
+			m.addMetric(collector, fmt.Sprintf("%s_rtt_min_ms", result.Type), &nowTs, result.Label, result.MinRTTMs)
+			m.addMetric(collector, fmt.Sprintf("%s_rtt_max_ms", result.Type), &nowTs, result.Label, result.MaxRTTMs)
+			m.addMetric(collector, fmt.Sprintf("%s_rtt_avg_ms", result.Type), &nowTs, result.Label, result.AvgRTTMs)
+			m.addMetric(collector, fmt.Sprintf("%s_rtt_total_ms", result.Type), &nowTs, result.Label, result.TotalRTTMs)
+			m.addMetric(collector, fmt.Sprintf("%s_rtt_stddev_ms", result.Type), &nowTs, result.Label, result.StdDevRTTMs)
 		} else if result.Type == PingTypeHttping {
 			if result.Success > 0 {
-				helper.AddMetric(collector, fmt.Sprintf("%s_rt_ms", result.Type), nowTs, result.Label, float64(result.HTTPRTMs))
-				helper.AddMetric(collector, fmt.Sprintf("%s_response_bytes", result.Type), nowTs, result.Label, float64(result.HTTPResponseSize))
+				m.addMetric(collector, fmt.Sprintf("%s_rt_ms", result.Type), &nowTs, result.Label, float64(result.HTTPRTMs))
+				m.addMetric(collector, fmt.Sprintf("%s_response_bytes", result.Type), &nowTs, result.Label, float64(result.HTTPResponseSize))
 			}
 
 			if result.HasHTTPSCert {
-				helper.AddMetric(collector, fmt.Sprintf("%s_cert_ttl_days", result.Type), nowTs, result.HTTPSCertLabels, float64(result.HTTPSCertTTLDay))
+				m.addMetric(collector, fmt.Sprintf("%s_cert_ttl_days", result.Type), &nowTs, result.HTTPSCertLabels, float64(result.HTTPSCertTTLDay))
 			}
 		}
 	}
 
 	return nil
+}
+
+func (m *NetPing) addMetric(collector pipeline.Collector, name string, t *time.Time, labels *helper.MetricLabels, val float64) {
+	collector.AddRawLog(helper.NewMetricLog(name, t.UnixNano(), val, labels))
 }
 
 func (m *NetPing) evaluteDNSResolve(host string) {
@@ -362,7 +366,7 @@ func (m *NetPing) evaluteDNSResolve(host string) {
 		m.resolveHostMap.Store(host, ips[n].String())
 	}
 
-	var label helper.KeyValues
+	var label helper.MetricLabels
 	label.Append("dns_name", host)
 	label.Append("src", m.ip)
 	label.Append("src_host", m.hostname)
@@ -373,7 +377,7 @@ func (m *NetPing) evaluteDNSResolve(host string) {
 	m.resolveChannel <- &ResolveResult{
 		Success: success,
 		RTMs:    float64(rt.Milliseconds()),
-		Label:   label.String(),
+		Label:   &label,
 	}
 }
 
@@ -391,7 +395,7 @@ func (m *NetPing) getRealTarget(target string) string {
 
 func (m *NetPing) doICMPing(config *ICMPConfig) {
 	// prepare labels
-	var label helper.KeyValues
+	var label helper.MetricLabels
 	label.Append("name", config.Name)
 	label.Append("src", config.Src)
 	label.Append("dst", config.Target)
@@ -409,7 +413,7 @@ func (m *NetPing) doICMPing(config *ICMPConfig) {
 			Type:   PingTypeIcmp,
 			Total:  config.Count,
 			Failed: config.Count,
-			Label:  label.String(),
+			Label:  &label,
 		}
 		return
 	}
@@ -428,7 +432,7 @@ func (m *NetPing) doICMPing(config *ICMPConfig) {
 			Type:   PingTypeIcmp,
 			Total:  config.Count,
 			Failed: config.Count,
-			Label:  label.String(),
+			Label:  &label,
 		}
 		return
 	}
@@ -441,7 +445,7 @@ func (m *NetPing) doICMPing(config *ICMPConfig) {
 
 	m.resultChannel <- &Result{
 		Valid:       true,
-		Label:       label.String(),
+		Label:       &label,
 		Type:        PingTypeIcmp,
 		Total:       pinger.Count,
 		Success:     stats.PacketsRecv,
@@ -471,7 +475,7 @@ func evaluteTcping(target string, port int, timeout time.Duration) (time.Duratio
 
 func (m *NetPing) doTCPing(config *TCPConfig) {
 	// prepare labels
-	var label helper.KeyValues
+	var label helper.MetricLabels
 	label.Append("name", config.Name)
 	label.Append("src", config.Src)
 	label.Append("dst", config.Target)
@@ -525,7 +529,7 @@ func (m *NetPing) doTCPing(config *TCPConfig) {
 
 	m.resultChannel <- &Result{
 		Valid:       true,
-		Label:       label.String(),
+		Label:       &label,
 		Type:        PingTypeTcping,
 		Total:       config.Count,
 		Success:     len(rtts),
@@ -540,7 +544,7 @@ func (m *NetPing) doTCPing(config *TCPConfig) {
 
 func (m *NetPing) doHTTPing(config *HTTPConfig) {
 	// prepare labels
-	var label helper.KeyValues
+	var label helper.MetricLabels
 	label.Append("name", config.Name)
 	label.Append("src", config.Src)
 	label.Append("url", config.Target)
@@ -579,7 +583,7 @@ func (m *NetPing) doHTTPing(config *HTTPConfig) {
 		m.resultChannel <- &Result{
 			Valid:   true,
 			Type:    PingTypeHttping,
-			Label:   label.String(),
+			Label:   &label,
 			Total:   1,
 			Success: 0,
 			Failed:  1,
@@ -595,7 +599,7 @@ func (m *NetPing) doHTTPing(config *HTTPConfig) {
 		m.resultChannel <- &Result{
 			Valid:   true,
 			Type:    PingTypeHttping,
-			Label:   label.String(),
+			Label:   &label,
 			Total:   1,
 			Success: 0,
 			Failed:  1,
@@ -611,7 +615,7 @@ func (m *NetPing) doHTTPing(config *HTTPConfig) {
 		m.resultChannel <- &Result{
 			Valid:   true,
 			Type:    PingTypeHttping,
-			Label:   label.String(),
+			Label:   &label,
 			Total:   1,
 			Success: 0,
 			Failed:  1,
@@ -638,7 +642,7 @@ func (m *NetPing) doHTTPing(config *HTTPConfig) {
 
 	var certTTLDay int
 	var hasCert bool
-	var certLabel helper.KeyValues
+	var certLabel helper.MetricLabels
 
 	if resp.TLS != nil {
 		for _, v := range resp.TLS.PeerCertificates {
@@ -662,7 +666,7 @@ func (m *NetPing) doHTTPing(config *HTTPConfig) {
 	m.resultChannel <- &Result{
 		Valid:            true,
 		Type:             PingTypeHttping,
-		Label:            label.String(),
+		Label:            &label,
 		Total:            1,
 		Success:          successCount,
 		Failed:           1 - successCount,
@@ -670,7 +674,7 @@ func (m *NetPing) doHTTPing(config *HTTPConfig) {
 		HTTPResponseSize: len(respBody),
 
 		HasHTTPSCert:    hasCert,
-		HTTPSCertLabels: certLabel.String(),
+		HTTPSCertLabels: &certLabel,
 		HTTPSCertTTLDay: certTTLDay,
 	}
 

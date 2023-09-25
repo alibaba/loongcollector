@@ -1,530 +1,530 @@
 [
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_cpu_usage"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "50.000000"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_committed"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#nonheap"
-            },
-            {
-                "Key": "__value__",
-                "Value": "4"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_init"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#nonheap"
-            },
-            {
-                "Key": "__value__",
-                "Value": "1"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_max"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#nonheap"
-            },
-            {
-                "Key": "__value__",
-                "Value": "9"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_used"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#nonheap"
-            },
-            {
-                "Key": "__value__",
-                "Value": "7"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_committed"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#heap"
-            },
-            {
-                "Key": "__value__",
-                "Value": "4"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_init"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#heap"
-            },
-            {
-                "Key": "__value__",
-                "Value": "1"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_max"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#heap"
-            },
-            {
-                "Key": "__value__",
-                "Value": "9"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_used"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#heap"
-            },
-            {
-                "Key": "__value__",
-                "Value": "7"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_gc_time"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "phrase#$#NEW|service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "123"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_gc_count"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "phrase#$#NEW|service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "12"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_gc_time"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "phrase#$#OLD|service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "123"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_gc_count"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "phrase#$#OLD|service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "12"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_committed"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#NEWGEN_USAGE"
-            },
-            {
-                "Key": "__value__",
-                "Value": "7"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_init"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#NEWGEN_USAGE"
-            },
-            {
-                "Key": "__value__",
-                "Value": "1"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_max"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#NEWGEN_USAGE"
-            },
-            {
-                "Key": "__value__",
-                "Value": "9"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_used"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#NEWGEN_USAGE"
-            },
-            {
-                "Key": "__value__",
-                "Value": "4"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_committed"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#OLDGEN_USAGE"
-            },
-            {
-                "Key": "__value__",
-                "Value": "7"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_init"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#OLDGEN_USAGE"
-            },
-            {
-                "Key": "__value__",
-                "Value": "1"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_max"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#OLDGEN_USAGE"
-            },
-            {
-                "Key": "__value__",
-                "Value": "9"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_memory_pool_used"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#OLDGEN_USAGE"
-            },
-            {
-                "Key": "__value__",
-                "Value": "4"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_threads_live"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "1"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_threads_daemon"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "2"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 10,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_jvm_threads_peak"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "10000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "3"
-            }
-        ],
-        "Time_ns": 0
-    }
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_cpu_usage"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "50"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_committed"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#nonheap"
+      },
+      {
+        "Key": "__value__",
+        "Value": "4"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_init"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#nonheap"
+      },
+      {
+        "Key": "__value__",
+        "Value": "1"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_max"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#nonheap"
+      },
+      {
+        "Key": "__value__",
+        "Value": "9"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_used"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#nonheap"
+      },
+      {
+        "Key": "__value__",
+        "Value": "7"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_committed"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#heap"
+      },
+      {
+        "Key": "__value__",
+        "Value": "4"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_init"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#heap"
+      },
+      {
+        "Key": "__value__",
+        "Value": "1"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_max"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#heap"
+      },
+      {
+        "Key": "__value__",
+        "Value": "9"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_used"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#heap"
+      },
+      {
+        "Key": "__value__",
+        "Value": "7"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_pool_committed"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#NEWGEN_USAGE"
+      },
+      {
+        "Key": "__value__",
+        "Value": "7"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_pool_init"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#NEWGEN_USAGE"
+      },
+      {
+        "Key": "__value__",
+        "Value": "1"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_pool_max"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#NEWGEN_USAGE"
+      },
+      {
+        "Key": "__value__",
+        "Value": "9"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_pool_used"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#NEWGEN_USAGE"
+      },
+      {
+        "Key": "__value__",
+        "Value": "4"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_pool_committed"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#OLDGEN_USAGE"
+      },
+      {
+        "Key": "__value__",
+        "Value": "7"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_pool_init"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#OLDGEN_USAGE"
+      },
+      {
+        "Key": "__value__",
+        "Value": "1"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_pool_max"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#OLDGEN_USAGE"
+      },
+      {
+        "Key": "__value__",
+        "Value": "9"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_memory_pool_used"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#OLDGEN_USAGE"
+      },
+      {
+        "Key": "__value__",
+        "Value": "4"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_gc_time"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "phrase#$#NEW|service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "123"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_gc_count"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "phrase#$#NEW|service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "12"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_gc_time"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "phrase#$#OLD|service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "123"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_gc_count"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "phrase#$#OLD|service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "12"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_threads_live"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "1"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_threads_daemon"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "2"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1000000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_jvm_threads_peak"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1000000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "3"
+      }
+    ],
+    "Time_ns": 0
+  }
 ]

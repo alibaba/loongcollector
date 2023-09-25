@@ -1,200 +1,200 @@
 [
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_cpu_usage"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "0.500000"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_gc_count"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "gen#$#gen0|service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "1"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_gc_count"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "gen#$#gen1|service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "2"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_gc_count"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "gen#$#gen2|service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "3"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_heap_memory"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1"
-            },
-            {
-                "Key": "__value__",
-                "Value": "123456"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_threads"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#availableCompletionPortThreads"
-            },
-            {
-                "Key": "__value__",
-                "Value": "999"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_threads"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#availableWorkerThreads"
-            },
-            {
-                "Key": "__value__",
-                "Value": "888"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_threads"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#maxCompletionPortThreads"
-            },
-            {
-                "Key": "__value__",
-                "Value": "777"
-            }
-        ],
-        "Time_ns": 0
-    },
-    {
-        "Time": 15,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "skywalking_clr_threads"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "15000"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#maxWorkerThreads"
-            },
-            {
-                "Key": "__value__",
-                "Value": "666"
-            }
-        ],
-        "Time_ns": 0
-    }
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_cpu_usage"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "0.5"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_gc_count"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "gen#$#gen0|service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "1"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_gc_count"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "gen#$#gen1|service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "2"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_gc_count"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "gen#$#gen2|service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "3"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_heap_memory"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1"
+      },
+      {
+        "Key": "__value__",
+        "Value": "123456"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_threads"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#availableCompletionPortThreads"
+      },
+      {
+        "Key": "__value__",
+        "Value": "999"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_threads"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#availableWorkerThreads"
+      },
+      {
+        "Key": "__value__",
+        "Value": "888"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_threads"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#maxCompletionPortThreads"
+      },
+      {
+        "Key": "__value__",
+        "Value": "777"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1500000000,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "skywalking_clr_threads"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1500000000000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "service#$#service_1|serviceInstance#$#instance_1|type#$#maxWorkerThreads"
+      },
+      {
+        "Key": "__value__",
+        "Value": "666"
+      }
+    ],
+    "Time_ns": 0
+  }
 ]

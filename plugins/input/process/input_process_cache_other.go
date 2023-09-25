@@ -124,8 +124,8 @@ func (pc *processCacheOther) FetchCoreCount() int64 {
 	return pc.meta.fetchCoreCount
 }
 
-func (pc *processCacheOther) Labels(customLabels helper.KeyValues) string {
-	if pc.meta.labels == "" {
+func (pc *processCacheOther) Labels(customLabels *helper.MetricLabels) *helper.MetricLabels {
+	if pc.meta.labels == nil {
 		if name := pc.getCommName(); name != "" {
 			processLabels := customLabels.Clone()
 			processLabels.Append("pid", strconv.Itoa(pc.GetPid()))
@@ -135,8 +135,7 @@ func (pc *processCacheOther) Labels(customLabels helper.KeyValues) string {
 			} else {
 				processLabels.Append("comm", name)
 			}
-			processLabels.Sort()
-			pc.meta.labels = processLabels.String()
+			pc.meta.labels = processLabels
 		}
 	}
 	return pc.meta.labels

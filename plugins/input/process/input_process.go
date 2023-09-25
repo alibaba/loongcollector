@@ -52,7 +52,7 @@ type InputProcess struct {
 	context       pipeline.Context
 	lastProcesses map[int]processCache
 	regexpList    []*regexp.Regexp
-	commonLabels  helper.KeyValues
+	commonLabels  helper.MetricLabels
 	collectTime   time.Time
 }
 
@@ -90,7 +90,7 @@ func (ip *InputProcess) Collect(collector pipeline.Collector) error {
 		return err
 	}
 	for _, pc := range matchedProcesses {
-		labels := pc.Labels(ip.commonLabels)
+		labels := pc.Labels(&ip.commonLabels)
 		// add necessary metrics
 		ip.addCPUMetrics(pc, labels, collector)
 		ip.addMemMetrics(pc, labels, collector)
@@ -218,52 +218,57 @@ func (ip *InputProcess) filterTopAndThresholdMatchedProcesses(processList []proc
 	return
 }
 
-func (ip *InputProcess) addCPUMetrics(pc processCache, labels string, collector pipeline.Collector) {
+func (ip *InputProcess) addCPUMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
 	if percentage := pc.GetProcessStatus().CPUPercentage; percentage != nil {
-		helper.AddMetric(collector, "process_cpu_percent", ip.collectTime, labels, percentage.TotalPercentage)
-		helper.AddMetric(collector, "process_cpu_stime_percent", ip.collectTime, labels, percentage.STimePercentage)
-		helper.AddMetric(collector, "process_cpu_utime_percent", ip.collectTime, labels, percentage.UTimePercentage)
+
+		ip.addMetric(collector, "process_cpu_percent", &ip.collectTime, labels, percentage.TotalPercentage)
+		ip.addMetric(collector, "process_cpu_stime_percent", &ip.collectTime, labels, percentage.STimePercentage)
+		ip.addMetric(collector, "process_cpu_utime_percent", &ip.collectTime, labels, percentage.UTimePercentage)
 	}
 }
 
-func (ip *InputProcess) addMemMetrics(pc processCache, labels string, collector pipeline.Collector) {
+func (ip *InputProcess) addMetric(collector pipeline.Collector, name string, t *time.Time, labels *helper.MetricLabels, val float64) {
+	collector.AddRawLog(helper.NewMetricLog(name, t.UnixNano(), val, labels))
+}
+
+func (ip *InputProcess) addMemMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
 	if mem := pc.GetProcessStatus().Memory; mem != nil {
-		helper.AddMetric(collector, "process_mem_rss", ip.collectTime, labels, float64(mem.Rss))
-		helper.AddMetric(collector, "process_mem_swap", ip.collectTime, labels, float64(mem.Swap))
-		helper.AddMetric(collector, "process_mem_vsz", ip.collectTime, labels, float64(mem.Vsz))
-		helper.AddMetric(collector, "process_mem_data", ip.collectTime, labels, float64(mem.Data))
+		ip.addMetric(collector, "process_mem_rss", &ip.collectTime, labels, float64(mem.Rss))
+		ip.addMetric(collector, "process_mem_swap", &ip.collectTime, labels, float64(mem.Swap))
+		ip.addMetric(collector, "process_mem_vsz", &ip.collectTime, labels, float64(mem.Vsz))
+		ip.addMetric(collector, "process_mem_data", &ip.collectTime, labels, float64(mem.Data))
 	}
 }
 
-func (ip *InputProcess) addThreadMetrics(pc processCache, labels string, collector pipeline.Collector) {
+func (ip *InputProcess) addThreadMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
 	if pc.FetchThreads() {
-		helper.AddMetric(collector, "process_threads", ip.collectTime, labels, float64(pc.GetProcessStatus().ThreadsNum))
+		ip.addMetric(collector, "process_threads", &ip.collectTime, labels, float64(pc.GetProcessStatus().ThreadsNum))
 	}
 }
 
-func (ip *InputProcess) addOpenFilesMetrics(pc processCache, labels string, collector pipeline.Collector) {
+func (ip *InputProcess) addOpenFilesMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
 	if pc.FetchFds() {
-		helper.AddMetric(collector, "process_fds", ip.collectTime, labels, float64(pc.GetProcessStatus().FdsNum))
+		ip.addMetric(collector, "process_fds", &ip.collectTime, labels, float64(pc.GetProcessStatus().FdsNum))
 	}
 }
 
-func (ip *InputProcess) addNetIOMetrics(pc processCache, labels string, collector pipeline.Collector) {
+func (ip *InputProcess) addNetIOMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
 	if pc.FetchNetIO() {
 		net := pc.GetProcessStatus().NetIO
-		helper.AddMetric(collector, "process_net_in_bytes", ip.collectTime, labels, float64(net.InBytes))
-		helper.AddMetric(collector, "process_net_in_packet", ip.collectTime, labels, float64(net.InPacket))
-		helper.AddMetric(collector, "process_net_out_bytes", ip.collectTime, labels, float64(net.OutBytes))
-		helper.AddMetric(collector, "process_net_out_packet", ip.collectTime, labels, float64(net.OutPacket))
+		ip.addMetric(collector, "process_net_in_bytes", &ip.collectTime, labels, float64(net.InBytes))
+		ip.addMetric(collector, "process_net_in_packet", &ip.collectTime, labels, float64(net.InPacket))
+		ip.addMetric(collector, "process_net_out_bytes", &ip.collectTime, labels, float64(net.OutBytes))
+		ip.addMetric(collector, "process_net_out_packet", &ip.collectTime, labels, float64(net.OutPacket))
 	}
 }
 
-func (ip *InputProcess) addIOMetrics(pc processCache, labels string, collector pipeline.Collector) {
+func (ip *InputProcess) addIOMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
 	if pc.FetchIO() {
 		io := pc.GetProcessStatus().IO
-		helper.AddMetric(collector, "process_read_bytes", ip.collectTime, labels, float64(io.ReadeBytes))
-		helper.AddMetric(collector, "process_write_bytes", ip.collectTime, labels, float64(io.WriteBytes))
-		helper.AddMetric(collector, "process_read_count", ip.collectTime, labels, float64(io.ReadCount))
-		helper.AddMetric(collector, "process_write_count", ip.collectTime, labels, float64(io.WriteCount))
+		ip.addMetric(collector, "process_read_bytes", &ip.collectTime, labels, float64(io.ReadeBytes))
+		ip.addMetric(collector, "process_write_bytes", &ip.collectTime, labels, float64(io.WriteBytes))
+		ip.addMetric(collector, "process_read_count", &ip.collectTime, labels, float64(io.ReadCount))
+		ip.addMetric(collector, "process_write_count", &ip.collectTime, labels, float64(io.WriteCount))
 	}
 }
 

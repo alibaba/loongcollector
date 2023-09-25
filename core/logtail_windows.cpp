@@ -64,6 +64,7 @@ static void overwrite_community_edition_flags() {
     INT32_FLAG(data_server_port) = 443;
     BOOL_FLAG(enable_env_ref_in_config) = true;
     BOOL_FLAG(enable_containerd_upper_dir_detect) = true;
+    BOOL_FLAG(enable_sls_metrics_format) = false;
 }
 
 void do_worker_process() {

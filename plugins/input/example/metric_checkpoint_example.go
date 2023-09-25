@@ -29,8 +29,7 @@ import (
 type MetricsCheckpointExample struct {
 	counter      int
 	gauge        int
-	commonLabels helper.KeyValues
-	labels       string
+	commonLabels helper.MetricLabels
 
 	context pipeline.Context
 }
@@ -48,7 +47,6 @@ func (m *MetricsCheckpointExample) Init(context pipeline.Context) (int, error) {
 	m.commonLabels.Append("hostname", util.GetHostName())
 	m.commonLabels.Append("ip", util.GetIPAddress())
 	// convert the commonLabels to string to reduce memory cost because the labels is the fixed value.
-	m.labels = m.commonLabels.String()
 	return 0, nil
 }
 
@@ -65,8 +63,8 @@ func (m *MetricsCheckpointExample) Collect(collector pipeline.Collector) error {
 	m.gauge = rand.Intn(100)
 
 	// collect the metrics
-	helper.AddMetric(collector, "example_counter", time.Now(), m.labels, float64(m.counter))
-	helper.AddMetric(collector, "example_gauge", time.Now(), m.labels, float64(m.gauge))
+	collector.AddRawLog(helper.NewMetricLog("example_counter", time.Now().UnixNano(), float64(m.counter), &m.commonLabels))
+	collector.AddRawLog(helper.NewMetricLog("example_gauge", time.Now().UnixNano(), float64(m.gauge), &m.commonLabels))
 	_ = m.context.SaveCheckPointObject("metric_checkpoint_example", &m.counter)
 	return nil
 }

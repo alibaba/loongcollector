@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
@@ -30,6 +28,7 @@ import (
 	"github.com/richardartoul/molecule"
 	"github.com/richardartoul/molecule/src/codec"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
@@ -68,35 +67,6 @@ type Decoder struct {
 	AllowUnsafeMode bool
 }
 
-func parseLabels(metric model.Metric) (metricName, labelsValue string) {
-	labels := (model.LabelSet)(metric)
-
-	lns := make(model.LabelPairs, 0, len(labels))
-	for k, v := range labels {
-		lns = append(lns, &model.LabelPair{
-			Name:  k,
-			Value: v,
-		})
-	}
-	sort.Sort(lns)
-	var builder strings.Builder
-	labelCount := 0
-	for _, label := range lns {
-		if label.Name == model.MetricNameLabel {
-			metricName = string(label.Value)
-			continue
-		}
-		if labelCount != 0 {
-			builder.WriteByte('|')
-		}
-		builder.WriteString(string(label.Name))
-		builder.WriteString("#$#")
-		builder.WriteString(string(label.Value))
-		labelCount++
-	}
-	return metricName, builder.String()
-}
-
 // Decode impl
 func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
 	if req.Header.Get(contentEncodingKey) == snappyEncoding &&
@@ -125,29 +95,18 @@ func (d *Decoder) decodeInExpFmt(data []byte, _ *http.Request) (logs []*protocol
 			break
 		}
 		for _, sample := range *s {
-			metricName, labelsValue := parseLabels(sample.Metric)
-			log := &protocol.Log{
-				Contents: []*protocol.Log_Content{
-					{
-						Key:   metricNameKey,
-						Value: metricName,
-					},
-					{
-						Key:   labelsKey,
-						Value: labelsValue,
-					},
-					{
-						Key:   timeNanoKey,
-						Value: strconv.FormatInt(sample.Timestamp.UnixNano(), 10),
-					},
-					{
-						Key:   valueKey,
-						Value: strconv.FormatFloat(float64(sample.Value), 'g', -1, 64),
-					},
-				},
+			var name string
+			var labels helper.MetricLabels
+			labelsSet := (model.LabelSet)(sample.Metric)
+			for k, v := range labelsSet {
+				if k == model.MetricNameLabel {
+					name = string(v)
+					continue
+				}
+				labels.Append(string(k), string(v))
 			}
-			protocol.SetLogTimeWithNano(log, uint32(sample.Timestamp.Unix()), uint32(sample.Timestamp.UnixNano()%1e9))
-			logs = append(logs, log)
+			metricLog := helper.NewMetricLog(name, sample.Timestamp.UnixNano(), float64(sample.Value), &labels)
+			logs = append(logs, metricLog)
 		}
 	}
 
@@ -166,61 +125,29 @@ func (d *Decoder) decodeInRemoteWriteFormat(data []byte, req *http.Request) (log
 	}
 
 	db := req.FormValue(metaDBKey)
-	contentLen := 4
-	if len(db) > 0 {
-		contentLen++
-	}
-
 	for _, m := range metrics.Timeseries {
-		metricName, labelsValue := d.parsePbLabels(m.Labels)
+		var metricName string
+		var labels helper.MetricLabels
+		for _, label := range m.Labels {
+			if label.Name == model.MetricNameLabel {
+				metricName = label.Value
+				continue
+			}
+			labels.Append(label.Name, label.Value)
+		}
 		for _, sample := range m.Samples {
-			contents := make([]*protocol.Log_Content, 0, contentLen)
-			contents = append(contents, &protocol.Log_Content{
-				Key:   metricNameKey,
-				Value: metricName,
-			}, &protocol.Log_Content{
-				Key:   labelsKey,
-				Value: labelsValue,
-			}, &protocol.Log_Content{
-				Key:   timeNanoKey,
-				Value: strconv.FormatInt(sample.Timestamp*1e6, 10),
-			}, &protocol.Log_Content{
-				Key:   valueKey,
-				Value: strconv.FormatFloat(sample.Value, 'g', -1, 64),
-			})
+			metricLog := helper.NewMetricLog(metricName, sample.Timestamp, sample.Value, &labels)
 			if len(db) > 0 {
-				contents = append(contents, &protocol.Log_Content{
+				metricLog.Contents = append(metricLog.Contents, &protocol.Log_Content{
 					Key:   tagDB,
 					Value: db,
 				})
 			}
-
-			log := &protocol.Log{
-				Contents: contents,
-			}
-			protocol.SetLogTimeWithNano(log, uint32(model.Time(sample.Timestamp).Unix()), uint32(model.Time(sample.Timestamp).UnixNano()%1e9))
-			logs = append(logs, log)
+			logs = append(logs, metricLog)
 		}
 	}
 
 	return logs, nil
-}
-
-func (d *Decoder) parsePbLabels(labels []prompb.Label) (metricName, labelsValue string) {
-	var builder strings.Builder
-	for _, label := range labels {
-		if label.Name == model.MetricNameLabel {
-			metricName = label.Value
-			continue
-		}
-		if builder.Len() > 0 {
-			builder.WriteByte('|')
-		}
-		builder.WriteString(label.Name)
-		builder.WriteString("#$#")
-		builder.WriteString(label.Value)
-	}
-	return metricName, builder.String()
 }
 
 func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {

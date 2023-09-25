@@ -1,156 +1,156 @@
 [
-    {
-        "Time": 123456,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "123456789"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#50|service#$#service_111|serviceInstance#$#instance_222"
-            },
-            {
-                "Key": "__value__",
-                "Value": "5"
-            }
-        ],
-        "Time_ns": 789000000
-    },
-    {
-        "Time": 123456,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "123456789"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#88.8|service#$#service_111|serviceInstance#$#instance_222"
-            },
-            {
-                "Key": "__value__",
-                "Value": "9"
-            }
-        ],
-        "Time_ns": 789000000
-    },
-    {
-        "Time": 123456,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "123456789"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#90|service#$#service_111|serviceInstance#$#instance_222"
-            },
-            {
-                "Key": "__value__",
-                "Value": "12"
-            }
-        ],
-        "Time_ns": 789000000
-    },
-    {
-        "Time": 123456,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "123456789"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#100|service#$#service_111|serviceInstance#$#instance_222"
-            },
-            {
-                "Key": "__value__",
-                "Value": "14"
-            }
-        ],
-        "Time_ns": 789000000
-    },
-    {
-        "Time": 123456,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_bucket"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "123456789"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#+Inf|service#$#service_111|serviceInstance#$#instance_222"
-            },
-            {
-                "Key": "__value__",
-                "Value": "15"
-            }
-        ],
-        "Time_ns": 789000000
-    },
-    {
-        "Time": 123456,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_count"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "123456789"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|service#$#service_111|serviceInstance#$#instance_222"
-            },
-            {
-                "Key": "__value__",
-                "Value": "15"
-            }
-        ],
-        "Time_ns": 789000000
-    },
-    {
-        "Time": 123456,
-        "Contents": [
-            {
-                "Key": "__name__",
-                "Value": "i_am_histogram_metric_sum"
-            },
-            {
-                "Key": "__time_nano__",
-                "Value": "123456789"
-            },
-            {
-                "Key": "__labels__",
-                "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|service#$#service_111|serviceInstance#$#instance_222"
-            },
-            {
-                "Key": "__value__",
-                "Value": "746.9"
-            }
-        ],
-        "Time_ns": 789000000
-    }
+  {
+    "Time": 1234567890,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "i_am_histogram_metric_count"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1234567890000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|service#$#service_111|serviceInstance#$#instance_222"
+      },
+      {
+        "Key": "__value__",
+        "Value": "15"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1234567890,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "i_am_histogram_metric_sum"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1234567890000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|service#$#service_111|serviceInstance#$#instance_222"
+      },
+      {
+        "Key": "__value__",
+        "Value": "746.9"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1234567890,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "i_am_histogram_metric_bucket"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1234567890000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#50|service#$#service_111|serviceInstance#$#instance_222"
+      },
+      {
+        "Key": "__value__",
+        "Value": "5"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1234567890,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "i_am_histogram_metric_bucket"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1234567890000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#88.8|service#$#service_111|serviceInstance#$#instance_222"
+      },
+      {
+        "Key": "__value__",
+        "Value": "9"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1234567890,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "i_am_histogram_metric_bucket"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1234567890000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#90|service#$#service_111|serviceInstance#$#instance_222"
+      },
+      {
+        "Key": "__value__",
+        "Value": "12"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1234567890,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "i_am_histogram_metric_bucket"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1234567890000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#100|service#$#service_111|serviceInstance#$#instance_222"
+      },
+      {
+        "Key": "__value__",
+        "Value": "14"
+      }
+    ],
+    "Time_ns": 0
+  },
+  {
+    "Time": 1234567890,
+    "Contents": [
+      {
+        "Key": "__name__",
+        "Value": "i_am_histogram_metric_bucket"
+      },
+      {
+        "Key": "__time_nano__",
+        "Value": "1234567890000000000"
+      },
+      {
+        "Key": "__labels__",
+        "Value": "Hahaha#$#test|a#$#aaa|ip#$#1.2.3.4|le#$#+Inf|service#$#service_111|serviceInstance#$#instance_222"
+      },
+      {
+        "Key": "__value__",
+        "Value": "15"
+      }
+    ],
+    "Time_ns": 0
+  }
 ]
