@@ -705,14 +705,13 @@ int LogProcess::ProcessBufferLegacy(std::shared_ptr<LogBuffer>& logBuffer,
                 if (errorLine.empty())
                     errorLine = logIndex[i].to_string();
             }
-            if (!config.mAdvancedConfig.mEnableTimestampNanosecond) {
-                sls_logs::Log* logPtr = logGroup.mutable_logs(successLogSize);
-                logPtr->clear_time_ns();
-            }
             // add source raw line, time zone adjust
             if (successLogSize < logGroup.logs_size()) {
                 sls_logs::Log* logPtr = logGroup.mutable_logs(successLogSize);
                 if (logPtr != NULL) {
+                    if (!config.mAdvancedConfig.mEnableTimestampNanosecond) {
+                        logPtr->clear_time_ns();
+                    }
                     if (config.mUploadRawLog) {
                         LogParser::AddLog(
                             logPtr, config.mAdvancedConfig.mRawLogTag, logIndex[i].to_string(), logGroupSize);
