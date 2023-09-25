@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -247,14 +246,14 @@ func (h *Response) httpGather(address string) (map[string]string, error) {
 		}
 	}
 	defer func() {
-		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}()
 
 	fields["_response_time_ms_"] = strconv.FormatFloat(float64(time.Since(start).Nanoseconds())/1000000., 'f', 3, 32)
 	fields["_http_response_code_"] = strconv.Itoa(resp.StatusCode)
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logger.Error(h.context.GetRuntimeContext(), "HTTP_PARSE_ALARM", "Read body of HTTP response failed", err)
 		fields["_result_"] = "invalid_body"

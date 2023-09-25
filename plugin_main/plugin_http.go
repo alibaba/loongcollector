@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof" //nolint
 	"os"
@@ -98,7 +97,7 @@ func HelpServer(w http.ResponseWriter, req *http.Request) {
 func HandleLoadConfig(w http.ResponseWriter, r *http.Request) {
 	controlLock.Lock()
 	defer controlLock.Unlock()
-	bytes, err := ioutil.ReadAll(r.Body)
+	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Error(context.Background(), "LOAD_CONFIG_ALARM", "stage", "read", "err", err)
 		w.WriteHeader(500)

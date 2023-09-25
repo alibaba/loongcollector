@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -62,7 +62,7 @@ var (
 
 // LoadConfig read the plugin content.
 func LoadConfig() (globalCfg string, pluginCfgs []string, err error) {
-	if gCfg, errRead := ioutil.ReadFile(*GlobalConfig); errRead != nil {
+	if gCfg, errRead := os.ReadFile(*GlobalConfig); errRead != nil {
 		globalCfg = defaultGlobalConfig
 	} else {
 		globalCfg = string(gCfg)
@@ -74,7 +74,7 @@ func LoadConfig() (globalCfg string, pluginCfgs []string, err error) {
 	}
 
 	var pluginCfg string
-	if pCfg, errRead := ioutil.ReadFile(*PluginConfig); errRead == nil {
+	if pCfg, errRead := os.ReadFile(*PluginConfig); errRead == nil {
 		pluginCfg = string(pCfg)
 	} else {
 		pluginCfg = defaultPluginConfig
@@ -118,7 +118,7 @@ func GetFlusherConfiguration() (flusherCategory string, flusherOptions map[strin
 			}
 			return c, options, true
 		}
-		if fCfg, err := ioutil.ReadFile(*FlusherConfig); err == nil {
+		if fCfg, err := os.ReadFile(*FlusherConfig); err == nil {
 			category, options, ok := extract(fCfg)
 			if ok {
 				flusherType = category

@@ -18,7 +18,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -95,7 +95,7 @@ func (p *ServiceStaticPrometheus) Init(context pipeline.Context) (int, error) {
 		defer func(f *os.File) {
 			_ = f.Close()
 		}(f)
-		bytes, err := ioutil.ReadAll(f)
+		bytes, err := io.ReadAll(f)
 		if err != nil {
 			return 0, fmt.Errorf("cannot read prometheus configuration file")
 		}

@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"sync"
@@ -89,7 +88,7 @@ func CollectBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) 
 		return data, http.StatusOK, nil
 	}
 
-	bytes, err := ioutil.ReadAll(body)
+	bytes, err := io.ReadAll(body)
 	if err != nil {
 		return nil, http.StatusRequestEntityTooLarge, err
 	}
@@ -112,7 +111,7 @@ func CollectBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) 
 func CollectRawBody(res http.ResponseWriter, req *http.Request, maxBodySize int64) ([]byte, int, error) {
 	body := req.Body
 	body = http.MaxBytesReader(res, body, maxBodySize)
-	bytes, err := ioutil.ReadAll(body)
+	bytes, err := io.ReadAll(body)
 	if err != nil {
 		return nil, http.StatusRequestEntityTooLarge, err
 	}

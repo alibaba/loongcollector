@@ -15,7 +15,6 @@
 package helper
 
 import (
-	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
@@ -55,7 +54,7 @@ func resetDockerCenter() {
 
 func TestGetIpByHost_1(t *testing.T) {
 	hostFileName := "./tmp_TestGetIpByHost.txt"
-	ioutil.WriteFile(hostFileName, []byte(hostFileContent1), 0x777)
+	os.WriteFile(hostFileName, []byte(hostFileContent1), 0x777)
 	ip := getIPByHosts(hostFileName, "8be13ee0dd9e")
 	if ip != "192.168.5.3" {
 		t.Errorf("GetIpByHosts = %v, want %v", ip, "192.168.5.3")
@@ -65,7 +64,7 @@ func TestGetIpByHost_1(t *testing.T) {
 
 func TestGetIpByHost_2(t *testing.T) {
 	hostFileName := "./tmp_TestGetIpByHost.txt"
-	ioutil.WriteFile(hostFileName, []byte(hostFileContent2), 0x777)
+	os.WriteFile(hostFileName, []byte(hostFileContent2), 0x777)
 	ip := getIPByHosts(hostFileName, "nginx-5fd7568b67-4sh8c")
 	if ip != "172.20.4.5" {
 		t.Errorf("GetIpByHosts = %v, want %v", ip, "172.20.4.5")

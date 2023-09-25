@@ -19,7 +19,6 @@ package helper
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -698,7 +697,7 @@ var staticECIConfig2 = `[
 func TestTryReadStaticContainerInfo(t *testing.T) {
 	defer os.Remove("./static_container.json")
 	defer os.Unsetenv(staticContainerInfoPathEnvKey)
-	ioutil.WriteFile("./static_container.json", []byte(staticDockerConfig), os.ModePerm)
+	os.WriteFile("./static_container.json", []byte(staticDockerConfig), os.ModePerm)
 	os.Setenv(staticContainerInfoPathEnvKey, "./static_container.json")
 	containerInfo, removedIDs, changed, err := tryReadStaticContainerInfo()
 	require.Nil(t, err)
@@ -724,7 +723,7 @@ func TestTryReadStaticContainerInfo(t *testing.T) {
 	}
 	require.Equal(t, 999999999908, info.State.Pid)
 
-	ioutil.WriteFile("./static_container.json", []byte(staticDockerConfig2), os.ModePerm)
+	os.WriteFile("./static_container.json", []byte(staticDockerConfig2), os.ModePerm)
 
 	containerInfo, removedIDs, changed, err = tryReadStaticContainerInfo()
 	require.Nil(t, err)
@@ -751,7 +750,7 @@ func TestLoadStaticContainerConfig(t *testing.T) {
 	resetDockerCenter()
 	defer os.Remove("./static_container.json")
 	defer os.Unsetenv(staticContainerInfoPathEnvKey)
-	ioutil.WriteFile("./static_container.json", []byte(staticDockerConfig), os.ModePerm)
+	os.WriteFile("./static_container.json", []byte(staticDockerConfig), os.ModePerm)
 	os.Setenv(staticContainerInfoPathEnvKey, "./static_container.json")
 	instance := getDockerCenterInstance()
 	allInfo := instance.containerMap
@@ -766,7 +765,7 @@ func TestLoadStaticContainerConfigTwice(t *testing.T) {
 	resetDockerCenter()
 	defer os.Remove("./static_container.json")
 	defer os.Unsetenv(staticContainerInfoPathEnvKey)
-	ioutil.WriteFile("./static_container.json", []byte(staticECIConfig), os.ModePerm)
+	os.WriteFile("./static_container.json", []byte(staticECIConfig), os.ModePerm)
 	os.Setenv(staticContainerInfoPathEnvKey, "./static_container.json")
 	instance := getDockerCenterInstance()
 	allInfo := instance.containerMap
@@ -776,7 +775,7 @@ func TestLoadStaticContainerConfigTwice(t *testing.T) {
 	}
 
 	os.Remove("./static_container.json")
-	ioutil.WriteFile("./static_container.json", []byte(staticECIConfig2), os.ModePerm)
+	os.WriteFile("./static_container.json", []byte(staticECIConfig2), os.ModePerm)
 
 	time.Sleep(time.Second * 10)
 
@@ -814,18 +813,18 @@ func TestScanContainerdFilesAndReLink(t *testing.T) {
 	go scanContainerdFilesAndReLink(logName)
 
 	time.Sleep(time.Second)
-	ioutil.WriteFile(filepath.Join(dir, "0.log"), []byte("abc"), os.ModePerm)
+	os.WriteFile(filepath.Join(dir, "0.log"), []byte("abc"), os.ModePerm)
 	checkSameDevInode(t, logName, filepath.Join(dir, "0.log"))
 
-	ioutil.WriteFile(filepath.Join(dir, "99.log"), []byte("abcdef"), os.ModePerm)
+	os.WriteFile(filepath.Join(dir, "99.log"), []byte("abcdef"), os.ModePerm)
 	time.Sleep(time.Second * 2)
 	checkSameDevInode(t, logName, filepath.Join(dir, "99.log"))
 
-	ioutil.WriteFile(filepath.Join(dir, "100.log"), []byte("abcde"), os.ModePerm)
+	os.WriteFile(filepath.Join(dir, "100.log"), []byte("abcde"), os.ModePerm)
 	time.Sleep(time.Second * 2)
 	checkSameDevInode(t, logName, filepath.Join(dir, "100.log"))
 
-	ioutil.WriteFile(filepath.Join(dir, "101.log"), []byte("abcdefg"), os.ModePerm)
+	os.WriteFile(filepath.Join(dir, "101.log"), []byte("abcdefg"), os.ModePerm)
 	time.Sleep(time.Second * 2)
 	checkSameDevInode(t, logName, filepath.Join(dir, "101.log"))
 }

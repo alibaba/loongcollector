@@ -16,7 +16,7 @@ package jmxfetch
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -32,7 +32,7 @@ func (m *Manager) installScripts(javaPath string) error {
 		yamls = append(yamls, key+".yaml")
 	}
 	scripts := fmt.Sprintf(scriptsTemplate, javaPath, strings.Join(yamls, ","), "0.0.0.0", m.port)
-	err := ioutil.WriteFile(m.jmxfetchdPath, []byte(scripts), 0755) //nolint: gosec
+	err := os.WriteFile(m.jmxfetchdPath, []byte(scripts), 0755) //nolint: gosec
 	if err != nil {
 		return fmt.Errorf("cannot crate jmxfetchd scripts: %v", err)
 	}

@@ -19,7 +19,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -60,7 +59,7 @@ func TestServiceHTTP_doDumpFile(t *testing.T) {
 		}
 	}
 	readFunc := func(file string, expectLen int) {
-		data, rerr := ioutil.ReadFile(file)
+		data, rerr := os.ReadFile(file)
 		require.NoError(t, rerr)
 		offset := 0
 		num := 0

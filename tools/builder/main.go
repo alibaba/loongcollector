@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -42,7 +42,7 @@ var gitExe = flag.String("git-exe", "git", "the git executable binary path")
 func main() {
 	flag.Parse()
 
-	goModContent, err := ioutil.ReadFile(filepath.Join(*projectRoot, "go.mod"))
+	goModContent, err := os.ReadFile(filepath.Join(*projectRoot, "go.mod"))
 	if err != nil {
 		fmt.Println("failed to read go.mod in project root:", *projectRoot)
 		os.Exit(1)
@@ -116,13 +116,13 @@ func loadPluginConfig(file string) (*pluginConfig, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		content, err = ioutil.ReadAll(resp.Body)
+		content, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		var err error
-		content, err = ioutil.ReadFile(file) // nolint
+		content, err = os.ReadFile(file) // nolint
 		if err != nil {
 			return nil, err
 		}
@@ -255,7 +255,7 @@ func getGoModules(ctx *buildContext) error {
 		return fmt.Errorf("failed to download go modules, err: %w, output: %s", err, out)
 	}
 
-	mods, err := ioutil.ReadFile(ctx.ModFile)
+	mods, err := os.ReadFile(ctx.ModFile)
 	if err != nil {
 		return fmt.Errorf("failed to read file content, err: %v", err)
 	}

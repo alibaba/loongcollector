@@ -17,7 +17,7 @@ package platformmeta
 import (
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,7 +50,7 @@ func AlibabaCloudEcsPlatformRequest(api string, method string, f func(header *ht
 	if resp.StatusCode == 404 {
 		return "", error404
 	}
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

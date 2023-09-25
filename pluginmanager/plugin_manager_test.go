@@ -19,7 +19,7 @@ package pluginmanager
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -91,7 +91,7 @@ func (s *managerTestSuite) TestPluginManager() {
 
 func GetTestConfig(configName string) string {
 	fileName := "./test_config/" + configName + ".json"
-	byteStr, err := ioutil.ReadFile(fileName)
+	byteStr, err := os.ReadFile(fileName)
 	if err != nil {
 		logger.Warning(context.Background(), "read", fileName, "error", err)
 	}

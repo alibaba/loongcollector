@@ -18,7 +18,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -106,7 +105,7 @@ func mockHttpClient() {
 					if err == nil {
 						atomic.AddInt64(&SuccessCount, 1)
 						atomic.AddInt64(&TotalLatency, afterTime.Sub(beforeTime).Microseconds())
-						io.Copy(ioutil.Discard, resp.Body)
+						io.Copy(io.Discard, resp.Body)
 						resp.Body.Close()
 						if *print {
 							fmt.Printf("request : %s, response : %d \n", request.URL.Path, resp.StatusCode)

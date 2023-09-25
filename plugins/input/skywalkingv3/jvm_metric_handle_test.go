@@ -19,7 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -47,7 +47,7 @@ func TestJvmMetrics(t *testing.T) {
 func validate(expectedResultPath string, result []*protocol.Log, t *testing.T) {
 	jsonBytes, _ := json.MarshalIndent(result, "", "    ")
 	fmt.Println(string(jsonBytes))
-	expected, _ := ioutil.ReadFile(filepath.Clean(expectedResultPath))
+	expected, _ := os.ReadFile(filepath.Clean(expectedResultPath))
 	temp := make([]*protocol.Log, 0, 16)
 	json.Unmarshal(expected, &temp)
 	expected, _ = json.MarshalIndent(temp, "", "    ")

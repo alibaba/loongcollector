@@ -16,7 +16,6 @@ package jmxfetch
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -300,7 +299,7 @@ func (m *Manager) updateFiles(key string, userCfg *Cfg) {
 	}
 	cfgPath := path.Join(m.jmxfetchConfPath, key+".yaml")
 	logger.Debug(m.managerMeta.GetContext(), "write files", string(bytes), "path", cfgPath)
-	err = ioutil.WriteFile(cfgPath, bytes, 0600)
+	err = os.WriteFile(cfgPath, bytes, 0600)
 	if err != nil {
 		logger.Error(m.managerMeta.GetContext(), JMXAlarmType, "write config file err", err, "path", cfgPath)
 	}
@@ -389,7 +388,7 @@ func (m *Manager) initConfDir() bool {
 		return true
 	}
 	// Clean config files (outdated) in conf directory.
-	if files, err := ioutil.ReadDir(m.jmxfetchConfPath); err == nil {
+	if files, err := os.ReadDir(m.jmxfetchConfPath); err == nil {
 		for _, f := range files {
 			filePath := path.Join(m.jmxfetchConfPath, f.Name())
 			if err = os.Remove(filePath); err == nil {

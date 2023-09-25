@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -39,7 +38,7 @@ func getListenPortsFromFile(pid int, protocol string) ([]int, error) {
 	ports := []int{}
 	filepath.Join()
 	file := fmt.Sprintf("/proc/%d/net/%s", pid, protocol)
-	data, err := ioutil.ReadFile(filepath.Clean(file))
+	data, err := os.ReadFile(filepath.Clean(file))
 	if err != nil {
 		return ports, err
 	}

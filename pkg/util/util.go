@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -122,7 +121,7 @@ func GetTLSConfig(sslCert, sslKey, sslCA string, insecureSkipVerify bool) (*tls.
 	t := &tls.Config{InsecureSkipVerify: insecureSkipVerify} //nolint:gosec
 
 	if sslCA != "" {
-		caCert, err := ioutil.ReadFile(filepath.Clean(sslCA))
+		caCert, err := os.ReadFile(filepath.Clean(sslCA))
 		if err != nil {
 			return nil, fmt.Errorf("Could not load TLS CA: %v", err)
 		}

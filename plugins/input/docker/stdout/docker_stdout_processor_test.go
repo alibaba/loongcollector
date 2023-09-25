@@ -16,7 +16,7 @@ package stdout
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -412,7 +412,7 @@ func (s *inputProcessorTestSuite) TestMultiLineError(c *check.C) {
 }
 
 func (s *inputProcessorTestSuite) TestBigLine(c *check.C) {
-	bigline, _ := ioutil.ReadFile("./big_data.json")
+	bigline, _ := os.ReadFile("./big_data.json")
 	if len(bigline) == 0 {
 		return
 	}

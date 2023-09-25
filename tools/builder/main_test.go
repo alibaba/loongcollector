@@ -15,8 +15,8 @@
 package main
 
 import (
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -29,7 +29,7 @@ func Test_loadPluginConfig(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
 	httpmock.RegisterResponder("GET", "https://test.com/external_plugins_config", func(req *http.Request) (*http.Response, error) {
-		data, err := ioutil.ReadFile("testdata/external_plugins.yml")
+		data, err := os.ReadFile("testdata/external_plugins.yml")
 		assert.Nil(t, err)
 		return httpmock.NewBytesResponse(200, data), nil
 	})
@@ -251,7 +251,7 @@ replace github.com/mock/common_plugins1 v1.0.0 => ../
 	assert.Nil(t, err)
 
 	for path, expect := range wants {
-		actual, err := ioutil.ReadFile(filepath.Join(ctx.ProjectRoot, path))
+		actual, err := os.ReadFile(filepath.Join(ctx.ProjectRoot, path))
 		assert.Nil(t, err)
 		assert.Equal(t, expect, string(actual))
 	}

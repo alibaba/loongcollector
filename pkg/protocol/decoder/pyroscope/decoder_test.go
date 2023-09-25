@@ -18,8 +18,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"sort"
 	"testing"
 
@@ -82,7 +82,7 @@ func TestDecoder_DecodeTire(t *testing.T) {
 }
 
 func TestDecoder_DecodePprofCumulative(t *testing.T) {
-	data, err := ioutil.ReadFile("test/dump_pprof_mem_data")
+	data, err := os.ReadFile("test/dump_pprof_mem_data")
 	require.NoError(t, err)
 	var length uint32
 	buffer := bytes.NewBuffer(data)

@@ -15,7 +15,6 @@
 package doc
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -95,7 +94,7 @@ this is a test doc demo
 		"k": "v",
 	}
 	generatePluginDoc("test-plugin.md", "test-plugin", t2)
-	bytes, _ := ioutil.ReadFile("test-plugin.md")
+	bytes, _ := os.ReadFile("test-plugin.md")
 	assert.Equal(t, str, string(bytes))
 	_ = os.Remove("test-plugin.md")
 }

@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -170,7 +169,7 @@ func scanContainerdFilesAndReLink(filePath string) {
 	}
 	for {
 		time.Sleep(time.Millisecond * time.Duration(containerdScanIntervalMs))
-		dir, err := ioutil.ReadDir(dirPath)
+		dir, err := os.ReadDir(dirPath)
 		if err != nil {
 			continue
 		}
@@ -204,7 +203,7 @@ func scanContainerdFilesAndReLink(filePath string) {
 }
 
 func innerReadStatisContainerInfo(file string, lastContainerInfo []types.ContainerJSON, stat fs.FileInfo) (containers []types.ContainerJSON, removed []string, changed bool, err error) {
-	body, err := ioutil.ReadFile(filepath.Clean(file))
+	body, err := os.ReadFile(filepath.Clean(file))
 	if err != nil {
 		return nil, nil, false, err
 	}

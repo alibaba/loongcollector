@@ -18,7 +18,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -87,7 +87,7 @@ func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
 	initAlarmName := fmt.Sprintf("%s_INIT_ALARM", strings.ToUpper(m.Driver))
 	m.Context = context
 	if len(m.StateMent) == 0 && len(m.StateMentPath) != 0 {
-		data, err := ioutil.ReadFile(m.StateMentPath)
+		data, err := os.ReadFile(m.StateMentPath)
 		if err != nil && len(data) > 0 {
 			m.StateMent = string(data)
 		} else {

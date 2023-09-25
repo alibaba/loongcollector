@@ -17,7 +17,6 @@ package telegraf
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -44,7 +43,7 @@ func (tm *Manager) isRunning() bool {
 }
 
 func init() {
-	data, err := ioutil.ReadFile("local_test/telegraf_test.conf")
+	data, err := os.ReadFile("local_test/telegraf_test.conf")
 	if err != nil {
 		panic(err)
 	}
@@ -85,15 +84,15 @@ func TestDeleteOutdatedConfig(t *testing.T) {
 
 	confPath := path.Join(testTelegrafPath, "conf.d")
 	require.NoError(t, os.MkdirAll(confPath, 0750))
-	require.NoError(t, ioutil.WriteFile(path.Join(confPath, "a.conf"), []byte(`content`), 0600))
-	require.NoError(t, ioutil.WriteFile(path.Join(confPath, "b.conf"), []byte(`content`), 0600))
-	files, err := ioutil.ReadDir(confPath)
+	require.NoError(t, os.WriteFile(path.Join(confPath, "a.conf"), []byte(`content`), 0600))
+	require.NoError(t, os.WriteFile(path.Join(confPath, "b.conf"), []byte(`content`), 0600))
+	files, err := os.ReadDir(confPath)
 	require.NoError(t, err)
 	require.Equal(t, len(files), 2)
 
 	getTestTelegrafManager(t)
 
-	files, err = ioutil.ReadDir(confPath)
+	files, err = os.ReadDir(confPath)
 	require.NoError(t, err)
 	require.Equal(t, len(files), 0)
 }
@@ -239,7 +238,7 @@ func TestInstall(t *testing.T) {
 	require.False(t, inst.install())
 
 	fileContent := fmt.Sprintf("#!/bin/sh\nmv %v %v", tmpName, inst.telegrafdPath)
-	require.NoError(t, ioutil.WriteFile(scriptPath, []byte(fileContent), 0600))
+	require.NoError(t, os.WriteFile(scriptPath, []byte(fileContent), 0600))
 
 	require.True(t, inst.install())
 	require.True(t, isPathExists(inst.telegrafdPath))

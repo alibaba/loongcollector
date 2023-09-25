@@ -18,7 +18,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,7 +91,7 @@ type Mysql struct {
 func (m *Mysql) Init(context pipeline.Context) (int, error) {
 	m.context = context
 	if len(m.StateMent) == 0 && len(m.StateMentPath) != 0 {
-		data, err := ioutil.ReadFile(m.StateMentPath)
+		data, err := os.ReadFile(m.StateMentPath)
 		if err != nil && len(data) > 0 {
 			m.StateMent = string(data)
 		} else {

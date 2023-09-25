@@ -15,7 +15,7 @@
 package jmxfetch
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -84,7 +84,7 @@ func TestManager_Register_static_config(t *testing.T) {
 		},
 	}, false)
 	time.Sleep(time.Second * 8)
-	bytes, err := ioutil.ReadFile(m.jmxfetchConfPath + "/test1.yaml")
+	bytes, err := os.ReadFile(m.jmxfetchConfPath + "/test1.yaml")
 	assert.NoErrorf(t, err, "file not read")
 	assert.Equal(t, string(bytes), expectCfg)
 }

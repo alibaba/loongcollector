@@ -21,7 +21,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -76,7 +76,7 @@ func getToken() (result []byte, err error) {
 	}
 	defer respList.Body.Close()
 	var body []byte
-	body, err = ioutil.ReadAll(respList.Body)
+	body, err = io.ReadAll(respList.Body)
 	if err != nil {
 		logger.Warning(context.Background(), "UPDATE_STS_ALARM", "parse role list error", err)
 		return nil, err
@@ -96,7 +96,7 @@ func getToken() (result []byte, err error) {
 		return nil, err
 	}
 	defer respGet.Body.Close()
-	body, err = ioutil.ReadAll(respGet.Body)
+	body, err = io.ReadAll(respGet.Body)
 	if err != nil {
 		logger.Warning(context.Background(), "UPDATE_STS_ALARM", "parse token error", err, "role", role)
 		return nil, err
@@ -156,7 +156,7 @@ func getAKFromLocalFile() (accessKeyID, accessKeySecret, securityToken string, e
 	if err == nil {
 		var akInfo AKInfo
 		// 获取token config json
-		encodeTokenCfg, err := ioutil.ReadFile(filepath.Clean(addonTokenConfigPath))
+		encodeTokenCfg, err := os.ReadFile(filepath.Clean(addonTokenConfigPath))
 		if err != nil {
 			return accessKeyID, accessKeySecret, securityToken, expireTime, err
 		}

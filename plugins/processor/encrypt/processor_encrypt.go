@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -167,7 +167,7 @@ func (p *ProcessorEncrypt) parseKey() error {
 	if len(p.EncryptionParameters.KeyFilePath) > 0 {
 		// Key is stored in local file in JSON format, load from file.
 		var fileBytes []byte
-		if fileBytes, err = ioutil.ReadFile(p.EncryptionParameters.KeyFilePath); err == nil {
+		if fileBytes, err = os.ReadFile(p.EncryptionParameters.KeyFilePath); err == nil {
 			err = json.Unmarshal(fileBytes, p.EncryptionParameters)
 		}
 		if err != nil {

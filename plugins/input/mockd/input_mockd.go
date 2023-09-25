@@ -15,7 +15,7 @@
 package mockd
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -40,7 +40,7 @@ type ServiceMock struct {
 func (p *ServiceMock) Init(context pipeline.Context) (int, error) {
 	p.context = context
 	if len(p.File) > 0 {
-		if content, _ := ioutil.ReadFile(p.File); len(content) > 0 {
+		if content, _ := os.ReadFile(p.File); len(content) > 0 {
 			if p.Fields == nil {
 				p.Fields = make(map[string]string)
 			}

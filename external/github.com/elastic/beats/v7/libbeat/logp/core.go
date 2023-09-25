@@ -19,7 +19,7 @@ package logp
 
 import (
 	"flag"
-	"io/ioutil"
+	"io"
 	golog "log"
 	"os"
 	"path/filepath"
@@ -100,7 +100,7 @@ func Configure(cfg Config) error {
 		if _, enabled := selectors["stdlog"]; !enabled {
 			// Disable standard logging by default (this is sometimes used by
 			// libraries and we don't want their spam).
-			golog.SetOutput(ioutil.Discard)
+			golog.SetOutput(io.Discard)
 		}
 
 		sink = selectiveWrapper(sink, selectors)
@@ -172,7 +172,7 @@ func makeStderrOutput(cfg Config) (zapcore.Core, error) {
 }
 
 func makeDiscardOutput(cfg Config) (zapcore.Core, error) {
-	discard := zapcore.AddSync(ioutil.Discard)
+	discard := zapcore.AddSync(io.Discard)
 	return zapcore.NewCore(buildEncoder(cfg), discard, cfg.Level.zapLevel()), nil
 }
 

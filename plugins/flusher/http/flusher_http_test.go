@@ -17,7 +17,7 @@ package http
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"testing"
@@ -134,7 +134,7 @@ func TestHttpFlusherFlush(t *testing.T) {
 
 		httpmock.RegisterResponder("POST", "http://test.com/write?db=mydb", func(req *http.Request) (*http.Response, error) {
 			assert.Equal(t, "mydb", req.Header.Get("db"))
-			body, _ := ioutil.ReadAll(req.Body)
+			body, _ := io.ReadAll(req.Body)
 			actualRequests = append(actualRequests, string(body))
 			return httpmock.NewStringResponse(200, "ok"), nil
 		})
@@ -236,7 +236,7 @@ func TestHttpFlusherFlush(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder("POST", "http://test.com/write?db=mydb", func(req *http.Request) (*http.Response, error) {
-			body, _ := ioutil.ReadAll(req.Body)
+			body, _ := io.ReadAll(req.Body)
 			actualRequests = append(actualRequests, string(body))
 			return httpmock.NewStringResponse(200, "ok"), nil
 		})
@@ -339,7 +339,7 @@ func TestHttpFlusherFlushWithAuthenticator(t *testing.T) {
 
 		httpmock.RegisterResponder("POST", "http://test.com/write?db=mydb", func(req *http.Request) (*http.Response, error) {
 			assert.Equal(t, req.Header.Get("Authorization"), "Basic dXNlcjE6cHdkMQ==")
-			body, _ := ioutil.ReadAll(req.Body)
+			body, _ := io.ReadAll(req.Body)
 			actualRequests = append(actualRequests, string(body))
 			return httpmock.NewStringResponse(200, "ok"), nil
 		})
@@ -444,7 +444,7 @@ func TestHttpFlusherExport(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder("POST", "http://test.com/write?db=mydb", func(req *http.Request) (*http.Response, error) {
-			body, _ := ioutil.ReadAll(req.Body)
+			body, _ := io.ReadAll(req.Body)
 			actualRequests = append(actualRequests, string(body))
 			return httpmock.NewStringResponse(200, "ok"), nil
 		})
@@ -525,7 +525,7 @@ func TestHttpFlusherExport(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder("POST", "http://test.com/write?db=mydb", func(req *http.Request) (*http.Response, error) {
-			body, _ := ioutil.ReadAll(req.Body)
+			body, _ := io.ReadAll(req.Body)
 			actualRequests = append(actualRequests, string(body))
 			return httpmock.NewStringResponse(200, "ok"), nil
 		})

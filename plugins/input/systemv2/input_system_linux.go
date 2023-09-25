@@ -20,7 +20,7 @@ package systemv2
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -152,7 +152,7 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 	defer func(file *os.File) {
 		_ = file.Close()
 	}(file)
-	content, err := ioutil.ReadAll(file)
+	content, err := io.ReadAll(file)
 	if err != nil {
 		logger.Error(r.context.GetRuntimeContext(), "READ_FILENR_ALARM", "err", err)
 		return

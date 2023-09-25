@@ -16,8 +16,8 @@ package elasticsearch
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"time"
 
@@ -79,7 +79,7 @@ func configureTLS(config *tlscommon.TLSConfig, opts *elasticsearch.Config) error
 		transport.TLSClientConfig = tlsConfig
 	}
 	if config.CAFile != "" {
-		opts.CACert, err = ioutil.ReadFile(config.CAFile)
+		opts.CACert, err = os.ReadFile(config.CAFile)
 		if err != nil {
 			return err
 		}

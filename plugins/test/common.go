@@ -16,8 +16,8 @@ package test
 
 import (
 	"context"
-	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -41,7 +41,7 @@ import (
 
 func GetTestConfig(configName string) string {
 	fileName := "./" + configName + ".json"
-	byteStr, err := ioutil.ReadFile(filepath.Clean(fileName))
+	byteStr, err := os.ReadFile(filepath.Clean(fileName))
 	if err != nil {
 		logger.Warning(context.Background(), "read", fileName, "error", err)
 	}

@@ -17,7 +17,6 @@ package telegraf
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -142,7 +141,7 @@ func (tm *Manager) initAgentDir() {
 		}
 	} else {
 		// Clean config files (outdated) in conf directory.
-		if files, err := ioutil.ReadDir(tm.telegrafConfPath); err == nil {
+		if files, err := os.ReadDir(tm.telegrafConfPath); err == nil {
 			for _, f := range files {
 				filePath := path.Join(tm.telegrafConfPath, f.Name())
 				if err = os.Remove(filePath); err == nil {
@@ -158,7 +157,7 @@ func (tm *Manager) initAgentDir() {
 		}
 	}
 	defaultConfigPath := path.Join(tm.telegrafPath, defaultConfFileName)
-	if err := ioutil.WriteFile(defaultConfigPath, []byte(fmt.Sprintf(defaultConfig, logger.DebugFlag())), 0600); err != nil {
+	if err := os.WriteFile(defaultConfigPath, []byte(fmt.Sprintf(defaultConfig, logger.DebugFlag())), 0600); err != nil {
 		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
 			"write default config error, path: %v, err: %v", defaultConfigPath, err)
 	}
@@ -262,7 +261,7 @@ func (tm *Manager) overwriteConfigFile(cfg *Config) bool {
 			"overwrite local config file error, path: %v err: %v", filePath, err)
 		return false
 	}
-	if err := ioutil.WriteFile(filePath, []byte(cfg.Detail), 0600); err != nil {
+	if err := os.WriteFile(filePath, []byte(cfg.Detail), 0600); err != nil {
 		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_OVERWRITE_CONFIG_ALARM",
 			"overwrite local config file error, path: %v err: %v", filePath, err)
 		return false
