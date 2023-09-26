@@ -148,11 +148,14 @@ ParseConfResult ParseConfig(const std::string& configName, Json::Value& jsonRoot
         return CONFIG_INVALID_FORMAT;
     }
 
-    Json::Reader jsonReader;
-    bool parseOk = jsonReader.parse(buffer, jsonRoot);
-    if (parseOk == false)
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+    std::string jsonParseErrs;
+    if (!jsonReader->parse(buffer.data(), buffer.data() + buffer.size(), &jsonRoot, &jsonParseErrs)) {
+        LOG_WARNING(sLogger, ("ConfigName", configName)("ParseConfig error", jsonParseErrs));
         return CONFIG_INVALID_FORMAT;
-
+    }
     return CONFIG_OK;
 }
 
@@ -304,7 +307,7 @@ void ConfigManagerBase::UpdatePluginStats(const Json::Value& config) {
         Json::Value::Members mem = config["plugin"].getMemberNames();
         for (auto it = mem.begin(); it != mem.end(); ++it) {
             if (*it == "inputs" || *it == "processors" || *it == "flushers") {
-                for (int i = 0; i < config["plugin"][*it].size(); ++i) {
+                for (int i = 0; i < (int)config["plugin"][*it].size(); ++i) {
                     std::string type = config["plugin"][*it][i]["type"].asString();
                     stats[*it].insert(type);
                     if (type == "service_docker_stdout") {
@@ -503,16 +506,32 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
             }
 
             Json::Value pluginConfigJson;
-            Json::Reader jsonReader;
-            if (!pluginConfig.empty() && !jsonReader.parse(pluginConfig, pluginConfigJson)) {
-                LOG_WARNING(sLogger,
+            Json::CharReaderBuilder builder;
+            builder["collectComments"] = false;
+            std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+            std::string jsonParseErrs;
+            if (!jsonReader->parse(pluginConfig.data(), pluginConfig.data() + pluginConfig.size(), &pluginConfigJson, &jsonParseErrs)) {
+                                LOG_WARNING(sLogger,
                             ("invalid plugin config, plugin config json parse error",
-                             pluginConfig)("project", projectName)("logstore", category)("config", logName));
+                             pluginConfig)("project", projectName)("logstore", category)("config", logName)("error", jsonParseErrs));
             }
 
             if (logType == PLUGIN_LOG) {
-                config = new Config(
-                    "", "", logType, logName, "", "", "", projectName, false, 0, 0, category, false, "", discardUnmatch);
+                config = new Config("",
+                                    "",
+                                    logType,
+                                    logName,
+                                    "",
+                                    "",
+                                    "",
+                                    projectName,
+                                    false,
+                                    0,
+                                    0,
+                                    category,
+                                    false,
+                                    "",
+                                    discardUnmatch);
                 if (pluginConfig.empty()) {
                     throw ExceptionBase(std::string("The plugin log type is invalid"));
                 }
@@ -826,8 +845,7 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                     GetRegexAndKeys(value, config);
                     if (config->mRegs && config->mKeys && config->mRegs->size() == (size_t)1
                         && config->mKeys->size() == (size_t)1) {
-                        if ((!config->IsMultiline())
-                            && *(config->mKeys->begin()) == DEFAULT_CONTENT_KEY
+                        if ((!config->IsMultiline()) && *(config->mKeys->begin()) == DEFAULT_CONTENT_KEY
                             && *(config->mRegs->begin()) == DEFAULT_REG) {
                             LOG_DEBUG(sLogger,
                                       ("config is simple mode", config->GetProjectName())(config->GetCategory(),
@@ -1797,7 +1815,6 @@ ConfigManagerBase::FindMatchWithForceFlag(std::vector<Config*>& allConfig, const
     auto itr = mNameConfigMap.begin();
     Config* prevMatch = NULL;
     size_t prevLen = 0;
-    int32_t preCreateTime = INT_MAX;
     size_t curLen = 0;
     uint32_t nameRepeat = 0;
     string logNameList;
@@ -1828,12 +1845,10 @@ ConfigManagerBase::FindMatchWithForceFlag(std::vector<Config*>& allConfig, const
                     curLen = config->mBasePath.size();
                     if (prevLen < curLen) {
                         prevMatch = config;
-                        preCreateTime = config->mCreateTime;
                         prevLen = curLen;
                     } else if (prevLen == curLen && prevMatch != NULL) {
                         if (prevMatch->mCreateTime > config->mCreateTime) {
                             prevMatch = config;
-                            preCreateTime = config->mCreateTime;
                             prevLen = curLen;
                         }
                     }
@@ -2672,10 +2687,12 @@ int32_t ConfigManagerBase::UpdateConfigJson(const std::string& configJson) {
     }
 
     Json::Value jsonRoot;
-    Json::Reader jsonReader;
-    bool parseOk = jsonReader.parse(configJson, jsonRoot);
-    if (!parseOk) {
-        LOG_ERROR(sLogger, ("invalid config json", configJson));
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+    std::string jsonParseErrs;
+    if (!jsonReader->parse(configJson.data(), configJson.data() + configJson.size(), &jsonRoot, &jsonParseErrs)) {
+        LOG_WARNING(sLogger, ("invalid config json", configJson)("ParseConfig error", jsonParseErrs));
         return 2;
     }
 

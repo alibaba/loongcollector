@@ -32,7 +32,7 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) override;
 
 private:
-    enum Mode { FilterExpressionRootMode, FilterRuleMode, GlobalMode };
+    enum Mode { BYPASS_MODE, EXPRESSION_MODE, RULE_MODE, GLOBAL_MODE };
     std::shared_ptr<LogFilterRule> mFilterRule;
     BaseFilterNodePtr mFilterExpressionRoot = nullptr;
     std::unordered_map<std::string, LogFilterRule*> mFilters;
@@ -45,6 +45,7 @@ private:
     CounterPtr mProcFilterErrorTotal;
     CounterPtr mProcFilterRecordsTotal;
 
+    bool LoadOldGlobalConfig(const PipelineConfig& componentConfig);
     bool FilterExpressionRoot(LogEvent& sourceEvent, const BaseFilterNodePtr& node);
     bool FilterFilterRule(LogEvent& sourceEvent, const LogFilterRule* filterRule);
     bool FilterGlobal(LogEvent& sourceEvent);

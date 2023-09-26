@@ -109,6 +109,17 @@ const std::string EVENT_GROUP_META_LOG_FILE_INODE = "log.file.inode";
 const std::string EVENT_GROUP_META_LOG_FILE_OFFSET = "log.file.offset";
 const std::string EVENT_GROUP_META_LOG_FILE_LENGTH = "log.file.length";
 
+const std::string EVENT_GROUP_META_K8S_CLUSTER_ID = "k8s.cluster.id";
+const std::string EVENT_GROUP_META_K8S_NODE_NAME = "k8s.node.name";
+const std::string EVENT_GROUP_META_K8S_NODE_IP = "k8s.node.ip";
+const std::string EVENT_GROUP_META_K8S_NAMESPACE = "k8s.namespace.name";
+const std::string EVENT_GROUP_META_K8S_POD_UID = "k8s.pod.uid";
+const std::string EVENT_GROUP_META_K8S_POD_NAME = "k8s.pod.name";
+const std::string EVENT_GROUP_META_CONTAINER_NAME = "container.name";
+const std::string EVENT_GROUP_META_CONTAINER_IP = "container.ip";
+const std::string EVENT_GROUP_META_CONTAINER_IMAGE_NAME = "container.image.name";
+const std::string EVENT_GROUP_META_CONTAINER_IMAGE_ID = "container.image.id";
+
 const std::string& EventGroupMetaKeyToString(EventGroupMetaKey key) {
     switch (key) {
         case EventGroupMetaKey::AGENT_TAG:

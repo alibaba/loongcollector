@@ -60,8 +60,7 @@ public:
     }
 
     void TestInit();
-    void TestInitFilterFail();
-    void TestInitFilterMissFieldFail();
+    void TestInitFilterBypass();
     void TestFilter();
     void TestLogFilterRule();
     void TestBaseFilter();
@@ -71,19 +70,11 @@ public:
 };
 
 UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestInit);
-
-UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestInitFilterFail);
-
-UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestInitFilterMissFieldFail);
-
+UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestInitFilterBypass);
 UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestFilter);
-
 UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestLogFilterRule);
-
 UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestBaseFilter);
-
 UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestFilterNoneUtf8);
-
 
 void ProcessorFilterNativeUnittest::TestInit() {
     string config = "{\"filters\" : [{\"project_name\" : \"123_proj\", \"category\" : \"test\", \"keys\" : [\"key1\", "
@@ -122,7 +113,7 @@ void ProcessorFilterNativeUnittest::TestInit() {
     LOG_INFO(sLogger, ("TestInitFilter() end", time(NULL)));
 }
 
-void ProcessorFilterNativeUnittest::TestInitFilterFail() {
+void ProcessorFilterNativeUnittest::TestInitFilterBypass() {
     string config = "{\"filters\" : [{\"project_name\" : \"123_proj\", \"category\" : \"test\", \"keys\" : "
                     "[\"key1\", \"key2\"], \"regs\" : [\"value1\",\"value2\", \"value3\"]}]}";
     string path = GetProcessExecutionDir() + "user_log_config.json";
@@ -141,31 +132,8 @@ void ProcessorFilterNativeUnittest::TestInitFilterFail() {
     std::string pluginId = "testID";
     ProcessorInstance processorInstance(&processor, pluginId);
     ComponentConfig componentConfig(pluginId, mConfig);
-    APSARA_TEST_TRUE_DESC(processorInstance.Init(componentConfig, mContext) == false,
-                          "false should returned for the invalid config");
-}
-
-void ProcessorFilterNativeUnittest::TestInitFilterMissFieldFail() {
-    string config = "{\"filters\" : [{\"project_name\" : \"123_proj\", \"category\" : \"test\", \"keys\" : "
-                    "[\"key1\", \"key2\", \"key3\"], \"regs\" : [\"value1\",\"value2\"]}]}";
-    string path = GetProcessExecutionDir() + "user_log_config.json";
-    ofstream file(path.c_str());
-    file << config;
-    file.close();
-
-    Config mConfig;
-    mConfig.mAdvancedConfig.mFilterExpressionRoot;
-    mConfig.mFilterRule = NULL;
-    mConfig.mLogType = JSON_LOG;
-    mConfig.mDiscardNoneUtf8 = true;
-
-    // run function
-    ProcessorFilterNative& processor = *(new ProcessorFilterNative);
-    std::string pluginId = "testID";
-    ProcessorInstance processorInstance(&processor, pluginId);
-    ComponentConfig componentConfig(pluginId, mConfig);
-    APSARA_TEST_TRUE_DESC(processorInstance.Init(componentConfig, mContext) == false,
-                          "false should returned for the invalid config");
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+    APSARA_TEST_EQUAL_FATAL(ProcessorFilterNative::BYPASS_MODE, processor.mFilterMode);
 }
 
 // To test bool ProcessorFilterNative::Filter(LogEvent& sourceEvent)

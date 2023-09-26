@@ -23,8 +23,12 @@
 
 namespace logtail {
 
-// referrence: https://opentelemetry.io/docs/specs/otel/logs/data-model-appendix/#elastic-common-schema
-// referrence: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/general/logs-general.md
+// referrences
+// https://opentelemetry.io/docs/specs/otel/logs/data-model-appendix/#elastic-common-schema
+// https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/README.md
+// https://github.com/open-telemetry/semantic-conventions/blob/main/docs/general/logs.md
+// https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/k8s.md
+// https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/container.md
 enum class EventGroupMetaKey {
     UNKNOWN,
     AGENT_TAG,
@@ -35,7 +39,18 @@ enum class EventGroupMetaKey {
     LOG_FILE_PATH_RESOLVED,
     LOG_FILE_INODE,
     LOG_READ_OFFSET,
-    LOG_READ_LENGTH
+    LOG_READ_LENGTH,
+
+    K8S_CLUSTER_ID,
+    K8S_NODE_NAME,
+    K8S_NODE_IP,
+    K8S_NAMESPACE,
+    K8S_POD_UID,
+    K8S_POD_NAME,
+    CONTAINER_NAME,
+    CONTAINER_IP,
+    CONTAINER_IMAGE_NAME,
+    CONTAINER_IMAGE_ID
 };
 
 using GroupMetadata = std::map<EventGroupMetaKey, StringView>;

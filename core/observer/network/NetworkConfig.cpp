@@ -170,11 +170,16 @@ std::string NetworkConfig::SetFromJsonString() {
     Clear();
     mEnabled = true;
 
-    Json::Reader jsonReader;
     Json::Value jsonRoot;
-    bool parseOk = jsonReader.parse(mLastApplyedConfigDetail, jsonRoot);
-    if (parseOk == false) {
-        return std::string("invalid config format : ") + jsonReader.getFormattedErrorMessages();
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+    std::string jsonParseErrs;
+    if (!jsonReader->parse(mLastApplyedConfigDetail.data(),
+                           mLastApplyedConfigDetail.data() + mLastApplyedConfigDetail.size(),
+                           &jsonRoot,
+                           &jsonParseErrs)) {
+        return std::string("invalid config format : ") + jsonParseErrs;
     }
     if (jsonRoot.isArray() && jsonRoot.size() == 1) {
         jsonRoot = jsonRoot[0];
@@ -182,7 +187,7 @@ std::string NetworkConfig::SetFromJsonString() {
         jsonRoot = {};
     }
     if (jsonRoot.empty()) {
-        return std::string("invalid config format : ") + jsonReader.getFormattedErrorMessages();
+        return std::string("invalid config format : ") + jsonParseErrs;
     }
 
     try {

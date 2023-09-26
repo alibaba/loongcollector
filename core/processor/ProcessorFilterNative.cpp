@@ -31,41 +31,51 @@ ProcessorFilterNative::~ProcessorFilterNative() {
 }
 
 bool ProcessorFilterNative::Init(const ComponentConfig& componentConfig) {
-    const PipelineConfig& mConfig = componentConfig.GetConfig();
+    const PipelineConfig& config = componentConfig.GetConfig();
 
-    if (mConfig.mAdvancedConfig.mFilterExpressionRoot.get() != nullptr) {
-        mFilterExpressionRoot = mConfig.mAdvancedConfig.mFilterExpressionRoot;
-        mFilterMode = FilterExpressionRootMode;
-    } else if (mConfig.mFilterRule) {
-        mFilterRule = mConfig.mFilterRule;
-        mFilterMode = FilterRuleMode;
+    if (config.mAdvancedConfig.mFilterExpressionRoot.get() != nullptr) {
+        mFilterExpressionRoot = config.mAdvancedConfig.mFilterExpressionRoot;
+        mFilterMode = EXPRESSION_MODE;
+    } else if (config.mFilterRule) {
+        mFilterRule = config.mFilterRule;
+        mFilterMode = RULE_MODE;
+    } else if (LoadOldGlobalConfig(config)) {
+        mFilterMode = GLOBAL_MODE;
     } else {
-        mFilterMode = GlobalMode;
+        mFilterMode = BYPASS_MODE;
     }
 
-    mDiscardNoneUtf8 = mConfig.mDiscardNoneUtf8;
+    mDiscardNoneUtf8 = config.mDiscardNoneUtf8;
 
     SetMetricsRecordRef(Name(), componentConfig.GetId());
     mProcFilterInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_FILTER_IN_SIZE_BYTES);
     mProcFilterOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_FILTER_OUT_SIZE_BYTES);
     mProcFilterErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_FILTER_ERROR_TOTAL);
     mProcFilterRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_FILTER_RECORDS_TOTAL);
+
+    return true;
+}
+
+bool ProcessorFilterNative::LoadOldGlobalConfig(const PipelineConfig& config) {
     // old InitFilter
     Json::Value jsonRoot; // will contains the root value after parsing.
     ParseConfResult userLogRes = ParseConfig(STRING_FLAG(user_log_config), jsonRoot);
     if (userLogRes != CONFIG_OK) {
         if (userLogRes == CONFIG_NOT_EXIST)
-            LOG_DEBUG(GetContext().GetLogger(), (mConfig.mConfigName, "not found, uninitialized Filter"));
+            LOG_DEBUG(GetContext().GetLogger(), (config.mConfigName, "not found, uninitialized Filter"));
         if (userLogRes == CONFIG_INVALID_FORMAT)
             LOG_ERROR(GetContext().GetLogger(),
-                      ("load user config for filter fail, file content is not valid json", mConfig.mConfigName));
+                      ("load user config for filter fail, file content is not valid json", config.mConfigName));
         return false;
     }
     if (!jsonRoot.isMember("filters")) {
-        return true;
+        return false;
     }
     const Json::Value& filters = jsonRoot["filters"];
     uint32_t filterSize = filters.size();
+    if (!filterSize) {
+        return false;
+    }
     try {
         for (uint32_t index = 0; index < filterSize; index++) {
             const Json::Value& item = filters[index];
@@ -90,7 +100,6 @@ bool ProcessorFilterNative::Init(const ComponentConfig& componentConfig) {
         LOG_ERROR(GetContext().GetLogger(), ("Can't parse the filter config", ""));
         return false;
     }
-
     return true;
 }
 
@@ -117,13 +126,13 @@ bool ProcessorFilterNative::ProcessEvent(PipelineEventPtr& e) {
     }
 
     auto& sourceEvent = e.Cast<LogEvent>();
-    bool res;
+    bool res = true;
 
-    if (mFilterMode == FilterExpressionRootMode) {
+    if (mFilterMode == EXPRESSION_MODE) {
         res = FilterExpressionRoot(sourceEvent, mFilterExpressionRoot);
-    } else if (mFilterMode == FilterRuleMode) {
+    } else if (mFilterMode == RULE_MODE) {
         res = FilterFilterRule(sourceEvent, mFilterRule.get());
-    } else if (mFilterMode == GlobalMode) {
+    } else if (mFilterMode == GLOBAL_MODE) {
         res = FilterGlobal(sourceEvent);
     }
     if (res && mDiscardNoneUtf8) {

@@ -203,10 +203,13 @@ void Logger::LoadConfig(const std::string& filePath) {
         in.close();
 
         Json::Value jsonRoot;
-        Json::Reader jsonReader;
-        bool parseRet = jsonReader.parse(buffer.data(), jsonRoot);
-        if (!parseRet)
+        Json::CharReaderBuilder builder;
+        builder["collectComments"] = false;
+        std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+        std::string jsonParseErrs;
+        if (!jsonReader->parse(buffer.data(), buffer.data() + buffer.size(), &jsonRoot, &jsonParseErrs)) {
             break;
+        }
 
         // Parse Sinks at first, so that we can find them when parsing Loggers.
         if (!jsonRoot.isMember("Sinks") || !jsonRoot["Sinks"].isObject() || jsonRoot["Sinks"].empty()) {
@@ -279,9 +282,9 @@ void Logger::LoadConfig(const std::string& filePath) {
         LogMsg(std::string("Load log level from the env success, level: ") + aliyun_logtail_log_level);
     } else {
         LogMsg(std::string("Load log level from the env error, level: ") + aliyun_logtail_log_level);
-        aliyun_logtail_log_level = ""; 
+        aliyun_logtail_log_level = "";
     }
-    
+
     // Add or supply default config(s).
     bool needSave = true;
     if (loggerConfigs.empty()) {

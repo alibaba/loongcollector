@@ -348,8 +348,16 @@ public:
     }
 
     bool StringToJson(const string& fileContent, Json::Value& valueJson) {
-        Json::Reader jsonReader;
-        return jsonReader.parse(fileContent, valueJson);
+        Json::CharReaderBuilder builder;
+        builder["collectComments"] = false;
+        std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+        std::string jsonParseErrs;
+        if (!jsonReader->parse(
+                fileContent.data(), fileContent.data() + fileContent.size(), &valueJson, &jsonParseErrs)) {
+            cout << "Parse json error: " << jsonParseErrs << std::endl;
+            return false;
+        }
+        return true;
     }
 
     string GetProcessExecutionDir(void) {
