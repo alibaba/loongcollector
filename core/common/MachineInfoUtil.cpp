@@ -23,6 +23,9 @@
 #include <sys/utsname.h>
 #include <pwd.h>
 #include <netdb.h>
+#include <map>
+#include <list>
+#include <algorithm>
 #elif defined(_MSC_VER)
 #include <WinSock2.h>
 #include <Windows.h>
@@ -161,6 +164,32 @@ std::string GetHostName() {
     return std::string(hostname);
 }
 
+std::list<std::string> GetNicIpv4IPList() {
+    struct ifaddrs* ifAddrStruct = NULL;
+    void* tmpAddrPtr = NULL;
+    std::list<std::string> ipList;
+    getifaddrs(&ifAddrStruct);
+    for (struct ifaddrs* ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) {
+            continue;
+        }
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
+            char addressBuffer[INET_ADDRSTRLEN] = "";
+            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+            std::string ip(addressBuffer);
+            // The loopback on most Linux distributions is lo, however it is not portable. For example loopback in OSX
+            // is lo0.
+            if (0 == strcmp("lo", ifa->ifa_name) || ip.empty() || StartWith(ip, "127.")) {
+                continue;
+            }
+            ipList.emplace_back(std::move(ip));
+        }
+    }
+    freeifaddrs(ifAddrStruct);
+    return ipList;
+}
+
 std::string GetHostIpByHostName() {
     std::string hostname = GetHostName();
 
@@ -175,7 +204,26 @@ std::string GetHostIpByHostName() {
         return "";
     }
 #if defined(__linux__)
-    struct in_addr* addr = (struct in_addr*)entry->h_addr_list[0];
+    int i = 0;
+    std::list<std::string> ipList;
+    ipList = GetNicIpv4IPList();
+    if (!ipList.empty()) {
+        int isExistValidIP = 0;
+        while (entry->h_addr_list[i] != NULL) {
+            struct in_addr addr;
+            memcpy(&addr, entry->h_addr_list[i], sizeof(struct in_addr));
+            auto item = std::find(ipList.begin(), ipList.end(), inet_ntoa(addr));
+            if (item != ipList.end()) {
+                isExistValidIP = 1;
+                break;
+            }
+            i++;
+        }
+        if (0 == isExistValidIP) {
+            i = 0;
+        }
+    }
+    struct in_addr* addr = (struct in_addr*)entry->h_addr_list[i];
     if (addr == NULL) {
         return "";
     }
@@ -264,45 +312,28 @@ std::string GetHostIp(const std::string& intf) {
 
 std::string GetAnyAvailableIP() {
 #if defined(__linux__)
-    struct ifaddrs* ifaddr = NULL;
-    if (getifaddrs(&ifaddr) == -1) {
-        APSARA_LOG_ERROR(sLogger, ("get any available IP error", errno));
-        return "";
-    }
-
     std::string retIP;
     char host[NI_MAXHOST];
-    for (struct ifaddrs* ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == NULL) {
-            continue;
-        }
-
-        const int family = ifa->ifa_addr->sa_family;
-        const char* familyName = (family == AF_PACKET) ? "AF_PACKET"
-            : (family == AF_INET)                      ? "AF_INET"
-            : (family == AF_INET6)                     ? "AF_INET6"
-                                                       : "???";
-        APSARA_LOG_DEBUG(sLogger, ("interface name", ifa->ifa_name)("family", family)("family name", familyName));
-        if (family == AF_INET) {
-            int s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-            if (s != 0) {
-                APSARA_LOG_WARNING(sLogger, ("getnameinfo error", gai_strerror(s))("interface name", ifa->ifa_name));
+    std::list<std::string> ipList;
+    ipList = GetNicIpv4IPList();
+    if (!ipList.empty()) {
+        for (std::string ip : ipList) {
+            struct sockaddr_in sa;
+            sa.sin_family = AF_INET;
+            sa.sin_port = 0;
+            int result = inet_pton(AF_INET, ip.c_str(), &sa.sin_addr);
+            if (result != 1) {
                 continue;
             }
-
-            std::string ip(host);
-            APSARA_LOG_DEBUG(sLogger, ("interface name", ifa->ifa_name)("IP", ip));
-            if (!ip.empty() && !StartWith(ip, "127.")) {
-                retIP = ip;
-                break;
+            int s = getnameinfo(
+                (struct sockaddr*)&sa, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+            if (s != 0) {
+                continue;
             }
-            if (retIP.empty()) {
-                retIP = ip;
-            }
+            retIP = ip;
+            break;
         }
     }
-
-    freeifaddrs(ifaddr);
     return retIP;
 
 #elif defined(_MSC_VER)
@@ -447,12 +478,12 @@ size_t FetchECSMetaCallback(char* buffer, size_t size, size_t nmemb, std::string
     if (NULL == buffer) {
         return 0;
     }
- 
+
     size_t sizes = size * nmemb;
     res->append(buffer, sizes);
     return sizes;
 }
- 
+
 ECSMeta FetchECSMeta() {
     CURL* curl;
     for (size_t retryTimes = 1; retryTimes <= 5; retryTimes++) {
@@ -486,7 +517,7 @@ ECSMeta FetchECSMeta() {
                 if (instanceItr != doc.MemberEnd() && (instanceItr->value.IsString())) {
                     metaObj.instanceID = instanceItr->value.GetString();
                 }
-        
+
                 rapidjson::Value::ConstMemberIterator userItr = doc.FindMember("owner-account-id");
                 if (userItr != doc.MemberEnd() && userItr->value.IsString()) {
                     metaObj.userID = userItr->value.GetString();
