@@ -15,26 +15,31 @@
  */
 
 #pragma once
-#include "models/PipelineEventPtr.h"
 #include <memory>
 #include <string>
+#include "common/Constants.h"
+#include "models/PipelineEventPtr.h"
 #include "reader/SourceBuffer.h"
 
 namespace logtail {
 
-using GroupInfoMetadata = std::map<StringView, StringView>;
-using GroupInfoTags = std::map<StringView, StringView>;
-
-class GroupInfo {
-public:
-    const GroupInfoMetadata& GetAllMetadata() const { return metadata; }
-    const GroupInfoTags& GetAllTags() const { return tags; }
-
-private:
-    std::map<StringView, StringView> metadata; // predefined source/topic etc. should have conventional protocol
-    std::map<StringView, StringView> tags; // custom tags
-    friend class PipelineEventGroup;
+// referrence: https://opentelemetry.io/docs/specs/otel/logs/data-model-appendix/#elastic-common-schema
+// referrence: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/general/logs-general.md
+enum class EventGroupMetaKey {
+    UNKNOWN,
+    AGENT_TAG,
+    HOST_IP,
+    HOST_NAME,
+    LOG_TOPIC,
+    LOG_FILE_PATH,
+    LOG_FILE_PATH_RESOLVED,
+    LOG_FILE_INODE,
+    LOG_READ_OFFSET,
+    LOG_READ_LENGTH
 };
+
+using GroupMetadata = std::map<EventGroupMetaKey, StringView>;
+using GroupTags = std::map<StringView, StringView>;
 
 // DeepCopy is required if we want to support no-linear topology
 // We cannot just use default copy constructor as it won't deep copy PipelineEvent pointed in Events vector.
@@ -44,7 +49,7 @@ public:
     PipelineEventGroup(std::shared_ptr<SourceBuffer> sourceBuffer) : mSourceBuffer(sourceBuffer) {}
     PipelineEventGroup(const PipelineEventGroup&) = delete;
     PipelineEventGroup& operator=(const PipelineEventGroup&) = delete;
-    const GroupInfo& GetGroupInfo() const { return mGroup; }
+
     const EventsContainer& GetEvents() const { return mEvents; }
     EventsContainer& MutableEvents() { return mEvents; }
     void AddEvent(const PipelineEventPtr& event);
@@ -53,31 +58,36 @@ public:
     // void SetSourceBuffer(std::shared_ptr<SourceBuffer> sourceBuffer) { mSourceBuffer = sourceBuffer; }
     std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
 
-    void SetMetadata(const StringView& key, const StringView& val);
-    void SetMetadata(const std::string& key, const std::string& val);
-    void SetMetadataNoCopy(const StringBuffer& key, const StringBuffer& val);
-    const StringView& GetMetadata(const StringView& key) const;
-    bool HasMetadata(const StringView& key) const;
-    void SetMetadataNoCopy(const StringView& key, const StringView& val);
-    void DelMetadata(const StringView& key);
+    void SetMetadata(EventGroupMetaKey key, const StringView& val);
+    void SetMetadata(EventGroupMetaKey key, const std::string& val);
+    void SetMetadataNoCopy(EventGroupMetaKey key, const StringBuffer& val);
+    const StringView& GetMetadata(EventGroupMetaKey key) const;
+    const GroupMetadata& GetMetadatum() const { return mMetadata; };
+    bool HasMetadata(EventGroupMetaKey key) const;
+    void SetMetadataNoCopy(EventGroupMetaKey key, const StringView& val);
+    void DelMetadata(EventGroupMetaKey key);
 
     void SetTag(const StringView& key, const StringView& val);
     void SetTag(const std::string& key, const std::string& val);
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     const StringView& GetTag(const StringView& key) const;
+    const GroupTags& GetTags() const { return mTags; };
     bool HasTag(const StringView& key) const;
     void SetTagNoCopy(const StringView& key, const StringView& val);
     void DelTag(const StringView& key);
 
+    uint64_t EventGroupSizeBytes();
+
+#ifdef APSARA_UNIT_TEST_MAIN
     // for debug and test
     Json::Value ToJson() const;
     bool FromJson(const Json::Value&);
     std::string ToJsonString() const;
     bool FromJsonString(const std::string&);
-    uint64_t EventGroupSizeBytes();
-
+#endif
 private:
-    GroupInfo mGroup;
+    GroupMetadata mMetadata; // Used to generate tag/log. Will not output.
+    GroupTags mTags; // custom tags to output
     EventsContainer mEvents;
     std::shared_ptr<SourceBuffer> mSourceBuffer;
 };

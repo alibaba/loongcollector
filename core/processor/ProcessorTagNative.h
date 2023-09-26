@@ -19,9 +19,9 @@
 
 namespace logtail {
 
-class ProcessorFillGroupInfoNative : public Processor {
+class ProcessorTagNative : public Processor {
 public:
-    static const char* Name() { return "processor_fill_group_info_native"; }
+    static const char* Name() { return "processor_tag_native"; }
     bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
 
@@ -29,13 +29,9 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) override;
 
 private:
-    std::string GetTopicName(const std::string& path, std::vector<sls_logs::LogTag>& extraTags);
-
-    std::string mTopicFormat, mGroupTopic, mStaticTopic;
-    bool mIsStaticTopic = false;
-
+    bool mPluginProcessFlag = false;
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class ProcessorFillGroupInfoNativeUnittest;
+    friend class ProcessorTagNativeUnittest;
 #endif
 };
 } // namespace logtail

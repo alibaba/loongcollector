@@ -93,8 +93,8 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventSingleLine() {
             {
                 "contents" :
                 {
-                    "content" : "line1\nline2",
-                    "log.file.offset": "0"
+                    "__file_offset__": "0",
+                    "content" : "line1\nline2"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -498,8 +498,8 @@ void ProcessorSplitRegexNativeUnittest::TestProcess() {
             {
                 "contents" :
                 {
-                    "content" : "line1\ncontinue\nline2\ncontinue",
-                    "log.file.offset": "0"
+                    "__file_offset__": "0",
+                    "content" : "line1\ncontinue\nline2\ncontinue"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -518,8 +518,8 @@ void ProcessorSplitRegexNativeUnittest::TestProcess() {
             {
                 "contents" :
                 {
-                    "content" : "line1\ncontinue",
-                    "log.file.offset": "0"
+                    "__file_offset__": "0",
+                    "content" : "line1\ncontinue"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -528,9 +528,9 @@ void ProcessorSplitRegexNativeUnittest::TestProcess() {
             {
                 "contents" :
                 {
-                    "content" : "line2\ncontinue",
-                    "log.file.offset": ")"
-               << strlen(R"(line1ncontinuen)") << R"("
+                    "__file_offset__": ")"
+               << strlen(R"(line1ncontinuen)") << R"(",
+                    "content" : "line2\ncontinue"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,

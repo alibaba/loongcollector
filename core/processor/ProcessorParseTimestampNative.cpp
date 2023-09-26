@@ -50,7 +50,7 @@ void ProcessorParseTimestampNative::Process(PipelineEventGroup& logGroup) {
     if (logGroup.GetEvents().empty() || mTimeFormat.empty() || mTimeKey.empty()) {
         return;
     }
-    const StringView& logPath = logGroup.GetMetadata(EVENT_META_LOG_FILE_PATH_RESOLVED);
+    const StringView& logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
     StringView timeStrCache;
     EventsContainer& events = logGroup.MutableEvents();
     // works good normally. poor performance if most data need to be discarded.

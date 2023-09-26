@@ -57,32 +57,29 @@ void PipelineEventGroupUnittest::TestSwapEvents() {
 
 void PipelineEventGroupUnittest::TestSetMetadata() {
     { // string copy, let kv out of scope
-        mEventGroup->SetMetadata(std::string("key1"), std::string("value1"));
+        mEventGroup->SetMetadata(EventGroupMetaKey::AGENT_TAG, std::string("value1"));
     }
     { // stringview copy, let kv out of scope
-        std::string key("key2");
         std::string value("value2");
-        mEventGroup->SetMetadata(StringView(key), StringView(value));
+        mEventGroup->SetMetadata(EventGroupMetaKey::HOST_IP, StringView(value));
     }
     size_t beforeAlloc;
     { // StringBuffer nocopy
-        StringBuffer key = mEventGroup->GetSourceBuffer()->CopyString(std::string("key3"));
         StringBuffer value = mEventGroup->GetSourceBuffer()->CopyString(std::string("value3"));
         beforeAlloc = mSourceBuffer->mAllocator.TotalAllocated();
-        mEventGroup->SetMetadataNoCopy(key, value);
+        mEventGroup->SetMetadataNoCopy(EventGroupMetaKey::HOST_NAME, value);
     }
-    std::string key("key4");
     std::string value("value4");
     { // StringView nocopy
-        mEventGroup->SetMetadataNoCopy(StringView(key), StringView(value));
+        mEventGroup->SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_INODE, StringView(value));
     }
     size_t afterAlloc = mSourceBuffer->mAllocator.TotalAllocated();
     APSARA_TEST_EQUAL_FATAL(beforeAlloc, afterAlloc);
-    std::vector<std::pair<std::string, std::string>> answers = {
-        {"key1", "value1"},
-        {"key2", "value2"},
-        {"key3", "value3"},
-        {"key4", "value4"},
+    std::vector<std::pair<EventGroupMetaKey, std::string>> answers = {
+        {EventGroupMetaKey::AGENT_TAG, "value1"},
+        {EventGroupMetaKey::HOST_IP, "value2"},
+        {EventGroupMetaKey::HOST_NAME, "value3"},
+        {EventGroupMetaKey::LOG_FILE_INODE, "value4"},
     };
     for (const auto kv : answers) {
         APSARA_TEST_TRUE_FATAL(mEventGroup->HasMetadata(kv.first));
@@ -91,10 +88,10 @@ void PipelineEventGroupUnittest::TestSetMetadata() {
 }
 
 void PipelineEventGroupUnittest::TestDelMetadata() {
-    mEventGroup->SetMetadata(std::string("key1"), std::string("value1"));
-    APSARA_TEST_TRUE_FATAL(mEventGroup->HasMetadata("key1"));
-    mEventGroup->DelMetadata(std::string("key1"));
-    APSARA_TEST_FALSE_FATAL(mEventGroup->HasMetadata("key1"));
+    mEventGroup->SetMetadata(EventGroupMetaKey::AGENT_TAG, std::string("value1"));
+    APSARA_TEST_TRUE_FATAL(mEventGroup->HasMetadata(EventGroupMetaKey::AGENT_TAG));
+    mEventGroup->DelMetadata(EventGroupMetaKey::AGENT_TAG);
+    APSARA_TEST_FALSE_FATAL(mEventGroup->HasMetadata(EventGroupMetaKey::AGENT_TAG));
 }
 
 void PipelineEventGroupUnittest::TestFromJsonToJson() {
@@ -127,8 +124,8 @@ void PipelineEventGroupUnittest::TestFromJsonToJson() {
     auto& logEvent = events[0];
     APSARA_TEST_TRUE_FATAL(logEvent.Is<LogEvent>());
 
-    APSARA_TEST_TRUE_FATAL(mEventGroup->HasMetadata("log.file.path"));
-    APSARA_TEST_STREQ_FATAL("/var/log/message", mEventGroup->GetMetadata("log.file.path").data());
+    APSARA_TEST_TRUE_FATAL(mEventGroup->HasMetadata(EventGroupMetaKey::LOG_FILE_PATH));
+    APSARA_TEST_STREQ_FATAL("/var/log/message", mEventGroup->GetMetadata(EventGroupMetaKey::LOG_FILE_PATH).data());
 
     APSARA_TEST_TRUE_FATAL(mEventGroup->HasTag("app_name"));
     APSARA_TEST_STREQ_FATAL("xxx", mEventGroup->GetTag("app_name").data());

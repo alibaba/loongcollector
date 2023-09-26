@@ -65,12 +65,4 @@ const std::string EXPIRE_DAY = "expire_day";
 const std::string DEFAULT_CONTENT_KEY = "content";
 const std::string DEFAULT_REG = "(.*)";
 
-const std::string EVENT_META_AGENT_TAG = "agent.tag";
-const std::string EVENT_META_HOST_IP = "host.ip";
-const std::string EVENT_META_HOST_NAME = "host.name";
-const std::string EVENT_META_LOG_TOPIC = "log.topic";
-const std::string EVENT_META_LOG_FILE_PATH = "log.file.path";
-const std::string EVENT_META_LOG_FILE_PATH_RESOLVED = "log.file.path_resolved";
-const std::string EVENT_META_LOG_FILE_INODE = "log.file.inode";
-const std::string EVENT_META_LOG_FILE_OFFSET = "log.file.offset";
 } // namespace logtail

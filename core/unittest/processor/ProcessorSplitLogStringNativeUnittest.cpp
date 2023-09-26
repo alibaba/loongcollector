@@ -73,7 +73,7 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
                 "contents" :
                 {
                     "content" : "{\n\"k1\":\"v1\"\n}\u0000{\n\"k2\":\"v2\"\n}",
-                    "log.file.offset": "0"
+                    "__file_offset__": "0"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -98,8 +98,8 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
             {
                 "contents" :
                 {
-                    "content" : "{\n\"k1\":\"v1\"\n}",
-                    "log.file.offset": "0"
+                    "__file_offset__": "0",
+                    "content" : "{\n\"k1\":\"v1\"\n}"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -108,9 +108,9 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
             {
                 "contents" :
                 {
-                    "content" : "{\n\"k2\":\"v2\"\n}",
-                    "log.file.offset": ")"
-               << strlen(R"({n"k1":"v1"n}0)") << R"("
+                    "__file_offset__": ")"
+               << strlen(R"({n"k1":"v1"n}0)") << R"(",
+                    "content" : "{\n\"k2\":\"v2\"\n}"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -141,8 +141,8 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
             {
                 "contents" :
                 {
-                    "content" : "line1\nline2",
-                    "log.file.offset": "0"
+                    "__file_offset__": "0",
+                    "content" : "line1\nline2"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -151,8 +151,8 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
             {
                 "contents" :
                 {
-                    "content" : "line3\nline4",
-                    "log.file.offset": "0"
+                    "__file_offset__": "0",
+                    "content" : "line3\nline4"
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,

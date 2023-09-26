@@ -30,35 +30,35 @@ void PipelineEventGroup::AddEvent(std::unique_ptr<PipelineEvent>&& event) {
     mEvents.emplace_back(std::move(event));
 }
 
-void PipelineEventGroup::SetMetadata(const StringView& key, const StringView& val) {
-    SetMetadataNoCopy(mSourceBuffer->CopyString(key), mSourceBuffer->CopyString(val));
+void PipelineEventGroup::SetMetadata(EventGroupMetaKey key, const StringView& val) {
+    SetMetadataNoCopy(key, mSourceBuffer->CopyString(val));
 }
 
-void PipelineEventGroup::SetMetadata(const std::string& key, const std::string& val) {
-    SetMetadataNoCopy(mSourceBuffer->CopyString(key), mSourceBuffer->CopyString(val));
+void PipelineEventGroup::SetMetadata(EventGroupMetaKey key, const std::string& val) {
+    SetMetadataNoCopy(key, mSourceBuffer->CopyString(val));
 }
 
-void PipelineEventGroup::SetMetadataNoCopy(const StringBuffer& key, const StringBuffer& val) {
-    SetMetadataNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
+void PipelineEventGroup::SetMetadataNoCopy(EventGroupMetaKey key, const StringBuffer& val) {
+    SetMetadataNoCopy(key, StringView(val.data, val.size));
 }
 
-bool PipelineEventGroup::HasMetadata(const StringView& key) const {
-    return mGroup.metadata.find(key) != mGroup.metadata.end();
+bool PipelineEventGroup::HasMetadata(EventGroupMetaKey key) const {
+    return mMetadata.find(key) != mMetadata.end();
 }
-void PipelineEventGroup::SetMetadataNoCopy(const StringView& key, const StringView& val) {
-    mGroup.metadata[key] = val;
+void PipelineEventGroup::SetMetadataNoCopy(EventGroupMetaKey key, const StringView& val) {
+    mMetadata[key] = val;
 }
 
-const StringView& PipelineEventGroup::GetMetadata(const StringView& key) const {
-    auto it = mGroup.metadata.find(key);
-    if (it != mGroup.metadata.end()) {
+const StringView& PipelineEventGroup::GetMetadata(EventGroupMetaKey key) const {
+    auto it = mMetadata.find(key);
+    if (it != mMetadata.end()) {
         return it->second;
     }
     return gEmptyStringView;
 }
 
-void PipelineEventGroup::DelMetadata(const StringView& key) {
-    mGroup.metadata.erase(key);
+void PipelineEventGroup::DelMetadata(EventGroupMetaKey key) {
+    mMetadata.erase(key);
 }
 
 void PipelineEventGroup::SetTag(const StringView& key, const StringView& val) {
@@ -74,38 +74,97 @@ void PipelineEventGroup::SetTagNoCopy(const StringBuffer& key, const StringBuffe
 }
 
 bool PipelineEventGroup::HasTag(const StringView& key) const {
-    return mGroup.tags.find(key) != mGroup.tags.end();
+    return mTags.find(key) != mTags.end();
 }
 
 void PipelineEventGroup::SetTagNoCopy(const StringView& key, const StringView& val) {
-    mGroup.tags[key] = val;
+    mTags[key] = val;
 }
 
 const StringView& PipelineEventGroup::GetTag(const StringView& key) const {
-    auto it = mGroup.tags.find(key);
-    if (it != mGroup.tags.end()) {
+    auto it = mTags.find(key);
+    if (it != mTags.end()) {
         return it->second;
     }
     return gEmptyStringView;
 }
 
 void PipelineEventGroup::DelTag(const StringView& key) {
-    mGroup.tags.erase(key);
+    mTags.erase(key);
+}
+
+uint64_t PipelineEventGroup::EventGroupSizeBytes() {
+    // TODO
+    return 0;
+}
+
+#ifdef APSARA_UNIT_TEST_MAIN
+const std::string EVENT_GROUP_META_AGENT_TAG = "agent.tag";
+const std::string EVENT_GROUP_META_HOST_IP = "host.ip";
+const std::string EVENT_GROUP_META_HOST_NAME = "host.name";
+const std::string EVENT_GROUP_META_LOG_TOPIC = "log.topic";
+const std::string EVENT_GROUP_META_LOG_FILE_PATH = "log.file.path";
+const std::string EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED = "log.file.path_resolved";
+const std::string EVENT_GROUP_META_LOG_FILE_INODE = "log.file.inode";
+const std::string EVENT_GROUP_META_LOG_FILE_OFFSET = "log.file.offset";
+const std::string EVENT_GROUP_META_LOG_FILE_LENGTH = "log.file.length";
+
+const std::string& EventGroupMetaKeyToString(EventGroupMetaKey key) {
+    switch (key) {
+        case EventGroupMetaKey::AGENT_TAG:
+            return EVENT_GROUP_META_AGENT_TAG;
+        case EventGroupMetaKey::HOST_IP:
+            return EVENT_GROUP_META_HOST_IP;
+        case EventGroupMetaKey::HOST_NAME:
+            return EVENT_GROUP_META_HOST_NAME;
+        case EventGroupMetaKey::LOG_TOPIC:
+            return EVENT_GROUP_META_LOG_TOPIC;
+        case EventGroupMetaKey::LOG_FILE_PATH:
+            return EVENT_GROUP_META_LOG_FILE_PATH;
+        case EventGroupMetaKey::LOG_FILE_PATH_RESOLVED:
+            return EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED;
+        case EventGroupMetaKey::LOG_FILE_INODE:
+            return EVENT_GROUP_META_LOG_FILE_INODE;
+        case EventGroupMetaKey::LOG_READ_OFFSET:
+            return EVENT_GROUP_META_LOG_FILE_OFFSET;
+        case EventGroupMetaKey::LOG_READ_LENGTH:
+            return EVENT_GROUP_META_LOG_FILE_LENGTH;
+        default:
+            static std::string sEmpty = "unknown";
+            return sEmpty;
+    }
+}
+
+EventGroupMetaKey StringToEventGroupMetaKey(const std::string& key) {
+    static std::unordered_map<std::string, EventGroupMetaKey> sStringToEnum
+        = {{EVENT_GROUP_META_AGENT_TAG, EventGroupMetaKey::AGENT_TAG},
+           {EVENT_GROUP_META_HOST_IP, EventGroupMetaKey::HOST_IP},
+           {EVENT_GROUP_META_HOST_NAME, EventGroupMetaKey::HOST_NAME},
+           {EVENT_GROUP_META_LOG_TOPIC, EventGroupMetaKey::LOG_TOPIC},
+           {EVENT_GROUP_META_LOG_FILE_PATH, EventGroupMetaKey::LOG_FILE_PATH},
+           {EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED, EventGroupMetaKey::LOG_FILE_PATH_RESOLVED},
+           {EVENT_GROUP_META_LOG_FILE_INODE, EventGroupMetaKey::LOG_FILE_INODE},
+           {EVENT_GROUP_META_LOG_FILE_OFFSET, EventGroupMetaKey::LOG_READ_OFFSET},
+           {EVENT_GROUP_META_LOG_FILE_LENGTH, EventGroupMetaKey::LOG_READ_LENGTH}};
+    auto it = sStringToEnum.find(key);
+    if (it != sStringToEnum.end()) {
+        return it->second;
+    }
+    return EventGroupMetaKey::UNKNOWN;
 }
 
 Json::Value PipelineEventGroup::ToJson() const {
     Json::Value root;
-    const auto& groupInfo = this->GetGroupInfo();
-    if (!groupInfo.metadata.empty()) {
+    if (!mMetadata.empty()) {
         Json::Value metadata;
-        for (const auto& meta : groupInfo.metadata) {
-            metadata[meta.first.to_string()] = meta.second.to_string();
+        for (const auto& meta : mMetadata) {
+            metadata[EventGroupMetaKeyToString(meta.first)] = meta.second.to_string();
         }
         root["metadata"] = metadata;
     }
-    if (!groupInfo.tags.empty()) {
+    if (!mTags.empty()) {
         Json::Value tags;
-        for (const auto& tag : groupInfo.tags) {
+        for (const auto& tag : mTags) {
             tags[tag.first.to_string()] = tag.second.to_string();
         }
         root["tags"] = tags;
@@ -124,7 +183,7 @@ bool PipelineEventGroup::FromJson(const Json::Value& root) {
     if (root.isMember("metadata")) {
         Json::Value metadata = root["metadata"];
         for (const auto& key : metadata.getMemberNames()) {
-            SetMetadata(key, metadata[key].asString());
+            SetMetadata(StringToEventGroupMetaKey(key), metadata[key].asString());
         }
     }
     if (root.isMember("tags")) {
@@ -173,10 +232,6 @@ bool PipelineEventGroup::FromJsonString(const std::string& inJson) {
     }
     return FromJson(root);
 }
-
-uint64_t PipelineEventGroup::EventGroupSizeBytes() {
-    // TODO
-    return 0;
-}
+#endif
 
 } // namespace logtail

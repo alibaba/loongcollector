@@ -105,13 +105,13 @@ private:
                             ProcessProfile& profile,
                             Config& config);
     void DoFuseHandling();
-    void FillLogGroupLogs(const PipelineEventGroup& eventGroup, sls_logs::LogGroup& resultGroup, bool enableTimestampNanosecond);
-    void FillLogGroupForPlugin(const PipelineEventGroup& eventGroup,
-                               LogFileReaderPtr& logFileReader,
-                               sls_logs::LogGroup& resultGroup);
-    void FillLogGroupAllNative(const PipelineEventGroup& eventGroup,
-                               LogFileReaderPtr& logFileReader,
-                               sls_logs::LogGroup& resultGroup);
+    void FillEventGroupMetadata(LogBuffer& logBuffer, PipelineEventGroup& eventGroup) const;
+    void FillLogGroupLogs(const PipelineEventGroup& eventGroup,
+                          sls_logs::LogGroup& resultGroup,
+                          bool enableTimestampNanosecond) const;
+    void FillLogGroupTags(const PipelineEventGroup& eventGroup,
+                          LogFileReaderPtr& logFileReader,
+                          sls_logs::LogGroup& resultGroup) const;
 
     bool mInitialized;
     int mLocalTimeZoneOffsetSecond;

@@ -587,7 +587,8 @@ struct LogBuffer : public SourceBuffer {
     // Current buffer's checkpoint, for exactly once feature.
     RangeCheckpointPtr exactlyOnceCheckpoint;
     // Current buffer's offset in file, for log position meta feature.
-    uint64_t beginOffset;
+    uint64_t readOffset = 0;
+    uint64_t readLength = 0;
 
     LogBuffer() {}
     void SetDependecy(const LogFileReaderPtr& reader) { logFileReader = reader; }

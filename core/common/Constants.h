@@ -66,14 +66,4 @@ extern const std::string EXPIRE_DAY;
 extern const std::string DEFAULT_CONTENT_KEY; //"content"
 extern const std::string DEFAULT_REG; //"(.*)"
 
-// referrence: https://opentelemetry.io/docs/specs/otel/logs/data-model-appendix/#elastic-common-schema
-// referrence: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/general/logs-general.md
-extern const std::string EVENT_META_AGENT_TAG;
-extern const std::string EVENT_META_HOST_IP;
-extern const std::string EVENT_META_HOST_NAME;
-extern const std::string EVENT_META_LOG_TOPIC;
-extern const std::string EVENT_META_LOG_FILE_PATH;
-extern const std::string EVENT_META_LOG_FILE_PATH_RESOLVED;
-extern const std::string EVENT_META_LOG_FILE_INODE;
-extern const std::string EVENT_META_LOG_FILE_OFFSET;
 } // namespace logtail
