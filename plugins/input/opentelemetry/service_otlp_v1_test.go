@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/plugins/test"
 )
@@ -74,6 +75,7 @@ func TestOtlpGRPC_Logs_V1(t *testing.T) {
 }
 
 func TestOtlpGRPC_Metrics_V1(t *testing.T) {
+	config.LogtailGlobalConfig.EnableSlsMetricsFormat = true
 	endpointGrpc := test.GetAvailableLocalAddress(t)
 	input, err := newInput(true, false, endpointGrpc, "")
 	assert.NoError(t, err)
@@ -97,12 +99,14 @@ func TestOtlpGRPC_Metrics_V1(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	types := make(map[string]int, 0)
+	types := make(map[string]int, 16)
 	for _, log := range collector.Logs {
 		assert.Equal(t, "__name__", log.Contents[0].Key)
-		assert.Equal(t, "__labels__", log.Contents[1].Key)
+		assert.Equal(t, "__labels__", log.Contents[2].Key)
 		types[log.Contents[0].Value]++
 	}
+	fmt.Printf("%v\n", types)
+	println(types["gauge_int"])
 	assert.Equal(t, 26, types["gauge_int"])
 	assert.Equal(t, 22, types["gauge_double"])
 	assert.Equal(t, 18, types["sum_int"])
@@ -154,7 +158,7 @@ func TestOtlpGRPC_Metrics_V1_Compress(t *testing.T) {
 	types := make(map[string]int, 0)
 	for _, log := range collector.Logs {
 		assert.Equal(t, "__name__", log.Contents[0].Key)
-		assert.Equal(t, "__labels__", log.Contents[1].Key)
+		assert.Equal(t, "__labels__", log.Contents[2].Key)
 		types[log.Contents[0].Value]++
 	}
 	assert.Equal(t, 26, types["gauge_int"])
@@ -266,7 +270,7 @@ func TestOtlpHTTP_Metrics_V1(t *testing.T) {
 	types := make(map[string]int, 0)
 	for _, log := range collector.Logs {
 		assert.Equal(t, "__name__", log.Contents[0].Key)
-		assert.Equal(t, "__labels__", log.Contents[1].Key)
+		assert.Equal(t, "__labels__", log.Contents[2].Key)
 		types[log.Contents[0].Value]++
 	}
 	assert.Equal(t, 26, types["gauge_int"])

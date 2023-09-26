@@ -133,6 +133,7 @@ func (kv *MetricLabels) Less(i int, j int) bool {
 }
 
 func (kv *MetricLabels) Replace(key, value string) {
+	sort.Sort(kv)
 	findIndex := sort.Search(len(kv.keyValues), func(index int) bool {
 		return kv.keyValues[index].Name >= key
 	})

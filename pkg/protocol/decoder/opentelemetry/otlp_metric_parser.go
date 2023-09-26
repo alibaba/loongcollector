@@ -13,11 +13,12 @@ import (
 	v1Common "go.opentelemetry.io/proto/otlp/common/v1"
 	v1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
 )
 
-func attrsToLabels(labels *KeyValues, attrs []*v1Common.KeyValue) {
+func attrsToLabels(labels *helper.MetricLabels, attrs []*v1Common.KeyValue) {
 	for _, attribute := range attrs {
 		labels.Append(attribute.GetKey(), anyValueToString(attribute.GetValue()))
 	}
@@ -50,7 +51,7 @@ func ConvertOtlpMetrics(metrics *v1.ResourceMetrics) (logs []*protocol.Log, err 
 		return nil, nil
 	}
 
-	var labels KeyValues
+	var labels helper.MetricLabels
 	attrsToLabels(&labels, metrics.GetResource().GetAttributes())
 
 	for _, scopeMetrics := range metrics.GetScopeMetrics() {
@@ -58,15 +59,15 @@ func ConvertOtlpMetrics(metrics *v1.ResourceMetrics) (logs []*protocol.Log, err 
 		for _, metric := range scopeMetrics.GetMetrics() {
 			switch metric.GetData().(type) {
 			case *v1.Metric_Gauge:
-				logs = append(logs, gauge2Logs(metric.GetName(), metric.GetGauge(), labels)...)
+				logs = append(logs, gauge2Logs(metric.GetName(), metric.GetGauge(), &labels)...)
 			case *v1.Metric_Histogram:
-				logs = append(logs, histogram2Logs(metric.GetName(), metric.GetHistogram(), labels)...)
+				logs = append(logs, histogram2Logs(metric.GetName(), metric.GetHistogram(), &labels)...)
 			case *v1.Metric_Sum:
-				logs = append(logs, sum2Logs(metric.GetName(), metric.GetSum(), labels)...)
+				logs = append(logs, sum2Logs(metric.GetName(), metric.GetSum(), &labels)...)
 			case *v1.Metric_Summary:
-				logs = append(logs, summary2Logs(metric.GetName(), metric.GetSummary(), labels)...)
+				logs = append(logs, summary2Logs(metric.GetName(), metric.GetSummary(), &labels)...)
 			case *v1.Metric_ExponentialHistogram:
-				logs = append(logs, exponentialHistogram2Logs(metric.GetName(), metric.GetExponentialHistogram(), labels)...)
+				logs = append(logs, exponentialHistogram2Logs(metric.GetName(), metric.GetExponentialHistogram(), &labels)...)
 			}
 		}
 	}
@@ -74,11 +75,11 @@ func ConvertOtlpMetrics(metrics *v1.ResourceMetrics) (logs []*protocol.Log, err 
 	return logs, err
 }
 
-func exponentialHistogram2Logs(name string, histogram *v1.ExponentialHistogram, defaultLabels KeyValues) (logs []*protocol.Log) {
+func exponentialHistogram2Logs(name string, histogram *v1.ExponentialHistogram, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 
 	for _, dataPoint := range histogram.GetDataPoints() {
 		labels := defaultLabels.Clone()
-		attrsToLabels(&labels, dataPoint.GetAttributes())
+		attrsToLabels(labels, dataPoint.GetAttributes())
 		labels.Append(otlp.TagKeyMetricAggregationTemporality, histogram.GetAggregationTemporality().String())
 		labels.Append(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeExponentialHistogram.String())
 
@@ -104,7 +105,6 @@ func exponentialHistogram2Logs(name string, histogram *v1.ExponentialHistogram, 
 
 		bucketLabels := labels.Clone()
 		bucketLabels.Append(bucketLabelKey, "")
-		bucketLabels.Sort()
 		for k, v := range postiveFields {
 			bucketLabels.Replace(bucketLabelKey, k)
 			logs = append(logs, newMetricLogFromRaw(name+metricNameSuffixBucket, bucketLabels, int64(dataPoint.GetTimeUnixNano()), v))
@@ -138,19 +138,18 @@ func genExponentialHistogramValuesToValues(isPositive bool, base float64, bucket
 	return res
 }
 
-func summary2Logs(name string, summary *v1.Summary, defaultLabels KeyValues) (logs []*protocol.Log) {
+func summary2Logs(name string, summary *v1.Summary, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 
 	for _, dataPoint := range summary.GetDataPoints() {
 		labels := defaultLabels.Clone()
 
-		attrsToLabels(&labels, dataPoint.GetAttributes())
+		attrsToLabels(labels, dataPoint.GetAttributes())
 
 		logs = append(logs, newMetricLogFromRaw(name+metricNameSuffixSum, labels, int64(toTimestamp(dataPoint.GetTimeUnixNano())), dataPoint.GetSum()))
 		logs = append(logs, newMetricLogFromRaw(name+metricNameSuffixCount, labels, int64(toTimestamp(dataPoint.GetTimeUnixNano())), float64(dataPoint.GetCount())))
 
 		summaryLabels := labels.Clone()
 		summaryLabels.Append(summaryLabelKey, "")
-		summaryLabels.Sort()
 
 		for _, quantileValue := range dataPoint.GetQuantileValues() {
 			summaryLabels.Replace(summaryLabelKey, strconv.FormatFloat(quantileValue.GetQuantile(), 'g', -1, 64))
@@ -161,10 +160,10 @@ func summary2Logs(name string, summary *v1.Summary, defaultLabels KeyValues) (lo
 	return logs
 }
 
-func sum2Logs(name string, sum *v1.Sum, defaultLabels KeyValues) (logs []*protocol.Log) {
+func sum2Logs(name string, sum *v1.Sum, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 	for _, dataPoint := range sum.GetDataPoints() {
 		labels := defaultLabels.Clone()
-		attrsToLabels(&labels, dataPoint.GetAttributes())
+		attrsToLabels(labels, dataPoint.GetAttributes())
 
 		labels.Append(otlp.TagKeyMetricIsMonotonic, strconv.FormatBool(sum.GetIsMonotonic()))
 		labels.Append(otlp.TagKeyMetricAggregationTemporality, sum.GetAggregationTemporality().String())
@@ -179,12 +178,12 @@ func sum2Logs(name string, sum *v1.Sum, defaultLabels KeyValues) (logs []*protoc
 	return logs
 }
 
-func histogram2Logs(name string, histogram *v1.Histogram, defaultLabels KeyValues) (logs []*protocol.Log) {
+func histogram2Logs(name string, histogram *v1.Histogram, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 
 	for _, dataPoint := range histogram.GetDataPoints() {
 		labels := defaultLabels.Clone()
 
-		attrsToLabels(&labels, dataPoint.GetAttributes())
+		attrsToLabels(labels, dataPoint.GetAttributes())
 		labels.Append(otlp.TagKeyMetricAggregationTemporality, histogram.GetAggregationTemporality().String())
 		labels.Append(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeHistogram.String())
 
@@ -216,7 +215,6 @@ func histogram2Logs(name string, histogram *v1.Histogram, defaultLabels KeyValue
 
 		bucketLabels := labels.Clone()
 		bucketLabels.Append(bucketLabelKey, "")
-		bucketLabels.Sort()
 
 		sumCount := uint64(0)
 
@@ -232,11 +230,11 @@ func histogram2Logs(name string, histogram *v1.Histogram, defaultLabels KeyValue
 	return logs
 }
 
-func gauge2Logs(name string, gauga *v1.Gauge, labels KeyValues) (logs []*protocol.Log) {
+func gauge2Logs(name string, gauga *v1.Gauge, labels *helper.MetricLabels) (logs []*protocol.Log) {
 	for _, dataPoint := range gauga.GetDataPoints() {
 
 		newLabels := labels.Clone()
-		attrsToLabels(&newLabels, dataPoint.GetAttributes())
+		attrsToLabels(newLabels, dataPoint.GetAttributes())
 
 		for _, exemplar := range dataPoint.GetExemplars() {
 			logs = append(logs, exemplarMetricToLogs(name, exemplar, newLabels.Clone()))
@@ -247,7 +245,7 @@ func gauge2Logs(name string, gauga *v1.Gauge, labels KeyValues) (logs []*protoco
 	return logs
 }
 
-func exemplarMetricToLogs(name string, exemplar *v1.Exemplar, labels KeyValues) *protocol.Log {
+func exemplarMetricToLogs(name string, exemplar *v1.Exemplar, labels *helper.MetricLabels) *protocol.Log {
 	metricName := name + metricNameSuffixExemplars
 
 	if hex.EncodeToString(exemplar.GetTraceId()) != "" {
@@ -265,28 +263,7 @@ func exemplarMetricToLogs(name string, exemplar *v1.Exemplar, labels KeyValues) 
 		labels.Append(key, fmt.Sprintf("%v", value))
 	}
 
-	labels.Sort()
-	log := &protocol.Log{
-		Contents: []*protocol.Log_Content{
-			{
-				Key:   metricNameKey,
-				Value: formatMetricName(metricName),
-			},
-			{
-				Key:   labelsKey,
-				Value: labels.String(),
-			},
-			{
-				Key:   timeNanoKey,
-				Value: strconv.FormatInt(int64(exemplar.TimeUnixNano), 10),
-			}, {
-				Key:   valueKey,
-				Value: strconv.FormatFloat(exemplarValue2Float(exemplar), 'g', -1, 64),
-			},
-		},
-	}
-	protocol.SetLogTimeWithNano(log, uint32(exemplar.GetTimeUnixNano()/1e9), uint32(exemplar.GetTimeUnixNano()%1e9))
-	return log
+	return helper.NewMetricLog(metricName, int64(exemplar.TimeUnixNano), exemplarValue2Float(exemplar), labels)
 }
 
 func copyAttributeToMap(attributes []*v1Common.KeyValue, attributeMap *pcommon.Map) {

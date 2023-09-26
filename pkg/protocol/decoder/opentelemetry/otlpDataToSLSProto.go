@@ -4,11 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
-	"unicode"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -18,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
 )
@@ -40,73 +38,6 @@ const (
 	metricNameSuffixBucket    = "_bucket"
 	metricNameSuffixExemplars = "_exemplars"
 )
-
-type KeyValue struct {
-	Key   string
-	Value string
-}
-
-type KeyValues struct {
-	keyValues []KeyValue
-}
-
-func (kv *KeyValues) Len() int {
-	return len(kv.keyValues)
-}
-
-func (kv *KeyValues) Swap(i, j int) {
-	kv.keyValues[i], kv.keyValues[j] = kv.keyValues[j], kv.keyValues[i]
-}
-
-func (kv *KeyValues) Less(i, j int) bool {
-	return kv.keyValues[i].Key < kv.keyValues[j].Key
-}
-
-func (kv *KeyValues) Sort() {
-	sort.Sort(kv)
-}
-
-func (kv *KeyValues) Replace(key, value string) {
-	key = sanitize(key)
-	findIndex := sort.Search(len(kv.keyValues), func(index int) bool {
-		return kv.keyValues[index].Key >= key
-	})
-	if findIndex < len(kv.keyValues) && kv.keyValues[findIndex].Key == key {
-		kv.keyValues[findIndex].Value = value
-	}
-}
-
-func (kv *KeyValues) Append(key, value string) {
-	key = sanitize(key)
-	kv.keyValues = append(kv.keyValues, KeyValue{
-		key,
-		value,
-	})
-}
-
-func (kv *KeyValues) Clone() KeyValues {
-	var newKeyValues KeyValues
-	newKeyValues.keyValues = make([]KeyValue, len(kv.keyValues))
-	copy(newKeyValues.keyValues, kv.keyValues)
-	return newKeyValues
-}
-
-func (kv *KeyValues) String() string {
-	var builder strings.Builder
-	kv.labelToStringBuilder(&builder)
-	return builder.String()
-}
-
-func (kv *KeyValues) labelToStringBuilder(sb *strings.Builder) {
-	for index, label := range kv.keyValues {
-		sb.WriteString(label.Key)
-		sb.WriteString("#$#")
-		sb.WriteString(label.Value)
-		if index != len(kv.keyValues)-1 {
-			sb.WriteByte('|')
-		}
-	}
-}
 
 func min(l, r int) int {
 	if l < r {
@@ -134,65 +65,18 @@ func formatMetricName(name string) string {
 	return string(newName)
 }
 
-func newMetricLogFromRaw(name string, labels KeyValues, nsec int64, value float64) *protocol.Log {
-	labels.Sort()
-	log := &protocol.Log{
-		Contents: []*protocol.Log_Content{
-			{
-				Key:   metricNameKey,
-				Value: formatMetricName(name),
-			},
-			{
-				Key:   labelsKey,
-				Value: labels.String(),
-			},
-			{
-				Key:   timeNanoKey,
-				Value: strconv.FormatInt(nsec, 10),
-			},
-			{
-				Key:   valueKey,
-				Value: strconv.FormatFloat(value, 'g', -1, 64),
-			},
-		},
-	}
-	protocol.SetLogTimeWithNano(log, uint32(nsec/1e9), uint32(nsec%1e9))
-	return log
+func newMetricLogFromRaw(name string, labels *helper.MetricLabels, nsec int64, value float64) *protocol.Log {
+	return helper.NewMetricLog(name, nsec, value, labels)
 }
 
-func sanitize(s string) string {
-	if len(s) == 0 {
-		return s
-	}
-
-	s = strings.Map(sanitizeRune, s)
-	if unicode.IsDigit(rune(s[0])) {
-		s = "key_" + s
-	}
-
-	if s[0] == '_' {
-		s = "key" + s
-	}
-
-	return s
-}
-
-func sanitizeRune(r rune) rune {
-	if unicode.IsLetter(r) || unicode.IsDigit(r) {
-		return r
-	}
-
-	return '_'
-}
-
-func attrs2Labels(labels *KeyValues, attrs pcommon.Map) {
+func attrs2Labels(labels *helper.MetricLabels, attrs pcommon.Map) {
 	attrs.Range(func(k string, v pcommon.Value) bool {
 		labels.Append(k, v.AsString())
 		return true
 	})
 }
 
-func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels KeyValues) *protocol.Log {
+func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels *helper.MetricLabels) *protocol.Log {
 	metricName := name + metricNameSuffixExemplars
 	if !exemplar.TraceID().IsEmpty() {
 		labels.Append("traceId", exemplar.TraceID().String())
@@ -209,7 +93,6 @@ func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels 
 		labels.Append(key, fmt.Sprintf("%v", value))
 	}
 
-	labels.Sort()
 	log := &protocol.Log{
 		Contents: []*protocol.Log_Content{
 			{
@@ -217,13 +100,14 @@ func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels 
 				Value: formatMetricName(metricName),
 			},
 			{
+				Key:   timeNanoKey,
+				Value: strconv.FormatInt(exemplar.Timestamp().AsTime().Unix(), 10),
+			},
+			{
 				Key:   labelsKey,
 				Value: labels.String(),
 			},
 			{
-				Key:   timeNanoKey,
-				Value: strconv.FormatInt(exemplar.Timestamp().AsTime().Unix(), 10),
-			}, {
 				Key:   valueKey,
 				Value: strconv.FormatFloat(exemplar.DoubleValue(), 'g', -1, 64),
 			},
@@ -233,12 +117,12 @@ func newExemplarMetricLogFromRaw(name string, exemplar pmetric.Exemplar, labels 
 	return log
 }
 
-func GaugeToLogs(name string, data pmetric.NumberDataPointSlice, defaultLabels KeyValues) (logs []*protocol.Log) {
+func GaugeToLogs(name string, data pmetric.NumberDataPointSlice, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 	for i := 0; i < data.Len(); i++ {
 		dataPoint := data.At(i)
 
 		labels := defaultLabels.Clone()
-		attrs2Labels(&labels, dataPoint.Attributes())
+		attrs2Labels(labels, dataPoint.Attributes())
 
 		for j := 0; j < dataPoint.Exemplars().Len(); j++ {
 			logs = append(logs, newExemplarMetricLogFromRaw(name, dataPoint.Exemplars().At(j), labels.Clone()))
@@ -253,12 +137,12 @@ func GaugeToLogs(name string, data pmetric.NumberDataPointSlice, defaultLabels K
 	return logs
 }
 
-func SumToLogs(name string, aggregationTemporality pmetric.AggregationTemporality, isMonotonic string, data pmetric.NumberDataPointSlice, defaultLabels KeyValues) (logs []*protocol.Log) {
+func SumToLogs(name string, aggregationTemporality pmetric.AggregationTemporality, isMonotonic string, data pmetric.NumberDataPointSlice, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 	for i := 0; i < data.Len(); i++ {
 		dataPoint := data.At(i)
 
 		labels := defaultLabels.Clone()
-		attrs2Labels(&labels, dataPoint.Attributes())
+		attrs2Labels(labels, dataPoint.Attributes())
 		labels.Append(otlp.TagKeyMetricIsMonotonic, isMonotonic)
 		labels.Append(otlp.TagKeyMetricAggregationTemporality, aggregationTemporality.String())
 
@@ -275,19 +159,18 @@ func SumToLogs(name string, aggregationTemporality pmetric.AggregationTemporalit
 	return logs
 }
 
-func SummaryToLogs(name string, data pmetric.SummaryDataPointSlice, defaultLabels KeyValues) (logs []*protocol.Log) {
+func SummaryToLogs(name string, data pmetric.SummaryDataPointSlice, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 	for i := 0; i < data.Len(); i++ {
 		dataPoint := data.At(i)
 
 		labels := defaultLabels.Clone()
-		attrs2Labels(&labels, dataPoint.Attributes())
+		attrs2Labels(labels, dataPoint.Attributes())
 
 		logs = append(logs, newMetricLogFromRaw(name+metricNameSuffixSum, labels, int64(dataPoint.Timestamp()), dataPoint.Sum()))
 		logs = append(logs, newMetricLogFromRaw(name+metricNameSuffixCount, labels, int64(dataPoint.Timestamp()), float64(dataPoint.Count())))
 
 		summaryLabels := labels.Clone()
 		summaryLabels.Append(summaryLabelKey, "")
-		summaryLabels.Sort()
 
 		values := dataPoint.QuantileValues()
 		for j := 0; j < values.Len(); j++ {
@@ -299,12 +182,12 @@ func SummaryToLogs(name string, data pmetric.SummaryDataPointSlice, defaultLabel
 	return logs
 }
 
-func HistogramToLogs(name string, data pmetric.HistogramDataPointSlice, aggregationTemporality pmetric.AggregationTemporality, defaultLabels KeyValues) (logs []*protocol.Log) {
+func HistogramToLogs(name string, data pmetric.HistogramDataPointSlice, aggregationTemporality pmetric.AggregationTemporality, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 	for i := 0; i < data.Len(); i++ {
 		dataPoint := data.At(i)
 
 		labels := defaultLabels.Clone()
-		attrs2Labels(&labels, dataPoint.Attributes())
+		attrs2Labels(labels, dataPoint.Attributes())
 		labels.Append(otlp.TagKeyMetricAggregationTemporality, aggregationTemporality.String())
 		labels.Append(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeHistogram.String())
 
@@ -334,8 +217,6 @@ func HistogramToLogs(name string, data pmetric.HistogramDataPointSlice, aggregat
 
 		bucketLabels := labels.Clone()
 		bucketLabels.Append(bucketLabelKey, "")
-		bucketLabels.Sort()
-
 		sumCount := uint64(0)
 		for j := 0; j < bucketCount; j++ {
 			bucket := dataPoint.BucketCounts().At(j)
@@ -347,12 +228,12 @@ func HistogramToLogs(name string, data pmetric.HistogramDataPointSlice, aggregat
 	return logs
 }
 
-func ExponentialHistogramToLogs(name string, data pmetric.ExponentialHistogramDataPointSlice, aggregationTemporality pmetric.AggregationTemporality, defaultLabels KeyValues) (logs []*protocol.Log) {
+func ExponentialHistogramToLogs(name string, data pmetric.ExponentialHistogramDataPointSlice, aggregationTemporality pmetric.AggregationTemporality, defaultLabels *helper.MetricLabels) (logs []*protocol.Log) {
 	for i := 0; i < data.Len(); i++ {
 		dataPoint := data.At(i)
 
 		labels := defaultLabels.Clone()
-		attrs2Labels(&labels, dataPoint.Attributes())
+		attrs2Labels(labels, dataPoint.Attributes())
 		labels.Append(otlp.TagKeyMetricAggregationTemporality, aggregationTemporality.String())
 		labels.Append(otlp.TagKeyMetricHistogramType, pmetric.MetricTypeExponentialHistogram.String())
 
@@ -378,7 +259,6 @@ func ExponentialHistogramToLogs(name string, data pmetric.ExponentialHistogramDa
 
 		bucketLabels := labels.Clone()
 		bucketLabels.Append(bucketLabelKey, "")
-		bucketLabels.Sort()
 		for k, v := range postiveFields {
 			bucketLabels.Replace(bucketLabelKey, k)
 			logs = append(logs, newMetricLogFromRaw(name+metricNameSuffixBucket, bucketLabels, int64(dataPoint.Timestamp()), v))
@@ -471,7 +351,7 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 
 	for i := 0; i < resMetricsLen; i++ {
 		resMetricsSlice := resMetrics.At(i)
-		var labels KeyValues
+		var labels helper.MetricLabels
 		attrs2Labels(&labels, resMetricsSlice.Resource().Attributes())
 
 		scopeMetrics := resMetricsSlice.ScopeMetrics()
@@ -486,27 +366,27 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 				case pmetric.MetricTypeGauge:
 					otGauge := otMetric.Gauge()
 					otDatapoints := otGauge.DataPoints()
-					logs = append(logs, GaugeToLogs(metricName, otDatapoints, labels)...)
+					logs = append(logs, GaugeToLogs(metricName, otDatapoints, &labels)...)
 				case pmetric.MetricTypeSum:
 					otSum := otMetric.Sum()
 					isMonotonic := strconv.FormatBool(otSum.IsMonotonic())
 					aggregationTemporality := otSum.AggregationTemporality()
 					otDatapoints := otSum.DataPoints()
-					logs = append(logs, SumToLogs(metricName, aggregationTemporality, isMonotonic, otDatapoints, labels)...)
+					logs = append(logs, SumToLogs(metricName, aggregationTemporality, isMonotonic, otDatapoints, &labels)...)
 				case pmetric.MetricTypeSummary:
 					otSummary := otMetric.Summary()
 					otDatapoints := otSummary.DataPoints()
-					logs = append(logs, SummaryToLogs(metricName, otDatapoints, labels)...)
+					logs = append(logs, SummaryToLogs(metricName, otDatapoints, &labels)...)
 				case pmetric.MetricTypeHistogram:
 					otHistogram := otMetric.Histogram()
 					aggregationTemporality := otHistogram.AggregationTemporality()
 					otDatapoints := otHistogram.DataPoints()
-					logs = append(logs, HistogramToLogs(metricName, otDatapoints, aggregationTemporality, labels)...)
+					logs = append(logs, HistogramToLogs(metricName, otDatapoints, aggregationTemporality, &labels)...)
 				case pmetric.MetricTypeExponentialHistogram:
 					otExponentialHistogram := otMetric.ExponentialHistogram()
 					aggregationTemporality := otExponentialHistogram.AggregationTemporality()
 					otDatapoints := otExponentialHistogram.DataPoints()
-					logs = append(logs, ExponentialHistogramToLogs(metricName, otDatapoints, aggregationTemporality, labels)...)
+					logs = append(logs, ExponentialHistogramToLogs(metricName, otDatapoints, aggregationTemporality, &labels)...)
 				default:
 					// TODO:
 					// find a better way to handle metric with type MetricTypeEmpty.
