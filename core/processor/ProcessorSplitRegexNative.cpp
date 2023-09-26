@@ -361,21 +361,21 @@ void ProcessorSplitRegexNative::SetLogMultilinePolicy(const std::string& begReg,
                                                       const std::string& endReg) {
     mLogBeginReg = begReg;
     if (mLogBeginRegPtr != nullptr) {
-        mLogBeginRegPtr.release();
+        mLogBeginRegPtr.reset();
     }
     if (begReg.empty() == false && begReg != ".*") {
         mLogBeginRegPtr.reset(new boost::regex(begReg));
     }
     mLogContinueReg = conReg;
     if (mLogContinueRegPtr != nullptr) {
-        mLogContinueRegPtr.release();
+        mLogContinueRegPtr.reset();
     }
     if (conReg.empty() == false && conReg != ".*") {
         mLogContinueRegPtr.reset(new boost::regex(conReg));
     }
     mLogEndReg = endReg;
     if (mLogEndRegPtr != nullptr) {
-        mLogEndRegPtr.release();
+        mLogEndRegPtr.reset();
     }
     if (endReg.empty() == false && endReg != ".*") {
         mLogEndRegPtr.reset(new boost::regex(endReg));

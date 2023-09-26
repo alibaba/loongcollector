@@ -353,7 +353,7 @@ public:
     }
 
     string GetProcessExecutionDir(void) {
-        char exePath[PATH_MAX + 1] = {0};
+        char exePath[PATH_MAX + 1] = "";
         readlink("/proc/self/exe", exePath, sizeof(exePath));
         string fullPath(exePath);
         size_t index = fullPath.rfind("/");

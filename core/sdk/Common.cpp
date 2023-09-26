@@ -504,7 +504,7 @@ namespace sdk {
      */
     void CopyBytesToBlock(const uint8_t* poolIn, struct Md5Block& block) {
         uint32_t j = 0;
-        for (uint32_t i = 0; i < 32; ++i, j += 4) {
+        for (uint32_t i = 0; i < 16; ++i, j += 4) {
             block.word[i] = ((uint32_t)poolIn[j]) | (((uint32_t)poolIn[j + 1]) << 8) | (((uint32_t)poolIn[j + 2]) << 16)
                 | (((uint32_t)poolIn[j + 3]) << 24);
         }
@@ -865,10 +865,10 @@ namespace sdk {
         unsigned mlen = (unsigned)((bits >> 3) % SHA1_INPUT_BYTES), padding = SHA1_INPUT_BYTES - mlen;
         M[mlen++] = 0x80;
         if (padding > BIT_COUNT_BYTES) {
-            memset(M + mlen, 0x00, padding - BIT_COUNT_BYTES);
+                        memset(M + mlen, 0x00, padding - BIT_COUNT_BYTES);
             make_big_endian32((uint32_t*)M, SHA1_INPUT_WORDS - BIT_COUNT_WORDS);
         } else {
-            memset(M + mlen, 0x00, SHA1_INPUT_BYTES - mlen);
+                        memset(M + mlen, 0x00, SHA1_INPUT_BYTES - mlen);
             make_big_endian32((uint32_t*)M, SHA1_INPUT_WORDS);
             transform();
             memset(M, 0x00, SHA1_INPUT_BYTES - BIT_COUNT_BYTES);

@@ -91,6 +91,9 @@ namespace sdk {
     }
 
     Client::~Client() throw() {
+        if (mClient != NULL){
+            delete mClient;
+        }
     }
 
     void Client::SetPort(int32_t port) {

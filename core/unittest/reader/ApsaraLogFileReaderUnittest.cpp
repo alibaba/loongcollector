@@ -49,6 +49,7 @@ void ApsaraParseLogLineUnittest::TestCanBeParsed() {
                           "18:14:57.365716]\t[ERROR]\t[12835]\t[build/debug64/ilogtail/core/"
                           "ilogtail.cpp:1945]\tParseWhiteListOK:{\n\"sys/"
                           "pangu/ChunkServerRole\": \"\",\n\"sys/pangu/PanguMasterRole\": \"\"}";
+    logFileReader.mTzOffsetSecond = 0;
     bool successful
         = logFileReader.ParseLogLine(testLog, logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
     APSARA_TEST_TRUE_FATAL(successful);
@@ -64,6 +65,7 @@ void ApsaraParseLogLineUnittest::TestCanNotBeParsedUnDiscard() {
     std::string lastLogTimeStr = "";
     uint32_t logGroupSize = 0;
     logFileReader.mDiscardUnmatch = false;
+    logFileReader.mTzOffsetSecond = 0;
     std::string testLog
         = "2013-03-13 "
           "18:14:57.365716\tERROR\t[12835]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\tParseWhiteListOK:{\n\"sys/"
@@ -83,6 +85,7 @@ void ApsaraParseLogLineUnittest::TestCanNotBeParsedDiscard() {
     std::string lastLogTimeStr = "";
     uint32_t logGroupSize = 0;
     logFileReader.mDiscardUnmatch = true;
+    logFileReader.mTzOffsetSecond = 0;
     std::string testLog
         = "2013-03-13 "
           "18:14:57.365716\tERROR\t[12835]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\tParseWhiteListOK:{\n\"sys/"

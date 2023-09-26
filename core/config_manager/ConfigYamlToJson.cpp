@@ -153,7 +153,7 @@ Json::Value ConfigYamlToJson::ParseScalar(const YAML::Node& node) {
         return node.as<std::string>();
     }
 
-    int i;
+    int i = 0;
     if (YAML::convert<int>::decode(node, i))
         return i;
 

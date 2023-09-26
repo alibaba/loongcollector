@@ -475,21 +475,21 @@ Sender::Sender() {
     srand(time(NULL));
     mFlushLog = false;
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
-    mTestNetworkClient = new sdk::Client("",
+    mTestNetworkClient.reset(new sdk::Client("",
                                          STRING_FLAG(default_access_key_id),
                                          STRING_FLAG(default_access_key),
                                          INT32_FLAG(sls_client_send_timeout),
                                          LogFileProfiler::mIpAddr,
-                                         AppConfig::GetInstance()->GetBindInterface());
-    SLSControl::Instance()->SetSlsSendClientCommonParam(mTestNetworkClient);
+                                         AppConfig::GetInstance()->GetBindInterface()));
+    SLSControl::Instance()->SetSlsSendClientCommonParam(mTestNetworkClient.get());
 
-    mUpdateRealIpClient = new sdk::Client("",
+    mUpdateRealIpClient.reset(new sdk::Client("",
                                           STRING_FLAG(default_access_key_id),
                                           STRING_FLAG(default_access_key),
                                           INT32_FLAG(sls_client_send_timeout),
                                           LogFileProfiler::mIpAddr,
-                                          AppConfig::GetInstance()->GetBindInterface());
-    SLSControl::Instance()->SetSlsSendClientCommonParam(mUpdateRealIpClient);
+                                          AppConfig::GetInstance()->GetBindInterface()));
+    SLSControl::Instance()->SetSlsSendClientCommonParam(mUpdateRealIpClient.get());
     SetSendingBufferCount(0);
     size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
     if (concurrencyCount < 10) {
@@ -1881,7 +1881,7 @@ bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint
         return false;
     static LogGroup logGroup;
     mTestNetworkClient->SetSlsHost(endpoint);
-    ResetPort(region, mTestNetworkClient);
+    ResetPort(region, mTestNetworkClient.get());
     bool status = true;
     int64_t beginTime = GetCurrentTimeInMicroSeconds();
     try {
@@ -2553,7 +2553,6 @@ Sender::~Sender() {
     }
     RemoveSender();
     if (mTestNetworkClient) {
-        delete mTestNetworkClient;
         mTestNetworkClient = NULL;
     }
 }

@@ -156,15 +156,15 @@ void CheckPointManager::LoadDirCheckPoint(const Json::Value& root) {
     const Json::Value::Members& dirNames = root["dir_check_point"].getMemberNames();
     for (size_t index = 0; index < dirNames.size(); ++index) {
         const string& dirname = dirNames[index];
-        DirCheckPoint* dir = new DirCheckPoint(dirname);
         const Json::Value& dirMeta = root["dir_check_point"][dirname];
         try {
             int32_t updateTime = dirMeta["update_time"].asInt();
+            DirCheckPointPtr dir(new DirCheckPoint(dirname));
             if (updateTime >= (time(NULL) - INT32_FLAG(file_check_point_time_out))) {
                 for (unsigned int i = 0; i < dirMeta["sub_dir"].size(); ++i) {
                     dir->mSubDir.insert(dirMeta["sub_dir"][i].asString());
                 }
-                mDirNameMap.insert(make_pair(dirname, DirCheckPointPtr(dir)));
+                mDirNameMap.insert(make_pair(dirname, dir));
             } else {
                 LOG_INFO(sLogger, ("load timeout dir check point, ignore", dirname)(ToString(updateTime), time(NULL)));
             }

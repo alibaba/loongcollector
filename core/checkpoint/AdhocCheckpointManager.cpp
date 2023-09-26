@@ -75,8 +75,15 @@ AdhocFileCheckpointPtr AdhocCheckpointManager::CreateAdhocFileCheckpoint(const s
         uint64_t fileSignatureHash = 0;
         uint32_t fileSignatureSize = 0;
         char firstLine[1025];
-        int nbytes = pread(open(filePath.c_str(), O_RDONLY), firstLine, 1024, 0);
+        int fd = open(filePath.c_str(), O_RDONLY);
+        // Check if the file handle is opened successfully.
+        if (fd == -1) {
+            LOG_ERROR(sLogger, ("fail to open file", filePath));
+            return nullptr;
+        }
+        int nbytes = pread(fd, firstLine, 1024, 0);
         if (nbytes < 0) {
+            close(fd);
             LOG_ERROR(sLogger, ("fail to read file", filePath)("nbytes", nbytes)("job name", jobName));
             return nullptr;
         }
@@ -92,6 +99,8 @@ AdhocFileCheckpointPtr AdhocCheckpointManager::CreateAdhocFileCheckpoint(const s
                                                     STATUS_WAITING, // Status
                                                     jobName, // job name
                                                     filePath); // real file path
+
+        close(fd);
         return fileCheckpoint;
     } else {
         LOG_WARNING(sLogger, ("Create file checkpoint fail, job name", jobName)("file path", filePath));

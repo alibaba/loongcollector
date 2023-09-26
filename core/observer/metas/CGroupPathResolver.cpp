@@ -118,7 +118,6 @@ void resolveAllCGroupProcsPaths(const std::string& basePath, std::vector<std::st
             resolveAllCGroupProcsPaths(basePath + "/" + ent.Name(), allPaths);
         }
     }
-    dir.Close();
 }
 
 void ResolveAllCGroupProcsPaths(const std::string& basePath, std::vector<std::string>& allPaths) {

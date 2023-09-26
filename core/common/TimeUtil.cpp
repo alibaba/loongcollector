@@ -164,8 +164,10 @@ int ReadUtmp(const char* filename, int* n_entries, utmp** utmp_buf) {
     if (utmp_file == NULL)
         return 1;
 
-    if (fstat(fileno(utmp_file), &file_stats) != 0)
+    if (fstat(fileno(utmp_file), &file_stats) != 0) {
+        fclose(utmp_file);
         return 1;
+    }
 
     size = file_stats.st_size;
     if (size > 0)

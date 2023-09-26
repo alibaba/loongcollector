@@ -352,7 +352,7 @@ bool Aggregator::Add(const std::string& projectName,
         if (context.mMarkOffsetFlag && !mergeFinishedFlag && !initFlag) {
             value->mLogGroupContext.mFileInfoPtr = context.mFileInfoPtr;
         }
-
+        // AddAllocated above
         for (int32_t logIdx = 0; logIdx < logSize; logIdx++)
             logGroup.mutable_logs()->ReleaseLast();
         if (value != NULL && (value->IsReady() || sender->IsFlush())) {

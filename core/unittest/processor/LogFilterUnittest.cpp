@@ -131,6 +131,7 @@ public:
         APSARA_TEST_EQUAL(param2Vec[0].mRegex->ok(), true);
 
         LOG_INFO(sLogger, ("TestParseCastSensWordConfig() end", time(NULL)));
+        delete pConfig;
     }
 
     void TestCastSensWordConst() {

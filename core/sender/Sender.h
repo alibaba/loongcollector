@@ -237,7 +237,7 @@ private:
     std::unordered_map<std::string, SlsClientInfo*> mSendClientMap;
     int32_t mLastCheckSendClientTime;
 
-    sdk::Client* mTestNetworkClient;
+    std::unique_ptr<sdk::Client> mTestNetworkClient;
 
     // SendBufferThread: SecondaryFile -> SLS
     ThreadPtr mSendBufferThreadId;
@@ -266,7 +266,7 @@ private:
 
     typedef std::unordered_map<std::string, RealIpInfo*> RegionRealIpInfoMap;
     RegionRealIpInfoMap mRegionRealIpMap;
-    sdk::Client* mUpdateRealIpClient;
+    std::unique_ptr<sdk::Client> mUpdateRealIpClient;
     PTMutex mRegionRealIpLock;
     bool mStopRealIpThread = false;
 

@@ -409,6 +409,7 @@ void PCAPWrapper::PCAPCallBack(const struct pcap_pkthdr* header, const u_char* p
     key.SockHash = eventHeader->SockHash;
     key.AddrInfo.RemoteAddr = eventHeader->DstAddr;
     key.AddrInfo.RemotePort = eventHeader->DstPort;
+    key.RoleType = eventHeader->RoleType;
     key.SockCategory = SocketCategory::InetSocket;
     bool needRebuildHash = false;
     if (eventHeader->RoleType == PacketRoleType::Server) {

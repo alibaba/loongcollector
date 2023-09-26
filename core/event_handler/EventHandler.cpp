@@ -999,8 +999,8 @@ void ModifyHandler::DeleteRollbackReader() {
 
 void ModifyHandler::ForceReadLogAndPush(LogFileReaderPtr reader) {
     LogBuffer* logBuffer = new LogBuffer;
-    Event* pEvent = reader->CreateFlushTimeoutEvent().release();
-    reader->ReadLog(*logBuffer, pEvent);
+    auto pEvent = reader->CreateFlushTimeoutEvent();
+    reader->ReadLog(*logBuffer, pEvent.get());
     PushLogToProcessor(reader, logBuffer);
 }
 

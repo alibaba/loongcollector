@@ -1039,7 +1039,7 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
               ("read log file", mRealLogPath)("last file pos", mLastFilePos)("last file size", mLastFileSize)(
                   "read size", mLastFilePos - lastFilePos));
     if (HasDataInCache()) {
-        Event* event = CreateFlushTimeoutEvent().release();
+        auto event = CreateFlushTimeoutEvent();
         BlockedEventManager::GetInstance()->UpdateBlockEvent(
             GetLogstoreKey(), mConfigName, *event, mDevInode, time(NULL) + mReaderFlushTimeout);
     }

@@ -75,7 +75,7 @@ struct Md5Block {
  */
 void CopyBytesToBlock(const uint8_t* poolIn, struct Md5Block& block) {
     uint32_t j = 0;
-    for (uint32_t i = 0; i < 32; ++i, j += 4) {
+    for (uint32_t i = 0; i < 16; ++i, j += 4) {
         block.word[i] = ((uint32_t)poolIn[j]) | (((uint32_t)poolIn[j + 1]) << 8) | (((uint32_t)poolIn[j + 2]) << 16)
             | (((uint32_t)poolIn[j + 3]) << 24);
     }
