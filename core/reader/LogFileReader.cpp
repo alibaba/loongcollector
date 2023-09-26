@@ -1901,6 +1901,10 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     if (nbytes == 0) {
         if (moreData) { // excessively long line without '\n' or multiline begin or valid wchar
             nbytes = alignedBytes ? alignedBytes : BUFFER_SIZE;
+            if (mLogType == JSON_LOG) {
+                int32_t rollbackLineFeedCount;
+                nbytes = LastMatchedLine(stringBuffer, nbytes, rollbackLineFeedCount, false);
+            }
             LOG_WARNING(
                 sLogger,
                 ("Log is too long and forced to be split at offset: ", mLastFilePos + nbytes)("file: ", mHostLogPath)(
@@ -2030,6 +2034,10 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         if (moreData) {
             resultCharCount = bakResultCharCount;
             rollbackLineFeedCount = 0;
+            if (mLogType == JSON_LOG) {
+                int32_t rollbackLineFeedCount;
+                LastMatchedLine(stringBuffer, resultCharCount, rollbackLineFeedCount, false);
+            }
             // Cannot get the split position here, so just mark a flag and send alarm later
             logTooLongSplitFlag = true;
         } else {
