@@ -99,9 +99,11 @@ void LogProcess::Start() {
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();
     // mBufferCountLimit = INT32_FLAG(process_buffer_count_upperlimit_perthread) * mThreadCount;
     mProcessThreads = new ThreadPtr[mThreadCount];
-    mThreadFlags = new bool[mThreadCount];
-    for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo)
+    mThreadFlags = new std::atomic_bool[mThreadCount];
+    for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
+        mThreadFlags[threadNo] = false;
         mProcessThreads[threadNo] = CreateThread([this, threadNo]() { ProcessLoop(threadNo); });
+    }
 }
 
 bool LogProcess::PushBuffer(LogBuffer* buffer, int32_t retryTimes) {

@@ -22,8 +22,12 @@ bool DockerContainerPath::ParseAllByJSONStr(
     const std::string& jsonStr, std::unordered_map<std::string, DockerContainerPath>& dockerContainerPathMap) {
     dockerContainerPathMap.clear();
     Json::Value paramsAll;
-    Json::Reader reader;
-    if (jsonStr.size() < (size_t)5 || !reader.parse(jsonStr, paramsAll)) {
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+    std::string jsonParseErrs;
+    if (jsonStr.size() < 5UL
+        || !jsonReader->parse(jsonStr.data(), jsonStr.data() + jsonStr.size(), &paramsAll, &jsonParseErrs)) {
         LOG_ERROR(sLogger, ("invalid docker container params error", jsonStr));
         return false;
     }
@@ -81,10 +85,14 @@ bool DockerContainerPath::ParseByJSONObj(const Json::Value& params, DockerContai
 }
 
 bool DockerContainerPath::ParseByJSONStr(const std::string& jsonStr, DockerContainerPath& dockerContainerPath) {
-    Json::Value params;
-    Json::Reader reader;
     dockerContainerPath.mJsonStr = jsonStr;
-    if (jsonStr.size() < (size_t)5 || !reader.parse(jsonStr, params)) {
+    Json::Value params;
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+    std::string jsonParseErrs;
+    if (jsonStr.size() < 5UL
+        || !jsonReader->parse(jsonStr.data(), jsonStr.data() + jsonStr.size(), &params, &jsonParseErrs)) {
         LOG_ERROR(sLogger, ("invalid docker container params", jsonStr));
         return false;
     }
@@ -96,14 +104,14 @@ bool DockerMountPaths::FindBestMountPath(const std::string source, std::string& 
     size_t maxSameIndex = 0;
 
     size_t sourceSize = source.size();
-    if (sourceSize < (size_t)1 || source[0] != '/') {
+    if (sourceSize < 1UL || source[0] != '/') {
         return false;
     }
     for (size_t i = 0; i < mMountPathArray.size(); ++i) {
         const MountPath& mountPath = mMountPathArray[i];
         size_t mountDestSize = mountPath.destination.size();
         // must check '/' first
-        if (mountDestSize == (size_t)1) {
+        if (mountDestSize == 1UL) {
             if (mountDestSize > maxSameLen) {
                 maxSameLen = mountDestSize;
                 maxSameIndex = i;
@@ -134,7 +142,7 @@ bool DockerMountPaths::FindBestMountPath(const std::string source, std::string& 
         mountRealPath = mHostPath + mMountPathArray[maxSameIndex].source + leftPath;
     }
     // source '/a/b/c', mountPath.destination '/'
-    else if (mHostPath.size() == (size_t)1 && mHostPath[0] == '/') {
+    else if (mHostPath.size() == 1UL && mHostPath[0] == '/') {
         mountRealPath = mMountPathArray[maxSameIndex].source + '/' + leftPath;
     } else {
         mountRealPath = mHostPath + mMountPathArray[maxSameIndex].source + '/' + leftPath;
@@ -147,10 +155,15 @@ bool DockerMountPaths::FindBestMountPath(const std::string source, std::string& 
 
 bool DockerMountPaths::ParseByJsonStr(const std::string& paramJSONStr, DockerMountPaths& dockerMountPaths) {
     Json::Value paramJSON;
-    Json::Reader reader;
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
+    std::string jsonParseErrs;
     dockerMountPaths.mMountPathArray.clear();
     dockerMountPaths.mJsonStr = paramJSONStr;
-    if (paramJSONStr.size() < (size_t)5 || !reader.parse(paramJSONStr, paramJSON)) {
+    if (paramJSONStr.size() < 5UL
+        || !jsonReader->parse(
+            paramJSONStr.data(), paramJSONStr.data() + paramJSONStr.size(), &paramJSON, &jsonParseErrs)) {
         LOG_ERROR(sLogger, ("invalid docker mount path param", paramJSONStr));
         return false;
     }

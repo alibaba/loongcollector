@@ -1010,7 +1010,6 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
         }
     }
 
-    auto const readOffset = mLastFilePos;
     size_t lastFilePos = mLastFilePos;
     bool allowRollback = true;
     if (event != nullptr && event->IsReaderFlushTimeout()) {

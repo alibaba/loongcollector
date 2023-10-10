@@ -205,7 +205,6 @@ namespace sdk {
         int still_running = 1;
         /* we start some action by calling perform right away */
 
-        bool needRead = true;
         while (still_running) {
             curl_multi_perform(multi_handle, &still_running);
             check_multi_info(multi_handle);
@@ -275,13 +274,13 @@ namespace sdk {
 
             switch (rc) {
                 case -1:
-                    /* select error */
-                    needRead = false;
+                    /* select error
+                    needRead = false; */
                     break;
                 case 0:
                 default:
-                    /* timeout or readable/writable sockets */
-                    needRead = true;
+                    /* timeout or readable/writable sockets
+                    needRead = true; */
                     break;
             }
         }

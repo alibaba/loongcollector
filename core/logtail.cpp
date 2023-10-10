@@ -264,9 +264,7 @@ void do_worker_process() {
     LogFilter::Instance()->InitFilter(STRING_FLAG(user_log_config));
     Sender::Instance()->InitSender();
     LogtailPlugin* pPlugin = LogtailPlugin::GetInstance();
-    if (pPlugin->LoadPluginBase()) {
-        pPlugin->Resume();
-    }
+    pPlugin->Resume();
     ObserverManager::GetInstance()->Reload();
     CheckPointManager::Instance()->LoadCheckPoint();
     // AdhocCheckpointManager::GetInstance()->LoadAdhocCheckpoint();

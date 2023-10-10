@@ -510,10 +510,15 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
             builder["collectComments"] = false;
             std::unique_ptr<Json::CharReader> jsonReader(builder.newCharReader());
             std::string jsonParseErrs;
-            if (!jsonReader->parse(pluginConfig.data(), pluginConfig.data() + pluginConfig.size(), &pluginConfigJson, &jsonParseErrs)) {
-                                LOG_WARNING(sLogger,
-                            ("invalid plugin config, plugin config json parse error",
-                             pluginConfig)("project", projectName)("logstore", category)("config", logName)("error", jsonParseErrs));
+            if (!pluginConfig.empty()
+                && !jsonReader->parse(pluginConfig.data(),
+                                      pluginConfig.data() + pluginConfig.size(),
+                                      &pluginConfigJson,
+                                      &jsonParseErrs)) {
+                LOG_WARNING(
+                    sLogger,
+                    ("invalid plugin config, plugin config json parse error", pluginConfig)("project", projectName)(
+                        "logstore", category)("config", logName)("error", jsonParseErrs));
             }
 
             if (logType == PLUGIN_LOG) {

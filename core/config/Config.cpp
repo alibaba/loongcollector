@@ -108,6 +108,7 @@ Config::Config(const std::string& basePath,
       mLogBeginReg(logBeginReg),
       mLogContinueReg(logContinueReg),
       mLogEndReg(logEndReg),
+      mReaderFlushTimeout(readerFlushTimeout),
       mProjectName(projectName),
       mIsPreserve(isPreserve),
       mPreserveDepth(preserveDepth),
@@ -118,8 +119,7 @@ Config::Config(const std::string& basePath,
       mCategory(category),
       mStreamLogTag(StreamLogTag),
       mDiscardUnmatch(discardUnmatch),
-      mUploadRawLog(uploadRawLog),
-      mReaderFlushTimeout(readerFlushTimeout) {
+      mUploadRawLog(uploadRawLog) {
 #if defined(_MSC_VER)
     mBasePath = EncodingConverter::GetInstance()->FromUTF8ToACP(mBasePath);
     mFilePattern = EncodingConverter::GetInstance()->FromUTF8ToACP(mFilePattern);

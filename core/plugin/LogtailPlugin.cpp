@@ -61,6 +61,10 @@ LogtailPlugin::~LogtailPlugin() {
 }
 
 void LogtailPlugin::LoadConfig() {
+    if (!mPluginValid || !mLoadConfigFun) {
+        LOG_WARNING(sLogger, ("load plugin config error", "plugin not inited"));
+        return;
+    }
     vector<Config*> pluginConfigs;
     ConfigManager::GetInstance()->GetAllPluginConfig(pluginConfigs);
     if (pluginConfigs.size() > 0) {
@@ -81,21 +85,19 @@ void LogtailPlugin::LoadConfig() {
             goPluginConfig.p = pConfig->mPluginConfig.c_str();
 
             long long logStoreKey = pConfig->mLogstoreKey;
-            if (mPluginValid && mLoadConfigFun != NULL) {
-                GoInt loadRst = mLoadConfigFun(goProject, goLogstore, goConfigName, logStoreKey, goPluginConfig);
-                if (loadRst != 0) {
-                    LOG_WARNING(
-                        sLogger,
-                        ("msg", "load plugin error")("project", pConfig->mProjectName)("logstore", pConfig->mCategory)(
-                            "config", pConfig->mConfigName)("content", pConfig->mPluginConfig)("result", loadRst));
-                    LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                           "load plugin config error, invalid config: "
-                                                               + pConfig->mConfigName
-                                                               + ". please check you config and logtail's plugin log.",
-                                                           pConfig->GetProjectName(),
-                                                           pConfig->GetCategory(),
-                                                           pConfig->mRegion);
-                }
+            GoInt loadRst = mLoadConfigFun(goProject, goLogstore, goConfigName, logStoreKey, goPluginConfig);
+            if (loadRst != 0) {
+                LOG_WARNING(
+                    sLogger,
+                    ("msg", "load plugin error")("project", pConfig->mProjectName)("logstore", pConfig->mCategory)(
+                        "config", pConfig->mConfigName)("content", pConfig->mPluginConfig)("result", loadRst));
+                LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+                                                       "load plugin config error, invalid config: "
+                                                           + pConfig->mConfigName
+                                                           + ". please check you config and logtail's plugin log.",
+                                                       pConfig->GetProjectName(),
+                                                       pConfig->GetCategory(),
+                                                       pConfig->mRegion);
             }
         }
     }
@@ -116,12 +118,13 @@ void LogtailPlugin::HoldOn(bool exitFlag) {
 }
 
 void LogtailPlugin::Resume() {
-    LoadPluginBase();
-    LoadConfig();
-    if (mPluginValid && mResumeFun != NULL) {
-        LOG_INFO(sLogger, ("logtail plugin Resume", "start"));
-        mResumeFun();
-        LOG_INFO(sLogger, ("logtail plugin Resume", "success"));
+    if (LoadPluginBase()) { // LoadPluginBase is required as plugin config may come after ilogtail start
+        LoadConfig();
+        if (mResumeFun != NULL) {
+            LOG_INFO(sLogger, ("logtail plugin Resume", "start"));
+            mResumeFun();
+            LOG_INFO(sLogger, ("logtail plugin Resume", "success"));
+        }
     }
 }
 
@@ -301,8 +304,9 @@ int LogtailPlugin::ExecPluginCmd(
 
 
 bool LogtailPlugin::LoadPluginBase() {
-    if (mPluginValid)
-        return true;
+    if (mPluginValid) {
+        return mPluginValid;
+    }
     vector<Config*> pluginConfigs;
     ConfigManager::GetInstance()->GetAllPluginConfig(pluginConfigs);
     vector<Config*> observerConfigs;
@@ -314,7 +318,7 @@ bool LogtailPlugin::LoadPluginBase() {
     if (observerConfigs.size() == (size_t)0 && pluginConfigs.size() == (size_t)0 && !dockerEnvConfigEnabled
         && !AppConfig::GetInstance()->IsPurageContainerMode()) {
         LOG_INFO(sLogger, ("no plugin config and no docker env config, do not load plugin base", ""));
-        return true;
+        return mPluginValid;
     }
     LOG_INFO(sLogger,
              ("load plugin base, config count", pluginConfigs.size())("docker env config", dockerEnvConfigEnabled)(
@@ -326,18 +330,18 @@ bool LogtailPlugin::LoadPluginBase() {
         std::string error;
         if (!loader.LoadDynLib("PluginAdapter", error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open adapter lib error, Message", error));
-            return false;
+            return mPluginValid;
         }
 
         auto versionFun = (PluginAdapterVersion)loader.LoadMethod("PluginAdapterVersion", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load version function error, Message", error));
-            return false;
+            return mPluginValid;
         }
         int version = versionFun();
         if (!(version / 100 == 2 || version / 100 == 3)) {
             LOG_ERROR(sLogger, ("check plugin adapter version error, version", version));
-            return false;
+            return mPluginValid;
         }
         LOG_INFO(sLogger, ("check plugin adapter version success, version", version));
 
@@ -354,7 +358,7 @@ bool LogtailPlugin::LoadPluginBase() {
             auto registerFun = (RegisterLogtailCallBack)loader.LoadMethod("RegisterLogtailCallBack", error);
             if (!error.empty()) {
                 LOG_WARNING(sLogger, ("load RegisterLogtailCallBack failed", error));
-                return false;
+                return mPluginValid;
             }
             registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::ExecPluginCmd);
         }
@@ -370,7 +374,7 @@ bool LogtailPlugin::LoadPluginBase() {
         std::string error;
         if (!loader.LoadDynLib("PluginBase", error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open plugin base dl error, Message", error));
-            return false;
+            return mPluginValid;
         }
 
         // Try V2 -> V1.
@@ -381,59 +385,59 @@ bool LogtailPlugin::LoadPluginBase() {
             initBase = (InitPluginBaseFun)loader.LoadMethod("InitPluginBase", error);
             if (!error.empty()) {
                 LOG_ERROR(sLogger, ("load InitPluginBase error", error));
-                return false;
+                return mPluginValid;
             }
         }
         mLoadGlobalConfigFun = (LoadGlobalConfigFun)loader.LoadMethod("LoadGlobalConfig", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load LoadGlobalConfig error, Message", error));
-            return false;
+            return mPluginValid;
         }
         mLoadConfigFun = (LoadConfigFun)loader.LoadMethod("LoadConfig", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load LoadConfig error, Message", error));
-            return false;
+            return mPluginValid;
         }
         mUnloadConfigFun = (UnloadConfigFun)loader.LoadMethod("UnloadConfig", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load UnloadConfig error, Message", error));
-            return false;
+            return mPluginValid;
         }
         mHoldOnFun = (HoldOnFun)loader.LoadMethod("HoldOn", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load HoldOn error, Message", error));
-            return false;
+            return mPluginValid;
         }
         mResumeFun = (ResumeFun)loader.LoadMethod("Resume", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load Resume error, Message", error));
-            return false;
+            return mPluginValid;
         }
         mProcessRawLogFun = (ProcessRawLogFun)loader.LoadMethod("ProcessRawLog", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load ProcessRawLog error, Message", error));
-            return false;
+            return mPluginValid;
         }
         mProcessRawLogV2Fun = (ProcessRawLogV2Fun)loader.LoadMethod("ProcessRawLogV2", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load ProcessRawLogV2 error, Message", error));
-            return false;
+            return mPluginValid;
         }
 
         mGetContainerMetaFun = (GetContainerMetaFun)loader.LoadMethod("GetContainerMeta", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load GetContainerMeta error, Message", error));
-            return false;
+            return mPluginValid;
         }
         mProcessLogsFun = (ProcessLogsFun)loader.LoadMethod("ProcessLog", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load ProcessLogs error, Message", error));
-            return false;
+            return mPluginValid;
         }
         mProcessLogGroupFun = (ProcessLogGroupFun)loader.LoadMethod("ProcessLogGroup", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load ProcessLogGroup error, Message", error));
-            return false;
+            return mPluginValid;
         }
 
         mPluginBasePtr = loader.Release();

@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include <atomic>
 #include <boost/regex.hpp>
 #include <map>
 #include <string>
@@ -118,7 +119,7 @@ private:
     ThreadPtr* mProcessThreads;
     int32_t mThreadCount;
     LogstoreFeedbackQueue<LogBuffer*> mLogFeedbackQueue;
-    volatile bool* mThreadFlags; // whether thread is sending data or wait
+    std::atomic_bool* mThreadFlags; // whether thread is sending data or wait
     // int32_t mBufferCountLimit;
     ReadWriteLock mAccessProcessThreadRWL;
 

@@ -183,7 +183,7 @@ bool NetLinkProber::SendMsg(const msgType& realMsg, std::string& errorMsg) {
 
     ssize_t sentTotal = 0;
 
-    while (sentTotal < iov.iov_len) {
+    while (sentTotal < (ssize_t)iov.iov_len) {
         ssize_t sendBytes = sendmsg(this->mFd, &msg, 0);
         if (sendBytes < 0) {
             errorMsg = "cannot send msg to netlink, fd:" + std::to_string(this->mFd);

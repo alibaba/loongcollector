@@ -16,6 +16,7 @@
 
 #include "processor/ProcessorTagNative.h"
 
+#include "app_config/AppConfig.h"
 #include "common/Constants.h"
 #include "common/FileSystemUtil.h"
 #include "reader/LogFileReader.h"
@@ -24,7 +25,7 @@
 namespace logtail {
 
 bool ProcessorTagNative::Init(const ComponentConfig& componentConfig) {
-    Config config = componentConfig.GetConfig();
+    const Config& config = componentConfig.GetConfig();
     mPluginProcessFlag = config.mPluginProcessFlag;
     SetMetricsRecordRef(Name(), componentConfig.GetId());
     return true;

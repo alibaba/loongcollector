@@ -94,11 +94,12 @@ func (p *checkPointManager) Init() error {
 		p.db, err = leveldb.RecoverFile(dbPath, nil)
 	}
 
-	logger.Info(context.Background(), "init checkpoint", err)
 	if err != nil {
+		logger.Error(context.Background(), "CHECKPOINT_ALARM", "recover db file error", err)
 		return err
 	}
 	p.initFlag = true
+	logger.Info(context.Background(), "init checkpoint", "success")
 	return nil
 }
 
