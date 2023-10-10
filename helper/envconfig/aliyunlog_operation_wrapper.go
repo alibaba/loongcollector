@@ -430,9 +430,18 @@ func (o *operationWrapper) makesureMachineGroupExist(project, machineGroup strin
 		if err != nil {
 			time.Sleep(time.Millisecond * 100)
 		} else {
+			for j := 0; j < *flags.LogOperationMaxRetryTimes; j++ {
+				err = o.TagMachineGroup(project, machineGroup, SlsMachinegroupDeployModeKey, SlsMachinegroupDeployModeDeamonset)
+				if err != nil {
+					time.Sleep(time.Millisecond * 100)
+				} else {
+					break
+				}
+			}
 			break
 		}
 	}
+
 	return err
 }
 
@@ -484,6 +493,84 @@ func checkFileConfigChanged(filePath, filePattern, includeEnv, includeLabel stri
 		filePattern != serverFilePattern ||
 		includeEnv != serverIncludeEnv ||
 		includeLabel != serverIncludeLabel
+}
+
+func (o *operationWrapper) UnTagLogtailConfig(project string, logtailConfig string) error {
+	var err error
+
+	// "github.com/aliyun/aliyun-log-go-sdk" doesn't support Untag all, we should list all first
+	var ResourceTags []*aliyunlog.ResourceTagResponse
+	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
+		ResourceTags, _, err = o.logClient.ListTagResources(project, TagLogtailConfig, []string{project + "#" + logtailConfig}, []aliyunlog.ResourceFilterTag{}, "")
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	if err != nil {
+		return err
+	}
+
+	ResourceUnTags := aliyunlog.ResourceUnTags{ResourceType: TagLogtailConfig,
+		ResourceID: []string{project + "#" + logtailConfig},
+		Tags:       []string{},
+	}
+	for _, tags := range ResourceTags {
+		ResourceUnTags.Tags = append(ResourceUnTags.Tags, tags.TagKey)
+	}
+	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
+		err = o.logClient.UnTagResources(project, &ResourceUnTags)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	return err
+}
+
+func (o *operationWrapper) TagLogtailConfig(project string, logtailConfig string, tags map[string]string) error {
+	var err error
+
+	// delete all before create
+	err = o.UnTagLogtailConfig(project, logtailConfig)
+	if err != nil {
+		return err
+	}
+
+	ResourceTags := aliyunlog.ResourceTags{ResourceType: TagLogtailConfig,
+		ResourceID: []string{project + "#" + logtailConfig},
+		Tags:       []aliyunlog.ResourceTag{},
+	}
+	for k, v := range tags {
+		tag := aliyunlog.ResourceTag{Key: k, Value: v}
+		ResourceTags.Tags = append(ResourceTags.Tags, tag)
+	}
+
+	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
+		err = o.logClient.TagResources(project, &ResourceTags)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	return err
+}
+
+func (o *operationWrapper) TagMachineGroup(project, machineGroup, tagKey, tagValue string) error {
+	ResourceTags := aliyunlog.ResourceTags{
+		ResourceType: TagMachinegroup,
+		ResourceID:   []string{project + "#" + machineGroup},
+		Tags:         []aliyunlog.ResourceTag{{Key: tagKey, Value: tagValue}},
+	}
+	var err error
+	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
+		err = o.logClient.TagResources(project, &ResourceTags)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	return err
 }
 
 // nolint:govet,ineffassign
@@ -632,6 +719,21 @@ func (o *operationWrapper) updateConfigInner(config *AliyunLogConfigSpec) error 
 		return fmt.Errorf("UpdateConfig error, config : %s, error : %s", config.LogtailConfig.ConfigName, err.Error())
 	}
 	logger.Info(context.Background(), "create or update config success", config.LogtailConfig.ConfigName)
+
+	// Tag config
+	logtailConfigTags := map[string]string{}
+	for k, v := range config.ConfigTags {
+		logtailConfigTags[k] = v
+	}
+	logtailConfigTags[SlsLogtailChannalKey] = SlsLogtailChannalEnv
+	err = o.TagLogtailConfig(project, config.LogtailConfig.ConfigName, logtailConfigTags)
+	annotations := GetAnnotationByObject(config, project, logstore, "", config.LogtailConfig.ConfigName, true)
+	if err != nil {
+		k8s_event.GetEventRecorder().SendErrorEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), GetAnnotationByError(annotations, CustomErrorFromSlsSDKError(err)), k8s_event.CreateTag, "", fmt.Sprintf("tag config %s error :%s", config.LogtailConfig.ConfigName, err.Error()))
+	} else {
+		k8s_event.GetEventRecorder().SendNormalEventWithAnnotation(k8s_event.GetEventRecorder().GetObject(), annotations, k8s_event.CreateTag, fmt.Sprintf("tag config %s success", config.LogtailConfig.ConfigName))
+	}
+
 	// check if config is in the machine group
 	// only check when create config
 	var machineGroup string

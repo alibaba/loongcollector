@@ -37,6 +37,7 @@ func Test(t *testing.T) {
 
 func MockDockerInfoDetail(containerName string, envList []string) *helper.DockerInfoDetail {
 	dockerInfo := types.ContainerJSON{}
+	dockerInfo.ContainerJSONBase = &types.ContainerJSONBase{}
 	dockerInfo.Name = containerName
 	dockerInfo.Config = &container.Config{}
 	dockerInfo.Config.Env = envList
@@ -176,6 +177,7 @@ func (s *logConfigTestSuite) TestAllConfigs(c *check.C) {
 		"aliyun_logs_catalina_ttl=3650",
 		"aliyun_logs_catalina_machinegroup=my-group",
 		"aliyun_logs_catalina_detail={\n  \"logType\": \"delimiter_log\",\n  \"logPath\": \"/usr/local/ilogtail\",\n  \"filePattern\": \"delimiter_log.LOG\",\n  \"separator\": \"|&|\",\n  \"key\": [\n    \"time\",\n    \"level\",\n    \"method\",\n    \"file\",\n    \"line\",\n    \"message\"\n  ],\n  \"timeKey\": \"time\",\n  \"timeFormat\": \"%Y-%m-%dT%H:%M:%S\",\n  \"dockerFile\": true,\n  \"dockerIncludeEnv\": {\n    \"ALIYUN_LOGTAIL_USER_DEFINED_ID\": \"\"\n  }\n}",
+		"aliyun_logs_catalina_configtags={\"sls.logtail.creator\":\"test-user\", \"sls.logtail.group\":\"test-group\", \"sls.logtail.datasource\":\"k8s\", \"test-tag\":\"test-value\"}",
 	})
 	c.Assert(info.EnvConfigInfoMap["catalina"], check.NotNil)
 	c.Assert(len(info.EnvConfigInfoMap), check.Equals, 1)
@@ -191,6 +193,10 @@ func (s *logConfigTestSuite) TestAllConfigs(c *check.C) {
 	c.Assert(config.LogtailConfig.ConfigName, check.Equals, "catalina")
 	c.Assert(len(config.LogtailConfig.LogtailConfig), check.Equals, 9)
 	c.Assert(config.LogtailConfig.LogtailConfig["logType"], check.Equals, "delimiter_log")
+	c.Assert(config.ConfigTags["sls.logtail.creator"], check.Equals, "test-user")
+	c.Assert(config.ConfigTags["sls.logtail.group"], check.Equals, "test-group")
+	c.Assert(config.ConfigTags["sls.logtail.datasource"], check.Equals, "k8s")
+	c.Assert(config.ConfigTags["test-tag"], check.Equals, "test-value")
 }
 
 func (s *logConfigTestSuite) TestNginxIngress(c *check.C) {
