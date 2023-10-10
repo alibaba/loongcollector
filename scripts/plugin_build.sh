@@ -31,7 +31,7 @@ VERSION=${4:-1.7.1}
 PLUGINS_CONFIG_FILE=${5:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml}}
 GO_MOD_FILE=${6:-${GO_MOD_FILE:-go.mod}}
 NAME=ilogtail
-LDFLAGS='-X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion='$VERSION'"'
+LDFLAGS="${GO_LDFLAGS:-}"' -X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion='$VERSION'"'
 BUILD_FLAG=${BUILD_FLAG:-}
 
 os
@@ -73,7 +73,6 @@ else
   "$CURRDIR/import_plugins.sh" "$PLUGINS_CONFIG_FILE" "$GO_MOD_FILE"
   cd $(go env GOPATH)/pkg/mod/github.com/valyala/gozstd@*
 fi
-
 # if libzstd.a is available in the image, copy instead of rebuild
 lib_name=libzstd_${GOOS}_${GOARCH}.a
 if [[ -f /opt/logtail/deps/lib64/libzstd.a ]]; then
