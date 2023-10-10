@@ -44,16 +44,15 @@
 
 | 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
 | -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
-| [ilogtail-1.7.1.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.7.1/ilogtail-1.7.1.linux-amd64.tar.gz) | Linux | x86-64 | 13029900e0bdd4f6db858d97b31d30f1659145fc40bfceb97f7946f35c94c232 |
-| [ilogtail-1.7.1.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.7.1/ilogtail-1.7.1.linux-arm64.tar.gz) | Linux | arm64  | fe5e2e2b69cb664ed0fc0578d1fdec95e94ab00711b547c7b90591f0a07853e1 |
-| [ilogtail-1.7.1.windows-amd64.zip](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.7.1/ilogtail-1.7.1.windows-amd64.zip)   | Windows | x86-64 | 593f734035f4c808654b638492f1e0d79205b2080a8975305f7f86b988841166 |
+| [ilogtail-1.8.0.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.8.0/ilogtail-1.8.0.linux-amd64.tar.gz) | Linux | x86-64 | 90f60c372379311880d78a30609e76924f07d1fc8fdbcb944a78c01cc94de891 |
+| [ilogtail-1.8.0.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.8.0/ilogtail-1.8.0.linux-arm64.tar.gz) | Linux | arm64  | 6737c2f59f4a462d98e46fe5dca8d471a6634531e2cd8a2feb4a6beaaff22d20 |
 
 ### Docker 镜像
 
 **Docker Pull 命令**&#x20;
 
 ``` bash
-docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.7.1
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.8.0
 ```
 
 ## 1.7.1
