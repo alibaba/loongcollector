@@ -88,8 +88,8 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake)
 set(SUB_DIRECTORIES_LIST
         aggregator app_config checkpoint common config config_manager config_server_pb
         controller event event_handler event_listener file_server helper input log_pb logger models monitor
-        parser pipeline plugin polling processor reader profile_sender sender shennong sdk
-        fuse sls_control
+        parser pipeline plugin polling processor profile_sender reader sdk sender shennong sls_control
+        fuse
         )
 if (UNIX)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} streamlog)
