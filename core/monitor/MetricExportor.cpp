@@ -28,6 +28,7 @@ void MetricExportor::PushMetrics(bool forceSend) {
         sls_logs::LogGroup* logGroup = iter->second;
         logGroup->set_category(METRIC_SLS_LOGSTORE_NAME);
         logGroup->set_source(LogFileProfiler::mIpAddr);
+        logGroup->set_topic(METRIC_TOPIC_TYPE);
         if (METRIC_REGION_DEFAULT == iter->first) {
             mProfileSender.SendToProfileProject(ConfigManager::GetInstance()->GetDefaultProfileRegion(), *logGroup);
         } else {

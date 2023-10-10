@@ -176,6 +176,10 @@ MetricsRecord* WriteMetrics::DoSnapshot() {
     MetricsRecord emptyHead;
     MetricsRecord* preTmp = nullptr;
 
+    int writeMetricsTotal = 0;
+    int writeMetricsDeleteTotal = 0;
+    int metricsSnapshotTotal = 0;
+
     // find the first undeleted node and set as new mHead
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -189,6 +193,7 @@ MetricsRecord* WriteMetrics::DoSnapshot() {
                 tmp->SetNext(toDeleteHead);
                 toDeleteHead = tmp;
                 tmp = preTmp->GetNext();
+                writeMetricsTotal ++;
             } else {
                 // find head
                 mHead = tmp;
@@ -210,9 +215,12 @@ MetricsRecord* WriteMetrics::DoSnapshot() {
         MetricsRecord* newMetrics = preTmp->CopyAndReset();
         newMetrics->SetNext(snapshot);
         snapshot = newMetrics;
+        metricsSnapshotTotal++;
+        writeMetricsTotal ++;
     }
 
     while (tmp) {
+        writeMetricsTotal ++;
         if (tmp->IsDeleted()) {
             preTmp->SetNext(tmp->GetNext());
             tmp->SetNext(toDeleteHead);
@@ -224,6 +232,7 @@ MetricsRecord* WriteMetrics::DoSnapshot() {
             snapshot = newMetrics;
             preTmp = tmp;
             tmp = tmp->GetNext();
+            metricsSnapshotTotal++;
         }
     }
 
@@ -231,7 +240,9 @@ MetricsRecord* WriteMetrics::DoSnapshot() {
         MetricsRecord* toDelete = toDeleteHead;
         toDeleteHead = toDeleteHead->GetNext();
         delete toDelete;
+        writeMetricsDeleteTotal ++;
     }
+    LOG_INFO(sLogger, ("writeMetricsTotal", writeMetricsTotal)("writeMetricsDeleteTotal", writeMetricsDeleteTotal)("metricsSnapshotTotal", metricsSnapshotTotal));
     return snapshot;
 }
 
@@ -294,12 +305,6 @@ void ReadMetrics::ReadAsLogGroup(std::map<std::string, sls_logs::LogGroup*>& log
             Log_Content* contentPtr = logPtr->add_contents();
             contentPtr->set_key(VALUE_PREFIX + gauge->GetName());
             contentPtr->set_value(ToString(gauge->GetValue()));
-        }
-        // set default key
-        {
-            Log_Content* contentPtr = logPtr->add_contents();
-            contentPtr->set_key(METRIC_TOPIC_FIELD_NAME);
-            contentPtr->set_value(METRIC_TOPIC_TYPE);
         }
         tmp = tmp->GetNext();
     }

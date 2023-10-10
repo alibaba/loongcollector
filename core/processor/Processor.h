@@ -29,7 +29,7 @@ public:
     virtual ~Processor() {}
     void SetContext(PipelineContext& context) { mContext = &context; }
     PipelineContext& GetContext() { return *mContext; }
-    MetricsRecordRef GetMetricsRecordRef() { return mMetricsRecordRef; }
+    MetricsRecordRef& GetMetricsRecordRef() { return mMetricsRecordRef; }
     virtual bool Init(const ComponentConfig& config) = 0;
     virtual void Process(PipelineEventGroup& logGroup) = 0;
 
