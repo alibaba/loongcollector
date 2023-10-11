@@ -1,4 +1,4 @@
-# processor_otel_trace插件
+# processor_otel_metric插件
 
 ## 版本
 
@@ -26,7 +26,7 @@ inputs:
     LogPath: .
     FilePattern: simple.log
 processors:
-  - Type: processor_otel_trace
+  - Type: processor_otel_metric
     SourceKey: "content"
     Format: protojson
 flushers:

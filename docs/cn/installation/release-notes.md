@@ -1,5 +1,60 @@
 # 发布历史
 
+## 1.8.0
+
+### 发布记录
+
+发版日期：2023 年 10 月 10 日
+
+新功能
+
+* C++流水线重构，处理流程插件化 [#995](https://github.com/alibaba/ilogtail/pull/995)
+* 多行切分新增continue/end模式，支持多个模式组合 [#978](https://github.com/alibaba/ilogtail/pull/978)
+* 支持超时切分行 [#1067](https://github.com/alibaba/ilogtail/pull/1067)
+* SLS Flusher 支持纳秒级日志时间[#1097](https://github.com/alibaba/ilogtail/issues/1097)
+* 新增全局主机路径黑名单 [#1073](https://github.com/alibaba/ilogtail/pull/1073)
+* 新增trace解析插件`processor_otel_metric` [#1130](https://github.com/alibaba/ilogtail/pull/1130)
+* 环境变量方式创建采集配置时添加资源标签 [#1147](https://github.com/alibaba/ilogtail/pull/1147)
+
+优化
+
+* 编译镜像GCC升级到9.3.1 [#1108](https://github.com/alibaba/ilogtail/pull/1108)
+* Kafka V2插件支持写数据时增加header [#1065](https://github.com/alibaba/ilogtail/issues/1065)
+* 缓存未构成完整行的日志，减少读文件系统调用 [#1142](https://github.com/alibaba/ilogtail/pull/1142)
+* 支持使用环境变量控制日志打印级别 [#959](https://github.com/alibaba/ilogtail/issues/959)
+* 支持flusher输出时使用扁平格式 [#1112](https://github.com/alibaba/ilogtail/pull/1112)
+* skywalking插件支持捕获`db.connection_string`标签 [#1131](https://github.com/alibaba/ilogtail/pull/1131)
+* 统一对metrics V1模型的格式化处理 [#1060](https://github.com/alibaba/ilogtail/pull/1060)
+* 校验网卡IP以获取更精确地主机IP [#1019](https://github.com/alibaba/ilogtail/pull/1019)
+
+问题修复
+
+* 解决采集有挂载卷的statefulset漂移到不同节点时数据重复采集的问题 [#1081](https://github.com/alibaba/ilogtail/issues/1081)
+* 修复json processor支持array解析后的兼容性问题 [#1088](https://github.com/alibaba/ilogtail/issues/1088)
+* 修复空文件inode复用后导致采集到的日志文件名错误的问题 [#1102](https://github.com/alibaba/ilogtail/issues/1102)
+* 修复因checkpoint重新打开文件导致容器无法退出的问题 [#1109](https://github.com/alibaba/ilogtail/pull/1109)
+* 修复stdout文件路径为软链时无法采集容器stdout的问题 [#1037](https://github.com/alibaba/ilogtail/issues/1037)
+* 修复飞天日志时间无法调整时区的问题 [#1123](https://github.com/alibaba/ilogtail/pull/1123)
+* 修复json模式日志最后没有回车可能解析不正确的问题 [#1126](https://github.com/alibaba/ilogtail/issues/1126)
+* 修复读取到的数据开头含有非法jon时json解析异常的问题 [#1161](https://github.com/alibaba/ilogtail/issues/1161)
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.7.1.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.8.0.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.8.0/ilogtail-1.8.0.linux-amd64.tar.gz) | Linux | x86-64 | 90f60c372379311880d78a30609e76924f07d1fc8fdbcb944a78c01cc94de891 |
+| [ilogtail-1.8.0.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.8.0/ilogtail-1.8.0.linux-arm64.tar.gz) | Linux | arm64  | 6737c2f59f4a462d98e46fe5dca8d471a6634531e2cd8a2feb4a6beaaff22d20 |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+``` bash
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.8.0
+```
+
 ## 1.7.1
 
 ### 发布记录
@@ -26,7 +81,6 @@
 问题修复
 
 * 修复 service_go_profile可能panic的问题 [#1036](https://github.com/alibaba/ilogtail/pull/1036)
-* 修复stdout文件路径为软链时无法采集容器stdout的问题 [#1037](https://github.com/alibaba/ilogtail/issues/1037)
 * 修复zstd批量发送问题 [#1006](https://github.com/alibaba/ilogtail/pull/1006)
 * 修复service_otlp插件无法退出的问题 [#1040](https://github.com/alibaba/ilogtail/pull/1040)
 * 修复env创建配置时ttl值非法与空行为不一致的问题 [#1045](https://github.com/alibaba/ilogtail/issues/1045)
