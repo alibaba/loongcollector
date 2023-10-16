@@ -15,7 +15,7 @@
  */
 
 #pragma once
-#include "processor/Processor.h"
+#include "plugin/interface/Processor.h"
 #include <vector>
 #include "parser/LogParser.h" //UserDefinedFormat
 
@@ -23,12 +23,14 @@ namespace logtail {
 
 class ProcessorParseRegexNative : public Processor {
 public:
-    static const char* Name() { return "processor_parse_regex_native"; }
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
     bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) override;
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
     void AddUserDefinedFormat(const std::string& regStr, const std::string& keys);

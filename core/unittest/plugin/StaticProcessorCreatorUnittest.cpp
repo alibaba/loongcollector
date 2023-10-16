@@ -20,11 +20,15 @@ namespace logtail {
 
 class ProcessorMock : public Processor {
 public:
-    static const char* Name() { return "processor_mock"; }
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
     bool Init(const ComponentConfig& config) override { return true; }
     void Process(PipelineEventGroup&) override {}
-    bool IsSupportedEvent(const PipelineEventPtr& e) override { return true; }
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; }
 };
+
+const std::string ProcessorMock::sName = "processor_mock";
 
 class StaticProcessorCreatorUnittest : public ::testing::Test {
 public:
@@ -49,9 +53,9 @@ void StaticProcessorCreatorUnittest::TestIsDynamic() {
 
 void StaticProcessorCreatorUnittest::TestCreate() {
     StaticProcessorCreator<ProcessorMock> creator;
-    auto processorMock = creator.Create(std::string(ProcessorMock::Name()) + "/0");
+    auto processorMock = creator.Create("0");
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, processorMock.get());
-    APSARA_TEST_EQUAL_FATAL(std::string(ProcessorMock::Name()) + "/0", processorMock->Id());
+    APSARA_TEST_EQUAL_FATAL("0", processorMock->Id());
 }
 
 } // namespace logtail

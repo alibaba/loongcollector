@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "processor/Processor.h"
+#include "plugin/interface/Processor.h"
 #include <string>
 #include <boost/regex.hpp>
 
@@ -22,12 +22,14 @@ namespace logtail {
 
 class ProcessorSplitRegexNative : public Processor {
 public:
-    static const char* Name() { return "processor_split_regex_native"; }
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
     bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) override;
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
     void ProcessEvent(PipelineEventGroup& logGroup,

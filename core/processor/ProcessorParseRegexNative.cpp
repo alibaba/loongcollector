@@ -26,6 +26,7 @@
 #include "monitor/MetricConstants.h"
 
 namespace logtail {
+const std::string ProcessorParseRegexNative::sName = "processor_parse_regex_native";
 
 bool ProcessorParseRegexNative::Init(const ComponentConfig& componentConfig) {
     const PipelineConfig& config = componentConfig.GetConfig();
@@ -48,7 +49,7 @@ bool ProcessorParseRegexNative::Init(const ComponentConfig& componentConfig) {
     mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
     mRegexMatchFailures = &(GetContext().GetProcessProfile().regexMatchFailures);
     mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
-    SetMetricsRecordRef(Name(), componentConfig.GetId());
+
     mProcParseInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_IN_SIZE_BYTES);
     mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
     mProcDiscardRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DISCARD_RECORDS_TOTAL);
@@ -75,7 +76,7 @@ void ProcessorParseRegexNative::Process(PipelineEventGroup& logGroup) {
     return;
 }
 
-bool ProcessorParseRegexNative::IsSupportedEvent(const PipelineEventPtr& e) {
+bool ProcessorParseRegexNative::IsSupportedEvent(const PipelineEventPtr& e) const {
     return e.Is<LogEvent>();
 }
 

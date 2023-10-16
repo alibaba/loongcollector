@@ -49,7 +49,7 @@ bool Pipeline::Init(const PipelineConfig& config) {
     }
 
     std::unique_ptr<ProcessorInstance> pluginGroupInfo = PluginRegistry::GetInstance()->CreateProcessor(
-        ProcessorTagNative::Name(), std::string(ProcessorTagNative::Name()) + "/" + std::to_string(pluginIndex++));
+        ProcessorTagNative::sName, std::to_string(pluginIndex++));
     if (!InitAndAddProcessor(std::move(pluginGroupInfo), config)) {
         return false;
     }
@@ -60,13 +60,11 @@ bool Pipeline::Init(const PipelineConfig& config) {
 
     std::unique_ptr<ProcessorInstance> pluginDecoder;
     if (config.mLogType == JSON_LOG || !config.IsMultiline()) {
-        pluginDecoder = PluginRegistry::GetInstance()->CreateProcessor(
-            ProcessorSplitLogStringNative::Name(),
-            std::string(ProcessorSplitLogStringNative::Name()) + "/" + std::to_string(pluginIndex++));
+        pluginDecoder = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitLogStringNative::sName,
+                                                                       std::to_string(pluginIndex++));
     } else {
-        pluginDecoder = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitRegexNative::Name(),
-                                                                       std::string(ProcessorSplitRegexNative::Name())
-                                                                           + "/" + std::to_string(pluginIndex++));
+        pluginDecoder = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitRegexNative::sName,
+                                                                       std::to_string(pluginIndex++));
     }
     if (!InitAndAddProcessor(std::move(pluginDecoder), config)) {
         return false;
@@ -76,24 +74,20 @@ bool Pipeline::Init(const PipelineConfig& config) {
     std::unique_ptr<ProcessorInstance> pluginParser;
     switch (config.mLogType) {
         case APSARA_LOG:
-            pluginParser = PluginRegistry::GetInstance()->CreateProcessor(
-                ProcessorParseApsaraNative::Name(),
-                std::string(ProcessorParseApsaraNative::Name()) + "/" + std::to_string(pluginIndex++));
+            pluginParser = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseApsaraNative::sName,
+                                                                          std::to_string(pluginIndex++));
             break;
         case REGEX_LOG:
-            pluginParser = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseRegexNative::Name(),
-                                                                          std::string(ProcessorParseRegexNative::Name())
-                                                                              + "/" + std::to_string(pluginIndex++));
+            pluginParser = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseRegexNative::sName,
+                                                                          std::to_string(pluginIndex++));
             break;
         case JSON_LOG:
-            pluginParser = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseJsonNative::Name(),
-                                                                          std::string(ProcessorParseJsonNative::Name())
-                                                                              + "/" + std::to_string(pluginIndex++));
+            pluginParser = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseJsonNative::sName,
+                                                                          std::to_string(pluginIndex++));
             break;
         case DELIMITER_LOG:
-            pluginParser = PluginRegistry::GetInstance()->CreateProcessor(
-                ProcessorParseDelimiterNative::Name(),
-                std::string(ProcessorParseDelimiterNative::Name()) + "/" + std::to_string(pluginIndex++));
+            pluginParser = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseDelimiterNative::sName,
+                                                                          std::to_string(pluginIndex++));
             break;
         default:
             return false;
@@ -103,23 +97,20 @@ bool Pipeline::Init(const PipelineConfig& config) {
     }
 
     std::unique_ptr<ProcessorInstance> pluginTime = PluginRegistry::GetInstance()->CreateProcessor(
-        ProcessorParseTimestampNative::Name(),
-        std::string(ProcessorParseTimestampNative::Name()) + "/" + std::to_string(pluginIndex++));
+        ProcessorParseTimestampNative::sName, std::to_string(pluginIndex++));
     if (!InitAndAddProcessor(std::move(pluginTime), config)) {
         return false;
     }
 
     std::unique_ptr<ProcessorInstance> pluginFilter = PluginRegistry::GetInstance()->CreateProcessor(
-        ProcessorFilterNative::Name(),
-        std::string(ProcessorFilterNative::Name()) + "/" + std::to_string(pluginIndex++));
+        ProcessorFilterNative::sName, std::to_string(pluginIndex++));
     if (!InitAndAddProcessor(std::move(pluginFilter), config)) {
         return false;
     }
 
     if (!config.mSensitiveWordCastOptions.empty()) {
         std::unique_ptr<ProcessorInstance> pluginDesensitize = PluginRegistry::GetInstance()->CreateProcessor(
-            ProcessorDesensitizeNative::Name(),
-            std::string(ProcessorDesensitizeNative::Name()) + "/" + std::to_string(pluginIndex++));
+            ProcessorDesensitizeNative::sName, std::to_string(pluginIndex++));
         if (!InitAndAddProcessor(std::move(pluginDesensitize), config)) {
             return false;
         }
@@ -137,7 +128,7 @@ void Pipeline::Process(PipelineEventGroup& logGroup) {
 bool Pipeline::InitAndAddProcessor(std::unique_ptr<ProcessorInstance>&& processor, const PipelineConfig& config) {
     if (!processor) {
         LOG_ERROR(GetContext().GetLogger(),
-                  ("CreateProcessor", ProcessorSplitRegexNative::Name())("Error", "Cannot find plugin"));
+                  ("CreateProcessor", ProcessorSplitRegexNative::sName)("Error", "Cannot find plugin"));
         return false;
     }
     ComponentConfig componentConfig(processor->Id(), config);

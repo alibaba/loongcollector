@@ -14,22 +14,23 @@
  * limitations under the License.
  */
 #pragma once
-#include "processor/Processor.h"
-#include <string>
-#include <boost/regex.hpp>
+
+#include "plugin/interface/Processor.h"
 #include "LogFilter.h"
 
 namespace logtail {
 
 class ProcessorFilterNative : public Processor {
 public:
-    static const char* Name() { return "processor_filter_native"; }
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
     bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
     ~ProcessorFilterNative();
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) override;
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
     enum Mode { BYPASS_MODE, EXPRESSION_MODE, RULE_MODE, GLOBAL_MODE };

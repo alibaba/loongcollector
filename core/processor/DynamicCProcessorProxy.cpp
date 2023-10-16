@@ -26,10 +26,6 @@ DynamicCProcessorProxy::~DynamicCProcessorProxy() {
     delete _c_ins;
 }
 
-const char* DynamicCProcessorProxy::Name() const {
-    return _name.c_str();
-}
-
 bool DynamicCProcessorProxy::Init(const ComponentConfig& componentConfig) {
     return _c_ins->plugin->init(_c_ins, (void*)(&componentConfig), (void*)(&GetContext())) == 0;
 }
@@ -38,7 +34,7 @@ void DynamicCProcessorProxy::Process(PipelineEventGroup& logGroup) {
     _c_ins->plugin->process(_c_ins->plugin_state, &logGroup);
 }
 
-bool DynamicCProcessorProxy::IsSupportedEvent(const PipelineEventPtr& /*e*/) {
+bool DynamicCProcessorProxy::IsSupportedEvent(const PipelineEventPtr& /*e*/) const {
     return true;
 }
 

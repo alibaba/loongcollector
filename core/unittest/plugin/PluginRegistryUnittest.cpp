@@ -43,9 +43,9 @@ void PluginRegistryUnittest::TestLoadStaticPlugins() {
 void PluginRegistryUnittest::TestCreateProcessor() {
     PluginRegistry::GetInstance()->LoadStaticPlugins();
     auto processorParseRegexNative = PluginRegistry::GetInstance()->CreateProcessor(
-        ProcessorParseRegexNative::Name(), std::string(ProcessorParseRegexNative::Name()) + "/0");
+        ProcessorParseRegexNative::sName, "0");
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, processorParseRegexNative.get());
-    APSARA_TEST_EQUAL_FATAL(std::string(ProcessorParseRegexNative::Name()) + "/0", processorParseRegexNative->Id());
+    APSARA_TEST_EQUAL_FATAL("0", processorParseRegexNative->Id());
 }
 
 } // namespace logtail

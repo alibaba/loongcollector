@@ -25,6 +25,7 @@
 
 
 namespace logtail {
+const std::string ProcessorParseApsaraNative::sName = "processor_parse_apsara_native";
 
 // static const int32_t MAX_BASE_FIELD_NUM = 10;
 
@@ -41,7 +42,7 @@ bool ProcessorParseApsaraNative::Init(const ComponentConfig& componentConfig) {
     mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
     mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
     mHistoryFailures = &(GetContext().GetProcessProfile().historyFailures);
-    SetMetricsRecordRef(Name(), componentConfig.GetId());
+
     mProcParseInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_IN_SIZE_BYTES);
     mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
     mProcDiscardRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DISCARD_RECORDS_TOTAL);
@@ -332,7 +333,7 @@ void ProcessorParseApsaraNative::AddLog(const StringView& key, const StringView&
     mProcParseOutSizeBytes->Add(key.size() + value.size());
 }
 
-bool ProcessorParseApsaraNative::IsSupportedEvent(const PipelineEventPtr& e) {
+bool ProcessorParseApsaraNative::IsSupportedEvent(const PipelineEventPtr& e) const {
     return e.Is<LogEvent>();
 }
 

@@ -14,26 +14,22 @@
  * limitations under the License.
  */
 
-#include "plugin/interface/Processor.h"
-#include <string>
+#pragma once
+
+#include "models/PipelineEventGroup.h"
+#include "plugin/interface/Plugin.h"
+#include "pipeline/PipelineConfig.h"
 
 namespace logtail {
 
-class ProcessorTagNative : public Processor {
+class Processor : public Plugin {
 public:
-    static const std::string sName;
+    virtual ~Processor() {}
 
-    const std::string& Name() const override { return sName; }
-    bool Init(const ComponentConfig& componentConfig) override;
-    void Process(PipelineEventGroup& logGroup) override;
+    virtual bool Init(const ComponentConfig& config) = 0;
+    virtual void Process(PipelineEventGroup& logGroup) = 0;
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) const override;
-
-private:
-    bool mPluginProcessFlag = false;
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class ProcessorTagNativeUnittest;
-#endif
+    virtual bool IsSupportedEvent(const PipelineEventPtr& e) const = 0;
 };
 } // namespace logtail

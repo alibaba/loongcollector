@@ -24,11 +24,11 @@
 #include "monitor/MetricConstants.h"
 
 namespace logtail {
+const std::string ProcessorTagNative::sName = "processor_tag_native";
 
 bool ProcessorTagNative::Init(const ComponentConfig& componentConfig) {
     const Config& config = componentConfig.GetConfig();
     mPluginProcessFlag = config.mPluginProcessFlag;
-    SetMetricsRecordRef(Name(), componentConfig.GetId());
     return true;
 }
 
@@ -77,7 +77,7 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     }
 }
 
-bool ProcessorTagNative::IsSupportedEvent(const PipelineEventPtr& /*e*/) {
+bool ProcessorTagNative::IsSupportedEvent(const PipelineEventPtr& /*e*/) const {
     return true;
 }
 

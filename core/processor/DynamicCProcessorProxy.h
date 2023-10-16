@@ -17,7 +17,7 @@
 #pragma once
 
 #include <string>
-#include "processor/Processor.h"
+#include "plugin/interface/Processor.h"
 #include "plugin/creator/CProcessor.h"
 
 namespace logtail {
@@ -26,13 +26,14 @@ class DynamicCProcessorProxy : public Processor {
 public:
     DynamicCProcessorProxy(const char* name);
     ~DynamicCProcessorProxy();
-    const char* Name() const;
+
+    const std::string& Name() const override { return _name; }
     bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
     void SetCProcessor(const processor_interface_t* c_ins);
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) override;
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
     std::string _name;

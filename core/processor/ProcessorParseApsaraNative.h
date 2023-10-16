@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "processor/Processor.h"
+#include "plugin/interface/Processor.h"
 #include <string>
 #include <boost/regex.hpp>
 
@@ -22,12 +22,14 @@ namespace logtail {
 
 class ProcessorParseApsaraNative : public Processor {
 public:
-    static const char* Name() { return "processor_parse_apsara_native"; }
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
     bool Init(const ComponentConfig& componentConfig) override;
     void Process(PipelineEventGroup& logGroup) override;
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) override;
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
     bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e, LogtailTime& lastLogTime, StringView& timeStrCache);
