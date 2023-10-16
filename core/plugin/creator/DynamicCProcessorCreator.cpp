@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-#include "plugin/DynamicCProcessorCreator.h"
+#include "plugin/creator/DynamicCProcessorCreator.h"
 
-#include "plugin/CProcessor.h"
-#include "plugin/ProcessorInstance.h"
-#include "processor/DynamicCProcessorProxy.h"
 #include "common/DynamicLibHelper.h"
+#include "plugin/instance/ProcessorInstance.h"
+#include "processor/DynamicCProcessorProxy.h"
 
 namespace logtail {
 

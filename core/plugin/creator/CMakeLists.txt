@@ -13,12 +13,13 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 2.9)
-project(event)
+project(plugin_creator)
 
-file(GLOB LIB_SOURCE_FILES *.cpp *.h)
+file(GLOB_RECURSE LIB_SOURCE_FILES *.cpp *.h)
 append_source_files(LIB_SOURCE_FILES)
 add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} common)
-target_link_libraries(${PROJECT_NAME} logger)
-target_link_libraries(${PROJECT_NAME} processor_daemon)
-target_link_libraries(${PROJECT_NAME} polling)
+target_link_libraries(${PROJECT_NAME} processor)
+if (UNIX)
+    target_link_libraries(${PROJECT_NAME} dl)
+endif ()

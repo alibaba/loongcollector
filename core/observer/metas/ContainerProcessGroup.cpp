@@ -19,7 +19,7 @@
 #include "monitor/LogtailAlarm.h"
 #include "FileSystemUtil.h"
 #include "StringTools.h"
-#include "plugin/LogtailPlugin.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "interface/statistics.h"
 #include <stdlib.h>
 

@@ -16,17 +16,16 @@
 
 #pragma once
 
-#include <string>
-#include "plugin/PluginInstance.h"
-#include "plugin/PluginCreator.h"
-#include "processor/Processor.h"
+#include <memory>
+
+#include "models/PipelineEventGroup.h"
+#include "monitor/LogtailMetric.h"
+#include "plugin/instance/PluginInstance.h"
 #include "pipeline/PipelineConfig.h"
 #include "pipeline/PipelineContext.h"
-#include "monitor/LogtailMetric.h"
-#include "monitor/MetricConstants.h"
+#include "processor/Processor.h"
 
 namespace logtail {
-
 
 class ProcessorInstance : public PluginInstance {
 public:

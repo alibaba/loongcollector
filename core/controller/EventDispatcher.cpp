@@ -48,7 +48,7 @@
 #include "event_handler/EventHandler.h"
 #include "event_handler/LogInput.h"
 #include "event/Event.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "sender/Sender.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
@@ -64,7 +64,7 @@
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "polling/PollingEventQueue.h"
 #endif
-#include "plugin/LogtailPlugin.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "config_manager/ConfigManager.h"
 #if !defined(_MSC_VER)
 #include "LogtailInsightDispatcher.h"

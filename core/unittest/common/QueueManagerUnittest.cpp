@@ -15,7 +15,7 @@
 #include "unittest/Unittest.h"
 #include "common/LogstoreFeedbackKey.h"
 #include "common/Flags.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "sender/Sender.h"
 
 DECLARE_FLAG_INT32(logtail_queue_check_gc_interval_sec);

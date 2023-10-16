@@ -16,33 +16,32 @@
 
 #include "plugin/PluginRegistry.h"
 
-#include <string>
-#include <stdio.h>
-#include <stdlib.h>
 #include <dlfcn.h>
-#include <string.h>
 #include <unistd.h>
 #include <dirent.h>
-#include "logger/Logger.h"
-#include "app_config/AppConfig.h"
-#include "plugin/PluginCreator.h"
-#include "plugin/StaticProcessorCreator.h"
-#include "plugin/DynamicCProcessorCreator.h"
 
-#include "plugin/CProcessor.h"
-#include "processor/ProcessorSplitLogStringNative.h"
-#include "processor/ProcessorSplitRegexNative.h"
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+#include <string>
+
+#include "app_config/AppConfig.h"
+#include "logger/Logger.h"
+#include "plugin/creator/CProcessor.h"
+#include "plugin/creator/DynamicCProcessorCreator.h"
+#include "plugin/creator/StaticProcessorCreator.h"
+#include "processor/ProcessorDesensitizeNative.h"
+#include "processor/ProcessorFilterNative.h"
 #include "processor/ProcessorParseApsaraNative.h"
 #include "processor/ProcessorParseDelimiterNative.h"
 #include "processor/ProcessorParseJsonNative.h"
 #include "processor/ProcessorParseRegexNative.h"
 #include "processor/ProcessorParseTimestampNative.h"
-#include "processor/ProcessorDesensitizeNative.h"
+#include "processor/ProcessorSplitLogStringNative.h"
+#include "processor/ProcessorSplitRegexNative.h"
 #include "processor/ProcessorTagNative.h"
-#include "processor/ProcessorFilterNative.h"
 
 namespace logtail {
-
 
 PluginRegistry* PluginRegistry::GetInstance() {
     static PluginRegistry instance;

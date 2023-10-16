@@ -22,7 +22,7 @@
 #include "common/FileSystemUtil.h"
 #include "polling/PollingCache.h"
 #include "monitor/Monitor.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "controller/EventDispatcher.h"
 #include "monitor/LogtailAlarm.h"
 #include "checkpoint/CheckPointManager.h"

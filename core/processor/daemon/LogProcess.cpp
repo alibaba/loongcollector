@@ -24,7 +24,7 @@
 #include "common/TimeUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/LogGroupContext.h"
-#include "plugin/LogtailPlugin.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "models/PipelineEventGroup.h"
 #include "pipeline/PipelineManager.h"
 #include "monitor/Monitor.h"

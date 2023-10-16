@@ -15,7 +15,7 @@
  */
 
 #pragma once
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
 #include "pipeline/PipelineConfig.h"
 #include "pipeline/PipelineContext.h"
 

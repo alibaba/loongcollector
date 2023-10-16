@@ -17,7 +17,7 @@
 #include "config/Config.h"
 #include "processor/ProcessorDesensitizeNative.h"
 #include "models/LogEvent.h"
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
 #include "config_manager/ConfigManager.h"
 
 using namespace std;

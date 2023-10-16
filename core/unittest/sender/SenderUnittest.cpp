@@ -47,7 +47,7 @@
 #include "monitor/LogIntegrity.h"
 #include "event_handler/LogInput.h"
 #include "common/FileEncryption.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "common/WaitObject.h"
 #include "common/Lock.h"
 #include "common/MemoryBarrier.h"

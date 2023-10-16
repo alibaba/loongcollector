@@ -26,7 +26,7 @@
 #include "Monitor.h"
 #include "metas/ConnectionMetaManager.h"
 #include "Sender.h"
-#include "LogtailPlugin.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "Constants.h"
 #include "LogFileProfiler.h"
 

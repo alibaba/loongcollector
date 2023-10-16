@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LogtailPlugin.h"
+#include "go_pipeline/LogtailPlugin.h"
 // #include "LogtailPluginAdapter.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"

@@ -16,9 +16,8 @@
 
 #pragma once
 
-#include <string>
-#include "plugin/PluginCreator.h"
-#include "plugin/CProcessor.h"
+#include "plugin/creator/CProcessor.h"
+#include "plugin/creator/PluginCreator.h"
 
 namespace logtail {
 

@@ -20,7 +20,8 @@
 #include "common/Constants.h"
 #include "common/FileSystemUtil.h"
 #include "reader/LogFileReader.h"
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
+#include "monitor/MetricConstants.h"
 
 namespace logtail {
 

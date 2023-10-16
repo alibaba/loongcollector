@@ -18,7 +18,7 @@
 #include "common/RuntimeUtil.h"
 #include "common/FileSystemUtil.h"
 #include "config_manager/ConfigManager.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "logger/Logger.h"
 #include "reader/LogFileReader.h"
 

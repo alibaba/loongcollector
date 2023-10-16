@@ -18,7 +18,7 @@
 #include "config/Config.h"
 #include "processor/ProcessorParseJsonNative.h"
 #include "models/LogEvent.h"
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 

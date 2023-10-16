@@ -15,13 +15,16 @@
  */
 
 #pragma once
+
 #include <memory>
-#include <string>
 #include <set>
+#include <string>
 #include <unordered_map>
-#include "plugin/PluginInstance.h"
-#include "plugin/ProcessorInstance.h"
+
 #include "common/DynamicLibHelper.h"
+#include "plugin/creator/PluginCreator.h"
+#include "plugin/instance/PluginInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
 
 struct processor_interface_t;
 

@@ -17,7 +17,7 @@
 #include "common/JsonUtil.h"
 #include "config/Config.h"
 #include "processor/ProcessorParseTimestampNative.h"
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 

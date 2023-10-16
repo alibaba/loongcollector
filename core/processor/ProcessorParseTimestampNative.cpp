@@ -19,8 +19,9 @@
 #include "app_config/AppConfig.h"
 #include "common/Constants.h"
 #include "common/LogtailCommonFlags.h"
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
 #include <algorithm>
+#include "monitor/MetricConstants.h"
 
 
 namespace logtail {

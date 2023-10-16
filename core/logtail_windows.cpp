@@ -29,9 +29,9 @@
 #include "common/GlobalPara.h"
 #include "logger/Logger.h"
 #ifdef LOGTAIL_RUNTIME_PLUGIN
-#include "plugin/LogtailRuntimePlugin.h"
+#include "go_pipeline/LogtailRuntimePlugin.h"
 #endif
-#include "plugin/LogtailPlugin.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "plugin/PluginRegistry.h"
 #include "pipeline/PipelineManager.h"
 #include "config_manager/ConfigManager.h"

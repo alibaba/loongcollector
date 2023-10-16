@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
+
+#include <cstdint>
+
+#include "logger/Logger.h"
 #include "monitor/MetricConstants.h"
 
 namespace logtail {

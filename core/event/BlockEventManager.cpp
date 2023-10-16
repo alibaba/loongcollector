@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "BlockEventManager.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
 #include "polling/PollingEventQueue.h"

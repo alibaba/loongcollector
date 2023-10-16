@@ -18,7 +18,7 @@
 
 #include <string>
 #include "processor/Processor.h"
-#include "plugin/CProcessor.h"
+#include "plugin/creator/CProcessor.h"
 
 namespace logtail {
 

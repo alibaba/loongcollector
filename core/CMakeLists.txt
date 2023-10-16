@@ -87,8 +87,8 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake)
 # Subdirectories (modules).
 set(SUB_DIRECTORIES_LIST
         aggregator app_config checkpoint common config config_manager config_server_pb
-        controller event event_handler event_listener file_server helper input log_pb logger models monitor
-        parser pipeline plugin polling processor profile_sender reader sdk sender shennong sls_control
+        controller event event_handler event_listener file_server go_pipeline helper input log_pb logger models monitor
+        parser pipeline plugin plugin/creator plugin/instance polling processor processor/daemon profile_sender reader sdk sender shennong sls_control
         fuse
         )
 if (UNIX)
@@ -121,7 +121,7 @@ target_link_libraries(${LOGTAIL_TARGET}
         logger
         config_manager
         checkpoint
-        processor
+        processor_daemon
         controller
         pipeline
         plugin
@@ -131,6 +131,7 @@ target_link_libraries(${LOGTAIL_TARGET}
         profile_sender
         app_config
         sls_control
+        go_pipeline
         )
 if (UNIX)
     target_link_libraries(${LOGTAIL_TARGET} streamlog)

@@ -14,7 +14,7 @@
 #include "unittest/Unittest.h"
 #include "common/JsonUtil.h"
 #include "processor/ProcessorFilterNative.h"
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
 #include "common/ExceptionBase.h"
 #include "config/UserLogConfigParser.h"
 

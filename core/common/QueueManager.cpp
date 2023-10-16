@@ -16,7 +16,7 @@
 #include "common/Flags.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "sender/Sender.h"
 
 DEFINE_FLAG_INT32(logtail_queue_check_gc_interval_sec, "30s", 30);

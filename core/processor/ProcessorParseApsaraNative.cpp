@@ -19,7 +19,8 @@
 #include "models/LogEvent.h"
 #include "app_config/AppConfig.h"
 #include "parser/LogParser.h" // for UNMATCH_LOG_KEY
-#include "plugin/ProcessorInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
+#include "monitor/MetricConstants.h"
 #include <algorithm>
 
 

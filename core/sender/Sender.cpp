@@ -39,7 +39,7 @@
 #include "sdk/Client.h"
 #include "sdk/Exception.h"
 #include "config/Config.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "processor/LogFilter.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/LogIntegrity.h"

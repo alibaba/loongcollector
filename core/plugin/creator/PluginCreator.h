@@ -15,21 +15,19 @@
  */
 
 #pragma once
+
 #include <string>
-#include "plugin/PluginCreator.h"
-#include "plugin/ProcessorInstance.h"
+#include <memory>
+
+#include "plugin/instance/PluginInstance.h"
 
 namespace logtail {
 
-template <typename T>
-class StaticProcessorCreator : public PluginCreator {
+class PluginCreator {
 public:
-    StaticProcessorCreator() {}
-    const char* Name() override { return T::Name(); }
-    bool IsDynamic() override { return false; }
-    std::unique_ptr<PluginInstance> Create(const std::string& pluginId) override {
-        return std::unique_ptr<ProcessorInstance>(new ProcessorInstance(new T, pluginId));
-    }
+    virtual ~PluginCreator() {}
+    virtual const char* Name() = 0;
+    virtual bool IsDynamic() = 0;
+    virtual std::unique_ptr<PluginInstance> Create(const std::string& pluginId) = 0;
 };
-
 } // namespace logtail

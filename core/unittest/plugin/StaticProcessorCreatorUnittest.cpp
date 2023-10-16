@@ -14,7 +14,7 @@
 
 #include <cstdlib>
 #include "unittest/Unittest.h"
-#include "plugin/StaticProcessorCreator.h"
+#include "plugin/creator/StaticProcessorCreator.h"
 
 namespace logtail {
 

@@ -26,7 +26,7 @@
 #include "controller/EventDispatcher.h"
 #include "config_manager/ConfigManager.h"
 #include "monitor/LogtailAlarm.h"
-#include "processor/LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 #include "logger/Logger.h"
 #include "fuse/FuseFileBlacklist.h"
 #include "common/LogFileCollectOffsetIndicator.h"

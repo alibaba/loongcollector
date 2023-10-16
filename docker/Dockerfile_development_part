@@ -31,7 +31,7 @@ RUN chown -R $(whoami) /ilogtail && \
 
 COPY --from=build /src/output/libPluginBase.so /ilogtail/
 COPY --from=build /src/example_config/quick_start/ilogtail_config.json /ilogtail/
-COPY --from=build /src/core/build/plugin/libPluginAdapter.so /ilogtail/
+COPY --from=build /src/core/build/go_pipeline/libPluginAdapter.so /ilogtail/
 
 ENV HOST_OS=$HOST_OS
 ENV LOGTAIL_VERSION=$VERSION

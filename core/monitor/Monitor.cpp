@@ -39,7 +39,7 @@
 #include "config_manager/ConfigManager.h"
 #include "app_config/AppConfig.h"
 #include "event_handler/LogInput.h"
-#include "plugin/LogtailPlugin.h"
+#include "go_pipeline/LogtailPlugin.h"
 #if defined(__linux__)
 #include "ObserverManager.h"
 #endif
