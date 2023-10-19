@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 iLogtail Authors
+ * Copyright 2023 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,10 @@
 #include "plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
-
+    
 template <typename T>
 class StaticProcessorCreator : public PluginCreator {
 public:
-    StaticProcessorCreator() {}
     const char* Name() override { return T::sName.c_str(); }
     bool IsDynamic() override { return false; }
     std::unique_ptr<PluginInstance> Create(const std::string& pluginId) override {

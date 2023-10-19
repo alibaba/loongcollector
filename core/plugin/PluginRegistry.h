@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 iLogtail Authors
+ * Copyright 2023 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@
 
 #include "common/DynamicLibHelper.h"
 #include "plugin/creator/PluginCreator.h"
+#include "plugin/instance/FlusherInstance.h"
+#include "plugin/instance/InputInstance.h"
 #include "plugin/instance/PluginInstance.h"
 #include "plugin/instance/ProcessorInstance.h"
 
@@ -32,28 +34,23 @@ namespace logtail {
 
 class PluginRegistry {
 public:
-    static PluginRegistry* GetInstance();
-    // 加载所有插件
+    PluginRegistry(const PluginRegistry&) = delete;
+    PluginRegistry& operator=(const PluginRegistry&) = delete;
+
+    static PluginRegistry* GetInstance() {
+        static PluginRegistry instance;
+        return &instance;
+    }
+
     void LoadPlugins();
-
-    // 卸载所有插件
     void UnloadPlugins();
-
-    // std::unique_ptr<InputInstance> CreateInput(const std::string& name, const std::string& pluginId);
+    std::unique_ptr<InputInstance> CreateInput(const std::string& name, const std::string& pluginId);
     std::unique_ptr<ProcessorInstance> CreateProcessor(const std::string& name, const std::string& pluginId);
-    // std::unique_ptr<FlusherInstance> CreateFlusher(const std::string& name, const std::string& pluginId);
+    std::unique_ptr<FlusherInstance> CreateFlusher(const std::string& name, const std::string& pluginId);
+    bool IsValidGoPlugin(const std::string& name);
 
 private:
     enum PluginCat { INPUT_PLUGIN, PROCESSOR_PLUGIN, FLUSHER_PLUGIN };
-
-    void LoadStaticPlugins();
-    void LoadDynamicPlugins(const std::set<std::string>& plugins);
-    // void RegisterInputCreator(PluginCreator* creator);
-    void RegisterProcessorCreator(PluginCreator* creator);
-    // void RegisterFlusherCreator(PluginCreator* creator);
-    PluginCreator* LoadProcessorPlugin(DynamicLibLoader& loader, const std::string pluginName);
-    void RegisterCreator(PluginCat cat, PluginCreator* creator);
-    std::unique_ptr<PluginInstance> Create(PluginCat cat, const std::string& name, const std::string& pluginId);
 
     struct PluginKey {
         PluginCat cat;
@@ -67,7 +64,21 @@ private:
             return std::hash<int>()(obj.cat) ^ std::hash<std::string>()(obj.name);
         }
     };
+
+    PluginRegistry();
+    ~PluginRegistry() = default;
+
+    void LoadStaticPlugins();
+    void LoadDynamicPlugins(const std::set<std::string>& plugins);
+    void RegisterInputCreator(PluginCreator* creator);
+    void RegisterProcessorCreator(PluginCreator* creator);
+    void RegisterFlusherCreator(PluginCreator* creator);
+    PluginCreator* LoadProcessorPlugin(DynamicLibLoader& loader, const std::string pluginName);
+    void RegisterCreator(PluginCat cat, PluginCreator* creator);
+    std::unique_ptr<PluginInstance> Create(PluginCat cat, const std::string& name, const std::string& pluginId);
+
     std::unordered_map<PluginKey, std::shared_ptr<PluginCreator>, PluginKeyHash> mPluginDict;
+    std::unordered_set<std::string> mGoPlugins;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PluginRegistryUnittest;
