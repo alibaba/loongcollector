@@ -119,10 +119,11 @@ bool Pipeline::Init(const PipelineConfig& config) {
     return true;
 }
 
-void Pipeline::Process(PipelineEventGroup& logGroup) {
+void Pipeline::Process(PipelineEventGroup&& logGroup, std::vector<PipelineEventGroup>& logGroupList) {
     for (auto& p : mProcessorLine) {
         p->Process(logGroup);
     }
+    logGroupList.emplace_back(std::move(logGroup));
 }
 
 bool Pipeline::InitAndAddProcessor(std::unique_ptr<ProcessorInstance>&& processor, const PipelineConfig& config) {

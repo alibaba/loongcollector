@@ -23,9 +23,12 @@ class PipelineUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
     void TestInit();
+    void TestProcess();
 };
 
 APSARA_UNIT_TEST_CASE(PipelineUnittest, TestInit, 0);
+APSARA_UNIT_TEST_CASE(PipelineUnittest, TestProcess, 1);
+
 
 void PipelineUnittest::TestInit() {
     Pipeline pipeline;
@@ -41,6 +44,66 @@ void PipelineUnittest::TestInit() {
     APSARA_TEST_EQUAL_FATAL(config.mProjectName, context.GetProjectName());
     APSARA_TEST_EQUAL_FATAL(config.mCategory, context.GetLogstoreName());
     APSARA_TEST_EQUAL_FATAL(config.mRegion, context.GetRegion());
+}
+
+void PipelineUnittest::TestProcess() {
+    Pipeline pipeline;
+    PipelineConfig config;
+    config.mConfigName = "project##config_0";
+    config.mProjectName = "project";
+    config.mCategory = "category";
+    config.mRegion = "cn-shanghai";
+    config.mLogType = REGEX_LOG;
+    config.mDiscardUnmatch = false;
+    config.mUploadRawLog = false;
+    config.mAdvancedConfig.mRawLogTag = "__raw__";
+    config.mRegs = std::make_shared<std::list<std::string> >();
+    config.mRegs->emplace_back("(.*)");
+    config.mKeys = std::make_shared<std::list<std::string> >();
+    config.mKeys->emplace_back("content");
+
+    APSARA_TEST_TRUE_FATAL(pipeline.Init(config));
+    
+    // make events
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "line1",
+                    "log.file.offset": "0"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "line2",
+                    "log.file.offset": "0"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ],
+        "tags" : {
+            "__tag__:taiye": "123"
+        }
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    std::vector<PipelineEventGroup> outputList;
+
+    pipeline.Process(std::move(eventGroup), outputList);
+    APSARA_TEST_EQUAL_FATAL(1, outputList.size());
+
+    APSARA_TEST_EQUAL_FATAL(2, outputList[0].GetEvents().size());
+    //APSARA_TEST_EQUAL_FATAL(1, outputList[0].GetTags().size());
 }
 
 } // namespace logtail
