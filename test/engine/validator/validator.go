@@ -24,6 +24,7 @@ import (
 )
 
 var logValidatorFactory = make(map[string]LogValidatorCreator)
+var tagValidatorFactory = make(map[string]TagValidatorCreator)
 var sysValidatorFactory = make(map[string]SystemValidatorCreator)
 var counterChan chan *protocol.LogGroup
 
@@ -45,6 +46,7 @@ var AlarmLogs = make(map[string]map[string]map[string]int)
 
 type (
 	LogValidatorCreator    func(spec map[string]interface{}) (LogValidator, error)
+	TagValidatorCreator    func(spec map[string]interface{}) (TagValidator, error)
 	SystemValidatorCreator func(spec map[string]interface{}) (SystemValidator, error)
 )
 
@@ -53,6 +55,14 @@ type (
 	LogValidator interface {
 		doc.Doc
 		// Valid the given log group and returns the reports when valid failed.
+		Valid(group *protocol.LogGroup) (reports []*Report)
+		// Name of LogValidator.
+		Name() string
+	}
+	// TagValidator check each tag and returns Report slice when having illegal tag.
+	TagValidator interface {
+		doc.Doc
+		// Valid the given group and returns the reports when valid failed.
 		Valid(group *protocol.LogGroup) (reports []*Report)
 		// Name of LogValidator.
 		Name() string
@@ -98,6 +108,13 @@ func RegisterLogValidatorCreator(name string, creator LogValidatorCreator) {
 	logValidatorFactory[name] = creator
 }
 
+// RegisterTagValidatorCreator register a new tag validator creator to the factory .
+func RegisterTagValidatorCreator(name string, creator TagValidatorCreator) {
+	mu.Lock()
+	defer mu.Unlock()
+	tagValidatorFactory[name] = creator
+}
+
 // RegisterSystemValidatorCreator register a new system validator creator to the factory.
 func RegisterSystemValidatorCreator(name string, creator SystemValidatorCreator) {
 	mu.Lock()
@@ -110,6 +127,17 @@ func NewLogValidator(name string, cfg map[string]interface{}) (LogValidator, err
 	mu.Lock()
 	defer mu.Unlock()
 	creator, ok := logValidatorFactory[name]
+	if !ok {
+		return nil, fmt.Errorf("cannot find %s validator", name)
+	}
+	return creator(cfg)
+}
+
+// NewTagValidators reate a new tag validator from the factory.
+func NewTagValidators(name string, cfg map[string]interface{}) (TagValidator, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	creator, ok := tagValidatorFactory[name]
 	if !ok {
 		return nil, fmt.Errorf("cannot find %s validator", name)
 	}

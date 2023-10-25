@@ -872,11 +872,17 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                 SetNotFoundJsonMember(pluginConfigJson["global"],
                                       "EnableTimestampNanosecond",
                                       config->mAdvancedConfig.mEnableTimestampNanosecond);
+                SetNotFoundJsonMember(pluginConfigJson["global"],
+                                      "UsingOldContentTag",
+                                      config->mAdvancedConfig.mUsingOldContentTag);
             } else {
                 Json::Value pluginGlobalConfigJson;
                 SetNotFoundJsonMember(pluginGlobalConfigJson,
                                       "EnableTimestampNanosecond",
                                       config->mAdvancedConfig.mEnableTimestampNanosecond);
+                SetNotFoundJsonMember(pluginGlobalConfigJson,
+                                      "UsingOldContentTag",
+                                      config->mAdvancedConfig.mUsingOldContentTag);
                 pluginConfigJson["global"] = pluginGlobalConfigJson;
             }
             config->mPluginConfig = pluginConfigJson.toStyledString();

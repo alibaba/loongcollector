@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	global_config "github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -414,6 +415,22 @@ func Test_extractTags(t *testing.T) {
 	assert.Equal(t, l.Contents[0].Value, "k2")
 }
 
+func Test_extractTagsToLogTags(t *testing.T) {
+	logTag := extractTagsToLogTags([]byte("k1~=~v1^^^k2~=~v2"))
+	assert.Equal(t, logTag[0].Key, "k1")
+	assert.Equal(t, logTag[0].Value, "v1")
+	assert.Equal(t, logTag[1].Key, "k2")
+	assert.Equal(t, logTag[1].Value, "v2")
+
+	logTag = extractTagsToLogTags([]byte("^^^k2~=~v2"))
+	assert.Equal(t, logTag[0].Key, "k2")
+	assert.Equal(t, logTag[0].Value, "v2")
+
+	logTag = extractTagsToLogTags([]byte("^^^k2"))
+	assert.Equal(t, logTag[0].Key, "__tag__:__prefix__0")
+	assert.Equal(t, logTag[0].Value, "k2")
+}
+
 func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 	rawLogs := []byte("12345")
 	topic := "topic"
@@ -423,7 +440,8 @@ func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 	l.PluginRunner = &pluginv1Runner{
 		LogsChan: make(chan *pipeline.LogWithContext, 10),
 	}
-
+	l.GlobalConfig = &config.LogtailGlobalConfig
+	l.GlobalConfig.UsingOldContentTag = true
 	{
 		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
 		assert.Equal(t, 1, len(l.PluginRunner.(*pluginv1Runner).LogsChan))

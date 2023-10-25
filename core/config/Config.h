@@ -92,6 +92,7 @@ public:
         uint16_t mSearchCheckpointDirDepth = 0; // Max directory depth when search checkpoint.
 
         bool mEnableTimestampNanosecond = false;
+        bool mUsingOldContentTag = false;
         // Deprecated
         bool mEnablePreciseTimestamp = false;
         std::string mPreciseTimestampKey;

@@ -45,7 +45,7 @@ iLogtail Prometheus 采集的Metrics 数据与日志同样遵循[iLogtail 的传
 
 ## E2E 快速上手
 目前iLogtail 已经集成了prometheus 的E2E测试，可以在iLogtail 的根路径快速进行上手验证。
-测试命令：_TEST_SCOPE=input_prometheus  TEST_DEBUG=true   make e2e（开启DEBUG 选项可以查看传输数据明细）_
+测试命令：TEST_SCOPE=input_prometheus  TEST_DEBUG=true   make e2e（开启DEBUG 选项可以查看传输数据明细）_
 ```
 TEST_DEBUG=true TEST_PROFILE=false  ./scripts/e2e.sh behavior input_prometheus
 =========================================

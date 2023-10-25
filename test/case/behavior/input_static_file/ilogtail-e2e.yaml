@@ -25,6 +25,9 @@ ilogtail:
                        "keys": [
                            "content"
                        ],
+                       "advanced": {
+                           "using_old_content_tag": true
+                       },
                        "log_begin_reg": ".*",
                        "log_path": "/root/test",
                        "log_type": "common_reg_log",

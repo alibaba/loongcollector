@@ -80,6 +80,7 @@ jobs:
           BUILD_LOGTAIL_UT: OFF
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
+          WITHOUTGDB: ON
         run: make dist && scripts/check_glibc.sh
 
       - name: Build Docker

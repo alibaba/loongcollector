@@ -251,6 +251,41 @@ func extractTags(rawTags []byte, log *protocol.Log) {
 	}
 }
 
+// extractTagsToLogTags extracts tags from rawTags and append them into []*protocol.LogTag.
+// Rule: k1~=~v1^^^k2~=~v2
+// rawTags
+func extractTagsToLogTags(rawTags []byte) []*protocol.LogTag {
+	logTags := []*protocol.LogTag{}
+	defaultPrefixIndex := 0
+	for len(rawTags) != 0 {
+		idx := bytes.Index(rawTags, tagDelimiter)
+		var part []byte
+		if idx < 0 {
+			part = rawTags
+			rawTags = rawTags[len(rawTags):]
+		} else {
+			part = rawTags[:idx]
+			rawTags = rawTags[idx+len(tagDelimiter):]
+		}
+		if len(part) > 0 {
+			pos := bytes.Index(part, tagSeparator)
+			if pos > 0 {
+				logTags = append(logTags, &protocol.LogTag{
+					Key:   string(part[:pos]),
+					Value: string(part[pos+len(tagSeparator):]),
+				})
+			} else {
+				logTags = append(logTags, &protocol.LogTag{
+					Key:   defaultTagPrefix + strconv.Itoa(defaultPrefixIndex),
+					Value: string(part),
+				})
+			}
+			defaultPrefixIndex++
+		}
+	}
+	return logTags
+}
+
 // ProcessRawLogV2 ...
 // V1 -> V2: enable topic field, and use tags field to pass more tags.
 // unsafe parameter: rawLog,packID and tags
@@ -263,8 +298,14 @@ func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic st
 	if len(topic) > 0 {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
 	}
-	extractTags(tags, log)
-	lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
+	// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
+	if !lc.GlobalConfig.UsingOldContentTag {
+		logTags := extractTagsToLogTags(tags)
+		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
+	} else {
+		extractTags(tags, log)
+		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
+	}
 	return 0
 }
 
@@ -279,8 +320,14 @@ func (lc *LogstoreConfig) ProcessLog(logByte []byte, packID string, topic string
 	if len(topic) > 0 {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
 	}
-	extractTags(tags, log)
-	lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
+	// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
+	if !lc.GlobalConfig.UsingOldContentTag {
+		logTags := extractTagsToLogTags(tags)
+		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
+	} else {
+		extractTags(tags, log)
+		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
+	}
 	return 0
 }
 
@@ -298,13 +345,18 @@ func (lc *LogstoreConfig) ProcessLogGroup(logByte []byte, packID string) int {
 		if len(topic) > 0 {
 			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
 		}
-		for _, tag := range logGroup.LogTags {
-			log.Contents = append(log.Contents, &protocol.Log_Content{
-				Key:   tagPrefix + tag.GetKey(),
-				Value: tag.GetValue(),
-			})
+		// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
+		if !lc.GlobalConfig.UsingOldContentTag {
+			lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logGroup.LogTags}})
+		} else {
+			for _, tag := range logGroup.LogTags {
+				log.Contents = append(log.Contents, &protocol.Log_Content{
+					Key:   tagPrefix + tag.GetKey(),
+					Value: tag.GetValue(),
+				})
+			}
+			lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
 		}
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
 	}
 	return 0
 }

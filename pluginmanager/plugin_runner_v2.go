@@ -417,6 +417,7 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	return nil
 }
 
+// TODO: Design the ReceiveRawLogV2, which is passed in a PipelineGroupEvents not pipeline.LogWithContext, and tags should be added in the PipelineGroupEvents.
 func (p *pluginv2Runner) ReceiveRawLog(in *pipeline.LogWithContext) {
 	md := models.NewMetadata()
 	if in.Context != nil {

@@ -150,6 +150,12 @@ void UserLogConfigParser::ParseAdvancedConfig(const Json::Value& originalVal, Co
             cfg.mAdvancedConfig.mSpecifiedYear = static_cast<int32_t>(val.asUInt());
         }
     }
+    // using_old_content_tag
+    {
+        if (advancedVal.isMember("using_old_content_tag") && advancedVal["using_old_content_tag"].isBool()) {
+            cfg.mAdvancedConfig.mUsingOldContentTag = GetBoolValue(advancedVal, "using_old_content_tag");
+        }
+    }
     // precise_timestamp
     {
         if (advancedVal.isMember("enable_timestamp_nanosecond") && advancedVal["enable_timestamp_nanosecond"].isBool()) {

@@ -6,6 +6,7 @@ if [ -d "${PROTO_GEN_HOME}" ]; then
   rm -rf "${PROTO_GEN_HOME}"
 fi
 mkdir "${PROTO_GEN_HOME}"
+export PATH=$PATH:$GOPATH/bin
 
 protoc -I="${PROTO_HOME}" \
   -I="${GOPATH}/src" \

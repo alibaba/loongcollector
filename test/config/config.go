@@ -71,6 +71,7 @@ type (
 	// Verify content transferred to the mock backend to verify the collected telemetry data.
 	Verify struct {
 		LogRules    []Rule `mapstructure:"log_rules" yaml:"log_rules"`
+		TagRules    []Rule `mapstructure:"tag_rules" yaml:"tag_rules"`
 		SystemRules []Rule `mapstructure:"system_rules" yaml:"system_rules"`
 	}
 	// Retry triggered when failing.

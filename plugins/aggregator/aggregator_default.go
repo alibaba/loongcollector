@@ -16,11 +16,11 @@ package aggregator
 
 import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
+	"github.com/alibaba/ilogtail/plugins/aggregator/context"
 )
 
 func init() {
 	pipeline.Aggregators["aggregator_default"] = func() pipeline.Aggregator {
-		return baseagg.NewAggregatorBase()
+		return context.NewAggregatorContext()
 	}
 }

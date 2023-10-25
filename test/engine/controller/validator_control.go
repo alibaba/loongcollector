@@ -29,6 +29,7 @@ import (
 type ValidatorController struct {
 	chain         *CancelChain
 	logValidators []validator.LogValidator
+	tagValidators []validator.TagValidator
 	sysValidators []validator.SystemValidator
 	report        *Report
 }
@@ -41,6 +42,7 @@ type Report struct {
 	FlushLogGroupCount int                                  `json:"flush_log_group"`
 	AlarmLogs          map[string]map[string]map[string]int `json:"alarm_logs"`
 	LogReports         map[string]*Reason                   `json:"log_reports"`
+	TagReports         map[string]*Reason                   `json:"tag_reports"`
 	TotalReports       map[string]*Reason                   `json:"total_reports"`
 }
 
@@ -61,6 +63,14 @@ func (c *ValidatorController) Init(parent *CancelChain, cfg *config.Case) error 
 		}
 		c.logValidators = append(c.logValidators, v)
 	}
+	for _, rule := range cfg.Verify.TagRules {
+		logger.Debug(context.Background(), "stage", "add", "rule", rule.Name)
+		v, err := validator.NewTagValidators(rule.Validator, rule.Spec)
+		if err != nil {
+			return err
+		}
+		c.tagValidators = append(c.tagValidators, v)
+	}
 	for _, rule := range cfg.Verify.SystemRules {
 		logger.Debug(context.Background(), "stage", "add", "rule", rule.Name)
 		v, err := validator.NewSystemValidator(rule.Validator, rule.Spec)
@@ -72,6 +82,7 @@ func (c *ValidatorController) Init(parent *CancelChain, cfg *config.Case) error 
 	c.report = &Report{
 		Pass:         true,
 		LogReports:   make(map[string]*Reason),
+		TagReports:   make(map[string]*Reason),
 		TotalReports: make(map[string]*Reason),
 	}
 	return nil
@@ -108,8 +119,14 @@ func (c *ValidatorController) Start() error {
 				for _, log := range group.Logs {
 					logger.Debugf(context.Background(), "%s", log.String())
 				}
+				for _, tag := range group.LogTags {
+					logger.Debugf(context.Background(), "%s", tag.String())
+				}
 				for _, v := range c.logValidators {
 					c.addLogReport(v.Name(), v.Valid(group))
+				}
+				for _, v := range c.tagValidators {
+					c.addTagReport(v.Name(), v.Valid(group))
 				}
 				for _, v := range c.sysValidators {
 					v.Valid(group)
@@ -123,8 +140,14 @@ func (c *ValidatorController) Start() error {
 				for _, log := range group.Logs {
 					logger.Debugf(context.Background(), "%s", log.String())
 				}
+				for _, tag := range group.LogTags {
+					logger.Debugf(context.Background(), "%s", tag.String())
+				}
 				for _, v := range c.logValidators {
 					c.addLogReport(v.Name(), v.Valid(group))
+				}
+				for _, v := range c.tagValidators {
+					c.addTagReport(v.Name(), v.Valid(group))
 				}
 				for _, v := range c.sysValidators {
 					v.Valid(group)
@@ -202,6 +225,25 @@ func (c *ValidatorController) addLogReport(name string, failReports []*validator
 	if len(failReports) > 0 {
 		c.report.Pass = false
 		reason := c.report.LogReports[name]
+		reason.Pass = false
+		for _, report := range failReports {
+			reason.FailReasons[report.String()] = reason.FailReasons[report.String()] + 1
+		}
+	}
+}
+
+// addTagReport add the tag validator result to the final report.
+func (c *ValidatorController) addTagReport(name string, failReports []*validator.Report) {
+	_, ok := c.report.TagReports[name]
+	if !ok {
+		c.report.TagReports[name] = &Reason{
+			Pass:        true,
+			FailReasons: make(map[string]int),
+		}
+	}
+	if len(failReports) > 0 {
+		c.report.Pass = false
+		reason := c.report.TagReports[name]
 		reason.Pass = false
 		for _, report := range failReports {
 			reason.FailReasons[report.String()] = reason.FailReasons[report.String()] + 1
