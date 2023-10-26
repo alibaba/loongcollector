@@ -67,7 +67,9 @@ type FlusherHTTP struct {
 	Concurrency         int                          // How many requests can be performed in concurrent
 	Authenticator       *extensions.ExtensionConfig  // name and options of the extensions.ClientAuthenticator extension to use
 	FlushInterceptor    *extensions.ExtensionConfig  // name and options of the extensions.FlushInterceptor extension to use
+	AsyncIntercept      bool                         // intercept the event asynchronously
 	RequestInterceptors []extensions.ExtensionConfig // custom request interceptor settings
+	QueueCapacity       int                          // capacity of channel
 
 	varKeys []string
 
@@ -127,7 +129,10 @@ func (f *FlusherHTTP) Init(context pipeline.Context) error {
 		return err
 	}
 
-	f.queue = make(chan interface{})
+	if f.QueueCapacity <= 0 {
+		f.QueueCapacity = 1024
+	}
+	f.queue = make(chan interface{}, f.QueueCapacity)
 	for i := 0; i < f.Concurrency; i++ {
 		go f.runFlushTask()
 	}
@@ -148,12 +153,14 @@ func (f *FlusherHTTP) Flush(projectName string, logstoreName string, configName 
 
 func (f *FlusherHTTP) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
 	for _, groupEvents := range groupEventsArray {
-		if f.interceptor != nil {
+		if !f.AsyncIntercept && f.interceptor != nil {
 			groupEvents = f.interceptor.Intercept(groupEvents)
-			if groupEvents == nil {
+			// skip groupEvents that is nil or empty.
+			if groupEvents == nil || len(groupEvents.Events) == 0 {
 				continue
 			}
 		}
+
 		f.addTask(groupEvents)
 	}
 	return nil
@@ -269,6 +276,12 @@ func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
 	case *protocol.LogGroup:
 		logs, varValues, err = f.converter.ToByteStreamWithSelectedFields(v, f.varKeys)
 	case *models.PipelineGroupEvents:
+		if f.AsyncIntercept && f.interceptor != nil {
+			v = f.interceptor.Intercept(v)
+			if v == nil || len(v.Events) == 0 {
+				return nil
+			}
+		}
 		logs, varValues, err = f.converter.ToByteStreamWithSelectedFieldsV2(v, f.varKeys)
 	default:
 		return fmt.Errorf("unsupport data type")
@@ -452,8 +465,9 @@ func (f *FlusherHTTP) fillRequestContentType() {
 func init() {
 	pipeline.Flushers["flusher_http"] = func() pipeline.Flusher {
 		return &FlusherHTTP{
-			Timeout:     defaultTimeout,
-			Concurrency: 1,
+			QueueCapacity: 1024,
+			Timeout:       defaultTimeout,
+			Concurrency:   1,
 			Convert: helper.ConvertConfig{
 				Protocol:             converter.ProtocolCustomSingle,
 				Encoding:             converter.EncodingJSON,

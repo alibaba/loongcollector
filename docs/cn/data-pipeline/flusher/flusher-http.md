@@ -29,6 +29,8 @@
 | Convert.TagFieldsRename      | Map<String,String> | 否       | 对日志中tags中的json字段重命名                                                                                                                               |
 | Convert.ProtocolFieldsRename | Map<String,String> | 否       | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                                                             |
 | Concurrency                  | Int                | 否       | 向url发起请求的并发数，默认为`1`                                                                                                                               |
+| QueueCapacity                  | Int                | 否       | 内部channel的缓存大小，默认为1024      
+| AsyncIntercept                  | Boolean                | 否       | 异步过滤数据，默认为否  
 
 ## 样例
 
