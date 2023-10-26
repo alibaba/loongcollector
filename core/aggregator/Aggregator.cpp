@@ -128,13 +128,17 @@ bool Aggregator::Add(const std::string& projectName,
                      sls_logs::LogGroup& logGroup,
                      const Config* config,
                      DATA_MERGE_TYPE mergeType,
-                     const uint32_t logGroupSize,
+                     uint32_t logGroupSize,
                      const std::string& defaultRegion,
                      const std::string& filename,
                      const LogGroupContext& context) {
-    if ((logGroupSize == 0 && logGroup.ByteSize() > INT32_FLAG(max_send_log_group_size))
-        || (int32_t)logGroupSize > INT32_FLAG(max_send_log_group_size)) {
-        LOG_ERROR(sLogger, ("invalid log group size", logGroupSize)("real size", logGroup.ByteSize()));
+    if (logGroupSize == 0) {
+        logGroupSize = logGroup.ByteSize();
+    }
+    if ((int32_t)logGroupSize > INT32_FLAG(max_send_log_group_size)) {
+        LOG_ERROR(sLogger,
+                  ("log group size exceed limit. actual size", logGroupSize)("size limit",
+                                                                             INT32_FLAG(max_send_log_group_size)));
         return false;
     }
 
@@ -213,7 +217,7 @@ bool Aggregator::Add(const std::string& projectName,
 
     LogGroup discardLogGroup;
     vector<MergeItem*> sendDataVec;
-    int32_t logByteSize = (logGroupSize == 0 ? logGroup.ByteSize() : logGroupSize) / logSize;
+    int32_t logByteSize = logGroupSize / logSize;
     decltype(logGroup.mutable_logs()->mutable_data()) mutableLogPtr = logGroup.mutable_logs()->mutable_data();
     int32_t neededIdx = 0;
     int32_t discardLogSize = logSize - neededLogSize;

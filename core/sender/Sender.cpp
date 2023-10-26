@@ -1016,6 +1016,9 @@ bool Sender::ReadNextEncryption(int32_t& pos,
         bufferMeta.set_endpoint(AppConfig::GetInstance()->GetDefaultRegion()); // new mode
         bufferMeta.set_aliuid("");
     }
+    if (!bufferMeta.has_compresstype()) {
+        bufferMeta.set_compresstype(SlsCompressType::SLS_CMP_LZ4);
+    }
 
     buffer = new char[meta.mEncryptionSize + 1];
     nbytes = fread(buffer, sizeof(char), meta.mEncryptionSize, fin);
@@ -2184,8 +2187,11 @@ bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
     if (logSize == 0)
         return true;
 
-    if ((int32_t)logGroup.ByteSize() > INT32_FLAG(max_send_log_group_size)) {
-        LOG_ERROR(sLogger, ("invalid log group size", logGroup.ByteSize()));
+    auto logGroupSize = logGroup.ByteSize();
+    if ((int32_t)logGroupSize > INT32_FLAG(max_send_log_group_size)) {
+        LOG_ERROR(sLogger,
+                  ("log group size exceed limit. actual size", logGroupSize)("size limit",
+                                                                                  INT32_FLAG(max_send_log_group_size)));
         return false;
     }
 

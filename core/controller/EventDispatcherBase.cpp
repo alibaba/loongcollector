@@ -1210,11 +1210,17 @@ void EventDispatcherBase::UpdateConfig() {
     // do not delete check point, when config update too short and we can't create all readers
     // if we remove checkpoint here, logtail will lost checkpoint
     // CheckPointManager::Instance()->RemoveAllCheckPoint();
+    LOG_INFO(sLogger, ("collect checkpoint", "start"));
     DumpAllHandlersMeta(true);
+    LOG_INFO(sLogger, ("collect checkpoint", "done"));
     // CheckPointManager::Instance()->PrintStatus();
     if (ConfigManager::GetInstance()->GetConfigRemoveFlag()) {
-        LOG_INFO(sLogger, ("dump checkpoint to local", ""));
-        CheckPointManager::Instance()->DumpCheckPointToLocal();
+        LOG_INFO(sLogger, ("dump checkpoint to local", "start"));
+        if (!(CheckPointManager::Instance()->DumpCheckPointToLocal())) {
+            LOG_WARNING(sLogger, ("dump checkpoint to local", "fail"));
+        } else {
+            LOG_INFO(sLogger, ("dump checkpoint to local", "success"));
+        }
         ConfigManager::GetInstance()->SetConfigRemoveFlag(false);
     }
     // reset last dump time to prevent check point manager to dump check point and delete check point.
@@ -1247,14 +1253,15 @@ void EventDispatcherBase::ExitProcess() {
     LOG_INFO(sLogger, ("LogInput", "hold on"));
     LogInput::GetInstance()->HoldOn();
 
-    LOG_INFO(sLogger, ("dump checkpoint to local", "start"));
+    LOG_INFO(sLogger, ("collect checkpoint", "start"));
     DumpAllHandlersMeta(false);
-    LOG_INFO(sLogger, ("dump checkpoint to local", "30%"));
-    if (!(CheckPointManager::Instance()->DumpCheckPointToLocal()))
+    LOG_INFO(sLogger, ("collect checkpoint", "done"));
+    LOG_INFO(sLogger, ("dump checkpoint to local", "start"));
+    if (!(CheckPointManager::Instance()->DumpCheckPointToLocal())) {
         LOG_WARNING(sLogger, ("dump checkpoint to local", "fail"));
-    else
+    } else {
         LOG_INFO(sLogger, ("dump checkpoint to local", "success"));
-
+    }
     // added by xianzhi(bowen.gbw@antfin.com)
     // should dump line count and integrity data to local file
     LOG_INFO(sLogger, ("dump line count data to local file", "start"));

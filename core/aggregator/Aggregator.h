@@ -130,7 +130,7 @@ public:
              sls_logs::LogGroup& logGroup,
              const Config* config,
              DATA_MERGE_TYPE mergeType,
-             const uint32_t logGroupSize,
+             uint32_t logGroupSize,
              const std::string& defaultRegion = "",
              const std::string& filename = "",
              const LogGroupContext& context = LogGroupContext());

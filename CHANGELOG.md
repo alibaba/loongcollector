@@ -38,3 +38,4 @@ your changes, such as:
 ## [Unreleased]
 
 - [public] [both] [added] add UsingOldContentTag. When UsingOldContentTag is set to false, the Tag is now placed in the Meta instead of Logs during cgo.
+- [public] [both] [fixed] fix send local buffer failed when upgrade iLogtail from version earlier than 1.3.
