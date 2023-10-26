@@ -4,7 +4,7 @@
 
 `processor_regex_accelerate processor`插件通过正则匹配以加速模式实现文本日志的字段提取。
 
-备注：该插件目前仅支持与输入插件file_log和输出插件flusher_sls配套使用，且不得与其它加速插件混用。
+备注：该插件目前仅支持与输入插件file_log配套使用，且不得与其它加速插件混用。
 
 ## 版本
 

@@ -4,6 +4,8 @@
 
 `processor_regex processor`插件可以通过正则匹配的模式实现文本日志的字段提取。
 
+备注：当作为第一个日志解析插件时，建议使用[正则加速](../accelerator/regex-accelerate.md)插件替代。
+
 ## 版本
 
 [Stable](../stability-level.md)
@@ -21,6 +23,7 @@
 | KeepSource   | Boolean  | 否    | 是否保留原始字段。如果未添加该参数，则默认使用false，表示不保留。                                       |
 | FullMatch    | Boolean  | 否    | 如果未添加该参数，则默认使用true，表示只有字段完全匹配Regex参数中的正则表达式时才被提取。配置为false，表示部分字段匹配也会进行提取。 |
 | KeepSourceIfParseError | Boolean | 否    | 解析失败时，是否保留原始日志。如果未添加该参数，则默认使用true，表示保留原始日志。       |
+
 ## 样例
 
 采集`/home/test-log/`路径下的`reg.log`文件，日志内容按照提取字段。

@@ -4,6 +4,8 @@
 
 `processor_json processor`插件可以实现对`Json`格式日志的解析。
 
+备注：当作为第一个日志解析插件时，建议使用[Json加速](../accelerator/json-accelerate.md)插件替代。
+
 ## 支持的Event类型
 
 | LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |

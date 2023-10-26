@@ -3,7 +3,9 @@
 ## 简介
 
 `processor_split_log_regex processor`插件实现多行日志（例如Java程序日志）的采集。
-备注：该插件必须设置为`processor`的第一个插件。
+
+备注：建议使用[正则加速](../accelerator/regex-accelerate.md)或[分隔符加速](../accelerator/delimiter-accelerate.md)插件中的多行切分功能替代。
+单独与非加速插件配合时，该插件必须设置为`processor`的第一个插件。
 
 ## 版本
 

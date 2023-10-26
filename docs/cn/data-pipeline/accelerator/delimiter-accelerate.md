@@ -4,7 +4,7 @@
 
 `processor_delimiter_accelerate processor`插件以加速模式实现分隔符日志的字段提取。该方式支持使用引用符对分隔符进行包裹。
 
-备注：该插件目前仅支持与输入插件file_log和输出插件flusher_sls配套使用，且不得与其它加速插件混用。
+备注：该插件目前仅支持与输入插件file_log配套使用，且不得与其它加速插件混用。
 
 ## 版本
 
@@ -19,6 +19,9 @@
 | Quote | Char | 是 | 包裹分隔符的引用符。若引用符为不可见字符，则值为"0x不可见字符在ASCII码中对应的十六进制数"。例如,若引用符为ASCII码中排行为1的不可见字符，则值为0x01。 |
 | ColumnKeys | Array | 是 | 解析后的字段名列表。 |
 | AcceptNoEnoughKeys | Boolean | 否 | 如果日志中分割出的字段数少于ColumnKeys的元素个数，是否上传已解析的字段。如果未添加该参数，则默认使用false，表示不上传已解析的字段。 |
+| LogBeginRegex | String | 否 | 起始行正则表达式，仅当待采集日志为多行日志时使用。支持组合参见表3。 |
+| LogContinueRegex | String | 否 | 中间行正则表达式，仅当待采集日志为多行日志时使用。支持组合参见表3。 |
+| LogEndRegex | String | 否 | 结尾行正则表达式，仅当待采集日志为多行日志时使用。支持组合参见表3。 |
 | FilterKey | Array | 否 | 用于过滤日志的字段。仅当该字段的值与FilterRegex参数中对应设置的正则表达式匹配时，对应的日志才会被采集。 |
 | FilterRegex | Array | 否，当FilterKey参数不为空时必选 | 日志字段过滤的正则表达式。该参数元素个数必须与FilterKey参数的元素个数相同。 |
 | TimeKey | String | 否 | 用于解析日志时间格式的字段名称。未配置该字段时，默认使用系统时间作为日志时间。 |
@@ -80,6 +83,16 @@
 | regex_content | String | 是 | [^']* | 敏感内容的正则表达式，使用RE2语法。 |
 | all | Boolean | 是 | true | 是否替换该字段中所有的敏感内容。可选值如下：<br>- true（推荐）：替换。<br>- false：只替换字段中匹配正则表达式的第一部分内容。 |
 | const | String | 否 | "********" | 当type设置为const时，必须配置。 |
+
+- 表3:多行切分正则模式组合
+
+| 正则 | 含义 |
+| --- | --- |
+| LogBeginRegex | 多行日志有明确的开头模式。开头模式之后的其他日志，跟随开头模式组成多行日志。
+| LogBeginRegex，LogContinueRegex | 多行日志有明确的开头模式，中间行模式。不符合模式的其他日志，根据 DiscardUnmatch 进行处理。
+| LogBeginRegex，LogEndRegex | 多行日志有明确的开头模式，结尾模式。两者之间的日志会被当做多行日志进行处理，两者之外的日志会根据 DiscardUnmatch 进行处理。
+| LogContinueRegex，LogEndRegex | 多行日志有明确的中间行模式，结尾模式。不符合模式的其他日志，根据 DiscardUnmatch 进行处理。
+| LogEndRegex | 多行日志有明确的结尾模式。结尾模式之前的其他日志，跟随结尾模式组成多行日志。
 
 ## 样例
 

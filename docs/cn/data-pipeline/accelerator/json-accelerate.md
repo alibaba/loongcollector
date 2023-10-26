@@ -1,10 +1,10 @@
-# json加速
+# Json加速
 
 ## 简介
 
 `processor_json_accelerate processor`插件以加速模式实现`Json`格式日志的字段提取。
 
-备注：该插件目前仅支持与输入插件file_log和输出插件flusher_sls配套使用，且不得与其它加速插件混用。
+备注：该插件目前仅支持与输入插件file_log配套使用，且不得与其它加速插件混用。
 
 ## 版本
 
