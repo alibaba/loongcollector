@@ -80,7 +80,7 @@ DEFINE_FLAG_DOUBLE(send_server_error_retry_ratio, "", 0.3);
 DEFINE_FLAG_DOUBLE(send_server_error_ratio_smoothing_factor, "", 5.0);
 DEFINE_FLAG_INT32(send_statistic_entry_timeout, "seconds", 7200);
 DEFINE_FLAG_INT32(sls_host_update_interval, "seconds", 5);
-DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 5 * 1024 * 1024);
+DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 DEFINE_FLAG_BOOL(dump_reduced_send_result, "for performance test", false);
 DEFINE_FLAG_INT32(test_network_normal_interval, "if last check is normal, test network again after seconds ", 30);
 DEFINE_FLAG_INT32(same_topic_merge_send_count,

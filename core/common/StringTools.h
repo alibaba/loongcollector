@@ -138,7 +138,7 @@ bool ExtractTopics(const std::string& val,
                    std::vector<std::string>& keys,
                    std::vector<std::string>& values);
 
-bool CheckTopicRegFormat(const std::string& regStr);
+bool NormalizeTopicRegFormat(std::string& regStr);
 
 #if defined(_MSC_VER)
 // TODO: Test it.

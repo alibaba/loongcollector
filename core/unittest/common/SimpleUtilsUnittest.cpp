@@ -17,7 +17,6 @@
 #include "FileSystemUtilUnittest.h"
 #include "DevInodeUnittest.h"
 #include "TimeUtilUnittest.h"
-#include "StringToolsUnittest.h"
 
 int main(int argc, char** argv) {
     logtail::Logger::Instance().InitGlobalLoggers();

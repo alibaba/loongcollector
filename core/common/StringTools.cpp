@@ -15,7 +15,7 @@
 #include "StringTools.h"
 #include <string.h>
 #include <boost/algorithm/string.hpp>
-#include <boost/xpressive/xpressive.hpp>
+#include <boost/exception/all.hpp>
 #include "logger/Logger.h"
 #if defined(_MSC_VER)
 #include <Shlwapi.h>
@@ -118,8 +118,8 @@ bool BoostRegexSearch(const char* buffer,
         else
             return false;
     } catch (boost::regex_error& e) {
-        exception.append("regex_error code: ");
-        exception.append(ToString(e.code()));
+        exception.append("regex_error: ");
+        exception.append(ToString(e.what()));
         exception.append("; buffer: ");
         exception.append(buffer);
         return false;
@@ -148,8 +148,8 @@ bool BoostRegexMatch(const char* buffer,
         else
             return false;
     } catch (boost::regex_error& e) {
-        exception.append("regex_error code: ");
-        exception.append(ToString(e.code()));
+        exception.append("regex_error: ");
+        exception.append(ToString(e.what()));
         exception.append("; buffer: ");
         exception.append(buffer);
         return false;
@@ -173,19 +173,19 @@ bool BoostRegexMatch(const char* buffer, size_t size, const boost::regex& reg, s
         else
             return false;
     } catch (boost::regex_error& e) {
-        exception.append("regex_error code is ");
-        exception.append(ToString(e.code()));
-        exception.append("; buffer is ");
+        exception.append("regex_error: ");
+        exception.append(ToString(e.what()));
+        exception.append("; buffer: ");
         exception.append(buffer);
         return false;
     } catch (std::exception& e) {
-        exception.append("exception message is ");
+        exception.append("exception message: ");
         exception.append(e.what());
-        exception.append("; buffer is ");
+        exception.append("; buffer ");
         exception.append(buffer);
         return false;
     } catch (...) {
-        exception.append("unknown exception; buffer is ");
+        exception.append("unknown exception; buffer: ");
         exception.append(buffer);
         return false;
     }
@@ -198,19 +198,19 @@ bool BoostRegexMatch(const char* buffer, const boost::regex& reg, string& except
         else
             return false;
     } catch (boost::regex_error& e) {
-        exception.append("regex_error code is ");
-        exception.append(ToString(e.code()));
+        exception.append("regex_error: ");
+        exception.append(ToString(e.what()));
         exception.append("; buffer is ");
         exception.append(buffer);
         return false;
     } catch (std::exception& e) {
-        exception.append("exception message is ");
+        exception.append("exception message: ");
         exception.append(e.what());
-        exception.append("; buffer is ");
+        exception.append("; buffer ");
         exception.append(buffer);
         return false;
     } catch (...) {
-        exception.append("unknown exception; buffer is ");
+        exception.append("unknown exception; buffer: ");
         exception.append(buffer);
         return false;
     }
@@ -220,21 +220,27 @@ uint32_t GetLittelEndianValue32(const uint8_t* buffer) {
     return buffer[3] << 24 | buffer[2] << 16 | buffer[1] << 8 | buffer[0];
 }
 
-std::vector<std::string> GetTopicNames(const std::string& topicFormat) {
+std::vector<std::string> GetTopicNames(const boost::regex& regex) {
+    static boost::regex topicNameRegex(R"(^\?<([^>]+)>)");
+    // static boost::regex topicNameRegex(R".(.+).");
     std::vector<std::string> result;
     try {
-        boost::regex regex("\\?P<([^>]+)>");
-        boost::sregex_token_iterator iter(topicFormat.begin(), topicFormat.end(), regex, 0);
-        boost::sregex_token_iterator end;
-
-        for (; iter != end; ++iter) {
-            std::string val = *iter;
-            if (val.size() > (size_t)4) {
-                result.push_back(val.substr(3, val.size() - 4));
+        auto subExpCount = regex.mark_count();
+        for (size_t i = 0; i < subExpCount; ++i) {
+            auto subExp = regex.subexpression(i);
+            boost::match_results<const char*> what;
+            if (boost::regex_search(subExp.first + 1, subExp.second, what, topicNameRegex)) {
+                result.emplace_back(what[1].str());
+            } else {
+                result.emplace_back(std::string("__topic_") + ToString(i + 1) + "__");
             }
         }
+    } catch (boost::regex_error& e) {
+        LOG_ERROR(sLogger, ("get topic name error", e.what())("topic format", regex.str()));
+    } catch (std::exception& e) {
+        LOG_ERROR(sLogger, ("get topic name error", e.what())("topic format", regex.str()));
     } catch (...) {
-        LOG_ERROR(sLogger, ("get topic name error", topicFormat));
+        LOG_ERROR(sLogger, ("get topic name error", "unknown")("topic format", regex.str()));
     }
     return result;
 }
@@ -243,39 +249,42 @@ bool ExtractTopics(const std::string& val,
                    const std::string& topicFormat,
                    std::vector<std::string>& keys,
                    std::vector<std::string>& values) {
+    static boost::regex groupNameRegex("\\?P?<[^>]+>");
     try {
-        boost::xpressive::sregex regex = boost::xpressive::sregex::compile(topicFormat);
-        boost::xpressive::smatch what;
-
-        if (boost::xpressive::regex_match(val, what, regex)) {
+        boost::regex regex(topicFormat,
+                           boost::regex::save_subexpression_location); // TODO: do not need to compile every time
+        keys = GetTopicNames(regex);
+        boost::smatch what;
+        if (boost::regex_match(val, what, regex)) {
             for (size_t i = 1; i < what.size(); ++i) {
                 values.push_back(what[i]);
             }
         } else {
             return false;
         }
-        keys = GetTopicNames(topicFormat);
         if (keys.size() < values.size()) {
             for (size_t i = keys.size(); i < values.size(); ++i) {
                 keys.push_back(std::string("__topic_") + ToString(i + 1) + "__");
             }
         }
+    } catch (boost::regex_error& e) {
+        LOG_ERROR(sLogger, ("get extract topic error", e.what())("topic format", topicFormat)("val", val));
+    } catch (std::exception& e) {
+        LOG_ERROR(sLogger, ("get extract topic error", e.what())("topic format", topicFormat)("val", val));
+        return false;
     } catch (...) {
-        LOG_ERROR(sLogger, ("get topic name error", topicFormat));
+        LOG_ERROR(sLogger, ("get extract topic error", "unknown")("topic format", topicFormat)("val", val));
         return false;
     }
     return true;
 }
 
-bool CheckTopicRegFormat(const std::string& regStr) {
+bool NormalizeTopicRegFormat(std::string& topicFormat) {
+    static boost::regex groupNameRegex(R"(\?P<([^>]+)>)");
     try {
-        boost::regex reg(regStr);
+        topicFormat = boost::regex_replace(topicFormat, groupNameRegex, R"(\?<$1>)");
+        boost::regex reg(topicFormat);
         return true;
-    } catch (...) {
-    }
-
-    try {
-        boost::xpressive::sregex::compile(regStr);
     } catch (...) {
         return false;
     }
