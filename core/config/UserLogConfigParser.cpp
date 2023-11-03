@@ -36,7 +36,7 @@ void UserLogConfigParser::ParseAdvancedConfig(const Json::Value& originalVal, Co
 
     auto blacklistException = ParseBlacklist(advancedVal, cfg);
     if (!blacklistException.empty()) {
-        throw blacklistException;
+        throw ExceptionBase(blacklistException);
     }
 
     // Boolean force_multiconfig.

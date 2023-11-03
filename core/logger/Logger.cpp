@@ -18,6 +18,7 @@
 #include <spdlog/async.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_sinks.h>
+#include "common/ExceptionBase.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
 #include "common/FileSystemUtil.h"
@@ -343,7 +344,7 @@ void Logger::LoadConfig(const std::string& filePath) {
             spdlog::stdout_logger_mt(DEFAULT_LOGGER_NAME);
         } catch (...) {
             LogMsg("Create console logger for default logger failed, we have no idea now.");
-            throw "Initialize logger failed......";
+            throw ExceptionBase("Initialize logger failed......");
         }
 
         failedLoggers.erase(DEFAULT_LOGGER_NAME);
