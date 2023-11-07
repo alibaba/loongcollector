@@ -217,7 +217,7 @@ public:
 
     bool CheckDevInode();
 
-    bool CheckFileSignatureAndOffset(int64_t& fileSize);
+    bool CheckFileSignatureAndOffset(bool isOpenOnUpdate);
 
     void UpdateLogPath(const std::string& filePath) {
         if (mHostLogPath == filePath) {
@@ -390,6 +390,7 @@ protected:
     uint32_t mLastFileSignatureSize;
     int64_t mLastFilePos = 0; // pos read and consumed, used for next read begin
     int64_t mLastFileSize = 0;
+    time_t mLastMTime = 0;
     std::string mCache;
     std::string mProjectName;
     std::string mTopicName;

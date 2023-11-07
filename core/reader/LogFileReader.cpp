@@ -1295,17 +1295,8 @@ bool LogFileReader::CheckDevInode() {
     }
 }
 
-bool LogFileReader::CheckFileSignatureAndOffset(int64_t& fileSize) {
+bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
     mLastEventTime = time(NULL);
-    char firstLine[1025];
-    int nbytes = mLogFileOp.Pread(firstLine, 1, 1024, 0);
-    if (nbytes < 0) {
-        LOG_ERROR(sLogger,
-                  ("fail to read file", mHostLogPath)("nbytes", nbytes)("project", mProjectName)("logstore", mCategory)(
-                      "config", mConfigName));
-        return false;
-    }
-    firstLine[nbytes] = '\0';
     int64_t endSize = mLogFileOp.GetFileSize();
     if (endSize < 0) {
         int lastErrNo = errno;
@@ -1332,26 +1323,40 @@ bool LogFileReader::CheckFileSignatureAndOffset(int64_t& fileSize) {
             return false;
         }
     }
+    mLastFileSize = endSize;
 
     // If file size is 0 and filename is changed, we cannot judge if the inode is reused by signature,
     // so we just recreate the reader to avoid filename mismatch
     if (mLastFileSignatureSize == 0 && mRealLogPath != mHostLogPath) {
         return false;
     }
-    fileSize = endSize;
-    mLastFileSize = endSize;
-    bool sigCheckRst = CheckAndUpdateSignature(string(firstLine), mLastFileSignatureHash, mLastFileSignatureSize);
-    if (!sigCheckRst) {
-        LOG_INFO(sLogger,
-                 ("Check file truncate by signature, read from begin",
-                  mHostLogPath)("project", mProjectName)("logstore", mCategory)("config", mConfigName));
-        mLastFilePos = 0;
-        if (mEOOption) {
+    fsutil::PathStat ps;
+    mLogFileOp.Stat(ps);
+    time_t lastMTime = mLastMTime;
+    mLastMTime = ps.GetMtime();
+    if (!isOpenOnUpdate || endSize < mLastFilePos ||(endSize == mLastFilePos && lastMTime != mLastMTime)) {
+        char firstLine[1025];
+        int nbytes = mLogFileOp.Pread(firstLine, 1, 1024, 0);
+        if (nbytes < 0) {
+            LOG_ERROR(sLogger,
+                      ("fail to read file", mHostLogPath)("nbytes", nbytes)("project", mProjectName)(
+                          "logstore", mCategory)("config", mConfigName));
+            return false;
+        }
+        firstLine[nbytes] = '\0';
+        bool sigCheckRst = CheckAndUpdateSignature(string(firstLine), mLastFileSignatureHash, mLastFileSignatureSize);
+        if (!sigCheckRst) {
+            LOG_INFO(sLogger,
+                     ("Check file truncate by signature, read from begin",
+                      mHostLogPath)("project", mProjectName)("logstore", mCategory)("config", mConfigName));
+            mLastFilePos = 0;
+            if (mEOOption) {
+                updatePrimaryCheckpointSignature();
+            }
+            return false;
+        } else if (mEOOption && mEOOption->primaryCheckpoint.sig_size() != mLastFileSignatureSize) {
             updatePrimaryCheckpointSignature();
         }
-        return false;
-    } else if (mEOOption && mEOOption->primaryCheckpoint.sig_size() != mLastFileSignatureSize) {
-        updatePrimaryCheckpointSignature();
     }
 
     if (endSize < mLastFilePos) {
@@ -1376,7 +1381,6 @@ bool LogFileReader::CheckFileSignatureAndOffset(int64_t& fileSize) {
             // after adjust mLastFilePos, we should fix last pos to assure that each log is complete
             FixLastFilePos(mLogFileOp, endSize);
         }
-        return true;
     }
     return true;
 }

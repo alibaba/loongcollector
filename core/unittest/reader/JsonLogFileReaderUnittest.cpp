@@ -97,11 +97,10 @@ void JsonLogFileReaderUnittest::TestReadGBK() {
                                  false);
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
-        int64_t fileSize = 0;
-        reader.CheckFileSignatureAndOffset(fileSize);
+        reader.CheckFileSignatureAndOffset(true);
         LogBuffer logBuffer;
         bool moreData = false;
-        reader.ReadGBK(logBuffer, fileSize, moreData);
+        reader.ReadGBK(logBuffer, reader.mLogFileOp.GetFileSize(), moreData);
         APSARA_TEST_FALSE_FATAL(moreData);
         std::string recovered = logBuffer.rawBuffer.to_string();
         std::replace(recovered.begin(), recovered.end(), '\0', '\n');
@@ -125,11 +124,10 @@ void JsonLogFileReaderUnittest::TestReadGBK() {
         reader.SetLogMultilinePolicy("no matching pattern", ".*", ".*");
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
-        int64_t fileSize = 0;
-        reader.CheckFileSignatureAndOffset(fileSize);
+        reader.CheckFileSignatureAndOffset(true);
         LogBuffer logBuffer;
         bool moreData = false;
-        reader.ReadGBK(logBuffer, fileSize, moreData);
+        reader.ReadGBK(logBuffer, reader.mLogFileOp.GetFileSize(), moreData);
         APSARA_TEST_TRUE_FATAL(moreData);
         APSARA_TEST_STREQ_FATAL(std::string(expectedContent.get(), BUFFER_SIZE_UTF8).c_str(),
                                 logBuffer.rawBuffer.data());
@@ -149,8 +147,8 @@ void JsonLogFileReaderUnittest::TestReadGBK() {
                                  false);
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
-        int64_t fileSize = 0;
-        reader.CheckFileSignatureAndOffset(fileSize);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
         LogFileReader::BUFFER_SIZE = fileSize - 11;
         LogBuffer logBuffer;
         bool moreData = false;
@@ -177,11 +175,10 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
                                  false);
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
-        int64_t fileSize = 0;
-        reader.CheckFileSignatureAndOffset(fileSize);
+        reader.CheckFileSignatureAndOffset(true);
         LogBuffer logBuffer;
         bool moreData = false;
-        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        reader.ReadUTF8(logBuffer, reader.mLogFileOp.GetFileSize(), moreData);
         APSARA_TEST_FALSE_FATAL(moreData);
         std::string recovered = logBuffer.rawBuffer.to_string();
         std::replace(recovered.begin(), recovered.end(), '\0', '\n');
@@ -203,11 +200,10 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
         LogFileReader::BUFFER_SIZE = 25;
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
-        int64_t fileSize = 0;
-        reader.CheckFileSignatureAndOffset(fileSize);
+        reader.CheckFileSignatureAndOffset(true);
         LogBuffer logBuffer;
         bool moreData = false;
-        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        reader.ReadUTF8(logBuffer, reader.mLogFileOp.GetFileSize(), moreData);
         APSARA_TEST_TRUE_FATAL(moreData);
         APSARA_TEST_STREQ_FATAL(std::string(expectedContent.get(), LogFileReader::BUFFER_SIZE).c_str(),
                                 logBuffer.rawBuffer.data());
@@ -227,8 +223,8 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
                                  false);
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
-        int64_t fileSize = 0;
-        reader.CheckFileSignatureAndOffset(fileSize);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
         LogFileReader::BUFFER_SIZE = fileSize - 11;
         LogBuffer logBuffer;
         bool moreData = false;
@@ -252,8 +248,8 @@ void JsonLogFileReaderUnittest::TestReadUTF8() {
                                  false);
         reader.UpdateReaderManual();
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
-        int64_t fileSize = 0;
-        reader.CheckFileSignatureAndOffset(fileSize);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
         LogFileReader::BUFFER_SIZE = fileSize - 11;
         LogBuffer logBuffer;
         bool moreData = false;
