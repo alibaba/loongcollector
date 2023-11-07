@@ -10,7 +10,7 @@
 | - | - | - | - |
 | SourceKey | String | 是 | 原始字段名。 |
 | SourceFormat | String | 是 | 原始时间的格式。 |
-| SourceLocation | Int | 是 | 原始时间的时区。参数值为空时，表示iLogtail所在主机或容器的时区。 |
+| SourceLocation | Int | 否 | 原始时间的时区。参数值为空时，表示iLogtail所在主机或容器的时区。 |
 | DestKey | String | 是 | 解析后的目标字段。 |
 | DestFormat | String | 是 | 解析后的时间格式。 |
 | DestLocation | Int | 否 | 解析后的时区。参数值为空时，表示本机时区。 |

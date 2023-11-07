@@ -10,7 +10,7 @@ the time format processor to parse time field with golang format pattern. More d
 | - | - | - | - |
 | SourceKey | String | Yes | The name of the original field. |
 | SourceFormat | String | Yes | The format of the original time. |
-| SourceLocation | Int | Yes | The time zone of the original time. If the parameter value is empty, it indicates the time zone of the host or container where iLogtail is located. |
+| SourceLocation | Int | No | The time zone of the original time. If the parameter value is empty, it indicates the time zone of the host or container where iLogtail is located. |
 | DestKey | String | Yes | The name of the target field after parsing. |
 | DestFormat | String | Yes | The format of the parsed time. |
 | DestLocation | Int | No | The time zone of the parsed time. If the parameter value is empty, it indicates the local time zone. |
