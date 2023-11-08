@@ -16,8 +16,11 @@ package prometheus
 
 import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
+
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+
+	"strings"
 )
 
 func appendTSDataToSlsLog(c pipeline.Collector, wr *prompbmarshal.WriteRequest) {
@@ -27,9 +30,11 @@ func appendTSDataToSlsLog(c pipeline.Collector, wr *prompbmarshal.WriteRequest) 
 		var labels helper.MetricLabels
 		for _, label := range ts.Labels {
 			if label.Name == "__name__" {
-				name = label.Value
+				// Prometheus scrape operation reuse bytes to enhance performance, must clone the unsafe string.
+				name = strings.Clone(label.Value)
 				continue
 			}
+			// Because AddRawLog operation would join labels to a new string, pass unsafe string would be safe.
 			labels.Append(label.Name, label.Value)
 		}
 		for _, sample := range ts.Samples {

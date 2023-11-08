@@ -36,6 +36,7 @@ your changes, such as:
 - [public] [both] [updated] add a new feature
 
 ## [Unreleased]
+- [public] [both] [fixed] fix prometheus send wrong sls logs when reuse string memory
 - [public] [both] [fixed] fix dropping jvm metrics when collecting multiple skywalking instances's data
 - [public] [both] [fixed] fix elasticsearch flusher authentication tls config and http config
 - [public] [both] [fixed] fix profiling wrong type when the different profiling type having same stack. 
