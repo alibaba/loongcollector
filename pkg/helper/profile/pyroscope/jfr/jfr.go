@@ -84,10 +84,6 @@ func (r *RawProfile) extractProfileV1(meta *profile.Meta, tags map[string]string
 				Value: meta.SpyName,
 			},
 			&protocol.Log_Content{
-				Key:   "type",
-				Value: profile.DetectProfileType(types[0]).Kind,
-			},
-			&protocol.Log_Content{
 				Key:   "dataType",
 				Value: "CallStack",
 			},
@@ -117,6 +113,10 @@ func (r *RawProfile) extractProfileV1(meta *profile.Meta, tags map[string]string
 				&protocol.Log_Content{
 					Key:   "units",
 					Value: units[i],
+				},
+				&protocol.Log_Content{
+					Key:   "type",
+					Value: profile.DetectProfileType(types[i]).Kind,
 				},
 				&protocol.Log_Content{
 					Key:   "valueTypes",
