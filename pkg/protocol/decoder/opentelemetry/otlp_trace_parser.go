@@ -503,7 +503,7 @@ func v1EventsToString(events []*v1.Span_Event) string {
 func keyValueToString(keyValues []*v1Common.KeyValue) string {
 	var results = make(map[string]string)
 	for _, keyValue := range keyValues {
-		results[keyValue.Key] = keyValue.Value.GetStringValue()
+		results[keyValue.Key] = anyValueToString(keyValue.Value)
 	}
 
 	var d []byte
