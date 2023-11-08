@@ -1,5 +1,46 @@
 # 发布历史
 
+## 1.8.1
+
+### 发布记录
+
+发版日期：2023 年 11 月 8 日
+
+问题修复
+
+* 修复因字符串内存重用导致Promethus插件发送错误数据 [#1201](https://github.com/alibaba/ilogtail/pull/1201)
+* 修复采集多个SkyWalking实例时丢失JVM指标的问题 [#1163](https://github.com/alibaba/ilogtail/pull/1163)
+* 修复ElasticSearch Flusher TLS鉴权问题 [#1157](https://github.com/alibaba/ilogtail/issues/1157)
+* 修复Profiling在相同Java堆栈下类型错误问题 [#1187](https://github.com/alibaba/ilogtail/pull/1187)
+* 修复从1.3之前的版本升级时本地send buffer丢失的问题 [#1199](https://github.com/alibaba/ilogtail/pull/1199)
+* 修复strptime_ns解析%c与原有striptime存在差异的问题 [#1204](https://github.com/alibaba/ilogtail/pull/1204)
+* 修复topic提取命名不支持带下划线的问题 [#1205](https://github.com/alibaba/ilogtail/pull/1205)
+* 修复存在多个jmxfetch配置时jmxfetch状态异常 [#1210](https://github.com/alibaba/ilogtail/pull/1210)
+* 修复被采集容器内存WSS增长的问题 [#1216](https://github.com/alibaba/ilogtail/pull/1216)
+* 修复采集路径黑名单配置错误没有日志提示的问题 [#1218](https://github.com/alibaba/ilogtail/pull/1218)
+
+* [public] [both] [fixed] fix increasing WSS memory issue in collected containers.
+* [public] [both] [fixed] fix cannot log blacklist config error
+
+* 解决采集有挂载卷的statefulset漂移到不同节点时数据重复采集的问题 [#1081](https://github.com/alibaba/ilogtail/issues/1081)
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.8.1.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.8.1.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.8.1/ilogtail-1.8.1.linux-amd64.tar.gz) | Linux | x86-64 | b659e711b1960db995787b306c9d87c615345df562affdaa1a090dad7cb453f4 |
+| [ilogtail-1.8.1.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.8.1/ilogtail-1.8.1.linux-arm64.tar.gz) | Linux | arm64  | a44ef5a4affcbff27dd551c57224c8e8447be37ad6c36292b63790673bba0b7c |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+``` bash
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.8.1
+```
+
 ## 1.8.0
 
 ### 发布记录
@@ -38,7 +79,7 @@
 * 修复json模式日志最后没有回车可能解析不正确的问题 [#1126](https://github.com/alibaba/ilogtail/issues/1126)
 * 修复读取到的数据开头含有非法jon时json解析异常的问题 [#1161](https://github.com/alibaba/ilogtail/issues/1161)
 
-[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.7.1.md)
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.8.0.md)
 
 ### 下载
 
