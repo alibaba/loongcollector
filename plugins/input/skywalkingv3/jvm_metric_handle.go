@@ -34,13 +34,15 @@ type JVMMetricHandler struct {
 func (h *JVMMetricHandler) Collect(ctx context.Context, req *skywalking.JVMMetricCollection) (*v3.Commands, error) {
 	defer panicRecover()
 	for _, metric := range req.GetMetrics() {
-		fixTime := metric.Time - metric.Time%1000
-		// 原始数据上传过于频繁, 不需要
-		if fixTime-h.lastTime >= h.interval {
-			h.lastTime = fixTime
-		} else {
-			return &v3.Commands{}, nil
-		}
+		// 在充当Collector角色（一对多个实例）时，将会出现问题，因为每个实例的时间不一致，所以这里不做时间过滤
+		// fixTime := metric.Time - metric.Time%1000
+		// // 原始数据上传过于频繁, 不需要
+		// if fixTime-h.lastTime >= h.interval {
+		// 	h.lastTime = fixTime
+		// } else {
+		// 	logger.Warning(h.context.GetRuntimeContext(), "", "lastTime", h.lastTime, "fixTime", fixTime, "interval", h.interval)
+		// 	return &v3.Commands{}, nil
+		// }
 		logs := h.toMetricStoreFormat(metric, req.Service, req.ServiceInstance)
 		for _, log := range logs {
 			h.collector.AddRawLog(log)

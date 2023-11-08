@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent"
@@ -35,6 +36,7 @@ func (j *JVMMetricServiceHandle) Collect(ctx context.Context, metrics *agent.JVM
 	applicationInstance, ok := j.RegistryInformationCache.findApplicationInstanceRegistryInfo(metrics.ApplicationInstanceId)
 
 	if !ok {
+		logger.Warning(j.context.GetRuntimeContext(), "Failed to find application instance registry info", "applicationInstanceId", metrics.ApplicationInstanceId)
 		return &agent.Downstream{}, nil
 	}
 

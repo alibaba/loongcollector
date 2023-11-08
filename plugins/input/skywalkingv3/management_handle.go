@@ -79,8 +79,6 @@ func (r *ResourcePropertiesCache) save(ctx pipeline.Context) {
 	err := ctx.SaveCheckPoint(r.cacheKey, jsonBytes)
 	if err != nil {
 		logger.Error(ctx.GetRuntimeContext(), "SKYWALKING_SAVE_CHECKPOINT_FAIL", "err", err.Error())
-	} else {
-		logger.Info(ctx.GetRuntimeContext(), "msg", "skywalking save checkpoint done")
 	}
 }
 
@@ -92,7 +90,6 @@ func (r *ResourcePropertiesCache) load(ctx pipeline.Context) bool {
 			logger.Error(ctx.GetRuntimeContext(), "SKYWALKING_LOAD_CHECKPOINT_FAIL", "err", err.Error())
 			return false
 		}
-		logger.Info(ctx.GetRuntimeContext(), "msg", "skywalking load checkpoint done", "count", len(r.cache))
 	}
 	return true
 }
