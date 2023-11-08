@@ -11,18 +11,13 @@
 * 修复因字符串内存重用导致Promethus插件发送错误数据 [#1201](https://github.com/alibaba/ilogtail/pull/1201)
 * 修复采集多个SkyWalking实例时丢失JVM指标的问题 [#1163](https://github.com/alibaba/ilogtail/pull/1163)
 * 修复ElasticSearch Flusher TLS鉴权问题 [#1157](https://github.com/alibaba/ilogtail/issues/1157)
-* 修复Profiling在相同Java堆栈下类型错误问题 [#1187](https://github.com/alibaba/ilogtail/pull/1187)
+* 修复Profiling在相同Java/Go堆栈下类型错误问题 [#1187](https://github.com/alibaba/ilogtail/pull/1187)
 * 修复从1.3之前的版本升级时本地send buffer丢失的问题 [#1199](https://github.com/alibaba/ilogtail/pull/1199)
 * 修复strptime_ns解析%c与原有striptime存在差异的问题 [#1204](https://github.com/alibaba/ilogtail/pull/1204)
 * 修复topic提取命名不支持带下划线的问题 [#1205](https://github.com/alibaba/ilogtail/pull/1205)
 * 修复存在多个jmxfetch配置时jmxfetch状态异常 [#1210](https://github.com/alibaba/ilogtail/pull/1210)
 * 修复被采集容器内存WSS增长的问题 [#1216](https://github.com/alibaba/ilogtail/pull/1216)
 * 修复采集路径黑名单配置错误没有日志提示的问题 [#1218](https://github.com/alibaba/ilogtail/pull/1218)
-
-* [public] [both] [fixed] fix increasing WSS memory issue in collected containers.
-* [public] [both] [fixed] fix cannot log blacklist config error
-
-* 解决采集有挂载卷的statefulset漂移到不同节点时数据重复采集的问题 [#1081](https://github.com/alibaba/ilogtail/issues/1081)
 
 [详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.8.1.md)
 
