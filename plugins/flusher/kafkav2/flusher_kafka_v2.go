@@ -79,6 +79,9 @@ type FlusherKafka struct {
 	// The compression level must be in the range of 1 (best speed) to 9 (best compression)
 	// The default value is 4.
 	CompressionLevel int
+	// How many outstanding requests a connection is allowed to have before
+	// sending on it blocks (default 5).
+	MaxOpenRequests int
 
 	// The maximum number of events to bulk in a single Kafka request. The default is 2048.
 	BulkMaxSize int
@@ -179,6 +182,7 @@ func NewFlusherKafka() *FlusherKafka {
 		KeepAlive:        0,
 		MaxMessageBytes:  nil, // use library default
 		RequiredACKs:     nil, // use library default
+		MaxOpenRequests:  5,
 		BrokerTimeout:    10 * time.Second,
 		Compression:      "none",
 		CompressionLevel: 4,
@@ -387,6 +391,7 @@ func newSaramaConfig(config *FlusherKafka) (*sarama.Config, error) {
 	k := sarama.NewConfig()
 
 	// configure network level properties
+	k.Net.MaxOpenRequests = config.MaxOpenRequests
 	timeout := config.Timeout
 	k.Net.DialTimeout = timeout
 	k.Net.ReadTimeout = timeout
@@ -559,8 +564,7 @@ func (k *FlusherKafka) makeHeaders() []sarama.RecordHeader {
 }
 
 func (k *FlusherKafka) getConverter() (*converter.Converter, error) {
-	logger.Debug(k.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", k.Convert.Protocol,
-		"Encoding", k.Convert.Encoding, "TagFieldsRename", k.Convert.TagFieldsRename, "ProtocolFieldsRename", k.Convert.ProtocolFieldsRename)
+	logger.Debug(k.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", k.Convert.Protocol, "Encoding", k.Convert.Encoding, "TagFieldsRename", k.Convert.TagFieldsRename, "ProtocolFieldsRename", k.Convert.ProtocolFieldsRename)
 	return converter.NewConverter(k.Convert.Protocol, k.Convert.Encoding, k.Convert.TagFieldsRename, k.Convert.ProtocolFieldsRename)
 }
 
