@@ -87,8 +87,8 @@ func (p *ProcessorEncrypt) Init(context pipeline.Context) error {
 		return err
 	}
 
-	p.encryptedCountMetric = helper.NewCounterMetricAndRegister("encrypted_count", p.context)
-	p.encryptedBytesMetric = helper.NewCounterMetricAndRegister("encrypted_bytes", p.context)
+	p.encryptedCountMetric = helper.NewCounterMetricAndRegister(p.context, "encrypted_count")
+	p.encryptedBytesMetric = helper.NewCounterMetricAndRegister(p.context, "encrypted_bytes")
 	return nil
 }
 

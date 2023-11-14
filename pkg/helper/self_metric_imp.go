@@ -24,15 +24,18 @@ import (
 	"time"
 )
 
+const SelfMetricNameKey = "__name__"
+
 var mu sync.Mutex
 
 type StrMetric struct {
-	name  string
-	value string
+	name   string
+	value  string
+	labels []*protocol.Log_Content
 }
 
 func (s *StrMetric) Name() string {
-	return s.name
+	return getNameWithLables(s.name, s.labels)
 }
 
 func (s *StrMetric) Set(v string) {
@@ -49,12 +52,14 @@ func (s *StrMetric) Get() string {
 }
 
 func (s *StrMetric) Serialize(log *protocol.Log) {
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: s.Get()})
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: s.Get()}, &protocol.Log_Content{Key: SelfMetricNameKey, Value: s.name})
+	log.Contents = append(log.Contents, s.labels...)
 }
 
 type NormalMetric struct {
-	name  string
-	value int64
+	name   string
+	value  int64
+	labels []*protocol.Log_Content
 }
 
 func (s *NormalMetric) Add(v int64) {
@@ -70,11 +75,12 @@ func (s *NormalMetric) Get() int64 {
 }
 
 func (s *NormalMetric) Name() string {
-	return s.name
+	return getNameWithLables(s.name, s.labels)
 }
 
 func (s *NormalMetric) Serialize(log *protocol.Log) {
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatInt(s.Get(), 10)})
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatInt(s.Get(), 10)}, &protocol.Log_Content{Key: SelfMetricNameKey, Value: s.name})
+	log.Contents = append(log.Contents, s.labels...)
 }
 
 type AvgMetric struct {
@@ -82,6 +88,7 @@ type AvgMetric struct {
 	value   int64
 	count   int64
 	prevAvg float64
+	labels  []*protocol.Log_Content
 }
 
 func (s *AvgMetric) Add(v int64) {
@@ -118,11 +125,12 @@ func (s *AvgMetric) GetAvg() float64 {
 }
 
 func (s *AvgMetric) Name() string {
-	return s.name
+	return getNameWithLables(s.name, s.labels)
 }
 
 func (s *AvgMetric) Serialize(log *protocol.Log) {
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(s.GetAvg(), 'f', 4, 64)})
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(s.GetAvg(), 'f', 4, 64)}, &protocol.Log_Content{Key: SelfMetricNameKey, Value: s.name})
+	log.Contents = append(log.Contents, s.labels...)
 }
 
 type LatMetric struct {
@@ -130,10 +138,11 @@ type LatMetric struct {
 	t          time.Time
 	count      int
 	latencySum time.Duration
+	labels     []*protocol.Log_Content
 }
 
 func (s *LatMetric) Name() string {
-	return s.name
+	return getNameWithLables(s.name, s.labels)
 }
 
 func (s *LatMetric) Begin() {
@@ -169,45 +178,54 @@ func (s *LatMetric) Get() int64 {
 }
 
 func (s *LatMetric) Serialize(log *protocol.Log) {
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(float64(s.Get())/1000, 'f', 4, 64)})
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(float64(s.Get())/1000, 'f', 4, 64)}, &protocol.Log_Content{Key: SelfMetricNameKey, Value: s.name})
+	log.Contents = append(log.Contents, s.labels...)
 }
 
-func NewCounterMetric(n string) pipeline.CounterMetric {
-	return &NormalMetric{name: n}
+func getNameWithLables(name string, labels []*protocol.Log_Content) string {
+	n := name
+	for _, lable := range labels {
+		n = n + "#" + lable.Key + "=" + lable.Value
+	}
+	return n
 }
 
-func NewAverageMetric(n string) pipeline.CounterMetric {
-	return &AvgMetric{name: n}
+func NewCounterMetric(n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
+	return &NormalMetric{name: n, labels: lables}
 }
 
-func NewStringMetric(n string) pipeline.StringMetric {
-	return &StrMetric{name: n}
+func NewAverageMetric(n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
+	return &AvgMetric{name: n, labels: lables}
 }
 
-func NewLatencyMetric(n string) pipeline.LatencyMetric {
-	return &LatMetric{name: n}
+func NewStringMetric(n string, lables ...*protocol.Log_Content) pipeline.StringMetric {
+	return &StrMetric{name: n, labels: lables}
 }
 
-func NewCounterMetricAndRegister(n string, c pipeline.Context) pipeline.CounterMetric {
-	metric := &NormalMetric{name: n}
+func NewLatencyMetric(n string, lables ...*protocol.Log_Content) pipeline.LatencyMetric {
+	return &LatMetric{name: n, labels: lables}
+}
+
+func NewCounterMetricAndRegister(c pipeline.Context, n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
+	metric := &NormalMetric{name: n, labels: lables}
 	c.RegisterCounterMetric(metric)
 	return metric
 }
 
-func NewAverageMetricAndRegister(n string, c pipeline.Context) pipeline.CounterMetric {
-	metric := &AvgMetric{name: n}
+func NewAverageMetricAndRegister(c pipeline.Context, n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
+	metric := &AvgMetric{name: n, labels: lables}
 	c.RegisterCounterMetric(metric)
 	return metric
 }
 
-func NewStringMetricAndRegister(n string, c pipeline.Context) pipeline.StringMetric {
-	metric := &StrMetric{name: n}
+func NewStringMetricAndRegister(c pipeline.Context, n string, lables ...*protocol.Log_Content) pipeline.StringMetric {
+	metric := &StrMetric{name: n, labels: lables}
 	c.RegisterStringMetric(metric)
 	return metric
 }
 
-func NewLatencyMetricAndRegister(n string, c pipeline.Context) pipeline.LatencyMetric {
-	metric := &LatMetric{name: n}
+func NewLatencyMetricAndRegister(c pipeline.Context, n string, lables ...*protocol.Log_Content) pipeline.LatencyMetric {
+	metric := &LatMetric{name: n, labels: lables}
 	c.RegisterLatencyMetric(metric)
 	return metric
 }

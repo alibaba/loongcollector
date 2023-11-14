@@ -25,8 +25,9 @@ import (
 
 func TestStrMetric_Name(t *testing.T) {
 	type fields struct {
-		name  string
-		value string
+		name   string
+		value  string
+		labels []*protocol.Log_Content
 	}
 	tests := []struct {
 		name   string
@@ -41,12 +42,27 @@ func TestStrMetric_Name(t *testing.T) {
 			},
 			want: "field",
 		},
+		{
+			name: "test_name",
+			fields: fields{
+				name:  "field",
+				value: "v",
+				labels: []*protocol.Log_Content{
+					{
+						Key:   "key",
+						Value: "value",
+					},
+				},
+			},
+			want: "field#key=value",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &StrMetric{
-				name:  tt.fields.name,
-				value: tt.fields.value,
+				name:   tt.fields.name,
+				value:  tt.fields.value,
+				labels: tt.fields.labels,
 			}
 			if got := s.Name(); got != tt.want {
 				t.Errorf("StrMetric.Name() = %v, want %v", got, tt.want)
