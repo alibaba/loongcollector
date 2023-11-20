@@ -339,25 +339,10 @@ func (lc *LogstoreConfig) ProcessLogGroup(logByte []byte, packID string) int {
 			"cannot process log group passed by core, err", err)
 		return -1
 	}
-	topic := logGroup.GetTopic()
-	// TODO: use v2 pipeline
-	for _, log := range logGroup.Logs {
-		if len(topic) > 0 {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
-		}
-		// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
-		if !lc.GlobalConfig.UsingOldContentTag {
-			lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logGroup.LogTags}})
-		} else {
-			for _, tag := range logGroup.LogTags {
-				log.Contents = append(log.Contents, &protocol.Log_Content{
-					Key:   tagPrefix + tag.GetKey(),
-					Value: tag.GetValue(),
-				})
-			}
-			lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
-		}
-	}
+	lc.PluginRunner.ReceiveLogGroup(pipeline.LogGroupWithContext{
+		LogGroup: logGroup,
+		Context:  map[string]interface{}{ctxKeySource: packID}},
+	)
 	return 0
 }
 

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -253,6 +254,16 @@ func (*AggregatorContext) evaluateLogSize(log *protocol.Log) int {
 		logSize += 5 + len(logC.Key) + len(logC.Value)
 	}
 	return logSize
+}
+
+func (p *AggregatorContext) Record(event *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	ctx.Collector().CollectList(event)
+	return nil
+}
+
+// GetResult the current aggregates to the accumulator.
+func (p *AggregatorContext) GetResult(ctx pipeline.PipelineContext) error {
+	return nil
 }
 
 // NewAggregatorContext create a default aggregator with default value.

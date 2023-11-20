@@ -25,6 +25,11 @@ type LogWithContext struct {
 	Context map[string]interface{}
 }
 
+type LogGroupWithContext struct {
+	LogGroup *protocol.LogGroup
+	Context  map[string]interface{}
+}
+
 // Collector ...
 type Collector interface {
 	AddData(tags map[string]string,

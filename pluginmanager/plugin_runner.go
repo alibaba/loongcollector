@@ -29,12 +29,22 @@ const (
 	pluginExtension    pluginCategory = "Extension"
 )
 
+const (
+	ctxKeySource = "source"
+	ctxKeyTopic  = "topic"
+	ctxKeyTags   = "tags"
+
+	tagKeyLogTopic = "__log_topic__"
+)
+
 type PluginRunner interface {
 	Init(inputQueueSize int, aggrQueueSize int) error
 
 	Initialized() error
 
 	ReceiveRawLog(log *pipeline.LogWithContext)
+
+	ReceiveLogGroup(logGroup pipeline.LogGroupWithContext)
 
 	AddPlugin(pluginName string, category pluginCategory, plugin interface{}, config map[string]interface{}) error
 
