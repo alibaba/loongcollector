@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper/async"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/plugins/test/async"
 )
 
 type DumpDataReq struct {

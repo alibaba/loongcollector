@@ -93,7 +93,6 @@ require (
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.0.0-20211216131617-bbee439d559c // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
-	github.com/frankban/quicktest v1.14.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.6.1 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
@@ -284,6 +283,8 @@ require (
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	sigs.k8s.io/gateway-api v0.6.2 // indirect
 )
+
+require github.com/rogpeppe/go-internal v1.6.1 // indirect
 
 replace (
 	github.com/VictoriaMetrics/VictoriaMetrics => github.com/iLogtail/VictoriaMetrics v1.83.4-ilogtail
