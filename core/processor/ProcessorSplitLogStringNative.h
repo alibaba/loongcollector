@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include "plugin/interface/Processor.h"
-#include <string>
 #include <boost/regex.hpp>
+#include <string>
+
+#include "plugin/interface/Processor.h"
 
 namespace logtail {
 
@@ -41,6 +42,7 @@ private:
     bool mEnableLogPositionMeta = false;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorRegexStringNativeUnittest;
+    friend class ProcessorParseDelimiterNativeUnittest;
 #endif
 };
 
