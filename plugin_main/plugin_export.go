@@ -106,6 +106,14 @@ func LoadConfig(project string, logstore string, configName string, logstoreKey 
 		logger.Error(context.Background(), "CONFIG_LOAD_ALARM", "cannot load config before hold on the running configs")
 		return 1
 	}
+	defer func() {
+		if err := recover(); err != nil {
+			trace := make([]byte, 2048)
+			runtime.Stack(trace, true)
+			logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "panicked", err, "stack", string(trace))
+		}
+	}()
+
 	err := pluginmanager.LoadLogstoreConfig(util.StringDeepCopy(project),
 		util.StringDeepCopy(logstore), util.StringDeepCopy(configName),
 		// Make deep copy if you want to save it in Go in the future.

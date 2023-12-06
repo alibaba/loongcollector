@@ -99,6 +99,7 @@ func (st tcpState) String() string {
 }
 
 func (r *InputSystem) Init(context pipeline.Context) (int, error) {
+	r.context = context
 	// mount the host proc path
 	fs, err := procfs.NewFS(helper.GetMountedFilePath(procfs.DefaultMountPoint))
 	if err != nil {
