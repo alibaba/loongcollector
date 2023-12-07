@@ -37,7 +37,7 @@ private:
     time_t ApsaraEasyReadLogTimeParser(StringView& buffer, StringView& timeStr, LogtailTime& lastLogTime, int64_t& microTime);
     int32_t GetApsaraLogMicroTime(StringView& buffer);
     bool IsPrefixString(const char* all, const StringView& prefix);
-    int32_t ParseApsaraBaseFields(StringView& buffer, LogEvent& sourceEvent);
+    int32_t ParseApsaraBaseFields(const StringView& buffer, LogEvent& sourceEvent);
 
     std::string mSourceKey;
     std::string mRawLogTag;

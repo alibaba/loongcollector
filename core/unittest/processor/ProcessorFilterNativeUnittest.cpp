@@ -191,7 +191,6 @@ void ProcessorFilterNativeUnittest::TestFilter() {
         ]
     })";
     eventGroup1.FromJsonString(inJson);
-    std::cout<<inJson<<std::endl;
     // run function
     processorInstance.Process(eventGroup1);
     std::string outJson = eventGroup1.ToJsonString();

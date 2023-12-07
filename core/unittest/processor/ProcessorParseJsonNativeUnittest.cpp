@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <cstdlib>
-#include "unittest/Unittest.h"
 
 #include "common/JsonUtil.h"
 #include "config/Config.h"
-#include "processor/ProcessorParseJsonNative.h"
 #include "models/LogEvent.h"
 #include "plugin/instance/ProcessorInstance.h"
+#include "processor/ProcessorParseJsonNative.h"
+#include "processor/ProcessorSplitLogStringNative.h"
+#include "processor/ProcessorSplitRegexNative.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
@@ -38,6 +40,7 @@ public:
     void TestProcessEventDiscardUnmatch();
     void TestProcessJsonContent();
     void TestProcessJsonRaw();
+    void TestMultipleLines();
 
     PipelineContext mContext;
 };
@@ -55,6 +58,178 @@ UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessEventDiscardUnmatch)
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessJsonContent);
 
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessJsonRaw);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestMultipleLines);
+
+void ProcessorParseJsonNativeUnittest::TestMultipleLines() {
+    // error json
+    {
+        std::string inJson = R"({
+            "events" :
+            [
+                {
+                    "contents" :
+                    {
+                        "content" : "{\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\"time\": \"07/Jul/2022:10:30:28\"}\u0000{\"name\":\"Mike\",\"age\":25,\"is_student\":asdfsadf,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}",
+                        "log.file.offset": "0"
+                    },
+                    "timestampNanosecond" : 0,
+                    "timestamp" : 12345678901,
+                    "type" : 1
+                }
+            ]
+        })";
+
+        std::string expectJson = R"({
+            "events" :
+            [
+                {
+                    "contents" :
+                    {
+                        "__raw__" : "{\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\"time\": \"07/Jul/2022:10:30:28\"}",
+                        "log.file.offset": "0",
+                        "time" : "07/Jul/2022:10:30:28",
+                        "url" : "POST /PutData?Category=YunOsAccountOpLog HTTP/1.1"
+                    },
+                    "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
+                    "type" : 1
+                },
+                {
+                    "contents" :
+                    {
+                        "__raw__" : "{\"name\":\"Mike\",\"age\":25,\"is_student\":asdfsadf,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}",
+                        "__raw_log__" : "{\"name\":\"Mike\",\"age\":25,\"is_student\":asdfsadf,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}",
+                        "content" : "{\"name\":\"Mike\",\"age\":25,\"is_student\":asdfsadf,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}",
+                        "log.file.offset":"0"
+                    },
+                    "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
+                    "type" : 1
+                }
+            ]
+        })";
+
+        // ProcessorSplitLogStringNative
+        {
+            // make events
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
+            PipelineEventGroup eventGroup(sourceBuffer);
+            eventGroup.FromJsonString(inJson);
+
+            // make config
+            Config config;
+            config.mDiscardUnmatch = false;
+            config.mUploadRawLog = true;
+            config.mAdvancedConfig.mRawLogTag = "__raw__";
+            config.mLogType = JSON_LOG;
+
+            std::string pluginId = "testID";
+            ComponentConfig componentConfig(pluginId, config);
+
+            // run function ProcessorSplitLogStringNative
+            ProcessorSplitLogStringNative processorSplitLogStringNative;
+            processorSplitLogStringNative.SetContext(mContext);
+            APSARA_TEST_TRUE_FATAL(processorSplitLogStringNative.Init(componentConfig));
+            processorSplitLogStringNative.Process(eventGroup);
+            std::string outJson = eventGroup.ToJsonString();
+            // run function ProcessorParseJsonNative
+            ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+            ProcessorInstance processorInstance(&processor, pluginId);
+            APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+            processor.Process(eventGroup);
+
+            // judge result
+            outJson = eventGroup.ToJsonString();
+            APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+        }
+    }
+    {
+        std::string inJson = R"({
+            "events" :
+            [
+                {
+                    "contents" :
+                    {
+                        "content" : "{\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\"time\": \"07/Jul/2022:10:30:28\"}\u0000{\"name\":\"Mike\",\"age\":25,\"is_student\":false,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}",
+                        "log.file.offset": "0"
+                    },
+                    "timestampNanosecond" : 0,
+                    "timestamp" : 12345678901,
+                    "type" : 1
+                }
+            ]
+        })";
+
+        std::string expectJson = R"({
+            "events" :
+            [
+                {
+                    "contents" :
+                    {
+                        "__raw__" : "{\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\"time\": \"07/Jul/2022:10:30:28\"}",
+                        "log.file.offset": "0",
+                        "time" : "07/Jul/2022:10:30:28",
+                        "url" : "POST /PutData?Category=YunOsAccountOpLog HTTP/1.1"
+                    },
+                    "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
+                    "type" : 1
+                },
+                {
+                    "contents" :
+                    {
+                        "__raw__" : "{\"name\":\"Mike\",\"age\":25,\"is_student\":false,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}",
+                        "address" : "{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"}",
+                        "age":"25",
+                        "courses":"[\"Math\",\"English\",\"Science\"]",
+                        "is_student":"false",
+                        "log.file.offset":"0",
+                        "name":"Mike",
+                        "scores":"{\"Math\":90,\"English\":85,\"Science\":95}"
+                    },
+                    "timestamp" : 12345678901,
+                    "timestampNanosecond" : 0,
+                    "type" : 1
+                }
+            ]
+        })";
+
+        // ProcessorSplitLogStringNative
+        {
+            // make events
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
+            PipelineEventGroup eventGroup(sourceBuffer);
+            eventGroup.FromJsonString(inJson);
+
+            // make config
+            Config config;
+            config.mDiscardUnmatch = false;
+            config.mUploadRawLog = true;
+            config.mAdvancedConfig.mRawLogTag = "__raw__";
+            config.mLogType = JSON_LOG;
+
+            std::string pluginId = "testID";
+            ComponentConfig componentConfig(pluginId, config);
+
+            // run function ProcessorSplitLogStringNative
+            ProcessorSplitLogStringNative processorSplitLogStringNative;
+            processorSplitLogStringNative.SetContext(mContext);
+            APSARA_TEST_TRUE_FATAL(processorSplitLogStringNative.Init(componentConfig));
+            processorSplitLogStringNative.Process(eventGroup);
+            std::string outJson = eventGroup.ToJsonString();
+            // run function ProcessorParseJsonNative
+            ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+            ProcessorInstance processorInstance(&processor, pluginId);
+            APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+            processor.Process(eventGroup);
+
+            // judge result
+            outJson = eventGroup.ToJsonString();
+            APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+        }
+    }
+}
 
 void ProcessorParseJsonNativeUnittest::TestInit() {
     Config config;
@@ -84,7 +259,7 @@ void ProcessorParseJsonNativeUnittest::TestAddLog() {
     char value[] = "value";
     processor.AddLog(key, value, *logEvent);
     // check observability
-    APSARA_TEST_EQUAL_FATAL(strlen(key) + strlen(value) + 5, processor.GetContext().GetProcessProfile().logGroupSize);
+    APSARA_TEST_EQUAL_FATAL(int(strlen(key) + strlen(value) + 5), processor.GetContext().GetProcessProfile().logGroupSize);
 }
 
 void ProcessorParseJsonNativeUnittest::TestProcessJson() {
@@ -166,7 +341,7 @@ void ProcessorParseJsonNativeUnittest::TestProcessJson() {
     })";
     std::string outJson = eventGroup.ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
-    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), 0);
+    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), uint64_t(0));
 }
 
 void ProcessorParseJsonNativeUnittest::TestProcessJsonContent() {
@@ -227,7 +402,7 @@ void ProcessorParseJsonNativeUnittest::TestProcessJsonContent() {
     })";
     std::string outJson = eventGroup.ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
-    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), 0);
+    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), uint64_t(0));
 }
 
 void ProcessorParseJsonNativeUnittest::TestProcessJsonRaw() {
@@ -287,7 +462,7 @@ void ProcessorParseJsonNativeUnittest::TestProcessJsonRaw() {
     })";
     std::string outJson = eventGroup.ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
-    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), 0);
+    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), uint64_t(0));
 }
 
 void ProcessorParseJsonNativeUnittest::TestProcessEventKeepUnmatch() {
@@ -329,18 +504,18 @@ void ProcessorParseJsonNativeUnittest::TestProcessEventKeepUnmatch() {
     // check observablity
     APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
 
-    APSARA_TEST_EQUAL_FATAL(count, processorInstance.mProcInRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcInRecordsTotal->GetValue());
     std::string expectValue
         = "{\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\"time\": \"07/Jul/2022:10:30:28\"";
     APSARA_TEST_EQUAL_FATAL((expectValue.length()) * count, processor.mProcParseInSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(count, processorInstance.mProcOutRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcOutRecordsTotal->GetValue());
     expectValue = "__raw_log__{\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\"time\": "
                   "\"07/Jul/2022:10:30:28\"";
-    APSARA_TEST_EQUAL_FATAL((expectValue.length()) * count, processor.mProcParseOutSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(expectValue.length() * count), processor.mProcParseOutSizeBytes->GetValue());
 
-    APSARA_TEST_EQUAL_FATAL(0, processor.mProcDiscardRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcDiscardRecordsTotal->GetValue());
 
-    APSARA_TEST_EQUAL_FATAL(count, processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcParseErrorTotal->GetValue());
 
     // judge result
     std::string expectJson = R"({
@@ -361,7 +536,7 @@ void ProcessorParseJsonNativeUnittest::TestProcessEventKeepUnmatch() {
     })";
     std::string outJson = eventGroup.ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
-    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), 0);
+    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), uint64_t(0));
 }
 
 void ProcessorParseJsonNativeUnittest::TestProcessEventDiscardUnmatch() {
@@ -403,20 +578,20 @@ void ProcessorParseJsonNativeUnittest::TestProcessEventDiscardUnmatch() {
     // check observablity
     APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
 
-    APSARA_TEST_EQUAL_FATAL(count, processorInstance.mProcInRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcInRecordsTotal->GetValue());
     std::string expectValue
         = "{\"url\": \"POST /PutData?Category=YunOsAccountOpLog HTTP/1.1\",\"time\": \"07/Jul/2022:10:30:28\"";
     APSARA_TEST_EQUAL_FATAL((expectValue.length()) * count, processor.mProcParseInSizeBytes->GetValue());
     // discard unmatch, so output is 0
-    APSARA_TEST_EQUAL_FATAL(0, processorInstance.mProcOutRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(0, processor.mProcParseOutSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(count, processor.mProcDiscardRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mProcOutRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcParseOutSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcDiscardRecordsTotal->GetValue());
 
-    APSARA_TEST_EQUAL_FATAL(count, processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcParseErrorTotal->GetValue());
 
     std::string outJson = eventGroup.ToJsonString();
     APSARA_TEST_STREQ_FATAL("null", CompactJson(outJson).c_str());
-    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), 0);
+    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), uint64_t(0));
 }
 
 } // namespace logtail

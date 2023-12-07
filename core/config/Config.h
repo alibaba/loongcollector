@@ -139,26 +139,26 @@ public:
     std::shared_ptr<LogFilterRule> mFilterRule;
     bool mLocalStorage;
     int mVersion;
-    bool mDiscardNoneUtf8;
+    bool mDiscardNoneUtf8 = false;
     std::string mAliuid;
     std::string mRegion;
     std::string mStreamLogTag;
-    bool mDiscardUnmatch;
+    bool mDiscardUnmatch = false;
     std::vector<std::string> mColumnKeys;
     std::string mSeparator;
     char mQuote;
     // for delimiter log, accept logs without enough keys or not
     // eg, keys -> [a, b, c], raw log "xx|yy", log -> [a->xx, b->yy]
-    bool mAcceptNoEnoughKeys;
-    bool mAutoExtend;
+    bool mAcceptNoEnoughKeys = false;
+    bool mAutoExtend = true;
     std::string mTimeKey;
     std::vector<std::string> mShardHashKey;
     bool mTailExisted;
     std::unordered_map<std::string, std::vector<SensitiveWordCastOption>> mSensitiveWordCastOptions;
-    bool mUploadRawLog; // true to update raw log to sls
+    bool mUploadRawLog = false; // true to update raw log to sls
     bool mSimpleLogFlag;
     bool mTimeZoneAdjust;
-    int mLogTimeZoneOffsetSecond;
+    int mLogTimeZoneOffsetSecond = 0;
     int32_t mCreateTime; // create time of this config
     int32_t
         mMaxSendBytesPerSecond; // limit for logstore, not just this config. so if we have multi configs with different

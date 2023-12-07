@@ -77,6 +77,8 @@ std::string CompactJson(const std::string& inJson) {
             case '\\':
                 if (++ch == inJson.end()) { // skip next char after escape char
                     --ch;
+                } else {
+                    outJson << '\\';
                 }
                 break;
             default:
