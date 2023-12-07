@@ -15,7 +15,7 @@
  */
 
 #pragma once
-#include <thread>
+#include <boost/thread.hpp>
 #include <memory>
 #include <future>
 #include <utility>

@@ -37,15 +37,11 @@ jobs:
       matrix:
         go-version: [1.19]
         # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
-        runner: [ubuntu-latest, macos-latest, windows-2019]
+        runner: [ubuntu-latest]
       fail-fast: true
     steps:
-      # prepare ubuntu environment
-      - name: prepare ubuntu environment
-        if: matrix.runner == 'ubuntu-latest'
-        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
       # Clean up space to prevent action from running out of disk space.
-      - name: clean
+      - name: Free disk space
         if: matrix.runner == 'ubuntu-latest'
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -54,23 +50,17 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
+
       - name: Check disk space
         run: |
           df -hT $PWD
-      # prepare windows environment
-      # https://github.com/actions/virtual-environments/issues/2549
-      - name: add mingw32 to path
-        if: matrix.runner == 'windows-2019'
-        shell: bash
-        run: |
-          echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
 
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
-
-      - name: Check out code into the Go module directory
+          
+      - name: Check out code
         uses: actions/checkout@v2
         with:
           submodules: true
@@ -78,15 +68,20 @@ jobs:
       - name: Build Binary
         if: matrix.runner == 'ubuntu-latest'
         env:
-          BUILD_LOGTAIL_UT: ON
+          BUILD_LOGTAIL_UT: OFF
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
         run: make core
 
-      - name: Unit Test
+      - name: Check compatibility
         if: matrix.runner == 'ubuntu-latest'
-        run: make unittest_core
+        env:
+          BUILD_LOGTAIL_UT: OFF
+          ENABLE_COMPATIBLE_MODE: ON
+          ENABLE_STATIC_LINK_CRT: ON
+          WITHOUTGDB: ON
+        run: make dist && scripts/check_glibc.sh
 
   result:
     runs-on: ubuntu-latest

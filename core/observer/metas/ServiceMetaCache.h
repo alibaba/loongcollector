@@ -52,8 +52,6 @@ struct ServiceMeta {
     bool Empty() const { return time == 0; }
 };
 
-static const ServiceMeta* sEmptyHost = new ServiceMeta;
-
 
 template <typename K, typename V>
 class LRUCache {

@@ -61,9 +61,8 @@ FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.
 
 # install dev tool set and debug utilities
 RUN yum -y install centos-release-scl
-RUN yum -y install devtoolset-9-gcc devtoolset-9-gcc-c++ make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients sudo 
-RUN yum remove -y centos-release-scl centos-release-scl-rh && \
-    yum -y clean all && rm -fr /var/cache && rm -rf /core.*
+RUN yum -y install devtoolset-9-gcc devtoolset-9-gcc-c++ devtoolset-9-libasan-devel make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients sudo
+RUN yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 RUN [[ ${TARGETPLATFORM##*/} == 'amd64' ]] && ARCH='x86_64' || ARCH='aarch64' && \
     debuginfo-install -y glibc-2.17-326.el7_9.${ARCH} libuuid-2.23.2-65.el7_9.1.${ARCH}
 

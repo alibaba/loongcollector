@@ -16,9 +16,10 @@ cmake_minimum_required(VERSION 2.9)
 project(logtail)
 
 # Options.
+option(BUILD_LOGTAIL "Build Logtail executable and tools" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail" OFF)
-option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF)
-option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF)
+option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" ON)
+option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" ON)
 option(WITHOUTGDB "Build Logtail without gdb" OFF)
 
 # Name/Version information.
@@ -54,8 +55,8 @@ if (UNIX)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
     endif ()
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer -DLOGTAIL_NO_TC_MALLOC")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer -DLOGTAIL_NO_TC_MALLOC")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
     string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
@@ -111,43 +112,46 @@ foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
 endforeach (DIR_NAME)
 
 # Logtail executable.
-if (UNIX)
-    add_executable(${LOGTAIL_TARGET} logtail.cpp)
-elseif (MSVC)
-    add_executable(${LOGTAIL_TARGET} logtail_windows.cpp)
-endif ()
-target_link_libraries(${LOGTAIL_TARGET}
-        common
-        logger
-        config_manager
-        checkpoint
-        processor_daemon
-        controller
-        pipeline
-        plugin
-        models
-        monitor
-        sender
-        profile_sender
-        app_config
-        sls_control
-        go_pipeline
-        )
-if (UNIX)
-    target_link_libraries(${LOGTAIL_TARGET} streamlog)
-    target_link_libraries(${LOGTAIL_TARGET} observer)
-    target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid)
-    if (ENABLE_STATIC_LINK_CRT)
-        target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
+if (BUILD_LOGTAIL)
+    if (UNIX)
+        add_executable(${LOGTAIL_TARGET} logtail.cpp)
+    elseif (MSVC)
+        add_executable(${LOGTAIL_TARGET} logtail_windows.cpp)
     endif ()
-    if (ENABLE_COMPATIBLE_MODE)
-        target_link_libraries(${LOGTAIL_TARGET} rt)
-        target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid -static-libstdc++ -static-libgcc)
-    else ()
+    link_tcmalloc(${LOGTAIL_TARGET}) # should be the first lib to link
+    target_link_libraries(${LOGTAIL_TARGET}
+            common
+            logger
+            config_manager
+            checkpoint
+            processor_daemon
+            controller
+            pipeline
+            plugin
+            models
+            monitor
+            sender
+            profile_sender
+            app_config
+            sls_control
+            go_pipeline
+            )
+    if (UNIX)
+        target_link_libraries(${LOGTAIL_TARGET} streamlog)
+        target_link_libraries(${LOGTAIL_TARGET} observer)
         target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid)
+        if (ENABLE_COMPATIBLE_MODE)
+            target_link_libraries(${LOGTAIL_TARGET} rt)
+            target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid -static-libstdc++ -static-libgcc)
+        else ()
+            target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid)
+            if (ENABLE_STATIC_LINK_CRT)
+                target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
+            endif ()
+        endif ()
+        link_ssl(${LOGTAIL_TARGET})
+        link_crypto(${LOGTAIL_TARGET})
     endif ()
-    link_ssl(${LOGTAIL_TARGET})
-    link_crypto(${LOGTAIL_TARGET})
 endif ()
 
 # Logtail UT.

@@ -17,9 +17,14 @@
 
 namespace logtail {
 
+static const ServiceMeta& GetEmptyHost() {
+    static const ServiceMeta sEmptyHost;
+    return sEmptyHost;
+}
+
 const ServiceMeta& ServiceMetaCache::Get(const std::string& remoteIP, ProtocolType protocolType) {
     if (mIndexMap.find(remoteIP) == mIndexMap.end()) {
-        return *sEmptyHost;
+        return GetEmptyHost();
     }
     mData.splice(mData.begin(), mData, mIndexMap[remoteIP]);
     mData.begin()->second.Category = DetectRemoteServiceCategory(protocolType);
@@ -29,7 +34,7 @@ const ServiceMeta& ServiceMetaCache::Get(const std::string& remoteIP, ProtocolTy
 
 const ServiceMeta& ServiceMetaCache::Get(const std::string& remoteIP) {
     if (mIndexMap.find(remoteIP) == mIndexMap.end()) {
-        return *sEmptyHost;
+        return GetEmptyHost();
     }
     mData.splice(mData.begin(), mData, mIndexMap[remoteIP]);
     mData.front().second.time = time(nullptr);
@@ -112,7 +117,7 @@ ServiceMetaManager::doGetOrPutServiceMeta(uint32_t pid, const std::string& ip, P
     auto meta = mHostnameMetas.find(pid);
     if (meta == mHostnameMetas.end()) {
         if (IsRemoteInvokeProtocolType(protocolType)) {
-            return *sEmptyHost;
+            return GetEmptyHost();
         }
         meta = mHostnameMetas.insert(std::make_pair(pid, new ServiceMetaCache(200))).first;
         meta->second->Put(ip, "", protocolType);
@@ -129,7 +134,7 @@ ServiceMetaManager::doGetOrPutServiceMeta(uint32_t pid, const std::string& ip, P
 inline const ServiceMeta& ServiceMetaManager::doGetServiceMeta(uint32_t pid, const std::string& ip) {
     auto meta = mHostnameMetas.find(pid);
     if (meta == mHostnameMetas.end()) {
-        return *sEmptyHost;
+        return GetEmptyHost();
     }
     return meta->second->Get(ip);
 }

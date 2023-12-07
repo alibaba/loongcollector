@@ -32,9 +32,11 @@ COPY_GIT_CONFIGS=${7:-${DOCKER_BUILD_COPY_GIT_CONFIGS:-true}}
 PLUGINS_CONFIG_FILE=${8:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml}}
 GO_MOD_FILE=${9:-${GO_MOD_FILE:-go.mod}}
 
+BUILD_TYPE=${BUILD_TYPE:-Release}
+BUILD_LOGTAIL=${BUILD_LOGTAIL:-ON}
 BUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT:-OFF}
-ENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE:-OFF}
-ENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT:-OFF}
+ENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE:-ON}
+ENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT:-ON}
 WITHOUTGDB==${WITHOUTGDB:-OFF}
 BUILD_SCRIPT_FILE=$GENERATED_HOME/gen_build.sh
 COPY_SCRIPT_FILE=$GENERATED_HOME/gen_copy_docker.sh
@@ -77,13 +79,13 @@ EOF
 
   chmod 755 $BUILD_SCRIPT_FILE
   if [ $CATEGORY = "plugin" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s PluginAdapter && cd ../../.. && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s PluginAdapter && cd ../../.. && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "core" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL=${BUILD_LOGTAIL} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "all" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "e2e" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc && cd - && ./scripts/plugin_gocbuild.sh ${OUT_DIR} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc && cd - && ./scripts/plugin_gocbuild.sh ${OUT_DIR} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   fi
 }
 
@@ -92,19 +94,24 @@ function generateCopyScript() {
   echo 'BINDIR=$(cd $(dirname "${BASH_SOURCE[0]}")&& cd .. && pwd)/'${OUT_DIR}'/' >>$COPY_SCRIPT_FILE
   echo 'rm -rf $BINDIR && mkdir $BINDIR' >>$COPY_SCRIPT_FILE
   echo "id=\$(docker create ${REPOSITORY}:${VERSION})" >>$COPY_SCRIPT_FILE
-  if [ $BUILD_LOGTAIL_UT = "ON" ]; then
-    echo 'docker cp "$id":/src/core/build core/build' >>$COPY_SCRIPT_FILE
-  fi
 
   if [ $CATEGORY = "plugin" ]; then
     echo 'docker cp "$id":/src/'${OUT_DIR}'/libPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
   elif [ $CATEGORY = "core" ]; then
-    echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR' >>$COPY_SCRIPT_FILE
-    echo 'docker cp "$id":/src/core/build/go_pipeline/libPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
+    if [ $BUILD_LOGTAIL = "ON" ]; then
+      echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR' >>$COPY_SCRIPT_FILE
+      echo 'docker cp "$id":/src/core/build/go_pipeline/libPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
+    fi
+    if [ $BUILD_LOGTAIL_UT = "ON" ]; then
+      echo 'docker cp "$id":/src/core/build core/build' >>$COPY_SCRIPT_FILE
+    fi
   else
     echo 'docker cp "$id":/src/'${OUT_DIR}'/libPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
     echo 'docker cp "$id":/src/core/build/ilogtail $BINDIR' >>$COPY_SCRIPT_FILE
     echo 'docker cp "$id":/src/core/build/go_pipeline/libPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
+    if [ $BUILD_LOGTAIL_UT = "ON" ]; then
+      echo 'docker cp "$id":/src/core/build core/build' >>$COPY_SCRIPT_FILE
+    fi
   fi
   echo 'echo -e "{\n}" > $BINDIR/ilogtail_config.json' >>$COPY_SCRIPT_FILE
   echo 'mkdir -p $BINDIR/user_yaml_config.d' >>$COPY_SCRIPT_FILE

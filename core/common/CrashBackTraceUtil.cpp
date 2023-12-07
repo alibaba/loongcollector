@@ -81,6 +81,7 @@ void CrashBackTrace(int signum) {
             // std::free(demangled);
         }
     }
+    fflush(g_crashBackTraceFilePtr);
     fclose(g_crashBackTraceFilePtr);
     _exit(10);
 }
