@@ -38,4 +38,3 @@ your changes, such as:
 ## [Unreleased]
 
 - [public] [both] [added] add UsingOldContentTag. When UsingOldContentTag is set to false, the Tag is now placed in the Meta instead of Logs during cgo.
-

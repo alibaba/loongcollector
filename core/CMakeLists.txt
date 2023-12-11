@@ -18,13 +18,13 @@ project(logtail)
 # Options.
 option(BUILD_LOGTAIL "Build Logtail executable and tools" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail" OFF)
-option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" ON)
-option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" ON)
+option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF)
+option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF)
 option(WITHOUTGDB "Build Logtail without gdb" OFF)
 
 # Name/Version information.
 if (NOT DEFINED LOGTAIL_VERSION)
-    set(LOGTAIL_VERSION "1.8.1")
+    set(LOGTAIL_VERSION "1.8.3")
 endif ()
 message(STATUS "Version: ${LOGTAIL_VERSION}")
 

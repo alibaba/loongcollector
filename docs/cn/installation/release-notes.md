@@ -1,5 +1,40 @@
 # 发布历史
 
+## 1.8.3
+
+### 发布记录
+
+发版日期：2023 年 12 月 7 日
+
+问题修复
+
+* 修复因#1216引入的日志重复采集问题 [#1232](https://github.com/alibaba/ilogtail/pull/1232)
+* 修复container info含nil字段导致的插件崩溃 [#1247](https://github.com/alibaba/ilogtail/pull/1247)
+* 修复ProcessorParseDelimiterNative解析携带下一行数据的问题 [#1250](https://github.com/alibaba/ilogtail/pull/1250)
+* 修复在反压情况下可能出现的文件无法读完的问题 [#1251](https://github.com/alibaba/ilogtail/pull/1251)
+* 修复plugin_export panic导致插件崩溃的问题 [#1252](https://github.com/alibaba/ilogtail/pull/1252)
+* 修复解析Apsara格式日志导致的崩溃问题 [#1253](https://github.com/alibaba/ilogtail/pull/1253)
+* 修复解析Apsara格式日志解析数据黏连问题 [#1255](https://github.com/alibaba/ilogtail/pull/1255)
+
+[详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.8.3.md)
+
+### 下载
+
+| 文件名                                                                                                                                          | 系统    | 架构     | SHA256 校验码                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------- |
+| [ilogtail-1.8.3.linux-amd64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.8.3/ilogtail-1.8.3.linux-amd64.tar.gz) | Linux | x86-64 | 1cd352dec783247c4500074f77d8cfb88b607e28f6c95039c8f3da2a7b5880e3 |
+| [ilogtail-1.8.3.linux-arm64.tar.gz](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/1.8.3/ilogtail-1.8.3.linux-arm64.tar.gz) | Linux | arm64  | 6d77b86ed4b38605ed9e87b3d3ec049da5497b8c48e2cb9ec5334324ef26f0aa |
+
+### Docker 镜像
+
+**Docker Pull 命令**&#x20;
+
+``` bash
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.8.3
+```
+
+# 发布历史
+
 ## 1.8.1
 
 ### 发布记录
