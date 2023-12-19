@@ -81,24 +81,35 @@ func GetEventRecorder() *EventRecorder {
 	return nil
 }
 
-func (e *EventRecorder) SendNormalEvent(object runtime.Object, action Action, message string) {
-	if message == "" {
-		message = "success"
-	}
-	e.recorder.Event(object, corev1.EventTypeNormal, e.define.getInfoAction(action), message)
-}
+// func (e *EventRecorder) SendNormalEvent(object runtime.Object, action Action, message string) {
 
-func (e *EventRecorder) SendErrorEvent(object runtime.Object, action Action, alarm Alarm, message string) {
-	if message == "" {
-		message = "failed"
-	}
-	if alarm == "" {
-		alarm = "Fail"
-	}
-	e.recorder.Event(object, corev1.EventTypeWarning, e.define.getErrorAction(action, alarm), message)
-}
+// 	if e == nil || e.recorder == nil {
+// 		return
+// 	}
+// 	if message == "" {
+// 		message = "success"
+// 	}
+// 	e.recorder.Event(object, corev1.EventTypeNormal, e.define.getInfoAction(action), message)
+// }
+
+// func (e *EventRecorder) SendErrorEvent(object runtime.Object, action Action, alarm Alarm, message string) {
+// 	if e == nil || e.recorder == nil {
+// 		return
+// 	}
+// 	if message == "" {
+// 		message = "failed"
+// 	}
+// 	if alarm == "" {
+// 		alarm = "Fail"
+// 	}
+// 	e.recorder.Event(object, corev1.EventTypeWarning, e.define.getErrorAction(action, alarm), message)
+// }
 
 func (e *EventRecorder) SendNormalEventWithAnnotation(object runtime.Object, annotations map[string]string, action Action, message string) {
+	logger.Info(context.Background(), "send normal event", "annotations", annotations, "message", message)
+	if e == nil || e.recorder == nil {
+		return
+	}
 	if message == "" {
 		message = "success"
 	}
@@ -112,6 +123,10 @@ func (e *EventRecorder) SendNormalEventWithAnnotation(object runtime.Object, ann
 }
 
 func (e *EventRecorder) SendErrorEventWithAnnotation(object runtime.Object, annotations map[string]string, action Action, alarm Alarm, message string) {
+	logger.Info(context.Background(), "send error event", "annotations", annotations, "alarm", alarm, "message", message)
+	if e == nil || e.recorder == nil {
+		return
+	}
 	if message == "" {
 		message = "failed"
 	}
