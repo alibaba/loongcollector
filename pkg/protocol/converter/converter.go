@@ -124,6 +124,7 @@ type Converter struct {
 	Encoding             string
 	Separator            string
 	IgnoreUnExpectedData bool
+	OnlyContents         bool
 	TagKeyRenameMap      map[string]string
 	ProtocolKeyRenameMap map[string]string
 }

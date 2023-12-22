@@ -18,10 +18,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/grafana/loki-client-go/pkg/labelutil"
-
 	"github.com/grafana/loki-client-go/loki"
 	"github.com/grafana/loki-client-go/pkg/backoff"
+	"github.com/grafana/loki-client-go/pkg/labelutil"
 	"github.com/grafana/loki-client-go/pkg/urlutil"
 	promconf "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
@@ -73,6 +72,8 @@ type convertConfig struct {
 	// Convert encoding, default value:json
 	// The options are: 'json'
 	Encoding string
+	// Include only contents in the final result.
+	OnlyContents bool
 }
 
 func NewFlusherLoki() *FlusherLoki {
@@ -179,7 +180,15 @@ func (f *FlusherLoki) Stop() error {
 func (f *FlusherLoki) getConverter() (*converter.Converter, error) {
 	logger.Debug(f.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", f.Convert.Protocol,
 		"Encoding", f.Convert.Encoding, "TagFieldsRename", f.Convert.TagFieldsRename, "ProtocolFieldsRename", f.Convert.ProtocolFieldsRename)
-	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
+	cvt, err := converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
+	if err != nil {
+		return nil, err
+	}
+	// only custom_single_flatten support contents_only
+	if f.Convert.Protocol == converter.ProtocolCustomSingleFlatten && f.Convert.OnlyContents {
+		cvt.OnlyContents = true
+	}
+	return cvt, nil
 }
 
 func (f *FlusherLoki) buildLokiConfig() (loki.Config, error) {

@@ -31,15 +31,21 @@ func (c *Converter) ConvertToSingleProtocolLogsFlatten(logGroup *protocol.LogGro
 		}
 		desiredValues[i] = desiredValue
 
-		logLength := len(contents) + len(tags) + 1
+		logLength := 1 + len(contents)
+		if !c.OnlyContents {
+			logLength += len(tags)
+		}
+
 		customSingleLog := make(map[string]interface{}, logLength)
 		// merge contents to final logs
 		for k, v := range contents {
 			customSingleLog[k] = v
 		}
-		// merge tags to final logs
-		for k, v := range tags {
-			customSingleLog[k] = v
+		if !c.OnlyContents {
+			// merge tags to final logs
+			for k, v := range tags {
+				customSingleLog[k] = v
+			}
 		}
 
 		if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTime]; ok {

@@ -10,24 +10,25 @@ Alpha
 
 ## 配置参数
 
-| 参数                           | 类型       | 是否必选          | 说明                                                                   |
-|------------------------------|----------|---------------|----------------------------------------------------------------------|
-| Type                         | String   | 是             | 插件类型                                                                 |
-| Convert                      | Struct   | 否             | ilogtail数据转换协议配置                                                     |
-| Convert.Protocol             | String   | 否             | ilogtail数据转换协议，可选值：`custom_single`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding             | String   | 否             | ilogtail数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`               |
-| Convert.TagFieldsRename      | Map      | 否             | 对日志中tags中的json字段重命名                                                  |
-| Convert.ProtocolFieldsRename | Map      | 否             | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                |
-| URL                          | String   | 是             | Loki 推送地址，例如：`http://localhost:3100/loki/api/v1/push`                |
-| TenantID                     | String   | 否             | Loki 的租户 ID（需要 Loki 开启该功能），默认为空，表示单租户模式                              |
-| MaxMessageWait               | Int      | 否             | 发送 batch 前的最长等待时间，默认 `1` 秒                                           |
-| MaxMessageBytes              | Int      | 否             | 发送积累的最大的 batch 大小，默认 `1024 * 1024` bytes                             |
-| Timeout                      | Int      | 否             | 等待 Loki 响应的最大时间，默认 `10` 秒                                            |
-| MinBackoff                   | Int      | 否             | 重试之间的最短退避时间，默认 `500`毫秒                                               |
-| MaxBackoff                   | Int      | 否             | 重试的最长退避时间，默认 `5`分钟                                                   |
-| MaxRetries                   | Int      | 否             | 最大重试次数，默认 `10`                                                       |
-| DynamicLabels                | String数组 | 两种Label至少选择一项 | 需要从日志中动态解析的标签列表，例如：`content.field1`                                  |
-| StaticLabels                 | Map      | 两种Label至少选择一项 | 需要添加到每条日志上的静态标签                                                      |
+| 参数                           | 类型       | 是否必选          | 说明                                                                                            |
+|------------------------------|----------|---------------|-----------------------------------------------------------------------------------------------|
+| Type                         | String   | 是             | 插件类型                                                                                          |
+| Convert                      | Struct   | 否             | ilogtail数据转换协议配置                                                                              |
+| Convert.Protocol             | String   | 否             | ilogtail数据转换协议，可选值：`custom_single`, `custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
+| Convert.Encoding             | String   | 否             | ilogtail数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                        |
+| Convert.TagFieldsRename      | Map      | 否             | 对日志中tags中的json字段重命名                                                                           |
+| Convert.ProtocolFieldsRename | Map      | 否             | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                         |
+| Convert.OnlyContents         | Bool     | 否             | 仅发送contents中的字段，目前只能和`custom_single_flatten`协议一起使用，默认值：`false`                                |
+| URL                          | String   | 是             | Loki 推送地址，例如：`http://localhost:3100/loki/api/v1/push`                                         |
+| TenantID                     | String   | 否             | Loki 的租户 ID（需要 Loki 开启该功能），默认为空，表示单租户模式                                                       |
+| MaxMessageWait               | Int      | 否             | 发送 batch 前的最长等待时间，默认 `1` 秒                                                                    |
+| MaxMessageBytes              | Int      | 否             | 发送积累的最大的 batch 大小，默认 `1024 * 1024` bytes                                                      |
+| Timeout                      | Int      | 否             | 等待 Loki 响应的最大时间，默认 `10` 秒                                                                     |
+| MinBackoff                   | Int      | 否             | 重试之间的最短退避时间，默认 `500`毫秒                                                                        |
+| MaxBackoff                   | Int      | 否             | 重试的最长退避时间，默认 `5`分钟                                                                            |
+| MaxRetries                   | Int      | 否             | 最大重试次数，默认 `10`                                                                                |
+| DynamicLabels                | String数组 | 两种Label至少选择一项 | 需要从日志中动态解析的标签列表，例如：`content.field1`                                                           |
+| StaticLabels                 | Map      | 两种Label至少选择一项 | 需要添加到每条日志上的静态标签                                                                               |
 
 ## 样例
 
@@ -123,7 +124,7 @@ flushers:
   - Type: flusher_loki
     URL: http://<loki 服务的地址与端口>/loki/api/v1/push
     DynamicLabels:
-      - tag.host.name
+      - tag.my.host.name
     Convert:
       TagFieldsRename:
         host.name: my.host.name
