@@ -844,7 +844,7 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                     config->mLogDelaySkipBytes = value["delay_skip_bytes"].asInt64();
                 }
 
-
+                config->mTimeKey = GetStringValue(value, "time_key", "");
                 if (logType == REGEX_LOG) {
                     config->mTimeFormat = GetStringValue(value, "timeformat", "");
                     GetRegexAndKeys(value, config);
@@ -858,9 +858,10 @@ void ConfigManagerBase::LoadSingleUserConfig(const std::string& logName, const J
                             config->mSimpleLogFlag = true;
                         }
                     }
+                    if (config->mTimeKey == ""){
+                        config->mTimeKey = "time";
+                    }
                 }
-
-                config->mTimeKey = GetStringValue(value, "time_key", "");
 
                 config->mTailExisted = GetBoolValue(value, "tail_existed", false);
                 int32_t tailLimit = GetIntValue(value, "tail_limit", INT32_FLAG(default_tail_limit_kb));
