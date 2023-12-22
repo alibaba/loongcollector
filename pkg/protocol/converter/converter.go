@@ -29,6 +29,7 @@ const (
 	ProtocolCustomSingleFlatten = "custom_single_flatten"
 	ProtocolOtlpV1              = "otlp_v1"
 	ProtocolInfluxdb            = "influxdb"
+	ProtocolJsonline            = "jsonline"
 	ProtocolRaw                 = "raw"
 )
 
@@ -110,6 +111,9 @@ var supportedEncodingMap = map[string]map[string]bool{
 	ProtocolInfluxdb: {
 		EncodingCustom: true,
 	},
+	ProtocolJsonline: {
+		EncodingJSON: true,
+	},
 	ProtocolRaw: {
 		EncodingCustom: true,
 	},
@@ -181,6 +185,8 @@ func (c *Converter) ToByteStreamWithSelectedFields(logGroup *protocol.LogGroup, 
 		return c.ConvertToSingleProtocolStreamFlatten(logGroup, targetFields)
 	case ProtocolInfluxdb:
 		return c.ConvertToInfluxdbProtocolStream(logGroup, targetFields)
+	case ProtocolJsonline:
+		return c.ConvertToJsonlineProtocolStreamFlatten(logGroup)
 	default:
 		return nil, nil, fmt.Errorf("unsupported protocol: %s", c.Protocol)
 	}
