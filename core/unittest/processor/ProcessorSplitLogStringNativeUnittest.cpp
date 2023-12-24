@@ -15,22 +15,17 @@
 #include <cstdlib>
 #include <sstream>
 
-#include "unittest/Unittest.h"
 #include "common/Constants.h"
 #include "common/JsonUtil.h"
 #include "config/Config.h"
 #include "processor/ProcessorSplitLogStringNative.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
 class ProcessorSplitLogStringNativeUnittest : public ::testing::Test {
 public:
-    void SetUp() override {
-        mContext.SetConfigName("project##config_0");
-        mContext.SetLogstoreName("logstore");
-        mContext.SetProjectName("project");
-        mContext.SetRegion("cn-shanghai");
-    }
+    void SetUp() override { mContext.SetConfigName("project##config_0"); }
 
     void TestInit();
     void TestProcessJson();
@@ -44,25 +39,21 @@ UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessJson);
 UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessCommon);
 
 void ProcessorSplitLogStringNativeUnittest::TestInit() {
-    Config config;
-    config.mLogType = REGEX_LOG;
-    config.mLogBeginReg = ".*";
-    config.mAdvancedConfig.mEnableLogPositionMeta = false;
+    // make config
+    Json::Value config;
+    config["AppendingLogPositionMeta"] = false;
 
     std::string pluginId = "testID";
-    ComponentConfig componentConfig(pluginId, config);
     ProcessorSplitLogStringNative processor;
     processor.SetContext(mContext);
-    APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
 }
 
 void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
     // make config
-    Config config;
-    config.mLogType = JSON_LOG;
-    config.mLogBeginReg = ".*";
-    config.mDiscardUnmatch = true;
-    config.mAdvancedConfig.mEnableLogPositionMeta = true;
+    Json::Value config;
+    config["SplitChar"] = '\0';
+    config["AppendingLogPositionMeta"] = true;
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
@@ -87,8 +78,7 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
     processor.SetContext(mContext);
 
     std::string pluginId = "testID";
-    ComponentConfig componentConfig(pluginId, config);
-    APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
     processor.Process(eventGroup);
     // judge result
     std::stringstream expectJson;
@@ -127,11 +117,8 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
 
 void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
     // make config
-    Config config;
-    config.mLogType = REGEX_LOG;
-    config.mLogBeginReg = ".*";
-    config.mDiscardUnmatch = true;
-    config.mAdvancedConfig.mEnableLogPositionMeta = false;
+    Json::Value config;
+    config["AppendingLogPositionMeta"] = false;
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
@@ -165,8 +152,7 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
     ProcessorSplitLogStringNative processor;
     processor.SetContext(mContext);
     std::string pluginId = "testID";
-    ComponentConfig componentConfig(pluginId, config);
-    APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
     processor.Process(eventGroup);
     // judge result
     std::string expectJson = R"({

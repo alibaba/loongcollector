@@ -29,6 +29,11 @@
 #include "go_pipeline/LogtailPlugin.h"
 #include "Constants.h"
 #include "LogFileProfiler.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
+#include "flusher/FlusherSLS.h"
+#include "common/HashUtil.h"
 
 DEFINE_FLAG_INT64(sls_observer_network_ebpf_connection_gc_interval,
                   "SLS Observer NetWork connection gc interval seconds",
@@ -339,11 +344,9 @@ void NetworkObserver::Reload() {
         LOG_ERROR(sLogger, ("observer depends on glibc1.14", "load glibc func fail"));
         return;
     }
-    std::vector<Config*> allObserverConfigs;
-    ConfigManager::GetInstance()->GetAllObserverConfig(allObserverConfigs);
     mConfig->BeginLoadConfig();
-    for (auto config : allObserverConfigs) {
-        mConfig->LoadConfig(config);
+    for (auto config : mConfig->mAllNetworkConfigs) {
+        mConfig->LoadConfig(config.second);
     }
     mConfig->EndLoadConfig();
     if (!mConfig->NeedReload()) {
@@ -498,7 +501,7 @@ void NetworkObserver::EventLoop() {
             sPStat->FlushMetrics();
             sPDStat->FlushMetrics(BOOL_FLAG(sls_observer_network_protocol_stat));
             mNetworkStatistic->FlushMetrics();
-            LogtailMonitor::Instance()->UpdateMetric("observer_container_category",
+            LogtailMonitor::GetInstance()->UpdateMetric("observer_container_category",
                                                      ContainerProcessGroupManager::GetInstance()->GetContainerType());
             lastProfilingTime = nowTimeNs;
         }
@@ -509,7 +512,8 @@ void NetworkObserver::EventLoop() {
 }
 
 void NetworkObserver::BindSender() {
-    mSenderFunc = this->mConfig->mLastApplyedConfig->mPluginProcessFlag ? OutputPluginProcess : OutputDirectly;
+    mSenderFunc
+        = this->mConfig->mLastApplyedConfig->IsFlushingThroughGoPipeline() ? OutputPluginProcess : OutputDirectly;
 }
 
 inline void NetworkObserver::StartEventLoop() {
@@ -517,18 +521,23 @@ inline void NetworkObserver::StartEventLoop() {
         mEventLoopThread = CreateThread([this]() { EventLoop(); });
     }
 }
-int NetworkObserver::OutputPluginProcess(std::vector<sls_logs::Log>& logs, Config* config) {
+int NetworkObserver::OutputPluginProcess(std::vector<sls_logs::Log>& logs, const Pipeline* config) {
     static auto sPlugin = LogtailPlugin::GetInstance();
     auto now = GetCurrentLogtailTime();
     for (auto& item : logs) {
         // nanosecond of observer will not be discard after processors, so here is default to no nanosecond
         SetLogTime(&item, now.tv_sec);
-        sPlugin->ProcessLog(config->mConfigName, item, "", config->mGroupTopic, "");
+        if (config->GetContext().GetGlobalConfig().mTopicType == GlobalConfig::TopicType::MACHINE_GROUP_TOPIC) {
+            sPlugin->ProcessLog(config->Name(), item, "", config->GetContext().GetGlobalConfig().mTopicFormat, "");
+        } else {
+            sPlugin->ProcessLog(config->Name(), item, "", "", "");
+        }
     }
     return 0;
 }
 
-int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, Config* config) {
+int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, const Pipeline* config) {
+    const FlusherSLS* plugin = static_cast<const FlusherSLS*>(config->GetFlushers()[0]->GetPlugin());
     static auto sSenderInstance = Sender::Instance();
     const size_t maxCount = INT32_FLAG(merge_log_count_limit) / 4;
     for (size_t beginIndex = 0; beginIndex < logs.size(); beginIndex += maxCount) {
@@ -540,16 +549,19 @@ int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, Config* co
         sls_logs::LogTag* logTagPtr = logGroup.add_logtags();
         logTagPtr->set_key(LOG_RESERVED_KEY_HOSTNAME);
         logTagPtr->set_value(LogFileProfiler::mHostname.substr(0, 99));
-        std::string userDefinedId = ConfigManager::GetInstance()->GetUserDefinedIdSet();
+#ifdef __ENTERPRISE__
+        std::string userDefinedId = EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
         if (!userDefinedId.empty()) {
             logTagPtr = logGroup.add_logtags();
             logTagPtr->set_key(LOG_RESERVED_KEY_USER_DEFINED_ID);
             logTagPtr->set_value(userDefinedId.substr(0, 99));
         }
-        logGroup.set_category(config->mCategory);
+#endif
+        logGroup.set_category(plugin->mLogstore);
         logGroup.set_source(LogFileProfiler::mIpAddr);
-        if (!config->mGroupTopic.empty()) {
-            logGroup.set_topic(config->mGroupTopic);
+        if (config->GetContext().GetGlobalConfig().mTopicType == GlobalConfig::TopicType::MACHINE_GROUP_TOPIC
+            && !config->GetContext().GetGlobalConfig().mTopicFormat.empty()) {
+            logGroup.set_topic(config->GetContext().GetGlobalConfig().mTopicFormat);
         }
         auto now = GetCurrentLogtailTime();
         for (size_t i = beginIndex; i < endIndex; ++i) {
@@ -557,20 +569,24 @@ int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, Config* co
             log->mutable_contents()->CopyFrom(*(logs[i].mutable_contents()));
             SetLogTime(log, now.tv_sec);
         }
-        if (!sSenderInstance->Send(config->mProjectName,
+        int64_t logGroupKey = HashString(plugin->mProject + "_" + logGroup.category() + "_" + logGroup.topic()
+                                                         + "_" + logGroup.source() + "_" + "" + "_" + "");
+        if (!sSenderInstance->Send(plugin->mProject,
                                    "",
                                    logGroup,
-                                   config,
-                                   config->mMergeType,
+                                   logGroupKey,
+                                   plugin,
+                                   plugin->mBatch.mMergeType,
                                    (uint32_t)((endIndex - beginIndex) * 1024))) {
             LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
                                                    "push observer data into batch map fail",
-                                                   config->mProjectName,
-                                                   config->mCategory,
-                                                   config->mRegion);
+                                                   config->GetContext().GetProjectName(),
+                                                   config->GetContext().GetLogstoreName(),
+                                                   config->GetContext().GetRegion());
             LOG_ERROR(sLogger,
-                      ("push observer data into batch map fail, discard logs",
-                       logGroup.logs_size())("project", config->mProjectName)("logstore", config->mCategory));
+                      ("push observer data into batch map fail, discard logs", logGroup.logs_size())(
+                          "project", config->GetContext().GetProjectName())("logstore",
+                                                                            config->GetContext().GetLogstoreName()));
             return -1;
         }
     }

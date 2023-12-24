@@ -12,67 +12,48 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "SLSControl.h"
+#include "sls_control/SLSControl.h"
+
 #include <thread>
-#include <curl/curl.h>
-#if defined(__linux__)
+
+#ifdef __linux__
 #include <sys/utsname.h>
 #endif
+
+#include "curl/curl.h"
+
 #include "app_config/AppConfig.h"
-#include "common/LogtailCommonFlags.h"
+#include "common/Flags.h"
 #include "common/version.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
+#ifdef __ENTERPRISE__
+#include "sls_control/EnterpriseSLSControl.h"
+#endif
+
 // for windows compatability, to avoid conflict with the same function defined in windows.h
 #ifdef SetPort
 #undef SetPort
 #endif
 
+DEFINE_FLAG_STRING(default_access_key_id, "", "");
+DEFINE_FLAG_STRING(default_access_key, "", "");
 DEFINE_FLAG_STRING(custom_user_agent, "custom user agent appended at the end of the exsiting ones", "");
 
-namespace logtail {
+using namespace std;
 
-SLSControl::SLSControl() {
+namespace logtail {
+SLSControl* SLSControl::GetInstance() {
+#ifdef __ENTERPRISE__
+    static SLSControl* ptr = new EnterpriseSLSControl();
+#else
+    static SLSControl* ptr = new SLSControl();
+#endif
+    return ptr;
 }
 
-SLSControl* SLSControl::Instance() {
-    static SLSControl* slsControl = new SLSControl();
-
-    if (slsControl->mUserAgent.empty()) {
-        std::string os;
-#if defined(__linux__)
-        utsname* buf = new utsname;
-        if (-1 == uname(buf)) {
-            LOG_WARNING(
-                sLogger,
-                ("get os info part of user agent failed", errno)("use default os info", LogFileProfiler::mOsDetail));
-            os = LogFileProfiler::mOsDetail;
-        } else {
-            char* pch = strchr(buf->release, '-');
-            if (pch) {
-                *pch = '\0';
-            }
-            os.append(buf->sysname);
-            os.append("; ");
-            os.append(buf->release);
-            os.append("; ");
-            os.append(buf->machine);
-        }
-        delete buf;
-#elif defined(_MSC_VER)
-        os = LogFileProfiler::mOsDetail;
-#endif
-
-        std::string userAgent = slsControl->mUserAgent = std::string("ilogtail/") + ILOGTAIL_VERSION + " (" + os
-            + ") ip/" + LogFileProfiler::mIpAddr + " env/" + slsControl->GetRunningEnvironment();
-        if (!STRING_FLAG(custom_user_agent).empty()) {
-            userAgent += " " + STRING_FLAG(custom_user_agent);
-        }
-        slsControl->mUserAgent = userAgent;
-        LOG_INFO(sLogger, ("user agent", userAgent));
-    }
-
-    return slsControl;
+void SLSControl::Init() {
+    GenerateUserAgent();
 }
 
 void SLSControl::SetSlsSendClientCommonParam(sdk::Client* sendClient) {
@@ -80,7 +61,7 @@ void SLSControl::SetSlsSendClientCommonParam(sdk::Client* sendClient) {
     sendClient->SetPort(AppConfig::GetInstance()->GetDataServerPort());
 }
 
-bool SLSControl::SetSlsSendClientAuth(const std::string aliuid,
+bool SLSControl::SetSlsSendClientAuth(const string aliuid,
                                       const bool init,
                                       sdk::Client* sendClient,
                                       int32_t& lastUpdateTime) {
@@ -90,8 +71,41 @@ bool SLSControl::SetSlsSendClientAuth(const std::string aliuid,
     return true;
 }
 
-std::string SLSControl::GetRunningEnvironment() {
-    std::string env;
+void SLSControl::GenerateUserAgent() {
+    string os;
+#if defined(__linux__)
+    utsname* buf = new utsname;
+    if (-1 == uname(buf)) {
+        LOG_WARNING(
+            sLogger,
+            ("get os info part of user agent failed", errno)("use default os info", LogFileProfiler::mOsDetail));
+        os = LogFileProfiler::mOsDetail;
+    } else {
+        char* pch = strchr(buf->release, '-');
+        if (pch) {
+            *pch = '\0';
+        }
+        os.append(buf->sysname);
+        os.append("; ");
+        os.append(buf->release);
+        os.append("; ");
+        os.append(buf->machine);
+    }
+    delete buf;
+#elif defined(_MSC_VER)
+    os = LogFileProfiler::mOsDetail;
+#endif
+
+    mUserAgent = string("ilogtail/") + ILOGTAIL_VERSION + " (" + os + ") ip/" + LogFileProfiler::mIpAddr + " env/"
+        + GetRunningEnvironment();
+    if (!STRING_FLAG(custom_user_agent).empty()) {
+        mUserAgent += " " + STRING_FLAG(custom_user_agent);
+    }
+    LOG_INFO(sLogger, ("user agent", mUserAgent));
+}
+
+string SLSControl::GetRunningEnvironment() {
+    string env;
     if (getenv("ALIYUN_LOG_STATIC_CONTAINER_INFO")) {
         env = "ECI";
     } else if (getenv("ACK_NODE_LOCAL_DNS_ADMISSION_CONTROLLER_SERVICE_HOST")) {
@@ -119,14 +133,14 @@ std::string SLSControl::GetRunningEnvironment() {
     return env;
 }
 
-bool SLSControl::TryCurlEndpoint(const std::string& endpoint) {
+bool SLSControl::TryCurlEndpoint(const string& endpoint) {
     CURL* curl;
     for (size_t retryTimes = 1; retryTimes <= 5; retryTimes++) {
         curl = curl_easy_init();
         if (curl) {
             break;
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        this_thread::sleep_for(chrono::seconds(1));
     }
 
     if (curl) {
@@ -148,6 +162,5 @@ bool SLSControl::TryCurlEndpoint(const std::string& endpoint) {
         ("curl handler cannot be initialized during user environment identification", "user agent may be mislabeled"));
     return false;
 }
-
 
 } // namespace logtail

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(common_unittest)
 
 add_executable(common_simple_utils_unittest SimpleUtilsUnittest.cpp
@@ -44,3 +44,16 @@ target_link_libraries(common_machine_info_util_unittest unittest_base)
 
 add_executable(encoding_converter_unittest EncodingConverterUnittest.cpp)
 target_link_libraries(encoding_converter_unittest unittest_base)
+
+add_executable(yaml_util_unittest YamlUtilUnittest.cpp)
+target_link_libraries(yaml_util_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(common_simple_utils_unittest)
+gtest_discover_tests(common_logfileoperator_unittest)
+gtest_discover_tests(common_sender_queue_unittest)
+gtest_discover_tests(common_sliding_window_counter_unittest)
+gtest_discover_tests(common_string_tools_unittest)
+gtest_discover_tests(common_machine_info_util_unittest)
+gtest_discover_tests(encoding_converter_unittest)
+gtest_discover_tests(yaml_util_unittest)

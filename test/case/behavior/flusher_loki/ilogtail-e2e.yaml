@@ -26,7 +26,7 @@ ilogtail:
                 __tag__:name: "hello"
               Fields:
                 value: "log contents"
-          outputs:
+          flushers:
             - Type: flusher_loki
               Convert:
                 TagFieldsRename:

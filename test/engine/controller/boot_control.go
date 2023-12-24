@@ -49,9 +49,8 @@ func (c *BootController) Clean() {
 	if err := boot.ShutDown(); err != nil {
 		logger.Error(context.Background(), "BOOT_STOP_ALARM", "err", err)
 	}
-	_ = os.Remove(config.ConfigJSONFileDir)
 	_ = os.Remove(config.FlusherFile)
-	_ = os.Remove(config.ConfigYamlFileDir)
+	_ = os.Remove(config.ConfigDir)
 }
 
 func (c *BootController) CancelChain() *CancelChain {

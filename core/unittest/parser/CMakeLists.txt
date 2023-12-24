@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(parser_unittest)
 
 # add_executable(parser_unittest LogParserUnittest.cpp)
@@ -20,3 +20,6 @@ project(parser_unittest)
 
 add_executable(log_time_parse_unittest LogTimeParserUnittest.cpp)
 target_link_libraries(log_time_parse_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(log_time_parse_unittest)

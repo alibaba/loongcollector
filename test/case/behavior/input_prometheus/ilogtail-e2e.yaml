@@ -17,8 +17,17 @@ boot:
 ilogtail:
   config:
     - name: prometheus-case
-      content:
-        - '{"inputs":[{"detail":{"Yaml":"global:\n  scrape_interval: 15s \n  evaluation_interval: 15s \nscrape_configs:\n  - job_name: \"prometheus\"\n    static_configs:\n      - targets: [\"exporter:18080\"]"},"type":"service_prometheus"}]}'
+      detail:
+        - inputs:
+          - Type: service_prometheus
+            Yaml: |-
+              global:
+                scrape_interval: 15s 
+                evaluation_interval: 15s 
+              scrape_configs:
+                - job_name: "prometheus"
+                  static_configs:
+                    - targets: ["exporter:18080"]
   close_wait: 5s
 verify:
   log_rules:

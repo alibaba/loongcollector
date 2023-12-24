@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(monitor)
 
 if (MSVC)
@@ -31,6 +31,11 @@ target_link_libraries(${PROJECT_NAME} config_manager)
 target_link_libraries(${PROJECT_NAME} app_config)
 target_link_libraries(${PROJECT_NAME} event_handler)
 target_link_libraries(${PROJECT_NAME} go_pipeline)
+target_link_libraries(${PROJECT_NAME} application)
+target_link_libraries(${PROJECT_NAME} profile_sender)
+if (UNIX)
+    target_link_libraries(${PROJECT_NAME} observer)
+endif ()
 if (MSVC)
     target_link_libraries(${PROJECT_NAME} "Psapi.lib")
 endif ()

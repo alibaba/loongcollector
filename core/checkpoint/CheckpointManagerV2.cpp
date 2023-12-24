@@ -21,7 +21,6 @@
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
 #include "app_config/AppConfig.h"
-#include "config/Config.h"
 #include "config_manager/ConfigManager.h"
 #include "checkpoint/CheckPointManager.h"
 
@@ -30,6 +29,8 @@ DEFINE_FLAG_INT32(logtail_checkpoint_gc_threshold_sec, "30 minutes", 30 * 60);
 DEFINE_FLAG_DOUBLE(logtail_checkpoint_max_gc_count_ratio_per_round, "10%", 0.1);
 DEFINE_FLAG_INT64(logtail_checkpoint_max_used_time_per_round_in_msec, "500ms", 500);
 DEFINE_FLAG_INT32(logtail_checkpoint_expired_threshold_sec, "6 hours", 6 * 60 * 60);
+
+DECLARE_FLAG_INT32(max_exactly_once_concurrency);
 
 namespace logtail {
 
@@ -128,7 +129,7 @@ void CheckpointManagerV2::appendCheckpointKeys(const std::string& primaryKey,
     AppendRangeKeys(primaryKey, rgCptCount, keys);
 }
 
-int64_t CheckpointManagerV2::scanCheckpoints(const std::vector<Config*>& exactlyOnceConfigs,
+int64_t CheckpointManagerV2::scanCheckpoints(const std::vector<std::string>& exactlyOnceConfigs,
                                              std::vector<std::pair<std::string, PrimaryCheckpointPB>>* checkpoints,
                                              std::vector<std::string>& shouldDeleteCptKeys,
                                              uint64_t limitScanTimeInMs) {
@@ -140,7 +141,7 @@ int64_t CheckpointManagerV2::scanCheckpoints(const std::vector<Config*>& exactly
 
     std::set<std::string> configNameSet;
     for (auto& cfg : exactlyOnceConfigs) {
-        configNameSet.insert(cfg->mConfigName);
+        configNameSet.insert(cfg);
     }
 
     leveldb::ReadOptions options;
@@ -218,7 +219,7 @@ int64_t CheckpointManagerV2::scanCheckpoints(const std::vector<Config*>& exactly
         PrimaryCheckpointPB cpt;
         if (!cpt.ParseFromArray(iter->value().data(), iter->value().size())) {
             LOG_ERROR(sLogger, ("parse primary checkpoint error, delete", key.ToString()));
-            appendCheckpointKeys(key.ToString(), Config::kExactlyOnceMaxConcurrency, shouldDeleteCptKeys);
+            appendCheckpointKeys(key.ToString(), INT32_FLAG(max_exactly_once_concurrency), shouldDeleteCptKeys);
             continue;
         }
 
@@ -277,7 +278,7 @@ int64_t CheckpointManagerV2::scanCheckpoints(const std::vector<Config*>& exactly
 
 
 std::vector<std::pair<std::string, PrimaryCheckpointPB>>
-CheckpointManagerV2::ScanCheckpoints(const std::vector<Config*>& exactlyOnceConfigs) {
+CheckpointManagerV2::ScanCheckpoints(const std::vector<std::string>& exactlyOnceConfigs) {
     std::vector<std::pair<std::string, PrimaryCheckpointPB>> checkpoints;
 
     LOG_INFO(sLogger,
@@ -487,7 +488,7 @@ void CheckpointManagerV2::runGCLoop() {
         checkGCItems();
 
         std::vector<std::string> toDeleteCptKeys;
-        auto scanUsedTimeInMs = scanCheckpoints(std::vector<Config*>(), nullptr, toDeleteCptKeys, 100);
+        auto scanUsedTimeInMs = scanCheckpoints(std::vector<std::string>(), nullptr, toDeleteCptKeys, 100);
         auto deleteUsedTimeInMs = DeleteCheckpoints(toDeleteCptKeys);
         if (!toDeleteCptKeys.empty()) {
             LOG_INFO(sLogger,

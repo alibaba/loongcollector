@@ -36,8 +36,7 @@ public:
         return ptr;
     }
 
-    void Resume() {} // TODO: Refine interface to avoid ambiguous.
-    void Resume(bool addCheckPointEventFlag = false);
+    void Resume();
     void Start();
     void HoldOn();
     void PushEventQueue(std::vector<Event*>& eventVec);
@@ -64,7 +63,7 @@ private:
     void* ProcessLoop();
     void ProcessEvent(EventDispatcher* dispatcher, Event* ev);
     Event* PopEventQueue();
-    void CheckAndUpdateCriticalMetric(int32_t curTime);
+    void UpdateCriticalMetric(int32_t curTime);
 
     std::queue<Event*> mInotifyEventQueue;
     std::unordered_set<int64_t> mModifyEventSet;

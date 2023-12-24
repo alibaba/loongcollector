@@ -14,20 +14,127 @@
  * limitations under the License.
  */
 #include "processor/ProcessorDesensitizeNative.h"
-#include "common/Constants.h"
-#include "models/LogEvent.h"
-#include "sdk/Common.h"
-#include "plugin/instance/ProcessorInstance.h"
-#include "monitor/MetricConstants.h"
 
+#include "common/Constants.h"
+#include "common/ParamExtractor.h"
+#include "models/LogEvent.h"
+#include "monitor/MetricConstants.h"
+#include "plugin/instance/ProcessorInstance.h"
+#include "sdk/Common.h"
 
 namespace logtail {
+
 const std::string ProcessorDesensitizeNative::sName = "processor_desensitize_native";
 
-bool ProcessorDesensitizeNative::Init(const ComponentConfig& componentConfig) {
-    const PipelineConfig& mConfig = componentConfig.GetConfig();
+bool ProcessorDesensitizeNative::Init(const Json::Value& config) {
+    std::string errorMsg;
 
-    mSensitiveWordCastOptions = mConfig.mSensitiveWordCastOptions;
+    // SourceKey
+    if (!GetMandatoryStringParam(config, "SourceKey", mSourceKey, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    // Method
+    std::string method;
+    if (!GetMandatoryStringParam(config, "Method", method, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (method == "const") {
+        mMethod = DesensitizeMethod::CONST_OPTION;
+    } else if (method == "md5") {
+        mMethod = DesensitizeMethod::MD5_OPTION;
+    } else {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           "string param Method is not valid",
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    // ReplacingString
+    if (mMethod == DesensitizeMethod::CONST_OPTION) {
+        if (!GetMandatoryStringParam(config, "ReplacingString", mReplacingString, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
+        }
+    }
+    mReplacingString = std::string("\\1") + mReplacingString;
+
+    // ContentPatternBeforeReplacedString
+    if (!GetMandatoryStringParam(
+            config, "ContentPatternBeforeReplacedString", mContentPatternBeforeReplacedString, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    // ReplacedContentPattern
+    if (!GetMandatoryStringParam(config, "ReplacedContentPattern", mReplacedContentPattern, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    std::string regexStr = std::string("(") + mContentPatternBeforeReplacedString + ")" + mReplacedContentPattern;
+    mRegex.reset(new re2::RE2(regexStr));
+    if (!mRegex->ok()) {
+        errorMsg = mRegex->error();
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           "param ContentPatternBeforeReplacedString or ReplacedContentPattern is not a valid regex: "
+                               + errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    // ReplacingAll
+    if (!GetOptionalBoolParam(config, "ReplacingAll", mReplacingAll, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mReplacingAll,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
 
     mProcDesensitizeRecodesTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DESENSITIZE_RECORDS_TOTAL);
 
@@ -56,86 +163,74 @@ void ProcessorDesensitizeNative::ProcessEvent(PipelineEventPtr& e) {
 
     const LogContents& contents = sourceEvent.GetContents();
 
-    for (auto it : mSensitiveWordCastOptions) {
-        const std::string& key = it.first;
-        if (!sourceEvent.HasContent(key)) {
+    // Traverse all fields and desensitize sensitive fields.
+    for (auto it = contents.begin(); it != contents.end(); ++it) {
+        // Only perform desensitization processing on specified fields.
+        if (it->first != mSourceKey) {
             continue;
         }
-        const auto& content = contents.find(key);
-        std::string value = sourceEvent.GetContent(key).to_string();
-        CastOneSensitiveWord(mSensitiveWordCastOptions[key], &value);
+        // Only perform desensitization processing on non-empty fields.
+        if (it->second.empty()) {
+            continue;
+        }
+        std::string value = it->second.to_string();
+        CastOneSensitiveWord(&value);
         mProcDesensitizeRecodesTotal->Add(1);
         StringBuffer valueBuffer = sourceEvent.GetSourceBuffer()->CopyString(value);
-        sourceEvent.SetContentNoCopy(content->first, StringView(valueBuffer.data, valueBuffer.size));
+        sourceEvent.SetContentNoCopy(it->first, StringView(valueBuffer.data, valueBuffer.size));
     }
-    return;
 }
 
-void ProcessorDesensitizeNative::CastOneSensitiveWord(const std::vector<SensitiveWordCastOption>& optionVec,
-                                                      std::string* value) {
+void ProcessorDesensitizeNative::CastOneSensitiveWord(std::string* value) {
     std::string* pVal = value;
-    for (size_t i = 0; i < optionVec.size(); ++i) {
-        const SensitiveWordCastOption& opt = optionVec[i];
-        if (!opt.mRegex || !opt.mRegex->ok()) {
-            continue;
-        }
-        bool rst = false;
+    bool rst = false;
 
-        if (opt.option == SensitiveWordCastOption::CONST_OPTION) {
-            if (opt.replaceAll) {
-                rst = RE2::GlobalReplace(pVal, *(opt.mRegex), opt.constValue);
-            } else {
-                rst = RE2::Replace(pVal, *(opt.mRegex), opt.constValue);
-            }
+    if (mMethod == DesensitizeMethod::CONST_OPTION) {
+        if (mReplacingAll) {
+            rst = RE2::GlobalReplace(pVal, *mRegex, mReplacingString);
         } else {
-            re2::StringPiece srcStr(*pVal);
-            size_t maxSize = pVal->size();
-            size_t beginPos = 0;
-            rst = true;
-            std::string destStr;
-            do {
-                re2::StringPiece findRst;
-                if (!re2::RE2::FindAndConsume(&srcStr, *(opt.mRegex), &findRst)) {
-                    if (beginPos == (size_t)0) {
-                        rst = false;
-                    }
-                    break;
-                }
-                // like  xxxx, psw=123abc,xx
-                size_t beginOffset = findRst.data() + findRst.size() - pVal->data();
-                size_t endOffset = srcStr.empty() ? maxSize : srcStr.data() - pVal->data();
-                if (beginOffset < beginPos || endOffset <= beginPos || endOffset > maxSize) {
-                    rst = false;
-                    break;
-                }
-                // add : xxxx, psw
-                destStr.append(pVal->substr(beginPos, beginOffset - beginPos));
-                // md5: 123abc
-                destStr.append(sdk::CalcMD5(pVal->substr(beginOffset, endOffset - beginOffset)));
-                beginPos = endOffset;
-                // refine for  : xxxx. psw=123abc
-                if (endOffset >= maxSize) {
-                    break;
-                }
-
-            } while (opt.replaceAll);
-
-            if (rst && beginPos < pVal->size()) {
-                // add ,xx
-                destStr.append(pVal->substr(beginPos));
-            }
-            if (rst) {
-                *value = destStr;
-                pVal = value;
-            }
+            rst = RE2::Replace(pVal, *mRegex, mReplacingString);
         }
+    } else {
+        re2::StringPiece srcStr(*pVal);
+        size_t maxSize = pVal->size();
+        size_t beginPos = 0;
+        rst = true;
+        std::string destStr;
+        do {
+            re2::StringPiece findRst;
+            if (!re2::RE2::FindAndConsume(&srcStr, *mRegex, &findRst)) {
+                if (beginPos == (size_t)0) {
+                    rst = false;
+                }
+                break;
+            }
+            // like  xxxx, psw=123abc,xx
+            size_t beginOffset = findRst.data() + findRst.size() - pVal->data();
+            size_t endOffset = srcStr.empty() ? maxSize : srcStr.data() - pVal->data();
+            if (beginOffset < beginPos || endOffset <= beginPos || endOffset > maxSize) {
+                rst = false;
+                break;
+            }
+            // add : xxxx, psw
+            destStr.append(pVal->substr(beginPos, beginOffset - beginPos));
+            // md5: 123abc
+            destStr.append(sdk::CalcMD5(pVal->substr(beginOffset, endOffset - beginOffset)));
+            beginPos = endOffset;
+            // refine for  : xxxx. psw=123abc
+            if (endOffset >= maxSize) {
+                break;
+            }
+        } while (mReplacingAll);
 
-        // if (!rst)
-        //{
-        //     LOG_WARNING(sLogger, ("cast sensitive word fail", opt.constValue)(pConfig->mProjectName,
-        //     pConfig->mCategory)); LogtailAlarm::GetInstance()->SendAlarm(CAST_SENSITIVE_WORD_ALARM, "cast sensitive
-        //     word fail", pConfig->mProjectName, pConfig->mCategory, pConfig->mRegion);
-        // }
+        if (rst && beginPos < pVal->size()) {
+            // add ,xx
+            destStr.append(pVal->substr(beginPos));
+        }
+        if (rst) {
+            *value = destStr;
+            pVal = value;
+        }
     }
 }
 

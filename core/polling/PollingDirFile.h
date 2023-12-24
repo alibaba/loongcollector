@@ -20,14 +20,13 @@
 #include "common/Lock.h"
 #include "common/Thread.h"
 #include "PollingCache.h"
+#include "file_server/FileDiscoveryOptions.h"
 
 namespace logtail {
 
 namespace fsutil {
     class PathStat;
 }
-
-class Config;
 
 class PollingDirFile : public LogRunnable {
 public:
@@ -65,7 +64,7 @@ private:
     // @depth: the depth of current level, used to detect max depth.
     // @return: it is used only by first call, returns true if poll successfully or
     //   error can be handled, otherwise false is returned.
-    bool PollingNormalConfigPath(const Config* config,
+    bool PollingNormalConfigPath(const FileDiscoveryConfig& config,
                                  const std::string& srcPath,
                                  const std::string& obj,
                                  const fsutil::PathStat& statBuf,
@@ -74,7 +73,7 @@ private:
     // PollingWildcardConfigPath polls config with wildcard base path recursively.
     // It will use PollingNormalConfigPath to poll if the path becomes normal.
     // @return true if at least one directory was found during polling.
-    bool PollingWildcardConfigPath(const Config* pConfig, const std::string& dirPath, int depth);
+    bool PollingWildcardConfigPath(const FileDiscoveryConfig& pConfig, const std::string& dirPath, int depth);
 
     // CheckAndUpdateDirMatchCache updates dir cache (add if not existing).
     // The caller of this method should make sure that there is at least one config matches
@@ -107,7 +106,8 @@ private:
 
     // CheckConfigPollingStatCount checks if the stat count of @config exceeds limit.
     // If true, logs and alarms.
-    void CheckConfigPollingStatCount(const int32_t lastStatCount, const Config* config, bool isDockerConfig);
+    void
+    CheckConfigPollingStatCount(const int32_t lastStatCount, const FileDiscoveryConfig& config, bool isDockerConfig);
 
 private:
     PTMutex mPollingThreadLock;

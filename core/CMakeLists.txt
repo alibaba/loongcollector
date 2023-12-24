@@ -12,48 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(logtail)
 
 # Options.
 option(BUILD_LOGTAIL "Build Logtail executable and tools" ON)
-option(BUILD_LOGTAIL_UT "Build unit test for Logtail" OFF)
-option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF)
-option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF)
-option(WITHOUTGDB "Build Logtail without gdb" OFF)
+option(ENABLE_ENTERPRISE "enable enterprise feature")
+option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)")
+option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically")
+option(WITHOUTGDB "Build Logtail without gdb")
+option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
 
-# Name/Version information.
-if (NOT DEFINED LOGTAIL_VERSION)
-    set(LOGTAIL_VERSION "1.8.3")
+if (ENABLE_ENTERPRISE)
+    message(STATUS "Enable Enterprise Feature.")
+    add_definitions(-D__ENTERPRISE__)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/enterprise_options.cmake)
+else ()
+    include(${CMAKE_CURRENT_SOURCE_DIR}/options.cmake)
 endif ()
-message(STATUS "Version: ${LOGTAIL_VERSION}")
-
-# Extract Git commit information for tracing.
-# For a better solution see https://jonathanhamberg.com/post/cmake-embedding-git-hash/ but this is simple and easy.
-find_package(Git)
-# Error is just ignored and output will be empty at runtime.
-execute_process(COMMAND
-        "${GIT_EXECUTABLE}" log -1 --format=%H
-        WORKING_DIRECTORY "${FLB_ROOT}"
-        OUTPUT_VARIABLE LOGTAIL_GIT_HASH
-        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-message(STATUS "Git hash: ${LOGTAIL_GIT_HASH}")
-
-string(TIMESTAMP LOGTAIL_BUILD_DATE "%Y%m%d")
-message(STATUS "Build date: ${LOGTAIL_BUILD_DATE}")
-
-set(LOGTAIL_TARGET "ilogtail")
-set(VERSION_CPP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/common/Version.cpp)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/common/Version.cpp.in ${VERSION_CPP_FILE})
 
 # Default C/CXX flags.
 if (UNIX)
-    if (WITHOUTGDB)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
-    else ()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -g -ggdb -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    if (NOT WITHOUTGDB)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -ggdb")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -ggdb")
     endif ()
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer -DLOGTAIL_NO_TC_MALLOC")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer -DLOGTAIL_NO_TC_MALLOC")
@@ -69,9 +53,8 @@ elseif (MSVC)
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd /MP")
 endif ()
-cmake_policy(SET CMP0074 NEW)
 
-# To be compatible with low version Linux (-DENABLE_COMPATIBLE_MODE=ON).
+# To be compatible with low version Linux.
 if (ENABLE_COMPATIBLE_MODE)
     if (UNIX)
         message(STATUS "Enable compatible mode.")
@@ -87,15 +70,24 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake)
 
 # Subdirectories (modules).
 set(SUB_DIRECTORIES_LIST
-        aggregator app_config checkpoint common config config_manager config_server_pb
-        controller event event_handler event_listener file_server go_pipeline helper input log_pb logger models monitor
-        parser pipeline plugin plugin/creator plugin/instance plugin/interface polling processor processor/daemon profile_sender reader sdk sender shennong sls_control
-        fuse
+        aggregator application app_config checkpoint common config config/provider config/watcher config_manager config_server_pb 
+        container_manager controller event event_handler event_listener file_server flusher go_pipeline helper input log_pb logger 
+        models monitor parser pipeline plugin plugin/creator plugin/instance plugin/interface polling processor processor/daemon 
+        profile_sender reader sdk sender sls_control fuse
         )
 if (UNIX)
-    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} streamlog)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer)
+    if (ENABLE_ENTERPRISE)
+        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong streamlog)
+    endif()
+elseif(MSVC)
+    if (ENABLE_ENTERPRISE)
+        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} daemon)
+    endif()
 endif ()
+if (ENABLE_ENTERPRISE)
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} config_sdk)
+endif()
 
 # Collect source files for UT.
 set(ALL_SOURCE_FILES "")
@@ -113,49 +105,33 @@ endforeach (DIR_NAME)
 
 # Logtail executable.
 if (BUILD_LOGTAIL)
-    if (UNIX)
-        add_executable(${LOGTAIL_TARGET} logtail.cpp)
-    elseif (MSVC)
-        add_executable(${LOGTAIL_TARGET} logtail_windows.cpp)
-    endif ()
-    link_tcmalloc(${LOGTAIL_TARGET}) # should be the first lib to link
-    target_link_libraries(${LOGTAIL_TARGET}
-            common
-            logger
-            config_manager
-            checkpoint
-            processor_daemon
-            controller
-            pipeline
-            plugin
-            models
-            monitor
-            sender
-            profile_sender
-            app_config
-            sls_control
-            go_pipeline
-            )
-    if (UNIX)
-        target_link_libraries(${LOGTAIL_TARGET} streamlog)
-        target_link_libraries(${LOGTAIL_TARGET} observer)
-        target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid)
-        if (ENABLE_COMPATIBLE_MODE)
-            target_link_libraries(${LOGTAIL_TARGET} rt)
-            target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid -static-libstdc++ -static-libgcc)
-        else ()
-            target_link_libraries(${LOGTAIL_TARGET} pthread dl uuid)
-            if (ENABLE_STATIC_LINK_CRT)
-                target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
-            endif ()
+    if (ENABLE_ENTERPRISE)
+        if (UNIX)
+            add_executable(${LOGTAIL_TARGET} enterprise_logtail.cpp)
+        elseif (MSVC)
+            add_executable(${LOGTAIL_TARGET} enterprise_logtail_windows.cpp)
         endif ()
-        link_ssl(${LOGTAIL_TARGET})
-        link_crypto(${LOGTAIL_TARGET})
+    else ()
+        if (UNIX)
+            add_executable(${LOGTAIL_TARGET} logtail.cpp)
+        elseif (MSVC)
+            add_executable(${LOGTAIL_TARGET} logtail_windows.cpp)
+        endif ()
+    endif()
+    target_link_libraries(${LOGTAIL_TARGET} application)
+    if (UNIX)
+        if (ENABLE_COMPATIBLE_MODE)
+            target_link_libraries(${LOGTAIL_TARGET} rt -static-libstdc++ -static-libgcc)
+        elseif (ENABLE_STATIC_LINK_CRT)
+            target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
+        endif ()
     endif ()
-endif ()
+endif()
 
 # Logtail UT.
 if (BUILD_LOGTAIL_UT)
     message(STATUS "Build unittest.")
+    include(CTest)
+    enable_testing()
     add_subdirectory(unittest)
 endif ()

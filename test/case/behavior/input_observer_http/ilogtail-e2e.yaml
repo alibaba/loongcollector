@@ -19,7 +19,7 @@ ilogtail:
     - name: observer-http-case
       detail:
         - inputs:
-            - Type: observer_ilogtail_network_v1
+            - Type: input_observer_network
               Common:
                 FlushOutL7Interval: 1
                 FlushOutL4Interval: 100

@@ -18,7 +18,7 @@ AlwaysBreakTemplateDeclarations: true
 IndentCaseLabels: true
 SpaceAfterTemplateKeyword: true
 SpaceBeforeCpp11BracedList: false
-SortIncludes: false
+SortIncludes: true
 ReflowComments: true
 AlignEscapedNewlinesLeft: false
 AlignEscapedNewlines: DontAlign

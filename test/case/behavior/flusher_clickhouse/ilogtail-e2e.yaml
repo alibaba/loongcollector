@@ -25,7 +25,7 @@ ilogtail:
               Fields:
                 _name: "hello"
                 _value: "log contents"
-          outputs:
+          flushers:
             - Type: flusher_clickhouse
               Addresses: ["clickhouse:9000"]
               Authentication:

@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+#pragma once
+
+#include "common/TimeUtil.h"
+#include "models/LogEvent.h"
 #include "plugin/interface/Processor.h"
-#include <string>
-#include <boost/regex.hpp>
+#include "processor/CommonParserOptions.h"
 
 namespace logtail {
 
@@ -25,27 +28,29 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const ComponentConfig& componentConfig) override;
+    bool Init(const Json::Value& config) override;
     void Process(PipelineEventGroup& logGroup) override;
+
+    // Source field name.
+    std::string mSourceKey;
+    // The time zone to which the log time belongs. The format is GMT+HH:MM (Eastern Zone) or GMT-HH:MM (Western Zone).
+    std::string mTimezone;
+    CommonParserOptions mCommonParserOptions;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e, LogtailTime& lastLogTime, StringView& timeStrCache);
-    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent);
-    time_t ApsaraEasyReadLogTimeParser(StringView& buffer, StringView& timeStr, LogtailTime& lastLogTime, int64_t& microTime);
-    int32_t GetApsaraLogMicroTime(StringView& buffer);
+    bool
+    ProcessEvent(const StringView& logPath, PipelineEventPtr& e, LogtailTime& lastLogTime, StringView& timeStrCache);
+    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
+    time_t
+    ApsaraEasyReadLogTimeParser(StringView& buffer, StringView& timeStr, LogtailTime& lastLogTime, int64_t& microTime);
     bool IsPrefixString(const char* all, const StringView& prefix);
     int32_t ParseApsaraBaseFields(const StringView& buffer, LogEvent& sourceEvent);
 
-    std::string mSourceKey;
-    std::string mRawLogTag;
-    bool mDiscardUnmatch = false;
-    bool mUploadRawLog = false;
-    bool mAdjustApsaraMicroTimezone = false;
+    int32_t mLogTimeZoneOffsetSecond = 0;
     bool mSourceKeyOverwritten = false;
-    int mLogTimeZoneOffsetSecond = 0;
 
     int* mLogGroupSize = nullptr;
     int* mParseFailures = nullptr;
@@ -55,6 +60,7 @@ private:
     CounterPtr mProcDiscardRecordsTotal;
     CounterPtr mProcParseErrorTotal;
     CounterPtr mProcHistoryFailureTotal;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseApsaraNativeUnittest;
 #endif

@@ -19,17 +19,15 @@
 #include <string>
 #include <memory>
 #include "common/Flags.h"
-#include "common/util.h"
 #include "common/FileSystemUtil.h"
 #include "event/Event.h"
 #include "event_handler/EventHandler.h"
-#include "reader/CommonRegLogFileReader.h"
+#include "reader/LogFileReader.h"
 
 using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);
-DECLARE_FLAG_STRING(user_log_config);
-DECLARE_FLAG_INT32(batch_send_interval);
+DECLARE_FLAG_INT32(default_tail_limit_kb);
 
 namespace logtail {
 class ModifyHandlerUnittest : public ::testing::Test {

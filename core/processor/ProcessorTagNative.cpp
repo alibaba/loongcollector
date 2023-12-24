@@ -16,26 +16,27 @@
 
 #include "processor/ProcessorTagNative.h"
 
+#include <vector>
+
 #include "app_config/AppConfig.h"
-#include "common/Constants.h"
-#include "common/FileSystemUtil.h"
-#include "reader/LogFileReader.h"
-#include "plugin/instance/ProcessorInstance.h"
-#include "monitor/MetricConstants.h"
+#include "common/Flags.h"
+#include "log_pb/sls_logs.pb.h"
+#include "pipeline/Pipeline.h"
+
+DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
 
 namespace logtail {
+
 const std::string ProcessorTagNative::sName = "processor_tag_native";
 
-bool ProcessorTagNative::Init(const ComponentConfig& componentConfig) {
-    const Config& config = componentConfig.GetConfig();
-    mPluginProcessFlag = config.mPluginProcessFlag;
+bool ProcessorTagNative::Init(const Json::Value& config) {
     return true;
 }
 
 void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     // add file tags (like env tags but support reload)
     if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
-        std::vector<sls_logs::LogTag>& fileTags = ConfigManager::GetInstance()->GetFileTags();
+        std::vector<sls_logs::LogTag>& fileTags = AppConfig::GetInstance()->GetFileTags();
         if (!fileTags.empty()) { // reloadable, so we must get it every time and copy value
             for (size_t i = 0; i < fileTags.size(); ++i) {
                 logGroup.SetTag(fileTags[i].key(), fileTags[i].value());
@@ -55,18 +56,12 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
         logGroup.SetTagNoCopy(LOG_RESERVED_KEY_USER_DEFINED_ID, agent_tag.substr(0, 99));
     }
 
-    if (mPluginProcessFlag) {
+    if (mContext->GetPipeline().IsFlushingThroughGoPipeline()) {
         return;
     }
 
     // __hostname__
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, logGroup.GetMetadata(EventGroupMetaKey::HOST_NAME).substr(0, 99));
-
-    // zone info for ant
-    const std::string& alipayZone = AppConfig::GetInstance()->GetAlipayZone();
-    if (!alipayZone.empty()) {
-        logGroup.SetTagNoCopy(LOG_RESERVED_KEY_ALIPAY_ZONE, alipayZone);
-    }
 
     // add env tags
     static const std::vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();

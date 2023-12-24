@@ -17,23 +17,13 @@ boot:
 ilogtail:
   config:
     - name: docker-event-case
-      content:
-        - '{
-               "inputs":[
-                   {
-                       "type":"service_docker_stdout",
-                       "detail":{
-                           "IncludeEnv":{
-                               "STDOUT_SWITCH":"true"
-                           },
-                           "Stdout":true,
-                           "BeginLineRegex":"today"
-                       }
-                   }
-               ]
-           }
-
-        '
+      detail:
+      - inputs:
+        - Type: service_docker_stdout
+          IncludeEnv:
+            STDOUT_SWITCH: "true"
+          Stdout: true
+          BeginLineRegex: "today"
   close_wait: 5s
 verify:
   log_rules:

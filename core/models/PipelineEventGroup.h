@@ -17,6 +17,7 @@
 #pragma once
 #include <memory>
 #include <string>
+
 #include "common/Constants.h"
 #include "models/PipelineEventPtr.h"
 #include "reader/SourceBuffer.h"
@@ -66,7 +67,7 @@ public:
     PipelineEventGroup& operator=(const PipelineEventGroup&) = delete;
     PipelineEventGroup(PipelineEventGroup&&) noexcept = default;
     PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept = default;
-    
+
 
     const EventsContainer& GetEvents() const { return mEvents; }
     EventsContainer& MutableEvents() { return mEvents; }
@@ -86,9 +87,7 @@ public:
     void DelMetadata(EventGroupMetaKey key);
     GroupMetadata& MutableAllMetadata() { return mMetadata; };
     void SwapAllMetadata(GroupMetadata& other) { mMetadata.swap(other); }
-    void SetAllMetadata(GroupMetadata& other) {
-        mMetadata = other;
-    }
+    void SetAllMetadata(GroupMetadata& other) { mMetadata = other; }
 
     void SetTag(const StringView& key, const StringView& val);
     void SetTag(const std::string& key, const std::string& val);

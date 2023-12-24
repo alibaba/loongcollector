@@ -48,7 +48,6 @@ void PollingModify::Start() {
     ClearCache();
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
-    LOG_INFO(sLogger, ("PollingModify", "start"));
 }
 
 void PollingModify::Stop() {
@@ -64,15 +63,17 @@ void PollingModify::Stop() {
 }
 
 void PollingModify::Resume() {
+    LOG_INFO(sLogger, ("polling modify resume", "starts"));
     mHoldOnFlag = false;
     mPollingThreadLock.unlock();
-    LOG_INFO(sLogger, ("PollingModify", "resume"));
+    LOG_INFO(sLogger, ("polling modify resume", "succeeded"));
 }
 
 void PollingModify::HoldOn() {
+    LOG_INFO(sLogger, ("polling modify pause", "starts"));
     mHoldOnFlag = true;
     mPollingThreadLock.lock();
-    LOG_INFO(sLogger, ("PollingModify", "hold on"));
+    LOG_INFO(sLogger, ("polling modify pause", "succeeded"));
 }
 
 struct ModifySortItem {
@@ -235,7 +236,7 @@ bool PollingModify::UpdateDeletedFile(const SplitedFilePath& filePath,
 }
 
 void PollingModify::Polling() {
-    LOG_INFO(sLogger, ("PollingModify::Polling", "start"));
+    LOG_INFO(sLogger, ("polling modify", "started"));
     mHoldOnFlag = false;
     while (mRuningFlag) {
         {
@@ -245,7 +246,7 @@ void PollingModify::Polling() {
             vector<SplitedFilePath> deletedFileVec;
             vector<Event*> pollingEventVec;
             int32_t statCount = 0;
-            LogtailMonitor::Instance()->UpdateMetric("polling_modify_size", mModifyCacheMap.size());
+            LogtailMonitor::GetInstance()->UpdateMetric("polling_modify_size", mModifyCacheMap.size());
             for (auto iter = mModifyCacheMap.begin(); iter != mModifyCacheMap.end(); ++iter) {
                 if (!mRuningFlag || mHoldOnFlag)
                     break;

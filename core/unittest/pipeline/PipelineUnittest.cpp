@@ -12,99 +12,2598 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdlib>
-#include "unittest/Unittest.h"
+#include <json/json.h>
+
+#include <memory>
+#include <string>
+
+#include "app_config/AppConfig.h"
+#include "common/JsonUtil.h"
+#include "common/LogstoreFeedbackKey.h"
+#include "config/Config.h"
 #include "pipeline/Pipeline.h"
 #include "plugin/PluginRegistry.h"
+#include "processor/ProcessorSplitLogStringNative.h"
+#include "processor/ProcessorSplitRegexNative.h"
+#include "unittest/Unittest.h"
+
+using namespace std;
 
 namespace logtail {
 
 class PipelineUnittest : public ::testing::Test {
 public:
-    static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
-    void TestInit();
-    void TestProcess();
+    void OnSuccessfulInit() const;
+    void OnFailedInit() const;
+    void OnInitVariousTopology() const;
+    void OnInputFileWithMultiline() const;
+    void OnInputFileWithContainerDiscovery() const;
+
+protected:
+    static void SetUpTestCase() {
+        PluginRegistry::GetInstance()->LoadPlugins();
+        AppConfig::GetInstance()->mPurageContainerMode = true;
+    }
+
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+
+private:
+    const string configName = "test_config";
 };
 
-APSARA_UNIT_TEST_CASE(PipelineUnittest, TestInit, 0);
-APSARA_UNIT_TEST_CASE(PipelineUnittest, TestProcess, 1);
+void PipelineUnittest::OnSuccessfulInit() const {
+    unique_ptr<Json::Value> configJson;
+    Json::Value goPipelineWithInput, goPipelineWithoutInput;
+    string configStr, goPipelineWithInputStr, goPipelineWithoutInputStr, errorMsg;
+    unique_ptr<Config> config;
+    unique_ptr<Pipeline> pipeline;
 
-
-void PipelineUnittest::TestInit() {
-    Pipeline pipeline;
-    PipelineConfig config;
-    config.mConfigName = "project##config_0";
-    config.mProjectName = "project";
-    config.mCategory = "category";
-    config.mRegion = "cn-shanghai";
-    config.mLogType = REGEX_LOG;
-    APSARA_TEST_TRUE_FATAL(pipeline.Init(config));
-    APSARA_TEST_EQUAL_FATAL(config.mConfigName, pipeline.Name());
-    PipelineContext& context = pipeline.GetContext();
-    APSARA_TEST_EQUAL_FATAL(config.mProjectName, context.GetProjectName());
-    APSARA_TEST_EQUAL_FATAL(config.mCategory, context.GetLogstoreName());
-    APSARA_TEST_EQUAL_FATAL(config.mRegion, context.GetRegion());
-}
-
-void PipelineUnittest::TestProcess() {
-    Pipeline pipeline;
-    PipelineConfig config;
-    config.mConfigName = "project##config_0";
-    config.mProjectName = "project";
-    config.mCategory = "category";
-    config.mRegion = "cn-shanghai";
-    config.mLogType = REGEX_LOG;
-    config.mDiscardUnmatch = false;
-    config.mUploadRawLog = false;
-    config.mAdvancedConfig.mRawLogTag = "__raw__";
-    config.mRegs = std::make_shared<std::list<std::string> >();
-    config.mRegs->emplace_back("(.*)");
-    config.mKeys = std::make_shared<std::list<std::string> >();
-    config.mKeys->emplace_back("content");
-
-    APSARA_TEST_TRUE_FATAL(pipeline.Init(config));
-    
-    // make events
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup eventGroup(sourceBuffer);
-    std::string inJson = R"({
-        "events" :
-        [
-            {
-                "contents" :
+    // with sls flusher
+    configStr = R"(
+        {
+            "createTime": 123456789,
+            "inputs": [
                 {
-                    "content" : "line1",
-                    "log.file.offset": "0"
-                },
-                "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
-                "type" : 1
-            },
-            {
-                "contents" :
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
                 {
-                    "content" : "line2",
-                    "log.file.offset": "0"
-                },
-                "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
-                "type" : 1
-            }
-        ],
-        "tags" : {
-            "__tag__:taiye": "123"
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
         }
-    })";
-    eventGroup.FromJsonString(inJson);
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(configName, pipeline->Name());
+    APSARA_TEST_EQUAL(configName, pipeline->GetContext().GetConfigName());
+    APSARA_TEST_EQUAL(123456789, pipeline->GetContext().GetCreateTime());
+    APSARA_TEST_EQUAL("test_project", pipeline->GetContext().GetProjectName());
+    APSARA_TEST_EQUAL("test_logstore", pipeline->GetContext().GetLogstoreName());
+    APSARA_TEST_EQUAL("test_region", pipeline->GetContext().GetRegion());
+    APSARA_TEST_EQUAL(GenerateLogstoreFeedBackKey("test_project", "test_logstore"),
+                      pipeline->GetContext().GetLogstoreKey());
 
-    std::vector<PipelineEventGroup> outputList;
+    // without sls flusher
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(configName, pipeline->Name());
+    APSARA_TEST_EQUAL(configName, pipeline->GetContext().GetConfigName());
+    APSARA_TEST_EQUAL(0, pipeline->GetContext().GetCreateTime());
+    APSARA_TEST_EQUAL("", pipeline->GetContext().GetProjectName());
+    APSARA_TEST_EQUAL("", pipeline->GetContext().GetLogstoreName());
+    APSARA_TEST_EQUAL("", pipeline->GetContext().GetRegion());
+#ifndef __ENTERPRISE__
+    APSARA_TEST_EQUAL(GenerateLogstoreFeedBackKey("", ""), pipeline->GetContext().GetLogstoreKey());
+#endif
 
-    pipeline.Process(std::move(eventGroup), outputList);
-    APSARA_TEST_EQUAL_FATAL(1, outputList.size());
-
-    APSARA_TEST_EQUAL_FATAL(2, outputList[0].GetEvents().size());
-    //APSARA_TEST_EQUAL_FATAL(1, outputList[0].GetTags().size());
+    // extensions and extended global param
+    configStr = R"(
+        {
+            "global": {
+                "DefaultLogGroupQueueSize": 3,
+                "DefaultLogQueueSize": 5
+            },
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ],
+                    "EnableContainerDiscovery": true
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ],
+            "extensions": [
+                {
+                    "Type": "ext_basicauth"
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global" : {
+                "AlwaysOnline": true,
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 5,
+                "DefaultLogGroupQueueSize": 3
+            },
+            "inputs": [
+                {
+                    "type": "metric_docker_file",
+                    "detail": {
+                        "LogPath": "/home",
+                        "MaxDepth": 0,
+                        "FilePattern": "test.log"
+                    }
+                }
+            ],
+            "extensions": [
+                {
+                    "type": "ext_basicauth",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10,
+                "DefaultLogGroupQueueSize": 3
+            },
+            "flushers": [
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ],
+            "extensions": [
+                {
+                    "type": "ext_basicauth",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithInput.clear();
+    goPipelineWithoutInput.clear();
 }
+
+void PipelineUnittest::OnFailedInit() const {
+    unique_ptr<Json::Value> configJson;
+    string configStr, errorMsg;
+    unique_ptr<Config> config;
+    unique_ptr<Pipeline> pipeline;
+
+    // invalid input
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_FALSE(pipeline->Init(std::move(*config)));
+
+    // invalid processor
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_FALSE(pipeline->Init(std::move(*config)));
+
+    // invalid flusher
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_FALSE(pipeline->Init(std::move(*config)));
+}
+
+void PipelineUnittest::OnInitVariousTopology() const {
+    unique_ptr<Json::Value> configJson;
+    Json::Value goPipelineWithInput, goPipelineWithoutInput;
+    string configStr, goPipelineWithInputStr, goPipelineWithoutInputStr, errorMsg;
+    unique_ptr<Config> config;
+    unique_ptr<Pipeline> pipeline;
+
+    // topology 1: native -> native -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+
+    // topology 2: extended -> native -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 3: (native, extended) -> native -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 4: native -> extended -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 5: extended -> extended -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global": {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false
+            },
+            "inputs": [
+                {
+                    "type": "service_docker_stdout",
+                    "detail": {}
+                }
+            ],
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    goPipelineWithInput.clear();
+
+    // topology 6: (native, extended) -> extended -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 7: native -> (native -> extended) -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 8: extended -> (native -> extended) -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 9: (native, extended) -> (native -> extended) -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 10: native -> none -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+
+    // topology 11: extended -> none -> native (future changes maybe applied)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global": {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false
+            },
+            "inputs": [
+                {
+                    "type": "service_docker_stdout",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    goPipelineWithInput.clear();
+
+    // topology 12: (native, extended) -> none -> native
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 13: native -> native -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 14: extended -> native -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 15: (native, extended) -> native -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 16: native -> extended -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 17: extended -> extended -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global": {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false
+            },
+            "inputs": [
+                {
+                    "type": "service_docker_stdout",
+                    "detail": {}
+                }
+            ],
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    goPipelineWithInput.clear();
+
+    // topology 18: (native, extended) -> extended -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 19: native -> (native -> extended) -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 20: extended -> (native -> extended) -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 21: (native, extended) -> (native -> extended) -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 22: native -> none -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 23: extended -> none -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global": {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false
+            },
+            "inputs": [
+                {
+                    "type": "service_docker_stdout",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    goPipelineWithInput.clear();
+
+    // topology 24: (native, extended) -> none -> extended
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 25: native -> native -> (native, extended) (future changes maybe applied)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                },
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 26: extended -> native -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 27: (native, extended) -> native -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 28: native -> extended -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                },
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 29: extended -> extended -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global": {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false
+            },
+            "inputs": [
+                {
+                    "type": "service_docker_stdout",
+                    "detail": {}
+                }
+            ],
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                },
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    goPipelineWithInput.clear();
+
+    // topology 30: (native, extended) -> extended -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 31: native -> (native -> extended) -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                },
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 32: extended -> (native -> extended) -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 33: (native, extended) -> (native -> extended) -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_regex_native",
+                    "SourceKey": "content",
+                    "Regex": ".*",
+                    "Keys": ["key"]
+                },
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // topology 34: native -> none -> (native, extended) (future changes maybe applied)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                },
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithoutInput.clear();
+
+    // topology 35: extended -> none -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global": {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false
+            },
+            "inputs": [
+                {
+                    "type": "service_docker_stdout",
+                    "detail": {}
+                }
+            ],
+            "aggregators": [
+                {
+                    "type": "aggregator_context",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                },
+                {
+                    "type": "flusher_kafka_v2",
+                    "detail": {}
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
+    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
+    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    goPipelineWithInput.clear();
+
+    // topology 36: (native, extended) -> none -> (native, extended)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                },
+                {
+                    "Type": "service_docker_stdout"
+                }
+            ],
+            "aggregators": [
+                {
+                    "Type": "aggregator_context"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                },
+                {
+                    "Type": "flusher_kafka_v2"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_FALSE(config->Parse());
+}
+
+void PipelineUnittest::OnInputFileWithMultiline() const {
+    unique_ptr<Json::Value> configJson;
+    string configStr, errorMsg;
+    unique_ptr<Config> config;
+    unique_ptr<Pipeline> pipeline;
+
+    // normal multiline
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ],
+                    "Multiline": {
+                        "StartPattern": "\\d+",
+                        "EndPattern": "end"
+                    }
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(ProcessorSplitRegexNative::sName, pipeline->mProcessorLine[1]->Name());
+
+    // json multiline
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_parse_json_native",
+                    "SourceKey": "content"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_TRUE(pipeline->GetContext().RequiringJsonReader());
+    APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, pipeline->mProcessorLine[1]->Name());
+
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_json"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_TRUE(pipeline->GetContext().RequiringJsonReader());
+    APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, pipeline->mProcessorLine[1]->Name());
+
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ],
+                    "Multiline": {
+                        "Mode": "JSON"
+                    }
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_TRUE(pipeline->GetContext().RequiringJsonReader());
+    APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, pipeline->mProcessorLine[1]->Name());
+}
+
+void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
+    unique_ptr<Json::Value> configJson;
+    Json::Value goPipelineWithInput, goPipelineWithoutInput;
+    string configStr, goPipelineWithoutInputStr, goPipelineWithInputStr, errorMsg;
+    unique_ptr<Config> config;
+    unique_ptr<Pipeline> pipeline;
+
+    // native processing
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ],
+                    "EnableContainerDiscovery": true
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global" : {
+                "AlwaysOnline": true,
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "inputs": [
+                {
+                    "type": "metric_docker_file",
+                    "detail": {
+                        "LogPath": "/home",
+                        "MaxDepth": 0,
+                        "FilePattern": "test.log"
+                    }
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
+    goPipelineWithInput.clear();
+
+    // mixed processing
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ],
+                    "EnableContainerDiscovery": true
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_regex"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "EnableShardHash": false
+                }
+            ]
+        }
+    )";
+    goPipelineWithInputStr = R"(
+        {
+            "global" : {
+                "AlwaysOnline": true,
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "inputs": [
+                {
+                    "type": "metric_docker_file",
+                    "detail": {
+                        "LogPath": "/home",
+                        "MaxDepth": 0,
+                        "FilePattern": "test.log"
+                    }
+                }
+            ]
+        }
+    )";
+    goPipelineWithoutInputStr = R"(
+        {
+            "global" : {
+                "EnableTimestampNanosecond": false,
+                "UsingOldContentTag": false,
+                "DefaultLogQueueSize" : 10
+            },
+            "processors": [
+                {
+                    "type": "processor_regex",
+                    "detail": {}
+                }
+            ],
+            "flushers": [
+                {
+                    "type": "flusher_sls",
+                    "detail": {
+                        "EnableShardHash": false
+                    }
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithInputStr, goPipelineWithInput, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(goPipelineWithoutInputStr, goPipelineWithoutInput, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    goPipelineWithInput.clear();
+    goPipelineWithoutInput.clear();
+}
+
+UNIT_TEST_CASE(PipelineUnittest, OnSuccessfulInit)
+UNIT_TEST_CASE(PipelineUnittest, OnFailedInit)
+UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithMultiline)
+UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithContainerDiscovery)
+UNIT_TEST_CASE(PipelineUnittest, OnInitVariousTopology)
 
 } // namespace logtail
 

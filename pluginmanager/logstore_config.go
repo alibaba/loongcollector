@@ -674,7 +674,7 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			continue
 		}
 
-		if pluginType != "global" && pluginType != "version" && pluginType != mixProcessModeFlag {
+		if pluginType != "global" && pluginType != "StructureType" && pluginType != mixProcessModeFlag {
 			return nil, fmt.Errorf("error plugin name \"%s\"", pluginType)
 		}
 	}
@@ -686,7 +686,7 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 }
 
 func fetchPluginVersion(config map[string]interface{}) ConfigVersion {
-	if v, ok := config["version"]; ok {
+	if v, ok := config["StructureType"]; ok {
 		if s, ok := v.(string); ok {
 			return ConfigVersion(strings.ToLower(s))
 		}

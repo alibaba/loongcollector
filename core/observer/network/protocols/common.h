@@ -380,7 +380,7 @@ private:
         eventType event;
         bool success = true;
         if (this->mConvertEventFunc != nullptr && this->mConvertEventFunc(req, resp, event)) {
-            APSARA_LOG_TRACE(sLogger,
+            LOG_TRACE(sLogger,
                       ("head_req", this->mHeadRequestsIdx)("tail_req", this->mTailRequestsIdx)(
                           "head_resp", this->mHeadRequestsIdx)("tail_resp", this->mTailResponsesIdx));
             success = this->mAggregators->AddEvent(std::move(event));

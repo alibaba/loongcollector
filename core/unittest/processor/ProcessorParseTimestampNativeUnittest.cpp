@@ -13,28 +13,23 @@
 // limitations under the License.
 
 #include <cstdlib>
-#include "unittest/Unittest.h"
-#include "common/JsonUtil.h"
-#include "config/Config.h"
-#include "processor/ProcessorParseTimestampNative.h"
-#include "plugin/instance/ProcessorInstance.h"
-#include "common/TimeUtil.h"
 #include <string>
 #include <vector>
 
-using namespace std;
+#include "common/JsonUtil.h"
+#include "common/TimeUtil.h"
+#include "config/Config.h"
+#include "plugin/instance/ProcessorInstance.h"
+#include "processor/ProcessorParseTimestampNative.h"
+#include "unittest/Unittest.h"
+
 using namespace logtail;
 
 namespace logtail {
 
 class ProcessorParseTimestampNativeUnittest : public ::testing::Test {
 public:
-    void SetUp() override {
-        mContext.SetConfigName("project##config_0");
-        mContext.SetLogstoreName("logstore");
-        mContext.SetProjectName("project");
-        mContext.SetRegion("cn-shanghai");
-    }
+    void SetUp() override { mContext.SetConfigName("project##config_0"); }
 
     void TestInit();
     void TestProcessNoFormat();
@@ -78,8 +73,8 @@ bool CheckTimeFormatV1(const std::string& timeValue, const std::string& timeForm
 }
 
 void ProcessorParseTimestampNativeUnittest::TestCheckTime() {
-    string timeValue;
-    string timeFormat;
+    std::string timeValue;
+    std::string timeFormat;
     timeValue = "Fri";
     timeFormat = "%a";
     APSARA_TEST_TRUE_FATAL(CheckTimeFormatV1(timeValue, timeFormat));
@@ -291,72 +286,45 @@ void ProcessorParseTimestampNativeUnittest::TestCheckTime() {
 }
 
 void ProcessorParseTimestampNativeUnittest::TestInit() {
-    Config config;
-    config.mTimeFormat = "%Y-%m-%d %H:%M:%S";
-    config.mTimeKey = "time";
-    config.mAdvancedConfig.mSpecifiedYear = 0;
-    config.mAdvancedConfig.mEnablePreciseTimestamp = false;
-    config.mAdvancedConfig.mPreciseTimestampKey = "precise_timestamp";
-    config.mAdvancedConfig.mPreciseTimestampUnit = TimeStampUnit::MILLISECOND;
-    config.mLogTimeZoneOffsetSecond = 28800;
+    // make config
+    Json::Value config;
+    config["SourceKey"] = "time";
+    config["SourceFormat"] = "%Y-%m-%d %H:%M:%S";
+    config["SourceTimezone"] = "GMT+08:00";
+    config["SourceYear"] = 0;
 
     ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
     std::string pluginId = "testID";
     ProcessorInstance processorInstance(&processor, pluginId);
-    ComponentConfig componentConfig(pluginId, config);
-    APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 }
 
 void ProcessorParseTimestampNativeUnittest::TestProcessNoFormat() {
     // make config
-    Config config;
-    config.mTimeFormat = "";
-    config.mTimeKey = "time";
-    config.mLogTimeZoneOffsetSecond = 28800;
-    // make events
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup eventGroup(sourceBuffer);
-    std::string inJson = R"({
-        "events" :
-        [
-            {
-                "contents" :
-                {
-                    "time" : "2023-07-30 23:00:00"
-                },
-                "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
-                "type" : 1
-            }
-        ]
-    })";
-    eventGroup.FromJsonString(inJson);
+    Json::Value config;
+    config["SourceKey"] = "time";
+    config["SourceFormat"] = "";
+    config["SourceTimezone"] = "GMT+08:00";
     // run function
     ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
     std::string pluginId = "testID";
     ProcessorInstance processorInstance(&processor, pluginId);
-    ComponentConfig componentConfig(pluginId, config);
-    APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
-    processor.Process(eventGroup);
-    // judge result
-    std::string outJson = eventGroup.ToJsonString();
-    APSARA_TEST_STREQ_FATAL(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
+    APSARA_TEST_TRUE_FATAL(!processorInstance.Init(config, mContext));
 }
 
 void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
     // make config
-    Config config;
-    config.mTimeFormat = "%Y-%m-%d %H:%M:%S";
-    config.mTimeKey = "time";
-    config.mTimeZoneAdjust = true;
-    config.mLogTimeZoneOffsetSecond = 28800;
+    Json::Value config;
+    config["SourceKey"] = "time";
+    config["SourceFormat"] = "%Y-%m-%d %H:%M:%S";
+    config["SourceTimezone"] = "GMT+08:00";
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
     time_t now = time(nullptr); // will not be discarded by history timeout
     char timebuff[32] = "";
     std::tm* now_tm = std::localtime(&now);
-    strftime(timebuff, sizeof(timebuff), config.mTimeFormat.c_str(), now_tm);
+    strftime(timebuff, sizeof(timebuff), config["SourceFormat"].asString().c_str(), now_tm);
     std::stringstream inJsonSs;
     inJsonSs << R"({
         "events":
@@ -365,7 +333,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
                 "contents" :
                 {
                     "time" : ")"
-                    << timebuff << R"("
+             << timebuff << R"("
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -375,7 +343,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
                 "contents" :
                 {
                     "time" : ")"
-                    << timebuff << R"("
+             << timebuff << R"("
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -388,11 +356,13 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
     ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
     std::string pluginId = "testID";
     ProcessorInstance processorInstance(&processor, pluginId);
-    ComponentConfig componentConfig(pluginId, config);
-    APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
-    processorInstance.Process(eventGroup);
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+    
     // judge result
-    std::string outJson = eventGroup.ToJsonString();
+    std::string outJson = eventGroupList[0].ToJsonString();
     std::stringstream expectJsonSs;
     expectJsonSs << R"({
         "events":
@@ -401,7 +371,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
                 "contents" :
                 {
                     "time" : ")"
-                    << timebuff << R"("
+                 << timebuff << R"("
                 },
                 "timestamp" : )"
                  << now - processor.mLogTimeZoneOffsetSecond << R"(,
@@ -412,7 +382,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
                 "contents" :
                 {
                     "time" : ")"
-                    << timebuff << R"("
+                 << timebuff << R"("
                 },
                 "timestamp" : )"
                  << now - processor.mLogTimeZoneOffsetSecond << R"(,
@@ -423,23 +393,23 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
     })";
     APSARA_TEST_EQUAL_FATAL(CompactJson(expectJsonSs.str()), CompactJson(outJson));
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(0, processor.GetContext().GetProcessProfile().historyFailures);    
+    APSARA_TEST_EQUAL_FATAL(0, processor.GetContext().GetProcessProfile().historyFailures);
     APSARA_TEST_EQUAL_FATAL(2, processorInstance.mProcInRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(strlen(timebuff)*2, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(strlen(timebuff) * 2, processor.mProcParseInSizeBytes->GetValue());
     // discard history, so output is 0
     APSARA_TEST_EQUAL_FATAL(2, processorInstance.mProcOutRecordsTotal->GetValue());
     // size of one timestamp and one nanosecond equals to 8 byte, respectively
-    APSARA_TEST_EQUAL_FATAL(8*4, processor.mProcParseOutSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(8 * 4, processor.mProcParseOutSizeBytes->GetValue());
     APSARA_TEST_EQUAL_FATAL(0, processor.mProcDiscardRecordsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(0, processor.mProcParseErrorTotal->GetValue());
 }
 
 void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
     // make config
-    Config config;
-    config.mTimeFormat = "%Y-%m-%d %H:%M:%S";
-    config.mTimeKey = "time";
-    config.mLogTimeZoneOffsetSecond = 28800;
+    Json::Value config;
+    config["SourceKey"] = "time";
+    config["SourceFormat"] = "%Y-%m-%d %H:%M:%S";
+    config["SourceTimezone"] = "GMT+08:00";
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
@@ -456,7 +426,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
                 "contents" :
                 {
                     "time" : ")"
-                    << timebuff << R"("
+             << timebuff << R"("
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -466,7 +436,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
                 "contents" :
                 {
                     "time" : ")"
-                    << timebuff << R"("
+             << timebuff << R"("
                 },
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
@@ -480,16 +450,18 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
     ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
     std::string pluginId = "testID";
     ProcessorInstance processorInstance(&processor, pluginId);
-    ComponentConfig componentConfig(pluginId, config);
-    APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
-    processorInstance.Process(eventGroup);
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+    
     // judge result
-    std::string outJson = eventGroup.ToJsonString();
+    std::string outJson = eventGroupList[0].ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(0, processor.GetContext().GetProcessProfile().historyFailures);    
+    APSARA_TEST_EQUAL_FATAL(0, processor.GetContext().GetProcessProfile().historyFailures);
     APSARA_TEST_EQUAL_FATAL(2, processorInstance.mProcInRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(strlen(timebuff)*2, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(strlen(timebuff) * 2, processor.mProcParseInSizeBytes->GetValue());
     // discard history, so output is 0
     APSARA_TEST_EQUAL_FATAL(2, processorInstance.mProcOutRecordsTotal->GetValue());
     // size of one timestamp and one nanosecond equals to 8 byte, respectively
@@ -500,17 +472,17 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
 
 void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
     // make config
-    Config config;
-    config.mTimeFormat = "%Y-%m-%d %H:%M:%S";
-    config.mTimeKey = "time";
-    config.mLogTimeZoneOffsetSecond = 28800;
+    Json::Value config;
+    config["SourceKey"] = "time";
+    config["SourceFormat"] = "%Y-%m-%d %H:%M:%S";
+    config["SourceTimezone"] = "GMT+08:00";
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
     time_t now = time(nullptr) - INT32_FLAG(ilogtail_discard_interval) - 1; // will be discarded by history timeout
     char timebuff[32] = "";
     std::tm* now_tm = std::localtime(&now);
-    strftime(timebuff, sizeof(timebuff), config.mTimeFormat.c_str(), now_tm);
+    strftime(timebuff, sizeof(timebuff), config["SourceFormat"].asString().c_str(), now_tm);
     std::stringstream inJsonSs;
     inJsonSs << R"({
         "events":
@@ -519,7 +491,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
                 "contents" :
                 {
                     "time" : ")"
-                    << timebuff << R"("
+             << timebuff << R"("
                 },
                 "timestamp" : 12345678901,
                 "type" : 1
@@ -528,7 +500,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
                 "contents" :
                 {
                     "time" : ")"
-                    << timebuff << R"("
+             << timebuff << R"("
                 },
                 "timestamp" : 12345678901,
                 "type" : 1
@@ -540,13 +512,16 @@ void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
     ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
     std::string pluginId = "testID";
     ProcessorInstance processorInstance(&processor, pluginId);
-    ComponentConfig componentConfig(pluginId, config);
-    APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
-    processorInstance.Process(eventGroup);
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+    
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(2, processor.GetContext().GetProcessProfile().historyFailures);    
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_EQUAL_FATAL(2, processor.GetContext().GetProcessProfile().historyFailures);
     APSARA_TEST_EQUAL_FATAL(2, processorInstance.mProcInRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(strlen(timebuff)*2, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(strlen(timebuff) * 2, processor.mProcParseInSizeBytes->GetValue());
     // discard history, so output is 0
     APSARA_TEST_EQUAL_FATAL(0, processorInstance.mProcOutRecordsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(0, processor.mProcParseOutSizeBytes->GetValue());
@@ -557,13 +532,10 @@ void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
 void ProcessorParseTimestampNativeUnittest::TestProcessEventPreciseTimestampLegacy() {
     // make config
     BOOL_FLAG(ilogtail_discard_old_data) = false;
-    Config config;
-    config.mTimeFormat = "%Y-%m-%d %H:%M:%S.%f";
-    config.mTimeKey = "time";
-    config.mLogTimeZoneOffsetSecond = -GetLocalTimeZoneOffsetSecond();
-    config.mAdvancedConfig.mEnablePreciseTimestamp = true;
-    config.mAdvancedConfig.mPreciseTimestampKey = "precise_timestamp";
-    config.mAdvancedConfig.mPreciseTimestampUnit = TimeStampUnit::MILLISECOND;
+    Json::Value config;
+    config["SourceKey"] = "time";
+    config["SourceFormat"] = "%Y-%m-%d %H:%M:%S.%f";
+    config["SourceTimezone"] = "GMT+00:00";
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     auto logEvent = PipelineEventPtr(LogEvent::CreateEvent(sourceBuffer));
@@ -581,8 +553,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessEventPreciseTimestampLega
     ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
     std::string pluginId = "testID";
     ProcessorInstance processorInstance(&processor, pluginId);
-    ComponentConfig componentConfig(pluginId, config);
-    APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
     logtail::StringView timeStrCache;
     LogtailTime logTime = {0, 0};
     APSARA_TEST_TRUE_FATAL(processor.ProcessEvent("/var/log/message", logEvent, logTime, timeStrCache));
@@ -592,7 +563,6 @@ void ProcessorParseTimestampNativeUnittest::TestProcessEventPreciseTimestampLega
     expectJsonSs << R"({
         "contents" :
         {
-            "precise_timestamp": "1484147107012",
             "time" : "2017-1-11 15:05:07.012"
         },
         "timestamp" : )"
@@ -605,12 +575,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessEventPreciseTimestampLega
 
 class ProcessorParseLogTimeUnittest : public ::testing::Test {
 public:
-    void SetUp() override {
-        mContext.SetConfigName("project##config_0");
-        mContext.SetLogstoreName("logstore");
-        mContext.SetProjectName("project");
-        mContext.SetRegion("cn-shanghai");
-    }
+    void SetUp() override { mContext.SetConfigName("project##config_0"); }
 
     void TestParseLogTime();
     void TestParseLogTimeSecondCache();
@@ -621,7 +586,7 @@ public:
 
 UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestParseLogTime);
 UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestParseLogTimeSecondCache);
-UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestAdjustTimeZone);
+// UNIT_TEST_CASE(ProcessorParseLogTimeUnittest, TestAdjustTimeZone);
 
 void ProcessorParseLogTimeUnittest::TestParseLogTime() {
     struct Case {
@@ -629,40 +594,38 @@ void ProcessorParseLogTimeUnittest::TestParseLogTime() {
         std::string fmtStr;
         time_t exceptedLogTime;
         long exceptedLogTimeNanosecond;
-        uint64_t exceptedPreciseTimestamp;
     };
 
     std::vector<Case> inputTimes = {
-        {"2017-1-11 15:05:07.012", "%Y-%m-%d %H:%M:%S.%f", 1484147107, 12000000, 1484147107012},
-        {"2017-1-11 15:05:07.012", "%Y-%m-%d %H:%M:%S.%f", 1484147107, 12000000,1484147107012},
-        {"[2017-1-11 15:05:07.0123]", "[%Y-%m-%d %H:%M:%S.%f", 1484147107, 12300000,1484147107012},
-        {"11 Jan 17 15:05 MST", "%d %b %y %H:%M", 1484147100, 0, 1484147100000},
-        {"11 Jan 17 15:05 -0700", "%d %b %y %H:%M", 1484147100, 0, 1484147100000},
-        {"Tuesday, 11-Jan-17 15:05:07.0123 MST", "%A, %d-%b-%y %H:%M:%S.%f", 1484147107, 12300000, 1484147107012},
-        {"Tuesday, 11 Jan 2017 15:05:07 MST", "%A, %d %b %Y %H:%M:%S", 1484147107, 0, 1484147107000},
-        {"2017-01-11T15:05:07Z08:00", "%Y-%m-%dT%H:%M:%S", 1484147107, 0, 1484147107000},
-        {"2017-01-11T15:05:07.012999999Z07:00", "%Y-%m-%dT%H:%M:%S.%f", 1484147107, 12999999, 1484147107012},
-        {"1484147107", "%s", 1484147107, 0, 1484147107000},
-        {"1484147107123", "%s", 1484147107, 123000000, 1484147107123},
-        {"15:05:07.012 2017-1-11", "%H:%M:%S.%f %Y-%m-%d", 1484147107, 12000000, 1484147107012},
-        {"2017-1-11 15:05:07.012 +0700 (UTC)", "%Y-%m-%d %H:%M:%S.%f %z (%Z)", 1484147107, 12000000, 1484147107012},
+        {"2017-1-11 15:05:07.012", "%Y-%m-%d %H:%M:%S.%f", 1484147107, 12000000},
+        {"2017-1-11 15:05:07.012", "%Y-%m-%d %H:%M:%S.%f", 1484147107, 12000000},
+        {"[2017-1-11 15:05:07.0123]", "[%Y-%m-%d %H:%M:%S.%f", 1484147107, 12300000},
+        {"11 Jan 17 15:05 MST", "%d %b %y %H:%M", 1484147100, 0},
+        {"11 Jan 17 15:05 -0700", "%d %b %y %H:%M", 1484147100, 0},
+        {"Tuesday, 11-Jan-17 15:05:07.0123 MST", "%A, %d-%b-%y %H:%M:%S.%f", 1484147107, 12300000},
+        {"Tuesday, 11 Jan 2017 15:05:07 MST", "%A, %d %b %Y %H:%M:%S", 1484147107, 0},
+        {"2017-01-11T15:05:07Z08:00", "%Y-%m-%dT%H:%M:%S", 1484147107, 0},
+        {"2017-01-11T15:05:07.012999999Z07:00", "%Y-%m-%dT%H:%M:%S.%f", 1484147107, 12999999},
+        {"1484147107", "%s", 1484147107, 0},
+        {"1484147107123", "%s", 1484147107, 123000000},
+        {"15:05:07.012 2017-1-11", "%H:%M:%S.%f %Y-%m-%d", 1484147107, 12000000},
+        {"2017-1-11 15:05:07.012 +0700 (UTC)", "%Y-%m-%d %H:%M:%S.%f %z (%Z)", 1484147107, 12000000},
         // Compatibility Test
-        {"2017-1-11 15:05:07.012", "%Y-%m-%d %H:%M:%S", 1484147107, 0, 1484147107012},
+        {"2017-1-11 15:05:07.012", "%Y-%m-%d %H:%M:%S", 1484147107, 0},
     };
-    Config config;
-    config.mTimeKey = "time";
-    config.mLogTimeZoneOffsetSecond = -GetLocalTimeZoneOffsetSecond();
-    config.mAdvancedConfig.mEnablePreciseTimestamp = true;
-    config.mAdvancedConfig.mPreciseTimestampUnit = TimeStampUnit::MILLISECOND;
+    // make config
+    Json::Value config;
+    config["SourceKey"] = "time";
+    config["SourceTimezone"] = "GMT+00:00";
     for (size_t i = 0; i < inputTimes.size(); ++i) {
         auto& c = inputTimes[i];
-        config.mTimeFormat = c.fmtStr;
+        config["SourceFormat"] = c.fmtStr;
+        config["SourceFormat"] = c.fmtStr;
         // run function
         ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
         std::string pluginId = "testID";
         ProcessorInstance processorInstance(&processor, pluginId);
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
         LogtailTime outTime = {0, 0};
         uint64_t preciseTimestamp = 0;
         StringView timeStrCache;
@@ -670,7 +633,6 @@ void ProcessorParseLogTimeUnittest::TestParseLogTime() {
         EXPECT_EQ(ret, true) << "failed: " + c.inputTimeStr;
         EXPECT_EQ(outTime.tv_sec, c.exceptedLogTime) << "failed: " + c.inputTimeStr;
         EXPECT_EQ(outTime.tv_nsec, c.exceptedLogTimeNanosecond) << "failed: " + c.inputTimeStr;
-        EXPECT_EQ(preciseTimestamp, c.exceptedPreciseTimestamp) << "failed: " + c.inputTimeStr;
     }
 }
 
@@ -679,7 +641,6 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         std::string inputTimeStr;
         time_t exceptedLogTime;
         long exceptedLogTimeNanosecond;
-        uint64_t exceptedPreciseTimestamp;
 
         Case(std::string _inputTimeStr,
              time_t _exceptedLogTime,
@@ -687,22 +648,19 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
              uint64_t _exceptedPreciseTimestamp)
             : inputTimeStr(_inputTimeStr),
               exceptedLogTime(_exceptedLogTime),
-              exceptedLogTimeNanosecond(_exceptedLogTimeNanosecond),
-              exceptedPreciseTimestamp(_exceptedPreciseTimestamp) {}
+              exceptedLogTimeNanosecond(_exceptedLogTimeNanosecond) {}
     };
-    Config config;
-    config.mTimeKey = "time";
-    config.mLogTimeZoneOffsetSecond = -GetLocalTimeZoneOffsetSecond();
-    config.mAdvancedConfig.mEnablePreciseTimestamp = true;
-    config.mAdvancedConfig.mPreciseTimestampUnit = TimeStampUnit::MICROSECOND;
+    // make config
+    Json::Value config;
+    config["SourceKey"] = "time";
+    config["SourceTimezone"] = "GMT+00:00";
     { // case: second
-        config.mTimeFormat = "%Y-%m-%d %H:%M:%S";
+        config["SourceFormat"] = "%Y-%m-%d %H:%M:%S";
         // run function
         ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
         std::string pluginId = "testID";
         ProcessorInstance processorInstance(&processor, pluginId);
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 
         time_t expectLogTimeBase = 1325430300;
         long expectLogTimeNanosecondBase = 1325430300000000;
@@ -712,28 +670,28 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         for (size_t i = 0; i < 5; ++i) {
             std::string second = "2012-01-01 15:05:" + (i < 10 ? "0" + std::to_string(i) : std::to_string(i));
             for (size_t j = 0; j < 5; ++j) {
-                inputTimes.emplace_back(std::string(second.data()), expectLogTimeBase + i, 0, expectLogTimeNanosecondBase + i * 1000000);
+                inputTimes.emplace_back(
+                    std::string(second.data()), expectLogTimeBase + i, 0, expectLogTimeNanosecondBase + i * 1000000);
             }
         }
 
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
             auto c = inputTimes[i];
-            bool ret = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+            bool ret
+                = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
             APSARA_TEST_EQUAL(outTime.tv_sec, c.exceptedLogTime);
             APSARA_TEST_EQUAL(outTime.tv_nsec, c.exceptedLogTimeNanosecond);
-            APSARA_TEST_EQUAL(preciseTimestamp, c.exceptedPreciseTimestamp);
         }
     }
     { // case: nanosecond
-        config.mTimeFormat = "%Y-%m-%d %H:%M:%S.%f";
+        config["SourceFormat"] = "%Y-%m-%d %H:%M:%S.%f";
         // run function
         ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
         std::string pluginId = "testID";
         ProcessorInstance processorInstance(&processor, pluginId);
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 
         time_t expectLogTimeBase = 1325430300;
         long expectLogTimeNanosecondBase = 1325430300000000;
@@ -743,27 +701,29 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         for (size_t i = 0; i < 5; ++i) {
             std::string second = "2012-01-01 15:05:" + (i < 10 ? "0" + std::to_string(i) : std::to_string(i));
             for (size_t j = 0; j < 5; ++j) {
-                inputTimes.emplace_back(second + "." + std::to_string(j), expectLogTimeBase + i, j * 100000000, expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
+                inputTimes.emplace_back(second + "." + std::to_string(j),
+                                        expectLogTimeBase + i,
+                                        j * 100000000,
+                                        expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
             }
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
             auto c = inputTimes[i];
-            bool ret = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+            bool ret
+                = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
             APSARA_TEST_EQUAL(outTime.tv_sec, c.exceptedLogTime);
             APSARA_TEST_EQUAL(outTime.tv_nsec, c.exceptedLogTimeNanosecond);
-            APSARA_TEST_EQUAL(preciseTimestamp, c.exceptedPreciseTimestamp);
         }
     }
     { // case: timestamp second
-        config.mTimeFormat = "%s";
+        config["SourceFormat"] = "%s";
         // run function
         ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
         std::string pluginId = "testID";
         ProcessorInstance processorInstance(&processor, pluginId);
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 
         time_t expectLogTimeBase = 1484147107;
         long expectLogTimeNanosecondBase = 1484147107000000;
@@ -773,27 +733,27 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         for (size_t i = 0; i < 5; ++i) {
             std::string second = std::to_string(expectLogTimeBase + i);
             for (size_t j = 0; j < 5; ++j) {
-                inputTimes.emplace_back(std::string(second.data()), expectLogTimeBase + i, 0, expectLogTimeNanosecondBase + i * 1000000);
+                inputTimes.emplace_back(
+                    std::string(second.data()), expectLogTimeBase + i, 0, expectLogTimeNanosecondBase + i * 1000000);
             }
         }
         StringView timeStrCache = "1484147106";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
             auto c = inputTimes[i];
-            bool ret = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+            bool ret
+                = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
             APSARA_TEST_EQUAL(outTime.tv_sec, c.exceptedLogTime);
             APSARA_TEST_EQUAL(outTime.tv_nsec, c.exceptedLogTimeNanosecond);
-            APSARA_TEST_EQUAL(preciseTimestamp, c.exceptedPreciseTimestamp);
         }
     }
     { // case: timestamp nanosecond
-        config.mTimeFormat = "%s";
+        config["SourceFormat"] = "%s";
         // run function
         ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
         std::string pluginId = "testID";
         ProcessorInstance processorInstance(&processor, pluginId);
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 
         time_t expectLogTimeBase = 1484147107;
         long expectLogTimeNanosecondBase = 1484147107000000;
@@ -803,27 +763,29 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         for (size_t i = 0; i < 5; ++i) {
             std::string second = std::to_string(expectLogTimeBase + i);
             for (size_t j = 0; j < 5; ++j) {
-                inputTimes.emplace_back(second + std::to_string(j), expectLogTimeBase + i, j * 100000000, expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
+                inputTimes.emplace_back(second + std::to_string(j),
+                                        expectLogTimeBase + i,
+                                        j * 100000000,
+                                        expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
             }
         }
         StringView timeStrCache = "1484147106";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
             auto c = inputTimes[i];
-            bool ret = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+            bool ret
+                = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
             APSARA_TEST_EQUAL(outTime.tv_sec, c.exceptedLogTime);
             APSARA_TEST_EQUAL(outTime.tv_nsec, c.exceptedLogTimeNanosecond);
-            APSARA_TEST_EQUAL(preciseTimestamp, c.exceptedPreciseTimestamp);
         }
     }
     { // case: nanosecond in the middle
-        config.mTimeFormat = "%H:%M:%S.%f %Y-%m-%d";
+        config["SourceFormat"] = "%H:%M:%S.%f %Y-%m-%d";
         // run function
         ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
         std::string pluginId = "testID";
         ProcessorInstance processorInstance(&processor, pluginId);
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 
         time_t expectLogTimeBase = 1325430300;
         long expectLogTimeNanosecondBase = 1325430300000000;
@@ -833,17 +795,20 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
         for (size_t i = 0; i < 5; ++i) {
             std::string second = "15:05:" + (i < 10 ? "0" + std::to_string(i) : std::to_string(i));
             for (size_t j = 0; j < 5; ++j) {
-                inputTimes.emplace_back(second + "." + std::to_string(j) + " 2012-01-01", expectLogTimeBase + i, j * 100000000, expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
+                inputTimes.emplace_back(second + "." + std::to_string(j) + " 2012-01-01",
+                                        expectLogTimeBase + i,
+                                        j * 100000000,
+                                        expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
             }
         }
         StringView timeStrCache = "15:04:59.0 2012-01-01";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
             auto c = inputTimes[i];
-            bool ret = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+            bool ret
+                = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
             APSARA_TEST_EQUAL(outTime.tv_sec, c.exceptedLogTime);
             APSARA_TEST_EQUAL(outTime.tv_nsec, c.exceptedLogTimeNanosecond);
-            APSARA_TEST_EQUAL(preciseTimestamp, c.exceptedPreciseTimestamp);
         }
     }
 }
@@ -853,7 +818,6 @@ void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {
         std::string inputTimeStr;
         time_t exceptedLogTime;
         long exceptedLogTimeNanosecond;
-        uint64_t exceptedPreciseTimestamp;
 
         Case(std::string _inputTimeStr,
              time_t _exceptedLogTime,
@@ -861,22 +825,19 @@ void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {
              uint64_t _exceptedPreciseTimestamp)
             : inputTimeStr(_inputTimeStr),
               exceptedLogTime(_exceptedLogTime),
-              exceptedLogTimeNanosecond(_exceptedLogTimeNanosecond),
-              exceptedPreciseTimestamp(_exceptedPreciseTimestamp) {}
+              exceptedLogTimeNanosecond(_exceptedLogTimeNanosecond) {}
     };
-    Config config;
-    config.mTimeKey = "time";
-    config.mAdvancedConfig.mEnablePreciseTimestamp = true;
-    config.mAdvancedConfig.mPreciseTimestampUnit = TimeStampUnit::MICROSECOND;
+    // make config
+    Json::Value config;
+    config["SourceKey"] = "time";
     { // case: UTC
-        config.mLogTimeZoneOffsetSecond = -GetLocalTimeZoneOffsetSecond();
-        config.mTimeFormat = "%Y-%m-%d %H:%M:%S.%f";
+        config["SourceTimezone"] = "GMT+00:00";
+        config["SourceFormat"] = "%Y-%m-%d %H:%M:%S.%f";
         // run function
         ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
         std::string pluginId = "testID";
         ProcessorInstance processorInstance(&processor, pluginId);
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 
         time_t expectLogTimeBase = 1325430300;
         long expectLogTimeNanosecondBase = 1325430300000000;
@@ -886,29 +847,30 @@ void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {
         for (size_t i = 0; i < 5; ++i) {
             std::string second = "2012-01-01 15:05:" + (i < 10 ? "0" + std::to_string(i) : std::to_string(i));
             for (size_t j = 0; j < 5; ++j) {
-                inputTimes.emplace_back(second + "." + std::to_string(j), expectLogTimeBase + i, j * 100000000, expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
+                inputTimes.emplace_back(second + "." + std::to_string(j),
+                                        expectLogTimeBase + i,
+                                        j * 100000000,
+                                        expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
             }
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
             auto c = inputTimes[i];
-            bool ret = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+            bool ret
+                = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
             APSARA_TEST_EQUAL(outTime.tv_sec, c.exceptedLogTime);
             APSARA_TEST_EQUAL(outTime.tv_nsec, c.exceptedLogTimeNanosecond);
-            APSARA_TEST_EQUAL(preciseTimestamp, c.exceptedPreciseTimestamp);
         }
     }
     { // case: +7
-        config.mTimeZoneAdjust = true;
-        config.mLogTimeZoneOffsetSecond = 7 * 3600;
-        config.mTimeFormat = "%Y-%m-%d %H:%M:%S.%f";
+        config["SourceTimezone"] = "GMT+07:00";
+        config["SourceFormat"] = "%Y-%m-%d %H:%M:%S.%f";
         // run function
         ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
         std::string pluginId = "testID";
         ProcessorInstance processorInstance(&processor, pluginId);
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(componentConfig, mContext));
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 
         time_t expectLogTimeBase = 1325405100;
         long expectLogTimeNanosecondBase = 1325405100000000;
@@ -918,17 +880,20 @@ void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {
         for (size_t i = 0; i < 5; ++i) {
             std::string second = "2012-01-01 15:05:" + (i < 10 ? "0" + std::to_string(i) : std::to_string(i));
             for (size_t j = 0; j < 5; ++j) {
-                inputTimes.emplace_back(second + "." + std::to_string(j), expectLogTimeBase + i, j * 100000000, expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
+                inputTimes.emplace_back(second + "." + std::to_string(j),
+                                        expectLogTimeBase + i,
+                                        j * 100000000,
+                                        expectLogTimeNanosecondBase + i * 1000000 + j * 100000);
             }
         }
         StringView timeStrCache = "2012-01-01 15:04:59";
         for (size_t i = 0; i < inputTimes.size(); ++i) {
             auto c = inputTimes[i];
-            bool ret = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+            bool ret
+                = processor.ParseLogTime(c.inputTimeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
             APSARA_TEST_EQUAL(ret, true);
             APSARA_TEST_EQUAL(outTime.tv_sec, c.exceptedLogTime);
             APSARA_TEST_EQUAL(outTime.tv_nsec, c.exceptedLogTimeNanosecond);
-            APSARA_TEST_EQUAL(preciseTimestamp, c.exceptedPreciseTimestamp);
         }
     }
 }

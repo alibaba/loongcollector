@@ -19,37 +19,34 @@
 #include <string>
 #include <memory>
 #include "common/Flags.h"
-#include "common/util.h"
 #include "app_config/AppConfig.h"
 #include "config_manager/ConfigManager.h"
 #include "event/Event.h"
+#include "file_server/FileServer.h"
 using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);
-DECLARE_FLAG_STRING(user_log_config);
-DECLARE_FLAG_INT32(batch_send_interval);
-
 namespace logtail {
 class ConfigContainerUnittest : public ::testing::Test {
 public:
     void MockDockerContainerPathConfig() {
-        Config* config1 = new Config;
+        FileDiscoveryOptions config1;
         std::string jsonStr1 = R"""({
   "ID":"abcdef",
   "Path":"/logtail_host/lib/var/docker/abcdef"
 })""";
-        APSARA_TEST_TRUE_FATAL(config1->SetDockerFileFlag(true));
-        APSARA_TEST_TRUE_FATAL(config1->UpdateDockerContainerPath(jsonStr1, false));
-        ConfigManager::GetInstance()->mNameConfigMap["test-config-1"] = config1;
+        config1.SetEnableContainerDiscoveryFlag(true);
+        APSARA_TEST_TRUE_FATAL(config1.UpdateDockerContainerPath(jsonStr1, false));
+        FileServer::GetInstance()->AddFileDiscoveryConfig("test-config-1", &config1, nullptr);
 
-        Config* config2 = new Config;
+        FileDiscoveryOptions config2;
         std::string jsonStr2 = R"""({
   "ID":"000000",
   "Path":"/logtail_host/lib/var/docker/000000"
 })""";
-        APSARA_TEST_TRUE_FATAL(config2->SetDockerFileFlag(true));
-        APSARA_TEST_TRUE_FATAL(config2->UpdateDockerContainerPath(jsonStr2, false));
-        ConfigManager::GetInstance()->mNameConfigMap["test-config-2"] = config2;
+        config2.SetEnableContainerDiscoveryFlag(true);
+        APSARA_TEST_TRUE_FATAL(config1.UpdateDockerContainerPath(jsonStr2, false));
+        FileServer::GetInstance()->AddFileDiscoveryConfig("test-config-1", &config2, nullptr);
     }
 
     void TestGetContainerStoppedEvents() {

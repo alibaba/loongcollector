@@ -12,41 +12,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdlib>
-#include "unittest/Unittest.h"
+#include <memory>
+
 #include "plugin/PluginRegistry.h"
-#include "processor/ProcessorParseRegexNative.h"
+#include "plugin/creator/StaticFlusherCreator.h"
+#include "plugin/creator/StaticInputCreator.h"
+#include "plugin/creator/StaticProcessorCreator.h"
+#include "unittest/plugin/PluginMock.h"
+#include "unittest/Unittest.h"
+
+using namespace std;
 
 namespace logtail {
 
-class PluginRegistryUnittest : public ::testing::Test {
+class PluginRegistryUnittest : public testing::Test {
 public:
-    void TestLoadStaticPlugins();
-    void TestUnloadPlugins();
-    void TestCreateProcessor();
+    void TestCreateInput() const;
+    void TestCreateProcessor() const;
+    void TestCreateFlusher() const;
+    void TestValidPlugin() const;
+
+protected:
+    void SetUp() override {
+        PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock>());
+        PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock>());
+        PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());
+        PluginRegistry::GetInstance()->mGoPlugins = {"service_mock"};
+    }
+    void TearDown() override { PluginRegistry::GetInstance()->UnloadPlugins(); }
 };
 
-APSARA_UNIT_TEST_CASE(PluginRegistryUnittest, TestLoadStaticPlugins, 0);
-APSARA_UNIT_TEST_CASE(PluginRegistryUnittest, TestCreateProcessor, 0);
-
-void LoadStaticPlugins();
-void UnloadPlugins();
-std::unique_ptr<ProcessorInstance> CreateProcessor(const std::string& name, const std::string& pluginId);
-
-void PluginRegistryUnittest::TestLoadStaticPlugins() {
-    PluginRegistry::GetInstance()->LoadStaticPlugins();
-    APSARA_TEST_FALSE_FATAL(PluginRegistry::GetInstance()->mPluginDict.empty());
-    PluginRegistry::GetInstance()->UnloadPlugins();
-    APSARA_TEST_TRUE_FATAL(PluginRegistry::GetInstance()->mPluginDict.empty());
+void PluginRegistryUnittest::TestCreateInput() const {
+    unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, "0");
+    APSARA_TEST_NOT_EQUAL_FATAL(nullptr, input);
+    APSARA_TEST_EQUAL("0", input->Id());
 }
 
-void PluginRegistryUnittest::TestCreateProcessor() {
-    PluginRegistry::GetInstance()->LoadStaticPlugins();
-    auto processorParseRegexNative = PluginRegistry::GetInstance()->CreateProcessor(
-        ProcessorParseRegexNative::sName, "0");
-    APSARA_TEST_NOT_EQUAL_FATAL(nullptr, processorParseRegexNative.get());
-    APSARA_TEST_EQUAL_FATAL("0", processorParseRegexNative->Id());
+void PluginRegistryUnittest::TestCreateProcessor() const {
+    unique_ptr<ProcessorInstance> processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMock::sName, "0");
+    APSARA_TEST_NOT_EQUAL_FATAL(nullptr, processor);
+    APSARA_TEST_EQUAL("0", processor->Id());
 }
+
+void PluginRegistryUnittest::TestCreateFlusher() const {
+    unique_ptr<FlusherInstance> flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, "0");
+    APSARA_TEST_NOT_EQUAL_FATAL(nullptr, flusher);
+    APSARA_TEST_EQUAL("0", flusher->Id());
+}
+
+void PluginRegistryUnittest::TestValidPlugin() const {
+    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeInputPlugin("input_mock"));
+    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeInputPlugin("input_unknown"));
+    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin("processor_mock"));
+    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin("processor_unknown"));
+    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin("flusher_mock"));
+    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin("flusher_unknown"));
+    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidGoPlugin("service_mock"));
+    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidGoPlugin("service_unknown"));
+}
+
+UNIT_TEST_CASE(PluginRegistryUnittest, TestCreateInput)
+UNIT_TEST_CASE(PluginRegistryUnittest, TestCreateProcessor)
+UNIT_TEST_CASE(PluginRegistryUnittest, TestCreateFlusher)
+UNIT_TEST_CASE(PluginRegistryUnittest, TestValidPlugin)
 
 } // namespace logtail
 

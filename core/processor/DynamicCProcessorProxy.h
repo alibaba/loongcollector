@@ -16,9 +16,8 @@
 
 #pragma once
 
-#include <string>
-#include "plugin/interface/Processor.h"
 #include "plugin/creator/CProcessor.h"
+#include "plugin/interface/Processor.h"
 
 namespace logtail {
 
@@ -28,7 +27,7 @@ public:
     ~DynamicCProcessorProxy();
 
     const std::string& Name() const override { return _name; }
-    bool Init(const ComponentConfig& componentConfig) override;
+    bool Init(const Json::Value& config) override;
     void Process(PipelineEventGroup& logGroup) override;
     void SetCProcessor(const processor_interface_t* c_ins);
 
@@ -39,4 +38,5 @@ private:
     std::string _name;
     processor_instance_t* _c_ins;
 };
+
 } // namespace logtail

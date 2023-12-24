@@ -13,18 +13,23 @@
 // limitations under the License.
 
 #include "TimeUtil.h"
+
 #include <memory.h>
-#include <chrono>
-#include <limits>
+
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <limits>
 #if defined(__linux__)
 #include <sys/sysinfo.h>
 #include <utmp.h>
 #endif
-#include "logger/Logger.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/ParamExtractor.h"
+#include "common/StringTools.h"
 #include "common/Strptime.h"
+#include "logger/Logger.h"
+#include "pipeline/PipelineContext.h"
 
 namespace logtail {
 
@@ -366,6 +371,39 @@ uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
 uint64_t GetCurrentTimeInNanoSeconds() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
+}
+
+bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond) {
+    if (logTZ.size() != strlen("GMT+08:00") || logTZ[6] != ':' || (logTZ[3] != '+' && logTZ[3] != '-')) {
+        return false;
+    }
+    if (logTZ.find("GMT") != (size_t)0) {
+        return false;
+    }
+    std::string hourStr = logTZ.substr(4, 2);
+    std::string minitueStr = logTZ.substr(7, 2);
+    logTZSecond = StringTo<int>(hourStr) * 3600 + StringTo<int>(minitueStr) * 60;
+    if (logTZ[3] == '-') {
+        logTZSecond = -logTZSecond;
+    }
+    return true;
+}
+
+bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, bool isAdjustmentNeeded, int& logTimeZoneOffsetSecond) {
+    if (logTZ.empty()) {
+        return true;
+    }
+    int logTZSecond = 0;
+    if (!ParseTimeZoneOffsetSecond(logTZ, logTZSecond)) {
+        return false;
+    } else {
+        if (isAdjustmentNeeded) {
+            logTimeZoneOffsetSecond = logTZSecond - GetLocalTimeZoneOffsetSecond();
+        } else {
+            logTimeZoneOffsetSecond = logTZSecond;
+        }
+    }
+    return true;
 }
 
 } // namespace logtail

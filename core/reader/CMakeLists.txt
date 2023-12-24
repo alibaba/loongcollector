@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(reader)
 
 if (MSVC)
@@ -32,4 +32,5 @@ target_link_libraries(${PROJECT_NAME} app_config)
 target_link_libraries(${PROJECT_NAME} config_manager)
 target_link_libraries(${PROJECT_NAME} log_pb)
 target_link_libraries(${PROJECT_NAME} fuse)
+target_link_libraries(${PROJECT_NAME} input)
 link_cityhash(${PROJECT_NAME})

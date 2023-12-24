@@ -18,9 +18,9 @@
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
+#include "common/LogtailCommonFlags.h"
 
 DECLARE_FLAG_INT32(batch_send_interval);
-DECLARE_FLAG_BOOL(ilogtail_discard_old_data);
 DECLARE_FLAG_STRING(check_point_filename);
 
 namespace logtail {

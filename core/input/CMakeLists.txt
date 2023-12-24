@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(input)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
@@ -21,3 +21,10 @@ add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} config)
 target_link_libraries(${PROJECT_NAME} file_server)
 target_link_libraries(${PROJECT_NAME} reader)
+target_link_libraries(${PROJECT_NAME} container_manager)
+if (UNIX)
+    target_link_libraries(${PROJECT_NAME} observer)
+    if (ENABLE_ENTERPRISE)
+        target_link_libraries(${PROJECT_NAME} streamlog)
+    endif()
+endif()

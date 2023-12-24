@@ -15,27 +15,54 @@
  */
 
 #pragma once
-#include "log_pb/sls_logs.pb.h"
+
 #include <string>
+#include <unordered_map>
 #include <vector>
+
+#include "common/Lock.h"
+#include "log_pb/sls_logs.pb.h"
 
 namespace logtail {
 
 class ProfileSender {
-public:
-    ProfileSender() {}
-    void SendToProfileProject(const std::string& region, sls_logs::LogGroup& logGroup);
-    bool SendInstantly(sls_logs::LogGroup& logGroup,
-                       const std::string& aliuid,
-                       const std::string& region,
-                       const std::string& projectName,
-                       const std::string& logstore);
-
-    void
-    SendToLineCountProject(const std::string& region, const std::string& projectName, sls_logs::LogGroup& logGroup);
-
 private:
     void SendRunningStatus(sls_logs::LogGroup& logGroup);
+
+protected:
+    SpinLock mProfileLock;
+    std::string mDefaultProfileProjectName;
+    std::string mDefaultProfileRegion;
+    std::unordered_map<std::string, std::string> mAllProfileProjectNames;
+
+    ProfileSender();
+    virtual ~ProfileSender() = default;
+
+public:
+    ProfileSender(const ProfileSender&) = delete;
+    ProfileSender& operator=(const ProfileSender&) = delete;
+
+    static ProfileSender* GetInstance();
+
+    void SetDefaultProfileRegion(const std::string& profileRegion);
+    std::string GetDefaultProfileRegion();
+
+    void SetDefaultProfileProjectName(const std::string& profileProjectName);
+    std::string GetDefaultProfileProjectName();
+
+    std::string GetProfileProjectName(const std::string& region, bool* existFlag = nullptr);
+    void GetAllProfileRegion(std::vector<std::string>& allRegion);
+    void SetProfileProjectName(const std::string& region, const std::string& profileProject);
+
+    virtual void SendToProfileProject(const std::string& region, sls_logs::LogGroup& logGroup);
+
+    virtual bool SendInstantly(sls_logs::LogGroup& logGroup,
+                               const std::string& aliuid,
+                               const std::string& region,
+                               const std::string& projectName,
+                               const std::string& logstore);
+    virtual void
+    SendToLineCountProject(const std::string& region, const std::string& projectName, sls_logs::LogGroup& logGroup);
 };
 
 } // namespace logtail

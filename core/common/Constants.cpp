@@ -30,7 +30,7 @@ const std::string LOG_RESERVED_KEY_HOSTNAME = "__hostname__";
 const std::string LOG_RESERVED_KEY_PATH = "__path__";
 const std::string LOG_RESERVED_KEY_PACKAGE_ID = "__pack_id__";
 const std::string LOG_RESERVED_KEY_TRUNCATE_INFO = "__truncate_info__";
-const std::string LOG_RESERVED_KEY_ALIPAY_ZONE = "__alipay_zone__";
+// const std::string LOG_RESERVED_KEY_ALIPAY_ZONE = "__alipay_zone__";
 const std::string LOG_RESERVED_KEY_INODE = "__inode__";
 const std::string LOG_RESERVED_KEY_FILE_OFFSET = "__file_offset__";
 

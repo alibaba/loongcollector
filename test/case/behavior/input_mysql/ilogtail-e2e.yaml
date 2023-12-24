@@ -17,8 +17,23 @@ boot:
 ilogtail:
   config:
     - name: mysql
-      content:
-        - '{"inputs":[{"type":"service_mysql","detail":{"Address":"mysql:3306","User":"root","Password":"root","DataBase":"mysql","Limit":true,"PageSize":100, "MaxSyncSize":100,"StateMent":"select * from help_keyword where help_keyword_id > ?","CheckPoint":true,"CheckPointColumn":"help_keyword_id","CheckPointStart":"0","CheckPointSavePerPage":true,"CheckPointColumnType":"int","IntervalMs":1000}}]}'
+      detail:
+        - inputs:
+          - Type: service_mysql
+            Address: mysql:3306
+            User: root
+            Password: root
+            Database: mysql
+            Limit: true
+            PageSize: 100
+            MaxSyncSize: 100
+            StateMent: "select * from help_keyword where help_keyword_id > ?"
+            CheckPoint: true
+            CheckPointColumn: help_keyword_id
+            CheckPointColumnType: int
+            CheckPointSavePerPage: true
+            CheckPointStart: "0"
+            IntervalMs: 1000
   close_wait: 5s
   depends_on:
     mysql:

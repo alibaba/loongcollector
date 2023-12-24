@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(go_pipeline)
 
 file(GLOB_RECURSE LIB_SOURCE_FILES *.cpp *.h)
@@ -27,6 +27,7 @@ target_link_libraries(${PROJECT_NAME} sender)
 target_link_libraries(${PROJECT_NAME} monitor)
 target_link_libraries(${PROJECT_NAME} app_config)
 target_link_libraries(${PROJECT_NAME} config)
+target_link_libraries(${PROJECT_NAME} profile_sender)
 if (UNIX)
     target_link_libraries(${PROJECT_NAME} dl)
 endif ()

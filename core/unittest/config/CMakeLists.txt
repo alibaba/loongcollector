@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(config_unittest)
 
 # add_executable(config_match_unittest ConfigMatchUnittest.cpp)
@@ -21,16 +21,24 @@ project(config_unittest)
 # add_executable(config_updator_unittest ConfigUpdatorUnittest.cpp)
 # target_link_libraries(config_updator_unittest unittest_base)
 
-add_executable(config_manager_base_unittest ConfigManagerBaseUnittest.cpp)
-target_link_libraries(config_manager_base_unittest unittest_base)
+add_executable(config_unittest ConfigUnittest.cpp)
+target_link_libraries(config_unittest unittest_base)
 
-add_executable(config_yaml_to_json_unittest ConfigYamlToJsonUnittest.cpp)
-target_link_libraries(config_yaml_to_json_unittest unittest_base)
+add_executable(config_watcher_unittest ConfigWatcherUnittest.cpp)
+target_link_libraries(config_watcher_unittest unittest_base)
 
-if (UNIX)
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testConfigDir)
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/testConfigDir/ DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/testConfigDir/)
-elseif (MSVC)
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/testConfigDir)
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/testConfigDir/ DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/testConfigDir/)
+add_executable(config_update_unittest ConfigUpdateUnittest.cpp)
+target_link_libraries(config_update_unittest unittest_base)
+
+if (ENABLE_ENTERPRISE)
+    add_executable(legacy_config_provider_unittest LegacyConfigProviderUnittest.cpp)
+    target_link_libraries(legacy_config_provider_unittest unittest_base)
+endif ()
+
+include(GoogleTest)
+gtest_discover_tests(config_unittest)
+gtest_discover_tests(config_watcher_unittest)
+gtest_discover_tests(config_update_unittest)
+if (ENABLE_ENTERPRISE)
+    gtest_discover_tests(legacy_config_provider_unittest)
 endif ()

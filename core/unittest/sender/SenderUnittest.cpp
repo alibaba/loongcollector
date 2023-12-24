@@ -19,9 +19,7 @@
 #include "app_config/AppConfig.h"
 #include "reader/LogFileReader.h"
 #include "event_handler/EventHandler.h"
-#include "processor/LogFilter.h"
 #include "monitor/Monitor.h"
-#include "common/util.h"
 #include "event/Event.h"
 #include "sender/Sender.h"
 #include <assert.h>
@@ -72,8 +70,6 @@ DECLARE_FLAG_INT32(buffer_file_alive_interval);
 DECLARE_FLAG_STRING(profile_project_name);
 DECLARE_FLAG_BOOL(enable_mock_send);
 DECLARE_FLAG_INT32(max_holded_data_size);
-DECLARE_FLAG_INT32(ilogtail_discard_interval);
-DECLARE_FLAG_BOOL(ilogtail_discard_old_data);
 DECLARE_FLAG_INT32(merge_log_count_limit);
 DECLARE_FLAG_INT32(first_read_endure_bytes);
 DECLARE_FLAG_STRING(ilogtail_config);
@@ -83,7 +79,6 @@ DECLARE_FLAG_INT32(buffer_check_period);
 DECLARE_FLAG_INT32(monitor_interval);
 DECLARE_FLAG_INT32(max_buffer_num);
 DECLARE_FLAG_INT32(sls_host_update_interval);
-DECLARE_FLAG_STRING(default_region_name);
 DECLARE_FLAG_INT32(logtail_alarm_interval);
 
 DECLARE_FLAG_INT32(max_client_send_error_count);
@@ -105,7 +100,8 @@ DECLARE_FLAG_INT32(dirfile_check_interval_ms);
 DECLARE_FLAG_INT32(send_request_concurrency);
 DECLARE_FLAG_INT32(test_unavailable_endpoint_interval);
 
-DECLARE_FLAG_STRING(alipay_zone);
+DECLARE_FLAG_STRING(logtail_send_address);
+DECLARE_FLAG_INT32(batch_send_interval);
 
 
 namespace logtail {
@@ -940,7 +936,7 @@ public:
         AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
         bool ret = ConfigManager::GetInstance()->LoadConfig(STRING_FLAG(user_log_config));
         assert(ret);
-        ret = Sender::Instance()->InitSender();
+        ret = Sender::Instance()->Init();
         assert(ret);
 
         if (gLogIntegrityTestFlag) {
@@ -2098,59 +2094,6 @@ public:
         }
     }
 
-    void TestFilterUTF8() {
-        LOG_INFO(sLogger, ("TestFilterUTF8() begin", time(NULL)));
-        CaseSetUp();
-        EnableNetWork();
-
-        string category = "app_log";
-        LogGroup srcLog;
-        srcLog.set_category(category);
-        GenerateNoneUTF8Char(srcLog);
-        Config* config = new Config("", "", APSARA_LOG, "", "", "", "", "", "1000000_proj", false, 2, -1, category);
-        config->mFilterRule = NULL;
-        config->mDiscardNoneUtf8 = true;
-        Sender::Instance()->Send("1000000_proj", "", srcLog, config, MERGE_BY_TOPIC, srcLog.ByteSize());
-        sleep(INT32_FLAG(batch_send_interval) * 2 + 1);
-        gRecvLogGroupLock.lock();
-        const LogGroup& mg = gRcvLogGroup;
-        char noneUTF8Char = ' ';
-
-        APSARA_TEST_EQUAL(mg.logs_size(), 10);
-
-        for (int i = 0; i < mg.logs_size(); ++i) {
-            const Log& log = mg.logs(i);
-            APSARA_TEST_EQUAL(log.contents_size(), 10);
-            for (int k = 0; k < log.contents_size() && k < 10; ++k) {
-                int j = k;
-                const Log_Content& content = log.contents(k);
-                string key = content.key();
-                string value = content.value();
-                if (j == i) {
-                    APSARA_TEST_EQUAL(key, "key" + ToString(j));
-                    APSARA_TEST_EQUAL(value, string(i, 'v') + string(i + 1, noneUTF8Char) + string(i, 'v'));
-                } else if (j == (i + 1)) {
-                    APSARA_TEST_EQUAL(key, string(i, 'v') + string(i + 1, noneUTF8Char) + string(i, 'v'));
-                    APSARA_TEST_EQUAL(value, "value" + ToString(j));
-                } else if (j == (i + 2)) {
-                    APSARA_TEST_EQUAL(key, "key" + ToString(j));
-                    APSARA_TEST_EQUAL(value, string(i, 'v') + string(i + 1, noneUTF8Char));
-                } else if (j == (i + 3)) {
-                    APSARA_TEST_EQUAL(key, "key" + ToString(j));
-                    APSARA_TEST_EQUAL(value, string(i + 1, noneUTF8Char) + string(i, 'v'));
-                } else {
-                    APSARA_TEST_EQUAL(key, "key" + ToString(j));
-                    APSARA_TEST_EQUAL(value, "value" + ToString(j));
-                }
-            }
-        }
-        delete config;
-        gRcvLogGroup.Clear();
-        gRecvLogGroupLock.unlock();
-        CaseCleanUp();
-        LOG_INFO(sLogger, ("TestFilterUTF8() end", time(NULL)));
-    }
-
     void TestMergeByCount() {
         LOG_INFO(sLogger, ("TestMergeByCount() begin", time(NULL)));
         int32_t defaultMergeLimit = INT32_FLAG(merge_log_count_limit);
@@ -2228,7 +2171,7 @@ public:
         int32_t defaultMonitorInterval = INT32_FLAG(monitor_interval);
         INT32_FLAG(monitor_interval) = 3;
         CaseSetUp();
-        LogtailMonitor::Instance()->InitMonitor();
+        LogtailMonitor::GetInstance()->Init();
         gStatusLogGroup.Clear();
         gStatusCount = 0;
         EnableNetWork();
@@ -2261,7 +2204,7 @@ public:
 #endif
         APSARA_TEST_EQUAL(log.contents(idx++).key(), "metric_json");
         APSARA_TEST_EQUAL(log.contents(idx++).key(), "status");
-        LogtailMonitor::Instance()->RemoveMonitor();
+        LogtailMonitor::GetInstance()->RemoveMonitor();
         CaseCleanUp();
         INT32_FLAG(monitor_interval) = defaultMonitorInterval;
         LOG_INFO(sLogger, ("TestMonitor() end", time(NULL)));
@@ -2810,7 +2753,7 @@ public:
                             std::string("test_aliuid"),
                             std::string("test_region"),
                             123456,
-                            MERGE_BY_LOGSTORE,
+                            FlusherSLS::Batch::MergeType::LOGSTORE,
                             std::string("test_shardhashkey"),
                             123456);
 
@@ -3000,47 +2943,6 @@ public:
         LOG_INFO(sLogger, ("TestGlobalMarkOffset() end", time(NULL)));
     }
 
-    void TestLogGroupAlipayZoneInfo() {
-        LOG_INFO(sLogger, ("TestLogGroupAlipayZoneInfo() begin", time(NULL)));
-
-        EnableNetWork();
-        // set env
-#if defined(_MSC_VER)
-        _putenv_s(STRING_FLAG(alipay_zone).c_str(), "GZ00C");
-#else
-        setenv(STRING_FLAG(alipay_zone).c_str(), "GZ00C", 1);
-#endif
-        CaseSetUp(false, true, true, 1, false, -1, 0, 900);
-
-        // write file, a.log
-        for (int round = 0; round < 10; ++round) {
-            OneJob(5, gRootDir, "a", true, time(NULL));
-            usleep(200 * 1000);
-        }
-        sleep(5);
-
-        bool hasZoneInfoFlag = false;
-        int logTagSize = gRcvLogGroup.logtags_size();
-        for (int i = 0; i < logTagSize; ++i) {
-            const ::sls_logs::LogTag logTag = gRcvLogGroup.logtags(i);
-            if (logTag.key() == LOG_RESERVED_KEY_ALIPAY_ZONE) {
-                APSARA_TEST_EQUAL(logTag.value(), "GZ00C");
-                hasZoneInfoFlag = true;
-            }
-        }
-        APSARA_TEST_TRUE(hasZoneInfoFlag);
-
-        // unset env
-#if defined(_MSC_VER)
-        _putenv((STRING_FLAG(alipay_zone) + "=").c_str());
-#else
-        unsetenv(STRING_FLAG(alipay_zone).c_str());
-#endif
-
-        CaseCleanUp();
-        LOG_INFO(sLogger, ("TestLogGroupAlipayZoneInfo() end", time(NULL)));
-    }
-
     static void MockExactlyOnceSend(LoggroupTimeValue* data);
 
     void TestExactlyOnceDataSendSequence();
@@ -3052,7 +2954,6 @@ public:
 
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestSecondaryStorage, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestEncryptAndDecrypt, gCaseID);
-APSARA_UNIT_TEST_CASE(SenderUnittest, TestFilterUTF8, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestDiscardOldData, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestConnect, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestDisConnect, gCaseID);
@@ -3078,7 +2979,6 @@ APSARA_UNIT_TEST_CASE(SenderUnittest, TestRealIpSend, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestEmptyRealIp, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestRealIpSendFailAndRecover, gCaseID);
 APSARA_UNIT_TEST_CASE(SenderUnittest, TestRegionConcurreny, gCaseID);
-APSARA_UNIT_TEST_CASE(SenderUnittest, TestLogGroupAlipayZoneInfo, gCaseID);
 UNIT_TEST_CASE(SenderUnittest, TestExactlyOnceDataSendSequence);
 UNIT_TEST_CASE(SenderUnittest, TestExactlyOncePartialBlockConcurrentSend);
 UNIT_TEST_CASE(SenderUnittest, TestExactlyOnceCompleteBlockConcurrentSend);

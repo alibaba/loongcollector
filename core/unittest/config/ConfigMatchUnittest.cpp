@@ -37,7 +37,6 @@
 #include <json/json.h>
 #include "common/Flags.h"
 #include "common/FileSystemUtil.h"
-#include "common/util.h"
 #include "event_handler/EventHandler.h"
 #include "polling/PollingEventQueue.h"
 #include "controller/EventDispatcher.h"
@@ -252,23 +251,23 @@ public:
 
         CaseSetUp();
         {
-            vector<Config*> allConfig;
+            vector<FileDiscoveryConfig> allConfig;
             ConfigManager::GetInstance()->FindMatchWithForceFlag(allConfig, gRootDir + PS + "A" + PS + "B", "");
             APSARA_TEST_EQUAL(allConfig.size(), (size_t)2);
         }
         {
-            vector<Config*> allConfig;
+            vector<FileDiscoveryConfig> allConfig;
             ConfigManager::GetInstance()->FindMatchWithForceFlag(allConfig, gRootDir + PS + "A" + PS + "B", "test.Log");
             APSARA_TEST_EQUAL(allConfig.size(), (size_t)2);
         }
         ConfigManager::GetInstance()->mCacheFileAllConfigMap.clear();
         {
-            vector<Config*> allConfig;
+            vector<FileDiscoveryConfig> allConfig;
             ConfigManager::GetInstance()->FindAllMatch(allConfig, gRootDir + PS + "A" + PS + "B", "test.Log");
             APSARA_TEST_EQUAL(allConfig.size(), (size_t)3);
         }
         {
-            vector<Config*> allConfig;
+            vector<FileDiscoveryConfig> allConfig;
             ConfigManager::GetInstance()->FindMatchWithForceFlag(allConfig, gRootDir + PS, "");
             APSARA_TEST_EQUAL(allConfig.size(), (size_t)0);
         }

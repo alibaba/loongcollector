@@ -15,16 +15,21 @@
  */
 
 #pragma once
-#include <cstdint>
-#include <cstdlib>
-#include <ostream>
-#include <numeric>
-#include <json/json.h>
-#include "config/Config.h"
-#include "reader/SourceBuffer.h"
+
 #if defined(_MSC_VER)
 #include <stddef.h>
 #endif
+
+#include <cstdint>
+#include <numeric>
+#include <sstream>
+#include <unordered_map>
+#include <utility>
+
+#include <json/json.h>
+
+#include "flusher/FlusherSLS.h"
+#include "log_pb/sls_logs.pb.h"
 
 extern "C" {
 // The definition of Golang type is copied from PluginAdaptor.h that
@@ -185,7 +190,13 @@ public:
     }
 
     bool LoadPluginBase();
-    void LoadConfig();
+    // void LoadConfig();
+    bool LoadPipeline(const std::string& pipelineName,
+                      const std::string& pipeline,
+                      const std::string& project = "",
+                      const std::string& logstore = "",
+                      const std::string& region = "",
+                      logtail::LogstoreFeedBackKey logstoreKey = 0);
     void HoldOn(bool exitFlag);
     void Resume();
 
@@ -235,6 +246,8 @@ public:
     K8sContainerMeta GetContainerMeta(const std::string& containerID);
 
 private:
+    static bool GetRealConfigName(std::string& name);
+
     void* mPluginBasePtr;
     void* mPluginAdapterPtr;
 
@@ -246,9 +259,9 @@ private:
     ProcessRawLogFun mProcessRawLogFun;
     ProcessRawLogV2Fun mProcessRawLogV2Fun;
     volatile bool mPluginValid;
-    logtail::Config mPluginAlarmConfig;
-    logtail::Config mPluginProfileConfig;
-    logtail::Config mPluginContainerConfig;
+    logtail::FlusherSLS mPluginAlarmConfig;
+    logtail::FlusherSLS mPluginProfileConfig;
+    logtail::FlusherSLS mPluginContainerConfig;
     ProcessLogsFun mProcessLogsFun;
     ProcessLogGroupFun mProcessLogGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;

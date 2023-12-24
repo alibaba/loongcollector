@@ -15,27 +15,65 @@
  */
 
 #pragma once
-#include "plugin/instance/ProcessorInstance.h"
-#include "pipeline/PipelineConfig.h"
+
+#include <json/json.h>
+
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "config/Config.h"
+#include "models/PipelineEventGroup.h"
 #include "pipeline/PipelineContext.h"
+#include "plugin/instance/FlusherInstance.h"
+#include "plugin/instance/InputInstance.h"
+#include "plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
 
 class Pipeline {
 public:
-    Pipeline() {}
+    bool Init(Config&& config);
+    void Start();
+    void Process(std::vector<PipelineEventGroup>& logGroupList);
+    void Stop(bool isRemoving);
+
     const std::string& Name() const { return mName; }
-    bool Init(const PipelineConfig& config);
-    void Process(PipelineEventGroup&& logGroup, std::vector<PipelineEventGroup>& logGroupList);
-    PipelineContext& GetContext() { return mContext; }
-    PipelineConfig& GetPipelineConfig() { return mConfig; }
+    PipelineContext& GetContext() const { return mContext; }
+    const Json::Value& GetConfig() const { return *mConfig; }
+    const std::vector<std::unique_ptr<FlusherInstance>>& GetFlushers() const { return mFlushers; }
+    bool IsFlushingThroughGoPipeline() const { return !mGoPipelineWithoutInput.isNull(); }
+    const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& GetPluginStatistics() const {
+        return mPluginCntMap;
+    }
+    bool LoadGoPipelines() const; // 应当放在private，过渡期间放在public
+
+    // only for input_observer_network for compatability
+    const std::vector<std::unique_ptr<InputInstance>>& GetInputs() const { return mInputs; }
 
 private:
-    bool InitAndAddProcessor(std::unique_ptr<ProcessorInstance>&& processor, const PipelineConfig& config);
+    void MergeGoPipeline(const Json::Value& src, Json::Value& dst);
+    void AddPluginToGoPipeline(const Json::Value& plugin, const std::string& module, Json::Value& dst);
+    void CopyNativeGlobalParamToGoPipeline(Json::Value& root);
+    bool ShouldAddPluginToGoPipelineWithInput() const { return mInputs.empty() && mProcessorLine.empty(); }
 
     std::string mName;
-    std::vector<std::unique_ptr<ProcessorInstance> > mProcessorLine;
-    PipelineContext mContext;
-    PipelineConfig mConfig;
+    std::vector<std::unique_ptr<InputInstance>> mInputs;
+    std::vector<std::unique_ptr<ProcessorInstance>> mProcessorLine;
+    std::vector<std::unique_ptr<FlusherInstance>> mFlushers;
+    Json::Value mGoPipelineWithInput;
+    Json::Value mGoPipelineWithoutInput;
+    mutable PipelineContext mContext;
+    std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mPluginCntMap;
+    std::unique_ptr<Json::Value> mConfig;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class PipelineMock;
+    friend class PipelineUnittest;
+    friend class InputFileUnittest;
+    friend class ProcessorTagNativeUnittest;
+#endif
 };
+
 } // namespace logtail

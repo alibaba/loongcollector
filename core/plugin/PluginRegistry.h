@@ -47,7 +47,10 @@ public:
     std::unique_ptr<InputInstance> CreateInput(const std::string& name, const std::string& pluginId);
     std::unique_ptr<ProcessorInstance> CreateProcessor(const std::string& name, const std::string& pluginId);
     std::unique_ptr<FlusherInstance> CreateFlusher(const std::string& name, const std::string& pluginId);
-    bool IsValidGoPlugin(const std::string& name);
+    bool IsValidGoPlugin(const std::string& name) const;
+    bool IsValidNativeInputPlugin(const std::string& name) const;
+    bool IsValidNativeProcessorPlugin(const std::string& name) const;
+    bool IsValidNativeFlusherPlugin(const std::string& name) const;
 
 private:
     enum PluginCat { INPUT_PLUGIN, PROCESSOR_PLUGIN, FLUSHER_PLUGIN };
@@ -82,6 +85,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PluginRegistryUnittest;
+    friend class PipelineUnittest;
 #endif
 };
 

@@ -20,7 +20,7 @@
 #include "plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
-    
+
 template <typename T>
 class StaticProcessorCreator : public PluginCreator {
 public:

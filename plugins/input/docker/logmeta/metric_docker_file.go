@@ -61,7 +61,7 @@ type InputDockerFile struct {
 	ExternalEnvTag        map[string]string
 	ExternalK8sLabelTag   map[string]string
 	LogPath               string
-	FileParttern          string
+	FilePattern           string
 	MountPath             string
 	HostFlag              bool
 	K8sNamespaceRegex     string
@@ -349,7 +349,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 			Project:                       idf.context.GetProject(),
 			Logstore:                      idf.context.GetLogstore(),
 			ConfigName:                    idf.context.GetConfigName(),
-			SourceAddress:                 fmt.Sprintf("%s/**/%s", idf.LogPath, idf.FileParttern),
+			SourceAddress:                 fmt.Sprintf("%s/**/%s", idf.LogPath, idf.FilePattern),
 			PathExistInputContainerIDs:    helper.GetStringFromList(havingPathkeys),
 			PathNotExistInputContainerIDs: helper.GetStringFromList(nothavingPathkeys),
 			InputType:                     "file_log",

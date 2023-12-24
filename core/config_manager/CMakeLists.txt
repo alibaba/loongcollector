@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(config_manager)
 
 if (MSVC)
@@ -33,4 +33,6 @@ target_link_libraries(${PROJECT_NAME} monitor)
 target_link_libraries(${PROJECT_NAME} checkpoint)
 target_link_libraries(${PROJECT_NAME} app_config)
 target_link_libraries(${PROJECT_NAME} processor_daemon)
+target_link_libraries(${PROJECT_NAME} flusher)
+target_link_libraries(${PROJECT_NAME} input)
 link_curl(${PROJECT_NAME})

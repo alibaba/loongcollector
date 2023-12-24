@@ -20,6 +20,9 @@
 #include "common/CompressTools.h"
 #include "sls_control/SLSControl.h"
 
+DECLARE_FLAG_STRING(default_access_key_id);
+DECLARE_FLAG_STRING(default_access_key);
+
 namespace logtail {
 
 class HttpMessageUnittest : public ::testing::Test {

@@ -19,31 +19,36 @@
 #elif defined(_MSC_VER)
 #include <Psapi.h>
 #endif
-#include <functional>
 #include <fstream>
-#include "common/Constants.h"
-#include "common/ExceptionBase.h"
-#include "common/StringTools.h"
-#include "common/LogtailCommonFlags.h"
-#include "common/TimeUtil.h"
-#include "common/RuntimeUtil.h"
-#include "common/DevInode.h"
-#include "common/GlobalPara.h"
-#include "common/version.h"
-#include "common/MachineInfoUtil.h"
-#include "log_pb/sls_logs.pb.h"
-#include "logger/Logger.h"
-#include "sender/Sender.h"
-#include "monitor/LogFileProfiler.h"
-#include "monitor/LogtailAlarm.h"
-#include "config_manager/ConfigManager.h"
+#include <functional>
+
 #include "app_config/AppConfig.h"
+#include "common/Constants.h"
+#include "common/DevInode.h"
+#include "common/ExceptionBase.h"
+#include "common/LogtailCommonFlags.h"
+#include "common/MachineInfoUtil.h"
+#include "common/RuntimeUtil.h"
+#include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "common/version.h"
+#include "config_manager/ConfigManager.h"
 #include "event_handler/LogInput.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "log_pb/sls_logs.pb.h"
+#include "logger/Logger.h"
+#include "monitor/LogFileProfiler.h"
+#include "monitor/LogtailAlarm.h"
+#include "sender/Sender.h"
 #if defined(__linux__)
 #include "ObserverManager.h"
 #endif
+#include "application/Application.h"
 #include "sdk/Common.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
+#include "pipeline/PipelineManager.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -76,13 +81,14 @@ inline void CpuStat::Reset() {
     mCpuUsage = 0;
 }
 
-LogtailMonitor::LogtailMonitor() {
+LogtailMonitor::LogtailMonitor() = default;
+
+LogtailMonitor* LogtailMonitor::GetInstance() {
+    static LogtailMonitor instance;
+    return &instance;
 }
 
-LogtailMonitor::~LogtailMonitor() {
-}
-
-bool LogtailMonitor::InitMonitor() {
+bool LogtailMonitor::Init() {
     mScaledCpuUsageUpLimit = AppConfig::GetInstance()->GetCpuUsageUpLimit();
     mStatusCount = 0;
 
@@ -106,91 +112,95 @@ bool LogtailMonitor::InitMonitor() {
 #endif
 
     // Initialize monitor thread.
-    mMonitorRunning = true;
-    mMonitorThreadPtr = CreateThread([&] { this->Monitor(); });
+    mThreadRes = async(launch::async, &LogtailMonitor::Monitor, this);
     return true;
 }
 
-bool LogtailMonitor::RemoveMonitor() {
-    mMonitorRunning = false;
-    try {
-        if (mMonitorThreadPtr != nullptr) {
-            mMonitorThreadPtr->GetValue(2000 * 1000);
-        }
-    } catch (const ExceptionBase& e) {
-        LOG_ERROR(sLogger, ("RemoveMonitor fail", e.ToString())("message", e.GetExceptionMessage()));
-        return false;
-    } catch (...) {
-        LOG_ERROR(sLogger, ("RemoveMonitor fail", "unknown exception"));
-        return false;
+void LogtailMonitor::Stop() {
+    {
+        lock_guard<mutex> lock(mThreadRunningMux);
+        mIsThreadRunning = false;
     }
-    return true;
+    future_status s = mThreadRes.wait_for(chrono::seconds(1));
+    if (s == future_status::ready) {
+        LOG_INFO(sLogger, ("profiling", "stopped successfully"));
+    } else {
+        LOG_WARNING(sLogger, ("profiling", "forced to stopped"));
+    }
 }
 
 void LogtailMonitor::Monitor() {
+    LOG_INFO(sLogger, ("profiling", "started"));
     int32_t lastMonitorTime = time(NULL);
     CpuStat curCpuStat;
-    while (mMonitorRunning) {
-        sleep(1);
-        GetCpuStat(curCpuStat);
+    {
+        unique_lock<mutex> lock(mThreadRunningMux);
+        while (mIsThreadRunning) {
+            if (mStopCV.wait_for(lock, std::chrono::seconds(1), [this]() { return !mIsThreadRunning; })) {
+                break;
+            }
+            GetCpuStat(curCpuStat);
 
-        // Update mRealtimeCpuStat for InputFlowControl.
-        if (AppConfig::GetInstance()->IsInputFlowControl()) {
-            CalCpuStat(curCpuStat, mRealtimeCpuStat);
-        }
+            // Update mRealtimeCpuStat for InputFlowControl.
+            if (AppConfig::GetInstance()->IsInputFlowControl()) {
+                CalCpuStat(curCpuStat, mRealtimeCpuStat);
+            }
 
-        int32_t monitorTime = time(NULL);
+            int32_t monitorTime = time(NULL);
 #if defined(__linux__) // TODO: Add auto scale support for Windows.
-        // Update related CPU statistics for controlling resource auto scale (Linux only).
-        if (AppConfig::GetInstance()->IsResourceAutoScale()) {
-            CalCpuStat(curCpuStat, mCpuStatForScale);
-            CalOsCpuStat();
-            mCpuArrayForScale[mCpuArrayForScaleIdx % CPU_STAT_FOR_SCALE_ARRAY_SIZE] = mCpuStatForScale.mCpuUsage;
-            mOsCpuArrayForScale[mCpuArrayForScaleIdx % CPU_STAT_FOR_SCALE_ARRAY_SIZE] = mOsCpuStatForScale.mOsCpuUsage;
-            ++mCpuArrayForScaleIdx;
-            CheckScaledCpuUsageUpLimit();
-            LOG_DEBUG(
-                sLogger,
-                ("mCpuStatForScale", mCpuStatForScale.mCpuUsage)("mOsCpuStatForScale", mOsCpuStatForScale.mOsCpuUsage));
-        }
+            // Update related CPU statistics for controlling resource auto scale (Linux only).
+            if (AppConfig::GetInstance()->IsResourceAutoScale()) {
+                CalCpuStat(curCpuStat, mCpuStatForScale);
+                CalOsCpuStat();
+                mCpuArrayForScale[mCpuArrayForScaleIdx % CPU_STAT_FOR_SCALE_ARRAY_SIZE] = mCpuStatForScale.mCpuUsage;
+                mOsCpuArrayForScale[mCpuArrayForScaleIdx % CPU_STAT_FOR_SCALE_ARRAY_SIZE]
+                    = mOsCpuStatForScale.mOsCpuUsage;
+                ++mCpuArrayForScaleIdx;
+                CheckScaledCpuUsageUpLimit();
+                LOG_DEBUG(sLogger,
+                          ("mCpuStatForScale", mCpuStatForScale.mCpuUsage)("mOsCpuStatForScale",
+                                                                           mOsCpuStatForScale.mOsCpuUsage));
+            }
 #endif
 
-        // Update statistics and send to logtail_status_profile regularly.
-        // If CPU or memory limit triggered, send to logtail_suicide_profile.
-        if ((monitorTime - lastMonitorTime) < INT32_FLAG(monitor_interval))
-            continue;
-        lastMonitorTime = monitorTime;
+            // Update statistics and send to logtail_status_profile regularly.
+            // If CPU or memory limit triggered, send to logtail_suicide_profile.
+            if ((monitorTime - lastMonitorTime) < INT32_FLAG(monitor_interval))
+                continue;
+            lastMonitorTime = monitorTime;
 
-        // Memory usage has exceeded limit, try to free some timeout objects.
-        if (1 == mMemStat.mViolateNum) {
-            LOG_DEBUG(sLogger, ("Memory is upper limit", "run gabbage collection."));
-            LogInput::GetInstance()->SetForceClearFlag(true);
-        }
-        GetMemStat();
-        CalCpuStat(curCpuStat, mCpuStat);
-        // CalCpuLimit and CalMemLimit will check if the number of violation (CPU
-        // or memory exceeds limit) // is greater or equal than limits (
-        // flag(cpu_limit_num) and flag(mem_limit_num)).
-        // Returning true means too much violations, so we have to prepare to restart
-        // logtail to release resource.
-        // Mainly for controlling memory because we have no idea to descrease memory usage.
-        if (CheckCpuLimit() || CheckMemLimit()) {
-            LOG_ERROR(sLogger,
-                      ("Resource used by program exceeds upper limit",
-                       "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
-            Suicide();
-        }
+            // Memory usage has exceeded limit, try to free some timeout objects.
+            if (1 == mMemStat.mViolateNum) {
+                LOG_DEBUG(sLogger, ("Memory is upper limit", "run gabbage collection."));
+                LogInput::GetInstance()->SetForceClearFlag(true);
+            }
+            GetMemStat();
+            CalCpuStat(curCpuStat, mCpuStat);
+            // CalCpuLimit and CalMemLimit will check if the number of violation (CPU
+            // or memory exceeds limit) // is greater or equal than limits (
+            // flag(cpu_limit_num) and flag(mem_limit_num)).
+            // Returning true means too much violations, so we have to prepare to restart
+            // logtail to release resource.
+            // Mainly for controlling memory because we have no idea to descrease memory usage.
+            if (CheckCpuLimit() || CheckMemLimit()) {
+                LOG_ERROR(sLogger,
+                          ("Resource used by program exceeds upper limit",
+                           "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
+                Suicide();
+            }
 
-        if (IsHostIpChanged()) {
-            Suicide();
-        }
+            if (IsHostIpChanged()) {
+                Suicide();
+            }
 
-        SendStatusProfile(false);
-        if (BOOL_FLAG(logtail_dump_monitor_info)) {
-            if (!DumpMonitorInfo(monitorTime))
-                LOG_ERROR(sLogger, ("Fail to dump monitor info", ""));
+            SendStatusProfile(false);
+            if (BOOL_FLAG(logtail_dump_monitor_info)) {
+                if (!DumpMonitorInfo(monitorTime))
+                    LOG_ERROR(sLogger, ("Fail to dump monitor info", ""));
+            }
         }
     }
+    SendStatusProfile(true);
 }
 
 template <typename T>
@@ -213,7 +223,8 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     auto now = GetCurrentLogtailTime();
     // Check input thread.
     int32_t lastReadEventTime = LogInput::GetInstance()->GetLastReadEventTime();
-    if (lastReadEventTime > 0 && (now.tv_sec - lastReadEventTime > AppConfig::GetInstance()->GetForceQuitReadTimeout())) {
+    if (lastReadEventTime > 0
+        && (now.tv_sec - lastReadEventTime > AppConfig::GetInstance()->GetForceQuitReadTimeout())) {
         LOG_ERROR(sLogger, ("last read event time is too old", lastReadEventTime)("prepare force exit", ""));
         LogtailAlarm::GetInstance()->SendAlarm(
             LOGTAIL_CRASH_ALARM, "last read event time is too old: " + ToString(lastReadEventTime) + " force exit");
@@ -242,12 +253,13 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     AddLogContent(logPtr, "mem", mMemStat.mRss);
     // The version, uuid of Logtail.
     AddLogContent(logPtr, "version", ILOGTAIL_VERSION);
-    AddLogContent(logPtr, "uuid", ConfigManager::GetInstance()->GetUUID());
-    // User defined id, aliuids.
-    AddLogContent(logPtr, "user_defined_id", ConfigManager::GetInstance()->GetUserDefinedIdSet());
-    AddLogContent(logPtr, "aliuids", ConfigManager::GetInstance()->GetAliuidSet());
-    AddLogContent(logPtr, "projects", ConfigManager::GetInstance()->GetAllProjectsSet());
-    AddLogContent(logPtr, "instance_id", ConfigManager::GetInstance()->GetInstanceId());
+    AddLogContent(logPtr, "uuid", Application::GetInstance()->GetUUID());
+#ifdef __ENTERPRISE__
+    AddLogContent(logPtr, "user_defined_id", EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
+    AddLogContent(logPtr, "aliuids", EnterpriseConfigProvider::GetInstance()->GetAliuidSet());
+#endif
+    AddLogContent(logPtr, "projects", Sender::Instance()->GetAllProjects());
+    AddLogContent(logPtr, "instance_id", Application::GetInstance()->GetInstanceId());
     AddLogContent(logPtr, "instance_key", id);
     AddLogContent(logPtr, "syslog_open", AppConfig::GetInstance()->GetOpenStreamLog());
     // Host informations.
@@ -259,23 +271,24 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
 #if defined(__linux__)
     AddLogContent(logPtr, "load", GetLoadAvg());
 #endif
-    AddLogContent(logPtr, "plugin_stats", ConfigManager::GetInstance()->GeneratePluginStatString());
+    AddLogContent(logPtr, "plugin_stats", PipelineManager::GetInstance()->GetPluginStatistics());
     // Metrics.
     vector<string> allProfileRegion;
-    ConfigManager::GetInstance()->GetAllProfileRegion(allProfileRegion);
+    ProfileSender::GetInstance()->GetAllProfileRegion(allProfileRegion);
     UpdateMetric("region", allProfileRegion);
-    UpdateMetric("config_update_count", ConfigManager::GetInstance()->GetConfigUpdateTotalCount());
-    UpdateMetric("config_update_item_count", ConfigManager::GetInstance()->GetConfigUpdateItemTotalCount());
+#ifdef __ENTERPRISE__
+    UpdateMetric("config_update_count", EnterpriseConfigProvider::GetInstance()->GetConfigUpdateTotalCount());
+    UpdateMetric("config_update_item_count", EnterpriseConfigProvider::GetInstance()->GetConfigUpdateItemTotalCount());
     UpdateMetric("config_update_last_time",
-                 GetTimeStamp(ConfigManager::GetInstance()->GetLastConfigUpdateTime(), "%Y-%m-%d %H:%M:%S"));
+                 GetTimeStamp(EnterpriseConfigProvider::GetInstance()->GetLastConfigUpdateTime(), "%Y-%m-%d %H:%M:%S"));
     UpdateMetric("config_get_last_time",
-                 GetTimeStamp(ConfigManager::GetInstance()->GetLastConfigGetTime(), "%Y-%m-%d %H:%M:%S"));
+                 GetTimeStamp(EnterpriseConfigProvider::GetInstance()->GetLastConfigGetTime(), "%Y-%m-%d %H:%M:%S"));
+#endif
     UpdateMetric("config_prefer_real_ip", BOOL_FLAG(send_prefer_real_ip));
     UpdateMetric("plugin_enabled", LogtailPlugin::GetInstance()->IsPluginOpened());
 #if defined(__linux__)
     UpdateMetric("observer_enabled", ObserverManager::GetInstance()->Status());
 #endif
-    UpdateMetric("env_config", ConfigManager::GetInstance()->IsEnvConfig());
     const std::vector<sls_logs::LogTag>& envTags = AppConfig::GetInstance()->GetEnvTags();
     if (!envTags.empty()) {
         UpdateMetric("env_config_count", envTags.size());
@@ -289,28 +302,28 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     AddLogContent(logPtr, "ecs_regioon_id", LogFileProfiler::mECSRegionID);
     ClearMetric();
 
-    if (!mMonitorRunning)
+    if (!mIsThreadRunning)
         return false;
 
     // Dump to local and send to enabled regions.
     DumpToLocal(logGroup);
     for (size_t i = 0; i < allProfileRegion.size(); ++i) {
-        if (BOOL_FLAG(check_profile_region) && !ConfigManager::GetInstance()->CheckRegion(allProfileRegion[i])) {
+        if (BOOL_FLAG(check_profile_region) && !Sender::Instance()->IsRegionContainingConfig(allProfileRegion[i])) {
             LOG_DEBUG(sLogger, ("region does not contain config for this instance", allProfileRegion[i]));
             continue;
         }
 
         // Check if the region is disabled.
-        if (!ConfigManager::GetInstance()->GetRegionStatus(allProfileRegion[i])) {
+        if (!Sender::Instance()->GetRegionStatus(allProfileRegion[i])) {
             LOG_DEBUG(sLogger, ("disabled region, do not send status profile to region", allProfileRegion[i]));
             continue;
         }
 
         if (i == allProfileRegion.size() - 1) {
-            mProfileSender.SendToProfileProject(allProfileRegion[i], logGroup);
+            ProfileSender::GetInstance()->SendToProfileProject(allProfileRegion[i], logGroup);
         } else {
             LogGroup copyLogGroup = logGroup;
-            mProfileSender.SendToProfileProject(allProfileRegion[i], copyLogGroup);
+            ProfileSender::GetInstance()->SendToProfileProject(allProfileRegion[i], copyLogGroup);
         }
     }
     return true;
@@ -483,8 +496,8 @@ bool LogtailMonitor::IsHostIpChanged() {
 
 void LogtailMonitor::Suicide() {
     SendStatusProfile(true);
-    mMonitorRunning = false;
-    LogtailGlobalPara::Instance()->SetSigtermFlag(true);
+    mIsThreadRunning = false;
+    Application::GetInstance()->SetSigTermSignalFlag(true);
     sleep(15);
     _exit(1);
 }

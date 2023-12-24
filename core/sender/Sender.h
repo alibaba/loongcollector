@@ -231,7 +231,7 @@ private:
     };
 
     PTMutex mSendStatisticLock;
-    std::unordered_map<std::string, std::vector<SendStatistic*> > mSendStatisticMap;
+    std::unordered_map<std::string, std::vector<SendStatistic*>> mSendStatisticMap;
 
     PTMutex mSendClientLock;
     std::unordered_map<std::string, SlsClientInfo*> mSendClientMap;
@@ -269,6 +269,23 @@ private:
     std::unique_ptr<sdk::Client> mUpdateRealIpClient;
     PTMutex mRegionRealIpLock;
     bool mStopRealIpThread = false;
+
+    mutable SpinLock mProjectRefCntMapLock;
+    std::unordered_map<std::string, int32_t> mProjectRefCntMap;
+
+    mutable SpinLock mRegionRefCntMapLock;
+    std::unordered_map<std::string, int32_t> mRegionRefCntMap;
+
+    mutable PTMutex mRegionAliuidRefCntMapLock;
+    std::map<std::string, std::unordered_map<std::string, int32_t>> mRegionAliuidRefCntMap;
+
+    std::vector<std::string> GetRegionAliuids(const std::string& region);
+
+    SpinLock mRegionStatusLock;
+    std::unordered_map<std::string, bool> mAllRegionStatus;
+
+    mutable SpinLock mDefaultRegionLock;
+    std::string mDefaultRegion;
 
     const static std::string BUFFER_FILE_NAME_PREFIX;
     const static int32_t BUFFER_META_BASE_SIZE;
@@ -346,13 +363,14 @@ private:
 public:
     static Sender* Instance();
     // void ResetProfileSender();
-    bool InitSender(); // Backward compatible
+    bool Init(); // Backward compatible
     // from collector to batchmap
     bool Send(const std::string& projectName,
               const std::string& sourceId,
               sls_logs::LogGroup& logGroup,
-              const Config* config,
-              DATA_MERGE_TYPE mergeType,
+              int64_t logGroupKey,
+              const FlusherSLS* config,
+              FlusherSLS::Batch::MergeType mergeType,
               const uint32_t logGroupSize,
               const std::string& defaultRegion = "",
               const std::string& filename = "",
@@ -449,7 +467,7 @@ public:
     LogstoreSenderStatistics GetSenderStatistics(const LogstoreFeedBackKey& key);
     void
     SetLogstoreFlowControl(const LogstoreFeedBackKey& logstoreKey, int32_t maxSendBytesPerSecond, int32_t expireTime);
-    bool SendPb(Config* pConfig,
+    bool SendPb(const FlusherSLS* pConfig,
                 char* pbBuffer,
                 int32_t pbSize,
                 int32_t lines,
@@ -469,12 +487,27 @@ public:
     void SendCompressed(std::vector<MergeItem*>& sendDataVec);
     void SendLogPackageList(std::vector<MergeItem*>& sendDataVec);
 
+    std::string GetAllProjects();
+    void IncreaseProjectReferenceCnt(const std::string& project);
+    void DecreaseProjectReferenceCnt(const std::string& project);
+    bool IsRegionContainingConfig(const std::string& region) const;
+    void IncreaseRegionReferenceCnt(const std::string& region);
+    void DecreaseRegionReferenceCnt(const std::string& region);
+    void IncreaseAliuidReferenceCntForRegion(const std::string& region, const std::string& aliuid);
+    void DecreaseAliuidReferenceCntForRegion(const std::string& region, const std::string& aliuid);
+    bool GetRegionStatus(const std::string& region);
+    void UpdateRegionStatus(const std::string& region, bool status);
+
+    const std::string& GetDefaultRegion() const;
+    void SetDefaultRegion(const std::string& region);
+
     friend class SendClosure;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;
     friend class ConfigUpdatorUnittest;
     friend class FuxiSceneUnittest;
+    friend class FlusherSLSUnittest;
 #endif
 };
 

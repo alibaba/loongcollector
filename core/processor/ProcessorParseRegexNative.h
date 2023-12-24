@@ -15,9 +15,14 @@
  */
 
 #pragma once
-#include "plugin/interface/Processor.h"
+
+#include <boost/regex.hpp>
+
 #include <vector>
-#include "parser/LogParser.h" //UserDefinedFormat
+
+#include "models/LogEvent.h"
+#include "plugin/interface/Processor.h"
+#include "processor/CommonParserOptions.h"
 
 namespace logtail {
 
@@ -26,14 +31,21 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const ComponentConfig& componentConfig) override;
+    bool Init(const Json::Value& config) override;
     void Process(PipelineEventGroup& logGroup) override;
+
+    // Source field name.
+    std::string mSourceKey;
+    // Regular expression.
+    std::string mRegex;
+    // Extracted field list.
+    std::vector<std::string> mKeys;
+    CommonParserOptions mCommonParserOptions;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    void AddUserDefinedFormat(const std::string& regStr, const std::string& keys);
     /// @return false if data need to be discarded
     bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
     bool WholeLineModeParser(LogEvent& sourceEvent, const std::string& key);
@@ -41,22 +53,17 @@ private:
                             const boost::regex& reg,
                             const std::vector<std::string>& keys,
                             const StringView& logPath);
-    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent);
-    std::string mSourceKey;
-    std::vector<UserDefinedFormat> mUserDefinedFormat;
-    bool mDiscardUnmatch = false;
-    bool mUploadRawLog = false;
+    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
+
     bool mSourceKeyOverwritten = false;
-    bool mRawLogTagOverwritten = false;
-    std::string mRawLogTag;
+    bool mIsWholeLineMode = false;
+    boost::regex mReg;
 
     int* mParseFailures = nullptr;
     int* mRegexMatchFailures = nullptr;
     int* mLogGroupSize = nullptr;
-
     CounterPtr mProcParseInSizeBytes;
     CounterPtr mProcParseOutSizeBytes;
-
     CounterPtr mProcDiscardRecordsTotal;
     CounterPtr mProcParseErrorTotal;
     CounterPtr mProcKeyCountNotMatchErrorTotal;
@@ -65,4 +72,5 @@ private:
     friend class ProcessorParseRegexNativeUnittest;
 #endif
 };
+
 } // namespace logtail

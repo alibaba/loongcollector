@@ -18,40 +18,44 @@
 
 #include <cstdint>
 
+#include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "monitor/MetricConstants.h"
 
 namespace logtail {
 
-bool ProcessorInstance::Init(const ComponentConfig& config, PipelineContext& context) {
+bool ProcessorInstance::Init(const Json::Value& config, PipelineContext& context) {
     mPlugin->SetContext(context);
     mPlugin->SetMetricsRecordRef(Name(), Id());
-    bool inited = mPlugin->Init(config);
-    if (!inited) {
-        return inited;
+    if (!mPlugin->Init(config)) {
+        return false;
     }
+
     // should init plugin first， then could GetMetricsRecordRef from plugin
     mProcInRecordsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_IN_RECORDS_TOTAL);
     mProcOutRecordsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_OUT_RECORDS_TOTAL);
     mProcTimeMS = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_TIME_MS);
-    
-    return inited;
+
+    return true;
 }
 
-void ProcessorInstance::Process(PipelineEventGroup& logGroup) {
-    size_t inSize = logGroup.GetEvents().size();
-
-    mProcInRecordsTotal->Add(inSize);
+void ProcessorInstance::Process(std::vector<PipelineEventGroup>& logGroupList) {
+    if (logGroupList.empty()) {
+        return;
+    } 
+    for (const auto& logGroup : logGroupList) {
+        mProcInRecordsTotal->Add(logGroup.GetEvents().size());
+    }
 
     uint64_t startTime = GetCurrentTimeInMicroSeconds();
-    mPlugin->Process(logGroup);
+    mPlugin->Process(logGroupList);
     uint64_t durationTime = GetCurrentTimeInMicroSeconds() - startTime;
-    
+
     mProcTimeMS->Add(durationTime);
 
-    size_t outSize = logGroup.GetEvents().size();
-    mProcOutRecordsTotal->Add(outSize);
-    LOG_DEBUG(mPlugin->GetContext().GetLogger(), ("Processor", Id())("InSize", inSize)("OutSize", outSize));
+    for (const auto& logGroup : logGroupList) {
+        mProcOutRecordsTotal->Add(logGroup.GetEvents().size());
+    }    
 }
 
 } // namespace logtail

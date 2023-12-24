@@ -20,8 +20,6 @@
 #include <json/json.h>
 #include "sls_logs.pb.h"
 #include "common/Lock.h"
-#include "util.h"
-#include "profile_sender/ProfileSender.h"
 
 namespace logtail {
 
@@ -101,7 +99,6 @@ private:
     int32_t mLineCountSendInterval;
     std::string mLineCountDumpFileName;
     std::string mBakLineCountDumpFileName;
-    ProfileSender mProfileSender;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class DataIntegrityUnittest;

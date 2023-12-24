@@ -19,7 +19,6 @@
 #include "parser/LogParser.h"
 #include "reader/LogFileReader.h"
 #include <iostream>
-#include "common/util.h"
 #include "common/TimeUtil.h"
 #include <ctime>
 #include <cstdlib>

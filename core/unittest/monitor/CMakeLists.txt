@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(logtail_metric_unittest)
 
 add_executable(logtail_metric_unittest LogtailMetricUnittest.cpp)
 target_link_libraries(logtail_metric_unittest unittest_base)
 
-
 add_executable(profiler_data_integrity_unittest DataIntegrityUnittest.cpp)
 target_link_libraries(profiler_data_integrity_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(logtail_metric_unittest)

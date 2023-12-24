@@ -17,7 +17,6 @@
 #include <json/json.h>
 #include "LogIntegrity.h"
 #include "LogLineCount.h"
-#include "util.h"
 
 namespace logtail {
 

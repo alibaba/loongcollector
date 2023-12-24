@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LogtailAlarm.h"
+#include "monitor/LogtailAlarm.h"
+
+#include "LogFileProfiler.h"
+#include "app_config/AppConfig.h"
 #include "common/Constants.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/Thread.h"
-#include "common/LogtailCommonFlags.h"
-#include "common/version.h"
 #include "common/TimeUtil.h"
+#include "common/version.h"
+#include "config_manager/ConfigManager.h"
 #include "log_pb/sls_logs.pb.h"
 #include "sender/Sender.h"
-#include "config_manager/ConfigManager.h"
-#include "app_config/AppConfig.h"
-#include "LogFileProfiler.h"
 
 DEFINE_FLAG_INT32(logtail_alarm_interval, "the interval of two same type alarm message", 30);
 DEFINE_FLAG_INT32(logtail_low_level_alarm_speed, "the speed(count/second) which logtail's low level alarm allow", 100);
@@ -99,21 +100,34 @@ LogtailAlarm::LogtailAlarm() {
     mMessageType[OBSERVER_INIT_ALARM] = "OBSERVER_INIT_ALARM";
     mMessageType[OBSERVER_RUNTIME_ALARM] = "OBSERVER_RUNTIME_ALARM";
     mMessageType[OBSERVER_STOP_ALARM] = "OBSERVER_STOP_ALARM";
-
-    mThread.reset(new Thread([this]() { SendAlarmLoop(); }));
 }
 
-LogtailAlarm::~LogtailAlarm() {
-    Stop();
-    mThread->Wait(1000000); // thread should stop before members destruct
+void LogtailAlarm::Init() {
+    mThreadRes = async(launch::async, &LogtailAlarm::SendAlarmLoop, this);
+}
+
+void LogtailAlarm::Stop() {
+    ForceToSend();
+    {
+        lock_guard<mutex> lock(mThreadRunningMux);
+        mIsThreadRunning = false;
+    }
+    mStopCV.notify_one();
+    future_status s = mThreadRes.wait_for(chrono::seconds(1));
+    if (s == future_status::ready) {
+        LOG_INFO(sLogger, ("alarm gathering", "stopped successfully"));
+    } else {
+        LOG_WARNING(sLogger, ("alarm gathering", "forced to stopped"));
+    }
 }
 
 bool LogtailAlarm::SendAlarmLoop() {
+    LOG_INFO(sLogger, ("alarm gathering", "started"));
     {
-        std::unique_lock<std::mutex> lock(mStopMutex);
-        while (!mStopFlag) {
+        unique_lock<mutex> lock(mThreadRunningMux);
+        while (mIsThreadRunning) {
             SendAllRegionAlarm();
-            if (mStopCV.wait_for(lock, std::chrono::seconds(3), [this]() { return mStopFlag; })) {
+            if (mStopCV.wait_for(lock, std::chrono::seconds(3), [this]() { return !mIsThreadRunning; })) {
                 break;
             }
         }
@@ -177,7 +191,7 @@ void LogtailAlarm::SendAllRegionAlarm() {
             }
             // check sender queue status, if invalid jump this region
             LogstoreFeedBackKey alarmPrjLogstoreKey = GenerateLogstoreFeedBackKey(
-                ConfigManager::GetInstance()->GetProfileProjectName(region), string("logtail_alarm"));
+                ProfileSender::GetInstance()->GetProfileProjectName(region), string("logtail_alarm"));
             if (!Sender::Instance()->GetSenderFeedBackInterface()->IsValidToPush(alarmPrjLogstoreKey)) {
                 // jump this region
                 ++sendRegionIndex;
@@ -246,7 +260,7 @@ void LogtailAlarm::SendAllRegionAlarm() {
             continue;
         }
         // this is an anonymous send and non lock send
-        mProfileSender.SendToProfileProject(region, logGroup);
+        ProfileSender::GetInstance()->SendToProfileProject(region, logGroup);
     } while (true);
 }
 
@@ -280,7 +294,7 @@ void LogtailAlarm::SendAlarm(const LogtailAlarmType alarmType,
     }
 
     // ignore logtail self alarm
-    string profileProject = ConfigManager::GetInstance()->GetProfileProjectName(region);
+    string profileProject = ProfileSender::GetInstance()->GetProfileProjectName(region);
     if (!profileProject.empty() && profileProject == projectName) {
         return;
     }
@@ -299,15 +313,6 @@ void LogtailAlarm::SendAlarm(const LogtailAlarmType alarmType,
 
 void LogtailAlarm::ForceToSend() {
     INT32_FLAG(logtail_alarm_interval) = 0;
-}
-
-void LogtailAlarm::Stop() {
-    ForceToSend();
-    {
-        std::lock_guard<std::mutex> lock(mStopMutex);
-        mStopFlag = true;
-    }
-    mStopCV.notify_one();
 }
 
 bool LogtailAlarm::IsLowLevelAlarmValid() {

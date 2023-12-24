@@ -1,74 +1,101 @@
-# editor
-*.swp
-*.swo
-.DS_Store
-# ctags generated file.
-/tags
-# backup files.
-*.bak
-/.devcontainer/
-
-# go
-/plugin_main/plugin_main
-/pluginmanager/checkpoint/
-*.prof
-/plugin_main/checkpoint/*
-*.LOG
-*.LOG.*
-*.test
-plugin_logger.xml
-license_coverage.txt
-vendor
-go.work
-go.work.sum
-
-# C++
-CMakeFiles
-CMakeCache.txt
-*.cmake
-Makefile
-*.cbp
-*.a
-/core/log_pb/*.pb.*
-/core/build/
-/core/common/Version.cpp
-/core/installer/public/
-!/Makefile
-!core/dependencies.cmake
-!core/utils.cmake
-!core/libulogfs.a
-core/unittest/ut.output/
-
-# output
-e2e-test
-/bin/
-/generated_files/
-/build/
-/find_licenses/
-*-test/
-
-# vscode
-.vscode
-!.vscode/settings.json
+### VSCode
+.vscode/*
+!.vscode/tasks.json
 !.vscode/launch.json
-output
-dist
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+# Local History for Visual Studio Code
+.history/
+# Built Visual Studio Code Extensions
+*.vsix
+# Dev Container
+.devcontainer/
 
-# goland
+### GoLand
 .idea
 
-# unit test
+### MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Thumbnails
+._*
+
+### Common
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+# Compiled Static libraries
+*.a
+*.lib
+# Executables
+*.exe
+*.out
+*.app
+
+### C++
+# Prerequisites
+*.d
+# Compiled Object files
+*.o
+*.obj
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+# Custom
+/build/
+core/build/
+core/log_pb/*.pb.*
+core/common/Version.cpp
+!/Makefile
+# Enterprise
+core/installer/public/
+core/unittest/ut.output/
+core/test/**/report/
+
+### Go
+# Test binary, built with `go test -c`
+*.test
+# Dependency directories (remove the comment below to include it)
+vendor/
+# Go workspace file
+go.work
+go.work.sum
+# Profile
+*.prof
+# Coverage
 .coretestCoverage.txt
 .testCoverage.txt
-plugin_main/*.dll
-plugin_main/*.so
-plugin_main/*.json
-
-# e2e report
-report
-
-# plugins
+e2e-engine-coverage.txt
+# Plugin
 plugins/all/
 /external_plugins.yml
 *.go.mod
 *.go.mod.sum
+# Custom
+plugin_logger.xml
+
+### E2E
+/*-test/
+
+### License
+find_licenses/
+license_coverage.txt
+
+### Others
+*.bak
+/bin/
+/output/
+/generated_files/
+/dist/
+/tags/

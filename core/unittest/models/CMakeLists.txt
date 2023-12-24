@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(models_unittest)
 
 add_executable(pipeline_event_unittest PipelineEventUnittest.cpp)
@@ -26,3 +26,9 @@ target_link_libraries(pipeline_event_ptr_unittest unittest_base)
 
 add_executable(pipeline_event_group_unittest PipelineEventGroupUnittest.cpp)
 target_link_libraries(pipeline_event_group_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(pipeline_event_unittest)
+gtest_discover_tests(log_event_unittest)
+gtest_discover_tests(pipeline_event_ptr_unittest)
+gtest_discover_tests(pipeline_event_group_unittest)

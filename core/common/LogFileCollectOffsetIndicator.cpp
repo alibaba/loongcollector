@@ -19,7 +19,6 @@
 #include "common/Flags.h"
 #include "common/LogstoreSenderQueue.h"
 #include "sender/Sender.h"
-#include "util.h"
 #include "ulogfslib_file.h"
 
 DEFINE_FLAG_INT32(file_eliminate_interval, "time interval for file eliminating, seconds", 86400 * 2);

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "FileSystemUtil.h"
+
 #if defined(_MSC_VER)
 #include <direct.h>
 #include <fcntl.h>
@@ -20,9 +21,13 @@
 #include <fnmatch.h>
 #endif
 #include <boost/filesystem.hpp>
-#include "logger/Logger.h"
-#include "StringTools.h"
+
+#include <fstream>
+
 #include "RuntimeUtil.h"
+#include "StringTools.h"
+#include "logger/Logger.h"
+
 using namespace std;
 
 namespace logtail {
@@ -684,5 +689,19 @@ namespace fsutil {
     }
 
 } // namespace fsutil
+
+bool ReadFile(const string& filepath, string& content) {
+    constexpr size_t read_size = size_t(4096);
+    ifstream fin(filepath);
+    if (!fin) {
+        return false;
+    }
+    string buf = string(read_size, '\0');
+    while (fin.read(&buf[0], read_size)) {
+        content.append(buf, 0, fin.gcount());
+    }
+    content.append(buf, 0, fin.gcount());
+    return true;
+}
 
 } // namespace logtail

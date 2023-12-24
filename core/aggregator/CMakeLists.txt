@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(aggregator)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
@@ -22,5 +22,5 @@ target_link_libraries(${PROJECT_NAME} logger)
 target_link_libraries(${PROJECT_NAME} common)
 target_link_libraries(${PROJECT_NAME} config_manager)
 target_link_libraries(${PROJECT_NAME} sender)
-target_link_libraries(${PROJECT_NAME} shennong)
 target_link_libraries(${PROJECT_NAME} monitor)
+target_link_libraries(${PROJECT_NAME} application)

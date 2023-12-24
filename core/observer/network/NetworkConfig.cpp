@@ -16,9 +16,10 @@
 #include <sstream>
 #include "LogtailAlarm.h"
 #include "logger/Logger.h"
-#include "json/json.h"
+#include <json/json.h>
 #include "common/JsonUtil.h"
 #include "ExceptionBase.h"
+#include "input/InputObserverNetwork.h"
 
 DEFINE_FLAG_INT64(sls_observer_network_gc_interval, "SLS Observer NetWork GC interval seconds", 30);
 DEFINE_FLAG_INT64(sls_observer_network_probe_disable_process_interval,
@@ -105,36 +106,37 @@ void NetworkConfig::ReportAlarm() {
     }
     std::stringstream ss;
     ss << "Load multi observer config, only one config is enabled, others not work. Enabled config is, project : "
-       << mLastApplyedConfig->mProjectName << ", store : " << mLastApplyedConfig->mCategory << ".\n";
+       << mLastApplyedConfig->GetContext().GetProjectName()
+       << ", store : " << mLastApplyedConfig->GetContext().GetLogstoreName() << ".\n";
     ss << "Disabled configs : ";
     for (auto& config : mAllNetworkConfigs) {
-        if (config == mLastApplyedConfig) {
+        if (config.second == mLastApplyedConfig) {
             continue;
         }
-        ss << "project : " << mLastApplyedConfig->mProjectName << ", store : " << mLastApplyedConfig->mCategory
-           << ".\n";
+        ss << "project : " << mLastApplyedConfig->GetContext().GetProjectName()
+           << ", store : " << mLastApplyedConfig->GetContext().GetLogstoreName() << ".\n";
     }
     std::string alarmStr = ss.str();
     for (auto& config : mAllNetworkConfigs) {
-        LogtailAlarm::GetInstance()->SendAlarm(
-            MULTI_OBSERVER_ALARM, alarmStr, config->mProjectName, config->mCategory, config->mRegion);
+        LogtailAlarm::GetInstance()->SendAlarm(MULTI_OBSERVER_ALARM,
+                                               alarmStr,
+                                               config.second->GetContext().GetProjectName(),
+                                               config.second->GetContext().GetLogstoreName(),
+                                               config.second->GetContext().GetRegion());
     }
     LOG_WARNING(sLogger, (alarmStr, ""));
 }
 
 
-void NetworkConfig::LoadConfig(Config* config) {
-    if (!config->mObserverFlag) {
-        return;
-    }
+void NetworkConfig::LoadConfig(const Pipeline* config) {
     if (mLastApplyedConfig == NULL) {
         mLastApplyedConfig = config;
     }
-    if (mOldestConfigCreateTime > config->mCreateTime) {
-        mOldestConfigCreateTime = config->mCreateTime;
+    if (mOldestConfigCreateTime > config->GetContext().GetCreateTime()) {
+        mOldestConfigCreateTime = config->GetContext().GetCreateTime();
         mLastApplyedConfig = config;
     }
-    mAllNetworkConfigs.push_back(config);
+    // mAllNetworkConfigs.push_back(config);
 }
 
 void NetworkConfig::EndLoadConfig() {
@@ -143,11 +145,11 @@ void NetworkConfig::EndLoadConfig() {
         return;
     }
     ReportAlarm();
-    if (mLastApplyedConfigDetail != mLastApplyedConfig->mObserverConfig) {
-        LOG_INFO(
-            sLogger,
-            ("reload observer config, last", mLastApplyedConfigDetail)("new", mLastApplyedConfig->mObserverConfig));
-        mLastApplyedConfigDetail = mLastApplyedConfig->mObserverConfig;
+    const InputObserverNetwork* plugin
+        = static_cast<const InputObserverNetwork*>(mLastApplyedConfig->GetInputs()[0]->GetPlugin());
+    if (mLastApplyedConfigDetail != plugin->mDetail) {
+        LOG_INFO(sLogger, ("reload observer config, last", mLastApplyedConfigDetail)("new", plugin->mDetail));
+        mLastApplyedConfigDetail = plugin->mDetail;
         std::string parseResult = SetFromJsonString();
         if (parseResult.empty()) {
             LOG_INFO(sLogger, ("new loaded observer config", ToString()));
@@ -191,19 +193,13 @@ std::string NetworkConfig::SetFromJsonString() {
     }
 
     try {
-        if (!(jsonRoot.isMember("type") && jsonRoot["type"].asString() == "observer_ilogtail_network_v1")
-            || !(jsonRoot.isMember("detail") && jsonRoot["detail"].isObject())) {
-            return "invalid format, observer_ilogtail_network_v1 is not exist or error type";
-        }
-        Json::Value& obserValue = jsonRoot["detail"];
-
-        if (obserValue.isMember("EBPF") && obserValue["EBPF"].isObject()) {
-            Json::Value& ebpfValue = obserValue["EBPF"];
+        if (jsonRoot.isMember("EBPF") && jsonRoot["EBPF"].isObject()) {
+            Json::Value& ebpfValue = jsonRoot["EBPF"];
             OBSERVER_CONFIG_EXTRACT_BOOL(ebpfValue, Enabled, false, EBPF);
             OBSERVER_CONFIG_EXTRACT_INT(ebpfValue, Pid, -1, EBPF);
         }
-        if (obserValue.isMember("PCAP") && obserValue["PCAP"].isObject()) {
-            Json::Value& pcapValue = obserValue["PCAP"];
+        if (jsonRoot.isMember("PCAP") && jsonRoot["PCAP"].isObject()) {
+            Json::Value& pcapValue = jsonRoot["PCAP"];
             OBSERVER_CONFIG_EXTRACT_BOOL(pcapValue, Enabled, false, PCAP);
             OBSERVER_CONFIG_EXTRACT_BOOL(pcapValue, Promiscuous, true, PCAP);
             OBSERVER_CONFIG_EXTRACT_INT(pcapValue, TimeoutMs, 0, PCAP);
@@ -211,8 +207,8 @@ std::string NetworkConfig::SetFromJsonString() {
             OBSERVER_CONFIG_EXTRACT_STRING(pcapValue, Interface, "", PCAP);
         }
 
-        if (obserValue.isMember("Common") && obserValue["Common"].isObject()) {
-            Json::Value& commonValue = obserValue["Common"];
+        if (jsonRoot.isMember("Common") && jsonRoot["Common"].isObject()) {
+            Json::Value& commonValue = jsonRoot["Common"];
             OBSERVER_CONFIG_EXTRACT_INT(commonValue, FlushOutL4Interval, 60, );
             OBSERVER_CONFIG_EXTRACT_INT(commonValue, FlushOutL7Interval, 15, );
             OBSERVER_CONFIG_EXTRACT_INT(commonValue, FlushMetaInterval, 30, );

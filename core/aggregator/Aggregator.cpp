@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <processor/LogFilter.h>
 #include <monitor/LogFileProfiler.h>
 #include <common/Constants.h>
 #include <config_manager/ConfigManager.h>
@@ -21,13 +20,19 @@
 #include "Aggregator.h"
 #include "common/LogtailCommonFlags.h"
 #include "sender/Sender.h"
-#include "config/Config.h"
 #include <app_config/AppConfig.h>
 #include <numeric>
 #include <vector>
+#include "application/Application.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 using namespace std;
 using namespace sls_logs;
+
+DEFINE_FLAG_BOOL(default_secondary_storage, "default strategy whether enable secondary storage", false);
+DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 256KB)", 256 * 1024);
 
 DECLARE_FLAG_INT32(merge_log_count_limit);
 DECLARE_FLAG_INT32(same_topic_merge_send_count);
@@ -57,7 +62,7 @@ bool Aggregator::FlushReadyBuffer() {
             if (sender->IsFlush()
                 || (itr->second->IsReady()
                     && sender->GetSenderFeedBackInterface()->IsValidToPush(itr->second->mLogstoreKey))) {
-                if (itr->second->mMergeType == MERGE_BY_TOPIC)
+                if (itr->second->mMergeType == FlusherSLS::Batch::MergeType::TOPIC)
                     sendDataVec.push_back(itr->second);
                 else {
                     int64_t key = itr->second->mKey;
@@ -126,8 +131,9 @@ void Aggregator::AddPackIDForLogGroup(const std::string& packIDPrefix,
 bool Aggregator::Add(const std::string& projectName,
                      const std::string& sourceId,
                      sls_logs::LogGroup& logGroup,
-                     const Config* config,
-                     DATA_MERGE_TYPE mergeType,
+                     int64_t logGroupKey,
+                     const FlusherSLS* config,
+                     FlusherSLS::Batch::MergeType mergeType,
                      uint32_t logGroupSize,
                      const std::string& defaultRegion,
                      const std::string& filename,
@@ -147,52 +153,17 @@ bool Aggregator::Add(const std::string& projectName,
         return true;
     vector<int32_t> neededLogs;
     int32_t neededLogSize = logSize;
-    if (!BOOL_FLAG(enable_new_pipeline)) {
-        static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
-        if (!sEnvTags.empty()) {
-            for (size_t i = 0; i < sEnvTags.size(); ++i) {
-                sls_logs::LogTag* logTagPtr = logGroup.add_logtags();
-                logTagPtr->set_key(sEnvTags[i].key());
-                logTagPtr->set_value(sEnvTags[i].value());
-            }
-        }
-
-        if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
-            vector<sls_logs::LogTag>& sFileTags = ConfigManager::GetInstance()->GetFileTags();
-            if (!sFileTags.empty()) {
-                for (size_t i = 0; i < sFileTags.size(); ++i) {
-                    sls_logs::LogTag* logTagPtr = logGroup.add_logtags();
-                    logTagPtr->set_key(sFileTags[i].key());
-                    logTagPtr->set_value(sFileTags[i].value());
-                }
-            }
-        }
-        neededLogSize = FilterNoneUtf8Metric(logGroup, config, neededLogs, context);
-        if (neededLogSize == 0)
-            return true;
-        if (config != NULL && config->mSensitiveWordCastOptions.size() > (size_t)0) {
-            LogFilter::CastSensitiveWords(logGroup, config);
-        }
-    } else {
-        neededLogs.resize(logSize);
-        std::iota(std::begin(neededLogs), std::end(neededLogs), 0);
-    }
+    neededLogs.resize(logSize);
+    std::iota(std::begin(neededLogs), std::end(neededLogs), 0);
 
     static Sender* sender = Sender::Instance();
     const string& region = (config == NULL ? defaultRegion : config->mRegion);
     const string& aliuid = (config == NULL ? STRING_FLAG(logtail_profile_aliuid) : config->mAliuid);
-    const string& configName = (config == NULL ? "" : config->mConfigName);
+    const string& configName = ((config == NULL || !config->HasContext()) ? "" : config->GetContext().GetConfigName());
     const string& category = logGroup.category();
     const string& topic = logGroup.topic();
     const string& source = logGroup.has_source() ? logGroup.source() : LogFileProfiler::mIpAddr;
     string shardHashKey = CalPostRequestShardHashKey(source, topic, config);
-    // now shardHashKey is compute using machine level fields, so logGroupKey will not contain shardHashKey
-    int64_t logGroupKey
-        = HashString(projectName + "_" + category + "_" + topic + "_" + source + "_"
-                     + ((config != NULL && config->mLogType != STREAM_LOG && config->mLogType != PLUGIN_LOG)
-                            ? (config->mBasePath + config->mFilePattern)
-                            : "")
-                     + "_" + sourceId);
 
     // Replay checkpoint had already been merged, resend directly.
     if (context.mExactlyOnceCheckpoint && context.mExactlyOnceCheckpoint->IsComplete()) {
@@ -206,9 +177,9 @@ bool Aggregator::Add(const std::string& projectName,
     }
 
     LogstoreFeedBackKey feedBackKey
-        = config == NULL ? GenerateLogstoreFeedBackKey(projectName, category) : config->mLogstoreKey;
-    int64_t key, logstoreKey;
-    if (mergeType == MERGE_BY_LOGSTORE) {
+        = config == NULL ? GenerateLogstoreFeedBackKey(projectName, category) : config->GetLogstoreKey();
+    int64_t key, logstoreKey = 0;
+    if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE) {
         logstoreKey = HashString(projectName + "_" + category);
         key = logstoreKey;
     } else {
@@ -233,7 +204,7 @@ bool Aggregator::Add(const std::string& projectName,
     {
         PTScopedLock lock(mMergeLock);
         unordered_map<int64_t, PackageListMergeBuffer*>::iterator pIter;
-        if (mergeType == MERGE_BY_LOGSTORE) {
+        if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE) {
             pIter = mPackageListMergeMap.find(logstoreKey);
             if (pIter == mPackageListMergeMap.end()) {
                 PackageListMergeBuffer* tmpPtr = new PackageListMergeBuffer();
@@ -268,15 +239,15 @@ bool Aggregator::Add(const std::string& projectName,
                             mergeFinishedFlag = true;
                         }
 
-                        if (mergeType == MERGE_BY_LOGSTORE)
+                        if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE)
                             pIter->second->AddMergeItem(value);
                         else
                             sendDataVec.push_back(value);
                     }
 
-                    bool bufferOrNot = config == NULL ? BOOL_FLAG(default_secondary_storage) : config->mLocalStorage;
+                    bool bufferOrNot = config == NULL ? BOOL_FLAG(default_secondary_storage) : true;
                     int32_t batchSendInterval
-                        = config == NULL ? INT32_FLAG(batch_send_interval) : config->mAdvancedConfig.mBatchSendInterval;
+                        = config == NULL ? INT32_FLAG(batch_send_interval) : config->mBatch.mSendIntervalSecs;
                     if (context.mExactlyOnceCheckpoint) {
                         // The log group might be splitted to multiple merge items, so we must
                         //  copy range checkpoint in context.
@@ -316,7 +287,7 @@ bool Aggregator::Add(const std::string& projectName,
                     (value->mLogGroup).mutable_logs()->Reserve(INT32_FLAG(merge_log_count_limit));
                     (value->mLogGroup).set_category(category);
                     (value->mLogGroup).set_topic(topic);
-                    (value->mLogGroup).set_machineuuid(ConfigManager::GetInstance()->GetUUID());
+                    (value->mLogGroup).set_machineuuid(Application::GetInstance()->GetUUID());
                     (value->mLogGroup).set_source(logGroup.has_source() ? logGroup.source() : LogFileProfiler::mIpAddr);
 
                     for (int32_t logTagIdx = 0; logTagIdx < logGroup.logtags_size(); ++logTagIdx) {
@@ -362,14 +333,14 @@ bool Aggregator::Add(const std::string& projectName,
         for (int32_t logIdx = 0; logIdx < logSize; logIdx++)
             logGroup.mutable_logs()->ReleaseLast();
         if (value != NULL && (value->IsReady() || sender->IsFlush() || context.mExactlyOnceCheckpoint)) {
-            if (mergeType == MERGE_BY_LOGSTORE)
+            if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE)
                 (pIter->second)->AddMergeItem(value);
             else
                 sendDataVec.push_back(value);
 
             mMergeMap.erase(itr);
         }
-        if (mergeType == MERGE_BY_LOGSTORE) {
+        if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE) {
             if (pIter->second->IsReady(curTime) || sender->IsFlush()) {
 #ifdef LOGTAIL_DEBUG_FLAG
                 LOG_DEBUG(sLogger,
@@ -391,7 +362,8 @@ bool Aggregator::Add(const std::string& projectName,
         // this scenario will only happen in log time mess
         if (context.mExactlyOnceCheckpoint) {
             sender->SendCompressed(sendDataVec);
-        } else if (mergeType == MERGE_BY_TOPIC && sendDataVec.size() < (size_t)INT32_FLAG(same_topic_merge_send_count))
+        } else if (mergeType == FlusherSLS::Batch::MergeType::TOPIC
+                   && sendDataVec.size() < (size_t)INT32_FLAG(same_topic_merge_send_count))
             sender->SendCompressed(sendDataVec);
         else
             sender->SendLogPackageList(sendDataVec);
@@ -429,24 +401,26 @@ void Aggregator::MergeTruncateInfo(const sls_logs::LogGroup& logGroup, MergeItem
 }
 
 std::string
-Aggregator::CalPostRequestShardHashKey(const std::string& source, const std::string& topic, const Config* config) {
+Aggregator::CalPostRequestShardHashKey(const std::string& source, const std::string& topic, const FlusherSLS* config) {
     if (config == NULL)
         return "";
-    uint32_t keySize = config->mShardHashKey.size();
+    uint32_t keySize = config->mBatch.mShardHashKeys.size();
     if (keySize == 0)
         return "";
 
     string input;
     for (uint32_t idx = 0; idx < keySize; ++idx) {
-        const string& key = config->mShardHashKey[idx];
+        const string& key = config->mBatch.mShardHashKeys[idx];
         if (key == LOG_RESERVED_KEY_SOURCE)
             input.append(source);
         else if (key == LOG_RESERVED_KEY_TOPIC)
             input.append(topic);
+#ifdef __ENTERPRISE__
         else if (key == LOG_RESERVED_KEY_USER_DEFINED_ID)
-            input.append(ConfigManager::GetInstance()->GetUserDefinedIdSet());
+            input.append(EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
+#endif
         else if (key == LOG_RESERVED_KEY_MACHINE_UUID)
-            input.append(ConfigManager::GetInstance()->GetUUID());
+            input.append(Application::GetInstance()->GetUUID());
         else if (key == LOG_RESERVED_KEY_HOSTNAME)
             input.append(LogFileProfiler::mHostname);
 
@@ -492,32 +466,6 @@ int64_t Aggregator::GetAndIncLogPackSeq(int64_t key) {
         iter->second->IncPackSeq();
         return seq;
     }
-}
-
-int32_t Aggregator::FilterNoneUtf8Metric(sls_logs::LogGroup& logGroup,
-                                         const Config* config,
-                                         std::vector<int32_t>& neededLogs,
-                                         const LogGroupContext& context) {
-    static LogFilter* filterPtr = LogFilter::Instance();
-    if (config != NULL && config->mAdvancedConfig.mFilterExpressionRoot.get() != NULL) {
-        neededLogs = filterPtr->Filter(logGroup, config->mAdvancedConfig.mFilterExpressionRoot, context);
-    } else if (config != NULL && config->mFilterRule) {
-        neededLogs = filterPtr->Filter(logGroup, config->mFilterRule.get(), context);
-    } else {
-        neededLogs = filterPtr->Filter(context.mProjectName, context.mRegion, logGroup);
-    }
-    int32_t neededLogSize = (int32_t)neededLogs.size();
-    if (neededLogSize > 0 && config != NULL && (config->mLogType != STREAM_LOG && config->mLogType != PLUGIN_LOG)
-        && config->mDiscardNoneUtf8) {
-        for (int32_t i = 0; i < neededLogSize; ++i) {
-            const Log& log = logGroup.logs(neededLogs[i]);
-            for (int j = 0; j < log.contents_size(); ++j) {
-                FilterNoneUtf8(log.contents(j).key());
-                FilterNoneUtf8(log.contents(j).value());
-            }
-        }
-    }
-    return neededLogSize;
 }
 
 bool Aggregator::IsMergeMapEmpty() {

@@ -17,8 +17,10 @@ boot:
 ilogtail:
   config:
     - name: docker-event-case
-      content:
-        - '{"inputs":[{"type":"service_docker_event","detail":{"IntervalMs":1000}}]}'
+      detail:
+        - inputs:
+          - Type: service_docker_event
+            IntervalMs: 1000
   close_wait: 5s
 verify:
   log_rules:

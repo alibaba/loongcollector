@@ -23,10 +23,9 @@
 #include <vector>
 #include <leveldb/db.h>
 #include "log_pb/checkpoint.pb.h"
+#include "input/InputFile.h"
 
 namespace logtail {
-
-class Config;
 
 // CheckpointManagerV2 for exactly once feature
 //
@@ -73,7 +72,7 @@ public:
     // @return checkpoints.
     std::vector<std::pair<std::string, /* the key of primary checkpoint */
                           PrimaryCheckpointPB>>
-    ScanCheckpoints(const std::vector<Config*>& exactlyOnceConfigs);
+    ScanCheckpoints(const std::vector<std::string>& exactlyOnceConfigs);
 
     template <class PBType>
     bool GetPB(const std::string& key, PBType& value) {
@@ -157,7 +156,7 @@ private:
     // @limitScanTimeInMs: 0 means unlimited.
     //
     // @return used time in milliseconds.
-    int64_t scanCheckpoints(const std::vector<Config*>& exactlyOnceConfigs,
+    int64_t scanCheckpoints(const std::vector<std::string>& exactlyOnceConfigs,
                             std::vector<std::pair<std::string, PrimaryCheckpointPB>>* checkpoints,
                             std::vector<std::string>& shouldDeleteCptKeys,
                             uint64_t limitScanTimeInMs = 0);

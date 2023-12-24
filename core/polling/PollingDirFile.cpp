@@ -33,6 +33,7 @@
 #include "monitor/Monitor.h"
 #include "PollingModify.h"
 #include "PollingEventQueue.h"
+#include "file_server/FileServer.h"
 
 // Control the check frequency to call ClearUnavailableFileAndDir.
 DEFINE_FLAG_INT32(check_not_exist_file_dir_round, "clear not exist file dir cache, round", 20);
@@ -69,7 +70,6 @@ void PollingDirFile::Start() {
     ClearCache();
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
-    LOG_INFO(sLogger, ("PollingDirFile", "start"));
 }
 
 void PollingDirFile::Stop() {
@@ -85,19 +85,21 @@ void PollingDirFile::Stop() {
 }
 
 void PollingDirFile::HoldOn() {
+    LOG_INFO(sLogger, ("polling discovery pause", "starts"));
     mHoldOnFlag = true;
     mPollingThreadLock.lock();
-    LOG_INFO(sLogger, ("PollingDirFile", "hold on"));
+    LOG_INFO(sLogger, ("polling discovery pause", "succeeded"));
 }
 
 void PollingDirFile::Resume() {
+    LOG_INFO(sLogger, ("polling discovery resume", "starts"));
     mHoldOnFlag = false;
     mPollingThreadLock.unlock();
-    LOG_INFO(sLogger, ("PollingDirFile", "resume"));
+    LOG_INFO(sLogger, ("polling discovery resume", "succeeded"));
 }
 
 void PollingDirFile::CheckConfigPollingStatCount(const int32_t lastStatCount,
-                                                 const Config* config,
+                                                 const FileDiscoveryConfig& config,
                                                  bool isDockerConfig) {
     auto diffCount = mStatCount - lastStatCount;
     if (diffCount <= INT32_FLAG(polling_max_stat_count_per_config))
@@ -108,16 +110,19 @@ void PollingDirFile::CheckConfigPollingStatCount(const int32_t lastStatCount,
         msgBase += "docker ";
     msgBase += "config has exceeded limit";
 
-    LOG_WARNING(sLogger, (msgBase, diffCount)(config->mBasePath, mStatCount)(config->mProjectName, config->mCategory));
+    LOG_WARNING(sLogger,
+                (msgBase, diffCount)(config.first->GetBasePath(), mStatCount)(config.second->GetProjectName(),
+                                                                              config.second->GetLogstoreName()));
     LogtailAlarm::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
-                                           msgBase + ", current count: " + ToString(diffCount)
-                                               + " total count:" + ToString(mStatCount) + " path: " + config->mBasePath,
-                                           config->mProjectName,
-                                           config->mCategory,
-                                           config->mRegion);
+                                           msgBase + ", current count: " + ToString(diffCount) + " total count:"
+                                               + ToString(mStatCount) + " path: " + config.first->GetBasePath(),
+                                           config.second->GetProjectName(),
+                                           config.second->GetLogstoreName(),
+                                           config.second->GetRegion());
 }
 
 void PollingDirFile::Polling() {
+    LOG_INFO(sLogger, ("polling discovery", "started"));
     mHoldOnFlag = false;
     while (mRuningFlag) {
         LOG_DEBUG(sLogger, ("start dir file polling, mCurrentRound", mCurrentRound));
@@ -129,24 +134,22 @@ void PollingDirFile::Polling() {
 
             // Get a copy of config list from ConfigManager.
             // PollingDirFile has to be held on at first because raw pointers are used here.
-            vector<Config*> sortedConfigs;
-            vector<Config*> wildcardConfigs;
-            auto nameConfigMap = ConfigManager::GetInstance()->GetAllConfig();
+            vector<FileDiscoveryConfig> sortedConfigs;
+            vector<FileDiscoveryConfig> wildcardConfigs;
+            auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
             for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
-                if (itr->second->mLogType == STREAM_LOG || itr->second->mLogType == PLUGIN_LOG)
-                    continue;
-                if (itr->second->mWildcardPaths.size() == 0)
+                if (itr->second.first->GetWildcardPaths().empty())
                     sortedConfigs.push_back(itr->second);
                 else
                     wildcardConfigs.push_back(itr->second);
             }
-            sort(sortedConfigs.begin(), sortedConfigs.end(), Config::CompareByPathLength);
+            sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
 
-            LogtailMonitor::Instance()->UpdateMetric("config_count", nameConfigMap.size());
+            LogtailMonitor::GetInstance()->UpdateMetric("config_count", nameConfigMap.size());
             {
                 ScopedSpinLock lock(mCacheLock);
-                LogtailMonitor::Instance()->UpdateMetric("polling_dir_cache", mDirCacheMap.size());
-                LogtailMonitor::Instance()->UpdateMetric("polling_file_cache", mFileCacheMap.size());
+                LogtailMonitor::GetInstance()->UpdateMetric("polling_dir_cache", mDirCacheMap.size());
+                LogtailMonitor::GetInstance()->UpdateMetric("polling_file_cache", mFileCacheMap.size());
             }
 
             // Iterate all normal configs, make sure stat count will not exceed limit.
@@ -156,40 +159,41 @@ void PollingDirFile::Polling() {
                 if (!mRuningFlag || mHoldOnFlag)
                     break;
 
-                Config* config = *itr;
-                if (!config->mDockerFileFlag) {
+                const FileDiscoveryOptions* config = itr->first;
+                const PipelineContext* ctx = itr->second;
+                if (!config->IsContainerDiscoveryEnabled()) {
                     fsutil::PathStat baseDirStat;
-                    if (!fsutil::PathStat::stat(config->mBasePath, baseDirStat)) {
-                        LOG_DEBUG(
-                            sLogger,
-                            ("get base dir info error: ", config->mBasePath)(config->mProjectName, config->mCategory));
+                    if (!fsutil::PathStat::stat(config->GetBasePath(), baseDirStat)) {
+                        LOG_DEBUG(sLogger,
+                                  ("get base dir info error: ", config->GetBasePath())(ctx->GetProjectName(),
+                                                                                       ctx->GetLogstoreName()));
                         continue;
                     }
 
                     int32_t lastConfigStatCount = mStatCount;
-                    if (!PollingNormalConfigPath(config, config->mBasePath, string(), baseDirStat, 0)) {
+                    if (!PollingNormalConfigPath(*itr, config->GetBasePath(), string(), baseDirStat, 0)) {
                         LOG_DEBUG(sLogger,
-                                  ("logPath in config not exist", config->mBasePath)(config->mProjectName,
-                                                                                     config->mCategory));
+                                  ("logPath in config not exist", config->GetBasePath())(ctx->GetProjectName(),
+                                                                                         ctx->GetLogstoreName()));
                     }
-                    CheckConfigPollingStatCount(lastConfigStatCount, config, false);
+                    CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
                 } else {
-                    for (size_t i = 0; i < config->mDockerContainerPaths->size(); ++i) {
-                        const string& basePath = (*config->mDockerContainerPaths)[i].mContainerPath;
+                    for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
+                        const string& basePath = (*config->GetContainerInfo())[i].mContainerPath;
                         fsutil::PathStat baseDirStat;
                         if (!fsutil::PathStat::stat(basePath.c_str(), baseDirStat)) {
                             LOG_DEBUG(sLogger,
-                                      ("get docker base dir info error: ", basePath)(config->mProjectName,
-                                                                                     config->mCategory));
+                                      ("get docker base dir info error: ", basePath)(ctx->GetProjectName(),
+                                                                                     ctx->GetLogstoreName()));
                             continue;
                         }
                         int32_t lastConfigStatCount = mStatCount;
-                        if (!PollingNormalConfigPath(config, basePath, string(), baseDirStat, 0)) {
+                        if (!PollingNormalConfigPath(*itr, basePath, string(), baseDirStat, 0)) {
                             LOG_DEBUG(sLogger,
-                                      ("docker logPath in config not exist", basePath)(config->mProjectName,
-                                                                                       config->mCategory));
+                                      ("docker logPath in config not exist", basePath)(ctx->GetProjectName(),
+                                                                                       ctx->GetLogstoreName()));
                         }
-                        CheckConfigPollingStatCount(lastConfigStatCount, config, true);
+                        CheckConfigPollingStatCount(lastConfigStatCount, *itr, true);
                     }
                 }
             }
@@ -201,26 +205,27 @@ void PollingDirFile::Polling() {
                 if (!mRuningFlag || mHoldOnFlag)
                     break;
 
-                Config* config = *itr;
-                if (!config->mDockerFileFlag) {
+                const FileDiscoveryOptions* config = itr->first;
+                const PipelineContext* ctx = itr->second;
+                if (!config->IsContainerDiscoveryEnabled()) {
                     int32_t lastConfigStatCount = mStatCount;
-                    if (!PollingWildcardConfigPath(config, config->mWildcardPaths[0], 0)) {
+                    if (!PollingWildcardConfigPath(*itr, config->GetWildcardPaths()[0], 0)) {
                         LOG_DEBUG(sLogger,
                                   ("can not find matched path in config, Wildcard begin logPath",
-                                   config->mBasePath)(config->mProjectName, config->mCategory));
+                                   config->GetBasePath())(ctx->GetProjectName(), ctx->GetLogstoreName()));
                     }
-                    CheckConfigPollingStatCount(lastConfigStatCount, config, false);
+                    CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
                 } else {
-                    for (size_t i = 0; i < config->mDockerContainerPaths->size(); ++i) {
-                        const string& baseWildcardPath = (*config->mDockerContainerPaths)[i].mContainerPath;
+                    for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
+                        const string& baseWildcardPath = (*config->GetContainerInfo())[i].mContainerPath;
                         int32_t lastConfigStatCount = mStatCount;
-                        if (!PollingWildcardConfigPath(config, baseWildcardPath, 0)) {
+                        if (!PollingWildcardConfigPath(*itr, baseWildcardPath, 0)) {
                             LOG_DEBUG(sLogger,
                                       ("can not find matched path in config, "
                                        "Wildcard begin logPath ",
-                                       baseWildcardPath)(config->mProjectName, config->mCategory));
+                                       baseWildcardPath)(ctx->GetProjectName(), ctx->GetLogstoreName()));
                         }
-                        CheckConfigPollingStatCount(lastConfigStatCount, config, true);
+                        CheckConfigPollingStatCount(lastConfigStatCount, *itr, true);
                     }
                 }
             }
@@ -295,8 +300,9 @@ bool PollingDirFile::CheckAndUpdateFileMatchCache(const string& fileDir,
     FileCheckCacheMap::iterator iter = mFileCacheMap.find(filePath);
     int32_t curTime = time(NULL);
     if (iter == mFileCacheMap.end()) {
-        bool matchFlag
-            = needFindBestMatch ? ConfigManager::GetInstance()->FindBestMatch(fileDir, fileName) != NULL : true;
+        bool matchFlag = needFindBestMatch
+            ? ConfigManager::GetInstance()->FindBestMatch(fileDir, fileName).first != nullptr
+            : true;
 
         DirFileCache& fileCache = mFileCacheMap[filePath];
         fileCache.SetConfigMatched(matchFlag);
@@ -335,11 +341,14 @@ bool PollingDirFile::CheckAndUpdateFileMatchCache(const string& fileDir,
     return iter->second.HasMatchedConfig() && newFlag;
 }
 
-bool PollingDirFile::PollingNormalConfigPath(
-    const Config* pConfig, const string& srcPath, const string& obj, const fsutil::PathStat& statBuf, int depth) {
-    if (pConfig->mMaxDepth >= 0 && depth > pConfig->mMaxDepth)
+bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
+                                             const string& srcPath,
+                                             const string& obj,
+                                             const fsutil::PathStat& statBuf,
+                                             int depth) {
+    if (pConfig.first->mMaxDirSearchDepth >= 0 && depth > pConfig.first->mMaxDirSearchDepth)
         return false;
-    if (!pConfig->mIsPreserve && depth > pConfig->mPreserveDepth)
+    if (pConfig.first->mPreservedDirDepth >= 0 && depth > pConfig.first->mPreservedDirDepth)
         return false;
 
     string dirPath = obj.empty() ? srcPath : PathJoin(srcPath, obj);
@@ -365,8 +374,8 @@ bool PollingDirFile::PollingNormalConfigPath(
             LogtailAlarm::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
-                                                   pConfig->GetProjectName(),
-                                                   pConfig->GetCategory());
+                                                   pConfig.second->GetProjectName(),
+                                                   pConfig.second->GetLogstoreName());
             LOG_ERROR(sLogger, ("Open dir error", dirPath.c_str())("error", ErrnoToString(err)));
         }
         return true;
@@ -383,26 +392,26 @@ bool PollingDirFile::PollingNormalConfigPath(
 
         if (mStatCount > INT32_FLAG(polling_max_stat_count)) {
             LOG_WARNING(sLogger,
-                        ("total dir's polling stat count is exceeded",
-                         nowStatCount)(dirPath, mStatCount)(pConfig->mProjectName, pConfig->mCategory));
-            LogtailAlarm::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
-                                                   string("total dir's polling stat count is exceeded, now count:")
-                                                       + ToString(nowStatCount) + " total count:" + ToString(mStatCount)
-                                                       + " path: " + dirPath + " project:" + pConfig->mProjectName
-                                                       + " logstore:" + pConfig->mCategory);
+                        ("total dir's polling stat count is exceeded", nowStatCount)(dirPath, mStatCount)(
+                            pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
+            LogtailAlarm::GetInstance()->SendAlarm(
+                STAT_LIMIT_ALARM,
+                string("total dir's polling stat count is exceeded, now count:") + ToString(nowStatCount)
+                    + " total count:" + ToString(mStatCount) + " path: " + dirPath + " project:"
+                    + pConfig.second->GetProjectName() + " logstore:" + pConfig.second->GetLogstoreName());
             break;
         }
 
         if (++nowStatCount > INT32_FLAG(polling_max_stat_count_per_dir)) {
             LOG_WARNING(sLogger,
-                        ("this dir's polling stat count is exceeded",
-                         nowStatCount)(dirPath, mStatCount)(pConfig->mProjectName, pConfig->mCategory));
-            LogtailAlarm::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
-                                                   string("this dir's polling stat count is exceeded, now count:")
-                                                       + ToString(nowStatCount) + " total count:" + ToString(mStatCount)
-                                                       + " path: " + dirPath + " project:" + pConfig->mProjectName
-                                                       + " logstore:" + pConfig->mCategory,
-                                                   pConfig->mRegion);
+                        ("this dir's polling stat count is exceeded", nowStatCount)(dirPath, mStatCount)(
+                            pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
+            LogtailAlarm::GetInstance()->SendAlarm(
+                STAT_LIMIT_ALARM,
+                string("this dir's polling stat count is exceeded, now count:") + ToString(nowStatCount)
+                    + " total count:" + ToString(mStatCount) + " path: " + dirPath
+                    + " project:" + pConfig.second->GetProjectName() + " logstore:" + pConfig.second->GetLogstoreName(),
+                pConfig.second->GetRegion());
             break;
         }
 
@@ -417,7 +426,7 @@ bool PollingDirFile::PollingNormalConfigPath(
             // the directory according to cache.
             // TODO: Refactor directory cache, maintain all configs that match the directory.
             needCheckDirMatch = false;
-            if (!ConfigManager::GetInstance()->MatchDirPattern(pConfig, item)) {
+            if (pConfig.first->IsDirectoryInBlacklist(item)) {
                 continue;
             }
         } else if (ent.IsRegFile()) {
@@ -425,7 +434,7 @@ bool PollingDirFile::PollingNormalConfigPath(
             // and the match flag is false (no config matches it).
             // There is a cache in FindBestMatch, so the overhead is acceptable now.
             needFindBestMatch = false;
-            if (ConfigManager::GetInstance()->FindBestMatch(dirPath, entName) == NULL) {
+            if (!ConfigManager::GetInstance()->FindBestMatch(dirPath, entName).first) {
                 continue;
             }
         } else {
@@ -448,7 +457,7 @@ bool PollingDirFile::PollingNormalConfigPath(
         // If needCheckDirMatch or needFindBestMatch is true, that means the item is a symbolic link.
         // We should check file type again to make sure that the original file which linked by
         // a symbolic file is DIR or REG.
-        if (buf.IsDir() && (!needCheckDirMatch || ConfigManager::GetInstance()->MatchDirPattern(pConfig, item))) {
+        if (buf.IsDir() && (!needCheckDirMatch || !pConfig.first->IsDirectoryInBlacklist(item))) {
             PollingNormalConfigPath(pConfig, dirPath, entName, buf, depth + 1);
         } else if (buf.IsRegFile()) {
             if (CheckAndUpdateFileMatchCache(dirPath, entName, buf, needFindBestMatch)) {
@@ -468,13 +477,13 @@ bool PollingDirFile::PollingNormalConfigPath(
 // PollingWildcardConfigPath will iterate mWildcardPaths one by one, and according to
 // corresponding value in mConstWildcardPaths, call PollingNormalConfigPath or call
 // PollingWildcardConfigPath recursively.
-bool PollingDirFile::PollingWildcardConfigPath(const Config* pConfig, const string& dirPath, int depth) {
+bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfig, const string& dirPath, int depth) {
     if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(dirPath)) {
         LOG_INFO(sLogger, ("ignore path matching host path blacklist", dirPath));
         return false;
     }
-    auto const wildcardPathSize = static_cast<int>(pConfig->mWildcardPaths.size());
-    if (depth - wildcardPathSize > pConfig->mMaxDepth)
+    auto const wildcardPathSize = static_cast<int>(pConfig.first->GetWildcardPaths().size());
+    if (depth - wildcardPathSize > pConfig.first->mMaxDirSearchDepth)
         return false;
 
     bool finish = false;
@@ -484,23 +493,24 @@ bool PollingDirFile::PollingWildcardConfigPath(const Config* pConfig, const stri
         finish = true;
     else {
         // This should not happen.
-        LOG_ERROR(
-            sLogger,
-            ("PollingWildcardConfigPath error: ", dirPath.c_str())(pConfig->GetProjectName(), pConfig->GetCategory()));
+        LOG_ERROR(sLogger,
+                  ("PollingWildcardConfigPath error: ", dirPath.c_str())(pConfig.second->GetProjectName(),
+                                                                         pConfig.second->GetLogstoreName()));
         return false;
     }
 
     // if sub path is const, we do not need to scan whole dir
     // Current part is constant, check if it is existing directly.
-    if (!pConfig->mConstWildcardPaths[depth].empty()) {
+    if (!pConfig.first->GetConstWildcardPaths()[depth].empty()) {
         // Stat directly, stat failure means that the directory is not existing or we have no
         // permission to access it, just return true to stop polling.
-        string item = PathJoin(dirPath, pConfig->mConstWildcardPaths[depth]);
+        string item = PathJoin(dirPath, pConfig.first->GetConstWildcardPaths()[depth]);
         fsutil::PathStat baseDirStat;
         if (!fsutil::PathStat::stat(item, baseDirStat)) {
             LOG_DEBUG(sLogger,
-                      ("get wildcard dir info error: ", pConfig->mBasePath)("stat path", item)(
-                          pConfig->mProjectName, pConfig->mCategory)("error", ErrnoToString(GetErrno())));
+                      ("get wildcard dir info error: ", pConfig.first->GetBasePath())("stat path", item)(
+                          pConfig.second->GetProjectName(),
+                          pConfig.second->GetLogstoreName())("error", ErrnoToString(GetErrno())));
             return true;
         }
         if (!baseDirStat.IsDir())
@@ -529,8 +539,8 @@ bool PollingDirFile::PollingWildcardConfigPath(const Config* pConfig, const stri
             LogtailAlarm::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
-                                                   pConfig->GetProjectName(),
-                                                   pConfig->GetCategory());
+                                                   pConfig.second->GetProjectName(),
+                                                   pConfig.second->GetLogstoreName());
             LOG_WARNING(sLogger, ("Open dir fail", dirPath.c_str())("errno", err));
         }
         return true;
@@ -542,9 +552,9 @@ bool PollingDirFile::PollingWildcardConfigPath(const Config* pConfig, const stri
             break;
 
         if (dirCount >= INT32_FLAG(wildcard_max_sub_dir_count)) {
-            LOG_WARNING(
-                sLogger,
-                ("too many sub directoried for path", dirPath)("dirCount", dirCount)("basePath", pConfig->mBasePath));
+            LOG_WARNING(sLogger,
+                        ("too many sub directoried for path",
+                         dirPath)("dirCount", dirCount)("basePath", pConfig.first->GetBasePath()));
             break;
         }
 
@@ -553,12 +563,13 @@ bool PollingDirFile::PollingWildcardConfigPath(const Config* pConfig, const stri
 
         if (mStatCount > INT32_FLAG(polling_max_stat_count)) {
             LOG_WARNING(sLogger,
-                        ("total dir's polling stat count is exceeded", "")(dirPath, mStatCount)(pConfig->mProjectName,
-                                                                                                pConfig->mCategory));
+                        ("total dir's polling stat count is exceeded",
+                         "")(dirPath, mStatCount)(pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
             LogtailAlarm::GetInstance()->SendAlarm(
                 STAT_LIMIT_ALARM,
-                string("total dir's polling stat count is exceeded, total count:" + ToString(mStatCount) + " path: "
-                       + dirPath + " project:" + pConfig->mProjectName + " logstore:" + pConfig->mCategory));
+                string("total dir's polling stat count is exceeded, total count:" + ToString(mStatCount)
+                       + " path: " + dirPath + " project:" + pConfig.second->GetProjectName()
+                       + " logstore:" + pConfig.second->GetLogstoreName()));
             break;
         }
 
@@ -576,19 +587,20 @@ bool PollingDirFile::PollingWildcardConfigPath(const Config* pConfig, const stri
             size_t dirIndex = 0;
             if (!BOOL_FLAG(enable_root_path_collection)) {
                 // Handle special path /.
-                dirIndex = pConfig->mWildcardPaths[depth].size() + 1;
+                dirIndex = pConfig.first->GetWildcardPaths()[depth].size() + 1;
                 if (dirIndex == (size_t)2) {
                     dirIndex = 1;
                 }
             } else {
                 // A better logic, but only enabled when flag enable_root_path_collection
                 //   is set for backward compatibility.
-                dirIndex = pConfig->mWildcardPaths[depth].size();
-                if (PATH_SEPARATOR[0] == pConfig->mWildcardPaths[depth + 1][dirIndex]) {
+                dirIndex = pConfig.first->GetWildcardPaths()[depth].size();
+                if (PATH_SEPARATOR[0] == pConfig.first->GetWildcardPaths()[depth + 1][dirIndex]) {
                     ++dirIndex;
                 }
             }
-            if (fnmatch(&(pConfig->mWildcardPaths[depth + 1].at(dirIndex)), entName.c_str(), FNM_PATHNAME) == 0) {
+            if (fnmatch(&(pConfig.first->GetWildcardPaths()[depth + 1].at(dirIndex)), entName.c_str(), FNM_PATHNAME)
+                == 0) {
                 if (finish) {
                     hasMatchFlag = true;
                     PollingNormalConfigPath(pConfig, item, string(), buf, 0);

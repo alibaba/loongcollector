@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "CGroupPathResolver.h"
-#include "common/util.h"
 #include "common/FileSystemUtil.h"
 #include "logger/Logger.h"
 #include "common/ExceptionBase.h"

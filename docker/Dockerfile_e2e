@@ -1,0 +1,41 @@
+# Copyright 2023 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:gcc_9.3.1-2
+
+ARG HOST_OS=Linux
+ARG VERSION=1.8.1
+
+USER root
+WORKDIR /ilogtail
+
+COPY ./output/ilogtail /ilogtail/
+COPY ./scripts/download_ebpflib.sh /tmp/
+
+RUN chown -R $(whoami) /ilogtail && \
+    chmod 755 /ilogtail/ilogtail && \
+    mkdir /ilogtail/checkpoint && \
+    if [ `uname -m` = "x86_64" ]; then /tmp/download_ebpflib.sh /ilogtail; fi && \
+    rm /tmp/download_ebpflib.sh
+
+COPY ./output/libPluginBase.so /ilogtail/
+COPY ./example_config/quick_start/ilogtail_config.json /ilogtail/
+COPY ./output/libPluginAdapter.so /ilogtail/
+
+ENV HOST_OS=$HOST_OS
+ENV LOGTAIL_VERSION=$VERSION
+
+EXPOSE 18689
+
+ENTRYPOINT ["/ilogtail/ilogtail"]

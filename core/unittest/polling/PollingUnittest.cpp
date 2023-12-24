@@ -20,9 +20,7 @@
 #include "app_config/AppConfig.h"
 #include "reader/LogFileReader.h"
 #include "event_handler/EventHandler.h"
-#include "processor/LogFilter.h"
 #include "monitor/Monitor.h"
-#include "common/util.h"
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "event/Event.h"
@@ -65,19 +63,12 @@ using namespace sls_logs;
 DECLARE_FLAG_INT32(buffer_file_alive_interval);
 DECLARE_FLAG_STRING(profile_project_name);
 DECLARE_FLAG_BOOL(enable_mock_send);
-DECLARE_FLAG_INT32(max_holded_data_size);
-DECLARE_FLAG_INT32(ilogtail_discard_interval);
-DECLARE_FLAG_BOOL(ilogtail_discard_old_data);
 DECLARE_FLAG_INT32(merge_log_count_limit);
 DECLARE_FLAG_INT32(first_read_endure_bytes);
 DECLARE_FLAG_STRING(ilogtail_config);
 DECLARE_FLAG_STRING(user_log_config);
-DECLARE_FLAG_STRING(logtail_profile_snapshot);
-DECLARE_FLAG_INT32(buffer_check_period);
-DECLARE_FLAG_INT32(monitor_interval);
 DECLARE_FLAG_INT32(max_buffer_num);
 DECLARE_FLAG_INT32(sls_host_update_interval);
-DECLARE_FLAG_STRING(default_region_name);
 DECLARE_FLAG_INT32(max_client_send_error_count);
 DECLARE_FLAG_INT32(client_disable_send_retry_interval);
 

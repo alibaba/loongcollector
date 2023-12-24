@@ -32,15 +32,13 @@
 #include "common/RuntimeUtil.h"
 #include "common/HashUtil.h"
 #include "common/FileSystemUtil.h"
-#include "common/util.h"
+#include "common/EndpointUtil.h"
 #include "common/ErrorUtil.h"
 #include "common/RandomUtil.h"
 #include "common/SlidingWindowCounter.h"
 #include "sdk/Client.h"
 #include "sdk/Exception.h"
-#include "config/Config.h"
 #include "processor/daemon/LogProcess.h"
-#include "processor/LogFilter.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/LogIntegrity.h"
 #include "monitor/LogLineCount.h"
@@ -50,15 +48,15 @@
 #include "config_manager/ConfigManager.h"
 #include "common/LogFileCollectOffsetIndicator.h"
 #include "fuse/UlogfsHandler.h"
-
-#ifdef LOGTAIL_RUNTIME_PLUGIN
-#include "LogtailRuntimePlugin.h"
+#include "application/Application.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
 #endif
 
 using namespace std;
 using namespace sls_logs;
 
-DECLARE_FLAG_INT32(buffer_check_period);
+DEFINE_FLAG_INT32(buffer_check_period, "check logtail local storage buffer period", 60);
 DEFINE_FLAG_INT32(quota_exceed_wait_interval, "when daemon buffer thread get quotaExceed error, sleep 5 seconds", 5);
 DEFINE_FLAG_INT32(secondary_buffer_count_limit, "data ready for write buffer file", 20);
 DEFINE_FLAG_BOOL(enable_mock_send, "if enable mock send in ut", false);
@@ -100,7 +98,14 @@ DEFINE_FLAG_INT32(sending_cost_time_alarm_interval, "sending log group cost too 
 DEFINE_FLAG_INT32(log_group_wait_in_queue_alarm_interval,
                   "log group wait in queue alarm interval, may blocked by concurrency or quota, second",
                   3);
-DEFINE_FLAG_STRING(data_endpoint_policy, "policy for switching between data server endpoints, possible options include 'designated_first'(default) and 'designated_locked'", "designated_first");
+DEFINE_FLAG_STRING(data_endpoint_policy,
+                   "policy for switching between data server endpoints, possible options include "
+                   "'designated_first'(default) and 'designated_locked'",
+                   "designated_first");
+DEFINE_FLAG_INT32(log_expire_time, "log expire time", 24 * 3600);
+
+DECLARE_FLAG_STRING(default_access_key_id);
+DECLARE_FLAG_STRING(default_access_key);
 
 namespace logtail {
 const string Sender::BUFFER_FILE_NAME_PREFIX = "logtail_buffer_file_";
@@ -249,18 +254,22 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
             operation = DISCARD_WHEN_FAIL;
         } else {
             BOOL_FLAG(global_network_success) = true;
-            if (mDataPtr->mAliuid.empty() && ConfigManager::GetInstance()->GetRegionType() == REGION_CORP) {
+#ifdef __ENTERPRISE__
+            if (mDataPtr->mAliuid.empty() && !EnterpriseConfigProvider::GetInstance()->IsPubRegion()) {
                 operation = RETRY_ASYNC_WHEN_FAIL;
             } else {
+#endif
                 int32_t lastUpdateTime;
                 sdk::Client* sendClient = Sender::Instance()->GetSendClient(mDataPtr->mRegion, mDataPtr->mAliuid);
-                if (SLSControl::Instance()->SetSlsSendClientAuth(mDataPtr->mAliuid, false, sendClient, lastUpdateTime))
+                if (SLSControl::GetInstance()->SetSlsSendClientAuth(mDataPtr->mAliuid, false, sendClient, lastUpdateTime))
                     operation = RETRY_ASYNC_WHEN_FAIL;
                 else if (curTime - lastUpdateTime < INT32_FLAG(unauthorized_allowed_delay_after_reset))
                     operation = RETRY_ASYNC_WHEN_FAIL;
                 else
                     operation = DISCARD_WHEN_FAIL;
+#ifdef __ENTERPRISE__
             }
+#endif
         }
     } else if (sendResult == SEND_PARAMETER_INVALID) {
         Sender::Instance()->IncTotalSendStatistic(mDataPtr->mProjectName, mDataPtr->mLogstore, curTime);
@@ -470,8 +479,9 @@ SendClosure::RecompressData(sdk::Response* response, const string& errorCode, co
     return RETRY_ASYNC_WHEN_FAIL;
 }
 
-Sender::Sender() {
+Sender::Sender(): mDefaultRegion(STRING_FLAG(default_region_name)) {
     setupServerSwitchPolicy();
+    
     srand(time(NULL));
     mFlushLog = false;
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
@@ -481,7 +491,7 @@ Sender::Sender() {
                                          INT32_FLAG(sls_client_send_timeout),
                                          LogFileProfiler::mIpAddr,
                                          AppConfig::GetInstance()->GetBindInterface()));
-    SLSControl::Instance()->SetSlsSendClientCommonParam(mTestNetworkClient.get());
+    SLSControl::GetInstance()->SetSlsSendClientCommonParam(mTestNetworkClient.get());
 
     mUpdateRealIpClient.reset(new sdk::Client("",
                                           STRING_FLAG(default_access_key_id),
@@ -489,7 +499,7 @@ Sender::Sender() {
                                           INT32_FLAG(sls_client_send_timeout),
                                           LogFileProfiler::mIpAddr,
                                           AppConfig::GetInstance()->GetBindInterface()));
-    SLSControl::Instance()->SetSlsSendClientCommonParam(mUpdateRealIpClient.get());
+    SLSControl::GetInstance()->SetSlsSendClientCommonParam(mUpdateRealIpClient.get());
     SetSendingBufferCount(0);
     size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
     if (concurrencyCount < 10) {
@@ -652,7 +662,7 @@ bool Sender::LZ4CompressLogGroup(const sls_logs::LogGroup& logGroup, std::string
 }
 /////////////////////////////////////////////////////////////////////////////////////
 
-bool Sender::InitSender(void) {
+bool Sender::Init(void) {
     static Aggregator* aggregator = Aggregator::GetInstance();
     aggregator->CleanLogPackSeqMap();
 
@@ -785,10 +795,10 @@ sdk::Client* Sender::GetSendClient(const std::string& region, const std::string&
                                               INT32_FLAG(sls_client_send_timeout),
                                               LogFileProfiler::mIpAddr,
                                               AppConfig::GetInstance()->GetBindInterface());
-    SLSControl::Instance()->SetSlsSendClientCommonParam(sendClient);
+    SLSControl::GetInstance()->SetSlsSendClientCommonParam(sendClient);
     ResetPort(region, sendClient);
     LOG_INFO(sLogger, ("init endpoint for sender, region", region)("uid", aliuid)("endpoint", endpoint)("use https",ToString(sendClient->IsUsingHTTPS())));
-    SLSControl::Instance()->SetSlsSendClientAuth(aliuid, true, sendClient, lastUpdateTime);
+    SLSControl::GetInstance()->SetSlsSendClientAuth(aliuid, true, sendClient, lastUpdateTime);
     SlsClientInfo* clientInfo = new SlsClientInfo(sendClient, time(NULL));
     {
         PTScopedLock lock(mSendClientLock);
@@ -815,7 +825,9 @@ bool Sender::ResetSendClientEndpoint(const std::string aliuid, const std::string
     mSenderQueue.OnRegionRecover(region);
     sendClient->SetSlsHost(endpoint);
     ResetPort(region, sendClient);
-    LOG_INFO(sLogger, ("reset endpoint for sender, region", region)("uid", aliuid)("from", originalEndpoint)("to", endpoint)("use https",ToString(sendClient->IsUsingHTTPS())));
+    LOG_INFO(sLogger,
+             ("reset endpoint for sender, region", region)("uid", aliuid)("from", originalEndpoint)("to", endpoint)(
+                 "use https", ToString(sendClient->IsUsingHTTPS())));
     return true;
 }
 
@@ -1013,7 +1025,7 @@ bool Sender::ReadNextEncryption(int32_t& pos,
         }
     } else {
         bufferMeta.set_project(encodedInfo);
-        bufferMeta.set_endpoint(AppConfig::GetInstance()->GetDefaultRegion()); // new mode
+        bufferMeta.set_endpoint(GetDefaultRegion()); // new mode
         bufferMeta.set_aliuid("");
     }
     if (!bufferMeta.has_compresstype()) {
@@ -1410,7 +1422,7 @@ void Sender::DaemonSender() {
 
         sendBufferCount += logGroupToSend.size();
         if (curTime - lastUpdateMetricTime >= 40) {
-            static auto sMonitor = LogtailMonitor::Instance();
+            static auto sMonitor = LogtailMonitor::GetInstance();
 
             sMonitor->UpdateMetric("send_tps", 1.0 * sendBufferCount / (curTime - lastUpdateMetricTime));
             sMonitor->UpdateMetric("send_bytes_ps", 1.0 * sendBufferBytes / (curTime - lastUpdateMetricTime));
@@ -1482,11 +1494,13 @@ void Sender::DaemonSender() {
             }
 
             mLastSendDataTime = curTime;
-            if (BOOST_UNLIKELY(AppConfig::GetInstance()->IsDebugMode())) {
+#ifdef __ENTERPRISE__
+            if (BOOST_UNLIKELY(EnterpriseConfigProvider::GetInstance()->IsDebugMode())) {
                 DumpDebugFile(data);
                 OnSendDone(data, LogstoreSenderInfo::SendResult_OK);
                 DescSendingCount();
             } else {
+#endif
                 if (!IsFlush() && AppConfig::GetInstance()->IsSendFlowControl()) {
                     FlowControl(data->mRawSize, REALTIME_SEND_THREAD);
                 }
@@ -1518,7 +1532,9 @@ void Sender::DaemonSender() {
                 sendLines += data->mLogLines;
                 data->mLastUpdateTime = time(NULL); // set last update time before sending
                 SendToNetAsync(data);
+#ifdef __ENTERPRISE__
             }
+#endif
         }
         logGroupToSend.clear();
 
@@ -1697,19 +1713,25 @@ bool Sender::IsValidToSend(const LogstoreFeedBackKey& logstoreKey) {
     return mSenderQueue.IsValidToPush(logstoreKey);
 }
 
-bool Sender::SendPb(Config* pConfig,
+bool Sender::SendPb(const FlusherSLS* pConfig,
                     char* pbBuffer,
                     int32_t pbSize,
                     int32_t lines,
                     const std::string& logstore,
                     const std::string& shardHash) {
     // if logstore is specific, use this key, otherwise use pConfig->->mCategory
-    sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(pConfig->mCompressType);
-    LogGroupContext logGroupContext(pConfig->mRegion, pConfig->mProjectName, pConfig->mCategory, compressType);
-    LoggroupTimeValue* pData = new LoggroupTimeValue(pConfig->mProjectName,
-                                                     logstore.empty() ? pConfig->mCategory : logstore,
-                                                     pConfig->mConfigName,
-                                                     pConfig->mFilePattern,
+    string compressStr = "zstd";
+    if (pConfig->mCompressType == FlusherSLS::CompressType::NONE) {
+        compressStr = "none";
+    } else if (pConfig->mCompressType == FlusherSLS::CompressType::LZ4) {
+        compressStr = "lz4";
+    }
+    sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(compressStr);
+    LogGroupContext logGroupContext(pConfig->mRegion, pConfig->mProject, pConfig->mLogstore, compressType);
+    LoggroupTimeValue* pData = new LoggroupTimeValue(pConfig->mProject,
+                                                     logstore.empty() ? pConfig->mLogstore : logstore,
+                                                     pConfig->HasContext() ? pConfig->GetContext().GetConfigName() : "",
+                                                     "", // only used for ant, set empty for simplicity
                                                      true,
                                                      pConfig->mAliuid,
                                                      pConfig->mRegion,
@@ -1718,13 +1740,13 @@ bool Sender::SendPb(Config* pConfig,
                                                      pbSize,
                                                      time(NULL),
                                                      shardHash,
-                                                     pConfig->mLogstoreKey,
+                                                     pConfig->GetLogstoreKey(),
                                                      logGroupContext);
     // apsara::timing::TimeInNsec startT = apsara::timing::GetCurrentTimeInNanoSeconds();
     if (!CompressData(logGroupContext.mCompressType, pbBuffer, pbSize, pData->mLogData)) {
-        LOG_ERROR(sLogger,
-                  ("compress data fail", "discard data")("projectName", pConfig->mProjectName)("logstore",
-                                                                                               pConfig->mCategory));
+        LOG_ERROR(
+            sLogger,
+            ("compress data fail", "discard data")("projectName", pConfig->mProject)("logstore", pConfig->mLogstore));
         delete pData;
         return false;
     } else {
@@ -1782,9 +1804,6 @@ void Sender::AddEndpointEntry(const std::string& region, const std::string& endp
 }
 
 void Sender::TestNetwork() {
-#ifdef LOGTAIL_RUNTIME_PLUGIN
-    return;
-#endif
     // pair<int32_t, string> represents the weight of each endpoint
     map<string, vector<pair<int32_t, string>>> unavaliableEndpoints;
     set<string> unavaliableRegions;
@@ -1831,7 +1850,7 @@ void Sender::TestNetwork() {
         for (const auto& value : unavaliableEndpoints) {
             const string& region = value.first;
             bool endpointChanged = false;
-            set<string> uids = ConfigManager::GetInstance()->GetRegionAliuids(region);
+            vector<string> uids = GetRegionAliuids(region);
             for (const auto& item : value.second) {
                 const string& endpoint = item.second;
                 const int32_t priority = item.first;
@@ -1875,7 +1894,7 @@ void Sender::TestNetwork() {
 
 bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint) {
     // if region status not ok, skip test endpoint
-    if (!ConfigManager::GetInstance()->GetRegionStatus(region)) {
+    if (!GetRegionStatus(region)) {
         return false;
     }
     if (mTestNetworkClient == NULL)
@@ -1890,8 +1909,12 @@ bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint
     try {
         if (BOOL_FLAG(enable_mock_send) && MockTestEndpoint) {
             string logData;
-            MockTestEndpoint(
-                "logtail-test-network-project", "logtail-test-network-logstore", logData, LOGGROUP_COMPRESSED, 0, SLS_CMP_LZ4);
+            MockTestEndpoint("logtail-test-network-project",
+                             "logtail-test-network-logstore",
+                             logData,
+                             LOGGROUP_COMPRESSED,
+                             0,
+                             SLS_CMP_LZ4);
         } else
             status = mTestNetworkClient->TestNetwork();
     } catch (sdk::LOGException& ex) {
@@ -1913,7 +1936,7 @@ bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint
 bool Sender::IsProfileData(const string& region, const std::string& project, const std::string& logstore) {
     if ((logstore == "shennong_log_profile" || logstore == "logtail_alarm" || logstore == "logtail_status_profile"
          || logstore == "logtail_suicide_profile")
-        && (project == ConfigManager::GetInstance()->GetProfileProjectName(region) || region == ""))
+        && (project == ProfileSender::GetInstance()->GetProfileProjectName(region) || region == ""))
         return true;
     else
         return false;
@@ -1942,7 +1965,7 @@ Sender::SendBufferFileData(const LogtailBufferMeta& bufferMeta, const std::strin
                    "SEND_NETWORK_ERROR")("region", region)("aliuid", bufferMeta.aliuid())("endpoint", endpoint));
     } else if (sendRes == SEND_UNAUTHORIZED) {
         int32_t lastUpdateTime;
-        if (SLSControl::Instance()->SetSlsSendClientAuth(bufferMeta.aliuid(), false, sendClient, lastUpdateTime))
+        if (SLSControl::GetInstance()->SetSlsSendClientAuth(bufferMeta.aliuid(), false, sendClient, lastUpdateTime))
             sendRes = SendToNetSync(sendClient, bufferMeta, logData, errorCode);
     }
     return sendRes;
@@ -1967,16 +1990,6 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
                 else
                     LOG_ERROR(sLogger, ("MockSyncSend", "uninitialized"));
             } else if (bufferMeta.datatype() == LOGGROUP_COMPRESSED) {
-#ifdef LOGTAIL_RUNTIME_PLUGIN
-                LogtailRuntimePlugin::GetInstance()->LogtailSendPb(bufferMeta.project(),
-                                                                   bufferMeta.logstore(),
-                                                                   bufferMeta.compresstype(),
-                                                                   logData.c_str(),
-                                                                   logData.size(),
-                                                                   bufferMeta.rawsize(),
-                                                                   0);
-                return SEND_OK;
-#endif
                 if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
                     sendClient->PostLogStoreLogs(bufferMeta.project(),
                                                  bufferMeta.logstore(),
@@ -1991,9 +2004,6 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
                                                  logData,
                                                  bufferMeta.rawsize());
             } else {
-#ifdef LOGTAIL_RUNTIME_PLUGIN
-                return SEND_OK;
-#endif
                 if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
                     sendClient->PostLogStoreLogPackageList(bufferMeta.project(),
                                                            bufferMeta.logstore(),
@@ -2068,21 +2078,6 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
         DescSendingCount();
         return;
     }
-
-#ifdef LOGTAIL_RUNTIME_PLUGIN
-    if (dataPtr->mDataType != LOG_PACKAGE_LIST) {
-        LogtailRuntimePlugin::GetInstance()->LogtailSendPb(dataPtr->mProjectName,
-                                                           dataPtr->mLogstore,
-                                                           dataPtr->mLogData.c_str(),
-                                                           dataPtr->mLogData.size(),
-                                                           dataPtr->mRawSize,
-                                                           dataPtr->mLogLines);
-    }
-    SubSendingBufferCount();
-    OnSendDone(dataPtr, LogstoreSenderInfo::SendResult_OK);
-    DescSendingCount();
-    return;
-#endif
 
     static int32_t lastResetEndpointTime = 0;
     sdk::Client* sendClient = GetSendClient(dataPtr->mRegion, dataPtr->mAliuid);
@@ -2167,15 +2162,16 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
 bool Sender::Send(const std::string& projectName,
                   const std::string& sourceId,
                   LogGroup& logGroup,
-                  const Config* config,
-                  DATA_MERGE_TYPE mergeType,
+                  int64_t logGroupKey,
+                  const FlusherSLS* config,
+                  FlusherSLS::Batch::MergeType mergeType,
                   const uint32_t logGroupSize,
                   const string& defaultRegion,
                   const string& filename,
                   const LogGroupContext& context) {
     static Aggregator* aggregator = Aggregator::GetInstance();
     return aggregator->Add(
-        projectName, sourceId, logGroup, config, mergeType, logGroupSize, defaultRegion, filename, context);
+        projectName, sourceId, logGroup, logGroupKey, config, mergeType, logGroupSize, defaultRegion, filename, context);
 }
 
 bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
@@ -2250,7 +2246,7 @@ void Sender::SendCompressed(const std::string& projectName,
         sls_logs::LogGroup filteredLogGroup;
         filteredLogGroup.set_category(logGroup.category());
         filteredLogGroup.set_topic(logGroup.topic());
-        filteredLogGroup.set_machineuuid(ConfigManager::GetInstance()->GetUUID());
+        filteredLogGroup.set_machineuuid(Application::GetInstance()->GetUUID());
         filteredLogGroup.set_source(logGroup.has_source() ? logGroup.source() : LogFileProfiler::mIpAddr);
         filteredLogGroup.mutable_logtags()->Swap(logGroup.mutable_logtags());
 
@@ -2807,6 +2803,116 @@ void Sender::SetRealIp(const std::string& region, const std::string& ip) {
     }
     LOG_DEBUG(sLogger, ("set real ip, last", pInfo->mRealIp)("now", ip)("region", region));
     pInfo->SetRealIp(ip);
+}
+
+std::string Sender::GetAllProjects() {
+    string result;
+    ScopedSpinLock lock(mProjectRefCntMapLock);
+    for (auto iter = mProjectRefCntMap.cbegin(); iter != mProjectRefCntMap.cend(); ++iter) {
+        result.append(iter->first).append(" ");
+    }
+    return result;
+}
+
+void Sender::IncreaseProjectReferenceCnt(const std::string& project) {
+    ScopedSpinLock lock(mProjectRefCntMapLock);
+    ++mProjectRefCntMap[project];
+}
+
+void Sender::DecreaseProjectReferenceCnt(const std::string& project) {
+    ScopedSpinLock lock(mProjectRefCntMapLock);
+    auto iter = mProjectRefCntMap.find(project);
+    if (iter == mProjectRefCntMap.end()) {
+        // should not happen
+        return;
+    }
+    if (--iter->second == 0) {
+        mProjectRefCntMap.erase(iter);
+    }
+}
+
+bool Sender::IsRegionContainingConfig(const std::string& region) const {
+    ScopedSpinLock lock(mRegionRefCntMapLock);
+    return mRegionRefCntMap.find(region) != mRegionRefCntMap.end();
+}
+
+void Sender::IncreaseRegionReferenceCnt(const std::string& region) {
+    ScopedSpinLock lock(mRegionRefCntMapLock);
+    ++mRegionRefCntMap[region];
+}
+
+void Sender::DecreaseRegionReferenceCnt(const std::string& region) {
+    ScopedSpinLock lock(mRegionRefCntMapLock);
+    auto iter = mRegionRefCntMap.find(region);
+    if (iter == mRegionRefCntMap.end()) {
+        // should not happen
+        return;
+    }
+    if (--iter->second == 0) {
+        mRegionRefCntMap.erase(iter);
+    }
+}
+
+vector<string> Sender::GetRegionAliuids(const std::string& region) {
+    PTScopedLock lock(mRegionAliuidRefCntMapLock);
+    vector<string> aliuids;
+    for (const auto &item: mRegionAliuidRefCntMap[region]) {
+        aliuids.push_back(item.first);
+    }
+    return aliuids;
+}
+
+void Sender::IncreaseAliuidReferenceCntForRegion(const std::string& region, const std::string& aliuid) {
+    PTScopedLock lock(mRegionAliuidRefCntMapLock);
+    ++mRegionAliuidRefCntMap[region][aliuid];
+}
+
+void Sender::DecreaseAliuidReferenceCntForRegion(const std::string& region, const std::string& aliuid) {
+    PTScopedLock lock(mRegionAliuidRefCntMapLock);
+    auto outerIter = mRegionAliuidRefCntMap.find(region);
+    if (outerIter == mRegionAliuidRefCntMap.end()) {
+        // should not happen
+        return;
+    }
+    auto innerIter = outerIter->second.find(aliuid);
+    if (innerIter == outerIter->second.end()) {
+        // should not happen
+        return;
+    }
+    if (--innerIter->second == 0) {
+        outerIter->second.erase(innerIter);
+    }
+    if (outerIter->second.empty()) {
+        mRegionAliuidRefCntMap.erase(outerIter);
+    }
+}
+
+void Sender::UpdateRegionStatus(const string& region, bool status) {
+    LOG_DEBUG(sLogger, ("update region status, region", region)("is network in good condition", ToString(status)));
+    ScopedSpinLock lock(mRegionStatusLock);
+    mAllRegionStatus[region] = status;
+}
+
+bool Sender::GetRegionStatus(const string& region) {
+    ScopedSpinLock lock(mRegionStatusLock);
+
+    decltype(mAllRegionStatus.begin()) rst = mAllRegionStatus.find(region);
+    if (rst == mAllRegionStatus.end()) {
+        // if no region status, return true
+        return true;
+    } else {
+        return rst->second;
+    }
+}
+
+const string& Sender::GetDefaultRegion() const {
+    ScopedSpinLock lock(mDefaultRegionLock);
+    return mDefaultRegion;
+}
+
+void Sender::SetDefaultRegion(const string& region) {
+    ScopedSpinLock lock(mDefaultRegionLock);
+    mDefaultRegion = region;
 }
 
 } // namespace logtail

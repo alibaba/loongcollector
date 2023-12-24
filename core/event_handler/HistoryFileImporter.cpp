@@ -58,7 +58,6 @@ void HistoryFileImporter::LoadCheckPoint() {
 void HistoryFileImporter::ProcessEvent(const HistoryFileEvent& event, const std::vector<std::string>& fileNames) {
     static LogProcess* logProcess = LogProcess::GetInstance();
 
-    auto& config = event.mConfig;
     LOG_INFO(sLogger, ("begin load history files, count", fileNames.size())("file list", ToString(fileNames)));
     for (size_t i = 0; i < fileNames.size(); ++i) {
         auto startTime = GetCurrentTimeInMilliSeconds();
@@ -77,7 +76,14 @@ void HistoryFileImporter::ProcessEvent(const HistoryFileEvent& event, const std:
             continue;
         }
 
-        LogFileReaderPtr readerSharePtr(config->CreateLogFileReader(event.mDirName, fileName, devInode, true));
+        LogFileReaderPtr readerSharePtr(LogFileReader::CreateLogFileReader(event.mDirName,
+                                                                           fileName,
+                                                                           devInode,
+                                                                           event.mReaderConfig,
+                                                                           event.mMultilineConfig,
+                                                                           event.mDiscoveryconfig,
+                                                                           event.mEOConcurrency,
+                                                                           true));
         if (readerSharePtr == NULL) {
             LOG_WARNING(sLogger,
                         ("[progress]", std::string("[") + ToString(i + 1) + "/" + ToString(fileNames.size()) + "]")(

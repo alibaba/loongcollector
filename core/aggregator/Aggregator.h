@@ -22,14 +22,11 @@
 #include "common/Lock.h"
 #include "common/LogGroupContext.h"
 #include "common/Flags.h"
+#include "flusher/FlusherSLS.h"
 
 DECLARE_FLAG_INT32(batch_send_interval);
 
 namespace logtail {
-
-class Config;
-
-enum DATA_MERGE_TYPE { MERGE_BY_TOPIC, MERGE_BY_LOGSTORE };
 
 struct MergeItem {
     int32_t mLastUpdateTime;
@@ -44,7 +41,7 @@ struct MergeItem {
     std::string mAliuid;
     std::string mRegion;
     int64_t mKey; // for batchmap
-    DATA_MERGE_TYPE mMergeType;
+    FlusherSLS::Batch::MergeType mMergeType;
     LogstoreFeedBackKey mLogstoreKey;
     int32_t mLogTimeInMinute;
     int32_t mBatchSendInterval;
@@ -59,7 +56,7 @@ struct MergeItem {
               const std::string& aliuid,
               const std::string& region,
               int64_t key,
-              DATA_MERGE_TYPE mergeType,
+              FlusherSLS::Batch::MergeType mergeType,
               const std::string& shardHashKey,
               const LogstoreFeedBackKey& logstoreKey,
               int32_t batchSendInterval = INT32_FLAG(batch_send_interval),
@@ -123,13 +120,15 @@ public:
     bool FlushReadyBuffer();
     bool IsMergeMapEmpty();
 
-    std::string CalPostRequestShardHashKey(const std::string& source, const std::string& topic, const Config* config);
+    std::string
+    CalPostRequestShardHashKey(const std::string& source, const std::string& topic, const FlusherSLS* config);
 
     bool Add(const std::string& projectName,
              const std::string& sourceId,
              sls_logs::LogGroup& logGroup,
-             const Config* config,
-             DATA_MERGE_TYPE mergeType,
+             int64_t logGroupKey,
+             const FlusherSLS* config,
+             FlusherSLS::Batch::MergeType mergeType,
              uint32_t logGroupSize,
              const std::string& defaultRegion = "",
              const std::string& filename = "",
@@ -158,11 +157,6 @@ private:
     void MergeTruncateInfo(const sls_logs::LogGroup& logGroup, MergeItem* mergeItem);
 
     int64_t GetAndIncLogPackSeq(int64_t key);
-
-    int32_t FilterNoneUtf8Metric(sls_logs::LogGroup& logGroup,
-                                 const Config* config,
-                                 std::vector<int32_t>& neededLogs,
-                                 const LogGroupContext& context);
 
     void AddPackIDForLogGroup(const std::string& packIDPrefix, int64_t logGroupKey, sls_logs::LogGroup& logGroup);
 

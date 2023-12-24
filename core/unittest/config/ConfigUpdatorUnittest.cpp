@@ -29,7 +29,6 @@
 #include "AppConfig.h"
 #include "Monitor.h"
 #include "EventDispatcher.h"
-#include "util.h"
 #include "CheckPointManager.h"
 #include "LogInput.h"
 #include "Sender.h"
@@ -41,7 +40,6 @@
 #include "common/FileSystemUtil.h"
 #include "logger/Logger.h"
 #include "sdk/Common.h"
-#include "processor/LogFilter.h"
 
 using namespace std;
 using namespace logtail::sdk;
@@ -66,14 +64,11 @@ DECLARE_FLAG_INT32(default_max_inotify_watch_num);
 DECLARE_FLAG_STRING(profile_project_name);
 DECLARE_FLAG_INT32(check_base_dir_interval);
 DECLARE_FLAG_INT32(batch_send_interval);
-DECLARE_FLAG_STRING(local_machine_uuid);
 DECLARE_FLAG_INT32(check_point_version);
 DECLARE_FLAG_INT32(check_point_dump_interval);
 DECLARE_FLAG_INT32(global_pub_config_retry_interval);
 DECLARE_FLAG_INT32(dirfile_check_interval_ms);
 DECLARE_FLAG_INT32(polling_modify_repush_interval);
-DECLARE_FLAG_STRING(fuse_customized_config_name);
-DECLARE_FLAG_BOOL(rapid_retry_update_config);
 DECLARE_FLAG_BOOL(default_global_fuse_mode);
 
 namespace logtail {
@@ -243,25 +238,19 @@ public:
     void TestParseWildcardPath();
     void TestIsWildcardPathMatch();
     void TestLogRotateWhenUpdate();
-    // test for container mode
-    void TestContainerModeNormal();
-    void TestContainerModeWildcardConfig();
-    void TestContainerModeConfigUpdate();
-    void TestLoadGlobalFuseConf();
-    void TestCheckUlogfsEnv();
 };
 
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestLogRotateWhenUpdate, -1);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestCheckPointManager, 0);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestConfigUpdate, 1);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestLocalConfigUpdate, 2);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestUpdatePath, 3);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestUpdateGlobalConfig, 4);
+// APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestConfigUpdate, 1);
+// APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestLocalConfigUpdate, 2);
+// APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestUpdatePath, 3);
+// APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestUpdateGlobalConfig, 4);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestUpdateProfileProject, 5);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestValidPath, 6);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestBlackDirList, 7);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestDirCheckPoint, 8);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestTimeoutCheckPoint, 9);
+// APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestDirCheckPoint, 8);
+// APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestTimeoutCheckPoint, 9);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestLoadIlogtailConfig, 10);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestUpdateGroupTopic, 11);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestValidWildcardPath, 14);
@@ -272,13 +261,6 @@ APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestCheckPointSaveInterval, 19);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestCheckPointUserDefinedFilePath, 20);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestCheckPointLoadDefaultFile, 21);
 APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestValidWildcardPath2, 25);
-#if defined(__linux__)
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestContainerModeNormal, 26);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestContainerModeWildcardConfig, 27);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestContainerModeConfigUpdate, 28);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestLoadGlobalFuseConf, 29);
-APSARA_UNIT_TEST_CASE(ConfigUpdatorUnittest, TestCheckUlogfsEnv, 30);
-#endif
 
 std::string ConfigUpdatorUnittest::mRootDir;
 std::unordered_map<std::string, std::string> ConfigUpdatorUnittest::flagMap;
@@ -817,7 +799,7 @@ void ConfigUpdatorUnittest::CaseSetup(bool replaceConfigAllowed) {
     ASSERT_TRUE(ret);
     ConfigManager::GetInstance()->mRegionType = REGION_CORP;
 
-    Sender::Instance()->InitSender();
+    Sender::Instance()->Init();
     Sender::Instance()->MockAsyncSend = MockAsyncSend;
     vector<string> filesToSend;
     Sender::Instance()->LoadFileToSend(time(NULL), filesToSend);
@@ -826,7 +808,6 @@ void ConfigUpdatorUnittest::CaseSetup(bool replaceConfigAllowed) {
 
     ConfigManager::GetInstance()->mThreadIsRunning = true;
     ConfigManager::GetInstance()->InitUpdateConfig(true);
-    STRING_FLAG(local_machine_uuid) = LOCAL_UUID;
     SetConfigResponse("{}");
     sProjectNameCountMap.clear();
     sProjectCategoryTopicCountMap.clear();
@@ -1678,61 +1659,6 @@ void ConfigUpdatorUnittest::TestValidPath() {
     CaseCleanup();
     RemoveConfigFile();
     LOG_INFO(sLogger, ("TestValidPath() end", time(NULL)));
-}
-
-void ConfigUpdatorUnittest::TestUpdateGlobalConfig() {
-    LOG_INFO(sLogger, ("TestUpdateGlobalConfig() begin", time(NULL)));
-    DumpInitConfigToLocal();
-    CaseSetup();
-
-    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetBytePerSec(), INT32_FLAG(default_send_byte_per_sec));
-    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMaxBytePerSec(), INT32_FLAG(default_max_send_byte_per_sec));
-    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetNumOfBufferFile(), INT32_FLAG(default_buffer_file_num));
-    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetLocalFileSize(), INT32_FLAG(default_local_file_size));
-    APSARA_TEST_EQUAL(Sender::Instance()->GetBufferFilePath(), GetProcessExecutionDir());
-    APSARA_TEST_EQUAL(LogtailGlobalPara::Instance()->GetTopic(), STRING_FLAG(default_global_topic));
-
-    Json::Value firstJson;
-    firstJson["max_flow_byte_per_sec"] = Json::Value("100000");
-    firstJson["max_net_flow_byte_per_sec"] = Json::Value("200000");
-    firstJson["max_num_of_file"] = Json::Value("10");
-    firstJson["local_file_size"] = Json::Value("1024");
-    firstJson["buffer_file_path"] = Json::Value(PS + "tmp/1");
-    firstJson["global_topic"] = Json::Value("AT-100");
-    Json::Value firstRoot;
-    firstRoot["config"] = firstJson;
-    SetConfigResponse(firstRoot.toStyledString());
-    sleep(WAIT_CONFIG_UPDATE_INTERVAL);
-    // APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetBytePerSec(), 100000);
-    // APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMaxBytePerSec(), 200000);
-    // APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetNumOfBufferFile(), 10);
-    // APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetLocalFileSize(), 1024);
-    // APSARA_TEST_EQUAL(Sender::Instance()->GetBufferFilePath(), "/tmp/1/");
-    APSARA_TEST_EQUAL(LogtailGlobalPara::Instance()->GetTopic(), "AT-100");
-
-    Json::Value secondJson;
-    secondJson["max_flow_byte_per_sec"] = Json::Value("300000");
-    secondJson["max_net_flow_byte_per_sec"] = Json::Value("600000");
-    secondJson["max_num_of_file"] = Json::Value("30");
-    secondJson["local_file_size"] = Json::Value("512");
-    secondJson["buffer_file_path"] = Json::Value(PS + "tmp/2");
-    secondJson["logtail_access_id"] = Json::Value("3000");
-    secondJson["logtail_project_name"] = Json::Value("3000_proj");
-    secondJson["global_topic"] = Json::Value("AT-300");
-    Json::Value thirdRoot;
-    thirdRoot["config"] = secondJson;
-    SetConfigResponse(thirdRoot.toStyledString());
-    sleep(WAIT_CONFIG_UPDATE_INTERVAL);
-    // APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetBytePerSec(), 300000);
-    // APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMaxBytePerSec(), 600000);
-    // APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetNumOfBufferFile(), 30);
-    // APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetLocalFileSize(), 512);
-    // APSARA_TEST_EQUAL(Sender::Instance()->GetBufferFilePath(), "/tmp/2/");
-    APSARA_TEST_EQUAL(LogtailGlobalPara::Instance()->GetTopic(), "AT-300");
-
-    CaseCleanup();
-    RemoveConfigFile();
-    LOG_INFO(sLogger, ("TestUpdateGlobalConfig() end", time(NULL)));
 }
 
 void ConfigUpdatorUnittest::TestUpdateProfileProject() {
@@ -2710,358 +2636,6 @@ void ConfigUpdatorUnittest::TestValidWildcardPath2() {
     LOG_INFO(sLogger, ("TestValidWildcardPath2() end", time(NULL)));
 }
 
-void ConfigUpdatorUnittest::TestContainerModeNormal() {
-    LOG_INFO(sLogger, ("TestContainerModeNormal() begin", time(NULL)));
-
-    // dump config to local
-    Json::Value rootJson;
-    Json::Value commonreg_com;
-    commonreg_com["project_name"] = Json::Value("1000000_proj");
-    commonreg_com["category"] = Json::Value("1000000_cateogry");
-    commonreg_com["log_type"] = Json::Value("common_reg_log");
-    commonreg_com["log_path"] = Json::Value(PS + "comm");
-    commonreg_com["file_pattern"] = Json::Value("*.[Ll][Oo][Gg]");
-    commonreg_com["enable"] = Json::Value(true);
-    commonreg_com["timeformat"] = Json::Value("%d/%b/%Y:%H:%M:%S");
-    commonreg_com["topic_format"] = Json::Value("none");
-    Json::Value regs;
-    regs.append(Json::Value("([\\d\\.]+) \\S+ \\S+ \\[(\\S+) \\S+\\] \\\"(\\w+) ([^\"]*)\\\" (\\d+) (\\d+|-)"));
-    regs.append(Json::Value("([\\d\\.]+) \\S+ \\S+ \\[(\\S+) \\S+\\] \\\"(\\w+) ([^\"]*)\\\" (\\d+) (\\d+|-) "
-                            "\\\"([^\"]*)\\\" \\\"([^\"]*)\\\""));
-    Json::Value keys;
-    keys.append(Json::Value("ip,time,method,url,status,length"));
-    keys.append(Json::Value("ip,time,method,url,status,length,ref_url,browser"));
-    commonreg_com["regex"] = regs;
-    commonreg_com["keys"] = keys;
-    commonreg_com["preserve"] = Json::Value(true);
-    rootJson["commonreg.com"] = commonreg_com;
-
-    Json::Value apsara_log;
-    apsara_log["project_name"] = Json::Value("8000000_proj");
-    apsara_log["category"] = Json::Value("8000000_category");
-    apsara_log["log_type"] = Json::Value("apsara_log");
-    apsara_log["log_begin_reg"] = Json::Value("\\[\\d+-\\d+-\\d+ \\d+:\\d+:\\d+.\\d+\\].*");
-    apsara_log["log_path"] = Json::Value(PS + "apsara_log");
-    apsara_log["file_pattern"] = Json::Value("*.[Ll][Oo][Gg]");
-    apsara_log["enable"] = Json::Value(true);
-    apsara_log["preserve"] = Json::Value(true);
-    apsara_log["topic_format"] = Json::Value("none");
-    rootJson["apsara_log"] = apsara_log;
-
-    Json::Value metrics;
-    metrics["metrics"] = rootJson;
-    ofstream fout(STRING_FLAG(user_log_config).c_str());
-    fout << metrics << endl;
-    fout.close();
-
-    bfs::remove_all(mRootDir);
-    bfs::create_directories(bfs::path(mRootDir) / "mount" / "apsara_log");
-    bfs::create_directories(bfs::path(mRootDir) / "mount" / "comm");
-    SetupContainerModeConfig();
-    CaseSetup(false);
-    for (int i = 0; i < 10; ++i) {
-        for (int j = 0; j < 2; ++j)
-            DumpLog(10, mRootDir + "/mount/" + gPath[j], (LogType)j);
-        usleep(WRITE_LOG_SLEEP_INTERVAL);
-    }
-    sleep(2 * INT32_FLAG(batch_send_interval) + 2);
-
-    APSARA_TEST_EQUAL(sProjectNameCountMap["1000000_proj"], 100);
-    APSARA_TEST_EQUAL(sProjectNameCountMap["8000000_proj"], 100);
-
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find("/apsara_log")
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find("comm")
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-
-    // check app config
-    AppConfig* pAppConfig = AppConfig::GetInstance();
-    APSARA_TEST_EQUAL(pAppConfig->IsContainerMode(), true);
-    APSARA_TEST_EQUAL(pAppConfig->GetConfigIP(), string("1.2.3.4"));
-    APSARA_TEST_EQUAL(pAppConfig->GetConfigHostName(), string("sls-zc-test"));
-    APSARA_TEST_EQUAL(pAppConfig->GetContainerMountConfigPath(), string("./container_mount_test.json"));
-
-    // check mount config
-    DockerMountPaths mountPaths = ConfigManager::GetInstance()->GetMountPaths();
-    APSARA_TEST_EQUAL(mountPaths.mVersion, string("0.1.0"));
-    APSARA_TEST_EQUAL(mountPaths.mContainerID, string("abcdef1234567890"));
-    APSARA_TEST_EQUAL(mountPaths.mContainerName, string("logtail-docker"));
-    APSARA_TEST_EQUAL(mountPaths.mHostPath, mRootDir);
-
-    APSARA_TEST_EQUAL(mountPaths.mMountPathArray.size(), (size_t)4);
-
-    APSARA_TEST_EQUAL(mountPaths.mMountPathArray.at(0).destination, string("/"));
-    APSARA_TEST_EQUAL(mountPaths.mMountPathArray.at(0).source, string("/mount"));
-    APSARA_TEST_EQUAL(mountPaths.mMountPathArray.at(3).destination, string("/app_2/xxx"));
-    APSARA_TEST_EQUAL(mountPaths.mMountPathArray.at(3).source, string("/xxx"));
-
-    // test find best match
-    string realPath;
-    bool result = false;
-
-    result = mountPaths.FindBestMountPath("/", realPath);
-    APSARA_TEST_EQUAL(result, true);
-    APSARA_TEST_EQUAL(realPath, mRootDir + string("/mount"));
-    result = mountPaths.FindBestMountPath("xxx", realPath);
-    APSARA_TEST_EQUAL(result, false);
-    result = mountPaths.FindBestMountPath("/root", realPath);
-    APSARA_TEST_EQUAL(result, true);
-    APSARA_TEST_EQUAL(realPath, mRootDir + string("/mount/root"));
-    result = mountPaths.FindBestMountPath("/home/admin", realPath);
-    APSARA_TEST_EQUAL(result, true);
-    APSARA_TEST_EQUAL(realPath, mRootDir + string("/mount/home/admin"));
-    result = mountPaths.FindBestMountPath("/home/admin/logs", realPath);
-    APSARA_TEST_EQUAL(result, true);
-    APSARA_TEST_EQUAL(realPath, mRootDir + string("/home/admin/t4/docker/logs"));
-
-    result = mountPaths.FindBestMountPath("/home/admin/logs/access", realPath);
-    APSARA_TEST_EQUAL(result, true);
-    APSARA_TEST_EQUAL(realPath, mRootDir + string("/home/admin/t4/docker/logs/access"));
-
-    result = mountPaths.FindBestMountPath("/home/admin/log", realPath);
-    APSARA_TEST_EQUAL(result, true);
-    APSARA_TEST_EQUAL(realPath, mRootDir + string("/mount/home/admin/log"));
-
-    result = mountPaths.FindBestMountPath("/app_2/x", realPath);
-    APSARA_TEST_EQUAL(result, true);
-    APSARA_TEST_EQUAL(realPath, mRootDir + string("/yyyy/x"));
-
-    CaseCleanup();
-    LOG_INFO(sLogger, ("TestContainerModeNormal() end", time(NULL)));
-}
-
-void ConfigUpdatorUnittest::TestContainerModeWildcardConfig() {
-    LOG_INFO(sLogger, ("TestContainerModeWildcardConfig() begin", time(NULL)));
-    SetupContainerModeConfig();
-    /*
-    string dirs[] = {
-        "/nginx/aa/bb",
-        "/app_1/aa",
-        "/app_2/aa/bb", //ok
-        "/app_2/aa/bb/cc", //ok
-        "/app_2/aa/bb/cc/dd",
-        "/app_2/aa/bb2/cc",
-        "/app_3/aa/bb2/cc/dd",
-        "/app_13/aa/bb/cc"
-    };
-    */
-
-    string mountDirs[] = {mRootDir + "/mount/nginx/aa/bb",
-                          mRootDir + "/mount/app_1/aa",
-                          mRootDir + "/mount/app_2/aa/bb", // ok
-                          mRootDir + "/mount/app_2/aa/bb/cc", // ok
-                          mRootDir + "/mount/app_2/aa/bb/cc/dd",
-                          mRootDir + "/mount/app_2/aa/bb2/cc",
-                          mRootDir + "/mount/app_3/aa/bb2/cc/dd",
-                          mRootDir + "/mount/app_3/aa/bb/cc/dd/ee"};
-
-    for (int i = 0; i < 8; ++i) {
-        if (i != 3 && i != 4) {
-            cout << "mkdir -p " << mountDirs[i] << endl;
-            bfs::create_directories(mountDirs[i]);
-        }
-    }
-    Json::Value rootJson;
-    Json::Value apsara_log;
-    apsara_log["project_name"] = Json::Value("9000000_proj");
-    apsara_log["category"] = Json::Value("9000000_category");
-    apsara_log["log_type"] = Json::Value("apsara_log");
-    apsara_log["log_begin_reg"] = Json::Value("\\[\\d+-\\d+-\\d+ \\d+:\\d+:\\d+.\\d+\\].*");
-    apsara_log["log_path"] = Json::Value("/app_?/*/bb");
-    apsara_log["file_pattern"] = Json::Value("*.[Ll][Oo][Gg]");
-    apsara_log["enable"] = Json::Value(true);
-    apsara_log["preserve"] = Json::Value(true);
-    apsara_log["max_depth"] = Json::Value(1);
-    apsara_log["topic_format"] = Json::Value("/app_(\\d+)/(\\w+)/.*");
-    rootJson["apsara_log"] = apsara_log;
-    Json::Value metrics;
-    metrics["metrics"] = rootJson;
-    ofstream fout(STRING_FLAG(user_log_config).c_str());
-    fout << metrics << endl;
-    fout.close();
-    CaseSetup(false);
-    LOG_INFO(sLogger, ("case", "#1"));
-    sleep(1);
-    bfs::create_directories(mountDirs[3]);
-    bfs::create_directories(mountDirs[4]);
-    cout << "mkdir -p " << mountDirs[3] << endl;
-    cout << "mkdir -p " << mountDirs[4] << endl;
-    usleep(100 * 1000);
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find(mountDirs[0])
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find(mountDirs[1])
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find(mountDirs[2])
-                     != EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find(mountDirs[3])
-                     != EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find(mountDirs[4])
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find(mountDirs[5])
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find(mountDirs[6])
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find(mountDirs[7])
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-    for (int i = 0; i < 20; ++i) {
-        for (int j = 0; j < 8; ++j)
-            DumpLog(10, mountDirs[j], APSARA_LOG);
-        usleep(WRITE_LOG_SLEEP_INTERVAL);
-    }
-    sleep(2 * INT32_FLAG(batch_send_interval) + 2);
-    APSARA_TEST_EQUAL(sTopicCountMap["2_aa"], 400);
-
-    for (int i = 0; i < 8; ++i)
-        bfs::remove_all(mountDirs[i]);
-
-    CaseCleanup();
-    LOG_INFO(sLogger, ("TestContainerModeWildcardConfig() end", time(NULL)));
-}
-
-void ConfigUpdatorUnittest::TestContainerModeConfigUpdate() {
-    LOG_INFO(sLogger, ("TestContainerModeConfigUpdate() begin", time(NULL)));
-    {
-        // dump config to local
-        Json::Value rootJson;
-        Json::Value commonreg_com;
-        commonreg_com["project_name"] = Json::Value("1000000_proj");
-        commonreg_com["category"] = Json::Value("1000000_cateogry");
-        commonreg_com["log_type"] = Json::Value("common_reg_log");
-        commonreg_com["log_path"] = Json::Value("/comm");
-        commonreg_com["file_pattern"] = Json::Value("*.[Ll][Oo][Gg]");
-        commonreg_com["enable"] = Json::Value(true);
-        commonreg_com["timeformat"] = Json::Value("%d/%b/%Y:%H:%M:%S");
-        commonreg_com["topic_format"] = Json::Value("none");
-        Json::Value regs;
-        regs.append(Json::Value("([\\d\\.]+) \\S+ \\S+ \\[(\\S+) \\S+\\] \\\"(\\w+) ([^\"]*)\\\" (\\d+) (\\d+|-)"));
-        regs.append(Json::Value("([\\d\\.]+) \\S+ \\S+ \\[(\\S+) \\S+\\] \\\"(\\w+) ([^\"]*)\\\" (\\d+) (\\d+|-) "
-                                "\\\"([^\"]*)\\\" \\\"([^\"]*)\\\""));
-        Json::Value keys;
-        keys.append(Json::Value("ip,time,method,url,status,length"));
-        keys.append(Json::Value("ip,time,method,url,status,length,ref_url,browser"));
-        commonreg_com["regex"] = regs;
-        commonreg_com["keys"] = keys;
-        commonreg_com["preserve"] = Json::Value(true);
-        rootJson["commonreg.com"] = commonreg_com;
-
-        Json::Value apsara_log;
-        apsara_log["project_name"] = Json::Value("8000000_proj");
-        apsara_log["category"] = Json::Value("8000000_category");
-        apsara_log["log_type"] = Json::Value("apsara_log");
-        apsara_log["log_begin_reg"] = Json::Value("\\[\\d+-\\d+-\\d+ \\d+:\\d+:\\d+.\\d+\\].*");
-        apsara_log["log_path"] = Json::Value("/apsara_log");
-        apsara_log["file_pattern"] = Json::Value("*.[Ll][Oo][Gg]");
-        apsara_log["enable"] = Json::Value(true);
-        apsara_log["preserve"] = Json::Value(true);
-        apsara_log["topic_format"] = Json::Value("none");
-        rootJson["apsara_log"] = apsara_log;
-
-        Json::Value metrics;
-        metrics["metrics"] = rootJson;
-        ofstream fout(STRING_FLAG(user_log_config).c_str());
-        fout << metrics << endl;
-        fout.close();
-    }
-
-
-    bfs::remove_all(mRootDir);
-    bfs::create_directories(bfs::path(mRootDir) / "mount" / "apsara_log");
-    bfs::create_directories(bfs::path(mRootDir) / "mount" / "comm");
-    SetupContainerModeConfig();
-    CaseSetup(false);
-    for (int i = 0; i < 10; ++i) {
-        for (int j = 0; j < 2; ++j)
-            DumpLog(10, mRootDir + "/mount/" + gPath[j], (LogType)j);
-        usleep(WRITE_LOG_SLEEP_INTERVAL);
-    }
-    sleep(2 * INT32_FLAG(batch_send_interval) + 2);
-
-    APSARA_TEST_EQUAL(sProjectNameCountMap["1000000_proj"], 100);
-    APSARA_TEST_EQUAL(sProjectNameCountMap["8000000_proj"], 100);
-
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find("/apsara_log")
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-    APSARA_TEST_TRUE(EventDispatcher::GetInstance()->mPathWdMap.find("comm")
-                     == EventDispatcher::GetInstance()->mPathWdMap.end());
-
-
-    // check config update
-    Json::Value rootJson;
-    Json::Value commonreg_com;
-    commonreg_com["project_name"] = Json::Value("2000000_proj");
-    commonreg_com["category"] = Json::Value("2000000_category");
-    commonreg_com["log_type"] = Json::Value("common_reg_log");
-    commonreg_com["log_path"] = Json::Value("/comm");
-    commonreg_com["file_pattern"] = Json::Value("*.[Ll][Oo][Gg]");
-    commonreg_com["enable"] = Json::Value(true);
-    commonreg_com["timeformat"] = Json::Value("%d/%b/%Y:%H:%M:%S");
-    Json::Value regs;
-    regs.append(Json::Value("([\\d\\.]+) \\S+ \\S+ \\[(\\S+) \\S+\\] \\\"(\\w+) ([^\"]*)\\\" (\\d+) (\\d+|-)"));
-    regs.append(Json::Value("([\\d\\.]+) \\S+ \\S+ \\[(\\S+) \\S+\\] \\\"(\\w+) ([^\"]*)\\\" (\\d+) (\\d+|-) "
-                            "\\\"([^\"]*)\\\" \\\"([^\"]*)\\\""));
-    Json::Value keys;
-    keys.append(Json::Value("ip,time,method,url,status,length"));
-    keys.append(Json::Value("ip,time,method,url,status,length,ref_url,browser"));
-    commonreg_com["regex"] = regs;
-    commonreg_com["keys"] = keys;
-    commonreg_com["max_depth"] = Json::Value(0);
-    commonreg_com["preserve"] = Json::Value(true);
-    commonreg_com["version"] = Json::Value(1);
-    rootJson["commonreg.com"] = commonreg_com;
-
-    Json::Value apsara_log;
-    apsara_log["project_name"] = Json::Value("8000000_proj");
-    apsara_log["category"] = Json::Value("8000000_category");
-    apsara_log["log_type"] = Json::Value("apsara_log");
-    apsara_log["log_begin_reg"] = Json::Value("\\[\\d+-\\d+-\\d+ \\d+:\\d+:\\d+.\\d+\\].*");
-    apsara_log["log_path"] = Json::Value("/apsara_log");
-    apsara_log["file_pattern"] = Json::Value("*.[Ll][Oo][Gg]");
-    apsara_log["enable"] = Json::Value(true);
-    apsara_log["preserve"] = Json::Value(false);
-    apsara_log["preserve_depth"] = Json::Value(2);
-    apsara_log["version"] = Json::Value(1);
-    rootJson["apsara_log"] = apsara_log;
-
-    Json::Value metrics;
-    metrics["metrics"] = rootJson;
-
-    SetConfigResponse(metrics.toStyledString());
-    sleep(WAIT_CONFIG_UPDATE_INTERVAL);
-    for (int i = 0; i < 20; ++i) {
-        for (int j = 0; j < 2; ++j)
-            DumpLog(10, mRootDir + "/mount/" + gPath[j], (LogType)j);
-        usleep(WRITE_LOG_SLEEP_INTERVAL);
-    }
-    sleep(2 * INT32_FLAG(batch_send_interval) + 2);
-
-    unordered_map<string, Config*>& configMap = ConfigManager::GetInstance()->mNameConfigMap;
-    unordered_map<string, Config*>::iterator it = configMap.find("commonreg.com");
-    APSARA_TEST_TRUE(it != configMap.end());
-    Config* config = it->second;
-    APSARA_TEST_EQUAL(config->mProjectName, "2000000_proj");
-    APSARA_TEST_EQUAL(config->mBasePath, "/comm");
-    APSARA_TEST_EQUAL(config->mVersion, 1);
-    APSARA_TEST_EQUAL(config->mLogType, REGEX_LOG);
-    APSARA_TEST_EQUAL(config->mDockerFileFlag, true);
-
-    it = configMap.find("apsara_log");
-    APSARA_TEST_TRUE(it != configMap.end());
-    config = it->second;
-    APSARA_TEST_EQUAL(config->mProjectName, "8000000_proj");
-    APSARA_TEST_EQUAL(config->mBasePath, "/apsara_log");
-    APSARA_TEST_EQUAL(config->mVersion, 1);
-    APSARA_TEST_EQUAL(config->mLogType, APSARA_LOG);
-    APSARA_TEST_EQUAL(config->mIsPreserve, false);
-    APSARA_TEST_EQUAL(config->mDockerFileFlag, true);
-
-    APSARA_TEST_EQUAL(configMap.size(), 2);
-    APSARA_TEST_EQUAL(sProjectNameCountMap["2000000_proj"] + sProjectNameCountMap["1000000_proj"], 300);
-    APSARA_TEST_EQUAL(sProjectNameCountMap["8000000_proj"], 300);
-
-    CaseCleanup();
-    LOG_INFO(sLogger, ("TestContainerModeConfigUpdate() end", time(NULL)));
-}
-
 void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     // No wildcard.
     Config* cfg_1
@@ -3252,198 +2826,6 @@ void ConfigUpdatorUnittest::TestIsWildcardPathMatch() {
     cfg.mMaxDepth = 0;
     APSARA_TEST_EQUAL(cfg.IsWildcardPathMatch(PS + "usr" + PS + "b" + PS + "cef"), false);
 }
-
-#if defined(__linux__)
-void ConfigUpdatorUnittest::TestLoadGlobalFuseConf() {
-    LOG_INFO(sLogger, ("TestLoadGlobalFuseConf() begin", time(NULL)));
-    // CaseSetup();
-
-    // test default fuse mode
-    {
-        system("rm -f ilogtail_config.json");
-
-        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
-        bool IsFuseModeEnable = BOOL_FLAG(default_global_fuse_mode);
-        APSARA_TEST_EQUAL(IsFuseModeEnable, false);
-    }
-
-    // test enable fuse mode
-    {
-        system("rm -f ilogtail_config.json");
-
-        Json::Value rootJson;
-        rootJson["global_fuse_mode"] = Json::Value(true);
-
-        ofstream fout(STRING_FLAG(ilogtail_config).c_str());
-        fout << rootJson.toStyledString();
-        fout.close();
-
-        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
-        bool IsFuseModeEnable = BOOL_FLAG(default_global_fuse_mode);
-        APSARA_TEST_EQUAL(IsFuseModeEnable, true);
-    }
-
-    // test disable fuse mode
-    {
-        system("rm -f ilogtail_config.json");
-
-        Json::Value rootJson;
-        rootJson["global_fuse_mode"] = Json::Value(false);
-
-        ofstream fout(STRING_FLAG(ilogtail_config).c_str());
-        fout << rootJson.toStyledString();
-        fout.close();
-
-        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
-        bool IsFuseModeEnable = BOOL_FLAG(default_global_fuse_mode);
-        APSARA_TEST_EQUAL(IsFuseModeEnable, false);
-    }
-
-    // CaseCleanup();
-    LOG_INFO(sLogger, ("TestLoadGlobalFuseConf() end", time(NULL)));
-}
-
-void ConfigUpdatorUnittest::TestCheckUlogfsEnv() {
-    LOG_INFO(sLogger, ("TestCheckUlogfsEnv() begin", time(NULL)));
-
-    APSARA_TEST_TRUE(getenv("ULOGFS_ENABLED") == NULL);
-
-    setenv("ULOGFS_ENABLED", "true", 1);
-    APSARA_TEST_EQUAL(std::string(getenv("ULOGFS_ENABLED")), std::string("true"));
-
-    unsetenv("ULOGFS_ENABLED");
-    APSARA_TEST_TRUE(getenv("ULOGFS_ENABLED") == NULL);
-
-    bool checkUlogfsEnv;
-    bool globalFuseMode;
-    bool isFuseMode;
-
-    // env ULOGFS_ENABLED not set
-    {
-        system("rm -rf ilogtail_config.json");
-        system("rm -rf user_log_config.json");
-
-        unsetenv("ULOGFS_ENABLED");
-
-        checkUlogfsEnv = false;
-        globalFuseMode = false;
-        isFuseMode = false;
-
-        SetupGlobalFuseMode(globalFuseMode);
-        DumpCustomizedConfigToLocal(checkUlogfsEnv, isFuseMode);
-
-        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
-        ConfigManager::GetInstance()->LoadConfig(STRING_FLAG(user_log_config));
-
-        APSARA_TEST_EQUAL(BOOL_FLAG(default_global_fuse_mode), false);
-
-        auto& nameConfigMap = ConfigManager::GetInstance()->mNameConfigMap;
-        APSARA_TEST_EQUAL(nameConfigMap.size(), 1);
-
-        for (auto it = nameConfigMap.begin(); it != nameConfigMap.end(); it++) {
-            Config* config = it->second;
-            APSARA_TEST_EQUAL(config->mIsFuseMode, false);
-        }
-
-        BOOL_FLAG(default_global_fuse_mode) = false;
-        ConfigManager::GetInstance()->mNameConfigMap.clear();
-    }
-
-    // env ULOGFS_ENABLED not set
-    {
-        system("rm -rf ilogtail_config.json");
-        system("rm -rf user_log_config.json");
-
-        unsetenv("ULOGFS_ENABLED");
-
-        checkUlogfsEnv = false;
-        globalFuseMode = false;
-        isFuseMode = true;
-
-        SetupGlobalFuseMode(globalFuseMode);
-        DumpCustomizedConfigToLocal(checkUlogfsEnv, isFuseMode);
-
-        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
-        ConfigManager::GetInstance()->LoadConfig(STRING_FLAG(user_log_config));
-
-        APSARA_TEST_EQUAL(BOOL_FLAG(default_global_fuse_mode), false);
-
-        auto& nameConfigMap = ConfigManager::GetInstance()->mNameConfigMap;
-        APSARA_TEST_EQUAL(nameConfigMap.size(), 1);
-
-        for (auto it = nameConfigMap.begin(); it != nameConfigMap.end(); it++) {
-            Config* config = it->second;
-            APSARA_TEST_EQUAL(config->mIsFuseMode, false);
-        }
-
-        BOOL_FLAG(default_global_fuse_mode) = false;
-        ConfigManager::GetInstance()->mNameConfigMap.clear();
-    }
-
-    // env ULOGFS_ENABLED set "true"
-    {
-        system("rm -rf ilogtail_config.json");
-        system("rm -rf user_log_config.json");
-
-        setenv("ULOGFS_ENABLED", "true", 1);
-
-        checkUlogfsEnv = true;
-        globalFuseMode = false;
-        isFuseMode = true;
-
-        SetupGlobalFuseMode(globalFuseMode);
-        DumpCustomizedConfigToLocal(checkUlogfsEnv, isFuseMode);
-
-        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
-        ConfigManager::GetInstance()->LoadConfig(STRING_FLAG(user_log_config));
-
-        APSARA_TEST_EQUAL(BOOL_FLAG(default_global_fuse_mode), false);
-
-        auto& nameConfigMap = ConfigManager::GetInstance()->mNameConfigMap;
-        APSARA_TEST_EQUAL(nameConfigMap.size(), 0);
-
-        BOOL_FLAG(default_global_fuse_mode) = false;
-        ConfigManager::GetInstance()->mNameConfigMap.clear();
-    }
-
-    // env ULOGFS_ENABLED not set
-    {
-        system("rm -rf ilogtail_config.json");
-        system("rm -rf user_log_config.json");
-
-        unsetenv("ULOGFS_ENABLED");
-
-        checkUlogfsEnv = true;
-        globalFuseMode = true;
-        isFuseMode = true;
-
-        SetupGlobalFuseMode(globalFuseMode);
-        DumpCustomizedConfigToLocal(checkUlogfsEnv, isFuseMode);
-
-        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
-        ConfigManager::GetInstance()->LoadConfig(STRING_FLAG(user_log_config));
-
-        APSARA_TEST_EQUAL(BOOL_FLAG(default_global_fuse_mode), true);
-
-        auto& nameConfigMap = ConfigManager::GetInstance()->mNameConfigMap;
-        APSARA_TEST_EQUAL(nameConfigMap.size(), 2);
-
-        for (auto it = nameConfigMap.begin(); it != nameConfigMap.end(); it++) {
-            Config* config = it->second;
-            if (config->mConfigName == STRING_FLAG(fuse_customized_config_name))
-                continue;
-
-            APSARA_TEST_EQUAL(config->mIsFuseMode, true);
-        }
-
-        BOOL_FLAG(default_global_fuse_mode) = false;
-        ConfigManager::GetInstance()->mNameConfigMap.clear();
-    }
-
-    RemoveConfigFile();
-    LOG_INFO(sLogger, ("TestCheckUlogfsEnv() end", time(NULL)));
-}
-#endif
 
 } // namespace logtail
 

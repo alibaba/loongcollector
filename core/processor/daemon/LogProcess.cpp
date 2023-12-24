@@ -44,6 +44,9 @@
 #include "aggregator/Aggregator.h"
 #include "fuse/FuseFileBlacklist.h"
 #include "common/LogFileCollectOffsetIndicator.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 
 using namespace sls_logs;
@@ -93,8 +96,8 @@ void LogProcess::Start() {
     if (mInitialized)
         return;
     mInitialized = true;
-    mLocalTimeZoneOffsetSecond = GetLocalTimeZoneOffsetSecond();
-    LOG_INFO(sLogger, ("local timezone offset second", mLocalTimeZoneOffsetSecond));
+    // mLocalTimeZoneOffsetSecond = GetLocalTimeZoneOffsetSecond();
+    // LOG_INFO(sLogger, ("local timezone offset second", mLocalTimeZoneOffsetSecond));
     Sender::Instance()->SetFeedBackInterface(&mLogFeedbackQueue);
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();
     // mBufferCountLimit = INT32_FLAG(process_buffer_count_upperlimit_perthread) * mThreadCount;
@@ -104,6 +107,7 @@ void LogProcess::Start() {
         mThreadFlags[threadNo] = false;
         mProcessThreads[threadNo] = CreateThread([this, threadNo]() { ProcessLoop(threadNo); });
     }
+    LOG_INFO(sLogger, ("process daemon", "started"));
 }
 
 bool LogProcess::PushBuffer(LogBuffer* buffer, int32_t retryTimes) {
@@ -114,7 +118,7 @@ bool LogProcess::PushBuffer(LogBuffer* buffer, int32_t retryTimes) {
             if (retry % 100 == 0) {
                 LOG_ERROR(sLogger,
                           ("Push log process buffer queue failed", ToString(buffer->rawBuffer.size()))(
-                              buffer->logFileReader->GetProjectName(), buffer->logFileReader->GetCategory()));
+                              buffer->logFileReader->GetProject(), buffer->logFileReader->GetLogstore()));
             }
         } else {
             return true;
@@ -148,9 +152,9 @@ void LogProcess::DeletePriorityWithHoldOn(const LogstoreFeedBackKey& logstoreKey
 }
 
 void LogProcess::HoldOn() {
+    LOG_INFO(sLogger, ("process daemon pause", "starts"));
     mAccessProcessThreadRWL.lock();
     mLogFeedbackQueue.Lock();
-    int32_t tryTime = 0;
     while (true) {
         bool allThreadWait = true;
         for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
@@ -160,21 +164,18 @@ void LogProcess::HoldOn() {
             }
         }
         if (allThreadWait) {
-            LOG_INFO(sLogger, ("LogProcess", "hold on"));
+            LOG_INFO(sLogger, ("process daemon pause", "succeeded"));
             return;
-        }
-        if (++tryTime % 100 == 0) {
-            LOG_ERROR(sLogger, ("LogProcess thread is too slow or blocked with unknow error.", ""));
         }
         usleep(10 * 1000);
     }
 }
 
-
 void LogProcess::Resume() {
+    LOG_INFO(sLogger, ("process daemon resume", "starts"));
     mLogFeedbackQueue.Unlock();
     mAccessProcessThreadRWL.unlock();
-    LOG_INFO(sLogger, ("LogProcess", "resume"));
+    LOG_INFO(sLogger, ("process daemon resume", "succeeded"));
 }
 
 bool LogProcess::FlushOut(int32_t waitMs) {
@@ -228,7 +229,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
         }
 
         if (threadNo == 0 && curTime - lastUpdateMetricTime >= 40) {
-            static auto sMonitor = LogtailMonitor::Instance();
+            static auto sMonitor = LogtailMonitor::GetInstance();
 
             // atomic counter will be negative if process speed is too fast.
             sMonitor->UpdateMetric("process_tps", 1.0 * s_processCount / (curTime - lastUpdateMetricTime));
@@ -297,12 +298,12 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             }
 #endif
 
-            Config* config = ConfigManager::GetInstance()->FindConfigByName(logFileReader->GetConfigName());
-            if (config == NULL) {
+            auto pipeline = PipelineManager::GetInstance()->FindPipelineByName(logFileReader->GetConfigName());
+            if (!pipeline) {
                 LOG_INFO(sLogger,
                          ("can not find config while processing log, maybe config updated. config",
-                          logFileReader->GetConfigName())("project", logFileReader->GetProjectName())(
-                             "logstore", logFileReader->GetCategory()));
+                          logFileReader->GetConfigName())("project", logFileReader->GetProject())(
+                             "logstore", logFileReader->GetLogstore()));
                 continue;
             }
 
@@ -311,13 +312,13 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             profile.readBytes = readBytes;
             int32_t parseStartTime = (int32_t)time(NULL);
             bool needSend = false;
-            if (!BOOL_FLAG(enable_new_pipeline)) {
-                needSend = (0 == ProcessBufferLegacy(logBuffer, logFileReader, logGroup, profile, *config));
-            } else {
-                needSend = (0 == ProcessBuffer(logBuffer, logFileReader, logGroup, profile));
-            }
-            const std::string& projectName = config->GetProjectName();
-            const std::string& category = config->GetCategory();
+            // if (!BOOL_FLAG(enable_new_pipeline)) {
+            //     needSend = (0 == ProcessBufferLegacy(logBuffer, logFileReader, logGroup, profile, *config));
+            // } else {
+            needSend = (0 == ProcessBuffer(logBuffer, logFileReader, logGroup, profile));
+            // }
+            const std::string& projectName = pipeline->GetContext().GetProjectName();
+            const std::string& category = pipeline->GetContext().GetLogstoreName();
             int32_t parseEndTime = (int32_t)time(NULL);
 
             // add lines count
@@ -331,7 +332,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                         + "time used seconds : " + ToString(parseEndTime - parseStartTime),
                     projectName,
                     category,
-                    config->mRegion);
+                    pipeline->GetContext().GetRegion());
                 LOG_WARNING(sLogger,
                             ("process log too slow, parse logs", logGroup.logs_size())("buffer size",
                                                                                        logBuffer->rawBuffer.size())(
@@ -339,45 +340,54 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                                                                                             category));
             }
 
-
             if (logGroup.logs_size() > 0 && needSend) { // send log group
+                const FlusherSLS* flusherSLS = static_cast<const FlusherSLS*>(pipeline->GetFlushers()[0]->GetPlugin());
+
                 IntegrityConfig* integrityConfig = NULL;
                 LineCountConfig* lineCountConfig = NULL;
-                if (config->mIntegrityConfig->mIntegritySwitch) {
-                    integrityConfig = new IntegrityConfig(config->mIntegrityConfig->mAliuid,
-                                                          config->mIntegrityConfig->mIntegritySwitch,
-                                                          config->mIntegrityConfig->mIntegrityProjectName,
-                                                          config->mIntegrityConfig->mIntegrityLogstore,
-                                                          config->mIntegrityConfig->mLogTimeReg,
-                                                          config->mIntegrityConfig->mTimeFormat,
-                                                          config->mIntegrityConfig->mTimePos);
-                }
-                if (config->mLineCountConfig->mLineCountSwitch) {
-                    lineCountConfig = new LineCountConfig(config->mLineCountConfig->mAliuid,
-                                                          config->mLineCountConfig->mLineCountSwitch,
-                                                          config->mLineCountConfig->mLineCountProjectName,
-                                                          config->mLineCountConfig->mLineCountLogstore);
-                }
+                // if (config->mIntegrityConfig->mIntegritySwitch) {
+                //     integrityConfig = new IntegrityConfig(config->mIntegrityConfig->mAliuid,
+                //                                           config->mIntegrityConfig->mIntegritySwitch,
+                //                                           config->mIntegrityConfig->mIntegrityProjectName,
+                //                                           config->mIntegrityConfig->mIntegrityLogstore,
+                //                                           config->mIntegrityConfig->mLogTimeReg,
+                //                                           config->mIntegrityConfig->mTimeFormat,
+                //                                           config->mIntegrityConfig->mTimePos);
+                // }
+                // if (config->mLineCountConfig->mLineCountSwitch) {
+                //     lineCountConfig = new LineCountConfig(config->mLineCountConfig->mAliuid,
+                //                                           config->mLineCountConfig->mLineCountSwitch,
+                //                                           config->mLineCountConfig->mLineCountProjectName,
+                //                                           config->mLineCountConfig->mLineCountLogstore);
+                // }
                 IntegrityConfigPtr integrityConfigPtr(integrityConfig);
                 LineCountConfigPtr lineCountConfigPtr(lineCountConfig);
-                sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(config->mCompressType);
 
-                LogGroupContext context(config->mRegion,
+                string compressStr = "zstd";
+                if (flusherSLS->mCompressType == FlusherSLS::CompressType::NONE) {
+                    compressStr = "none";
+                } else if (flusherSLS->mCompressType == FlusherSLS::CompressType::LZ4) {
+                    compressStr = "lz4";
+                }
+                sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(compressStr);
+
+                LogGroupContext context(flusherSLS->mRegion,
                                         projectName,
-                                        config->mCategory,
+                                        flusherSLS->mLogstore,
                                         compressType,
                                         logBuffer->fileInfo,
                                         integrityConfigPtr,
                                         lineCountConfigPtr,
                                         -1,
-                                        logFileReader->GetFuseMode(),
-                                        logFileReader->GetMarkOffsetFlag(),
+                                        false,
+                                        false,
                                         logBuffer->exactlyOnceCheckpoint);
                 if (!Sender::Instance()->Send(projectName,
                                               logFileReader->GetSourceId(),
                                               logGroup,
-                                              config,
-                                              config->mMergeType,
+                                              logFileReader->GetLogGroupKey(),
+                                              flusherSLS,
+                                              flusherSLS->mBatch.mMergeType,
                                               (uint32_t)(profile.logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
                                               "",
                                               convertedPath,
@@ -386,15 +396,15 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                                            "push file data into batch map fail",
                                                            projectName,
                                                            category,
-                                                           config->mRegion);
+                                                           pipeline->GetContext().GetRegion());
                     LOG_ERROR(sLogger,
                               ("push file data into batch map fail, discard logs", logGroup.logs_size())(
                                   "project", projectName)("logstore", category)("filename", convertedPath));
                 }
             }
 
-            LogFileProfiler::GetInstance()->AddProfilingData(config->mConfigName,
-                                                             config->mRegion,
+            LogFileProfiler::GetInstance()->AddProfilingData(pipeline->Name(),
+                                                             pipeline->GetContext().GetRegion(),
                                                              projectName,
                                                              category,
                                                              convertedPath,
@@ -430,12 +440,12 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
     if (pipeline.get() == nullptr) {
         LOG_INFO(sLogger,
                  ("can not find pipeline while processing log, maybe config deleted. config",
-                  logFileReader->GetConfigName())("project", logFileReader->GetProjectName())(
-                     "logstore", logFileReader->GetCategory()));
+                  logFileReader->GetConfigName())("project", logFileReader->GetProject())(
+                     "logstore", logFileReader->GetLogstore()));
         return -1;
     }
 
-    std::vector<PipelineEventGroup> outputList;
+    std::vector<PipelineEventGroup> eventGroupList;
     {
         // construct a logGroup, it should be moved into input later
         PipelineEventGroup eventGroup(logBuffer);
@@ -452,8 +462,9 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
         auto offsetStr = event->GetSourceBuffer()->CopyString(std::to_string(logBuffer->readOffset));
         event->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
         eventGroup.AddEvent(std::move(event));
+        eventGroupList.emplace_back(std::move(eventGroup));
         // process logGroup
-        pipeline->Process(std::move(eventGroup), outputList);
+        pipeline->Process(eventGroupList);
     }
 
     // record profile
@@ -461,11 +472,11 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
     profile = processProfile;
     processProfile.Reset();
 
-    for (auto& eventGroup : outputList) {
+    for (auto& eventGroup : eventGroupList) {
         // fill protobuf
-        FillLogGroupLogs(eventGroup, resultGroup, pipeline->GetPipelineConfig().mAdvancedConfig.mEnableTimestampNanosecond);
+        FillLogGroupLogs(eventGroup, resultGroup, pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond);
         FillLogGroupTags(eventGroup, logFileReader, resultGroup);
-        if (logFileReader->GetPluginFlag()) {
+        if (pipeline->IsFlushingThroughGoPipeline()) {
             LogtailPlugin::GetInstance()->ProcessLogGroup(
                 logFileReader->GetConfigName(), resultGroup, logFileReader->GetSourceId());
             return 1;
@@ -485,10 +496,12 @@ void LogProcess::FillEventGroupMetadata(LogBuffer& logBuffer, PipelineEventGroup
     eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, logBuffer.logFileReader->GetHostLogPath());
     eventGroup.SetMetadata(EventGroupMetaKey::LOG_FILE_INODE,
                            std::to_string(logBuffer.logFileReader->GetDevInode().inode));
-    std::string agentTag = ConfigManager::GetInstance()->GetUserDefinedIdSet();
+#ifdef __ENTERPRISE__
+    std::string agentTag = EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
     if (!agentTag.empty()) {
-        eventGroup.SetMetadata(EventGroupMetaKey::AGENT_TAG, ConfigManager::GetInstance()->GetUserDefinedIdSet());
+        eventGroup.SetMetadata(EventGroupMetaKey::AGENT_TAG, EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
     }
+#endif
     eventGroup.SetMetadataNoCopy(EventGroupMetaKey::HOST_IP, LogFileProfiler::mIpAddr);
     eventGroup.SetMetadataNoCopy(EventGroupMetaKey::HOST_NAME, LogFileProfiler::mHostname);
     eventGroup.SetMetadata(EventGroupMetaKey::LOG_READ_OFFSET, std::to_string(logBuffer.readOffset));
@@ -536,8 +549,8 @@ void LogProcess::FillLogGroupTags(const PipelineEventGroup& eventGroup,
         logTagPtr->set_value(extraTags[i].value());
     }
 
-    if (resultGroup.category() != logFileReader->GetCategory()) {
-        resultGroup.set_category(logFileReader->GetCategory());
+    if (resultGroup.category() != logFileReader->GetLogstore()) {
+        resultGroup.set_category(logFileReader->GetLogstore());
     }
 
     if (resultGroup.topic().empty()) {
@@ -545,232 +558,10 @@ void LogProcess::FillLogGroupTags(const PipelineEventGroup& eventGroup,
     }
 }
 
-int LogProcess::ProcessBufferLegacy(std::shared_ptr<LogBuffer>& logBuffer,
-                                    LogFileReaderPtr& logFileReader,
-                                    sls_logs::LogGroup& logGroup,
-                                    ProcessProfile& profile,
-                                    Config& config) {
-    auto logPath = logFileReader->GetConvertedPath();
-    // Mixed mode, pass buffer to plugin system.
-    if (logFileReader->GetPluginFlag()) {
-        if (!config.PassingTagsToPlugin()) // V1
-        {
-            LogtailPlugin::GetInstance()->ProcessRawLog(logFileReader->GetConfigName(),
-                                                        logBuffer->rawBuffer,
-                                                        logFileReader->GetSourceId(),
-                                                        logFileReader->GetTopicName());
-        } else // V2
-        {
-            static const std::string TAG_DELIMITER = "^^^";
-            static const std::string TAG_SEPARATOR = "~=~";
-            static const std::string TAG_PREFIX = "__tag__:";
-
-            // Collect tags to pass, __hostname__ will be added in plugin.
-            std::string passingTags;
-            passingTags.append(TAG_PREFIX)
-                .append(LOG_RESERVED_KEY_PATH)
-                .append(TAG_SEPARATOR)
-                .append(logPath.substr(0, 511));
-
-            std::string userDefinedId = ConfigManager::GetInstance()->GetUserDefinedIdSet();
-            if (!userDefinedId.empty()) {
-                passingTags.append(TAG_DELIMITER)
-                    .append(TAG_PREFIX)
-                    .append(LOG_RESERVED_KEY_USER_DEFINED_ID)
-                    .append(TAG_SEPARATOR)
-                    .append(userDefinedId.substr(0, 99));
-            }
-            const std::vector<sls_logs::LogTag>& extraTags = logFileReader->GetExtraTags();
-            for (size_t i = 0; i < extraTags.size(); ++i) {
-                passingTags.append(TAG_DELIMITER)
-                    .append(TAG_PREFIX)
-                    .append(extraTags[i].key())
-                    .append(TAG_SEPARATOR)
-                    .append(extraTags[i].value());
-            }
-
-            if (config.mAdvancedConfig.mEnableLogPositionMeta) {
-                passingTags.append(TAG_DELIMITER)
-                    .append(TAG_PREFIX)
-                    .append(LOG_RESERVED_KEY_FILE_OFFSET)
-                    .append(TAG_SEPARATOR)
-                    .append(std::to_string(logBuffer->readOffset));
-            }
-
-            LogtailPlugin::GetInstance()->ProcessRawLogV2(logFileReader->GetConfigName(),
-                                                          logBuffer->rawBuffer,
-                                                          logFileReader->GetSourceId(),
-                                                          logFileReader->GetTopicName(),
-                                                          passingTags);
-        }
-        return 1;
-    }
-
-    StringView& rawBuffer = logBuffer->rawBuffer;
-    int32_t lineFeed = 0;
-    std::vector<StringView> logIndex; // all splitted logs
-    std::vector<StringView> discardIndex; // used to send warning
-    bool splitSuccess = logFileReader->LogSplit(rawBuffer.data(), rawBuffer.size(), lineFeed, logIndex, discardIndex);
-
-    const std::string& projectName = config.GetProjectName();
-    const std::string& category = config.GetCategory();
-    ParseLogError error;
-    uint32_t lines = logIndex.size();
-    //////////////////////////////////////////////
-    // for profiling
-    profile.splitLines = lines;
-    string errorLine;
-    //////////////////////////////////////////////
-
-    if (AppConfig::GetInstance()->IsLogParseAlarmValid() && LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
-        if (!splitSuccess) { // warning if unsplittable
-            LogtailAlarm::GetInstance()->SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                                   "split log lines fail, please check log_begin_regex, file:" + logPath
-                                                       + ", logs:" + rawBuffer.substr(0, 1024).to_string(),
-                                                   projectName,
-                                                   category,
-                                                   config.mRegion);
-            LOG_ERROR(sLogger,
-                      ("split log lines fail", "please check log_begin_regex")("file_name", logPath)(
-                          "read bytes", profile.readBytes)("first 1KB log", rawBuffer.substr(0, 1024).to_string()));
-        }
-        for (auto& discardData : discardIndex) { // warning if data loss
-            LogtailAlarm::GetInstance()->SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                                   "split log lines discard data, file:" + logPath
-                                                       + ", logs:" + discardData.substr(0, 1024).to_string(),
-                                                   projectName,
-                                                   category,
-                                                   config.mRegion);
-            LOG_WARNING(sLogger,
-                        ("split log lines discard data", "please check log_begin_regex")("file_name", logPath)(
-                            "read bytes", profile.readBytes)("first 1KB log", discardData.substr(0, 1024).to_string()));
-        }
-    }
-
-    if (lines > 0) {
-        // @debug
-        // static int linesCount = 0;
-        // linesCount += lines;
-        // LOG_INFO(sLogger, ("Logprocess lines", lines)("Total lines", linesCount));
-        LogtailTime lastLogLineTime = {0, 0};
-        string lastLogTimeStr = "";
-        uint32_t logGroupSize = 0;
-        int32_t successLogSize = 0;
-        for (uint32_t i = 0; i < lines; i++) {
-            bool successful = logFileReader->ParseLogLine(
-                logIndex[i], logGroup, error, lastLogLineTime, lastLogTimeStr, logGroupSize);
-            if (!successful) {
-                ++profile.parseFailures;
-                if (error == PARSE_LOG_REGEX_ERROR)
-                    ++profile.regexMatchFailures;
-                else if (error == PARSE_LOG_TIMEFORMAT_ERROR)
-                    ++profile.parseTimeFailures;
-                else if (error == PARSE_LOG_HISTORY_ERROR)
-                    ++profile.historyFailures;
-                if (errorLine.empty())
-                    errorLine = logIndex[i].to_string();
-            }
-            // add source raw line, time zone adjust
-            if (successLogSize < logGroup.logs_size()) {
-                sls_logs::Log* logPtr = logGroup.mutable_logs(successLogSize);
-                if (logPtr != NULL) {
-                    if (!config.mAdvancedConfig.mEnableTimestampNanosecond) {
-                        logPtr->clear_time_ns();
-                    }
-                    if (config.mUploadRawLog) {
-                        LogParser::AddLog(
-                            logPtr, config.mAdvancedConfig.mRawLogTag, logIndex[i].to_string(), logGroupSize);
-                    }
-                    if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
-                        logPtr->set_time(logPtr->time() + GetTimeDelta());
-                    }
-                }
-                successLogSize = logGroup.logs_size();
-
-                // record offset in content
-                // TODO: I don't think all offsets calc below works with GBK
-                auto const offset = logBuffer->readOffset + (logIndex[i].data() - rawBuffer.data());
-                if ((logBuffer->exactlyOnceCheckpoint || config.mAdvancedConfig.mEnableLogPositionMeta)
-                    && logPtr != nullptr) {
-                    auto content = logPtr->add_contents();
-                    content->set_key(LOG_RESERVED_KEY_FILE_OFFSET);
-                    content->set_value(std::to_string(offset));
-                }
-                // record log positions for exactly once.
-                if (logBuffer->exactlyOnceCheckpoint && logPtr != nullptr) {
-                    int32_t length = 0;
-                    if (1 == lines) {
-                        length = logBuffer->readLength;
-                    } else if (i != lines - 1) {
-                        length = logIndex[i + 1].data() - logIndex[i].data();
-                    } else {
-                        length = logBuffer->readLength - (logIndex[i].data() - rawBuffer.data());
-                    }
-                    logBuffer->exactlyOnceCheckpoint->positions.emplace_back(
-                        std::make_pair(offset, static_cast<size_t>(length)));
-                }
-            }
-        }
-
-        // add common predefined tags
-        if (logGroup.logs_size() > 0) {
-            sls_logs::LogTag* logTagPtr = logGroup.add_logtags();
-            logTagPtr->set_key(LOG_RESERVED_KEY_HOSTNAME);
-            logTagPtr->set_value(LogFileProfiler::mHostname.substr(0, 99));
-            logTagPtr = logGroup.add_logtags();
-            logTagPtr->set_key(LOG_RESERVED_KEY_PATH);
-            logTagPtr->set_value(logPath.substr(0, 511));
-
-            // zone info for ant
-            const std::string& alipayZone = AppConfig::GetInstance()->GetAlipayZone();
-            if (!alipayZone.empty()) {
-                logTagPtr = logGroup.add_logtags();
-                logTagPtr->set_key(LOG_RESERVED_KEY_ALIPAY_ZONE);
-                logTagPtr->set_value(alipayZone);
-            }
-
-            string userDefinedId = ConfigManager::GetInstance()->GetUserDefinedIdSet();
-            if (userDefinedId.size() > 0) {
-                logTagPtr = logGroup.add_logtags();
-                logTagPtr->set_key(LOG_RESERVED_KEY_USER_DEFINED_ID);
-                logTagPtr->set_value(userDefinedId.substr(0, 99));
-            }
-
-            const std::vector<sls_logs::LogTag>& extraTags = logFileReader->GetExtraTags();
-            for (size_t i = 0; i < extraTags.size(); ++i) {
-                logTagPtr = logGroup.add_logtags();
-                logTagPtr->set_key(extraTags[i].key());
-                logTagPtr->set_value(extraTags[i].value());
-            }
-
-            // add truncate info to loggroup
-            if (config.mIsFuseMode && logBuffer->truncateInfo.get() != NULL
-                && logBuffer->truncateInfo->empty() == false) {
-                sls_logs::LogTag* logTagPtr = logGroup.add_logtags();
-                logTagPtr->set_key(LOG_RESERVED_KEY_TRUNCATE_INFO);
-                logTagPtr->set_value(logBuffer->truncateInfo->toString());
-            }
-
-            if (logGroup.category() != category) {
-                logGroup.set_category(category);
-            }
-
-            if (logGroup.topic().empty()) {
-                logGroup.set_topic(logFileReader->GetTopicName());
-            }
-        }
-    }
-    return 0;
-}
-
 void LogProcess::DoFuseHandling() {
     LogFileCollectOffsetIndicator::GetInstance()->CalcFileOffset();
     LogFileCollectOffsetIndicator::GetInstance()->EliminateOutDatedItem();
     LogFileCollectOffsetIndicator::GetInstance()->ShrinkLogFileOffsetInfoMap();
-
-    if (ConfigManager::GetInstance()->HaveFuseConfig()) {
-        FuseFileBlacklist::GetInstance()->RemoveFile();
-    }
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

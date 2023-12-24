@@ -86,8 +86,8 @@ private:
      * @brief BindSender bind different output ways, such as sls or plugins output ways.
      */
     void BindSender();
-    static int OutputPluginProcess(std::vector<sls_logs::Log>& logs, Config* cfg);
-    static int OutputDirectly(std::vector<sls_logs::Log>& logs, Config* cfg);
+    static int OutputPluginProcess(std::vector<sls_logs::Log>& logs, const Pipeline* cfg);
+    static int OutputDirectly(std::vector<sls_logs::Log>& logs, const Pipeline* cfg);
 
     /**
      * @brief Process bytes by different protocol processors.
@@ -119,7 +119,7 @@ private:
     void StartEventLoop();
 
     std::unordered_map<uint32_t, ProcessObserver*> mAllProcesses;
-    std::function<int(std::vector<sls_logs::Log>&, Config*)> mSenderFunc;
+    std::function<int(std::vector<sls_logs::Log>&, const Pipeline*)> mSenderFunc;
     ThreadPtr mEventLoopThread;
     ReadWriteLock mEventLoopThreadRWL;
     uint64_t mLastGCTimeNs = 0;

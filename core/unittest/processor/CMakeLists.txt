@@ -12,11 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(processor_unittest)
-
-add_executable(processor_filter_unittest LogFilterUnittest.cpp)
-target_link_libraries(processor_filter_unittest unittest_base)
 
 add_executable(processor_split_log_string_native_unittest ProcessorSplitLogStringNativeUnittest.cpp)
 target_link_libraries(processor_split_log_string_native_unittest unittest_base)
@@ -47,3 +44,15 @@ target_link_libraries(processor_filter_native_unittest unittest_base)
 
 add_executable(processor_desensitize_native_unittest ProcessorDesensitizeNativeUnittest.cpp)
 target_link_libraries(processor_desensitize_native_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(processor_split_log_string_native_unittest)
+gtest_discover_tests(processor_split_regex_native_unittest)
+gtest_discover_tests(processor_parse_regex_native_unittest)
+gtest_discover_tests(processor_parse_json_native_unittest)
+gtest_discover_tests(processor_parse_timestamp_native_unittest)
+gtest_discover_tests(processor_tag_native_unittest)
+gtest_discover_tests(processor_parse_apsara_native_unittest)
+gtest_discover_tests(processor_parse_delimiter_native_unittest)
+gtest_discover_tests(processor_filter_native_unittest)
+gtest_discover_tests(processor_desensitize_native_unittest)

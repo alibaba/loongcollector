@@ -17,25 +17,17 @@ boot:
 ilogtail:
   config:
     - name: input-canal-case
-      content:
-      - '{
- "inputs": [
-     {
-         "type": "service_canal",
-         "detail": {
-             "User" : "root",
-             "Host" : "mysql",
-             "ServerID" : 9966,
-             "Password": "root",
-             "IncludeTables": [
-                 "mysql\\.specialalarmtest"
-             ],
-             "TextToString" : true,
-             "EnableDDL" : true
-         }
-     }
- ]
-}'
+      detail:
+        - inputs:
+          - Type: service_canal
+            User: root
+            Host: mysql
+            ServerId: 9966
+            Password: root
+            IncludeTables:
+              - mysql\\.specialalarmtest
+            TextToString: true
+            EnableDDL: true
   close_wait: 5s
   depends_on:
     mysql:

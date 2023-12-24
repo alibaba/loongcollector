@@ -13,24 +13,21 @@
 // limitations under the License.
 
 #include <cstdlib>
-#include "unittest/Unittest.h"
+
 #include "common/Constants.h"
 #include "config/Config.h"
 #include "config_manager/ConfigManager.h"
+#include "pipeline/Pipeline.h"
 #include "processor/ProcessorTagNative.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
 class ProcessorTagNativeUnittest : public ::testing::Test {
 public:
-    static void SetUpTestCase() { ConfigManager::GetInstance()->SetUserDefinedIdSet({"mg1", "mg2"}); }
+    static void SetUpTestCase() {}
 
-    void SetUp() override {
-        mContext.SetConfigName("project##config_0");
-        mContext.SetLogstoreName("logstore");
-        mContext.SetProjectName("project");
-        mContext.SetRegion("cn-shanghai");
-    }
+    void SetUp() override { mContext.SetConfigName("project##config_0"); }
 
     void TestInit();
     void TestProcess();
@@ -42,21 +39,23 @@ UNIT_TEST_CASE(ProcessorTagNativeUnittest, TestInit);
 UNIT_TEST_CASE(ProcessorTagNativeUnittest, TestProcess);
 
 void ProcessorTagNativeUnittest::TestInit() {
-    Config config;
-    config.mPluginProcessFlag = true;
+    // make config
+    Json::Value config;
+    Pipeline pipeline;
+    mContext.SetPipeline(pipeline);
+    mContext.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
 
     {
         ProcessorTagNative processor;
         processor.SetContext(mContext);
         std::string pluginId = "testID";
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
-        APSARA_TEST_EQUAL_FATAL(true, processor.mPluginProcessFlag);
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
     }
 }
 
 void ProcessorTagNativeUnittest::TestProcess() {
-    Config config;
+    // make config
+    Json::Value config;
     auto sourceBuffer = std::make_shared<logtail::SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
     std::string filePath = "/var/log/message";
@@ -73,12 +72,13 @@ void ProcessorTagNativeUnittest::TestProcess() {
     eventGroup.SetMetadataNoCopy(EventGroupMetaKey::HOST_NAME, hostname);
 
     { // test plugin branch
-        config.mPluginProcessFlag = true;
+        Pipeline pipeline;
+        mContext.SetPipeline(pipeline);
+        mContext.GetPipeline().mGoPipelineWithoutInput = Json::Value("test");
         ProcessorTagNative processor;
         processor.SetContext(mContext);
         std::string pluginId = "testID";
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
         processor.Process(eventGroup);
         APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_PATH));
         APSARA_TEST_EQUAL_FATAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH),
@@ -90,12 +90,12 @@ void ProcessorTagNativeUnittest::TestProcess() {
     }
 
     { // test native branch
-        config.mPluginProcessFlag = false;
+        Pipeline pipeline;
+        mContext.SetPipeline(pipeline);
         ProcessorTagNative processor;
         processor.SetContext(mContext);
         std::string pluginId = "testID";
-        ComponentConfig componentConfig(pluginId, config);
-        APSARA_TEST_TRUE_FATAL(processor.Init(componentConfig));
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
         processor.Process(eventGroup);
         APSARA_TEST_TRUE_FATAL(eventGroup.HasTag(LOG_RESERVED_KEY_PATH));
         APSARA_TEST_EQUAL_FATAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH),

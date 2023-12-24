@@ -12,51 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdlib>
-#include "unittest/Unittest.h"
 #include "plugin/creator/StaticProcessorCreator.h"
+#include "plugin/instance/PluginInstance.h"
+#include "unittest/plugin/PluginMock.h"
+#include "unittest/Unittest.h"
+
+using namespace std;
 
 namespace logtail {
 
-class ProcessorMock : public Processor {
-public:
-    static const std::string sName;
-
-    const std::string& Name() const override { return sName; }
-    bool Init(const ComponentConfig& config) override { return true; }
-    void Process(PipelineEventGroup&) override {}
-    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; }
-};
-
-const std::string ProcessorMock::sName = "processor_mock";
-
-class StaticProcessorCreatorUnittest : public ::testing::Test {
+class StaticProcessorCreatorUnittest : public testing::Test {
 public:
     void TestName();
     void TestIsDynamic();
     void TestCreate();
 };
 
-APSARA_UNIT_TEST_CASE(StaticProcessorCreatorUnittest, TestName, 0);
-APSARA_UNIT_TEST_CASE(StaticProcessorCreatorUnittest, TestIsDynamic, 0);
-APSARA_UNIT_TEST_CASE(StaticProcessorCreatorUnittest, TestCreate, 0);
-
 void StaticProcessorCreatorUnittest::TestName() {
     StaticProcessorCreator<ProcessorMock> creator;
-    APSARA_TEST_STREQ_FATAL("processor_mock", creator.Name());
+    APSARA_TEST_STREQ("processor_mock", creator.Name());
 }
 
 void StaticProcessorCreatorUnittest::TestIsDynamic() {
     StaticProcessorCreator<ProcessorMock> creator;
-    APSARA_TEST_FALSE_FATAL(creator.IsDynamic());
+    APSARA_TEST_FALSE(creator.IsDynamic());
 }
 
 void StaticProcessorCreatorUnittest::TestCreate() {
     StaticProcessorCreator<ProcessorMock> creator;
-    auto processorMock = creator.Create("0");
-    APSARA_TEST_NOT_EQUAL_FATAL(nullptr, processorMock.get());
-    APSARA_TEST_EQUAL_FATAL("0", processorMock->Id());
+    unique_ptr<PluginInstance> processorMock = creator.Create("0");
+    APSARA_TEST_NOT_EQUAL(nullptr, processorMock.get());
+    APSARA_TEST_EQUAL("0", processorMock->Id());
 }
+
+UNIT_TEST_CASE(StaticProcessorCreatorUnittest, TestName)
+UNIT_TEST_CASE(StaticProcessorCreatorUnittest, TestIsDynamic)
+UNIT_TEST_CASE(StaticProcessorCreatorUnittest, TestCreate)
 
 } // namespace logtail
 

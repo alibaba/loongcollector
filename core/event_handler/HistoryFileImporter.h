@@ -20,7 +20,7 @@
 #include <unordered_map>
 #include "common/StringTools.h"
 #include "common/CircularBuffer.h"
-#include "config/Config.h"
+#include "input/InputFile.h"
 
 namespace logtail {
 
@@ -29,7 +29,10 @@ struct HistoryFileEvent {
     std::string mDirName;
     std::string mFileName;
     int64_t mStartPos;
-    std::shared_ptr<Config> mConfig;
+    FileDiscoveryConfig mDiscoveryconfig;
+    FileReaderConfig mReaderConfig;
+    MultilineConfig mMultilineConfig;
+    uint32_t mEOConcurrency = 0;
 
     HistoryFileEvent() : mStartPos(0) {}
 

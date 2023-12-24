@@ -15,7 +15,7 @@ public:
 
 private:
     MetricExportor();
-    ProfileSender mProfileSender;
+    
     int32_t mSendInterval;
     int32_t mLastSendTime;
 };

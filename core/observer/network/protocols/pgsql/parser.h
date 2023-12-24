@@ -19,6 +19,7 @@
 #include <utility>
 #include <ostream>
 
+#include "common/StringTools.h"
 #include "network/protocols/pgsql/type.h"
 
 #include "interface/network.h"

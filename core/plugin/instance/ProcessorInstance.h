@@ -18,9 +18,13 @@
 
 #include <memory>
 
+#include <json/json.h>
+
 #include "models/PipelineEventGroup.h"
+#include "monitor/LogtailMetric.h"
 #include "plugin/instance/PluginInstance.h"
 #include "plugin/interface/Processor.h"
+#include "pipeline/PipelineContext.h"
 
 namespace logtail {
 
@@ -29,8 +33,9 @@ public:
     ProcessorInstance(Processor* plugin, const std::string& pluginId) : PluginInstance(pluginId), mPlugin(plugin) {}
 
     const std::string& Name() const override { return mPlugin->Name(); };
-    bool Init(const ComponentConfig& config, PipelineContext& context) override;
-    void Process(PipelineEventGroup& logGroup);
+
+    bool Init(const Json::Value& config, PipelineContext& context);
+    void Process(std::vector<PipelineEventGroup>& logGroupList);
 
 private:
     std::unique_ptr<Processor> mPlugin;
@@ -42,6 +47,7 @@ private:
     CounterPtr mProcTimeMS;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    friend class ProcessorInstanceUnittest;
     friend class ProcessorParseRegexNativeUnittest;
     friend class ProcessorParseTimestampNativeUnittest;
     friend class ProcessorParseJsonNativeUnittest;

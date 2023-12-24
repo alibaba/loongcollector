@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(common)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
@@ -20,13 +20,11 @@ list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/BoostRegexValidato
 list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/GetUUID.cpp)
 if (MSVC)
     add_definitions(-DNOMINMAX)
-    list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/LinuxDaemonUtil.h)
-    list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/LinuxDaemonUtil.cpp)
+    if (ENABLE_ENTERPRISE)
+        list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/LinuxDaemonUtil.h)
+        list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/LinuxDaemonUtil.cpp)
+    endif()
 elseif (UNIX)
-    list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/WinUuid.h)
-    list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/WinUuid.cpp)
-    file(GLOB DMI_UUID_SOURCE_FILES dmi_uuid/*.c dmi_uuid/*.h)
-    list(APPEND LIB_SOURCE_FILES ${DMI_UUID_SOURCE_FILES})
     file(GLOB PICOHTTPPARSER_SOURCE_FILES protocol/picohttpparser/*.c protocol/picohttpparser/*.h)
     list(APPEND LIB_SOURCE_FILES ${PICOHTTPPARSER_SOURCE_FILES})
 endif ()

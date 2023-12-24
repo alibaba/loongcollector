@@ -184,7 +184,6 @@ void AppConfigUnittest::TestLoadEnvParameters() {
     setEnv("ALIYUN_LOGTAIL_CHECK_POINT_PATH", kCptPath);
     setEnv("truncate_pos_skip_bytes", kTruncatePosSkipBytes);
     setEnv("ALIYUN_LOGTAIL_USER_CONIFG_PATH", kUserConfigPath);
-    setEnv("user_local_config_filename", kUserLocalPath);
     setEnv("discard_old_data", kDiscardOldData);
     setEnv("ALIYUN_LOGTAIL_WORKING_IP", kWorkingIP);
     setEnv("ALIYUN_LOGTAIL_WORKING_HOSTNAME", kWorkingHostname);
@@ -233,7 +232,6 @@ void AppConfigUnittest::TestLoadFileParameters() {
     setJSON(value, "check_point_file_path", kCptPath);
     setJSON(value, "truncate_pos_skip_bytes", kTruncatePosSkipBytes);
     setJSON(value, "user_config_file_path", kUserConfigPath);
-    setJSON(value, "user_local_config_filename", kUserLocalPath);
     setJSON(value, "discard_old_data", kDiscardOldData);
     setJSON(value, "working_ip", kWorkingIP);
     setJSON(value, "working_hostname", kWorkingHostname);

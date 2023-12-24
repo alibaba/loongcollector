@@ -2,16 +2,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch UT",
+            "name": "(gdb) Launch iLogtail",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/core/build/unittest/processor/processor_parse_timestamp_native_unittest",
-            "args": [],
+            "program": "${workspaceFolder}/output/ilogtail",
+            "args": [
+                "-ilogtail_disable_core=false"
+            ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/core/build/unittest/processor",
-            "environment": [],
+            "cwd": "${workspaceFolder}/output",
             "externalConsole": false,
             "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -26,16 +28,19 @@
             ]
         },
         {
-            "name": "(gdb) Launch ilogtail",
+            "name": "(ctest) Launch UT",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/core/build/ilogtail",
-            "args": [],
+            "program": "${cmake.testProgram}",
+            "args": [
+                "${cmake.testArgs}"
+            ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/core/build",
+            "cwd": "${cmake.testWorkingDirectory}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -50,11 +55,18 @@
             ]
         },
         {
-            "name": "(gdb) Attach ilogtail",
+            "name": "(gdb) Launch memory dump",
             "type": "cppdbg",
-            "request": "attach",
-            "program": "${workspaceFolder}/core/build/ilogtail",
+            "request": "launch",
+            "program": "${workspaceFolder}/output/ilogtail",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/output",
+            "environment": [],
+            "externalConsole": false,
+            "coreDumpPath": "${workspaceFolder}/output/core",
             "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

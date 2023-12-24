@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 #pragma once
-#include "plugin/interface/Processor.h"
-#include <string>
-#include <rapidjson/rapidjson.h>
+
 #include <rapidjson/document.h>
+
+#include "models/LogEvent.h"
+#include "plugin/interface/Processor.h"
+#include "processor/CommonParserOptions.h"
 
 namespace logtail {
 
@@ -26,20 +28,23 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const ComponentConfig& componentConfig) override;
+    bool Init(const Json::Value& config) override;
     void Process(PipelineEventGroup& logGroup) override;
+
+    // Source field name.
+    std::string mSourceKey;
+    CommonParserOptions mCommonParserOptions;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    std::string mSourceKey;
+    bool JsonLogLineParser(LogEvent& sourceEvent, const StringView& logPath, PipelineEventPtr& e);
+    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
+    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
+    static std::string RapidjsonValueToString(const rapidjson::Value& value);
 
-    bool mDiscardUnmatch = false;
-    bool mUploadRawLog = false;
     bool mSourceKeyOverwritten = false;
-    std::string mRawLogTag;
-    bool mRawLogTagOverwritten = false;
 
     int* mParseFailures = nullptr;
     int* mLogGroupSize = nullptr;
@@ -48,11 +53,6 @@ private:
     CounterPtr mProcParseOutSizeBytes;
     CounterPtr mProcDiscardRecordsTotal;
     CounterPtr mProcParseErrorTotal;
-
-    bool JsonLogLineParser(LogEvent& sourceEvent, const StringView& logPath, PipelineEventPtr& e);
-    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent);
-    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
-    static std::string RapidjsonValueToString(const rapidjson::Value& value);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseJsonNativeUnittest;

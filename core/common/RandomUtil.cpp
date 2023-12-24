@@ -17,7 +17,6 @@
 #if defined(__linux__)
 #include <uuid/uuid.h>
 #endif
-#include "util.h"
 
 namespace logtail {
 

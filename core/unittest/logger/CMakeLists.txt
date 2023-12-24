@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(logger_unittest)
 
-add_executable(${PROJECT_NAME} logger_unittest.cpp)
-target_link_libraries(${PROJECT_NAME} unittest_base)
+add_executable(logger_unittest logger_unittest.cpp)
+target_link_libraries(logger_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(logger_unittest)

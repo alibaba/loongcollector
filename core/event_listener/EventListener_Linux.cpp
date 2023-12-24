@@ -21,8 +21,9 @@
 #include "common/ErrorUtil.h"
 #include "common/Flags.h"
 #include "controller/EventDispatcher.h"
+#include "event_handler/LogInput.h"
 
-DECLARE_FLAG_BOOL(fs_events_inotify_enable);
+DEFINE_FLAG_BOOL(fs_events_inotify_enable, "", true);
 
 namespace logtail {
 
@@ -93,7 +94,7 @@ int32_t logtail::EventListener::ReadEvents(std::vector<logtail::Event*>& eventVe
 
 
             // when interrupt (config update), must check event buf tail, if not a whole packet, next read will crash
-            if (dispatcher->IsInterupt()) {
+            if (LogInput::GetInstance()->IsInterupt()) {
                 n += sizeof(struct inotify_event) + event->len;
                 continue;
             }

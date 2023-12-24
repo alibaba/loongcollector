@@ -47,8 +47,7 @@ func TestBootCompose(t *testing.T) {
 	defer os.Remove("./test.log")
 	os.Create("test.log")
 	config.FlusherFile = "./test.log"
-	config.ConfigJSONFileDir = "./json"
-	config.ConfigYamlFileDir = "./yaml"
+	config.ConfigDir = "./yaml"
 	createComposeFile()
 	defer clean()
 	path, _ := filepath.Abs(".")

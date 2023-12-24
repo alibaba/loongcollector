@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(checkpoint_unittest)
 
 add_executable(checkpoint_manager_unittest CheckpointManagerUnittest.cpp)
@@ -23,3 +23,7 @@ target_link_libraries(checkpoint_manager_unittest unittest_base)
 
 add_executable(adhoc_checkpoint_manager_unittest AdhocCheckpointManagerUnittest.cpp)
 target_link_libraries(adhoc_checkpoint_manager_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(checkpoint_manager_unittest)
+# gtest_discover_tests(adhoc_checkpoint_manager_unittest)

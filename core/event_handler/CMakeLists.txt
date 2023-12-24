@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(event_handler)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
@@ -28,3 +28,4 @@ target_link_libraries(${PROJECT_NAME} config_manager)
 target_link_libraries(${PROJECT_NAME} monitor)
 target_link_libraries(${PROJECT_NAME} processor_daemon)
 target_link_libraries(${PROJECT_NAME} fuse)
+target_link_libraries(${PROJECT_NAME} application)

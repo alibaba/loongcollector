@@ -28,7 +28,6 @@ public:
 
         cfg->mLastApplyedConfigDetail = "[\n"
                                         "    {\n"
-                                        "        \"detail\":{\n"
                                         "            \"Common\":{\n"
                                         "                \"Sampling\":50,\n"
                                         "                \"FlushOutL4Interval\":5,\n"
@@ -85,9 +84,8 @@ public:
                                         "            },\n"
                                         "            \"EBPF\":{\n"
                                         "                \"Enabled\":true\n"
-                                        "            }\n"
-                                        "        },\n"
-                                        "        \"type\":\"observer_ilogtail_network_v1\"\n"
+                                        "            },\n"
+                                        "            \"Type\":\"input_observer_network\"\n"
                                         "    }\n"
                                         "]";
 

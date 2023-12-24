@@ -15,11 +15,13 @@
  */
 
 #pragma once
-#include <string>
 #include <ctime>
+#include <string>
 #include <thread>
-#include "log_pb/sls_logs.pb.h"
+
 #include "common/Strptime.h"
+#include "log_pb/sls_logs.pb.h"
+#include "pipeline/PipelineContext.h"
 
 // Time and timestamp utility.
 namespace logtail {
@@ -88,4 +90,8 @@ LogtailTime GetCurrentLogtailTime();
 uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
                              const char* preciseTimeSuffix,
                              const PreciseTimestampConfig& preciseTimestampConfig);
+bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond);
+
+bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, bool isAdjustmentNeeded, int& logTimeZoneOffsetSecond);
+
 } // namespace logtail

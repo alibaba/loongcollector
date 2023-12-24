@@ -17,12 +17,6 @@
 #pragma once
 
 #include <string>
-#include <utility>
-#include <vector>
-
-#include "pipeline/PipelineContext.h"
-#include "pipeline/PipelineConfig.h"
-#include "monitor/LogtailMetric.h"
 
 namespace logtail {
 
@@ -34,7 +28,6 @@ public:
     const std::string& Id() const { return mId; }
 
     virtual const std::string& Name() const = 0;
-    virtual bool Init(const ComponentConfig& config, PipelineContext& context) = 0;
 
 protected:
     const std::string mId;

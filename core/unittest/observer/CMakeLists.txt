@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(observer_unittest)
 
 add_executable(observer_config_unittest ObserverConfigUnittest.cpp)
@@ -45,7 +45,14 @@ add_executable(network_observer_unittest NetworkObserverUnittest.cpp)
 add_executable(protocol_util_unittest ProtocolUtilUnittest.cpp)
 add_executable(protocol_infer_unittest ProtocolInferUnittest.cpp)
 
-
 target_link_libraries(network_observer_unittest unittest_base)
 target_link_libraries(protocol_util_unittest unittest_base)
 target_link_libraries(protocol_infer_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(observer_config_unittest)
+gtest_discover_tests(netlink_meta_unittest)
+gtest_discover_tests(hostname_meta_unittest)
+gtest_discover_tests(network_observer_unittest)
+gtest_discover_tests(protocol_util_unittest)
+gtest_discover_tests(protocol_infer_unittest)

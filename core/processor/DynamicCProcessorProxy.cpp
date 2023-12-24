@@ -21,13 +21,14 @@ namespace logtail {
 DynamicCProcessorProxy::DynamicCProcessorProxy(const char* name) : _name(name) {
     _c_ins = new processor_instance_t;
 }
+
 DynamicCProcessorProxy::~DynamicCProcessorProxy() {
     _c_ins->plugin->finalize(_c_ins->plugin_state);
     delete _c_ins;
 }
 
-bool DynamicCProcessorProxy::Init(const ComponentConfig& componentConfig) {
-    return _c_ins->plugin->init(_c_ins, (void*)(&componentConfig), (void*)(&GetContext())) == 0;
+bool DynamicCProcessorProxy::Init(const Json::Value& config) {
+    return _c_ins->plugin->init(_c_ins, (void*)(&config), (void*)(&GetContext())) == 0;
 }
 
 void DynamicCProcessorProxy::Process(PipelineEventGroup& logGroup) {

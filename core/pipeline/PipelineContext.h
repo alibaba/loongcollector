@@ -15,12 +15,23 @@
  */
 
 #pragma once
-#include "models/PipelineEventGroup.h"
+
+#include <json/json.h>
+
+#include <cstdint>
+#include <string>
+
+#include "common/LogstoreFeedbackKey.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "models/PipelineEventGroup.h"
 #include "monitor/LogFileProfiler.h"
+#include "monitor/LogtailAlarm.h"
+#include "pipeline/GlobalConfig.h"
 
 namespace logtail {
+
+class Pipeline;
+class FlusherSLS;
 
 // for compatiblity with shennong profile
 struct ProcessProfile {
@@ -45,25 +56,50 @@ public:
     PipelineContext operator=(const PipelineContext&) = delete;
     PipelineContext operator=(PipelineContext&&) = delete;
 
-    const std::string& GetProjectName() const { return mProjectName; }
-    void SetProjectName(const std::string& projectName) { mProjectName = projectName; }
-    const std::string& GetLogstoreName() const { return mLogstoreName; }
-    void SetLogstoreName(const std::string& logstoreName) { mLogstoreName = logstoreName; }
     const std::string& GetConfigName() const { return mConfigName; }
     void SetConfigName(const std::string& configName) { mConfigName = configName; }
-    const std::string& GetRegion() const { return mRegion; }
-    void SetRegion(const std::string& region) { mRegion = region; }
+    uint32_t GetCreateTime() const { return mCreateTime; }
+    void SetCreateTime(uint32_t time) { mCreateTime = time; }
+    const GlobalConfig& GetGlobalConfig() const { return mGlobalConfig; }
+    bool InitGlobalConfig(const Json::Value& config, Json::Value& extendedParams) {
+        return mGlobalConfig.Init(config, *this, extendedParams);
+    }
+    const Pipeline& GetPipeline() const { return *mPipeline; }
+    Pipeline& GetPipeline() { return *mPipeline; }
+    void SetPipeline(Pipeline& pipeline) { mPipeline = &pipeline; }
 
-    ProcessProfile& GetProcessProfile() { return mProcessProfile; }
+    const std::string& GetProjectName() const;
+    const std::string& GetLogstoreName() const;
+    const std::string& GetRegion() const;
+    LogstoreFeedBackKey GetLogstoreKey() const;
+    const FlusherSLS* GetSLSInfo() const { return mSLSInfo; }
+    void SetSLSInfo(const FlusherSLS* flusherSLS) { mSLSInfo = flusherSLS; }
+    bool RequiringJsonReader() const { return mRequiringJsonReader; }
+    void SetRequiringJsonReaderFlag(bool flag) { mRequiringJsonReader = flag; }
+    bool IsFirstProcessorApsara() const { return mIsFirstProcessorApsara; }
+    void SetIsFirstProcessorApsaraFlag(bool flag) { mIsFirstProcessorApsara = flag; }
+
+    ProcessProfile& GetProcessProfile() const { return mProcessProfile; }
     // LogFileProfiler& GetProfiler() { return *mProfiler; }
-    Logger::logger& GetLogger() { return mLogger; }
-    LogtailAlarm& GetAlarm() { return *mAlarm; };
+    const Logger::logger& GetLogger() const { return mLogger; }
+    LogtailAlarm& GetAlarm() const { return *mAlarm; };
 
 private:
-    std::string mProjectName, mLogstoreName, mConfigName, mRegion;
-    ProcessProfile mProcessProfile;
+    static const std::string sEmptyString;
+
+    std::string mConfigName;
+    uint32_t mCreateTime;
+    GlobalConfig mGlobalConfig;
+    Pipeline* mPipeline = nullptr;
+
+    const FlusherSLS* mSLSInfo = nullptr;
+    bool mRequiringJsonReader = false;
+    bool mIsFirstProcessorApsara = false;
+
+    mutable ProcessProfile mProcessProfile;
     // LogFileProfiler* mProfiler = LogFileProfiler::GetInstance();
     Logger::logger mLogger = sLogger;
     LogtailAlarm* mAlarm = LogtailAlarm::GetInstance();
 };
+
 } // namespace logtail

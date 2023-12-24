@@ -21,7 +21,6 @@
 #include <vector>
 
 #include "K8sMeta.h"
-#include "common/util.h"
 #include "logger/Logger.h"
 #include "network/NetworkConfig.h"
 #include "network/sources/ebpf/EBPFWrapper.h"

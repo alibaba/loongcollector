@@ -12,12 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "JsonUtil.h"
+#include "common/JsonUtil.h"
+
+#include <sstream>
+#include <memory>
+
+#include "common/ExceptionBase.h"
+#include "common/StringTools.h"
 #include "logger/Logger.h"
-#include "ExceptionBase.h"
-#include "StringTools.h"
+
+using namespace std;
 
 namespace logtail {
+
+bool ParseJsonTable(const string& config, Json::Value& res, string& errorMsg) {
+    Json::CharReaderBuilder builder;
+    const unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    return reader->parse(config.c_str(), config.c_str() + config.size(), &res, &errorMsg);
+}
 
 bool IsValidJson(const char* buffer, int32_t size) {
     int32_t idx = 0;
@@ -59,8 +71,8 @@ bool IsValidJson(const char* buffer, int32_t size) {
     return braceCount == 0;
 }
 
-std::string CompactJson(const std::string& inJson) {
-    std::stringstream outJson;
+string CompactJson(const string& inJson) {
+    stringstream outJson;
     bool inQuote = false;
     for (auto ch = inJson.begin(); ch != inJson.end(); ++ch) {
         switch (*ch) {
@@ -89,66 +101,66 @@ std::string CompactJson(const std::string& inJson) {
     return outJson.str();
 }
 
-void CheckNameExist(const Json::Value& value, const std::string& name) {
+void CheckNameExist(const Json::Value& value, const string& name) {
     if (value.isMember(name) == false) {
-        throw ExceptionBase(std::string("The key '") + name + "' not exist");
+        throw ExceptionBase(string("The key '") + name + "' not exist");
     }
 }
 
-bool GetBoolValue(const Json::Value& value, const std::string& name) {
+bool GetBoolValue(const Json::Value& value, const string& name) {
     CheckNameExist(value, name);
     if (value[name].isBool() == false) {
-        throw ExceptionBase(std::string("The key '") + name + "' not valid bool value");
+        throw ExceptionBase(string("The key '") + name + "' not valid bool value");
     }
     return value[name].asBool();
 }
 
-bool GetBoolValue(const Json::Value& value, const std::string& name, const bool defValue) {
+bool GetBoolValue(const Json::Value& value, const string& name, const bool defValue) {
     if (value.isMember(name) == false) {
         return defValue;
     }
     return GetBoolValue(value, name);
 }
 
-std::string GetStringValue(const Json::Value& value, const std::string& name) {
+string GetStringValue(const Json::Value& value, const string& name) {
     CheckNameExist(value, name);
     if (value[name].isString() == false) {
-        throw ExceptionBase(std::string("The key '") + name + "' not valid string value");
+        throw ExceptionBase(string("The key '") + name + "' not valid string value");
     }
     return value[name].asString();
 }
 
-std::string GetStringValue(const Json::Value& value, const std::string& name, const std::string& defValue) {
+string GetStringValue(const Json::Value& value, const string& name, const string& defValue) {
     if (value.isMember(name) == false) {
         return defValue;
     }
     return GetStringValue(value, name);
 }
 
-int32_t GetIntValue(const Json::Value& value, const std::string& name) {
+int32_t GetIntValue(const Json::Value& value, const string& name) {
     CheckNameExist(value, name);
     if (value[name].isInt() == false) {
-        throw ExceptionBase(std::string("The key '") + name + "' not valid int value");
+        throw ExceptionBase(string("The key '") + name + "' not valid int value");
     }
     return value[name].asInt();
 }
 
-int32_t GetIntValue(const Json::Value& value, const std::string& name, const int32_t defValue) {
+int32_t GetIntValue(const Json::Value& value, const string& name, const int32_t defValue) {
     if (value.isMember(name) == false) {
         return defValue;
     }
     return GetIntValue(value, name);
 }
 
-int64_t GetInt64Value(const Json::Value& value, const std::string& name) {
+int64_t GetInt64Value(const Json::Value& value, const string& name) {
     CheckNameExist(value, name);
     if (value[name].isInt() == false) {
-        throw ExceptionBase(std::string("The key '") + name + "' not valid int value");
+        throw ExceptionBase(string("The key '") + name + "' not valid int value");
     }
     return value[name].asInt64();
 }
 
-int64_t GetInt64Value(const Json::Value& value, const std::string& name, const int64_t defValue) {
+int64_t GetInt64Value(const Json::Value& value, const string& name, const int64_t defValue) {
     if (value.isMember(name) == false) {
         return defValue;
     }
@@ -168,7 +180,7 @@ namespace {
                 APSARA_LOG_INFO(sLogger, ("load config from env", envKey)("value", val));
                 return true;
             }
-        } catch (const std::exception& e) {
+        } catch (const exception& e) {
             APSARA_LOG_WARNING(sLogger, ("load config from env error", envKey)("error", e.what()));
         }
         return false;
@@ -197,7 +209,7 @@ bool LoadInt32Parameter(int32_t& value, const Json::Value& confJSON, const char*
     LOAD_PARAMETER(value, confJSON, name, envName, isInt, asInt)
 }
 
-bool LoadStringParameter(std::string& value, const Json::Value& confJSON, const char* name, const char* envName) {
+bool LoadStringParameter(string& value, const Json::Value& confJSON, const char* name, const char* envName) {
     LOAD_PARAMETER(value, confJSON, name, envName, isString, asString)
 }
 

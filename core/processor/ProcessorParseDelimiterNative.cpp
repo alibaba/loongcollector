@@ -16,49 +16,165 @@
 
 #include "processor/ProcessorParseDelimiterNative.h"
 
-#include "common/Constants.h"
+#include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
 #include "monitor/MetricConstants.h"
-#include "parser/LogParser.h"
 #include "plugin/instance/ProcessorInstance.h"
 
-
 namespace logtail {
+
 const std::string ProcessorParseDelimiterNative::sName = "processor_parse_delimiter_native";
 
 const std::string ProcessorParseDelimiterNative::s_mDiscardedFieldKey = "_";
 
-bool ProcessorParseDelimiterNative::Init(const ComponentConfig& componentConfig) {
-    const PipelineConfig& config = componentConfig.GetConfig();
-    mSourceKey = DEFAULT_CONTENT_KEY;
-    mSeparator = config.mSeparator;
-    mColumnKeys = config.mColumnKeys;
-    mExtractPartialFields = config.mAdvancedConfig.mExtractPartialFields;
-    mAutoExtend = config.mAutoExtend;
-    mAcceptNoEnoughKeys = config.mAcceptNoEnoughKeys;
-    mDiscardUnmatch = config.mDiscardUnmatch;
-    mUploadRawLog = config.mUploadRawLog;
-    mRawLogTag = config.mAdvancedConfig.mRawLogTag;
-    mQuote = config.mQuote;
-    if (!mSeparator.empty())
-        mSeparatorChar = mSeparator.data()[0];
-    else {
-        // This should never happened.
-        mSeparatorChar = '\t';
+bool ProcessorParseDelimiterNative::Init(const Json::Value& config) {
+    std::string errorMsg;
+
+    // SourceKey
+    if (!GetMandatoryStringParam(config, "SourceKey", mSourceKey, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
     }
-    if (mUploadRawLog && mRawLogTag == mSourceKey) {
-        mSourceKeyOverwritten = true;
+
+    // Separator
+    if (!GetMandatoryStringParam(config, "Separator", mSeparator, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
     }
-    for (auto key : mColumnKeys) {
-        if (key.compare(mSourceKey) == 0) {
-            mSourceKeyOverwritten = true;
+    if (mSeparator.size() > 4) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           "mandatory string param Separator has more than 4 chars",
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    // Compatible with old logic.
+    if (mSeparator == "\\t") {
+        mSeparator = '\t';
+    }
+    mSeparatorChar = mSeparator[0];
+
+    // Quote
+    std::string quoteStr;
+    bool res = GetOptionalStringParam(config, "Quote", quoteStr, errorMsg);
+    if (mSeparator.size() == 1) {
+        if (!res) {
+            PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                                  mContext->GetAlarm(),
+                                  errorMsg,
+                                  "\"",
+                                  sName,
+                                  mContext->GetConfigName(),
+                                  mContext->GetProjectName(),
+                                  mContext->GetLogstoreName(),
+                                  mContext->GetRegion());
+        } else if (quoteStr.size() > 1) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               "string param Quote is not a single char",
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
+        } else if (!quoteStr.empty()) {
+            mQuote = quoteStr[0];
         }
-        if (key.compare(mRawLogTag) == 0) {
-            mRawLogTagOverwritten = true;
-        }
+    } else if (!quoteStr.empty()) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             "string param Quote is not allowed when param Separator is not a single char",
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
     }
 
     mDelimiterModeFsmParserPtr = new DelimiterModeFsmParser(mQuote, mSeparatorChar);
+
+    // Keys
+    if (!GetMandatoryListParam(config, "Keys", mKeys, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    for (const auto& key : mKeys) {
+        if (key == mSourceKey) {
+            mSourceKeyOverwritten = true;
+        }
+    }
+
+    // AllowingShortenedFields
+    if (!GetOptionalBoolParam(config, "AllowingShortenedFields", mAllowingShortenedFields, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mAllowingShortenedFields,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    // OverflowedFieldsTreatment
+    std::string overflowedFieldsTreatment;
+    if (!GetOptionalStringParam(config, "OverflowedFieldsTreatment", overflowedFieldsTreatment, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              "extend",
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    } else if (overflowedFieldsTreatment == "keep") {
+        mOverflowedFieldsTreatment = OverflowedFieldsTreatment::KEEP;
+    } else if (overflowedFieldsTreatment == "discard") {
+        mOverflowedFieldsTreatment = OverflowedFieldsTreatment::DISCARD;
+    } else if (!overflowedFieldsTreatment.empty() && overflowedFieldsTreatment != "extend") {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              "string param OverflowedFieldsTreatment is not valid",
+                              "extend",
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    // ExtractingPartialFields
+    // TODO: currently OverflowedFieldsTreatment additionally controls ExtractingPartialFields, which should be
+    // separated in the future.
+    mExtractingPartialFields = mOverflowedFieldsTreatment == OverflowedFieldsTreatment::DISCARD;
+
+    if (!mCommonParserOptions.Init(config, *mContext, sName)) {
+        return false;
+    }
+
     mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
     mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
 
@@ -66,6 +182,7 @@ bool ProcessorParseDelimiterNative::Init(const ComponentConfig& componentConfig)
     mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
     mProcDiscardRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DISCARD_RECORDS_TOTAL);
     mProcParseErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_ERROR_TOTAL);
+
     return true;
 }
 
@@ -115,33 +232,35 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
     }
     if (begIdx >= endIdx)
         return true;
-    size_t reserveSize = mAutoExtend ? (mColumnKeys.size() + 10) : (mColumnKeys.size() + 1);
+    size_t reserveSize
+        = mOverflowedFieldsTreatment == OverflowedFieldsTreatment::EXTEND ? (mKeys.size() + 10) : (mKeys.size() + 1);
     std::vector<StringView> columnValues;
     std::vector<size_t> colBegIdxs;
     std::vector<size_t> colLens;
     bool parseSuccess = false;
     size_t parsedColCount = 0;
     bool useQuote = (mSeparator.size() == 1) && (mQuote != mSeparatorChar);
-    if (mColumnKeys.size() > 0) {
+    if (mKeys.size() > 0) {
         if (useQuote) {
             columnValues.reserve(reserveSize);
             parseSuccess = mDelimiterModeFsmParserPtr->ParseDelimiterLine(buffer, begIdx, endIdx, columnValues);
             // handle auto extend
-            if (!mAutoExtend && columnValues.size() > mColumnKeys.size()) {
+            if (!(mOverflowedFieldsTreatment == OverflowedFieldsTreatment::EXTEND)
+                && columnValues.size() > mKeys.size()) {
                 int requiredLen = 0;
-                for (size_t i = mColumnKeys.size(); i < columnValues.size(); ++i) {
+                for (size_t i = mKeys.size(); i < columnValues.size(); ++i) {
                     requiredLen += 1 + columnValues[i].size();
                 }
                 StringBuffer sb = sourceEvent.GetSourceBuffer()->AllocateStringBuffer(requiredLen);
                 char* extraFields = sb.data;
-                for (size_t i = mColumnKeys.size(); i < columnValues.size(); ++i) {
+                for (size_t i = mKeys.size(); i < columnValues.size(); ++i) {
                     extraFields[0] = mSeparatorChar;
                     extraFields++;
                     memcpy(extraFields, columnValues[i].data(), columnValues[i].size());
                     extraFields += columnValues[i].size();
                 }
                 // remove extra fields
-                columnValues.resize(mColumnKeys.size());
+                columnValues.resize(mKeys.size());
                 columnValues.push_back(StringView(sb.data, requiredLen));
             }
             parsedColCount = columnValues.size();
@@ -153,17 +272,17 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
         }
 
         if (parseSuccess) {
-            if (parsedColCount <= 0 || (!mAcceptNoEnoughKeys && parsedColCount < mColumnKeys.size())) {
-                LOG_WARNING(sLogger,
-                            ("parse delimiter log fail, keys count unmatch "
-                             "columns count, parsed",
-                             parsedColCount)("required", mColumnKeys.size())("log", buffer)(
-                                "project", GetContext().GetProjectName())("logstore", GetContext().GetLogstoreName())(
-                                "file", logPath));
+            if (parsedColCount <= 0 || (!mAllowingShortenedFields && parsedColCount < mKeys.size())) {
+                LOG_WARNING(
+                    sLogger,
+                    ("parse delimiter log fail, keys count unmatch "
+                     "columns count, parsed",
+                     parsedColCount)("required", mKeys.size())("log", buffer)("project", GetContext().GetProjectName())(
+                        "logstore", GetContext().GetLogstoreName())("file", logPath));
                 GetContext().GetAlarm().SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                   std::string("keys count unmatch columns count :")
                                                       + ToString(parsedColCount) + ", required:"
-                                                      + ToString(mColumnKeys.size()) + ", logs:" + buffer.to_string(),
+                                                      + ToString(mKeys.size()) + ", logs:" + buffer.to_string(),
                                                   GetContext().GetProjectName(),
                                                   GetContext().GetLogstoreName(),
                                                   GetContext().GetRegion());
@@ -198,15 +317,15 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
 
     if (parseSuccess) {
         for (uint32_t idx = 0; idx < parsedColCount; idx++) {
-            if (mColumnKeys.size() > idx) {
-                if (mExtractPartialFields && mColumnKeys[idx] == s_mDiscardedFieldKey) {
+            if (mKeys.size() > idx) {
+                if (mExtractingPartialFields && mKeys[idx] == s_mDiscardedFieldKey) {
                     continue;
                 }
-                AddLog(mColumnKeys[idx],
+                AddLog(mKeys[idx],
                        useQuote ? columnValues[idx] : StringView(buffer.data() + colBegIdxs[idx], colLens[idx]),
                        sourceEvent);
             } else {
-                if (mExtractPartialFields) {
+                if (mExtractingPartialFields) {
                     continue;
                 }
                 std::string key = "__column" + ToString(idx) + "__";
@@ -216,27 +335,26 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
                        sourceEvent);
             }
         }
-    } else if (!mDiscardUnmatch) {
-        AddLog(LogParser::UNMATCH_LOG_KEY, // __raw_log__
-               buffer,
-               sourceEvent); // legacy behavior, should use sourceKey
     }
-    if (parseSuccess || !mDiscardUnmatch) {
-        if (mUploadRawLog && (!parseSuccess || !mRawLogTagOverwritten)) {
-            AddLog(mRawLogTag, buffer, sourceEvent); // __raw__
-        }
-        if (parseSuccess && !mSourceKeyOverwritten) {
-            sourceEvent.DelContent(mSourceKey);
-        }
-        return true;
+    if (!parseSuccess || !mSourceKeyOverwritten) {
+        sourceEvent.DelContent(mSourceKey);
     }
-    mProcDiscardRecordsTotal->Add(1);
-    return false;
+    if (mCommonParserOptions.ShouldAddSourceContent(parseSuccess)) {
+        AddLog(mCommonParserOptions.mRenamedSourceKey, buffer, sourceEvent, false);
+    }
+    if (mCommonParserOptions.ShouldAddLegacyUnmatchedRawLog(parseSuccess)) {
+        AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, buffer, sourceEvent, false);
+    }
+    if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent)) {
+        mProcDiscardRecordsTotal->Add(1);
+        return false;
+    }
+    return true;
 }
 
 bool ProcessorParseDelimiterNative::SplitString(
     const char* buffer, int32_t begIdx, int32_t endIdx, std::vector<size_t>& colBegIdxs, std::vector<size_t>& colLens) {
-    if (endIdx <= begIdx || mSeparator.size() == 0 || mColumnKeys.size() == 0)
+    if (endIdx <= begIdx || mSeparator.size() == 0 || mKeys.size() == 0)
         return false;
     size_t size = endIdx - begIdx;
     size_t d_size = mSeparator.size();
@@ -266,7 +384,7 @@ bool ProcessorParseDelimiterNative::SplitString(
         if (pos2 == (size_t)endIdx)
             return true;
         pos = pos2 + d_size;
-        if (colLens.size() >= mColumnKeys.size() && !mAutoExtend) {
+        if (colLens.size() >= mKeys.size() && !(mOverflowedFieldsTreatment == OverflowedFieldsTreatment::EXTEND)) {
             colBegIdxs.push_back(pos2);
             colLens.push_back(endIdx - pos2);
             return true;
@@ -279,7 +397,13 @@ bool ProcessorParseDelimiterNative::SplitString(
     return true;
 }
 
-void ProcessorParseDelimiterNative::AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent) {
+void ProcessorParseDelimiterNative::AddLog(const StringView& key,
+                                           const StringView& value,
+                                           LogEvent& targetEvent,
+                                           bool overwritten) {
+    if (!overwritten && targetEvent.HasContent(key)) {
+        return;
+    }
     targetEvent.SetContentNoCopy(key, value);
     *mLogGroupSize += key.size() + value.size() + 5;
     mProcParseOutSizeBytes->Add(key.size() + value.size());

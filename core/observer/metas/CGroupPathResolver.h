@@ -20,7 +20,6 @@
 #include <regex>
 #include <vector>
 
-#include "common/util.h"
 #include "ProcessMeta.h"
 
 namespace logtail {

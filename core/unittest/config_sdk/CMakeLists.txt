@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.9)
+cmake_minimum_required(VERSION 3.10)
 project(config_sdk_unittest)
 
 add_executable(config_sdk_unittest config_sdk_unittest.cpp)
 target_link_libraries(config_sdk_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(config_sdk_unittest)

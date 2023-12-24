@@ -20,6 +20,8 @@
 #include <memory>
 #include <deque>
 #include <ostream>
+
+#include "common/StringTools.h"
 #include "network/protocols/redis/type.h"
 #include "observer/interface/network.h"
 #include "inner_parser.h"

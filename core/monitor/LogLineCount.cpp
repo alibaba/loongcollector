@@ -24,6 +24,8 @@
 #include "config_manager/ConfigManager.h"
 #include "Sender.h"
 #include "LogtailAlarm.h"
+#include "application/Application.h"
+#include "common/TimeUtil.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -170,7 +172,7 @@ void LogLineCount::SendLineCountData(bool forceSend) {
                 }
             }
             logGroup.set_category(lineCountLogStore);
-            logGroup.set_machineuuid(ConfigManager::GetInstance()->GetUUID());
+            logGroup.set_machineuuid(Application::GetInstance()->GetUUID());
 
             LogTag* logTagPtr = logGroup.add_logtags();
             logTagPtr->set_key("__hostname__"); // NOTICE: "__hostname__" for kepler
@@ -180,7 +182,7 @@ void LogLineCount::SendLineCountData(bool forceSend) {
             logTagPtr->set_key("ip");
             logTagPtr->set_value(LogFileProfiler::mIpAddr);
 
-            mProfileSender.SendToLineCountProject(region, lineCountProject, logGroup);
+            ProfileSender::GetInstance()->SendToLineCountProject(region, lineCountProject, logGroup);
             LOG_DEBUG(
                 sLogger,
                 ("send line count data, region", region)("project", lineCountProject)("log store", lineCountLogStore));

@@ -19,7 +19,6 @@
 #include <unordered_map>
 #include "common/Lock.h"
 #include "common/DevInode.h"
-#include "util.h"
 
 namespace logtail {
 

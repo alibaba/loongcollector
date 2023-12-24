@@ -23,17 +23,17 @@
 #include <atomic>
 #include "parser/LogParser.h"
 #include "common/TimeUtil.h"
-#include "common/GlobalPara.h"
 #include "common/StringTools.h"
 #include "common/EncodingConverter.h"
 #include "common/DevInode.h"
 #include "common/LogFileOperator.h"
 #include "logger/Logger.h"
 #include "log_pb/sls_logs.pb.h"
-#include "config/LogType.h"
 #include "common/FileInfo.h"
 #include "checkpoint/RangeCheckpoint.h"
 #include "reader/SourceBuffer.h"
+#include "reader/FileReaderOptions.h"
+#include "file_server/MultilineOptions.h"
 
 namespace logtail {
 
@@ -92,38 +92,33 @@ public:
         BACKWARD_TO_FIXED_POS,
     };
 
-    // for ApsaraLogFileReader
-    LogFileReader(const std::string& projectName,
-                  const std::string& category,
-                  const std::string& hostLogPathDir,
-                  const std::string& hostLogPathFile,
-                  int32_t tailLimit,
-                  bool discardUnmatch,
-                  bool dockerFileFlag);
+    static LogFileReader* CreateLogFileReader(const std::string& hostLogPathDir,
+                                              const std::string& hostLogPathFile,
+                                              const DevInode& devInode,
+                                              const FileReaderConfig& readerConfig,
+                                              const MultilineConfig& multilineConfig,
+                                              const FileDiscoveryConfig& discoveryConfig,
+                                              uint32_t exactlyonceConcurrency,
+                                              bool forceFromBeginning);
 
-    // for CommonRegLogFileReader, JsonLogFileReader, DelimiterLogFileReader
-    LogFileReader(const std::string& projectName,
-                  const std::string& category,
-                  const std::string& hostLogPathDir,
+    LogFileReader(const std::string& hostLogPathDir,
                   const std::string& hostLogPathFile,
-                  int32_t tailLimit,
-                  const std::string& topicFormat,
-                  const std::string& groupTopic,
-                  FileEncoding fileEncoding,
-                  bool discardUnmatch,
-                  bool dockerFileFlag);
+                  const DevInode& devInode,
+                  const FileReaderConfig& readerConfig,
+                  const MultilineConfig& multilineConfig);
 
     bool ReadLog(LogBuffer& logBuffer, const Event* event);
     time_t GetLastUpdateTime() const // actually it's the time whenever ReadLogs is called
     {
         return mLastUpdateTime;
     }
-    // this function should only be called once
-    void SetLogMultilinePolicy(const std::string& begReg, const std::string& conReg, const std::string& endReg);
+    // 转移至multilineoptions
+    // // this function should only be called once
+    // void SetLogMultilinePolicy(const std::string& begReg, const std::string& conReg, const std::string& endReg);
 
-    bool IsMultiLine() { return mLogBeginRegPtr != NULL || mLogContinueRegPtr != NULL || mLogEndRegPtr != NULL; }
+    // bool IsMultiLine() { return mLogBeginRegPtr != NULL || mLogContinueRegPtr != NULL || mLogEndRegPtr != NULL; }
 
-    void SetReaderFlushTimeout(int timeout) { mReaderFlushTimeout = timeout; }
+    // void SetReaderFlushTimeout(int timeout) { mReaderFlushTimeout = timeout; }
 
     std::string GetTopicName(const std::string& topicConfig, const std::string& path);
 
@@ -138,19 +133,19 @@ public:
 
     virtual ~LogFileReader();
 
-    const std::string& GetRegion() const { return mRegion; }
+    // const std::string& GetRegion() const { return mRegion; }
 
-    void SetRegion(const std::string& region) { mRegion = region; }
+    // void SetRegion(const std::string& region) { mRegion = region; }
 
-    const std::string& GetConfigName() const { return mConfigName; }
+    // const std::string& GetConfigName() const { return mConfigName; }
 
-    void SetConfigName(const std::string& configName) { mConfigName = configName; }
+    // void SetConfigName(const std::string& configName) { mConfigName = configName; }
 
-    const std::string& GetProjectName() const { return mProjectName; }
+    // const std::string& GetProjectName() const { return mProjectName; }
 
     const std::string& GetTopicName() const { return mTopicName; }
 
-    const std::string& GetCategory() const { return mCategory; }
+    // const std::string& GetCategory() const { return mCategory; }
 
     /// @return e.g. `/logtail_host/var/xxx/home/admin/access.log`,
     const std::string& GetHostLogPath() const { return mHostLogPath; }
@@ -174,7 +169,8 @@ public:
 
     void SetReadFromBeginning();
 
-    bool SetReadPosForBackwardReading(LogFileOperator& op);
+    // fuse, 废弃
+    // bool SetReadPosForBackwardReading(LogFileOperator& op);
 
     void SetLastFilePos(int64_t pos) {
         if (pos > 0)
@@ -204,9 +200,9 @@ public:
 
     bool ShouldForceReleaseDeletedFileFd();
 
-    void SetPluginFlag(bool flag) { mPluginFlag = flag; }
+    // void SetPluginFlag(bool flag) { mPluginFlag = flag; }
 
-    bool GetPluginFlag() const { return mPluginFlag; }
+    // bool GetPluginFlag() const { return mPluginFlag; }
 
     void OnOpenFileError();
 
@@ -230,7 +226,7 @@ public:
 
     void CloseFilePtr();
 
-    void SetLogstoreKey(uint64_t logstoreKey) { mLogstoreKey = logstoreKey; }
+    // void SetLogstoreKey(uint64_t logstoreKey) { mLogstoreKey = logstoreKey; }
 
     // Return the key of queues into which next read data will push.
     //
@@ -249,9 +245,9 @@ public:
 
     const std::string& GetRealLogPath() const { return mRealLogPath; }
 
-    void SetTimeFormat(const std::string& timeFormat) { mTimeFormat = timeFormat; }
+    // void SetTimeFormat(const std::string& timeFormat) { mTimeFormat = timeFormat; }
 
-    std::string GetTimeFormat() const { return mTimeFormat; }
+    // std::string GetTimeFormat() const { return mTimeFormat; }
 
     bool IsReadToEnd() const { return GetLastReadPos() == mLastFileSize; }
 
@@ -261,19 +257,19 @@ public:
 
     void SetReaderArray(LogFileReaderPtrArray* readerArray);
 
-    // some Reader will overide these functions (eg. JsonLogFileReader)
-    virtual bool ParseLogLine(StringView buffer,
-                              sls_logs::LogGroup& logGroup,
-                              ParseLogError& error,
-                              LogtailTime& lastLogLineTime,
-                              std::string& lastLogTimeStr,
-                              uint32_t& logGroupSize)
-        = 0;
-    virtual bool LogSplit(const char* buffer,
-                          int32_t size,
-                          int32_t& lineFeed,
-                          std::vector<StringView>& logIndex,
-                          std::vector<StringView>& discardIndex);
+    // // some Reader will overide these functions (eg. JsonLogFileReader)
+    // virtual bool ParseLogLine(StringView buffer,
+    //                           sls_logs::LogGroup& logGroup,
+    //                           ParseLogError& error,
+    //                           LogtailTime& lastLogLineTime,
+    //                           std::string& lastLogTimeStr,
+    //                           uint32_t& logGroupSize)
+    //     = 0;
+    // virtual bool LogSplit(const char* buffer,
+    //                       int32_t size,
+    //                       int32_t& lineFeed,
+    //                       std::vector<StringView>& logIndex,
+    //                       std::vector<StringView>& discardIndex);
 
     // added by xianzhi(bowen.gbw@antfin.com)
     static bool ParseLogTime(const char* buffer,
@@ -295,9 +291,9 @@ public:
 
     bool IsFromCheckPoint() { return mLastFileSignatureHash != 0 && mLastFileSignatureSize > (size_t)0; }
 
-    void SetDelayAlarmBytes(int64_t value) { mReadDelayAlarmBytes = value; }
+    // void SetDelayAlarmBytes(int64_t value) { mReadDelayAlarmBytes = value; }
 
-    int64_t GetPackId() { return ++mPackId; }
+    // int64_t GetPackId() { return ++mPackId; }
 
     void SetDockerPath(const std::string& dockerBasePath, size_t dockerReplaceSize);
 
@@ -307,48 +303,55 @@ public:
         mExtraTags.insert(mExtraTags.end(), tags.begin(), tags.end());
     }
 
-    void SetDelaySkipBytes(int64_t value) { mReadDelaySkipBytes = value; }
+    // void SetDelaySkipBytes(int64_t value) { mReadDelaySkipBytes = value; }
 
-    void SetFuseMode(bool fusemode) { mIsFuseMode = fusemode; }
+    // void SetFuseMode(bool fusemode) { mIsFuseMode = fusemode; }
 
-    bool GetFuseMode() const { return mIsFuseMode; }
+    // bool GetFuseMode() const { return mIsFuseMode; }
 
-    void SetMarkOffsetFlag(bool markOffsetFlag) { mMarkOffsetFlag = markOffsetFlag; }
+    // void SetMarkOffsetFlag(bool markOffsetFlag) { mMarkOffsetFlag = markOffsetFlag; }
 
-    bool GetMarkOffsetFlag() const { return mMarkOffsetFlag; }
+    // bool GetMarkOffsetFlag() const { return mMarkOffsetFlag; }
 
-    void SetFuseTrimedFilename(const std::string& filename) { mFuseTrimedFilename = filename; }
+    // void SetFuseTrimedFilename(const std::string& filename) { mFuseTrimedFilename = filename; }
 
-    std::string GetFuseTrimedFilename() const { return mFuseTrimedFilename; }
+    // std::string GetFuseTrimedFilename() const { return mFuseTrimedFilename; }
 
     void ResetTopic(const std::string& topicFormat);
 
     // SetReadBufferSize set reader buffer size, which controls the max size of single log.
     static void SetReadBufferSize(int32_t bufSize);
 
-    void SetSpecifiedYear(int32_t y) { mSpecifiedYear = y; }
+    // void SetSpecifiedYear(int32_t y) { mSpecifiedYear = y; }
 
-    void SetCloseUnusedInterval(int32_t interval) { mCloseUnusedInterval = interval; }
+    // void SetCloseUnusedInterval(int32_t interval) { mCloseUnusedInterval = interval; }
 
-    void SetPreciseTimestampConfig(bool enabled, const std::string& key, TimeStampUnit unit) {
-        mPreciseTimestampConfig.enabled = enabled;
-        mPreciseTimestampConfig.key = key;
-        mPreciseTimestampConfig.unit = unit;
-    }
+    // void SetPreciseTimestampConfig(bool enabled, const std::string& key, TimeStampUnit unit) {
+    //     mPreciseTimestampConfig.enabled = enabled;
+    //     mPreciseTimestampConfig.key = key;
+    //     mPreciseTimestampConfig.unit = unit;
+    // }
 
-    void SetTzOffsetSecond(bool tzAdjust = false, int logTzOffsetSecond = 0) {
-        if (tzAdjust) {
-            mTzOffsetSecond = logTzOffsetSecond - GetLocalTimeZoneOffsetSecond();
-        } else {
-            mTzOffsetSecond = 0;
-        }
-    }
+    // void SetTzOffsetSecond(bool tzAdjust = false, int logTzOffsetSecond = 0) {
+    //     if (tzAdjust) {
+    //         mTzOffsetSecond = logTzOffsetSecond - GetLocalTimeZoneOffsetSecond();
+    //     } else {
+    //         mTzOffsetSecond = 0;
+    //     }
+    // }
 
-    void SetAdjustApsaraMicroTimezone(bool adjustApsaraMicroTimezone = false) {
-        mAdjustApsaraMicroTimezone = adjustApsaraMicroTimezone;
-    }
+    // void SetAdjustApsaraMicroTimezone(bool adjustApsaraMicroTimezone = false) {
+    //     mAdjustApsaraMicroTimezone = adjustApsaraMicroTimezone;
+    // }
 
     std::unique_ptr<Event> CreateFlushTimeoutEvent();
+
+    const std::string& GetProject() const { return mProject; }
+    const std::string& GetLogstore() const { return mLogstore; }
+    const std::string& GetRegion() const { return mRegion; }
+    const std::string& GetConfigName() const { return mConfigName; }
+
+    int64_t GetLogGroupKey() const { return mLogGroupKey; }
 
 protected:
     bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool allowRollback = true);
@@ -376,66 +379,77 @@ protected:
     }
 
     static size_t BUFFER_SIZE;
-    std::string mRegion;
-    std::string mCategory;
-    std::string mConfigName;
+    // std::string mRegion;
+    // std::string mCategory;
+    // std::string mConfigName;
     std::string mHostLogPath;
     std::string mHostLogPathDir;
     std::string mHostLogPathFile;
     std::string mRealLogPath; // real log path
     bool mSymbolicLinkFlag = false;
     std::string mSourceId;
-    int32_t mTailLimit; // KB
-    uint64_t mLastFileSignatureHash;
-    uint32_t mLastFileSignatureSize;
+    // int32_t mTailLimit; // KB
+    uint64_t mLastFileSignatureHash = 0;
+    uint32_t mLastFileSignatureSize = 0;
     int64_t mLastFilePos = 0; // pos read and consumed, used for next read begin
     int64_t mLastFileSize = 0;
     time_t mLastMTime = 0;
     std::string mCache;
-    std::string mProjectName;
+    // std::string mProjectName;
     std::string mTopicName;
     time_t mLastUpdateTime;
-    boost::regex* mLogBeginRegPtr;
-    boost::regex* mLogContinueRegPtr;
-    boost::regex* mLogEndRegPtr;
-    int mReaderFlushTimeout;
-    bool mLastForceRead;
-    FileEncoding mFileEncoding;
-    bool mDiscardUnmatch;
-    LogType mLogType;
+    // boost::regex* mLogBeginRegPtr;
+    // boost::regex* mLogContinueRegPtr;
+    // boost::regex* mLogEndRegPtr;
+    // int mReaderFlushTimeout;
+    bool mLastForceRead = false;
+    // FileEncoding mFileEncoding;
+    // bool mDiscardUnmatch;
+    // LogType mLogType;
     DevInode mDevInode;
-    bool mFirstWatched;
-    bool mFileDeleted;
-    time_t mDeletedTime;
-    bool mContainerStopped;
-    time_t mContainerStoppedTime;
-    time_t mReadStoppedContainerAlarmTime;
-    int32_t mReadDelayTime;
-    bool mSkipFirstModify;
-    int64_t mReadDelayAlarmBytes;
-    bool mPluginFlag;
-    int64_t mPackId;
-    int64_t mReadDelaySkipBytes; // if <=0, discard it, default 0.
+    bool mFirstWatched = true;
+    bool mFileDeleted = false;
+    time_t mDeletedTime = 0;
+    bool mContainerStopped = false;
+    time_t mContainerStoppedTime = 0;
+    time_t mReadStoppedContainerAlarmTime = 0;
+    int32_t mReadDelayTime = 0;
+    bool mSkipFirstModify = false;
+    // int64_t mReadDelayAlarmBytes;
+    // bool mPluginFlag;
+    // int64_t mPackId;
+    // int64_t mReadDelaySkipBytes; // if <=0, discard it, default 0.
     int32_t mLastEventTime; // last time when process modify event, updated in check file sig
-    int32_t mSpecifiedYear; // Copied from corresponding Config, see more in Config.h
-    bool mIsFuseMode = false;
-    bool mMarkOffsetFlag = false;
-    std::string mTimeFormat; // for backward reading
+    // int32_t mSpecifiedYear;
+    // bool mIsFuseMode = false;
+    // bool mMarkOffsetFlag = false;
+    // std::string mTimeFormat; // for backward reading
     LogFileOperator mLogFileOp; // encapsulate fuse & non-fuse mode
-    std::string mFuseTrimedFilename;
-    LogFileReaderPtrArray* mReaderArray;
-    uint64_t mLogstoreKey;
+    // std::string mFuseTrimedFilename;
+    LogFileReaderPtrArray* mReaderArray = nullptr;
+    // uint64_t mLogstoreKey;
     // mHostLogPath is `/logtail_host/var/xxx/home/admin/access.log`,
     // mDockerPath is `/home/admin/access.log`
     // we should use mDockerPath to extract topic and set it to __tag__:__path__
     std::string mDockerPath;
     std::vector<sls_logs::LogTag> mExtraTags;
-    int32_t mCloseUnusedInterval;
+    // int32_t mCloseUnusedInterval;
 
-    PreciseTimestampConfig mPreciseTimestampConfig;
+    // PreciseTimestampConfig mPreciseTimestampConfig;
 
-    int32_t mTzOffsetSecond;
-    bool mAdjustApsaraMicroTimezone;
+    // int32_t mTzOffsetSecond;
+    // bool mAdjustApsaraMicroTimezone;
+
+    FileReaderConfig mReaderConfig;
+    MultilineConfig mMultilineConfig;
+    int64_t mLogGroupKey = 0;
+
+    // since reader is destructed after the corresponding pipeline is removed, pipeline context used in destructor
+    // should be copied explicitly from context.
+    std::string mProject;
+    std::string mLogstore;
+    std::string mConfigName;
+    std::string mRegion;
 
 private:
     // Initialized when the exactly once feature is enabled.
@@ -495,7 +509,7 @@ private:
     // Conflict resolve: file signature will be stored in primary checkpoint.
     std::string makePrimaryCheckpointKey() {
         std::string key;
-        key.append(mConfigName)
+        key.append(mReaderConfig.second->GetConfigName())
             .append("-")
             .append(mHostLogPath)
             .append("-")
@@ -574,6 +588,7 @@ private:
     friend class LogSplitNoDiscardUnmatchUnittest;
     friend class LastMatchedLineDiscardUnmatchUnittest;
     friend class LastMatchedLineNoDiscardUnmatchUnittest;
+    friend class LogFileReaderCheckpointUnittest;
 
 protected:
     void UpdateReaderManual();

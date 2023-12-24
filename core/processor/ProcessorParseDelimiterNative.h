@@ -14,47 +14,66 @@
  * limitations under the License.
  */
 
-#include "plugin/interface/Processor.h"
-#include <string>
-#include <boost/regex.hpp>
+#pragma once
+
+#include "models/LogEvent.h"
 #include "parser/DelimiterModeFsmParser.h"
+#include "plugin/interface/Processor.h"
+#include "processor/CommonParserOptions.h"
 
 namespace logtail {
 
 class ProcessorParseDelimiterNative : public Processor {
 public:
+    enum class OverflowedFieldsTreatment { EXTEND, KEEP, DISCARD };
+
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const ComponentConfig& componentConfig) override;
+    bool Init(const Json::Value& config) override;
     void Process(PipelineEventGroup& logGroup) override;
+
+    // Required: source field name.
+    std::string mSourceKey;
+    // Required: Separator
+    std::string mSeparator;
+    // Quotation mark
+    char mQuote = '"';
+    // Required: List of extracted fields.
+    std::vector<std::string> mKeys;
+    // Whether the number of fields allowed to be extracted is less than the number of Keys. If not allowed, this
+    // scenario will be considered as parsing failure.
+    bool mAllowingShortenedFields = true;
+    // Behavior when the number of extracted fields is greater than the number of Keys. Optional values include:
+    // ● extend: Retain excess fields, and each excess field is added to the log as a separate field, with the field
+    // name being __column$i__, where $i represents the sequence number of additional fields, starting from 0.
+    // ● keep: Retain excess fields, but add surplus content as a whole field to the log, with the field name being
+    // __column0__.
+    // ● discard: Discard excess fields.
+    OverflowedFieldsTreatment mOverflowedFieldsTreatment = OverflowedFieldsTreatment::EXTEND;
+    bool mExtractingPartialFields = false;
+    CommonParserOptions mCommonParserOptions;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
-    bool SplitString(const char* buffer, int32_t begIdx, int32_t endIdx, std::vector<size_t>& colBegIdxs, std::vector<size_t>& colLens);
-    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent);
-    std::string mSourceKey;
-    std::string mSeparator;
-    std::string mRawLogTag;
-    std::vector<std::string> mColumnKeys;
-    bool mExtractPartialFields = false;
-    bool mAutoExtend = false;
-    bool mAcceptNoEnoughKeys = false;
-    bool mDiscardUnmatch = false;
-    bool mUploadRawLog = false;
-    bool mSourceKeyOverwritten = false;
-    bool mRawLogTagOverwritten = false;
-    char mQuote;
-    char mSeparatorChar;
-    DelimiterModeFsmParser* mDelimiterModeFsmParserPtr;
+    static const std::string s_mDiscardedFieldKey;
 
+    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
+    bool SplitString(const char* buffer,
+                     int32_t begIdx,
+                     int32_t endIdx,
+                     std::vector<size_t>& colBegIdxs,
+                     std::vector<size_t>& colLens);
+    void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
+
+    char mSeparatorChar;
+    bool mSourceKeyOverwritten = false;
+    DelimiterModeFsmParser* mDelimiterModeFsmParserPtr = nullptr;
+    
     int* mLogGroupSize = nullptr;
     int* mParseFailures = nullptr;
-
-    static const std::string s_mDiscardedFieldKey;
     CounterPtr mProcParseInSizeBytes;
     CounterPtr mProcParseOutSizeBytes;
     CounterPtr mProcDiscardRecordsTotal;

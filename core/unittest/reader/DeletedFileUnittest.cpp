@@ -12,30 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "reader/LogFileReader.h"
 #include "unittest/Unittest.h"
-#include <fstream>
-#include <json/json.h>
-#include "reader/CommonRegLogFileReader.h"
-#include "util.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
 
+using namespace std;
+
 namespace logtail {
 
-class DeletedFileUnittest : public ::testing::Test {
+class DeletedFileUnittest : public testing::Test {
 public:
-    void SetUp() override {
-        hostLogPathDir = ".";
-        hostLogPathFile = "DeletedFileUnittest.txt";
-        reader.reset(new CommonRegLogFileReader(
-            "testProject", "testLogstore", hostLogPathDir, hostLogPathFile, 0, "%Y-%m-%d %H:%M:%S", ""));
-    }
-    void TearDown() override { INT32_FLAG(force_release_deleted_file_fd_timeout) = -1; }
     void TestShouldForceReleaseDeletedFileFdDeleted();
     void TestShouldForceReleaseDeletedFileFdStopped();
+
+protected:
+    void SetUp() override {
+        reader.reset(new LogFileReader(hostLogPathDir,
+                                       hostLogPathFile,
+                                       DevInode(),
+                                       make_pair(&readerOpts, &ctx),
+                                       make_pair(&multilineOpts, &ctx)));
+        }
+
+    void TearDown() override { INT32_FLAG(force_release_deleted_file_fd_timeout) = -1; }
+
+private:
     LogFileReaderPtr reader;
-    std::string hostLogPathDir;
-    std::string hostLogPathFile;
+    FileReaderOptions readerOpts;
+    MultilineOptions multilineOpts;
+    PipelineContext ctx;
+    string hostLogPathDir = ".";
+    string hostLogPathFile = "DeletedFileUnittest.txt";
 };
 
 void DeletedFileUnittest::TestShouldForceReleaseDeletedFileFdDeleted() {
@@ -52,14 +60,9 @@ void DeletedFileUnittest::TestShouldForceReleaseDeletedFileFdStopped() {
     APSARA_TEST_TRUE(reader->ShouldForceReleaseDeletedFileFd());
 }
 
-UNIT_TEST_CASE(DeletedFileUnittest, TestShouldForceReleaseDeletedFileFdDeleted);
-UNIT_TEST_CASE(DeletedFileUnittest, TestShouldForceReleaseDeletedFileFdStopped);
-
+UNIT_TEST_CASE(DeletedFileUnittest, TestShouldForceReleaseDeletedFileFdDeleted)
+UNIT_TEST_CASE(DeletedFileUnittest, TestShouldForceReleaseDeletedFileFdStopped)
 
 } // namespace logtail
 
-int main(int argc, char** argv) {
-    logtail::Logger::Instance().InitGlobalLoggers();
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
+UNIT_TEST_MAIN

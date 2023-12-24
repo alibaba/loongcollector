@@ -14,9 +14,15 @@
  * limitations under the License.
  */
 
+#pragma once
+
+#include <cstdint>
+#include <vector>
+
+#include "common/Constants.h"
+#include "file_server/MultilineOptions.h"
 #include "plugin/interface/Processor.h"
-#include <string>
-#include <boost/regex.hpp>
+#include "processor/CommonParserOptions.h"
 
 namespace logtail {
 
@@ -24,8 +30,12 @@ class ProcessorSplitRegexNative : public Processor {
 public:
     static const std::string sName;
 
+    std::string mSourceKey = DEFAULT_CONTENT_KEY;
+    MultilineOptions mMultiline;
+    bool mAppendingLogPositionMeta = false;
+
     const std::string& Name() const override { return sName; }
-    bool Init(const ComponentConfig& componentConfig) override;
+    bool Init(const Json::Value& config) override;
     void Process(PipelineEventGroup& logGroup) override;
 
 protected:
@@ -42,7 +52,6 @@ private:
                   std::vector<StringView>& logIndex,
                   std::vector<StringView>& discardIndex,
                   const StringView& logPath);
-    void SetLogMultilinePolicy(const std::string& begReg, const std::string& conReg, const std::string& endReg);
     void HandleUnmatchLogs(const char* buffer,
                            int& multiBeginIndex,
                            int endIndex,
@@ -51,16 +60,7 @@ private:
 
     int* mFeedLines = nullptr;
     int* mSplitLines = nullptr;
-    std::string mSplitKey;
-    bool mIsMultline;
-    std::string mLogBeginReg;
-    std::string mLogContinueReg;
-    std::string mLogEndReg;
-    std::unique_ptr<boost::regex> mLogBeginRegPtr;
-    std::unique_ptr<boost::regex> mLogContinueRegPtr;
-    std::unique_ptr<boost::regex> mLogEndRegPtr;
-    bool mDiscardUnmatch = false;
-    bool mEnableLogPositionMeta = false;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorSplitRegexNativeUnittest;
     friend class ProcessorSplitRegexDisacardUnmatchUnittest;

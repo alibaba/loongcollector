@@ -21,10 +21,6 @@ function run() {
   echo "========================================="
   echo "$name testing case"
   echo "========================================="
-  # currently, latest github runner cannot run ebpf program, skip it.
-  if echo "$name" | grep 'observer'; then
-   exit 0
-  fi
   
   eval "$command"
   if [ $? = 1 ]; then
@@ -48,7 +44,7 @@ rm -rf "$TEST_HOME"
 mkdir "$TEST_HOME"
 
 cd "$TESTDIR"
-go build -v -o "$TEST_HOME"/ilogtail-test-tool "$TESTDIR"
+go build -buildvcs=false -v -o "$TEST_HOME"/ilogtail-test-tool "$TESTDIR"
 
 if [ $? != 0 ]; then
   echo "build ilogtail e2e engine failed"
@@ -68,10 +64,13 @@ fi
 if [ "$TEST_SCOPE" = "all" ]; then
   ls "$TESTDIR"/case/"$TYPE" | while read case
   do
-    command=$prefix" -c $TESTDIR/case/$TYPE/$case"
-    run "$case" "$command" "$TEST_HOME"
-    if [ $? = 1 ]; then
-      exit 1
+    # currently, latest github runner cannot run ebpf program, skip it.
+    if [ "$case" != "input_observer_dns" -a "$case" != "input_observer_http" ]; then
+      command=$prefix" -c $TESTDIR/case/$TYPE/$case"
+      run "$case" "$command" "$TEST_HOME"
+      if [ $? = 1 ]; then
+        exit 1
+      fi
     fi
   done
 else

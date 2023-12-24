@@ -16,7 +16,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,76 +34,38 @@ type LogtailController struct {
 func (l *LogtailController) Init(parent *CancelChain, fullCfg *config.Case) error {
 	logger.Info(context.Background(), "ilogtail controller is initializing....")
 	l.chain = WithCancelChain(parent)
-	logstoreCfg := make(map[string]interface{})
-	// todo currently only support one fixed config with cgo
+	// one config set means the set should be loaded on start
 	if len(fullCfg.Ilogtail.Config) == 1 {
 		cfg := fullCfg.Ilogtail.Config[0]
-		if len(cfg.Detail) != 0 {
-			if _, err := os.Stat(config.ConfigYamlFileDir); err == nil {
-				_ = os.Remove(config.ConfigYamlFileDir)
-			} else if !os.IsNotExist(err) {
-				return err
-			}
-			if err := os.Mkdir(config.ConfigYamlFileDir, 0750); err != nil {
-				return err
-			}
-			for idx, detail := range cfg.Detail {
-				name := cfg.Name + "_" + strconv.Itoa(idx) + ".yaml"
-				if _, ok := detail["inputs"]; !ok {
-					return fmt.Errorf("lack of input plugin in the %d config detail under name %s", idx, cfg.Name)
-				}
-				flushers := detail["flushers"]
-				if flushers == nil {
-					flushers = detail["outputs"]
-				}
-				if flushers == nil {
-					detail["flushers"] = []map[string]interface{}{
-						{
-							"Type":    "flusher_grpc",
-							"Address": "host.docker.internal:8000",
-						},
-					}
-				} else {
-					detail["flushers"] = flushers
-				}
-				detail["enable"] = true
-				bytes, _ := yaml.Marshal(detail)
-				if err := os.WriteFile(filepath.Join(config.ConfigYamlFileDir, name), bytes, 0600); err != nil {
-					return err
-				}
-			}
-			fullCfg.Ilogtail.Config = fullCfg.Ilogtail.Config[:0]
-			return nil
+		if _, err := os.Stat(config.ConfigDir); err == nil {
+			_ = os.Remove(config.ConfigDir)
+		} else if !os.IsNotExist(err) {
+			return err
 		}
-		for idx, con := range cfg.Content {
-			name := cfg.Name + "_" + strconv.Itoa(idx)
-			content := make(map[string]interface{})
-			if err := json.Unmarshal([]byte(con), &content); err != nil {
-				return fmt.Errorf("cannot deserizlize %s config by json, content:%s", name, con)
+		if err := os.Mkdir(config.ConfigDir, 0750); err != nil {
+			return err
+		}
+		for idx, detail := range cfg.Detail {
+			name := cfg.Name + "_" + strconv.Itoa(idx) + ".yaml"
+			if _, ok := detail["inputs"]; !ok {
+				return fmt.Errorf("lack of input plugin in the %d config detail under name %s", idx, cfg.Name)
 			}
-			if cfg.MixedMode {
-				content["category"] = E2ELogstoreName
-				content["project_name"] = E2EProjectName
-				logstoreCfg[name] = content
-			} else {
-				pluginCfg := make(map[string]interface{})
-				pluginCfg["enable"] = true
-				pluginCfg["log_type"] = "plugin"
-				pluginCfg["category"] = E2ELogstoreName
-				pluginCfg["project_name"] = E2EProjectName
-				pluginCfg["plugin"] = content
-				logstoreCfg[name] = pluginCfg
+			if _, ok := detail["flushers"]; !ok {
+				detail["flushers"] = []map[string]interface{}{
+					{
+						"Type":    "flusher_grpc",
+						"Address": "host.docker.internal:8000",
+					},
+				}
+			}
+			bytes, _ := yaml.Marshal(detail)
+			if err := os.WriteFile(filepath.Join(config.ConfigDir, name), bytes, 0600); err != nil {
+				return err
 			}
 		}
 		fullCfg.Ilogtail.Config = fullCfg.Ilogtail.Config[:0]
 	}
-
-	bytes, _ := json.Marshal(map[string]interface{}{
-		"metrics": logstoreCfg,
-	})
-	_ = os.Remove(config.ConfigJSONFileDir)
-	_ = os.Mkdir(config.ConfigJSONFileDir, 0750)
-	return os.WriteFile(filepath.Join(config.ConfigJSONFileDir, "config.json"), bytes, 0600)
+	return nil
 }
 
 func (l *LogtailController) Start() error {

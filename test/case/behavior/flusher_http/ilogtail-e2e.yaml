@@ -31,7 +31,7 @@ ilogtail:
             - Type: aggregator_content_value_group
               GroupKeys:
                 - '__tag__:db'
-          outputs:
+          flushers:
             - Type: flusher_http
               RemoteURL: http://influxdb:8086/write
               Query:

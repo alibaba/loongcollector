@@ -15,11 +15,13 @@
  */
 
 #pragma once
+
 #include <boost/thread.hpp>
-#include <memory>
-#include <future>
-#include <utility>
+
 #include <functional>
+#include <memory>
+#include <thread>
+#include <utility>
 
 namespace logtail {
 
@@ -53,5 +55,43 @@ template <class Function, class... Args>
 ThreadPtr CreateThread(Function&& f, Args&&... args) {
     return ThreadPtr(new Thread(std::forward<Function>(f), std::forward<Args>(args)...));
 }
+
+class JThread {
+public:
+    JThread() noexcept = default;
+    template <typename Callable, typename... Args>
+    explicit JThread(Callable&& func, Args&&... args) : t(std::forward<Callable>(func), std::forward<Args>(args)...) {}
+    explicit JThread(std::thread t_) noexcept : t(std::move(t_)) {}
+    ~JThread() noexcept {
+        if (Joinable()) {
+            Join();
+        }
+    }
+
+    JThread(JThread&& other) noexcept : t(std::move(other.t)) {}
+    JThread& operator=(JThread&& other) noexcept {
+        if (Joinable()) {
+            Join();
+        }
+        t = std::move(other.t);
+        return *this;
+    }
+    JThread& operator=(std::thread other) noexcept {
+        if (Joinable()) {
+            Join();
+        }
+        t = std::move(other);
+        return *this;
+    }
+
+    bool Joinable() const noexcept { return t.joinable(); }
+    void Join() { t.join(); }
+    void Detach() { t.detach(); }
+    std::thread& Get() noexcept { return t; }
+    const std::thread& Get() const noexcept { return t; }
+
+private:
+    std::thread t;
+};
 
 } // namespace logtail

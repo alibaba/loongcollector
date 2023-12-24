@@ -17,7 +17,6 @@
 #include "app_config/AppConfig.h"
 #include "log_pb/sls_logs.pb.h"
 #include "checkpoint/CheckpointManagerV2.h"
-#include "config/Config.h"
 
 DECLARE_FLAG_INT32(logtail_checkpoint_check_gc_interval_sec);
 DECLARE_FLAG_INT32(logtail_checkpoint_expired_threshold_sec);
@@ -103,8 +102,7 @@ void CheckpointManagerV2Unittest::TestProtobufMethod() {
 
 // Test checkpoints returned by ScanCheckpoints.
 void CheckpointManagerV2Unittest::TestScanCheckpoints() {
-    Config config;
-    config.mConfigName = kConfigName;
+    std::vector<std::string> configs{kConfigName};
 
     CheckpointManagerV2 m;
     std::string ignoreCptValue;
@@ -134,7 +132,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
             EXPECT_TRUE(m.SetPB(m.MakeRangeKey(kPrimaryKey, idx), rgCpt));
         }
 
-        auto checkpoints = m.ScanCheckpoints(std::vector<Config*>{&config});
+        auto checkpoints = m.ScanCheckpoints(configs);
         EXPECT_EQ(checkpoints.size(), 1);
         EXPECT_EQ(checkpoints[0].second.DebugString(), cpt.DebugString());
     }
@@ -154,7 +152,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
             EXPECT_TRUE(m.SetPB(m.MakeRangeKey(kPrimaryKey, idx), rgCpt));
         }
 
-        auto checkpoints = m.ScanCheckpoints(std::vector<Config*>{&config});
+        auto checkpoints = m.ScanCheckpoints(configs);
         EXPECT_EQ(checkpoints.size(), 0);
         for (uint32_t idx = 0; idx < kConcurrency; ++idx) {
             EXPECT_FALSE(m.read(m.MakeRangeKey(kPrimaryKey, idx), ignoreCptValue));
@@ -167,7 +165,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
 
         EXPECT_TRUE(m.write(kPrimaryKey, "broken value"));
 
-        auto checkpoints = m.ScanCheckpoints(std::vector<Config*>{&config});
+        auto checkpoints = m.ScanCheckpoints(configs);
         EXPECT_EQ(checkpoints.size(), 0);
         EXPECT_FALSE(m.read(kPrimaryKey, ignoreCptValue));
     }
@@ -187,7 +185,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
         cpt.set_update_time(time(NULL));
         EXPECT_TRUE(m.SetPB(kPrimaryKey, cpt));
 
-        auto checkpoints = m.ScanCheckpoints(std::vector<Config*>{&config});
+        auto checkpoints = m.ScanCheckpoints(configs);
         EXPECT_EQ(checkpoints.size(), 0);
         EXPECT_FALSE(m.read(kPrimaryKey, ignoreCptValue));
     }
@@ -209,7 +207,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
         {
             cpt.set_update_time(time(NULL));
             EXPECT_TRUE(m.SetPB(kPrimaryKey, cpt));
-            auto checkpoints = m.ScanCheckpoints(std::vector<Config*>{&config});
+            auto checkpoints = m.ScanCheckpoints(configs);
             EXPECT_EQ(checkpoints.size(), 1);
             EXPECT_TRUE(m.read(kPrimaryKey, ignoreCptValue));
         }
@@ -218,7 +216,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
         {
             cpt.set_update_time(time(NULL) - 100 - INT32_FLAG(logtail_checkpoint_expired_threshold_sec));
             EXPECT_TRUE(m.SetPB(kPrimaryKey, cpt));
-            auto checkpoints = m.ScanCheckpoints(std::vector<Config*>{&config});
+            auto checkpoints = m.ScanCheckpoints(configs);
             EXPECT_EQ(checkpoints.size(), 0);
             EXPECT_FALSE(m.read(kPrimaryKey, ignoreCptValue));
         }
@@ -252,7 +250,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
         {
             cpt.set_update_time(time(NULL));
             EXPECT_TRUE(m.SetPB(kPrimaryKey, cpt));
-            auto checkpoints = m.ScanCheckpoints(std::vector<Config*>{&config});
+            auto checkpoints = m.ScanCheckpoints(configs);
             EXPECT_EQ(checkpoints.size(), 1);
             EXPECT_TRUE(m.read(kPrimaryKey, ignoreCptValue));
             for (uint32_t idx = 0; idx < kConcurrency; ++idx) {
@@ -264,7 +262,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
         {
             cpt.set_update_time(outdatedUpdateTime);
             EXPECT_TRUE(m.SetPB(kPrimaryKey, cpt));
-            auto checkpoints = m.ScanCheckpoints(std::vector<Config*>{&config});
+            auto checkpoints = m.ScanCheckpoints(configs);
             EXPECT_EQ(checkpoints.size(), 0);
             EXPECT_FALSE(m.read(kPrimaryKey, ignoreCptValue));
             for (uint32_t idx = 0; idx < kConcurrency; ++idx) {

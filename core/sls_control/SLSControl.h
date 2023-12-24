@@ -15,24 +15,35 @@
  */
 
 #pragma once
+
+#include <cstdint>
+#include <string>
+
 #include "sdk/Client.h"
 
 namespace logtail {
 
 class SLSControl {
-private:
-    SLSControl();
-    SLSControl(const SLSControl&);
-    std::string GetRunningEnvironment();
-    bool TryCurlEndpoint(const std::string& endpoint);
+protected:
     std::string mUserAgent;
 
+    SLSControl() = default;
+    virtual ~SLSControl() = default;
+
+    virtual void GenerateUserAgent();
+    virtual std::string GetRunningEnvironment();
+    bool TryCurlEndpoint(const std::string& endpoint);
+
 public:
-    static SLSControl* Instance();
-    void SetSlsSendClientCommonParam(sdk::Client* sendClient);
-    bool
+    SLSControl(const SLSControl&) = delete;
+    SLSControl& operator=(const SLSControl&) = delete;
+
+    static SLSControl* GetInstance();
+
+    void Init();
+    virtual void SetSlsSendClientCommonParam(sdk::Client* sendClient);
+    virtual bool
     SetSlsSendClientAuth(const std::string aliuid, const bool init, sdk::Client* sendClient, int32_t& lastUpdateTime);
-    ~SLSControl();
 };
 
 } // namespace logtail

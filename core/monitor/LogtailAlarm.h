@@ -15,12 +15,17 @@
  */
 
 #pragma once
+
 #include <stdio.h>
+
+#include <atomic>
+#include <condition_variable>
+#include <future>
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
-#include <map>
-#include <atomic>
-#include "common/Thread.h"
+
 #include "common/Lock.h"
 #include "profile_sender/ProfileSender.h"
 
@@ -111,28 +116,15 @@ struct LogtailAlarmMessage {
 };
 
 class LogtailAlarm {
-private:
-    std::vector<std::string> mMessageType;
-    typedef std::vector<std::map<std::string, LogtailAlarmMessage*> > LogtailAlarmVector;
-    std::map<std::string, std::pair<std::shared_ptr<LogtailAlarmVector>, std::vector<int32_t> > > mAllAlarmMap;
-    PTMutex mAlarmBufferMutex;
-
-    LogtailAlarm();
-    bool SendAlarmLoop();
-    // without lock
-    LogtailAlarmVector* MakesureLogtailAlarmMapVecUnlocked(const std::string& region);
-    void SendAllRegionAlarm();
-
-    std::atomic_int mLastLowLevelTime{0};
-    std::atomic_int mLastLowLevelCount{0};
-    ProfileSender mProfileSender;
-    std::unique_ptr<Thread> mThread;
-    std::mutex mStopMutex;
-    std::condition_variable mStopCV;
-    bool mStopFlag = false;
-
 public:
-    ~LogtailAlarm();
+    static LogtailAlarm* GetInstance() {
+        static LogtailAlarm instance;
+        return &instance;
+    }
+
+    void Init();
+    void Stop();
+
     void SendAlarm(const LogtailAlarmType alarmType,
                    const std::string& message,
                    const std::string& projectName = "",
@@ -140,12 +132,31 @@ public:
                    const std::string& region = "");
     // only be called when prepare to exit
     void ForceToSend();
-    void Stop();
     bool IsLowLevelAlarmValid();
-    static LogtailAlarm* GetInstance() {
-        static LogtailAlarm ptr;
-        return &ptr;
-    }
+
+private:
+    typedef std::vector<std::map<std::string, LogtailAlarmMessage*> > LogtailAlarmVector;
+
+    LogtailAlarm();
+    ~LogtailAlarm() = default;
+
+    bool SendAlarmLoop();
+    // without lock
+    LogtailAlarmVector* MakesureLogtailAlarmMapVecUnlocked(const std::string& region);
+    void SendAllRegionAlarm();
+
+    std::future<bool> mThreadRes;
+    std::mutex mThreadRunningMux;
+    bool mIsThreadRunning = true;
+    std::condition_variable mStopCV;
+
+
+    std::vector<std::string> mMessageType;
+    std::map<std::string, std::pair<std::shared_ptr<LogtailAlarmVector>, std::vector<int32_t> > > mAllAlarmMap;
+    PTMutex mAlarmBufferMutex;
+
+    std::atomic_int mLastLowLevelTime{0};
+    std::atomic_int mLastLowLevelCount{0};
 };
 
 } // namespace logtail

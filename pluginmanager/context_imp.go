@@ -157,11 +157,21 @@ func (p *ContextImp) MetricSerializeToPB(log *protocol.Log) {
 
 func (p *ContextImp) SaveCheckPoint(key string, value []byte) error {
 	logger.Debug(p.ctx, "save checkpoint, key", key, "value", string(value))
-	return CheckPointManager.SaveCheckpoint(p.GetConfigName(), key, value)
+	configName := p.GetConfigName()
+	l := len(configName)
+	if l > 2 && configName[l-2:] == "/1" {
+		configName = configName[:l-2]
+	}
+	return CheckPointManager.SaveCheckpoint(configName, key, value)
 }
 
 func (p *ContextImp) GetCheckPoint(key string) (value []byte, exist bool) {
-	value, err := CheckPointManager.GetCheckpoint(p.GetConfigName(), key)
+	configName := p.GetConfigName()
+	l := len(configName)
+	if l > 2 && configName[l-2:] == "/1" {
+		configName = configName[:l-2]
+	}
+	value, err := CheckPointManager.GetCheckpoint(configName, key)
 	logger.Debug(p.ctx, "get checkpoint, key", key, "value", string(value), "error", err)
 	return value, value != nil
 }

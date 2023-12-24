@@ -34,17 +34,16 @@ const (
 )
 
 var (
-	CaseHome          string
-	CaseName          string
-	EngineLogFile     string
-	ReportFile        string
-	PprofDir          string
-	ProfileFlag       bool
-	CoverageFile      string
-	FlusherFile       string
-	ConfigYamlFileDir string
-	ConfigJSONFileDir string
-	LogDir            string
+	CaseHome      string
+	CaseName      string
+	EngineLogFile string
+	ReportFile    string
+	PprofDir      string
+	ProfileFlag   bool
+	CoverageFile  string
+	FlusherFile   string
+	ConfigDir     string
+	LogDir        string
 )
 
 // Load E2E engine config and define the global variables.
@@ -71,8 +70,7 @@ func Load(path string, profile bool) (*Case, error) {
 	ProfileFlag = profile
 
 	FlusherFile = reportDir + CaseName + "default_flusher.json"
-	ConfigYamlFileDir = reportDir + CaseName + "_yaml"
-	ConfigJSONFileDir = reportDir + CaseName + "_json"
+	ConfigDir = reportDir + CaseName + "_config"
 	return c, nil
 }
 

@@ -18,6 +18,8 @@
 
 #include <map>
 #include <utility>
+
+#include "common/StringTools.h"
 #include "network/protocols/mysql/type.h"
 #include "observer/interface/network.h"
 #include "inner_parser.h"

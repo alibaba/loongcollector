@@ -258,4 +258,6 @@ namespace fsutil {
 
 } // namespace fsutil
 
+bool ReadFile(const std::string& filepath, std::string& content);
+
 } // namespace logtail

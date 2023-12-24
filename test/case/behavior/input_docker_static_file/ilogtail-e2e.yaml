@@ -19,20 +19,21 @@ ilogtail:
     - name: static-file-case
       detail:
         - inputs:
-            - Type: file_log
-              LogPath: /root/test/
-              FilePattern: a*.log
-              MaxDepth: 10
-              ContainerInfo:
+            - Type: input_file
+              FilePaths:
+                - /root/test/**/a*.log
+              MaxDirSearchDepth: 10
+              EnableContainerDiscovery: true
+              ContainerFilters:
                 IncludeEnv:
                   STDOUT_SWITCH: "true"
   close_wait: 5s
 verify:
-  tag_rules:  
-    - name: tag-check  
-      validator: tag_kv_regex  
-      spec:  
-        expect_key_value_regex: 
+  tag_rules:
+    - name: tag-check
+      validator: tag_kv_regex
+      spec:
+        expect_key_value_regex:
           "__path__": "^/root/test/a/b/c/d/axxxxxxx.log$"
   log_rules:
     - name: fields-kv-check

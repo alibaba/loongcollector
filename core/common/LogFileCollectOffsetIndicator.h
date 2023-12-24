@@ -24,7 +24,6 @@
 #include "common/DevInode.h"
 #include "common/StringTools.h"
 #include "FileInfo.h"
-#include "util.h"
 
 namespace logtail {
 

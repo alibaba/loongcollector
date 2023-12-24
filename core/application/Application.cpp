@@ -1,0 +1,372 @@
+#include "application/Application.h"
+
+#ifndef LOGTAIL_NO_TC_MALLOC
+#include <gperftools/malloc_extension.h>
+#include <gperftools/tcmalloc.h>
+#endif
+
+#include <thread>
+
+#include "app_config/AppConfig.h"
+#include "checkpoint/CheckPointManager.h"
+#include "common/CrashBackTraceUtil.h"
+#include "common/Flags.h"
+#include "common/MachineInfoUtil.h"
+#include "common/RuntimeUtil.h"
+#include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "common/UUIDUtil.h"
+#include "common/version.h"
+#include "config/ConfigDiff.h"
+#include "config/watcher/ConfigWatcher.h"
+#include "config_manager/ConfigManager.h"
+#include "controller/EventDispatcher.h"
+#include "event_handler/LogInput.h"
+#include "file_server/FileServer.h"
+#include "go_pipeline/LogtailPlugin.h"
+#include "logger/Logger.h"
+#include "monitor/LogFileProfiler.h"
+#include "monitor/MetricExportor.h"
+#include "monitor/Monitor.h"
+#include "pipeline/PipelineManager.h"
+#include "plugin/PluginRegistry.h"
+#include "processor/daemon/LogProcess.h"
+#include "sender/Sender.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#include "config/provider/LegacyConfigProvider.h"
+#ifdef __linux__
+#include "shennong/ShennongManager.h"
+#include "streamlog/StreamLogManager.h"
+#endif
+#else
+#include "config/provider/CommonConfigProvider.h"
+#endif
+
+DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
+DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
+DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
+DEFINE_FLAG_INT32(file_tags_update_interval, "second", 1);
+DEFINE_FLAG_INT32(config_scan_interval, "seconds", 10);
+DEFINE_FLAG_INT32(profiling_check_interval, "seconds", 60);
+DEFINE_FLAG_INT32(tcmalloc_release_memory_interval, "force release memory held by tcmalloc, seconds", 300);
+DEFINE_FLAG_INT32(exit_flushout_duration, "exit process flushout duration", 20 * 1000);
+
+DECLARE_FLAG_BOOL(send_prefer_real_ip);
+DECLARE_FLAG_BOOL(global_network_success);
+
+using namespace std;
+
+namespace logtail {
+
+Application::Application() : mStartTime(time(nullptr)) {
+    mInstanceId = CalculateRandomUUID() + "_" + LogFileProfiler::mIpAddr + "_" + ToString(time(NULL));
+}
+
+void Application::Init() {
+    // get last crash info
+    string backTraceStr = GetCrashBackTrace();
+    if (!backTraceStr.empty()) {
+        LOG_ERROR(sLogger, ("last logtail crash stack", backTraceStr));
+        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
+    }
+    if (BOOL_FLAG(ilogtail_disable_core)) {
+        InitCrashBackTrace();
+    }
+
+    // change working dir to ./${ILOGTAIL_VERSION}/
+    string processExecutionDir = GetProcessExecutionDir();
+    AppConfig::GetInstance()->SetProcessExecutionDir(processExecutionDir);
+    string newWorkingDir = processExecutionDir + ILOGTAIL_VERSION;
+#ifdef _MSC_VER
+    int chdirRst = _chdir(newWorkingDir.c_str());
+#else
+    int chdirRst = chdir(newWorkingDir.c_str());
+#endif
+    if (chdirRst == 0) {
+        LOG_INFO(sLogger, ("working dir", newWorkingDir));
+        AppConfig::GetInstance()->SetWorkingDir(newWorkingDir + "/");
+    } else {
+        // if change error, try change working dir to ./
+#ifdef _MSC_VER
+        _chdir(GetProcessExecutionDir().c_str());
+#else
+        chdir(GetProcessExecutionDir().c_str());
+#endif
+        LOG_INFO(sLogger, ("working dir", GetProcessExecutionDir()));
+        AppConfig::GetInstance()->SetWorkingDir(GetProcessExecutionDir());
+    }
+
+    // load ilogtail_config.json
+    char* configEnv = getenv(STRING_FLAG(ilogtail_config_env_name).c_str());
+    if (configEnv == NULL || strlen(configEnv) == 0) {
+        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
+    } else {
+        AppConfig::GetInstance()->LoadAppConfig(configEnv);
+    }
+
+    // Initialize basic information: IP, hostname, etc.
+    LogFileProfiler::GetInstance();
+
+    // override process related params if designated by user explicitly
+    const string& interface = AppConfig::GetInstance()->GetBindInterface();
+    const string& configIP = AppConfig::GetInstance()->GetConfigIP();
+    if (!configIP.empty()) {
+        LogFileProfiler::mIpAddr = configIP;
+        LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_ip", GetHostIp());
+    } else if (!interface.empty()) {
+        LogFileProfiler::mIpAddr = GetHostIp(interface);
+        if (LogFileProfiler::mIpAddr.empty()) {
+            LOG_WARNING(sLogger,
+                        ("failed to get ip from interface", "try to get any available ip")("interface", interface));
+        }
+    } else if (LogFileProfiler::mIpAddr.empty()) {
+        LOG_WARNING(sLogger, ("failed to get ip from hostname or eth0 or bond0", "try to get any available ip"));
+    }
+    if (LogFileProfiler::mIpAddr.empty()) {
+        LogFileProfiler::mIpAddr = GetAnyAvailableIP();
+        LOG_INFO(sLogger, ("get available ip succeeded", LogFileProfiler::mIpAddr));
+    }
+
+    const string& configHostName = AppConfig::GetInstance()->GetConfigHostName();
+    if (!configHostName.empty()) {
+        LogFileProfiler::mHostname = configHostName;
+        LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_hostname", GetHostName());
+    }
+
+    int32_t systemBootTime = AppConfig::GetInstance()->GetSystemBootTime();
+    LogFileProfiler::mSystemBootTime = systemBootTime > 0 ? systemBootTime : GetSystemBootTime();
+
+    // generate app_info.json
+    Json::Value appInfoJson;
+    appInfoJson["ip"] = Json::Value(LogFileProfiler::mIpAddr);
+    appInfoJson["hostname"] = Json::Value(LogFileProfiler::mHostname);
+    appInfoJson["UUID"] = Json::Value(Application::GetInstance()->GetUUID());
+    appInfoJson["instance_id"] = Json::Value(Application::GetInstance()->GetInstanceId());
+#ifdef __ENTERPRISE__
+    appInfoJson["logtail_version"] = Json::Value(ILOGTAIL_VERSION);
+#else
+    appInfoJson["logtail_version"] = Json::Value(string(ILOGTAIL_VERSION) + " Community Edition");
+    appInfoJson["git_hash"] = Json::Value(ILOGTAIL_GIT_HASH);
+    appInfoJson["build_date"] = Json::Value(ILOGTAIL_BUILD_DATE);
+#endif
+#define STRINGIFY(x) #x
+#ifdef _MSC_VER
+#define VERSION_STR(A) "MSVC " STRINGIFY(A)
+#define ILOGTAIL_COMPILER VERSION_STR(_MSC_FULL_VER)
+#else
+#define VERSION_STR(A, B, C) "GCC " STRINGIFY(A) "." STRINGIFY(B) "." STRINGIFY(C)
+#define ILOGTAIL_COMPILER VERSION_STR(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__)
+#endif
+    appInfoJson["compiler"] = Json::Value(ILOGTAIL_COMPILER);
+    appInfoJson["os"] = Json::Value(LogFileProfiler::mOsDetail);
+    appInfoJson["update_time"] = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
+    string appInfo = appInfoJson.toStyledString();
+    OverwriteFile(GetProcessExecutionDir() + STRING_FLAG(app_info_file), appInfo);
+    LOG_INFO(sLogger, ("app info", appInfo));
+}
+
+void Application::Start() {
+    LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S"));
+
+#if defined(__ENTERPRISE__) && defined(_MSC_VER)
+    InitWindowsSignalObject();
+#endif
+    // flusher_sls should always be loaded, since profiling will rely on this.
+    Sender::Instance()->Init();
+
+    LogtailAlarm::GetInstance()->Init();
+    LogtailMonitor::GetInstance()->Init();
+
+    // add local config dir
+    filesystem::path localConfigPath
+        = filesystem::path(AppConfig::GetInstance()->GetLogtailSysConfDir()) / "config" / "local";
+    error_code ec;
+    filesystem::create_directories(localConfigPath, ec);
+    if (ec) {
+        LOG_WARNING(sLogger,
+                    ("failed to create dir for local config",
+                     "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
+    }
+    ConfigWatcher::GetInstance()->AddSource(localConfigPath.string());
+
+#ifdef __ENTERPRISE__
+    EnterpriseConfigProvider::GetInstance()->Init("enterprise");
+    LegacyConfigProvider::GetInstance()->Init("legacy");
+#else
+    CommonConfigProvider::GetInstance()->Init("common");
+#endif
+
+    PluginRegistry::GetInstance()->LoadPlugins();
+
+#if defined(__ENTERPRISE__) && defined(__linux__)
+    if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
+        ShennongManager::GetInstance()->Init();
+    }
+#endif
+
+    // If in purage container mode, it means iLogtail is deployed as Daemonset, so plugin base should be loaded since
+    // liveness probe relies on it.
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+        LogtailPlugin::GetInstance()->LoadPluginBase();
+    }
+    // Actually, docker env config will not work if not in purage container mode, so there is no need to load plugin
+    // base if not in purage container mode. However, we still load it here for backward compatability.
+    const char* dockerEnvConfig = getenv("ALICLOUD_LOG_DOCKER_ENV_CONFIG");
+    if (dockerEnvConfig != NULL && strlen(dockerEnvConfig) > 0
+        && (dockerEnvConfig[0] == 't' || dockerEnvConfig[0] == 'T')) {
+        LogtailPlugin::GetInstance()->LoadPluginBase();
+    }
+
+    LogProcess::GetInstance()->Start();
+
+    time_t curTime = 0, lastProfilingCheckTime = 0, lastTcmallocReleaseMemTime = 0, lastConfigCheckTime = 0,
+           lastUpdateMetricTime = 0, lastCheckTagsTime = 0;
+    while (true) {
+        curTime = time(NULL);
+        if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
+            AppConfig::GetInstance()->UpdateFileTags();
+            lastCheckTagsTime = curTime;
+        }
+        if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
+            ConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
+            if (!diff.IsEmpty()) {
+                PipelineManager::GetInstance()->UpdatePipelines(diff);
+            }
+            lastConfigCheckTime = curTime;
+        }
+        if (curTime - lastProfilingCheckTime >= INT32_FLAG(profiling_check_interval)) {
+            LogFileProfiler::GetInstance()->SendProfileData();
+            MetricExportor::GetInstance()->PushMetrics(false);
+            lastProfilingCheckTime = curTime;
+        }
+#ifndef LOGTAIL_NO_TC_MALLOC
+        if (curTime - lastTcmallocReleaseMemTime >= INT32_FLAG(tcmalloc_release_memory_interval)) {
+            MallocExtension::instance()->ReleaseFreeMemory();
+            lastTcmallocReleaseMemTime = curTime;
+        }
+#endif
+        if (curTime - lastUpdateMetricTime >= 40) {
+            CheckCriticalCondition(curTime);
+            lastUpdateMetricTime = curTime;
+        }
+        if (mSigTermSignalFlag.load()) {
+            LOG_INFO(sLogger, ("received SIGTERM signal", "exit process"));
+            Exit();
+        }
+#if defined(__ENTERPRISE__) && defined(_MSC_VER)
+        SyncWindowsSignalObject();
+#endif
+        // 过渡使用
+        EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
+
+        if (ConfigManager::GetInstance()->IsUpdateContainerPaths()) {
+            FileServer::GetInstance()->Pause();
+            FileServer::GetInstance()->Resume();
+        }
+
+        this_thread::sleep_for(chrono::seconds(1));
+    }
+}
+
+bool Application::TryGetUUID() {
+    mUUIDThread = thread([this] { GetUUID(); });
+    // wait 1000 ms
+    for (int i = 0; i < 100; ++i) {
+        this_thread::sleep_for(chrono::milliseconds(10));
+        if (!GetUUID().empty()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Application::Exit() {
+#if defined(__ENTERPRISE__) && defined(__linux__)
+    if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
+        ShennongManager::GetInstance()->Stop();
+    }
+#endif
+
+    PipelineManager::GetInstance()->StopAllPipelines();
+
+    PluginRegistry::GetInstance()->UnloadPlugins();
+
+    LogtailMonitor::GetInstance()->Stop();
+    LogtailAlarm::GetInstance()->Stop();
+    // from now on, alarm should not be used.
+    
+    if (!(Sender::Instance()->FlushOut(INT32_FLAG(exit_flushout_duration)))) {
+        LOG_WARNING(sLogger, ("flush SLS sender data", "failed"));
+    } else {
+        LOG_INFO(sLogger, ("flush SLS sender data", "succeeded"));
+    }
+
+    
+#if defined(_MSC_VER)
+    ReleaseWindowsSignalObject();
+#endif
+    LOG_INFO(sLogger, ("exit", "bye!"));
+    exit(0);
+}
+
+void Application::CheckCriticalCondition(int32_t curTime) {
+#ifdef __ENTERPRISE__
+    int32_t lastGetConfigTime = EnterpriseConfigProvider::GetInstance()->GetLastConfigGetTime();
+    // force to exit if config update thread is block more than 1 hour
+    if (lastGetConfigTime > 0 && curTime - lastGetConfigTime > 3600) {
+        LOG_ERROR(sLogger, ("last config get time is too old", lastGetConfigTime)("prepare force exit", ""));
+        LogtailAlarm::GetInstance()->SendAlarm(
+            LOGTAIL_CRASH_ALARM, "last config get time is too old: " + ToString(lastGetConfigTime) + " force exit");
+        LogtailAlarm::GetInstance()->ForceToSend();
+        sleep(10);
+        _exit(1);
+    }
+#endif
+    // if network is fail in 2 hours, force exit (for ant only)
+    // work around for no network when docker start
+    if (BOOL_FLAG(send_prefer_real_ip) && !BOOL_FLAG(global_network_success) && curTime - mStartTime > 7200) {
+        LOG_ERROR(sLogger, ("network is fail", "prepare force exit"));
+        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
+                                               "network is fail since " + ToString(mStartTime) + " force exit");
+        LogtailAlarm::GetInstance()->ForceToSend();
+        sleep(10);
+        _exit(1);
+    }
+
+    int32_t lastDaemonRunTime = Sender::Instance()->GetLastDeamonRunTime();
+    if (lastDaemonRunTime > 0 && curTime - lastDaemonRunTime > 3600) {
+        LOG_ERROR(sLogger, ("last sender daemon run time is too old", lastDaemonRunTime)("prepare force exit", ""));
+        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
+                                               "last sender daemon run time is too old: " + ToString(lastDaemonRunTime)
+                                                   + " force exit");
+        LogtailAlarm::GetInstance()->ForceToSend();
+        sleep(10);
+        _exit(1);
+    }
+
+    int32_t lastSendTime = Sender::Instance()->GetLastSendTime();
+    if (lastSendTime > 0 && curTime - lastSendTime > 3600 * 12) {
+        LOG_ERROR(sLogger, ("last send time is too old", lastSendTime)("prepare force exit", ""));
+        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
+                                               "last send time is too old: " + ToString(lastSendTime) + " force exit");
+        LogtailAlarm::GetInstance()->ForceToSend();
+        sleep(10);
+        _exit(1);
+    }
+
+    LogtailMonitor::GetInstance()->UpdateMetric("last_send_time", GetTimeStamp(lastSendTime, "%Y-%m-%d %H:%M:%S"));
+}
+
+bool Application::GetUUIDThread() {
+    string uuid;
+#if defined(__aarch64__) || defined(__sw_64__)
+    // DMI can not work on such platforms but might crash Logtail, disable.
+#else
+    uuid = CalculateRandomUUID();
+#endif
+    SetUUID(uuid);
+    return true;
+}
+
+} // namespace logtail

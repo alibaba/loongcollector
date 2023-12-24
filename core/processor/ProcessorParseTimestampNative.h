@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+#pragma once
+
+#include "common/TimeUtil.h"
 #include "plugin/interface/Processor.h"
-#include <string>
 
 namespace logtail {
 class ProcessorParseTimestampNative : public Processor {
@@ -23,8 +25,16 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const ComponentConfig& componentConfig) override;
+    bool Init(const Json::Value& config) override;
     void Process(PipelineEventGroup& logGroup) override;
+
+    // Source field name.
+    std::string mSourceKey;
+    // Log time format. %Y/%m/%d %H:%M:%S
+    std::string mSourceFormat;
+    // The time zone to which the log time belongs. The format is GMT+HH:MM (Eastern Zone) or GMT-HH:MM (Western Zone).
+    std::string mSourceTimezone;
+    int32_t mSourceYear = -1;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
@@ -40,11 +50,8 @@ private:
                       StringView& timeStr // cache
     );
     bool IsPrefixString(const StringView& all, const StringView& prefix);
-    std::string mTimeKey;
-    std::string mTimeFormat;
-    int mLogTimeZoneOffsetSecond = 0;
-    int mSpecifiedYear = -1;
-    PreciseTimestampConfig mLegacyPreciseTimestampConfig;
+
+    int32_t mLogTimeZoneOffsetSecond = 0;
 
     int* mParseTimeFailures = nullptr;
     int* mHistoryFailures = nullptr;
@@ -53,9 +60,11 @@ private:
     CounterPtr mProcDiscardRecordsTotal;
     CounterPtr mProcParseErrorTotal;
     CounterPtr mProcHistoryFailureTotal;
+    
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseTimestampNativeUnittest;
     friend class ProcessorParseLogTimeUnittest;
 #endif
 };
+
 } // namespace logtail

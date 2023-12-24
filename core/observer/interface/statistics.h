@@ -43,7 +43,7 @@ struct ProcessMetaStatistic {
     }
 
     void FlushMetrics() {
-        static auto sMonitor = LogtailMonitor::Instance();
+        static auto sMonitor = LogtailMonitor::GetInstance();
         sMonitor->UpdateMetric("observer_processmeta_cgroup_count", mCgroupPathTotalCount);
         sMonitor->UpdateMetric("observer_processmeta_cgroup_invalid_count", mCgroupPathParseFailCount);
         sMonitor->UpdateMetric("observer_processmeta_watch_count", mWatchProcessCount);
@@ -98,7 +98,7 @@ struct ConnectionMetaStatistic {
     }
 
     void FlushMetrics() {
-        static auto sMonitor = LogtailMonitor::Instance();
+        static auto sMonitor = LogtailMonitor::GetInstance();
         sMonitor->UpdateMetric("observer_connmeta_socket_get_count", mGetSocketInfoCount);
         sMonitor->UpdateMetric("observer_connmeta_socket_get_fail_count", mGetSocketInfoFailCount);
         sMonitor->UpdateMetric("observer_connmeta_socket_create_prober_count", mGetNetlinkProberCount);
@@ -152,7 +152,7 @@ struct NetworkStatistic {
     uint32_t mEbpfUsingConnections{0};
 
     void FlushMetrics() {
-        static auto sMonitor = LogtailMonitor::Instance();
+        static auto sMonitor = LogtailMonitor::GetInstance();
         LogtailAlarm::GetInstance()->SendAlarm(OBSERVER_RUNTIME_ALARM,
                                                "ebpf lost event count: " + std::to_string(mEbpfLostCount));
         sMonitor->UpdateMetric("observer_input_events", mInputEvents);
@@ -252,7 +252,7 @@ struct ProtocolStatistic {
     }
 
     void FlushMetrics() {
-        static auto sMonitor = LogtailMonitor::Instance();
+        static auto sMonitor = LogtailMonitor::GetInstance();
 
         sMonitor->UpdateMetric("observer_protocol_http_drop_count", mHTTPDropCount);
         sMonitor->UpdateMetric("observer_protocol_dns_drop_count", mDNSDropCount);
@@ -338,7 +338,7 @@ struct ProtocolDebugStatistic {
     }
 
     void FlushMetrics(bool flush) {
-        static auto sMonitor = LogtailMonitor::Instance();
+        static auto sMonitor = LogtailMonitor::GetInstance();
 
         if (flush) {
             sMonitor->UpdateMetric("observer_protocolstat_http_conn", mHTTPConnectionNum);

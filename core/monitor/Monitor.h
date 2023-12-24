@@ -15,9 +15,13 @@
  */
 
 #pragma once
-#include "MetricStore.h"
+
+#include <condition_variable>
+#include <future>
+#include <mutex>
 #include <string>
-#include "common/Thread.h"
+
+#include "MetricStore.h"
 #include "profile_sender/ProfileSender.h"
 #if defined(_MSC_VER)
 #include <Windows.h>
@@ -46,9 +50,7 @@ struct CpuStat {
     int32_t mViolateNum;
     float mCpuUsage;
 
-    CpuStat() {
-        Reset();
-    }
+    CpuStat() { Reset(); }
     void Reset();
 };
 
@@ -76,52 +78,23 @@ struct OsCpuStat {
 
 class LogtailMonitor : public MetricStore {
 public:
-    LogtailMonitor();
-    ~LogtailMonitor();
-    static LogtailMonitor* Instance() {
-        static LogtailMonitor* monitorPtr = new LogtailMonitor();
-        return monitorPtr;
-    }
+    LogtailMonitor(const LogtailMonitor&) = delete;
+    LogtailMonitor& operator=(const LogtailMonitor&) = delete;
 
-    bool InitMonitor();
-    bool RemoveMonitor();
+    static LogtailMonitor* GetInstance();
+
+    bool Init();
+    void Stop();
 
     // GetRealtimeCpuLevel return a value to indicates current CPU usage level.
     // LogInput use it to do flow control.
     float GetRealtimeCpuLevel() { return mRealtimeCpuStat.mCpuUsage / mScaledCpuUsageUpLimit; }
 
 private:
-    ThreadPtr mMonitorThreadPtr;
+    LogtailMonitor();
+    ~LogtailMonitor() = default;
+
     void Monitor();
-    volatile bool mMonitorRunning;
-
-    // Control report status profile frequency.
-    int32_t mStatusCount;
-
-    // Use to calculate realtime CPU level (updated every 1s).
-    CpuStat mRealtimeCpuStat;
-    // Use to calculate CPU limit, updated regularly (30s by default).
-    CpuStat mCpuStat;
-    // Memory usage statistics.
-    MemStat mMemStat;
-
-    // Current scale up level, updated by CheckScaledCpuUsageUpLimit.
-    float mScaledCpuUsageUpLimit;
-#if defined(__linux__)
-    const static int32_t CPU_STAT_FOR_SCALE_ARRAY_SIZE = 2;
-    int32_t mCpuCores;
-    CpuStat mCpuStatForScale;
-    OsCpuStat mOsCpuStatForScale;
-    // mCpuArrayForScale and mOsCpuArrayForScale store lastest two CPU usage of
-    // ilogtail process and global.
-    float mCpuArrayForScale[CPU_STAT_FOR_SCALE_ARRAY_SIZE];
-    float mOsCpuArrayForScale[CPU_STAT_FOR_SCALE_ARRAY_SIZE];
-    int32_t mCpuArrayForScaleIdx;
-    float mScaledCpuUsageStep;
-#endif
-    ProfileSender mProfileSender;
-
-private:
     // GetCpuStat gets current CPU statistics of Logtail process and save it to @cpuStat.
     // @return true if get successfully.
     bool GetCpuStat(CpuStat& cpuStat);
@@ -170,6 +143,36 @@ private:
     bool IsHostIpChanged();
 
     void Suicide();
+
+    std::future<void> mThreadRes;
+    std::mutex mThreadRunningMux;
+    bool mIsThreadRunning = true;
+    std::condition_variable mStopCV;
+
+    // Control report status profile frequency.
+    int32_t mStatusCount;
+
+    // Use to calculate realtime CPU level (updated every 1s).
+    CpuStat mRealtimeCpuStat;
+    // Use to calculate CPU limit, updated regularly (30s by default).
+    CpuStat mCpuStat;
+    // Memory usage statistics.
+    MemStat mMemStat;
+
+    // Current scale up level, updated by CheckScaledCpuUsageUpLimit.
+    float mScaledCpuUsageUpLimit;
+#if defined(__linux__)
+    const static int32_t CPU_STAT_FOR_SCALE_ARRAY_SIZE = 2;
+    int32_t mCpuCores;
+    CpuStat mCpuStatForScale;
+    OsCpuStat mOsCpuStatForScale;
+    // mCpuArrayForScale and mOsCpuArrayForScale store lastest two CPU usage of
+    // ilogtail process and global.
+    float mCpuArrayForScale[CPU_STAT_FOR_SCALE_ARRAY_SIZE];
+    float mOsCpuArrayForScale[CPU_STAT_FOR_SCALE_ARRAY_SIZE];
+    int32_t mCpuArrayForScaleIdx;
+    float mScaledCpuUsageStep;
+#endif
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConfigUpdatorUnittest;

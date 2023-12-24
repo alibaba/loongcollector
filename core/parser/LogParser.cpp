@@ -19,12 +19,10 @@
 #include <vector>
 #include <regex>
 #include "common/StringTools.h"
-#include "common/util.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
-#include "config/LogType.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "app_config/AppConfig.h"
