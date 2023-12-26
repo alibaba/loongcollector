@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"regexp"
 
+	"github.com/alibabacloud-go/tea/tea"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
@@ -44,30 +46,44 @@ func CustomErrorNew(code string, requestID string, msg string) *CustomError {
 	}
 }
 
-type SDKError struct {
-	HTTPCode     int    `json:"httpCode"`
-	ErrorCode    string `json:"errorCode"`
-	ErrorMessage string `json:"errorMessage"`
-	RequestID    string `json:"requestID"`
+type SDKErrorMsg struct {
+	HTTPCode   int    `json:"httpCode"`
+	RequestID  string `json:"requestId"`
+	StatusCode int    `json:"statusCode"`
 }
 
-func CustomErrorFromSlsSDKError(slsSDKError error) *CustomError {
-	var sdkError SDKError
-	err := json.Unmarshal([]byte(slsSDKError.Error()), &sdkError)
-	if err != nil {
-		logger.Error(context.Background(), "unmarshal json fail : ", err.Error())
+func CustomErrorFromSlsSDKError(err error) *CustomError {
+	var sdkError = &tea.SDKError{}
+	// 判断是否为SDKError
+	if _t, ok := err.(*tea.SDKError); ok {
+		sdkError = _t
+	} else {
 		return &CustomError{
 			Code:      "SDKError",
 			RequestID: "",
-			Message:   slsSDKError.Error(),
-			RawError:  slsSDKError,
+			Message:   err.Error(),
+			RawError:  err,
 		}
 	}
+
+	// 解析Data获取RequestId
+	var sdkErrorMsg SDKErrorMsg
+	err = json.Unmarshal([]byte(tea.StringValue(sdkError.Data)), &sdkErrorMsg)
+	if err != nil {
+		logger.Error(context.Background(), "unmarshal json fail : ", err.Error())
+		return &CustomError{
+			Code:      tea.StringValue(sdkError.Code),
+			RequestID: "",
+			Message:   tea.StringValue(sdkError.Message),
+			RawError:  err,
+		}
+	}
+
 	return &CustomError{
-		Code:      sdkError.ErrorCode,
-		RequestID: sdkError.RequestID,
-		Message:   sdkError.ErrorMessage,
-		RawError:  slsSDKError,
+		Code:      tea.StringValue(sdkError.Code),
+		RequestID: sdkErrorMsg.RequestID,
+		Message:   tea.StringValue(sdkError.Message),
+		RawError:  err,
 	}
 }
 

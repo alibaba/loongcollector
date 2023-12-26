@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-const invalidLogPath = "/invalid_log_path"
+const invalidLogPath = "/invalid_log_path/"
 
 func splitLogPathAndFilePattern(filePath string) (logPath string, filePattern string, err error) {
 	lastSeperatorPos := strings.LastIndexByte(filePath, '/')

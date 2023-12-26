@@ -19,7 +19,7 @@ import (
 	"strings"
 )
 
-const invalidLogPath = "c:\\invalid_log_path"
+const invalidLogPath = "c:\\invalid_log_path\\"
 
 func splitLogPathAndFilePattern(filePath string) (logPath string, filePattern string, err error) {
 	filePath = strings.ToLower(filePath)

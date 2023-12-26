@@ -54,7 +54,14 @@ func recorrectRegion(region string) string {
 //	"k8s-audit"
 //	"cn"
 func CreateProductLogstore(region, project, logstore, product, lang string, hotTTL int) error {
-	client, err := createProductClient()
+	var client *productAPI.Client
+	var err error
+	defer func() {
+		if client != nil {
+			client.Shutdown()
+		}
+	}()
+	client, err = createProductClient()
 	if err != nil {
 		return err
 	}
@@ -78,6 +85,8 @@ func CreateProductLogstore(region, project, logstore, product, lang string, hotT
 	request.Lang = lang
 	if hotTTL >= 30 {
 		request.HotTTL = requests.NewInteger(hotTTL)
+	} else if hotTTL > 0 {
+		request.HotTTL = requests.NewInteger(30)
 	}
 	resp, err := client.AnalyzeProductLog(request)
 	if err != nil {

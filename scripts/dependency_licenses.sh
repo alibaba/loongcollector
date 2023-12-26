@@ -66,6 +66,8 @@ function filter_dependencies() {
   		# ignore ourselves
   		github.com/alibaba/ilogtail) continue;;
   		github.com/alibaba/ilogtail/test) continue;;
+      github.com/alibabacloud-go/alibabacloud*) continue;; # ignore other alibabacloud-go dependencies
+      github.com/alibabacloud-go/darabonba*) continue;; # ignore other alibabacloud-go dependencies
   		./pkg) continue;;
   		../pkg) continue;;
   		../) continue;;

@@ -24,51 +24,42 @@ import (
 
 const nginxIngressProcessor = `
 {
-	"detail": {
-		"KeepSource": true,
-		"Keys": [
-			"client_ip",
-			"x_forward_for",
-			"remote_user",
-			"time",
-			"method",
-			"url",
-			"version",
-			"status",
-			"body_bytes_sent",
-			"http_referer",
-			"http_user_agent",
-			"request_length",
-			"request_time",
-			"proxy_upstream_name",
-			"upstream_addr",
-			"upstream_response_length",
-			"upstream_response_time",
-			"upstream_status",
-			"req_id"
-		],
-		"NoKeyError": true,
-		"NoMatchError": true,
-		"Regex": "^(\\S+)\\s-\\s\\[([^]]+)]\\s-\\s(\\S+)\\s\\[(\\S+)\\s\\S+\\s\"(\\w+)\\s(\\S+)\\s([^\"]+)\"\\s(\\d+)\\s(\\d+)\\s\"([^\"]*)\"\\s\"([^\"]*)\"\\s(\\S+)\\s(\\S+)+\\s\\[([^]]*)]\\s(\\S+)\\s(\\S+)\\s(\\S+)\\s(\\S+)\\s(\\S+).*",
+	"KeepSource": true,
+	"Keys": [
+		"client_ip",
+		"x_forward_for",
+		"remote_user",
+		"time",
+		"method",
+		"url",
+		"version",
+		"status",
+		"body_bytes_sent",
+		"http_referer",
+		"http_user_agent",
+		"request_length",
+		"request_time",
+		"proxy_upstream_name",
+		"upstream_addr",
+		"upstream_response_length",
+		"upstream_response_time",
+		"upstream_status",
+		"req_id"
+	],
+	"NoKeyError": true,
+	"NoMatchError": true,
+	"Regex": "^(\\S+)\\s-\\s\\[([^]]+)]\\s-\\s(\\S+)\\s\\[(\\S+)\\s\\S+\\s\"(\\w+)\\s(\\S+)\\s([^\"]+)\"\\s(\\d+)\\s(\\d+)\\s\"([^\"]*)\"\\s\"([^\"]*)\"\\s(\\S+)\\s(\\S+)+\\s\\[([^]]*)]\\s(\\S+)\\s(\\S+)\\s(\\S+)\\s(\\S+)\\s(\\S+).*",
 
-		"SourceKey": "content"
-	},
-	"type": "processor_regex"
+	"SourceKey": "content",
+	"Type": "processor_regex"
 }`
 
 func initNginxIngress(_ *helper.K8SInfo, config *AliyunLogConfigSpec, configType string) {
 	if !isDockerStdout(configType) {
 		return
 	}
-	pluginConfig, ok := config.LogtailConfig.LogtailConfig["plugin"]
-	if !ok {
-		logger.Error(context.Background(), "LOGTAIL_CONFIG_ALARM", "invalid nginx ingress config", "no plugin")
-		return
-	}
-	pluginConfigDetail, ok := pluginConfig.(map[string]interface{})
-	if !ok {
-		logger.Error(context.Background(), "LOGTAIL_CONFIG_ALARM", "invalid nginx ingress config", "plugin type error")
-		return
+	if config.LogtailConfig.Processors == nil {
+		config.LogtailConfig.Processors = make([]map[string]interface{}, 0, 1)
 	}
 	nginxIngressProcessorDetail := make(map[string]interface{})
 	err := json.Unmarshal(([]byte)(nginxIngressProcessor), &nginxIngressProcessorDetail)
@@ -76,12 +67,12 @@ func initNginxIngress(_ *helper.K8SInfo, config *AliyunLogConfigSpec, configType
 		logger.Error(context.Background(), "LOGTAIL_CONFIG_ALARM", "invalid nginx ingress config", "processor type error")
 		return
 	}
-	pluginConfigDetail["processors"] = []interface{}{nginxIngressProcessorDetail}
-	logger.Debug(context.Background(), "init nginx ingress config", pluginConfig)
+	config.LogtailConfig.Processors = append(config.LogtailConfig.Processors, nginxIngressProcessorDetail)
+	logger.Debug(context.Background(), "init nginx ingress config", config.LogtailConfig.Processors)
 }
 
 func initLogtailConfigForProduct(k8sInfo *helper.K8SInfo, config *AliyunLogConfigSpec, configType string) {
-	if config.ProductCode == "k8s-ingress-nginx" {
+	if config.ProductCode == "k8s-nginx-ingress" {
 		initNginxIngress(k8sInfo, config, configType)
 	}
 }

@@ -16,12 +16,16 @@ package envconfig
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/alibabacloud-go/tea/tea"
+
 	"strings"
 	"sync"
 	"time"
 
-	aliyunlog "github.com/aliyun/aliyun-log-go-sdk"
+	aliyunlog "github.com/alibabacloud-go/sls-20201230/v5/client"
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -30,85 +34,86 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-// nolint:unused
-type configCheckPoint struct {
-	ProjectName string
-	ConfigName  string
-}
+// const MachineIDTypes
+const (
+	MachineIDTypeIP          = "ip"
+	MachineIDTypeUserDefined = "userdefined"
+)
 
 type operationWrapper struct {
-	logClient        aliyunlog.ClientInterface
-	lock             sync.RWMutex
-	project          string
-	logstoreCacheMap map[string]time.Time
-	configCacheMap   map[string]time.Time
+	logClient        *AliyunLogClient     // 日志客户端接口
+	lock             sync.RWMutex         // 读写锁
+	project          string               // project名称
+	logstoreCacheMap map[string]time.Time // logStore缓存映射
 	eventRecorder    *k8s_event.EventRecorder
 }
 
-func createDefaultK8SIndex(logstoremode string) *aliyunlog.Index {
-	docvalue := logstoremode == StandardMode
-	normalIndexKey := aliyunlog.IndexKey{
-		Token:         []string{" ", "\n", "\t", "\r", ",", ";", "[", "]", "{", "}", "(", ")", "&", "^", "*", "#", "@", "~", "=", "<", ">", "/", "\\", "?", ":", "'", "\""},
-		CaseSensitive: false,
-		Type:          "text",
-		DocValue:      docvalue,
+// createDefaultK8SIndex 创建默认的K8S索引
+// logstoreMode 用于判断是否开启字段统计。
+func createDefaultK8SIndex(logstoreMode string) *aliyunlog.CreateIndexRequest {
+	docValue := logstoreMode == StandardMode
+	normalIndexKey := aliyunlog.KeysValue{
+		CaseSensitive: tea.Bool(false),    // 是否大小写敏感
+		Type:          tea.String("text"), // 类型为文本
+		// 定义分词符
+		Token:    tea.StringSlice([]string{" ", "\n", "\t", "\r", ",", ";", "[", "]", "{", "}", "(", ")", "&", "^", "*", "#", "@", "~", "=", "<", ">", "/", "\\", "?", ":", "'", "\""}),
+		DocValue: &docValue, // 是否开启字段统计
 	}
-	return &aliyunlog.Index{
-		Line: &aliyunlog.IndexLine{
-			Token:         []string{" ", "\n", "\t", "\r", ",", ";", "[", "]", "{", "}", "(", ")", "&", "^", "*", "#", "@", "~", "=", "<", ">", "/", "\\", "?", ":", "'", "\""},
-			CaseSensitive: false,
+	return &aliyunlog.CreateIndexRequest{
+		Line: &aliyunlog.CreateIndexRequestLine{ // 索引行
+			CaseSensitive: tea.Bool(false),
+			Token:         tea.StringSlice([]string{" ", "\n", "\t", "\r", ",", ";", "[", "]", "{", "}", "(", ")", "&", "^", "*", "#", "@", "~", "=", "<", ">", "/", "\\", "?", ":", "'", "\""}),
 		},
-		Keys: map[string]aliyunlog.IndexKey{
-			"__tag__:__hostname__":     normalIndexKey,
-			"__tag__:__path__":         normalIndexKey,
-			"__tag__:_container_ip_":   normalIndexKey,
-			"__tag__:_container_name_": normalIndexKey,
-			"__tag__:_image_name_":     normalIndexKey,
-			"__tag__:_namespace_":      normalIndexKey,
-			"__tag__:_pod_name_":       normalIndexKey,
-			"__tag__:_pod_uid_":        normalIndexKey,
-			"_container_ip_":           normalIndexKey,
-			"_container_name_":         normalIndexKey,
-			"_image_name_":             normalIndexKey,
-			"_namespace_":              normalIndexKey,
-			"_pod_name_":               normalIndexKey,
-			"_pod_uid_":                normalIndexKey,
-			"_source_":                 normalIndexKey,
+		// 索引键
+		Keys: map[string]*aliyunlog.KeysValue{
+			"__tag__:__hostname__":     &normalIndexKey,
+			"__tag__:__path__":         &normalIndexKey,
+			"__tag__:_container_ip_":   &normalIndexKey,
+			"__tag__:_container_name_": &normalIndexKey,
+			"__tag__:_image_name_":     &normalIndexKey,
+			"__tag__:_namespace_":      &normalIndexKey,
+			"__tag__:_pod_name_":       &normalIndexKey,
+			"__tag__:_pod_uid_":        &normalIndexKey,
+			"_container_ip_":           &normalIndexKey,
+			"_container_name_":         &normalIndexKey,
+			"_image_name_":             &normalIndexKey,
+			"_namespace_":              &normalIndexKey,
+			"_pod_name_":               &normalIndexKey,
+			"_pod_uid_":                &normalIndexKey,
+			"_source_":                 &normalIndexKey,
 		},
 	}
 }
 
-func addNecessaryInputConfigField(inputConfigDetail map[string]interface{}) map[string]interface{} {
-	inputConfigDetailCopy := util.DeepCopy(&inputConfigDetail)
-	aliyunlog.AddNecessaryInputConfigField(*inputConfigDetailCopy)
-	logger.Debug(context.Background(), "before", inputConfigDetail, "after", *inputConfigDetailCopy)
-	return *inputConfigDetailCopy
-}
-
-func createClientInterface(endpoint, accessKeyID, accessKeySecret, stsToken string, shutdown <-chan struct{}) (aliyunlog.ClientInterface, error) {
-	var clientInterface aliyunlog.ClientInterface
+func createClientInterface(endpoint, accessKeyID, accessKeySecret, stsToken string, shutdown <-chan struct{}) (*AliyunLogClient, error) {
+	var logClient *AliyunLogClient
 	var err error
 	if *flags.AliCloudECSFlag {
-		clientInterface, err = aliyunlog.CreateTokenAutoUpdateClient(endpoint, UpdateTokenFunction, shutdown)
+		// 如果是阿里云ECS, 创建一个自动更新令牌的客户端
+		logClient, err = CreateTokenAutoUpdateAliyunLogClient(endpoint, UpdateTokenFunction, shutdown, config.UserAgent)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		clientInterface = aliyunlog.CreateNormalInterface(endpoint, accessKeyID, accessKeySecret, stsToken)
+		// 如果不是阿里云ECS, 创建一个普通的客户端接口
+		logClient, err = CreateNormalAliyunLogClient(endpoint, accessKeyID, accessKeySecret, stsToken, config.UserAgent)
+		if err != nil {
+			return nil, err
+		}
 	}
-	clientInterface.SetUserAgent(config.UserAgent)
-	return clientInterface, err
+	return logClient, err
 }
 
-func createAliyunLogOperationWrapper(project string, clientInterface aliyunlog.ClientInterface) (*operationWrapper, error) {
+// createAliyunLogOperationWrapper 保证project和机器组存在, 并初始化logStore缓存映射
+func createAliyunLogOperationWrapper(project string, logClient *AliyunLogClient) (*operationWrapper, error) {
 	var err error
 	wrapper := &operationWrapper{
-		logClient:     clientInterface,
+		logClient:     logClient,
 		project:       project,
 		eventRecorder: k8s_event.GetEventRecorder(),
 	}
 	logger.Info(context.Background(), "init aliyun log operation wrapper", "begin")
-	// retry when make project fail
+	// 确保project存在
 	for i := 0; i < 1; i++ {
 		err = wrapper.makesureProjectExist(nil, project)
 		if err == nil {
@@ -118,7 +123,7 @@ func createAliyunLogOperationWrapper(project string, clientInterface aliyunlog.C
 		time.Sleep(time.Second * time.Duration(30))
 	}
 
-	// retry when make machine group fail
+	// 确保机器组存在
 	for i := 0; i < 3; i++ {
 		err = wrapper.makesureMachineGroupExist(project, *flags.DefaultLogMachineGroup)
 		if err == nil {
@@ -130,16 +135,20 @@ func createAliyunLogOperationWrapper(project string, clientInterface aliyunlog.C
 	if err != nil {
 		return nil, err
 	}
+	// 创建logStore缓存映射
 	wrapper.logstoreCacheMap = make(map[string]time.Time)
-	wrapper.configCacheMap = make(map[string]time.Time)
 	logger.Info(context.Background(), "init aliyun log operation wrapper", "done")
 	return wrapper, nil
 }
 
+// logstoreCacheExists 检查给定的project和logStore是否在缓存中存在
+// 并且其最后更新时间距离现在的时间小于缓存过期时间。
 func (o *operationWrapper) logstoreCacheExists(project, logstore string) bool {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
+	// 检查project和logStore是否在缓存中
 	if lastUpdateTime, ok := o.logstoreCacheMap[project+"@@"+logstore]; ok {
+		// 检查最后更新时间是否在缓存过期时间内
 		if time.Since(lastUpdateTime) < time.Second*time.Duration(*flags.LogResourceCacheExpireSec) {
 			return true
 		}
@@ -147,61 +156,21 @@ func (o *operationWrapper) logstoreCacheExists(project, logstore string) bool {
 	return false
 }
 
+// addLogstoreCache 将给定的project和logStore添加到缓存中。
 func (o *operationWrapper) addLogstoreCache(project, logstore string) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
+	// 将project和logStore添加到缓存中
 	o.logstoreCacheMap[project+"@@"+logstore] = time.Now()
 }
 
-// nolint:unused
-func (o *operationWrapper) configCacheExists(project, config string) bool {
-	o.lock.RLock()
-	defer o.lock.RUnlock()
-	if lastUpdateTime, ok := o.configCacheMap[project+"@@"+config]; ok {
-		if time.Since(lastUpdateTime) < time.Second*time.Duration(*flags.LogResourceCacheExpireSec) {
-			return true
-		}
-	}
-	return false
-}
-
-func (o *operationWrapper) addConfigCache(project, config string) {
-	o.lock.Lock()
-	defer o.lock.Unlock()
-	o.configCacheMap[project+"@@"+config] = time.Now()
-}
-
-// nolint:unused
-func (o *operationWrapper) removeConfigCache(project, config string) {
-	o.lock.Lock()
-	defer o.lock.Unlock()
-	delete(o.configCacheMap, project+"@@"+config)
-}
-
-// nolint:unused
-func (o *operationWrapper) retryCreateIndex(project, logstore, logstoremode string) {
-	time.Sleep(time.Second * 10)
-	index := createDefaultK8SIndex(logstoremode)
-	// create index, create index do not return error
-	for i := 0; i < 10; i++ {
-		err := o.logClient.CreateIndex(project, logstore, *index)
-		if err != nil {
-			// if IndexAlreadyExist, just return
-			if clientError, ok := err.(*aliyunlog.Error); ok && clientError.Code == "IndexAlreadyExist" {
-				return
-			}
-			time.Sleep(time.Second * 10)
-		} else {
-			break
-		}
-	}
-}
-
+// createProductLogstore 创建logStore
 func (o *operationWrapper) createProductLogstore(config *AliyunLogConfigSpec, project, logstore, product, lang string, hotTTL int) error {
 	logger.Info(context.Background(), "begin to create product logstore, project", project, "logstore", logstore, "product", product, "lang", lang)
+	// 调用 CreateProductLogstore 函数创建logStore
 	err := CreateProductLogstore(*flags.DefaultRegion, project, logstore, product, lang, hotTTL)
 
-	annotations := GetAnnotationByObject(config, project, logstore, product, config.LogtailConfig.ConfigName, false)
+	annotations := GetAnnotationByObject(config, project, logstore, product, tea.StringValue(config.LogtailConfig.ConfigName), false)
 
 	if err != nil {
 		customErr := CustomErrorFromPopError(err)
@@ -212,10 +181,12 @@ func (o *operationWrapper) createProductLogstore(config *AliyunLogConfigSpec, pr
 
 	o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.CreateProductLogStore, "create product log success")
 
+	// 将logStore添加到缓存中
 	o.addLogstoreCache(project, logstore)
 	return nil
 }
 
+// makesureLogstoreExist 确保logStore存在, 如果不存在就创建logstore
 func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec) error {
 	project := o.project
 	if len(config.Project) != 0 {
@@ -244,6 +215,7 @@ func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec) er
 		hotTTL = int(*config.LogstoreHotTTL)
 	}
 
+	// 如果logStore已经存在于缓存中,则返回 nil
 	if o.logstoreCacheExists(project, logstore) {
 		return nil
 	}
@@ -255,27 +227,35 @@ func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec) er
 		return o.createProductLogstore(config, project, logstore, product, lang, hotTTL)
 	}
 
-	// @note hardcode for k8s audit, eg audit-cfc281c9c4ca548638a1aaa765d8f220d
+	// 如果logStore名称以 "audit-" 开头并且长度为 39, 例如audit-cfc281c9c4ca548638a1aaa765d8f220d
 	if strings.HasPrefix(logstore, "audit-") && len(logstore) == 39 {
 		return o.createProductLogstore(config, project, logstore, "k8s-audit", "cn", 0)
 	}
 
+	// 如果project名称不等于 o.project, 确保project存在
 	if project != o.project {
 		if err := o.makesureProjectExist(config, project); err != nil {
 			return err
 		}
 	}
-	ok := false
+	var ok *aliyunlog.GetLogStoreResponse
 	var err error
+	// 检查logStore是否存在
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		if ok, err = o.logClient.CheckLogstoreExist(project, logstore); err != nil {
+		if ok, err = o.logClient.GetClient().GetLogStore(&project, &logstore); err != nil {
 			time.Sleep(time.Millisecond * 100)
+			var clientError *tea.SDKError
+			if errors.As(err, &clientError) && tea.StringValue(clientError.Code) == "LogStoreNotExist" {
+				break
+			}
 		} else {
 			break
 		}
 	}
-	if ok {
+	// 如果logStore已经存在
+	if ok != nil && ok.Body != nil && err == nil {
 		logger.Info(context.Background(), "logstore already exist, logstore", logstore)
+		// 将logStore添加到缓存中
 		o.addLogstoreCache(project, logstore)
 		return nil
 	}
@@ -290,50 +270,51 @@ func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec) er
 	if shardCount > 10 {
 		shardCount = 10
 	}
-	logStore := &aliyunlog.LogStore{
-		Name:          logstore,
-		TTL:           ttl,
-		ShardCount:    shardCount,
-		AutoSplit:     true,
-		MaxSplitShard: 32,
-		Mode:          mode,
+	logStore := &aliyunlog.CreateLogStoreRequest{
+		LogstoreName:  tea.String(logstore),         // logStore的名称
+		Ttl:           tea.Int32(int32(ttl)),        // logStore的生命周期
+		ShardCount:    tea.Int32(int32(shardCount)), // Shard 分区个数
+		AutoSplit:     tea.Bool(true),               // 是否自动分片
+		MaxSplitShard: tea.Int32(32),                // 最大分片数量
+		Mode:          tea.String(mode),             // 模式
 	}
 	if config.LogstoreHotTTL != nil {
-		logStore.HotTTL = uint32(*config.LogstoreHotTTL)
+		logStore.HotTtl = tea.Int32(*config.LogstoreHotTTL)
 	}
 
 	if len(config.LogstoreTelemetryType) > 0 {
 		if MetricsTelemetryType == config.LogstoreTelemetryType {
-			logStore.TelemetryType = config.LogstoreTelemetryType
+			logStore.TelemetryType = tea.String(config.LogstoreTelemetryType)
 		}
 	}
 	if config.LogstoreAppendMeta {
-		logStore.AppendMeta = config.LogstoreAppendMeta
+		logStore.AppendMeta = tea.Bool(config.LogstoreAppendMeta)
 	}
 	if config.LogstoreEnableTracking {
-		logStore.WebTracking = config.LogstoreEnableTracking
+		logStore.EnableTracking = tea.Bool(config.LogstoreEnableTracking)
 	}
 	if config.LogstoreAutoSplit {
-		logStore.AutoSplit = config.LogstoreAutoSplit
+		logStore.AutoSplit = tea.Bool(config.LogstoreAutoSplit)
 	}
 	if config.LogstoreMaxSplitShard != nil {
-		logStore.MaxSplitShard = int(*config.LogstoreMaxSplitShard)
+		logStore.MaxSplitShard = tea.Int32(*config.LogstoreMaxSplitShard)
 	}
-	if config.LogstoreEncryptConf.Enable {
+	if tea.BoolValue(config.LogstoreEncryptConf.Enable) {
 		logStore.EncryptConf = &config.LogstoreEncryptConf
 	}
-
+	// 创建logStore
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.CreateLogStoreV2(project, logStore)
+		_, err = o.logClient.GetClient().CreateLogStore(&project, logStore)
 		if err != nil {
 			time.Sleep(time.Millisecond * 100)
 		} else {
+			// 将logStore添加到缓存中
 			o.addLogstoreCache(project, logstore)
 			logger.Info(context.Background(), "create logstore success, logstore", logstore)
 			break
 		}
 	}
-	annotations := GetAnnotationByObject(config, project, logstore, "", config.LogtailConfig.ConfigName, false)
+	annotations := GetAnnotationByObject(config, project, logstore, "", tea.StringValue(config.LogtailConfig.ConfigName), false)
 	if err != nil {
 		customErr := CustomErrorFromSlsSDKError(err)
 		o.eventRecorder.SendErrorEventWithAnnotation(o.eventRecorder.GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.CreateLogstore, "", fmt.Sprintf("create logstore failed, error: %s", err.Error()))
@@ -341,14 +322,13 @@ func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec) er
 	}
 
 	o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.CreateLogstore, "create logstore success")
-
-	// after create logstore success, wait 1 sec
+	// 创建logStore成功后,等待 1 秒
 	time.Sleep(time.Second)
-	// use default k8s index
+	// 使用默认的 k8s 索引
 	index := createDefaultK8SIndex(mode)
-	// create index, create index do not return error
+	// 创建索引
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.CreateIndex(project, logstore, *index)
+		_, err = o.logClient.GetClient().CreateIndex(&project, &logstore, index)
 		if err != nil {
 			time.Sleep(time.Millisecond * 100)
 		} else {
@@ -364,23 +344,47 @@ func (o *operationWrapper) makesureLogstoreExist(config *AliyunLogConfigSpec) er
 	return nil
 }
 
+// makesureProjectExist 函数确保在阿里云日志服务中存在指定的project。
+// 如果project不存在,该函数将尝试创建它。
 func (o *operationWrapper) makesureProjectExist(config *AliyunLogConfigSpec, project string) error {
-	ok := false
+	var ok *aliyunlog.GetProjectResponse
 	var err error
 
+	// 检查project是否存在
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		if ok, err = o.logClient.CheckProjectExist(project); err != nil {
+		if ok, err = o.logClient.GetClient().GetProject(&project); err != nil {
+			var clientError *tea.SDKError
+			if errors.As(err, &clientError) {
+				if tea.StringValue(clientError.Code) == "ProjectNotExist" {
+					ok = nil
+					break
+				} else if tea.StringValue(clientError.Code) == "Unauthorized" {
+					// The project does not belong to you.
+					return fmt.Errorf("GetProject error, project : %s, Endpoint : %s, error : %s", project, *o.logClient.GetClient().Endpoint, tea.StringValue(clientError.Message))
+				}
+			}
 			time.Sleep(time.Millisecond * 1000)
 		} else {
 			break
 		}
 	}
-	if ok {
+	// 如果project存在,返回 nil
+	if ok != nil && ok.Body != nil && err == nil {
 		return nil
 	}
+	// 如果project不存在, 创建project
+	createProjectRequest := aliyunlog.CreateProjectRequest{
+		Description: tea.String("k8s log project, created by alibaba ilogtail"),
+		ProjectName: tea.String(project),
+	}
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		_, err = o.logClient.CreateProject(project, "k8s log project, created by alibaba cloud log controller")
+		_, err = o.logClient.GetClient().CreateProject(&createProjectRequest)
 		if err != nil {
+			var clientError *tea.SDKError
+			if errors.As(err, &clientError) && tea.StringValue(clientError.Code) == "ProjectAlreadyExist" {
+				err = nil
+				break
+			}
 			time.Sleep(time.Millisecond * 1000)
 		} else {
 			break
@@ -389,7 +393,7 @@ func (o *operationWrapper) makesureProjectExist(config *AliyunLogConfigSpec, pro
 	configName := ""
 	logstore := ""
 	if config != nil {
-		configName = config.LogtailConfig.ConfigName
+		configName = tea.StringValue(config.LogtailConfig.ConfigName)
 		logstore = config.Logstore
 	}
 	annotations := GetAnnotationByObject(config, project, logstore, "", configName, false)
@@ -402,30 +406,52 @@ func (o *operationWrapper) makesureProjectExist(config *AliyunLogConfigSpec, pro
 	return err
 }
 
+// makesureMachineGroupExist 函数确保在阿里云日志服务中存在指定的机器组。
+// 如果机器组不存在,该函数将尝试创建它。
+// project 是project的名称,machineGroup 是要检查或创建的机器组的名称。
 func (o *operationWrapper) makesureMachineGroupExist(project, machineGroup string) error {
-	ok := false
+	var ok *aliyunlog.GetMachineGroupResponse
 	var err error
 
+	// 检查机器组是否存在
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		if ok, err = o.logClient.CheckMachineGroupExist(project, machineGroup); err != nil {
+		if ok, err = o.logClient.GetClient().GetMachineGroup(&project, &machineGroup); err != nil {
+			var clientError *tea.SDKError
+			if errors.As(err, &clientError) {
+				if tea.StringValue(clientError.Code) == "MachineGroupNotExist" {
+					ok, err = nil, nil
+					break
+				} else if tea.StringValue(clientError.Code) == "MachineGroupAlreadyExist" {
+					return nil
+				}
+			}
 			time.Sleep(time.Millisecond * 100)
 		} else {
 			break
 		}
 	}
-	if ok {
+	if ok != nil && ok.Body != nil && err == nil {
 		return nil
 	}
-	m := &aliyunlog.MachineGroup{
-		Name:          machineGroup,
-		MachineIDType: aliyunlog.MachineIDTypeUserDefined,
-		MachineIDList: []string{machineGroup},
+	if err != nil {
+		return fmt.Errorf("GetMachineGroup error, project : %s, machineGroup : %s, Endpoint : %s, error : %s", project, machineGroup, *o.logClient.GetClient().Endpoint, err.Error())
 	}
+
+	// 如果机器组不存在,创建一个新的机器组
+	createMachineGroupRequest := aliyunlog.CreateMachineGroupRequest{
+		GroupAttribute:      nil,
+		GroupName:           tea.String(machineGroup),
+		GroupType:           tea.String(""),
+		MachineIdentifyType: tea.String(MachineIDTypeUserDefined),
+		MachineList:         tea.StringSlice([]string{machineGroup}),
+	}
+	// 创建机器组
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.CreateMachineGroup(project, m)
+		_, err = o.logClient.GetClient().CreateMachineGroup(&project, &createMachineGroupRequest)
 		if err != nil {
 			time.Sleep(time.Millisecond * 100)
 		} else {
+			// 给机器组加tag
 			for j := 0; j < *flags.LogOperationMaxRetryTimes; j++ {
 				err = o.TagMachineGroup(project, machineGroup, SlsMachinegroupDeployModeKey, SlsMachinegroupDeployModeDeamonset)
 				if err != nil {
@@ -441,81 +467,68 @@ func (o *operationWrapper) makesureMachineGroupExist(project, machineGroup strin
 	return err
 }
 
-// nolint:unused
-func (o *operationWrapper) resetToken(accessKeyID, accessKeySecret, stsToken string) {
-	o.logClient.ResetAccessKeyToken(accessKeyID, accessKeySecret, stsToken)
-}
-
-// nolint:unused
-func (o *operationWrapper) deleteConfig(checkpoint *configCheckPoint) error {
-	var err error
-	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.DeleteConfig(checkpoint.ProjectName, checkpoint.ConfigName)
-		if err == nil {
-			o.removeConfigCache(checkpoint.ProjectName, checkpoint.ConfigName)
-			return nil
-		}
-		if sdkError, ok := err.(*aliyunlog.Error); ok {
-			if sdkError.HTTPCode == 404 {
-				// no project or no config, return true
-				o.removeConfigCache(checkpoint.ProjectName, checkpoint.ConfigName)
-				return nil
-			}
-		}
-		// sleep 100 ms
-		time.Sleep(time.Millisecond * 100)
-	}
-	if err != nil {
-		return fmt.Errorf("DeleteConfig error, config : %s, error : %s", checkpoint.ConfigName, err.Error())
-	}
-	return err
-}
-
+// updateConfig 更新配置
 func (o *operationWrapper) updateConfig(config *AliyunLogConfigSpec) error {
 	return o.updateConfigInner(config)
 }
 
-// nolint:unused
-func (o *operationWrapper) createConfig(config *AliyunLogConfigSpec) error {
-	return o.updateConfigInner(config)
+// checkFileConfigChanged 函数用于检查文件配置是否发生了变化
+func checkFileConfigChanged(filePaths, includeEnv, includeLabel string, serverInput map[string]interface{}) bool {
+	var ok bool
+
+	// 判断FilePaths是否存在, 且长度是否为0
+	if _, ok = serverInput["FilePaths"]; !ok {
+		return true
+	}
+	if len(serverInput["FilePaths"].([]interface{})) == 0 {
+		return true
+	}
+	serverFilePath, _ := util.InterfaceToString(serverInput["FilePaths"].([]interface{})[0])
+	// 把/**/ 替换为/ 后再进行比较
+	for strings.Contains(serverFilePath, "/**/") {
+		serverFilePath = strings.ReplaceAll(serverFilePath, "/**/", "/")
+		serverFilePath = strings.ReplaceAll(serverFilePath, "//", "/")
+	}
+	for strings.Contains(filePaths, "/**/") {
+		filePaths = strings.ReplaceAll(filePaths, "/**/", "/")
+		filePaths = strings.ReplaceAll(filePaths, "//", "/")
+	}
+	if serverFilePath != filePaths {
+		return true
+	}
+
+	// 判断ContainerFilters是否存在
+	if _, ok = serverInput["ContainerFilters"]; !ok {
+		return true
+	}
+	var containerFilters map[string]interface{}
+	// 判断ContainerFilters类型是否正确
+	if containerFilters, ok = serverInput["ContainerFilters"].(map[string]interface{}); !ok {
+		return true
+	}
+
+	serverIncludeEnv, _ := util.InterfaceToJSONString(containerFilters["IncludeEnv"])
+	if includeEnv != serverIncludeEnv {
+		return true
+	}
+
+	serverIncludeLabel, _ := util.InterfaceToJSONString(containerFilters["IncludeContainerLabel"])
+
+	return includeLabel != serverIncludeLabel
 }
 
-func checkFileConfigChanged(filePath, filePattern, includeEnv, includeLabel string, serverConfigDetail map[string]interface{}) bool {
-	serverFilePath, _ := util.InterfaceToString(serverConfigDetail["logPath"])
-	serverFilePattern, _ := util.InterfaceToString(serverConfigDetail["filePattern"])
-	serverIncludeEnv, _ := util.InterfaceToJSONString(serverConfigDetail["dockerIncludeEnv"])
-	serverIncludeLabel, _ := util.InterfaceToJSONString(serverConfigDetail["dockerIncludeLabel"])
-	return filePath != serverFilePath ||
-		filePattern != serverFilePattern ||
-		includeEnv != serverIncludeEnv ||
-		includeLabel != serverIncludeLabel
-}
-
+// UnTagLogtailConfig 移除 Logtail 配置所有的标签
 func (o *operationWrapper) UnTagLogtailConfig(project string, logtailConfig string) error {
 	var err error
 
-	// "github.com/aliyun/aliyun-log-go-sdk" doesn't support Untag all, we should list all first
-	var ResourceTags []*aliyunlog.ResourceTagResponse
+	untagResourcesRequest := aliyunlog.UntagResourcesRequest{
+		All:          tea.Bool(true),
+		ResourceId:   tea.StringSlice([]string{project + "#" + logtailConfig}),
+		ResourceType: tea.String(TagLogtailConfig),
+	}
+	// 移除标签
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		ResourceTags, _, err = o.logClient.ListTagResources(project, TagLogtailConfig, []string{project + "#" + logtailConfig}, []aliyunlog.ResourceFilterTag{}, "")
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Millisecond * 100)
-	}
-	if err != nil {
-		return err
-	}
-
-	ResourceUnTags := aliyunlog.ResourceUnTags{ResourceType: TagLogtailConfig,
-		ResourceID: []string{project + "#" + logtailConfig},
-		Tags:       []string{},
-	}
-	for _, tags := range ResourceTags {
-		ResourceUnTags.Tags = append(ResourceUnTags.Tags, tags.TagKey)
-	}
-	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.UnTagResources(project, &ResourceUnTags)
+		_, err = o.logClient.GetClient().UntagResources(&untagResourcesRequest)
 		if err == nil {
 			return nil
 		}
@@ -524,26 +537,28 @@ func (o *operationWrapper) UnTagLogtailConfig(project string, logtailConfig stri
 	return err
 }
 
+// TagLogtailConfig 给 Logtail 配置添加标签
 func (o *operationWrapper) TagLogtailConfig(project string, logtailConfig string, tags map[string]string) error {
 	var err error
 
-	// delete all before create
+	// 在创建之前删除所有标签
 	err = o.UnTagLogtailConfig(project, logtailConfig)
 	if err != nil {
 		return err
 	}
 
-	ResourceTags := aliyunlog.ResourceTags{ResourceType: TagLogtailConfig,
-		ResourceID: []string{project + "#" + logtailConfig},
-		Tags:       []aliyunlog.ResourceTag{},
+	tagResourcesRequest := aliyunlog.TagResourcesRequest{ResourceType: tea.String(TagLogtailConfig),
+		ResourceId: tea.StringSlice([]string{project + "#" + logtailConfig}),
+		Tags:       []*aliyunlog.TagResourcesRequestTags{},
 	}
+	// 遍历所有标签
 	for k, v := range tags {
-		tag := aliyunlog.ResourceTag{Key: k, Value: v}
-		ResourceTags.Tags = append(ResourceTags.Tags, tag)
+		tag := aliyunlog.TagResourcesRequestTags{Key: tea.String(k), Value: tea.String(v)}
+		tagResourcesRequest.Tags = append(tagResourcesRequest.Tags, &tag)
 	}
-
+	// 添加标签
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.TagResources(project, &ResourceTags)
+		_, err = o.logClient.GetClient().TagResources(&tagResourcesRequest)
 		if err == nil {
 			return nil
 		}
@@ -552,15 +567,17 @@ func (o *operationWrapper) TagLogtailConfig(project string, logtailConfig string
 	return err
 }
 
+// TagMachineGroup 给机器组添加标签
 func (o *operationWrapper) TagMachineGroup(project, machineGroup, tagKey, tagValue string) error {
-	ResourceTags := aliyunlog.ResourceTags{
-		ResourceType: TagMachinegroup,
-		ResourceID:   []string{project + "#" + machineGroup},
-		Tags:         []aliyunlog.ResourceTag{{Key: tagKey, Value: tagValue}},
+	tagResourcesRequest := aliyunlog.TagResourcesRequest{
+		ResourceType: tea.String(TagMachinegroup),
+		ResourceId:   tea.StringSlice([]string{project + "#" + machineGroup}),
+		Tags:         []*aliyunlog.TagResourcesRequestTags{{Key: tea.String(tagKey), Value: tea.String(tagValue)}},
 	}
 	var err error
+	// 添加标签
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.TagResources(project, &ResourceTags)
+		_, err = o.logClient.GetClient().TagResources(&tagResourcesRequest)
 		if err == nil {
 			return nil
 		}
@@ -569,100 +586,107 @@ func (o *operationWrapper) TagMachineGroup(project, machineGroup, tagKey, tagVal
 	return err
 }
 
-// nolint:govet,ineffassign
+// nolint:govet,ineffassign,gocritic
+// updateConfigInner 更新配置
 func (o *operationWrapper) updateConfigInner(config *AliyunLogConfigSpec) error {
 	project := o.project
 	if len(config.Project) != 0 {
 		project = config.Project
 	}
 	logstore := config.Logstore
+	// 确保logStore存在
 	err := o.makesureLogstoreExist(config)
 	if err != nil {
-		return fmt.Errorf("Create logconfig error when update config, config : %s, error : %s", config.LogtailConfig.ConfigName, err.Error())
+		return fmt.Errorf("create logconfig error when update config, config : %s, error : %s", tea.StringValue(config.LogtailConfig.ConfigName), err.Error())
 	}
-
-	// make config
-	inputType := config.LogtailConfig.InputType
-	if len(inputType) == 0 {
-		inputType = aliyunlog.InputTypeFile
-	}
-	aliyunLogConfig := &aliyunlog.LogConfig{
-		Name:        config.LogtailConfig.ConfigName,
-		InputDetail: addNecessaryInputConfigField(config.LogtailConfig.LogtailConfig),
-		InputType:   inputType,
-		OutputType:  aliyunlog.OutputTypeLogService,
-		OutputDetail: aliyunlog.OutputDetail{
-			ProjectName:  project,
-			LogStoreName: logstore,
-		},
-	}
-
-	logger.Info(context.Background(), "create or update config", config.LogtailConfig.ConfigName, "detail", *aliyunLogConfig)
+	logger.Info(context.Background(), "create or update config", tea.StringValue(config.LogtailConfig.ConfigName))
 
 	ok := false
-	// if o.configCacheExists(project, config.LogtailConfig.ConfigName) {
-	// 	ok = true
-	// } else {
-	// 	// check if config exists
-	// 	for i := 0; i < *LogOperationMaxRetryTimes; i++ {
-	// 		ok, err = o.logClient.CheckConfigExist(project, config.LogtailConfig.ConfigName)
-	// 		if err == nil {
-	// 			break
-	// 		}
-	// 	}
-	// }
 
-	var serverConfig *aliyunlog.LogConfig
+	// 获取服务端配置
+	var serverConfig *aliyunlog.LogtailPipelineConfig
+	var getLogtailPipelineConfigResponse *aliyunlog.GetLogtailPipelineConfigResponse
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		serverConfig, err = o.logClient.GetConfig(project, config.LogtailConfig.ConfigName)
+		getLogtailPipelineConfigResponse, err = o.logClient.GetClient().GetLogtailPipelineConfig(&project, config.LogtailConfig.ConfigName)
 		if err != nil {
-			if slsErr, ok := err.(*aliyunlog.Error); ok {
-				if slsErr.Code == "ConfigNotExist" {
-					ok = false
-					break
-				}
+			var slsErr *tea.SDKError
+			if errors.As(err, &slsErr) && tea.StringValue(slsErr.Code) == "ConfigNotExist" {
+				ok = false
+				break
 			}
 		} else {
 			ok = true
+			serverConfig = getLogtailPipelineConfigResponse.Body
 			break
 		}
 	}
 
-	logger.Info(context.Background(), "get config", config.LogtailConfig.ConfigName, "result", ok)
+	logger.Info(context.Background(), "get config", tea.StringValue(config.LogtailConfig.ConfigName), "result", ok)
 
-	// create config or update config
+	// 如果服务端配置存在
 	if ok && serverConfig != nil {
+		// 如果配置为简单配置
 		if config.SimpleConfig {
-			configDetail, ok := serverConfig.InputDetail.(map[string]interface{})
-			// only update file type's filePattern and logPath
-			if config.LogtailConfig.InputType == "file" && serverConfig.InputType == "file" && ok {
-				filePattern, _ := util.InterfaceToString(config.LogtailConfig.LogtailConfig["filePattern"])
-				logPath, _ := util.InterfaceToString(config.LogtailConfig.LogtailConfig["logPath"])
-				includeEnv, _ := util.InterfaceToJSONString(config.LogtailConfig.LogtailConfig["dockerIncludeEnv"])
-				includeLabel, _ := util.InterfaceToJSONString(config.LogtailConfig.LogtailConfig["dockerIncludeLabel"])
+			needUpdate := false
+			// 服务端配置的inputs为空时, 强制更新服务端config
+			if serverConfig.Inputs == nil || len(serverConfig.Inputs) == 0 {
+				updateLogtailPipelineConfigRequest := aliyunlog.UpdateLogtailPipelineConfigRequest{
+					Aggregators: config.LogtailConfig.Aggregators,
+					ConfigName:  config.LogtailConfig.ConfigName,
+					Flushers: []map[string]interface{}{
+						{
+							"Logstore": logstore,
+							"Type":     "flusher_sls",
+						},
+					},
+					Global:     config.LogtailConfig.Global,
+					Inputs:     config.LogtailConfig.Inputs,
+					LogSample:  config.LogtailConfig.LogSample,
+					Processors: config.LogtailConfig.Processors,
+				}
+				for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
+					_, err = o.logClient.GetClient().UpdateLogtailPipelineConfig(&project, config.LogtailConfig.ConfigName, &updateLogtailPipelineConfigRequest)
+					if err == nil {
+						needUpdate = true
+						break
+					}
+				}
+				annotations := GetAnnotationByObject(config, project, logstore, "", tea.StringValue(config.LogtailConfig.ConfigName), true)
+				if err != nil {
+					customErr := CustomErrorFromSlsSDKError(err)
+					o.eventRecorder.SendErrorEventWithAnnotation(o.eventRecorder.GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.UpdateConfig, "", fmt.Sprintf("update config failed, error: %s", err.Error()))
+				} else {
+					o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.UpdateConfig, "update config success")
+				}
+			} else if config.LogtailConfig.Inputs[0]["Type"].(string) == "input_file" && serverConfig.Inputs[0]["Type"].(string) == "input_file" {
+				// 如果配置的输入类型为"input_file",并且serverConfig的输入类型也为"input_file"
+				// 则检查env配置的FilePaths、includeEnv、includeLabel是否和服务端配置相同, 如果不同则更新服务端配置
 
-				if len(filePattern) > 0 && len(logPath) > 0 {
+				// 获取FilePaths、includeEnv、includeLabel的值
+				filePaths, _ := util.InterfaceToString(config.LogtailConfig.Inputs[0]["FilePaths"].([]string)[0])
+				includeEnv, _ := util.InterfaceToJSONString(config.LogtailConfig.Inputs[0]["ContainerFilters"].(map[string]map[string]interface{})["IncludeEnv"])
+				includeLabel, _ := util.InterfaceToJSONString(config.LogtailConfig.Inputs[0]["ContainerFilters"].(map[string]map[string]interface{})["IncludeContainerLabel"])
 
-					if checkFileConfigChanged(logPath, filePattern, includeEnv, includeLabel, configDetail) {
-						logger.Info(context.Background(), "file config changed, old", configDetail, "new", config.LogtailConfig.LogtailConfig)
-						configDetail["logPath"] = logPath
-						configDetail["filePattern"] = filePattern
-						configDetail["dockerIncludeEnv"] = config.LogtailConfig.LogtailConfig["dockerIncludeEnv"]
-						if _, hasLabel := configDetail["dockerIncludeLabel"]; hasLabel {
-							if _, hasLocalLabel := config.LogtailConfig.LogtailConfig["dockerIncludeLabel"]; hasLocalLabel {
-								configDetail["dockerIncludeLabel"] = config.LogtailConfig.LogtailConfig["dockerIncludeLabel"]
-							}
+				if len(filePaths) > 0 {
+					if checkFileConfigChanged(filePaths, includeEnv, includeLabel, serverConfig.Inputs[0]) {
+						updateLogtailPipelineConfigRequest := aliyunlog.UpdateLogtailPipelineConfigRequest{
+							Aggregators: serverConfig.Aggregators,
+							ConfigName:  serverConfig.ConfigName,
+							Flushers:    serverConfig.Flushers,
+							Global:      serverConfig.Global,
+							Inputs:      config.LogtailConfig.Inputs,
+							LogSample:   serverConfig.LogSample,
+							Processors:  serverConfig.Processors,
 						}
-						serverConfig.InputDetail = configDetail
-						// update config
 						for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-							err = o.logClient.UpdateConfig(project, serverConfig)
+							_, err = o.logClient.GetClient().UpdateLogtailPipelineConfig(&project, config.LogtailConfig.ConfigName, &updateLogtailPipelineConfigRequest)
 							if err == nil {
+								needUpdate = true
 								break
 							}
 						}
 
-						annotations := GetAnnotationByObject(config, project, logstore, "", config.LogtailConfig.ConfigName, true)
+						annotations := GetAnnotationByObject(config, project, logstore, "", tea.StringValue(config.LogtailConfig.ConfigName), true)
 						if err != nil {
 							customErr := CustomErrorFromSlsSDKError(err)
 							o.eventRecorder.SendErrorEventWithAnnotation(o.eventRecorder.GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.UpdateConfig, "", fmt.Sprintf("update config failed, error: %s", err.Error()))
@@ -670,99 +694,124 @@ func (o *operationWrapper) updateConfigInner(config *AliyunLogConfigSpec) error 
 							o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.UpdateConfig, "update config success")
 						}
 
-					} else {
-						logger.Info(context.Background(), "file config not changed", "skip update")
 					}
 				}
-			}
-			if config.LogtailConfig.InputType != serverConfig.InputType && ok {
-				// force update
-				logger.Info(context.Background(), "config input type change from", serverConfig.InputType,
-					"to", config.LogtailConfig.InputType, "force update")
-				// update config
+			} else if config.LogtailConfig.Inputs[0]["Type"].(string) != serverConfig.Inputs[0]["Type"].(string) && ok {
+				// 如果配置的输入类型和serverConfig的输入类型不一致, 强制更新
+				logger.Info(context.Background(), "config input type change from", serverConfig.Inputs[0]["Type"].(string),
+					"to", config.LogtailConfig.Inputs[0]["Type"].(string), "force update")
+				updateLogtailPipelineConfigRequest := aliyunlog.UpdateLogtailPipelineConfigRequest{
+					Aggregators: config.LogtailConfig.Aggregators,
+					ConfigName:  config.LogtailConfig.ConfigName,
+					Flushers: []map[string]interface{}{
+						{
+							"Logstore": logstore,
+							"Type":     "flusher_sls",
+						},
+					},
+					Global:     config.LogtailConfig.Global,
+					Inputs:     config.LogtailConfig.Inputs,
+					LogSample:  config.LogtailConfig.LogSample,
+					Processors: config.LogtailConfig.Processors,
+				}
 				for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-					err = o.logClient.UpdateConfig(project, aliyunLogConfig)
+					_, err = o.logClient.GetClient().UpdateLogtailPipelineConfig(&project, config.LogtailConfig.ConfigName, &updateLogtailPipelineConfigRequest)
 					if err == nil {
+						needUpdate = true
 						break
 					}
 				}
+				annotations := GetAnnotationByObject(config, project, logstore, "", tea.StringValue(config.LogtailConfig.ConfigName), true)
+				if err != nil {
+					customErr := CustomErrorFromSlsSDKError(err)
+					o.eventRecorder.SendErrorEventWithAnnotation(o.eventRecorder.GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.UpdateConfig, "", fmt.Sprintf("update config failed, error: %s", err.Error()))
+				} else {
+					o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.UpdateConfig, "update config success")
+				}
 			}
-			logger.Info(context.Background(), "config updated, server config", *serverConfig, "local config", *config)
+			if needUpdate {
+				logger.Info(context.Background(), "config updated, server config", *serverConfig, "local config", *config)
+			} else {
+				logger.Debug(context.Background(), "config not changed", "skip update")
+			}
 		}
 
 	} else {
+		// 如果配置不存在, 创建新的配置
+		createLogtailPipelineConfigRequest := aliyunlog.CreateLogtailPipelineConfigRequest{
+			Aggregators: config.LogtailConfig.Aggregators,
+			ConfigName:  config.LogtailConfig.ConfigName,
+			Flushers: []map[string]interface{}{
+				{
+					"Logstore": logstore,
+					"Type":     "flusher_sls",
+				},
+			},
+			Global:     config.LogtailConfig.Global,
+			Inputs:     config.LogtailConfig.Inputs,
+			LogSample:  config.LogtailConfig.LogSample,
+			Processors: config.LogtailConfig.Processors,
+		}
 		for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-			err = o.logClient.CreateConfig(project, aliyunLogConfig)
+			_, err = o.logClient.GetClient().CreateLogtailPipelineConfig(&project, &createLogtailPipelineConfigRequest)
 			if err == nil {
 				break
 			}
 		}
-		annotations := GetAnnotationByObject(config, project, logstore, "", config.LogtailConfig.ConfigName, true)
+		annotations := GetAnnotationByObject(config, project, logstore, "", tea.StringValue(config.LogtailConfig.ConfigName), true)
 		if err != nil {
 			customErr := CustomErrorFromSlsSDKError(err)
-			o.eventRecorder.SendErrorEventWithAnnotation(o.eventRecorder.GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.UpdateConfig, "", fmt.Sprintf("update config failed, error: %s", err.Error()))
+			o.eventRecorder.SendErrorEventWithAnnotation(o.eventRecorder.GetObject(), GetAnnotationByError(annotations, customErr), k8s_event.CreateConfig, "", fmt.Sprintf("create config failed, error: %s", err.Error()))
 		} else {
-			o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.UpdateConfig, "update config success")
+			o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.CreateConfig, "create config success")
+		}
+		logger.Info(context.Background(), "config created, config", *config)
+	}
+	if err != nil {
+		return fmt.Errorf("UpdateConfig error, config : %s, error : %s", tea.StringValue(config.LogtailConfig.ConfigName), err.Error())
+	}
+	logger.Debug(context.Background(), "create or update config success", tea.StringValue(config.LogtailConfig.ConfigName))
+
+	// 为Logtail配置添加标签
+	logtailConfigTags := map[string]string{}
+	if config.ConfigTags != nil {
+		for k, v := range config.ConfigTags {
+			logtailConfigTags[k] = v
 		}
 	}
-	if err != nil {
-		return fmt.Errorf("UpdateConfig error, config : %s, error : %s", config.LogtailConfig.ConfigName, err.Error())
-	}
-	logger.Info(context.Background(), "create or update config success", config.LogtailConfig.ConfigName)
-
-	// Tag config
-	logtailConfigTags := map[string]string{}
-	for k, v := range config.ConfigTags {
-		logtailConfigTags[k] = v
-	}
 	logtailConfigTags[SlsLogtailChannalKey] = SlsLogtailChannalEnv
-	err = o.TagLogtailConfig(project, config.LogtailConfig.ConfigName, logtailConfigTags)
-	annotations := GetAnnotationByObject(config, project, logstore, "", config.LogtailConfig.ConfigName, true)
+	err = o.TagLogtailConfig(project, tea.StringValue(config.LogtailConfig.ConfigName), logtailConfigTags)
+	annotations := GetAnnotationByObject(config, project, logstore, "", tea.StringValue(config.LogtailConfig.ConfigName), true)
 	if err != nil {
-		o.eventRecorder.SendErrorEventWithAnnotation(o.eventRecorder.GetObject(), GetAnnotationByError(annotations, CustomErrorFromSlsSDKError(err)), k8s_event.CreateTag, "", fmt.Sprintf("tag config %s error :%s", config.LogtailConfig.ConfigName, err.Error()))
+		o.eventRecorder.SendErrorEventWithAnnotation(o.eventRecorder.GetObject(), GetAnnotationByError(annotations, CustomErrorFromSlsSDKError(err)), k8s_event.CreateTag, "", fmt.Sprintf("tag config %s error :%s", tea.StringValue(config.LogtailConfig.ConfigName), err.Error()))
 	} else {
-		o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.CreateTag, fmt.Sprintf("tag config %s success", config.LogtailConfig.ConfigName))
+		o.eventRecorder.SendNormalEventWithAnnotation(o.eventRecorder.GetObject(), annotations, k8s_event.CreateTag, fmt.Sprintf("tag config %s success", tea.StringValue(config.LogtailConfig.ConfigName)))
 	}
 
-	// check if config is in the machine group
-	// only check when create config
 	var machineGroup string
+	// 如果配置中有机器组,取第一个机器组
 	if len(config.MachineGroups) > 0 {
 		machineGroup = config.MachineGroups[0]
 	} else {
+		// 如果配置中没有机器组,使用默认的机器组
 		machineGroup = *flags.DefaultLogMachineGroup
 	}
-	_ = o.makesureMachineGroupExist(project, machineGroup)
-	if ok {
-		var machineGroups []string
-		for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-			machineGroups, err = o.logClient.GetAppliedMachineGroups(project, config.LogtailConfig.ConfigName)
-			if err == nil {
-				break
-			}
-		}
-		if err != nil {
-			return fmt.Errorf("GetAppliedMachineGroups error, config : %s, error : %s", config.LogtailConfig.ConfigName, err.Error())
-		}
-		ok = false
-		for _, key := range machineGroups {
-			if key == machineGroup {
-				ok = true
-				break
-			}
-		}
+	// 确保机器组存在
+	err = o.makesureMachineGroupExist(project, machineGroup)
+	if err != nil {
+		return fmt.Errorf("makesureMachineGroupExist error, config : %s, machineGroup : %s, error : %s", tea.StringValue(config.LogtailConfig.ConfigName), machineGroup, err.Error())
 	}
-	// apply config to the machine group
+
+	// 将配置应用到机器组
 	for i := 0; i < *flags.LogOperationMaxRetryTimes; i++ {
-		err = o.logClient.ApplyConfigToMachineGroup(project, config.LogtailConfig.ConfigName, machineGroup)
+		_, err = o.logClient.GetClient().ApplyConfigToMachineGroup(&project, &machineGroup, config.LogtailConfig.ConfigName)
 		if err == nil {
 			break
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("ApplyConfigToMachineGroup error, config : %s, machine group : %s, error : %s", config.LogtailConfig.ConfigName, machineGroup, err.Error())
+		return fmt.Errorf("ApplyConfigToMachineGroup error, config : %s, machine group : %s, error : %s", tea.StringValue(config.LogtailConfig.ConfigName), machineGroup, err.Error())
 	}
-	logger.Info(context.Background(), "apply config to machine group success", config.LogtailConfig.ConfigName, "group", machineGroup)
-	o.addConfigCache(project, config.LogtailConfig.ConfigName)
+	logger.Info(context.Background(), "apply config to machine group success", tea.StringValue(config.LogtailConfig.ConfigName), "group", machineGroup)
 	return nil
 }

@@ -30,6 +30,10 @@ type EventDefine struct {
 type Action string
 
 const (
+	CreateConfig Action = "CreateConfig"
+
+	CreateConfigStatus Action = "CreateConfigStatus"
+
 	UpdateConfig Action = "UpdateConfig"
 
 	UpdateConfigStatus Action = "UpdateConfigStatus"

@@ -106,8 +106,8 @@ func GetEventRecorder() *EventRecorder {
 // }
 
 func (e *EventRecorder) SendNormalEventWithAnnotation(object runtime.Object, annotations map[string]string, action Action, message string) {
-	logger.Info(context.Background(), "send normal event", "annotations", annotations, "message", message)
 	if e == nil || e.recorder == nil {
+		logger.Info(context.Background(), "send normal event", "annotations", annotations, "message", message)
 		return
 	}
 	if message == "" {
@@ -123,8 +123,8 @@ func (e *EventRecorder) SendNormalEventWithAnnotation(object runtime.Object, ann
 }
 
 func (e *EventRecorder) SendErrorEventWithAnnotation(object runtime.Object, annotations map[string]string, action Action, alarm Alarm, message string) {
-	logger.Info(context.Background(), "send error event", "annotations", annotations, "alarm", alarm, "message", message)
 	if e == nil || e.recorder == nil {
+		logger.Info(context.Background(), "send error event", "annotations", annotations, "alarm", alarm, "message", message)
 		return
 	}
 	if message == "" {

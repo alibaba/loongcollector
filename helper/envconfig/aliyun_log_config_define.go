@@ -22,7 +22,9 @@ import (
 	"strings"
 	"time"
 
-	aliyunlog "github.com/aliyun/aliyun-log-go-sdk"
+	"github.com/alibabacloud-go/tea/tea"
+
+	aliyunlog "github.com/alibabacloud-go/sls-20201230/v5/client"
 	"github.com/gogo/protobuf/proto"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -93,29 +95,29 @@ import (
 
 // AliyunLogConfigSpec logtail config struct for wrapper
 type AliyunLogConfigSpec struct {
-	Project                string                `json:"project"`
-	Logstore               string                `json:"logstore"`
-	ShardCount             *int32                `json:"shardCount"`
-	LifeCycle              *int32                `json:"lifeCycle"`
-	MachineGroups          []string              `json:"machineGroups"`
-	LogtailConfig          AliyunLogConfigDetail `json:"logtailConfig"`
-	ContainerName          string                `json:"containerName"`
-	HashCode               []byte                `json:"hashCode"`
-	ErrorCount             int                   `json:"errorCount"`
-	NextTryTime            int64                 `json:"nextTryTime"`
-	SimpleConfig           bool                  `json:"simpleConfig"`
-	LastFetchTime          int64                 `json:"lastFetchTime"`
-	ProductCode            string                `json:"productCode"`
-	ProductLang            string                `json:"productLang"`
-	LogstoreMode           string                `json:"logstoreMode"`
-	LogstoreHotTTL         *int32                `json:"logstoreHotTTL"`
-	LogstoreTelemetryType  string                `json:"logstoreTelemetryType"`
-	LogstoreAppendMeta     bool                  `json:"logstoreAppendMeta"`
-	LogstoreMaxSplitShard  *int32                `json:"logstoreMaxSplitShard"`
-	LogstoreEnableTracking bool                  `json:"logstoreEnableTracking"`
-	LogstoreAutoSplit      bool                  `json:"logstoreAutoSplit"`
-	LogstoreEncryptConf    aliyunlog.EncryptConf `json:"logstoreEncryptConf"`
-	ConfigTags             map[string]string     `json:"configTags"`
+	Project                string                          `json:"project"`
+	Logstore               string                          `json:"logstore"`
+	ShardCount             *int32                          `json:"shardCount"`
+	LifeCycle              *int32                          `json:"lifeCycle"`
+	MachineGroups          []string                        `json:"machineGroups"`
+	LogtailConfig          aliyunlog.LogtailPipelineConfig `json:"logtailConfig"`
+	ContainerName          string                          `json:"containerName"`
+	HashCode               []byte                          `json:"hashCode"`
+	ErrorCount             int                             `json:"errorCount"`
+	NextTryTime            int64                           `json:"nextTryTime"`
+	SimpleConfig           bool                            `json:"simpleConfig"`
+	LastFetchTime          int64                           `json:"lastFetchTime"`
+	ProductCode            string                          `json:"productCode"`
+	ProductLang            string                          `json:"productLang"`
+	LogstoreMode           string                          `json:"logstoreMode"`
+	LogstoreHotTTL         *int32                          `json:"logstoreHotTTL"`
+	LogstoreTelemetryType  string                          `json:"logstoreTelemetryType"`
+	LogstoreAppendMeta     bool                            `json:"logstoreAppendMeta"`
+	LogstoreMaxSplitShard  *int32                          `json:"logstoreMaxSplitShard"`
+	LogstoreEnableTracking bool                            `json:"logstoreEnableTracking"`
+	LogstoreAutoSplit      bool                            `json:"logstoreAutoSplit"`
+	LogstoreEncryptConf    aliyunlog.EncryptConf           `json:"logstoreEncryptConf"`
+	ConfigTags             map[string]string               `json:"configTags"`
 }
 
 const (
@@ -131,13 +133,6 @@ const (
 	SlsMachinegroupDeployModeDeamonset string = "deamonset"
 )
 
-// AliyunLogConfigDetail logtail config detail
-type AliyunLogConfigDetail struct {
-	ConfigName    string                 `json:"configName"`
-	InputType     string                 `json:"inputType"`
-	LogtailConfig map[string]interface{} `json:"inputDetail"`
-}
-
 // Hash generate sha256 hash
 func (alcs *AliyunLogConfigSpec) hash(hashValue string) {
 	h := sha256.New()
@@ -147,16 +142,7 @@ func (alcs *AliyunLogConfigSpec) hash(hashValue string) {
 
 // Key return the unique key
 func (alcs *AliyunLogConfigSpec) Key() string {
-	return alcs.Project + "@" + alcs.LogtailConfig.ConfigName + "@" + alcs.ContainerName
-}
-
-// InitFromDockerInfo init AliyunLogConfigDetail from docker info with specific config name
-func (alcs *AliyunLogConfigDetail) InitFromDockerInfo(dockerInfo *helper.DockerInfoDetail,
-	config string,
-	configKeys []string,
-	configValues []string) error {
-
-	return nil
+	return alcs.Project + "@" + tea.StringValue(alcs.LogtailConfig.ConfigName) + "@" + alcs.ContainerName
 }
 
 // all log config spec, must been cleared before next process
@@ -183,8 +169,9 @@ func isDockerStdout(configType string) bool {
 
 // nolint: unparam
 func initDockerStdoutConfig(dockerInfo *helper.DockerInfoDetail, config *AliyunLogConfigSpec, configType string) {
-	config.LogtailConfig.InputType = "plugin"
+	config.LogtailConfig.Inputs = make([]map[string]interface{}, 0, 1)
 	stdoutDetail := make(map[string]interface{})
+	stdoutDetail["Type"] = "service_docker_stdout"
 	switch configType {
 	case "stdout":
 		stdoutDetail["Stdout"] = true
@@ -204,54 +191,62 @@ func initDockerStdoutConfig(dockerInfo *helper.DockerInfoDetail, config *AliyunL
 	// 	}
 	// }
 	stdoutDetail["IncludeEnv"] = map[string]string{
-		*flags.LogConfigPrefix + config.LogtailConfig.ConfigName: configType,
+		*flags.LogConfigPrefix + tea.StringValue(config.LogtailConfig.ConfigName): configType,
 	}
-	stdoutConfig := map[string]interface{}{
-		"type":   "service_docker_stdout",
-		"detail": stdoutDetail,
-	}
-	config.LogtailConfig.LogtailConfig = map[string]interface{}{
-		"plugin": map[string]interface{}{
-			"inputs": []interface{}{stdoutConfig},
-			"global": map[string]interface{}{
-				"AlwaysOnline": true,
-			},
-		},
-	}
+	config.LogtailConfig.Inputs = append(config.LogtailConfig.Inputs, stdoutDetail)
+	config.LogtailConfig.Global = map[string]interface{}{"AlwaysOnline": true}
 }
 
 const invalidFilePattern = "invalid_file_pattern"
 
 // nolint: unparam
 func initFileConfig(k8sInfo *helper.K8SInfo, config *AliyunLogConfigSpec, filePath string, jsonFlag, dockerFile bool) {
-	config.LogtailConfig.InputType = "file"
+	config.LogtailConfig.Inputs = make([]map[string]interface{}, 0, 1)
+
+	// 判断有没有 /**/
+	maxDirSearchDepth := 0
+	if strings.Contains(filePath, "/**/") {
+		maxDirSearchDepth = 10
+	}
+
 	logPath, filePattern, err := splitLogPathAndFilePattern(filePath)
+	var input map[string]interface{}
 	if err != nil {
 		logger.Error(context.Background(), "INVALID_DOCKER_ENV_CONFIG_ALARM", "invalid file config, you must input full file path", filePath, err)
 	}
 
 	if !jsonFlag {
-		config.LogtailConfig.LogtailConfig = map[string]interface{}{
-			"logType":     "common_reg_log",
-			"logPath":     logPath,
-			"filePattern": filePattern,
-			"dockerFile":  dockerFile,
-			"dockerIncludeEnv": map[string]string{
-				*flags.LogConfigPrefix + config.LogtailConfig.ConfigName: filePath,
+		input = map[string]interface{}{
+			"Type":                     "input_file",
+			"FilePaths":                []string{logPath + filePattern},
+			"EnableContainerDiscovery": dockerFile,
+			"ContainerFilters": map[string]map[string]interface{}{
+				"IncludeEnv": {
+					*flags.LogConfigPrefix + tea.StringValue(config.LogtailConfig.ConfigName): filePath,
+				},
 			},
+			"MaxDirSearchDepth": maxDirSearchDepth,
 		}
 	} else {
-		config.LogtailConfig.LogtailConfig = map[string]interface{}{
-			"logType":     "json_log",
-			"logPath":     logPath,
-			"filePattern": filePattern,
-			"dockerFile":  dockerFile,
-			"dockerIncludeEnv": map[string]string{
-				*flags.LogConfigPrefix + config.LogtailConfig.ConfigName: filePath,
+		input = map[string]interface{}{
+			"Type":                     "input_file",
+			"FilePaths":                []string{logPath + filePattern},
+			"EnableContainerDiscovery": dockerFile,
+			"ContainerFilters": map[string]map[string]interface{}{
+				"IncludeEnv": {
+					*flags.LogConfigPrefix + tea.StringValue(config.LogtailConfig.ConfigName): filePath,
+				},
+			},
+			"MaxDirSearchDepth": maxDirSearchDepth,
+		}
+		config.LogtailConfig.Processors = []map[string]interface{}{
+			{
+				"SourceKey": "content",
+				"Type":      "processor_parse_json_native",
 			},
 		}
 	}
-
+	config.LogtailConfig.Inputs = append(config.LogtailConfig.Inputs, input)
 	//  remove container name limit, this will not work when pod with a sidecar/init container which has same env
 	// if len(k8sInfo.Namespace) > 0 {
 	// 	config.LogtailConfig.LogtailConfig["dockerIncludeLabel"] = map[string]string{
@@ -261,6 +256,7 @@ func initFileConfig(k8sInfo *helper.K8SInfo, config *AliyunLogConfigSpec, filePa
 }
 
 func isJSONFile(envConfigInfo *helper.EnvConfigInfo, config *AliyunLogConfigSpec) bool {
+	// aliyun_logs_****_jsonfile=true or aliyun_logs_****_jsonfile=TRUE
 	if jsonfile, ok := envConfigInfo.ConfigItemMap["jsonfile"]; ok && (jsonfile == "true" || jsonfile == "TRUE") {
 		return true
 	}
@@ -285,7 +281,7 @@ func makeLogConfigSpec(dockerInfo *helper.DockerInfoDetail, envConfigInfo *helpe
 	config.LastFetchTime = time.Now().Unix()
 	// save all config info, and keep sequence
 	var totalConfig string
-	config.LogtailConfig.ConfigName = envConfigInfo.ConfigName
+	config.LogtailConfig.ConfigName = tea.String(envConfigInfo.ConfigName)
 	// @note add image name to prevent key conflict
 	if len(dockerInfo.K8SInfo.ContainerName) > 0 {
 		config.ContainerName = dockerInfo.K8SInfo.ContainerName
@@ -414,13 +410,12 @@ func makeLogConfigSpec(dockerInfo *helper.DockerInfoDetail, envConfigInfo *helpe
 	// config
 	// makesure exist
 	configType := envConfigInfo.ConfigItemMap[""]
-	config.LogtailConfig.LogtailConfig = make(map[string]interface{})
+
 	if configDetail, ok := envConfigInfo.ConfigItemMap["detail"]; ok {
 		totalConfig += configDetail
-		if err := json.Unmarshal([]byte(configDetail), &config.LogtailConfig.LogtailConfig); err != nil {
-			logger.Error(context.Background(), "INVALID_ENV_CONFIG_DETAIL", "unmarshal error", err, "detail", configDetail)
-		}
-		config.LogtailConfig.InputType = configType
+		// if err := json.Unmarshal([]byte(configDetail), &config.LogtailConfig); err != nil {
+		// 	logger.Error(context.Background(), "INVALID_ENV_CONFIG_DETAIL", "unmarshal error", err, "detail", configDetail)
+		// }
 		config.SimpleConfig = false
 	} else {
 		totalConfig += configType

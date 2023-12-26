@@ -142,7 +142,7 @@ type K8SInfo struct {
 	PausedContainer bool
 
 	matchedCache map[uint64]bool
-	mu           sync.Mutex
+	mu           sync.RWMutex
 }
 
 func (info *K8SInfo) IsSamePod(o *K8SInfo) bool {
@@ -150,6 +150,8 @@ func (info *K8SInfo) IsSamePod(o *K8SInfo) bool {
 }
 
 func (info *K8SInfo) GetLabel(key string) string {
+	info.mu.RLock()
+	defer info.mu.RUnlock()
 	if info.Labels != nil {
 		return info.Labels[key]
 	}
@@ -158,10 +160,10 @@ func (info *K8SInfo) GetLabel(key string) string {
 
 // ExtractK8sLabels only work for original docker container.
 func (info *K8SInfo) ExtractK8sLabels(containerInfo types.ContainerJSON) {
-	info.mu.Lock()
-	defer info.mu.Unlock()
 	// only pause container has k8s labels
 	if info.ContainerName == "POD" || info.ContainerName == "pause" {
+		info.mu.Lock()
+		defer info.mu.Unlock()
 		info.PausedContainer = true
 		if info.Labels == nil {
 			info.Labels = make(map[string]string)
@@ -194,15 +196,18 @@ func (info *K8SInfo) Merge(o *K8SInfo) {
 
 // IsMatch ...
 func (info *K8SInfo) IsMatch(filter *K8SFilter) bool {
-	if info.PausedContainer {
-		return false
-	}
 	if filter == nil {
 		return true
 	}
+	info.mu.RLock() // 使用读锁
+	isPausedContainer := info.PausedContainer
+	info.mu.RUnlock() // 解读锁
+	if isPausedContainer {
+		return false
+	}
 
-	info.mu.Lock()
-	defer info.mu.Unlock()
+	info.mu.Lock()         // 使用写锁
+	defer info.mu.Unlock() // 解写锁
 	if info.matchedCache == nil {
 		info.matchedCache = make(map[uint64]bool)
 	} else if cacheRst, ok := info.matchedCache[filter.hashKey]; ok {

@@ -24,12 +24,12 @@ const defaultEnvTagKeys = "ALIYUN_LOG_ENV_TAGS"
 
 // EnvTags to be add to every logroup
 var EnvTags []string
-var envTagsLock sync.Mutex
+var envTagsLock sync.RWMutex
 
 // LoadEnvTags load tags from env
 func LoadEnvTags() {
+	envTagsLock.Lock() // Lock for writing
 	defer envTagsLock.Unlock()
-	envTagsLock.Lock()
 	envTagKeys := os.Getenv(defaultEnvTagKeys)
 	if len(envTagKeys) == 0 || len(EnvTags) > 0 {
 		return
@@ -42,6 +42,8 @@ func LoadEnvTags() {
 
 // HasEnvTags check if specific tags exist in envTags
 func HasEnvTags(tagKey string, tagValue string) bool {
+	envTagsLock.RLock() // Lock for reading
+	defer envTagsLock.RUnlock()
 	for i := 0; i < len(EnvTags)-1; i += 2 {
 		if EnvTags[i] == tagKey && EnvTags[i+1] == tagValue {
 			return true

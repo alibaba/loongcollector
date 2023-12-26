@@ -227,6 +227,8 @@ func CreateContainerInfoDetail(info types.ContainerJSON, envConfigPrefix string,
 // for test
 func GetContainerMap() map[string]*DockerInfoDetail {
 	instance := getDockerCenterInstance()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 	return instance.containerMap
 }
 

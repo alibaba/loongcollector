@@ -18,6 +18,7 @@
 package envconfig
 
 import (
+	"github.com/alibabacloud-go/tea/tea"
 	"github.com/pingcap/check"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -36,14 +37,33 @@ func (s *logConfigTestSuite) TestFile(c *check.C) {
 	c.Assert(config.ShardCount, check.IsNil)
 	c.Assert(config.LifeCycle, check.IsNil)
 	c.Assert(config.SimpleConfig, check.Equals, true)
-	c.Assert(config.LogtailConfig.InputType, check.Equals, "file")
-	c.Assert(config.LogtailConfig.ConfigName, check.Equals, "catalina")
-	c.Assert(len(config.LogtailConfig.LogtailConfig), check.Equals, 5)
-	c.Assert(config.LogtailConfig.LogtailConfig["logType"].(string), check.Equals, "common_reg_log")
-	c.Assert(config.LogtailConfig.LogtailConfig["logPath"].(string), check.Equals, "/usr/local/tomcat/logs/")
-	c.Assert(config.LogtailConfig.LogtailConfig["filePattern"].(string), check.Equals, "catalina.*.log")
-	c.Assert(config.LogtailConfig.LogtailConfig["dockerFile"].(bool), check.Equals, true)
-	c.Assert(config.LogtailConfig.LogtailConfig["dockerIncludeEnv"].(map[string]string)["aliyun_logs_catalina"], check.Equals, "/usr/local/tomcat/logs/catalina.*.log")
+	c.Assert(tea.StringValue(config.LogtailConfig.ConfigName), check.Equals, "catalina")
+	c.Assert(len(config.LogtailConfig.Inputs[0]), check.Equals, 5)
+	c.Assert(config.LogtailConfig.Inputs[0]["Type"], check.Equals, "input_file")
+	c.Assert(config.LogtailConfig.Inputs[0]["FilePaths"].([]string)[0], check.Equals, "/usr/local/tomcat/logs/catalina.*.log")
+	c.Assert(config.LogtailConfig.Inputs[0]["EnableContainerDiscovery"].(bool), check.Equals, true)
+	c.Assert(config.LogtailConfig.Inputs[0]["ContainerFilters"].(map[string]map[string]interface{})["IncludeEnv"]["aliyun_logs_catalina"], check.Equals, "/usr/local/tomcat/logs/catalina.*.log")
+	c.Assert(config.LogtailConfig.Inputs[0]["MaxDirSearchDepth"].(int), check.Equals, 0)
+
+	info = MockDockerInfoDetail("containerName", []string{
+		"aliyun_logs_catalina=/usr/local/tomcat/logs/**/catalina.*.log",
+	})
+	c.Assert(info.EnvConfigInfoMap["catalina"], check.NotNil)
+	c.Assert(len(info.EnvConfigInfoMap), check.Equals, 1)
+	config = makeLogConfigSpec(info, info.EnvConfigInfoMap["catalina"])
+	c.Assert(config.Project, check.Equals, *flags.DefaultLogProject)
+	c.Assert(len(config.MachineGroups), check.Equals, 0)
+	c.Assert(config.Logstore, check.Equals, "catalina")
+	c.Assert(config.ShardCount, check.IsNil)
+	c.Assert(config.LifeCycle, check.IsNil)
+	c.Assert(config.SimpleConfig, check.Equals, true)
+	c.Assert(tea.StringValue(config.LogtailConfig.ConfigName), check.Equals, "catalina")
+	c.Assert(len(config.LogtailConfig.Inputs[0]), check.Equals, 5)
+	c.Assert(config.LogtailConfig.Inputs[0]["Type"], check.Equals, "input_file")
+	c.Assert(config.LogtailConfig.Inputs[0]["FilePaths"].([]string)[0], check.Equals, "/usr/local/tomcat/logs/**/catalina.*.log")
+	c.Assert(config.LogtailConfig.Inputs[0]["EnableContainerDiscovery"].(bool), check.Equals, true)
+	c.Assert(config.LogtailConfig.Inputs[0]["ContainerFilters"].(map[string]map[string]interface{})["IncludeEnv"]["aliyun_logs_catalina"], check.Equals, "/usr/local/tomcat/logs/**/catalina.*.log")
+	c.Assert(config.LogtailConfig.Inputs[0]["MaxDirSearchDepth"].(int), check.Equals, 10)
 }
 
 func (s *logConfigTestSuite) TestJsonFile(c *check.C) {
@@ -60,12 +80,15 @@ func (s *logConfigTestSuite) TestJsonFile(c *check.C) {
 	c.Assert(config.ShardCount, check.IsNil)
 	c.Assert(config.LifeCycle, check.IsNil)
 	c.Assert(config.SimpleConfig, check.Equals, true)
-	c.Assert(config.LogtailConfig.InputType, check.Equals, "file")
-	c.Assert(config.LogtailConfig.ConfigName, check.Equals, "catalina")
-	c.Assert(len(config.LogtailConfig.LogtailConfig), check.Equals, 5)
-	c.Assert(config.LogtailConfig.LogtailConfig["logType"].(string), check.Equals, "json_log")
-	c.Assert(config.LogtailConfig.LogtailConfig["logPath"].(string), check.Equals, "/usr/local/tomcat/logs/")
-	c.Assert(config.LogtailConfig.LogtailConfig["filePattern"].(string), check.Equals, "catalina.*.log")
-	c.Assert(config.LogtailConfig.LogtailConfig["dockerFile"].(bool), check.Equals, true)
-	c.Assert(config.LogtailConfig.LogtailConfig["dockerIncludeEnv"].(map[string]string)["aliyun_logs_catalina"], check.Equals, "/usr/local/tomcat/logs/catalina.*.log")
+	c.Assert(tea.StringValue(config.LogtailConfig.ConfigName), check.Equals, "catalina")
+	c.Assert(len(config.LogtailConfig.Inputs[0]), check.Equals, 5)
+	c.Assert(config.LogtailConfig.Inputs[0]["Type"], check.Equals, "input_file")
+	c.Assert(config.LogtailConfig.Inputs[0]["FilePaths"].([]string)[0], check.Equals, "/usr/local/tomcat/logs/catalina.*.log")
+	c.Assert(config.LogtailConfig.Inputs[0]["EnableContainerDiscovery"].(bool), check.Equals, true)
+	c.Assert(config.LogtailConfig.Inputs[0]["ContainerFilters"].(map[string]map[string]interface{})["IncludeEnv"]["aliyun_logs_catalina"], check.Equals, "/usr/local/tomcat/logs/catalina.*.log")
+	c.Assert(config.LogtailConfig.Inputs[0]["MaxDirSearchDepth"].(int), check.Equals, 0)
+
+	c.Assert(len(config.LogtailConfig.Processors[0]), check.Equals, 2)
+	c.Assert(config.LogtailConfig.Processors[0]["SourceKey"], check.Equals, "content")
+	c.Assert(config.LogtailConfig.Processors[0]["Type"].(string), check.Equals, "processor_parse_json_native")
 }
