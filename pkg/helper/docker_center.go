@@ -476,6 +476,9 @@ func getIPByHosts(hostFileName, hostname string) string {
 			return util.ReadFirstBlock(line)
 		}
 	}
+	if util.GetHostName() == hostname {
+		return util.GetIPAddress()
+	}
 	return ""
 }
 
