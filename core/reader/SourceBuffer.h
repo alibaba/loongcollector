@@ -34,46 +34,128 @@ private:
     friend class SourceBuffer;
 };
 
-class BufferAllocator {
+class BufferAllocator
+{
+private:
+    static const int32_t kAlignSize = sizeof(void*);
+    static const int32_t kPageSize = 4096; // in bytes
+
 public:
-    BufferAllocator() : mCapacity(0), mUsed(0), mOtherUsed(0) {}
-
-    bool Init(size_t capacity) {
-        if (capacity == 0 || mCapacity > 0) {
-            return false;
-        }
-        mData.reset(new char[capacity]);
-        mCapacity = capacity;
-        return true;
+    explicit BufferAllocator(int32_t firstChunkSize = 4096, int32_t chunkSizeLimit = 1024 * 128)
+      : mFirstChunkSize(firstChunkSize),
+        mChunkSize(firstChunkSize),
+        mChunkSizeLimit(chunkSizeLimit),
+        mFreeBytesInChunk(0),
+        mAllocPtr(NULL),
+        mAllocated(0),
+        mUsed(0)
+    {
+        mAllocPtr = new uint8_t[mChunkSize];
+        mAllocatedChunks.push_back(mAllocPtr);
+        mFreeBytesInChunk = mChunkSize;
+        mAllocated = mChunkSize;
     }
 
-    bool IsInited() { return mCapacity > 0; }
-
-    void* Allocate(size_t size) {
-        if (mCapacity == 0) {
-            return nullptr;
+    ~BufferAllocator()
+    {
+        for(size_t i = 0 ; i < mAllocatedChunks.size() ; i++) {
+            delete[] mAllocatedChunks[i];
         }
-        if (mUsed + size > mCapacity) {
-            mOtherData.emplace_back(new char[size]);
-            mOtherUsed += size;
-            return mOtherData.back().get();
-        }
-        void* result = mData.get() + mUsed;
-        mUsed += size;
-        return result;
     }
 
-    size_t TotalAllocated() { return mUsed + mOtherUsed; }
+    void Reset(void)
+    {
+        for(size_t i = 1 ; i < mAllocatedChunks.size() ; i++)
+        {
+            delete[] mAllocatedChunks[i];
+        }
+        mAllocatedChunks.resize(1);
+        mAllocPtr = mAllocatedChunks[0];
+        mChunkSize = mFirstChunkSize;
+        mFreeBytesInChunk = mChunkSize;
+        mAllocated = mChunkSize;
+        mUsed = 0;
+    }
 
-    size_t TotalMemory() { return mCapacity + mOtherUsed; }
+    void* Allocate(int32_t bytes)
+    {
+        // Align the alloc size
+        int32_t aligned = (bytes + kAlignSize - 1) & ~(kAlignSize - 1);
+        return Alloc(aligned);
+    }
+
+    int64_t GetUsedSize() const
+    {
+        return mUsed;
+    }
+
+    size_t TotalAllocated() { return mAllocated; }
+
+    int64_t GetAllocatedSize() const
+    {
+        return mAllocated + mAllocatedChunks.size() * sizeof(void*);
+    }
 
 private:
-    std::unique_ptr<char[]> mData;
-    size_t mCapacity;
-    size_t mUsed;
-    // Stores other memory allocation than buffer
-    std::list<std::unique_ptr<char[]>> mOtherData;
-    size_t mOtherUsed;
+    // Please do not make it public, user should always use Allocate() to get a better performance.
+    // If you have a strong reason to do it, please drop a email to me: shiquan.yangsq@aliyun-inc.com
+    uint8_t* Alloc(int32_t bytes)
+    {
+        uint8_t* mem = NULL;
+
+        if (bytes <= mFreeBytesInChunk) {
+            // Alloc it from the free area of the current chunk.
+            mem = mAllocPtr;
+            mAllocPtr += bytes;
+            mFreeBytesInChunk -= bytes;
+        } else if (bytes * 2 >= mChunkSize) {
+            /*
+             * This request is unexpectedly large. We believe the next request
+             * will not be so large. Thus, it is wise to allocate it directly
+             * from heap in order to avoid polluting chunk size.
+             */
+            mem = new uint8_t[bytes];
+            mAllocatedChunks.push_back(mem);
+            mAllocated += bytes;
+        } else {
+            /*
+             * Here we intentionally waste some space in the current chunk.
+             */
+            if (mChunkSize < mChunkSizeLimit) {
+                mChunkSize *= 2;
+            }
+            mem = new uint8_t[mChunkSize];
+            mAllocatedChunks.push_back(mem);
+            mAllocPtr = mem + bytes;
+            mFreeBytesInChunk = mChunkSize - bytes;
+            mAllocated += mChunkSize;
+        }
+
+        mUsed += bytes;
+        return mem;
+    }
+
+private:
+    int32_t mFirstChunkSize;
+    int32_t mChunkSize;
+    int32_t mChunkSizeLimit;
+    int32_t mFreeBytesInChunk;
+    // Pointing to the available memory address
+    uint8_t* mAllocPtr;
+    // How many bytes are free in the current chunk
+    // The allocated memory chunks.
+    std::vector<uint8_t*> mAllocatedChunks;
+
+    // Statistics data
+    int64_t mAllocated;
+    int64_t mUsed;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class SourceBufferUnittest;
+#endif
+
+private : 
+    BufferAllocator(const BufferAllocator&);
 };
 
 class SourceBuffer {
@@ -81,11 +163,6 @@ public:
     SourceBuffer() {}
     virtual ~SourceBuffer() {}
     StringBuffer AllocateStringBuffer(size_t size) {
-        if (!mAllocator.IsInited()) {
-            if (!mAllocator.Init(size * 1.2)) {
-                return StringBuffer(nullptr, 0);
-            }; // TODO: better allocate strategy
-        }
         char* data = static_cast<char*>(mAllocator.Allocate(size + 1));
         data[size] = '\0';
         return StringBuffer(data, size);

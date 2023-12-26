@@ -31,6 +31,9 @@ void LogEvent::SetContent(const StringView& key, const StringView& val) {
 void LogEvent::SetContent(const std::string& key, const std::string& val) {
     SetContentNoCopy(mSourceBuffer->CopyString(key), mSourceBuffer->CopyString(val));
 }
+void LogEvent::SetContent(const StringBuffer& key, const StringView& val) {
+    SetContentNoCopy(key, mSourceBuffer->CopyString(val));
+}
 void LogEvent::SetContentNoCopy(const StringBuffer& key, const StringBuffer& val) {
     SetContentNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
 }

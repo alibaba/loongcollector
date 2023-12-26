@@ -69,6 +69,10 @@ void PipelineEventGroup::SetTag(const std::string& key, const std::string& val) 
     SetTagNoCopy(mSourceBuffer->CopyString(key), mSourceBuffer->CopyString(val));
 }
 
+void PipelineEventGroup::SetTag(const StringBuffer& key, const StringView& val) {
+    SetTagNoCopy(key, mSourceBuffer->CopyString(val));
+}
+
 void PipelineEventGroup::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val) {
     SetTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
 }

@@ -261,7 +261,7 @@ bool Config::Parse() {
 #endif
         }
     }
-
+    bool isSPL = false;
     key = "processors";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (itr) {
@@ -359,15 +359,18 @@ bool Config::Parse() {
                                            mProject,
                                            mLogstore,
                                            mRegion);
-                    } else if (pluginName == "processor_spl" && (i != 0 || itr->size() != 1)) {
-                        PARAM_ERROR_RETURN(sLogger,
-                                           alarm,
-                                           "native processor plugins coexist with spl processor",
-                                           noModule,
-                                           mName,
-                                           mProject,
-                                           mLogstore,
-                                           mRegion);
+                    } else if (pluginName == "processor_spl") {
+                        isSPL = true;
+                        if (i != 0 || itr->size() != 1) {
+                            PARAM_ERROR_RETURN(sLogger,
+                                            alarm,
+                                            "native processor plugins coexist with spl processor",
+                                            noModule,
+                                            mName,
+                                            mProject,
+                                            mLogstore,
+                                            mRegion);
+                        }
                     } else {
                         if (hasObserverInput) {
                             PARAM_ERROR_RETURN(sLogger,
@@ -473,6 +476,12 @@ bool Config::Parse() {
             mHasGoFlusher = true;
         } else if (PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin(pluginName)) {
             mHasNativeFlusher = true;
+            // processor spl could change pipelineEventGroup tags and affect the merge logic of aggregator
+            // so force specify the MergeType as logstore, loggroup will be merged into a List.
+            if (isSPL) {
+                Json::Value& tmp = const_cast<Json::Value&>(plugin);
+                tmp["Batch"]["MergeType"] = Json::Value("logstore");
+            }
         } else {
             PARAM_ERROR_RETURN(
                 sLogger, alarm, "unsupported flusher plugin", pluginName, mName, mProject, mLogstore, mRegion);

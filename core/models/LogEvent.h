@@ -27,6 +27,8 @@ public:
     LogContents& MutableContents() { return contents; }
     void SetContent(const StringView& key, const StringView& val);
     void SetContent(const std::string& key, const std::string& val);
+    void SetContent(const StringBuffer& key, const StringView& val);
+
     void SetContentNoCopy(const StringBuffer& key, const StringBuffer& val);
     const StringView& GetContent(const StringView& key) const;
     bool HasContent(const StringView& key) const;

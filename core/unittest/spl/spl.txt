@@ -1,0 +1,231 @@
+*| parse-regexp content, '(\S+)' as ip 
+*| parse-regexp content, '\S+\s+(\w+)' as method 
+*| parse-regexp content, '(\S+)\s+(\w+)' as ip, method 
+*| parse-regexp content, '(?P<ip>\S+)\s+(?P<method>\w+)' 
+
+*| parse-json map_str 
+*| parse-json -prefix='prefix_' map_str 
+*| parse-json -path='$.body' content_body 
+
+*| parse-csv content_csv as ip, time, host 
+*| parse-csv -quote='"' content_csv as ip, time, host 
+*| parse-csv -delim=';' content_delim as ip, time, host 
+*| parse-csv -strict content_csv as ip, time 
+*| parse-csv -strict content_csv as ip, time, host, extra_field 
+
+*| parse-kv -delims='&?' content_kv
+*| parse-kv -mode='preserve' -delims='&?' content_kv 
+*| parse-kv -kv-sep=':' -delims='&?' content_sep 
+*| parse-kv -kv-sep=':' -prefix='prefix_' -delims='&?' content_sep 
+
+*| parse-csv content_simp as ip, time, host 
+*| parse-csv -quote='"' content_simp as ip, time, host 
+*| parse-csv -strict content_simp as ip, time, host 
+*| parse-csv -strict content_simp as ip, time
+*| parse-csv -strict content_simp as ip, time, host, extra_field
+
+*| parse-csv content_complex as ip, time, host 
+*| parse-csv -quote='\x09' content_complex as ip, time, host 
+*| parse-csv -quote='\t' content_complex as ip, time, host 
+*| parse-csv -quote='-' content_complex as ip, time, host 
+
+*| parse-csv -delim='\' content_delim1 as ip, time, host 
+*| parse-csv -delim='\11' content_delim2 as ip, time, host 
+*| parse-csv -delim='\x09' content_delim3 as ip, time, host 
+
+
+* | parse-regexp content, '(\S+)' as ip | parse-regexp content, '\S+\s+(\w+)' as method | parse-regexp content, '(\S+)\s+(\w+)' as ipp, methodd | parse-regexp content, '(?P<ippp>\S+)\s+(?P<methoddd>\w+)'
+* | parse-json map_str | parse-json -prefix='prefix_' map_str | parse-json -path='$.body' content_body
+* | parse-csv content_csv as ip, time, host | parse-csv -quote='"' content_csv as ip1, time1, host1 | parse-csv -delim=';' content_delim as ip2, time2, host3 | parse-csv -strict content_csv as ip4, time4 | parse-csv -strict content_csv as ip5, time5, host5, extra_field5
+* | parse-kv -delims='&?' content_kv | parse-kv -mode='preserve' -delims='&?' content_kv | parse-kv -kv-sep=':' -delims='&?' content_sep | parse-kv -kv-sep=':' -prefix='prefix_' -delims='&?' content_sep
+
+* | extend a = 23 | extend b = chr(a)
+* | extend a = 't' | extend b = codepoint(a)
+* | extend a = 'hello', b = 'world', c = '111' | extend d = concat(a, b, c)
+* | extend a = 'this is word 555' | extend b = length(a)
+* | extend a = 'this is word 555' | extend b = lower(a)
+* | extend a = 'hello volex' | extend b = lpad(a, 100, 'rep')
+* | extend a = 'this is word 555' | extend b = ltrim(a)
+* | extend a = 'hello volex' | extend b = replace(a, 'hello')
+* | extend a = 'hello volex' | extend b = replace(a, 'hello', 'rep')
+* | extend a = 'this is word 555' | extend b = reverse(a)
+* | extend a = 'hello volex' | extend b = rpad(a, 100, 'rep')
+* | extend a = 'this is word 555' | extend b = rtrim(a)
+* | extend a = 'hello,volex,world,hello' | extend b = split(a, ',')
+* | extend a = 'hello,volex,world,hello' | extend b = split(a, ',', 2)
+* | extend a = 'hello,volex,world,hello' | extend b = split_part(a, ',', 2)
+* | extend a = 'hello,volex,world,hello' | extend b = strpos(a, 'hello')
+* | extend a = 'hello velox' | extend d = strpos(a, 'velox', 1)
+* | extend a = 'hello,volex,world,hello' | extend b = strrpos(a, 'hello')
+* | extend a = 'hello velox' | extend d = strrpos(a, 'velox', 1)
+* | extend a = 'hello velox' | extend d = substr(a, 1)
+* | extend a = 'hello velox' | extend d = substr(a, 1, 3)
+* | extend a = 'this is word 555' | extend b = trim(a)
+* | extend a = 'this is word 555' | extend b = upper(a)
+* | extend a = 'this is word 555' | extend b = to_utf8(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = crc32(a)
+* | extend a = '1101' | extend b = from_base64(a)
+* | extend a = 'D74D' | extend b = from_hex(a)
+* | extend a = cast('4444' as VARBINARY), b = cast('this is key' as VARBINARY) | extend c = hmac_md5(a, b)
+* | extend a = cast('4444' as VARBINARY), b = cast('this is key' as VARBINARY) | extend c = hmac_sha1(a, b)
+* | extend a = cast('4444' as VARBINARY), b = cast('this is key' as VARBINARY) | extend c = hmac_sha256(a, b)
+* | extend a = cast('4444' as VARBINARY), b = cast('this is key' as VARBINARY) | extend c = hmac_sha512(a, b)
+* | extend a = cast('4444' as VARBINARY) | extend b = md5(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = sha1(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = sha256(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = sha512(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = spooky_hash_v2_32(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = spooky_hash_v2_64(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = to_base64(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = to_hex(a)
+* | extend a = cast('4444' as VARBINARY) | extend b = xxhash64(a)
+* | extend a = 9 | extend b = bit_count(a, 64)
+* | extend a = 1342 | extend b = bitwise_and(a, 8)
+* | extend a = 1342 | extend b = bitwise_arithmetic_shift_right(a, 8)
+* | extend a = 1342 | extend b = bitwise_left_shift(a, 8)
+* | extend a = 1342 | extend b = bitwise_logical_shift_right(a, 9, 8)
+* | extend a = 33 | extend b = bitwise_not(a)
+* | extend a = 1342 | extend b = bitwise_or(a, 8)
+* | extend a = 1342 | extend b = bitwise_right_shift(a, 8)
+* | extend a = 1342 | extend b = bitwise_right_shift_arithmetic(a, 8)
+* | extend a = 1342 | extend b = bitwise_shift_left(a, 9, 8)
+* | extend a = 1342 | extend b = bitwise_xor(a, 8)
+* | extend a = 'https://sls.aliyun.com/v1/path' | extend b = url_extract_fragment(a)
+* | extend a = 'https://sls.aliyun.com/v1/path' | extend b = url_extract_host(a)
+* | extend a = 'https://sls.aliyun.com/v1/path?a=b&c=d' | extend b = url_extract_parameter(a, 'c')
+* | extend a = 'https://sls.aliyun.com/v1/path' | extend b = url_extract_path(a)
+* | extend a = 'https://sls.aliyun.com/v1/path' | extend b = url_extract_port(a)
+* | extend a = 'https://sls.aliyun.com/v1/path' | extend b = url_extract_protocol(a)
+* | extend a = 'https://sls.aliyun.com/v1/path' | extend b = url_extract_query(a)
+* | extend a = 'https://sls.aliyun.com/v1/path?a=b&c=d' | extend b = url_encode(a)
+* | extend a = 'https%3A%2F%2Fsls.aliyun.com%2Fv1%2Fpath' | extend b = url_decode(a)
+* | extend a = current_date
+* | extend a = from_unixtime(1534521600) | extend b = date(a)
+* | extend a = 1534521600 | extend b = from_unixtime(a)
+* | extend a = 1534521600 | extend b = from_unixtime(a, '+01:00')
+* | extend a = from_unixtime(1534521600) | extend b = to_unixtime(a)
+* | extend a = 'minute' | extend b = date_trunc(a, from_unixtime(1534521600))
+* | extend a = from_unixtime(1534521600) | extend b = date_add('minute', 33, a)
+* | extend a = from_unixtime(1534521600), b = from_unixtime(1534521800) | extend c = date_diff('minute', a, b)
+* | extend a = from_unixtime(1534521600) | extend b = date_format(a, '%Y-%m-%d %H:%i:%s')
+* | extend a = '2018-08-12 16:13:15' | extend b = parse_datetime(a, '%Y-%m-%d %H:%i:%s')
+* | extend a = from_unixtime(1534521600) | extend b = day(a)
+* | extend a = from_unixtime(1534521600) | extend b = day_of_month(a)
+* | extend a = from_unixtime(1534521600) | extend b = day_of_week(a)
+* | extend a = from_unixtime(1534521600) | extend b = day_of_year(a)
+* | extend a = from_unixtime(1534521600) | extend b = dow(a)
+* | extend a = from_unixtime(1534521600) | extend b = doy(a)
+* | extend a = from_unixtime(1534521600) | extend b = hour(a)
+* | extend a = from_unixtime(1534521600) | extend b = millisecond(a)
+* | extend a = from_unixtime(1534521600) | extend b = minute(a)
+* | extend a = from_unixtime(1534521600) | extend b = month(a)
+* | extend a = from_unixtime(1534521600) | extend b = quarter(a)
+* | extend a = from_unixtime(1534521600) | extend b = second(a)
+* | extend a = from_unixtime(1534521600) | extend b = week(a)
+* | extend a = from_unixtime(1534521600) | extend b = week_of_year(a)
+* | extend a = from_unixtime(1534521600) | extend b = year(a)
+* | extend a = from_unixtime(1534521600) | extend b = year_of_week(a)
+* | extend a = from_unixtime(1534521600) | extend b = yow(a)
+* | extend a = from_unixtime(1534521600) | extend b = format_datetime(a, 'yyyyMMdd')
+* | extend a = '2022-10-19 15:46:05' | extend b = date_parse(a, '%Y-%m-%d %H:%i:%s')
+* | extend a = 1342.2, b = 13.1, c = 8.9 | extend d = greatest(a, b, c)
+* | extend a = 1342.2, b = 13.1, c = 8.9 | extend d = least(a, b, c)
+* | extend a = ARRAY [10, 20, 30] | extend b = array_average(a)
+* | extend a = ARRAY [10, 20, 30] | extend b = array_distinct(a)
+* | extend a = ARRAY [10, 20, 30], b = ARRAY [20, 40, 50] | extend b = array_except(a, b)
+* | extend a = ARRAY [10, 20, 30], b = ARRAY [20, 40, 50] | extend b = array_intersect(a, b)
+* | extend a = ARRAY [1, NULL, 2] | extend b = array_join(a, ',', '0')
+* | extend a = ARRAY [10, 20, 30, 30, 40] | extend b = array_max(a)
+* | extend a = ARRAY [10, 20, 30, 30, 40] | extend b = array_min(a)
+* | extend a = ARRAY [1.2, 3.1, 2.05] | extend b = array_normalize(a, 3.1)
+* | extend a = ARRAY [10, 20, 30], b = ARRAY [20, 40, 50] | extend b = arrays_overlap(a, b)
+* | extend a = ARRAY [1, 3, 2] | extend b = array_position(a, 3)
+* | extend a = ARRAY [1, 3, 2] | extend b = array_position(a, 3, 2)
+* | extend a = ARRAY [10, 20, 30] | extend b = array_sort(a)
+* | extend a = ARRAY [10, 20, 30, 30, 40] | extend b = array_sum(a)
+* | extend a = ARRAY [10, 20, 30, 30, 40] | extend b = cardinality(a)
+* | extend a = ARRAY ['cat', 'leopard', 'mouse'] | extend b = combinations(a, 2)
+* | extend a = 'catl eopard mouse', b = 'cati1 leopard2 mouse2' | extend b = concat(a, b)
+* | extend a = ARRAY [1, 3, 2] | extend b = contains(a, 3)
+* | extend a = ARRAY ['cat', 'leopard', 'mouse'] | extend b = element_at(a, 2)
+* | extend a = ARRAY ['cat', NULL, 'leopard', 'mouse'] | extend b = filter(a, x -> x IS NOT NULL)
+* | extend a = ARRAY [5, 20, NULL, 50] | extend b = reduce(a, 0, (s, x) -> IF(x IS NULL, s, s + x), s -> s)
+* | extend a = 'hello ' | extend b = repeat(a, 3)
+* | extend a = ARRAY [10, 20, 30] | extend b = reverse(a)
+* | extend a = ARRAY [10, 20, 30] | extend b = shuffle(a)
+* | extend a = ARRAY [5, 20, NULL, 50] | extend b = slice(a, 0, 3)
+* | extend a = sequence(0, 10)
+* | extend a = sequence(0, 10, 2)
+* | extend a = ARRAY [5, NULL, 6] | extend b = transform(a, x -> COALESCE(x, 0) + 1)
+* | extend a = ARRAY[1, 2] | extend b = zip(a, ARRAY['1b', null, '3b'])
+* | extend a = ARRAY[1, 3, 5], b = ARRAY['a', 'b', 'c'] | extend c = zip_with(a, b, (x, y) -> (y, x))
+* | extend a = ARRAY[1, 3, 5] | extend b = all_match(a, x -> x > 3)
+* | extend a = empty_approx_set()
+* | extend a = 'this is word 555' | extend b = regexp_extract(a, '(\d+)')
+* | extend a = 'this is word 555' | extend b = regexp_extract(a, '(\d+)', 1)
+* | extend a = 'this is word 555' | extend b = regexp_extract_all(a, '(\d+)', 1)
+* | extend a = 'this is word 555' | extend b = regexp_like(a, '(\d+)')
+* | extend a = 'this is word 555' | extend b = regexp_replace(a, '(\d+)')
+* | extend a = '1a 2b 14m' | extend b = regexp_replace(a, '(\d+)([ab]) ', '3c$2' )
+* | extend a = 30 | extend b = abs(a)
+* | extend a = 30 | extend b = cbrt(a)
+* | extend a = 30 | extend b = ceil(a)
+* | extend a = 30 | extend b = ceiling(a)
+* | extend a = 30 | extend b = degrees(a)
+* | extend a = e() | extend b = a
+* | extend a = 30 | extend b = exp(a)
+* | extend a = 30 | extend b = floor(a)
+* | extend a = '312', b = 8 | extend c = from_base(a, b)
+* | extend a = 30 | extend b = ln(a)
+* | extend a = 30 | extend b = log2(a)
+* | extend a = 30 | extend b = log10(a)
+* | extend a = 1321, b = 8 | extend c = mod(a, b)
+* | extend a = pi() | extend b = a
+* | extend a = 30 | extend b = pow(a, 3)
+* | extend a = 30 | extend b = power(a, 3)
+* | extend a = 30 | extend b = radians(a)
+* | extend a = rand() | extend b = a
+* | extend a = random() | extend b = a
+* | extend a = 30 | extend b = round(a)
+* | extend a = 3.14 | extend b = round(a, 5)
+* | extend a = 30 | extend b = sign(a)
+* | extend a = 30 | extend b = sqrt(a)
+* | extend a = 19 | extend b = to_base(a, 29)
+* | extend a = 19.1234567 | extend b = truncate(a)
+* | extend a = 19.1234567 | extend b = truncate(a, 3)
+* | extend a = 500 | extend b = width_bucket(a, 100, 5000, 10)
+* | extend a = ARRAY[0, 2, 4] | extend b = width_bucket(3, a)
+* | extend a = 30 | extend b = acos(a)
+* | extend a = 30 | extend b = asin(a)
+* | extend a = 30 | extend b = atan(a)
+* | extend a = 60 | extend b = atan2(a, 90)
+* | extend a = 30 | extend b = cos(a)
+* | extend a = 30 | extend b = cosh(a)
+* | extend a = 30 | extend b = sin(a)
+* | extend a = 30 | extend b = tan(a)
+* | extend a = 30 | extend b = tanh(a)
+* | extend a = infinity() | extend b = a
+* | extend a = 30 | extend b = is_finite(a)
+* | extend a = 30 | extend b = is_infinite(a)
+* | extend a = 30 | extend b = is_nan(a)
+* | extend a = nan() | extend b = a
+* | extend a = map(ARRAY[1,3], ARRAY[2,4]) | extend b = cardinality(a)
+* | extend a = map(ARRAY[1,3], ARRAY[2,4]) | extend b = element_at(a, 3)
+* | extend a = map()
+* | extend a = ARRAY[1,3], b = ARRAY[2,4] | extend c = map(a, b)
+* | extend a = map(ARRAY[1,3], ARRAY[2,4]), b = map(ARRAY[1,30], ARRAY[21,4]) | extend c = map_concat(a, b)
+* | extend a = map(ARRAY[1,3], ARRAY[2,4]) | extend b = map_entries(a)
+* | extend a = map(ARRAY[1,3], ARRAY[2,4]) | extend b = map_filter(a, (k, v) -> v IS NOT NULL)
+* | extend a = map(ARRAY[1,3], ARRAY[2,4]) | extend b = map_keys(a)
+* | extend a = map(ARRAY[1,3], ARRAY[2,4]) | extend b = map_values(a)
+* | extend a = MAP(ARRAY[1, 2, 3], ARRAY['a', 'b', 'c']), b = MAP(ARRAY[1, 2, 3], ARRAY['d', 'e', 'f']) | extend c = map_zip_with(a, b, (k, v1, v2) -> concat(v1, v2))
+* | extend a = MAP(ARRAY [1, 2, 3], ARRAY ['a', 'b', 'c']) | extend b = transform_keys(a, (k, v) -> k + 1)
+* | extend a = MAP(ARRAY [1, 2, 3], ARRAY ['a', 'b', 'c']) | extend b = transform_values(a, (k, v) -> k * k)
+* | extend a = json_parse('{"x": {"a": 1, "b": 2}}') | extend b = is_json_scalar(a)
+* | extend a = '[1, 2, 3]' | extend b = json_array_contains(a, 2)
+* | extend a = '[1, 2, 3]' | extend b = json_array_length(a)
+* | extend a = json_parse('{"x": {"a": 1, "b": 2}}') | extend b = json_extract_scalar(a, '$.x.a')
+* | extend a = json_parse('{"x": {"a": 1, "b": 2}}') | extend b = json_format(a)
+* | extend a = '{"x": {"a": 1, "b": 2}}' | extend b = json_parse(a)
+* | extend a = json_parse('{"x": {"a": 1, "b": 2}}') | extend b = json_size(a, '$.x.a')
+* | extend a = json_parse('{"x": {"a": [1, 2], "b": 2}}') | extend b = json_size(a, '$.x.a')

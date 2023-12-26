@@ -30,26 +30,33 @@ public:
 
 void SourceBufferUnittest::TestBufferAllocatorAllocate() {
     BufferAllocator allocator;
-    APSARA_TEST_FALSE(allocator.IsInited());
     const size_t alloc_size1 = 1000;
-    const size_t alloc_size2 = 20;
-    // should not allocate anything before init
-    APSARA_TEST_EQUAL(nullptr, allocator.Allocate(alloc_size1));
-    const size_t size = 1024;
-    APSARA_TEST_TRUE(allocator.Init(size));
-    // should allocate successfully after init
+
+    // mChunkSize default is 4096
+    // should use inited buffer when alloc_size <= mFreeBytesInChunk
     char* alloc1 = static_cast<char*>(allocator.Allocate(alloc_size1));
     APSARA_TEST_NOT_EQUAL(nullptr, alloc1);
     alloc1[0] = 'a';
-    // should use inited buffer is capacity is enough
+
+    // mFreeBytesInChunk = 4096 - 1000 = 3096
+    // mFreeBytesInChunk < alloc_size < 2*mChunkSize
+    const size_t alloc_size2 = 4000;
     char* alloc2 = static_cast<char*>(allocator.Allocate(alloc_size2));
-    APSARA_TEST_EQUAL(alloc1 + alloc_size1, alloc2);
-    // should new block is capacity is not enough
-    char* alloc3 = static_cast<char*>(allocator.Allocate(alloc_size1));
-    alloc3[0] = 'b';
+    APSARA_TEST_NOT_EQUAL(nullptr, alloc2);
+    APSARA_TEST_EQUAL(allocator.mAllocatedChunks.size(), 2);
+    alloc2[0] = 'b';
+
+    // alloc_size >= 2*mChunkSize
+    const size_t alloc_size3 = 10000;
+    char* alloc3 = static_cast<char*>(allocator.Allocate(alloc_size3));
     APSARA_TEST_NOT_EQUAL(nullptr, alloc3);
+    APSARA_TEST_EQUAL(allocator.mAllocatedChunks.size(), 3);
+    alloc3[0] = 'c';
+
     // ensure ptr is still valid
     APSARA_TEST_EQUAL('a', static_cast<char*>(alloc1)[0]);
+    APSARA_TEST_EQUAL('b', static_cast<char*>(alloc2)[0]);
+    APSARA_TEST_EQUAL('c', static_cast<char*>(alloc3)[0]);
 }
 
 UNIT_TEST_CASE(SourceBufferUnittest, TestBufferAllocatorAllocate);

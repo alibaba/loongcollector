@@ -73,7 +73,7 @@ set(SUB_DIRECTORIES_LIST
         aggregator application app_config checkpoint common config config/provider config/watcher config_manager config_server_pb 
         container_manager controller event event_handler event_listener file_server flusher go_pipeline helper input log_pb logger 
         models monitor parser pipeline plugin plugin/creator plugin/instance plugin/interface polling processor processor/daemon 
-        profile_sender reader sdk sender sls_control fuse
+        profile_sender reader sdk sender sls_control spl fuse
         )
 if (UNIX)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer)
@@ -96,6 +96,7 @@ macro(append_source_files source_files)
 endmacro()
 # Module includes & add_subdirectory.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories("/opt/logtail_spl/include")
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})
 endforeach (DIR_NAME)

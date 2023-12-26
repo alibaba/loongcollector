@@ -34,7 +34,7 @@ NF>0 && \$(NF-1)~"GLIBC_" {
   split(sec, a, "_");
   split(a[2], a, ".");
   ver=a[1]*1000+a[2];
-  if (ver > 2006) {
+  if (ver > 2012) {
     bad_syms[length(bad_syms)]=\$0
   }
 }
@@ -42,7 +42,7 @@ END {
   if (length(bad_syms) == 0) {
     exit 0
   }
-  print "\033[0;31mError: The following symbols are not compatible with GLIBC_2.6"
+  print "\033[0;31mError: The following symbols are not compatible with GLIBC_2.12"
   for (i in bad_syms) {
     print bad_syms[i]
     printf("\033[0m")

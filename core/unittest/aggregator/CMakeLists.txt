@@ -1,4 +1,4 @@
-# Copyright 2021 iLogtail Authors
+# Copyright 2022 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+ 
+cmake_minimum_required(VERSION 3.10)
+project(aggregator_unittest)
+ 
+add_executable(aggregator_unittest AggregatorUnittest.cpp)
+target_link_libraries(aggregator_unittest unittest_base)
 
-# goc server is only for e2e test to analysis code coverage.
-
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:spl-0.1 as build
-
-USER root
-ENTRYPOINT ["goc","server"]

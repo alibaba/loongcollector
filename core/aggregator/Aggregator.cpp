@@ -203,21 +203,22 @@ bool Aggregator::Add(const std::string& projectName,
     int32_t curTime = time(NULL);
     {
         PTScopedLock lock(mMergeLock);
-        unordered_map<int64_t, PackageListMergeBuffer*>::iterator pIter;
+        unordered_map<int64_t, PackageListMergeBuffer*>::iterator pIter = mPackageListMergeMap.find(logstoreKey);;
+        unordered_map<int64_t, MergeItem*>::iterator itr = mMergeMap.find(logGroupKey);
+        MergeItem* value = NULL;
+        // for mergeType: LOGSTORE, value is always new
         if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE) {
-            pIter = mPackageListMergeMap.find(logstoreKey);
             if (pIter == mPackageListMergeMap.end()) {
                 PackageListMergeBuffer* tmpPtr = new PackageListMergeBuffer();
                 pIter = mPackageListMergeMap.insert(std::make_pair(logstoreKey, tmpPtr)).first;
             }
+        } else {
+            if (itr != mMergeMap.end()) {
+                value = itr->second;
+            } else {
+                itr = mMergeMap.insert(std::make_pair(logGroupKey, value)).first;
+            }
         }
-        unordered_map<int64_t, MergeItem*>::iterator itr = mMergeMap.find(logGroupKey);
-        MergeItem* value = NULL;
-        if (itr != mMergeMap.end())
-            value = itr->second;
-        else
-            itr = mMergeMap.insert(std::make_pair(logGroupKey, value)).first;
-
         bool mergeFinishedFlag = false, initFlag = false;
         for (int32_t logIdx = 0; logIdx < logSize; logIdx++) {
             if (neededIdx < neededLogSize && logIdx == neededLogs[neededIdx]) {
@@ -239,15 +240,19 @@ bool Aggregator::Add(const std::string& projectName,
                             mergeFinishedFlag = true;
                         }
 
-                        if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE)
-                            pIter->second->AddMergeItem(value);
-                        else
+                        // put finished value to sendDataVec, and set new value
+                        if (mergeType != FlusherSLS::Batch::MergeType::LOGSTORE) {
                             sendDataVec.push_back(value);
+                        } else {
+                            pIter->second->AddMergeItem(value);
+                        }
                     }
 
                     bool bufferOrNot = config == NULL ? BOOL_FLAG(default_secondary_storage) : true;
                     int32_t batchSendInterval
                         = config == NULL ? INT32_FLAG(batch_send_interval) : config->mBatch.mSendIntervalSecs;
+                    // when old value is finish
+                    // or new value
                     if (context.mExactlyOnceCheckpoint) {
                         // The log group might be splitted to multiple merge items, so we must
                         //  copy range checkpoint in context.
@@ -280,10 +285,13 @@ bool Aggregator::Add(const std::string& projectName,
                                               batchSendInterval,
                                               context);
                     }
-                    itr->second = value;
-                    initFlag = true;
-
                     value->mLastUpdateTime = curTime; // set the last update time before enqueue
+
+                    initFlag = true;
+                    if (mergeType != FlusherSLS::Batch::MergeType::LOGSTORE) {
+                        itr->second = value;
+                    }
+                    
                     (value->mLogGroup).mutable_logs()->Reserve(INT32_FLAG(merge_log_count_limit));
                     (value->mLogGroup).set_category(category);
                     (value->mLogGroup).set_topic(topic);
@@ -318,8 +326,9 @@ bool Aggregator::Add(const std::string& projectName,
                 value->mRawBytes += logByteSize;
                 value->mLines++;
                 neededIdx++;
-            } else
+            } else {
                 discardLogGroup.mutable_logs()->AddAllocated(*(mutableLogPtr + logIdx));
+            }
         }
 
         // handle truncate info, the first truncate info may be inserted while merge item 'value' initialized
@@ -330,17 +339,12 @@ bool Aggregator::Add(const std::string& projectName,
             value->mLogGroupContext.mFileInfoPtr = context.mFileInfoPtr;
         }
         // AddAllocated above
-        for (int32_t logIdx = 0; logIdx < logSize; logIdx++)
+        for (int32_t logIdx = 0; logIdx < logSize; logIdx++) {
             logGroup.mutable_logs()->ReleaseLast();
-        if (value != NULL && (value->IsReady() || sender->IsFlush() || context.mExactlyOnceCheckpoint)) {
-            if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE)
-                (pIter->second)->AddMergeItem(value);
-            else
-                sendDataVec.push_back(value);
-
-            mMergeMap.erase(itr);
         }
+        
         if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE) {
+            pIter->second->AddMergeItem(value);
             if (pIter->second->IsReady(curTime) || sender->IsFlush()) {
 #ifdef LOGTAIL_DEBUG_FLAG
                 LOG_DEBUG(sLogger,
@@ -353,8 +357,19 @@ bool Aggregator::Add(const std::string& projectName,
                 delete pIter->second;
                 mPackageListMergeMap.erase(pIter);
             }
+        } else {
+            if (value != NULL && (value->IsReady() || sender->IsFlush() || context.mExactlyOnceCheckpoint)) {
+                sendDataVec.push_back(value);
+                if (itr != mMergeMap.end()) {
+                    mMergeMap.erase(itr);
+                }
+            }
         }
     }
+
+    #ifdef APSARA_UNIT_TEST_MAIN
+        mSendVectorSize = sendDataVec.size();
+    #endif
 
     if (sendDataVec.size() > 0) {
         // if send data package count greater than INT32_FLAG(same_topic_merge_send_count), there will be many little
@@ -363,10 +378,11 @@ bool Aggregator::Add(const std::string& projectName,
         if (context.mExactlyOnceCheckpoint) {
             sender->SendCompressed(sendDataVec);
         } else if (mergeType == FlusherSLS::Batch::MergeType::TOPIC
-                   && sendDataVec.size() < (size_t)INT32_FLAG(same_topic_merge_send_count))
+                   && sendDataVec.size() < (size_t)INT32_FLAG(same_topic_merge_send_count)) {
             sender->SendCompressed(sendDataVec);
-        else
+        } else {
             sender->SendLogPackageList(sendDataVec);
+        }
     }
     return true;
 }

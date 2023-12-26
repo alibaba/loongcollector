@@ -94,7 +94,7 @@ private:
      */
     int ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
                       LogFileReaderPtr& logFileReader,
-                      sls_logs::LogGroup& logGroup,
+                      std::vector<sls_logs::LogGroup*>& logGroupList,
                       ProcessProfile& profile);
     /**
      * @retval 0 if continue processing by C++, 1 if processed by Go

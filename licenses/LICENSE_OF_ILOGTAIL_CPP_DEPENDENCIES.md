@@ -6,6 +6,10 @@ When distributed in a binary form, Logtail may contain portions of the following
 
 - [https://www.openssl.org/source/license.html](https://www.openssl.org/source/apache-license-2.0.txt)
 - [https://github.com/pixie-io/pixie](https://github.com/pixie-io/pixie/blob/main/LICENSE)
+- [https://github.com/facebookincubator/velox](https://github.com/facebookincubator/velox/blob/main/LICENSE)
+- [https://github.com/prestodb/presto](https://github.com/prestodb/presto/blob/master/LICENSE)
+- [https://github.com/facebook/folly](https://github.com/facebook/folly/blob/main/LICENSE)
+- [https://github.com/apache/thrift](https://github.com/apache/thrift/blob/master/LICENSE)
 
 ## BSD licenses
 
@@ -29,6 +33,8 @@ When distributed in a binary form, Logtail may contain portions of the following
 - [https://github.com/gabime/spdlog](https://github.com/gabime/spdlog/blob/v1.x/LICENSE)
 - [https://github.com/jbeder/yaml-cpp](https://github.com/jbeder/yaml-cpp/blob/master/LICENSE)
 - [https://github.com/h2o/picohttpparser](https://github.com/h2o/picohttpparser/blob/master/picohttpparser.c)
+- [https://github.com/duckdb/duckdb](https://github.com/duckdb/duckdb/blob/main/LICENSE)
+- [https://github.com/jupp0r/prometheus-cpp](https://github.com/jupp0r/prometheus-cpp/blob/master/LICENSE)
 
 ## Boost Software License
 

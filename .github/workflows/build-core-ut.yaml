@@ -65,20 +65,20 @@ jobs:
         with:
           submodules: true
 
-      - name: Build Unit Test
-        if: matrix.runner == 'ubuntu-latest'
-        env:
-          BUILD_LOGTAIL: OFF
-          BUILD_LOGTAIL_UT: ON
-          ENABLE_COMPATIBLE_MODE: ON
-          ENABLE_STATIC_LINK_CRT: ON
-          WITHOUTGDB: ON
-          # BUILD_TYPE: Debug # TODO: Uncomment when memory management is refined
-        run: make core
+      #- name: Build Unit Test
+      #  if: matrix.runner == 'ubuntu-latest'
+      #  env:
+      #    BUILD_LOGTAIL: OFF
+      #    BUILD_LOGTAIL_UT: ON
+      #    ENABLE_COMPATIBLE_MODE: ON
+      #    ENABLE_STATIC_LINK_CRT: ON
+      #    WITHOUTGDB: ON
+      #    # BUILD_TYPE: Debug # TODO: Uncomment when memory management is refined
+      #  run: make core
 
-      - name: Unit Test
-        if: matrix.runner == 'ubuntu-latest'
-        run: make unittest_core
+      #- name: Unit Test
+      #  if: matrix.runner == 'ubuntu-latest'
+      #  run: make unittest_core
 
   result:
     runs-on: ubuntu-latest

@@ -1,5 +1,3 @@
-# Copyright 2021 iLogtail Authors
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -12,9 +10,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# goc server is only for e2e test to analysis code coverage.
+cmake_minimum_required(VERSION 2.9)
+project (spl)
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:spl-0.1 as build
+file(GLOB LIB_SOURCE_FILES *.cpp *.h .c)
+append_source_files(LIB_SOURCE_FILES)
+add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
 
-USER root
-ENTRYPOINT ["goc","server"]
+link_directories("/opt/logtail_spl/lib")
+
+link_spl(${PROJECT_NAME})

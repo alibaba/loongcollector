@@ -173,7 +173,9 @@ private:
     PTMutex mMergeLock;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    int mSendVectorSize = 0;
     friend class SenderUnittest;
+    friend class AggregatorUnittest;
 #endif
 };
 

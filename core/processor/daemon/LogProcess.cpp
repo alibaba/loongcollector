@@ -307,7 +307,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 continue;
             }
 
-            sls_logs::LogGroup logGroup;
+            std::vector<sls_logs::LogGroup*> logGroupList;
             ProcessProfile profile;
             profile.readBytes = readBytes;
             int32_t parseStartTime = (int32_t)time(NULL);
@@ -315,32 +315,37 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             // if (!BOOL_FLAG(enable_new_pipeline)) {
             //     needSend = (0 == ProcessBufferLegacy(logBuffer, logFileReader, logGroup, profile, *config));
             // } else {
-            needSend = (0 == ProcessBuffer(logBuffer, logFileReader, logGroup, profile));
+            needSend = (0 == ProcessBuffer(logBuffer, logFileReader, logGroupList, profile));
             // }
             const std::string& projectName = pipeline->GetContext().GetProjectName();
             const std::string& category = pipeline->GetContext().GetLogstoreName();
             int32_t parseEndTime = (int32_t)time(NULL);
 
+            int logSize = 0;
+            for (auto pLogGroup : logGroupList) {
+                sls_logs::LogGroup logGroup = *pLogGroup;
+                logSize +=logGroup.logs_size();
+            }
             // add lines count
             s_processLines += profile.splitLines;
             // check whether processing is too slow
             if (parseEndTime - parseStartTime > 1) {
                 LogtailAlarm::GetInstance()->SendAlarm(
                     PROCESS_TOO_SLOW_ALARM,
-                    string("parse ") + ToString(logGroup.logs_size()) + " logs, buffer size "
+                    string("parse ") + ToString(logSize) + " logs, buffer size "
                         + ToString(logBuffer->rawBuffer.size())
                         + "time used seconds : " + ToString(parseEndTime - parseStartTime),
                     projectName,
                     category,
                     pipeline->GetContext().GetRegion());
                 LOG_WARNING(sLogger,
-                            ("process log too slow, parse logs", logGroup.logs_size())("buffer size",
+                            ("process log too slow, parse logs", logSize)("buffer size",
                                                                                        logBuffer->rawBuffer.size())(
                                 "time used seconds", parseEndTime - parseStartTime)("project", projectName)("logstore",
                                                                                                             category));
             }
 
-            if (logGroup.logs_size() > 0 && needSend) { // send log group
+            if (logSize > 0 && needSend) { // send log group
                 const FlusherSLS* flusherSLS = static_cast<const FlusherSLS*>(pipeline->GetFlushers()[0]->GetPlugin());
 
                 IntegrityConfig* integrityConfig = NULL;
@@ -371,60 +376,65 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 }
                 sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(compressStr);
 
-                LogGroupContext context(flusherSLS->mRegion,
-                                        projectName,
-                                        flusherSLS->mLogstore,
-                                        compressType,
-                                        logBuffer->fileInfo,
-                                        integrityConfigPtr,
-                                        lineCountConfigPtr,
-                                        -1,
-                                        false,
-                                        false,
-                                        logBuffer->exactlyOnceCheckpoint);
-                if (!Sender::Instance()->Send(projectName,
-                                              logFileReader->GetSourceId(),
-                                              logGroup,
-                                              logFileReader->GetLogGroupKey(),
-                                              flusherSLS,
-                                              flusherSLS->mBatch.mMergeType,
-                                              (uint32_t)(profile.logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
-                                              "",
-                                              convertedPath,
-                                              context)) {
-                    LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
-                                                           "push file data into batch map fail",
-                                                           projectName,
-                                                           category,
-                                                           pipeline->GetContext().GetRegion());
-                    LOG_ERROR(sLogger,
-                              ("push file data into batch map fail, discard logs", logGroup.logs_size())(
-                                  "project", projectName)("logstore", category)("filename", convertedPath));
+                for (auto pLogGroup : logGroupList) {
+                    LogGroupContext context(flusherSLS->mRegion,
+                                            projectName,
+                                            flusherSLS->mLogstore,
+                                            compressType,
+                                            logBuffer->fileInfo,
+                                            integrityConfigPtr,
+                                            lineCountConfigPtr,
+                                            -1,
+                                            false,
+                                            false,
+                                            logBuffer->exactlyOnceCheckpoint);
+                    if (!Sender::Instance()->Send(projectName,
+                                                logFileReader->GetSourceId(),
+                                                *pLogGroup,
+                                                logFileReader->GetLogGroupKey(),
+                                                flusherSLS,
+                                                flusherSLS->mBatch.mMergeType,
+                                                (uint32_t)(profile.logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
+                                                "",
+                                                convertedPath,
+                                                context)) {
+                        LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
+                                                            "push file data into batch map fail",
+                                                            projectName,
+                                                            category,
+                                                            pipeline->GetContext().GetRegion());
+                        LOG_ERROR(sLogger,
+                                ("push file data into batch map fail, discard logs", (*pLogGroup).logs_size())(
+                                    "project", projectName)("logstore", category)("filename", convertedPath));
+                    
+                    
+                    }
+                    delete pLogGroup;
                 }
-            }
 
-            LogFileProfiler::GetInstance()->AddProfilingData(pipeline->Name(),
-                                                             pipeline->GetContext().GetRegion(),
-                                                             projectName,
-                                                             category,
-                                                             convertedPath,
-                                                             hostLogPath,
-                                                             logFileReader->GetExtraTags(),
-                                                             readBytes,
-                                                             profile.skipBytes,
-                                                             profile.splitLines,
-                                                             profile.parseFailures,
-                                                             profile.regexMatchFailures,
-                                                             profile.parseTimeFailures,
-                                                             profile.historyFailures,
-                                                             0,
-                                                             ""); // TODO: I don't think errorLine is useful
-            LOG_DEBUG(
-                sLogger,
-                ("project", projectName)("logstore", category)("filename", convertedPath)("read_bytes", readBytes)(
-                    "line_feed", profile.feedLines)("split_lines", profile.splitLines)(
-                    "parse_failures", profile.parseFailures)("parse_time_failures", profile.parseTimeFailures)(
-                    "regex_match_failures", profile.regexMatchFailures)("history_failures", profile.historyFailures));
+                LogFileProfiler::GetInstance()->AddProfilingData(pipeline->Name(),
+                                                                pipeline->GetContext().GetRegion(),
+                                                                projectName,
+                                                                category,
+                                                                convertedPath,
+                                                                hostLogPath,
+                                                                logFileReader->GetExtraTags(),
+                                                                readBytes,
+                                                                profile.skipBytes,
+                                                                profile.splitLines,
+                                                                profile.parseFailures,
+                                                                profile.regexMatchFailures,
+                                                                profile.parseTimeFailures,
+                                                                profile.historyFailures,
+                                                                0,
+                                                                ""); // TODO: I don't think errorLine is useful
+                LOG_DEBUG(
+                    sLogger,
+                    ("project", projectName)("logstore", category)("filename", convertedPath)("read_bytes", readBytes)(
+                        "line_feed", profile.feedLines)("split_lines", profile.splitLines)(
+                        "parse_failures", profile.parseFailures)("parse_time_failures", profile.parseTimeFailures)(
+                        "regex_match_failures", profile.regexMatchFailures)("history_failures", profile.historyFailures));
+            }
         }
     }
     LOG_WARNING(sLogger, ("LogProcessThread", "Exit")("threadNo", threadNo));
@@ -433,7 +443,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
 
 int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
                               LogFileReaderPtr& logFileReader,
-                              sls_logs::LogGroup& resultGroup,
+                              std::vector<sls_logs::LogGroup*>& resultGroupList,
                               ProcessProfile& profile) {
     auto pipeline = PipelineManager::GetInstance()->FindPipelineByName(
         logFileReader->GetConfigName()); // pipeline should be set in the loggroup by input
@@ -474,11 +484,13 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
 
     for (auto& eventGroup : eventGroupList) {
         // fill protobuf
-        FillLogGroupLogs(eventGroup, resultGroup, pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond);
-        FillLogGroupTags(eventGroup, logFileReader, resultGroup);
+        sls_logs::LogGroup* resultGroup = new sls_logs::LogGroup();
+        resultGroupList.emplace_back(resultGroup);
+        FillLogGroupLogs(eventGroup, *resultGroup, pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond);
+        FillLogGroupTags(eventGroup, logFileReader, *resultGroup);
         if (pipeline->IsFlushingThroughGoPipeline()) {
             LogtailPlugin::GetInstance()->ProcessLogGroup(
-                logFileReader->GetConfigName(), resultGroup, logFileReader->GetSourceId());
+                logFileReader->GetConfigName(), *resultGroup, logFileReader->GetSourceId());
             return 1;
         }
         // record log positions for exactly once. TODO: make it correct for each log, current implementation requires
