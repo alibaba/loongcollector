@@ -361,13 +361,17 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
     // Log warning if retry for too long or will discard data
     switch (operation) {
         case RETRY_ASYNC_WHEN_FAIL:
-            if (curTime - mDataPtr->mLastUpdateTime > INT32_FLAG(sending_cost_time_alarm_interval)) {
+            if (curTime - mDataPtr->mLastUpdateTime > INT32_FLAG(sending_cost_time_alarm_interval)
+                || errorCode == sdk::LOGE_REQUEST_TIMEOUT) {
+                // retry on network timeout should be recorded, because this may lead to data duplication
                 LOG_WARNING(sLogger, LOG_PATTERN);
             }
             Sender::Instance()->SendToNetAsync(mDataPtr);
             break;
         case RECORD_ERROR_WHEN_FAIL:
-            if (curTime - mDataPtr->mLastUpdateTime > INT32_FLAG(sending_cost_time_alarm_interval)) {
+            if (curTime - mDataPtr->mLastUpdateTime > INT32_FLAG(sending_cost_time_alarm_interval)
+                || errorCode == sdk::LOGE_REQUEST_TIMEOUT) {
+                // retry on network timeout should be recorded, because this may lead to data duplication
                 LOG_WARNING(sLogger, LOG_PATTERN);
             }
             // Sender::Instance()->PutIntoSecondaryBuffer(mDataPtr, 10);

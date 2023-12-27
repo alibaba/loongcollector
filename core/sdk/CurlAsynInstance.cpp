@@ -80,6 +80,7 @@ namespace sdk {
         if (addRst != CURLM_OK) {
             request->mCallBack->OnFail(
                 request->mResponse, LOGE_UNKNOWN_ERROR, "curl_multi_add_handle failed: " + std::to_string(addRst));
+            curl_easy_cleanup(curl);
             delete request;
             return false;
         }
@@ -96,7 +97,7 @@ namespace sdk {
                 break;
             case CURLE_OPERATION_TIMEDOUT:
                 curl_easy_cleanup(curl);
-                request->mCallBack->OnFail(request->mResponse, LOGE_REQUEST_ERROR, "Request operation timeout.");
+                request->mCallBack->OnFail(request->mResponse, LOGE_REQUEST_TIMEOUT, "Request operation timeout.");
                 return;
             case CURLE_COULDNT_CONNECT:
                 curl_easy_cleanup(curl);
@@ -199,6 +200,7 @@ namespace sdk {
             }
             MultiHandlerLoop(multi_handle);
         }
+        curl_multi_cleanup(multi_handle);
     }
 
     bool CurlAsynInstance::MultiHandlerLoop(CURLM* multi_handle) {

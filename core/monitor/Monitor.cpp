@@ -498,7 +498,7 @@ void LogtailMonitor::Suicide() {
     SendStatusProfile(true);
     mIsThreadRunning = false;
     Application::GetInstance()->SetSigTermSignalFlag(true);
-    sleep(15);
+    sleep(60);
     _exit(1);
 }
 

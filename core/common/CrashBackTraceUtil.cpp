@@ -152,11 +152,13 @@ std::string GetCrashBackTrace() {
     struct stat fileStat;
     if (fstat(_fileno(pStackFile), &fileStat) != 0) {
         LOG_WARNING(sLogger, ("fstat failed", stackFilePath)("errno", errno));
+        fflush(pStackFile);
         fclose(pStackFile);
         return "";
     }
     if (fileStat.st_size > MAX_FILE_SIZE) {
         LOG_WARNING(sLogger, ("A dump larger than 1MB", fileStat.st_size));
+        fflush(pStackFile);
         fclose(pStackFile);
         return "";
     }
@@ -169,6 +171,7 @@ std::string GetCrashBackTrace() {
 #endif
 
     auto len = fread(buf, 1, MAX_FILE_SIZE, pStackFile);
+    fflush(pStackFile);
     fclose(pStackFile);
     remove(stackFilePath.c_str());
     return std::string(buf, len);
