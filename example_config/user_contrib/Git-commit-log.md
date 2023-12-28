@@ -23,7 +23,7 @@ git log -1 >> /path/to/your/log/gitlog.txt
 
 ## 日志输入样例
 
-``` 
+```text
 commit 73669da2a51694cac0563fd1c93a79394bfc2e60
 Author: linrunqi08 <90741255+linrunqi08@users.noreply.github.com>
 Date:   Thu Jul 6 19:14:56 2023 +0800
@@ -82,9 +82,9 @@ Date:   Wed Jun 21 14:53:31 2023 +0800
 ``` yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /path/to/your/log/
-    FilePattern: gitlog.txt
+  - Type: input_file
+    FilePaths: 
+      - /path/to/your/log/gitlog.txt
 processors:
   - Type: processor_split_log_regex
     SplitRegex: ^commit [0-9a-fA-F]{4,40}$

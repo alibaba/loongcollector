@@ -15,9 +15,9 @@
 # To collect file logs in container and write to Kafka.
 # 
 # You may change ContainerInfo parameters to select containers for collection.
-# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/input/file-log
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/plugins/input/file-log
 # You may change <kafka_host>:<kafka_port> and Topic according to you Kafka cluster setup.
-# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/flusher/kafka
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/plugins/flusher/kafka
 
 ---
 apiVersion: v1
@@ -34,11 +34,11 @@ data:
   regex_log.yaml: |
     enable: true
     inputs:
-      - Type: file_log
-        LogPath: /root/bin/input_data/
-        FilePattern: access.log
-        ContainerFile: true
-        ContainerInfo:
+      - Type: input_file
+        FilePaths: 
+          - /root/bin/input_data/access.log
+        EnableContainerDiscovery: true
+        ContainerFilters:
           K8sPodRegex: regex-log
           K8sNamespaceRegex: regex-ns
           IncludeEnv:
@@ -135,7 +135,7 @@ spec:
               readOnly: true
             - mountPath: /usr/local/ilogtail/checkpoint
               name: checkpoint
-            - mountPath: /usr/local/ilogtail/user_yaml_config.d
+            - mountPath: /usr/local/ilogtail/config/local
               name: user-config
               readOnly: true
       dnsPolicy: ClusterFirstWithHostNet

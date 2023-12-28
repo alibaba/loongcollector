@@ -63,7 +63,7 @@ bool ProcessorParseTimestampNative::Init(const Json::Value& config) {
                              mContext->GetProjectName(),
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
-    } else if (!ParseLogTimeZoneOffsetSecond(mSourceTimezone, false, mLogTimeZoneOffsetSecond)) {
+    } else if (!ParseLogTimeZoneOffsetSecond(mSourceTimezone, mLogTimeZoneOffsetSecond)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              "string param SourceTimezone is not valid",

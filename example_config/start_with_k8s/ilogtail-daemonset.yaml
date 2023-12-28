@@ -80,7 +80,7 @@ spec:
               readOnly: true
             - mountPath: /usr/local/ilogtail/checkpoint # for checkpoint between container restart
               name: checkpoint
-            - mountPath: /usr/local/ilogtail/user_yaml_config.d # mount config dir
+            - mountPath: /usr/local/ilogtail/config/local # mount config dir
               name: user-config
               readOnly: true
           lifecycle:

@@ -19,9 +19,9 @@
 制作的镜像默认名称为aliyun/ilogtail，可以DOCKER_REPOSITORY环境变量覆盖，Tag则必须与iLogtail包的版本相同，可以通过环境变量VERSION指定，例如：
 
 ```shell
-$ VERSION=1.1.1 make dist
-$ VERSION=1.1.1 make docker
+$ VERSION=1.8.3 make dist
+$ VERSION=1.8.3 make docker
 $ docker image list
 REPOSITORY        TAG     IMAGE ID       CREATED         SIZE
-aliyun/ilogtail   1.1.1   c7977eb7dcc1   2 minutes ago   764MB
+aliyun/ilogtail   1.8.3   c7977eb7dcc1   2 minutes ago   764MB
 ```

@@ -6,7 +6,7 @@ test scenario is not met, the pluggable structure is provided to extend. Current
 provided, namely [validator](docs/How-to-write-test-engine-plugin.md)
 and [subscriber](docs/How-to-write-test-engine-plugin.md).
 
-# DataFlow
+## DataFlow
 
 When the test case config is loaded, Test Engine would start a virtual environment to do the test case. ILogtail
 container would transfer the telemetry data to the selected Subscriber. LogValidator and SysValidator would valid the
@@ -14,43 +14,43 @@ received telemetry data according to the given configuration, such as valid log 
 log num. In addition, SysValidator also read the ILogtail CPU and memory cost to do performance check.
 ![e2e_data_flow](./dataflow.png)
 
-# Contribution
+## Contribution
 
 If you want to add custom plugins for Test Engine, please read the [doc](./docs/How-to-write-test-engine-plugin.md).
 
-# Config Test Case
+## Config Test Case
 
-## Define the test process
+### Define the test process
 
 The following configuration is to test nginx plugin behavior, the case would help you to learn how to config a test
 case.
 
 - boot: [**Required**]
-    - category: the virtual environment category, currently only support `docker-compose`.
-    - timeout: the timeout period of virtual environment, the default value is `60s`.
+  - category: the virtual environment category, currently only support `docker-compose`.
+  - timeout: the timeout period of virtual environment, the default value is `60s`.
 - ilogtail: [**Required**]
-    - config: the ILogtail configuration array, the including items would be loaded to ILogtail container before
+  - config: the ILogtail configuration array, the including items would be loaded to ILogtail container before
       testing.
-        - name: the config name.
-        - content: the ILogtail configuration array.
-    - close_wait: the wait period before closing the test case to transfer the data on the way.
-    - env: the env in ILogtail container.
-    - depend_on: control the sequence of starting ILogtail container, which is same as docker-compose.
+    - name: the config name.
+    - content: the ILogtail configuration array.
+  - close_wait: the wait period before closing the test case to transfer the data on the way.
+  - env: the env in ILogtail container.
+  - depend_on: control the sequence of starting ILogtail container, which is same as docker-compose.
 - subscriber: [**Optional**] the default subscriber is `gRPC subscriber`. More details please
   see [here](./docs/plugin-list.md).
-    - name: the subscriber category.
-    - config: the subscriber configuration map.
+  - name: the subscriber category.
+  - config: the subscriber configuration map.
 - trigger: [**Optional**]
-    - url: the HTTP request URL.
-    - method: the request method.
-    - interval: the interval between 2 requests.
-    - times: the trigger times.
+  - url: the HTTP request URL.
+  - method: the request method.
+  - interval: the interval between 2 requests.
+  - times: the trigger times.
 - verify: [**Required**]
-    - log_rules: the LogValidator configuration array. More details please see [here](./docs/plugin-list.md).
-    - system_rules: the SysValidator configuration array. More details please see [here](./docs/plugin-list.md).
+  - log_rules: the LogValidator configuration array. More details please see [here](./docs/plugin-list.md).
+  - system_rules: the SysValidator configuration array. More details please see [here](./docs/plugin-list.md).
 - retry: [**Optional**] the retry times when facing test failed.
-    - times: the retry times, the default value is `1`.
-    - interval: the retry interval, the default value is `10s`.
+  - times: the retry times, the default value is `1`.
+  - interval: the retry interval, the default value is `10s`.
 - test_interval: [**Required**] the total test interval.
 
 ```yaml
@@ -96,11 +96,11 @@ verify:
 testing_interval: 15s
 ```
 
-## Define dependency environment
+### Define dependency environment
 
 If you only depends on the ILogtail container, please skip the part.
 
-### Docker-Compose Environment
+#### Docker-Compose Environment
 
 Only need to define a `docker-compose.yaml` without any ILogtail configuration.
 
@@ -122,7 +122,7 @@ services:
       retries: 3
 ```
 
-## Try to run nginx test demo
+### Try to run nginx test demo
 
 In the root dir，the test reports are contained in `beaverhor-test/report` dir after executing the following commands.
-`TEST_SCOPE=input_nginx  TEST_DEBUG=true   make e2e `
+`TEST_SCOPE=input_nginx  TEST_DEBUG=true   make e2e`

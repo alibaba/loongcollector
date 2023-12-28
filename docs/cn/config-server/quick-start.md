@@ -77,7 +77,6 @@ Agent 侧需要配置 ConfigServer 信息，才能使用管控功能。
 }
 ```
 
-
 ### Service
 
 Service 为分布式的结构，支持多地部署，负责与采集 Agent 和用户/ui 通信，实现了管控的核心能力。

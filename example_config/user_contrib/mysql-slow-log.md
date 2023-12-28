@@ -57,9 +57,9 @@ SELECT * FROM customers WHERE age > 20;
 ``` YAML
 enable: true
 inputs:
-  - Type: file_log           # 文件输入类型
-    LogPath: .               # 文件路径
-    FilePattern: mysql_slow.log  # 文件名模式
+  - Type: input_file
+    FilePaths: 
+      - ./mysql_slow.log
 processors:
   - Type: processor_regex_accelerate
     LogBeginRegex: '# Time:.*'

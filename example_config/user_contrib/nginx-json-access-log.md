@@ -70,9 +70,9 @@ log_format user_log_format escape=json '{"@timestamp":"$time_iso8601",'
 ``` YAML
 enable: true
 inputs:
-  - Type: file_log           # 文件输入类型
-    LogPath: .               # 文件路径
-    FilePattern: access.log  # 文件名模式
+  - Type: input_file
+    FilePaths: 
+      - ./access.log
 processors:
   - Type: processor_json
     SourceKey: content

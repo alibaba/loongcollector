@@ -2,7 +2,7 @@
 
 [iLogtail](https://github.com/alibaba/ilogtail)，包括内核、插件和工具均遵循[Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0)分发：
 
-```
+```plain
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/

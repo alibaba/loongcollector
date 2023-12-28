@@ -17,7 +17,7 @@
 # After Process: {"uid":"123","time":"2022-08-08","method":"buy","value":"10000"}
 #
 # You may change SplitSep and SplitKeys for your need.
-# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/processor/delimiter
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/plugins/processor/delimiter
 ##自定义指标脚本
 ##获取信息:
 ##  端口数量检测

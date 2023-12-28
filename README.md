@@ -71,7 +71,7 @@ Our official **User Manual** is located here:
 
 [Configuration](https://ilogtail.gitbook.io/ilogtail-docs/configuration/collection-config)
 
-[All Plugins](https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/overview)
+[All Plugins](https://ilogtail.gitbook.io/ilogtail-docs/plugins/overview)
 
 [Getting Started](https://ilogtail.gitbook.io/ilogtail-docs/awesome-ilogtail/getting-started)
 
@@ -105,4 +105,3 @@ Tens of thousands of companies use iLogtail in Alibaba Cloud, IDC, or other clou
 ## Licence
 
 [Apache 2.0 License](./LICENSE)
-

@@ -10,7 +10,7 @@
 
 ## 日志输入样例
 
-```shell
+```plain
 2023/07/13 12:33:52.881  [info] [TCP] 127.0.0.1:64873 --> adservice.google.com:443 match DomainKeyword(google) using 节点选择[【I】日本 VIP 3 - chatGPT]
 2023/07/13 12:32:33.810  [info] [TCP] 127.0.0.1:64711 --> github.githubassets.com:443 match DomainKeyword(github) using 节点选择[【A】香港  VIP 1 - Nearoute]
 2023/07/13 12:30:56.540  [info] [TCP] 127.0.0.1:64660 --> self.events.data.microsoft.com:443 match Match() using 国外网站[【L】新加坡  VIP4 - chatGPT]
@@ -19,7 +19,7 @@
 
 ## 日志输出样例
 
-```shell
+```json
 {
     "__tag__:__path__":"./Logs/ClashX/com.west2online.ClashX.log",
     "event_time":"2023/07/13 12:33:52.881",
@@ -64,13 +64,12 @@
 
 ## 采集配置
 
-```shell
+```yaml
 enable: true
 inputs:
-  - Type: file_log          
-    LogPath: ./Logs/ClashX
-    FilePattern: com.west2online.ClashX.log
-
+  - Type: input_file
+    FilePaths: 
+      - ./Logs/ClashX/com.west2online.ClashX.log
 processors:
   - Type: processor_regex
     SourceKey: content

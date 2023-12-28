@@ -60,9 +60,9 @@ W20220926 21:37:44.070065 3276269 main.cpp:26] warning message
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /logs # log directory
-    FilePattern: glog.log # log file
+  - Type: input_file
+    FilePaths: 
+      - /logs/glog.log
 processors:
   - Type: processor_split_log_regex # configure only when logs may span lines
     SplitRegex: \[IWEF\]

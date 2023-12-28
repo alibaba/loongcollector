@@ -47,9 +47,9 @@ go.uber.org/zap/zapcore.CheckWriteAction.OnWrite(0x2, 0x987e770, {0x0, 0x0, 0x0}
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /logs # log directory
-    FilePattern: zap.log # log file
+  - Type: input_file
+    FilePaths: 
+      - /logs/zap.log
 processors:
   - Type: processor_split_log_regex
     SplitRegex: \{.+\}

@@ -81,7 +81,7 @@ drwxrwxr-x 5 505 505      4096 7月  10 18:00 example_config
 -rw-rw-r-- 1 505 505     11356 7月  11 00:00 LICENSE
 -rw-rw-r-- 1 505 505      4834 7月  11 00:00 README.md
 -rw-rw-r-- 1  505  505    118 7月  14 11:22 ilogtail_config.json
-drwxr-xr-x 2 root root    4096 7月  12 09:55 user_yaml_config.d
+drwxr-xr-x 2 root root    4096 7月  12 09:55 config
 ```
 
 - 获取阿里云AK，并进行配置。
@@ -96,16 +96,16 @@ $ cat ilogtail_config.json
 
 - 采集配置
 
-在`user_yaml_config.d`创建针对`access_log`、`error_log`分别创建两个采集配置，两个采集配置分别将日志采集到`SLS`不同`logstore` 及`Kafka`不同的`Topic`中。双写适用于从`Kafka`迁移到SLS的场景，如果迁移完成稳定后，可以删除`flusher_kafka`，只保留`flusher_sls`即可。
+在`config/local`创建针对`access_log`、`error_log`分别创建两个采集配置，两个采集配置分别将日志采集到`SLS`不同`logstore` 及`Kafka`不同的`Topic`中。双写适用于从`Kafka`迁移到SLS的场景，如果迁移完成稳定后，可以删除`flusher_kafka`，只保留`flusher_sls`即可。
 
 ```yaml
 # 访问日志采集配置
-$ cat user_yaml_config.d/access_log.yaml
+$ cat config/local/access_log.yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /root/bin/input_data/
-    FilePattern: access.log
+  - Type: input_file
+    FilePaths: 
+      - /root/bin/input_data/access.log
 processors:
   - Type: processor_regex
     SourceKey: content
@@ -123,9 +123,10 @@ processors:
       - browser
 flushers:
   - Type: flusher_sls
+    Region: cn-hangzhou
     Endpoint: cn-hangzhou.log.aliyuncs.com
-    ProjectName: test-ilogtail
-    LogstoreName: access-log
+    Project: test-ilogtail
+    Logstore: access-log
   - Type: flusher_kafka
     Brokers:
       - localhost:9092
@@ -134,17 +135,17 @@ flushers:
 
 ```yaml
 # 错误日志采集配置
-$ cat user_yaml_config.d/error_log.yaml
+$ cat config/local/error_log.yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /root/bin/input_data/
-    FilePattern: error.log
+  - Type: input_file
+    FilePaths: 
+      - /root/bin/input_data/error.log
 flushers:
   - Type: flusher_sls
     Endpoint: cn-hangzhou.log.aliyuncs.com
-    ProjectName: test-ilogtail
-    LogstoreName: access-log
+    Project: test-ilogtail
+    Logstore: access-log
   - Type: flusher_kafka
     Brokers:
       - localhost:9092
@@ -152,8 +153,8 @@ flushers:
 ```
 
 ```shell
-$ tree user_yaml_config.d/
-user_yaml_config.d/
+$ tree config/local/
+config/local/
 ─ access_log.yaml
 └── error_log.yaml
 ```

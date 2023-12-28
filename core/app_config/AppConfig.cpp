@@ -63,12 +63,12 @@ DEFINE_FLAG_STRING(logtail_sys_conf_dir, "store machine-unique-id, user-defined-
 #elif defined(_MSC_VER)
 DEFINE_FLAG_STRING(logtail_sys_conf_dir, "store machine-unique-id, user-defined-id, aliuid", "C:\\LogtailData\\");
 #endif
-const char* DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE = "user_local_config.json";
-DEFINE_FLAG_STRING(ilogtail_local_config, "local ilogtail config file", DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE);
-const char* DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE = "user_config.d";
-DEFINE_FLAG_STRING(ilogtail_local_config_dir,
-                   "local ilogtail config file dir",
-                   DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE);
+// const char* DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE = "user_local_config.json";
+// DEFINE_FLAG_STRING(ilogtail_local_config, "local ilogtail config file", DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE);
+// const char* DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE = "user_config.d";
+// DEFINE_FLAG_STRING(ilogtail_local_config_dir,
+//                    "local ilogtail config file dir",
+//                    DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE);
 // const char* DEFAULT_ILOGTAIL_LOCAL_YAML_CONFIG_DIR_FLAG_VALUE = "user_yaml_config.d";
 // DEFINE_FLAG_STRING(ilogtail_local_yaml_config_dir,
 //                    "local ilogtail yaml config file dir",
@@ -1191,14 +1191,14 @@ void AppConfig::SetLogtailSysConfDir(const std::string& dirPath) {
 #endif
 
     // Update related configurations (local user config).
-    if (STRING_FLAG(ilogtail_local_config).empty()) {
-        LOG_WARNING(sLogger, ("flag error", "ilogtail_local_config must be non-empty"));
-        STRING_FLAG(ilogtail_local_config) = DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE;
-    }
-    if (STRING_FLAG(ilogtail_local_config_dir).empty()) {
-        LOG_WARNING(sLogger, ("flag error", "ilogtail_local_config_dir must be non-empty"));
-        STRING_FLAG(ilogtail_local_config_dir) = DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE;
-    }
+    // if (STRING_FLAG(ilogtail_local_config).empty()) {
+    //     LOG_WARNING(sLogger, ("flag error", "ilogtail_local_config must be non-empty"));
+    //     STRING_FLAG(ilogtail_local_config) = DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE;
+    // }
+    // if (STRING_FLAG(ilogtail_local_config_dir).empty()) {
+    //     LOG_WARNING(sLogger, ("flag error", "ilogtail_local_config_dir must be non-empty"));
+    //     STRING_FLAG(ilogtail_local_config_dir) = DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE;
+    // }
     // mUserLocalConfigPath = AbsolutePath(STRING_FLAG(ilogtail_local_config), mLogtailSysConfDir);
     // mUserLocalConfigDirPath = AbsolutePath(STRING_FLAG(ilogtail_local_config_dir), mLogtailSysConfDir) +
     // PATH_SEPARATOR; mUserLocalYamlConfigDirPath

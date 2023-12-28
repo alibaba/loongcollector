@@ -8,6 +8,6 @@
 
 ## 内容下载链接替换示例
 
-主站GitHub：`wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/quick_start/user_yaml_config.d/file_simple.yaml`
+主站GitHub：`wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/quick_start/config/file_simple.yaml`
 
-镜像站Gitee：`wget https://gitee.com/mirrors/iLogtail/raw/main/example_config/quick_start/user_yaml_config.d/file_simple.yaml`
+镜像站Gitee：`wget https://gitee.com/mirrors/iLogtail/raw/main/example_config/quick_start/config/file_simple.yaml`

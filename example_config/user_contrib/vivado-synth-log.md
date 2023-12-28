@@ -70,9 +70,9 @@ WARNING: [Synth 8-6779] Delay data for wire-load model not found, using default 
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: "/mnt/hgfs/synth_25"
-    FilePattern: runme.log
+  - Type: input_file
+    FilePaths: 
+      - /mnt/hgfs/synth_25/runme.log
 processors:
   - Type: processor_filter_regex
     Include:

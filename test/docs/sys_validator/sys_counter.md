@@ -1,7 +1,11 @@
 # sys_counter
+
 ## Description
+
 this is a log field validator to check received log from subscriber
+
 ## Config
+
 |  field   |   type   |   description   | default value   |
 | ---- | ---- | ---- | ---- |
 |expect_received_minimum_log_num|int|the expected minimum received log number|0|

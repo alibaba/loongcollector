@@ -16,7 +16,7 @@ A clear and concise description of what you want to achieve and implement. For e
 > We can use the package `github.com/gosnmp/gosnmp` to act as an snmp server in a gesture to collect client logs.
 
 **Additional comments**
-Add any other context or screenshots about the feature request here. 
+Add any other context or screenshots about the feature request here.
 For example, the ideal input and output logs.
 > The logs are supposed to have the following contents, e.g.,
 >

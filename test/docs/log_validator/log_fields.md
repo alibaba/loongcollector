@@ -1,7 +1,11 @@
 # log_fields
+
 ## Description
+
 this is a log field validator to check received log from subscriber
+
 ## Config
+
 |  field   |   type   |   description   | default value   |
 | ---- | ---- | ---- | ---- |
 |expect_log_fields|[]string|the expected log fields mapping|null|

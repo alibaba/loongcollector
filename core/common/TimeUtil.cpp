@@ -389,20 +389,15 @@ bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond) {
     return true;
 }
 
-bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, bool isAdjustmentNeeded, int& logTimeZoneOffsetSecond) {
+bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, int& logTimeZoneOffsetSecond) {
     if (logTZ.empty()) {
         return true;
     }
     int logTZSecond = 0;
     if (!ParseTimeZoneOffsetSecond(logTZ, logTZSecond)) {
         return false;
-    } else {
-        if (isAdjustmentNeeded) {
-            logTimeZoneOffsetSecond = logTZSecond - GetLocalTimeZoneOffsetSecond();
-        } else {
-            logTimeZoneOffsetSecond = logTZSecond;
-        }
     }
+    logTimeZoneOffsetSecond = logTZSecond - GetLocalTimeZoneOffsetSecond();
     return true;
 }
 

@@ -15,7 +15,7 @@
 # To collect file logs in container with ilogtail deployed as a sidecar container and write to SLS.
 # 
 # You may change <sls_endpoint>, <sls_project> and <sls_logstore> according to you SLS setup.
-# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/flusher/sls
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/plugins/flusher/sls
 
 ---
 apiVersion: v1
@@ -27,9 +27,9 @@ data:
   json_log.yaml: |
     enable: true
     inputs:
-      - Type: file_log
-        LogPath: /root/log
-        FilePattern: "json.log"
+      - Type: input_file
+        FilePaths: 
+          - /root/log/json.log
     processors:
       - Type: processor_json
         SourceKey: content
@@ -101,7 +101,7 @@ spec:
           volumeMounts:
             - mountPath: /usr/local/ilogtail/checkpoint
               name: checkpoint
-            - mountPath: /usr/local/ilogtail/user_yaml_config.d
+            - mountPath: /usr/local/ilogtail/config/local
               name: user-config
               readOnly: true
       volumes:

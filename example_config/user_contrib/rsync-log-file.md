@@ -81,9 +81,9 @@ Rsync 使用 `--log-file` 参数时，有默认日志格式 `%t [%p] %i %n%L`，
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /tmp
-    FilePattern: rsync.log
+  - Type: input_file
+    FilePaths: 
+      - /tmp/rsync.log
 processors:
   - Type: processor_regex
     SourceKey: content

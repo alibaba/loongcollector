@@ -92,12 +92,12 @@ drwxrwxr-x 5 505 505      4096 7月  10 18:00 example_config
 -rw-rw-r-- 1 505 505     11356 7月  11 00:00 LICENSE
 -rw-rw-r-- 1 505 505      4834 7月  11 00:00 README.md
 -rw-rw-r-- 1  505  505    118 7月  14 11:22 ilogtail_config.json
-drwxr-xr-x 2 root root    4096 7月  12 09:55 user_yaml_config.d
+drwxr-xr-x 2 root root    4096 7月  12 09:55 config
 ```
 
 - 采集配置
 
-在`user_yaml_config.d`目录下创建binlog.yaml
+在`config/local`目录下创建binlog.yaml
 
 ```yaml
 enable: true
@@ -117,8 +117,8 @@ flushers:
 ```
 
 ```shell
-$ tree user_yaml_config.d/
-user_yaml_config.d/
+$ tree config/local/
+config/local/
 └── binlog.yaml
 ```
 

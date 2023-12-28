@@ -14,12 +14,13 @@ type ByteArray []byte
 
 ```go
 type GroupInfo struct {
-	Metadata Metadata
-	Tags     Tags
+ Metadata Metadata
+ Tags     Tags
 }
 ```
 
 ## PipelineGroupEvents
+
 传输数据整体。
 
 ```go

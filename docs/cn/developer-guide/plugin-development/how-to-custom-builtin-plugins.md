@@ -9,6 +9,7 @@ iLogtail 通过 [插件引用配置文件](https://github.com/alibaba/ilogtail/b
 当执行诸如 `make all` 等构建指令时，该配置文件会被解析并生成 go import 文件到 [plugins/all](https://github.com/alibaba/ilogtail/tree/main/plugins/all) 目录下。
 
 插件引用配置文件的格式定义如下：
+
 ```yaml
 plugins:    // 需要注册的plugins，按适用的系统分类
 common:
@@ -38,6 +39,7 @@ project:
 您也可以通过指定一个`自定义的插件引用配置文件`来指导构建，该文件可以是一个本地文件或者远程文件url，该文件的内容格式应当与默认的 plugins.yml文件一致。
 
 假设您自定义的插件引用配置文件名为 `/tmp/custom_plugins.yml`，可以通过设置 `PLUGINS_CONFIG_FILE` 环境变量为该文件的路径来指导构建，如：
+
 ```shell
 PLUGINS_CONFIG_FILE=/tmp/custom_plugins.yml make all
 ```

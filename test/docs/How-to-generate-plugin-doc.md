@@ -6,7 +6,7 @@
 // Doc generates markdown doc with the exported field.
 // If some field want to add comment, please use comment tag to describe it.
 type Doc interface {
-	Description() string
+ Description() string
 }
 ```
 
@@ -17,12 +17,10 @@ or `mapstructure`, the original name would be override by the previous sequence.
 
 ## Register to the doc center
 
-
-
 ``` go
 
 import (
-	"github.com/alibaba/ilogtail/pkg/doc"
+ "github.com/alibaba/ilogtail/pkg/doc"
 )
 
 func init(){
@@ -30,19 +28,18 @@ func init(){
 }
 ```
 
-
 ## Demo
 
 ``` go
 type TestDoc struct {
-	Field1      int    `json:"field_1" comment:"field one"`
-	Field2      string `json:"field_2" comment:"field two"`
-	Field3      int64  `json:"field_3" mapstructure:"field_4" comment:"field three"`
-	ignoreField string
+ Field1      int    `json:"field_1" comment:"field one"`
+ Field2      string `json:"field_2" comment:"field two"`
+ Field3      int64  `json:"field_3" mapstructure:"field_4" comment:"field three"`
+ ignoreField string
 }
 
 func (t TestDoc) Description() string {
-	return "this is a test doc demo"
+ return "this is a test doc demo"
 }
 ```
 
@@ -57,4 +54,3 @@ this is a test doc demo
 |field_2|string|field two|
 |field_4|int64|field three|
 ```
-

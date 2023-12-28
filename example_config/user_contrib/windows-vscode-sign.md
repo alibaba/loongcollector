@@ -12,7 +12,7 @@
 
 ## 日志输入样例
 
-```
+```text
 2023-07-04 13:20:00.352 [info] Reading sessions from secret storage...
 2023-07-04 13:20:00.352 [info] Got 0 stored sessions
 2023-07-04 13:20:00.352 [info] Getting sessions for all scopes...
@@ -38,10 +38,9 @@
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: .
-    FilePattern: vscode_Microsoft_sign.log
-    MaxDepth: 0
+  - Type: input_file
+    FilePaths: 
+      - ./vscode_Microsoft_sign.log
 processors:
   - Type: processor_regex
     SourceKey: content

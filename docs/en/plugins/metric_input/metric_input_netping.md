@@ -1,7 +1,11 @@
 # metric_input_netping
+
 ## Description
+
 a icmp-ping/tcp-ping plugin for logtail
+
 ## Config
+
 |  field   |   type   |   description   | default value   |
 | ---- | ---- | ---- | ---- |
 |disable_dns_metric|bool|disable dns resolve metric, default is false| false|

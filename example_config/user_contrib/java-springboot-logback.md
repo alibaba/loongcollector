@@ -101,8 +101,8 @@ logging.config = /home/tomcat/conf/logback-spring.xml
 
 ```
 
-
 ## 日志输出样例
+
 ### App 日志
 
 ```log
@@ -115,34 +115,35 @@ logging.config = /home/tomcat/conf/logback-spring.xml
 ```log
 2023-09-04 00:00:08.212|2148dd19-c0ff-4ef3-b32e-cd59602ec44e|ERROR|internalMethod|com.alibaba.druid.filter.stat.StatFilter:523|JobThread-893-1693756800039|slow sql 5676 millis. SELECT SUM(VERIFY_NUM) as totalNum, SUM(VERIFY_MONEY) as totalMoney FROM tb_pay_table[]|""
 2023-09-04 00:00:43.079|ed0be4c8-974d-4bf5-9154-1b0ac4edf0b5|ERROR|postMethod|com.xxl.job.core.util.XxlJobRemotingUtil:143|xxl-job, executor ExecutorRegistryThread|Read timed out|"java.net.SocketTimeoutException: Read timed out
-	at java.net.SocketInputStream.socketRead0(Native Method)
-	at java.net.SocketInputStream.socketRead(SocketInputStream.java:116)
-	at java.net.SocketInputStream.read(SocketInputStream.java:171)
-	at java.net.SocketInputStream.read(SocketInputStream.java:141)
-	at java.io.BufferedInputStream.fill(BufferedInputStream.java:246)
-	at java.io.BufferedInputStream.read1(BufferedInputStream.java:286)
-	at java.io.BufferedInputStream.read(BufferedInputStream.java:345)
-	at sun.net.www.http.HttpClient.parseHTTPHeader(HttpClient.java:735)
-	at sun.net.www.http.HttpClient.parseHTTP(HttpClient.java:678)
-	at sun.net.www.protocol.http.HttpURLConnection.getInputStream0(HttpURLConnection.java:1593)
-	at sun.net.www.protocol.http.HttpURLConnection.getInputStream(HttpURLConnection.java:1498)
-	at java.net.HttpURLConnection.getResponseCode(HttpURLConnection.java:480)
-	at com.xxl.job.core.util.XxlJobRemotingUtil.postBody(XxlJobRemotingUtil.java:119)
-	at com.xxl.job.core.biz.client.AdminBizClient.registry(AdminBizClient.java:42)
-	at com.xxl.job.core.thread.ExecutorRegistryThread$1.run(ExecutorRegistryThread.java:48)
-	at java.lang.Thread.run(Thread.java:748)
+ at java.net.SocketInputStream.socketRead0(Native Method)
+ at java.net.SocketInputStream.socketRead(SocketInputStream.java:116)
+ at java.net.SocketInputStream.read(SocketInputStream.java:171)
+ at java.net.SocketInputStream.read(SocketInputStream.java:141)
+ at java.io.BufferedInputStream.fill(BufferedInputStream.java:246)
+ at java.io.BufferedInputStream.read1(BufferedInputStream.java:286)
+ at java.io.BufferedInputStream.read(BufferedInputStream.java:345)
+ at sun.net.www.http.HttpClient.parseHTTPHeader(HttpClient.java:735)
+ at sun.net.www.http.HttpClient.parseHTTP(HttpClient.java:678)
+ at sun.net.www.protocol.http.HttpURLConnection.getInputStream0(HttpURLConnection.java:1593)
+ at sun.net.www.protocol.http.HttpURLConnection.getInputStream(HttpURLConnection.java:1498)
+ at java.net.HttpURLConnection.getResponseCode(HttpURLConnection.java:480)
+ at com.xxl.job.core.util.XxlJobRemotingUtil.postBody(XxlJobRemotingUtil.java:119)
+ at com.xxl.job.core.biz.client.AdminBizClient.registry(AdminBizClient.java:42)
+ at com.xxl.job.core.thread.ExecutorRegistryThread$1.run(ExecutorRegistryThread.java:48)
+ at java.lang.Thread.run(Thread.java:748)
 "
 ```
 
 ## 采集配置
 
 ### App 日志采集
+
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /home/tomcat/logs/app
-    FilePattern: app.*.ing
+  - Type: input_file
+    FilePaths: 
+      - /home/tomcat/logs/app/app.*.ing
 processors:
   - Type: processor_split_log_regex
     SplitRegex: \d+-\d+-\d+\s\d+:\d+:\d+\.\d+\|.*
@@ -179,14 +180,14 @@ flushers:
     Topic: APP_LOG
 ```
 
-
 ### Err 日志采集
+
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /home/tomcat/logs/err
-    FilePattern: err.*.ing
+  - Type: input_file
+    FilePaths: 
+      - /home/tomcat/logs/err/err.*.ing
 processors:
   - Type: processor_split_log_regex
     SplitRegex: \d+-\d+-\d+\s\d+:\d+:\d+\.\d+\|.*

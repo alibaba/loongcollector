@@ -56,8 +56,6 @@ func (c *Converter) ToByteStreamWithSelectedFieldsV2(groupEvents *models.Pipelin
 - `ToByteStreamWithSelectedFields`：与`DoWithSelectedFields`方法类似，在完成和`ToByteStream`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，以map的形式将结果保存于`values`数组中，`targetFields`中各字符串的的格式要求同上。
 - `ToByteStreamWithSelectedFieldsV2`：作用与`ToByteStreamWithSelectedFields`方法一致，只是作用于v2版本的数据模版的协议转换
 
-
-
 ## 使用步骤
 
 这里给出使用`Converter`进行日志转换的典型步骤：
@@ -118,7 +116,6 @@ c, err := protocol.NewConverter("custom_single", "json", map[string]string{"host
     | custom_single_flatten | 单条协议，数据平铺 ，如写入kafka的json消息体              |
     | influxdb              | Influxdb协议                               |
     | raw                   | 原始Byte流协议，仅支持v2版本中ByteArray类型的Event的协议转换 |
-
 
 - 可选编码方式
 

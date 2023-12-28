@@ -1,7 +1,11 @@
 # processor_strptime
+
 ## Description
+
 Processor to extract time from log: strptime(SourceKey, Format)
+
 ## Config
+
 |  field   |   type   |   description   | default value   |
 | ---- | ---- | ---- | ---- |
 |SourceKey|string|The source key prepared to be parsed by strptime.|"time"|

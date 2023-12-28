@@ -35,9 +35,9 @@
 ```yaml
 enable: true
 inputs:
-  - Type: file_log                    # 文件输入类型
-    LogPath: ./                       # 文件路径
-    FilePattern: redis.log            # 文件名模式
+  - Type: input_file
+    FilePaths: 
+      - ./redis.log
 processors:
   - Type: processor_regex
     SourceKey: content

@@ -26,9 +26,9 @@ Collect the log information from the `simple.log` file in the current path accor
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: .
-    FilePattern: simple.log
+  - Type: input_file
+    FilePaths: 
+      - /home/test-log/*.log
 processors:
   - Type: processor_gotime
     SourceKey: "content"

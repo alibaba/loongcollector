@@ -19,13 +19,13 @@
 # {"remote_addr":"::1","remote_user":"-","time_local":"18/Jul/2022:07:28:01","method":"GET","url":"/hello/ilogtail","protocol":"HTTP/1.1","status":"404","body_bytes_sent":"153","http_referer":"-","http_user_agent":"curl/7.74.0","http_x_forwarded_for":"-"}
 #
 # You may change Regex and Keys according to data pattern.
-# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/processor/regex
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/plugins/processor/regex
 
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /home/test-log/
-    FilePattern: access.log
+  - Type: input_file
+    FilePaths: 
+      - /home/test-log/*.log
 processors:
   - Type: processor_regex
     SourceKey: content

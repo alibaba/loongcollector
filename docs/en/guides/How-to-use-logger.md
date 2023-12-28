@@ -17,17 +17,17 @@ configuration and logstore name will be automatically appended.
 
 ```
 type plugin struct {
-	context ilogtail.Context
+ context ilogtail.Context
 }
 
 func (p *plugin) func1() {
-	logger.Warning(p.context.GetRuntimeContext(), "a", "b")
+ logger.Warning(p.context.GetRuntimeContext(), "a", "b")
 }
 ```
 
 ```
 WithMetaData:
-2021-08-24 18:20:02 [DBG] [logger_test.go:174] [func1] [mock-configname,mock-logstore]	[a b]:
+2021-08-24 18:20:02 [DBG] [logger_test.go:174] [func1] [mock-configname,mock-logstore] [a b]:
 WithoutMetaData:
 2021-08-24 18:20:02 [DBG] [logger_test.go:174] [func1] [a b]:
 ```
@@ -61,19 +61,19 @@ asynchronous printing, etc.
 package test
 
 import (
-	"context"
-	"testing"
+ "context"
+ "testing"
 
-	"github.com/alibaba/ilogtail/pkg/logger"
+ "github.com/alibaba/ilogtail/pkg/logger"
 )
 
 func init() {
-	logger.InitTestLogger(logger.OptionDebugLevel)
+ logger.InitTestLogger(logger.OptionDebugLevel)
 
 }
 
 func Test_plugin_func1(t *testing.T) {
-	logger.Debug(context.Background(), "a", "b")
+ logger.Debug(context.Background(), "a", "b")
 }
 ```
 

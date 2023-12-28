@@ -1,10 +1,13 @@
 # Data structure
+
 This article will introduce the internal data structure and data flow of iLogtail.
 
 ## Overview of data types
+
 This section will introduce some data types related to the plug-in interface. Currently, the data types between iLogtail and the service backend are described by [protobuf]( ../../../pkg/protocol/proto/sls_logs.proto) .
 
 ### Content & LogTag
+
 Transfer data fields and labels, simple key/value pairs.
 
 ```protobuf
@@ -22,6 +25,7 @@ required string Value = 2;
 ```
 
 ### Log
+
 Log is the data type that represents a single log. The Time field is the log time. The Contents field maintains the content of this log and consists of a key/value list.
 
 ```protobuf
@@ -55,4 +59,3 @@ message LogGroup
   repeated LogTag LogTags = 6;
 }
 ```
-

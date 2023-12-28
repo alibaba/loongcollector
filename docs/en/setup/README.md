@@ -27,7 +27,7 @@ following command to quickly start the iLogtail program.
 
 Execute the `make docker` command in the root directory, and you will get the `aliyun/ilogtail:1.1.0` image. Use the
 following command to quickly start the docker program. The behavior of the image is the same as the above program. The
-log output is in `/aliyun/logtail_plugin.LOG `File.
+log output is in `/aliyun/logtail_plugin.LOG`File.
 
 ```shell
 make docker && docker run aliyun/ilogtail:1.1.0
@@ -158,19 +158,19 @@ file mode startup**.
 1. First we start the iLogtail program: `./output/ilogtail`
 2. Use the following command to reload the configuration.
 
-```shell
-curl 127.0.0.1:18689/loadconfig -X POST -d '[{"project":"e2e-test-project","logstore":"e2e-test-logstore","config_name":"test-case_0","logstore_key":1,"json_str":"{\"inputs\":[{\"type\":\"metric_mock\",\"detail\":{\"Index\":0,\"
-Fields\":{\"Content\":\"quickstart_input_1\"}}},{\"type\":\"metric_mock\",\"detail\":{\"Index\":100000000,\"Fields\":{\"Content\":\"quickstart_input_2\"}}}],\"processors\":[{\"type\":\"processor_default\"}],\"flushers\":[{\"type\":\"flusher_stdout\",\"detail\":{\"FileName\":\"quickstart_1.stdout\"}},{\"type\":\"flusher_stdout\",\"detail\":{\"FileName\":\"quickstart_2.stdout\"}}]}\n"}]'
-```
+    ```shell
+    curl 127.0.0.1:18689/loadconfig -X POST -d '[{"project":"e2e-test-project","logstore":"e2e-test-logstore","config_name":"test-case_0","logstore_key":1,"json_str":"{\"inputs\":[{\"type\":\"metric_mock\",\"detail\":{\"Index\":0,\"
+    Fields\":{\"Content\":\"quickstart_input_1\"}}},{\"type\":\"metric_mock\",\"detail\":{\"Index\":100000000,\"Fields\":{\"Content\":\"quickstart_input_2\"}}}],\"processors\":[{\"type\":\"processor_default\"}],\"flushers\":[{\"type\":\"flusher_stdout\",\"detail\":{\"FileName\":\"quickstart_1.stdout\"}},{\"type\":\"flusher_stdout\",\"detail\":{\"FileName\":\"quickstart_2.stdout\"}}]}\n"}]'
+    ```
 
 3. Check the log to observe the configuration change.
 
-```log
-2021-11-15 14:38:42 [INF] [logstore_config.go:113] [Start] [logtail_alarm,logtail_alarm]        config start:begin      
-2021-11-15 14:38:42 [INF] [logstore_config.go:151] [Start] [logtail_alarm,logtail_alarm]        config start:success    
-2021-11-15 14:38:42 [INF] [logstore_config.go:113] [Start] [test-case_0,e2e-test-logstore]      config start:begin      
-2021-11-15 14:38:42 [INF] [logstore_config.go:151] [Start] [test-case_0,e2e-test-logstore]      config start:success
-```
+    ```log
+    2021-11-15 14:38:42 [INF] [logstore_config.go:113] [Start] [logtail_alarm,logtail_alarm]        config start:begin      
+    2021-11-15 14:38:42 [INF] [logstore_config.go:151] [Start] [logtail_alarm,logtail_alarm]        config start:success    
+    2021-11-15 14:38:42 [INF] [logstore_config.go:113] [Start] [test-case_0,e2e-test-logstore]      config start:begin      
+    2021-11-15 14:38:42 [INF] [logstore_config.go:151] [Start] [test-case_0,e2e-test-logstore]      config start:success
+    ```
 
 4. By looking at the directory, you will find that the behavior is consistent with the above static configuration mode.
    Two files, quickstart_1.stdout and quickstart_2.stdout, are generated, and their contents are consistent.

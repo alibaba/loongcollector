@@ -12,14 +12,14 @@ Extension 插件的作用是提供一个通用的注册特定能力的方式(通
 
 ```go
 type Extension interface {
-	// Description returns a one-sentence description on the Extension
-	Description() string
+ // Description returns a one-sentence description on the Extension
+ Description() string
 
-	// Init called for init some system resources, like socket, mutex...
-	Init(Context) error
+ // Init called for init some system resources, like socket, mutex...
+ Init(Context) error
 
-	// Stop stops the services and release resources
-	Stop() error
+ // Stop stops the services and release resources
+ Stop() error
 }
 ```
 

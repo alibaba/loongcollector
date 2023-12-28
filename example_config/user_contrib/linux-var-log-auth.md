@@ -1,6 +1,7 @@
 # Linux /var/log/auth.log日志
 
 ## 提供者
+
 [`shouao.chen`](https://github.com/shouao)
 
 ## 描述
@@ -25,12 +26,12 @@
 
 找到`$ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat`，将其注释掉，然后加上下面两行
 
-```
+```plain
 $template CustomFormat,"%timegenerated:::date-year%-%timegenerated:::date-month%-%timegenerated:::date-day% %timegenerated:::date-hour%:%timegenerated:::date-minute%:%timegenerated:::date-second% %HOSTNAME% %syslogtag%%msg%\n"
 $ActionFileDefaultTemplate CustomFormat
 ```
 
-之后` sudo systemctl restart rsyslog`重启服务使配置生效后`auth.log`格式更新。
+之后`sudo systemctl restart rsyslog`重启服务使配置生效后`auth.log`格式更新。
 
 ## 日志输入样例
 
@@ -51,12 +52,13 @@ $ActionFileDefaultTemplate CustomFormat
 ```
 
 ## 采集配置
+
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /var/log/
-    FilePattern: auth.log
+  - Type: input_file
+    FilePaths: 
+      - /var/log/auth.log
 processors:
   - Type: processor_regex
     SourceKey: content

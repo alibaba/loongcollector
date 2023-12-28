@@ -1,7 +1,11 @@
 # service_docker_stdout
+
 ## Description
+
 the container stdout input plugin for iLogtail, which supports docker and containerd.
+
 ## Config
+
 |  field   |   type   |   description   | default value   |
 | ---- | ---- | ---- | ---- |
 |IncludeLabel|map[string]string|include container label for selector. [Deprecated： use IncludeContainerLabel and IncludeK8sLabel instead]|null|

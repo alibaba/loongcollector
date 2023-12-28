@@ -1,6 +1,7 @@
 # Linux mysql error.log日志
 
 ## 提供者
+
 [`alph00`](https://github.com/alph00)
 
 ## 描述
@@ -13,6 +14,7 @@
 从输出结果来看，达到了预期的目的，并且在5条输入日志中只有一条priority为Warning的日志被筛选出来了，其他日志都被过滤掉了。
 
 ## 日志输入样例
+
 ``` plain
 2023-07-08T17:51:01.833256Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.0.33-0ubuntu0.22.04.2) starting as process 1077
 2023-07-08T17:51:01.873571Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
@@ -22,26 +24,28 @@
 ```
 
 ## 日志输出样例
+
 ``` json
 {
-	"__tag__:__path__": "/var/log/mysql/error.log",
-	"logged": "2023-07-08T17:51:03.209853",
-	"thread_id": "0",
-	"priority": "Warning",
-	"error_code": "MY-010068",
-	"subsystem": "Server",
-	"info": "CA certificate ca.pem is self signed.",
-	"__time__": "1688860505"
+ "__tag__:__path__": "/var/log/mysql/error.log",
+ "logged": "2023-07-08T17:51:03.209853",
+ "thread_id": "0",
+ "priority": "Warning",
+ "error_code": "MY-010068",
+ "subsystem": "Server",
+ "info": "CA certificate ca.pem is self signed.",
+ "__time__": "1688860505"
 }
 ```
 
 ## 采集配置
+
 ``` YAML
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /var/log/mysql/
-    FilePattern: error.log 
+  - Type: input_file
+    FilePaths: 
+      - /var/log/mysql/error.log
 processors:
   - Type: processor_regex
     SourceKey: content

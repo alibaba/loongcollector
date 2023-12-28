@@ -56,10 +56,9 @@ Quit the server with CONTROL-C.
 ```yaml
 enable: true 
 inputs:
-  - Type: file_log
-    LogPath: ./logs
-    FilePattern: django.log.*
-    MaxDepth: 0
+  - Type: input_file
+    FilePaths: 
+      - /logs/django.log.*
 processors:
   - Type: processor_filter_regex
     Include:

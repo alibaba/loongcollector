@@ -17,13 +17,13 @@
 # After Process: {"uid":"123","time":"2022-08-08","method":"buy","value":"10000"}
 #
 # You may change SplitSep and SplitKeys for your need.
-# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/data-pipeline/processor/delimiter
+# For a full list of parameters, visit https://ilogtail.gitbook.io/ilogtail-docs/plugins/processor/delimiter
 
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /home/test-log/
-    FilePattern: delimiter.log
+  - Type: input_file
+    FilePaths: 
+      - /home/test-log/*.log
 processors:
   - Type: processor_split_char
     SourceKey: content

@@ -33,8 +33,6 @@
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.8.3
 ```
 
-# 发布历史
-
 ## 1.8.1
 
 ### 发布记录
@@ -362,7 +360,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 **Docker Pull 命令**&#x20;
 
-```
+```bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.4.0
 ```
 
@@ -394,7 +392,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 **Docker Pull 命令**&#x20;
 
-```
+```bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.3.1
 ```
 
@@ -441,7 +439,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 **Docker Pull 命令**&#x20;
 
-```
+```bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.3.0
 ```
 
@@ -465,6 +463,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 * 缩短已退出容器句柄释放时间。
 
 问题修复
+
 * 飞天日志格式微妙时间戳解析。
 
 [详情和源代码](https://github.com/alibaba/ilogtail/blob/main/changes/v1.2.1.md)
@@ -480,7 +479,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 **Docker Pull 命令**&#x20;
 
-```
+```bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.2.1
 ```
 
@@ -507,7 +506,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 **Docker Pull 命令**&#x20;
 
-```
+```bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.1
 ```
 
@@ -538,6 +537,6 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 tag为1.1.0的镜像缺少必要环境变量，无法支持容器内文件采集和checkpoint，请使用1.1.0-k8s-patch或重新拉取latest
 {% endhint %}
 
-```
+```bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:1.1.0-k8s-patch
 ```

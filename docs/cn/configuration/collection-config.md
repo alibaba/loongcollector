@@ -1,38 +1,51 @@
 # 采集配置
 
-在`iLogtail`工作目录里，可以将采集配置存入`user_yaml_config.d`目录下进行数据采集。每个采集配置文件以数据流水线（`data-pipeline`）的形式组织，每个采集配置文件对应一个数据流水线，配置文件为`yaml`格式，文件名以`.yaml`结尾。
+`iLogtail`流水线是通过采集配置文件来定义的，每一个采集配置文件对应一条流水线。
 
-一个典型的采集流水线以下部分组成：
+## 格式
 
-* 输入（`Input`）：从数据源采集数据，数据源可以是文本、HTTP数据、Syslog等。
-* 处理（`Processor`）：对采集的数据进行解析、过滤、加工等。
-* 聚合（`Aggregator`）：`Pipeline`会自带默认聚合插件，一般不需要关注。
-* 输出（`Flusher`）：将符合条件的数据发送到指定的存储系统。
+采集配置文件支持json和yaml文件格式，每个采集配置的一级字段如下：
+
+|  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
+| --- | --- | --- | --- | --- |
+|  enable  |  bool  |  否  |  true  |  是否使用当前配置。  |
+|  global  |  object  |  否  |  空  |  全局配置。  |
+|  inputs  |  \[object\]  |  是  |  /  |  输入插件列表。目前只允许使用1个输入插件。  |
+|  processors  |  \[object\]  |  否  |  空  |  处理插件列表。  |
+|  aggregators  |  \[object\]  |  否  |  空  |  聚合插件列表。目前最多只能包含1个聚合插件，所有输出插件共享。  |
+|  flushers  |  \[object\]  |  是  |  /  |  输出插件列表。至少需要包含1个输出插件。  |
+|  extenstions  |  \[object\]  |  否  |  空  |  扩展插件列表。  |
+
+其中，inputs、processors、aggregators、flushers和extenstions中可包含任意数量的[插件](../plugins/overview.md)。
+
+## 组织形式
+
+本地的采集配置文件默认均存放在`./config/local`目录下，每个采集配置一个文件，文件名即为采集配置的名称。
+
+## 热加载
+
+采集配置文件支持热加载，当您在`./config/local`目录下新增或修改已有配置文件，iLogtail将自动感知并重新加载配置。生效等待时间最长默认为10秒，可通过启动参数`config_scan_interval`进行调整。
+
+## 示例
+
+一个典型的采集配置如下所示：
 
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /home/test-log
-    FilePattern: reg.log
+  - Type: input_file
+    FilePaths: 
+      - /home/test-log/reg.log
 processors:
-  - Type: processor_regex
+  - Type: processor_parse_regex_native
     SourceKey: content
     Regex: (\d*-\d*-\d*)\s(.*)
     Keys:
       - time
       - msg
 flushers:
-  - Type: flusher_sls
-    Endpoint: cn-xxx.log.aliyuncs.com
-    ProjectName: test_project
-    LogstoreName: test_logstore
   - Type: flusher_stdout
     OnlyStdout: true
 ```
 
-为了降低开发者使用`iLogtail`的门槛，将一些常见的采集配置归档整理到[`example_config`](../../../example_config/)目录.
-
-目前，`iLogtail`支持本地配置文件热加载，即在修改`user_yaml_config.d`中已有的配置或增加新的配置文件后，无需重启iLogtail即可生效。生效最长等待时间默认约为10秒，可通过`config_update_interval`参数进行调整。
-
-**注意：`config_update_interval`参数仅对社区版有效。**
+其它常见的采集配置可参考[`example_config`](../../../example_config/)目录.

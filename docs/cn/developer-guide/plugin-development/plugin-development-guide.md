@@ -33,5 +33,5 @@ ilogtail 插件的开发主要有以下步骤：
 文档的编写主要有如下步骤：
 
 1. 遵循[插件文档规范](./plugin-doc-templete.md)，编写插件文档。
-2. 在[数据流水线概览](https://github.com/Takuka0311/ilogtail/blob/doc/docs/cn/data-pipeline/overview.md)中添加插件的信息。所有的插件按英文名字典序升序排列，添加的时候请注意插入的位置。
+2. 在[数据流水线概览](https://github.com/Takuka0311/ilogtail/blob/doc/docs/cn/plugins/overview.md)中添加插件的信息。所有的插件按英文名字典序升序排列，添加的时候请注意插入的位置。
 3. 在[文档目录](https://github.com/Takuka0311/ilogtail/blob/doc/docs/cn/SUMMARY.md)中添加插件文档的路径，注意与数据流水线概览中保持顺序一致。

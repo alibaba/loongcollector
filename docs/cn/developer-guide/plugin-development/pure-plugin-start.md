@@ -51,7 +51,7 @@ iLogtail 目前提供以下4种模式进行配置设置：
 
 从它们的类型是 array 可知，在一个配置中，每类插件都可以同时指定多项，但需要注意同时指定的多个同类插件之间的关系，除了 processors 之间是串型关系以外，其他都是并行的关系，如下图所示：&#x20;
 
-![](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/logtail-libPluginBase.png?versionId=CAEQMxiBgIDM6YCk6BciIDBjYmVkZjQ2Yjg5NzQwY2NhZjI4MmFmZDA2M2MwZTU2)
+![图片](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/logtail-libPluginBase.png?versionId=CAEQMxiBgIDM6YCk6BciIDBjYmVkZjQ2Yjg5NzQwY2NhZjI4MmFmZDA2M2MwZTU2)
 
 对于 array 中的每一个 object，它们指定了一个个具体插件，type 字段指定插件的名字，detail 字段对应的 object 指定了对于该插件的配置。
 
@@ -167,13 +167,14 @@ stdin.log内容如下：
 接下来我们将使用HTTP 模式重新进行动态加载**指定配置文件模式启动**篇幅中的静态配置案例。
 
 1. 首先我们启动 iLogtail 程序： `./output/ilogtail`
-2.  使用以下命令进行配置重新加载。
+2. 使用以下命令进行配置重新加载。
 
     ```shell
     curl 127.0.0.1:18689/loadconfig -X POST -d '[{"project":"e2e-test-project","logstore":"e2e-test-logstore","config_name":"test-case_0","logstore_key":1,"json_str":"{\"inputs\":[{\"type\":\"metric_mock\",\"detail\":{\"Index\":0,\"
     Fields\":{\"Content\":\"quickstart_input_1\"}}},{\"type\":\"metric_mock\",\"detail\":{\"Index\":100000000,\"Fields\":{\"Content\":\"quickstart_input_2\"}}}],\"processors\":[{\"type\":\"processor_default\"}],\"flushers\":[{\"type\":\"flusher_stdout\",\"detail\":{\"FileName\":\"quickstart_1.stdout\"}},{\"type\":\"flusher_stdout\",\"detail\":{\"FileName\":\"quickstart_2.stdout\"}}]}\n"}]'
     ```
-3.  查看日志观察到配置变更。
+
+3. 查看日志观察到配置变更。
 
     ```log
     2021-11-15 14:38:42 [INF] [logstore_config.go:113] [Start] [logtail_alarm,logtail_alarm]        config start:begin      
@@ -181,6 +182,7 @@ stdin.log内容如下：
     2021-11-15 14:38:42 [INF] [logstore_config.go:113] [Start] [test-case_0,e2e-test-logstore]      config start:begin      
     2021-11-15 14:38:42 [INF] [logstore_config.go:151] [Start] [test-case_0,e2e-test-logstore]      config start:success
     ```
+
 4. 通过查看目录，会发现行为与上述静态配置方式一致，生成了 quickstart\_1.stdout 和 quickstart\_2.stdout 两个文件，并且它们的内容一致。
 
 ### C API 配置变更

@@ -59,7 +59,7 @@ bool ProcessorParseApsaraNative::Init(const Json::Value& config) {
                              mContext->GetProjectName(),
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
-    } else if (!ParseLogTimeZoneOffsetSecond(mTimezone, true, mLogTimeZoneOffsetSecond)) {
+    } else if (!ParseLogTimeZoneOffsetSecond(mTimezone, mLogTimeZoneOffsetSecond)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              "string param Timezone is not valid",

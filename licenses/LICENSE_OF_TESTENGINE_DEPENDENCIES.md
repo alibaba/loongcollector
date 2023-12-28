@@ -153,5 +153,3 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 ## LGPL v3 licenses
 
 ## EPL V2 licenses
-
-

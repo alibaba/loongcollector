@@ -28,7 +28,9 @@
 ![](<../.gitbook/assets/getting-started/collect-to-kafka/ilogtail-arch.png>)
 
 ## 操作实战
+
 本文将会详细介绍如何使用`iLogtail`社区版将日志采集到`Kafka`中，从而帮助使用者构建日志采集系统。
+
 ### 场景 <a href="#qarop" id="qarop"></a>
 
 采集`/root/bin/input_data/access.log`、`/root/bin/input_data/error.log`，并将采集到的日志写入本地部署的kafka中。为此，我们将配置两个采集配置项。
@@ -80,21 +82,21 @@ drwxrwxr-x 5 505 505      4096 7月  10 18:00 example_config
 -rw-r--r-- 1 505 505 115963144 7月  11 00:00 libPluginBase.so
 -rw-rw-r-- 1 505 505     11356 7月  11 00:00 LICENSE
 -rw-rw-r-- 1 505 505      4834 7月  11 00:00 README.md
-drwxr-xr-x 2 root root    4096 7月  12 09:55 user_yaml_config.d
+drwxr-xr-x 2 root root    4096 7月  12 09:55 config
 ```
 
 * 采集配置
 
-在`user_yaml_config.d`创建针对`access_log`、`error_log`分别创建两个采集配置，两个采集配置分别将日志采集到`Kafka`不同的`Topic`中。
+在`config/local`创建针对`access_log`、`error_log`分别创建两个采集配置，两个采集配置分别将日志采集到`Kafka`不同的`Topic`中。
 
 ```yaml
 # 访问日志采集配置
-$ cat user_yaml_config.d/access_log.yaml
+$ cat config/lcoal/access_log.yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /root/bin/input_data/
-    FilePattern: access.log
+  - Type: input_file
+    FilePaths: 
+      - /root/bin/input_data/access.log
 processors:
   - Type: processor_regex
     SourceKey: content
@@ -119,12 +121,12 @@ flushers:
 
 ```yaml
 # 错误日志采集配置
-$ cat user_yaml_config.d/error_log.yaml
+$ cat config/local/error_log.yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /root/bin/input_data/
-    FilePattern: error.log
+  - Type: input_file
+    FilePaths: 
+      - /root/bin/input_data/error.log
 flushers:
   - Type: flusher_kafka
     Brokers:
@@ -133,8 +135,8 @@ flushers:
 ```
 
 ```bash
-$ tree user_yaml_config.d/
-user_yaml_config.d/
+$ tree config/local/
+config/local/
 ├── access_log.yaml
 └── error_log.yaml
 ```
@@ -142,7 +144,7 @@ user_yaml_config.d/
 * 启动
 
 ```bash
-$ nohup ./ilogtail > stdout.log 2> stderr.log &
+nohup ./ilogtail > stdout.log 2> stderr.log &
 ```
 
 ### 验证 <a href="#ovijv" id="ovijv"></a>
@@ -178,9 +180,8 @@ $ echo -e '2022-07-12 10:00:00 ERROR This is a error!\n2022-07-12 10:00:00 ERROR
 
 以上，我们介绍了使用iLogtail社区版将日志采集到Kafka的方法，大家可以与其他开源软件Kafka、ELK配合，构建出属于自己的开源日志采集系统；同样的，如果对采集的稳定性、查询的体验有更高的要求，也可以基于SLS构建商业版的可观测平台。
 
-
-
 ## 关于iLogtail
+
 iLogtail作为阿里云SLS提供的可观测数据采集器，可以运行在服务器、容器、K8s、嵌入式等多种环境，支持采集数百种可观测数据（日志、监控、Trace、事件等），已经有千万级的安装量。目前，iLogtail已正式开源，欢迎使用及参与共建。
 
 * GitHub：[https://github.com/alibaba/ilogtail](https://github.com/alibaba/ilogtail)

@@ -54,9 +54,9 @@ May 9 18:06:22 Swift-SAG sag_control[111111]: Component: Sag:System|Event Number
 ``` YAML
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /var/log
-    FilePattern: message
+  - Type: input_file
+    FilePaths: 
+      - /var/log/message
 processors:
   - Type: processor_filter_regex
     Include:

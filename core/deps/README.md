@@ -12,6 +12,6 @@
 - [liblz4](https://github.com/lz4/lz4): v1.8.3
 - [zlib](https://zlib.net/): v1.2.11
 - libuuid
-    - get_dmi_uuid
+  - get_dmi_uuid
 - libpthread
 - libdl

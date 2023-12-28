@@ -92,6 +92,6 @@ uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
                              const PreciseTimestampConfig& preciseTimestampConfig);
 bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond);
 
-bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, bool isAdjustmentNeeded, int& logTimeZoneOffsetSecond);
+bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, int& logTimeZoneOffsetSecond);
 
 } // namespace logtail

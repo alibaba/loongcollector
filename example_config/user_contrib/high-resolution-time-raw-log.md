@@ -43,9 +43,9 @@ The following configuration parses high resolution time from the input logs and 
 ``` YAML
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /apps/srv
-    FilePattern: app.log
+  - Type: input_file
+    FilePaths: 
+      - /apps/app.log
 processors:
   - Type: processor_regex_accelerate
     SourceKey: content

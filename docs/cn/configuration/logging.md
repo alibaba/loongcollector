@@ -22,57 +22,57 @@
 
 完整配置项：
 
-```
+```json
 {
-	"Loggers" :
-	{
-		"/" :
-		{
-			"AsyncFileSink" : "WARNING"
-		},
-		"/apsara/sls/ilogtail" :
-		{
-			"AsyncFileSink" : "INFO"
-		},
-		"/apsara/sls/ilogtail/profile" :
-		{
-			"AsyncFileSinkProfile" : "INFO"
-		},
-		"/apsara/sls/ilogtail/status" :
-		{
-			"AsyncFileSinkStatus" : "INFO"
-		}
-	},
-	"Sinks" :
-	{
-		"AsyncFileSink" :
-		{
-			"Compress" : "Gzip",
-			"LogFilePath" : "${ilogtail运行路径}/ilogtail.LOG",
-			"MaxDaysFromModify" : 300,
-			"MaxLogFileNum" : 10,
-			"MaxLogFileSize" : 20000000,
-			"Type" : "AsyncFile"
-		},
-		"AsyncFileSinkProfile" :
-		{
-			"Compress" : "",
-			"LogFilePath" : "${ilogtail运行路径}/snapshot/ilogtail_profile.LOG",
-			"MaxDaysFromModify" : 1,
-			"MaxLogFileNum" : 61,
-			"MaxLogFileSize" : 1,
-			"Type" : "AsyncFile"
-		},
-		"AsyncFileSinkStatus" :
-		{
-			"Compress" : "",
-			"LogFilePath" : "${ilogtail运行路径}/snapshot/ilogtail_status.LOG",
-			"MaxDaysFromModify" : 1,
-			"MaxLogFileNum" : 61,
-			"MaxLogFileSize" : 1,
-			"Type" : "AsyncFile"
-		}
-	}
+ "Loggers" :
+ {
+  "/" :
+  {
+   "AsyncFileSink" : "WARNING"
+  },
+  "/apsara/sls/ilogtail" :
+  {
+   "AsyncFileSink" : "INFO"
+  },
+  "/apsara/sls/ilogtail/profile" :
+  {
+   "AsyncFileSinkProfile" : "INFO"
+  },
+  "/apsara/sls/ilogtail/status" :
+  {
+   "AsyncFileSinkStatus" : "INFO"
+  }
+ },
+ "Sinks" :
+ {
+  "AsyncFileSink" :
+  {
+   "Compress" : "Gzip",
+   "LogFilePath" : "${ilogtail运行路径}/ilogtail.LOG",
+   "MaxDaysFromModify" : 300,
+   "MaxLogFileNum" : 10,
+   "MaxLogFileSize" : 20000000,
+   "Type" : "AsyncFile"
+  },
+  "AsyncFileSinkProfile" :
+  {
+   "Compress" : "",
+   "LogFilePath" : "${ilogtail运行路径}/snapshot/ilogtail_profile.LOG",
+   "MaxDaysFromModify" : 1,
+   "MaxLogFileNum" : 61,
+   "MaxLogFileSize" : 1,
+   "Type" : "AsyncFile"
+  },
+  "AsyncFileSinkStatus" :
+  {
+   "Compress" : "",
+   "LogFilePath" : "${ilogtail运行路径}/snapshot/ilogtail_status.LOG",
+   "MaxDaysFromModify" : 1,
+   "MaxLogFileNum" : 61,
+   "MaxLogFileSize" : 1,
+   "Type" : "AsyncFile"
+  }
+ }
 }
 ```
 
@@ -88,15 +88,15 @@
 
 完整配置文件：
 
-```
+```xml
 <seelog type="asynctimer" asyncinterval="500000" minlevel="info" >
  <outputs formatid="common">
-	 <rollingfile type="size" filename="${ilogtail运行路径}/logtail_plugin.LOG" maxsize="2097152" maxrolls="10"/>
+  <rollingfile type="size" filename="${ilogtail运行路径}/logtail_plugin.LOG" maxsize="2097152" maxrolls="10"/>
 
 
  </outputs>
  <formats>
-	 <format id="common" format="%Date %Time [%LEV] [%File:%Line] [%FuncShort] %Msg%n" />
+  <format id="common" format="%Date %Time [%LEV] [%File:%Line] [%FuncShort] %Msg%n" />
  </formats>
 </seelog>
 ```

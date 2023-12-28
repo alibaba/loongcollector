@@ -60,9 +60,9 @@ src > dst: Flags [tcpflags], seq data-seqno, ack ackno, win window, urg urgent, 
 ```yaml
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /logs # log directory
-    FilePattern: dump.log # log file
+  - Type: input_file
+    FilePaths: 
+      - /logs/dump.log
 processors:
   - Type: processor_filter_regex
     Include:

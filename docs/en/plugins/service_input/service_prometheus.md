@@ -1,7 +1,11 @@
 # service_prometheus
+
 ## Description
+
 prometheus scrape plugin for logtail, use vmagent lib
+
 ## Config
+
 |  field   |   type   |   description   | default value   |
 | ---- | ---- | ---- | ---- |
 |Yaml|string|the prometheus configuration content, more details please see [here](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)|""|

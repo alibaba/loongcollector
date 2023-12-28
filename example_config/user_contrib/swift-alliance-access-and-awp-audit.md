@@ -94,9 +94,9 @@ May  18 11:32:23 Swift-SAA swpservice[1111]: CEF:0|SWIFT|Alliance Web Platform|7
 ``` YAML
 enable: true
 inputs:
-  - Type: file_log
-    LogPath: /var/log
-    FilePattern: message
+  - Type: input_file
+    FilePaths: 
+      - /var/log/message
 processors:
   - Type: processor_filter_regex
     Include:
