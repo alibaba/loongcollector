@@ -216,8 +216,8 @@ bool DelimiterModeFsmParser::ParseDelimiterLine(StringView buffer,
     // because we consider that all element in this buffer is valid,
     // despite some '\0' elements which are brought from file system due to system crash
     const char* ch = buffer.data();
-    int fieldStart = 0;
-    int fieldEnd = 0;
+    int fieldStart = begin;
+    int fieldEnd = begin;
     for (int i = begin; i < end; ++i) {
         if (ch[i] == separator) {
             result = HandleSeparator(ch, fieldStart, fieldEnd, fsm, columnValues);

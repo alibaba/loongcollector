@@ -1105,97 +1105,236 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessWholeLine() {
 }
 
 void ProcessorParseDelimiterNativeUnittest::TestProcessQuote() {
-    // make config
-    Json::Value config;
-    config["SourceKey"] = "content";
-    config["Separator"] = ",";
-    config["Quote"] = "'";
-    config["Keys"] = Json::arrayValue;
-    config["Keys"].append("time");
-    config["Keys"].append("method");
-    config["Keys"].append("url");
-    config["Keys"].append("request_time");
-    config["KeepingSourceWhenParseFail"] = true;
-    config["KeepingSourceWhenParseSucceed"] = false;
-    config["RenamedSourceKey"] = "rawLog";
-    config["AllowingShortenedFields"] = false;
-    // make events
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup eventGroup(sourceBuffer);
-    std::string inJson = R"({
+    {
+        std::string inJson = R"({
         "events" :
         [
             {
                 "contents" :
                 {
-                    "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog',0.024"
-                },
-                "timestamp" : 12345678901,
-                "type" : 1
-            },
-            {
-                "contents" :
-                {
-                    "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog,0.024"
-                },
-                "timestamp" : 12345678901,
-                "type" : 1
-            },
-            {
-                "contents" :
-                {
-                    "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOs'AccountOpLog',0.024"
+                    "content" : " 2023-12-25 1|zdfvzdfv zfdv|zfdvzdfv zfd|fzdvzdfvzdfvz|zfvzfdzv zfdb|zfdvzdfbvzb|zdfvzdfbvzdb|'advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb '|zdfbvzbszfbsfb
+2023-12-25 1|zdfvzdfv zfdv|zfdvzdfv zfd|fzdvzdfvzdfvz|zfvzfdzv zfdb|zfdvzdfbvzb|zdfvzdfbvzdb|'advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb '|zdfbvzbszfbsfb
+    2023-12-25 1|zdfvzdfv zfdv|zfdvzdfv zfd|fzdvzdfvzdfvz|zfvzfdzv zfdb|zfdvzdfbvzb|zdfvzdfbvzdb|'advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb '|zdfbvzbszfbsfb
+        2023-12-25 1|zdfvzdfv zfdv|zfdvzdfv zfd|fzdvzdfvzdfvz|zfvzfdzv zfdb|zfdvzdfbvzb|zdfvzdfbvzdb|'advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb '|zdfbvzbszfbsfb",
                 },
                 "timestamp" : 12345678901,
                 "type" : 1
             }
         ]
-    })";
-    eventGroup.FromJsonString(inJson);
-    // run function
-    ProcessorParseDelimiterNative& processor = *(new ProcessorParseDelimiterNative);
-    std::string pluginId = "testID";
-    ProcessorInstance processorInstance(&processor, pluginId);
-    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
-    processor.Process(eventGroup);
-    std::string expectJson = R"({
-        "events" :
-        [
-            {
-                "contents" :
+        })";
+
+        std::string expectJson = R"({
+            "events": [
                 {
-                    "method": "POST",
-                    "request_time": "0.024",
-                    "time": "2013-10-31 21:03:49",
-                    "url": "PutData?Category=YunOsAccountOpLog"
+                    "contents": {
+                        "1": "2023-12-25 1",
+                        "2": "zdfvzdfv zfdv",
+                        "3": "zfdvzdfv zfd",
+                        "4": "fzdvzdfvzdfvz",
+                        "5": "zfvzfdzv zfdb",
+                        "6": "zfdvzdfbvzb",
+                        "7": "zdfvzdfbvzdb",
+                        "8": "advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb ",
+                        "9": "zdfbvzbszfbsfb"
+                    },
+                    "timestamp": 12345678901,
+                    "timestampNanosecond": 0,
+                    "type": 1
                 },
-                "timestamp" : 12345678901,
-                "timestampNanosecond": 0,
-                "type" : 1
-            },
-            {
-                "contents" :
                 {
-                    "rawLog": "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog,0.024"
+                    "contents": {
+                        "1": "2023-12-25 1",
+                        "2": "zdfvzdfv zfdv",
+                        "3": "zfdvzdfv zfd",
+                        "4": "fzdvzdfvzdfvz",
+                        "5": "zfvzfdzv zfdb",
+                        "6": "zfdvzdfbvzb",
+                        "7": "zdfvzdfbvzdb",
+                        "8": "advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb ",
+                        "9": "zdfbvzbszfbsfb"
+                    },
+                    "timestamp": 12345678901,
+                    "timestampNanosecond": 0,
+                    "type": 1
                 },
-                "timestamp" : 12345678901,
-                "timestampNanosecond": 0,
-                "type" : 1
-            },
-            {
-                "contents" :
                 {
-                    "rawLog": "2013-10-31 21:03:49,POST,'PutData?Category=YunOs'AccountOpLog',0.024"
+                    "contents": {
+                        "1": "2023-12-25 1",
+                        "2": "zdfvzdfv zfdv",
+                        "3": "zfdvzdfv zfd",
+                        "4": "fzdvzdfvzdfvz",
+                        "5": "zfvzfdzv zfdb",
+                        "6": "zfdvzdfbvzb",
+                        "7": "zdfvzdfbvzdb",
+                        "8": "advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb ",
+                        "9": "zdfbvzbszfbsfb"
+                    },
+                    "timestamp": 12345678901,
+                    "timestampNanosecond": 0,
+                    "type": 1
                 },
-                "timestamp" : 12345678901,
-                "timestampNanosecond": 0,
-                "type" : 1
-            }
-        ]
-    })";
-    // judge result
-    std::string outJson = eventGroup.ToJsonString();
-    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+                {
+                    "contents": {
+                        "1": "2023-12-25 1",
+                        "2": "zdfvzdfv zfdv",
+                        "3": "zfdvzdfv zfd",
+                        "4": "fzdvzdfvzdfvz",
+                        "5": "zfvzfdzv zfdb",
+                        "6": "zfdvzdfbvzb",
+                        "7": "zdfvzdfbvzdb",
+                        "8": "advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb ",
+                        "9": "zdfbvzbszfbsfb"
+                    },
+                    "timestamp": 12345678901,
+                    "timestampNanosecond": 0,
+                    "type": 1
+                }
+            ]
+        })";
+        // ProcessorSplitRegexNative
+        {
+            // make events
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
+            PipelineEventGroup eventGroup(sourceBuffer);
+            eventGroup.FromJsonString(inJson);
+
+            // make config
+            Json::Value config;
+            config["SourceKey"] = "content";
+            config["Separator"] = "|";
+            config["Quote"] = "'";
+            config["Keys"] = Json::arrayValue;
+            config["Keys"].append("1");
+            config["Keys"].append("2");
+            config["Keys"].append("3");
+            config["Keys"].append("4");
+            config["Keys"].append("5");
+            config["Keys"].append("6");
+            config["Keys"].append("7");
+            config["Keys"].append("8");
+            config["Keys"].append("9");
+            config["Keys"].append("10");
+            config["Keys"].append("11");
+            config["KeepingSourceWhenParseFail"] = false;
+            config["KeepingSourceWhenParseSucceed"] = false;
+            config["CopingRawLog"] = false;
+            config["RenamedSourceKey"] = "__raw__";
+            config["AllowingShortenedFields"] = true;
+            config["StartPattern"] = ".*";
+            config["UnmatchedContentTreatment"] = "split";
+            config["AppendingLogPositionMeta"] = false;
+
+            std::string pluginId = "testID";
+            // run function ProcessorSplitRegexNative
+            ProcessorSplitRegexNative processor;
+            processor.SetContext(mContext);
+            APSARA_TEST_TRUE_FATAL(processor.Init(config));
+            processor.Process(eventGroup);
+
+            // run function ProcessorParseDelimiterNative
+            ProcessorParseDelimiterNative& processorParseDelimiterNative = *(new ProcessorParseDelimiterNative);
+            ProcessorInstance processorInstance(&processorParseDelimiterNative, pluginId);
+            APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+            processorParseDelimiterNative.Process(eventGroup);
+
+            // judge result
+            std::string outJson = eventGroup.ToJsonString();
+            APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+        }
+    }
+    {
+        // make config
+        Json::Value config;
+        config["SourceKey"] = "content";
+        config["Separator"] = ",";
+        config["Quote"] = "'";
+        config["Keys"] = Json::arrayValue;
+        config["Keys"].append("time");
+        config["Keys"].append("method");
+        config["Keys"].append("url");
+        config["Keys"].append("request_time");
+        config["KeepingSourceWhenParseFail"] = true;
+        config["KeepingSourceWhenParseSucceed"] = false;
+        config["RenamedSourceKey"] = "rawLog";
+        config["AllowingShortenedFields"] = false;
+        // make events
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::string inJson = R"({
+            "events" :
+            [
+                {
+                    "contents" :
+                    {
+                        "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog',0.024"
+                    },
+                    "timestamp" : 12345678901,
+                    "type" : 1
+                },
+                {
+                    "contents" :
+                    {
+                        "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog,0.024"
+                    },
+                    "timestamp" : 12345678901,
+                    "type" : 1
+                },
+                {
+                    "contents" :
+                    {
+                        "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOs'AccountOpLog',0.024"
+                    },
+                    "timestamp" : 12345678901,
+                    "type" : 1
+                }
+            ]
+        })";
+        eventGroup.FromJsonString(inJson);
+        // run function
+        ProcessorParseDelimiterNative& processor = *(new ProcessorParseDelimiterNative);
+        std::string pluginId = "testID";
+        ProcessorInstance processorInstance(&processor, pluginId);
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+        processor.Process(eventGroup);
+        std::string expectJson = R"({
+            "events" :
+            [
+                {
+                    "contents" :
+                    {
+                        "method": "POST",
+                        "request_time": "0.024",
+                        "time": "2013-10-31 21:03:49",
+                        "url": "PutData?Category=YunOsAccountOpLog"
+                    },
+                    "timestamp" : 12345678901,
+                    "timestampNanosecond": 0,
+                    "type" : 1
+                },
+                {
+                    "contents" :
+                    {
+                        "rawLog": "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog,0.024"
+                    },
+                    "timestamp" : 12345678901,
+                    "timestampNanosecond": 0,
+                    "type" : 1
+                },
+                {
+                    "contents" :
+                    {
+                        "rawLog": "2013-10-31 21:03:49,POST,'PutData?Category=YunOs'AccountOpLog',0.024"
+                    },
+                    "timestamp" : 12345678901,
+                    "timestampNanosecond": 0,
+                    "type" : 1
+                }
+            ]
+        })";
+        // judge result
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+    }
 }
 
 void ProcessorParseDelimiterNativeUnittest::TestProcessKeyOverwritten() {
