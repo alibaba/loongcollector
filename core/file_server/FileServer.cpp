@@ -37,6 +37,8 @@ void FileServer::Start() {
     ConfigManager::GetInstance()->RegisterHandlers();
     LOG_INFO(sLogger, ("watch dirs", "succeeded"));
     EventDispatcher::GetInstance()->AddExistedCheckPointFileEvents();
+    // the dump time must be reset after dir registration, since it may take long on NFS.
+    CheckPointManager::Instance()->ResetLastDumpTime();
     if (BOOL_FLAG(enable_polling_discovery)) {
         PollingModify::GetInstance()->Start();
         PollingDirFile::GetInstance()->Start();
@@ -50,7 +52,6 @@ void FileServer::Pause(bool isConfigUpdate) {
     if (isConfigUpdate) {
         EventDispatcher::GetInstance()->DumpAllHandlersMeta(true);
         CheckPointManager::Instance()->DumpCheckPointToLocal();
-        CheckPointManager::Instance()->ResetLastDumpTime();
         EventDispatcher::GetInstance()->ClearBrokenLinkSet();
         PollingDirFile::GetInstance()->ClearCache();
         ConfigManager::GetInstance()->ClearFilePipelineMatchCache();
