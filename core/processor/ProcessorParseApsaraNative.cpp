@@ -260,6 +260,7 @@ time_t ProcessorParseApsaraNative::ApsaraEasyReadLogTimeParser(StringView& buffe
             LOG_WARNING(sLogger, ("parse apsara log time", "fail")("string", buffer));
             return 0;
         }
+        // strTime is the content between '[' and ']' and ends with '\0'
         std::string strTime = buffer.substr(1, pos).to_string();
         auto strptimeResult = Strptime(strTime.c_str(), "%s", &lastLogTime, nanosecondLength);
         if (NULL == strptimeResult || strptimeResult[0] != ']') {
@@ -276,6 +277,7 @@ time_t ProcessorParseApsaraNative::ApsaraEasyReadLogTimeParser(StringView& buffe
             LOG_WARNING(sLogger, ("parse apsara log time", "fail")("string", buffer));
             return 0;
         }
+        // strTime is the content between '[' and ']' and ends with '\0'
         std::string strTime = buffer.substr(1, pos).to_string();
         if (IsPrefixString(strTime.c_str(), timeStr) == true) {
             microTime = (int64_t)lastLogTime.tv_sec * 1000000 + lastLogTime.tv_nsec / 1000;
@@ -284,11 +286,20 @@ time_t ProcessorParseApsaraNative::ApsaraEasyReadLogTimeParser(StringView& buffe
         struct tm tm;
         memset(&tm, 0, sizeof(tm));
         int nanosecondLength = 0;
-        auto strptimeResult = Strptime(strTime.c_str(), "%Y-%m-%d %H:%M:%S.%f", &lastLogTime, nanosecondLength);
-        if (NULL == strptimeResult || strptimeResult[0] != ']') {
+        // parse second part
+        auto strptimeResult = Strptime(strTime.c_str(), "%Y-%m-%d %H:%M:%S", &lastLogTime, nanosecondLength);
+        if (NULL == strptimeResult) {
             LOG_WARNING(sLogger,
-                        ("parse apsara log time", "fail")("string", buffer)("timeformat", "%Y-%m-%d %H:%M:%S.%f"));
+                        ("parse apsara log time", "fail")("string", buffer)("timeformat", "%Y-%m-%d %H:%M:%S"));
             return 0;
+        }
+        // parse nanosecond part (optional)
+        if (*strptimeResult != '\0') {
+            strptimeResult = Strptime(strptimeResult + 1, "%f", &lastLogTime, nanosecondLength);
+            if (NULL == strptimeResult) {
+                LOG_WARNING(sLogger,
+                            ("parse apsara log time", "fail")("string", buffer)("timeformat", "%Y-%m-%d %H:%M:%S.%f"));
+            }
         }
         // if the time is valid (strptime not return NULL), the date value size must be 19 ,like '2013-09-11 03:11:05'
         timeStr = StringView(buffer.data() + 1, 19);

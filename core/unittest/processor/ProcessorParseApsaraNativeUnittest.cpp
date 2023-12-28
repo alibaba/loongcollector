@@ -41,6 +41,7 @@ public:
     void TestProcessEventKeepUnmatch();
     void TestProcessEventDiscardUnmatch();
     void TestMultipleLines();
+    void TestProcessEventMicrosecondUnmatch();
 
     PipelineContext mContext;
 };
@@ -54,6 +55,7 @@ UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestAddLog);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventKeepUnmatch);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventDiscardUnmatch);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestMultipleLines);
+UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventMicrosecondUnmatch);
 
 void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
     // 第一个contents 测试多行下的解析，第二个contents测试多行下time的解析
@@ -395,16 +397,41 @@ void ProcessorParseApsaraNativeUnittest::TestProcessWholeLinePart() {
 
     // judge result
     std::string outJson = eventGroupList[0].ToJsonString();
-    APSARA_TEST_STREQ_FATAL("null", CompactJson(outJson).c_str());
+    std::string expectJson = R"({
+        "events": [
+            {
+                "contents": {
+                    "/ilogtail/AppConfigBase.cpp": "100",
+                    "AppConfigBase AppConfigBase": "success",
+                    "__LEVEL__": "INFO",
+                    "__THREAD__": "385658",
+                    "microtime": "1693833300000000"
+                },
+                "timestamp": 1693833300,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {
+                    "/ilogtail/AppConfigBase.cpp": "100",
+                    "AppConfigBase AppConfigBase": "success",
+                    "__THREAD__": "385658",
+                    "microtime": "1693833360000000"
+                },
+                "timestamp": 1693833360,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
-    int count = 3;
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcInRecordsTotal->GetValue());
-    // discard unmatch, so output is 0
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mProcOutRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcParseOutSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(1, processor.GetContext().GetProcessProfile().parseFailures);
+    APSARA_TEST_EQUAL_FATAL(uint64_t(3), processorInstance.mProcInRecordsTotal->GetValue());
+    // only timestamp failed, so output is 2
+    APSARA_TEST_EQUAL_FATAL(uint64_t(2), processorInstance.mProcOutRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mProcDiscardRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mProcParseErrorTotal->GetValue());
 }
 
 void ProcessorParseApsaraNativeUnittest::TestProcessKeyOverwritten() {
@@ -798,6 +825,123 @@ void ProcessorParseApsaraNativeUnittest::TestProcessEventDiscardUnmatch() {
     APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcParseOutSizeBytes->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcDiscardRecordsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcParseErrorTotal->GetValue());
+}
+
+void ProcessorParseApsaraNativeUnittest::TestProcessEventMicrosecondUnmatch() {
+    // make config
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+    // make events
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "[2023-09-04 13:15:04,862181]	[INFO]	[385658]	/ilogtail/AppConfigBase.cpp:100		AppConfigBase AppConfigBase:success"
+                },
+                "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "[2023-09-04 13:16:04]	[INFO]	[385658]	/ilogtail/AppConfigBase.cpp:100		AppConfigBase AppConfigBase:success"
+                },
+                "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "[2023-09-04 13:17:04,1]	[INFO]	[385658]	/ilogtail/AppConfigBase.cpp:100		AppConfigBase AppConfigBase:success"
+                },
+                "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "[2023-09-04 13:18:04"
+                },
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+    // run function
+    ProcessorParseApsaraNative& processor = *(new ProcessorParseApsaraNative);
+    std::string pluginId = "testID";
+    ProcessorInstance processorInstance(&processor, pluginId);
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // judge result
+    std::string expectJson = R"({
+        "events": [
+            {
+                "contents": {
+                    "/ilogtail/AppConfigBase.cpp": "100",
+                    "AppConfigBase AppConfigBase": "success",
+                    "__LEVEL__": "INFO",
+                    "__THREAD__": "385658",
+                    "microtime": "1693833304862181"
+                },
+                "timestamp": 1693833304,
+                "timestampNanosecond": 862181000,
+                "type": 1
+            },
+            {
+                "contents": {
+                    "/ilogtail/AppConfigBase.cpp": "100",
+                    "AppConfigBase AppConfigBase": "success",
+                    "__LEVEL__": "INFO",
+                    "__THREAD__": "385658",
+                    "microtime": "1693833364000000"
+                },
+                "timestamp": 1693833364,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {
+                    "/ilogtail/AppConfigBase.cpp": "100",
+                    "AppConfigBase AppConfigBase": "success",
+                    "__LEVEL__": "INFO",
+                    "__THREAD__": "385658",
+                    "microtime": "1693833424100000"
+                },
+                "timestamp": 1693833424,
+                "timestampNanosecond": 100000000,
+                "type": 1
+            },
+            {
+                "contents": {
+                    "rawLog": "[2023-09-04 13:18:04"
+                },
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+    // check observablity
+    APSARA_TEST_EQUAL_FATAL(1, processor.GetContext().GetProcessProfile().parseFailures);
+    APSARA_TEST_EQUAL_FATAL(uint64_t(4), processorInstance.mProcInRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(4), processorInstance.mProcOutRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcDiscardRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mProcParseErrorTotal->GetValue());
 }
 
 } // namespace logtail
