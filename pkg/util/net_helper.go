@@ -84,3 +84,10 @@ func getExternalIP() (string, error) {
 	}
 	return "", errors.New("are you connected to the network?")
 }
+
+func TryConvertLocalhost2RealIP(ip string) string {
+	if ip == "localhost" || ip == "127.0.0.1" || ip == "0.0.0.0" {
+		return GetIPAddress()
+	}
+	return ip
+}

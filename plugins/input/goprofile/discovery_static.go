@@ -19,6 +19,8 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/alibaba/ilogtail/pkg/util"
+
 	"github.com/pyroscope-io/pyroscope/pkg/scrape/discovery"
 	"github.com/pyroscope-io/pyroscope/pkg/scrape/discovery/targetgroup"
 	"github.com/pyroscope-io/pyroscope/pkg/scrape/model"
@@ -66,9 +68,8 @@ func (k *StaticConfig) convertStaticConfig() (discovery.StaticConfig, error) {
 		innerLabels := make(model.LabelSet)
 		innerLabels[model.AddressLabel] = model.LabelValue(addr)
 		innerLabels[model.AppNameLabel] = appName
-
 		for key, val := range address.InstanceLabels {
-			innerLabels[model.LabelName(key)] = model.LabelValue(val)
+			innerLabels[model.LabelName(key)] = model.LabelValue(util.TryConvertLocalhost2RealIP(val))
 		}
 		cfg = append(cfg, &targetgroup.Group{
 			Source:  addr,
