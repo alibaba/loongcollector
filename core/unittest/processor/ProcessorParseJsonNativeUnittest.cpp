@@ -349,6 +349,11 @@ void ProcessorParseJsonNativeUnittest::TestProcessJsonContent() {
     config["RenamedSourceKey"] = "rawLog";
 
     // make events
+    // the first event has key "content" in json key with overwrites sourceKey "content"
+    // the second event doesn't have key "content" in json
+    // after parsing, the first event's content should be the value in json, the original content should be the value of
+    // "rawLog" the second event's content should be dropped, the original content should be the value of "rawLog"
+
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
     std::string inJson = R"({
@@ -361,6 +366,15 @@ void ProcessorParseJsonNativeUnittest::TestProcessJsonContent() {
                 },
                 "timestampNanosecond" : 0,
                 "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "{\"name\":\"Mike\",\"age\":25,\"is_student\":false,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678902,
                 "type" : 1
             }
         ]
@@ -394,6 +408,21 @@ void ProcessorParseJsonNativeUnittest::TestProcessJsonContent() {
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "address" : "{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"}",
+                    "age":"25",
+                    "courses":"[\"Math\",\"English\",\"Science\"]",
+                    "is_student":"false",
+                    "name":"Mike",
+                    "rawLog" : "{\"name\":\"Mike\",\"age\":25,\"is_student\":false,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}",
+                    "scores":"{\"Math\":90,\"English\":85,\"Science\":95}"
+                },
+                "timestamp" : 12345678902,
+                "timestampNanosecond" : 0,
+                "type" : 1
             }
         ]
     })";
@@ -412,6 +441,10 @@ void ProcessorParseJsonNativeUnittest::TestProcessJsonRaw() {
     config["RenamedSourceKey"] = "rawLog";
 
     // make events
+    // the first event has key "rawLog" in json key with overwrites rawLogTag "rawLog"
+    // the second event doesn't have key "rawLog" in json
+    // after parsing, the first event's rawLog should be the value in json, the original content should be discarded
+    // the second event's rawLog should be the original content
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
     std::string inJson = R"({
@@ -424,6 +457,15 @@ void ProcessorParseJsonNativeUnittest::TestProcessJsonRaw() {
                 },
                 "timestampNanosecond" : 0,
                 "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "{\"name\":\"Mike\",\"age\":25,\"is_student\":false,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678902,
                 "type" : 1
             }
         ]
@@ -454,6 +496,21 @@ void ProcessorParseJsonNativeUnittest::TestProcessJsonRaw() {
                     "scores":"{\"Math\":90,\"English\":85,\"Science\":95}"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "address" : "{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"}",
+                    "age":"25",
+                    "courses":"[\"Math\",\"English\",\"Science\"]",
+                    "is_student":"false",
+                    "name":"Mike",
+                    "rawLog" : "{\"name\":\"Mike\",\"age\":25,\"is_student\":false,\"address\":{\"city\":\"Hangzhou\",\"postal_code\":\"100000\"},\"courses\":[\"Math\",\"English\",\"Science\"],\"scores\":{\"Math\":90,\"English\":85,\"Science\":95}}",
+                    "scores":"{\"Math\":90,\"English\":85,\"Science\":95}"
+                },
+                "timestamp" : 12345678902,
                 "timestampNanosecond" : 0,
                 "type" : 1
             }

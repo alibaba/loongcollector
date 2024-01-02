@@ -86,10 +86,10 @@ bool ProcessorParseJsonNative::ProcessEvent(const StringView& logPath, PipelineE
 
     auto rawContent = sourceEvent.GetContent(mSourceKey);
 
-    bool parseSuccess = true;
-    parseSuccess = JsonLogLineParser(sourceEvent, logPath, e);
+    bool sourceKeyOverwritten = false;
+    bool parseSuccess = JsonLogLineParser(sourceEvent, logPath, e, sourceKeyOverwritten);
 
-    if (!parseSuccess || !mSourceKeyOverwritten) {
+    if (!parseSuccess || !sourceKeyOverwritten) {
         sourceEvent.DelContent(mSourceKey);
     }
     if (mCommonParserOptions.ShouldAddSourceContent(parseSuccess)) {
@@ -107,7 +107,8 @@ bool ProcessorParseJsonNative::ProcessEvent(const StringView& logPath, PipelineE
 
 bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
                                                  const StringView& logPath,
-                                                 PipelineEventPtr& e) {
+                                                 PipelineEventPtr& e,
+                                                 bool& sourceKeyOverwritten) {
     StringView buffer = sourceEvent.GetContent(mSourceKey);
 
     if (buffer.empty())
@@ -160,7 +161,7 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
         StringBuffer contentValueBuffer = sourceEvent.GetSourceBuffer()->CopyString(contentValue);
 
         if (contentKey.c_str() == mSourceKey) {
-            mSourceKeyOverwritten = true;
+            sourceKeyOverwritten = true;
         }
 
         AddLog(StringView(contentKeyBuffer.data, contentKeyBuffer.size),
