@@ -15,25 +15,28 @@
  */
 
 #pragma once
-#include <utility>
-#include <string>
-#include <vector>
-#include <unordered_set>
-#include <deque>
+
 #include <atomic>
-#include "parser/LogParser.h"
-#include "common/TimeUtil.h"
-#include "common/StringTools.h"
-#include "common/EncodingConverter.h"
-#include "common/DevInode.h"
-#include "common/LogFileOperator.h"
-#include "logger/Logger.h"
-#include "log_pb/sls_logs.pb.h"
-#include "common/FileInfo.h"
+#include <deque>
+#include <string>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
 #include "checkpoint/RangeCheckpoint.h"
-#include "reader/SourceBuffer.h"
-#include "reader/FileReaderOptions.h"
+#include "common/DevInode.h"
+#include "common/EncodingConverter.h"
+#include "common/FileInfo.h"
+#include "common/LogFileOperator.h"
+#include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "event/Event.h"
+#include "file_server/FileDiscoveryOptions.h"
 #include "file_server/MultilineOptions.h"
+#include "log_pb/sls_logs.pb.h"
+#include "logger/Logger.h"
+#include "reader/FileReaderOptions.h"
+#include "reader/SourceBuffer.h"
 
 namespace logtail {
 

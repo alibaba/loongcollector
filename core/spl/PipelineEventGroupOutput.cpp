@@ -32,7 +32,7 @@ namespace apsara::sls::spl {
 
 void PipelineEventGroupOutput::setHeader(const IOHeader& header, std::string& err) {
     mIOHeader = &header;
-    for (int32_t i = 0; i < header.columnNames.size(); i++) {
+    for (size_t i = 0; i < header.columnNames.size(); i++) {
         auto field = header.columnNames[i].ToString();
         auto length = field.length();
         if (length >= LENGTH_FIELD_PREFIX_TAG

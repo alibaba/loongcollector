@@ -121,6 +121,7 @@ void LogtailMonitor::Stop() {
         lock_guard<mutex> lock(mThreadRunningMux);
         mIsThreadRunning = false;
     }
+    mStopCV.notify_one();
     future_status s = mThreadRes.wait_for(chrono::seconds(1));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("profiling", "stopped successfully"));

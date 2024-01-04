@@ -28,7 +28,6 @@
 #include "models/PipelineEventGroup.h"
 #include "pipeline/PipelineManager.h"
 #include "monitor/Monitor.h"
-#include "parser/LogParser.h"
 #include "sdk/Client.h"
 #include "sender/Sender.h"
 #include "log_pb/sls_logs.pb.h"

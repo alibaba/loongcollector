@@ -16,6 +16,7 @@
 
 #include "pipeline/PipelineManager.h"
 
+#include "config_manager/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
 #ifdef __linux__

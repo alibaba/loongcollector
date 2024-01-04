@@ -136,7 +136,6 @@ void ProcessorSPL::Process(std::vector<PipelineEventGroup>& logGroupList) {
     PipelineEventGroup logGroup = std::move(logGroupList[0]);
     std::vector<PipelineEventGroup>().swap(logGroupList);
 
-    size_t inSize = logGroup.GetEvents().size();
     std::vector<std::string> colNames{FIELD_CONTENT};
     // 根据spip->getInputSearches()，设置input数组
     std::vector<Input*> inputs;
