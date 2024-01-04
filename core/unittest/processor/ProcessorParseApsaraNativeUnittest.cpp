@@ -17,6 +17,7 @@
 #include "common/JsonUtil.h"
 #include "config/Config.h"
 #include "models/LogEvent.h"
+#include "models/StringView.h"
 #include "plugin/instance/ProcessorInstance.h"
 #include "processor/ProcessorParseApsaraNative.h"
 #include "processor/ProcessorSplitLogStringNative.h"
@@ -42,6 +43,8 @@ public:
     void TestProcessEventDiscardUnmatch();
     void TestMultipleLines();
     void TestProcessEventMicrosecondUnmatch();
+    void TestApsaraEasyReadLogTimeParser();
+    void TestApsaraLogLineParser();
 
     PipelineContext mContext;
 };
@@ -56,6 +59,364 @@ UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventKeepUnmatch);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventDiscardUnmatch);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestMultipleLines);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventMicrosecondUnmatch);
+UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraEasyReadLogTimeParser);
+UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraLogLineParser);
+
+void ProcessorParseApsaraNativeUnittest::TestApsaraEasyReadLogTimeParser() {
+    // make config
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = false;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+    config["Timezone"] = "GMT+08:00";
+    ProcessorParseApsaraNative* processor = new ProcessorParseApsaraNative;
+    processor->SetContext(mContext);
+    std::string pluginId = "testID";
+    ProcessorInstance processorInstance(processor, pluginId);
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+
+    StringView buffer = "[1378972170425093]\tA:B";
+    StringView lastStr;
+    LogtailTime lastTime = {0, 0};
+    int64_t microTime = 0;
+    uint32_t dateTime = 0;
+
+    dateTime = processor->ApsaraEasyReadLogTimeParser(buffer, lastStr, lastTime, microTime);
+    APSARA_TEST_EQUAL(dateTime, 1378972170);
+    APSARA_TEST_EQUAL(microTime, 1378972170425093);
+    APSARA_TEST_EQUAL(lastTime.tv_sec, 0);
+
+    buffer = "[1378972171093]\tA:B";
+    microTime = 0;
+    dateTime = 0;
+    dateTime = processor->ApsaraEasyReadLogTimeParser(buffer, lastStr, lastTime, microTime);
+    APSARA_TEST_EQUAL(dateTime, 1378972171);
+    APSARA_TEST_EQUAL(microTime, 1378972171093000);
+    APSARA_TEST_EQUAL(lastTime.tv_sec, 0);
+
+    buffer = "[1378972172]\tA:B";
+    microTime = 0;
+    dateTime = 0;
+    dateTime = processor->ApsaraEasyReadLogTimeParser(buffer, lastStr, lastTime, microTime);
+    APSARA_TEST_EQUAL(dateTime, 1378972172);
+    APSARA_TEST_EQUAL(microTime, 1378972172000000);
+    APSARA_TEST_EQUAL(lastTime.tv_sec, 0);
+
+    buffer = "[2013-09-12 22:18:28.819129]\tA:B";
+    microTime = 0;
+    dateTime = 0;
+    dateTime = processor->ApsaraEasyReadLogTimeParser(buffer, lastStr, lastTime, microTime);
+    APSARA_TEST_EQUAL(dateTime, 1378995508);
+    APSARA_TEST_EQUAL(microTime, 1378995508819129);
+    APSARA_TEST_EQUAL(dateTime, lastTime.tv_sec);
+    APSARA_TEST_EQUAL(lastStr, "2013-09-12 22:18:28");
+
+    buffer = "[2013-09-12 22:18:28.819139]\tA:B";
+    microTime = 0;
+    dateTime = 0;
+    dateTime = processor->ApsaraEasyReadLogTimeParser(buffer, lastStr, lastTime, microTime);
+    APSARA_TEST_EQUAL(dateTime, 1378995508);
+    APSARA_TEST_EQUAL(microTime, 1378995508819139);
+    APSARA_TEST_EQUAL(dateTime, lastTime.tv_sec);
+    APSARA_TEST_EQUAL(lastStr, "2013-09-12 22:18:28");
+
+    buffer = "[2013-09-12 22:18:29.819139]\tA:B";
+    microTime = 0;
+    dateTime = 0;
+    dateTime = processor->ApsaraEasyReadLogTimeParser(buffer, lastStr, lastTime, microTime);
+    APSARA_TEST_EQUAL(dateTime, 1378995509);
+    APSARA_TEST_EQUAL(microTime, 1378995509819139);
+    APSARA_TEST_EQUAL(dateTime, lastTime.tv_sec);
+    APSARA_TEST_EQUAL(lastStr, "2013-09-12 22:18:29");
+    LOG_INFO(sLogger, ("TestApsaraEasyReadLogTimeParser() end", time(NULL)));
+
+    buffer = "[2013-09-12 22:18:29.819]\tA:B";
+    microTime = 0;
+    dateTime = 0;
+    dateTime = processor->ApsaraEasyReadLogTimeParser(buffer, lastStr, lastTime, microTime);
+    APSARA_TEST_EQUAL(dateTime, 1378995509);
+    APSARA_TEST_EQUAL(microTime, 1378995509819000);
+    APSARA_TEST_EQUAL(dateTime, lastTime.tv_sec);
+    APSARA_TEST_EQUAL(lastStr, "2013-09-12 22:18:29");
+}
+
+void ProcessorParseApsaraNativeUnittest::TestApsaraLogLineParser() {
+    const char* logLine[] = {
+        "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]", // 1
+        "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]\t", // 2
+        "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1754]\tsomestring", // 3
+        "[2013-03-13 "
+        "18:05:09.493309]\t[WARNING]\t[13000]\t[build/debug64/ilogtail/core/ilogtail.cpp:1755]\tRealRecycle#Command:rm "
+        "-rf /apsara/tubo/.fuxi_tubo_trash/*", // 4
+        "[2013-03-13 "
+        "18:14:57.365716]\t[ERROR]\t[12835]\t[build/debug64/ilogtail/core/"
+        "ilogtail.cpp:1945]\tParseWhiteListOK:{\n\\\"sys/"
+        "pangu/ChunkServerRole\\\": \\\"\\\",\n\\\"sys/pangu/PanguMasterRole\\\": \\\"\\\"}", // 5
+        "[2013-03-13 18:14:57.365716]\t[12835]\t[ERROR]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]", // 6
+        "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]", // 7
+        "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[ERROR]", // 8
+        "[2013-03-13 18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]\t[5432187]", // 9
+        "[2013-03-13 "
+        "18:14:57.365716]\t[build/debug64/ilogtail/core/ilogtail.cpp:1945]\t[12835]\t[ERROR]\t[5432187]\tcount:55", // 10
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]", // 11
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t", // 12
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\n", // 13
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tother\tcount:45", // 14
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tother:\tcount:45", // 15
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tcount:45", // 16
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\tcount:45\tnum:88\tjob:ss", // 17
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corrupt\tcount:45\tnum:88\tjob:ss", // 18
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corruptcount:45\tnum:88\tjob:ss", // 19
+        "[2013-03-13 18:14:57.365716]\t[trace_id:787]\t[ERROR]\t[corrupt]count:45\tnum:88\tjob:ss", // 20
+        "[2013-03-13 18:14:57.365716]\t[build/debug64]\t[ERROR]\tcount:45\tnum:88\tjob:ss", // 21
+        "[2013-03-13 18:14:57.365716]\t[build/debug64:]\t[ERROR]\tcount:45\tnum:88\tjob:ss", // 22
+        "[2013-03-13 18:14:57.365716]\t[build/debug64:]\t[ERROR]\tcount:45\t:88\tjob:ss", // 23
+        "[2013-03-13 18:14:57.365716]", // 24
+        "[2013-03-13 18:14:57.365716]\t", // 25
+        "[2013-03-13 18:14:57.365716]\n", // 26
+        "[2013-03-13 18:14:57.365716]\t\t\t", // 27
+        "", // 28
+        "[2013-03-13 "
+        "18:05:09.493309]\t[WARNING]\t[13000]\t[13003]\t[ERROR]\t[build/debug64/ilogtail/core/ilogtail.cpp:1753]", // 29
+        "[2013-03-13 18:05:09.493309]\t[WARNING]\t[13000]\t[13003]\t[ERROR]\t[tubo.cpp:1753]", // 30
+        "[2013-03-13 18:05:09.493309" // 31
+    };
+    static const char* APSARA_FIELD_LEVEL = "__LEVEL__";
+    static const char* APSARA_FIELD_THREAD = "__THREAD__";
+    static const char* APSARA_FIELD_FILE = "__FILE__";
+    static const char* APSARA_FIELD_LINE = "__LINE__";
+    const char* logParseResult[][16] = {
+        {"microtime",
+         "1363169109493309",
+         APSARA_FIELD_LEVEL,
+         "WARNING",
+         APSARA_FIELD_THREAD,
+         "13000",
+         APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1753",
+         NULL}, // 1
+        {"microtime",
+         "1363169109493309",
+         APSARA_FIELD_LEVEL,
+         "WARNING",
+         APSARA_FIELD_THREAD,
+         "13000",
+         APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1753",
+         NULL}, // 2
+        {"microtime",
+         "1363169109493309",
+         APSARA_FIELD_LEVEL,
+         "WARNING",
+         APSARA_FIELD_THREAD,
+         "13000",
+         APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1754",
+         NULL}, // 3
+        {APSARA_FIELD_LEVEL,
+         "WARNING",
+         APSARA_FIELD_THREAD,
+         "13000",
+         APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1755",
+         "RealRecycle#Command",
+         "rm -rf /apsara/tubo/.fuxi_tubo_trash/*",
+         NULL}, // 4
+        {APSARA_FIELD_LEVEL,
+         "ERROR",
+         APSARA_FIELD_THREAD,
+         "12835",
+         APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1945",
+         "ParseWhiteListOK",
+         "{\n\"sys/pangu/ChunkServerRole\": \"\",\n\"sys/pangu/PanguMasterRole\": \"\"}",
+         NULL}, // 5
+        {APSARA_FIELD_THREAD,
+         "12835",
+         APSARA_FIELD_LEVEL,
+         "ERROR",
+         APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1945",
+         NULL}, // 6
+        {APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1945",
+         APSARA_FIELD_THREAD,
+         "12835",
+         APSARA_FIELD_LEVEL,
+         "ERROR",
+         NULL}, // 7
+        {APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1945",
+         APSARA_FIELD_LEVEL,
+         "ERROR",
+         NULL}, // 8
+        {APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1945",
+         APSARA_FIELD_THREAD,
+         "12835",
+         APSARA_FIELD_LEVEL,
+         "ERROR",
+         NULL}, // 9
+        {APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1945",
+         APSARA_FIELD_THREAD,
+         "12835",
+         APSARA_FIELD_LEVEL,
+         "ERROR",
+         "count",
+         "55",
+         NULL}, // 10
+        {APSARA_FIELD_LEVEL, "ERROR", NULL}, // 11
+        {APSARA_FIELD_LEVEL, "ERROR", NULL}, // 12
+        {APSARA_FIELD_LEVEL, "ERROR", NULL}, // 13
+        {APSARA_FIELD_LEVEL, "ERROR", "count", "45", NULL}, // 14
+        {APSARA_FIELD_LEVEL, "ERROR", "other", "", "count", "45", NULL}, // 15
+        {APSARA_FIELD_LEVEL, "ERROR", "count", "45", NULL}, // 16
+        {APSARA_FIELD_LEVEL, "ERROR", "count", "45", "num", "88", "job", "ss", NULL}, // 17
+        {APSARA_FIELD_LEVEL, "ERROR", "count", "45", "num", "88", "job", "ss", NULL}, // 18
+        {APSARA_FIELD_LEVEL, "ERROR", "[corruptcount", "45", "num", "88", "job", "ss", NULL}, // 19
+        {APSARA_FIELD_LEVEL, "ERROR", "[corrupt]count", "45", "num", "88", "job", "ss", NULL}, // 20
+        {APSARA_FIELD_FILE,
+         "build/debug64",
+         APSARA_FIELD_LEVEL,
+         "ERROR",
+         "count",
+         "45",
+         "num",
+         "88",
+         "job",
+         "ss",
+         NULL}, // 21
+        {APSARA_FIELD_FILE,
+         "build/debug64",
+         APSARA_FIELD_LINE,
+         "",
+         APSARA_FIELD_LEVEL,
+         "ERROR",
+         "count",
+         "45",
+         "num",
+         "88",
+         "job",
+         "ss",
+         NULL}, // 22
+        {APSARA_FIELD_FILE,
+         "build/debug64",
+         APSARA_FIELD_LINE,
+         "",
+         APSARA_FIELD_LEVEL,
+         "ERROR",
+         "count",
+         "45",
+         "",
+         "88",
+         "job",
+         "ss",
+         NULL}, // 23
+        {"microtime", "1363169697365716", NULL}, // 24
+        {"microtime", "1363169697365716", NULL}, // 25
+        {"microtime", "1363169697365716", NULL}, // 26
+        {"microtime", "1363169697365716", NULL}, // 27
+        {"content", "", NULL}, // 28
+        {APSARA_FIELD_LEVEL,
+         "WARNING",
+         APSARA_FIELD_THREAD,
+         "13000",
+         APSARA_FIELD_FILE,
+         "build/debug64/ilogtail/core/ilogtail.cpp",
+         APSARA_FIELD_LINE,
+         "1753",
+         NULL}, // 29
+        {APSARA_FIELD_LEVEL,
+         "WARNING",
+         APSARA_FIELD_THREAD,
+         "13000",
+         APSARA_FIELD_FILE,
+         "tubo.cpp",
+         APSARA_FIELD_LINE,
+         "1753",
+         NULL}, // 30
+        {NULL} // 31
+    };
+
+
+    // make config
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = false;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+    config["Timezone"] = "GMT+08:00";
+    std::string pluginId = "testID";
+    ProcessorInstance processorInstance(new ProcessorParseApsaraNative, pluginId);
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+
+    for (uint32_t i = 0; i < sizeof(logLine) / sizeof(logLine[0]); i++) {
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::string inJson = R"({
+            "events" :
+            [
+                {
+                    "contents" :
+                    {
+                        "content" : ")"
+            + std::string(logLine[i]) +
+            R"("
+                    },
+                    "timestamp" : 12345678901,
+                    "type" : 1
+                }
+            ]
+        })";
+        eventGroup.FromJsonString(inJson);
+        std::vector<PipelineEventGroup> eventGroupList;
+        eventGroupList.emplace_back(std::move(eventGroup));
+        processorInstance.Process(eventGroupList);
+
+        Json::Value outJson = eventGroupList[0].ToJson();
+        if (logParseResult[i][0] == NULL) {
+            APSARA_TEST_EQUAL(eventGroupList[0].ToJsonString(), "null");
+            continue;
+        }
+        for (int j = 0; j < 10 && logParseResult[i][j] != NULL; j++) {
+            if (j % 2 == 0) {
+                APSARA_TEST_TRUE(outJson.isMember("events"));
+                APSARA_TEST_TRUE(outJson["events"].isArray());
+                APSARA_TEST_TRUE(outJson["events"][0].isObject());
+                APSARA_TEST_TRUE(outJson["events"][0].isMember("contents"));
+                APSARA_TEST_TRUE(outJson["events"][0]["contents"].isMember(logParseResult[i][j]));
+                APSARA_TEST_EQUAL(outJson["events"][0]["contents"][logParseResult[i][j]],
+                                  std::string(logParseResult[i][j + 1]));
+            } else {
+                continue;
+            }
+        }
+    }
+}
 
 void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
     // 第一个contents 测试多行下的解析，第二个contents测试多行下time的解析

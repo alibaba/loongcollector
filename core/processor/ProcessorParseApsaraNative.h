@@ -46,7 +46,7 @@ private:
     void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
     time_t
     ApsaraEasyReadLogTimeParser(StringView& buffer, StringView& timeStr, LogtailTime& lastLogTime, int64_t& microTime);
-    bool IsPrefixString(const char* all, const StringView& prefix);
+    bool IsPrefixString(const std::string& all, const StringView& prefix);
     int32_t ParseApsaraBaseFields(const StringView& buffer, LogEvent& sourceEvent);
 
     int32_t mLogTimeZoneOffsetSecond = 0;
