@@ -48,7 +48,7 @@ bool MergeItem::IsReady() {
 bool PackageListMergeBuffer::IsReady(int32_t curTime) {
     // should use 2 * INT32_FLAG(batch_send_interval)), package list interval should > merge item interval
     return (mTotalRawBytes >= INT32_FLAG(batch_send_metric_size))
-        || (mItemCount > 0 && (curTime - mFirstItemTime) >= 2 * INT32_FLAG(batch_send_interval));
+        || (mItemCount > 0 && (curTime - mFirstItemTime) >= INT32_FLAG(batch_send_interval));
 }
 
 

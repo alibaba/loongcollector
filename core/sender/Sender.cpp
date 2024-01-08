@@ -97,7 +97,7 @@ DEFINE_FLAG_INT32(test_unavailable_endpoint_interval, "test unavailable endpoint
 DEFINE_FLAG_INT32(sending_cost_time_alarm_interval, "sending log group cost too much time, second", 3);
 DEFINE_FLAG_INT32(log_group_wait_in_queue_alarm_interval,
                   "log group wait in queue alarm interval, may blocked by concurrency or quota, second",
-                  3);
+                  6);
 DEFINE_FLAG_STRING(data_endpoint_policy,
                    "policy for switching between data server endpoints, possible options include "
                    "'designated_first'(default) and 'designated_locked'",
