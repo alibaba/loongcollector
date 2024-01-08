@@ -166,10 +166,6 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         ShennongManager::GetInstance()->Resume();
     }
 #endif
-    // destruct event handlers here so that it will not block file reading task
-    if (isInputFileChanged) {
-        ConfigManager::GetInstance()->DeleteHandlers();
-    }
 #endif
 }
 

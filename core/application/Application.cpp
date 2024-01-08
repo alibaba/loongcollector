@@ -15,6 +15,7 @@
 #include "application/Application.h"
 
 #ifndef LOGTAIL_NO_TC_MALLOC
+#include <gperftools/heap-profiler.h>
 #include <gperftools/malloc_extension.h>
 #include <gperftools/tcmalloc.h>
 #endif
@@ -65,6 +66,7 @@ DEFINE_FLAG_INT32(config_scan_interval, "seconds", 10);
 DEFINE_FLAG_INT32(profiling_check_interval, "seconds", 60);
 DEFINE_FLAG_INT32(tcmalloc_release_memory_interval, "force release memory held by tcmalloc, seconds", 300);
 DEFINE_FLAG_INT32(exit_flushout_duration, "exit process flushout duration", 20 * 1000);
+DEFINE_FLAG_BOOL(enable_heap_profile, "", false);
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
 DECLARE_FLAG_BOOL(global_network_success);
@@ -181,6 +183,12 @@ void Application::Init() {
 }
 
 void Application::Start() {
+#ifndef LOGTAIL_NO_TC_MALLOC
+    if (BOOL_FLAG(enable_heap_profile)) {
+        HeapProfilerStart("heap_profile");
+    }
+#endif
+
     LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S"));
 
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
@@ -279,6 +287,9 @@ void Application::Start() {
             FileServer::GetInstance()->Resume();
         }
 
+        // destruct event handlers here so that it will not block file reading task
+        ConfigManager::GetInstance()->DeleteHandlers();
+
         this_thread::sleep_for(chrono::seconds(1));
     }
 }
@@ -309,16 +320,21 @@ void Application::Exit() {
     LogtailMonitor::GetInstance()->Stop();
     LogtailAlarm::GetInstance()->Stop();
     // from now on, alarm should not be used.
-    
+
     if (!(Sender::Instance()->FlushOut(INT32_FLAG(exit_flushout_duration)))) {
         LOG_WARNING(sLogger, ("flush SLS sender data", "failed"));
     } else {
         LOG_INFO(sLogger, ("flush SLS sender data", "succeeded"));
     }
 
-    
+
 #if defined(_MSC_VER)
     ReleaseWindowsSignalObject();
+#endif
+#ifndef LOGTAIL_NO_TC_MALLOC
+    if (BOOL_FLAG(enable_heap_profile)) {
+        HeapProfilerStop();
+    }
 #endif
     LOG_INFO(sLogger, ("exit", "bye!"));
     exit(0);
