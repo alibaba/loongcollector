@@ -5,7 +5,7 @@ REM 1. Set environments.
 REM 2. Copy output to dist package dir.
 REM 3. Pack dir to zip archive.
 
-set ILOGTAIL_VERSION=1.8.3
+set ILOGTAIL_VERSION=2.0.0
 if not "%1" == "" set ILOGTAIL_VERSION=%1
 set CurrentPath=%~dp0
 set P1Path=

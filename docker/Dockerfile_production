@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM --platform=$TARGETPLATFORM centos:centos7.9.2009 as build
-ARG VERSION=1.8.3
+ARG VERSION=2.0.0
 ARG TARGETPLATFORM
 WORKDIR /usr/local
 COPY dist/ilogtail-${VERSION}.linux-*.tar.gz .
@@ -28,7 +28,7 @@ ENV container docker
 RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 
 ARG HOST_OS=Linux
-ARG VERSION=1.8.3
+ARG VERSION=2.0.0
 ARG TARGETPLATFORM
 
 COPY --from=build /usr/local/ilogtail-${VERSION} /usr/local/ilogtail

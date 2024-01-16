@@ -15,6 +15,7 @@
 * [Kubernetes使用](installation/start-with-k8s.md)
 * [守护进程](installation/daemon.md)
 * [发布记录](installation/release-notes.md)
+* [发布记录(1.x版本)](installation/release-notes-1.md)
 * [支持的操作系统](installation/os.md)
 * [源代码](installation/sources/README.md)
   * [下载](installation/sources/download.md)

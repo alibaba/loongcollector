@@ -19,7 +19,7 @@ WORKDIR /src
 COPY . .
 
 ARG HOST_OS=Linux
-ARG VERSION=1.8.3
+ARG VERSION=2.0.0
 
 USER root
 
