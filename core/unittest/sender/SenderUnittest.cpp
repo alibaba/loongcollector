@@ -919,7 +919,7 @@ public:
             fsutil::Dir dir(gRootDir);
             dir.Open();
             fsutil::Entry entry;
-            while (entry = dir.ReadNext(false)) {
+            while ((entry = dir.ReadNext(false))) {
                 auto fullPath = gRootDir + PATH_SEPARATOR + entry.Name();
                 auto targetPath = gRootDir + PATH_SEPARATOR + ".." + PATH_SEPARATOR + entry.Name();
                 bfs::rename(fullPath, targetPath);

@@ -14,7 +14,7 @@
 
 # Name/Version information.
 if (NOT DEFINED LOGTAIL_VERSION)
-    set(LOGTAIL_VERSION "1.8.1")
+    set(LOGTAIL_VERSION "2.0.0")
 endif ()
 message(STATUS "Version: ${LOGTAIL_VERSION}")
 

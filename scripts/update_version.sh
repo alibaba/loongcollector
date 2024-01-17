@@ -30,7 +30,7 @@ cd "${ROOTDIR}"
 # Build version
 sed -i "s/VERSION ?= .*/VERSION ?= $version/g" Makefile
 sed -i "s/set(LOGTAIL_VERSION \".*\")/set(LOGTAIL_VERSION \"$version\")/g" \
-    core/CMakeLists.txt
+    core/options.cmake
 
 # Dockerfile
 sed -i "s/ARG VERSION=.*/ARG VERSION=$version/g" docker/Dockerfile*

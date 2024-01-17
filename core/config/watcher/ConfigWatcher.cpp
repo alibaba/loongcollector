@@ -56,7 +56,7 @@ ConfigDiff ConfigWatcher::CheckConfigDiff() {
             unique_lock<mutex> lock;
             auto itr = mDirMutexMap.find(dir.string());
             if (itr != mDirMutexMap.end()) {
-                lock = std::move(unique_lock<mutex>(*itr->second, defer_lock));
+                lock = unique_lock<mutex>(*itr->second, defer_lock);
                 lock.lock();
             }
 

@@ -220,7 +220,7 @@ void AppConfig::LoadIncludeConfig(Json::Value& confJson) {
 
     std::vector<std::string> v;
     fsutil::Entry entry;
-    while (entry = dir.ReadNext(false)) {
+    while ((entry = dir.ReadNext(false))) {
         if (!entry.IsRegFile()) {
             continue;
         }

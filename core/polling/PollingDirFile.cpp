@@ -382,7 +382,7 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
     }
     int32_t nowStatCount = 0;
     fsutil::Entry ent;
-    while (ent = dir.ReadNext(false)) {
+    while ((ent = dir.ReadNext(false))) {
         if (!mRuningFlag || mHoldOnFlag)
             break;
 
@@ -547,7 +547,7 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
     }
     fsutil::Entry ent;
     int32_t dirCount = 0;
-    while (ent = dir.ReadNext(false)) {
+    while ((ent = dir.ReadNext(false))) {
         if (!mRuningFlag || mHoldOnFlag)
             break;
 

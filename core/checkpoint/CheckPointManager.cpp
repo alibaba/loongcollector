@@ -498,7 +498,7 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
         std::string entName;
         const std::string entPathPrefix = PathJoin(dirPath, "");
         std::string entPath = entPathPrefix;
-        while (ent = dir.ReadNext(false)) {
+        while ((ent = dir.ReadNext(false))) {
             if (findCount++ > INT32_FLAG(checkpoint_find_max_file_count)) {
                 LOG_WARNING(sLogger,
                             METHOD_LOG_PATTERN("exceed max search count", INT32_FLAG(checkpoint_find_max_file_count)));

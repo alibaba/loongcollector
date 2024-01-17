@@ -145,7 +145,7 @@ macro(link_tcmalloc target_name)
         if (tcmalloc_${LINK_OPTION_SUFFIX})
             target_link_libraries(${target_name} "${tcmalloc_${LINK_OPTION_SUFFIX}}")
         elseif (UNIX)
-            target_link_libraries(${target_name} "${tcmalloc_${LIBRARY_DIR_SUFFIX}}/libtcmalloc_and_profiler.a")
+            target_link_libraries(${target_name} "${tcmalloc_${LIBRARY_DIR_SUFFIX}}/libtcmalloc_minimal.a")
         elseif (MSVC)
             add_definitions(-DPERFTOOLS_DLL_DECL=)
             target_link_libraries(${target_name}

@@ -162,7 +162,7 @@ bool ConfigManager::RegisterHandlersRecursively(const std::string& path,
         return false;
     }
     fsutil::Entry ent;
-    while (ent = dir.ReadNext()) {
+    while ((ent = dir.ReadNext())) {
         string item = PathJoin(path, ent.Name());
         if (ent.IsDir()) {
             if (false == RegisterHandlersRecursively(item, config, checkTimeout)) {
@@ -330,7 +330,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config,
     }
     fsutil::Entry ent;
     int32_t dirCount = 0;
-    while (ent = dir.ReadNext()) {
+    while ((ent = dir.ReadNext())) {
         if (dirCount >= INT32_FLAG(wildcard_max_sub_dir_count)) {
             LOG_WARNING(sLogger,
                         ("too many sub directoried for path", path)("dirCount", dirCount)("basePath",
@@ -477,7 +477,7 @@ bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path,
         return false;
     }
     fsutil::Entry ent;
-    while (ent = dir.ReadNext()) {
+    while ((ent = dir.ReadNext())) {
         string item = PathJoin(path, ent.Name());
         if (ent.IsDir() && !config.first->IsDirectoryInBlacklist(item)) {
             if (!(EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler))) {
@@ -514,7 +514,7 @@ bool ConfigManager::RegisterDescendants(const string& path, const FileDiscoveryC
     }
     fsutil::Entry ent;
     bool result = true;
-    while (ent = dir.ReadNext()) {
+    while ((ent = dir.ReadNext())) {
         string item = PathJoin(path, ent.Name());
         if (ent.IsDir() && !config.first->IsDirectoryInBlacklist(item)) {
             result = EventDispatcher::GetInstance()->RegisterEventHandler(item.c_str(), config, mSharedHandler);

@@ -908,7 +908,7 @@ bool Sender::LoadFileToSend(time_t timeLine, std::vector<std::string>& filesToSe
         return false;
     }
     fsutil::Entry ent;
-    while (ent = dir.ReadNext()) {
+    while ((ent = dir.ReadNext())) {
         string filename = ent.Name();
         if (filename.find(BUFFER_FILE_NAME_PREFIX) == 0) {
             try {

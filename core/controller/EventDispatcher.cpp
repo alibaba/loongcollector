@@ -346,7 +346,7 @@ void EventDispatcher::AddExistedFileEvents(const char* path, int wd) {
     int32_t curTime = time(NULL);
     vector<Event*> eventVec;
     int32_t tailFileCount = 0;
-    while (ent = dir.ReadNext(false)) {
+    while ((ent = dir.ReadNext(false))) {
         ++tailFileCount;
         if (tailFileCount > MAX_TAIL_FILE_COUNT) {
             LOG_DEBUG(sLogger,
