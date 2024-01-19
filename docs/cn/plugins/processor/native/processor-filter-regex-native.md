@@ -13,7 +13,8 @@
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为processor\_filter\_regex\_native。  |
-|  Include  |  map  |  是  |  /  |  日志字段白名单，其中key为字段名，value为正则表达式，表示如果当前事件要被采集，则key指定的字段内容所需要满足的条件。多个条件之间为“且”的关系，仅当所有条件均满足时，该条日志才会被采集。  |
+|  FilterKey  |  \[string\]  |  是  |  /  |  过滤字段名，需配套`FilterRegex`参数使用，表示如果当前事件要被采集，则key指定的字段内容所需要满足的条件。多个条件之间为“且”的关系，仅当所有条件均满足时，该条日志才会被采集。  |
+|  FilterRegex  |  \[string\]  |  是  |  /  |  与`FilterKey`对应的过滤正则表达式。必须与`FilterKey`长度相同。  |
 
 ## 样例
 
@@ -50,9 +51,12 @@ processors:
       - ref_url
       - browser
   - Type: processor_filter_regex_native
-    Include:
-      method: ^(POST|PUT)$
-      status: ^200$
+    FilterKey: 
+      - method
+      - status
+    FilterRegex:
+      - ^(POST|PUT)$
+      - ^200$
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true

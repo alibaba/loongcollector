@@ -18,6 +18,7 @@
 #include "unittest/Unittest.h"
 
 using boost::regex;
+using namespace std;
 
 namespace logtail {
 
@@ -25,6 +26,8 @@ class ProcessorFilterNativeUnittest : public ::testing::Test {
 public:
     void SetUp() override { mContext.SetConfigName("project##config_0"); }
 
+    void OnSuccessfulInit();
+    void OnFailedInit();
     void TestLogFilterRule();
     void TestBaseFilter();
     void TestFilterNoneUtf8();
@@ -32,9 +35,81 @@ public:
     PipelineContext mContext;
 };
 
-UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestLogFilterRule);
-UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestBaseFilter);
-UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestFilterNoneUtf8);
+UNIT_TEST_CASE(ProcessorFilterNativeUnittest, OnSuccessfulInit)
+UNIT_TEST_CASE(ProcessorFilterNativeUnittest, OnFailedInit)
+UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestLogFilterRule)
+UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestBaseFilter)
+UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestFilterNoneUtf8)
+
+void ProcessorFilterNativeUnittest::OnSuccessfulInit() {
+    unique_ptr<ProcessorFilterNative> processor;
+    Json::Value configJson;
+    string configStr, errorMsg;
+
+    // FilterKey + FilterRegex
+    configStr = R"(
+        {
+            "Type": "processor_filter_regex_native",
+            "FilterKey": [
+                "a"
+            ],
+            "FilterRegex": [
+                "b"
+            ]
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    processor.reset(new ProcessorFilterNative());
+    processor->SetContext(mContext);
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    APSARA_TEST_TRUE(processor->Init(configJson));
+    APSARA_TEST_EQUAL(1, processor->mFilterRule->FilterKeys.size());
+    APSARA_TEST_EQUAL(1, processor->mFilterRule->FilterRegs.size());
+}
+
+void ProcessorFilterNativeUnittest::OnFailedInit() {
+    unique_ptr<ProcessorFilterNative> processor;
+    Json::Value configJson;
+    string configStr, errorMsg;
+
+    // FilterKey + FilterRegex
+    configStr = R"(
+        {
+            "Type": "processor_filter_regex_native",
+            "FilterKey": [
+                "a",
+                "c"
+            ],
+            "FilterRegex": [
+                "b"
+            ]
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    processor.reset(new ProcessorFilterNative());
+    processor->SetContext(mContext);
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    APSARA_TEST_FALSE(processor->Init(configJson));
+
+    configStr = R"(
+        {
+            "Type": "processor_filter_regex_native",
+            "FilterKey": [
+                "a",
+                "a"
+            ],
+            "FilterRegex": [
+                "b",
+                "[a"
+            ]
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    processor.reset(new ProcessorFilterNative());
+    processor->SetContext(mContext);
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
+    APSARA_TEST_FALSE(processor->Init(configJson));
+}
 
 // To test bool ProcessorFilterNative::Filter(LogEvent& sourceEvent, const LogFilterRule* filterRule)
 void ProcessorFilterNativeUnittest::TestLogFilterRule() {

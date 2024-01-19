@@ -86,8 +86,8 @@ private:
 // UnaryFilterOperatorNode
 class UnaryFilterOperatorNode : public BaseFilterNode {
 public:
-    UnaryFilterOperatorNode(FilterOperator op, BaseFilterNodePtr child)
-        : BaseFilterNode(OPERATOR_NODE), op(op), child(child) {}
+    UnaryFilterOperatorNode(BaseFilterNodePtr child)
+        : BaseFilterNode(OPERATOR_NODE), child(child) {}
 
     virtual ~UnaryFilterOperatorNode(){};
 
@@ -97,7 +97,6 @@ public:
     virtual bool Match(const LogContents& contents, const PipelineContext& mContext);
 
 private:
-    FilterOperator op;
     BaseFilterNodePtr child;
 };
 

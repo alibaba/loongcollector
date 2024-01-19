@@ -60,4 +60,4 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-communi
 
 ## 1.x版本
 
-[发布记录(1.x版本)](installation/release-notes-1.md)
+[发布记录(1.x版本)](release-notes-1.md)
