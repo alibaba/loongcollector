@@ -82,7 +82,7 @@ bool ProcessorSPL::Init(const Json::Value& config) {
     // spl pipeline语句的最大长度
     splOptions.queryMaxSize = INT32_FLAG(logtail_spl_query_max_size);
     // sampling for error
-    splOptions.errorSampling = false;
+    splOptions.errorSampling = true;
 
     // this function is void and has no return
     initSPL(&splOptions);
