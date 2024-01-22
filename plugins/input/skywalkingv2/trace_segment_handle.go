@@ -193,6 +193,14 @@ func (t *TraceSegmentHandle) parseSpan(span *agent.SpanObject, applicationInstan
 	} else {
 		otSpan.StatusCode = skywalkingv3.StatusCodeOk
 	}
+
+	switch {
+	case span.SpanLayer == agent.SpanLayer_MQ:
+		t.mappingMessageSystemTag(span, otSpan)
+	case span.SpanType == agent.SpanType_Exit:
+		mappingDatabaseTag(span, otSpan)
+	}
+
 	return otSpan
 }
 
@@ -217,7 +225,7 @@ func mappingDatabaseTag(span *agent.SpanObject, otSpan *skywalkingv3.OtSpan) {
 		return
 	}
 
-	otSpan.Attribute[skywalkingv3.AttributeDBConnectionString] = dbType + "://" + span.GetPeer()
+	otSpan.Attribute[skywalkingv3.AttributeDBConnectionString] = strings.ToLower(dbType) + "://" + span.GetPeer()
 }
 
 func convertUniIDToString(u *agent.UniqueId) string {
