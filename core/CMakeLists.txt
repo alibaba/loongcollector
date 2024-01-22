@@ -12,14 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 project(logtail)
+
+include(CMakeDependentOption)
+
+# variable LINUX is supported in cmake version 3.25
+# for now, explicitly set LINUX to true if the platform is linux
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    set(LINUX TRUE)
+endif ()
 
 # Options.
 option(BUILD_LOGTAIL "Build Logtail executable and tools" ON)
+option(BUILD_LOGTAIL_SHARED_LIBRARY "Build Logtail shared library")
 option(ENABLE_ENTERPRISE "enable enterprise feature")
-option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)")
-option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically")
+cmake_dependent_option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF "LINUX" OFF)
+cmake_dependent_option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF "LINUX" OFF)
 option(WITHOUTGDB "Build Logtail without gdb")
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
 
@@ -39,8 +48,8 @@ if (UNIX)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -ggdb")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -ggdb")
     endif ()
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer -DLOGTAIL_NO_TC_MALLOC")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer -DLOGTAIL_NO_TC_MALLOC")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1 -fno-omit-frame-pointer")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
     string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
@@ -56,12 +65,15 @@ endif ()
 
 # To be compatible with low version Linux.
 if (ENABLE_COMPATIBLE_MODE)
-    if (UNIX)
-        message(STATUS "Enable compatible mode.")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c90")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--wrap=memcpy")
-        add_definitions(-DENABLE_COMPATIBLE_MODE)
-    endif ()
+    message(STATUS "Enable compatible mode.")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c90")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--wrap=memcpy")
+    add_definitions(-DENABLE_COMPATIBLE_MODE)
+endif ()
+
+if (ANDROID OR CMAKE_BUILD_TYPE MATCHES Debug)
+    set(NO_TCMALLOC TRUE)
+    add_definitions(-DLOGTAIL_NO_TC_MALLOC)
 endif ()
 
 # Dependencies.
@@ -73,10 +85,10 @@ set(SUB_DIRECTORIES_LIST
         aggregator application app_config checkpoint common config config/provider config/watcher config_manager config_server_pb 
         container_manager controller event event_handler event_listener file_server flusher go_pipeline helper input log_pb logger 
         models monitor parser pipeline plugin plugin/creator plugin/instance plugin/interface polling processor processor/daemon 
-        profile_sender reader sdk sender sls_control spl fuse
+        profile_sender reader sdk sender sls_control fuse
         )
-if (UNIX)
-    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer)
+if (LINUX)
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer spl)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong streamlog)
     endif()
@@ -120,14 +132,36 @@ if (BUILD_LOGTAIL)
         endif ()
     endif()
     target_link_libraries(${LOGTAIL_TARGET} application)
-    if (UNIX)
-        if (ENABLE_COMPATIBLE_MODE)
-            target_link_libraries(${LOGTAIL_TARGET} rt -static-libstdc++ -static-libgcc)
-        elseif (ENABLE_STATIC_LINK_CRT)
-            target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
-        endif ()
+    if (ENABLE_COMPATIBLE_MODE)
+        target_link_libraries(${LOGTAIL_TARGET} rt -static-libstdc++ -static-libgcc)
+    endif ()
+    if (ENABLE_STATIC_LINK_CRT)
+        target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
     endif ()
 endif()
+
+if (BUILD_LOGTAIL_SHARED_LIBRARY)
+    if (ENABLE_ENTERPRISE)
+        if (UNIX)
+            add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail.cpp)
+        elseif (MSVC)
+            add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail_windows.cpp)
+        endif ()
+    else ()
+        if (UNIX)
+            add_library(${LOGTAIL_TARGET} SHARED logtail.cpp)
+        elseif (MSVC)
+            add_library(${LOGTAIL_TARGET} SHARED logtail_windows.cpp)
+        endif ()
+    endif()
+    target_link_libraries(${LOGTAIL_TARGET} application)
+    if (ENABLE_COMPATIBLE_MODE)
+        target_link_libraries(${LOGTAIL_TARGET} rt -static-libstdc++ -static-libgcc)
+    endif ()
+    if (ENABLE_STATIC_LINK_CRT)
+        target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
+    endif ()
+endif ()
 
 # Logtail UT.
 if (BUILD_LOGTAIL_UT)

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 project(monitor)
 
 if (MSVC)
@@ -33,7 +33,7 @@ target_link_libraries(${PROJECT_NAME} event_handler)
 target_link_libraries(${PROJECT_NAME} go_pipeline)
 target_link_libraries(${PROJECT_NAME} application)
 target_link_libraries(${PROJECT_NAME} profile_sender)
-if (UNIX)
+if (LINUX)
     target_link_libraries(${PROJECT_NAME} observer)
 endif ()
 if (MSVC)

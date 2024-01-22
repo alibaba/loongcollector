@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 project(go_pipeline)
 
 file(GLOB_RECURSE LIB_SOURCE_FILES *.cpp *.h)
@@ -28,13 +28,15 @@ target_link_libraries(${PROJECT_NAME} monitor)
 target_link_libraries(${PROJECT_NAME} app_config)
 target_link_libraries(${PROJECT_NAME} config)
 target_link_libraries(${PROJECT_NAME} profile_sender)
-if (UNIX)
+if (LINUX)
     target_link_libraries(${PROJECT_NAME} dl)
 endif ()
 
-add_library(PluginAdapter SHARED LogtailPluginAdapter.h LogtailPluginAdapter.cpp)
-if (UNIX)
-    target_link_libraries(PluginAdapter dl)
-elseif (MSVC)
-    add_definitions(-DPLUGIN_ADAPTER_EXPORTS)
+if (LINUX OR MSVC)
+    add_library(PluginAdapter SHARED LogtailPluginAdapter.h LogtailPluginAdapter.cpp)
+    if (LINUX)
+        target_link_libraries(PluginAdapter dl)
+    else ()
+        add_definitions(-DPLUGIN_ADAPTER_EXPORTS)
+    endif ()
 endif ()

@@ -19,12 +19,12 @@
 #include "config_manager/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 #include "observer/ObserverManager.h"
 #endif
 #include "processor/daemon/LogProcess.h"
 #include "sender/Sender.h"
-#if defined(__ENTERPRISE__) && defined(__linux__)
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
 #include "shennong/ShennongManager.h"
 #include "streamlog/StreamLogManager.h"
@@ -52,7 +52,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         CheckIfInputUpdated(*config.mInputs[0], isInputObserverChanged, isInputFileChanged, isInputStreamChanged);
     }
 
-#if defined(__ENTERPRISE__) && defined(__linux__)
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Pause();
     }
@@ -60,7 +60,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         StreamLogManager::GetInstance()->ShutdownConfigUsage();
     }
 #endif
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
     if (isInputObserverStarted && isInputObserverChanged) {
         ObserverManager::GetInstance()->HoldOn(false);
     }
@@ -139,7 +139,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
             isInputFileStarted = true;
         }
     }
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
     if (isInputObserverChanged) {
         if (isInputObserverStarted) {
             ObserverManager::GetInstance()->Resume();
@@ -151,7 +151,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         }
     }
 #endif
-#if defined(__ENTERPRISE__) && defined(__linux__)
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (isInputStreamChanged) {
         if (isInputStreamStarted) {
             StreamLogManager::GetInstance()->StartupConfigUsage();
@@ -198,12 +198,12 @@ string PipelineManager::GetPluginStatistics() const {
 
 void PipelineManager::StopAllPipelines() {
     LOG_INFO(sLogger, ("stop all pipelines", "starts"));
-#if defined(__ENTERPRISE__) && defined(__linux__)
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->GetOpenStreamLog()) {
         StreamLogManager::GetInstance()->Shutdown();
     }
 #endif
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
     ObserverManager::GetInstance()->HoldOn(true);
 #endif
     FileServer::GetInstance()->Stop();

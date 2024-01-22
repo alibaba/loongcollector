@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 project(application)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
@@ -24,7 +24,7 @@ target_link_libraries(${PROJECT_NAME} config_watcher)
 target_link_libraries(${PROJECT_NAME} config_provider)
 target_link_libraries(${PROJECT_NAME} plugin)
 if (ENABLE_ENTERPRISE)
-    if (UNIX)
+    if (LINUX)
         target_link_libraries(${PROJECT_NAME} shennong)
     endif()
 endif()

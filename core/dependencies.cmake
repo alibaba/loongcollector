@@ -58,11 +58,11 @@ set(DEP_NAME_LIST
         unwind                  # google breakpad on Windows
         ssl                     # openssl
         crypto
-        dmiuuid
         leveldb
+        uuid
         )
 
-if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
+if (NOT NO_TCMALLOC)
     list(APPEND DEP_NAME_LIST "tcmalloc") # (gperftools)
 endif()
 
@@ -74,7 +74,7 @@ endif ()
 
 # Set link options, add user-defined INCLUDE_DIR and LIBRARY_DIR.
 foreach (DEP_NAME ${DEP_NAME_LIST})
-    logtaiL_define(${DEP_NAME}_${LINK_OPTION_SUFFIX} "Link option for ${DEP_NAME}" "")
+    logtail_define(${DEP_NAME}_${LINK_OPTION_SUFFIX} "Link option for ${DEP_NAME}" "")
 
     if (${DEP_NAME}_${INCLUDE_DIR_SUFFIX})
         include_directories("${${DEP_NAME}_${INCLUDE_DIR_SUFFIX}}")
@@ -120,6 +120,9 @@ macro(link_protobuf target_name)
                 debug "libprotobufd"
                 optimized "libprotobuf")
     endif ()
+    if (ANDROID)
+        target_link_libraries(${target_name} "log")
+    endif ()
 endmacro()
 logtail_define(protobuf_BIN "Absolute path to protoc" "${DEPS_BINARY_ROOT}/protoc")
 set(PROTO_FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/log_pb")
@@ -141,7 +144,7 @@ endmacro()
 
 # tcmalloc (gperftools)
 macro(link_tcmalloc target_name)
-    if(NOT CMAKE_BUILD_TYPE MATCHES Debug)
+    if(NOT NO_TCMALLOC)
         if (tcmalloc_${LINK_OPTION_SUFFIX})
             target_link_libraries(${target_name} "${tcmalloc_${LINK_OPTION_SUFFIX}}")
         elseif (UNIX)
@@ -301,6 +304,8 @@ endmacro()
 macro(link_unwind target_name)
     if (unwind_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${unwind_${LINK_OPTION_SUFFIX}}")
+    elseif (ANDROID)
+        # target_link_libraries(${target_name} "${unwind_${LIBRARY_DIR_SUFFIX}}/libunwindstack.a")
     elseif (UNIX)
         target_link_libraries(${target_name} "${unwind_${LIBRARY_DIR_SUFFIX}}/libunwind.a")
     elseif (MSVC)
@@ -359,6 +364,17 @@ macro(link_asan target_name)
         target_compile_options(${target_name} PUBLIC -fsanitize=address)
         target_link_options(${target_name} PUBLIC -fsanitize=address -static-libasan)
     endif()
+endmacro()
+
+# uuid
+macro(link_uuid target_name)
+    if (uuid_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${uuid_${LINK_OPTION_SUFFIX}}")
+    elseif (ANDROID)
+        target_link_libraries(${target_name} "${uuid_${LIBRARY_DIR_SUFFIX}}/libuuid.a")
+    elseif (UNIX)
+        target_link_libraries(${target_name} uuid)
+    endif ()
 endmacro()
 
 macro(link_spl target_name)
@@ -489,4 +505,3 @@ macro(link_spl target_name)
     target_link_libraries(${target_name} "/opt/logtail_spl/lib/libevent_pthreads.a")
 
 endmacro()
-

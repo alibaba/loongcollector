@@ -13,9 +13,15 @@
 // limitations under the License.
 
 #include "CompressTools.h"
-#include <zlib/zlib.h>
+
 #include <lz4/lz4.h>
+#ifdef __ANDROID__
+#include <zlib.h>
+#else
+#include <zlib/zlib.h>
+#endif
 #include <zstd/zstd.h>
+
 #include <cstring>
 
 #include "log_pb/sls_logs.pb.h"

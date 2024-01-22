@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 project(log_file_reader_unittest)
 
 add_executable(log_file_reader_deleted_file_unittest DeletedFileUnittest.cpp)

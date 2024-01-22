@@ -15,7 +15,8 @@
 #include "CrashBackTraceUtil.h"
 #include <cstdlib>
 #include <cstdio>
-#if defined(__linux__)
+#if defined(__ANDROID__)
+#elif defined(__linux__)
 #define UNW_LOCAL_ONLY
 #include <cxxabi.h>
 #include <libunwind/libunwind.h>
@@ -38,7 +39,8 @@ FILE* g_crashBackTraceFilePtr = NULL;
 std::unique_ptr<google_breakpad::ExceptionHandler> g_handler = nullptr;
 #endif
 
-#if defined(__linux__)
+#if defined(__ANDROID__)
+#elif defined(__linux__)
 void CrashBackTrace(int signum) {
     if (g_crash_process_flag) {
         // prevent recursive crash
@@ -122,7 +124,8 @@ bool MinidumpCallbackFunc(const wchar_t* dump_path,
 #endif
 
 void InitCrashBackTrace() {
-#if defined(__linux__)
+#if defined(__ANDROID__)
+#elif defined(__linux__)
     g_crashBackTraceFilePtr = fopen((GetProcessExecutionDir() + STRING_FLAG(crash_stack_file_name)).c_str(), "w");
     if (g_crashBackTraceFilePtr == NULL) {
         APSARA_LOG_ERROR(sLogger, ("unable to open stack back trace file", strerror(errno)));

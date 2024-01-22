@@ -437,7 +437,7 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                             tm->TM_GMTOFF = -5 - i;
 #endif
 #ifdef TM_ZONE
-                            tm->TM_ZONE = __UNCONST(nast[i]);
+                            tm->TM_ZONE = (char *)(nast[i]);
 #endif
                             bp = ep;
                             continue;
@@ -449,7 +449,7 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                             tm->TM_GMTOFF = -4 - i;
 #endif
 #ifdef TM_ZONE
-                            tm->TM_ZONE = __UNCONST(nadt[i]);
+                            tm->TM_ZONE = (char *)(nadt[i]);
 #endif
                             bp = ep;
                             continue;

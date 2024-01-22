@@ -48,7 +48,7 @@
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #include "config/provider/LegacyConfigProvider.h"
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 #include "shennong/ShennongManager.h"
 #include "streamlog/StreamLogManager.h"
 #endif
@@ -212,7 +212,7 @@ void Application::Start() {
 
     PluginRegistry::GetInstance()->LoadPlugins();
 
-#if defined(__ENTERPRISE__) && defined(__linux__)
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Init();
     }
@@ -298,7 +298,7 @@ bool Application::TryGetUUID() {
 }
 
 void Application::Exit() {
-#if defined(__ENTERPRISE__) && defined(__linux__)
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Stop();
     }

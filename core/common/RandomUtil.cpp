@@ -59,15 +59,14 @@ std::string GenerateRandomHashKey() {
             hashKey += out[i];
         }
     }
-    return hashKey;
 #elif defined(_MSC_VER)
     for (auto v : CalculateRandomUUID()) {
         if (v != '-') {
             hashKey += v;
         }
     }
-    return hashKey;
 #endif
+    return hashKey;
 }
 
 std::string GenerateHashKey(const std::string& baseHashKey, size_t bucketIndex, size_t bucketNum) {

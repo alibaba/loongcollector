@@ -12,17 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 project(input)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
+if (NOT LINUX)
+    list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/InputObserverNetwork.h ${CMAKE_CURRENT_SOURCE_DIR}/InputObserverNetwork.cpp)
+    if (ENABLE_ENTERPRISE)
+        list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/InputStream.h ${CMAKE_CURRENT_SOURCE_DIR}/InputStream.cpp)
+    endif ()
+endif ()
 append_source_files(LIB_SOURCE_FILES)
 add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} config)
 target_link_libraries(${PROJECT_NAME} file_server)
 target_link_libraries(${PROJECT_NAME} reader)
 target_link_libraries(${PROJECT_NAME} container_manager)
-if (UNIX)
+if (LINUX)
     target_link_libraries(${PROJECT_NAME} observer)
     if (ENABLE_ENTERPRISE)
         target_link_libraries(${PROJECT_NAME} streamlog)

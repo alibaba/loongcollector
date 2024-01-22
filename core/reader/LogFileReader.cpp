@@ -13,40 +13,46 @@
 // limitations under the License.
 
 #include "LogFileReader.h"
-#include <time.h>
-#include <limits>
-#include <numeric>
+
 #if defined(_MSC_VER)
 #include <fcntl.h>
 #include <io.h>
 #endif
-#include <boost/regex.hpp>
+#include <time.h>
+
+#include <algorithm>
+#include <limits>
+#include <numeric>
+#include <random>
+
 #include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 #include <cityhash/city.h>
-#include "common/UUIDUtil.h"
-#include "common/Flags.h"
-#include "common/HashUtil.h"
-#include "common/ErrorUtil.h"
-#include "common/TimeUtil.h"
-#include "common/FileSystemUtil.h"
-#include "common/RandomUtil.h"
-#include "common/Constants.h"
-#include "sdk/Common.h"
-#include "logger/Logger.h"
+
+#include "GloablFileDescriptorManager.h"
+#include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 #include "checkpoint/CheckpointManagerV2.h"
-#include "monitor/LogtailAlarm.h"
-#include "monitor/LogFileProfiler.h"
-#include "event_handler/LogInput.h"
-#include "app_config/AppConfig.h"
-#include "config_manager/ConfigManager.h"
+#include "common/Constants.h"
+#include "common/ErrorUtil.h"
+#include "common/FileSystemUtil.h"
+#include "common/Flags.h"
+#include "common/HashUtil.h"
 #include "common/LogFileCollectOffsetIndicator.h"
-#include "fuse/UlogfsHandler.h"
-#include "sender/Sender.h"
-#include "GloablFileDescriptorManager.h"
+#include "common/RandomUtil.h"
+#include "common/TimeUtil.h"
+#include "common/UUIDUtil.h"
+#include "config_manager/ConfigManager.h"
 #include "event/BlockEventManager.h"
-#include "reader/JsonLogFileReader.h"
+#include "event_handler/LogInput.h"
 #include "file_server/FileServer.h"
+#include "fuse/UlogfsHandler.h"
+#include "logger/Logger.h"
+#include "monitor/LogFileProfiler.h"
+#include "monitor/LogtailAlarm.h"
+#include "reader/JsonLogFileReader.h"
+#include "sdk/Common.h"
+#include "sender/Sender.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -374,7 +380,9 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
     // Randomize range checkpoints index for load balance.
     std::vector<uint32_t> concurrencySequence(mEOOption->concurrency);
     std::iota(concurrencySequence.begin(), concurrencySequence.end(), 0);
-    std::random_shuffle(concurrencySequence.begin(), concurrencySequence.end());
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(concurrencySequence.begin(), concurrencySequence.end(), g);
     // Initialize range checkpoints (recover from local if have).
     mEOOption->rangeCheckpointPtrs.resize(mEOOption->concurrency);
     std::string baseHashKey;
