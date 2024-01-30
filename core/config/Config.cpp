@@ -114,7 +114,7 @@ bool Config::Parse() {
             if (plugin.isObject()) {
                 key = "Type";
                 const Json::Value* it = plugin.find(key.c_str(), key.c_str() + key.size());
-                if (it && it->isString() && it->asString() == "flusherSLS") {
+                if (it && it->isString() && it->asString() == "flusher_sls") {
                     GetMandatoryStringParam(plugin, "Project", mProject, errorMsg);
                     GetMandatoryStringParam(plugin, "Logstore", mLogstore, errorMsg);
                     GetMandatoryStringParam(plugin, "Region", mRegion, errorMsg);
