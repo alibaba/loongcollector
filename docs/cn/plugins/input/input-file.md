@@ -152,7 +152,7 @@ inputs:
     FilePaths: 
       - /home/test-log/regMulti.log
     Multiline:
-      StartPattern: \[\d+-\d+-\w+:\d+:\d+,\d+]\s\[\w+]\s.*
+      StartPattern: \[\d+-\d+-\w+:\d+:\d+.\d+]\s\[\w+]\s.*
 processors:
   - Type: processor_parse_regex_native
     SourceKey: content
