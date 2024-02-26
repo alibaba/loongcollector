@@ -26,7 +26,7 @@ namespace logtail {
 
 HistoryFileImporter::HistoryFileImporter() {
     LOG_INFO(sLogger, ("HistoryFileImporter", "init"));
-    static auto _doNotQuitThread = CreateThread([this]() { Run(); });
+    mThread = CreateThread([this]() { Run(); });
 }
 
 void HistoryFileImporter::PushEvent(const HistoryFileEvent& event) {

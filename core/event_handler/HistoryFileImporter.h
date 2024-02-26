@@ -16,10 +16,10 @@
 
 #pragma once
 #include <string>
-#include <vector>
 #include <unordered_map>
 #include "common/StringTools.h"
 #include "common/CircularBuffer.h"
+#include "common/Thread.h"
 #include "input/InputFile.h"
 
 namespace logtail {
@@ -47,8 +47,8 @@ public:
     HistoryFileImporter();
 
     static HistoryFileImporter* GetInstance() {
-        static HistoryFileImporter sFileImporter;
-        return &sFileImporter;
+        static HistoryFileImporter* sFileImporter = new HistoryFileImporter;
+        return sFileImporter;
     }
 
     void PushEvent(const HistoryFileEvent& event);
@@ -66,6 +66,7 @@ private:
     CircularBufferSem<HistoryFileEvent, HISTORY_EVENT_MAX> mEventQueue;
     std::unordered_map<std::string, int64_t> mCheckPoints;
     FILE* mCheckPointPtr;
+    ThreadPtr mThread;
 };
 
 } // namespace logtail
