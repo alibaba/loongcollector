@@ -13,42 +13,43 @@
 // limitations under the License.
 
 #include "Sender.h"
-#include "sls_control/SLSControl.h"
+
+#include <atomic>
 #include <fstream>
 #include <string>
-#include <atomic>
+
+#include "sls_control/SLSControl.h"
 #if defined(__linux__)
 #include <fcntl.h>
 #include <unistd.h>
 #endif
-#include "common/Constants.h"
-#include "common/StringTools.h"
+#include "app_config/AppConfig.h"
+#include "application/Application.h"
 #include "common/CompressTools.h"
-#include "common/FileEncryption.h"
-#include "common/ExceptionBase.h"
-#include "common/FileSystemUtil.h"
-#include "common/LogtailCommonFlags.h"
-#include "common/TimeUtil.h"
-#include "common/RuntimeUtil.h"
-#include "common/HashUtil.h"
-#include "common/FileSystemUtil.h"
+#include "common/Constants.h"
 #include "common/EndpointUtil.h"
 #include "common/ErrorUtil.h"
+#include "common/ExceptionBase.h"
+#include "common/FileEncryption.h"
+#include "common/FileSystemUtil.h"
+#include "common/HashUtil.h"
+#include "common/LogFileCollectOffsetIndicator.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/RandomUtil.h"
+#include "common/RuntimeUtil.h"
 #include "common/SlidingWindowCounter.h"
-#include "sdk/Client.h"
-#include "sdk/Exception.h"
-#include "processor/daemon/LogProcess.h"
-#include "monitor/LogtailAlarm.h"
+#include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "config_manager/ConfigManager.h"
+#include "fuse/UlogfsHandler.h"
+#include "monitor/LogFileProfiler.h"
 #include "monitor/LogIntegrity.h"
 #include "monitor/LogLineCount.h"
-#include "monitor/LogFileProfiler.h"
-#include "app_config/AppConfig.h"
+#include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
-#include "config_manager/ConfigManager.h"
-#include "common/LogFileCollectOffsetIndicator.h"
-#include "fuse/UlogfsHandler.h"
-#include "application/Application.h"
+#include "processor/daemon/LogProcess.h"
+#include "sdk/Client.h"
+#include "sdk/Exception.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -261,7 +262,8 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
 #endif
                 int32_t lastUpdateTime;
                 sdk::Client* sendClient = Sender::Instance()->GetSendClient(mDataPtr->mRegion, mDataPtr->mAliuid);
-                if (SLSControl::GetInstance()->SetSlsSendClientAuth(mDataPtr->mAliuid, false, sendClient, lastUpdateTime))
+                if (SLSControl::GetInstance()->SetSlsSendClientAuth(
+                        mDataPtr->mAliuid, false, sendClient, lastUpdateTime))
                     operation = RETRY_ASYNC_WHEN_FAIL;
                 else if (curTime - lastUpdateTime < INT32_FLAG(unauthorized_allowed_delay_after_reset))
                     operation = RETRY_ASYNC_WHEN_FAIL;
@@ -483,26 +485,26 @@ SendClosure::RecompressData(sdk::Response* response, const string& errorCode, co
     return RETRY_ASYNC_WHEN_FAIL;
 }
 
-Sender::Sender(): mDefaultRegion(STRING_FLAG(default_region_name)) {
+Sender::Sender() : mDefaultRegion(STRING_FLAG(default_region_name)) {
     setupServerSwitchPolicy();
-    
+
     srand(time(NULL));
     mFlushLog = false;
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
     mTestNetworkClient.reset(new sdk::Client("",
-                                         STRING_FLAG(default_access_key_id),
-                                         STRING_FLAG(default_access_key),
-                                         INT32_FLAG(sls_client_send_timeout),
-                                         LogFileProfiler::mIpAddr,
-                                         AppConfig::GetInstance()->GetBindInterface()));
+                                             STRING_FLAG(default_access_key_id),
+                                             STRING_FLAG(default_access_key),
+                                             INT32_FLAG(sls_client_send_timeout),
+                                             LogFileProfiler::mIpAddr,
+                                             AppConfig::GetInstance()->GetBindInterface()));
     SLSControl::GetInstance()->SetSlsSendClientCommonParam(mTestNetworkClient.get());
 
     mUpdateRealIpClient.reset(new sdk::Client("",
-                                          STRING_FLAG(default_access_key_id),
-                                          STRING_FLAG(default_access_key),
-                                          INT32_FLAG(sls_client_send_timeout),
-                                          LogFileProfiler::mIpAddr,
-                                          AppConfig::GetInstance()->GetBindInterface()));
+                                              STRING_FLAG(default_access_key_id),
+                                              STRING_FLAG(default_access_key),
+                                              INT32_FLAG(sls_client_send_timeout),
+                                              LogFileProfiler::mIpAddr,
+                                              AppConfig::GetInstance()->GetBindInterface()));
     SLSControl::GetInstance()->SetSlsSendClientCommonParam(mUpdateRealIpClient.get());
     SetSendingBufferCount(0);
     size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
@@ -801,7 +803,9 @@ sdk::Client* Sender::GetSendClient(const std::string& region, const std::string&
                                               AppConfig::GetInstance()->GetBindInterface());
     SLSControl::GetInstance()->SetSlsSendClientCommonParam(sendClient);
     ResetPort(region, sendClient);
-    LOG_INFO(sLogger, ("init endpoint for sender, region", region)("uid", aliuid)("endpoint", endpoint)("use https",ToString(sendClient->IsUsingHTTPS())));
+    LOG_INFO(sLogger,
+             ("init endpoint for sender, region", region)("uid", aliuid)("hostname", GetHostFromEndpoint(endpoint))(
+                 "use https", ToString(sendClient->IsUsingHTTPS())));
     SLSControl::GetInstance()->SetSlsSendClientAuth(aliuid, true, sendClient, lastUpdateTime);
     SlsClientInfo* clientInfo = new SlsClientInfo(sendClient, time(NULL));
     {
@@ -829,9 +833,10 @@ bool Sender::ResetSendClientEndpoint(const std::string aliuid, const std::string
     mSenderQueue.OnRegionRecover(region);
     sendClient->SetSlsHost(endpoint);
     ResetPort(region, sendClient);
-    LOG_INFO(sLogger,
-             ("reset endpoint for sender, region", region)("uid", aliuid)("from", originalEndpoint)("to", endpoint)(
-                 "use https", ToString(sendClient->IsUsingHTTPS())));
+    LOG_INFO(
+        sLogger,
+        ("reset endpoint for sender, region", region)("uid", aliuid)("from", GetHostFromEndpoint(originalEndpoint))(
+            "to", GetHostFromEndpoint(endpoint))("use https", ToString(sendClient->IsUsingHTTPS())));
     return true;
 }
 
@@ -2174,8 +2179,16 @@ bool Sender::Send(const std::string& projectName,
                   const string& filename,
                   const LogGroupContext& context) {
     static Aggregator* aggregator = Aggregator::GetInstance();
-    return aggregator->Add(
-        projectName, sourceId, logGroup, logGroupKey, config, mergeType, logGroupSize, defaultRegion, filename, context);
+    return aggregator->Add(projectName,
+                           sourceId,
+                           logGroup,
+                           logGroupKey,
+                           config,
+                           mergeType,
+                           logGroupSize,
+                           defaultRegion,
+                           filename,
+                           context);
 }
 
 bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
@@ -2191,7 +2204,7 @@ bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
     if ((int32_t)logGroupSize > INT32_FLAG(max_send_log_group_size)) {
         LOG_ERROR(sLogger,
                   ("log group size exceed limit. actual size", logGroupSize)("size limit",
-                                                                                  INT32_FLAG(max_send_log_group_size)));
+                                                                             INT32_FLAG(max_send_log_group_size)));
         return false;
     }
 
@@ -2860,7 +2873,7 @@ void Sender::DecreaseRegionReferenceCnt(const std::string& region) {
 vector<string> Sender::GetRegionAliuids(const std::string& region) {
     PTScopedLock lock(mRegionAliuidRefCntMapLock);
     vector<string> aliuids;
-    for (const auto &item: mRegionAliuidRefCntMap[region]) {
+    for (const auto& item : mRegionAliuidRefCntMap[region]) {
         aliuids.push_back(item.first);
     }
     return aliuids;

@@ -89,6 +89,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
                 config.mProject,
                 config.mLogstore,
                 config.mRegion);
+            diff.mUnchanged.push_back(config.mName);
             continue;
         }
         LOG_INFO(sLogger,

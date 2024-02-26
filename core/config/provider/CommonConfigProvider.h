@@ -39,6 +39,7 @@ public:
     }
 
     void Init(const std::string& dir) override;
+    void Stop() override;
 
 private:
     struct ConfigServerAddress {
@@ -51,7 +52,7 @@ private:
     };
 
     CommonConfigProvider() = default;
-    ~CommonConfigProvider();
+    ~CommonConfigProvider() = default;
 
     ConfigServerAddress GetOneConfigServerAddress(bool changeConfigServer);
     const std::vector<std::string>& GetConfigServerTags() const { return mConfigServerTags; }

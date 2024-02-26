@@ -308,6 +308,13 @@ void Application::Exit() {
 
     PluginRegistry::GetInstance()->UnloadPlugins();
 
+#ifdef __ENTERPRISE__
+    EnterpriseConfigProvider::GetInstance()->Stop();
+    LegacyConfigProvider::GetInstance()->Stop();
+#else
+    CommonConfigProvider::GetInstance()->Stop();
+#endif
+
     LogtailMonitor::GetInstance()->Stop();
     LogtailAlarm::GetInstance()->Stop();
     // from now on, alarm should not be used.

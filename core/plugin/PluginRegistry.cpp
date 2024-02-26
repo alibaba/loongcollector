@@ -82,9 +82,6 @@ PluginRegistry::PluginRegistry() {
                   "service_skywalking_agent_v3",
                   "service_syslog",
                   "service_udp_server",
-                  "metric_alarm",
-                  "metric_container",
-                  "metric_statistics",
                   "metric_debug_file",
                   "metric_docker_file",
                   "metric_checkpoint_example",
@@ -100,6 +97,25 @@ PluginRegistry::PluginRegistry() {
                   "metric_redis",
                   "metric_system",
                   "metric_system_v2",
+#ifdef _MSC_VER
+                  "service_wineventlog",
+#else
+                  "input_command",
+                  "service_gpu_metric",
+                  "service_journal",
+                  "service_snmp",
+                  "service_telegraf",
+                  "service_prometheus",
+#endif
+#ifdef __ENTERPRISE__
+                  "service_sunfire_heartbeat",
+                  "metric_sunfire_nginx",
+                  "metric_sunfire_nginx_status",
+                  "metric_sunfire_process",
+                  "metric_sunfire_system",
+                  "metric_alimetrics_custom",
+                  "metric_alimetrics_middleware",
+#endif
                   "processor_add_fields",
                   "processor_anchor",
                   "processor_appender",
@@ -135,6 +151,10 @@ PluginRegistry::PluginRegistry() {
                   "processor_split_string",
                   "processor_string_replace",
                   "processor_strptime",
+#ifdef __ENTERPRISE__
+                  "processor_guess_timestamp",
+                  "processor_uniquedim",
+#endif
                   "aggregator_default",
                   "aggregator_base",
                   "aggregator_content_value_group",
@@ -144,33 +164,30 @@ PluginRegistry::PluginRegistry() {
                   "aggregator_opentelemetry",
                   "aggregator_shardhash",
                   "aggregator_skywalking",
+#ifdef __ENTERPRISE__
+                  "aggregator_sunfire",
+#endif
                   "flusher_checker",
+                  "flusher_http",
+                  "flusher_kafka",
+                  "flusher_sleep",
+                  "flusher_statistics",
+                  "flusher_stdout",
+#ifdef __ENTERPRISE__
+                  "flusher_http_tj",
+#else
                   "flusher_clickhouse",
                   "flusher_elasticsearch",
                   "flusher_grpc",
-                  "flusher_http",
-                  "flusher_kafka",
                   "flusher_kafka_v2",
                   "flusher_loki",
                   "flusher_otlp",
                   "flusher_pulsar",
-                  "flusher_sleep",
-                  "flusher_statistics",
-                  "flusher_stdout",
+#endif
                   "ext_basicauth",
                   "ext_default_decoder",
                   "ext_groupinfo_filter",
                   "ext_request_breaker"};
-#ifdef _MSC_VER
-    mGoPlugins.insert("service_wineventlog");
-#else
-    mGoPlugins.insert("input_command");
-    mGoPlugins.insert("service_gpu_metric");
-    mGoPlugins.insert("service_journal");
-    mGoPlugins.insert("service_snmp");
-    mGoPlugins.insert("service_telegraf");
-    mGoPlugins.insert("service_prometheus");
-#endif
 }
 
 void PluginRegistry::LoadPlugins() {

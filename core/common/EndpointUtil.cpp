@@ -49,4 +49,15 @@ string StandardizeEndpoint(const string& endpoint, const string& defaultEndpoint
     return res;
 }
 
+string GetHostFromEndpoint(const std::string& endpoint) {
+    static size_t httpSchemaLen = strlen("http://"), httpsSchemaLen = strlen("https://");
+    if (endpoint.find("https://") == 0) {
+        return endpoint.substr(httpsSchemaLen);
+    } else if (endpoint.find("http://") == 0) {
+        return endpoint.substr(httpSchemaLen);
+    } else {
+        return endpoint;
+    }
+}
+
 } // namespace logtail
