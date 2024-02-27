@@ -32,17 +32,18 @@ on:
 jobs:
   CI:
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       matrix:
         go-version: [1.19]
         # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
-        runner: [ubuntu-latest]
+        runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
+      - name: prepare ubuntu environment
+        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
       # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
-        if: matrix.runner == 'ubuntu-latest'
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
@@ -56,33 +57,32 @@ jobs:
           df -hT $PWD
 
       - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: true
 
-      #- name: Build Unit Test
-      #  if: matrix.runner == 'ubuntu-latest'
-      #  env:
-      #    BUILD_LOGTAIL: OFF
-      #    BUILD_LOGTAIL_UT: ON
-      #    ENABLE_COMPATIBLE_MODE: ON
-      #    ENABLE_STATIC_LINK_CRT: ON
-      #    WITHOUTGDB: ON
-      #    # BUILD_TYPE: Debug # TODO: Uncomment when memory management is refined
-      #  run: make core
+      - name: Build Unit Test
+        env:
+          BUILD_LOGTAIL: OFF
+          BUILD_LOGTAIL_UT: ON
+          ENABLE_COMPATIBLE_MODE: ON
+          ENABLE_STATIC_LINK_CRT: ON
+          WITHOUTGDB: ON
+          MAKE_JOBS: 8
+          # BUILD_TYPE: Debug # TODO: Uncomment when memory management is refined
+        run: make core
 
-      #- name: Unit Test
-      #  if: matrix.runner == 'ubuntu-latest'
-      #  run: make unittest_core
+      - name: Unit Test
+        run: make unittest_core
 
   result:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: arc-runner-set-ilogtail
+    timeout-minutes: 90
     needs: [CI]
     steps:
       - name: Build Result

@@ -36,18 +36,18 @@ jobs:
       matrix:
         go-version: [ 1.19 ]
         # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
-        runner: [ ubuntu-latest, macos-latest, windows-2019 ]
+        runner: [ arc-runner-set-ilogtail ]
       fail-fast: true
     steps:
 
       # prepare ubuntu environment
       - name: prepare ubuntu environment
-        if: matrix.runner == 'ubuntu-latest'
-        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev
+        if: matrix.runner == 'arc-runner-set-ilogtail'
+        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
         
       # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
-        if: matrix.runner == 'ubuntu-latest'
+        if: matrix.runner == 'arc-runner-set-ilogtail'
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
@@ -69,12 +69,12 @@ jobs:
           echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
 
       - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -82,7 +82,7 @@ jobs:
         run: make plugin_main
 
   result:
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-ilogtail
     timeout-minutes: 60
     needs: [ CI ]
     steps:

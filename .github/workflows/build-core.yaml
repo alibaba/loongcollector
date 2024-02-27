@@ -37,12 +37,13 @@ jobs:
       matrix:
         go-version: [1.19]
         # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
-        runner: [ubuntu-latest]
+        runner: [ arc-runner-set-ilogtail ]
       fail-fast: true
     steps:
+      - name: prepare ubuntu environment
+        run: sudo apt-get clean && sudo apt-get update && sudo apt-get install -y libsystemd-dev build-essential git curl bc
       # Clean up space to prevent action from running out of disk space.
       - name: Free disk space
-        if: matrix.runner == 'ubuntu-latest'
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
@@ -56,26 +57,25 @@ jobs:
           df -hT $PWD
 
       - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
           
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: true
 
       - name: Build Binary
-        if: matrix.runner == 'ubuntu-latest'
         env:
           BUILD_LOGTAIL_UT: OFF
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
+          MAKE_JOBS: 16
         run: make core
 
       - name: Check compatibility
-        if: matrix.runner == 'ubuntu-latest'
         env:
           BUILD_LOGTAIL_UT: OFF
           ENABLE_COMPATIBLE_MODE: ON
@@ -84,8 +84,8 @@ jobs:
         run: make dist && scripts/check_glibc.sh
 
   result:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: arc-runner-set-ilogtail
+    timeout-minutes: 60
     needs: [CI]
     steps:
       - name: Build Result
