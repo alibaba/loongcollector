@@ -142,6 +142,7 @@ PluginRegistry::PluginRegistry() {
                   "processor_otel_trace",
                   "processor_packjson",
                   "processor_pick_key",
+                  "processor_rate_limit",
                   "processor_regex",
                   "processor_rename",
                   "processor_split_char",
