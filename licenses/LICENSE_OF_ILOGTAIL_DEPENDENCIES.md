@@ -7,7 +7,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/openkruise/kruise-api](https://pkg.go.dev/github.com/openkruise/kruise-api?tab=licenses)
 - [sigs.k8s.io/gateway-api](https://pkg.go.dev/sigs.k8s.io/gateway-api?tab=licenses)
 - [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
-- [github.com/aliyun/alibaba-cloud-sdk-go](https://pkg.go.dev/github.com/aliyun/alibaba-cloud-sdk-go?tab=licenses)
 - [github.com/containerd/cgroups](https://pkg.go.dev/github.com/containerd/cgroups?tab=licenses)
 - [github.com/containerd/containerd](https://pkg.go.dev/github.com/containerd/containerd?tab=licenses)
 - [github.com/containerd/continuity](https://pkg.go.dev/github.com/containerd/continuity?tab=licenses)
@@ -32,14 +31,12 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/intel/goresctrl](https://pkg.go.dev/github.com/intel/goresctrl?tab=licenses)
 - [github.com/go-logr/logr](https://pkg.go.dev/github.com/go-logr/logr?tab=licenses)
 - [github.com/gogo/googleapis](https://pkg.go.dev/github.com/gogo/googleapis?tab=licenses)
-- [github.com/golang/groupcache](https://pkg.go.dev/github.com/golang/groupcache?tab=licenses)
 - [github.com/golang-sql/civil](https://pkg.go.dev/github.com/golang-sql/civil?tab=licenses)
 - [github.com/google/gofuzz](https://pkg.go.dev/github.com/google/gofuzz?tab=licenses)
 - [github.com/jcmturner/aescts](https://pkg.go.dev/github.com/jcmturner/aescts?tab=licenses)
 - [github.com/jcmturner/dnsutils](https://pkg.go.dev/github.com/jcmturner/dnsutils?tab=licenses)
 - [github.com/jcmturner/gokrb5](https://pkg.go.dev/github.com/jcmturner/gokrb5?tab=licenses)
 - [github.com/jcmturner/rpc](https://pkg.go.dev/github.com/jcmturner/rpc?tab=licenses)
-- [github.com/jmespath/go-jmespath](https://pkg.go.dev/github.com/jmespath/go-jmespath?tab=licenses)
 - [github.com/matttproud/golang\_protobuf\_extensions](https://pkg.go.dev/github.com/matttproud/golang_protobuf_extensions?tab=licenses)
 - [github.com/moby/locker](https://pkg.go.dev/github.com/moby/locker?tab=licenses)
 - [github.com/moby/spdystream](https://pkg.go.dev/github.com/moby/spdystream?tab=licenses)
@@ -99,16 +96,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/grafana/loki-client-go](https://pkg.go.dev/github.com/grafana/loki-client-go?tab=licenses)
 - [github.com/mwitkow/go-conntrack](https://pkg.go.dev/github.com/mwitkow/go-conntrack?tab=licenses)
 - [sigs.k8s.io/json](https://pkg.go.dev/sigs.k8s.io/json?tab=licenses)
-- [gopkg.in/ini.v1](https://pkg.go.dev/gopkg.in/ini.v1?tab=licenses)
 - [go.opentelemetry.io/proto/otlp](https://pkg.go.dev/go.opentelemetry.io/proto/otlp?tab=licenses)
-- [github.com/alibabacloud-go/debug](https://pkg.go.dev/github.com/alibabacloud-go/debug?tab=licenses)
-- [github.com/alibabacloud-go/openapi-util](https://pkg.go.dev/github.com/alibabacloud-go/openapi-util?tab=licenses)
-- [github.com/alibabacloud-go/sls-20201230](https://pkg.go.dev/github.com/alibabacloud-go/sls-20201230?tab=licenses)
-- [github.com/alibabacloud-go/tea](https://pkg.go.dev/github.com/alibabacloud-go/tea?tab=licenses)
-- [github.com/alibabacloud-go/tea-utils](https://pkg.go.dev/github.com/alibabacloud-go/tea-utils?tab=licenses)
-- [github.com/alibabacloud-go/tea-xml](https://pkg.go.dev/github.com/alibabacloud-go/tea-xml?tab=licenses)
-- [github.com/aliyun/credentials-go](https://pkg.go.dev/github.com/aliyun/credentials-go?tab=licenses)
-- [github.com/tjfoc/gmsm](https://pkg.go.dev/github.com/tjfoc/gmsm?tab=licenses)
 
 ## BSD licenses
 
@@ -157,7 +145,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/munnerz/goautoneg](https://pkg.go.dev/github.com/munnerz/goautoneg?tab=licenses)
 - [github.com/pmezard/go-difflib](https://pkg.go.dev/github.com/pmezard/go-difflib?tab=licenses)
 - [github.com/gorilla/websocket](github.com/gorilla/websocket)
-- [github.com/clbanning/mxj](https://pkg.go.dev/github.com/clbanning/mxj?tab=licenses)
 
 ## MIT licenses
 

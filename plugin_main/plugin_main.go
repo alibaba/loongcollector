@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"runtime"
 
-	_ "github.com/alibaba/ilogtail/helper/envconfig"
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
