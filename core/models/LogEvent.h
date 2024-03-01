@@ -15,14 +15,17 @@
  */
 
 #pragma once
+
 #include "models/PipelineEvent.h"
 
 namespace logtail {
 
 using LogContents = std::map<StringView, StringView>;
+
 class LogEvent : public PipelineEvent {
+    friend class PipelineEventGroup;
+
 public:
-    static std::unique_ptr<LogEvent> CreateEvent(std::shared_ptr<SourceBuffer>& sb);
     const LogContents& GetContents() const { return contents; }
     LogContents& MutableContents() { return contents; }
     void SetContent(const StringView& key, const StringView& val);
@@ -35,13 +38,15 @@ public:
     void SetContentNoCopy(const StringView& key, const StringView& val);
     void DelContent(const StringView& key);
 
-    // for debug and test
-    Json::Value ToJson() const override;
-    bool FromJson(const Json::Value&) override;
     uint64_t EventsSizeBytes() override;
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    Json::Value ToJson() const override;
+    bool FromJson(const Json::Value&) override;
+#endif
+
 private:
-    LogEvent();
+    LogEvent(PipelineEventGroup* ptr);
 
     LogContents contents;
 };

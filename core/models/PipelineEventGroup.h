@@ -15,6 +15,7 @@
  */
 
 #pragma once
+
 #include <memory>
 #include <string>
 
@@ -60,19 +61,24 @@ using GroupTags = std::map<StringView, StringView>;
 // DeepCopy is required if we want to support no-linear topology
 // We cannot just use default copy constructor as it won't deep copy PipelineEvent pointed in Events vector.
 using EventsContainer = std::vector<PipelineEventPtr>;
+
 class PipelineEventGroup {
 public:
     PipelineEventGroup(std::shared_ptr<SourceBuffer> sourceBuffer) : mSourceBuffer(sourceBuffer) {}
     PipelineEventGroup(const PipelineEventGroup&) = delete;
     PipelineEventGroup& operator=(const PipelineEventGroup&) = delete;
-    PipelineEventGroup(PipelineEventGroup&&) noexcept = default;
-    PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept = default;
+    PipelineEventGroup(PipelineEventGroup&&) noexcept;
+    PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept;
 
+    std::unique_ptr<LogEvent> CreateLogEvent();
+    std::unique_ptr<MetricEvent> CreateMetricEvent();
+    std::unique_ptr<SpanEvent> CreateSpanEvent();
 
     const EventsContainer& GetEvents() const { return mEvents; }
     EventsContainer& MutableEvents() { return mEvents; }
-    void AddEvent(const PipelineEventPtr& event);
-    void AddEvent(std::unique_ptr<PipelineEvent>&& event);
+    LogEvent* AddLogEvent();
+    MetricEvent* AddMetricEvent();
+    SpanEvent* AddSpanEvent();
     void SwapEvents(EventsContainer& other) { mEvents.swap(other); }
     // void SetSourceBuffer(std::shared_ptr<SourceBuffer> sourceBuffer) { mSourceBuffer = sourceBuffer; }
     std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
@@ -110,6 +116,7 @@ public:
     std::string ToJsonString() const;
     bool FromJsonString(const std::string&);
 #endif
+
 private:
     GroupMetadata mMetadata; // Used to generate tag/log. Will not output.
     GroupTags mTags; // custom tags to output

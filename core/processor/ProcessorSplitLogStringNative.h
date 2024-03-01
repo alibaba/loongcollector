@@ -40,10 +40,9 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    void ProcessEvent(PipelineEventGroup& logGroup, const PipelineEventPtr& e, EventsContainer& newEvents);
-    void LogSplit(const char* buffer, int32_t size, int32_t& lineFeed, std::vector<StringView>& logIndex);
+    void ProcessEvent(PipelineEventGroup& logGroup, PipelineEventPtr&& e, EventsContainer& newEvents);
+    StringView GetNextLine(StringView log, size_t begin);
 
-    int* mFeedLines = nullptr;
     int* mSplitLines = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN

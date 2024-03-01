@@ -15,20 +15,24 @@
  */
 
 #pragma once
+
 #include "models/PipelineEvent.h"
 
 namespace logtail {
 
 class MetricEvent : public PipelineEvent {
-public:
-    static std::unique_ptr<MetricEvent> CreateEvent(std::shared_ptr<SourceBuffer>& sb);
+    friend class PipelineEventGroup;
 
-    // for debug and test
+public:
+    uint64_t EventsSizeBytes() override;
+
+#ifdef APSARA_UNIT_TEST_MAIN
     Json::Value ToJson() const override;
     bool FromJson(const Json::Value&) override;
-    uint64_t EventsSizeBytes() override;
+#endif
+
 private:
-    MetricEvent();
+    MetricEvent(PipelineEventGroup* ptr);
 };
 
 } // namespace logtail

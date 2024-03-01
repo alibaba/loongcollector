@@ -101,7 +101,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventSingleLine() {
     std::string logPath("/var/log/message");
     EventsContainer newEvents;
     // run test function
-    processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+    processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
     eventGroup.SwapEvents(newEvents);
     // judge result
     std::string expectJson = R"({
@@ -167,7 +167,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultiline() {
     std::string logPath("/var/log/message");
     EventsContainer newEvents;
     // run test function
-    processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+    processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
     eventGroup.SwapEvents(newEvents);
     // judge result
     std::stringstream expectJson;
@@ -237,7 +237,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineKeepUnmatch() {
     std::string logPath("/var/log/message");
     EventsContainer newEvents;
     // run test function
-    processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+    processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
     eventGroup.SwapEvents(newEvents);
     // judge result
     std::stringstream expectJson;
@@ -322,7 +322,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineDiscardUnmatch(
     std::string logPath("/var/log/message");
     EventsContainer newEvents;
     // run test function
-    processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+    processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
     eventGroup.SwapEvents(newEvents);
     // judge result
     std::stringstream expectJson;
@@ -378,7 +378,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineAllNotMatchKeep
     std::string logPath("/var/log/message");
     EventsContainer newEvents;
     // run test function
-    processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+    processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
     eventGroup.SwapEvents(newEvents);
     // judge result
     std::stringstream expectJson;
@@ -460,7 +460,7 @@ void ProcessorSplitRegexNativeUnittest::TestProcessEventMultilineAllNotMatchDisc
     std::string logPath("/var/log/message");
     EventsContainer newEvents;
     // run test function
-    processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+    processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
     eventGroup.SwapEvents(newEvents);
     // judge result
     std::string outJson = eventGroup.ToJsonString();
@@ -590,7 +590,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -636,7 +636,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -692,7 +692,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginContinue()
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::string outJson = eventGroup.ToJsonString();
@@ -736,7 +736,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -783,7 +783,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -829,7 +829,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::string outJson = eventGroup.ToJsonString();
@@ -859,7 +859,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBeginEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::string outJson = eventGroup.ToJsonString();
@@ -902,7 +902,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBegin() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -948,7 +948,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithBegin() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::string outJson = eventGroup.ToJsonString();
@@ -993,7 +993,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithContinueEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1039,7 +1039,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithContinueEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1085,7 +1085,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithContinueEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::string outJson = eventGroup.ToJsonString();
@@ -1128,7 +1128,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1174,7 +1174,7 @@ void ProcessorSplitRegexDisacardUnmatchUnittest::TestLogSplitWithEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::string outJson = eventGroup.ToJsonString();
@@ -1238,7 +1238,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1294,7 +1294,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1360,7 +1360,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginContinue() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1430,7 +1430,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1487,7 +1487,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1543,7 +1543,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1609,7 +1609,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBeginEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1678,7 +1678,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBegin() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1734,7 +1734,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithBegin() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1795,7 +1795,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1851,7 +1851,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1907,7 +1907,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithContinueEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -1966,7 +1966,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;
@@ -2012,7 +2012,7 @@ void ProcessorSplitRegexKeepUnmatchUnittest::TestLogSplitWithEnd() {
         std::string logPath("/var/log/message");
         EventsContainer newEvents;
         // run test function
-        processor.ProcessEvent(eventGroup, logPath, eventGroup.GetEvents()[0], newEvents);
+        processor.ProcessEvent(eventGroup, logPath, std::move(eventGroup.MutableEvents()[0]), newEvents);
         eventGroup.SwapEvents(newEvents);
         // judge result
         std::stringstream expectJson;

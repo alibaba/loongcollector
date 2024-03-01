@@ -1512,8 +1512,8 @@ void ProcessorParseDelimiterNativeUnittest::TestAddLog() {
     ProcessorInstance processorInstance(&processor, pluginId);
     APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
 
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    auto logEvent = LogEvent::CreateEvent(sourceBuffer);
+    auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
+    auto logEvent = eventGroup.CreateLogEvent();
     char key[] = "key";
     char value[] = "value";
     processor.AddLog(key, value, *logEvent);

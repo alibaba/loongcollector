@@ -43,8 +43,8 @@ void PipelineEventGroupInput::getHeader(IOHeader& header, std::string& err) {
 
 void PipelineEventGroupInput::getColumn(const int32_t colIndex, std::vector<SplStringPiece>& values, std::string& err) {
     std::string columnName = mColumnNames[colIndex];
-    for (auto event : mLogGroup->GetEvents()) {
-        LogEvent& sourceEvent = event.Cast<LogEvent>();
+    for (const auto &event : mLogGroup->GetEvents()) {
+        const LogEvent& sourceEvent = event.Cast<LogEvent>();
         StringView content = sourceEvent.GetContent(columnName);
         values.emplace_back(SplStringPiece(content.data(), content.size()));
     }
@@ -53,8 +53,8 @@ void PipelineEventGroupInput::getColumn(const int32_t colIndex, std::vector<SplS
 void PipelineEventGroupInput::getTimeColumns(std::vector<uint32_t>& times,
                                              std::vector<uint32_t>& timeNanos,
                                              std::string& err) {
-    for (auto event : mLogGroup->GetEvents()) {
-        LogEvent& sourceEvent = event.Cast<LogEvent>();
+    for (const auto &event : mLogGroup->GetEvents()) {
+        const LogEvent& sourceEvent = event.Cast<LogEvent>();
         times.emplace_back(sourceEvent.GetTimestamp());
         timeNanos.emplace_back(sourceEvent.GetTimestampNanosecond());
     }

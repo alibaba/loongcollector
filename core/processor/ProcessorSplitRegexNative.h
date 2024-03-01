@@ -44,7 +44,7 @@ protected:
 private:
     void ProcessEvent(PipelineEventGroup& logGroup,
                       const StringView& logPath,
-                      const PipelineEventPtr& e,
+                      PipelineEventPtr&& e,
                       EventsContainer& newEvents);
     bool LogSplit(const char* buffer,
                   int32_t size,

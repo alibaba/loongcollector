@@ -13,19 +13,15 @@
 // limitations under the License.
 
 #include <cstdlib>
-#include "unittest/Unittest.h"
+
 #include "common/JsonUtil.h"
 #include "models/LogEvent.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
 class LogEventUnittest : public ::testing::Test {
 public:
-    void SetUp() override {
-        mSourceBuffer.reset(new SourceBuffer);
-        mLogEvent = LogEvent::CreateEvent(mSourceBuffer);
-    }
-
     void TestSetTimestamp();
     void TestSetContent();
     void TestDelContent();
@@ -33,14 +29,22 @@ public:
     void TestFromJsonToJson();
 
 protected:
+    void SetUp() override {
+        mSourceBuffer.reset(new SourceBuffer);
+        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+        mLogEvent = mEventGroup->CreateLogEvent();
+    }
+
+private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
+    std::unique_ptr<PipelineEventGroup> mEventGroup;
     std::unique_ptr<LogEvent> mLogEvent;
 };
 
-APSARA_UNIT_TEST_CASE(LogEventUnittest, TestSetTimestamp, 0);
-APSARA_UNIT_TEST_CASE(LogEventUnittest, TestSetContent, 0);
-APSARA_UNIT_TEST_CASE(LogEventUnittest, TestDelContent, 0);
-APSARA_UNIT_TEST_CASE(LogEventUnittest, TestFromJsonToJson, 0);
+UNIT_TEST_CASE(LogEventUnittest, TestSetTimestamp)
+UNIT_TEST_CASE(LogEventUnittest, TestSetContent)
+UNIT_TEST_CASE(LogEventUnittest, TestDelContent)
+UNIT_TEST_CASE(LogEventUnittest, TestFromJsonToJson)
 
 void LogEventUnittest::TestSetTimestamp() {
     mLogEvent->SetTimestamp(13800000000);

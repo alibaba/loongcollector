@@ -13,30 +13,33 @@
 // limitations under the License.
 
 #include <cstdlib>
-#include "unittest/Unittest.h"
+
 #include "models/PipelineEventPtr.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
 class PipelineEventPtrUnittest : public ::testing::Test {
 public:
-    void SetUp() override { mSourceBuffer.reset(new SourceBuffer); }
-
     void TestIs();
     void TestGet();
     void TestCast();
 
 protected:
+    void SetUp() override {
+        mSourceBuffer.reset(new SourceBuffer);
+        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+    }
+
+private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
+    std::unique_ptr<PipelineEventGroup> mEventGroup;
 };
 
-APSARA_UNIT_TEST_CASE(PipelineEventPtrUnittest, TestIs, 0);
-
-
 void PipelineEventPtrUnittest::TestIs() {
-    PipelineEventPtr logEventPtr(LogEvent::CreateEvent(mSourceBuffer));
-    PipelineEventPtr metricEventPtr(MetricEvent::CreateEvent(mSourceBuffer));
-    PipelineEventPtr spanEventPtr(SpanEvent::CreateEvent(mSourceBuffer));
+    PipelineEventPtr logEventPtr(mEventGroup->CreateLogEvent());
+    PipelineEventPtr metricEventPtr(mEventGroup->CreateMetricEvent());
+    PipelineEventPtr spanEventPtr(mEventGroup->CreateSpanEvent());
     APSARA_TEST_TRUE_FATAL(logEventPtr.Is<LogEvent>());
     APSARA_TEST_FALSE_FATAL(logEventPtr.Is<MetricEvent>());
     APSARA_TEST_FALSE_FATAL(logEventPtr.Is<SpanEvent>());
@@ -49,20 +52,22 @@ void PipelineEventPtrUnittest::TestIs() {
 }
 
 void PipelineEventPtrUnittest::TestGet() {
-    auto logUPtr = LogEvent::CreateEvent(mSourceBuffer);
+    auto logUPtr = mEventGroup->CreateLogEvent();
     auto logAddr = logUPtr.get();
-    PipelineEventPtr logEventPtr(LogEvent::CreateEvent(mSourceBuffer));
+    PipelineEventPtr logEventPtr(mEventGroup->CreateLogEvent());
     LogEvent* log = logEventPtr.Get<LogEvent>();
     APSARA_TEST_EQUAL_FATAL(logAddr, log);
 }
 
 void PipelineEventPtrUnittest::TestCast() {
-    auto logUPtr = LogEvent::CreateEvent(mSourceBuffer);
+    auto logUPtr = mEventGroup->CreateLogEvent();
     auto logAddr = logUPtr.get();
-    PipelineEventPtr logEventPtr(LogEvent::CreateEvent(mSourceBuffer));
+    PipelineEventPtr logEventPtr(mEventGroup->CreateLogEvent());
     LogEvent& log = logEventPtr.Cast<LogEvent>();
     APSARA_TEST_EQUAL_FATAL(logAddr, &log);
 }
+
+UNIT_TEST_CASE(PipelineEventPtrUnittest, TestIs)
 
 } // namespace logtail
 

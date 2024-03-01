@@ -537,8 +537,8 @@ void ProcessorParseTimestampNativeUnittest::TestProcessEventPreciseTimestampLega
     config["SourceFormat"] = "%Y-%m-%d %H:%M:%S.%f";
     config["SourceTimezone"] = "GMT+00:00";
     // make events
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    auto logEvent = PipelineEventPtr(LogEvent::CreateEvent(sourceBuffer));
+    auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
+    auto logEvent = PipelineEventPtr(eventGroup.CreateLogEvent());
     std::stringstream inJsonSs;
     inJsonSs << R"({
         "contents" :

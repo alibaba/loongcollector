@@ -15,25 +15,24 @@
  */
 
 #include "models/LogEvent.h"
-#include <memory>
 
 namespace logtail {
 
-std::unique_ptr<LogEvent> LogEvent::CreateEvent(std::shared_ptr<SourceBuffer>& sb) {
-    auto p = std::unique_ptr<LogEvent>(new LogEvent);
-    p->SetSourceBuffer(sb);
-    return p;
+LogEvent::LogEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::LOG, ptr) {
 }
 
 void LogEvent::SetContent(const StringView& key, const StringView& val) {
-    SetContentNoCopy(mSourceBuffer->CopyString(key), mSourceBuffer->CopyString(val));
+    SetContentNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
+
 void LogEvent::SetContent(const std::string& key, const std::string& val) {
-    SetContentNoCopy(mSourceBuffer->CopyString(key), mSourceBuffer->CopyString(val));
+    SetContentNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
+
 void LogEvent::SetContent(const StringBuffer& key, const StringView& val) {
-    SetContentNoCopy(key, mSourceBuffer->CopyString(val));
+    SetContentNoCopy(key, GetSourceBuffer()->CopyString(val));
 }
+
 void LogEvent::SetContentNoCopy(const StringBuffer& key, const StringBuffer& val) {
     SetContentNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
 }
@@ -49,6 +48,7 @@ const StringView& LogEvent::GetContent(const StringView& key) const {
 bool LogEvent::HasContent(const StringView& key) const {
     return contents.find(key) != contents.end();
 }
+
 void LogEvent::SetContentNoCopy(const StringView& key, const StringView& val) {
     contents[key] = val;
 }
@@ -57,13 +57,15 @@ void LogEvent::DelContent(const StringView& key) {
     contents.erase(key);
 }
 
-LogEvent::LogEvent() {
-    mType = LOG_EVENT_TYPE;
+uint64_t LogEvent::EventsSizeBytes() {
+    // TODO
+    return 0;
 }
 
+#ifdef APSARA_UNIT_TEST_MAIN
 Json::Value LogEvent::ToJson() const {
     Json::Value root;
-    root["type"] = GetType();
+    root["type"] = static_cast<int>(GetType());
     root["timestamp"] = GetTimestamp();
     root["timestampNanosecond"] = GetTimestampNanosecond();
     if (!GetContents().empty()) {
@@ -90,10 +92,6 @@ bool LogEvent::FromJson(const Json::Value& root) {
     }
     return true;
 }
-
-uint64_t LogEvent::EventsSizeBytes() {
-    // TODO
-    return 0;
-}
+#endif
 
 } // namespace logtail

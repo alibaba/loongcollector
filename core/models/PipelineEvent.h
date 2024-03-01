@@ -15,50 +15,58 @@
  */
 
 #pragma once
+
+#include <json/json.h>
+
+#include <cstdint>
+#include <ctime>
 #include <map>
 #include <memory>
 #include <string>
-#include <json/json.h>
 
 #include "models/StringView.h"
 #include "reader/SourceBuffer.h"
 
 namespace logtail {
 
-enum PipelineEventType { VOID_EVENT_TYPE = 0, LOG_EVENT_TYPE = 1, METRIC_EVENT_TYPE = 2, SPAN_EVENT_TYPE = 3 };
-
-const std::string& PipelineEventTypeToString(PipelineEventType t);
+class PipelineEventGroup;
 
 class PipelineEvent {
 public:
-    virtual ~PipelineEvent() {}
-    PipelineEventType GetType() const { return mType; }
-    std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
+    enum class Type { NONE, LOG, METRIC, SPAN };
+    
+    virtual ~PipelineEvent() = default;
 
+    Type GetType() const { return mType; }
     time_t GetTimestamp() const { return timestamp; }
+    long GetTimestampNanosecond() const { return timestampNanosecond; }
     void SetTimestamp(time_t t) { timestamp = t; }
-    void SetTimestamp(time_t t, long ns) { 
-        timestamp = t; 
+    void SetTimestamp(time_t t, long ns) {
+        timestamp = t;
         timestampNanosecond = ns; // Only nanosecond part
     }
-    long GetTimestampNanosecond() const { return timestampNanosecond; }
+    void ResetPipelineEventGroup(PipelineEventGroup* ptr) { mPipelineEventGroupPtr = ptr; }
+    std::shared_ptr<SourceBuffer>& GetSourceBuffer();
 
-    // for debug and test
+    virtual uint64_t EventsSizeBytes() = 0;
+
+#ifdef APSARA_UNIT_TEST_MAIN
     virtual Json::Value ToJson() const = 0;
     virtual bool FromJson(const Json::Value&) = 0;
     std::string ToJsonString() const;
     bool FromJsonString(const std::string&);
-
-    virtual uint64_t EventsSizeBytes() = 0;
+#endif
 
 protected:
-    void SetSourceBuffer(std::shared_ptr<SourceBuffer> sourceBuffer) { mSourceBuffer = sourceBuffer; }
+    PipelineEvent(Type type, PipelineEventGroup* ptr);
 
+    Type mType = Type::NONE;
     time_t timestamp = 0;
     long timestampNanosecond = 0;
-    PipelineEventType mType = VOID_EVENT_TYPE;
-    std::shared_ptr<SourceBuffer> mSourceBuffer;
+    PipelineEventGroup* mPipelineEventGroupPtr = nullptr;
 };
+
+const std::string& PipelineEventTypeToString(PipelineEvent::Type t);
 
 extern StringView gEmptyStringView;
 

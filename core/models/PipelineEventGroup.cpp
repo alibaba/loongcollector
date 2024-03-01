@@ -22,12 +22,57 @@
 
 namespace logtail {
 
-void PipelineEventGroup::AddEvent(const PipelineEventPtr& event) {
-    mEvents.emplace_back(event);
+PipelineEventGroup::PipelineEventGroup(PipelineEventGroup&& rhs) noexcept
+    : mMetadata(std::move(rhs.mMetadata)),
+      mTags(std::move(rhs.mTags)),
+      mEvents(std::move(rhs.mEvents)),
+      mSourceBuffer(std::move(rhs.mSourceBuffer)) {
+    for (auto& item : mEvents) {
+        item->ResetPipelineEventGroup(this);
+    }
 }
 
-void PipelineEventGroup::AddEvent(std::unique_ptr<PipelineEvent>&& event) {
-    mEvents.emplace_back(std::move(event));
+PipelineEventGroup& PipelineEventGroup::operator=(PipelineEventGroup&& rhs) noexcept {
+    if (this != &rhs) {
+        mMetadata = std::move(rhs.mMetadata);
+        mTags = std::move(rhs.mTags);
+        mEvents = std::move(rhs.mEvents);
+        mSourceBuffer = std::move(rhs.mSourceBuffer);
+        for (auto& item : mEvents) {
+            item->ResetPipelineEventGroup(this);
+        }
+    }
+    return *this;
+}
+
+std::unique_ptr<LogEvent> PipelineEventGroup::CreateLogEvent() {
+    return std::unique_ptr<LogEvent>(new LogEvent(this));
+}
+
+std::unique_ptr<MetricEvent> PipelineEventGroup::CreateMetricEvent() {
+    return std::unique_ptr<MetricEvent>(new MetricEvent(this));
+}
+
+std::unique_ptr<SpanEvent> PipelineEventGroup::CreateSpanEvent() {
+    return std::unique_ptr<SpanEvent>(new SpanEvent(this));
+}
+
+LogEvent* PipelineEventGroup::AddLogEvent() {
+    LogEvent* e = new LogEvent(this);
+    mEvents.emplace_back(e);
+    return e;
+}
+
+MetricEvent* PipelineEventGroup::AddMetricEvent() {
+    MetricEvent* e = new MetricEvent(this);
+    mEvents.emplace_back(e);
+    return e;
+}
+
+SpanEvent* PipelineEventGroup::AddSpanEvent() {
+    SpanEvent* e = new SpanEvent(this);
+    mEvents.emplace_back(e);
+    return e;
 }
 
 void PipelineEventGroup::SetMetadata(EventGroupMetaKey key, const StringView& val) {
@@ -210,16 +255,13 @@ bool PipelineEventGroup::FromJson(const Json::Value& root) {
     if (root.isMember("events")) {
         Json::Value events = root["events"];
         for (const auto& event : events) {
-            PipelineEventPtr eventPtr;
-            if (event["type"].asInt() == LOG_EVENT_TYPE) {
-                eventPtr = LogEvent::CreateEvent(GetSourceBuffer());
-            } else if (event["type"].asInt() == METRIC_EVENT_TYPE) {
-                eventPtr = MetricEvent::CreateEvent(GetSourceBuffer());
+            if (event["type"].asInt() == static_cast<int>(PipelineEvent::Type::LOG)) {
+                AddLogEvent()->FromJson(event);
+            } else if (event["type"].asInt() == static_cast<int>(PipelineEvent::Type::METRIC)) {
+                AddMetricEvent()->FromJson(event);
             } else {
-                eventPtr = SpanEvent::CreateEvent(GetSourceBuffer());
+                AddSpanEvent()->FromJson(event);
             }
-            eventPtr->FromJson(event);
-            AddEvent(eventPtr);
         }
     }
     return true;

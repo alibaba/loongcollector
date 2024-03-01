@@ -13,42 +13,35 @@
 // limitations under the License.
 
 #include <cstdlib>
-#include "unittest/Unittest.h"
 
 #include "common/JsonUtil.h"
 #include "models/PipelineEventGroup.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
 class PipelineEventGroupUnittest : public ::testing::Test {
 public:
-    void SetUp() override {
-        mSourceBuffer.reset(new SourceBuffer);
-        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
-    }
-
     void TestSwapEvents();
     void TestSetMetadata();
     void TestDelMetadata();
     void TestFromJsonToJson();
 
 protected:
+    void SetUp() override {
+        mSourceBuffer.reset(new SourceBuffer);
+        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+    }
+
+private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
     std::unique_ptr<PipelineEventGroup> mEventGroup;
 };
 
-APSARA_UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSwapEvents, 0);
-APSARA_UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSetMetadata, 0);
-APSARA_UNIT_TEST_CASE(PipelineEventGroupUnittest, TestDelMetadata, 0);
-APSARA_UNIT_TEST_CASE(PipelineEventGroupUnittest, TestFromJsonToJson, 0);
-
 void PipelineEventGroupUnittest::TestSwapEvents() {
-    PipelineEventPtr logEventPtr(LogEvent::CreateEvent(mSourceBuffer));
-    PipelineEventPtr metricEventPtr(MetricEvent::CreateEvent(mSourceBuffer));
-    PipelineEventPtr spanEventPtr(SpanEvent::CreateEvent(mSourceBuffer));
-    mEventGroup->AddEvent(logEventPtr);
-    mEventGroup->AddEvent(metricEventPtr);
-    mEventGroup->AddEvent(spanEventPtr);
+    mEventGroup->AddLogEvent();
+    mEventGroup->AddMetricEvent();
+    mEventGroup->AddSpanEvent();
     EventsContainer eventContainer;
     mEventGroup->SwapEvents(eventContainer);
     APSARA_TEST_EQUAL_FATAL(3L, eventContainer.size());
@@ -133,6 +126,11 @@ void PipelineEventGroupUnittest::TestFromJsonToJson() {
     std::string outJson = mEventGroup->ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
 }
+
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSwapEvents)
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSetMetadata)
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestDelMetadata)
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestFromJsonToJson)
 
 } // namespace logtail
 

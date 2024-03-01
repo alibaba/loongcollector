@@ -13,36 +13,38 @@
 // limitations under the License.
 
 #include "LogProcess.h"
-#include <algorithm>
-#include <time.h>
+
 #include <sys/types.h>
+#include <time.h>
+
+#include <algorithm>
 #if defined(__linux__)
 #include <sys/syscall.h>
 #include <unistd.h>
 #endif
+#include "aggregator/Aggregator.h"
+#include "app_config/AppConfig.h"
 #include "common/Constants.h"
-#include "common/TimeUtil.h"
-#include "common/LogtailCommonFlags.h"
+#include "common/LogFileCollectOffsetIndicator.h"
 #include "common/LogGroupContext.h"
-#include "go_pipeline/LogtailPlugin.h"
-#include "models/PipelineEventGroup.h"
-#include "pipeline/PipelineManager.h"
-#include "monitor/Monitor.h"
-#include "sdk/Client.h"
-#include "sender/Sender.h"
-#include "log_pb/sls_logs.pb.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
-#include "monitor/LogtailAlarm.h"
+#include "common/TimeUtil.h"
+#include "config/IntegrityConfig.h"
+#include "config_manager/ConfigManager.h"
+#include "fuse/FuseFileBlacklist.h"
+#include "go_pipeline/LogtailPlugin.h"
+#include "log_pb/sls_logs.pb.h"
+#include "logger/Logger.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/LogFileProfiler.h"
 #include "monitor/LogIntegrity.h"
 #include "monitor/LogLineCount.h"
-#include "config/IntegrityConfig.h"
-#include "app_config/AppConfig.h"
-#include "monitor/LogFileProfiler.h"
-#include "config_manager/ConfigManager.h"
-#include "logger/Logger.h"
-#include "aggregator/Aggregator.h"
-#include "fuse/FuseFileBlacklist.h"
-#include "common/LogFileCollectOffsetIndicator.h"
+#include "monitor/LogtailAlarm.h"
+#include "monitor/Monitor.h"
+#include "pipeline/PipelineManager.h"
+#include "sdk/Client.h"
+#include "sender/Sender.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -330,15 +332,13 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             if (parseEndTime - parseStartTime > 1) {
                 LogtailAlarm::GetInstance()->SendAlarm(
                     PROCESS_TOO_SLOW_ALARM,
-                    string("parse ") + ToString(logSize) + " logs, buffer size "
-                        + ToString(logBuffer->rawBuffer.size())
+                    string("parse ") + ToString(logSize) + " logs, buffer size " + ToString(logBuffer->rawBuffer.size())
                         + "time used seconds : " + ToString(parseEndTime - parseStartTime),
                     projectName,
                     category,
                     pipeline->GetContext().GetRegion());
                 LOG_WARNING(sLogger,
-                            ("process log too slow, parse logs", logSize)("buffer size",
-                                                                                       logBuffer->rawBuffer.size())(
+                            ("process log too slow, parse logs", logSize)("buffer size", logBuffer->rawBuffer.size())(
                                 "time used seconds", parseEndTime - parseStartTime)("project", projectName)("logstore",
                                                                                                             category));
             }
@@ -386,51 +386,51 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                             false,
                                             false,
                                             logBuffer->exactlyOnceCheckpoint);
-                    if (!Sender::Instance()->Send(projectName,
-                                                logFileReader->GetSourceId(),
-                                                *(pLogGroup.get()),
-                                                logFileReader->GetLogGroupKey(),
-                                                flusherSLS,
-                                                flusherSLS->mBatch.mMergeType,
-                                                (uint32_t)(profile.logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
-                                                "",
-                                                convertedPath,
-                                                context)) {
+                    if (!Sender::Instance()->Send(
+                            projectName,
+                            logFileReader->GetSourceId(),
+                            *(pLogGroup.get()),
+                            logFileReader->GetLogGroupKey(),
+                            flusherSLS,
+                            flusherSLS->mBatch.mMergeType,
+                            (uint32_t)(profile.logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
+                            "",
+                            convertedPath,
+                            context)) {
                         LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
-                                                            "push file data into batch map fail",
-                                                            projectName,
-                                                            category,
-                                                            pipeline->GetContext().GetRegion());
+                                                               "push file data into batch map fail",
+                                                               projectName,
+                                                               category,
+                                                               pipeline->GetContext().GetRegion());
                         LOG_ERROR(sLogger,
-                                ("push file data into batch map fail, discard logs", pLogGroup->logs_size())(
-                                    "project", projectName)("logstore", category)("filename", convertedPath));
-                    
-                    
+                                  ("push file data into batch map fail, discard logs", pLogGroup->logs_size())(
+                                      "project", projectName)("logstore", category)("filename", convertedPath));
                     }
                 }
 
                 LogFileProfiler::GetInstance()->AddProfilingData(pipeline->Name(),
-                                                                pipeline->GetContext().GetRegion(),
-                                                                projectName,
-                                                                category,
-                                                                convertedPath,
-                                                                hostLogPath,
-                                                                logFileReader->GetExtraTags(),
-                                                                readBytes,
-                                                                profile.skipBytes,
-                                                                profile.splitLines,
-                                                                profile.parseFailures,
-                                                                profile.regexMatchFailures,
-                                                                profile.parseTimeFailures,
-                                                                profile.historyFailures,
-                                                                0,
-                                                                ""); // TODO: I don't think errorLine is useful
+                                                                 pipeline->GetContext().GetRegion(),
+                                                                 projectName,
+                                                                 category,
+                                                                 convertedPath,
+                                                                 hostLogPath,
+                                                                 logFileReader->GetExtraTags(),
+                                                                 readBytes,
+                                                                 profile.skipBytes,
+                                                                 profile.splitLines,
+                                                                 profile.parseFailures,
+                                                                 profile.regexMatchFailures,
+                                                                 profile.parseTimeFailures,
+                                                                 profile.historyFailures,
+                                                                 0,
+                                                                 ""); // TODO: I don't think errorLine is useful
                 LOG_DEBUG(
                     sLogger,
                     ("project", projectName)("logstore", category)("filename", convertedPath)("read_bytes", readBytes)(
-                        "line_feed", profile.feedLines)("split_lines", profile.splitLines)(
-                        "parse_failures", profile.parseFailures)("parse_time_failures", profile.parseTimeFailures)(
-                        "regex_match_failures", profile.regexMatchFailures)("history_failures", profile.historyFailures));
+                        "split_lines", profile.splitLines)("parse_failures", profile.parseFailures)(
+                        "parse_time_failures", profile.parseTimeFailures)(
+                        "regex_match_failures", profile.regexMatchFailures)("history_failures",
+                                                                            profile.historyFailures));
             }
             logGroupList.clear();
         }
@@ -460,7 +460,7 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
         // TODO: metadata should be set in reader
         FillEventGroupMetadata(*logBuffer, eventGroup);
 
-        std::unique_ptr<LogEvent> event = LogEvent::CreateEvent(eventGroup.GetSourceBuffer());
+        LogEvent* event = eventGroup.AddLogEvent();
         time_t logtime = time(NULL);
         if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
             logtime += GetTimeDelta();
@@ -469,7 +469,6 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
         event->SetContentNoCopy(DEFAULT_CONTENT_KEY, logBuffer->rawBuffer);
         auto offsetStr = event->GetSourceBuffer()->CopyString(std::to_string(logBuffer->readOffset));
         event->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
-        eventGroup.AddEvent(std::move(event));
         eventGroupList.emplace_back(std::move(eventGroup));
         // process logGroup
         pipeline->Process(eventGroupList);
@@ -510,7 +509,8 @@ void LogProcess::FillEventGroupMetadata(LogBuffer& logBuffer, PipelineEventGroup
 #ifdef __ENTERPRISE__
     std::string agentTag = EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
     if (!agentTag.empty()) {
-        eventGroup.SetMetadata(EventGroupMetaKey::AGENT_TAG, EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
+        eventGroup.SetMetadata(EventGroupMetaKey::AGENT_TAG,
+                               EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
     }
 #endif
     eventGroup.SetMetadataNoCopy(EventGroupMetaKey::HOST_IP, LogFileProfiler::mIpAddr);

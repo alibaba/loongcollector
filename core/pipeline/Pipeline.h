@@ -34,6 +34,7 @@ namespace logtail {
 
 class Pipeline {
 public:
+    // copy/move control functions are deleted because of mContext
     bool Init(Config&& config);
     void Start();
     void Process(std::vector<PipelineEventGroup>& logGroupList);

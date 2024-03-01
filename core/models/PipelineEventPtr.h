@@ -17,16 +17,18 @@
 #pragma once
 #include <memory>
 #include <typeinfo>
-#include "models/PipelineEvent.h"
+
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
+#include "models/PipelineEvent.h"
 #include "models/SpanEvent.h"
 
 namespace logtail {
 
 class PipelineEventPtr {
 public:
-    PipelineEventPtr() {}
+    PipelineEventPtr() = default;
+    PipelineEventPtr(PipelineEvent* ptr) : mData(std::unique_ptr<PipelineEvent>(ptr)) {}
     PipelineEventPtr(std::unique_ptr<PipelineEvent>&& ptr) : mData(std::move(ptr)) {}
     // default copy/move constructor is ok
     void Reset(std::unique_ptr<PipelineEvent>&& ptr) { mData.reset(ptr.release()); }
@@ -38,13 +40,13 @@ public:
     template <typename T>
     bool Is() const {
         if (typeid(T) == typeid(LogEvent)) {
-            return mData->GetType() == LOG_EVENT_TYPE;
+            return mData->GetType() == PipelineEvent::Type::LOG;
         }
         if (typeid(T) == typeid(MetricEvent)) {
-            return mData->GetType() == METRIC_EVENT_TYPE;
+            return mData->GetType() == PipelineEvent::Type::METRIC;
         }
         if (typeid(T) == typeid(SpanEvent)) {
-            return mData->GetType() == SPAN_EVENT_TYPE;
+            return mData->GetType() == PipelineEvent::Type::SPAN;
         }
         return false;
     }
@@ -70,7 +72,7 @@ public:
     const PipelineEvent* operator->() const { return mData.operator->(); }
 
 private:
-    std::shared_ptr<PipelineEvent> mData;
+    std::unique_ptr<PipelineEvent> mData;
 };
 
 } // namespace logtail

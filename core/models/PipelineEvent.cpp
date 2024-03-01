@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-#include "models/PipelineEventGroup.h"
-
 #include <sstream>
 
 #include "logger/Logger.h"
+#include "models/PipelineEventGroup.h"
 
 namespace logtail {
+
 StringView gEmptyStringView;
 
-const std::string& PipelineEventTypeToString(PipelineEventType t) {
+const std::string& PipelineEventTypeToString(PipelineEvent::Type t) {
     switch (t) {
-        case LOG_EVENT_TYPE:
+        case PipelineEvent::Type::LOG:
             static std::string logname = "Log";
             return logname;
-        case METRIC_EVENT_TYPE:
+        case PipelineEvent::Type::METRIC:
             static std::string metricname = "Metric";
             return metricname;
-        case SPAN_EVENT_TYPE:
+        case PipelineEvent::Type::SPAN:
             static std::string spanname = "Span";
             return spanname;
         default:
@@ -40,6 +40,14 @@ const std::string& PipelineEventTypeToString(PipelineEventType t) {
     }
 }
 
+PipelineEvent::PipelineEvent(Type type, PipelineEventGroup* ptr) : mType(type), mPipelineEventGroupPtr(ptr) {
+}
+
+std::shared_ptr<SourceBuffer>& PipelineEvent::GetSourceBuffer() {
+    return mPipelineEventGroupPtr->GetSourceBuffer();
+}
+
+#ifdef APSARA_UNIT_TEST_MAIN
 std::string PipelineEvent::ToJsonString() const {
     Json::Value root = ToJson();
     Json::StreamWriterBuilder builder;
@@ -63,5 +71,6 @@ bool PipelineEvent::FromJsonString(const std::string& inJson) {
     }
     return FromJson(root);
 }
+#endif
 
 } // namespace logtail

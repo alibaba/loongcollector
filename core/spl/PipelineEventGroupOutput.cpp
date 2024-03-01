@@ -54,8 +54,6 @@ void PipelineEventGroupOutput::addRow(const std::vector<SplStringPiece>& row,
                                       const uint32_t timeNsPart,
                                       const ErrorKV& errorKV,
                                       std::string& error) {
-    std::unique_ptr<LogEvent> targetEvent = LogEvent::CreateEvent(mLogGroup->GetSourceBuffer());
-
     size_t tagStrHash = 0;
     for (const auto& idxTag : mTagsIdxs) {
         boost::hash_combine(tagStrHash, mIOHeader->columnNames[idxTag].hash());
@@ -66,9 +64,10 @@ void PipelineEventGroupOutput::addRow(const std::vector<SplStringPiece>& row,
         mLogGroupList->emplace_back(mLogGroup->GetSourceBuffer());
         mLogGroupList->back().SetAllMetadata(mLogGroup->GetAllMetadata());
     }
+    lastTagStrHash = tagStrHash;
 
     PipelineEventGroup& current = mLogGroupList->back();
-    lastTagStrHash = tagStrHash;
+    LogEvent* targetEvent = current.AddLogEvent();
 
     targetEvent->SetTimestamp(time, timeNsPart);
 
@@ -87,7 +86,6 @@ void PipelineEventGroupOutput::addRow(const std::vector<SplStringPiece>& row,
         current.SetTag(mColumns[idxTag], StringView(row[idxTag].mPtr, row[idxTag].mLen));
     }
 
-    current.AddEvent(std::move(targetEvent));
     if (!errorKV.second.empty()) {
         LOG_WARNING(sLogger,
                     ("__error__", errorKV.second)("project", mContext->GetProjectName())("logstore",

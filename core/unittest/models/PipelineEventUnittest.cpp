@@ -13,35 +13,40 @@
 // limitations under the License.
 
 #include <cstdlib>
-#include "unittest/Unittest.h"
-#include "models/PipelineEvent.h"
+
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
+#include "models/PipelineEvent.h"
 #include "models/SpanEvent.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
 class PipelineEventUnittest : public ::testing::Test {
 public:
-    void SetUp() override { mSourceBuffer.reset(new SourceBuffer); }
-
     void TestGetType();
 
 protected:
+    void SetUp() override {
+        mSourceBuffer.reset(new SourceBuffer);
+        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+    }
+
+private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
+    std::unique_ptr<PipelineEventGroup> mEventGroup;
 };
 
-APSARA_UNIT_TEST_CASE(PipelineEventUnittest, TestGetType, 0);
-
-
 void PipelineEventUnittest::TestGetType() {
-    std::unique_ptr<LogEvent> logEvent = LogEvent::CreateEvent(mSourceBuffer);
-    std::unique_ptr<MetricEvent> metricEvent = MetricEvent::CreateEvent(mSourceBuffer);
-    std::unique_ptr<SpanEvent> spanEvent = SpanEvent::CreateEvent(mSourceBuffer);
+    std::unique_ptr<LogEvent> logEvent = mEventGroup->CreateLogEvent();
+    std::unique_ptr<MetricEvent> metricEvent = mEventGroup->CreateMetricEvent();
+    std::unique_ptr<SpanEvent> spanEvent = mEventGroup->CreateSpanEvent();
     APSARA_TEST_STREQ_FATAL("Log", PipelineEventTypeToString(logEvent->GetType()).c_str());
     APSARA_TEST_STREQ_FATAL("Metric", PipelineEventTypeToString(metricEvent->GetType()).c_str());
     APSARA_TEST_STREQ_FATAL("Span", PipelineEventTypeToString(spanEvent->GetType()).c_str());
 }
+
+UNIT_TEST_CASE(PipelineEventUnittest, TestGetType)
 
 } // namespace logtail
 
