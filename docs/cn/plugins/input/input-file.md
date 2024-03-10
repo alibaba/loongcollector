@@ -23,8 +23,8 @@
 |  Multiline  |  object  |  否  |  空  |  多行聚合选项。详见表1。  |
 |  EnableContainerDiscovery  |  bool  |  否  |  false  |  是否启用容器发现功能。仅当Logtail以Daemonset模式运行，且采集文件路径为容器内路径时有效。  |
 |  ContainerFilters  |  object  |  否  |  空  |  容器过滤选项。多个选项之间为“且”的关系，仅当EnableContainerDiscovery取值为true时有效，详见表2。  |
-|  ExternalK8sLabelTag  |  map  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与Pod标签相关的tag。map中的key为Pod标签名，value为对应的tag名。 例如：在map中添加`app: k8s\_label\_app`，则若pod中包含`app=serviceA`的标签时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:k8s\_label\_app: serviceA；若不包含`app`标签，则会添加空字段\_\_tag\_\_:k8s\_label\_app:  |
-|  ExternalEnvTag  |  map  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与容器环境变量相关的tag。map中的key为环境变量名，value为对应的tag名。 例如：在map中添加`VERSION: env\_version`，则当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:env\_version: v1.0.0；若不包含`VERSION`环境变量，则会添加空字段\_\_tag\_\_:env\_version:  |
+|  ExternalK8sLabelTag  |  map  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与Pod标签相关的tag。map中的key为Pod标签名，value为对应的tag名。 例如：在map中添加`app: k8s_label_app`，则若pod中包含`app=serviceA`的标签时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:k8s\_label\_app: serviceA；若不包含`app`标签，则会添加空字段\_\_tag\_\_:k8s\_label\_app:  |
+|  ExternalEnvTag  |  map  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与容器环境变量相关的tag。map中的key为环境变量名，value为对应的tag名。 例如：在map中添加`VERSION: env_version`，则当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:env\_version: v1.0.0；若不包含`VERSION`环境变量，则会添加空字段\_\_tag\_\_:env\_version:  |
 |  AppendingLogPositionMeta  |  bool  |  否  |  false  |  是否在日志中添加该条日志所属文件的元信息，包括\_\_tag\_\_:\_\_inode\_\_字段和\_\_file\_offset\_\_字段。  |
 |  FlushTimeoutSecs  |  uint  |  否  |  5  |  当文件超过指定时间未出现新的完整日志时，将当前读取缓存中的内容作为一条日志输出。  |
 |  AllowingIncludedByMultiConfigs  |  bool  |  否  |  false  |  是否允许当前配置采集其它配置已匹配的文件。  |
@@ -76,6 +76,7 @@ inputs:
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
+    Tags: true
 ```
 
 * 输出
@@ -87,6 +88,12 @@ flushers:
     "__time__": "1657354763"
 }
 ```
+
+注意：`__tag__` 字段的输出会由于ilogtail版本的不同而存在差别。为了在标准输出中能够准确地观察到 `__tag__`，建议仔细检查以下几点：
+- flusher_stdout 的配置中，设置了 `Tags: true`
+- 如果使用了较新版本的ilogtail，在观察标准输出时，`__tag__`可能会被拆分为一行单独的信息，先于日志的内容输出（这与文档中的示例输出会有差别），请注意不要观察遗漏。
+
+此注意事项适用于后文所有观察 `__tag__` 字段输出的地方。
 
 ### 采集指定目录下的所有文件
 
@@ -104,6 +111,7 @@ inputs:
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
+    Tags: true
 ```
 
 ### 采集K8s容器文件（仅限iLogtail以Daemonset的方式部署）
@@ -129,6 +137,7 @@ inputs:
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
+    Tags: true
 ```
 
 ### 采集简单多行日志
@@ -164,6 +173,7 @@ processors:
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
+    Tags: true
 ```
 
 * 输出
@@ -217,6 +227,7 @@ processors:
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
+    Tags: true
 ```
 
 * 输出

@@ -276,8 +276,8 @@ metadata:
   namespace: ilogtail
 type: Opaque
 data:
-  access_key: <base64_access_key_secret>
   access_key_id: <base64_access_key_id>
+  access_key: <base64_access_key_secret>
 ```
 
 获取阿里云AK，进行base64。

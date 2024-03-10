@@ -81,8 +81,8 @@
       namespace: ilogtail
     type: Opaque
     data:
-      access_key:     # base64 accesskey secret if you want to flush to SLS
       access_key_id:  # base64 accesskey id if you want to flush to SLS
+      access_key:     # base64 accesskey secret if you want to flush to SLS
     ```
 
     您也可以直接从下面的地址下载示例配置。

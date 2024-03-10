@@ -24,7 +24,7 @@
 | MaxSize       | Int     | 否    | 打印到文件时，需指定单个文件大小。默认1M。            |
 | MaxRolls      | Int     | 否    | 打印到文件时，需指定文件的轮转个数。默认为1。           |
 | KeyValuePairs | Boolean | 否    |                                   |
-| Tags          | Boolean | 否    |                                   |
+| Tags          | Boolean | 否    | 打印 `__tag__`，默认false。如果将flusher-stdout用于调试，建议设置为true。 |
 
 ## 样例
 
@@ -39,4 +39,5 @@ inputs:
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
+    Tags: true
 ```
