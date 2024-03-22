@@ -217,6 +217,8 @@ public:
 
     void ClearBrokenLinkSet() { mBrokenLinkSet.clear(); }
 
+    bool IsAllFileRead();
+
 protected:
     EventDispatcher();
     ~EventDispatcher();

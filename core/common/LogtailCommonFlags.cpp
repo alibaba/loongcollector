@@ -83,6 +83,7 @@ DEFINE_FLAG_STRING(logtail_integrity_snapshot, "integrity file on local disk", "
 DEFINE_FLAG_STRING(ilogtail_config,
                    "set dataserver & configserver address; (optional)set cpu,mem,bufflerfile,buffermap and etc.",
                    "ilogtail_config.json");
+DEFINE_FLAG_BOOL(enable_full_drain_mode, "", false);
 DEFINE_FLAG_INT32(cpu_limit_num, "cpu violate limit num before shutdown", 10);
 DEFINE_FLAG_INT32(mem_limit_num, "memory violate limit num before shutdown", 10);
 DEFINE_FLAG_DOUBLE(cpu_usage_up_limit, "cpu usage upper limit, cores", 2.0);

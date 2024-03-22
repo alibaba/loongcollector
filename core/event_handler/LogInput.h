@@ -17,10 +17,12 @@
 #ifndef __LOG_ILOGTAIL_LOG_INPUT_H__
 #define __LOG_ILOGTAIL_LOG_INPUT_H__
 
-#include <string>
+#include <condition_variable>
 #include <queue>
-#include <vector>
+#include <string>
 #include <unordered_set>
+#include <vector>
+
 #include "common/Lock.h"
 #include "common/LogRunnable.h"
 
@@ -78,6 +80,8 @@ private:
     int32_t mLastUpdateMetricTime;
 
     std::atomic_int mLastReadEventTime{0};
+    mutable std::mutex mThreadRunningMux;
+    mutable std::condition_variable mStopCV;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class LogInputUnittest;

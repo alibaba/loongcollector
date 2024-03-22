@@ -59,7 +59,7 @@ bool Aggregator::FlushReadyBuffer() {
         PTScopedLock lock(mMergeLock);
         unordered_map<int64_t, MergeItem*>::iterator itr = mMergeMap.begin();
         for (; itr != mMergeMap.end();) {
-            if (sender->IsFlush()
+            if (Application::GetInstance()->IsExiting()
                 || (itr->second->IsReady()
                     && sender->GetSenderFeedBackInterface()->IsValidToPush(itr->second->mLogstoreKey))) {
                 if (itr->second->mMergeType == FlusherSLS::Batch::MergeType::TOPIC)
@@ -85,7 +85,7 @@ bool Aggregator::FlushReadyBuffer() {
         PTScopedLock lock(mMergeLock);
         unordered_map<int64_t, PackageListMergeBuffer*>::iterator pIter = mPackageListMergeMap.begin();
         for (; pIter != mPackageListMergeMap.end();) {
-            if (sender->IsFlush()
+            if (Application::GetInstance()->IsExiting()
                 || (pIter->second->IsReady(curTime) && pIter->second->mMergeItems.size() > 0
                     && sender->GetSenderFeedBackInterface()->IsValidToPush(
                         pIter->second->GetFirstItem()->mLogstoreKey))) {
@@ -345,7 +345,7 @@ bool Aggregator::Add(const std::string& projectName,
         
         if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE) {
             pIter->second->AddMergeItem(value);
-            if (pIter->second->IsReady(curTime) || sender->IsFlush()) {
+            if (pIter->second->IsReady(curTime) || Application::GetInstance()->IsExiting()) {
 #ifdef LOGTAIL_DEBUG_FLAG
                 LOG_DEBUG(sLogger,
                           ("Send logstore merged packet, size", pIter->second->mMergeItems.size())(
@@ -358,7 +358,7 @@ bool Aggregator::Add(const std::string& projectName,
                 mPackageListMergeMap.erase(pIter);
             }
         } else {
-            if (value != NULL && (value->IsReady() || sender->IsFlush() || context.mExactlyOnceCheckpoint)) {
+            if (value != NULL && (value->IsReady() || Application::GetInstance()->IsExiting() || context.mExactlyOnceCheckpoint)) {
                 sendDataVec.push_back(value);
                 if (itr != mMergeMap.end()) {
                     mMergeMap.erase(itr);

@@ -1002,6 +1002,15 @@ void EventDispatcher::DumpCheckPointPeriod(int32_t curTime) {
     }
 }
 
+bool EventDispatcher::IsAllFileRead() {
+    for (auto it = mWdDirInfoMap.begin(); it != mWdDirInfoMap.end(); ++it) {
+        if (!((it->second)->mHandler)->IsAllFileRead()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 #ifdef APSARA_UNIT_TEST_MAIN
 void EventDispatcher::CleanEnviroments() {
     // mMainThreadRunning = false;

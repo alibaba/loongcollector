@@ -20,8 +20,8 @@
 #include <cstdint>
 #include <string>
 
-#include "common/Thread.h"
 #include "common/Lock.h"
+#include "common/Thread.h"
 
 namespace logtail {
 
@@ -38,6 +38,7 @@ public:
     void Init();
     void Start();
     void SetSigTermSignalFlag(bool flag) { mSigTermSignalFlag = flag; }
+    bool IsExiting() { return mSigTermSignalFlag; }
 
     std::string GetInstanceId() { return mInstanceId; }
     bool TryGetUUID();

@@ -1397,7 +1397,7 @@ void Sender::DaemonSender() {
         uint32_t bufferPackageCount = 0;
         bool singleBatchMapFull = false;
         int32_t curTime = time(NULL);
-        if (IsFlush()) {
+        if (Application::GetInstance()->IsExiting()) {
             mSenderQueue.PopAllItem(logGroupToSend, curTime, singleBatchMapFull);
         } else {
             std::unordered_map<std::string, int32_t> regionConcurrencyLimits;
@@ -1468,7 +1468,7 @@ void Sender::DaemonSender() {
 
         ///////////////////////////////////////
         // smoothing send tps, walk around webserver load burst
-        if (!IsFlush() && AppConfig::GetInstance()->IsSendRandomSleep()) {
+        if (!Application::GetInstance()->IsExiting() && AppConfig::GetInstance()->IsSendRandomSleep()) {
             int64_t sleepMicroseconds = 0;
             if (bufferPackageCount < 10)
                 sleepMicroseconds = (rand() % 40) * 10000; // 0ms ~ 400ms
@@ -1510,12 +1510,13 @@ void Sender::DaemonSender() {
                 DescSendingCount();
             } else {
 #endif
-                if (!IsFlush() && AppConfig::GetInstance()->IsSendFlowControl()) {
+                if (!Application::GetInstance()->IsExiting() && AppConfig::GetInstance()->IsSendFlowControl()) {
                     FlowControl(data->mRawSize, REALTIME_SEND_THREAD);
                 }
 
                 int32_t beforeSleepTime = time(NULL);
-                while (!IsFlush() && GetSendingBufferCount() >= AppConfig::GetInstance()->GetSendRequestConcurrency()) {
+                while (!Application::GetInstance()->IsExiting()
+                       && GetSendingBufferCount() >= AppConfig::GetInstance()->GetSendRequestConcurrency()) {
                     usleep(10 * 1000);
                 }
                 int32_t afterSleepTime = time(NULL);
@@ -1568,7 +1569,8 @@ void Sender::PutIntoSecondaryBuffer(LoggroupTimeValue* dataPtr, int32_t retryTim
         ++retry;
         {
             PTScopedLock lock(mSecondaryMutexLock);
-            if (IsFlush() || (mSecondaryBuffer.size() < (uint32_t)INT32_FLAG(secondary_buffer_count_limit))) {
+            if (Application::GetInstance()->IsExiting()
+                || (mSecondaryBuffer.size() < (uint32_t)INT32_FLAG(secondary_buffer_count_limit))) {
                 mSecondaryBuffer.push_back(dataPtr);
                 writeDone = true;
                 break;
@@ -2073,7 +2075,8 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
 void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
     auto& exactlyOnceCpt = dataPtr->mLogGroupContext.mExactlyOnceCheckpoint;
 
-    if (IsFlush()) // write local file avoid binary update fail
+    if (!BOOL_FLAG(enable_full_drain_mode)
+        && Application::GetInstance()->IsExiting()) // write local file avoid binary update fail
     {
         SubSendingBufferCount();
         if (!exactlyOnceCpt) {
@@ -2539,16 +2542,18 @@ void Sender::ResetRegionConcurrency(const std::string& region) {
 
 bool Sender::FlushOut(int32_t time_interval_in_mili_seconds) {
     static Aggregator* aggregator = Aggregator::GetInstance();
-    SetFlush();
     aggregator->FlushReadyBuffer();
+    SetFlush();
     for (int i = 0; i < time_interval_in_mili_seconds / 100; ++i) {
         mSenderQueue.Signal();
         {
             WaitObject::Lock lock(mWriteSecondaryWait);
             mWriteSecondaryWait.signal();
         }
-        if (IsFlush() == false) {
+        if (!IsFlush()) {
             // double check, fix bug #13758589
+            // TODO: this is not necessary, the task of checking whether all data has been flushed should be done in
+            // this func, not in Sender thread
             aggregator->FlushReadyBuffer();
             if (aggregator->IsMergeMapEmpty() && IsBatchMapEmpty() && GetSendingCount() == 0
                 && IsSecondaryBufferEmpty()) {
@@ -2558,7 +2563,6 @@ bool Sender::FlushOut(int32_t time_interval_in_mili_seconds) {
                 continue;
             }
         }
-        aggregator->FlushReadyBuffer();
         usleep(100 * 1000);
     }
     ResetFlush();

@@ -13,32 +13,34 @@
 // limitations under the License.
 
 #include "LogInput.h"
+
 #include <time.h>
+
+#include "EventHandler.h"
+#include "HistoryFileImporter.h"
+#include "app_config/AppConfig.h"
+#include "application/Application.h"
+#include "checkpoint/CheckPointManager.h"
+#include "common/FileSystemUtil.h"
+#include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
-#include "common/HashUtil.h"
 #include "common/TimeUtil.h"
-#include "common/FileSystemUtil.h"
-#include "polling/PollingCache.h"
-#include "monitor/Monitor.h"
-#include "processor/daemon/LogProcess.h"
-#include "controller/EventDispatcher.h"
-#include "monitor/LogtailAlarm.h"
-#include "checkpoint/CheckPointManager.h"
-#include "polling/PollingDirFile.h"
-#include "polling/PollingModify.h"
-#include "reader/LogFileReader.h"
-#include "reader/GloablFileDescriptorManager.h"
-#include "app_config/AppConfig.h"
-#include "sender/Sender.h"
-#include "polling/PollingEventQueue.h"
-#include "event/BlockEventManager.h"
 #include "config_manager/ConfigManager.h"
+#include "controller/EventDispatcher.h"
+#include "event/BlockEventManager.h"
 #include "logger/Logger.h"
-#include "EventHandler.h"
-#include "HistoryFileImporter.h"
-#include "application/Application.h"
+#include "monitor/LogtailAlarm.h"
+#include "monitor/Monitor.h"
+#include "polling/PollingCache.h"
+#include "polling/PollingDirFile.h"
+#include "polling/PollingEventQueue.h"
+#include "polling/PollingModify.h"
+#include "processor/daemon/LogProcess.h"
+#include "reader/GloablFileDescriptorManager.h"
+#include "reader/LogFileReader.h"
+#include "sender/Sender.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -99,8 +101,13 @@ void LogInput::Resume() {
 
 void LogInput::HoldOn() {
     LOG_INFO(sLogger, ("event handle daemon pause", "starts"));
-    mInteruptFlag = true;
-    mAccessMainThreadRWL.lock();
+    if (BOOL_FLAG(enable_full_drain_mode)) {
+        unique_lock<mutex> lock(mThreadRunningMux);
+        mStopCV.wait(lock, [this]() { return mInteruptFlag; });
+    } else {
+        mInteruptFlag = true;
+        mAccessMainThreadRWL.lock();
+    }
     LOG_INFO(sLogger, ("event handle daemon pause", "succeeded"));
 }
 
@@ -331,11 +338,12 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
 
 void LogInput::UpdateCriticalMetric(int32_t curTime) {
     LogtailMonitor::GetInstance()->UpdateMetric("last_read_event_time",
-                                             GetTimeStamp(mLastReadEventTime, "%Y-%m-%d %H:%M:%S"));
+                                                GetTimeStamp(mLastReadEventTime, "%Y-%m-%d %H:%M:%S"));
 
-    LogtailMonitor::GetInstance()->UpdateMetric("event_tps", 1.0 * mEventProcessCount / (curTime - mLastUpdateMetricTime));
+    LogtailMonitor::GetInstance()->UpdateMetric("event_tps",
+                                                1.0 * mEventProcessCount / (curTime - mLastUpdateMetricTime));
     LogtailMonitor::GetInstance()->UpdateMetric("open_fd",
-                                             GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
+                                                GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
     LogtailMonitor::GetInstance()->UpdateMetric("register_handler", EventDispatcher::GetInstance()->GetHandlerCount());
     LogtailMonitor::GetInstance()->UpdateMetric("reader_count", CheckPointManager::Instance()->GetReaderCount());
     LogtailMonitor::GetInstance()->UpdateMetric("multi_config", AppConfig::GetInstance()->IsAcceptMultiConfig());
@@ -440,9 +448,19 @@ void* LogInput::ProcessLoop() {
             ConfigManager::GetInstance()->ClearConfigMatchCache();
             lastClearConfigCache = curTime;
         }
+
+        if (BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()
+            && EventDispatcher::GetInstance()->IsAllFileRead()) {
+            break;
+        }
     }
 
-    LOG_WARNING(sLogger, ("LogInputThread", "Exit"));
+    mInteruptFlag = true;
+    mStopCV.notify_one();
+
+    if (!BOOL_FLAG(enable_full_drain_mode)) {
+        LOG_WARNING(sLogger, ("LogInputThread", "Exit"));
+    }
     return NULL;
 }
 

@@ -212,8 +212,6 @@ void PipelineManager::StopAllPipelines() {
     Sender::Instance()->SetQueueUrgent();
     bool logProcessFlushFlag = false;
     for (int i = 0; !logProcessFlushFlag && i < 500; ++i) {
-        // deamon send thread may reset flush, so we should set flush every time
-        Sender::Instance()->SetFlush();
         logProcessFlushFlag = LogProcess::GetInstance()->FlushOut(10);
     }
     if (!logProcessFlushFlag) {

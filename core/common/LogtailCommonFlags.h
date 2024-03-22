@@ -24,6 +24,7 @@ DECLARE_FLAG_STRING(logtail_integrity_snapshot);
 
 // app config
 DECLARE_FLAG_STRING(ilogtail_config);
+DECLARE_FLAG_BOOL(enable_full_drain_mode);
 DECLARE_FLAG_INT32(cpu_limit_num);
 DECLARE_FLAG_INT32(mem_limit_num);
 DECLARE_FLAG_DOUBLE(cpu_usage_up_limit);

@@ -13,24 +13,26 @@
 // limitations under the License.
 
 #include "EventHandler.h"
+
 #include <iostream>
 #include <string>
 #include <vector>
-#include "common/TimeUtil.h"
-#include "common/RuntimeUtil.h"
-#include "common/FileSystemUtil.h"
-#include "common/StringTools.h"
+
+#include "LogInput.h"
 #include "app_config/AppConfig.h"
-#include "event/BlockEventManager.h"
-#include "controller/EventDispatcher.h"
+#include "common/FileSystemUtil.h"
+#include "common/LogFileCollectOffsetIndicator.h"
+#include "common/RuntimeUtil.h"
+#include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "config_manager/ConfigManager.h"
+#include "controller/EventDispatcher.h"
+#include "event/BlockEventManager.h"
+#include "file_server/FileServer.h"
+#include "fuse/FuseFileBlacklist.h"
+#include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
 #include "processor/daemon/LogProcess.h"
-#include "logger/Logger.h"
-#include "fuse/FuseFileBlacklist.h"
-#include "common/LogFileCollectOffsetIndicator.h"
-#include "LogInput.h"
-#include "file_server/FileServer.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -184,6 +186,15 @@ void TimeoutHandler::HandleTimeOut() {
 bool CreateModifyHandler::DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) {
     for (ModifyHandlerMap::iterator iter = mModifyHandlerPtrMap.begin(); iter != mModifyHandlerPtrMap.end(); ++iter) {
         iter->second->DumpReaderMeta(isRotatorReader, checkConfigFlag);
+    }
+    return true;
+}
+
+bool CreateModifyHandler::IsAllFileRead() {
+    for (ModifyHandlerMap::iterator iter = mModifyHandlerPtrMap.begin(); iter != mModifyHandlerPtrMap.end(); ++iter) {
+        if (!iter->second->IsAllFileRead()) {
+            return false;
+        }
     }
     return true;
 }
@@ -936,6 +947,19 @@ bool ModifyHandler::DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) {
     } else {
         for (DevInodeLogFileReaderMap::iterator it = mRotatorReaderMap.begin(); it != mRotatorReaderMap.end(); ++it) {
             it->second->DumpMetaToMem(checkConfigFlag);
+        }
+    }
+    return true;
+}
+
+bool ModifyHandler::IsAllFileRead() {
+    for (auto it = mNameReaderMap.begin(); it != mNameReaderMap.end(); ++it) {
+        if (it->second.size() > 1 || (!it->second.empty() && !it->second[0]->IsReadToEnd())) {
+            return false;
+        }
+        if (!it->second.empty()) {
+            // force flushing the last line immediately instead of waiting for timeout
+            ForceReadLogAndPush(it->second[0]);
         }
     }
     return true;
