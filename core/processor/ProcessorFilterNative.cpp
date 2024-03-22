@@ -218,25 +218,22 @@ bool ProcessorFilterNative::ProcessEvent(PipelineEventPtr& e) {
         res = FilterFilterRule(sourceEvent, mFilterRule.get());
     }
     if (res && mDiscardingNonUTF8) {
-        LogContents& contents = sourceEvent.MutableContents();
         std::vector<std::pair<StringView, StringView> > newContents;
-        for (auto content = contents.begin(); content != contents.end();) {
-            if (CheckNoneUtf8(content->second)) {
-                auto value = content->second.to_string();
+        for (auto &content: sourceEvent) {
+            if (CheckNoneUtf8(content.second)) {
+                auto value = content.second.to_string();
                 FilterNoneUtf8(value);
                 StringBuffer valueBuffer = sourceEvent.GetSourceBuffer()->CopyString(value);
-                content->second = StringView(valueBuffer.data, valueBuffer.size);
+                content.second = StringView(valueBuffer.data, valueBuffer.size);
             }
-            if (CheckNoneUtf8(content->first)) {
+            if (CheckNoneUtf8(content.first)) {
                 // key
-                auto key = content->first.to_string();
+                auto key = content.first.to_string();
                 FilterNoneUtf8(key);
                 StringBuffer keyBuffer = sourceEvent.GetSourceBuffer()->CopyString(key);
 
-                newContents.emplace_back(StringView(keyBuffer.data, keyBuffer.size), content->second);
-                content = contents.erase(content);
-            } else {
-                content++;
+                newContents.emplace_back(StringView(keyBuffer.data, keyBuffer.size), content.second);
+                sourceEvent.DelContent(content.first);
             }
         }
         for (auto& newContent : newContents) {
@@ -252,8 +249,7 @@ bool ProcessorFilterNative::IsSupportedEvent(const PipelineEventPtr& e) const {
 }
 
 bool ProcessorFilterNative::FilterExpressionRoot(LogEvent& sourceEvent, const BaseFilterNodePtr& node) {
-    const LogContents& contents = sourceEvent.GetContents();
-    if (contents.empty()) {
+    if (sourceEvent.Empty()) {
         return false;
     }
 
@@ -263,7 +259,7 @@ bool ProcessorFilterNative::FilterExpressionRoot(LogEvent& sourceEvent, const Ba
     }
 
     try {
-        return node->Match(contents, GetContext());
+        return node->Match(sourceEvent, GetContext());
     } catch (...) {
         mProcFilterErrorTotal->Add(1);
         LOG_ERROR(GetContext().GetLogger(), ("filter error ", ""));
@@ -272,8 +268,7 @@ bool ProcessorFilterNative::FilterExpressionRoot(LogEvent& sourceEvent, const Ba
 }
 
 bool ProcessorFilterNative::FilterFilterRule(LogEvent& sourceEvent, const LogFilterRule* filterRule) {
-    const LogContents& contents = sourceEvent.GetContents();
-    if (contents.empty()) {
+    if (sourceEvent.Empty()) {
         return false;
     }
 
@@ -283,7 +278,7 @@ bool ProcessorFilterNative::FilterFilterRule(LogEvent& sourceEvent, const LogFil
     }
 
     try {
-        return IsMatched(contents, *filterRule);
+        return IsMatched(sourceEvent, *filterRule);
     } catch (...) {
         mProcFilterErrorTotal->Add(1);
         LOG_ERROR(GetContext().GetLogger(), ("filter error ", ""));
@@ -291,12 +286,12 @@ bool ProcessorFilterNative::FilterFilterRule(LogEvent& sourceEvent, const LogFil
     }
 }
 
-bool ProcessorFilterNative::IsMatched(const LogContents& contents, const LogFilterRule& rule) {
+bool ProcessorFilterNative::IsMatched(const LogEvent& contents, const LogFilterRule& rule) {
     const std::vector<std::string>& keys = rule.FilterKeys;
     const std::vector<boost::regex> regs = rule.FilterRegs;
     std::string exception;
-    for (uint32_t i = 0; i < keys.size(); i++) {
-        const auto& content = contents.find(keys[i]);
+    for (uint32_t i = 0; i < keys.size(); ++i) {
+        const auto& content = contents.FindContent(keys[i]);
         if (content == contents.end()) {
             return false;
         }
@@ -492,7 +487,7 @@ bool BinaryFilterOperatorNode::Match(const sls_logs::Log& log, const LogGroupCon
     return false;
 }
 
-bool BinaryFilterOperatorNode::Match(const LogContents& contents, const PipelineContext& mContext) {
+bool BinaryFilterOperatorNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
     if (BOOST_LIKELY(left && right)) {
         if (op == AND_OPERATOR) {
             return left->Match(contents, mContext) && right->Match(contents, mContext);
@@ -525,8 +520,8 @@ bool RegexFilterValueNode::Match(const sls_logs::Log& log, const LogGroupContext
 }
 
 
-bool RegexFilterValueNode::Match(const LogContents& contents, const PipelineContext& mContext) {
-    const auto& content = contents.find(key);
+bool RegexFilterValueNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
+    const auto& content = contents.FindContent(key);
     if (content == contents.end()) {
         return false;
     }
@@ -555,7 +550,7 @@ bool UnaryFilterOperatorNode::Match(const sls_logs::Log& log, const LogGroupCont
 }
 
 
-bool UnaryFilterOperatorNode::Match(const LogContents& contents, const PipelineContext& mContext) {
+bool UnaryFilterOperatorNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
     if (BOOST_LIKELY(child.get() != NULL)) {
         return !child->Match(contents, mContext);
     }

@@ -533,7 +533,7 @@ void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup,
         } else {
             SetLogTime(log, logEvent.GetTimestamp());
         }
-        for (auto& kv : logEvent.GetContents()) {
+        for (const auto& kv : logEvent) {
             sls_logs::Log_Content* contPtr = log->add_contents();
             // need to rename EVENT_META_LOG_FILE_OFFSET
             contPtr->set_key(kv.first.to_string());

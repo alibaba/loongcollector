@@ -466,7 +466,7 @@ void ProcessorParseApsaraNative::AddLog(const StringView& key,
     if (!overwritten && targetEvent.HasContent(key)) {
         return;
     }
-    targetEvent.SetContentNoCopy(key, value);
+    targetEvent.AppendContentNoCopy(key, value);
     *mLogGroupSize += key.size() + value.size() + 5;
     mProcParseOutSizeBytes->Add(key.size() + value.size());
 }

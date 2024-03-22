@@ -20,23 +20,74 @@
 
 namespace logtail {
 
-using LogContents = std::map<StringView, StringView>;
+using LogContent = std::pair<StringView, StringView>;
+using ContentsContainer = std::vector<std::pair<LogContent, bool>>;
+
+template <class T, class F>
+class BaseContentIterator {
+    friend class LogEvent;
+
+public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = F;
+    using reference = F&;
+    using pointer = F*;
+
+    BaseContentIterator(const ContentsContainer& c) : container(c) {}
+
+    reference operator*() const { return ptr->first; }
+    pointer operator->() const { return &ptr->first; }
+    BaseContentIterator& operator++() {
+        Advance();
+        return *this;
+    }
+    BaseContentIterator operator++(int) {
+        BaseContentIterator it(ptr, container);
+        Advance();
+        return it;
+    }
+    bool operator==(const BaseContentIterator& rhs) const { return ptr == rhs.ptr; }
+    bool operator!=(const BaseContentIterator& rhs) const { return ptr != rhs.ptr; }
+
+private:
+    explicit BaseContentIterator(const T& p, const ContentsContainer& c) : ptr(p), container(c) {}
+    void Advance() {
+        while ((++ptr != container.end()) && !(ptr->second))
+            ;
+    }
+
+    T ptr;
+    const ContentsContainer& container;
+};
 
 class LogEvent : public PipelineEvent {
     friend class PipelineEventGroup;
 
 public:
-    const LogContents& GetContents() const { return contents; }
-    LogContents& MutableContents() { return contents; }
-    void SetContent(const StringView& key, const StringView& val);
-    void SetContent(const std::string& key, const std::string& val);
-    void SetContent(const StringBuffer& key, const StringView& val);
+    using ConstContentIterator = BaseContentIterator<ContentsContainer::const_iterator, const LogContent>;
+    using ContentIterator = BaseContentIterator<ContentsContainer::iterator, LogContent>;
 
+    StringView GetContent(StringView key) const;
+    bool HasContent(StringView key) const;
+    ContentIterator FindContent(StringView key);
+    ConstContentIterator FindContent(StringView key) const;
+    void SetContent(StringView key, StringView val);
+    void SetContent(const std::string& key, const std::string& val);
+    void SetContent(const StringBuffer& key, StringView val);
     void SetContentNoCopy(const StringBuffer& key, const StringBuffer& val);
-    const StringView& GetContent(const StringView& key) const;
-    bool HasContent(const StringView& key) const;
-    void SetContentNoCopy(const StringView& key, const StringView& val);
-    void DelContent(const StringView& key);
+    void SetContentNoCopy(StringView key, StringView val);
+    void DelContent(StringView key);
+
+    bool Empty() const { return mIndex.empty(); }
+    size_t Size() const { return mIndex.size(); }
+
+    ContentIterator begin();
+    ContentIterator end();
+    ConstContentIterator begin() const;
+    ConstContentIterator end() const;
+    ConstContentIterator cbegin() const;
+    ConstContentIterator cend() const;
 
     uint64_t EventsSizeBytes() override;
 
@@ -48,7 +99,15 @@ public:
 private:
     LogEvent(PipelineEventGroup* ptr);
 
-    LogContents contents;
+    // this is only used for ProcessorParseApsaraNative for backward compatability, since multiple keys are allowed.
+    // We do not invalidate existing LogContent when the same key has arrived.
+    friend class ProcessorParseApsaraNative;
+    void AppendContentNoCopy(StringView key, StringView val);
+
+    // since log reduce in SLS server requires the original order of log contents, we have to maintain this sequential
+    // information for backward compatability.
+    ContentsContainer mContents;
+    std::map<StringView, size_t> mIndex;
 };
 
 } // namespace logtail

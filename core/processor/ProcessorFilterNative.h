@@ -37,7 +37,7 @@ public:
 
 public:
     virtual bool Match(const sls_logs::Log& log, const LogGroupContext& context) { return true; }
-    virtual bool Match(const LogContents& contents, const PipelineContext& mContext) { return true; }
+    virtual bool Match(const LogEvent& contents, const PipelineContext& mContext) { return true; }
 
 public:
     FilterNodeType GetNodeType() const { return nodeType; }
@@ -57,7 +57,7 @@ public:
 
 public:
     virtual bool Match(const sls_logs::Log& log, const LogGroupContext& context);
-    virtual bool Match(const LogContents& contents, const PipelineContext& mContext);
+    virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
 
 private:
     FilterOperator op;
@@ -76,7 +76,7 @@ public:
 public:
     virtual bool Match(const sls_logs::Log& log, const LogGroupContext& context);
 
-    virtual bool Match(const LogContents& contents, const PipelineContext& mContext);
+    virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
 
 private:
     std::string key;
@@ -94,7 +94,7 @@ public:
 public:
     virtual bool Match(const sls_logs::Log& log, const LogGroupContext& context);
 
-    virtual bool Match(const LogContents& contents, const PipelineContext& mContext);
+    virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
 
 private:
     BaseFilterNodePtr child;
@@ -136,7 +136,7 @@ private:
 
     // Filter logs through FilterRule
     bool FilterFilterRule(LogEvent& sourceEvent, const LogFilterRule* filterRule);
-    bool IsMatched(const LogContents& contents, const LogFilterRule& rule);
+    bool IsMatched(const LogEvent& contents, const LogFilterRule& rule);
 
     bool noneUtf8(StringView& strSrc, bool modify);
     bool CheckNoneUtf8(const StringView& strSrc);

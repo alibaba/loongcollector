@@ -96,12 +96,11 @@ bool CommonParserOptions::ShouldAddSourceContent(bool parseSuccess) {
 
 bool CommonParserOptions::ShouldEraseEvent(bool parseSuccess, const LogEvent& sourceEvent) {
     if (!parseSuccess && !mKeepingSourceWhenParseFail) {
-        const auto& contents = sourceEvent.GetContents();
-        if (contents.empty()) {
+        if (sourceEvent.Empty()) {
             return true;
         }
         // "__file_offset__"
-        if (contents.size() == 1 && (contents.begin()->first == LOG_RESERVED_KEY_FILE_OFFSET)) {
+        if (sourceEvent.Size() == 1 && (sourceEvent.cbegin()->first == LOG_RESERVED_KEY_FILE_OFFSET)) {
             return true;
         }
     }
