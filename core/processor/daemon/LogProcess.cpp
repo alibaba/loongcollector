@@ -516,7 +516,7 @@ void LogProcess::FillEventGroupMetadata(LogBuffer& logBuffer, PipelineEventGroup
     eventGroup.SetMetadataNoCopy(EventGroupMetaKey::HOST_IP, LogFileProfiler::mIpAddr);
     eventGroup.SetMetadataNoCopy(EventGroupMetaKey::HOST_NAME, LogFileProfiler::mHostname);
     eventGroup.SetMetadata(EventGroupMetaKey::LOG_READ_OFFSET, std::to_string(logBuffer.readOffset));
-    eventGroup.SetMetadata(EventGroupMetaKey::LOG_READ_OFFSET, std::to_string(logBuffer.readLength));
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_READ_LENGTH, std::to_string(logBuffer.readLength));
 }
 
 void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup,
