@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 	"github.com/alibaba/ilogtail/pkg/logger"

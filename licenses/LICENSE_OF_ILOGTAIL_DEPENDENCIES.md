@@ -156,7 +156,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/BurntSushi/toml](https://pkg.go.dev/github.com/BurntSushi/toml?tab=licenses)
 - [github.com/Microsoft/go-winio](https://pkg.go.dev/github.com/Microsoft/go-winio?tab=licenses)
 - [github.com/Microsoft/hcsshim](https://pkg.go.dev/github.com/Microsoft/hcsshim?tab=licenses)
-- [github.com/Shopify/sarama](https://pkg.go.dev/github.com/Shopify/sarama?tab=licenses)
+- [github.com/IBM/sarama](https://pkg.go.dev/github.com/IBM/sarama?tab=licenses)
 - [github.com/VictoriaMetrics/fasthttp](https://pkg.go.dev/github.com/VictoriaMetrics/fasthttp?tab=licenses)
 - [github.com/buger/jsonparser](https://pkg.go.dev/github.com/buger/jsonparser?tab=licenses)
 - [github.com/cespare/xxhash](https://pkg.go.dev/github.com/cespare/xxhash?tab=licenses)

@@ -17,11 +17,11 @@
 | Topic                                 | String   | 是    | Kafka Topic,支持动态topic, 例如: `test_%{content.appname}`                                                       |
 | Version                               | String   | 否    | Kafka协议版本号 ,例如：`2.0.0`，默认值：`1.0.0`                                                                         |
 | Headers                               | header数组 | 否    | kafka消息头 ，配置使用请参考本文中`Headers`配置用例                                                                          |
-| Convert                               | Struct   | 否    | ilogtail数据转换协议配置                                                                                           |
-| Convert.Protocol                      | String   | 否    | ilogtail数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding                      | String   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
+| Convert                               | Struct   | 否    | iLogtail数据转换协议配置                                                                                           |
+| Convert.Protocol                      | String   | 否    | iLogtail数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
+| Convert.Encoding                      | String   | 否    | iLogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
 | Convert.TagFieldsRename               | Map      | 否    | 对日志中tags中的json字段重命名                                                                                        |
-| Convert.ProtocolFieldsRename          | Map      | 否    | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
+| Convert.ProtocolFieldsRename          | Map      | 否    | iLogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
 | Authentication                        | Struct   | 否    | Kafka连接访问认证配置，支持`SASL/PLAIN`，根据kafka服务端认证方式选择配置                                                            |
 | Authentication.PlainText.Username     | String   | 否    | PlainText认证用户名                                                                                             |
 | Authentication.PlainText.Password     | String   | 否    | PlainText认证密码                                                                                              |
@@ -73,7 +73,7 @@
 0.11.0.0,0.11.0.1,0.11.0.2
 1.0.0,1.0.1,1.0.2,1.1.0,1.1.1,
 2.0.0,2.0.1,2.1.0,2.1.1,2.2.0,2.2.1,2.2.2,2.3.0,2.3.1,2.4.0,2.4.1,2.5.0,2.5.1,2.6.0,2.6.1,2.6.2,2.7.0,2.7.1,2.8.0,2.8.1,2.8.2
-3.0.0,3.0.1,3.0.2,3.1.0,3.1.1,3.1.2,3.2.0,3.2.1,3.2.2,3.2.3,3.3.0,3.3.1
+3.0.0,3.0.1,3.0.2,3.1.0,3.1.1,3.1.2,3.2.0,3.2.1,3.2.2,3.2.3,3.3.0,3.3.1,3.3.2,3.4.0,3.4.1,3.5.0,3.5.1,3.6.0
 ```
 
 - `Brokers`是个数组，多个`Broker`地址不能使用`;`或者`,`来隔开放在一行里，`yaml`配置文件中正确的多个`Broker`地址配置参考如下：

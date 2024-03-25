@@ -89,7 +89,7 @@ func (c *TLSConfig) LoadTLSConfig() (*tls.Config, error) {
 	}, nil
 }
 
-func (c TLSConfig) loadCert(caPath string) (*x509.CertPool, error) {
+func (c *TLSConfig) loadCert(caPath string) (*x509.CertPool, error) {
 	caPEM, err := os.ReadFile(filepath.Clean(caPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load CA %s: %w", caPath, err)

@@ -17,7 +17,7 @@ package kafkav2
 import (
 	"fmt"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 )
 
 // Version is a kafka version
@@ -28,12 +28,12 @@ func (v *Version) Validate() error {
 	if _, ok := v.Get(); ok {
 		return nil
 	}
-	return fmt.Errorf("unknown/unsupported kafka version '%v'", *v)
+	return fmt.Errorf("unknown/unsupported kafka version '%v'", v)
 }
 
 // Get a sarama kafka version
-func (v Version) Get() (sarama.KafkaVersion, bool) {
-	s := string(v)
+func (v *Version) Get() (sarama.KafkaVersion, bool) {
+	s := string(*v)
 	version, err := sarama.ParseKafkaVersion(s)
 	if err != nil {
 		return sarama.KafkaVersion{}, false
