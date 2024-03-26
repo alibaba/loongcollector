@@ -142,8 +142,6 @@ bool LogstoreSenderInfo::RecordSendResult(SendResult rst, LogstoreSenderStatisti
             if (++mLastNetworkErrorCount >= INT32_FLAG(max_client_send_error_count)) {
                 mLastNetworkErrorCount = INT32_FLAG(max_client_send_error_count);
                 mNetworkValidFlag = false;
-                LOG_WARNING(sLogger,
-                            ("Network fail, disable ", this->mRegion)("retry interval", mNetworkRetryInterval));
             }
             break;
         case LogstoreSenderInfo::SendResult_QuotaFail:
@@ -155,7 +153,6 @@ bool LogstoreSenderInfo::RecordSendResult(SendResult rst, LogstoreSenderStatisti
             if (++mLastQuotaExceedCount >= INT32_FLAG(max_client_quota_exceed_count)) {
                 mLastQuotaExceedCount = INT32_FLAG(max_client_quota_exceed_count);
                 mQuotaValidFlag = false;
-                LOG_WARNING(sLogger, ("QuotaF fail, disable ", this->mRegion)("retry interval", mQuotaRetryInterval));
             }
             break;
         default:

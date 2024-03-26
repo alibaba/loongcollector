@@ -273,7 +273,8 @@ void LogIntegrity::Notify(LoggroupTimeValue* data, bool flag) {
     PTScopedLock lock(mLogIntegrityMapLock);
     LogIntegrityInfo* info = NULL;
     if (FindLogIntegrityInfo(region, projectName, logstore, filename, info)) {
-        info->mLastUpdateTime = data->mLastUpdateTime;
+        info->mLastUpdateTime = data->mEnqueueTime;
+        
         info->SetStatus(data->mLogGroupContext.mSeqNum,
                         data->mLogLines,
                         flag ? LogTimeInfo::LogIntegrityStatus_SendOK : LogTimeInfo::LogIntegrityStatus_SendFail);

@@ -47,7 +47,7 @@ struct LogstoreSenderStatistics {
 };
 
 struct LoggroupTimeValue {
-    int32_t mLastUpdateTime;
+    int32_t mEnqueueTime;
     SEND_DATA_TYPE mDataType;
     std::string mLogData;
     int32_t mRawSize;
@@ -63,6 +63,7 @@ struct LoggroupTimeValue {
 
     int32_t mSendRetryTimes;
     int32_t mLastSendTime;
+    int32_t mLastLogWarningTime;
     std::string mAliuid;
     std::string mRegion;
     std::string mShardHashKey;
@@ -99,9 +100,10 @@ struct LoggroupTimeValue {
         mDataType = dataType;
         mLogLines = lines;
         mRawSize = rawSize;
-        mLastUpdateTime = lastUpdateTime;
+        mEnqueueTime = lastUpdateTime;
         mSendRetryTimes = 0;
         mLastSendTime = 0;
+        mLastLogWarningTime = 0;
         mLogData.clear();
         mShardHashKey = shardHashKey;
         mStatus = LoggroupSendStatus_Idle;
@@ -400,11 +402,11 @@ public:
                 continue;
             }
 
-            if (item->mLastUpdateTime < minSendTime) {
-                minSendTime = item->mLastUpdateTime;
+            if (item->mEnqueueTime < minSendTime) {
+                minSendTime = item->mEnqueueTime;
             }
-            if (item->mLastUpdateTime > maxSendTime) {
-                maxSendTime = item->mLastUpdateTime;
+            if (item->mEnqueueTime > maxSendTime) {
+                maxSendTime = item->mEnqueueTime;
             }
             ++statisticsItem.mSendQueueSize;
         }
@@ -417,6 +419,16 @@ public:
 
     int32_t OnSendDone(LoggroupTimeValue* item, LogstoreSenderInfo::SendResult sendRst, bool& needTrigger) {
         needTrigger = mSenderInfo.RecordSendResult(sendRst, mSenderStatistics);
+        if (!mSenderInfo.mNetworkValidFlag) {
+            LOG_WARNING(sLogger,
+                        ("Network fail, pause logstore", item->mLogstore)("project", item->mProjectName)(
+                            "region", mSenderInfo.mRegion)("retry interval", mSenderInfo.mNetworkRetryInterval));
+        }
+        if (!mSenderInfo.mQuotaValidFlag) {
+            LOG_WARNING(sLogger,
+                        ("Quota fail, pause logstore", item->mLogstore)("project", item->mProjectName)(
+                            "region", mSenderInfo.mRegion)("retry interval", mSenderInfo.mQuotaRetryInterval));
+        }
         // if send error, reset status to idle, and wait to send again
         // network fail or quota fail
         if (sendRst != LogstoreSenderInfo::SendResult_OK && sendRst != LogstoreSenderInfo::SendResult_Buffered
@@ -424,8 +436,8 @@ public:
             item->mStatus = LoggroupSendStatus_Idle;
             return 0;
         }
-        if (mSenderStatistics.mMaxSendSuccessTime < item->mLastUpdateTime) {
-            mSenderStatistics.mMaxSendSuccessTime = item->mLastUpdateTime;
+        if (mSenderStatistics.mMaxSendSuccessTime < item->mEnqueueTime) {
+            mSenderStatistics.mMaxSendSuccessTime = item->mEnqueueTime;
         }
         // else remove item except buffered
         return RemoveItem(item, sendRst != LogstoreSenderInfo::SendResult_Buffered);
