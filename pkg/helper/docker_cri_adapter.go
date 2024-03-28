@@ -46,11 +46,7 @@ const (
 	maxMsgSize            = 1024 * 1024 * 16
 )
 
-var (
-	containerdUnixSocket  = "/run/containerd/containerd.sock"
-	dockerShimUnixSocket1 = "/var/run/dockershim.sock"
-	dockerShimUnixSocket2 = "/run/dockershim.sock"
-)
+var containerdUnixSocket = "/run/containerd/containerd.sock"
 
 var criRuntimeWrapper *CRIRuntimeWrapper
 
@@ -82,14 +78,6 @@ type CRIRuntimeWrapper struct {
 func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
 	if len(os.Getenv("USE_CONTAINERD")) > 0 {
 		return true
-	}
-
-	// Verify dockershim.sock existence.
-	for _, sock := range []string{dockerShimUnixSocket1, dockerShimUnixSocket2} {
-		if fi, err := os.Stat(sock); err == nil && !fi.IsDir() {
-			// Having dockershim.sock means k8s + docker cri
-			return false
-		}
 	}
 
 	// Verify containerd.sock cri valid.
