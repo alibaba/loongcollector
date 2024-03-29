@@ -47,8 +47,6 @@ class DevInode;
 typedef std::shared_ptr<LogFileReader> LogFileReaderPtr;
 typedef std::deque<LogFileReaderPtr> LogFileReaderPtrArray;
 
-enum SplitState { SPLIT_UNMATCH, SPLIT_BEGIN, SPLIT_CONTINUE };
-
 // Only get the currently written log file, it will choose the last modified file to read. There are several condition
 // to choose the lastmodify file:
 // 1. if the last read file don't exist

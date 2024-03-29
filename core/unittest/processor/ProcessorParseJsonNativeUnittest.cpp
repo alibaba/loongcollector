@@ -19,7 +19,7 @@
 #include "plugin/instance/ProcessorInstance.h"
 #include "processor/ProcessorParseJsonNative.h"
 #include "processor/ProcessorSplitLogStringNative.h"
-#include "processor/ProcessorSplitRegexNative.h"
+#include "processor/ProcessorSplitMultilineLogStringNative.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

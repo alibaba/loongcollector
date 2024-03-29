@@ -26,7 +26,7 @@
 #include "plugin/PluginRegistry.h"
 #include "processor/ProcessorParseApsaraNative.h"
 #include "processor/ProcessorSplitLogStringNative.h"
-#include "processor/ProcessorSplitRegexNative.h"
+#include "processor/ProcessorSplitMultilineLogStringNative.h"
 #include "processor/ProcessorTagNative.h"
 #include "processor/daemon/LogProcess.h"
 
@@ -113,7 +113,7 @@ bool Pipeline::Init(Config&& config) {
             detail["SplitChar"] = Json::Value('\0');
             detail["AppendingLogPositionMeta"] = Json::Value(inputFile->mFileReader.mAppendingLogPositionMeta);
         } else if (inputFile->mMultiline.IsMultiline()) {
-            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitRegexNative::sName,
+            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitMultilineLogStringNative::sName,
                                                                        to_string(++pluginIndex));
             detail["Mode"] = Json::Value("custom");
             detail["StartPattern"] = Json::Value(inputFile->mMultiline.mStartPattern);

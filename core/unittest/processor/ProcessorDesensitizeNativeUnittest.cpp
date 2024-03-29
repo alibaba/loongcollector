@@ -16,7 +16,7 @@
 #include "plugin/instance/ProcessorInstance.h"
 #include "processor/ProcessorDesensitizeNative.h"
 #include "processor/ProcessorSplitLogStringNative.h"
-#include "processor/ProcessorSplitRegexNative.h"
+#include "processor/ProcessorSplitMultilineLogStringNative.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
@@ -77,7 +77,8 @@ void ProcessorDesensitizeNativeUnittest::TestMultipleLines() {
                 "contents" :
                 {
                     "content" : "asf@@@324 FS2$%pwd,pwd=saf543#$@,,
-dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
+dbf@@@324 FS2$%pwd,pwd=saf543#$@,,",
+                    "__file_offset__": 0
                 },
                 "timestampNanosecond" : 0,
                 "timestamp" : 12345678901,
@@ -140,7 +141,7 @@ dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
         std::string outJson = eventGroup.ToJsonString();
         APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     }
-    // ProcessorSplitRegexNative
+    // ProcessorSplitMultilineLogStringNative
     {
         // make events
         auto sourceBuffer = std::make_shared<SourceBuffer>();
@@ -150,15 +151,16 @@ dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
         // make config
         Json::Value config = GetCastSensWordConfig("content");
         std::string pluginId = "testID";
-        config["StartPattern"] = ".*";
+        config["StartPattern"] = "[a-zA-Z0-9]*";
         config["UnmatchedContentTreatment"] = "split";
         config["AppendingLogPositionMeta"] = false;
 
-        // run function ProcessorSplitRegexNative
-        ProcessorSplitRegexNative processorSplitRegexNative;
-        processorSplitRegexNative.SetContext(mContext);
-        APSARA_TEST_TRUE_FATAL(processorSplitRegexNative.Init(config));
-        processorSplitRegexNative.Process(eventGroup);
+        // run function ProcessorSplitMultilineLogStringNative
+        ProcessorSplitMultilineLogStringNative processorSplitMultilineLogStringNative;
+        processorSplitMultilineLogStringNative.SetContext(mContext);
+        processorSplitMultilineLogStringNative.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
+        APSARA_TEST_TRUE_FATAL(processorSplitMultilineLogStringNative.Init(config));
+        processorSplitMultilineLogStringNative.Process(eventGroup);
 
         // run function ProcessorDesensitizeNative
         ProcessorDesensitizeNative& processor = *(new ProcessorDesensitizeNative);

@@ -26,7 +26,7 @@
 
 namespace logtail {
 
-class ProcessorSplitRegexNative : public Processor {
+class ProcessorSplitMultilineLogStringNative : public Processor {
 public:
     static const std::string sName;
 
@@ -43,28 +43,39 @@ protected:
 
 private:
     void ProcessEvent(PipelineEventGroup& logGroup,
-                      const StringView& logPath,
+                      StringView logPath,
                       PipelineEventPtr&& e,
-                      EventsContainer& newEvents);
-    bool LogSplit(const char* buffer,
-                  int32_t size,
-                  int32_t& lineFeed,
-                  std::vector<StringView>& logIndex,
-                  std::vector<StringView>& discardIndex,
-                  const StringView& logPath);
-    void HandleUnmatchLogs(const char* buffer,
-                           int& multiBeginIndex,
-                           int endIndex,
-                           std::vector<StringView>& logIndex,
-                           std::vector<StringView>& discardIndex);
+                      EventsContainer& newEvents,
+                      int* inputLines,
+                      int* unmatchLines);
+    void SplitLogByRegex(PipelineEventGroup& logGroup);
+    void CreateNewEvent(const StringView& content,
+                        long sourceoffset,
+                        StringBuffer& sourceKey,
+                        const LogEvent& sourceEvent,
+                        PipelineEventGroup& logGroup,
+                        EventsContainer& newEvents);
+    void HandleUnmatchLogs(const StringView& sourceVal,
+                           long sourceoffset,
+                           StringBuffer& sourceKey,
+                           const LogEvent& sourceEvent,
+                           PipelineEventGroup& logGroup,
+                           EventsContainer& newEvents,
+                           StringView logPath,
+                           int* unmatchLines);
 
-    int* mFeedLines = nullptr;
+    StringView GetNextLine(StringView log, size_t begin);
+
     int* mSplitLines = nullptr;
 
+    CounterPtr mProcMatchedEventsCnt;
+    CounterPtr mProcMatchedLinesCnt;
+    CounterPtr mProcUnmatchedLinesCnt;
+
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class ProcessorSplitRegexNativeUnittest;
-    friend class ProcessorSplitRegexDisacardUnmatchUnittest;
-    friend class ProcessorSplitRegexKeepUnmatchUnittest;
+    friend class ProcessorSplitMultilineLogStringNativeUnittest;
+    friend class ProcessorSplitMultilineLogDisacardUnmatchUnittest;
+    friend class ProcessorSplitMultilineLogKeepUnmatchUnittest;
 #endif
 };
 

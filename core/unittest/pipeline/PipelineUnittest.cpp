@@ -24,7 +24,7 @@
 #include "pipeline/Pipeline.h"
 #include "plugin/PluginRegistry.h"
 #include "processor/ProcessorSplitLogStringNative.h"
-#include "processor/ProcessorSplitRegexNative.h"
+#include "processor/ProcessorSplitMultilineLogStringNative.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -2340,7 +2340,7 @@ void PipelineUnittest::OnInputFileWithMultiline() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(ProcessorSplitRegexNative::sName, pipeline->mProcessorLine[1]->Name());
+    APSARA_TEST_EQUAL(ProcessorSplitMultilineLogStringNative::sName, pipeline->mProcessorLine[1]->Name());
 
     // json multiline
     configStr = R"(
