@@ -257,6 +257,7 @@ func (p *FlusherStdout) writeSpan(writer *jsoniter.Stream, metric *models.Span) 
 func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, log *models.Log) {
 	writer.WriteObjectField("offset")
 	writer.WriteInt64(int64(log.GetOffset()))
+	_, _ = writer.Write([]byte{','})
 	writer.WriteObjectField("level")
 	writer.WriteString(log.GetLevel())
 	_, _ = writer.Write([]byte{','})
