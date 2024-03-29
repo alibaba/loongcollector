@@ -23,7 +23,7 @@ ilogtail:
             - Type: input_file
               FilePaths: 
                 - /root/test/simple.log
-              FlushTimeoutSecs: 10000
+              FlushTimeoutSecs: 2
           flushers:
             - Type: flusher_stdout
               OnlyStdout: false

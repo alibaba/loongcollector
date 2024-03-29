@@ -15,6 +15,7 @@
 # limitations under the License.
 sleep 5
 echo -n "5=====" >> /root/volume/simple.log
-sleep 3
+sleep 1
 mv /root/volume/simple.log /root/volume/simple.log.1
 echo "6=====" >> /root/volume/simple.log
+sleep 3
