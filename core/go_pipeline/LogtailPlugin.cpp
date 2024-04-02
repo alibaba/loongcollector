@@ -244,9 +244,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
             return 0;
         }
     } else {
-        if (!GetRealConfigName(configNameStr)) {
-            return -2;
-        }
         shared_ptr<Pipeline> p = PipelineManager::GetInstance()->FindPipelineByName(configNameStr);
         if (!p) {
             LOG_INFO(sLogger,
@@ -270,9 +267,6 @@ int LogtailPlugin::ExecPluginCmd(
         return -2;
     }
     string configNameStr(configName, configNameSize);
-    if (!GetRealConfigName(configNameStr)) {
-        return -2;
-    }
     string paramsStr(params, paramsLen);
     PluginCmdType cmdType = (PluginCmdType)cmdId;
     LOG_DEBUG(sLogger, ("exec cmd", cmdType)("config", configNameStr)("detail", paramsStr));
@@ -564,15 +558,4 @@ K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
         }
     }
     return K8sContainerMeta();
-}
-
-bool LogtailPlugin::GetRealConfigName(std::string& name) {
-    // all Go pipeline name should end with "/1" or "/2"
-    size_t len = name.size();
-    if (len <= 2) {
-        LOG_ERROR(sLogger, ("invalid Go pipeline name", "something wrong happend")("config", name));
-        return false;
-    }
-    name = name.substr(0, len - 2);
-    return true;
 }

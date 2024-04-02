@@ -44,3 +44,11 @@ func DeserializeLoadedConfig(cfg []byte) ([]*LoadedConfig, error) {
 	}
 	return c, nil
 }
+
+func GetRealConfigName(configName string) string {
+	realConfigName := configName
+	if len(configName) > 2 && (configName[len(configName)-2:] == "/1" || configName[len(configName)-2:] == "/2") {
+		realConfigName = configName[:len(configName)-2]
+	}
+	return realConfigName
+}

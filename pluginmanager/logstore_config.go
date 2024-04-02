@@ -382,7 +382,7 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	logstoreC := &LogstoreConfig{
 		ProjectName:      project,
 		LogstoreName:     logstore,
-		ConfigName:       configName,
+		ConfigName:       config.GetRealConfigName(configName),
 		LogstoreKey:      logstoreKey,
 		Context:          contextImp,
 		configDetailHash: fmt.Sprintf("%x", md5.Sum([]byte(jsonStr))), //nolint:gosec

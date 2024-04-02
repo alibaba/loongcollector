@@ -17,6 +17,7 @@ package pkg
 import (
 	"context"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -39,7 +40,7 @@ func NewLogtailContextMeta(project, logstore, configName string) (context.Contex
 	meta := &LogtailContextMeta{
 		project:    project,
 		logstore:   logstore,
-		configName: configName,
+		configName: config.GetRealConfigName(configName),
 		alarm:      new(util.Alarm),
 	}
 	if len(logstore) == 0 {
