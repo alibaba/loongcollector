@@ -24,7 +24,7 @@ target_link_libraries(file_reader_options_unittest unittest_base)
 add_executable(json_log_file_reader_unittest JsonLogFileReaderUnittest.cpp)
 target_link_libraries(json_log_file_reader_unittest unittest_base)
 
-add_executable(last_matched_line_unittest LastMatchedLineUnittest.cpp)
+add_executable(last_matched_line_unittest RemoveLastIncompleteLogUnittest.cpp)
 target_link_libraries(last_matched_line_unittest unittest_base)
 
 add_executable(log_file_reader_unittest LogFileReaderUnittest.cpp)

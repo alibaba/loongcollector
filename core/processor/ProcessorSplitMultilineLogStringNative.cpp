@@ -348,7 +348,7 @@ void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView&
                                                                EventsContainer& newEvents,
                                                                StringView logPath,
                                                                int* unmatchLines) {
-    size_t begin, fisrtLogSize, totalLines = 0;
+    size_t begin = 0, fisrtLogSize = 0, totalLines = 0;
     while (begin < sourceVal.size()) {
         StringView content = GetNextLine(sourceVal, begin);
         ++(*unmatchLines);

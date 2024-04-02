@@ -30,8 +30,10 @@ public:
         : LogFileReader(hostLogPathDir, hostLogPathFile, devInode, readerConfig, multilineConfig) {}
 
 protected:
-    int32_t
-    LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount, bool allowRollback = true) override;
+    int32_t RemoveLastIncompleteLog(char* buffer,
+                                    int32_t size,
+                                    int32_t& rollbackLineFeedCount,
+                                    bool allowRollback = true) override;
 
 private:
     bool FindJsonMatch(
@@ -40,7 +42,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class JsonLogFileReaderUnittest;
     friend class JsonParseLogLineUnittest;
-    friend class LastMatchedLineUnittest;
+    friend class RemoveLastIncompleteLogUnittest;
 #endif
 };
 

@@ -1698,7 +1698,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
         }
         if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
             int32_t rollbackLineFeedCount;
-            nbytes = LastMatchedLine(stringBuffer, alignedBytes, rollbackLineFeedCount, allowRollback);
+            nbytes = RemoveLastIncompleteLog(stringBuffer, alignedBytes, rollbackLineFeedCount, allowRollback);
         }
 
         if (nbytes == 0) {
@@ -1706,7 +1706,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
                 nbytes = alignedBytes ? alignedBytes : BUFFER_SIZE;
                 if (mReaderConfig.second->RequiringJsonReader()) {
                     int32_t rollbackLineFeedCount;
-                    nbytes = LastMatchedLine(stringBuffer, nbytes, rollbackLineFeedCount, false);
+                    nbytes = RemoveLastIncompleteLog(stringBuffer, nbytes, rollbackLineFeedCount, false);
                 }
                 LOG_WARNING(sLogger,
                             ("Log is too long and forced to be split at offset: ",
@@ -1856,7 +1856,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     int32_t rollbackLineFeedCount = 0;
     int32_t bakResultCharCount = resultCharCount;
     if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
-        resultCharCount = LastMatchedLine(stringBuffer, resultCharCount, rollbackLineFeedCount, allowRollback);
+        resultCharCount = RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, allowRollback);
     }
     if (resultCharCount == 0) {
         if (moreData) {
@@ -1864,7 +1864,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             rollbackLineFeedCount = 0;
             if (mReaderConfig.second->RequiringJsonReader()) {
                 int32_t rollbackLineFeedCount;
-                LastMatchedLine(stringBuffer, resultCharCount, rollbackLineFeedCount, false);
+                RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, false);
             }
             // Cannot get the split position here, so just mark a flag and send alarm later
             logTooLongSplitFlag = true;
@@ -2027,74 +2027,75 @@ LogFileReader::FileCompareResult LogFileReader::CompareToFile(const string& file
         1. xxx\nend\n -> xxx\nend
         1. xxx\nend\nxxx\n -> xxx\nend
 */
-int32_t LogFileReader::LastMatchedLine(char* buffer, int32_t size, int32_t& rollbackLineFeedCount, bool allowRollback) {
+/*
+    return: the number of bytes left, including \n
+*/
+int32_t
+LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& rollbackLineFeedCount, bool allowRollback) {
     if (!allowRollback) {
         return size;
     }
-    int endPs = size - 1; // buffer[size] = 0 , buffer[size-1] = '\n'
-    rollbackLineFeedCount = 0;
-    // Single line rollback
-    if (!mMultilineConfig.first->IsMultiline()) {
-        while (endPs >= 0) {
-            if (buffer[endPs] == '\n') {
-                if (endPs != size - 1) { // if last line dose not end with '\n', rollback
-                    ++rollbackLineFeedCount;
-                }
-                return endPs + 1;
-            }
-            endPs--;
-        }
-        return 0;
+    int32_t endPs; // the position of \n or \0
+    if (buffer[size - 1] == '\n') {
+        endPs = size - 1;
+    } else {
+        endPs = size;
     }
+    rollbackLineFeedCount = 0;
     // Multiline rollback
-    int begPs = size - 2;
-    std::string exception;
-    while (begPs >= 0) {
-        if (buffer[begPs] == '\n' || begPs == 0) {
-            int lineBegin = begPs == 0 ? 0 : begPs + 1;
-            if (mMultilineConfig.first->GetContinuePatternReg()
-                && BoostRegexMatch(buffer + lineBegin,
-                                   endPs - lineBegin,
-                                   *mMultilineConfig.first->GetContinuePatternReg(),
-                                   exception)) {
-                ++rollbackLineFeedCount;
-                endPs = begPs;
-            } else if (mMultilineConfig.first->GetEndPatternReg()
-                       && BoostRegexMatch(buffer + lineBegin,
-                                          endPs - lineBegin,
-                                          *mMultilineConfig.first->GetEndPatternReg(),
-                                          exception)) {
-                // Ensure the end line is complete
-                if (buffer[endPs] == '\n') {
-                    return endPs + 1;
-                } else {
-                    ++rollbackLineFeedCount;
-                    endPs = begPs;
+    if (mMultilineConfig.first->IsMultiline()) {
+        std::string exception;
+        while (endPs >= 0) {
+            StringView content = GetLastLine(StringView(buffer, size), endPs);
+            if (mMultilineConfig.first->GetEndPatternReg()) {
+                // start + end, continue + end, end
+                if (BoostRegexMatch(
+                        content.data(), content.size(), *mMultilineConfig.first->GetEndPatternReg(), exception)) {
+                    // Ensure the end line is complete
+                    if (buffer[endPs] == '\n') {
+                        return endPs + 1;
+                    }
                 }
             } else if (mMultilineConfig.first->GetStartPatternReg()
-                       && BoostRegexMatch(buffer + lineBegin,
-                                          endPs - lineBegin,
-                                          *mMultilineConfig.first->GetStartPatternReg(),
-                                          exception)) {
+                       && BoostRegexMatch(
+                           content.data(), content.size(), *mMultilineConfig.first->GetStartPatternReg(), exception)) {
+                // start + continue, start
                 ++rollbackLineFeedCount;
                 // Keep all the buffer if rollback all
-                return lineBegin;
-            } else if (mMultilineConfig.first->GetContinuePatternReg()) {
-                // We can confirm the logs before are complete if continue is configured but no regex pattern can match.
-                if (buffer[endPs] == '\n') {
-                    return endPs + 1;
-                } else {
-                    // Keep all the buffer if rollback all
-                    return lineBegin;
-                }
-            } else {
-                ++rollbackLineFeedCount;
-                endPs = begPs;
+                return content.data() - buffer;
             }
+            ++rollbackLineFeedCount;
+            endPs = content.data() - buffer - 1;
         }
-        begPs--;
     }
-    return 0;
+    // Single line rollback or all unmatch rollback
+    rollbackLineFeedCount = 0;
+    if (buffer[size - 1] == '\n') {
+        return size;
+    }
+    StringView content = GetLastLine(StringView(buffer, size), size - 1);
+    ++rollbackLineFeedCount;
+    return content.data() - buffer;
+}
+
+/*
+    params:
+        buffer: all read logs
+        end: the end position of current line, \n or \0
+    return:
+        last line (backward), without \n or \0
+*/
+StringView LogFileReader::GetLastLine(StringView buffer, size_t end) {
+    if (end == 0) {
+        return buffer;
+    }
+
+    for (size_t begin = end; begin > 0; --begin) {
+        if (buffer[begin - 1] == '\n') {
+            return StringView(buffer.data() + begin, end - begin);
+        }
+    }
+    return StringView(buffer.data(), end);
 }
 
 size_t LogFileReader::AlignLastCharacter(char* buffer, size_t size) {
@@ -2108,8 +2109,8 @@ size_t LogFileReader::AlignLastCharacter(char* buffer, size_t size) {
         // 1. The number of byte for one character can be 1, 2, 4.
         // 2. 1 byte character: the top bit is 0.
         // 3. 2 bytes character: the 1st byte is between 0x81 and 0xFE; the 2nd byte is between 0x40 and 0xFE.
-        // 4. 4 bytes character: the 1st and 3rd byte is between 0x81 and 0xFE; the 2nd and 4th byte are between 0x30
-        // and 0x39. (not supported to align)
+        // 4. 4 bytes character: the 1st and 3rd byte is between 0x81 and 0xFE; the 2nd and 4th byte are between
+        // 0x30 and 0x39. (not supported to align)
 
         // 1 byte character, 2nd byte of 2 bytes, 2nd or 4th byte of 4 bytes
         if ((buffer[endPs] & 0x80) == 0 || size == 1) {
