@@ -129,7 +129,7 @@ func refreshEnvAndLabel() {
 	containerLabelSet = make(map[string]struct{})
 	k8sLabelSet = make(map[string]struct{})
 	for _, logstoreConfig := range LogtailConfig {
-		if logstoreConfig.CollectContainersFlag {
+		if logstoreConfig.CollectingContainersMeta {
 			for key := range logstoreConfig.EnvSet {
 				envSet[key] = struct{}{}
 			}
@@ -150,7 +150,7 @@ func compareEnvAndLabel() (diffEnvSet, diffContainerLabelSet, diffK8sLabelSet ma
 	diffContainerLabelSet = make(map[string]struct{})
 	diffK8sLabelSet = make(map[string]struct{})
 	for _, logstoreConfig := range LogtailConfig {
-		if logstoreConfig.CollectContainersFlag {
+		if logstoreConfig.CollectingContainersMeta {
 			for key := range logstoreConfig.EnvSet {
 				if _, ok := envSet[key]; !ok {
 					envSet[key] = struct{}{}
@@ -268,7 +268,7 @@ func compareEnvAndLabelAndRecordContainer() []*helper.ContainerDetail {
 
 func isCollectContainers() bool {
 	for _, logstoreConfig := range LogtailConfig {
-		if logstoreConfig.CollectContainersFlag {
+		if logstoreConfig.CollectingContainersMeta {
 			return true
 		}
 	}

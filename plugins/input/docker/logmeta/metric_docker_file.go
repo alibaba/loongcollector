@@ -87,10 +87,10 @@ type InputDockerFile struct {
 	lastUpdateTime       int64
 
 	// Last return of GetAllAcceptedInfoV2
-	fullList              map[string]bool
-	matchList             map[string]*helper.DockerInfoDetail
-	CollectContainersFlag bool
-	firstStart            bool
+	fullList                 map[string]bool
+	matchList                map[string]*helper.DockerInfoDetail
+	CollectingContainersMeta bool
+	firstStart               bool
 }
 
 func formatPath(path string) string {
@@ -343,7 +343,7 @@ func (idf *InputDockerFile) Collect(collector pipeline.Collector) error {
 			logger.Warning(idf.context.GetRuntimeContext(), "DOCKER_FILE_MATCH_ALARM", "unknow error", "can't find path from this container", "path", idf.LogPath, "container", info.ContainerInfo.Name)
 		}
 	}
-	if idf.CollectContainersFlag {
+	if idf.CollectingContainersMeta {
 		configResult := &helper.ContainerConfigResult{
 			DataType:                      "container_config_result",
 			Project:                       idf.context.GetProject(),
