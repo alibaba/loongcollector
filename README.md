@@ -96,7 +96,7 @@ You can report bugs, make suggestions or participate in discussions through [Git
 * Zhihu：[iLogtail社区](https://www.zhihu.com/column/c_1533139823409270785)
 * DingTalk：iLogtail社区
 
-<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup/chatgroup_20230207.png" style="width: 50%; height: 50%" />
+<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup/chatgroup_20240408.png" style="width: 50%; height: 50%" />
 
 ## Our Users
 
