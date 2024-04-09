@@ -679,6 +679,8 @@ bool Sender::LZ4CompressLogGroup(const sls_logs::LogGroup& logGroup, std::string
 /////////////////////////////////////////////////////////////////////////////////////
 
 bool Sender::Init(void) {
+    SLSControl::GetInstance()->Init();
+
     static Aggregator* aggregator = Aggregator::GetInstance();
     aggregator->CleanLogPackSeqMap();
 
