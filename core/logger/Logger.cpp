@@ -322,11 +322,12 @@ void Logger::LoadConfig(const std::string& filePath) {
         }
 
         spdlog::register_logger(logger);
-        logger->set_level(loggerCfg.level);
         logger->set_pattern(DEFAULT_PATTERN);
         if (name == "/apsara/sls/ilogtail" && !aliyun_logtail_log_level.empty()) {
+            logger->set_level(envLogLevel);
             logger->flush_on(envLogLevel);
         } else {
+            logger->set_level(loggerCfg.level);
             logger->flush_on(loggerCfg.level);
         }
         LogMsg(std::string("logger named ") + name + " created.");
