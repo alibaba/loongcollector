@@ -294,9 +294,8 @@ void LogtailAlarm::SendAlarm(const LogtailAlarmType alarmType,
         return;
     }
 
-    // ignore logtail self alarm
-    string profileProject = ProfileSender::GetInstance()->GetProfileProjectName(region);
-    if (!profileProject.empty() && profileProject == projectName) {
+    // ignore alarm for profile data
+    if (Sender::IsProfileData(region, projectName, category)) {
         return;
     }
     // LOG_DEBUG(sLogger, ("Add Alarm", region)("projectName", projectName)("alarm index",

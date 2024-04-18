@@ -188,9 +188,6 @@ void Application::Start() {
     // flusher_sls should always be loaded, since profiling will rely on this.
     Sender::Instance()->Init();
 
-    LogtailAlarm::GetInstance()->Init();
-    LogtailMonitor::GetInstance()->Init();
-
     // add local config dir
     filesystem::path localConfigPath
         = filesystem::path(AppConfig::GetInstance()->GetLogtailSysConfDir()) / "config" / "local";
@@ -209,6 +206,9 @@ void Application::Start() {
 #else
     CommonConfigProvider::GetInstance()->Init("common");
 #endif
+
+    LogtailAlarm::GetInstance()->Init();
+    LogtailMonitor::GetInstance()->Init();
 
     PluginRegistry::GetInstance()->LoadPlugins();
 

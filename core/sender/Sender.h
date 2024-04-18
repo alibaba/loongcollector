@@ -353,7 +353,6 @@ private:
     void CleanTimeoutSendStatistic();
 
     // bool CheckBatchMapFull(int64_t key);
-    static bool IsProfileData(const std::string& region, const std::string& project, const std::string& logstore);
 
     std::string GetRegionCurrentEndpoint(const std::string& region);
     std::string GetRegionFromEndpoint(const std::string& endpoint);
@@ -362,6 +361,7 @@ private:
 
 public:
     static Sender* Instance();
+    static bool IsProfileData(const std::string& region, const std::string& project, const std::string& logstore);
     // void ResetProfileSender();
     bool Init(); // Backward compatible
     // from collector to batchmap
