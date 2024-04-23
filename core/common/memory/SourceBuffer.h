@@ -16,57 +16,57 @@
 
 #pragma once
 
-#include <memory>
 #include <list>
+#include <memory>
+
 #include "models/StringView.h"
 
 namespace logtail {
 
-class SourceBuffer;
+class StringBuffer {
+    friend class SourceBuffer;
 
-struct StringBuffer {
+public:
     bool IsValid() { return data != nullptr; }
+
     char* const data;
     size_t size;
     const size_t capacity; // max bytes of data can be stored, data[capacity] is always '\0'.
+
 private:
+    // capacity is guranteed to be greater than 0
     StringBuffer(char* data, size_t capacity) : data(data), size(0), capacity(capacity) { data[0] = '\0'; }
-    friend class SourceBuffer;
 };
 
-class BufferAllocator
-{
+// only movable
+class BufferAllocator {
 private:
-    static const int32_t kAlignSize = sizeof(void*);
-    static const int32_t kPageSize = 4096; // in bytes
+    static const uint32_t kAlignSize = sizeof(void*);
+    static const uint32_t kPageSize = 4096; // in bytes
 
 public:
-    explicit BufferAllocator(int32_t firstChunkSize = 4096, int32_t chunkSizeLimit = 1024 * 128)
-      : mFirstChunkSize(firstChunkSize),
-        mChunkSize(firstChunkSize),
-        mChunkSizeLimit(chunkSizeLimit),
-        mFreeBytesInChunk(0),
-        mAllocPtr(NULL),
-        mAllocated(0),
-        mUsed(0)
-    {
+    explicit BufferAllocator(uint32_t firstChunkSize = 4096, uint32_t chunkSizeLimit = 1024 * 128)
+        : mFirstChunkSize(firstChunkSize), mChunkSizeLimit(chunkSizeLimit), mChunkSize(firstChunkSize) {
         mAllocPtr = new uint8_t[mChunkSize];
         mAllocatedChunks.push_back(mAllocPtr);
         mFreeBytesInChunk = mChunkSize;
         mAllocated = mChunkSize;
     }
 
-    ~BufferAllocator()
-    {
-        for(size_t i = 0 ; i < mAllocatedChunks.size() ; i++) {
+    BufferAllocator(const BufferAllocator&) = delete;
+    BufferAllocator& operator=(const BufferAllocator&) = delete;
+
+    BufferAllocator(BufferAllocator&&) = default;
+    BufferAllocator& operator=(BufferAllocator&&) = default;
+
+    ~BufferAllocator() {
+        for (size_t i = 0; i < mAllocatedChunks.size(); i++) {
             delete[] mAllocatedChunks[i];
         }
     }
 
-    void Reset(void)
-    {
-        for(size_t i = 1 ; i < mAllocatedChunks.size() ; i++)
-        {
+    void Reset(void) {
+        for (size_t i = 1; i < mAllocatedChunks.size(); i++) {
             delete[] mAllocatedChunks[i];
         }
         mAllocatedChunks.resize(1);
@@ -77,30 +77,22 @@ public:
         mUsed = 0;
     }
 
-    void* Allocate(int32_t bytes)
-    {
+    void* Allocate(uint32_t bytes) {
         // Align the alloc size
         int32_t aligned = (bytes + kAlignSize - 1) & ~(kAlignSize - 1);
         return Alloc(aligned);
     }
 
-    int64_t GetUsedSize() const
-    {
-        return mUsed;
-    }
+    int64_t GetUsedSize() const { return mUsed; }
 
     size_t TotalAllocated() { return mAllocated; }
 
-    int64_t GetAllocatedSize() const
-    {
-        return mAllocated + mAllocatedChunks.size() * sizeof(void*);
-    }
+    int64_t GetAllocatedSize() const { return mAllocated + mAllocatedChunks.size() * sizeof(void*); }
 
 private:
     // Please do not make it public, user should always use Allocate() to get a better performance.
     // If you have a strong reason to do it, please drop a email to me: shiquan.yangsq@aliyun-inc.com
-    uint8_t* Alloc(int32_t bytes)
-    {
+    uint8_t* Alloc(uint32_t bytes) {
         uint8_t* mem = NULL;
 
         if (bytes <= mFreeBytesInChunk) {
@@ -136,32 +128,30 @@ private:
     }
 
 private:
-    int32_t mFirstChunkSize;
-    int32_t mChunkSize;
-    int32_t mChunkSizeLimit;
-    int32_t mFreeBytesInChunk;
-    // Pointing to the available memory address
-    uint8_t* mAllocPtr;
-    // How many bytes are free in the current chunk
-    // The allocated memory chunks.
-    std::vector<uint8_t*> mAllocatedChunks;
+    const uint32_t mFirstChunkSize = 4096;
+    const uint32_t mChunkSizeLimit = 1024 * 128;
 
+    // The allocated memory chunks
+    std::vector<uint8_t*> mAllocatedChunks;
     // Statistics data
-    int64_t mAllocated;
-    int64_t mUsed;
+    uint64_t mAllocated = 0;
+    uint64_t mUsed = 0;
+
+    // Pointing to the available memory address
+    uint8_t* mAllocPtr = nullptr;
+    // How many bytes are free in the current chunk
+    uint32_t mFreeBytesInChunk = 0;
+    // Current chunk size
+    uint32_t mChunkSize = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SourceBufferUnittest;
 #endif
-
-private : 
-    BufferAllocator(const BufferAllocator&);
 };
 
+// only movable
 class SourceBuffer {
 public:
-    SourceBuffer() {}
-    virtual ~SourceBuffer() {}
     StringBuffer AllocateStringBuffer(size_t size) {
         char* data = static_cast<char*>(mAllocator.Allocate(size + 1));
         data[size] = '\0';
@@ -177,10 +167,9 @@ public:
     StringBuffer CopyString(const std::string& s) { return CopyString(s.data(), s.length()); }
     StringBuffer CopyString(const StringView& s) { return CopyString(s.data(), s.length()); }
 
-    // StringView GetProperty(const char* key){};
-
 private:
     BufferAllocator mAllocator;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class LogEventUnittest;
     friend class PipelineEventGroupUnittest;

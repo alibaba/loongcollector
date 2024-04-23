@@ -17,7 +17,7 @@
 #include <fstream>
 #include "checkpoint/CheckPointManager.h"
 #include "reader/LogFileReader.h"
-#include "reader/SourceBuffer.h"
+#include "common/memory/SourceBuffer.h"
 #include "common/RuntimeUtil.h"
 #include "common/FileSystemUtil.h"
 #include "log_pb/sls_logs.pb.h"

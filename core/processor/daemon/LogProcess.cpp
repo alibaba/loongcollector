@@ -456,7 +456,7 @@ int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
     std::vector<PipelineEventGroup> eventGroupList;
     {
         // construct a logGroup, it should be moved into input later
-        PipelineEventGroup eventGroup(logBuffer);
+        PipelineEventGroup eventGroup{std::shared_ptr<SourceBuffer>(std::move(logBuffer->sourcebuffer))};
         // TODO: metadata should be set in reader
         FillEventGroupMetadata(*logBuffer, eventGroup);
 

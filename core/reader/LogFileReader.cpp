@@ -1640,7 +1640,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     if (!mLogFileOp.IsOpen()) {
         // read flush timeout
         nbytes = mCache.size();
-        StringBuffer stringMemory = logBuffer.AllocateStringBuffer(nbytes);
+        StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(nbytes);
         stringBuffer = stringMemory.data;
         memcpy(stringBuffer, mCache.data(), nbytes);
         // Ignore \n if last is force read
@@ -1662,7 +1662,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
         if (READ_BYTE < lastCacheSize) {
             READ_BYTE = lastCacheSize; // this should not happen, just avoid READ_BYTE >= 0 theoratically
         }
-        StringBuffer stringMemory = logBuffer.AllocateStringBuffer(READ_BYTE); // allocate modifiable buffer
+        StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(READ_BYTE); // allocate modifiable buffer
         if (lastCacheSize) {
             READ_BYTE -= lastCacheSize; // reserve space to copy from cache if needed
         }
@@ -1838,7 +1838,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     size_t srcLength = readCharCount;
     size_t requiredLen
         = EncodingConverter::GetInstance()->ConvertGbk2Utf8(gbkBuffer, &srcLength, nullptr, 0, lineFeedPos);
-    StringBuffer stringMemory = logBuffer.AllocateStringBuffer(requiredLen + 1);
+    StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(requiredLen + 1);
     size_t resultCharCount = EncodingConverter::GetInstance()->ConvertGbk2Utf8(
         gbkBuffer, &srcLength, stringMemory.data, stringMemory.capacity, lineFeedPos);
     char* stringBuffer = stringMemory.data; // utf8 buffer

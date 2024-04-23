@@ -23,7 +23,6 @@
 
 namespace logtail {
 // forward declaration
-struct LogBuffer;
 struct LoggroupTimeValue;
 struct MergeItem;
 

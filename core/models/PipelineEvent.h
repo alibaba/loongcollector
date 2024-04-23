@@ -25,7 +25,7 @@
 #include <string>
 
 #include "models/StringView.h"
-#include "reader/SourceBuffer.h"
+#include "common/memory/SourceBuffer.h"
 
 namespace logtail {
 

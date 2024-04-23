@@ -20,7 +20,7 @@
 #include <vector>
 #include <string>
 #include <cstddef>
-#include "reader/SourceBuffer.h"
+#include "common/memory/SourceBuffer.h"
 
 namespace logtail {
 enum FileEncoding { ENCODING_UTF8, ENCODING_GBK };

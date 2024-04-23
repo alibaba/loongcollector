@@ -16,6 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(common)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
+list(APPEND LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/memory/SourceBuffer.h)
 list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/BoostRegexValidator.cpp)
 list(REMOVE_ITEM LIB_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/GetUUID.cpp)
 if (MSVC)

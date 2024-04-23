@@ -21,7 +21,7 @@
 
 #include "common/Constants.h"
 #include "models/PipelineEventPtr.h"
-#include "reader/SourceBuffer.h"
+#include "common/memory/SourceBuffer.h"
 
 namespace logtail {
 

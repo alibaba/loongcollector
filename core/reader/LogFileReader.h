@@ -30,13 +30,13 @@
 #include "common/LogFileOperator.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "common/memory/SourceBuffer.h"
 #include "event/Event.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/MultilineOptions.h"
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
 #include "reader/FileReaderOptions.h"
-#include "reader/SourceBuffer.h"
 
 namespace logtail {
 
@@ -597,7 +597,7 @@ protected:
 #endif
 };
 
-struct LogBuffer : public SourceBuffer {
+struct LogBuffer {
     StringView rawBuffer;
     LogFileReaderPtr logFileReader;
     FileInfoPtr fileInfo;
@@ -607,8 +607,9 @@ struct LogBuffer : public SourceBuffer {
     // Current buffer's offset in file, for log position meta feature.
     uint64_t readOffset = 0;
     uint64_t readLength = 0;
+    std::unique_ptr<SourceBuffer> sourcebuffer;
 
-    LogBuffer() {}
+    LogBuffer() : sourcebuffer(new SourceBuffer()) {}
     void SetDependecy(const LogFileReaderPtr& reader) { logFileReader = reader; }
 };
 
