@@ -348,7 +348,7 @@ flushers:
         TenantDomain: shopping
         TenantService: some_app
         PrivateKey: file:///path/to/client-key.pem
-        KeyId: v1
+        KeyID: v1
     Topic: PulsarTestTopic
 ```
 
