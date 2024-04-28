@@ -1,5 +1,8 @@
 # 走近iLogtail社区版
 
+* 2024-04-17 [破浪前行：iLogtail十年老架构如何浴火重生](https://developer.aliyun.com/article/1484844)
+* 2024-04-17 [跟着iLogtail学习无锁化编程](https://developer.aliyun.com/article/1484342)
+* 2024-02-21 [你好，iLogtail 2.0！](https://developer.aliyun.com/article/1441630)
 * 2023-08-30 [跟着iLogtail学习设计模式](https://mp.weixin.qq.com/s/gfy9DfvcTuCiBiLJdZLTKQ)
 * 2023-02-17 [鲲鹏展翅凌云志：iLogtail社区2022年度开源报告](https://mp.weixin.qq.com/s/6luD7VUFd_0aaeyUBAShkw)
 * 2022-12-08 [性能与可靠的超强碰撞：第三方测评开源日志采集器](https://mp.weixin.qq.com/s/8mCVk3gvXPOijTlcRjUR_w)

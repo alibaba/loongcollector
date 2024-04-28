@@ -5,14 +5,13 @@
 | 名称                                                                            | 提供方                                                        | 简介                                                    |
 |-------------------------------------------------------------------------------|------------------------------------------------------------|-------------------------------------------------------|
 | [`input_file`](input/input-file.md)<br> 文本日志                                      | SLS官方 | 文本采集。                                                 |
-| [`input_observer_network`](input/metric-observer.md)<br>eBPF网络调用数据         | SLS官方                                                      | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。
+| [`input_observer_network`](input/metric-observer.md)<br>eBPF网络调用数据         | SLS官方                                                      | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。 |
 | [`input_command`](input/input-command.md)<br>脚本执行数据                           | 社区<br>[`didachuxing`](https://github.com/didachuxing)      | 采集脚本执行数据。                                             |
 | [`input_docker_stdout`](input/service-docker-stdout.md)<br>容器标准输出             | SLS官方                                                      | 从容器标准输出/标准错误流中采集日志。                                   |
 | [`metric_debug_file`](input/metric-debug-file.md)<br>文本日志（debug）              | SLS官方                                                      | 用于调试的读取文件内容的插件。                                       |
 | [`metric_input_example`](input/metric-input-example.md)<br>MetricInput示例插件    | SLS官方                                                      | MetricInput示例插件。                                      |
 | [`metric_meta_host`](input/metric-meta-host.md)<br>主机Meta数据                   | SLS官方                                                      | 主机Meta数据。                                             |
 | [`metric_mock`](input/metric-mock.md)<br>Mock数据-Metric                        | SLS官方                                                      | 生成metric模拟数据的插件。                                      |
-         |
 | [`metric_system_v2`](input/metric-system.md)<br>主机监控数据                        | SLS官方                                                      | 主机监控数据。                                               |
 | [`service_canal`](input/service-canal.md)<br>MySQL Binlog                     | SLS官方                                                      | 将MySQL Binlog输入到iLogtail。                             |
 | [`service_go_profile`](input/service-goprofile.md)<br>GO Profile              | SLS官方                                                      | 采集Golang pprof 性能数据。                                  |
