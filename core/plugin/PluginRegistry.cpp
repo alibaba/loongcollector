@@ -54,7 +54,7 @@
 #include "common/Flags.h"
 
 
-DEFINE_FLAG_BOOL(enable_processor_spl, "", false);
+DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
 
 using namespace std;
 
