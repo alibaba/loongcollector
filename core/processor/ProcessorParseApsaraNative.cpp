@@ -94,15 +94,18 @@ void ProcessorParseApsaraNative::Process(PipelineEventGroup& logGroup) {
     const StringView& logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
     EventsContainer& events = logGroup.MutableEvents();
     StringView timeStrCache;
-    LogtailTime cachedLogTime;
-    // works good normally. poor performance if most data need to be discarded.
-    for (auto it = events.begin(); it != events.end();) {
-        if (ProcessEvent(logPath, *it, cachedLogTime, timeStrCache)) {
-            ++it;
-        } else {
-            it = events.erase(it);
+    LogtailTime cachedLogTime = {0, 0};
+
+    size_t wIdx = 0;
+    for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
+        if (ProcessEvent(logPath, events[rIdx], cachedLogTime, timeStrCache)) {
+            if (wIdx != rIdx) {
+                events[wIdx] = std::move(events[rIdx]);
+            }
+            ++wIdx;
         }
     }
+    events.resize(wIdx);
     return;
 }
 

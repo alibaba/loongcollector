@@ -194,14 +194,18 @@ void ProcessorFilterNative::Process(PipelineEventGroup& logGroup) {
 
     EventsContainer& events = logGroup.MutableEvents();
 
-    for (auto it = events.begin(); it != events.end();) {
-        if (ProcessEvent(*it)) {
-            ++it;
+    size_t wIdx = 0;
+    for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
+        if (ProcessEvent(events[rIdx])) {
+            if (wIdx != rIdx) {
+                events[wIdx] = std::move(events[rIdx]);
+            }
+            ++wIdx;
         } else {
-            it = events.erase(it);
             mProcFilterRecordsTotal->Add(1);
         }
     }
+    events.resize(wIdx);
 }
 
 bool ProcessorFilterNative::ProcessEvent(PipelineEventPtr& e) {
@@ -234,7 +238,7 @@ bool ProcessorFilterNative::ProcessEvent(PipelineEventPtr& e) {
 
                 newContents.emplace_back(StringView(keyBuffer.data, keyBuffer.size), content.second);
                 sourceEvent.DelContent(content.first);
-            }
+                        }
         }
         for (auto& newContent : newContents) {
             sourceEvent.SetContentNoCopy(newContent.first, newContent.second);

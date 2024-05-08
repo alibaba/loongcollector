@@ -32,3 +32,6 @@ gtest_discover_tests(pipeline_event_unittest)
 gtest_discover_tests(log_event_unittest)
 gtest_discover_tests(pipeline_event_ptr_unittest)
 gtest_discover_tests(pipeline_event_group_unittest)
+
+add_executable(event_group_benchmark EventGroupBenchmark.cpp)
+target_link_libraries(event_group_benchmark unittest_base)

@@ -106,15 +106,18 @@ void ProcessorParseTimestampNative::Process(PipelineEventGroup& logGroup) {
     const StringView& logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
     StringView timeStrCache;
     EventsContainer& events = logGroup.MutableEvents();
-    // works good normally. poor performance if most data need to be discarded.
     LogtailTime logTime = {0, 0};
-    for (auto it = events.begin(); it != events.end();) {
-        if (ProcessorParseTimestampNative::ProcessEvent(logPath, *it, logTime, timeStrCache)) {
-            ++it;
-        } else {
-            it = events.erase(it);
+
+    size_t wIdx = 0;
+    for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
+        if (ProcessEvent(logPath, events[rIdx], logTime, timeStrCache)) {
+            if (wIdx != rIdx) {
+                events[wIdx] = std::move(events[rIdx]);
+            }
+            ++wIdx;
         }
     }
+    events.resize(wIdx);
     return;
 }
 

@@ -66,13 +66,16 @@ void ProcessorParseJsonNative::Process(PipelineEventGroup& logGroup) {
     const StringView& logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
     EventsContainer& events = logGroup.MutableEvents();
 
-    for (auto it = events.begin(); it != events.end();) {
-        if (ProcessEvent(logPath, *it)) {
-            ++it;
-        } else {
-            it = events.erase(it);
+    size_t wIdx = 0;
+    for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
+        if (ProcessEvent(logPath, events[rIdx])) {
+            if (wIdx != rIdx) {
+                events[wIdx] = std::move(events[rIdx]);
+            }
+            ++wIdx;
         }
     }
+    events.resize(wIdx);
 }
 
 bool ProcessorParseJsonNative::ProcessEvent(const StringView& logPath, PipelineEventPtr& e) {

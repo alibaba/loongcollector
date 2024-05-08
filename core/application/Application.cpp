@@ -233,8 +233,11 @@ void Application::Start() {
 
     LogProcess::GetInstance()->Start();
 
-    time_t curTime = 0, lastProfilingCheckTime = 0, lastTcmallocReleaseMemTime = 0, lastConfigCheckTime = 0,
-           lastUpdateMetricTime = 0, lastCheckTagsTime = 0;
+    time_t curTime = 0, lastProfilingCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
+           lastCheckTagsTime = 0;
+#ifndef LOGTAIL_NO_TC_MALLOC
+    time_t lastTcmallocReleaseMemTime = 0;
+#endif
     while (true) {
         curTime = time(NULL);
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
