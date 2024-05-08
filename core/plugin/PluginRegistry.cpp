@@ -60,137 +60,6 @@ using namespace std;
 
 namespace logtail {
 
-PluginRegistry::PluginRegistry() {
-    mGoPlugins = {"service_canal",
-                  "service_docker_event",
-                  "service_docker_stdout_raw",
-                  "service_docker_stdout",
-                  "service_input_example",
-                  "service_go_profile",
-                  "service_http_server",
-                  "service_jmx",
-                  "service_kafka",
-                  "service_lumberjack",
-                  "service_mock",
-                  "service_mqtt",
-                  "service_mysql",
-                  "service_otlp",
-                  "service_mssql",
-                  "service_pgsql",
-                  "service_skywalking_agent_v2",
-                  "service_skywalking_agent_v3_http",
-                  "service_skywalking_agent_v3",
-                  "service_syslog",
-                  "service_udp_server",
-                  "metric_debug_file",
-                  "metric_docker_file",
-                  "metric_checkpoint_example",
-                  "metric_input_example",
-                  "metric_meta_host",
-                  "metric_http",
-                  "metric_meta_kubernetes",
-                  "metric_mock",
-                  "metric_binlog",
-                  "metric_input_netping",
-                  "metric_nginx_status",
-                  "metric_process_v2",
-                  "metric_redis",
-                  "metric_system",
-                  "metric_system_v2",
-#ifdef _MSC_VER
-                  "service_wineventlog",
-#else
-                  "input_command",
-                  "service_gpu_metric",
-                  "service_journal",
-                  "service_snmp",
-                  "service_telegraf",
-                  "service_prometheus",
-#endif
-#ifdef __ENTERPRISE__
-                  "service_sunfire_heartbeat",
-                  "metric_sunfire_nginx",
-                  "metric_sunfire_nginx_status",
-                  "metric_sunfire_process",
-                  "metric_sunfire_system",
-                  "metric_alimetrics_custom",
-                  "metric_alimetrics_middleware",
-#endif
-                  "processor_add_fields",
-                  "processor_anchor",
-                  "processor_appender",
-                  "processor_base64_decoding",
-                  "processor_base64_encoding",
-                  "processor_cloud_meta",
-                  "processor_csv",
-                  "processor_default",
-                  "processor_desensitize",
-                  "processor_dict_map",
-                  "processor_drop",
-                  "processor_drop_last_key",
-                  "processor_encrypt",
-                  "processor_fields_with_condition",
-                  "processor_filter_key_regex",
-                  "processor_filter_regex",
-                  "processor_geoip",
-                  "processor_gotime",
-                  "processor_grok",
-                  "processor_json",
-                  "processor_log_to_sls_metric",
-                  "processor_md5",
-                  "processor_otel_metric",
-                  "processor_otel_trace",
-                  "processor_packjson",
-                  "processor_pick_key",
-                  "processor_rate_limit",
-                  "processor_regex",
-                  "processor_rename",
-                  "processor_split_char",
-                  "processor_split_key_value",
-                  "processor_split_log_regex",
-                  "processor_split_log_string",
-                  "processor_split_string",
-                  "processor_string_replace",
-                  "processor_strptime",
-#ifdef __ENTERPRISE__
-                  "processor_guess_timestamp",
-                  "processor_uniquedim",
-#endif
-                  "aggregator_default",
-                  "aggregator_base",
-                  "aggregator_content_value_group",
-                  "aggregator_context",
-                  "aggregator_logstore_router",
-                  "aggregator_metadata_group",
-                  "aggregator_opentelemetry",
-                  "aggregator_shardhash",
-                  "aggregator_skywalking",
-#ifdef __ENTERPRISE__
-                  "aggregator_sunfire",
-#endif
-                  "flusher_checker",
-                  "flusher_http",
-                  "flusher_kafka",
-                  "flusher_sleep",
-                  "flusher_statistics",
-                  "flusher_stdout",
-#ifdef __ENTERPRISE__
-                  "flusher_http_tj",
-#else
-                  "flusher_clickhouse",
-                  "flusher_elasticsearch",
-                  "flusher_grpc",
-                  "flusher_kafka_v2",
-                  "flusher_loki",
-                  "flusher_otlp",
-                  "flusher_pulsar",
-#endif
-                  "ext_basicauth",
-                  "ext_default_decoder",
-                  "ext_groupinfo_filter",
-                  "ext_request_breaker"};
-}
-
 void PluginRegistry::LoadPlugins() {
     LoadStaticPlugins();
     auto& plugins = AppConfig::GetInstance()->GetDynamicPlugins();
@@ -225,7 +94,11 @@ unique_ptr<FlusherInstance> PluginRegistry::CreateFlusher(const string& name, co
 }
 
 bool PluginRegistry::IsValidGoPlugin(const string& name) const {
-    return mGoPlugins.find(name) != mGoPlugins.end();
+    // If the plugin is not a C++ plugin, iLogtail core considers it is a go plugin.
+    // Go PluginManager validates the go plugins instead of C++ core.
+    return !IsValidNativeInputPlugin(name) && 
+        !IsValidNativeProcessorPlugin(name) &&
+        !IsValidNativeFlusherPlugin(name);
 }
 
 bool PluginRegistry::IsValidNativeInputPlugin(const string& name) const {

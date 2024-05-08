@@ -68,7 +68,7 @@ private:
         }
     };
 
-    PluginRegistry();
+    PluginRegistry() {}
     ~PluginRegistry() = default;
 
     void LoadStaticPlugins();
@@ -81,7 +81,6 @@ private:
     std::unique_ptr<PluginInstance> Create(PluginCat cat, const std::string& name, const std::string& pluginId);
 
     std::unordered_map<PluginKey, std::shared_ptr<PluginCreator>, PluginKeyHash> mPluginDict;
-    std::unordered_set<std::string> mGoPlugins;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PluginRegistryUnittest;

@@ -37,7 +37,6 @@ protected:
         PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock>());
         PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock>());
         PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());
-        PluginRegistry::GetInstance()->mGoPlugins = {"service_mock"};
     }
     void TearDown() override { PluginRegistry::GetInstance()->UnloadPlugins(); }
 };
@@ -68,7 +67,7 @@ void PluginRegistryUnittest::TestValidPlugin() const {
     APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin("flusher_mock"));
     APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin("flusher_unknown"));
     APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidGoPlugin("service_mock"));
-    APSARA_TEST_FALSE(PluginRegistry::GetInstance()->IsValidGoPlugin("service_unknown"));
+    APSARA_TEST_TRUE(PluginRegistry::GetInstance()->IsValidGoPlugin("service_unknown"));
 }
 
 UNIT_TEST_CASE(PluginRegistryUnittest, TestCreateInput)

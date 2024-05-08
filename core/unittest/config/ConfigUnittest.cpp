@@ -1436,7 +1436,7 @@ void ConfigUnittest::HandleInvalidInputs() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
-    APSARA_TEST_FALSE(config->Parse());
+    APSARA_TEST_TRUE(config->Parse());
 
     configStr = R"(
         {
@@ -1480,7 +1480,7 @@ void ConfigUnittest::HandleInvalidInputs() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
-    APSARA_TEST_FALSE(config->Parse());
+    APSARA_TEST_TRUE(config->Parse());
 
     // more than 1 native input
     configStr = R"(
@@ -2106,7 +2106,7 @@ void ConfigUnittest::HandleInvalidFlushers() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
-    APSARA_TEST_FALSE(config->Parse());
+    APSARA_TEST_TRUE(config->Parse());
 }
 
 void ConfigUnittest::HandleInvalidExtensions() const {
