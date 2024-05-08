@@ -73,7 +73,6 @@ using namespace std;
 namespace logtail {
 
 Application::Application() : mStartTime(time(nullptr)) {
-    mInstanceId = CalculateRandomUUID() + "_" + LogFileProfiler::mIpAddr + "_" + ToString(time(NULL));
 }
 
 void Application::Init() {
@@ -146,6 +145,9 @@ void Application::Init() {
         LogFileProfiler::mHostname = configHostName;
         LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_hostname", GetHostName());
     }
+
+    GenerateInstanceId();
+    TryGetUUID();
 
     int32_t systemBootTime = AppConfig::GetInstance()->GetSystemBootTime();
     LogFileProfiler::mSystemBootTime = systemBootTime > 0 ? systemBootTime : GetSystemBootTime();
@@ -288,8 +290,12 @@ void Application::Start() {
     }
 }
 
+void Application::GenerateInstanceId() {
+    mInstanceId = CalculateRandomUUID() + "_" + LogFileProfiler::mIpAddr + "_" + ToString(mStartTime);
+}
+
 bool Application::TryGetUUID() {
-    mUUIDThread = thread([this] { GetUUID(); });
+    mUUIDThread = thread([this] { GetUUIDThread(); });
     // wait 1000 ms
     for (int i = 0; i < 100; ++i) {
         this_thread::sleep_for(chrono::milliseconds(10));
@@ -385,12 +391,7 @@ void Application::CheckCriticalCondition(int32_t curTime) {
 }
 
 bool Application::GetUUIDThread() {
-    string uuid;
-#if defined(__aarch64__) || defined(__sw_64__)
-    // DMI can not work on such platforms but might crash Logtail, disable.
-#else
-    uuid = CalculateRandomUUID();
-#endif
+    string uuid = CalculateRandomUUID();
     SetUUID(uuid);
     return true;
 }

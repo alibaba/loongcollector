@@ -56,6 +56,7 @@ private:
     void Exit();
     void CheckCriticalCondition(int32_t curTime);
 
+    void GenerateInstanceId();
     bool GetUUIDThread();
     void SetUUID(std::string uuid) {
         mUUIDLock.lock();
