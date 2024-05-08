@@ -283,7 +283,6 @@ macro(link_curl target_name)
         target_link_libraries(${target_name} "${curl_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
         target_link_libraries(${target_name} "${curl_${LIBRARY_DIR_SUFFIX}}/libcurl.a")
-        target_link_libraries(${target_name} ssl crypto)
     elseif (MSVC)
         target_link_libraries(${target_name}
                 debug "libcurl-d"
@@ -336,7 +335,7 @@ endmacro()
 
 # crypto
 macro(link_crypto target_name)
-    if (ssl_${LINK_OPTION_SUFFIX})
+    if (crypto_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${crypto_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
         target_link_libraries(${target_name} "${crypto_${LIBRARY_DIR_SUFFIX}}/libcrypto.a")

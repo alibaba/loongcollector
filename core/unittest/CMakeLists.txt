@@ -26,7 +26,6 @@ link_jsoncpp(${PROJECT_NAME})
 link_yamlcpp(${PROJECT_NAME})
 link_boost(${PROJECT_NAME})
 link_gflags(${PROJECT_NAME})
-link_curl(${PROJECT_NAME})
 link_lz4(${PROJECT_NAME})
 link_zlib(${PROJECT_NAME})
 link_zstd(${PROJECT_NAME})
@@ -38,6 +37,9 @@ link_cityhash(${PROJECT_NAME})
 link_leveldb(${PROJECT_NAME})
 link_asan(${PROJECT_NAME})
 link_spl(${PROJECT_NAME})
+link_curl(${PROJECT_NAME})
+link_ssl(${PROJECT_NAME}) # must after link_spl
+link_crypto(${PROJECT_NAME}) # must after link_spl
 link_tcmalloc(${PROJECT_NAME})
 
 if (UNIX)
