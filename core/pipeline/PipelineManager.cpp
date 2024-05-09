@@ -37,7 +37,10 @@ namespace logtail {
 void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
 #ifndef APSARA_UNIT_TEST_MAIN
     // 过渡使用
-    static bool isInputFileStarted = false, isInputObserverStarted = false, isInputStreamStarted = false;
+    static bool isInputFileStarted = false, isInputObserverStarted = false;
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
+    static bool isInputStreamStarted = false;
+#endif
     bool isInputObserverChanged = false, isInputFileChanged = false, isInputStreamChanged = false;
     for (const auto& name : diff.mRemoved) {
         CheckIfInputUpdated(mPipelineNameEntityMap[name]->GetConfig()["inputs"][0],

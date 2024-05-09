@@ -358,6 +358,10 @@ bool ExtractDiagMsg(const inet_diag_msg& msg,
                                            .IPV4 = msg.id.idiag_dst[0],
                                        }};
     } else if (msg.idiag_family == AF_INET6) {
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif // __GNUC__
         info->localAddr = SockAddress{.Type = SockAddressType_IPV6,
                                       .Addr = SockAddressDetail{
                                           .IPV6 = {((uint64_t*)msg.id.idiag_src)[0], ((uint64_t*)msg.id.idiag_src)[1]},
@@ -366,6 +370,9 @@ bool ExtractDiagMsg(const inet_diag_msg& msg,
                                        .Addr = SockAddressDetail{
                                            .IPV6 = {((uint64_t*)msg.id.idiag_dst)[0], ((uint64_t*)msg.id.idiag_dst)[1]},
                                        }};
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif // __GNUC__
     }
     infos.insert(std::make_pair(inode, info));
     return true;

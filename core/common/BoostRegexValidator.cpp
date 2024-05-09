@@ -89,17 +89,17 @@ int main(int argc, char* argv[]) // argv is logFile,logBeginReg,logRegex
         }
     } else {
         Json::Value jsonResult;
-        Json::FastWriter jsonWriter;
         jsonResult["result"]["state"] = false;
         jsonResult["result"]["content"] = "argument's format is not correct";
-        cout << jsonWriter.write(jsonResult);
+        Json::StreamWriterBuilder writerBuilder;
+        cout << Json::writeString(writerBuilder, jsonResult);
     }
     return 0;
 }
 void checkFilterRegex(const string& logFile, const string& logRegex) {
     Json::Value jsonResult;
     Json::Value jsonRoot;
-    Json::FastWriter jsonWriter;
+    Json::StreamWriterBuilder writerBuilder;
     try {
         boost::regex reg(logRegex);
         boost::match_results<const char*> what;
@@ -111,12 +111,12 @@ void checkFilterRegex(const string& logFile, const string& logRegex) {
             jsonRoot["content"] = what.str();
         }
         jsonResult["result"] = jsonRoot;
-        cout << jsonWriter.write(jsonResult);
+        cout << Json::writeString(writerBuilder, jsonResult);
     } catch (boost::regex_error& e) {
         jsonRoot["state"] = "error";
         jsonRoot["content"] = "过滤正则表达式错误!";
         jsonResult["result"] = jsonRoot;
-        cout << jsonWriter.write(jsonResult);
+        cout << Json::writeString(writerBuilder, jsonResult);
         return;
     }
 }
@@ -124,7 +124,7 @@ void checkFilterRegex(const string& logFile, const string& logRegex) {
 void checkRegex(const string& logFile, const string& logBeginReg, const string& logRegex) {
     Json::Value jsonResult;
     Json::Value jsonRoot;
-    Json::FastWriter jsonWriter;
+    Json::StreamWriterBuilder writerBuilder;
     try {
         boost::regex reg(logRegex);
         boost::match_results<const char*> what;
@@ -151,18 +151,18 @@ void checkRegex(const string& logFile, const string& logBeginReg, const string& 
             jsonRoot["content"] = content;
         }
         jsonResult["result"] = jsonRoot;
-        cout << jsonWriter.write(jsonResult);
+        cout << Json::writeString(writerBuilder, jsonResult);
     } catch (boost::regex_error& e) {
         jsonRoot["state"] = "error";
         jsonRoot["content"] = "日志内容正则表达式错误!";
         jsonResult["result"] = jsonRoot;
-        cout << jsonWriter.write(jsonResult);
+        cout << Json::writeString(writerBuilder, jsonResult);
         return;
     }
 }
 
 vector<string> checkLogBeginReg(const string& logFile, const string& logBeginReg, const bool display) {
-    Json::FastWriter jsonWriter;
+    Json::StreamWriterBuilder writerBuilder;
     Json::Value jsonRoot;
     Json::Value jsonResult;
     Json::Value jsonPosition;
@@ -203,13 +203,13 @@ vector<string> checkLogBeginReg(const string& logFile, const string& logBeginReg
         jsonRoot["result"]["position"] = jsonPosition;
 
         if (display)
-            cout << jsonWriter.write(jsonRoot);
+            cout << Json::writeString(writerBuilder, jsonRoot);
         return outputVector;
     } catch (boost::regex_error& e) {
         jsonRoot["state"] = "error";
         jsonRoot["content"] = "日志起始匹配正则表达式错误!";
         jsonResult["result"] = jsonRoot;
-        cout << jsonWriter.write(jsonResult);
+        cout << Json::writeString(writerBuilder, jsonResult);
         return resultVector;
     }
 }

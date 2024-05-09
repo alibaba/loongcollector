@@ -17,13 +17,16 @@
 #include "processor/ProcessorSPL.h"
 
 #include <curl/curl.h>
+#ifdef FMT_HEADER_ONLY
+#undef FMT_HEADER_ONLY
+#endif
 #include <spl/logger/Logger.h>
 #include <spl/pipeline/SplPipeline.h>
 
 #include <iostream>
 
-#include "common/ParamExtractor.h"
 #include "common/Flags.h"
+#include "common/ParamExtractor.h"
 #include "logger/Logger.h"
 #include "monitor/MetricConstants.h"
 #include "spl/PipelineEventGroupInput.h"
