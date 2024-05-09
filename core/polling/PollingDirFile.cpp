@@ -14,26 +14,27 @@
 
 #include "PollingDirFile.h"
 #if defined(__linux__)
-#include <sys/file.h>
 #include <fnmatch.h>
+#include <sys/file.h>
 #elif defined(_MSC_VER)
 #include <Shlwapi.h>
 #endif
 #include <sys/stat.h>
+
+#include "PollingEventQueue.h"
+#include "PollingModify.h"
 #include "app_config/AppConfig.h"
-#include "common/Flags.h"
-#include "common/StringTools.h"
 #include "common/ErrorUtil.h"
 #include "common/FileSystemUtil.h"
+#include "common/Flags.h"
+#include "common/StringTools.h"
 #include "common/TimeUtil.h"
-#include "event/Event.h"
-#include "logger/Logger.h"
 #include "config_manager/ConfigManager.h"
+#include "event/Event.h"
+#include "file_server/FileServer.h"
+#include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
-#include "PollingModify.h"
-#include "PollingEventQueue.h"
-#include "file_server/FileServer.h"
 
 // Control the check frequency to call ClearUnavailableFileAndDir.
 DEFINE_FLAG_INT32(check_not_exist_file_dir_round, "clear not exist file dir cache, round", 20);
@@ -179,7 +180,7 @@ void PollingDirFile::Polling() {
                     CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
                 } else {
                     for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                        const string& basePath = (*config->GetContainerInfo())[i].mContainerPath;
+                        const string& basePath = (*config->GetContainerInfo())[i].mRealBaseDir;
                         fsutil::PathStat baseDirStat;
                         if (!fsutil::PathStat::stat(basePath.c_str(), baseDirStat)) {
                             LOG_DEBUG(sLogger,
@@ -217,7 +218,7 @@ void PollingDirFile::Polling() {
                     CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
                 } else {
                     for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                        const string& baseWildcardPath = (*config->GetContainerInfo())[i].mContainerPath;
+                        const string& baseWildcardPath = (*config->GetContainerInfo())[i].mRealBaseDir;
                         int32_t lastConfigStatCount = mStatCount;
                         if (!PollingWildcardConfigPath(*itr, baseWildcardPath, 0)) {
                             LOG_DEBUG(sLogger,

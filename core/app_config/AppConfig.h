@@ -16,11 +16,13 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-#include <map>
-#include <unordered_set>
 #include <json/json.h>
+
+#include <map>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
 #include "common/Lock.h"
 #include "log_pb/sls_logs.pb.h"
 
@@ -405,6 +407,7 @@ public:
     friend class AppConfigUnittest;
     friend class PipelineUnittest;
     friend class InputFileUnittest;
+    friend class InputContainerStdioUnittest;
     friend class AggregatorUnittest;
 #endif
 };

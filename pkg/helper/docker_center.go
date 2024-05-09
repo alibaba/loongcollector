@@ -43,7 +43,7 @@ var envConfigPrefix = "aliyun_logs_"
 const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 
 var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
-var ContainerInfoDeletedTimeout = time.Second * time.Duration(30)
+var ContainerInfoDeletedTimeout = time.Second * time.Duration(120)
 var EventListenerTimeout = time.Second * time.Duration(3600)
 
 // "io.kubernetes.pod.name": "logtail-z2224",
@@ -237,6 +237,7 @@ func (info *K8SInfo) innerMatch(filter *K8SFilter) bool {
 }
 
 type DockerInfoDetail struct {
+	StdoutPath       string
 	ContainerInfo    types.ContainerJSON
 	ContainerNameTag map[string]string
 	K8SInfo          *K8SInfo
@@ -259,6 +260,13 @@ func (did *DockerInfoDetail) PodName() string {
 	return ""
 }
 
+func (did *DockerInfoDetail) FinishedAt() string {
+	if did.ContainerInfo.State != nil {
+		return did.ContainerInfo.State.FinishedAt
+	}
+	return ""
+}
+
 func (did *DockerInfoDetail) Status() string {
 	if did.ContainerInfo.State != nil {
 		return did.ContainerInfo.State.Status
@@ -276,16 +284,12 @@ func (did *DockerInfoDetail) IsTimeout() bool {
 }
 
 func (did *DockerInfoDetail) GetExternalTags(envs, k8sLabels map[string]string) map[string]string {
+	tags := map[string]string{}
 	if len(envs) == 0 && len(k8sLabels) == 0 {
-		return did.ContainerNameTag
-	}
-	tags := make(map[string]string)
-	for k, v := range did.ContainerNameTag {
-		tags[k] = v
+		return tags
 	}
 	did.GetCustomExternalTags(tags, envs, k8sLabels)
 	return tags
-
 }
 
 func (did *DockerInfoDetail) GetCustomExternalTags(tags, envs, k8sLabels map[string]string) {
@@ -599,6 +603,7 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 	}
 
 	did := &DockerInfoDetail{
+		StdoutPath:       info.LogPath,
 		ContainerInfo:    info,
 		ContainerNameTag: containerNameTag,
 		K8SInfo:          &k8sInfo,
@@ -1035,7 +1040,7 @@ func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) 
 func (dc *DockerCenter) fetchAll() error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
-	containers, err := dc.client.ContainerList(context.Background(), types.ContainerListOptions{})
+	containers, err := dc.client.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 	if err != nil {
 		dc.setLastError(err, "list container error")
 		return err
@@ -1053,7 +1058,14 @@ func (dc *DockerCenter) fetchAll() error {
 		}
 		if err == nil {
 			if !ContainerProcessAlive(containerDetail.State.Pid) {
-				continue
+				containerDetail.State.Status = ContainerStatusExited
+				finishedAt := containerDetail.State.FinishedAt
+				finishedAtTime, _ := time.Parse(time.RFC3339, finishedAt)
+				now := time.Now()
+				duration := now.Sub(finishedAtTime)
+				if duration >= ContainerInfoDeletedTimeout {
+					continue
+				}
 			}
 			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
 		} else {

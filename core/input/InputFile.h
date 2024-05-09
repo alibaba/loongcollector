@@ -30,6 +30,11 @@ class InputFile : public Input {
 public:
     static const std::string sName;
 
+    static bool SetContainerBaseDir(ContainerInfo& containerInfo, const std::string& logPath);
+    static std::string GetLogPath(const FileDiscoveryOptions* fileDiscovery);
+    static bool
+    DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo, const PipelineContext*, const FileDiscoveryOptions*);
+
     InputFile();
 
     const std::string& Name() const override { return sName; }
@@ -47,7 +52,6 @@ public:
     uint32_t mExactlyOnceConcurrency = 0;
 
 private:
-    void GenerateContainerMetaFetchingGoPipeline(Json::Value& res) const;
 };
 
 } // namespace logtail

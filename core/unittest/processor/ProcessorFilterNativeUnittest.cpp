@@ -983,7 +983,6 @@ void ProcessorFilterNativeUnittest::TestFilterNoneUtf8() {
     }
 
     for (int i = 0; i < 10; ++i) {
-        LOG_INFO(sLogger, ("################################round", i));
         std::string testStr;
         const int CHARACTER_COUNT = 8192;
         bool flow[CHARACTER_COUNT * 4];
@@ -991,7 +990,6 @@ void ProcessorFilterNativeUnittest::TestFilterNoneUtf8() {
         // generate test string with character randomly, and record whether a position should be replaced by blunck
         for (int j = 0; j < CHARACTER_COUNT; ++j) {
             int randIndex = rand() % 80;
-            LOG_INFO(sLogger, ("j", j)("randIndex", randIndex)("index", index));
             testStr += characterSet[randIndex];
             if (randIndex >= 0 && randIndex < 20) {
                 flow[index] = isBlunk[randIndex][0];
@@ -1025,7 +1023,7 @@ void ProcessorFilterNativeUnittest::TestFilterNoneUtf8() {
                     flow[index - 4] = flow[index - 3] = flow[index - 2] = true;
             }
         }
-        ProcessorFilterNative& processor = *(new ProcessorFilterNative);
+        ProcessorFilterNative processor;
         processor.FilterNoneUtf8(testStr);
         for (uint32_t indexOfString = 0; indexOfString < testStr.size(); ++indexOfString) {
             if (flow[indexOfString] == true) {

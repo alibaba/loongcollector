@@ -16,6 +16,7 @@
 
 #include <filesystem>
 
+#include "StringTools.h"
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
@@ -23,12 +24,12 @@
 #include "config_manager/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "pipeline/Pipeline.h"
+#include "pipeline/PipelineManager.h"
 
 using namespace std;
 
 DEFINE_FLAG_INT32(search_checkpoint_default_dir_depth, "0 means only search current directory", 0);
 DEFINE_FLAG_INT32(max_exactly_once_concurrency, "", 512);
-DEFINE_FLAG_INT32(default_plugin_log_queue_size, "", 10);
 
 namespace logtail {
 
@@ -72,15 +73,17 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
         if (!mContainerDiscovery.Init(config, *mContext, sName)) {
             return false;
         }
-        GenerateContainerMetaFetchingGoPipeline(optionalGoPipeline);
+        mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(optionalGoPipeline, &mFileDiscovery);
     }
 
     if (!mFileReader.Init(config, *mContext, sName)) {
         return false;
     }
+    mFileReader.mInputType = FileReaderOptions::InputType::InputFile;
 
     // 过渡使用
     mFileDiscovery.SetTailingAllMatchedFiles(mFileReader.mTailingAllMatchedFiles);
+    mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
 
     // Multiline
     const char* key = "Multiline";
@@ -144,6 +147,58 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
     return true;
 }
 
+std::string InputFile::GetLogPath(const FileDiscoveryOptions* fileDiscovery) {
+    std::string logPath;
+    if (!fileDiscovery->GetWildcardPaths().empty()) {
+        logPath = fileDiscovery->GetWildcardPaths()[0];
+    } else {
+        logPath = fileDiscovery->GetBasePath();
+    }
+    return logPath;
+}
+
+bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const std::string& logPath) {
+    if (!containerInfo.mRealBaseDir.empty()) {
+        return true;
+    }
+    size_t pthSize = logPath.size();
+
+    size_t size = containerInfo.mMounts.size();
+    size_t bestMatchedMountsIndex = size;
+    // ParseByJSONObj 确保 Destination、Source、mUpperDir 不会以\或者/结尾
+    for (size_t i = 0; i < size; ++i) {
+        StringView dst = containerInfo.mMounts[i].mDestination;
+        size_t dstSize = dst.size();
+
+        if (StartWith(logPath, dst)
+            && (pthSize == dstSize || (pthSize > dstSize && (logPath[dstSize] == '/' || logPath[dstSize] == '\\')))
+            && (bestMatchedMountsIndex == size
+                || containerInfo.mMounts[bestMatchedMountsIndex].mDestination.size() < dstSize)) {
+            bestMatchedMountsIndex = i;
+        }
+    }
+    if (bestMatchedMountsIndex < size) {
+        containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path)
+            + containerInfo.mMounts[bestMatchedMountsIndex].mSource
+            + logPath.substr(containerInfo.mMounts[bestMatchedMountsIndex].mDestination.size());
+        LOG_DEBUG(sLogger,
+                  ("set container base dir",
+                   containerInfo.mRealBaseDir)("source", containerInfo.mMounts[bestMatchedMountsIndex].mSource)(
+                      "destination", containerInfo.mMounts[bestMatchedMountsIndex].mDestination)("logPath", logPath));
+    } else {
+        containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path) + containerInfo.mUpperDir + logPath;
+    }
+    LOG_INFO(sLogger, ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mID));
+    return true;
+}
+
+bool InputFile::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
+                                             const PipelineContext*,
+                                             const FileDiscoveryOptions* fileDiscovery) {
+    std::string logPath = GetLogPath(fileDiscovery);
+    return SetContainerBaseDir(containerInfo, logPath);
+}
+
 bool InputFile::Start() {
     if (mEnableContainerDiscovery) {
         mFileDiscovery.SetContainerInfo(
@@ -165,57 +220,6 @@ bool InputFile::Stop(bool isPipelineRemoving) {
     FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveExactlyOnceConcurrency(mContext->GetConfigName());
     return true;
-}
-
-void InputFile::GenerateContainerMetaFetchingGoPipeline(Json::Value& res) const {
-    Json::Value plugin(Json::objectValue), detail(Json::objectValue), object(Json::objectValue);
-    auto ConvertMapToJsonObj = [&](const char* key, const unordered_map<string, string>& map) {
-        if (!map.empty()) {
-            object.clear();
-            for (const auto& item : map) {
-                object[item.first] = Json::Value(item.second);
-            }
-            detail[key] = object;
-        }
-    };
-
-    if (!mFileDiscovery.GetWildcardPaths().empty()) {
-        detail["LogPath"] = Json::Value(mFileDiscovery.GetWildcardPaths()[0]);
-        detail["MaxDepth"] = Json::Value(static_cast<int32_t>(mFileDiscovery.GetWildcardPaths().size())
-                                         + mFileDiscovery.mMaxDirSearchDepth - 1);
-    } else {
-        detail["LogPath"] = Json::Value(mFileDiscovery.GetBasePath());
-        detail["MaxDepth"] = Json::Value(mFileDiscovery.mMaxDirSearchDepth);
-    }
-    detail["FilePattern"] = Json::Value(mFileDiscovery.GetFilePattern());
-    if (!mContainerDiscovery.mContainerFilters.mK8sNamespaceRegex.empty()) {
-        detail["K8sNamespaceRegex"] = Json::Value(mContainerDiscovery.mContainerFilters.mK8sNamespaceRegex);
-    }
-    if (!mContainerDiscovery.mContainerFilters.mK8sPodRegex.empty()) {
-        detail["K8sPodRegex"] = Json::Value(mContainerDiscovery.mContainerFilters.mK8sPodRegex);
-    }
-    if (!mContainerDiscovery.mContainerFilters.mK8sContainerRegex.empty()) {
-        detail["K8sContainerRegex"] = Json::Value(mContainerDiscovery.mContainerFilters.mK8sContainerRegex);
-    }
-    ConvertMapToJsonObj("IncludeK8sLabel", mContainerDiscovery.mContainerFilters.mIncludeK8sLabel);
-    ConvertMapToJsonObj("ExcludeK8sLabel", mContainerDiscovery.mContainerFilters.mExcludeK8sLabel);
-    ConvertMapToJsonObj("IncludeEnv", mContainerDiscovery.mContainerFilters.mIncludeEnv);
-    ConvertMapToJsonObj("ExcludeEnv", mContainerDiscovery.mContainerFilters.mExcludeEnv);
-    ConvertMapToJsonObj("IncludeContainerLabel", mContainerDiscovery.mContainerFilters.mIncludeContainerLabel);
-    ConvertMapToJsonObj("ExcludeContainerLabel", mContainerDiscovery.mContainerFilters.mExcludeContainerLabel);
-    ConvertMapToJsonObj("ExternalK8sLabelTag", mContainerDiscovery.mExternalK8sLabelTag);
-    ConvertMapToJsonObj("ExternalEnvTag", mContainerDiscovery.mExternalEnvTag);
-    if (mContainerDiscovery.mCollectingContainersMeta) {
-        detail["CollectingContainersMeta"] = Json::Value(true);
-    }
-    plugin["type"] = Json::Value("metric_docker_file");
-    plugin["detail"] = detail;
-
-    res["inputs"].append(plugin);
-    // these param will be overriden if the same param appears in the global module of config, which will be parsed
-    // later.
-    res["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
-    res["global"]["AlwaysOnline"] = Json::Value(true);
 }
 
 } // namespace logtail

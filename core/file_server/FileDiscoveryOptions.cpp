@@ -496,23 +496,23 @@ bool FileDiscoveryOptions::IsMatch(const string& path, const string& name) const
     // File in docker.
     if (mEnableContainerDiscovery) {
         if (mWildcardPaths.size() > (size_t)0) {
-            DockerContainerPath* containerPath = GetContainerPathByLogPath(path);
+            ContainerInfo* containerPath = GetContainerPathByLogPath(path);
             if (containerPath == NULL) {
                 return false;
             }
             // convert Logtail's real path to config path. eg /host_all/var/lib/xxx/home/admin/logs -> /home/admin/logs
             if (mWildcardPaths[0].size() == (size_t)1) {
                 // if mWildcardPaths[0] is root path, do not add mWildcardPaths[0]
-                return IsWildcardPathMatch(path.substr(containerPath->mContainerPath.size()), name);
+                return IsWildcardPathMatch(path.substr(containerPath->mRealBaseDir.size()), name);
             } else {
-                string convertPath = mWildcardPaths[0] + path.substr(containerPath->mContainerPath.size());
+                string convertPath = mWildcardPaths[0] + path.substr(containerPath->mRealBaseDir.size());
                 return IsWildcardPathMatch(convertPath, name);
             }
         }
 
         // Normal base path.
         for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-            const string& containerBasePath = (*mContainerInfos)[i].mContainerPath;
+            const string& containerBasePath = (*mContainerInfos)[i].mRealBaseDir;
             if (_IsPathMatched(containerBasePath, path, mMaxDirSearchDepth)) {
                 if (!mHasBlacklist) {
                     return true;
@@ -641,31 +641,35 @@ bool FileDiscoveryOptions::WithinMaxDepth(const string& path) const {
     return true;
 }
 
-DockerContainerPath* FileDiscoveryOptions::GetContainerPathByLogPath(const string& logPath) const {
+ContainerInfo* FileDiscoveryOptions::GetContainerPathByLogPath(const string& logPath) const {
     if (!mContainerInfos) {
         return NULL;
     }
     for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-        if (_IsSubPath((*mContainerInfos)[i].mContainerPath, logPath)) {
+        if (_IsSubPath((*mContainerInfos)[i].mRealBaseDir, logPath)) {
             return &(*mContainerInfos)[i];
         }
     }
     return NULL;
 }
 
-bool FileDiscoveryOptions::IsSameDockerContainerPath(const string& paramsJSONStr, bool allFlag) const {
+bool FileDiscoveryOptions::IsSameContainerInfo(const Json::Value& paramsJSON, const PipelineContext* ctx) {
     if (!mEnableContainerDiscovery)
         return true;
 
-    if (!allFlag) {
-        DockerContainerPath dockerContainerPath;
-        if (!DockerContainerPath::ParseByJSONStr(paramsJSONStr, dockerContainerPath)) {
-            LOG_ERROR(sLogger, ("invalid docker container params", "skip this path")("params", paramsJSONStr));
+    if (!paramsJSON.isMember("AllCmd")) {
+        ContainerInfo containerInfo;
+        std::string errorMsg;
+        if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
+            LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
+            return true;
+        }
+        if (!mDeduceAndSetContainerBaseDirFunc(containerInfo, ctx, this)) {
             return true;
         }
         // try update
         for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-            if ((*mContainerInfos)[i] == dockerContainerPath) {
+            if ((*mContainerInfos)[i] == containerInfo) {
                 return true;
             }
         }
@@ -673,9 +677,10 @@ bool FileDiscoveryOptions::IsSameDockerContainerPath(const string& paramsJSONStr
     }
 
     // check all
-    unordered_map<string, DockerContainerPath> allPathMap;
-    if (!DockerContainerPath::ParseAllByJSONStr(paramsJSONStr, allPathMap)) {
-        LOG_ERROR(sLogger, ("invalid all docker container params", "skip this path")("params", paramsJSONStr));
+    unordered_map<string, ContainerInfo> allPathMap;
+    std::string errorMsg;
+    if (!ContainerInfo::ParseAllByJSONObj(paramsJSON["AllCmd"], allPathMap, errorMsg)) {
+        LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
         return true;
     }
 
@@ -685,10 +690,13 @@ bool FileDiscoveryOptions::IsSameDockerContainerPath(const string& paramsJSONStr
     }
 
     for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-        unordered_map<string, DockerContainerPath>::iterator iter = allPathMap.find((*mContainerInfos)[i].mContainerID);
+        unordered_map<string, ContainerInfo>::iterator iter = allPathMap.find((*mContainerInfos)[i].mID);
         // need delete
         if (iter == allPathMap.end()) {
             return false;
+        }
+        if (!mDeduceAndSetContainerBaseDirFunc(iter->second, ctx, this)) {
+            return true;
         }
         // need update
         if ((*mContainerInfos)[i] != iter->second) {
@@ -699,60 +707,69 @@ bool FileDiscoveryOptions::IsSameDockerContainerPath(const string& paramsJSONStr
     return true;
 }
 
-bool FileDiscoveryOptions::UpdateDockerContainerPath(const string& paramsJSONStr, bool allFlag) {
+bool FileDiscoveryOptions::UpdateContainerInfo(const Json::Value& paramsJSON, const PipelineContext* ctx) {
     if (!mContainerInfos)
         return false;
 
-    if (!allFlag) {
-        DockerContainerPath dockerContainerPath;
-        if (!DockerContainerPath::ParseByJSONStr(paramsJSONStr, dockerContainerPath)) {
-            LOG_ERROR(sLogger, ("invalid docker container params", "skip this path")("params", paramsJSONStr));
+    if (!paramsJSON.isMember("AllCmd")) {
+        ContainerInfo containerInfo;
+        std::string errorMsg;
+        if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
+            LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
+            return false;
+        }
+        if (!mDeduceAndSetContainerBaseDirFunc(containerInfo, ctx, this)) {
             return false;
         }
         // try update
         for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-            if ((*mContainerInfos)[i].mContainerID == dockerContainerPath.mContainerID) {
+            if ((*mContainerInfos)[i].mID == containerInfo.mID) {
                 // update
-                (*mContainerInfos)[i] = dockerContainerPath;
+                (*mContainerInfos)[i] = containerInfo;
                 return true;
             }
         }
         // add
-        mContainerInfos->push_back(dockerContainerPath);
+        mContainerInfos->push_back(containerInfo);
         return true;
     }
 
-    unordered_map<string, DockerContainerPath> allPathMap;
-    if (!DockerContainerPath::ParseAllByJSONStr(paramsJSONStr, allPathMap)) {
-        LOG_ERROR(sLogger, ("invalid all docker container params", "skip this path")("params", paramsJSONStr));
+    unordered_map<string, ContainerInfo> allPathMap;
+    std::string errorMsg;
+    if (!ContainerInfo::ParseAllByJSONObj(paramsJSON["AllCmd"], allPathMap, errorMsg)) {
+        LOG_ERROR(sLogger,
+                  ("invalid all docker container params",
+                   "skip this path")("params", paramsJSON.toStyledString())("errorMsg", errorMsg));
         return false;
     }
     // if update all, clear and reset
     mContainerInfos->clear();
-    for (unordered_map<string, DockerContainerPath>::iterator iter = allPathMap.begin(); iter != allPathMap.end();
-         ++iter) {
+    for (unordered_map<string, ContainerInfo>::iterator iter = allPathMap.begin(); iter != allPathMap.end(); ++iter) {
+        if (!mDeduceAndSetContainerBaseDirFunc(iter->second, ctx, this)) {
+            return false;
+        }
         mContainerInfos->push_back(iter->second);
     }
     return true;
 }
 
-bool FileDiscoveryOptions::DeleteDockerContainerPath(const string& paramsJSONStr) {
+bool FileDiscoveryOptions::DeleteContainerInfo(const Json::Value& paramsJSON) {
     if (!mContainerInfos)
         return false;
 
-    DockerContainerPath dockerContainerPath;
-    if (!DockerContainerPath::ParseByJSONStr(paramsJSONStr, dockerContainerPath)) {
+    ContainerInfo containerInfo;
+    std::string errorMsg;
+    if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
+        LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
         return false;
     }
-    for (vector<DockerContainerPath>::iterator iter = mContainerInfos->begin(); iter != mContainerInfos->end();
-         ++iter) {
-        if (iter->mContainerID == dockerContainerPath.mContainerID) {
+    for (vector<ContainerInfo>::iterator iter = mContainerInfos->begin(); iter != mContainerInfos->end(); ++iter) {
+        if (iter->mID == containerInfo.mID) {
             mContainerInfos->erase(iter);
             break;
         }
     }
     return true;
 }
-
 
 } // namespace logtail

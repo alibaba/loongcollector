@@ -18,8 +18,7 @@
 #include "models/LogEvent.h"
 #include "plugin/instance/ProcessorInstance.h"
 #include "processor/ProcessorParseJsonNative.h"
-#include "processor/ProcessorSplitLogStringNative.h"
-#include "processor/ProcessorSplitMultilineLogStringNative.h"
+#include "processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

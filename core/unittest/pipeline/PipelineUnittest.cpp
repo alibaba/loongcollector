@@ -23,8 +23,8 @@
 #include "config/Config.h"
 #include "pipeline/Pipeline.h"
 #include "plugin/PluginRegistry.h"
-#include "processor/ProcessorSplitLogStringNative.h"
-#include "processor/ProcessorSplitMultilineLogStringNative.h"
+#include "processor/inner/ProcessorSplitLogStringNative.h"
+#include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -89,7 +89,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(configName, pipeline->Name());
     APSARA_TEST_EQUAL(configName, pipeline->GetContext().GetConfigName());
-    APSARA_TEST_EQUAL(123456789, pipeline->GetContext().GetCreateTime());
+    APSARA_TEST_EQUAL(123456789, int(pipeline->GetContext().GetCreateTime()));
     APSARA_TEST_EQUAL("test_project", pipeline->GetContext().GetProjectName());
     APSARA_TEST_EQUAL("test_logstore", pipeline->GetContext().GetLogstoreName());
     APSARA_TEST_EQUAL("test_region", pipeline->GetContext().GetRegion());
@@ -122,7 +122,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
     APSARA_TEST_EQUAL(configName, pipeline->Name());
     APSARA_TEST_EQUAL(configName, pipeline->GetContext().GetConfigName());
-    APSARA_TEST_EQUAL(0, pipeline->GetContext().GetCreateTime());
+    APSARA_TEST_EQUAL(0, int(pipeline->GetContext().GetCreateTime()));
     APSARA_TEST_EQUAL("", pipeline->GetContext().GetProjectName());
     APSARA_TEST_EQUAL("", pipeline->GetContext().GetLogstoreName());
     APSARA_TEST_EQUAL("", pipeline->GetContext().GetRegion());
@@ -143,7 +143,8 @@ void PipelineUnittest::OnSuccessfulInit() const {
                     "FilePaths": [
                         "/home/test.log"
                     ],
-                    "EnableContainerDiscovery": true
+                    "EnableContainerDiscovery": true,
+                    "CollectingContainersMeta": true
                 }
             ],
             "flushers": [
@@ -169,8 +170,9 @@ void PipelineUnittest::OnSuccessfulInit() const {
             },
             "inputs": [
                 {
-                    "type": "metric_docker_file",
+                    "type": "metric_container_info",
                     "detail": {
+                        "CollectingContainersMeta": true,
                         "LogPath": "/home",
                         "MaxDepth": 0,
                         "FilePattern": "test.log"
@@ -215,8 +217,8 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
-    APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
+    APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
+    APSARA_TEST_EQUAL(goPipelineWithoutInput.toStyledString(), pipeline->mGoPipelineWithoutInput.toStyledString());
     goPipelineWithInput.clear();
     goPipelineWithoutInput.clear();
 }
@@ -358,9 +360,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(3, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
 
@@ -503,9 +505,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(2, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -581,9 +583,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(0, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
     goPipelineWithInput.clear();
@@ -704,9 +706,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(3, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -827,9 +829,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(2, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
 
@@ -893,9 +895,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(0, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
     goPipelineWithInput.clear();
@@ -995,9 +997,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(3, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -1136,9 +1138,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(2, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -1207,9 +1209,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(0, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
     goPipelineWithInput.clear();
@@ -1318,9 +1320,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(3, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -1454,9 +1456,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(2, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -1514,9 +1516,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(0, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(0, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
     goPipelineWithInput.clear();
@@ -1625,9 +1627,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(3, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -1796,9 +1798,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(2, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -1881,9 +1883,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(0, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
     goPipelineWithInput.clear();
@@ -2014,9 +2016,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(3, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(3, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -2180,9 +2182,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(1, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(2, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(1, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(2, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithInput.isNull());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithoutInput.clear();
@@ -2254,9 +2256,9 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_EQUAL(0, pipeline->mInputs.size());
-    APSARA_TEST_EQUAL(0, pipeline->mProcessorLine.size());
-    APSARA_TEST_EQUAL(1, pipeline->GetFlushers().size());
+    APSARA_TEST_EQUAL(0, int(pipeline->mInputs.size()));
+    APSARA_TEST_EQUAL(0, int(pipeline->mProcessorLine.size()));
+    APSARA_TEST_EQUAL(1, int(pipeline->GetFlushers().size()));
     APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
     goPipelineWithInput.clear();
@@ -2467,7 +2469,8 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
                     "FilePaths": [
                         "/home/test.log"
                     ],
-                    "EnableContainerDiscovery": true
+                    "EnableContainerDiscovery": true,
+                    "CollectingContainersMeta": true
                 }
             ],
             "flushers": [
@@ -2492,8 +2495,9 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
             },
             "inputs": [
                 {
-                    "type": "metric_docker_file",
+                    "type": "metric_container_info",
                     "detail": {
+                        "CollectingContainersMeta": true,
                         "LogPath": "/home",
                         "MaxDepth": 0,
                         "FilePattern": "test.log"
@@ -2509,7 +2513,7 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
     APSARA_TEST_TRUE(pipeline->mGoPipelineWithoutInput.isNull());
     goPipelineWithInput.clear();
 
@@ -2522,7 +2526,8 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
                     "FilePaths": [
                         "/home/test.log"
                     ],
-                    "EnableContainerDiscovery": true
+                    "EnableContainerDiscovery": true,
+                    "CollectingContainersMeta": true
                 }
             ],
             "processors": [
@@ -2552,8 +2557,9 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
             },
             "inputs": [
                 {
-                    "type": "metric_docker_file",
+                    "type": "metric_container_info",
                     "detail": {
+                        "CollectingContainersMeta": true,
                         "LogPath": "/home",
                         "MaxDepth": 0,
                         "FilePattern": "test.log"
@@ -2593,7 +2599,7 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-    APSARA_TEST_TRUE(goPipelineWithInput == pipeline->mGoPipelineWithInput);
+    APSARA_TEST_EQUAL(goPipelineWithInput.toStyledString(), pipeline->mGoPipelineWithInput.toStyledString());
     APSARA_TEST_TRUE(goPipelineWithoutInput == pipeline->mGoPipelineWithoutInput);
     goPipelineWithInput.clear();
     goPipelineWithoutInput.clear();

@@ -24,6 +24,8 @@
 #include <vector>
 
 #include "config/Config.h"
+#include "input/InputContainerStdio.h"
+#include "input/InputFile.h"
 #include "models/PipelineEventGroup.h"
 #include "pipeline/PipelineContext.h"
 #include "plugin/instance/FlusherInstance.h"
@@ -54,6 +56,10 @@ public:
     const std::vector<std::unique_ptr<InputInstance>>& GetInputs() const { return mInputs; }
 
 private:
+    bool handleInputFileProcessor(const InputFile* inputFile, int16_t& pluginIndex, const Config& config);
+    bool handleInputContainerStdioProcessor(const InputContainerStdio* inputContainerStdio,
+                                          int16_t& pluginIndex,
+                                          const Config& config);
     void MergeGoPipeline(const Json::Value& src, Json::Value& dst);
     void AddPluginToGoPipeline(const Json::Value& plugin, const std::string& module, Json::Value& dst);
     void CopyNativeGlobalParamToGoPipeline(Json::Value& root);

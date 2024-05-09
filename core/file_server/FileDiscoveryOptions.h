@@ -16,15 +16,15 @@
 
 #pragma once
 
+#include <json/json.h>
+
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <json/json.h>
-
-#include "file_server/DockerContainerPath.h"
+#include "file_server/ContainerInfo.h"
 #include "pipeline/PipelineContext.h"
 
 namespace logtail {
@@ -43,19 +43,22 @@ public:
     const std::vector<std::string>& GetConstWildcardPaths() const { return mConstWildcardPaths; }
     bool IsContainerDiscoveryEnabled() const { return mEnableContainerDiscovery; }
     void SetEnableContainerDiscoveryFlag(bool flag) { mEnableContainerDiscovery = true; }
-    const std::shared_ptr<std::vector<DockerContainerPath>>& GetContainerInfo() const { return mContainerInfos; }
-    void SetContainerInfo(const std::shared_ptr<std::vector<DockerContainerPath>>& info) { mContainerInfos = info; }
-    void SetUpdateContainerInfoFunc(bool (*f)(const std::string&, bool)) { mUpdateContainerInfo = f; }
-    void SetDeleteContainerInfoFunc(bool (*f)(const std::string&)) { mDeleteContainerInfo = f; }
+    const std::shared_ptr<std::vector<ContainerInfo>>& GetContainerInfo() const { return mContainerInfos; }
+    void SetContainerInfo(const std::shared_ptr<std::vector<ContainerInfo>>& info) { mContainerInfos = info; }
+    void SetDeduceAndSetContainerBaseDirFunc(bool (*f)(ContainerInfo&,
+                                                       const PipelineContext*,
+                                                       const FileDiscoveryOptions*)) {
+        mDeduceAndSetContainerBaseDirFunc = f;
+    }
 
     bool IsDirectoryInBlacklist(const std::string& dirPath) const;
     bool IsMatch(const std::string& path, const std::string& name) const;
     bool IsTimeout(const std::string& path) const;
     bool WithinMaxDepth(const std::string& path) const;
-    bool IsSameDockerContainerPath(const std::string& paramsJSONStr, bool allFlag) const;
-    bool UpdateDockerContainerPath(const std::string& paramsJSONStr, bool allFlag);
-    bool DeleteDockerContainerPath(const std::string& paramsJSONStr);
-    DockerContainerPath* GetContainerPathByLogPath(const std::string& logPath) const;
+    bool IsSameContainerInfo(const Json::Value& paramsJSON, const PipelineContext*);
+    bool UpdateContainerInfo(const Json::Value& paramsJSON, const PipelineContext*);
+    bool DeleteContainerInfo(const Json::Value& paramsJSON);
+    ContainerInfo* GetContainerPathByLogPath(const std::string& logPath) const;
     // 过渡使用
     bool IsTailingAllMatchedFiles() const { return mTailingAllMatchedFiles; }
     void SetTailingAllMatchedFiles(bool flag) { mTailingAllMatchedFiles = flag; }
@@ -105,9 +108,11 @@ private:
     std::vector<std::string> mFileNameBlacklist;
 
     bool mEnableContainerDiscovery = false;
-    std::shared_ptr<std::vector<DockerContainerPath>> mContainerInfos; // must not be null if container discovery is enabled
-    bool (*mUpdateContainerInfo)(const std::string&, bool) = nullptr;
-    bool (*mDeleteContainerInfo)(const std::string&) = nullptr;
+    std::shared_ptr<std::vector<ContainerInfo>> mContainerInfos; // must not be null if container discovery is enabled
+    bool (*mDeduceAndSetContainerBaseDirFunc)(ContainerInfo& containerInfo,
+                                              const PipelineContext*,
+                                              const FileDiscoveryOptions*)
+        = nullptr;
 
     // 过渡使用
     bool mTailingAllMatchedFiles = false;

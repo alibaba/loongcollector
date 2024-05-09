@@ -113,8 +113,14 @@ func (s *containerConfigTestSuite) AfterTest(suiteName, testName string) {
 func mockDockerInfoDetail(containerName string, envList []string) *helper.DockerInfoDetail {
 	dockerInfo := types.ContainerJSON{
 		ContainerJSONBase: &types.ContainerJSONBase{
-			Name: containerName,
-			ID:   "test",
+			Name:    containerName,
+			ID:      "test",
+			LogPath: "/var/lib/docker/containers/test/test-json.log",
+			HostConfig: &container.HostConfig{
+				LogConfig: container.LogConfig{
+					Type: "json-file",
+				},
+			},
 		},
 	}
 	dockerInfo.Config = &container.Config{}

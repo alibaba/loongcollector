@@ -14,12 +14,15 @@
 
 #include "go_pipeline/LogtailPlugin.h"
 
+#include <json/json.h>
+
 #include "app_config/AppConfig.h"
 #include "common/DynamicLibHelper.h"
+#include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "config_manager/ConfigManager.h"
-#include "container_manager/DockerContainerPathCmd.h"
+#include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
@@ -270,21 +273,29 @@ int LogtailPlugin::ExecPluginCmd(
     string paramsStr(params, paramsLen);
     PluginCmdType cmdType = (PluginCmdType)cmdId;
     LOG_DEBUG(sLogger, ("exec cmd", cmdType)("config", configNameStr)("detail", paramsStr));
+    // cmd 解析json
+    Json::Value jsonParams;
+    std::string errorMsg;
+    if (paramsStr.size() < 5UL || !ParseJsonTable(paramsStr, jsonParams, errorMsg)) {
+        LOG_ERROR(sLogger, ("invalid docker container params", paramsStr)("errorMsg", errorMsg));
+        return -2;
+    }
+
     switch (cmdType) {
         case PLUGIN_DOCKER_UPDATE_FILE: {
-            DockerContainerPathCmd* cmd = new DockerContainerPathCmd(configNameStr, false, paramsStr, false);
+            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, false, jsonParams);
             ConfigManager::GetInstance()->UpdateContainerPath(cmd);
         } break;
         case PLUGIN_DOCKER_STOP_FILE: {
-            DockerContainerPathCmd* cmd = new DockerContainerPathCmd(configNameStr, true, paramsStr, false);
+            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, true, jsonParams);
             ConfigManager::GetInstance()->UpdateContainerStopped(cmd);
         } break;
         case PLUGIN_DOCKER_REMOVE_FILE: {
-            DockerContainerPathCmd* cmd = new DockerContainerPathCmd(configNameStr, true, paramsStr, false);
+            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, true, jsonParams);
             ConfigManager::GetInstance()->UpdateContainerPath(cmd);
         } break;
         case PLUGIN_DOCKER_UPDATE_FILE_ALL: {
-            DockerContainerPathCmd* cmd = new DockerContainerPathCmd(configNameStr, false, paramsStr, true);
+            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, false, jsonParams);
             ConfigManager::GetInstance()->UpdateContainerPath(cmd);
         } break;
         default:

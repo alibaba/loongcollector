@@ -15,16 +15,18 @@
  */
 
 #pragma once
-#include <vector>
-#include <string>
 #include <algorithm>
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
+#include <string>
+#include <vector>
+
+#include "models/StringView.h"
 
 namespace logtail {
 
-inline bool StartWith(const std::string& input, const std::string& pattern) {
-    return input.find(pattern) == 0;
+inline bool StartWith(const std::string& input, StringView pattern) {
+    return input.find(pattern.data(), 0, pattern.size()) == 0;
 }
 
 inline bool EndWith(const std::string& input, const std::string& pattern) {
@@ -129,6 +131,8 @@ bool BoostRegexMatch(const char* buffer,
                      boost::match_flag_type flags = boost::match_default);
 bool BoostRegexMatch(const char* buffer, size_t size, const boost::regex& reg, std::string& exception);
 bool BoostRegexMatch(const char* buffer, const boost::regex& reg, std::string& exception);
+bool BoostRegexSearch(const char* buffer, size_t size, const boost::regex& reg, std::string& exception);
+bool BoostRegexSearch(const char* buffer, const boost::regex& reg, std::string& exception);
 
 // GetLittelEndianValue32 converts @buffer in little endian to uint32_t.
 uint32_t GetLittelEndianValue32(const uint8_t* buffer);
@@ -139,6 +143,8 @@ bool ExtractTopics(const std::string& val,
                    std::vector<std::string>& values);
 
 bool NormalizeTopicRegFormat(std::string& regStr);
+
+void RemoveFilePathTrailingSlash(std::string& path);
 
 #if defined(_MSC_VER)
 // TODO: Test it.

@@ -23,9 +23,9 @@
 #include <vector>
 
 #include "common/Lock.h"
+#include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "event/Event.h"
 #include "file_server/FileDiscoveryOptions.h"
-#include "container_manager/DockerContainerPathCmd.h"
 
 namespace logtail {
 
@@ -156,17 +156,18 @@ protected:
     SpinLock mCacheFileAllConfigMapLock;
     std::unordered_map<std::string, std::pair<std::vector<FileDiscoveryConfig>, int32_t>> mCacheFileAllConfigMap;
 
-    PTMutex mDockerContainerPathCmdLock;
-    std::vector<DockerContainerPathCmd*> mDockerContainerPathCmdVec;
+    PTMutex mContainerInfoCmdLock;
+    std::vector<ConfigContainerInfoUpdateCmd*> mContainerInfoCmdVec;
 
     PTMutex mDockerContainerStoppedCmdLock;
-    std::vector<DockerContainerPathCmd*> mDockerContainerStoppedCmdVec;
+    std::vector<ConfigContainerInfoUpdateCmd*> mDockerContainerStoppedCmdVec;
 
     // /**
-    //  * @brief mAllDockerContainerPathMap. when config update, we dump all config's std::vector<DockerContainerPath> to
-    //  * mAllDockerContainerPathMap. And reset to config when LoadSingleUserConfig
+    //  * @brief mAllContainerInfoMap. when config update, we dump all config's std::vector<ContainerInfo>
+    //  to
+    //  * mAllContainerInfoMap. And reset to config when LoadSingleUserConfig
     //  */
-    // std::unordered_map<std::string, std::shared_ptr<std::vector<DockerContainerPath>>> mAllDockerContainerPathMap;
+    // std::unordered_map<std::string, std::shared_ptr<std::vector<ContainerInfo>>> mAllContainerInfoMap;
 
     // 废弃，容器模式
     // PTMutex mDockerMountPathsLock;
@@ -251,7 +252,7 @@ public:
     // void UpdatePluginStats(const Json::Value& config);
     // std::string GeneratePluginStatString();
     // void ClearPluginStats();
-    
+
     // 废弃
     // const std::unordered_map<std::string, Config*>& GetAllConfig() { return mNameConfigMap; }
 
@@ -440,11 +441,11 @@ public:
 
     // std::string GetAllProjectsSet();
 
-    bool UpdateContainerPath(DockerContainerPathCmd* cmd);
+    bool UpdateContainerPath(ConfigContainerInfoUpdateCmd* cmd);
     bool IsUpdateContainerPaths();
     bool DoUpdateContainerPaths();
 
-    bool UpdateContainerStopped(DockerContainerPathCmd* cmd);
+    bool UpdateContainerStopped(ConfigContainerInfoUpdateCmd* cmd);
     void GetContainerStoppedEvents(std::vector<Event*>& eventVec);
 
     void SaveDockerConfig();
@@ -514,7 +515,7 @@ private:
     // bool CheckLogType(const std::string& logTypeStr, LogType& logType);
     // 废弃
     // std::vector<std::string> GetStringVector(const Json::Value& value);
-    
+
     // LogFilterRule* GetFilterFule(const Json::Value& filterKeys, const Json::Value& filterRegs);
     // void GetRegexAndKeys(const Json::Value& value, Config* configPtr);
     // void GetSensitiveKeys(const Json::Value& value, Config* pConfig);

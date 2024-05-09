@@ -18,7 +18,7 @@
 #include "common/Constants.h"
 #include "common/JsonUtil.h"
 #include "config/Config.h"
-#include "processor/ProcessorSplitLogStringNative.h"
+#include "processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

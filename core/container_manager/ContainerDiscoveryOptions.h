@@ -16,12 +16,13 @@
 
 #pragma once
 
+#include <json/json.h>
+
 #include <string>
 #include <unordered_map>
 #include <utility>
 
-#include <json/json.h>
-
+#include "file_server/FileDiscoveryOptions.h"
 #include "pipeline/PipelineContext.h"
 
 namespace logtail {
@@ -44,9 +45,12 @@ struct ContainerDiscoveryOptions {
     ContainerFilters mContainerFilters;
     std::unordered_map<std::string, std::string> mExternalK8sLabelTag;
     std::unordered_map<std::string, std::string> mExternalEnvTag;
+    // 启用容器元信息预览
     bool mCollectingContainersMeta = false;
 
     bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginName);
+    void GenerateContainerMetaFetchingGoPipeline(Json::Value& res,
+                                                 const FileDiscoveryOptions* fileDiscovery = nullptr) const;
 };
 
 using ContainerDiscoveryConfig = std::pair<const ContainerDiscoveryOptions*, const PipelineContext*>;

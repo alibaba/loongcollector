@@ -118,3 +118,9 @@ DEFINE_FLAG_INT32(ilogtail_discard_interval, "if the data is old than the interv
 // file source
 DEFINE_FLAG_BOOL(enable_root_path_collection, "", false);
 DEFINE_FLAG_INT32(timeout_interval, "the time interval that an inactive dir being timeout, seconds", 900);
+
+#if defined(_MSC_VER)
+DEFINE_FLAG_STRING(default_container_host_path, "", "C:\\logtail_host");
+#else
+DEFINE_FLAG_STRING(default_container_host_path, "", "/logtail_host");
+#endif

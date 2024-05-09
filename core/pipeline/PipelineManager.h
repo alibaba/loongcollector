@@ -22,7 +22,6 @@
 
 #include "common/Lock.h"
 #include "config/ConfigDiff.h"
-
 #include "pipeline/Pipeline.h"
 
 namespace logtail {
@@ -61,7 +60,8 @@ private:
     void CheckIfInputUpdated(const Json::Value& config,
                              bool& isInputObserverChanged,
                              bool& isInputFileChanged,
-                             bool& isInputStreamChanged);
+                             bool& isInputStreamChanged,
+                             bool& isInputContainerStdioChanged);
 
     std::unordered_map<std::string, std::shared_ptr<Pipeline>> mPipelineNameEntityMap;
     mutable SpinLock mPluginCntMapLock;

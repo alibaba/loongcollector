@@ -18,7 +18,7 @@
 #include "config/Config.h"
 #include "config_manager/ConfigManager.h"
 #include "pipeline/Pipeline.h"
-#include "processor/ProcessorTagNative.h"
+#include "processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

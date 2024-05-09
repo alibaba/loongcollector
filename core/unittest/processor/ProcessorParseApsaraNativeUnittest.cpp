@@ -19,9 +19,10 @@
 #include "models/LogEvent.h"
 #include "models/StringView.h"
 #include "plugin/instance/ProcessorInstance.h"
+#include "processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "processor/ProcessorParseApsaraNative.h"
-#include "processor/ProcessorSplitLogStringNative.h"
-#include "processor/ProcessorSplitMultilineLogStringNative.h"
+#include "processor/inner/ProcessorSplitLogStringNative.h"
+#include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
@@ -568,7 +569,7 @@ void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
         config["CopingRawLog"] = false;
         config["RenamedSourceKey"] = "__raw__";
         config["StartPattern"] = "[a-zA-Z0-9]*";
-        config["UnmatchedContentTreatment"] = "split";
+        config["UnmatchedContentTreatment"] = "single_line";
         config["AppendingLogPositionMeta"] = false;
 
         std::string pluginId = "testID";

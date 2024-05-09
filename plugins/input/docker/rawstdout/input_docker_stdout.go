@@ -199,6 +199,9 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 		}
 	}
 	tags := ss.info.GetExternalTags(ss.ExternalEnvTag, ss.ExternalK8sLabelTag)
+	for k, v := range ss.info.ContainerNameTag {
+		tags[k] = v
+	}
 	if stdout != nil {
 		go pump("stdout", tags, stdout)
 	}

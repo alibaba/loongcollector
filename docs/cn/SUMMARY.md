@@ -47,6 +47,7 @@
 * [版本管理](plugins/stability-level.md)
 * [输入](plugins/input/README.md)
   * [文本日志](plugins/input/input-file.md)
+  * [容器标准输出（原生插件）](plugins/input/input-container-stdlog.md)
   * [脚本执行数据](plugins/input/input-command.md)
   * [容器标准输出](plugins/input/service-docker-stdout.md)
   * [文本日志（debug）](plugins/input/metric-debug-file.md)

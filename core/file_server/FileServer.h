@@ -61,8 +61,8 @@ public:
     void AddMultilineConfig(const std::string& name, const MultilineOptions* opts, const PipelineContext* ctx);
     void RemoveMultilineConfig(const std::string& name);
 
-    void SaveContainerInfo(const std::string& pipeline, const std::shared_ptr<std::vector<DockerContainerPath>>& info);
-    std::shared_ptr<std::vector<DockerContainerPath>> GetAndRemoveContainerInfo(const std::string& pipeline);
+    void SaveContainerInfo(const std::string& pipeline, const std::shared_ptr<std::vector<ContainerInfo>>& info);
+    std::shared_ptr<std::vector<ContainerInfo>> GetAndRemoveContainerInfo(const std::string& pipeline);
     void ClearContainerInfo();
     // 过渡使用
     void Resume(bool isConfigUpdate = true);
@@ -81,7 +81,7 @@ private:
     std::unordered_map<std::string, FileDiscoveryConfig> mPipelineNameFileDiscoveryConfigsMap;
     std::unordered_map<std::string, FileReaderConfig> mPipelineNameFileReaderConfigsMap;
     std::unordered_map<std::string, MultilineConfig> mPipelineNameMultilineConfigsMap;
-    std::unordered_map<std::string, std::shared_ptr<std::vector<DockerContainerPath>>> mAllDockerContainerPathMap;
+    std::unordered_map<std::string, std::shared_ptr<std::vector<ContainerInfo>>> mAllContainerInfoMap;
     // 过渡使用
     std::unordered_map<std::string, uint32_t> mPipelineNameEOConcurrencyMap;
 };

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "processor/ProcessorSplitLogStringNative.h"
+#include "processor/inner/ProcessorSplitLogStringNative.h"
 
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"

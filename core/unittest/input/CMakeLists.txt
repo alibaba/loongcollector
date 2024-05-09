@@ -18,5 +18,9 @@ project(input_unittest)
 add_executable(input_file_unittest InputFileUnittest.cpp)
 target_link_libraries(input_file_unittest unittest_base)
 
+add_executable(input_container_stdio_unittest InputContainerStdioUnittest.cpp)
+target_link_libraries(input_container_stdio_unittest unittest_base)
+
 include(GoogleTest)
 gtest_discover_tests(input_file_unittest)
+gtest_discover_tests(input_container_stdio_unittest)

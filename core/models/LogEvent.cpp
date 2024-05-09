@@ -151,7 +151,8 @@ bool LogEvent::FromJson(const Json::Value& root) {
     if (root.isMember("contents")) {
         Json::Value contents = root["contents"];
         for (const auto& key : contents.getMemberNames()) {
-            SetContent(key, contents[key].asString());
+            // 单测需要，每个key需要独立的内存空间
+            SetContent(GetSourceBuffer()->CopyString(key), contents[key].asString());
         }
     }
     return true;

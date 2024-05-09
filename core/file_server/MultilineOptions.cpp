@@ -135,7 +135,24 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
                                      ctx.GetProjectName(),
                                      ctx.GetLogstoreName(),
                                      ctx.GetRegion());
-        } else if (mStartPatternRegPtr || mEndPatternRegPtr) {
+        } else if (mStartPatternRegPtr && mContinuePatternRegPtr && mEndPatternRegPtr) {
+            mContinuePatternRegPtr.reset();
+            LOG_WARNING(
+                ctx.GetLogger(),
+                ("problem encountered in config parsing",
+                 "none of param Multiline.StartPattern, Multiline.ContinuePattern and Multiline.EndPattern are empty")(
+                    "action", "ignore param Multiline.ContinuePattern")("module", pluginName)("config",
+                                                                                              ctx.GetConfigName()));
+            ctx.GetAlarm().SendAlarm(
+                CATEGORY_CONFIG_ALARM,
+                "none of param Multiline.StartPattern, Multiline.ContinuePattern and Multiline.EndPattern are empty: "
+                "ignore param Multiline.ContinuePattern, module: "
+                    + pluginName + ", config: " + ctx.GetConfigName(),
+                ctx.GetProjectName(),
+                ctx.GetLogstoreName(),
+                ctx.GetRegion());
+        }
+        if (mStartPatternRegPtr || mEndPatternRegPtr) {
             mIsMultiline = true;
         }
     }
@@ -183,11 +200,18 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
 }
 
 bool MultilineOptions::ParseRegex(const string& pattern, shared_ptr<boost::regex>& reg) {
-    if (pattern.empty() || pattern == ".*") {
+    string regexPattern = pattern;
+    if (!regexPattern.empty() && EndWith(regexPattern, "$")) {
+        regexPattern = regexPattern.substr(0, regexPattern.size() - 1);
+    }
+    while (!regexPattern.empty() && EndWith(regexPattern, ".*")) {
+        regexPattern = regexPattern.substr(0, regexPattern.size() - 2);
+    }
+    if (regexPattern.empty()) {
         return true;
     }
     try {
-        reg.reset(new boost::regex(pattern));
+        reg.reset(new boost::regex(regexPattern));
     } catch (...) {
         return false;
     }

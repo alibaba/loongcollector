@@ -42,6 +42,8 @@ enum class EventGroupMetaKey {
     LOG_FILE_INODE,
     LOG_READ_OFFSET,
     LOG_READ_LENGTH,
+    LOG_FORMAT,
+    HAS_PART_LOG,
 
     K8S_CLUSTER_ID,
     K8S_NODE_NAME,

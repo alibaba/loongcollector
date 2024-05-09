@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <json/json.h>
+
 #include <memory>
 #include <string>
-
-#include <json/json.h>
 
 #include "common/JsonUtil.h"
 #include "file_server/MultilineOptions.h"
@@ -38,7 +38,7 @@ private:
 void MultilineOptionsUnittest::OnSuccessfulInit() const {
     unique_ptr<MultilineOptions> config;
     Json::Value configJson;
-    string configStr, errorMsg; 
+    string configStr, errorMsg;
 
     // only mandatory param
     config.reset(new MultilineOptions());
@@ -70,7 +70,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL("\\S+", config->mEndPattern);
     APSARA_TEST_EQUAL(MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE, config->mUnmatchedContentTreatment);
     APSARA_TEST_NOT_EQUAL(nullptr, config->GetStartPatternReg());
-    APSARA_TEST_NOT_EQUAL(nullptr, config->GetContinuePatternReg());
+    APSARA_TEST_EQUAL(nullptr, config->GetContinuePatternReg());
     APSARA_TEST_NOT_EQUAL(nullptr, config->GetEndPatternReg());
     APSARA_TEST_TRUE(config->IsMultiline());
 

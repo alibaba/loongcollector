@@ -57,3 +57,5 @@ DECLARE_FLAG_INT32(ilogtail_discard_interval);
 // file source
 DECLARE_FLAG_BOOL(enable_root_path_collection);
 DECLARE_FLAG_INT32(timeout_interval);
+
+DECLARE_FLAG_STRING(default_container_host_path);

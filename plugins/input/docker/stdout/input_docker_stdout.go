@@ -72,7 +72,9 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 
 	source := util.NewPackIDPrefix(info.ContainerInfo.ID + sds.context.GetConfigName())
 	tags := info.GetExternalTags(sds.ExternalEnvTag, sds.ExternalK8sLabelTag)
-
+	for k, v := range info.ContainerNameTag {
+		tags[k] = v
+	}
 	processor := NewDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond, sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector, tags, source)
 
 	checkpoint, ok := checkpointMap[info.ContainerInfo.ID]

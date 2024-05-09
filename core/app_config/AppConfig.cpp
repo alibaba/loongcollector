@@ -83,11 +83,6 @@ DEFINE_FLAG_STRING(logtail_sys_conf_dir, "store machine-unique-id, user-defined-
 
 // DEFINE_FLAG_STRING(default_container_mount_path, "", "container_mount.json");
 DEFINE_FLAG_STRING(default_include_config_path, "", "config.d");
-#if defined(_MSC_VER)
-DEFINE_FLAG_STRING(default_container_host_path, "", "C:\\logtail_host");
-#else
-DEFINE_FLAG_STRING(default_container_host_path, "", "/logtail_host");
-#endif
 
 DEFINE_FLAG_INT32(default_oas_connect_timeout, "default (minimum) connect timeout for OSARequest", 5);
 DEFINE_FLAG_INT32(default_oas_request_timeout, "default (minimum) request timeout for OSARequest", 10);

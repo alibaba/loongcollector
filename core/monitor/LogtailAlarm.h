@@ -96,7 +96,8 @@ enum LogtailAlarmType {
     OBSERVER_INIT_ALARM = 61,
     OBSERVER_RUNTIME_ALARM = 62,
     OBSERVER_STOP_ALARM = 63,
-    ALL_LOGTAIL_ALARM_NUM = 64
+    INVALID_CONTAINER_PATH_ALARM = 64,
+    ALL_LOGTAIL_ALARM_NUM = 65,
 };
 
 struct LogtailAlarmMessage {

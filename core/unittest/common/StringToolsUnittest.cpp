@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include "unittest/Unittest.h"
 #include "common/StringTools.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 extern std::vector<std::string> GetTopicNames(const boost::regex& regex);
@@ -34,6 +34,14 @@ TEST_F(StringToolsUnittest, TestToStringVector) {
 
     std::vector<std::string> v4{"a", "b", "c"};
     EXPECT_EQ("a,b,c", ToString(v4));
+}
+
+TEST_F(StringToolsUnittest, TestStartWith) {
+    EXPECT_TRUE(StartWith("/asdfasdf/asdfasdf/asdfasdf", "/"));
+    EXPECT_TRUE(StartWith("/asdfasdf/asdfasdf/asdfasdf", "/asdfasdf"));
+    EXPECT_FALSE(StartWith("/asdfasdf/asdfasdf/asdfasdf", "/213123"));
+    EXPECT_FALSE(StartWith("/", "/asdfasdf"));
+    EXPECT_FALSE(StartWith("", "/asdfasdf"));
 }
 
 TEST_F(StringToolsUnittest, TestEndWith) {
@@ -104,6 +112,98 @@ TEST_F(StringToolsUnittest, TestGetTopicNames) {
         APSARA_TEST_EQUAL_FATAL(2UL, names.size());
         APSARA_TEST_EQUAL_FATAL(std::string("container_name"), names[0]);
         APSARA_TEST_EQUAL_FATAL(std::string("log_name"), names[1]);
+    }
+}
+
+TEST_F(StringToolsUnittest, TestRemoveFilePathTrailingSlash) {
+    std::string filePath = "/aaa/aa/";
+    RemoveFilePathTrailingSlash(filePath);
+    APSARA_TEST_EQUAL("/aaa/aa",filePath);
+    filePath = "/";
+    RemoveFilePathTrailingSlash(filePath);
+    APSARA_TEST_EQUAL("/",filePath);
+}
+
+TEST_F(StringToolsUnittest, TestBoostRegexSearch) {
+    {
+        // ^(\[\d+-\d+-\d+\].*)|(\[\d+\].*)
+        std::string buffer = "[2024-04-01] xxxxxx";
+        boost::regex reg(R"(^(\[\d+-\d+-\d+\].*)|(\[\d+\].*))"); // Regular expression to match "test"
+        std::string exception;
+        bool result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_TRUE(result);
+
+        buffer = "aaa[2024-04-01] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_FALSE(result);
+
+        buffer = "[138998928392] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_TRUE(result);
+        buffer = "123[138998928392] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_FALSE(result);
+    }
+
+    {
+        // ^(\[\d+-\d+-\d+\].*)|\[\d+\]
+        std::string buffer = "[2024-04-01] xxxxxx";
+        boost::regex reg(R"(^(\[\d+-\d+-\d+\].*)|\[\d+\])"); // Regular expression to match "test"
+        std::string exception;
+        bool result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_TRUE(result);
+
+        buffer = "aaa[2024-04-01] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_FALSE(result);
+
+        buffer = "[138998928392] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_TRUE(result);
+        buffer = "123[138998928392] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_FALSE(result);
+    }
+
+    {
+        // ^\[\d+-\d+-\d+\].*|\[\d+\]
+        std::string buffer = "[2024-04-01] xxxxxx";
+        boost::regex reg(R"(^\[\d+-\d+-\d+\].*|\[\d+\])"); // Regular expression to match "test"
+        std::string exception;
+        bool result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_TRUE(result);
+
+        buffer = "aaa[2024-04-01] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_FALSE(result);
+
+        buffer = "[138998928392] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_TRUE(result);
+        buffer = "123[138998928392] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_FALSE(result);
+    }
+
+
+    {
+        // ^\[\d+-\d+-\d+\]|\[\d+\]
+        std::string buffer = "[2024-04-01] xxxxxx";
+        boost::regex reg(R"(^\[\d+-\d+-\d+\]|\[\d+\])"); // Regular expression to match "test"
+        std::string exception;
+        bool result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_TRUE(result);
+
+        buffer = "aaa[2024-04-01] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_FALSE(result);
+
+        buffer = "[138998928392] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_TRUE(result);
+        buffer = "123[138998928392] xxxxxx";
+        result = BoostRegexSearch(buffer.data(), reg, exception);
+        EXPECT_FALSE(result);
     }
 }
 

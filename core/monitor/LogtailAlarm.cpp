@@ -101,6 +101,7 @@ LogtailAlarm::LogtailAlarm() {
     mMessageType[OBSERVER_INIT_ALARM] = "OBSERVER_INIT_ALARM";
     mMessageType[OBSERVER_RUNTIME_ALARM] = "OBSERVER_RUNTIME_ALARM";
     mMessageType[OBSERVER_STOP_ALARM] = "OBSERVER_STOP_ALARM";
+    mMessageType[INVALID_CONTAINER_PATH_ALARM] = "INVALID_CONTAINER_PATH_ALARM";
 }
 
 void LogtailAlarm::Init() {
