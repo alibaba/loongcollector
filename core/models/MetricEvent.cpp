@@ -27,7 +27,7 @@ uint64_t MetricEvent::EventsSizeBytes() {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-Json::Value MetricEvent::ToJson() const {
+Json::Value MetricEvent::ToJson(bool enableEventMeta) const {
     Json::Value root;
     root["type"] = static_cast<int>(GetType());
     root["timestamp"] = GetTimestamp();

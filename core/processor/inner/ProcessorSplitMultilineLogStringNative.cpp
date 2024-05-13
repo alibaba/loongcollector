@@ -76,7 +76,7 @@ bool ProcessorSplitMultilineLogStringNative::Init(const Json::Value& config) {
 /*
     Presumption:
     1. Event must be LogEvent
-    2. Log content must have exactly 2 elements (sourceKey, __file_offset__)
+    2. Log content must have exactly 1 field (sourceKey)
     3. The last \n of each log string is discarded in LogFileReader
 */
 void ProcessorSplitMultilineLogStringNative::Process(PipelineEventGroup& logGroup) {
@@ -99,11 +99,10 @@ bool ProcessorSplitMultilineLogStringNative::IsSupportedEvent(const PipelineEven
     if (e.Is<LogEvent>()) {
         return true;
     }
-    LOG_ERROR(
-        mContext->GetLogger(),
-        ("unexpected error", "some events are not supported")("processor", sName)("config", mContext->GetConfigName()));
+    LOG_ERROR(mContext->GetLogger(),
+              ("unexpected error", "unsupported log event")("processor", sName)("config", mContext->GetConfigName()));
     mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                   "unexpected error: some events are not supported.\tprocessor: " + sName
+                                   "unexpected error: unsupported log event.\tprocessor: " + sName
                                        + "\tconfig: " + mContext->GetConfigName(),
                                    mContext->GetProjectName(),
                                    mContext->GetLogstoreName(),
@@ -121,55 +120,30 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
         newEvents.emplace_back(std::move(e));
         return;
     }
-    const LogEvent& sourceEvent = e.Cast<LogEvent>();
-    // This is an inner plugin, so the size of log content must equal to 2 (sourceKey, __file_offset__)
-    if (sourceEvent.Size() != 2) {
-        newEvents.emplace_back(std::move(e));
-        LOG_ERROR(mContext->GetLogger(),
-                  ("unexpected error", "size of event content doesn't equal to 2")("processor", sName)(
-                      "config", mContext->GetConfigName()));
-        mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                       "unexpected error: size of event content doesn't equal to 2.\tprocessor: "
-                                           + sName + "\tconfig: " + mContext->GetConfigName(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetLogstoreName(),
-                                       mContext->GetRegion());
-        return;
-    }
+    LogEvent& sourceEvent = e.Cast<LogEvent>();
 
-    auto sourceIterator = sourceEvent.FindContent(mSourceKey);
-    if (sourceIterator == sourceEvent.end()) {
+    std::string errorMsg;
+    if (sourceEvent.Size() != 1) {
+        errorMsg = "log event fields cnt does not equal to 1";
+    } else if (!sourceEvent.HasContent(mSourceKey)) {
+        errorMsg = "log event does not have content key";
+    }
+    if (!errorMsg.empty()) {
         newEvents.emplace_back(std::move(e));
         LOG_ERROR(mContext->GetLogger(),
-                  ("unexpected error", "event does not have SourceKey")("processor", sName)("config",
-                                                                                            mContext->GetConfigName()));
+                  ("unexpected error", errorMsg)("processor", sName)("config", mContext->GetConfigName()));
         mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                       "unexpected error: event does not have SourceKey.\tprocessor: " + sName
+                                       "unexpected error: " + errorMsg + ".\tprocessor: " + sName
                                            + "\tconfig: " + mContext->GetConfigName(),
                                        mContext->GetProjectName(),
                                        mContext->GetLogstoreName(),
                                        mContext->GetRegion());
         return;
     }
-    StringView sourceVal = sourceIterator->second;
 
-    auto offsetIterator = sourceEvent.FindContent(LOG_RESERVED_KEY_FILE_OFFSET);
-    if (offsetIterator == sourceEvent.end()) {
-        newEvents.emplace_back(std::move(e));
-        LOG_ERROR(mContext->GetLogger(),
-                  ("unexpected error",
-                   "event does not have key __file_ofset__")("processor", sName)("config", mContext->GetConfigName()));
-        mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
-                                       "unexpected error: event does not have key __file_ofset__.\tprocessor" + sName
-                                           + "\tconfig: " + mContext->GetConfigName(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetLogstoreName(),
-                                       mContext->GetRegion());
-        return;
-    }
-    uint32_t sourceOffset = atol(offsetIterator->second.data());
-
+    StringView sourceVal = sourceEvent.GetContent(mSourceKey);
     StringBuffer sourceKey = logGroup.GetSourceBuffer()->CopyString(mSourceKey);
+
     std::string exception;
     const char* multiStartIndex = nullptr;
     bool isPartialLog = false;
@@ -183,6 +157,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
     size_t begin = 0;
     while (begin < sourceVal.size()) {
         StringView content = GetNextLine(sourceVal, begin);
+        bool isLastLog = begin + content.size() == sourceVal.size();
         ++(*inputLines);
         if (!isPartialLog) {
             // it is impossible to enter this state if only end pattern is given
@@ -199,12 +174,12 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                        && mMultiline.GetContinuePatternReg() != nullptr
                        && BoostRegexSearch(content.data(), content.size(), *mMultiline.GetEndPatternReg(), exception)) {
                 // case: continue + end
-                CreateNewEvent(content, sourceOffset, sourceKey, sourceEvent, logGroup, newEvents);
+                CreateNewEvent(content, isLastLog, sourceKey, sourceEvent, logGroup, newEvents);
                 multiStartIndex = content.data() + content.size() + 1;
                 mProcMatchedEventsCnt->Add(1);
             } else {
                 HandleUnmatchLogs(
-                    content, sourceOffset, sourceKey, sourceEvent, logGroup, newEvents, logPath, unmatchLines);
+                    content, isLastLog, sourceKey, sourceEvent, logGroup, newEvents, logPath, unmatchLines);
             }
         } else {
             // case: start + continue or continue + end
@@ -220,7 +195,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                     // if the current log is a match or not
                     if (BoostRegexSearch(content.data(), content.size(), *mMultiline.GetEndPatternReg(), exception)) {
                         CreateNewEvent(StringView(multiStartIndex, content.data() + content.size() - multiStartIndex),
-                                       sourceOffset,
+                                       isLastLog,
                                        sourceKey,
                                        sourceEvent,
                                        logGroup,
@@ -229,7 +204,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                     } else {
                         HandleUnmatchLogs(
                             StringView(multiStartIndex, content.data() + content.size() - multiStartIndex),
-                            sourceOffset,
+                            isLastLog,
                             sourceKey,
                             sourceEvent,
                             logGroup,
@@ -242,7 +217,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                     // case: start + end or end
                     if (BoostRegexSearch(content.data(), content.size(), *mMultiline.GetEndPatternReg(), exception)) {
                         CreateNewEvent(StringView(multiStartIndex, content.data() + content.size() - multiStartIndex),
-                                       sourceOffset,
+                                       isLastLog,
                                        sourceKey,
                                        sourceEvent,
                                        logGroup,
@@ -263,7 +238,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                     // case: start
                     if (BoostRegexSearch(content.data(), content.size(), *mMultiline.GetStartPatternReg(), exception)) {
                         CreateNewEvent(StringView(multiStartIndex, content.data() - 1 - multiStartIndex),
-                                       sourceOffset,
+                                       isLastLog,
                                        sourceKey,
                                        sourceEvent,
                                        logGroup,
@@ -275,7 +250,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                     // case: start + continue
                     // continue pattern is given, but current line is not matched against the continue pattern
                     CreateNewEvent(StringView(multiStartIndex, content.data() - 1 - multiStartIndex),
-                                   sourceOffset,
+                                   isLastLog,
                                    sourceKey,
                                    sourceEvent,
                                    logGroup,
@@ -287,7 +262,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
                         // start and continue pattern are given, and the current line is not matched against the
                         // start pattern
                         HandleUnmatchLogs(
-                            content, sourceOffset, sourceKey, sourceEvent, logGroup, newEvents, logPath, unmatchLines);
+                            content, isLastLog, sourceKey, sourceEvent, logGroup, newEvents, logPath, unmatchLines);
                         isPartialLog = false;
                     } else {
                         multiStartIndex = content.data();
@@ -302,7 +277,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
     if (isPartialLog && multiStartIndex - sourceVal.data() < static_cast<int64_t>(sourceVal.size())) {
         if (mMultiline.GetEndPatternReg() == nullptr) {
             CreateNewEvent(StringView(multiStartIndex, sourceVal.data() + sourceVal.size() - multiStartIndex),
-                           sourceOffset,
+                           true,
                            sourceKey,
                            sourceEvent,
                            logGroup,
@@ -310,7 +285,7 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
             mProcMatchedEventsCnt->Add(1);
         } else {
             HandleUnmatchLogs(StringView(multiStartIndex, sourceVal.data() + sourceVal.size() - multiStartIndex),
-                              sourceOffset,
+                              true,
                               sourceKey,
                               sourceEvent,
                               logGroup,
@@ -322,27 +297,34 @@ void ProcessorSplitMultilineLogStringNative::ProcessEvent(PipelineEventGroup& lo
 }
 
 void ProcessorSplitMultilineLogStringNative::CreateNewEvent(const StringView& content,
-                                                            long sourceoffset,
+                                                            bool isLastLog,
                                                             StringBuffer& sourceKey,
                                                             const LogEvent& sourceEvent,
                                                             PipelineEventGroup& logGroup,
                                                             EventsContainer& newEvents) {
     StringView sourceVal = sourceEvent.GetContent(mSourceKey);
     std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent();
+    targetEvent->SetContentNoCopy(StringView(sourceKey.data, sourceKey.size), content);
     targetEvent->SetTimestamp(
         sourceEvent.GetTimestamp(),
         sourceEvent.GetTimestampNanosecond()); // it is easy to forget other fields, better solution?
-    targetEvent->SetContentNoCopy(StringView(sourceKey.data, sourceKey.size), content);
+    auto const offset = sourceEvent.GetPosition().first + (content.data() - sourceVal.data());
+    auto const length
+        = isLastLog ? sourceEvent.GetPosition().second - (content.data() - sourceVal.data()) : content.size() + 1;
+    targetEvent->SetPosition(offset, length);
     if (mAppendingLogPositionMeta) {
-        auto const offset = sourceoffset + (content.data() - sourceVal.data());
-        StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(std::to_string(offset));
+        StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
         targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
+    }
+    // TODO: remove the following code after the flusher refactorization
+    if (logGroup.GetExactlyOnceCheckpoint() != nullptr) {
+        logGroup.GetExactlyOnceCheckpoint()->positions.emplace_back(offset, content.size());
     }
     newEvents.emplace_back(std::move(targetEvent));
 }
 
 void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView& sourceVal,
-                                                               long sourceoffset,
+                                                               bool isLastLog,
                                                                StringBuffer& sourceKey,
                                                                const LogEvent& sourceEvent,
                                                                PipelineEventGroup& logGroup,
@@ -354,7 +336,7 @@ void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView&
         StringView content = GetNextLine(sourceVal, begin);
         ++(*unmatchLines);
         if (mMultiline.mUnmatchedContentTreatment == MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE) {
-            CreateNewEvent(content, sourceoffset, sourceKey, sourceEvent, logGroup, newEvents);
+            CreateNewEvent(content, isLastLog, sourceKey, sourceEvent, logGroup, newEvents);
         }
         begin += content.size() + 1;
         ++totalLines;

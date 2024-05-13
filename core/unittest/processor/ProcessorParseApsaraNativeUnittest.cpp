@@ -429,8 +429,7 @@ void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
                 {
                     "content" : "[2023-09-04 13:15:50.1]\t[ERROR]\t[1]\t/ilogtail/AppConfigBase.cpp:1\t\tAppConfigBase AppConfigBase:1
 [2023-09-04 13:15:33.2]\t[INFO]\t[2]\t/ilogtail/AppConfigBase.cpp:2\t\tAppConfigBase AppConfigBase:2
-[2023-09-04 13:15:22.3]\t[WARNING]\t[3]\t/ilogtail/AppConfigBase.cpp:3\t\tAppConfigBase AppConfigBase:3",
-                    "__file_offset__": 0
+[2023-09-04 13:15:22.3]\t[WARNING]\t[3]\t/ilogtail/AppConfigBase.cpp:3\t\tAppConfigBase AppConfigBase:3"
                 },
                 "timestamp" : 12345678901,
                 "type" : 1
@@ -440,8 +439,7 @@ void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
                 {
                     "content" : "[2023-09-04 13:15
 :50.1]\t[ERROR]\t[1]\t/ilogtail/AppConfigBase.cpp:1\t\tAppConfigBase AppConfigBase:1
-[2023-09-04 13:15:22.3]\t[WARNING]\t[3]\t/ilogtail/AppConfigBase.cpp:3\t\tAppConfigBase AppConfigBase:3",
-                    "__file_offset__": 0
+[2023-09-04 13:15:22.3]\t[WARNING]\t[3]\t/ilogtail/AppConfigBase.cpp:3\t\tAppConfigBase AppConfigBase:3"
                 },
                 "timestamp" : 12345678901,
                 "type" : 1

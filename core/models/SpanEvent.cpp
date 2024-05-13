@@ -27,7 +27,7 @@ uint64_t SpanEvent::EventsSizeBytes() {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-Json::Value SpanEvent::ToJson() const {
+Json::Value SpanEvent::ToJson(bool enableEventMeta) const {
     Json::Value root;
     root["type"] = static_cast<int>(GetType());
     root["timestamp"] = GetTimestamp();

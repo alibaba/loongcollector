@@ -112,25 +112,25 @@ void LogProcess::Start() {
     LOG_INFO(sLogger, ("process daemon", "started"));
 }
 
-bool LogProcess::PushBuffer(LogBuffer* buffer, int32_t retryTimes) {
-    int32_t retry = 0;
-    while (true) {
-        retry++;
-        if (!mLogFeedbackQueue.PushItem((buffer->logFileReader)->GetLogstoreKey(), buffer)) {
-            if (retry % 100 == 0) {
-                LOG_ERROR(sLogger,
-                          ("Push log process buffer queue failed", ToString(buffer->rawBuffer.size()))(
-                              buffer->logFileReader->GetProject(), buffer->logFileReader->GetLogstore()));
-            }
-        } else {
+bool LogProcess::PushBuffer(LogstoreFeedBackKey key,
+                            const std::string& configName,
+                            size_t inputIndex,
+                            PipelineEventGroup&& group,
+                            uint32_t retryTimes) {
+    std::unique_ptr<ProcessQueueItem> item
+        = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), configName, inputIndex));
+    for (size_t i = 0; i < retryTimes; ++i) {
+        if (mLogFeedbackQueue.PushItem(key, std::move(item))) {
             return true;
         }
-
-        retry++;
-        if (retry >= retryTimes)
-            return false;
-        usleep(10 * 1000);
+        if (i % 100 == 0) {
+            LOG_WARNING(sLogger,
+                        ("push attempts to process queue continuously failed for the past second",
+                         "retry again")("config", configName)("input index", ToString(inputIndex)));
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    return false;
 }
 
 bool LogProcess::IsValidToReadLog(const LogstoreFeedBackKey& logstoreKey) {
@@ -220,7 +220,6 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
     uint64_t waitCount = 0;
 #endif
     while (true) {
-        std::shared_ptr<LogBuffer> logBuffer;
         mThreadFlags[threadNo] = false;
 
         int32_t curTime = time(NULL);
@@ -264,108 +263,68 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
         }
 
         // if have no data, wait 100 ms for new data or timeout, then continue to check again
-        LogBuffer* tmpLogBuffer = NULL;
+        std::unique_ptr<ProcessQueueItem> item;
         if (!mLogFeedbackQueue.CheckAndPopNextItem(
-                logstoreKey, tmpLogBuffer, Sender::Instance()->GetSenderFeedBackInterface(), threadNo, mThreadCount)) {
+                logstoreKey, item, Sender::Instance()->GetSenderFeedBackInterface(), threadNo, mThreadCount)) {
             mLogFeedbackQueue.Wait(100);
             continue;
         }
-        logBuffer.reset(tmpLogBuffer);
-
-#ifdef LOGTAIL_DEBUG_FLAG
-        ++processCount;
-        if (curTime != lastPrintTime) {
-            lastPrintTime = curTime;
-            LOG_DEBUG(sLogger,
-                      ("Logprocess tps", ToString(processCount))("wait time", ToString(waitTime))("wait count",
-                                                                                                  ToString(waitCount)));
-            processCount = 0;
-            waitCount = 0;
-            waitTime = 0;
-        }
-#endif
         {
             ReadLock lock(mAccessProcessThreadRWL);
             mThreadFlags[threadNo] = true;
-            s_processCount++;
-            uint64_t readBytes = logBuffer->rawBuffer.size() + 1; // may not be accurate if input is not utf8
-            s_processBytes += readBytes;
-            LogFileReaderPtr logFileReader = logBuffer->logFileReader;
-            auto convertedPath = logFileReader->GetConvertedPath();
-            auto hostLogPath = logFileReader->GetHostLogPath();
-#if defined(_MSC_VER)
-            if (BOOL_FLAG(enable_chinese_tag_path)) {
-                convertedPath = EncodingConverter::GetInstance()->FromACPToUTF8(convertedPath);
-                hostLogPath = EncodingConverter::GetInstance()->FromACPToUTF8(hostLogPath);
-            }
-#endif
 
-            auto pipeline = PipelineManager::GetInstance()->FindPipelineByName(logFileReader->GetConfigName());
+            auto pipeline = PipelineManager::GetInstance()->FindPipelineByName(item->mConfigName);
             if (!pipeline) {
                 LOG_INFO(sLogger,
-                         ("can not find config while processing log, maybe config updated. config",
-                          logFileReader->GetConfigName())("project", logFileReader->GetProject())(
-                             "logstore", logFileReader->GetLogstore()));
+                         ("pipeline not found during processing, perhaps due to config deletion",
+                          "discard data")("config", item->mConfigName));
                 continue;
             }
 
+            // record profile, must be placed here since readbytes info exists only before processing
+            auto& processProfile = pipeline->GetContext().GetProcessProfile();
+            ProcessProfile profile = processProfile;
+            bool isLog = false;
+            if (!item->mEventGroup.GetEvents().empty() && item->mEventGroup.GetEvents()[0].Is<LogEvent>()) {
+                isLog = true;
+                profile.readBytes = item->mEventGroup.GetEvents()[0].Cast<LogEvent>().GetPosition().second
+                    + 1; // may not be accurate if input is not utf8
+            }
+            processProfile.Reset();
+
+            int32_t startTime = (int32_t)time(NULL);
+            std::vector<PipelineEventGroup> eventGroupList;
+            eventGroupList.emplace_back(std::move(item->mEventGroup));
+            pipeline->Process(eventGroupList);
+            int32_t elapsedTime = (int32_t)time(NULL) - startTime;
+            if (elapsedTime > 1) {
+                LogtailAlarm::GetInstance()->SendAlarm(PROCESS_TOO_SLOW_ALARM,
+                                                       string("event processing took too long, elapsed time: ")
+                                                           + ToString(elapsedTime) + "s\tconfig: " + pipeline->Name(),
+                                                       pipeline->GetContext().GetProjectName(),
+                                                       pipeline->GetContext().GetLogstoreName(),
+                                                       pipeline->GetContext().GetRegion());
+                LOG_WARNING(sLogger,
+                            ("event processing took too long, elapsed time",
+                             ToString(elapsedTime) + "s")("config", pipeline->Name()));
+            }
+
+            s_processCount++;
+            if (isLog) {
+                s_processBytes += profile.readBytes;
+                s_processLines += profile.splitLines;
+            }
+
+            // send part
             std::vector<std::unique_ptr<sls_logs::LogGroup>> logGroupList;
-            ProcessProfile profile;
-            profile.readBytes = readBytes;
-            int32_t parseStartTime = (int32_t)time(NULL);
-            bool needSend = false;
-            // if (!BOOL_FLAG(enable_new_pipeline)) {
-            //     needSend = (0 == ProcessBufferLegacy(logBuffer, logFileReader, logGroup, profile, *config));
-            // } else {
-            needSend = (0 == ProcessBuffer(logBuffer, logFileReader, logGroupList, profile));
-            // }
-            const std::string& projectName = pipeline->GetContext().GetProjectName();
-            const std::string& category = pipeline->GetContext().GetLogstoreName();
-            int32_t parseEndTime = (int32_t)time(NULL);
+            bool needSend = ProcessBuffer(pipeline, eventGroupList, logGroupList);
 
             int logSize = 0;
             for (auto& pLogGroup : logGroupList) {
                 logSize += pLogGroup->logs_size();
             }
-            // add lines count
-            s_processLines += profile.splitLines;
-            // check whether processing is too slow
-            if (parseEndTime - parseStartTime > 1) {
-                LogtailAlarm::GetInstance()->SendAlarm(
-                    PROCESS_TOO_SLOW_ALARM,
-                    string("parse ") + ToString(logSize) + " logs, buffer size " + ToString(logBuffer->rawBuffer.size())
-                        + "time used seconds : " + ToString(parseEndTime - parseStartTime),
-                    projectName,
-                    category,
-                    pipeline->GetContext().GetRegion());
-                LOG_WARNING(sLogger,
-                            ("process log too slow, parse logs", logSize)("buffer size", logBuffer->rawBuffer.size())(
-                                "time used seconds", parseEndTime - parseStartTime)("project", projectName)("logstore",
-                                                                                                            category));
-            }
-
             if (logSize > 0 && needSend) { // send log group
                 const FlusherSLS* flusherSLS = static_cast<const FlusherSLS*>(pipeline->GetFlushers()[0]->GetPlugin());
-
-                IntegrityConfig* integrityConfig = NULL;
-                LineCountConfig* lineCountConfig = NULL;
-                // if (config->mIntegrityConfig->mIntegritySwitch) {
-                //     integrityConfig = new IntegrityConfig(config->mIntegrityConfig->mAliuid,
-                //                                           config->mIntegrityConfig->mIntegritySwitch,
-                //                                           config->mIntegrityConfig->mIntegrityProjectName,
-                //                                           config->mIntegrityConfig->mIntegrityLogstore,
-                //                                           config->mIntegrityConfig->mLogTimeReg,
-                //                                           config->mIntegrityConfig->mTimeFormat,
-                //                                           config->mIntegrityConfig->mTimePos);
-                // }
-                // if (config->mLineCountConfig->mLineCountSwitch) {
-                //     lineCountConfig = new LineCountConfig(config->mLineCountConfig->mAliuid,
-                //                                           config->mLineCountConfig->mLineCountSwitch,
-                //                                           config->mLineCountConfig->mLineCountProjectName,
-                //                                           config->mLineCountConfig->mLineCountLogstore);
-                // }
-                IntegrityConfigPtr integrityConfigPtr(integrityConfig);
-                LineCountConfigPtr lineCountConfigPtr(lineCountConfig);
 
                 string compressStr = "zstd";
                 if (flusherSLS->mCompressType == FlusherSLS::CompressType::NONE) {
@@ -375,23 +334,35 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 }
                 sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(compressStr);
 
+                const std::string& projectName = pipeline->GetContext().GetProjectName();
+                const std::string& category = pipeline->GetContext().GetLogstoreName();
+                string convertedPath = eventGroupList[0].GetMetadata(EventGroupMetaKey::LOG_FILE_PATH).to_string();
+                string hostLogPath
+                    = eventGroupList[0].GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED).to_string();
+#if defined(_MSC_VER)
+                if (BOOL_FLAG(enable_chinese_tag_path)) {
+                    convertedPath = EncodingConverter::GetInstance()->FromACPToUTF8(convertedPath);
+                    hostLogPath = EncodingConverter::GetInstance()->FromACPToUTF8(hostLogPath);
+                }
+#endif
+
                 for (auto& pLogGroup : logGroupList) {
                     LogGroupContext context(flusherSLS->mRegion,
                                             projectName,
                                             flusherSLS->mLogstore,
                                             compressType,
-                                            logBuffer->fileInfo,
-                                            integrityConfigPtr,
-                                            lineCountConfigPtr,
+                                            FileInfoPtr(),
+                                            IntegrityConfigPtr(),
+                                            LineCountConfigPtr(),
                                             -1,
                                             false,
                                             false,
-                                            logBuffer->exactlyOnceCheckpoint);
+                                            eventGroupList[0].GetExactlyOnceCheckpoint());
                     if (!Sender::Instance()->Send(
                             projectName,
-                            logFileReader->GetSourceId(),
+                            eventGroupList[0].GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string(),
                             *(pLogGroup.get()),
-                            logFileReader->GetLogGroupKey(),
+                            std::stol(eventGroupList[0].GetMetadata(EventGroupMetaKey::LOGGROUP_KEY).to_string()),
                             flusherSLS,
                             flusherSLS->mBatch.mMergeType,
                             (uint32_t)(profile.logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
@@ -409,29 +380,29 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                     }
                 }
 
-                LogFileProfiler::GetInstance()->AddProfilingData(pipeline->Name(),
-                                                                 pipeline->GetContext().GetRegion(),
-                                                                 projectName,
-                                                                 category,
-                                                                 convertedPath,
-                                                                 hostLogPath,
-                                                                 logFileReader->GetExtraTags(),
-                                                                 readBytes,
-                                                                 profile.skipBytes,
-                                                                 profile.splitLines,
-                                                                 profile.parseFailures,
-                                                                 profile.regexMatchFailures,
-                                                                 profile.parseTimeFailures,
-                                                                 profile.historyFailures,
-                                                                 0,
-                                                                 ""); // TODO: I don't think errorLine is useful
-                LOG_DEBUG(
-                    sLogger,
-                    ("project", projectName)("logstore", category)("filename", convertedPath)("read_bytes", readBytes)(
-                        "split_lines", profile.splitLines)("parse_failures", profile.parseFailures)(
-                        "parse_time_failures", profile.parseTimeFailures)(
-                        "regex_match_failures", profile.regexMatchFailures)("history_failures",
-                                                                            profile.historyFailures));
+                if (isLog) {
+                    std::vector<sls_logs::LogTag> logTags;
+                    for (auto& item : logGroupList[0]->logtags()) {
+                        logTags.push_back(item);
+                    }
+                    LogFileProfiler::GetInstance()->AddProfilingData(
+                        pipeline->Name(),
+                        pipeline->GetContext().GetRegion(),
+                        projectName,
+                        category,
+                        convertedPath,
+                        hostLogPath,
+                        logTags, // warning: this is not the same as reader extra tags!
+                        profile.readBytes,
+                        profile.skipBytes,
+                        profile.splitLines,
+                        profile.parseFailures,
+                        profile.regexMatchFailures,
+                        profile.parseTimeFailures,
+                        profile.historyFailures,
+                        0,
+                        ""); // TODO: I don't think errorLine is useful
+                }
             }
             logGroupList.clear();
         }
@@ -440,101 +411,25 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
     return NULL;
 }
 
-int LogProcess::ProcessBuffer(std::shared_ptr<LogBuffer>& logBuffer,
-                              LogFileReaderPtr& logFileReader,
-                              std::vector<std::unique_ptr<sls_logs::LogGroup>>& resultGroupList,
-                              ProcessProfile& profile) {
-    auto pipeline = PipelineManager::GetInstance()->FindPipelineByName(
-        logFileReader->GetConfigName()); // pipeline should be set in the loggroup by input
-    if (pipeline.get() == nullptr) {
-        LOG_INFO(sLogger,
-                 ("can not find pipeline while processing log, maybe config deleted. config",
-                  logFileReader->GetConfigName())("project", logFileReader->GetProject())(
-                     "logstore", logFileReader->GetLogstore()));
-        return -1;
-    }
-
-    std::vector<PipelineEventGroup> eventGroupList;
-    {
-        // construct a logGroup, it should be moved into input later
-        PipelineEventGroup eventGroup{std::shared_ptr<SourceBuffer>(std::move(logBuffer->sourcebuffer))};
-        // TODO: metadata should be set in reader
-        FillEventGroupMetadata(*logBuffer, eventGroup, logFileReader->mFileLogFormat);
-
-        LogEvent* event = eventGroup.AddLogEvent();
-        time_t logtime = time(NULL);
-        if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
-            logtime += GetTimeDelta();
-        }
-        event->SetTimestamp(logtime);
-        event->SetContentNoCopy(DEFAULT_CONTENT_KEY, logBuffer->rawBuffer);
-        auto offsetStr = event->GetSourceBuffer()->CopyString(std::to_string(logBuffer->readOffset));
-        event->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
-        eventGroupList.emplace_back(std::move(eventGroup));
-        // process logGroup
-        pipeline->Process(eventGroupList);
-    }
-
-    // record profile
-    auto& processProfile = pipeline->GetContext().GetProcessProfile();
-    profile = processProfile;
-    processProfile.Reset();
-
+bool LogProcess::ProcessBuffer(const std::shared_ptr<Pipeline>& pipeline,
+                               std::vector<PipelineEventGroup>& eventGroupList,
+                               std::vector<std::unique_ptr<sls_logs::LogGroup>>& resultGroupList) {
     for (auto& eventGroup : eventGroupList) {
         // fill protobuf
         resultGroupList.emplace_back(new sls_logs::LogGroup());
         auto& resultGroup = resultGroupList.back();
         FillLogGroupLogs(eventGroup, *resultGroup, pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond);
-        FillLogGroupTags(eventGroup, logFileReader, *resultGroup);
+        FillLogGroupTags(eventGroup, pipeline->GetContext().GetLogstoreName(), *resultGroup);
         if (pipeline->IsFlushingThroughGoPipeline()) {
             // LogGroup will be deleted outside
             LogtailPlugin::GetInstance()->ProcessLogGroup(
-                logFileReader->GetConfigName(), *resultGroup, logFileReader->GetSourceId());
-            return 1;
-        }
-        // record log positions for exactly once. TODO: make it correct for each log, current implementation requires
-        // loggroup send in one shot
-        if (logBuffer->exactlyOnceCheckpoint) {
-            std::pair<size_t, size_t> pos(logBuffer->readOffset, logBuffer->readLength);
-            logBuffer->exactlyOnceCheckpoint->positions.assign(eventGroup.GetEvents().size(), pos);
+                pipeline->GetContext().GetConfigName(),
+                *resultGroup,
+                eventGroup.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
+            return false;
         }
     }
-    return 0;
-}
-
-void LogProcess::FillEventGroupMetadata(LogBuffer& logBuffer,
-                                        PipelineEventGroup& eventGroup,
-                                        LogFileReader::LogFormat fileLogFormat) const {
-    bool isContainerLog = fileLogFormat == LogFileReader::LogFormat::DOCKER_JSON_FILE
-        || fileLogFormat == LogFileReader::LogFormat::CONTAINERD_TEXT;
-    switch (fileLogFormat) {
-        case LogFileReader::LogFormat::DOCKER_JSON_FILE:
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
-            break;
-        case LogFileReader::LogFormat::CONTAINERD_TEXT:
-            eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::CONTAINERD_TEXT);
-            break;
-        default:
-            break;
-    }
-    if (!isContainerLog) {
-        eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH, logBuffer.logFileReader->GetConvertedPath());
-        eventGroup.SetMetadataNoCopy(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED,
-                                     logBuffer.logFileReader->GetHostLogPath());
-        eventGroup.SetMetadata(EventGroupMetaKey::LOG_FILE_INODE,
-                               std::to_string(logBuffer.logFileReader->GetDevInode().inode));
-    }
-#ifdef __ENTERPRISE__
-    std::string agentTag = EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
-    if (!agentTag.empty()) {
-        eventGroup.SetMetadata(EventGroupMetaKey::AGENT_TAG,
-                               EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
-    }
-#endif
-    eventGroup.SetMetadataNoCopy(EventGroupMetaKey::HOST_IP, LogFileProfiler::mIpAddr);
-    eventGroup.SetMetadataNoCopy(EventGroupMetaKey::HOST_NAME, LogFileProfiler::mHostname);
-    eventGroup.SetMetadata(EventGroupMetaKey::LOG_READ_OFFSET, std::to_string(logBuffer.readOffset));
-    eventGroup.SetMetadata(EventGroupMetaKey::LOG_READ_LENGTH, std::to_string(logBuffer.readLength));
+    return true;
 }
 
 void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup,
@@ -561,30 +456,22 @@ void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup,
 }
 
 void LogProcess::FillLogGroupTags(const PipelineEventGroup& eventGroup,
-                                  LogFileReaderPtr& logFileReader,
+                                  const std::string& logstore,
                                   sls_logs::LogGroup& resultGroup) const {
-    // fill tags from eventGroup
     for (auto& tag : eventGroup.GetTags()) {
         auto logTagPtr = resultGroup.add_logtags();
         logTagPtr->set_key(tag.first.to_string());
         logTagPtr->set_value(tag.second.to_string());
     }
 
-    // special tags from reader
-    const std::vector<sls_logs::LogTag>& extraTags = logFileReader->GetExtraTags();
-    for (size_t i = 0; i < extraTags.size(); ++i) {
-        auto logTagPtr = resultGroup.add_logtags();
-        logTagPtr->set_key(extraTags[i].key());
-        logTagPtr->set_value(extraTags[i].value());
-    }
-
-    if (resultGroup.category() != logFileReader->GetLogstore()) {
-        resultGroup.set_category(logFileReader->GetLogstore());
+    if (resultGroup.category() != logstore) {
+        resultGroup.set_category(logstore);
     }
 
     if (resultGroup.topic().empty()) {
-        resultGroup.set_topic(logFileReader->GetTopicName());
+        resultGroup.set_topic(eventGroup.GetMetadata(EventGroupMetaKey::TOPIC).to_string());
     }
+    // source is set by sender
 }
 
 void LogProcess::DoFuseHandling() {

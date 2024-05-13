@@ -81,8 +81,7 @@ void ProcessorDesensitizeNativeUnittest::TestMultipleLines() {
                 "contents" :
                 {
                     "content" : "asf@@@324 FS2$%pwd,pwd=saf543#$@,,
-dbf@@@324 FS2$%pwd,pwd=saf543#$@,,",
-                    "__file_offset__": 0
+dbf@@@324 FS2$%pwd,pwd=saf543#$@,,"
                 },
                 "timestampNanosecond" : 0,
                 "timestamp" : 12345678901,

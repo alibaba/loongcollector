@@ -34,9 +34,9 @@ public:
     PipelineContext mContext;
 };
 
-UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestInit);
-UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessJson);
-UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessCommon);
+UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestInit)
+UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessJson)
+UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessCommon)
 
 void ProcessorSplitLogStringNativeUnittest::TestInit() {
     // make config
@@ -57,22 +57,25 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
     // make events
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    std::string inJson = R"({
+    std::stringstream inJson;
+    inJson << R"({
         "events" :
         [
             {
                 "contents" :
                 {
-                    "content" : "{\n\"k1\":\"v1\"\n}\u0000{\n\"k2\":\"v2\"\n}",
-                    "__file_offset__": "0"
+                    "content" : "{\n\"k1\":\"v1\"\n}\u0000{\n\"k2\":\"v2\"\n}"
                 },
+                "fileOffset": 1,
+                "rawSize": )"
+           << strlen(R"({n"k1":"v1"n}0{n"k2":"v2"n})") << R"(,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
     })";
-    APSARA_TEST_TRUE_FATAL(eventGroup.FromJsonString(inJson));
+    APSARA_TEST_TRUE_FATAL(eventGroup.FromJsonString(inJson.str()));
     // run function
     ProcessorSplitLogStringNative processor;
     processor.SetContext(mContext);
@@ -88,9 +91,12 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
             {
                 "contents" :
                 {
-                    "__file_offset__": "0",
+                    "__file_offset__": "1",
                     "content" : "{\n\"k1\":\"v1\"\n}"
                 },
+                "fileOffset": 1,
+                "rawSize": )"
+               << strlen(R"({n"k1":"v1"n}0)") << R"(,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
@@ -99,16 +105,20 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
                 "contents" :
                 {
                     "__file_offset__": ")"
-               << strlen(R"({n"k1":"v1"n}0)") << R"(",
+               << strlen(R"({n"k1":"v1"n}0)") + 1 << R"(",
                     "content" : "{\n\"k2\":\"v2\"\n}"
                 },
+                "fileOffset": )"
+               << strlen(R"({n"k1":"v1"n}0)") + 1 << R"(,
+                "rawSize": )"
+               << strlen(R"({n"k2":"v2"n})") << R"(,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
     })";
-    std::string outJson = eventGroup.ToJsonString();
+    std::string outJson = eventGroup.ToJsonString(true);
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
     // check observability
     APSARA_TEST_EQUAL_FATAL(2, processor.GetContext().GetProcessProfile().splitLines);
@@ -127,9 +137,10 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
             {
                 "contents" :
                 {
-                    "__file_offset__": "0",
                     "content" : "line1\nline2"
                 },
+                "fileOffset": 1,
+                "rawSize": 12,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
@@ -137,9 +148,10 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
             {
                 "contents" :
                 {
-                    "__file_offset__": "0",
                     "content" : "line3\nline4"
                 },
+                "fileOffset": 0,
+                "rawSize": 11,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
@@ -162,6 +174,8 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
                 {
                     "content" : "line1"
                 },
+                "fileOffset": 1,
+                "rawSize": 6,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
@@ -171,6 +185,8 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
                 {
                     "content" : "line2"
                 },
+                "fileOffset": 7,
+                "rawSize": 6,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
@@ -180,6 +196,8 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
                 {
                     "content" : "line3"
                 },
+                "fileOffset": 0,
+                "rawSize": 6,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
@@ -189,13 +207,15 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
                 {
                     "content" : "line4"
                 },
+                "fileOffset": 6,
+                "rawSize": 5,
                 "timestamp" : 12345678901,
                 "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
     })";
-    std::string outJson = eventGroup.ToJsonString();
+    std::string outJson = eventGroup.ToJsonString(true);
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observability
     APSARA_TEST_EQUAL_FATAL(4, processor.GetContext().GetProcessProfile().splitLines);

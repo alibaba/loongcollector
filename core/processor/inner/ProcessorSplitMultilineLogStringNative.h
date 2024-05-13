@@ -48,22 +48,20 @@ private:
                       EventsContainer& newEvents,
                       int* inputLines,
                       int* unmatchLines);
-    void SplitLogByRegex(PipelineEventGroup& logGroup);
     void CreateNewEvent(const StringView& content,
-                        long sourceoffset,
+                        bool isLastLog,
                         StringBuffer& sourceKey,
                         const LogEvent& sourceEvent,
                         PipelineEventGroup& logGroup,
                         EventsContainer& newEvents);
     void HandleUnmatchLogs(const StringView& sourceVal,
-                           long sourceoffset,
+                           bool isLastLog,
                            StringBuffer& sourceKey,
                            const LogEvent& sourceEvent,
                            PipelineEventGroup& logGroup,
                            EventsContainer& newEvents,
                            StringView logPath,
                            int* unmatchLines);
-
     StringView GetNextLine(StringView log, size_t begin);
 
     int* mSplitLines = nullptr;

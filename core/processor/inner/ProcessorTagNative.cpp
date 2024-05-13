@@ -34,7 +34,20 @@ bool ProcessorTagNative::Init(const Json::Value& config) {
 }
 
 void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
-    // add file tags (like env tags but support reload)
+    // group level
+    StringView filePath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH);
+    if (!filePath.empty()) {
+        logGroup.SetTagNoCopy(LOG_RESERVED_KEY_PATH, filePath.substr(0, 511));
+    }
+
+    // process level
+#ifdef __ENTERPRISE__
+    const string& agent_tag = EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
+    if (!agent_tag.empty()) {
+        logGroup.SetTagNoCopy(LOG_RESERVED_KEY_USER_DEFINED_ID, agent_tag);
+    }
+#endif
+
     if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
         std::vector<sls_logs::LogTag>& fileTags = AppConfig::GetInstance()->GetFileTags();
         if (!fileTags.empty()) { // reloadable, so we must get it every time and copy value
@@ -44,26 +57,14 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
         }
     }
 
-    // __path__
-    const logtail::StringView& filePath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH);
-    if (!filePath.empty()) {
-        logGroup.SetTagNoCopy(LOG_RESERVED_KEY_PATH, filePath.substr(0, 511));
-    }
-
-    // __user_defined_id__
-    const logtail::StringView& agent_tag = logGroup.GetMetadata(EventGroupMetaKey::AGENT_TAG);
-    if (!agent_tag.empty()) {
-        logGroup.SetTagNoCopy(LOG_RESERVED_KEY_USER_DEFINED_ID, agent_tag.substr(0, 99));
-    }
-
     if (mContext->GetPipeline().IsFlushingThroughGoPipeline()) {
         return;
     }
 
-    // __hostname__
-    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, logGroup.GetMetadata(EventGroupMetaKey::HOST_NAME).substr(0, 99));
+    // group level
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LogFileProfiler::mHostname);
 
-    // add env tags
+    // process level
     static const std::vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
     if (!sEnvTags.empty()) {
         for (size_t i = 0; i < sEnvTags.size(); ++i) {

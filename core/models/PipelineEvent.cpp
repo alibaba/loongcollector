@@ -48,8 +48,8 @@ std::shared_ptr<SourceBuffer>& PipelineEvent::GetSourceBuffer() {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-std::string PipelineEvent::ToJsonString() const {
-    Json::Value root = ToJson();
+std::string PipelineEvent::ToJsonString(bool enableEventMeta) const {
+    Json::Value root = ToJson(enableEventMeta);
     Json::StreamWriterBuilder builder;
     builder["commentStyle"] = "None";
     builder["indentation"] = "    ";

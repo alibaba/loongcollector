@@ -77,7 +77,7 @@ SpanEvent* PipelineEventGroup::AddSpanEvent() {
     return e;
 }
 
-void PipelineEventGroup::SetMetadata(EventGroupMetaKey key, const StringView& val) {
+void PipelineEventGroup::SetMetadata(EventGroupMetaKey key, StringView val) {
     SetMetadataNoCopy(key, mSourceBuffer->CopyString(val));
 }
 
@@ -92,11 +92,11 @@ void PipelineEventGroup::SetMetadataNoCopy(EventGroupMetaKey key, const StringBu
 bool PipelineEventGroup::HasMetadata(EventGroupMetaKey key) const {
     return mMetadata.find(key) != mMetadata.end();
 }
-void PipelineEventGroup::SetMetadataNoCopy(EventGroupMetaKey key, const StringView& val) {
+void PipelineEventGroup::SetMetadataNoCopy(EventGroupMetaKey key, StringView val) {
     mMetadata[key] = val;
 }
 
-const StringView& PipelineEventGroup::GetMetadata(EventGroupMetaKey key) const {
+StringView PipelineEventGroup::GetMetadata(EventGroupMetaKey key) const {
     auto it = mMetadata.find(key);
     if (it != mMetadata.end()) {
         return it->second;
@@ -108,7 +108,7 @@ void PipelineEventGroup::DelMetadata(EventGroupMetaKey key) {
     mMetadata.erase(key);
 }
 
-void PipelineEventGroup::SetTag(const StringView& key, const StringView& val) {
+void PipelineEventGroup::SetTag(StringView key, StringView val) {
     SetTagNoCopy(mSourceBuffer->CopyString(key), mSourceBuffer->CopyString(val));
 }
 
@@ -116,7 +116,7 @@ void PipelineEventGroup::SetTag(const std::string& key, const std::string& val) 
     SetTagNoCopy(mSourceBuffer->CopyString(key), mSourceBuffer->CopyString(val));
 }
 
-void PipelineEventGroup::SetTag(const StringBuffer& key, const StringView& val) {
+void PipelineEventGroup::SetTag(const StringBuffer& key, StringView val) {
     SetTagNoCopy(key, mSourceBuffer->CopyString(val));
 }
 
@@ -124,15 +124,15 @@ void PipelineEventGroup::SetTagNoCopy(const StringBuffer& key, const StringBuffe
     SetTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
 }
 
-bool PipelineEventGroup::HasTag(const StringView& key) const {
+bool PipelineEventGroup::HasTag(StringView key) const {
     return mTags.find(key) != mTags.end();
 }
 
-void PipelineEventGroup::SetTagNoCopy(const StringView& key, const StringView& val) {
+void PipelineEventGroup::SetTagNoCopy(StringView key, StringView val) {
     mTags[key] = val;
 }
 
-const StringView& PipelineEventGroup::GetTag(const StringView& key) const {
+StringView PipelineEventGroup::GetTag(StringView key) const {
     auto it = mTags.find(key);
     if (it != mTags.end()) {
         return it->second;
@@ -140,7 +140,7 @@ const StringView& PipelineEventGroup::GetTag(const StringView& key) const {
     return gEmptyStringView;
 }
 
-void PipelineEventGroup::DelTag(const StringView& key) {
+void PipelineEventGroup::DelTag(StringView key) {
     mTags.erase(key);
 }
 
@@ -150,15 +150,15 @@ uint64_t PipelineEventGroup::EventGroupSizeBytes() {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-const std::string EVENT_GROUP_META_AGENT_TAG = "agent.tag";
-const std::string EVENT_GROUP_META_HOST_IP = "host.ip";
-const std::string EVENT_GROUP_META_HOST_NAME = "host.name";
-const std::string EVENT_GROUP_META_LOG_TOPIC = "log.topic";
+// const std::string EVENT_GROUP_META_AGENT_TAG = "agent.tag";
+// const std::string EVENT_GROUP_META_HOST_IP = "host.ip";
+// const std::string EVENT_GROUP_META_HOST_NAME = "host.name";
+// const std::string EVENT_GROUP_META_LOG_TOPIC = "log.topic";
 const std::string EVENT_GROUP_META_LOG_FILE_PATH = "log.file.path";
 const std::string EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED = "log.file.path_resolved";
 const std::string EVENT_GROUP_META_LOG_FILE_INODE = "log.file.inode";
-const std::string EVENT_GROUP_META_LOG_FILE_OFFSET = "log.file.offset";
-const std::string EVENT_GROUP_META_LOG_FILE_LENGTH = "log.file.length";
+// const std::string EVENT_GROUP_META_LOG_FILE_OFFSET = "log.file.offset";
+// const std::string EVENT_GROUP_META_LOG_FILE_LENGTH = "log.file.length";
 const std::string EVENT_GROUP_META_CONTAINER_TYPE = "container.type";
 const std::string EVENT_GROUP_META_HAS_PART_LOG = "has.part.log";
 
@@ -175,27 +175,21 @@ const std::string EVENT_GROUP_META_CONTAINER_IMAGE_ID = "container.image.id";
 
 const std::string EVENT_GROUP_META_CONTAINERD_TEXT = "containerd_text";
 const std::string EVENT_GROUP_META_DOCKER_JSON_FILE = "docker_json-file";
+const std::string EVENT_GROUP_META_SOURCE_ID = "source.id";
+const std::string EVENT_GROUP_META_TOPIC = "topic";
 
 const std::string& EventGroupMetaKeyToString(EventGroupMetaKey key) {
     switch (key) {
-        case EventGroupMetaKey::AGENT_TAG:
-            return EVENT_GROUP_META_AGENT_TAG;
-        case EventGroupMetaKey::HOST_IP:
-            return EVENT_GROUP_META_HOST_IP;
-        case EventGroupMetaKey::HOST_NAME:
-            return EVENT_GROUP_META_HOST_NAME;
-        case EventGroupMetaKey::LOG_TOPIC:
-            return EVENT_GROUP_META_LOG_TOPIC;
         case EventGroupMetaKey::LOG_FILE_PATH:
             return EVENT_GROUP_META_LOG_FILE_PATH;
         case EventGroupMetaKey::LOG_FILE_PATH_RESOLVED:
             return EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED;
         case EventGroupMetaKey::LOG_FILE_INODE:
             return EVENT_GROUP_META_LOG_FILE_INODE;
-        case EventGroupMetaKey::LOG_READ_OFFSET:
-            return EVENT_GROUP_META_LOG_FILE_OFFSET;
-        case EventGroupMetaKey::LOG_READ_LENGTH:
-            return EVENT_GROUP_META_LOG_FILE_LENGTH;
+        case EventGroupMetaKey::SOURCE_ID:
+            return EVENT_GROUP_META_SOURCE_ID;
+        case EventGroupMetaKey::TOPIC:
+            return EVENT_GROUP_META_TOPIC;
         case EventGroupMetaKey::LOG_FORMAT:
             return EVENT_GROUP_META_CONTAINER_TYPE;
         case EventGroupMetaKey::HAS_PART_LOG:
@@ -216,16 +210,12 @@ const std::string EventGroupMetaValueToString(std::string value) {
 }
 
 EventGroupMetaKey StringToEventGroupMetaKey(const std::string& key) {
-    static std::unordered_map<std::string, EventGroupMetaKey> sStringToEnum
-        = {{EVENT_GROUP_META_AGENT_TAG, EventGroupMetaKey::AGENT_TAG},
-           {EVENT_GROUP_META_HOST_IP, EventGroupMetaKey::HOST_IP},
-           {EVENT_GROUP_META_HOST_NAME, EventGroupMetaKey::HOST_NAME},
-           {EVENT_GROUP_META_LOG_TOPIC, EventGroupMetaKey::LOG_TOPIC},
-           {EVENT_GROUP_META_LOG_FILE_PATH, EventGroupMetaKey::LOG_FILE_PATH},
-           {EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED, EventGroupMetaKey::LOG_FILE_PATH_RESOLVED},
-           {EVENT_GROUP_META_LOG_FILE_INODE, EventGroupMetaKey::LOG_FILE_INODE},
-           {EVENT_GROUP_META_LOG_FILE_OFFSET, EventGroupMetaKey::LOG_READ_OFFSET},
-           {EVENT_GROUP_META_LOG_FILE_LENGTH, EventGroupMetaKey::LOG_READ_LENGTH},
+    static std::unordered_map<std::string, EventGroupMetaKey> sStringToEnum{
+        {EVENT_GROUP_META_LOG_FILE_PATH, EventGroupMetaKey::LOG_FILE_PATH},
+        {EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED, EventGroupMetaKey::LOG_FILE_PATH_RESOLVED},
+        {EVENT_GROUP_META_LOG_FILE_INODE, EventGroupMetaKey::LOG_FILE_INODE},
+        {EVENT_GROUP_META_SOURCE_ID, EventGroupMetaKey::SOURCE_ID},
+        {EVENT_GROUP_META_TOPIC, EventGroupMetaKey::TOPIC},
            {EVENT_GROUP_META_HAS_PART_LOG, EventGroupMetaKey::HAS_PART_LOG}};
     auto it = sStringToEnum.find(key);
     if (it != sStringToEnum.end()) {
@@ -234,7 +224,7 @@ EventGroupMetaKey StringToEventGroupMetaKey(const std::string& key) {
     return EventGroupMetaKey::UNKNOWN;
 }
 
-Json::Value PipelineEventGroup::ToJson() const {
+Json::Value PipelineEventGroup::ToJson(bool enableEventMeta) const {
     Json::Value root;
     if (!mMetadata.empty()) {
         Json::Value metadata;
@@ -253,7 +243,7 @@ Json::Value PipelineEventGroup::ToJson() const {
     if (!this->GetEvents().empty()) {
         Json::Value events;
         for (const auto& event : this->GetEvents()) {
-            events.append(event->ToJson());
+            events.append(event->ToJson(enableEventMeta));
         }
         root["events"] = std::move(events);
     }
@@ -288,8 +278,8 @@ bool PipelineEventGroup::FromJson(const Json::Value& root) {
     return true;
 }
 
-std::string PipelineEventGroup::ToJsonString() const {
-    Json::Value root = ToJson();
+std::string PipelineEventGroup::ToJsonString(bool enableEventMeta) const {
+    Json::Value root = ToJson(enableEventMeta);
     Json::StreamWriterBuilder builder;
     builder["commentStyle"] = "None";
     std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());

@@ -19,9 +19,10 @@
 #include <memory>
 #include <string>
 
+#include "checkpoint/RangeCheckpoint.h"
 #include "common/Constants.h"
-#include "models/PipelineEventPtr.h"
 #include "common/memory/SourceBuffer.h"
+#include "models/PipelineEventPtr.h"
 
 namespace logtail {
 
@@ -33,15 +34,9 @@ namespace logtail {
 // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/container.md
 enum class EventGroupMetaKey {
     UNKNOWN,
-    AGENT_TAG,
-    HOST_IP,
-    HOST_NAME,
-    LOG_TOPIC,
     LOG_FILE_PATH,
     LOG_FILE_PATH_RESOLVED,
     LOG_FILE_INODE,
-    LOG_READ_OFFSET,
-    LOG_READ_LENGTH,
     LOG_FORMAT,
     HAS_PART_LOG,
 
@@ -54,7 +49,11 @@ enum class EventGroupMetaKey {
     CONTAINER_NAME,
     CONTAINER_IP,
     CONTAINER_IMAGE_NAME,
-    CONTAINER_IMAGE_ID
+    CONTAINER_IMAGE_ID,
+
+    SOURCE_ID,
+    TOPIC,
+    LOGGROUP_KEY // TODO: temporarily used here, should be removed in flusher refactorization
 };
 
 using GroupMetadata = std::map<EventGroupMetaKey, StringView>;
@@ -82,40 +81,42 @@ public:
     MetricEvent* AddMetricEvent();
     SpanEvent* AddSpanEvent();
     void SwapEvents(EventsContainer& other) { mEvents.swap(other); }
-    // void SetSourceBuffer(std::shared_ptr<SourceBuffer> sourceBuffer) { mSourceBuffer = sourceBuffer; }
     std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
 
-    void SetMetadata(EventGroupMetaKey key, const StringView& val);
+    void SetMetadata(EventGroupMetaKey key, StringView val);
     void SetMetadata(EventGroupMetaKey key, const std::string& val);
     void SetMetadataNoCopy(EventGroupMetaKey key, const StringBuffer& val);
-    const StringView& GetMetadata(EventGroupMetaKey key) const;
+    StringView GetMetadata(EventGroupMetaKey key) const;
     const GroupMetadata& GetAllMetadata() const { return mMetadata; };
     bool HasMetadata(EventGroupMetaKey key) const;
-    void SetMetadataNoCopy(EventGroupMetaKey key, const StringView& val);
+    void SetMetadataNoCopy(EventGroupMetaKey key, StringView val);
     void DelMetadata(EventGroupMetaKey key);
     GroupMetadata& MutableAllMetadata() { return mMetadata; };
     void SwapAllMetadata(GroupMetadata& other) { mMetadata.swap(other); }
     void SetAllMetadata(const GroupMetadata& other) { mMetadata = other; }
 
-    void SetTag(const StringView& key, const StringView& val);
+    void SetTag(StringView key, StringView val);
     void SetTag(const std::string& key, const std::string& val);
-    void SetTag(const StringBuffer& key, const StringView& val);
+    void SetTag(const StringBuffer& key, StringView val);
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
-    const StringView& GetTag(const StringView& key) const;
+    StringView GetTag(StringView key) const;
     const GroupTags& GetTags() const { return mTags; };
-    bool HasTag(const StringView& key) const;
-    void SetTagNoCopy(const StringView& key, const StringView& val);
-    void DelTag(const StringView& key);
+    bool HasTag(StringView key) const;
+    void SetTagNoCopy(StringView key, StringView val);
+    void DelTag(StringView key);
     GroupTags& MutableTags() { return mTags; };
     void SwapTags(GroupTags& other) { mTags.swap(other); }
+
+    void SetExactlyOnceCheckpoint(const RangeCheckpointPtr& checkpoint) { mExactlyOnceCheckpoint = checkpoint; }
+    RangeCheckpointPtr GetExactlyOnceCheckpoint() const { return mExactlyOnceCheckpoint; }
 
     uint64_t EventGroupSizeBytes();
 
 #ifdef APSARA_UNIT_TEST_MAIN
     // for debug and test
-    Json::Value ToJson() const;
+    Json::Value ToJson(bool enableEventMeta = false) const;
     bool FromJson(const Json::Value&);
-    std::string ToJsonString() const;
+    std::string ToJsonString(bool enableEventMeta = false) const;
     bool FromJsonString(const std::string&);
 #endif
 
@@ -124,6 +125,7 @@ private:
     GroupTags mTags; // custom tags to output
     EventsContainer mEvents;
     std::shared_ptr<SourceBuffer> mSourceBuffer;
+    RangeCheckpointPtr mExactlyOnceCheckpoint;
 };
 
 } // namespace logtail

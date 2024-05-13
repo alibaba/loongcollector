@@ -88,7 +88,18 @@ void ProcessorSplitLogStringNative::Process(PipelineEventGroup& logGroup) {
 }
 
 bool ProcessorSplitLogStringNative::IsSupportedEvent(const PipelineEventPtr& e) const {
-    return e.Is<LogEvent>();
+    if (e.Is<LogEvent>()) {
+        return true;
+    }
+    LOG_ERROR(mContext->GetLogger(),
+              ("unexpected error", "unsupported log event")("processor", sName)("config", mContext->GetConfigName()));
+    mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
+                                   "unexpected error: unsupported log event.\tprocessor: " + sName
+                                       + "\tconfig: " + mContext->GetConfigName(),
+                                   mContext->GetProjectName(),
+                                   mContext->GetLogstoreName(),
+                                   mContext->GetRegion());
+    return false;
 }
 
 void ProcessorSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
@@ -98,19 +109,29 @@ void ProcessorSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
         newEvents.emplace_back(std::move(e));
         return;
     }
-
     LogEvent& sourceEvent = e.Cast<LogEvent>();
-    if (!sourceEvent.HasContent(mSourceKey)) {
+
+    std::string errorMsg;
+    if (sourceEvent.Size() != 1) {
+        errorMsg = "log event fields cnt does not equal to 1";
+    } else if (!sourceEvent.HasContent(mSourceKey)) {
+        errorMsg = "log event does not have content key";
+    }
+    if (!errorMsg.empty()) {
         newEvents.emplace_back(std::move(e));
+        LOG_ERROR(mContext->GetLogger(),
+                  ("unexpected error", errorMsg)("processor", sName)("config", mContext->GetConfigName()));
+        mContext->GetAlarm().SendAlarm(SPLIT_LOG_FAIL_ALARM,
+                                       "unexpected error: " + errorMsg + ".\tprocessor: " + sName
+                                           + "\tconfig: " + mContext->GetConfigName(),
+                                       mContext->GetProjectName(),
+                                       mContext->GetLogstoreName(),
+                                       mContext->GetRegion());
         return;
     }
 
     StringView sourceVal = sourceEvent.GetContent(mSourceKey);
     StringBuffer sourceKey = logGroup.GetSourceBuffer()->CopyString(mSourceKey);
-    long sourceOffset = 0L;
-    if (sourceEvent.HasContent(LOG_RESERVED_KEY_FILE_OFFSET)) {
-        sourceOffset = atol(sourceEvent.GetContent(LOG_RESERVED_KEY_FILE_OFFSET).data()); // use safer method
-    }
 
     size_t begin = 0;
     while (begin < sourceVal.size()) {
@@ -120,17 +141,18 @@ void ProcessorSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
         targetEvent->SetTimestamp(
             sourceEvent.GetTimestamp(),
             sourceEvent.GetTimestampNanosecond()); // it is easy to forget other fields, better solution?
+        auto const offset = sourceEvent.GetPosition().first + (content.data() - sourceVal.data());
+        auto const length = begin + content.size() == sourceVal.size()
+            ? sourceEvent.GetPosition().second - (content.data() - sourceVal.data())
+            : content.size() + 1;
+        targetEvent->SetPosition(offset, length);
         if (mAppendingLogPositionMeta) {
-            auto const offset = sourceOffset + (content.data() - sourceVal.data());
-            StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(std::to_string(offset));
+            StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
             targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
         }
-        if (sourceEvent.Size() > 1) { // copy other fields
-            for (const auto& kv : sourceEvent) {
-                if (kv.first != mSourceKey && kv.first != LOG_RESERVED_KEY_FILE_OFFSET) {
-                    targetEvent->SetContentNoCopy(kv.first, kv.second);
-                }
-            }
+        // TODO: remove the following code after the flusher refactorization
+        if (logGroup.GetExactlyOnceCheckpoint() != nullptr) {
+            logGroup.GetExactlyOnceCheckpoint()->positions.emplace_back(offset, content.size());
         }
         newEvents.emplace_back(std::move(targetEvent));
         begin += content.size() + 1;

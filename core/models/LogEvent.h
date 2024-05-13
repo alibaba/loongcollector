@@ -79,6 +79,12 @@ public:
     void SetContentNoCopy(StringView key, StringView val);
     void DelContent(StringView key);
 
+    void SetPosition(uint32_t offset, uint32_t size) {
+        mFileOffset = offset;
+        mRawSize = size;
+    }
+    std::pair<uint32_t, uint32_t> GetPosition() const { return {mFileOffset, mRawSize}; }
+
     bool Empty() const { return mIndex.empty(); }
     size_t Size() const { return mIndex.size(); }
 
@@ -92,7 +98,7 @@ public:
     uint64_t EventsSizeBytes() override;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    Json::Value ToJson() const override;
+    Json::Value ToJson(bool enableEventMeta = false) const override;
     bool FromJson(const Json::Value&) override;
 #endif
 
@@ -108,6 +114,8 @@ private:
     // information for backward compatability.
     ContentsContainer mContents;
     std::map<StringView, size_t> mIndex;
+    uint32_t mFileOffset = 0;
+    uint32_t mRawSize = 0;
 };
 
 } // namespace logtail

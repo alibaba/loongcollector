@@ -55,16 +55,6 @@ struct LineInfo {
     int32_t lineEnd;
     int32_t rollbackLineFeedCount;
     bool fullLine;
-    LineInfo(StringView data = StringView(),
-             int32_t lineBegin = 0,
-             int32_t lineEnd = 0,
-             int32_t rollbackLineFeedCount = 0,
-             bool fullLine = false)
-        : data(data),
-          lineBegin(lineBegin),
-          lineEnd(lineEnd),
-          rollbackLineFeedCount(rollbackLineFeedCount),
-          fullLine(fullLine) {}
 };
 
 class BaseLineParse {
@@ -184,6 +174,8 @@ public:
                                               const FileDiscoveryConfig& discoveryConfig,
                                               uint32_t exactlyonceConcurrency,
                                               bool forceFromBeginning);
+
+    static PipelineEventGroup GenerateEventGroup(LogFileReaderPtr reader, LogBuffer* logBuffer);
 
     LogFileReader(const std::string& hostLogPathDir,
                   const std::string& hostLogPathFile,
@@ -437,6 +429,8 @@ public:
 
     int64_t GetLogGroupKey() const { return mLogGroupKey; }
     FileReaderOptions::InputType GetInputType() { return mReaderConfig.first->mInputType; }
+
+    void SetEventGroupMetaAndTag(PipelineEventGroup& group);
 
 protected:
     bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool allowRollback = true);

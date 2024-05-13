@@ -765,9 +765,9 @@ void ModifyHandler::Handle(const Event& event) {
                     reader->GetLogstoreKey(), mConfigName, event, reader->GetDevInode(), curTime);
                 return;
             }
-            LogBuffer* logBuffer = new LogBuffer;
+            unique_ptr<LogBuffer> logBuffer(new LogBuffer);
             hasMoreData = reader->ReadLog(*logBuffer, &event);
-            int32_t pushRetry = PushLogToProcessor(reader, logBuffer);
+            int32_t pushRetry = PushLogToProcessor(reader, logBuffer.get());
             if (!hasMoreData) {
                 if (reader->IsFileDeleted()) {
                     LOG_INFO(sLogger,
@@ -1071,15 +1071,14 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
                                                               reader->GetFileSize(),
                                                               reader->GetLastFilePos(),
                                                               time(NULL));
-        logBuffer->SetDependecy(reader);
-        while (!LogProcess::GetInstance()->PushBuffer(logBuffer)) // 10ms
+        PipelineEventGroup group = LogFileReader::GenerateEventGroup(reader, logBuffer);
+
+        while (!LogProcess::GetInstance()->PushBuffer(reader->GetLogstoreKey(), reader->GetConfigName(), 0, std::move(group))) // 10ms
         {
             ++pushRetry;
             if (pushRetry % 10 == 0)
                 LogInput::GetInstance()->TryReadEvents(false);
         }
-    } else {
-        delete logBuffer;
     }
     return pushRetry;
 }

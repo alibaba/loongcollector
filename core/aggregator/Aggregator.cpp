@@ -12,18 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <monitor/LogFileProfiler.h>
-#include <common/Constants.h>
-#include <config_manager/ConfigManager.h>
-#include <common/StringTools.h>
-#include <common/HashUtil.h>
 #include "Aggregator.h"
-#include "common/LogtailCommonFlags.h"
-#include "sender/Sender.h"
+
 #include <app_config/AppConfig.h>
+#include <common/Constants.h>
+#include <common/HashUtil.h>
+#include <common/StringTools.h>
+#include <config_manager/ConfigManager.h>
+#include <monitor/LogFileProfiler.h>
+
 #include <numeric>
 #include <vector>
+
 #include "application/Application.h"
+#include "common/LogtailCommonFlags.h"
+#include "sender/Sender.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -203,7 +206,8 @@ bool Aggregator::Add(const std::string& projectName,
     int32_t curTime = time(NULL);
     {
         PTScopedLock lock(mMergeLock);
-        unordered_map<int64_t, PackageListMergeBuffer*>::iterator pIter = mPackageListMergeMap.find(logstoreKey);;
+        unordered_map<int64_t, PackageListMergeBuffer*>::iterator pIter = mPackageListMergeMap.find(logstoreKey);
+        ;
         unordered_map<int64_t, MergeItem*>::iterator itr = mMergeMap.find(logGroupKey);
         MergeItem* value = NULL;
         // for mergeType: LOGSTORE, value is always new
@@ -222,13 +226,10 @@ bool Aggregator::Add(const std::string& projectName,
         bool mergeFinishedFlag = false, initFlag = false;
         for (int32_t logIdx = 0; logIdx < logSize; logIdx++) {
             if (neededIdx < neededLogSize && logIdx == neededLogs[neededIdx]) {
-                // TODO: enforce exactly once to send all logs in one shot, because we do not calc offset and length
-                // correctly for each log, especially in GBK encoding mode
                 if (value == NULL
-                    || (!context.mExactlyOnceCheckpoint
-                        && (value->mLines > logCountMin || value->mRawBytes > logGroupByteMin
-                            || (curTime - value->mLastUpdateTime) >= INT32_FLAG(batch_send_interval)
-                            || ((value->mLogGroup).logs(0).time() / 60 != (*(mutableLogPtr + logIdx))->time() / 60)))) {
+                    || (value->mLines > logCountMin || value->mRawBytes > logGroupByteMin
+                        || (curTime - value->mLastUpdateTime) >= INT32_FLAG(batch_send_interval)
+                        || ((value->mLogGroup).logs(0).time() / 60 != (*(mutableLogPtr + logIdx))->time() / 60))) {
                     // value is not NULL, log group merging finished
                     if (value != NULL) {
                         if (context.mMarkOffsetFlag) {
@@ -291,7 +292,7 @@ bool Aggregator::Add(const std::string& projectName,
                     if (mergeType != FlusherSLS::Batch::MergeType::LOGSTORE) {
                         itr->second = value;
                     }
-                    
+
                     (value->mLogGroup).mutable_logs()->Reserve(INT32_FLAG(merge_log_count_limit));
                     (value->mLogGroup).set_category(category);
                     (value->mLogGroup).set_topic(topic);
@@ -310,6 +311,7 @@ bool Aggregator::Add(const std::string& projectName,
 
                 (value->mLogGroup).mutable_logs()->AddAllocated(*(mutableLogPtr + logIdx));
                 if (context.mExactlyOnceCheckpoint) {
+                    // TODO: for GBK, position is not correct
                     auto& logPosition = context.mExactlyOnceCheckpoint->positions[logIdx];
                     auto& cpt = value->mLogGroupContext.mExactlyOnceCheckpoint->data;
 
@@ -342,7 +344,7 @@ bool Aggregator::Add(const std::string& projectName,
         for (int32_t logIdx = 0; logIdx < logSize; logIdx++) {
             logGroup.mutable_logs()->ReleaseLast();
         }
-        
+
         if (mergeType == FlusherSLS::Batch::MergeType::LOGSTORE) {
             pIter->second->AddMergeItem(value);
             if (pIter->second->IsReady(curTime) || Application::GetInstance()->IsExiting()) {
@@ -358,7 +360,8 @@ bool Aggregator::Add(const std::string& projectName,
                 mPackageListMergeMap.erase(pIter);
             }
         } else {
-            if (value != NULL && (value->IsReady() || Application::GetInstance()->IsExiting() || context.mExactlyOnceCheckpoint)) {
+            if (value != NULL
+                && (value->IsReady() || Application::GetInstance()->IsExiting() || context.mExactlyOnceCheckpoint)) {
                 sendDataVec.push_back(value);
                 if (itr != mMergeMap.end()) {
                     mMergeMap.erase(itr);
@@ -367,9 +370,9 @@ bool Aggregator::Add(const std::string& projectName,
         }
     }
 
-    #ifdef APSARA_UNIT_TEST_MAIN
-        mSendVectorSize = sendDataVec.size();
-    #endif
+#ifdef APSARA_UNIT_TEST_MAIN
+    mSendVectorSize = sendDataVec.size();
+#endif
 
     if (sendDataVec.size() > 0) {
         // if send data package count greater than INT32_FLAG(same_topic_merge_send_count), there will be many little

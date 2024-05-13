@@ -85,7 +85,7 @@ set(SUB_DIRECTORIES_LIST
         aggregator application app_config checkpoint common config config/provider config/watcher config_manager config_server_pb 
         container_manager controller event event_handler event_listener file_server flusher go_pipeline helper input log_pb logger 
         models monitor parser pipeline plugin plugin/creator plugin/instance plugin/interface polling processor processor/daemon processor/inner
-        profile_sender reader sdk sender sls_control fuse
+        profile_sender queue reader sdk sender sls_control fuse
         )
 if (LINUX)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer spl)

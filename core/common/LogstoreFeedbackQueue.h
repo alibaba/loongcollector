@@ -74,13 +74,11 @@ protected:
 template <class TT, class PARAM>
 class SingleLogstoreFeedbackQueue {
 public:
-    SingleLogstoreFeedbackQueue() : mArray(NULL), mType(QueueType::Normal) {
+    SingleLogstoreFeedbackQueue() : mType(QueueType::Normal) {
         ResetParam(PARAM::GetInstance()->GetLowSize(),
                    PARAM::GetInstance()->GetHighSize(),
                    PARAM::GetInstance()->GetMaxSize());
     }
-
-    ~SingleLogstoreFeedbackQueue() { free(mArray); }
 
     SingleLogstoreFeedbackQueue(const SingleLogstoreFeedbackQueue& que) = delete;
     SingleLogstoreFeedbackQueue& operator=(const SingleLogstoreFeedbackQueue&) = delete;
@@ -97,11 +95,8 @@ public:
         HIGH_SIZE = highSize;
         SIZE = maxSize;
 
-        if (mArray != NULL) {
-            free(mArray);
-        }
-        mArray = (TT*)malloc(SIZE * sizeof(TT));
-        memset(mArray, 0, SIZE * sizeof(TT));
+        mArray.resize(SIZE);
+        mArray.clear();
         Reset();
     }
 
@@ -130,6 +125,20 @@ public:
         return true;
     }
 
+    bool PushItem(TT&& item) {
+        if (IsFull()) {
+            return false;
+        }
+
+        mArray[mWrite % SIZE] = std::move(item);
+        ++mWrite;
+        ++mSize;
+        if (mSize == HIGH_SIZE) {
+            mValid = false;
+        }
+        return true;
+    }
+
     // Pop an item from queue.
     //
     // @return:
@@ -142,7 +151,7 @@ public:
         }
 
         int rst = 1;
-        item = mArray[mRead % SIZE];
+        item = std::move(mArray[mRead % SIZE]);
         ++mRead;
         if (--mSize == LOW_SIZE && !mValid) {
             mValid = true;
@@ -160,7 +169,7 @@ protected:
     size_t HIGH_SIZE;
     size_t SIZE;
 
-    TT* mArray;
+    std::vector<TT> mArray;
     volatile bool mValid;
     volatile uint64_t mWrite;
     volatile uint64_t mRead;
@@ -245,12 +254,12 @@ public:
         return singleQueue.IsValid();
     }
 
-    bool PushItem(const LogstoreFeedBackKey& key, const T& item) {
+    bool PushItem(const LogstoreFeedBackKey& key, T&& item) {
         {
             PTScopedLock dataLock(mLock);
             SingleLogStoreQueue& singleQueue = mLogstoreQueueMap[key];
 
-            if (!singleQueue.PushItem(item)) {
+            if (!singleQueue.PushItem(std::forward<T>(item))) {
                 return false;
             }
         }

@@ -165,7 +165,7 @@ public:
         return sb;
     }
     StringBuffer CopyString(const std::string& s) { return CopyString(s.data(), s.length()); }
-    StringBuffer CopyString(const StringView& s) { return CopyString(s.data(), s.length()); }
+    StringBuffer CopyString(StringView s) { return CopyString(s.data(), s.length()); }
 
 private:
     BufferAllocator mAllocator;
