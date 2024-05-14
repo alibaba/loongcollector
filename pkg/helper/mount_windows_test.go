@@ -59,6 +59,14 @@ func TestGetMountedFilePath(t *testing.T) {
 			filePath:            "E:\\any_path\\xxx\\containers\\id\\id.json",
 			outFilePath:         "C:\\path\\docker\\containers\\id\\id.json",
 		},
+		// containerd
+		{
+			dockerInstallPath:   "",
+			dockerDataMountPath: "",
+			logtailMountPath:    "C:\\logtail_host",
+			filePath:            "\\var\\logs\\pods\\xxx\\0.log",
+			outFilePath:         "\\var\\logs\\pods\\xxx\\0.log",
+		},
 	}
 
 	for _, c := range testCases {

@@ -12,16 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-// +build linux
-
 package helper
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"path"
@@ -45,8 +41,6 @@ const (
 	kubeRuntimeAPIVersion = "0.1.0"
 	maxMsgSize            = 1024 * 1024 * 16
 )
-
-var containerdUnixSocket = "/run/containerd/containerd.sock"
 
 var criRuntimeWrapper *CRIRuntimeWrapper
 
@@ -90,7 +84,7 @@ func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
 }
 
 func IsCRIStatusValid(criRuntimeEndpoint string) bool {
-	addr, dailer, err := GetAddressAndDialer("unix://" + criRuntimeEndpoint)
+	addr, dailer, err := GetAddressAndDialer(criRuntimeEndpoint)
 	if err != nil {
 		return false
 	}
@@ -134,23 +128,6 @@ func IsCRIStatusValid(criRuntimeEndpoint string) bool {
 	return false
 }
 
-// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
-	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, "unix")
-	if err != nil {
-		return "", nil, err
-	}
-	if protocol != "unix" {
-		return "", nil, fmt.Errorf("only support unix socket endpoint")
-	}
-
-	return addr, dial, nil
-}
-
-func dial(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout("unix", addr, timeout)
-}
-
 func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {
 	if protocol, addr, err = parseEndpoint(endpoint); err != nil && protocol == "" {
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
@@ -184,7 +161,7 @@ func parseEndpoint(endpoint string) (string, string, error) {
 }
 
 func newRuntimeServiceClient() (cri.RuntimeServiceClient, error) {
-	addr, dailer, err := GetAddressAndDialer("unix://" + containerdUnixSocket)
+	addr, dailer, err := GetAddressAndDialer(containerdUnixSocket)
 	if err != nil {
 		return nil, err
 	}

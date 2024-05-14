@@ -70,6 +70,8 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [go.opentelemetry.io/otel](https://pkg.go.dev/go.opentelemetry.io/otel?tab=licenses)
 - [go.opentelemetry.io/otel/trace](https://pkg.go.dev/go.opentelemetry.io/otel/trace?tab=licenses)
 - [sigs.k8s.io/json](https://pkg.go.dev/sigs.k8s.io/json?tab=licenses)
+- [go.opencensus.io](https://pkg.go.dev/go.opencensus.io?tab=licenses)
+- [github.com/golang/groupcache](https://pkg.go.dev/github.com/golang/groupcache?tab=licenses)
 
 ## BSD licenses
 
