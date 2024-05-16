@@ -16,16 +16,18 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
 #include <ctime>
 #include <map>
 #include <memory>
 #include <string>
 
-#include "models/StringView.h"
 #include "common/memory/SourceBuffer.h"
+#include "models/StringView.h"
+
+#ifdef APSARA_UNIT_TEST_MAIN
+#include <json/json.h>
+#endif
 
 namespace logtail {
 
@@ -34,7 +36,7 @@ class PipelineEventGroup;
 class PipelineEvent {
 public:
     enum class Type { NONE, LOG, METRIC, SPAN };
-    
+
     virtual ~PipelineEvent() = default;
 
     Type GetType() const { return mType; }

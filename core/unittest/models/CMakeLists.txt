@@ -21,6 +21,12 @@ target_link_libraries(pipeline_event_unittest unittest_base)
 add_executable(log_event_unittest LogEventUnittest.cpp)
 target_link_libraries(log_event_unittest unittest_base)
 
+add_executable(metric_value_unittest MetricValueUnittest.cpp)
+target_link_libraries(metric_value_unittest unittest_base)
+
+add_executable(metric_event_unittest MetricEventUnittest.cpp)
+target_link_libraries(metric_event_unittest unittest_base)
+
 add_executable(pipeline_event_ptr_unittest PipelineEventPtrUnittest.cpp)
 target_link_libraries(pipeline_event_ptr_unittest unittest_base)
 
@@ -30,6 +36,8 @@ target_link_libraries(pipeline_event_group_unittest unittest_base)
 include(GoogleTest)
 gtest_discover_tests(pipeline_event_unittest)
 gtest_discover_tests(log_event_unittest)
+gtest_discover_tests(metric_value_unittest)
+gtest_discover_tests(metric_event_unittest)
 gtest_discover_tests(pipeline_event_ptr_unittest)
 gtest_discover_tests(pipeline_event_group_unittest)
 

@@ -363,9 +363,13 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                         "type": 1
                     },
                     {
+                        "name": "",
                         "timestamp": 0,
                         "timestampNanosecond": 0,
-                        "type": 2
+                        "type": 2,
+                        "value": {
+                            "type": "unknown"
+                        }
                     },
                     {
                         "contents": {
@@ -463,9 +467,13 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                         "type": 1
                     },
                     {
+                        "name": "",
                         "timestamp": 0,
                         "timestampNanosecond": 0,
-                        "type": 2
+                        "type": 2,
+                        "value": {
+                            "type": "unknown"
+                        }
                     },
                     {
                         "contents": {
@@ -516,9 +524,13 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
             expectJson << R"({
                 "events": [
                     {
+                        "name": "",
                         "timestamp": 0,
                         "timestampNanosecond": 0,
-                        "type": 2
+                        "type": 2,
+                        "value": {
+                            "type": "unknown"
+                        }
                     },
                     {
                         "contents": {
@@ -1398,9 +1410,13 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
             expectJson << R"({
                 "events": [
                     {
+                        "name": "",
                         "timestamp": 0,
                         "timestampNanosecond": 0,
-                        "type": 2
+                        "type": 2,
+                        "value": {
+                            "type": "unknown"
+                        }
                     },
                     {
                         "contents" :
@@ -1538,9 +1554,13 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
                         "type" : 1
                     },
                     {
+                        "name": "",
                         "timestamp": 0,
                         "timestampNanosecond": 0,
-                        "type": 2
+                        "type": 2,
+                        "value": {
+                            "type": "unknown"
+                        }
                     },
                     {
                         "contents" :
@@ -1675,9 +1695,13 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
                         "type" : 1
                     },
                     {
+                        "name": "",
                         "timestamp": 0,
                         "timestampNanosecond": 0,
-                        "type": 2
+                        "type": 2,
+                        "value": {
+                            "type": "unknown"
+                        }
                     },
                     {
                         "contents" :
@@ -1801,9 +1825,13 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
                         "type" : 1
                     },
                     {
+                        "name": "",
                         "timestamp": 0,
                         "timestampNanosecond": 0,
-                        "type": 2
+                        "type": 2,
+                        "value": {
+                            "type": "unknown"
+                        }
                     },
                     {
                         "contents" :
