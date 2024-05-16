@@ -5,7 +5,7 @@ ARG TARGETPLATFORM
 RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz -o goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz && \
     tar -xzf goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz
 
-RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.linux-${TARGETPLATFORM##*/}-2.0.1.tar.gz -o ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz && \
+RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.linux-${TARGETPLATFORM##*/}-2.0.2.tar.gz -o ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz && \
     mkdir ilogtail-deps &&\
     tar -xzvf ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz -C ilogtail-deps --strip-components 1
 
@@ -23,6 +23,7 @@ COPY --from=dep-build ilogtail-deps /opt/logtail/deps
 # install spl deps
 COPY --from=dep-build ilogtail-spl /opt/logtail_spl
 
+RUN cp /opt/logtail/deps/lib/*proto* /opt/rh/devtoolset-9/root/usr/lib/
 
 ARG USERNAME=admin
 ARG USER_UID=500

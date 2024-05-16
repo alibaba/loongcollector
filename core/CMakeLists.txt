@@ -30,6 +30,7 @@ option(ENABLE_ENTERPRISE "enable enterprise feature")
 cmake_dependent_option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF "LINUX" OFF)
 cmake_dependent_option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF "LINUX" OFF)
 option(WITHOUTGDB "Build Logtail without gdb")
+option(WITHOUTSPL "Build Logtail and UT without SPL")
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
 
 if (ENABLE_ENTERPRISE)
@@ -39,6 +40,10 @@ if (ENABLE_ENTERPRISE)
 else ()
     include(${CMAKE_CURRENT_SOURCE_DIR}/options.cmake)
 endif ()
+
+if (WITHOUTSPL)
+    add_definitions(-D__EXCLUDE_SPL__)
+endif()
 
 # Default C/CXX flags.
 if (UNIX)
@@ -88,7 +93,10 @@ set(SUB_DIRECTORIES_LIST
         profile_sender queue reader sdk sender sls_control fuse
         )
 if (LINUX)
-    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer spl)
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer)
+    if (NOT WITHOUTSPL)
+        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} spl)
+    endif()
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong streamlog)
     endif()
