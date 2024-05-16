@@ -94,19 +94,33 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         }
 
         // Endpoint
-        if (!GetMandatoryStringParam(config, "Endpoint", mEndpoint, errorMsg)) {
-            PARAM_ERROR_RETURN(mContext->GetLogger(),
-                               mContext->GetAlarm(),
-                               errorMsg,
-                               sName,
-                               mContext->GetConfigName(),
-                               mContext->GetProjectName(),
-                               mContext->GetLogstoreName(),
-                               mContext->GetRegion());
-        }
-        mEndpoint = TrimString(mEndpoint);
-        if (!mEndpoint.empty()) {
-            Sender::Instance()->AddEndpointEntry(mRegion, StandardizeEndpoint(mEndpoint, mEndpoint));
+#ifdef __ENTERPRISE__
+        if (!GetOptionalStringParam(config, "Endpoint", mEndpoint, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        } else {
+#else
+    if (!GetMandatoryStringParam(config, "Endpoint", mEndpoint, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    } else {
+#endif
+            mEndpoint = TrimString(mEndpoint);
+            if (!mEndpoint.empty()) {
+                Sender::Instance()->AddEndpointEntry(mRegion, StandardizeEndpoint(mEndpoint, mEndpoint));
+            }
         }
 #ifdef __ENTERPRISE__
     }
