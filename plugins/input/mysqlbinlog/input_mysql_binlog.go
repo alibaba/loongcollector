@@ -23,8 +23,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/juju/errors"
-	"github.com/siddontang/go-mysql/replication"
+	"github.com/go-mysql-org/go-mysql/replication"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -66,7 +65,7 @@ func (b *InputMysqlBinlog) getBinLogPath(indexDir, binlogFilename string) string
 func (b *InputMysqlBinlog) skipToEndFile(path string) (int, error) {
 	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
-		return 0, errors.Trace(err)
+		return 0, err
 	}
 	defer func(f *os.File) {
 		_ = f.Close()
@@ -74,9 +73,9 @@ func (b *InputMysqlBinlog) skipToEndFile(path string) (int, error) {
 
 	buf := make([]byte, 4)
 	if _, err = f.Read(buf); err != nil {
-		return 0, errors.Trace(err)
+		return 0, err
 	} else if !bytes.Equal(buf, replication.BinLogFileHeader) {
-		return 0, errors.Errorf("%s is not a valid binlog file, head 4 bytes must fe'bin' ", path)
+		return 0, fmt.Errorf("%s is not a valid binlog file, head 4 bytes must fe'bin' ", path)
 	}
 
 	offset := 4
@@ -88,7 +87,7 @@ func (b *InputMysqlBinlog) skipToEndFile(path string) (int, error) {
 		if _, err = io.ReadFull(f, headBuf); err == io.EOF {
 			return offset, nil
 		} else if err != nil {
-			return 0, errors.Trace(err)
+			return 0, err
 		}
 		err := h.Decode(headBuf)
 		if err != nil {
@@ -96,7 +95,7 @@ func (b *InputMysqlBinlog) skipToEndFile(path string) (int, error) {
 		}
 
 		if h.EventSize <= uint32(replication.EventHeaderSize) {
-			return 0, errors.Errorf("invalid event header, event size is %d, too small", h.EventSize)
+			return 0, fmt.Errorf("invalid event header, event size is %d, too small", h.EventSize)
 		}
 
 		rst, err := f.Seek(int64(h.EventSize)-int64(replication.EventHeaderSize), os.SEEK_CUR)

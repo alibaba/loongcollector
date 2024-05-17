@@ -25,11 +25,11 @@ make check-dependency-licenses
 
 ```go
 require (
-    github.com/siddontang/go-mysql v0.0.0
+    github.com/VictoriaMetrics/metrics v1.23.0
 )
 
 replace (
-    github.com/siddontang/go-mysql => github.com/iLogtail/go-mysql v0.0.0-20180725024449-535abe8f2eba-ilogtail
+    github.com/VictoriaMetrics/metrics => github.com/iLogtail/metrics v1.23.0-ilogtail
 )
 ```
 
@@ -40,8 +40,7 @@ replace (
 ```go
 ## iLogtail used or modified source code from these projects
 - [github.com/iLogtail/VictoriaMetrics fork from github.com/VictoriaMetrics/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics) based on Apache-2.0
-- [github.com/iLogtail/go-mysql fork from github.com/siddontang/go-mysql](http://github.com/iLogtail/go-mysql) based on MIT
-
+- [github.com/iLogtail/metrics fork from github.com/VictoriaMetrics/metrics](http://github.com/iLogtail/metrics) based on MIT
 ```
 
 ### 建议
