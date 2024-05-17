@@ -27,6 +27,7 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/GlobalConfig.h"
+#include "queue/FeedbackQueueKey.h"
 
 namespace logtail {
 
@@ -64,6 +65,8 @@ public:
     bool InitGlobalConfig(const Json::Value& config, Json::Value& extendedParams) {
         return mGlobalConfig.Init(config, *this, extendedParams);
     }
+    void SetProcessQueueKey(QueueKey key) { mProcessQueueKey = key; }
+    QueueKey GetProcessQueueKey() const { return mProcessQueueKey; }
     const Pipeline& GetPipeline() const { return *mPipeline; }
     Pipeline& GetPipeline() { return *mPipeline; }
     void SetPipeline(Pipeline& pipeline) { mPipeline = &pipeline; }
@@ -90,6 +93,7 @@ private:
     std::string mConfigName;
     uint32_t mCreateTime;
     GlobalConfig mGlobalConfig;
+    QueueKey mProcessQueueKey = -1;
     Pipeline* mPipeline = nullptr;
 
     const FlusherSLS* mSLSInfo = nullptr;

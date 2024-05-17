@@ -15,20 +15,22 @@
  */
 
 #pragma once
-#include <unordered_map>
-#include <string>
-#include <vector>
-#include <iostream>
 #include <atomic>
-#include "common/LogstoreSenderQueue.h"
-#include "common/WaitObject.h"
-#include "common/Lock.h"
-#include "common/Thread.h"
-#include "sdk/Closure.h"
-#include "log_pb/sls_logs.pb.h"
-#include "log_pb/logtail_buffer_meta.pb.h"
-#include "aggregator/Aggregator.h"
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "SenderQueueParam.h"
+#include "aggregator/Aggregator.h"
+#include "common/Lock.h"
+#include "common/LogstoreSenderQueue.h"
+#include "common/Thread.h"
+#include "common/WaitObject.h"
+#include "log_pb/logtail_buffer_meta.pb.h"
+#include "log_pb/sls_logs.pb.h"
+#include "sdk/Closure.h"
+#include "common/LogstoreFeedbackQueue.h"
 
 namespace logtail {
 
@@ -437,8 +439,8 @@ public:
                           const std::string& endpoint,
                           bool isDefault = false,
                           bool isProxy = false);
-    LogstoreFeedBackInterface* GetSenderFeedBackInterface();
-    void SetFeedBackInterface(LogstoreFeedBackInterface* pProcessInterface);
+    FeedbackInterface* GetSenderFeedBackInterface();
+    void SetFeedBackInterface(FeedbackInterface* pProcessInterface);
     void OnSendDone(LoggroupTimeValue* mDataPtr, LogstoreSenderInfo::SendResult sendRst);
 
     bool IsFlush();
@@ -500,6 +502,8 @@ public:
 
     const std::string& GetDefaultRegion() const;
     void SetDefaultRegion(const std::string& region);
+
+    SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue(QueueKey key);
 
     friend class SendClosure;
 

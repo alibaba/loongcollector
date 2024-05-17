@@ -13,12 +13,12 @@
 // limitations under the License.
 
 #include "LogstoreFeedbackKey.h"
-#include "QueueManager.h"
+#include "queue/QueueKeyManager.h"
 
 namespace logtail {
 
 LogstoreFeedBackKey GenerateLogstoreFeedBackKey(const std::string& project, const std::string& logStore) {
-    return QueueManager::GetInstance()->GenerateFeedBackKey(project, logStore);
+    return QueueKeyManager::GetInstance()->GetKey(project + "-" +logStore);
 }
 
 } // namespace logtail

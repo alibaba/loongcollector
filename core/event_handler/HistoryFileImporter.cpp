@@ -14,6 +14,7 @@
 
 #include "HistoryFileImporter.h"
 
+#include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/Thread.h"
@@ -21,6 +22,7 @@
 #include "config_manager/ConfigManager.h"
 #include "logger/Logger.h"
 #include "processor/daemon/LogProcess.h"
+#include "queue/ProcessQueueManager.h"
 #include "reader/LogFileReader.h"
 #include "app_config/AppConfig.h"
 
@@ -103,7 +105,7 @@ void HistoryFileImporter::ProcessEvent(const HistoryFileEvent& event, const std:
 
         bool doneFlag = false;
         while (true) {
-            while (!logProcess->IsValidToReadLog(readerSharePtr->GetLogstoreKey())) {
+            while (!ProcessQueueManager::GetInstance()->IsValidToPush(readerSharePtr->GetQueueKey())) {
                 usleep(1000 * 10);
             }
             std::unique_ptr<LogBuffer> logBuffer(new LogBuffer);
@@ -114,8 +116,7 @@ void HistoryFileImporter::ProcessEvent(const HistoryFileEvent& event, const std:
                 PipelineEventGroup group = LogFileReader::GenerateEventGroup(readerSharePtr, logBuffer.get());
                 
                 // TODO: currently only 1 input is allowed, so we assume 0 here. It should be the actual input seq after refactorization.
-                logProcess->PushBuffer(
-                    readerSharePtr->GetLogstoreKey(), readerSharePtr->GetConfigName(), 0, std::move(group), 100000000);
+                logProcess->PushBuffer(readerSharePtr->GetQueueKey(), 0, std::move(group), 100000000);
             } else {
                 // when ReadLog return false, retry once
                 if (doneFlag) {

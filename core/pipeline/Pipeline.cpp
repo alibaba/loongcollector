@@ -23,6 +23,7 @@
 #include "common/ParamExtractor.h"
 #include "flusher/FlusherSLS.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/PluginRegistry.h"
 #include "processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "processor/ProcessorParseApsaraNative.h"
@@ -30,7 +31,8 @@
 #include "processor/inner/ProcessorSplitLogStringNative.h"
 #include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "processor/inner/ProcessorTagNative.h"
-#include "processor/daemon/LogProcess.h"
+#include "queue/ProcessQueueManager.h"
+#include "queue/QueueKeyManager.h"
 
 // for special treatment
 #include "file_server/MultilineOptions.h"
@@ -171,6 +173,8 @@ bool Pipeline::Init(Config&& config) {
     // for special treatment below
     const InputFile* inputFile = nullptr;
     const InputContainerStdio* inputContainerStdio = nullptr;
+    bool hasFlusherSLS = false;
+    
 #ifdef __ENTERPRISE__
     // to send alarm before flusherSLS is built, a temporary object is made, which will be overriden shortly after.
     unique_ptr<FlusherSLS> SLSTmp = unique_ptr<FlusherSLS>(new FlusherSLS());
@@ -274,6 +278,7 @@ bool Pipeline::Init(Config&& config) {
                 }
             }
             if (name == FlusherSLS::sName) {
+                hasFlusherSLS = true;
                 mContext.SetSLSInfo(static_cast<const FlusherSLS*>(mFlushers[0]->GetPlugin()));
             }
         } else {
@@ -315,19 +320,32 @@ bool Pipeline::Init(Config&& config) {
             = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
     }
 
-    // special treatment
-    const GlobalConfig& global = mContext.GetGlobalConfig();
-    if (global.mProcessPriority > 0) {
-        LogProcess::GetInstance()->SetPriorityWithHoldOn(mContext.GetLogstoreKey(), global.mProcessPriority);
-    } else {
-        LogProcess::GetInstance()->DeletePriorityWithHoldOn(mContext.GetLogstoreKey());
-    }
-
+    // special treatment for exactly once
     if (inputFile && inputFile->mExactlyOnceConcurrency > 0) {
+        if (mInputs.size() > 1) {
+            PARAM_ERROR_RETURN(mContext.GetLogger(),
+                               mContext.GetAlarm(),
+                               "exactly once enabled when input other than input_file is given",
+                               noModule,
+                               mName,
+                               mContext.GetProjectName(),
+                               mContext.GetLogstoreName(),
+                               mContext.GetRegion());
+        }
+        if (mFlushers.size() > 1 || !hasFlusherSLS) {
+            PARAM_ERROR_RETURN(mContext.GetLogger(),
+                               mContext.GetAlarm(),
+                               "exactly once enabled when flusher other than flusher_sls is given",
+                               noModule,
+                               mName,
+                               mContext.GetProjectName(),
+                               mContext.GetLogstoreName(),
+                               mContext.GetRegion());
+        }
         if (IsFlushingThroughGoPipeline()) {
             PARAM_ERROR_RETURN(mContext.GetLogger(),
                                mContext.GetAlarm(),
-                               "exactly once enabled when not in native mode exist",
+                               "exactly once enabled when not in native mode",
                                noModule,
                                mName,
                                mContext.GetProjectName(),
@@ -353,23 +371,57 @@ bool Pipeline::Init(Config&& config) {
     }
 #endif
 
+    // Process queue, not generated when exactly once is enabled
+    if (!inputFile || inputFile->mExactlyOnceConcurrency == 0) {
+        if (mContext.GetProcessQueueKey() == -1) {
+            mContext.SetProcessQueueKey(QueueKeyManager::GetInstance()->GetKey(mName));
+        }
+        uint32_t priority = mContext.GetGlobalConfig().mProcessPriority == 0
+            ? ProcessQueueManager::sMaxPriority
+            : mContext.GetGlobalConfig().mProcessPriority - 1;
+        ProcessQueueManager::GetInstance()->CreateOrUpdateQueue(mContext.GetProcessQueueKey(), priority);
+
+        unordered_set<FeedbackInterface*> feedbackSet;
+        for (const auto& input : mInputs) {
+            FeedbackInterface* feedback
+                = InputFeedbackInterfaceRegistry::GetInstance()->GetFeedbackInterface(input->Name());
+            if (feedback != nullptr) {
+                feedbackSet.insert(feedback);
+            }
+        }
+        vector<FeedbackInterface*> feedbacks(feedbackSet.begin(), feedbackSet.end());
+        ProcessQueueManager::GetInstance()->SetFeedbackInterface(mContext.GetProcessQueueKey(), feedbacks);
+
+        vector<SingleLogstoreSenderManager<SenderQueueParam>*> senderQueues;
+        for (const auto& flusher : mFlushers) {
+            senderQueues.push_back(flusher->GetSenderQueue());
+        }
+        ProcessQueueManager::GetInstance()->SetDownStreamQueues(mContext.GetProcessQueueKey(), senderQueues);
+    }
+
     return true;
 }
+
 void Pipeline::Start() {
     // TODO: 应该保证指定时间内返回，如果无法返回，将配置放入startDisabled里
     for (const auto& flusher : mFlushers) {
         flusher->Start();
     }
+
     if (!mGoPipelineWithoutInput.isNull()) {
         // TODO: 加载该Go流水线
     }
+
     // TODO: 启用Process中改流水线对应的输入队列
+
     if (!mGoPipelineWithInput.isNull()) {
         // TODO: 加载该Go流水线
     }
+
     for (const auto& input : mInputs) {
         input->Start();
     }
+
     LOG_INFO(sLogger, ("pipeline start", "succeeded")("config", mName));
 }
 
@@ -384,17 +436,27 @@ void Pipeline::Stop(bool isRemoving) {
     for (const auto& input : mInputs) {
         input->Stop(isRemoving);
     }
+
     if (!mGoPipelineWithInput.isNull()) {
         // TODO: 卸载该Go流水线
     }
+
     // TODO: 禁用Process中改流水线对应的输入队列
+
     if (!mGoPipelineWithoutInput.isNull()) {
         // TODO: 卸载该Go流水线
     }
+
     for (const auto& flusher : mFlushers) {
         flusher->Stop(isRemoving);
     }
+
     LOG_INFO(sLogger, ("pipeline stop", "succeeded")("config", mName));
+}
+
+void Pipeline::RemoveProcessQueue() const {
+    ProcessQueueManager::GetInstance()->DeleteQueue(mContext.GetProcessQueueKey());
+    QueueKeyManager::GetInstance()->RemoveKey(mContext.GetProcessQueueKey());
 }
 
 void Pipeline::MergeGoPipeline(const Json::Value& src, Json::Value& dst) {

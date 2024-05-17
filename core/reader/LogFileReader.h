@@ -39,6 +39,7 @@
 #include "models/StringView.h"
 #include "rapidjson/allocators.h"
 #include "reader/FileReaderOptions.h"
+#include "queue/FeedbackQueueKey.h"
 
 namespace logtail {
 
@@ -379,6 +380,8 @@ public:
         mExtraTags.insert(mExtraTags.end(), tags.begin(), tags.end());
     }
 
+    QueueKey GetQueueKey() const { return mReaderConfig.second->GetProcessQueueKey();}
+
     // void SetDelaySkipBytes(int64_t value) { mReadDelaySkipBytes = value; }
 
     // void SetFuseMode(bool fusemode) { mIsFuseMode = fusemode; }
@@ -537,7 +540,7 @@ private:
     // Initialized when the exactly once feature is enabled.
     struct ExactlyOnceOption {
         std::string primaryCheckpointKey;
-        LogstoreFeedBackKey fbKey;
+        QueueKey fbKey;
         PrimaryCheckpointPB primaryCheckpoint;
         std::vector<RangeCheckpointPtr> rangeCheckpointPtrs;
 

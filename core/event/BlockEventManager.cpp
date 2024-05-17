@@ -17,12 +17,13 @@
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
 #include "polling/PollingEventQueue.h"
+#include "queue/ProcessQueueManager.h"
 
 DEFINE_FLAG_INT32(max_block_event_timeout, "max block event timeout, seconds", 3);
 
 namespace logtail {
 
-void BlockedEventManager::UpdateBlockEvent(const LogstoreFeedBackKey& logstoreKey,
+void BlockedEventManager::UpdateBlockEvent(QueueKey logstoreKey,
                                            const std::string& configName,
                                            const Event& event,
                                            const DevInode& devInode,
@@ -56,12 +57,11 @@ void BlockedEventManager::UpdateBlockEvent(const LogstoreFeedBackKey& logstoreKe
 
 void BlockedEventManager::GetTimeoutEvent(std::vector<Event*>& eventVec, int32_t curTime) {
     ScopedSpinLock lock(mLock);
-    LogProcess* pProcess = LogProcess::GetInstance();
     for (std::unordered_map<int64_t, BlockedEvent>::iterator iter = mBlockEventMap.begin();
          iter != mBlockEventMap.end();) {
         BlockedEvent& blockedEvent = iter->second;
         if (blockedEvent.mEvent != NULL && blockedEvent.mInvalidTime + blockedEvent.mTimeout <= curTime) {
-            if (pProcess->IsValidToReadLog(blockedEvent.mLogstoreKey)) {
+            if (ProcessQueueManager::GetInstance()->IsValidToPush(blockedEvent.mQueueKey)) {
                 eventVec.push_back(blockedEvent.mEvent);
                 // LOG_DEBUG(sLogger, ("Get timeout block event  ",
                 // blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(),
@@ -76,7 +76,7 @@ void BlockedEventManager::GetTimeoutEvent(std::vector<Event*>& eventVec, int32_t
     }
 }
 
-void BlockedEventManager::FeedBack(const LogstoreFeedBackKey& key) {
+void BlockedEventManager::Feedback(int64_t key) {
     // LOG_DEBUG(sLogger, ("Get feedback block event  ", key));
     std::vector<Event*> eventVec;
     {
@@ -84,7 +84,7 @@ void BlockedEventManager::FeedBack(const LogstoreFeedBackKey& key) {
         for (std::unordered_map<int64_t, BlockedEvent>::iterator iter = mBlockEventMap.begin();
              iter != mBlockEventMap.end();) {
             BlockedEvent& blockedEvent = iter->second;
-            if (blockedEvent.mEvent != NULL && blockedEvent.mLogstoreKey == key) {
+            if (blockedEvent.mEvent != NULL && blockedEvent.mQueueKey == key) {
                 eventVec.push_back(blockedEvent.mEvent);
                 // LOG_DEBUG(sLogger, ("Get feedback block event  ",
                 // blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(),

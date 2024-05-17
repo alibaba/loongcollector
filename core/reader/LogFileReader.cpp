@@ -51,6 +51,9 @@
 #include "monitor/LogtailAlarm.h"
 #include "processor/inner/ProcessorParseContainerLogNative.h"
 #include "rapidjson/document.h"
+#include "queue/ExactlyOnceQueueManager.h"
+#include "queue/ProcessQueueManager.h"
+#include "queue/QueueKeyManager.h"
 #include "reader/JsonLogFileReader.h"
 #include "sdk/Common.h"
 #include "sender/Sender.h"
@@ -421,10 +424,10 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
     }
 
     // Initialize feedback queues.
-    mEOOption->fbKey = QueueManager::GetInstance()->InitializeExactlyOnceQueues(
-        GetProject(),
-        mEOOption->primaryCheckpointKey + mEOOption->rangeCheckpointPtrs[0]->data.hash_key(),
-        mEOOption->rangeCheckpointPtrs);
+    mEOOption->fbKey = QueueKeyManager::GetInstance()->GetKey(GetProject() + "-" + mEOOption->primaryCheckpointKey
+                                                              + mEOOption->rangeCheckpointPtrs[0]->data.hash_key());
+    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(
+        mEOOption->fbKey, ProcessQueueManager::sMaxPriority, mConfigName, mEOOption->rangeCheckpointPtrs);
     for (auto& cpt : mEOOption->rangeCheckpointPtrs) {
         cpt->fbKey = mEOOption->fbKey;
     }
@@ -1057,7 +1060,7 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
     if (HasDataInCache()) {
         auto event = CreateFlushTimeoutEvent();
         BlockedEventManager::GetInstance()->UpdateBlockEvent(
-            GetLogstoreKey(), GetConfigName(), *event, mDevInode, time(NULL) + mReaderConfig.first->mFlushTimeoutSecs);
+            GetQueueKey(), GetConfigName(), *event, mDevInode, time(NULL) + mReaderConfig.first->mFlushTimeoutSecs);
     }
     return moreData;
 }
@@ -2235,9 +2238,7 @@ LogFileReader::~LogFileReader() {
     // For config update, reader will be recreated, which will retrieve these
     //  resources back, then their GC flag will be removed.
     if (mEOOption) {
-        static auto sQueueM = QueueManager::GetInstance();
-        sQueueM->MarkGC(GetProject(),
-                        mEOOption->primaryCheckpointKey + mEOOption->rangeCheckpointPtrs[0]->data.hash_key());
+        ExactlyOnceQueueManager::GetInstance()->DeleteQueue(mEOOption->fbKey);
 
         static auto sCptM = CheckpointManagerV2::GetInstance();
         sCptM->MarkGC(mEOOption->primaryCheckpointKey);

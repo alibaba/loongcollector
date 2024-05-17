@@ -49,6 +49,10 @@
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
+#include "pipeline/Pipeline.h"
+#include "queue/ExactlyOnceQueueManager.h"
+#include "queue/ProcessQueueManager.h"
+#include "queue/QueueKeyManager.h"
 
 
 using namespace sls_logs;
@@ -70,16 +74,14 @@ DEFINE_FLAG_BOOL(enable_new_pipeline, "use C++ pipline with refactoried plugins"
 namespace logtail {
 
 LogProcess::LogProcess() : mAccessProcessThreadRWL(ReadWriteLock::PREFER_WRITER) {
-    size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
-    if (concurrencyCount < 20) {
-        concurrencyCount = 20;
-    }
-    if (concurrencyCount > 50) {
-        concurrencyCount = 50;
-    }
-    mLogFeedbackQueue.SetParam(concurrencyCount, (size_t)(concurrencyCount * 1.5), 100);
-    mThreadCount = 0;
-    mInitialized = false;
+    // size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
+    // if (concurrencyCount < 20) {
+    //     concurrencyCount = 20;
+    // }
+    // if (concurrencyCount > 50) {
+    //     concurrencyCount = 50;
+    // }
+    // mLogFeedbackQueue.SetParam(concurrencyCount, (size_t)(concurrencyCount * 1.5), 100);
 }
 
 LogProcess::~LogProcess() {
@@ -100,7 +102,7 @@ void LogProcess::Start() {
     mInitialized = true;
     // mLocalTimeZoneOffsetSecond = GetLocalTimeZoneOffsetSecond();
     // LOG_INFO(sLogger, ("local timezone offset second", mLocalTimeZoneOffsetSecond));
-    Sender::Instance()->SetFeedBackInterface(&mLogFeedbackQueue);
+    Sender::Instance()->SetFeedBackInterface(ProcessQueueManager::GetInstance());
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();
     // mBufferCountLimit = INT32_FLAG(process_buffer_count_upperlimit_perthread) * mThreadCount;
     mProcessThreads = new ThreadPtr[mThreadCount];
@@ -112,51 +114,27 @@ void LogProcess::Start() {
     LOG_INFO(sLogger, ("process daemon", "started"));
 }
 
-bool LogProcess::PushBuffer(LogstoreFeedBackKey key,
-                            const std::string& configName,
-                            size_t inputIndex,
-                            PipelineEventGroup&& group,
-                            uint32_t retryTimes) {
+bool LogProcess::PushBuffer(QueueKey key, size_t inputIndex, PipelineEventGroup&& group, uint32_t retryTimes) {
     std::unique_ptr<ProcessQueueItem> item
-        = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), configName, inputIndex));
+        = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), inputIndex));
     for (size_t i = 0; i < retryTimes; ++i) {
-        if (mLogFeedbackQueue.PushItem(key, std::move(item))) {
+        if (ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item)) == 0) {
             return true;
         }
         if (i % 100 == 0) {
             LOG_WARNING(sLogger,
                         ("push attempts to process queue continuously failed for the past second",
-                         "retry again")("config", configName)("input index", ToString(inputIndex)));
+                         "retry again")("config", QueueKeyManager::GetInstance()->GetName(key))("input index",
+                                                                                                ToString(inputIndex)));
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return false;
 }
 
-bool LogProcess::IsValidToReadLog(const LogstoreFeedBackKey& logstoreKey) {
-    if (INT32_FLAG(debug_logprocess_queue_flag) > 0) {
-        return INT32_FLAG(debug_logprocess_queue_flag) == 1;
-    }
-    return mLogFeedbackQueue.IsValidToPush(logstoreKey);
-}
-
-
-void LogProcess::SetFeedBack(LogstoreFeedBackInterface* pInterface) {
-    mLogFeedbackQueue.SetFeedBackObject(pInterface);
-}
-
-void LogProcess::SetPriorityWithHoldOn(const LogstoreFeedBackKey& logstoreKey, int32_t priority) {
-    mLogFeedbackQueue.SetPriorityNoLock(logstoreKey, priority);
-}
-
-void LogProcess::DeletePriorityWithHoldOn(const LogstoreFeedBackKey& logstoreKey) {
-    mLogFeedbackQueue.DeletePriorityNoLock(logstoreKey);
-}
-
 void LogProcess::HoldOn() {
     LOG_INFO(sLogger, ("process daemon pause", "starts"));
     mAccessProcessThreadRWL.lock();
-    mLogFeedbackQueue.Lock();
     while (true) {
         bool allThreadWait = true;
         for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
@@ -175,14 +153,13 @@ void LogProcess::HoldOn() {
 
 void LogProcess::Resume() {
     LOG_INFO(sLogger, ("process daemon resume", "starts"));
-    mLogFeedbackQueue.Unlock();
     mAccessProcessThreadRWL.unlock();
     LOG_INFO(sLogger, ("process daemon resume", "succeeded"));
 }
 
 bool LogProcess::FlushOut(int32_t waitMs) {
-    mLogFeedbackQueue.Signal();
-    if (mLogFeedbackQueue.IsEmpty()) {
+    ProcessQueueManager::GetInstance()->Trigger();
+    if (ProcessQueueManager::GetInstance()->IsAllQueueEmpty()) {
         bool allThreadWait = true;
         for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
             if (mThreadFlags[threadNo]) {
@@ -206,19 +183,12 @@ bool LogProcess::FlushOut(int32_t waitMs) {
 
 void* LogProcess::ProcessLoop(int32_t threadNo) {
     LOG_DEBUG(sLogger, ("LogProcessThread", "Start")("threadNo", threadNo));
-    LogstoreFeedBackKey logstoreKey = 0;
     static int32_t lastMergeTime = 0;
     static atomic_int s_processCount{0};
     static atomic_long s_processBytes{0};
     static atomic_int s_processLines{0};
     // only thread 0 update metric
     int32_t lastUpdateMetricTime = time(NULL);
-#ifdef LOGTAIL_DEBUG_FLAG
-    int32_t lastPrintTime = time(NULL);
-    uint64_t processCount = 0;
-    uint64_t waitTime = 0;
-    uint64_t waitCount = 0;
-#endif
     while (true) {
         mThreadFlags[threadNo] = false;
 
@@ -242,16 +212,13 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             s_processLines = 0;
 
             // update process queue status
-            int32_t invalidCount = 0;
-            int32_t totalCount = 0;
-            int32_t eoInvalidCount = 0;
-            int32_t eoTotalCount = 0;
-            mLogFeedbackQueue.GetStatus(invalidCount, totalCount, eoInvalidCount, eoTotalCount);
-            sMonitor->UpdateMetric("process_queue_full", invalidCount);
-            sMonitor->UpdateMetric("process_queue_total", totalCount);
-            if (eoTotalCount > 0) {
-                sMonitor->UpdateMetric("eo_process_queue_full", eoInvalidCount);
-                sMonitor->UpdateMetric("eo_process_queue_total", eoTotalCount);
+            sMonitor->UpdateMetric("process_queue_full", ProcessQueueManager::GetInstance()->GetInvalidCnt());
+            sMonitor->UpdateMetric("process_queue_total", ProcessQueueManager::GetInstance()->GetCnt());
+            if (ExactlyOnceQueueManager::GetInstance()->GetProcessQueueCnt() > 0) {
+                sMonitor->UpdateMetric("eo_process_queue_full",
+                                       ExactlyOnceQueueManager::GetInstance()->GetInvalidProcessQueueCnt());
+                sMonitor->UpdateMetric("eo_process_queue_total",
+                                       ExactlyOnceQueueManager::GetInstance()->GetProcessQueueCnt());
             }
         }
 
@@ -262,22 +229,22 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             DoFuseHandling();
         }
 
-        // if have no data, wait 100 ms for new data or timeout, then continue to check again
-        std::unique_ptr<ProcessQueueItem> item;
-        if (!mLogFeedbackQueue.CheckAndPopNextItem(
-                logstoreKey, item, Sender::Instance()->GetSenderFeedBackInterface(), threadNo, mThreadCount)) {
-            mLogFeedbackQueue.Wait(100);
-            continue;
-        }
         {
             ReadLock lock(mAccessProcessThreadRWL);
-            mThreadFlags[threadNo] = true;
+            
+            std::unique_ptr<ProcessQueueItem> item;
+            std::string configName;
+            if (!ProcessQueueManager::GetInstance()->PopItem(threadNo, item, configName)) {
+                ProcessQueueManager::GetInstance()->Wait(100);
+                continue;
+            }
 
-            auto pipeline = PipelineManager::GetInstance()->FindPipelineByName(item->mConfigName);
+            mThreadFlags[threadNo] = true;
+            auto pipeline = PipelineManager::GetInstance()->FindPipelineByName(configName);
             if (!pipeline) {
                 LOG_INFO(sLogger,
                          ("pipeline not found during processing, perhaps due to config deletion",
-                          "discard data")("config", item->mConfigName));
+                          "discard data")("config", configName));
                 continue;
             }
 
@@ -479,27 +446,5 @@ void LogProcess::DoFuseHandling() {
     LogFileCollectOffsetIndicator::GetInstance()->EliminateOutDatedItem();
     LogFileCollectOffsetIndicator::GetInstance()->ShrinkLogFileOffsetInfoMap();
 }
-
-#ifdef APSARA_UNIT_TEST_MAIN
-void LogProcess::CleanEnviroments() {
-    int32_t tryTime = 0;
-    mLogFeedbackQueue.RemoveAll();
-    while (true) {
-        bool allThreadWait = true;
-        for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
-            if (mThreadFlags[threadNo]) {
-                allThreadWait = false;
-                break;
-            }
-        }
-        if (allThreadWait)
-            return;
-        if (++tryTime % 100 == 0) {
-            LOG_ERROR(sLogger, ("LogProcess CleanEnviroments is too slow or  blocked with unknow error.", ""));
-        }
-        usleep(10 * 1000);
-    }
-}
-#endif
 
 } // namespace logtail

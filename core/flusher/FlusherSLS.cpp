@@ -74,6 +74,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                            mContext->GetRegion());
     }
     mLogstoreKey = GenerateLogstoreFeedBackKey(mProject, mLogstore);
+    mSenderQueue = Sender::Instance()->GetSenderQueue(mLogstoreKey);
 
 #ifdef __ENTERPRISE__
     if (EnterpriseConfigProvider::GetInstance()->IsDataServerPrivateCloud()) {

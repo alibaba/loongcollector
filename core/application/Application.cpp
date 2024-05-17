@@ -37,6 +37,7 @@
 #include "event_handler/LogInput.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "input/InputFeedbackInterfaceRegistry.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/MetricExportor.h"
@@ -55,6 +56,7 @@
 #else
 #include "config/provider/CommonConfigProvider.h"
 #endif
+#include "queue/ExactlyOnceQueueManager.h"
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
 DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
@@ -64,6 +66,7 @@ DEFINE_FLAG_INT32(config_scan_interval, "seconds", 10);
 DEFINE_FLAG_INT32(profiling_check_interval, "seconds", 60);
 DEFINE_FLAG_INT32(tcmalloc_release_memory_interval, "force release memory held by tcmalloc, seconds", 300);
 DEFINE_FLAG_INT32(exit_flushout_duration, "exit process flushout duration", 20 * 1000);
+DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
 DECLARE_FLAG_BOOL(global_network_success);
@@ -213,6 +216,7 @@ void Application::Start() {
     LogtailMonitor::GetInstance()->Init();
 
     PluginRegistry::GetInstance()->LoadPlugins();
+    InputFeedbackInterfaceRegistry::GetInstance()->LoadFeedbackInterfaces();
 
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
@@ -236,7 +240,7 @@ void Application::Start() {
     LogProcess::GetInstance()->Start();
 
     time_t curTime = 0, lastProfilingCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
-           lastCheckTagsTime = 0;
+           lastCheckTagsTime = 0, lastQueueGCTime = 0;
 #ifndef LOGTAIL_NO_TC_MALLOC
     time_t lastTcmallocReleaseMemTime = 0;
 #endif
@@ -264,6 +268,10 @@ void Application::Start() {
             lastTcmallocReleaseMemTime = curTime;
         }
 #endif
+        if (curTime - lastQueueGCTime >= INT32_FLAG(queue_check_gc_interval_sec)) {
+            ExactlyOnceQueueManager::GetInstance()->ClearTimeoutQueues();
+            lastQueueGCTime = curTime;
+        }
         if (curTime - lastUpdateMetricTime >= 40) {
             CheckCriticalCondition(curTime);
             lastUpdateMetricTime = curTime;

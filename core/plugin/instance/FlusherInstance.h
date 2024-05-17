@@ -23,6 +23,7 @@
 #include "plugin/instance/PluginInstance.h"
 #include "plugin/interface/Flusher.h"
 #include "pipeline/PipelineContext.h"
+#include "common/LogstoreSenderQueue.h"
 
 namespace logtail {
 
@@ -36,6 +37,7 @@ public:
     bool Init(const Json::Value& config, PipelineContext& context, Json::Value& optionalGoPipeline);
     bool Start() { return mPlugin->Start(); }
     bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
+    SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue() const { return mPlugin->GetSenderQueue(); }
 
 private:
     std::unique_ptr<Flusher> mPlugin;

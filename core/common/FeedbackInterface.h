@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,18 @@
 
 #pragma once
 
-#include "models/PipelineEventGroup.h"
-#include "pipeline/Pipeline.h"
+#include <cstdint>
 
 namespace logtail {
 
-struct ProcessQueueItem {
-    PipelineEventGroup mEventGroup;
-    std::shared_ptr<Pipeline> mPipeline; // not null only during pipeline update
-    size_t mInputIndex = 0; // index of the input in the pipeline
+class FeedbackInterface {
+public:
+    virtual ~FeedbackInterface() = default;
 
-    ProcessQueueItem(PipelineEventGroup&& group, size_t index) : mEventGroup(std::move(group)), mInputIndex(index) {}
+    virtual void Feedback(int64_t key) = 0;
+
+    // TODO: should not be a common method after flusher refactorization
+    virtual bool IsValidToPush(int64_t key) const { return true; }
 };
 
 } // namespace logtail

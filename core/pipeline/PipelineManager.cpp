@@ -29,6 +29,8 @@
 #include "shennong/ShennongManager.h"
 #include "streamlog/StreamLogManager.h"
 #endif
+#include "queue/ProcessQueueManager.h"
+#include "queue/QueueKeyManager.h"
 
 using namespace std;
 
@@ -86,9 +88,11 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
 #endif
 
     for (const auto& name : diff.mRemoved) {
-        mPipelineNameEntityMap[name]->Stop(true);
-        DecreasePluginUsageCnt(mPipelineNameEntityMap[name]->GetPluginStatistics());
-        mPipelineNameEntityMap.erase(name);
+        auto iter = mPipelineNameEntityMap.find(name);
+        iter->second->Stop(true);
+        DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
+        iter->second->RemoveProcessQueue();
+        mPipelineNameEntityMap.erase(iter);
     }
     for (auto& config : diff.mModified) {
         auto p = BuildPipeline(std::move(config));
@@ -108,8 +112,10 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         LOG_INFO(sLogger,
                  ("pipeline building for existing config succeeded",
                   "stop the old pipeline and start the new one")("config", config.mName));
-        mPipelineNameEntityMap[config.mName]->Stop(false);
-        DecreasePluginUsageCnt(mPipelineNameEntityMap[config.mName]->GetPluginStatistics());
+
+        auto iter = mPipelineNameEntityMap.find(config.mName);
+        iter->second->Stop(false);
+        DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
         mPipelineNameEntityMap[config.mName] = p;
         IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();

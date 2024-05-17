@@ -41,6 +41,7 @@ public:
     void Start();
     void Process(std::vector<PipelineEventGroup>& logGroupList);
     void Stop(bool isRemoving);
+    void RemoveProcessQueue() const;
 
     const std::string& Name() const { return mName; }
     PipelineContext& GetContext() const { return mContext; }

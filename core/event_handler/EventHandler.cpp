@@ -33,6 +33,7 @@
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
 #include "processor/daemon/LogProcess.h"
+#include "queue/ProcessQueueManager.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -297,8 +298,8 @@ void CreateModifyHandler::HandleTimeOut() {
 ModifyHandler::ModifyHandler(const std::string& configName, const FileDiscoveryConfig& pConfig)
     : mConfigName(configName) {
     if (pConfig.first && pConfig.second->GetGlobalConfig().mProcessPriority > 0
-        && pConfig.second->GetGlobalConfig().mProcessPriority <= MAX_CONFIG_PRIORITY_LEVEL) {
-        mReadFileTimeSlice = (1 << (MAX_CONFIG_PRIORITY_LEVEL - pConfig.second->GetGlobalConfig().mProcessPriority + 1))
+        && pConfig.second->GetGlobalConfig().mProcessPriority <= ProcessQueueManager::sMaxPriority) {
+        mReadFileTimeSlice = (1 << (ProcessQueueManager::sMaxPriority - pConfig.second->GetGlobalConfig().mProcessPriority + 1))
             * INT64_FLAG(read_file_time_slice);
     } else {
         mReadFileTimeSlice = INT64_FLAG(read_file_time_slice);
@@ -745,7 +746,7 @@ void ModifyHandler::Handle(const Event& event) {
 
         bool hasMoreData;
         do {
-            if (!LogProcess::GetInstance()->IsValidToReadLog(reader->GetLogstoreKey())) {
+            if (!ProcessQueueManager::GetInstance()->IsValidToPush(reader->GetQueueKey())) {
                 static int32_t s_lastOutPutTime = 0;
                 int32_t curTime = time(NULL);
                 if (curTime - s_lastOutPutTime > 600) {
@@ -762,7 +763,7 @@ void ModifyHandler::Handle(const Event& event) {
                 }
 
                 BlockedEventManager::GetInstance()->UpdateBlockEvent(
-                    reader->GetLogstoreKey(), mConfigName, event, reader->GetDevInode(), curTime);
+                    reader->GetQueueKey(), mConfigName, event, reader->GetDevInode(), curTime);
                 return;
             }
             unique_ptr<LogBuffer> logBuffer(new LogBuffer);
@@ -1073,7 +1074,7 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
                                                               time(NULL));
         PipelineEventGroup group = LogFileReader::GenerateEventGroup(reader, logBuffer);
 
-        while (!LogProcess::GetInstance()->PushBuffer(reader->GetLogstoreKey(), reader->GetConfigName(), 0, std::move(group))) // 10ms
+        while (!LogProcess::GetInstance()->PushBuffer(reader->GetQueueKey(), 0, std::move(group))) // 10ms
         {
             ++pushRetry;
             if (pushRetry % 10 == 0)

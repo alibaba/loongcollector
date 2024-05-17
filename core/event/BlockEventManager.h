@@ -17,38 +17,36 @@
 #pragma once
 #include <string>
 #include <unordered_map>
-#include "common/LogstoreFeedbackQueue.h"
+
+#include "Event.h"
 #include "common/Flags.h"
 #include "common/Lock.h"
-#include "Event.h"
+#include "common/FeedbackInterface.h"
+#include "queue/FeedbackQueueKey.h"
 
 DECLARE_FLAG_INT32(max_block_event_timeout);
 
 namespace logtail {
 
-class BlockedEventManager : public LogstoreFeedBackInterface {
+class BlockedEventManager : public FeedbackInterface {
 public:
     static BlockedEventManager* GetInstance() {
         static BlockedEventManager* s_Instance = new BlockedEventManager;
         return s_Instance;
     }
 
-    void UpdateBlockEvent(const LogstoreFeedBackKey& logstoreKey,
+    void UpdateBlockEvent(QueueKey logstoreKey,
                           const std::string& configName,
                           const Event& event,
                           const DevInode& devInode,
                           int32_t curTime);
     void GetTimeoutEvent(std::vector<Event*>& eventVec, int32_t curTime);
-    virtual void FeedBack(const LogstoreFeedBackKey& key);
-    virtual bool IsValidToPush(const LogstoreFeedBackKey& key) {
-        // should not be used
-        return true;
-    }
+    void Feedback(int64_t key) override;
 
 protected:
     struct BlockedEvent {
-        BlockedEvent() : mLogstoreKey(0), mEvent(NULL), mInvalidTime(time(NULL)), mTimeout(1) {}
-        void Update(const LogstoreFeedBackKey& logstoreKey, Event* pEvent, int32_t curTime) {
+        BlockedEvent() : mInvalidTime(time(NULL)) {}
+        void Update(QueueKey key, Event* pEvent, int32_t curTime) {
             if (mEvent != NULL) {
                 // There are only two situations where event coverage is possible
                 // 1. the new event is not timeout event
@@ -60,7 +58,7 @@ protected:
                 }
             }
             mEvent = pEvent;
-            mLogstoreKey = logstoreKey;
+            mQueueKey = key;
             // will become traditional block event if processor queue is not ready
             if (mEvent->IsReaderFlushTimeout()) {
                 mTimeout = curTime - mInvalidTime;
@@ -78,10 +76,10 @@ protected:
             }
         }
 
-        LogstoreFeedBackKey mLogstoreKey;
-        Event* mEvent;
+        QueueKey mQueueKey = -1;
+        Event* mEvent = nullptr;
         int32_t mInvalidTime;
-        int32_t mTimeout;
+        int32_t mTimeout = 1;
     };
 
     BlockedEventManager();

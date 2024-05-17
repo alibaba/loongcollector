@@ -21,10 +21,13 @@
 #include "common/JsonUtil.h"
 #include "common/LogstoreFeedbackKey.h"
 #include "config/Config.h"
+#include "input/InputFeedbackInterfaceRegistry.h"
 #include "pipeline/Pipeline.h"
 #include "plugin/PluginRegistry.h"
 #include "processor/inner/ProcessorSplitLogStringNative.h"
 #include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
+#include "queue/ProcessQueueManager.h"
+#include "queue/QueueKeyManager.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -36,12 +39,14 @@ public:
     void OnSuccessfulInit() const;
     void OnFailedInit() const;
     void OnInitVariousTopology() const;
+    void TestProcessQueue() const;
     void OnInputFileWithMultiline() const;
     void OnInputFileWithContainerDiscovery() const;
 
 protected:
     static void SetUpTestCase() {
         PluginRegistry::GetInstance()->LoadPlugins();
+        InputFeedbackInterfaceRegistry::GetInstance()->LoadFeedbackInterfaces();
         AppConfig::GetInstance()->mPurageContainerMode = true;
     }
 
@@ -2303,6 +2308,118 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
+void PipelineUnittest::TestProcessQueue() const {
+    unique_ptr<Json::Value> configJson;
+    string configStr, errorMsg;
+    unique_ptr<Config> config;
+    unique_ptr<Pipeline> pipeline;
+    QueueKey key;
+    list<ProcessQueue>::iterator que;
+
+    // new pipeline
+    configStr = R"(
+        {
+            "global": {
+                "ProcessPriority": 1
+            },
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+
+    key = QueueKeyManager::GetInstance()->GetKey(configName);
+    que = ProcessQueueManager::GetInstance()->mQueues[key];
+    // queue level
+    APSARA_TEST_EQUAL(configName, que->GetConfigName());
+    APSARA_TEST_EQUAL(key, que->GetKey());
+    APSARA_TEST_EQUAL(0U, que->GetPriority());
+    APSARA_TEST_EQUAL(1U, que->mUpStreamFeedbacks.size());
+    APSARA_TEST_EQUAL(InputFeedbackInterfaceRegistry::GetInstance()->GetFeedbackInterface("input_file"),
+                      que->mUpStreamFeedbacks[0]);
+    APSARA_TEST_EQUAL(1U, que->mDownStreamQueues.size());
+    // pipeline level
+    APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());
+    // manager level
+    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mQueues.size());
+    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[0].size());
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[0].begin()
+                     == ProcessQueueManager::GetInstance()->mQueues[key]);
+    
+    // update pipeline with different priority
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new Config(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+
+    key = QueueKeyManager::GetInstance()->GetKey(configName);
+    que = ProcessQueueManager::GetInstance()->mQueues[key];
+    // queue level
+    APSARA_TEST_EQUAL(configName, que->GetConfigName());
+    APSARA_TEST_EQUAL(key, que->GetKey());
+    APSARA_TEST_EQUAL(3U, que->GetPriority());
+    APSARA_TEST_EQUAL(1U, que->mUpStreamFeedbacks.size());
+    APSARA_TEST_EQUAL(InputFeedbackInterfaceRegistry::GetInstance()->GetFeedbackInterface("input_file"),
+                      que->mUpStreamFeedbacks[0]);
+    APSARA_TEST_EQUAL(1U, que->mDownStreamQueues.size());
+    // pipeline level
+    APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());
+    // manager level
+    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mQueues.size());
+    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[3].size());
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[3].begin()
+                     == ProcessQueueManager::GetInstance()->mQueues[key]);
+
+    // delete pipeline
+    pipeline->RemoveProcessQueue();
+    pipeline.reset();
+    APSARA_TEST_EQUAL(0U, ProcessQueueManager::GetInstance()->mQueues.size());
+    APSARA_TEST_EQUAL("", QueueKeyManager::GetInstance()->GetName(key));
+}
+
 void PipelineUnittest::OnInputFileWithMultiline() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
@@ -2607,9 +2724,10 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
 
 UNIT_TEST_CASE(PipelineUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(PipelineUnittest, OnFailedInit)
+UNIT_TEST_CASE(PipelineUnittest, TestProcessQueue)
+UNIT_TEST_CASE(PipelineUnittest, OnInitVariousTopology)
 UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithMultiline)
 UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithContainerDiscovery)
-UNIT_TEST_CASE(PipelineUnittest, OnInitVariousTopology)
 
 } // namespace logtail
 

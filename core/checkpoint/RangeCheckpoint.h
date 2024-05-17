@@ -19,8 +19,7 @@
 #include <string>
 #include <vector>
 #include "log_pb/checkpoint.pb.h"
-#include "common/LogstoreFeedbackKey.h"
-
+#include "queue/FeedbackQueueKey.h"
 
 namespace logtail {
 
@@ -28,7 +27,7 @@ class RangeCheckpoint {
 public:
     size_t index;
     std::string key;
-    LogstoreFeedBackKey fbKey;
+    QueueKey fbKey;
     RangeCheckpointPB data;
     std::vector<std::pair<uint64_t, size_t>> positions;
 

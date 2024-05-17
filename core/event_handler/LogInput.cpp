@@ -370,7 +370,6 @@ void* LogInput::ProcessLoop() {
     int32_t lastReadLocalEventTime = prevTime;
     mEventProcessCount = 0;
     BlockedEventManager* pBlockedEventManager = BlockedEventManager::GetInstance();
-    LogProcess::GetInstance()->SetFeedBack(pBlockedEventManager);
     string path;
     while (true) {
         ReadLock lock(mAccessMainThreadRWL);

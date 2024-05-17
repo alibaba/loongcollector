@@ -19,6 +19,7 @@
 #include <json/json.h>
 
 #include "plugin/interface/Plugin.h"
+#include "common/LogstoreSenderQueue.h"
 
 namespace logtail {
 class Flusher : public Plugin {
@@ -27,9 +28,15 @@ public:
 
     virtual bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) = 0;
     virtual bool Start() = 0;
-    // 单例flusher: 只修改元信息
-    // 独立flusher：停止线程
+    // used for unregistering the flusher
     virtual bool Stop(bool isPipelineRemoving) = 0;
+
+    SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue() const { return mSenderQueue; }
+
+protected:
+    // TODO: replace queue type
+    SingleLogstoreSenderManager<SenderQueueParam>* mSenderQueue;
+    // SenderQueue* mSenderQueue;
 };
 
 } // namespace logtail

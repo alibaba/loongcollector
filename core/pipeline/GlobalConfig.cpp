@@ -19,6 +19,7 @@
 #include "common/LogstoreFeedbackQueue.h"
 #include "common/ParamExtractor.h"
 #include "pipeline/PipelineContext.h"
+#include "queue/ProcessQueueManager.h"
 
 using namespace std;
 
@@ -105,7 +106,7 @@ bool GlobalConfig::Init(const Json::Value& config, const PipelineContext& ctx, J
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
                               ctx.GetRegion());
-    } else if (priority > MAX_CONFIG_PRIORITY_LEVEL) {
+    } else if (priority > ProcessQueueManager::sMaxPriority) {
         PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                               ctx.GetAlarm(),
                               errorMsg,

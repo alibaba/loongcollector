@@ -15,14 +15,19 @@
  */
 
 #pragma once
-#include <unordered_map>
-#include <string>
-#include <deque>
 #include <stdio.h>
-#include "logger/Logger.h"
-#include "LogGroupContext.h"
+
+#include <deque>
+#include <string>
+#include <unordered_map>
+
 #include "Lock.h"
-#include "LogstoreFeedbackQueue.h"
+#include "LogGroupContext.h"
+#include "common/FeedbackInterface.h"
+#include "common/LogstoreFeedbackKey.h"
+#include "logger/Logger.h"
+#include "common/LogstoreFeedbackQueue.h"
+#include "sender/SenderQueueParam.h"
 
 namespace logtail {
 
@@ -114,8 +119,7 @@ struct LoggroupTimeValue {
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    LoggroupTimeValue() {
-    }
+    LoggroupTimeValue() {}
 #endif
 };
 
@@ -443,9 +447,7 @@ public:
         return RemoveItem(item, sendRst != LogstoreSenderInfo::SendResult_Buffered);
     }
 
-    bool IsValidToSend(int32_t curTime) {
-        return mSenderInfo.CanSend(curTime);
-    }
+    bool IsValidToSend(int32_t curTime) { return mSenderInfo.CanSend(curTime); }
 
     LogstoreSenderInfo mSenderInfo;
     LogstoreSenderStatistics mSenderStatistics;
@@ -462,7 +464,7 @@ public:
 };
 
 template <class PARAM>
-class LogstoreSenderQueue : public LogstoreFeedBackInterface {
+class LogstoreSenderQueue : public FeedbackInterface {
 protected:
     typedef SingleLogstoreSenderManager<PARAM> SingleLogStoreManager;
     typedef std::unordered_map<LogstoreFeedBackKey, SingleLogStoreManager> LogstoreFeedBackQueueMap;
@@ -479,18 +481,18 @@ public:
         pParam->SetMaxSize(maxSize);
     }
 
-    void SetFeedBackObject(LogstoreFeedBackInterface* pFeedbackObj) {
+    void SetFeedBackObject(FeedbackInterface* pFeedbackObj) {
         PTScopedLock dataLock(mLock);
         mFeedBackObj = pFeedbackObj;
     }
 
     void Signal() { mTrigger.Trigger(); }
 
-    virtual void FeedBack(const LogstoreFeedBackKey& key) { mTrigger.Trigger(); }
+    void Feedback(int64_t key) override { mTrigger.Trigger(); }
 
-    virtual bool IsValidToPush(const LogstoreFeedBackKey& key) {
+    bool IsValidToPush(int64_t key) const override {
         PTScopedLock dataLock(mLock);
-        auto& singleQueue = mLogstoreSenderQueueMap[key];
+        const auto& singleQueue = mLogstoreSenderQueueMap.at(key);
 
         // For correctness, exactly once queue should ignore mUrgentFlag.
         if (singleQueue.GetQueueType() == QueueType::ExactlyOnce) {
@@ -601,7 +603,7 @@ public:
         }
         if (rst == 2 && mFeedBackObj != NULL) {
             APSARA_LOG_DEBUG(sLogger, ("OnLoggroupSendDone feedback", ""));
-            mFeedBackObj->FeedBack(key);
+            mFeedBackObj->Feedback(key);
         }
         if (needTrigger) {
             // trigger deamon sender
@@ -699,11 +701,16 @@ public:
         }
     }
 
+    SingleLogstoreSenderManager<SenderQueueParam>* GetQueue(QueueKey key) {
+        PTScopedLock dataLock(mLock);
+        return &mLogstoreSenderQueueMap[key];
+    }
+
 protected:
     LogstoreFeedBackQueueMap mLogstoreSenderQueueMap;
-    PTMutex mLock;
-    TriggerEvent mTrigger;
-    LogstoreFeedBackInterface* mFeedBackObj;
+    mutable PTMutex mLock;
+    mutable TriggerEvent mTrigger;
+    FeedbackInterface* mFeedBackObj;
     bool mUrgentFlag;
     size_t mSenderQueueBeginIndex;
 
@@ -711,7 +718,6 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;
     friend class ExactlyOnceReaderUnittest;
-    friend class QueueManagerUnittest;
 
     void PrintStatus() {
         printf("================================\n");

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,10 @@
 
 #pragma once
 
-#include "models/PipelineEventGroup.h"
-#include "pipeline/Pipeline.h"
+#include <cstdint>
 
 namespace logtail {
 
-struct ProcessQueueItem {
-    PipelineEventGroup mEventGroup;
-    std::shared_ptr<Pipeline> mPipeline; // not null only during pipeline update
-    size_t mInputIndex = 0; // index of the input in the pipeline
-
-    ProcessQueueItem(PipelineEventGroup&& group, size_t index) : mEventGroup(std::move(group)), mInputIndex(index) {}
-};
+using QueueKey = int64_t;
 
 } // namespace logtail

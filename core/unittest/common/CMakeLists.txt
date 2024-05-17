@@ -27,9 +27,6 @@ target_link_libraries(common_logfileoperator_unittest unittest_base)
 add_executable(common_sender_queue_unittest SenderQueueUnittest.cpp)
 target_link_libraries(common_sender_queue_unittest unittest_base)
 
-# add_executable(common_queue_manager_unittest QueueManagerUnittest.cpp)
-# target_link_libraries(common_queue_manager_unittest unittest_base)
-
 add_executable(common_sliding_window_counter_unittest SlidingWindowCounterUnittest.cpp)
 target_link_libraries(common_sliding_window_counter_unittest unittest_base)
 

@@ -452,7 +452,7 @@ struct AsyncRequest {
 };
 
 static decltype(CheckpointManagerV2::GetInstance()) sCptM = nullptr;
-static decltype(QueueManager::GetInstance()) sQueueM = nullptr;
+static decltype(ExactlyOnceQueueManager::GetInstance()) sQueueM = nullptr;
 static decltype(EventDispatcher::GetInstance()) sEventDispatcher = nullptr;
 
 class SenderUnittest : public ::testing::Test {
@@ -862,7 +862,7 @@ public:
         bfs::create_directories(sysConfDir);
         AppConfig::GetInstance()->SetLogtailSysConfDir(sysConfDir);
         sCptM = CheckpointManagerV2::GetInstance();
-        sQueueM = QueueManager::GetInstance();
+        sQueueM = ExactlyOnceQueueManager::GetInstance();
         sEventDispatcher = EventDispatcher::GetInstance();
         sProcessQueueMap = &(LogProcess::GetInstance()->GetQueue().mLogstoreQueueMap);
         sSenderQueueMap = &(Sender::Instance()->GetQueue().mLogstoreSenderQueueMap);
