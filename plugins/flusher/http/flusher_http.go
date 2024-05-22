@@ -246,7 +246,7 @@ func (f *FlusherHTTP) initRequestInterceptors(transport http.RoundTripper) (http
 }
 
 func (f *FlusherHTTP) getConverter() (*converter.Converter, error) {
-	return converter.NewConverterWithSep(f.Convert.Protocol, f.Convert.Encoding, f.Convert.Separator, f.Convert.IgnoreUnExpectedData, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
+	return converter.NewConverterWithSep(f.Convert.Protocol, f.Convert.Encoding, f.Convert.Separator, f.Convert.IgnoreUnExpectedData, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
 }
 
 func (f *FlusherHTTP) addTask(log interface{}) {

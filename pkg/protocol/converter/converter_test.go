@@ -19,12 +19,13 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 func TestInvalidProtocol(t *testing.T) {
 	Convey("When constructing converter with invalid protocol", t, func() {
-		_, err := NewConverter("xml", "pb", nil, nil)
+		_, err := NewConverter("xml", "pb", nil, nil, &config.GlobalConfig{})
 
 		Convey("Then error should be returned", func() {
 			So(err, ShouldNotBeNil)

@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -127,10 +128,11 @@ type Converter struct {
 	OnlyContents         bool
 	TagKeyRenameMap      map[string]string
 	ProtocolKeyRenameMap map[string]string
+	GlobalConfig         *config.GlobalConfig
 }
 
-func NewConverterWithSep(protocol, encoding, sep string, ignoreUnExpectedData bool, tagKeyRenameMap, protocolKeyRenameMap map[string]string) (*Converter, error) {
-	converter, err := NewConverter(protocol, encoding, tagKeyRenameMap, protocolKeyRenameMap)
+func NewConverterWithSep(protocol, encoding, sep string, ignoreUnExpectedData bool, tagKeyRenameMap, protocolKeyRenameMap map[string]string, globalConfig *config.GlobalConfig) (*Converter, error) {
+	converter, err := NewConverter(protocol, encoding, tagKeyRenameMap, protocolKeyRenameMap, globalConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +141,7 @@ func NewConverterWithSep(protocol, encoding, sep string, ignoreUnExpectedData bo
 	return converter, nil
 }
 
-func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameMap map[string]string) (*Converter, error) {
+func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameMap map[string]string, globalConfig *config.GlobalConfig) (*Converter, error) {
 	enc, ok := supportedEncodingMap[protocol]
 	if !ok {
 		return nil, fmt.Errorf("unsupported protocol: %s", protocol)
@@ -152,6 +154,7 @@ func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameM
 		Encoding:             encoding,
 		TagKeyRenameMap:      tagKeyRenameMap,
 		ProtocolKeyRenameMap: protocolKeyRenameMap,
+		GlobalConfig:         globalConfig,
 	}, nil
 }
 

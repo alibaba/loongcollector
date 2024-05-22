@@ -411,7 +411,8 @@ func ConvertOtlpMetricV1(otlpMetrics pmetric.Metrics) (logs []*protocol.Log, err
 							},
 						},
 					}
-					protocol.SetLogTimeWithNano(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+					// Not support for nanosecond of system time
+					protocol.SetLogTime(log, uint32(nowTime.Unix()))
 					logs = append(logs, log)
 				}
 			}

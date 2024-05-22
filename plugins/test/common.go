@@ -158,7 +158,7 @@ func (m *MockMetricCollector) AddDataWithContext(tags map[string]string, fields 
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := helper.CreateLog(logTime, m.Tags, tags, fields)
+	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, m.Tags, tags, fields)
 	m.Logs = append(m.Logs, slsLog)
 }
 
@@ -172,7 +172,7 @@ func (m *MockMetricCollector) AddDataArrayWithContext(tags map[string]string, co
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := helper.CreateLogByArray(logTime, m.Tags, tags, columns, values)
+	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, m.Tags, tags, columns, values)
 	m.Logs = append(m.Logs, slsLog)
 }
 

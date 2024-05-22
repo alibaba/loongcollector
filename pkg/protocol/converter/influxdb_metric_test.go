@@ -21,6 +21,7 @@ import (
 
 	"github.com/smartystreets/goconvey/convey"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
@@ -64,7 +65,7 @@ func TestConvertToInfluxdbProtocolStream(t *testing.T) {
 			},
 		}
 
-		converter, err := NewConverter("influxdb", "custom", nil, nil)
+		converter, err := NewConverter("influxdb", "custom", nil, nil, &config.GlobalConfig{})
 		convey.So(err, convey.ShouldBeNil)
 
 		for _, test := range cases {
@@ -141,7 +142,7 @@ func TestConverter_ConvertToInfluxdbProtocolStreamV2(t *testing.T) {
 			},
 		}
 
-		converter, err := NewConverter("influxdb", "custom", nil, nil)
+		converter, err := NewConverter("influxdb", "custom", nil, nil, &config.GlobalConfig{})
 		convey.So(err, convey.ShouldBeNil)
 
 		for _, test := range cases {

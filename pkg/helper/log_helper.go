@@ -37,7 +37,7 @@ const (
 	SlsMetricstoreInvalidReplaceCharacter        = '_'
 )
 
-func CreateLog(t time.Time, configTag map[string]string, logTags map[string]string, fields map[string]string) (*protocol.Log, error) {
+func CreateLog(t time.Time, enableTimestampNano bool, configTag map[string]string, logTags map[string]string, fields map[string]string) (*protocol.Log, error) {
 	var slsLog protocol.Log
 	slsLog.Contents = make([]*protocol.Log_Content, 0, len(configTag)+len(logTags)+len(fields))
 	for key, val := range configTag {
@@ -63,11 +63,15 @@ func CreateLog(t time.Time, configTag map[string]string, logTags map[string]stri
 		}
 		slsLog.Contents = append(slsLog.Contents, cont)
 	}
-	protocol.SetLogTimeWithNano(&slsLog, uint32(t.Unix()), uint32(t.Nanosecond()))
+	if enableTimestampNano {
+		protocol.SetLogTimeWithNano(&slsLog, uint32(t.Unix()), uint32(t.Nanosecond()))
+	} else {
+		protocol.SetLogTime(&slsLog, uint32(t.Unix()))
+	}
 	return &slsLog, nil
 }
 
-func CreateLogByArray(t time.Time, configTag map[string]string, logTags map[string]string, columns []string, values []string) (*protocol.Log, error) {
+func CreateLogByArray(t time.Time, enableTimestampNano bool, configTag map[string]string, logTags map[string]string, columns []string, values []string) (*protocol.Log, error) {
 	var slsLog protocol.Log
 	slsLog.Contents = make([]*protocol.Log_Content, 0, len(configTag)+len(logTags)+len(columns))
 
@@ -98,7 +102,11 @@ func CreateLogByArray(t time.Time, configTag map[string]string, logTags map[stri
 		}
 		slsLog.Contents = append(slsLog.Contents, cont)
 	}
-	protocol.SetLogTimeWithNano(&slsLog, uint32(t.Unix()), uint32(t.Nanosecond()))
+	if enableTimestampNano {
+		protocol.SetLogTimeWithNano(&slsLog, uint32(t.Unix()), uint32(t.Nanosecond()))
+	} else {
+		protocol.SetLogTime(&slsLog, uint32(t.Unix()))
+	}
 	return &slsLog, nil
 }
 

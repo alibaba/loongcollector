@@ -76,7 +76,7 @@ func (p *ServiceWrapper) AddDataWithContext(tags map[string]string, fields map[s
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := helper.CreateLog(logTime, p.Tags, tags, fields)
+	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, p.Tags, tags, fields)
 	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
@@ -91,7 +91,7 @@ func (p *ServiceWrapper) AddDataArrayWithContext(tags map[string]string,
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := helper.CreateLogByArray(logTime, p.Tags, tags, columns, values)
+	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, p.Tags, tags, columns, values)
 	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 

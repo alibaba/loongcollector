@@ -145,7 +145,11 @@ func (s *Strptime) processLog(log *protocol.Log) {
 			logTime = logTime.In(s.location).Add(time.Second * time.Duration(-s.UTCOffset))
 		}
 
-		protocol.SetLogTimeWithNano(log, uint32(logTime.Unix()), uint32(logTime.Nanosecond()))
+		if s.context.GetPipelineScopeConfig().EnableTimestampNanosecond {
+			protocol.SetLogTimeWithNano(log, uint32(logTime.Unix()), uint32(logTime.Nanosecond()))
+		} else {
+			protocol.SetLogTime(log, uint32(logTime.Unix()))
+		}
 		if !s.KeepSource {
 			log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
 		}

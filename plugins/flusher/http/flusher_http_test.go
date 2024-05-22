@@ -27,6 +27,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -757,6 +758,10 @@ func (c mockContext) GetConfigName() string {
 
 func (c mockContext) GetRuntimeContext() context.Context {
 	return context.Background()
+}
+
+func (c mockContext) GetPipelineScopeConfig() *config.GlobalConfig {
+	return &config.GlobalConfig{}
 }
 
 func init() {

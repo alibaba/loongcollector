@@ -450,15 +450,18 @@ func Test_Flusher_Flush_Timeout(t *testing.T) {
 func Test_Flusher_GetConverter(t *testing.T) {
 	convey.Convey("When get Converter", t, func() {
 
+		logCtx := mock.NewEmptyContext("p", "l", "c")
 		convey.Convey("When get Converter", func() {
-			f := &FlusherOTLP{Version: v1}
+			f := &FlusherOTLP{Version: v1, context: logCtx}
+
 			c, err := f.getConverter()
 			convey.So(c, convey.ShouldNotBeNil)
 			convey.So(err, convey.ShouldBeNil)
 		})
 
 		convey.Convey("When get Converter fail", func() {
-			f := &FlusherOTLP{}
+			f := &FlusherOTLP{context: logCtx}
+
 			_, err := f.getConverter()
 			convey.So(err, convey.ShouldBeError)
 		})

@@ -48,7 +48,7 @@ func (p *LocalCollector) AddDataWithContext(tags map[string]string, fields map[s
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := CreateLog(logTime, nil, tags, fields)
+	slsLog, _ := CreateLog(logTime, len(t) != 0, nil, tags, fields)
 	p.Logs = append(p.Logs, slsLog)
 }
 
@@ -63,7 +63,7 @@ func (p *LocalCollector) AddDataArrayWithContext(tags map[string]string,
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := CreateLogByArray(logTime, nil, tags, columns, values)
+	slsLog, _ := CreateLogByArray(logTime, len(t) != 0, nil, tags, columns, values)
 	p.Logs = append(p.Logs, slsLog)
 }
 

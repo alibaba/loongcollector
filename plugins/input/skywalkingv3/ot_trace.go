@@ -72,7 +72,7 @@ func (ot *OtSpan) ToLog() (*protocol.Log, error) {
 		protocol.SetLogTimeWithNano(log, uint32(ot.End/int64(1000000)), uint32((ot.End*1000)%1e9))
 	} else {
 		nowTime := time.Now()
-		protocol.SetLogTimeWithNano(log, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+		protocol.SetLogTime(log, uint32(nowTime.Unix()))
 	}
 	log.Contents = make([]*protocol.Log_Content, 0)
 	linksJSON, err := json.Marshal(ot.Links)

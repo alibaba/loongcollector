@@ -70,7 +70,7 @@ func (p *ProcessorSplit) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 			}
 		} else {
 			nowTime := time.Now()
-			protocol.SetLogTimeWithNano(newLog, uint32(nowTime.Unix()), uint32(nowTime.Nanosecond()))
+			protocol.SetLogTime(newLog, uint32(nowTime.Unix()))
 		}
 
 		if destCont != nil {

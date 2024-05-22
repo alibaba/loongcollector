@@ -21,13 +21,14 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 func TestConvertToSimple(t *testing.T) {
 	Convey("Given a converter with protocol: single, encoding: json, with no tag rename or protocol key rename", t, func() {
-		c, err := NewConverter("custom_single", "json", nil, nil)
+		c, err := NewConverter("custom_single", "json", nil, nil, &config.GlobalConfig{})
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from host environment", func() {
@@ -590,7 +591,7 @@ func TestConvertToSimple(t *testing.T) {
 			"contents": "values",
 			"tags":     "annos",
 		}
-		c, err := NewConverter("custom_single", "json", keyRenameMap, protocolKeyRenameMap)
+		c, err := NewConverter("custom_single", "json", keyRenameMap, protocolKeyRenameMap, &config.GlobalConfig{})
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
@@ -694,7 +695,7 @@ func TestConvertToSimple(t *testing.T) {
 			"label":       "",
 			"env":         "",
 		}
-		c, err := NewConverter("custom_single", "json", keyRenameMap, nil)
+		c, err := NewConverter("custom_single", "json", keyRenameMap, nil, &config.GlobalConfig{})
 		So(err, ShouldBeNil)
 
 		Convey("When the logGroup is generated from files and from k8s daemonset environment", func() {
@@ -837,7 +838,7 @@ func TestConvertToSimple(t *testing.T) {
 	})
 
 	Convey("When constructing converter with unsupported encoding", t, func() {
-		_, err := NewConverter("custom_single", "pb", nil, nil)
+		_, err := NewConverter("custom_single", "pb", nil, nil, &config.GlobalConfig{})
 
 		Convey("Then error should be returned", func() {
 			So(err, ShouldNotBeNil)

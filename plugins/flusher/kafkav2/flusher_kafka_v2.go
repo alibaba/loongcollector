@@ -565,7 +565,7 @@ func (k *FlusherKafka) makeHeaders() []sarama.RecordHeader {
 
 func (k *FlusherKafka) getConverter() (*converter.Converter, error) {
 	logger.Debug(k.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", k.Convert.Protocol, "Encoding", k.Convert.Encoding, "TagFieldsRename", k.Convert.TagFieldsRename, "ProtocolFieldsRename", k.Convert.ProtocolFieldsRename)
-	return converter.NewConverter(k.Convert.Protocol, k.Convert.Encoding, k.Convert.TagFieldsRename, k.Convert.ProtocolFieldsRename)
+	return converter.NewConverter(k.Convert.Protocol, k.Convert.Encoding, k.Convert.TagFieldsRename, k.Convert.ProtocolFieldsRename, k.context.GetPipelineScopeConfig())
 }
 
 func init() {

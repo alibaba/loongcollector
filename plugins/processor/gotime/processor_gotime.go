@@ -132,7 +132,11 @@ func (p *ProcessorGotime) processLog(log *protocol.Log) {
 				parsedTime = parsedStringTime
 			}
 			if p.SetTime {
-				protocol.SetLogTimeWithNano(log, uint32(parsedTime.Unix()), uint32(parsedTime.Nanosecond()))
+				if p.context.GetPipelineScopeConfig().EnableTimestampNanosecond {
+					protocol.SetLogTimeWithNano(log, uint32(parsedTime.Unix()), uint32(parsedTime.Nanosecond()))
+				} else {
+					protocol.SetLogTime(log, uint32(parsedTime.Unix()))
+				}
 			}
 			if !p.KeepSource {
 				log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)

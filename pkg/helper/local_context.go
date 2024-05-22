@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg"
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -47,6 +48,10 @@ func (p *LocalContext) GetProject() string {
 }
 func (p *LocalContext) GetLogstore() string {
 	return p.common.GetLogStore()
+}
+
+func (p *LocalContext) GetPipelineScopeConfig() *config.GlobalConfig {
+	return &config.GlobalConfig{}
 }
 
 func (p *LocalContext) AddPlugin(name string) {
