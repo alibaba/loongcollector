@@ -91,8 +91,8 @@ func Test_checkPointManager_run(t *testing.T) {
 func Test_checkPointManager_keyMatch(t *testing.T) {
 	CheckPointManager.Init()
 	t.Run("key match", func(t *testing.T) {
-		LogtailConfig["test_1"] = nil
-		LogtailConfig["test_2"] = nil
+		LogtailConfig["test_1/1"] = nil
+		LogtailConfig["test_2/1"] = nil
 		if got := CheckPointManager.keyMatch([]byte("test_1")); got {
 			t.Errorf("checkPointManager.Test_checkPointManager_keyMatch()")
 		}
@@ -112,7 +112,7 @@ func Test_checkPointManager_keyMatch(t *testing.T) {
 		if got := CheckPointManager.keyMatch([]byte("texst_1^xxx")); got {
 			t.Errorf("checkPointManager.Test_checkPointManager_keyMatch()")
 		}
-		delete(LogtailConfig, "test_1")
-		delete(LogtailConfig, "test_2")
+		delete(LogtailConfig, "test_1/1")
+		delete(LogtailConfig, "test_2/1")
 	})
 }
