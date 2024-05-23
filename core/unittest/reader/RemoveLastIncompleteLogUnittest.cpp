@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "common/FileSystemUtil.h"
-#include "reader/LogFileReader.h"
 #include "common/memory/SourceBuffer.h"
+#include "reader/LogFileReader.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
@@ -123,6 +123,15 @@ void RemoveLastIncompleteLogUnittest::TestSingleline() {
         // return the whole buffer, so no rollback
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
     }
+    { // case empty string
+        std::string expectMatch = "";
+        int32_t rollbackLineFeedCount = 0;
+        std::string testLog2 = expectMatch + "";
+        int32_t matchSize = logFileReader.RemoveLastIncompleteLog(
+            const_cast<char*>(testLog2.data()), testLog2.size(), rollbackLineFeedCount);
+        APSARA_TEST_EQUAL_FATAL(int32_t(expectMatch.size()), matchSize);
+        APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
+    }
 }
 
 void RemoveLastIncompleteLogUnittest::TestMultiline() {
@@ -132,13 +141,13 @@ void RemoveLastIncompleteLogUnittest::TestMultiline() {
     multilineOpts.Init(config, ctx, "");
     LogFileReader logFileReader(
         logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
-    int32_t rollbackLineFeedCount = 0;
     { // case multi line
         std::vector<int32_t> index;
         std::string firstLog = LOG_BEGIN_STRING + "first.\nmultiline1\nmultiline2";
         std::string secondLog = LOG_BEGIN_STRING + "second.\nmultiline1\nmultiline2";
         std::string expectMatch = firstLog + '\n';
         std::string testLog = expectMatch + secondLog + '\n';
+        int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.RemoveLastIncompleteLog(
             const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
@@ -151,6 +160,7 @@ void RemoveLastIncompleteLogUnittest::TestMultiline() {
         std::string secondLog = LOG_BEGIN_STRING + "second.\nmultiline1\nmultiline2";
         std::string expectMatch = firstLog + '\n';
         std::string testLog = expectMatch + secondLog;
+        int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.RemoveLastIncompleteLog(
             const_cast<char*>(testLog.data()), testLog.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(static_cast<int32_t>(expectMatch.size()), matchSize);
@@ -159,6 +169,7 @@ void RemoveLastIncompleteLogUnittest::TestMultiline() {
     }
     { // case multi line not match
         std::string testLog2 = "log begin does not match.\nlog begin does not match.\nlog begin does not match.\n";
+        int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.RemoveLastIncompleteLog(
             const_cast<char*>(testLog2.data()), testLog2.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(int32_t(testLog2.size()), matchSize);
@@ -167,10 +178,20 @@ void RemoveLastIncompleteLogUnittest::TestMultiline() {
     { // case multi line not match, buffer size not big enough (no new line at the end of line)
         std::string expectMatch = "log begin does not match.\nlog begin does not match.\n";
         std::string testLog2 = expectMatch + "log begin does not";
+        int32_t rollbackLineFeedCount = 0;
         int32_t matchSize = logFileReader.RemoveLastIncompleteLog(
             const_cast<char*>(testLog2.data()), testLog2.size(), rollbackLineFeedCount);
         APSARA_TEST_EQUAL_FATAL(int32_t(expectMatch.size()), matchSize);
         APSARA_TEST_EQUAL_FATAL(1, rollbackLineFeedCount);
+    }
+    { // case empty string
+        std::string expectMatch = "";
+        std::string testLog2 = expectMatch + "";
+        int32_t rollbackLineFeedCount = 0;
+        int32_t matchSize = logFileReader.RemoveLastIncompleteLog(
+            const_cast<char*>(testLog2.data()), testLog2.size(), rollbackLineFeedCount);
+        APSARA_TEST_EQUAL_FATAL(int32_t(expectMatch.size()), matchSize);
+        APSARA_TEST_EQUAL_FATAL(0, rollbackLineFeedCount);
     }
 }
 

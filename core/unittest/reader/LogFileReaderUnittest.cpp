@@ -17,15 +17,12 @@
 #include <fstream>
 
 #include "checkpoint/CheckPointManager.h"
-#include "reader/LogFileReader.h"
-#include "common/memory/SourceBuffer.h"
-#include "common/RuntimeUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
+#include "common/memory/SourceBuffer.h"
 #include "file_server/FileServer.h"
 #include "log_pb/sls_logs.pb.h"
 #include "reader/LogFileReader.h"
-#include "common/memory/SourceBuffer.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
@@ -250,6 +247,56 @@ void LogFileReaderUnittest::TestReadGBK() {
         APSARA_TEST_FALSE_FATAL(moreData);
         APSARA_TEST_STREQ_FATAL(NULL, logBuffer.rawBuffer.data());
     }
+    { // force read + \n, which case read bytes is 0
+        Json::Value config;
+        config["StartPattern"] = "iLogtail.*";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
+        LogFileReader reader(
+            logPathDir, gbkFile, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+        LogBuffer logBuffer;
+        bool moreData = false;
+        std::string expectedPart(expectedContent.get());
+        // first read, read first line without \n and not allowRollback
+        int64_t firstReadSize = expectedPart.find("\n");
+        expectedPart.resize(firstReadSize);
+        reader.ReadGBK(logBuffer, 127, moreData, false); // first line without \n
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_EQUAL_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_TRUE_FATAL(reader.mLastForceRead);
+
+        // second read, start with \n but with other lines
+        reader.ReadGBK(logBuffer, fileSize - 1, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        std::string expectedPart2(expectedContent.get() + firstReadSize + 1); // skip \n
+        int64_t secondReadSize = expectedPart2.rfind("iLogtail") - 1;
+        expectedPart2.resize(secondReadSize);
+        APSARA_TEST_STREQ_FATAL(expectedPart2.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_FALSE_FATAL(reader.mLastForceRead);
+
+        // third read, force read cache
+        reader.ReadGBK(logBuffer, fileSize - 1, moreData, false);
+        std::string expectedPart3(expectedContent.get() + firstReadSize + 1 + secondReadSize + 1);
+        APSARA_TEST_STREQ_FATAL(expectedPart3.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_TRUE_FATAL(reader.mLastForceRead);
+
+        // fourth read, only read \n
+        LogBuffer logBuffer2;
+        reader.ReadGBK(logBuffer2, fileSize, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_EQUAL_FATAL(fileSize, reader.mLastFilePos);
+        APSARA_TEST_STREQ_FATAL(NULL, logBuffer2.rawBuffer.data());
+    }
 }
 
 void LogFileReaderUnittest::TestReadUTF8() {
@@ -402,6 +449,56 @@ void LogFileReaderUnittest::TestReadUTF8() {
         reader.ReadUTF8(logBuffer, 0, moreData);
         APSARA_TEST_FALSE_FATAL(moreData);
         APSARA_TEST_STREQ_FATAL(NULL, logBuffer.rawBuffer.data());
+    }
+    { // force read + \n, which case read bytes is 0
+        Json::Value config;
+        config["StartPattern"] = "iLogtail.*";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        LogFileReader reader(
+            logPathDir, utf8File, DevInode(), std::make_pair(&readerOpts, &ctx), std::make_pair(&multilineOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+        LogBuffer logBuffer;
+        bool moreData = false;
+        std::string expectedPart(expectedContent.get());
+        // first read, read first line without \n and not allowRollback
+        int64_t firstReadSize = expectedPart.find("\n");
+        expectedPart.resize(firstReadSize);
+        reader.mLastForceRead = true;
+        reader.ReadUTF8(logBuffer, firstReadSize, moreData, false);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_EQUAL_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_TRUE_FATAL(reader.mLastForceRead);
+
+        // second read, start with \n but with other lines
+        reader.ReadUTF8(logBuffer, fileSize - 1, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        std::string expectedPart2(expectedContent.get() + firstReadSize + 1); // skip \n
+        int64_t secondReadSize = expectedPart2.rfind("iLogtail") - 1;
+        expectedPart2.resize(secondReadSize);
+        APSARA_TEST_STREQ_FATAL(expectedPart2.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_FALSE_FATAL(reader.mLastForceRead);
+
+        // third read, force read cache
+        reader.ReadUTF8(logBuffer, fileSize - 1, moreData, false);
+        std::string expectedPart3(expectedContent.get() + firstReadSize + 1 + secondReadSize + 1);
+        APSARA_TEST_STREQ_FATAL(expectedPart3.c_str(), logBuffer.rawBuffer.data());
+        APSARA_TEST_TRUE_FATAL(reader.mLastForceRead);
+
+        // fourth read, only read \n
+        LogBuffer logBuffer2;
+        reader.ReadUTF8(logBuffer2, fileSize, moreData);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_GE_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_EQUAL_FATAL(fileSize, reader.mLastFilePos);
+        APSARA_TEST_STREQ_FATAL(NULL, logBuffer2.rawBuffer.data());
     }
 }
 

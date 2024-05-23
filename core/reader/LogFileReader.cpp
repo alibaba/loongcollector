@@ -50,10 +50,10 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "processor/inner/ProcessorParseContainerLogNative.h"
-#include "rapidjson/document.h"
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
+#include "rapidjson/document.h"
 #include "reader/JsonLogFileReader.h"
 #include "sdk/Common.h"
 #include "sender/Sender.h"
@@ -1039,6 +1039,11 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
         // If flush timeout event, we should filter whether the event is legacy.
         if (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
             && event->GetInode() == mDevInode.inode) {
+            // For the scenario: log rotation, the last line needs to be read by timeout, which is a normal situation.
+            // So here only local warning is given, don't raise alarm.
+            LOG_WARNING(sLogger,
+                        ("read timeout", "force to read")("last read pos", event->GetLastReadPos())(
+                            "last file pos", event->GetLastFilePos())("file inode", mDevInode.inode));
             allowRollback = false;
         } else {
             return false;
@@ -1683,6 +1688,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             logBuffer.readOffset = mLastFilePos;
             --nbytes;
         }
+        mLastForceRead = !allowRollback;
         mCache.clear();
         moreData = false;
     } else {
@@ -1725,6 +1731,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             logBuffer.readOffset = mLastFilePos;
             --nbytes;
         }
+        mLastForceRead = !allowRollback;
         const size_t stringBufferLen = nbytes;
         logBuffer.truncateInfo.reset(truncateInfo);
         lastReadPos = mLastFilePos + nbytes; // this doesn't seem right when ulogfs is used and a hole is skipped
@@ -1775,9 +1782,10 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
 
     // cache is sealed, nbytes should no change any more
     size_t stringLen = nbytes;
-    if (stringBuffer[stringLen - 1] == '\n'
-        || stringBuffer[stringLen - 1]
-            == '\0') { // \0 is for json, such behavior make ilogtail not able to collect binary log
+    if (stringLen > 0
+        && (stringBuffer[stringLen - 1] == '\n'
+            || stringBuffer[stringLen - 1]
+                == '\0')) { // \0 is for json, such behavior make ilogtail not able to collect binary log
         --stringLen;
     }
     stringBuffer[stringLen] = '\0';
@@ -1787,7 +1795,6 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     setExactlyOnceCheckpointAfterRead(nbytes);
     mLastFilePos += nbytes;
 
-    mLastForceRead = !allowRollback;
     LOG_DEBUG(sLogger, ("read size", nbytes)("last file pos", mLastFilePos));
 }
 
@@ -1812,6 +1819,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             logBuffer.readOffset = mLastFilePos;
             --readCharCount;
         }
+        mLastForceRead = !allowRollback;
         lastReadPos = mLastFilePos + readCharCount;
         originReadCount = readCharCount;
         moreData = false;
@@ -1848,6 +1856,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             ++mLastFilePos;
             logBuffer.readOffset = mLastFilePos;
         }
+        mLastForceRead = !allowRollback;
         logBuffer.truncateInfo.reset(truncateInfo);
         lastReadPos = mLastFilePos + readCharCount;
         originReadCount = readCharCount;
@@ -1929,9 +1938,10 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     }
     // cache is sealed, readCharCount should not change any more
     size_t stringLen = resultCharCount;
-    if (stringBuffer[stringLen - 1] == '\n'
-        || stringBuffer[stringLen - 1]
-            == '\0') { // \0 is for json, such behavior make ilogtail not able to collect binary log
+    if (stringLen > 0
+        && (stringBuffer[stringLen - 1] == '\n'
+            || stringBuffer[stringLen - 1]
+                == '\0')) { // \0 is for json, such behavior make ilogtail not able to collect binary log
         --stringLen;
     }
     stringBuffer[stringLen] = '\0';
@@ -1953,7 +1963,6 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         LogtailAlarm::GetInstance()->SendAlarm(
             SPLIT_LOG_FAIL_ALARM, oss.str(), GetProject(), GetLogstore(), GetRegion());
     }
-    mLastForceRead = !allowRollback;
     LOG_DEBUG(sLogger,
               ("read gbk buffer, offset", mLastFilePos)("origin read", originReadCount)("at last read", readCharCount));
 }
