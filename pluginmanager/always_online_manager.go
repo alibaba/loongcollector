@@ -60,7 +60,7 @@ func (aom *AlwaysOnlineManager) AddCachedConfig(config *LogstoreConfig, timeout 
 		addedTime: time.Now(),
 		timeout:   timeout,
 	}
-	aom.configMap[config.ConfigName] = alwaysOnlineItem
+	aom.configMap[config.ConfigNameWithSuffix] = alwaysOnlineItem
 }
 
 // GetCachedConfig get cached config from manager and delete this item, so manager will not close this config

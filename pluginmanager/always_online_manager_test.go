@@ -35,28 +35,29 @@ func init() {
 func TestAlwaysOnlineManager(t *testing.T) {
 	aom := GetAlwaysOnlineManager()
 	newLogstoreConfig := func(name string, hash string) *LogstoreConfig {
-		config := &LogstoreConfig{}
-		config.ConfigName = name
-		config.configDetailHash = hash
-		config.Context = mock.NewEmptyContext("p", "l", "c")
-		config.PluginRunner = &pluginv1Runner{LogstoreConfig: config, FlushOutStore: NewFlushOutStore[protocol.LogGroup]()}
-		config.pauseChan = make(chan struct{})
-		config.resumeChan = make(chan struct{})
-		config.PluginRunner.Init(1, 1)
-		return config
+		conf := &LogstoreConfig{}
+		conf.ConfigName = config.GetRealConfigName(name)
+		conf.ConfigNameWithSuffix = name
+		conf.configDetailHash = hash
+		conf.Context = mock.NewEmptyContext("p", "l", "c")
+		conf.PluginRunner = &pluginv1Runner{LogstoreConfig: conf, FlushOutStore: NewFlushOutStore[protocol.LogGroup]()}
+		conf.pauseChan = make(chan struct{})
+		conf.resumeChan = make(chan struct{})
+		conf.PluginRunner.Init(1, 1)
+		return conf
 	}
 	for i := 0; i < 1000; i++ {
-		aom.AddCachedConfig(newLogstoreConfig(strconv.Itoa(i), strconv.Itoa(i)), time.Minute)
+		aom.AddCachedConfig(newLogstoreConfig(strconv.Itoa(i)+"/1", strconv.Itoa(i)), time.Minute)
 	}
 
-	config := newLogstoreConfig("x", "x")
+	config := newLogstoreConfig("x/1", "x")
 	aom.AddCachedConfig(config, time.Second*time.Duration(5))
 	require.Equal(t, len(aom.configMap), 1001)
 
 	time.Sleep(time.Second)
 	for i := 0; i < 500; i++ {
 		var ok bool
-		config, ok = aom.GetCachedConfig(strconv.Itoa(i))
+		config, ok = aom.GetCachedConfig(strconv.Itoa(i) + "/1")
 		require.Equal(t, ok, true)
 		require.Equal(t, config.ConfigName, config.configDetailHash)
 		require.Equal(t, config.ConfigName, strconv.Itoa(i))
@@ -64,7 +65,7 @@ func TestAlwaysOnlineManager(t *testing.T) {
 	require.Equal(t, len(aom.configMap), 501)
 
 	time.Sleep(time.Second * time.Duration(8))
-	config, ok := aom.GetCachedConfig("x")
+	config, ok := aom.GetCachedConfig("x/1")
 	require.True(t, config == nil)
 	require.Equal(t, ok, false)
 }

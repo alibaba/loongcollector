@@ -153,11 +153,11 @@ func timeoutStop(config *LogstoreConfig, flag bool) bool {
 
 		// The config is valid but stop slowly, allow it to load again.
 		DisabledLogtailConfigLock.Lock()
-		if _, exists := DisabledLogtailConfig[config.ConfigName]; !exists {
+		if _, exists := DisabledLogtailConfig[config.ConfigNameWithSuffix]; !exists {
 			DisabledLogtailConfigLock.Unlock()
 			return
 		}
-		delete(DisabledLogtailConfig, config.ConfigName)
+		delete(DisabledLogtailConfig, config.ConfigNameWithSuffix)
 		DisabledLogtailConfigLock.Unlock()
 		logger.Info(config.Context.GetRuntimeContext(), "Valid but slow stop config, enable it again", config.ConfigName)
 	}()
@@ -181,7 +181,7 @@ func HoldOn(exitFlag bool) error {
 			logger.Error(logstoreConfig.Context.GetRuntimeContext(), "CONFIG_STOP_TIMEOUT_ALARM",
 				"timeout when stop config, goroutine might leak")
 			DisabledLogtailConfigLock.Lock()
-			DisabledLogtailConfig[logstoreConfig.ConfigName] = logstoreConfig
+			DisabledLogtailConfig[logstoreConfig.ConfigNameWithSuffix] = logstoreConfig
 			DisabledLogtailConfigLock.Unlock()
 		}
 	}

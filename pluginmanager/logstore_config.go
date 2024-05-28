@@ -89,11 +89,12 @@ var (
 
 type LogstoreConfig struct {
 	// common fields
-	ProjectName  string
-	LogstoreName string
-	ConfigName   string
-	LogstoreKey  int64
-	FlushOutFlag bool
+	ProjectName          string
+	LogstoreName         string
+	ConfigName           string
+	ConfigNameWithSuffix string
+	LogstoreKey          int64
+	FlushOutFlag         bool
 	// Each LogstoreConfig can have its independent GlobalConfig if the "global" field
 	//   is offered in configuration, see build-in StatisticsConfig and AlarmConfig.
 	GlobalConfig *config.GlobalConfig
@@ -380,12 +381,13 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	contextImp := &ContextImp{}
 	contextImp.InitContext(project, logstore, configName)
 	logstoreC := &LogstoreConfig{
-		ProjectName:      project,
-		LogstoreName:     logstore,
-		ConfigName:       config.GetRealConfigName(configName),
-		LogstoreKey:      logstoreKey,
-		Context:          contextImp,
-		configDetailHash: fmt.Sprintf("%x", md5.Sum([]byte(jsonStr))), //nolint:gosec
+		ProjectName:          project,
+		LogstoreName:         logstore,
+		ConfigName:           config.GetRealConfigName(configName),
+		ConfigNameWithSuffix: configName,
+		LogstoreKey:          logstoreKey,
+		Context:              contextImp,
+		configDetailHash:     fmt.Sprintf("%x", md5.Sum([]byte(jsonStr))), //nolint:gosec
 	}
 	contextImp.logstoreC = logstoreC
 
