@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #include "common/YamlUtil.h"
-
-#include <string>
-
 #include "common/ExceptionBase.h"
+#include <vector>
+#include <algorithm>
+#include <string>
 
 using namespace std;
 
@@ -25,6 +25,10 @@ namespace logtail {
 bool ParseYamlTable(const string& config, YAML::Node& yamlRoot, string& errorMsg) {
     try {
         yamlRoot = YAML::Load(config);
+        if (CheckYamlCycle(yamlRoot)) {
+            errorMsg = "yaml file contains cycle dependencies.";
+            return false;
+        }
     } catch (const YAML::ParserException& e) {
         errorMsg = "parse yaml failed: " + string(e.what());
         return false;
@@ -36,6 +40,37 @@ bool ParseYamlTable(const string& config, YAML::Node& yamlRoot, string& errorMsg
         return false;
     }
     return true;
+}
+
+bool VisitNode(const YAML::Node &node, std::vector<YAML::Node>& visited) {
+    visited.push_back(node);
+    if (node.IsMap()) {
+        for (const auto &child : node) {
+            if (std::find(visited.begin(), visited.end(), child.second) != visited.end()) {
+                return true;  // Cycle detected
+            }
+            if (VisitNode(child.second, visited)) {
+                return true;  // Propagate the failure up the call stack
+            }
+        }
+    } else if (node.IsSequence()) {
+        for (const auto &child : node) {
+            if (std::find(visited.begin(), visited.end(), child) != visited.end()) {
+                return true;  // Cycle detected
+            }
+            if (VisitNode(child, visited)) {
+                return true;  // Propagate the failure up the call stack
+            }
+        }
+    }
+    // If the node is a scalar, we don't need to do anything special.
+    visited.pop_back();
+    return false;  // No cycle detected, continue recursion
+}
+
+bool CheckYamlCycle(const YAML::Node& root) {
+    std::vector<YAML::Node> visited;
+    return VisitNode(root, visited);
 }
 
 Json::Value ParseScalar(const YAML::Node& node) {

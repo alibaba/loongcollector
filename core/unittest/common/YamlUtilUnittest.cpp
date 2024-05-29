@@ -38,6 +38,7 @@ public:
     void TestTimeAndDateYaml();
     void TestUnicodeYaml();
     void TestAnchorAndAliasYaml();
+    void TestCycleDependenciesYaml();
 };
 
 void YamlUtilUnittest::TestEmptyYaml() {
@@ -444,6 +445,38 @@ void YamlUtilUnittest::TestAnchorAndAliasYaml() {
     APSARA_TEST_EQUAL_FATAL(json["d"]["c"].asInt(), 2);
 }
 
+void YamlUtilUnittest::TestCycleDependenciesYaml() {
+    std::string yaml = R"(
+            global:
+              EnableTimestampNanosecond: false
+            inputs:
+            - Type: input_file
+              FilePaths:
+              - /root/zhl/als/testjson.log
+              MaxDirSearchDepth: 5
+              ExcludeFilePaths: []
+              TailSizeKB: 0
+              AllowingIncludedByMultiConfigs: &id004
+                enable: *id004
+                global:
+                  EnableTimestampNanosecond: false
+                  inputs:
+                  - Type: input_file
+                    FilePaths:
+                    - /root/zhl/als/duohangzhengze.log
+                    MaxDirSearchDepth: 5
+                    ExcludeFilePaths: []
+                    TailSizeKB: 0
+                    AllowingIncludedByMultiConfigs: *id004
+        )";
+    Json::Value json;
+    std::string errorMsg;
+    YAML::Node yamlRoot;
+    bool ret = ParseYamlTable(yaml, yamlRoot, errorMsg);
+    EXPECT_FALSE(ret);
+    APSARA_TEST_EQUAL_FATAL(errorMsg, "yaml file contains cycle dependencies.");
+}
+
 UNIT_TEST_CASE(YamlUtilUnittest, TestEmptyYaml);
 UNIT_TEST_CASE(YamlUtilUnittest, TestInvalidYaml);
 UNIT_TEST_CASE(YamlUtilUnittest, TestNestedYaml);
@@ -460,6 +493,7 @@ UNIT_TEST_CASE(YamlUtilUnittest, TestVariousNumberYaml);
 UNIT_TEST_CASE(YamlUtilUnittest, TestTimeAndDateYaml);
 UNIT_TEST_CASE(YamlUtilUnittest, TestUnicodeYaml);
 UNIT_TEST_CASE(YamlUtilUnittest, TestAnchorAndAliasYaml);
+UNIT_TEST_CASE(YamlUtilUnittest, TestCycleDependenciesYaml);
 } // namespace logtail
 
 UNIT_TEST_MAIN
