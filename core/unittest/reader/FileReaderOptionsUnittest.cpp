@@ -54,7 +54,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_FALSE(config->mTailingAllMatchedFiles);
     APSARA_TEST_EQUAL(INT32_FLAG(default_tail_limit_kb), config->mTailSizeKB);
     APSARA_TEST_EQUAL(INT32_FLAG(default_reader_flush_timeout), config->mFlushTimeoutSecs);
-    APSARA_TEST_EQUAL(0, config->mReadDelaySkipThresholdBytes);
+    APSARA_TEST_EQUAL(0U, config->mReadDelaySkipThresholdBytes);
     APSARA_TEST_EQUAL(INT32_FLAG(delay_bytes_upperlimit), config->mReadDelayAlertThresholdBytes);
     APSARA_TEST_EQUAL(INT32_FLAG(reader_close_unused_file_time), config->mCloseUnusedReaderIntervalSec);
     APSARA_TEST_EQUAL(INT32_FLAG(logreader_max_rotate_queue_size), config->mRotatorQueueSize);
@@ -79,12 +79,12 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
     APSARA_TEST_EQUAL(FileReaderOptions::Encoding::UTF8, config->mFileEncoding);
     APSARA_TEST_TRUE(config->mTailingAllMatchedFiles);
-    APSARA_TEST_EQUAL(2048, config->mTailSizeKB);
-    APSARA_TEST_EQUAL(2, config->mFlushTimeoutSecs);
-    APSARA_TEST_EQUAL(1000, config->mReadDelaySkipThresholdBytes);
-    APSARA_TEST_EQUAL(100, config->mReadDelayAlertThresholdBytes);
-    APSARA_TEST_EQUAL(10, config->mCloseUnusedReaderIntervalSec);
-    APSARA_TEST_EQUAL(15, config->mRotatorQueueSize);
+    APSARA_TEST_EQUAL(2048U, config->mTailSizeKB);
+    APSARA_TEST_EQUAL(2U, config->mFlushTimeoutSecs);
+    APSARA_TEST_EQUAL(1000U, config->mReadDelaySkipThresholdBytes);
+    APSARA_TEST_EQUAL(100U, config->mReadDelayAlertThresholdBytes);
+    APSARA_TEST_EQUAL(10U, config->mCloseUnusedReaderIntervalSec);
+    APSARA_TEST_EQUAL(15U, config->mRotatorQueueSize);
     APSARA_TEST_TRUE(config->mAppendingLogPositionMeta);
 
     // invalid optional param (except for FileEcoding)
@@ -108,7 +108,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_FALSE(config->mTailingAllMatchedFiles);
     APSARA_TEST_EQUAL(INT32_FLAG(default_tail_limit_kb), config->mTailSizeKB);
     APSARA_TEST_EQUAL(INT32_FLAG(default_reader_flush_timeout), config->mFlushTimeoutSecs);
-    APSARA_TEST_EQUAL(0, config->mReadDelaySkipThresholdBytes);
+    APSARA_TEST_EQUAL(0U, config->mReadDelaySkipThresholdBytes);
     APSARA_TEST_EQUAL(INT32_FLAG(delay_bytes_upperlimit), config->mReadDelayAlertThresholdBytes);
     APSARA_TEST_EQUAL(INT32_FLAG(reader_close_unused_file_time), config->mCloseUnusedReaderIntervalSec);
     APSARA_TEST_EQUAL(INT32_FLAG(logreader_max_rotate_queue_size), config->mRotatorQueueSize);

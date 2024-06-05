@@ -22,6 +22,7 @@
 
 #include "common/memory/SourceBuffer.h"
 #include "models/PipelineEvent.h"
+#include "models/SizedContainer.h"
 
 namespace logtail {
 
@@ -60,6 +61,8 @@ public:
 
         std::shared_ptr<SourceBuffer>& GetSourceBuffer();
 
+        size_t DataSize() const;
+
 #ifdef APSARA_UNIT_TEST_MAIN
         Json::Value ToJson() const;
         void FromJson(const Json::Value& value);
@@ -71,7 +74,7 @@ public:
         StringView mTraceId;
         StringView mSpanId;
         StringView mTraceState;
-        std::map<StringView, StringView> mTags;
+        SizedMap mTags;
         SpanEvent* mParent = nullptr;
     };
 
@@ -95,6 +98,8 @@ public:
 
         std::shared_ptr<SourceBuffer>& GetSourceBuffer();
 
+        size_t DataSize() const;
+
 #ifdef APSARA_UNIT_TEST_MAIN
         Json::Value ToJson() const;
         void FromJson(const Json::Value& value);
@@ -105,7 +110,7 @@ public:
 
         uint64_t mTimestampNs = 0;
         StringView mName;
-        std::map<StringView, StringView> mTags;
+        SizedMap mTags;
         SpanEvent* mParent = nullptr;
     };
 
@@ -164,7 +169,7 @@ public:
     void SetScopeTagNoCopy(StringView key, StringView val);
     void DelScopeTag(StringView key);
 
-    uint64_t EventsSizeBytes() override;
+    size_t DataSize() const override;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     Json::Value ToJson(bool enableEventMeta = false) const override;
@@ -182,11 +187,15 @@ private:
     Kind mKind = Kind::Unspecified;
     uint64_t mStartTimeNs = 0; // required
     uint64_t mEndTimeNs = 0; // required
-    std::map<StringView, StringView> mTags;
+    SizedMap mTags;
     std::vector<InnerEvent> mEvents;
     std::vector<SpanLink> mLinks;
     StatusCode mStatus = StatusCode::Unset;
-    std::map<StringView, StringView> mScopeTags; // store InstrumentedScope info in otlp
+    SizedMap mScopeTags; // store InstrumentedScope info in otlp
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class SpanEventUnittest;
+#endif
 };
 
 } // namespace logtail

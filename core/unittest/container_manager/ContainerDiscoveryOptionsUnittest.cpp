@@ -44,15 +44,15 @@ void ContainerDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new ContainerDiscoveryOptions());
     APSARA_TEST_EQUAL("", config->mContainerFilters.mK8sNamespaceRegex);
     APSARA_TEST_EQUAL("", config->mContainerFilters.mK8sPodRegex);
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mIncludeK8sLabel.size());
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mExcludeK8sLabel.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mIncludeK8sLabel.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mExcludeK8sLabel.size());
     APSARA_TEST_EQUAL("", config->mContainerFilters.mK8sContainerRegex);
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mIncludeEnv.size());
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mExcludeEnv.size());
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mIncludeContainerLabel.size());
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mExcludeContainerLabel.size());
-    APSARA_TEST_EQUAL(0, config->mExternalK8sLabelTag.size());
-    APSARA_TEST_EQUAL(0, config->mExternalEnvTag.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mIncludeEnv.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mExcludeEnv.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mIncludeContainerLabel.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mExcludeContainerLabel.size());
+    APSARA_TEST_EQUAL(0U, config->mExternalK8sLabelTag.size());
+    APSARA_TEST_EQUAL(0U, config->mExternalEnvTag.size());
     APSARA_TEST_FALSE(config->mCollectingContainersMeta);
 
     // valid optional param
@@ -95,15 +95,15 @@ void ContainerDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
     APSARA_TEST_EQUAL("default", config->mContainerFilters.mK8sNamespaceRegex);
     APSARA_TEST_EQUAL("pod", config->mContainerFilters.mK8sPodRegex);
-    APSARA_TEST_EQUAL(1, config->mContainerFilters.mIncludeK8sLabel.size());
-    APSARA_TEST_EQUAL(1, config->mContainerFilters.mExcludeK8sLabel.size());
+    APSARA_TEST_EQUAL(1U, config->mContainerFilters.mIncludeK8sLabel.size());
+    APSARA_TEST_EQUAL(1U, config->mContainerFilters.mExcludeK8sLabel.size());
     APSARA_TEST_EQUAL("container", config->mContainerFilters.mK8sContainerRegex);
-    APSARA_TEST_EQUAL(1, config->mContainerFilters.mIncludeEnv.size());
-    APSARA_TEST_EQUAL(1, config->mContainerFilters.mExcludeEnv.size());
-    APSARA_TEST_EQUAL(1, config->mContainerFilters.mIncludeContainerLabel.size());
-    APSARA_TEST_EQUAL(1, config->mContainerFilters.mExcludeContainerLabel.size());
-    APSARA_TEST_EQUAL(1, config->mExternalK8sLabelTag.size());
-    APSARA_TEST_EQUAL(1, config->mExternalEnvTag.size());
+    APSARA_TEST_EQUAL(1U, config->mContainerFilters.mIncludeEnv.size());
+    APSARA_TEST_EQUAL(1U, config->mContainerFilters.mExcludeEnv.size());
+    APSARA_TEST_EQUAL(1U, config->mContainerFilters.mIncludeContainerLabel.size());
+    APSARA_TEST_EQUAL(1U, config->mContainerFilters.mExcludeContainerLabel.size());
+    APSARA_TEST_EQUAL(1U, config->mExternalK8sLabelTag.size());
+    APSARA_TEST_EQUAL(1U, config->mExternalEnvTag.size());
     APSARA_TEST_TRUE(config->mCollectingContainersMeta);
 
     // invalid optional param
@@ -130,15 +130,15 @@ void ContainerDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
     APSARA_TEST_EQUAL("", config->mContainerFilters.mK8sNamespaceRegex);
     APSARA_TEST_EQUAL("", config->mContainerFilters.mK8sPodRegex);
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mIncludeK8sLabel.size());
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mExcludeK8sLabel.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mIncludeK8sLabel.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mExcludeK8sLabel.size());
     APSARA_TEST_EQUAL("", config->mContainerFilters.mK8sContainerRegex);
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mIncludeEnv.size());
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mExcludeEnv.size());
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mIncludeContainerLabel.size());
-    APSARA_TEST_EQUAL(0, config->mContainerFilters.mExcludeContainerLabel.size());
-    APSARA_TEST_EQUAL(0, config->mExternalK8sLabelTag.size());
-    APSARA_TEST_EQUAL(0, config->mExternalEnvTag.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mIncludeEnv.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mExcludeEnv.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mIncludeContainerLabel.size());
+    APSARA_TEST_EQUAL(0U, config->mContainerFilters.mExcludeContainerLabel.size());
+    APSARA_TEST_EQUAL(0U, config->mExternalK8sLabelTag.size());
+    APSARA_TEST_EQUAL(0U, config->mExternalEnvTag.size());
     APSARA_TEST_FALSE(config->mCollectingContainersMeta);
 }
 

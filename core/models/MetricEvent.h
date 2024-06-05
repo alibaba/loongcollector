@@ -22,6 +22,7 @@
 #include "common/memory/SourceBuffer.h"
 #include "models/MetricValue.h"
 #include "models/PipelineEvent.h"
+#include "models/SizedContainer.h"
 
 namespace logtail {
 
@@ -60,7 +61,7 @@ public:
     void SetTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
 
-    uint64_t EventsSizeBytes() override;
+    size_t DataSize() const override;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     Json::Value ToJson(bool enableEventMeta = false) const override;
@@ -72,7 +73,7 @@ private:
 
     StringView mName;
     MetricValue mValue;
-    std::map<StringView, StringView> mTags;
+    SizedMap mTags;
 };
 
 } // namespace logtail

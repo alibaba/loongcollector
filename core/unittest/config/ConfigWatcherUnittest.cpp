@@ -95,7 +95,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
     { ofstream fout("dir2/config.json"); }
     ConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
     APSARA_TEST_FALSE(diff.IsEmpty());
-    APSARA_TEST_EQUAL(1, diff.mAdded.size());
+    APSARA_TEST_EQUAL(1U, diff.mAdded.size());
 
     filesystem::remove_all("dir1");
     filesystem::remove_all("dir2");

@@ -16,33 +16,35 @@
 
 #include "models/MetricEvent.h"
 
+using namespace std;
+
 namespace logtail {
 
 MetricEvent::MetricEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::METRIC, ptr) {
 }
 
-void MetricEvent::SetName(const std::string& name) {
+void MetricEvent::SetName(const string& name) {
     const StringBuffer& b = GetSourceBuffer()->CopyString(name);
     mName = StringView(b.data, b.size);
 }
 
 StringView MetricEvent::GetTag(StringView key) const {
-    auto it = mTags.find(key);
-    if (it != mTags.end()) {
+    auto it = mTags.mInner.find(key);
+    if (it != mTags.mInner.end()) {
         return it->second;
     }
     return gEmptyStringView;
 }
 
 bool MetricEvent::HasTag(StringView key) const {
-    return mTags.find(key) != mTags.end();
+    return mTags.mInner.find(key) != mTags.mInner.end();
 }
 
 void MetricEvent::SetTag(StringView key, StringView val) {
     SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
-void MetricEvent::SetTag(const std::string& key, const std::string& val) {
+void MetricEvent::SetTag(const string& key, const string& val) {
     SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
@@ -51,16 +53,15 @@ void MetricEvent::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val)
 }
 
 void MetricEvent::SetTagNoCopy(StringView key, StringView val) {
-    mTags[key] = val;
+    mTags.Insert(key, val);
 }
 
 void MetricEvent::DelTag(StringView key) {
-    mTags.erase(key);
+    mTags.Erase(key);
 }
 
-uint64_t MetricEvent::EventsSizeBytes() {
-    // TODO
-    return 0;
+size_t MetricEvent::DataSize() const {
+    return PipelineEvent::DataSize() + mName.size() + logtail::DataSize(mValue) + mTags.DataSize();
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -71,9 +72,9 @@ Json::Value MetricEvent::ToJson(bool enableEventMeta) const {
     root["timestampNanosecond"] = GetTimestampNanosecond();
     root["name"] = mName.to_string();
     root["value"] = MetricValueToJson(mValue);
-    if (!mTags.empty()) {
+    if (!mTags.mInner.empty()) {
         Json::Value& tags = root["tags"];
-        for (const auto& tag : mTags) {
+        for (const auto& tag : mTags.mInner) {
             tags[tag.first.to_string()] = tag.second.to_string();
         }
     }

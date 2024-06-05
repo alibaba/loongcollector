@@ -16,6 +16,8 @@
 
 #include "models/LogEvent.h"
 
+using namespace std;
+
 namespace logtail {
 
 LogEvent::LogEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::LOG, ptr) {
@@ -37,7 +39,7 @@ void LogEvent::SetContent(StringView key, StringView val) {
     SetContentNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
-void LogEvent::SetContent(const std::string& key, const std::string& val) {
+void LogEvent::SetContent(const string& key, const string& val) {
     SetContentNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
@@ -52,9 +54,12 @@ void LogEvent::SetContentNoCopy(const StringBuffer& key, const StringBuffer& val
 void LogEvent::SetContentNoCopy(StringView key, StringView val) {
     auto it = mIndex.find(key);
     if (it != mIndex.end()) {
-        mContents[it->second].first = std::pair<StringView, StringView>(key, val);
+        auto& field = mContents[it->second].first;
+        mAllocatedContentSize += key.size() + val.size() - field.first.size() - field.second.size();
+        field = make_pair(key, val);
     } else {
-        mContents.emplace_back(std::pair<StringView, StringView>(key, val), true);
+        mAllocatedContentSize += key.size() + val.size();
+        mContents.emplace_back(make_pair(key, val), true);
         mIndex[key] = mContents.size() - 1;
     }
 }
@@ -62,6 +67,8 @@ void LogEvent::SetContentNoCopy(StringView key, StringView val) {
 void LogEvent::DelContent(StringView key) {
     auto it = mIndex.find(key);
     if (it != mIndex.end()) {
+        auto& field = mContents[it->second].first;
+        mAllocatedContentSize -= field.first.size() + field.second.size();
         mContents[it->second].second = false;
         mIndex.erase(it);
     }
@@ -117,13 +124,13 @@ LogEvent::ConstContentIterator LogEvent::cend() const {
 }
 
 void LogEvent::AppendContentNoCopy(StringView key, StringView val) {
-    mContents.emplace_back(std::pair<StringView, StringView>(key, val), true);
+    mAllocatedContentSize += key.size() + val.size();
+    mContents.emplace_back(make_pair(key, val), true);
     mIndex[key] = mContents.size() - 1;
 }
 
-uint64_t LogEvent::EventsSizeBytes() {
-    // TODO
-    return 0;
+size_t LogEvent::DataSize() const {
+    return PipelineEvent::DataSize() + sizeof(decltype(mContents)) + mAllocatedContentSize;
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

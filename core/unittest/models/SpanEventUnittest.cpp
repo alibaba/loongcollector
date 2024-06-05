@@ -29,6 +29,7 @@ public:
     void TestLink();
     void TestEvent();
     void TestScopeTag();
+    void TestSize();
     void TestToJson();
     void TestFromJson();
 
@@ -176,6 +177,75 @@ void SpanEventUnittest::TestScopeTag() {
     }
 }
 
+void SpanEventUnittest::TestSize() {
+    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(SpanEvent::Kind) + sizeof(uint64_t) + sizeof(uint64_t)
+        + sizeof(SpanEvent::StatusCode) + sizeof(vector<SpanEvent::InnerEvent>) + sizeof(vector<SpanEvent::SpanLink>)
+        + sizeof(map<StringView, StringView>) + sizeof(map<StringView, StringView>);
+
+    mSpanEvent->SetTraceId("test_trace_id");
+    mSpanEvent->SetSpanId("test_span_id");
+    mSpanEvent->SetTraceState("normal");
+    mSpanEvent->SetParentSpanId("test_parent_span_id");
+    mSpanEvent->SetName("test_name");
+    mSpanEvent->SetKind(SpanEvent::Kind::Client);
+    mSpanEvent->SetStatus(SpanEvent::StatusCode::Ok);
+    basicSize += strlen("test_trace_id") + strlen("test_span_id") + strlen("normal") + strlen("test_parent_span_id")
+        + strlen("test_name");
+
+    {
+        // add tag, key not existed
+        mSpanEvent->SetTag(string("key1"), string("a"));
+        APSARA_TEST_EQUAL(basicSize + 5U, mSpanEvent->DataSize());
+
+        // add tag, key existed
+        mSpanEvent->SetTag(string("key1"), string("bb"));
+        APSARA_TEST_EQUAL(basicSize + 6U, mSpanEvent->DataSize());
+
+        // delete tag
+        mSpanEvent->DelTag(string("key1"));
+        APSARA_TEST_EQUAL(basicSize, mSpanEvent->DataSize());
+    }
+    {
+        // add scope tag, key not existed
+        mSpanEvent->SetScopeTag(string("key1"), string("a"));
+        APSARA_TEST_EQUAL(basicSize + 5U, mSpanEvent->DataSize());
+
+        // add scope tag, key existed
+        mSpanEvent->SetScopeTag(string("key1"), string("bb"));
+        APSARA_TEST_EQUAL(basicSize + 6U, mSpanEvent->DataSize());
+
+        // delete scope tag
+        mSpanEvent->DelScopeTag(string("key1"));
+        APSARA_TEST_EQUAL(basicSize, mSpanEvent->DataSize());
+    }
+    {
+        SpanEvent::InnerEvent* e = mSpanEvent->AddEvent();
+        size_t newBasicSize = basicSize + sizeof(uint64_t) + sizeof(map<StringView, StringView>);
+
+        e->SetName("test_event");
+        newBasicSize += strlen("test_event");
+
+        e->SetTag(string("key1"), string("a"));
+        APSARA_TEST_EQUAL(newBasicSize + 5U, mSpanEvent->DataSize());
+
+        mSpanEvent->mEvents.clear();
+    }
+    {
+        SpanEvent::SpanLink* l = mSpanEvent->AddLink();
+        size_t newBasicSize = basicSize + sizeof(map<StringView, StringView>);
+
+        l->SetTraceId("other_trace_id");
+        l->SetSpanId("other_span_id");
+        l->SetTraceState("normal");
+        newBasicSize += strlen("other_trace_id") + strlen("other_span_id") + strlen("normal");
+
+        l->SetTag(string("key1"), string("a"));
+        APSARA_TEST_EQUAL(newBasicSize + 5U, mSpanEvent->DataSize());
+
+        mSpanEvent->mLinks.clear();
+    }
+}
+
 void SpanEventUnittest::TestToJson() {
     mSpanEvent->SetTimestamp(12345678901);
     mSpanEvent->SetTraceId("test_trace_id");
@@ -293,6 +363,7 @@ UNIT_TEST_CASE(SpanEventUnittest, TestTag)
 UNIT_TEST_CASE(SpanEventUnittest, TestLink)
 UNIT_TEST_CASE(SpanEventUnittest, TestEvent)
 UNIT_TEST_CASE(SpanEventUnittest, TestScopeTag)
+UNIT_TEST_CASE(SpanEventUnittest, TestSize)
 UNIT_TEST_CASE(SpanEventUnittest, TestToJson)
 UNIT_TEST_CASE(SpanEventUnittest, TestFromJson)
 
@@ -300,6 +371,7 @@ class InnerEventUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
+    void TestSize();
     void TestToJson();
     void TestFromJson();
 
@@ -371,6 +443,25 @@ void InnerEventUnittest::TestTag() {
     }
 }
 
+void InnerEventUnittest::TestSize() {
+    size_t basicSize = sizeof(uint64_t) + sizeof(map<StringView, StringView>);
+
+    mInnerEvent->SetName("test");
+    basicSize += strlen("test");
+
+    // add tag, and key not existed
+    mInnerEvent->SetTag(string("key1"), string("a"));
+    APSARA_TEST_EQUAL(basicSize + 5U, mInnerEvent->DataSize());
+
+    // add tag, and key existed
+    mInnerEvent->SetTag(string("key1"), string("bb"));
+    APSARA_TEST_EQUAL(basicSize + 6U, mInnerEvent->DataSize());
+
+    // delete tag
+    mInnerEvent->DelTag(string("key1"));
+    APSARA_TEST_EQUAL(basicSize, mInnerEvent->DataSize());
+}
+
 void InnerEventUnittest::TestToJson() {
     mInnerEvent->SetName("test");
     mInnerEvent->SetTimestampNs(1715826723000000000);
@@ -411,6 +502,7 @@ void InnerEventUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(InnerEventUnittest, TestSimpleFields)
 UNIT_TEST_CASE(InnerEventUnittest, TestTag)
+UNIT_TEST_CASE(InnerEventUnittest, TestSize)
 UNIT_TEST_CASE(InnerEventUnittest, TestToJson)
 UNIT_TEST_CASE(InnerEventUnittest, TestFromJson)
 
@@ -418,6 +510,7 @@ class SpanLinkUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
+    void TestSize();
     void TestToJson();
     void TestFromJson();
 
@@ -491,6 +584,27 @@ void SpanLinkUnittest::TestTag() {
     }
 }
 
+void SpanLinkUnittest::TestSize() {
+    size_t basicSize = sizeof(map<StringView, StringView>);
+
+    mLink->SetTraceId("test_trace_id");
+    mLink->SetSpanId("test_span_id");
+    mLink->SetTraceState("normal");
+    basicSize += strlen("test_trace_id") + strlen("test_span_id") + strlen("normal");
+
+    // add tag, and key not existed
+    mLink->SetTag(string("key1"), string("a"));
+    APSARA_TEST_EQUAL(basicSize + 5U, mLink->DataSize());
+
+    // add tag, and key existed
+    mLink->SetTag(string("key1"), string("bb"));
+    APSARA_TEST_EQUAL(basicSize + 6U, mLink->DataSize());
+
+    // delete tag
+    mLink->DelTag(string("key1"));
+    APSARA_TEST_EQUAL(basicSize, mLink->DataSize());
+}
+
 void SpanLinkUnittest::TestToJson() {
     mLink->SetTraceId("test_trace_id");
     mLink->SetSpanId("test_span_id");
@@ -535,6 +649,7 @@ void SpanLinkUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(SpanLinkUnittest, TestSimpleFields)
 UNIT_TEST_CASE(SpanLinkUnittest, TestTag)
+UNIT_TEST_CASE(SpanLinkUnittest, TestSize)
 UNIT_TEST_CASE(SpanLinkUnittest, TestToJson)
 UNIT_TEST_CASE(SpanLinkUnittest, TestFromJson)
 

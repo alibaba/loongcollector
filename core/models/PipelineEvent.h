@@ -40,17 +40,17 @@ public:
     virtual ~PipelineEvent() = default;
 
     Type GetType() const { return mType; }
-    time_t GetTimestamp() const { return timestamp; }
-    long GetTimestampNanosecond() const { return timestampNanosecond; }
-    void SetTimestamp(time_t t) { timestamp = t; }
+    time_t GetTimestamp() const { return mTimestamp; }
+    long GetTimestampNanosecond() const { return mTimestampNanosecond; }
+    void SetTimestamp(time_t t) { mTimestamp = t; }
     void SetTimestamp(time_t t, long ns) {
-        timestamp = t;
-        timestampNanosecond = ns; // Only nanosecond part
+        mTimestamp = t;
+        mTimestampNanosecond = ns; // Only nanosecond part
     }
     void ResetPipelineEventGroup(PipelineEventGroup* ptr) { mPipelineEventGroupPtr = ptr; }
     std::shared_ptr<SourceBuffer>& GetSourceBuffer();
 
-    virtual uint64_t EventsSizeBytes() = 0;
+    virtual size_t DataSize() const { return sizeof(decltype(mTimestamp)) + sizeof(decltype(mTimestampNanosecond)); };
 
 #ifdef APSARA_UNIT_TEST_MAIN
     virtual Json::Value ToJson(bool enableEventMeta = false) const = 0;
@@ -63,8 +63,8 @@ protected:
     PipelineEvent(Type type, PipelineEventGroup* ptr);
 
     Type mType = Type::NONE;
-    time_t timestamp = 0;
-    long timestampNanosecond = 0;
+    time_t mTimestamp = 0;
+    long mTimestampNanosecond = 0;
     PipelineEventGroup* mPipelineEventGroupPtr = nullptr;
 };
 

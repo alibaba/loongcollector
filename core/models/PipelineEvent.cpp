@@ -19,23 +19,25 @@
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 
+using namespace std;
+
 namespace logtail {
 
 StringView gEmptyStringView;
 
-const std::string& PipelineEventTypeToString(PipelineEvent::Type t) {
+const string& PipelineEventTypeToString(PipelineEvent::Type t) {
     switch (t) {
         case PipelineEvent::Type::LOG:
-            static std::string logname = "Log";
+            static string logname = "Log";
             return logname;
         case PipelineEvent::Type::METRIC:
-            static std::string metricname = "Metric";
+            static string metricname = "Metric";
             return metricname;
         case PipelineEvent::Type::SPAN:
-            static std::string spanname = "Span";
+            static string spanname = "Span";
             return spanname;
         default:
-            static std::string voidname = "";
+            static string voidname = "";
             return voidname;
     }
 }
@@ -43,27 +45,27 @@ const std::string& PipelineEventTypeToString(PipelineEvent::Type t) {
 PipelineEvent::PipelineEvent(Type type, PipelineEventGroup* ptr) : mType(type), mPipelineEventGroupPtr(ptr) {
 }
 
-std::shared_ptr<SourceBuffer>& PipelineEvent::GetSourceBuffer() {
+shared_ptr<SourceBuffer>& PipelineEvent::GetSourceBuffer() {
     return mPipelineEventGroupPtr->GetSourceBuffer();
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-std::string PipelineEvent::ToJsonString(bool enableEventMeta) const {
+string PipelineEvent::ToJsonString(bool enableEventMeta) const {
     Json::Value root = ToJson(enableEventMeta);
     Json::StreamWriterBuilder builder;
     builder["commentStyle"] = "None";
     builder["indentation"] = "    ";
-    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-    std::ostringstream oss;
+    unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+    ostringstream oss;
     writer->write(root, &oss);
     return oss.str();
 }
 
-bool PipelineEvent::FromJsonString(const std::string& inJson) {
+bool PipelineEvent::FromJsonString(const string& inJson) {
     Json::CharReaderBuilder builder;
     builder["collectComments"] = false;
-    std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
-    std::string errs;
+    unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    string errs;
     Json::Value root;
     if (!reader->parse(inJson.data(), inJson.data() + inJson.size(), &root, &errs)) {
         LOG_ERROR(sLogger, ("build PipelineEvent FromJsonString error", errs));

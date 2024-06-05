@@ -20,6 +20,19 @@ using namespace std;
 
 namespace logtail {
 
+size_t DataSize(const MetricValue& value) {
+    return visit(
+        [](auto&& arg) {
+            using T = decay_t<decltype(arg)>;
+            if constexpr (is_same_v<T, monostate>) {
+                return 0UL;
+            } else {
+                return arg.DataSize();
+            }
+        },
+        value);
+}
+
 #ifdef APSARA_UNIT_TEST_MAIN
 Json::Value UntypedSingleValue::ToJson() const {
     return Json::Value(mValue);
@@ -31,13 +44,13 @@ void UntypedSingleValue::FromJson(const Json::Value& value) {
 
 Json::Value MetricValueToJson(const MetricValue& value) {
     Json::Value res;
-    std::visit(
+    visit(
         [&](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, UntypedSingleValue>) {
+            using T = decay_t<decltype(arg)>;
+            if constexpr (is_same_v<T, UntypedSingleValue>) {
                 res["type"] = "untyped_single_value";
-                res["detail"] = std::get<UntypedSingleValue>(value).ToJson();
-            } else if constexpr (std::is_same_v<T, std::monostate>){
+                res["detail"] = get<UntypedSingleValue>(value).ToJson();
+            } else if constexpr (is_same_v<T, monostate>) {
                 res["type"] = "unknown";
             }
         },
@@ -45,7 +58,7 @@ Json::Value MetricValueToJson(const MetricValue& value) {
     return res;
 }
 
-MetricValue JsonToMetricValue(const std::string& type, const Json::Value& detail) {
+MetricValue JsonToMetricValue(const string& type, const Json::Value& detail) {
     if (type == "untyped_single_value") {
         UntypedSingleValue v;
         v.FromJson(detail);

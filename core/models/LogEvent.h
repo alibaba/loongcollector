@@ -95,7 +95,7 @@ public:
     ConstContentIterator cbegin() const;
     ConstContentIterator cend() const;
 
-    uint64_t EventsSizeBytes() override;
+    size_t DataSize() const override;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     Json::Value ToJson(bool enableEventMeta = false) const override;
@@ -113,6 +113,7 @@ private:
     // since log reduce in SLS server requires the original order of log contents, we have to maintain this sequential
     // information for backward compatability.
     ContentsContainer mContents;
+    size_t mAllocatedContentSize = 0;
     std::map<StringView, size_t> mIndex;
     uint32_t mFileOffset = 0;
     uint32_t mRawSize = 0;

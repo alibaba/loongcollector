@@ -29,7 +29,7 @@ void PipelineManagerUnittest::TestPipelineManagement() const {
     PipelineManager::GetInstance()->mPipelineNameEntityMap["test1"] = make_shared<Pipeline>();
     PipelineManager::GetInstance()->mPipelineNameEntityMap["test2"] = make_shared<Pipeline>();
 
-    APSARA_TEST_EQUAL(2, PipelineManager::GetInstance()->GetAllPipelineNames().size());
+    APSARA_TEST_EQUAL(2U, PipelineManager::GetInstance()->GetAllPipelineNames().size());
     APSARA_TEST_NOT_EQUAL(nullptr, PipelineManager::GetInstance()->FindPipelineByName("test1"));
     APSARA_TEST_EQUAL(nullptr, PipelineManager::GetInstance()->FindPipelineByName("test3"));
 }

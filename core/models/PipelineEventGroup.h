@@ -91,8 +91,6 @@ public:
     bool HasMetadata(EventGroupMetaKey key) const;
     void SetMetadataNoCopy(EventGroupMetaKey key, StringView val);
     void DelMetadata(EventGroupMetaKey key);
-    GroupMetadata& MutableAllMetadata() { return mMetadata; };
-    void SwapAllMetadata(GroupMetadata& other) { mMetadata.swap(other); }
     void SetAllMetadata(const GroupMetadata& other) { mMetadata = other; }
 
     void SetTag(StringView key, StringView val);
@@ -100,17 +98,16 @@ public:
     void SetTag(const StringBuffer& key, StringView val);
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     StringView GetTag(StringView key) const;
-    const GroupTags& GetTags() const { return mTags; };
+    const GroupTags& GetTags() const { return mTags.mInner; };
     bool HasTag(StringView key) const;
     void SetTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
-    GroupTags& MutableTags() { return mTags; };
-    void SwapTags(GroupTags& other) { mTags.swap(other); }
 
     void SetExactlyOnceCheckpoint(const RangeCheckpointPtr& checkpoint) { mExactlyOnceCheckpoint = checkpoint; }
     RangeCheckpointPtr GetExactlyOnceCheckpoint() const { return mExactlyOnceCheckpoint; }
+    bool IsReplay() const;
 
-    uint64_t EventGroupSizeBytes();
+    size_t DataSize() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     // for debug and test
@@ -122,7 +119,7 @@ public:
 
 private:
     GroupMetadata mMetadata; // Used to generate tag/log. Will not output.
-    GroupTags mTags; // custom tags to output
+    SizedMap mTags; // custom tags to output
     EventsContainer mEvents;
     std::shared_ptr<SourceBuffer> mSourceBuffer;
     RangeCheckpointPtr mExactlyOnceCheckpoint;

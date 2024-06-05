@@ -95,13 +95,13 @@ void ConfigUnittest::HandleValidConfig() const {
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
     APSARA_TEST_EQUAL(configName, config->mName);
-    APSARA_TEST_EQUAL(123456789, config->mCreateTime);
+    APSARA_TEST_EQUAL(123456789U, config->mCreateTime);
     APSARA_TEST_NOT_EQUAL(config->mGlobal, nullptr);
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(2, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mAggregators.size());
-    APSARA_TEST_EQUAL(2, config->mFlushers.size());
-    APSARA_TEST_EQUAL(1, config->mExtensions.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(2U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mAggregators.size());
+    APSARA_TEST_EQUAL(2U, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mExtensions.size());
 
     // topology 1: native -> native -> native
     configStr = R"(
@@ -127,9 +127,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_FALSE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_FALSE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -212,9 +212,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -244,9 +244,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_FALSE(config->IsProcessRunnerInvolved());
@@ -312,9 +312,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(2, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(2U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -408,9 +408,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(0, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(0U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_FALSE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_FALSE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -435,9 +435,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(0, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(0U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_FALSE(config->IsProcessRunnerInvolved());
@@ -495,9 +495,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_FALSE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -590,9 +590,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -622,9 +622,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_FALSE(config->IsProcessRunnerInvolved());
@@ -690,9 +690,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(2, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(2U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -786,9 +786,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(0, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(0U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_FALSE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -813,9 +813,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(0, config->mProcessors.size());
-    APSARA_TEST_EQUAL(1, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(0U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_FALSE(config->IsProcessRunnerInvolved());
@@ -876,9 +876,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(2, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(2U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -980,9 +980,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(2, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(2U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -1015,9 +1015,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(1, config->mProcessors.size());
-    APSARA_TEST_EQUAL(2, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(2U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_FALSE(config->IsProcessRunnerInvolved());
@@ -1089,9 +1089,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(2, config->mProcessors.size());
-    APSARA_TEST_EQUAL(2, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(2U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(2U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -1194,9 +1194,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(0, config->mProcessors.size());
-    APSARA_TEST_EQUAL(2, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(0U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(2U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -1224,9 +1224,9 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(1, config->mInputs.size());
-    APSARA_TEST_EQUAL(0, config->mProcessors.size());
-    APSARA_TEST_EQUAL(2, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(0U, config->mProcessors.size());
+    APSARA_TEST_EQUAL(2U, config->mFlushers.size());
     APSARA_TEST_TRUE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_TRUE(config->IsFlushingThroughGoPipelineExisted());
     APSARA_TEST_FALSE(config->IsProcessRunnerInvolved());
@@ -1288,7 +1288,7 @@ void ConfigUnittest::HandleInvalidCreateTime() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new Config(configName, std::move(configJson)));
     APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_EQUAL(0, config->mCreateTime);
+    APSARA_TEST_EQUAL(0U, config->mCreateTime);
 }
 
 void ConfigUnittest::HandleInvalidGlobal() const {

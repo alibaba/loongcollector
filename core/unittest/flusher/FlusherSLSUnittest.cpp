@@ -73,7 +73,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("", flusher->mAliuid);
     APSARA_TEST_EQUAL(FlusherSLS::CompressType::LZ4, flusher->mCompressType);
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
-    APSARA_TEST_EQUAL(0, flusher->mFlowControlExpireTime);
+    APSARA_TEST_EQUAL(0U, flusher->mFlowControlExpireTime);
     APSARA_TEST_EQUAL(-1, flusher->mMaxSendRate);
     APSARA_TEST_EQUAL(FlusherSLS::Batch::MergeType::TOPIC, flusher->mBatch.mMergeType);
     APSARA_TEST_EQUAL(INT32_FLAG(batch_send_interval), flusher->mBatch.mSendIntervalSecs);
@@ -114,11 +114,11 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
 #endif
     APSARA_TEST_EQUAL(FlusherSLS::CompressType::ZSTD, flusher->mCompressType);
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::METRIC, flusher->mTelemetryType);
-    APSARA_TEST_EQUAL(123456789, flusher->mFlowControlExpireTime);
+    APSARA_TEST_EQUAL(123456789U, flusher->mFlowControlExpireTime);
     APSARA_TEST_EQUAL(5, flusher->mMaxSendRate);
     APSARA_TEST_EQUAL(FlusherSLS::Batch::MergeType::LOGSTORE, flusher->mBatch.mMergeType);
-    APSARA_TEST_EQUAL(1, flusher->mBatch.mSendIntervalSecs);
-    APSARA_TEST_EQUAL(1, flusher->mBatch.mShardHashKeys.size());
+    APSARA_TEST_EQUAL(1U, flusher->mBatch.mSendIntervalSecs);
+    APSARA_TEST_EQUAL(1U, flusher->mBatch.mShardHashKeys.size());
 
     // invalid optional param
     configStr = R"(
@@ -149,7 +149,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("", flusher->mAliuid);
     APSARA_TEST_EQUAL(FlusherSLS::CompressType::LZ4, flusher->mCompressType);
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
-    APSARA_TEST_EQUAL(0, flusher->mFlowControlExpireTime);
+    APSARA_TEST_EQUAL(0U, flusher->mFlowControlExpireTime);
     APSARA_TEST_EQUAL(-1, flusher->mMaxSendRate);
     APSARA_TEST_EQUAL(FlusherSLS::Batch::MergeType::TOPIC, flusher->mBatch.mMergeType);
     APSARA_TEST_EQUAL(INT32_FLAG(batch_send_interval), flusher->mBatch.mSendIntervalSecs);
@@ -480,23 +480,23 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     flusher2.SetContext(ctx2);
 
     APSARA_TEST_TRUE(flusher1.Start());
-    APSARA_TEST_EQUAL(1, Sender::Instance()->mProjectRefCntMap.size());
+    APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
-    APSARA_TEST_EQUAL(1, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
+    APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
 
     APSARA_TEST_TRUE(flusher2.Start());
-    APSARA_TEST_EQUAL(2, Sender::Instance()->mProjectRefCntMap.size());
+    APSARA_TEST_EQUAL(2U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
 #ifdef __ENTERPRISE__
-    APSARA_TEST_EQUAL(2, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
+    APSARA_TEST_EQUAL(2U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
 #else
-    APSARA_TEST_EQUAL(1, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
+    APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
 #endif
 
     APSARA_TEST_TRUE(flusher2.Stop(true));
-    APSARA_TEST_EQUAL(1, Sender::Instance()->mProjectRefCntMap.size());
+    APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
-    APSARA_TEST_EQUAL(1, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
+    APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
 
     APSARA_TEST_TRUE(flusher1.Stop(true));
     APSARA_TEST_TRUE(Sender::Instance()->mProjectRefCntMap.empty());

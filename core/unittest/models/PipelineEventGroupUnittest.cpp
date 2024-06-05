@@ -44,8 +44,8 @@ void PipelineEventGroupUnittest::TestSwapEvents() {
     mEventGroup->AddSpanEvent();
     EventsContainer eventContainer;
     mEventGroup->SwapEvents(eventContainer);
-    APSARA_TEST_EQUAL_FATAL(3L, eventContainer.size());
-    APSARA_TEST_EQUAL_FATAL(0L, mEventGroup->GetEvents().size());
+    APSARA_TEST_EQUAL_FATAL(3U, eventContainer.size());
+    APSARA_TEST_EQUAL_FATAL(0U, mEventGroup->GetEvents().size());
 }
 
 void PipelineEventGroupUnittest::TestSetMetadata() {
@@ -113,7 +113,7 @@ void PipelineEventGroupUnittest::TestFromJsonToJson() {
     })";
     APSARA_TEST_TRUE_FATAL(mEventGroup->FromJsonString(inJson));
     auto& events = mEventGroup->GetEvents();
-    APSARA_TEST_EQUAL_FATAL(1L, events.size());
+    APSARA_TEST_EQUAL_FATAL(1U, events.size());
     auto& logEvent = events[0];
     APSARA_TEST_TRUE_FATAL(logEvent.Is<LogEvent>());
 

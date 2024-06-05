@@ -27,9 +27,10 @@ public:
     void TestName();
     void TestValue();
     void TestTag();
+    void TestSize();
     void TestToJson();
     void TestFromJson();
-    
+
 protected:
     void SetUp() override {
         mSourceBuffer.reset(new SourceBuffer);
@@ -103,6 +104,26 @@ void MetricEventUnittest::TestTag() {
     }
 }
 
+void MetricEventUnittest::TestSize() {
+    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(UntypedSingleValue) + sizeof(map<StringView, StringView>);
+    mMetricEvent->SetName("test");
+    basicSize += 4;
+    
+    mMetricEvent->SetValue(UntypedSingleValue{10.0});
+
+    // add tag, and key not existed
+    mMetricEvent->SetTag(string("key1"), string("a"));
+    APSARA_TEST_EQUAL(basicSize + 5U, mMetricEvent->DataSize());
+
+    // add tag, and key existed
+    mMetricEvent->SetTag(string("key1"), string("bb"));
+    APSARA_TEST_EQUAL(basicSize + 6U, mMetricEvent->DataSize());
+
+    // delete tag
+    mMetricEvent->DelTag(string("key1"));
+    APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
+}
+
 void MetricEventUnittest::TestToJson() {
     mMetricEvent->SetTimestamp(12345678901);
     mMetricEvent->SetName("test");
@@ -159,6 +180,7 @@ void MetricEventUnittest::TestFromJson() {
 UNIT_TEST_CASE(MetricEventUnittest, TestName)
 UNIT_TEST_CASE(MetricEventUnittest, TestValue)
 UNIT_TEST_CASE(MetricEventUnittest, TestTag)
+UNIT_TEST_CASE(MetricEventUnittest, TestSize)
 UNIT_TEST_CASE(MetricEventUnittest, TestToJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestFromJson)
 

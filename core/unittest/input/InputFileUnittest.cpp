@@ -73,8 +73,8 @@ void InputFileUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
-    APSARA_TEST_EQUAL(0, int(input->mMaxCheckpointDirSearchDepth));
-    APSARA_TEST_EQUAL(0, int(input->mExactlyOnceConcurrency));
+    APSARA_TEST_EQUAL(0U, input->mMaxCheckpointDirSearchDepth);
+    APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
 
     // valid optional param
     configStr = R"(
@@ -93,8 +93,8 @@ void InputFileUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
-    APSARA_TEST_EQUAL(1, int(input->mMaxCheckpointDirSearchDepth));
-    APSARA_TEST_EQUAL(1, int(input->mExactlyOnceConcurrency));
+    APSARA_TEST_EQUAL(1, input->mMaxCheckpointDirSearchDepth);
+    APSARA_TEST_EQUAL(1, input->mExactlyOnceConcurrency);
 
     // invalid optional param
     configStr = R"(
@@ -113,8 +113,8 @@ void InputFileUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
-    APSARA_TEST_EQUAL(0, input->mMaxCheckpointDirSearchDepth);
-    APSARA_TEST_EQUAL(0, input->mExactlyOnceConcurrency);
+    APSARA_TEST_EQUAL(0U, input->mMaxCheckpointDirSearchDepth);
+    APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
 
     // TailingAllMatchedFiles
     configStr = R"(
@@ -147,7 +147,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(0, input->mExactlyOnceConcurrency);
+    APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
 }
 
 void InputFileUnittest::OnFailedInit() {
@@ -285,13 +285,13 @@ void InputFileUnittest::OnPipelineUpdate() {
     APSARA_TEST_NOT_EQUAL(nullptr, FileServer::GetInstance()->GetFileDiscoveryConfig("test_config").first);
     APSARA_TEST_NOT_EQUAL(nullptr, FileServer::GetInstance()->GetFileReaderConfig("test_config").first);
     APSARA_TEST_NOT_EQUAL(nullptr, FileServer::GetInstance()->GetMultilineConfig("test_config").first);
-    APSARA_TEST_EQUAL(2, FileServer::GetInstance()->GetExactlyOnceConcurrency("test_config"));
+    APSARA_TEST_EQUAL(2U, FileServer::GetInstance()->GetExactlyOnceConcurrency("test_config"));
 
     APSARA_TEST_TRUE(input.Stop(true));
     APSARA_TEST_EQUAL(nullptr, FileServer::GetInstance()->GetFileDiscoveryConfig("test_config").first);
     APSARA_TEST_EQUAL(nullptr, FileServer::GetInstance()->GetFileReaderConfig("test_config").first);
     APSARA_TEST_EQUAL(nullptr, FileServer::GetInstance()->GetMultilineConfig("test_config").first);
-    APSARA_TEST_EQUAL(0, FileServer::GetInstance()->GetExactlyOnceConcurrency("test_config"));
+    APSARA_TEST_EQUAL(0U, FileServer::GetInstance()->GetExactlyOnceConcurrency("test_config"));
 }
 
 void InputFileUnittest::TestSetContainerBaseDir() {
