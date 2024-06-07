@@ -210,7 +210,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegex() {
                     "rawLog" : "value1\tvalue2"
                 },
                 "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -221,7 +220,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegex() {
                     "rawLog" : "value3\tvalue4"
                 },
                 "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -288,7 +286,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegexRaw() {
                     "rawLog" : "value1"
                 },
                 "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -298,7 +295,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegexRaw() {
                     "rawLog" : "value3"
                 },
                 "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]
@@ -366,7 +362,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegexContent() {
                     "rawLog" : "value1\tvalue2"
                 },
                 "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
                 "type" : 1
             },
             {
@@ -377,7 +372,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegexContent() {
                     "rawLog" : "value3\tvalue4"
                 },
                 "timestamp" : 12345678901,
-                "timestampNanosecond" : 0,
                 "type" : 1
             }
         ]

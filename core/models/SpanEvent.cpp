@@ -299,9 +299,9 @@ size_t SpanEvent::DataSize() const {
         linksSize += item.DataSize();
     }
     // TODO: for enum, it seems more reasonable to use actual string size instead of size of enum
-    return PipelineEvent::DataSize() + mTraceId.size() + mSpanId.size() + mTraceState.size() + mParentSpanId.size() + mName.size()
-        + sizeof(decltype(mKind)) + sizeof(decltype(mStartTimeNs)) + sizeof(decltype(mEndTimeNs)) + mTags.DataSize()
-        + eventsSize + linksSize + sizeof(decltype(mStatus)) + mScopeTags.DataSize();
+    return PipelineEvent::DataSize() + mTraceId.size() + mSpanId.size() + mTraceState.size() + mParentSpanId.size()
+        + mName.size() + sizeof(decltype(mKind)) + sizeof(decltype(mStartTimeNs)) + sizeof(decltype(mEndTimeNs))
+        + mTags.DataSize() + eventsSize + linksSize + sizeof(decltype(mStatus)) + mScopeTags.DataSize();
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -309,7 +309,9 @@ Json::Value SpanEvent::ToJson(bool enableEventMeta) const {
     Json::Value root;
     root["type"] = static_cast<int>(GetType());
     root["timestamp"] = GetTimestamp();
-    root["timestampNanosecond"] = GetTimestampNanosecond();
+    if (GetTimestampNanosecond()) {
+        root["timestampNanosecond"] = static_cast<int32_t>(GetTimestampNanosecond().value());
+    }
     root["traceId"] = mTraceId.to_string();
     root["spanId"] = mSpanId.to_string();
     if (!mTraceState.empty()) {

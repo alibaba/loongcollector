@@ -302,10 +302,11 @@ void SetLogTime(sls_logs::Log* log, time_t second) {
     log->set_time(second);
 }
 
-void SetLogTimeWithNano(sls_logs::Log* log, time_t second, long nanosecond) {
-    // Usage: set nanosecond first, and then discard at LogProcess@ProcessBufferLegacy
+void SetLogTimeWithNano(sls_logs::Log* log, time_t second, std::optional<uint32_t> nanosecond) {
     log->set_time(second);
-    log->set_time_ns(nanosecond);
+    if (nanosecond) {
+        log->set_time_ns(nanosecond.value());
+    }
 }
 
 LogtailTime GetCurrentLogtailTime() {

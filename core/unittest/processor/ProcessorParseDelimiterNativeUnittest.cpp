@@ -89,6 +89,7 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
                     "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog',0.024"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -97,6 +98,7 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -148,6 +150,7 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
 012@@34"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -271,6 +274,7 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
 012@@34"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -417,6 +421,7 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
 012@@345@@1@@2@@3"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -544,6 +549,7 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
 012@@345@@1@@2@@3"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -674,6 +680,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
 012@@345"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -797,6 +804,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
 012@@345@@678"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -919,6 +927,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
 012@@345@@678"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -1048,6 +1057,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
 012@@345"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -1178,6 +1188,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
 012@@345@@678"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -1307,6 +1318,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
 012@@345@@678"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -1456,6 +1468,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessWholeLine() {
                     "content" : "2013-10-31 21:03:49,POST,PutData?Category=YunOsAccountOpLog,0.024"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -1464,6 +1477,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessWholeLine() {
                     "content" : "2013-10-31 21:04:49,POST,PutData?Category=YunOsAccountOpLog,0.024"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -1523,6 +1537,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessQuote() {
         2023-12-25 1|zdfvzdfv zfdv|zfdvzdfv zfd|fzdvzdfvzdfvz|zfvzfdzv zfdb|zfdvzdfbvzb|zdfvzdfbvzdb|'advfawevaevb|dvzdfvzdbfazdb|zdfvbzdfb '|zdfbvzbszfbsfb"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -1675,6 +1690,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessQuote() {
                         "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog',0.024"
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond": 0,
                     "type" : 1
                 },
                 {
@@ -1683,6 +1699,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessQuote() {
                         "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog,0.024"
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond": 0,
                     "type" : 1
                 },
                 {
@@ -1691,6 +1708,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessQuote() {
                         "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOs'AccountOpLog',0.024"
                     },
                     "timestamp" : 12345678901,
+                    "timestampNanosecond": 0,
                     "type" : 1
                 }
             ]
@@ -1771,6 +1789,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessKeyOverwritten() {
                     "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog',0.024"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -1779,6 +1798,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessKeyOverwritten() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -1850,6 +1870,7 @@ void ProcessorParseDelimiterNativeUnittest::TestUploadRawLog() {
                     "content" : "2013-10-31 21:03:49,POST,'PutData?Category=YunOsAccountOpLog',0.024"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -1858,6 +1879,7 @@ void ProcessorParseDelimiterNativeUnittest::TestUploadRawLog() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -1955,6 +1977,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventKeepUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -1963,6 +1986,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventKeepUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -1971,6 +1995,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventKeepUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -1979,6 +2004,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventKeepUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -1987,6 +2013,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventKeepUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]
@@ -2095,6 +2122,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventDiscardUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -2103,6 +2131,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventDiscardUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -2111,6 +2140,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventDiscardUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -2119,6 +2149,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventDiscardUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             },
             {
@@ -2127,6 +2158,7 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventDiscardUnmatch() {
                     "content" : "value1"
                 },
                 "timestamp" : 12345678901,
+                "timestampNanosecond": 0,
                 "type" : 1
             }
         ]

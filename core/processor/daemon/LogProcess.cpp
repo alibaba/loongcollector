@@ -231,7 +231,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
 
         {
             ReadLock lock(mAccessProcessThreadRWL);
-            
+
             std::unique_ptr<ProcessQueueItem> item;
             std::string configName;
             if (!ProcessQueueManager::GetInstance()->PopItem(threadNo, item, configName)) {

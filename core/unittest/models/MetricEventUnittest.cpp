@@ -125,7 +125,7 @@ void MetricEventUnittest::TestSize() {
 }
 
 void MetricEventUnittest::TestToJson() {
-    mMetricEvent->SetTimestamp(12345678901);
+    mMetricEvent->SetTimestamp(12345678901, 0);
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(UntypedSingleValue{10.0});
     mMetricEvent->SetTag(string("key1"), string("value1"));
@@ -170,7 +170,7 @@ void MetricEventUnittest::TestFromJson() {
     mMetricEvent->FromJson(eventJson);
 
     APSARA_TEST_EQUAL(12345678901, mMetricEvent->GetTimestamp());
-    APSARA_TEST_EQUAL(0L, mMetricEvent->GetTimestampNanosecond());
+    APSARA_TEST_EQUAL(0L, mMetricEvent->GetTimestampNanosecond().value());
     APSARA_TEST_EQUAL("test", mMetricEvent->GetName());
     APSARA_TEST_TRUE(mMetricEvent->Is<UntypedSingleValue>());
     APSARA_TEST_EQUAL(10.0, mMetricEvent->GetValue<UntypedSingleValue>()->mValue);

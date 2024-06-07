@@ -365,7 +365,6 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     {
                         "name": "",
                         "timestamp": 0,
-                        "timestampNanosecond": 0,
                         "type": 2,
                         "value": {
                             "type": "unknown"
@@ -469,7 +468,6 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     {
                         "name": "",
                         "timestamp": 0,
-                        "timestampNanosecond": 0,
                         "type": 2,
                         "value": {
                             "type": "unknown"
@@ -526,7 +524,6 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     {
                         "name": "",
                         "timestamp": 0,
-                        "timestampNanosecond": 0,
                         "type": 2,
                         "value": {
                             "type": "unknown"
@@ -1412,7 +1409,6 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
                     {
                         "name": "",
                         "timestamp": 0,
-                        "timestampNanosecond": 0,
                         "type": 2,
                         "value": {
                             "type": "unknown"
@@ -1556,7 +1552,6 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
                     {
                         "name": "",
                         "timestamp": 0,
-                        "timestampNanosecond": 0,
                         "type": 2,
                         "value": {
                             "type": "unknown"
@@ -1697,7 +1692,6 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
                     {
                         "name": "",
                         "timestamp": 0,
-                        "timestampNanosecond": 0,
                         "type": 2,
                         "value": {
                             "type": "unknown"
@@ -1827,7 +1821,6 @@ void ProcessEventsWithPartLogUnittest::TestProcess() {
                     {
                         "name": "",
                         "timestamp": 0,
-                        "timestampNanosecond": 0,
                         "type": 2,
                         "value": {
                             "type": "unknown"

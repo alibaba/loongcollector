@@ -56,7 +56,7 @@ void PipelineEventGroupInput::getTimeColumns(std::vector<uint32_t>& times,
     for (const auto &event : mLogGroup->GetEvents()) {
         const LogEvent& sourceEvent = event.Cast<LogEvent>();
         times.emplace_back(sourceEvent.GetTimestamp());
-        timeNanos.emplace_back(sourceEvent.GetTimestampNanosecond());
+        timeNanos.emplace_back(sourceEvent.GetTimestampNanosecond() ? sourceEvent.GetTimestampNanosecond().value() : 0);
     }
 }
 

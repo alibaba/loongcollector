@@ -247,7 +247,7 @@ void SpanEventUnittest::TestSize() {
 }
 
 void SpanEventUnittest::TestToJson() {
-    mSpanEvent->SetTimestamp(12345678901);
+    mSpanEvent->SetTimestamp(12345678901, 0);
     mSpanEvent->SetTraceId("test_trace_id");
     mSpanEvent->SetSpanId("test_span_id");
     mSpanEvent->SetTraceState("normal");
@@ -343,6 +343,8 @@ void SpanEventUnittest::TestFromJson() {
     ParseJsonTable(eventStr, eventJson, errorMsg);
     mSpanEvent->FromJson(eventJson);
 
+    APSARA_TEST_EQUAL(12345678901, mSpanEvent->GetTimestamp());
+    APSARA_TEST_EQUAL(0L, mSpanEvent->GetTimestampNanosecond().value());
     APSARA_TEST_EQUAL("test_trace_id", mSpanEvent->GetTraceId().to_string());
     APSARA_TEST_EQUAL("test_span_id", mSpanEvent->GetSpanId().to_string());
     APSARA_TEST_EQUAL("normal", mSpanEvent->GetTraceState().to_string());
