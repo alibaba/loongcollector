@@ -70,10 +70,6 @@ type CRIRuntimeWrapper struct {
 }
 
 func IsCRIRuntimeValid(criRuntimeEndpoint string) bool {
-	if len(os.Getenv("USE_CONTAINERD")) > 0 {
-		return true
-	}
-
 	// Verify containerd.sock cri valid.
 	if fi, err := os.Stat(criRuntimeEndpoint); err == nil && !fi.IsDir() {
 		if IsCRIStatusValid(criRuntimeEndpoint) {
@@ -99,30 +95,17 @@ func IsCRIStatusValid(criRuntimeEndpoint string) bool {
 
 	client := cri.NewRuntimeServiceClient(conn)
 	// check cri status
-	for tryCount := 0; tryCount < 5; tryCount++ {
-		_, err = client.Status(ctx, &cri.StatusRequest{})
-		if err == nil {
-			break
-		}
-		if strings.Contains(err.Error(), "code = Unimplemented") {
-			logger.Debug(context.Background(), "Status failed", err)
-			return false
-		}
-		time.Sleep(time.Millisecond * 100)
-	}
+	_, err = client.Status(ctx, &cri.StatusRequest{})
 	if err != nil {
 		logger.Debug(context.Background(), "Status failed", err)
 		return false
 	}
 	// check running containers
-	for tryCount := 0; tryCount < 5; tryCount++ {
-		var containersResp *cri.ListContainersResponse
-		containersResp, err = client.ListContainers(ctx, &cri.ListContainersRequest{Filter: nil})
-		if err == nil {
-			logger.Debug(context.Background(), "ListContainers result", containersResp.Containers)
-			return containersResp.Containers != nil
-		}
-		time.Sleep(time.Millisecond * 100)
+	var containersResp *cri.ListContainersResponse
+	containersResp, err = client.ListContainers(ctx, &cri.ListContainersRequest{Filter: nil})
+	if err == nil {
+		logger.Debug(context.Background(), "ListContainers result", containersResp.Containers)
+		return containersResp.Containers != nil
 	}
 	logger.Debug(context.Background(), "ListContainers failed", err)
 	return false

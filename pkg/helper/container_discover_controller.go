@@ -45,11 +45,11 @@ type ContainerDiscoverManager struct {
 	fetchOneLock     sync.Mutex
 }
 
-func NewContainerDiscoverManager(enableDockerDiscover, enableCRIDiscover, enableStaticDiscover bool) *ContainerDiscoverManager {
+func NewContainerDiscoverManager() *ContainerDiscoverManager {
 	return &ContainerDiscoverManager{
-		enableDockerDiscover: enableDockerDiscover,
-		enableCRIDiscover:    enableCRIDiscover,
-		enableStaticDiscover: enableStaticDiscover,
+		enableDockerDiscover: false,
+		enableCRIDiscover:    false,
+		enableStaticDiscover: false,
 	}
 }
 
@@ -125,7 +125,7 @@ func (c *ContainerDiscoverManager) fetchCRI() error {
 	return criRuntimeWrapper.fetchAll()
 }
 
-func (c *ContainerDiscoverManager) SyncContainers() {
+func (c *ContainerDiscoverManager) StartSyncContainers() {
 	if c.enableCRIDiscover {
 		logger.Debug(context.Background(), "discover manager start sync containers goroutine", "cri")
 		go criRuntimeWrapper.loopSyncContainers()
@@ -159,8 +159,42 @@ func (c *ContainerDiscoverManager) LogAlarm(err error, msg string) {
 	}
 }
 
-func (c *ContainerDiscoverManager) Init(initTryTimes int) {
+func (c *ContainerDiscoverManager) Init() bool {
 	defer dockerCenterRecover()
+
+	// discover which runtime is valid
+	if IsCRIRuntimeValid(containerdUnixSocket) {
+		var err error
+		criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance)
+		if err != nil {
+			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+			criRuntimeWrapper = nil
+		} else {
+			logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
+		}
+	}
+	if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
+		if !ok {
+			logger.Info(context.Background(), "no docker mount path", "set empty")
+			DefaultLogtailMountPath = ""
+		}
+	} else {
+		logger.Warning(context.Background(), "check docker mount path error", err.Error())
+	}
+	c.enableCRIDiscover = criRuntimeWrapper != nil
+	c.enableDockerDiscover = dockerCenterInstance.initClient() == nil
+	c.enableStaticDiscover = isStaticContainerInfoEnabled()
+	discoverdRuntime := false
+	if len(os.Getenv("USE_CONTAINERD")) > 0 {
+		discoverdRuntime = c.enableCRIDiscover
+	} else {
+		discoverdRuntime = c.enableCRIDiscover || c.enableDockerDiscover || c.enableStaticDiscover
+	}
+	if !discoverdRuntime {
+		return false
+	}
+
+	// try to connect to runtime
 	logger.Info(context.Background(), "input", "param", "docker discover", c.enableDockerDiscover, "cri discover", c.enableCRIDiscover, "static discover", c.enableStaticDiscover)
 	listenLoopIntervalSec := 0
 	// Get env in the same order as in C Logtail
@@ -222,31 +256,22 @@ func (c *ContainerDiscoverManager) Init(initTryTimes int) {
 
 	var err error
 	if c.enableDockerDiscover {
-		for i := 0; i < initTryTimes; i++ {
-			if err = c.fetchDocker(); err == nil {
-				break
-			}
-		}
-		if err != nil {
+		if err = c.fetchDocker(); err != nil {
 			c.enableDockerDiscover = false
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "fetch docker containers error in %d times, close docker discover", initTryTimes)
+			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "fetch docker containers error, close docker discover, will retry")
 		}
 	}
 	if c.enableCRIDiscover {
-		for i := 0; i < initTryTimes; i++ {
-			if err = c.fetchCRI(); err == nil {
-				break
-			}
-		}
-		if err != nil {
+		if err = c.fetchCRI(); err != nil {
 			c.enableCRIDiscover = false
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "fetch cri containers error in %d times, close cri discover", initTryTimes)
+			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "fetch cri containers error, close cri discover, will retry")
 		}
 	}
 	if c.enableStaticDiscover {
 		c.fetchStatic()
 	}
 	logger.Info(context.Background(), "final", "param", "docker discover", c.enableDockerDiscover, "cri discover", c.enableCRIDiscover, "static discover", c.enableStaticDiscover)
+	return c.enableCRIDiscover || c.enableDockerDiscover || c.enableStaticDiscover
 }
 
 func (c *ContainerDiscoverManager) TimerFetch() {

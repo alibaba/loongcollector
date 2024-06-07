@@ -637,39 +637,24 @@ func getDockerCenterInstance() *DockerCenter {
 		dockerCenterInstance = &DockerCenter{}
 		dockerCenterInstance.imageCache = make(map[string]string)
 		dockerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
-		if IsCRIRuntimeValid(containerdUnixSocket) {
-			retryTimes := 10
-			for i := 0; i < retryTimes; i++ {
-				var err error
-				criRuntimeWrapper, err = NewCRIRuntimeWrapper(dockerCenterInstance)
-				if err != nil {
-					logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
-					criRuntimeWrapper = nil
-				} else {
-					logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
+		// containerFindingManager works in a producer-consumer model
+		// so even manager is not initialized, it will not affect consumers like service_stdout
+		go func() {
+			retryCount := 0
+			containerFindingManager = NewContainerDiscoverManager()
+			for {
+				if containerFindingManager.Init() {
 					break
 				}
-				time.Sleep(time.Second * 1)
-				if i == retryTimes-1 {
-					logger.Error(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] create cri-runtime client failed")
+				if retryCount%10 == 0 {
+					logger.Error(context.Background(), "DOCKER_CENTER_ALARM", "docker center init failed", "retry count", retryCount)
 				}
+				retryCount++
+				time.Sleep(time.Second * 1)
 			}
-		}
-		if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
-			if !ok {
-				logger.Info(context.Background(), "no docker mount path", "set empty")
-				DefaultLogtailMountPath = ""
-			}
-		} else {
-			logger.Warning(context.Background(), "check docker mount path error", err.Error())
-		}
-		var enableCriFinding = criRuntimeWrapper != nil
-		var enableDocker = dockerCenterInstance.initClient() == nil
-		var enableStatic = isStaticContainerInfoEnabled()
-		containerFindingManager = NewContainerDiscoverManager(enableDocker, enableCriFinding, enableStatic)
-		containerFindingManager.Init(3)
-		containerFindingManager.TimerFetch()
-		containerFindingManager.SyncContainers()
+			containerFindingManager.TimerFetch()
+			containerFindingManager.StartSyncContainers()
+		}()
 	})
 	return dockerCenterInstance
 }
