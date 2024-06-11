@@ -159,6 +159,10 @@ bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalG
 std::string InputContainerStdio::TryGetRealPath(const std::string& path) {
     std::string tmpPath = path;
 #if defined(__linux__)
+    if (tmpPath.empty()) {
+        return "";
+    }
+
     int index = 0; // assume path is absolute
     for (int i = 0; i < 10; i++) {
         fsutil::PathStat buf;
@@ -207,8 +211,8 @@ std::string InputContainerStdio::TryGetRealPath(const std::string& path) {
 }
 
 bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
-                                                     const PipelineContext* ctx,
-                                                     const FileDiscoveryOptions*) {
+                                                       const PipelineContext* ctx,
+                                                       const FileDiscoveryOptions*) {
     if (!containerInfo.mRealBaseDir.empty()) {
         return true;
     }

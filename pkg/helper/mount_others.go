@@ -35,6 +35,10 @@ func GetMountedFilePathWithBasePath(basePath, logPath string) string {
 
 func TryGetRealPath(path string) (string, fs.FileInfo) {
 	sepLen := len(string(os.PathSeparator))
+	if len(path) < sepLen {
+		return "", nil
+	}
+
 	index := 0 // assume path is absolute
 	for i := 0; i < 10; i++ {
 		if f, err := os.Stat(path); err == nil {
