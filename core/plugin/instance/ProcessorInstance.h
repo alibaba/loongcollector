@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include <memory>
-
 #include <json/json.h>
+
+#include <memory>
 
 #include "models/PipelineEventGroup.h"
 #include "monitor/LogtailMetric.h"
+#include "pipeline/PipelineContext.h"
 #include "plugin/instance/PluginInstance.h"
 #include "plugin/interface/Processor.h"
-#include "pipeline/PipelineContext.h"
 
 namespace logtail {
 
@@ -55,6 +55,8 @@ private:
     friend class ProcessorParseDelimiterNativeUnittest;
     friend class ProcessorFilterNativeUnittest;
     friend class ProcessorDesensitizeNativeUnittest;
+    friend class InputFileUnittest;
+    friend class PipelineUnittest;
 #endif
 };
 

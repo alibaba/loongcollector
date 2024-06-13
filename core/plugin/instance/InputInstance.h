@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include <memory>
-
 #include <json/json.h>
 
+#include <memory>
+
+#include "pipeline/PipelineContext.h"
 #include "plugin/instance/PluginInstance.h"
 #include "plugin/interface/Input.h"
-#include "pipeline/PipelineContext.h"
 
 namespace logtail {
 
@@ -32,9 +32,14 @@ public:
 
     const std::string& Name() const override { return mPlugin->Name(); }
 
-    bool Init(const Json::Value& config, PipelineContext& context, Json::Value& optionalGoPipeline);
+    bool Init(const Json::Value& config,
+              PipelineContext& context,
+              uint32_t& pluginIdx,
+              size_t inputIdx,
+              Json::Value& optionalGoPipeline);
     bool Start() { return mPlugin->Start(); }
     bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
+    std::vector<std::unique_ptr<ProcessorInstance>>& GetInnerProcessors() { return mPlugin->GetInnerProcessors(); }
 
     // just for special treatment of exactly once of input_file, should not be used otherwise!
     const Input* GetPlugin() const { return mPlugin.get(); }

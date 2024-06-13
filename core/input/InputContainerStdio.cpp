@@ -20,6 +20,11 @@
 #include "common/ParamExtractor.h"
 #include "file_server/FileServer.h"
 #include "pipeline/Pipeline.h"
+#include "plugin/PluginRegistry.h"
+#include "processor/inner/ProcessorMergeMultilineLogNative.h"
+#include "processor/inner/ProcessorParseContainerLogNative.h"
+#include "processor/inner/ProcessorSplitLogStringNative.h"
+#include "processor/inner/ProcessorTagNative.h"
 
 using namespace std;
 
@@ -27,7 +32,7 @@ namespace logtail {
 
 const string InputContainerStdio::sName = "input_container_stdio";
 
-bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputContainerStdio::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) {
     string errorMsg;
     if (!AppConfig::GetInstance()->IsPurageContainerMode()) {
         PARAM_ERROR_RETURN(mContext->GetLogger(),
@@ -153,7 +158,7 @@ bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalG
                                        GetContext().GetRegion());
     }
 
-    return true;
+    return CreateInnerProcessors(pluginIdx);
 }
 
 std::string InputContainerStdio::TryGetRealPath(const std::string& path) {
@@ -261,6 +266,84 @@ bool InputContainerStdio::Stop(bool isPipelineRemoving) {
     FileServer::GetInstance()->RemoveFileDiscoveryConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveFileReaderConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());
+    return true;
+}
+
+bool InputContainerStdio::CreateInnerProcessors(uint32_t& pluginIdx) {
+    unique_ptr<ProcessorInstance> processor;
+    // ProcessorSplitLogStringNative
+    {
+        Json::Value detail;
+        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitLogStringNative::sName,
+                                                                   to_string(++pluginIdx));
+        detail["SplitChar"] = Json::Value('\n');
+        if (!processor->Init(detail, *mContext)) {
+            return false;
+        }
+        mInnerProcessors.emplace_back(std::move(processor));
+    }
+    // ProcessorParseContainerLogNative
+    {
+        Json::Value detail;
+        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseContainerLogNative::sName,
+                                                                   to_string(++pluginIdx));
+        detail["IgnoringStdout"] = Json::Value(mIgnoringStdout);
+        detail["IgnoringStderr"] = Json::Value(mIgnoringStderr);
+        detail["KeepingSourceWhenParseFail"] = Json::Value(mKeepingSourceWhenParseFail);
+        detail["IgnoreParseWarning"] = Json::Value(mIgnoreParseWarning);
+        if (!processor->Init(detail, *mContext)) {
+            return false;
+        }
+        mInnerProcessors.emplace_back(std::move(processor));
+    }
+    // ProcessorMergeMultilineLogNative
+    {
+        Json::Value detail;
+        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMergeMultilineLogNative::sName,
+                                                                   to_string(++pluginIdx));
+        detail["MergeType"] = Json::Value("flag");
+        if (!processor->Init(detail, *mContext)) {
+            return false;
+        }
+        mInnerProcessors.emplace_back(std::move(processor));
+    }
+    if (mMultiline.IsMultiline()) {
+        Json::Value detail;
+        if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
+            mContext->SetRequiringJsonReaderFlag(true);
+            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitLogStringNative::sName,
+                                                                       to_string(++pluginIdx));
+            detail["SplitChar"] = Json::Value('\0');
+        } else {
+            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMergeMultilineLogNative::sName,
+                                                                       to_string(++pluginIdx));
+            detail["Mode"] = Json::Value("custom");
+            detail["MergeType"] = Json::Value("regex");
+            detail["StartPattern"] = Json::Value(mMultiline.mStartPattern);
+            detail["ContinuePattern"] = Json::Value(mMultiline.mContinuePattern);
+            detail["EndPattern"] = Json::Value(mMultiline.mEndPattern);
+            detail["IgnoringUnmatchWarning"] = Json::Value(mMultiline.mIgnoringUnmatchWarning);
+            if (mMultiline.mUnmatchedContentTreatment == MultilineOptions::UnmatchedContentTreatment::DISCARD) {
+                detail["UnmatchedContentTreatment"] = Json::Value("discard");
+            } else if (mMultiline.mUnmatchedContentTreatment
+                       == MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE) {
+                detail["UnmatchedContentTreatment"] = Json::Value("single_line");
+            }
+        }
+        if (!processor->Init(detail, *mContext)) {
+            return false;
+        }
+        mInnerProcessors.emplace_back(std::move(processor));
+    }
+    {
+        Json::Value detail;
+        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, to_string(++pluginIdx));
+        if (!processor->Init(detail, *mContext)) {
+            // should not happen
+            return false;
+        }
+        mInnerProcessors.emplace_back(std::move(processor));
+    }
     return true;
 }
 

@@ -18,6 +18,10 @@
 
 #include <json/json.h>
 
+#include <memory>
+#include <vector>
+
+#include "plugin/instance/ProcessorInstance.h"
 #include "plugin/interface/Plugin.h"
 
 namespace logtail {
@@ -26,9 +30,20 @@ class Input : public Plugin {
 public:
     virtual ~Input() = default;
 
-    virtual bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) = 0;
+    virtual bool Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) = 0;
     virtual bool Start() = 0;
     virtual bool Stop(bool isPipelineRemoving) = 0;
+
+    void SetInputIndex(size_t idx) { mIndex = idx; }
+    std::vector<std::unique_ptr<ProcessorInstance>>& GetInnerProcessors() { return mInnerProcessors; }
+
+protected:
+    size_t mIndex = 0;
+    std::vector<std::unique_ptr<ProcessorInstance>> mInnerProcessors;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class InputInstanceUnittest;
+#endif
 };
 
 } // namespace logtail

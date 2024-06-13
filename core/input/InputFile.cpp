@@ -25,6 +25,10 @@
 #include "file_server/FileServer.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineManager.h"
+#include "plugin/PluginRegistry.h"
+#include "processor/inner/ProcessorSplitLogStringNative.h"
+#include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
+#include "processor/inner/ProcessorTagNative.h"
 
 using namespace std;
 
@@ -35,11 +39,18 @@ namespace logtail {
 
 const string InputFile::sName = "input_file";
 
+bool InputFile::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
+                                             const PipelineContext*,
+                                             const FileDiscoveryOptions* fileDiscovery) {
+    string logPath = GetLogPath(fileDiscovery);
+    return SetContainerBaseDir(containerInfo, logPath);
+}
+
 InputFile::InputFile()
     : mMaxCheckpointDirSearchDepth(static_cast<uint32_t>(INT32_FLAG(search_checkpoint_default_dir_depth))) {
 }
 
-bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputFile::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) {
     string errorMsg;
 
     if (!mFileDiscovery.Init(config, *mContext, sName)) {
@@ -67,12 +78,12 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-
     if (mEnableContainerDiscovery) {
-        mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
         if (!mContainerDiscovery.Init(config, *mContext, sName)) {
             return false;
         }
+        mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
+        mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
         mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(optionalGoPipeline, &mFileDiscovery);
     }
 
@@ -83,7 +94,6 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
 
     // 过渡使用
     mFileDiscovery.SetTailingAllMatchedFiles(mFileReader.mTailingAllMatchedFiles);
-    mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
 
     // Multiline
     const char* key = "Multiline";
@@ -144,11 +154,82 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
         mExactlyOnceConcurrency = exactlyOnceConcurrency;
     }
 
+    return CreateInnerProcessors(pluginIdx);
+}
+
+bool InputFile::Start() {
+    if (mEnableContainerDiscovery) {
+        mFileDiscovery.SetContainerInfo(
+            FileServer::GetInstance()->GetAndRemoveContainerInfo(mContext->GetPipeline().Name()));
+    }
+    FileServer::GetInstance()->AddFileDiscoveryConfig(mContext->GetConfigName(), &mFileDiscovery, mContext);
+    FileServer::GetInstance()->AddFileReaderConfig(mContext->GetConfigName(), &mFileReader, mContext);
+    FileServer::GetInstance()->AddMultilineConfig(mContext->GetConfigName(), &mMultiline, mContext);
+    FileServer::GetInstance()->AddExactlyOnceConcurrency(mContext->GetConfigName(), mExactlyOnceConcurrency);
     return true;
 }
 
-std::string InputFile::GetLogPath(const FileDiscoveryOptions* fileDiscovery) {
-    std::string logPath;
+bool InputFile::Stop(bool isPipelineRemoving) {
+    if (!isPipelineRemoving && mEnableContainerDiscovery) {
+        FileServer::GetInstance()->SaveContainerInfo(mContext->GetPipeline().Name(), mFileDiscovery.GetContainerInfo());
+    }
+    FileServer::GetInstance()->RemoveFileDiscoveryConfig(mContext->GetConfigName());
+    FileServer::GetInstance()->RemoveFileReaderConfig(mContext->GetConfigName());
+    FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());
+    FileServer::GetInstance()->RemoveExactlyOnceConcurrency(mContext->GetConfigName());
+    return true;
+}
+
+bool InputFile::CreateInnerProcessors(uint32_t& pluginIdx) {
+    unique_ptr<ProcessorInstance> processor;
+    {
+        Json::Value detail;
+        if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
+            mContext->SetRequiringJsonReaderFlag(true);
+            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitLogStringNative::sName,
+                                                                       to_string(++pluginIdx));
+            detail["SplitChar"] = Json::Value('\0');
+            detail["AppendingLogPositionMeta"] = Json::Value(mFileReader.mAppendingLogPositionMeta);
+        } else if (mMultiline.IsMultiline()) {
+            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitMultilineLogStringNative::sName,
+                                                                       to_string(++pluginIdx));
+            detail["Mode"] = Json::Value("custom");
+            detail["StartPattern"] = Json::Value(mMultiline.mStartPattern);
+            detail["ContinuePattern"] = Json::Value(mMultiline.mContinuePattern);
+            detail["EndPattern"] = Json::Value(mMultiline.mEndPattern);
+            detail["AppendingLogPositionMeta"] = Json::Value(mFileReader.mAppendingLogPositionMeta);
+            detail["IgnoringUnmatchWarning"] = Json::Value(mMultiline.mIgnoringUnmatchWarning);
+            if (mMultiline.mUnmatchedContentTreatment == MultilineOptions::UnmatchedContentTreatment::DISCARD) {
+                detail["UnmatchedContentTreatment"] = Json::Value("discard");
+            } else if (mMultiline.mUnmatchedContentTreatment
+                       == MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE) {
+                detail["UnmatchedContentTreatment"] = Json::Value("single_line");
+            }
+        } else {
+            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitLogStringNative::sName,
+                                                                       to_string(++pluginIdx));
+            detail["AppendingLogPositionMeta"] = Json::Value(mFileReader.mAppendingLogPositionMeta);
+        }
+        if (!processor->Init(detail, *mContext)) {
+            // should not happen
+            return false;
+        }
+        mInnerProcessors.emplace_back(std::move(processor));
+    }
+    {
+        Json::Value detail;
+        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, to_string(++pluginIdx));
+        if (!processor->Init(detail, *mContext)) {
+            // should not happen
+            return false;
+        }
+        mInnerProcessors.emplace_back(std::move(processor));
+    }
+    return true;
+}
+
+string InputFile::GetLogPath(const FileDiscoveryOptions* fileDiscovery) {
+    string logPath;
     if (!fileDiscovery->GetWildcardPaths().empty()) {
         logPath = fileDiscovery->GetWildcardPaths()[0];
     } else {
@@ -157,7 +238,7 @@ std::string InputFile::GetLogPath(const FileDiscoveryOptions* fileDiscovery) {
     return logPath;
 }
 
-bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const std::string& logPath) {
+bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const string& logPath) {
     if (!containerInfo.mRealBaseDir.empty()) {
         return true;
     }
@@ -189,36 +270,6 @@ bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const std::str
         containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path) + containerInfo.mUpperDir + logPath;
     }
     LOG_INFO(sLogger, ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mID));
-    return true;
-}
-
-bool InputFile::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
-                                             const PipelineContext*,
-                                             const FileDiscoveryOptions* fileDiscovery) {
-    std::string logPath = GetLogPath(fileDiscovery);
-    return SetContainerBaseDir(containerInfo, logPath);
-}
-
-bool InputFile::Start() {
-    if (mEnableContainerDiscovery) {
-        mFileDiscovery.SetContainerInfo(
-            FileServer::GetInstance()->GetAndRemoveContainerInfo(mContext->GetPipeline().Name()));
-    }
-    FileServer::GetInstance()->AddFileDiscoveryConfig(mContext->GetConfigName(), &mFileDiscovery, mContext);
-    FileServer::GetInstance()->AddFileReaderConfig(mContext->GetConfigName(), &mFileReader, mContext);
-    FileServer::GetInstance()->AddMultilineConfig(mContext->GetConfigName(), &mMultiline, mContext);
-    FileServer::GetInstance()->AddExactlyOnceConcurrency(mContext->GetConfigName(), mExactlyOnceConcurrency);
-    return true;
-}
-
-bool InputFile::Stop(bool isPipelineRemoving) {
-    if (!isPipelineRemoving && mEnableContainerDiscovery) {
-        FileServer::GetInstance()->SaveContainerInfo(mContext->GetPipeline().Name(), mFileDiscovery.GetContainerInfo());
-    }
-    FileServer::GetInstance()->RemoveFileDiscoveryConfig(mContext->GetConfigName());
-    FileServer::GetInstance()->RemoveFileReaderConfig(mContext->GetConfigName());
-    FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());
-    FileServer::GetInstance()->RemoveExactlyOnceConcurrency(mContext->GetConfigName());
     return true;
 }
 

@@ -39,7 +39,7 @@ public:
     // copy/move control functions are deleted because of mContext
     bool Init(Config&& config);
     void Start();
-    void Process(std::vector<PipelineEventGroup>& logGroupList);
+    void Process(std::vector<PipelineEventGroup>& logGroupList, size_t inputIndex);
     void Stop(bool isRemoving);
     void RemoveProcessQueue() const;
 
@@ -57,10 +57,6 @@ public:
     const std::vector<std::unique_ptr<InputInstance>>& GetInputs() const { return mInputs; }
 
 private:
-    bool handleInputFileProcessor(const InputFile* inputFile, int16_t& pluginIndex, const Config& config);
-    bool handleInputContainerStdioProcessor(const InputContainerStdio* inputContainerStdio,
-                                          int16_t& pluginIndex,
-                                          const Config& config);
     void MergeGoPipeline(const Json::Value& src, Json::Value& dst);
     void AddPluginToGoPipeline(const Json::Value& plugin, const std::string& module, Json::Value& dst);
     void CopyNativeGlobalParamToGoPipeline(Json::Value& root);

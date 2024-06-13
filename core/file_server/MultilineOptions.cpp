@@ -218,17 +218,16 @@ bool MultilineOptions::ParseRegex(const string& pattern, shared_ptr<boost::regex
     return true;
 }
 
-const std::string&
-UnmatchedContentTreatmentToString(MultilineOptions::UnmatchedContentTreatment unmatchedContentTreatment) {
+const string& UnmatchedContentTreatmentToString(MultilineOptions::UnmatchedContentTreatment unmatchedContentTreatment) {
     switch (unmatchedContentTreatment) {
         case MultilineOptions::UnmatchedContentTreatment::DISCARD:
-            static std::string discardStr = "discard";
+            static string discardStr = "discard";
             return discardStr;
         case MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE:
-            static std::string singleLine = "single line";
+            static string singleLine = "single line";
             return singleLine;
         default:
-            static std::string unkonwn = "";
+            static string unkonwn = "";
             return unkonwn;
     }
 }

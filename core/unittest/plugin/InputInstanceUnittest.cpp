@@ -14,9 +14,10 @@
 
 #include <memory>
 
-#include "unittest/plugin/PluginMock.h"
+#include "plugin/creator/StaticProcessorCreator.h"
 #include "plugin/instance/InputInstance.h"
 #include "unittest/Unittest.h"
+#include "unittest/plugin/PluginMock.h"
 
 using namespace std;
 
@@ -28,6 +29,13 @@ public:
     void TestInit() const;
     void TestStart() const;
     void TestStop() const;
+
+protected:
+    static void SetUpTestCase() {
+        LoadPluginMock();
+    }
+
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 };
 
 void InputInstanceUnittest::TestName() const {
@@ -39,8 +47,10 @@ void InputInstanceUnittest::TestInit() const {
     unique_ptr<InputInstance> input = unique_ptr<InputInstance>(new InputInstance(new InputMock(), "0"));
     Json::Value config, opt;
     PipelineContext context;
-    APSARA_TEST_TRUE(input->Init(config, context, opt));
+    uint32_t pluginIdx = 0;
+    APSARA_TEST_TRUE(input->Init(config, context, pluginIdx, 0U, opt));
     APSARA_TEST_EQUAL(&context, &input->GetPlugin()->GetContext());
+    APSARA_TEST_EQUAL(0U, input->GetPlugin()->mIndex);
 }
 
 void InputInstanceUnittest::TestStart() const {

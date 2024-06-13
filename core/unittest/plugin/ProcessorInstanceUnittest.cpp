@@ -14,9 +14,9 @@
 
 #include <memory>
 
-#include "unittest/plugin/PluginMock.h"
 #include "plugin/instance/ProcessorInstance.h"
 #include "unittest/Unittest.h"
+#include "unittest/plugin/PluginMock.h"
 
 using namespace std;
 
@@ -26,6 +26,7 @@ class ProcessorInstanceUnittest : public testing::Test {
 public:
     void TestName() const;
     void TestInit() const;
+    void TestProcess() const;
 };
 
 void ProcessorInstanceUnittest::TestName() const {
@@ -43,8 +44,28 @@ void ProcessorInstanceUnittest::TestInit() const {
     APSARA_TEST_EQUAL(&context, &processor->mPlugin->GetContext());
 }
 
+void ProcessorInstanceUnittest::TestProcess() const {
+    unique_ptr<ProcessorInstance> processor
+        = unique_ptr<ProcessorInstance>(new ProcessorInstance(new ProcessorMock(), "0"));
+    Json::Value config;
+    PipelineContext context;
+    processor->Init(config, context);
+
+    vector<PipelineEventGroup> groups;
+
+    // empty group
+    processor->Process(groups);
+    APSARA_TEST_EQUAL(0U, static_cast<ProcessorMock*>(processor->mPlugin.get())->mCnt);
+
+    // non-empty group
+    groups.emplace_back(make_shared<SourceBuffer>());
+    processor->Process(groups);
+    APSARA_TEST_EQUAL(1U, static_cast<ProcessorMock*>(processor->mPlugin.get())->mCnt);
+}
+
 UNIT_TEST_CASE(ProcessorInstanceUnittest, TestName)
 UNIT_TEST_CASE(ProcessorInstanceUnittest, TestInit)
+UNIT_TEST_CASE(ProcessorInstanceUnittest, TestProcess)
 
 } // namespace logtail
 

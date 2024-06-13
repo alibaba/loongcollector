@@ -30,15 +30,13 @@ class InputFile : public Input {
 public:
     static const std::string sName;
 
-    static bool SetContainerBaseDir(ContainerInfo& containerInfo, const std::string& logPath);
-    static std::string GetLogPath(const FileDiscoveryOptions* fileDiscovery);
     static bool
     DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo, const PipelineContext*, const FileDiscoveryOptions*);
 
     InputFile();
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
+    bool Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) override;
     bool Start() override;
     bool Stop(bool isPipelineRemoving) override;
 
@@ -52,6 +50,13 @@ public:
     uint32_t mExactlyOnceConcurrency = 0;
 
 private:
+    bool CreateInnerProcessors(uint32_t& pluginIdx);
+    static bool SetContainerBaseDir(ContainerInfo& containerInfo, const std::string& logPath);
+    static std::string GetLogPath(const FileDiscoveryOptions* fileDiscovery);
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class InputFileUnittest;
+#endif
 };
 
 } // namespace logtail

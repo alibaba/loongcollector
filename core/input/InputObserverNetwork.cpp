@@ -22,7 +22,7 @@ namespace logtail {
 
 const std::string InputObserverNetwork::sName = "input_observer_network";
 
-bool InputObserverNetwork::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputObserverNetwork::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) {
     mDetail = config.toStyledString();
     return true;
 }

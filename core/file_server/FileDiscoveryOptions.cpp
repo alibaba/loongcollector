@@ -659,7 +659,7 @@ bool FileDiscoveryOptions::IsSameContainerInfo(const Json::Value& paramsJSON, co
 
     if (!paramsJSON.isMember("AllCmd")) {
         ContainerInfo containerInfo;
-        std::string errorMsg;
+        string errorMsg;
         if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
             LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
             return true;
@@ -678,7 +678,7 @@ bool FileDiscoveryOptions::IsSameContainerInfo(const Json::Value& paramsJSON, co
 
     // check all
     unordered_map<string, ContainerInfo> allPathMap;
-    std::string errorMsg;
+    string errorMsg;
     if (!ContainerInfo::ParseAllByJSONObj(paramsJSON["AllCmd"], allPathMap, errorMsg)) {
         LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
         return true;
@@ -713,7 +713,7 @@ bool FileDiscoveryOptions::UpdateContainerInfo(const Json::Value& paramsJSON, co
 
     if (!paramsJSON.isMember("AllCmd")) {
         ContainerInfo containerInfo;
-        std::string errorMsg;
+        string errorMsg;
         if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
             LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
             return false;
@@ -735,7 +735,7 @@ bool FileDiscoveryOptions::UpdateContainerInfo(const Json::Value& paramsJSON, co
     }
 
     unordered_map<string, ContainerInfo> allPathMap;
-    std::string errorMsg;
+    string errorMsg;
     if (!ContainerInfo::ParseAllByJSONObj(paramsJSON["AllCmd"], allPathMap, errorMsg)) {
         LOG_ERROR(sLogger,
                   ("invalid all docker container params",
@@ -758,7 +758,7 @@ bool FileDiscoveryOptions::DeleteContainerInfo(const Json::Value& paramsJSON) {
         return false;
 
     ContainerInfo containerInfo;
-    std::string errorMsg;
+    string errorMsg;
     if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
         LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
         return false;

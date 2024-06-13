@@ -25,6 +25,7 @@
 #include "input/InputContainerStdio.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
+#include "plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
@@ -42,7 +43,13 @@ public:
     void TestTryGetRealPath();
 
 protected:
-    static void SetUpTestCase() { AppConfig::GetInstance()->mPurageContainerMode = true; }
+    static void SetUpTestCase() {
+        AppConfig::GetInstance()->mPurageContainerMode = true;
+        PluginRegistry::GetInstance()->LoadPlugins();
+    }
+
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+
     void SetUp() override {
         ctx.SetConfigName("test_config");
         ctx.SetPipeline(p);
@@ -101,6 +108,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     unique_ptr<InputContainerStdio> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
+    uint32_t pluginIdx = 0;
 
     // only mandatory param
     configStr = R"(
@@ -114,7 +122,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input.reset(new InputContainerStdio());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputContainerStdio::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
 
     // valid optional param
     configStr = R"(
@@ -129,7 +137,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input.reset(new InputContainerStdio());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputContainerStdio::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
 
     // invalid optional param
     configStr = R"(
@@ -142,7 +150,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input.reset(new InputContainerStdio());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputContainerStdio::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
 
     // TailingAllMatchedFiles
     configStr = R"(
@@ -155,7 +163,7 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input.reset(new InputContainerStdio());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputContainerStdio::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_TRUE(input->mFileReader.mTailingAllMatchedFiles);
 
     configStr = R"(
@@ -167,13 +175,14 @@ void InputContainerStdioUnittest::OnSuccessfulInit() {
     input.reset(new InputContainerStdio());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputContainerStdio::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
 }
 
 void InputContainerStdioUnittest::OnEnableContainerDiscovery() {
     unique_ptr<InputContainerStdio> input;
     Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
     string configStr, optionalGoPipelineStr, errorMsg;
+    uint32_t pluginIdx = 0;
 
     configStr = R"(
         {
@@ -205,7 +214,7 @@ void InputContainerStdioUnittest::OnEnableContainerDiscovery() {
     input.reset(new InputContainerStdio());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputContainerStdio::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_TRUE(optionalGoPipelineJson == optionalGoPipeline);
 }
 
@@ -213,6 +222,7 @@ void InputContainerStdioUnittest::OnPipelineUpdate() {
     Json::Value configJson, optionalGoPipeline;
     InputContainerStdio input;
     string configStr, errorMsg;
+    uint32_t pluginIdx = 0;
 
     configStr = R"(
         {
@@ -220,8 +230,8 @@ void InputContainerStdioUnittest::OnPipelineUpdate() {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
     input.SetContext(ctx);
+    APSARA_TEST_TRUE(input.Init(configJson, pluginIdx, optionalGoPipeline));
 
     APSARA_TEST_TRUE(input.Start());
     APSARA_TEST_NOT_EQUAL(nullptr, FileServer::GetInstance()->GetFileReaderConfig("test_config").first);

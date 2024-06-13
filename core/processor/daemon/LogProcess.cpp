@@ -262,7 +262,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             int32_t startTime = (int32_t)time(NULL);
             std::vector<PipelineEventGroup> eventGroupList;
             eventGroupList.emplace_back(std::move(item->mEventGroup));
-            pipeline->Process(eventGroupList);
+            pipeline->Process(eventGroupList, item->mInputIndex);
             int32_t elapsedTime = (int32_t)time(NULL) - startTime;
             if (elapsedTime > 1) {
                 LogtailAlarm::GetInstance()->SendAlarm(PROCESS_TOO_SLOW_ALARM,

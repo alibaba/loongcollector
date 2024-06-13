@@ -24,6 +24,10 @@
 #include "input/InputFile.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
+#include "plugin/PluginRegistry.h"
+#include "processor/inner/ProcessorSplitLogStringNative.h"
+#include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
+#include "processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
@@ -37,11 +41,18 @@ public:
     void OnSuccessfulInit();
     void OnFailedInit();
     void OnEnableContainerDiscovery();
+    void TestCreateInnerProcessors();
     void OnPipelineUpdate();
     void TestSetContainerBaseDir();
 
 protected:
-    static void SetUpTestCase() { AppConfig::GetInstance()->mPurageContainerMode = true; }
+    static void SetUpTestCase() {
+        AppConfig::GetInstance()->mPurageContainerMode = true;
+        PluginRegistry::GetInstance()->LoadPlugins();
+    }
+
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+
     void SetUp() override {
         p.mName = "test_config";
         ctx.SetConfigName("test_config");
@@ -57,6 +68,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     unique_ptr<InputFile> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
+    uint32_t pluginIdx = 0;
     filesystem::path filePath = filesystem::absolute("*.log");
 
     // only mandatory param
@@ -71,7 +83,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     input.reset(new InputFile());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(0U, input->mMaxCheckpointDirSearchDepth);
     APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
@@ -91,7 +103,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     input.reset(new InputFile());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(1, input->mMaxCheckpointDirSearchDepth);
     APSARA_TEST_EQUAL(1, input->mExactlyOnceConcurrency);
@@ -111,7 +123,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     input.reset(new InputFile());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(0U, input->mMaxCheckpointDirSearchDepth);
     APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
@@ -129,7 +141,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     input.reset(new InputFile());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_TRUE(input->mFileReader.mTailingAllMatchedFiles);
     APSARA_TEST_TRUE(input->mFileDiscovery.IsTailingAllMatchedFiles());
 
@@ -146,29 +158,29 @@ void InputFileUnittest::OnSuccessfulInit() {
     input.reset(new InputFile());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
 }
 
 void InputFileUnittest::OnFailedInit() {
     unique_ptr<InputFile> input;
     Json::Value configJson, optionalGoPipeline;
+    uint32_t pluginIdx = 0;
 
     input.reset(new InputFile());
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
-    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_FALSE(input->Init(configJson, pluginIdx, optionalGoPipeline));
 }
 
 void InputFileUnittest::OnEnableContainerDiscovery() {
-    // 启用容器元信息预览
-    {
-        unique_ptr<InputFile> input;
-        Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
-        string configStr, optionalGoPipelineStr, errorMsg;
-        filesystem::path filePath = filesystem::absolute("*.log");
+    unique_ptr<InputFile> input;
+    Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
+    string configStr, optionalGoPipelineStr, errorMsg;
+    uint32_t pluginIdx = 0;
+    filesystem::path filePath = filesystem::absolute("*.log");
 
-        configStr = R"(
+    configStr = R"(
             {
                 "Type": "input_file",
                 "FilePaths": [],
@@ -179,7 +191,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
                 "CollectingContainersMeta": true
             }
         )";
-        optionalGoPipelineStr = R"(
+    optionalGoPipelineStr = R"(
             {
                 "global": {
                     "AlwaysOnline": true
@@ -198,68 +210,136 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
                 ]
             }
         )";
-        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-        APSARA_TEST_TRUE(ParseJsonTable(optionalGoPipelineStr, optionalGoPipelineJson, errorMsg));
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        optionalGoPipelineJson["global"]["DefaultLogQueueSize"]
-            = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
-        optionalGoPipelineJson["inputs"][0]["detail"]["LogPath"] = Json::Value(filePath.parent_path().string());
-        input.reset(new InputFile());
-        input->SetContext(ctx);
-        input->SetMetricsRecordRef(InputFile::sName, "1");
-        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
-        APSARA_TEST_TRUE(input->mFileDiscovery.IsContainerDiscoveryEnabled());
-        APSARA_TEST_EQUAL(optionalGoPipelineJson.toStyledString(), optionalGoPipeline.toStyledString());
-    }
-    // 不启用容器元信息预览
-    {
-        unique_ptr<InputFile> input;
-        Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
-        string configStr, optionalGoPipelineStr, errorMsg;
-        filesystem::path filePath = filesystem::absolute("*.log");
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(optionalGoPipelineStr, optionalGoPipelineJson, errorMsg));
+    configJson["FilePaths"].append(Json::Value(filePath.string()));
+    optionalGoPipelineJson["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
+    optionalGoPipelineJson["inputs"][0]["detail"]["LogPath"] = Json::Value(filePath.parent_path().string());
+    input.reset(new InputFile());
+    input->SetContext(ctx);
+    input->SetMetricsRecordRef(InputFile::sName, "1");
+    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
+    APSARA_TEST_TRUE(input->mFileDiscovery.IsContainerDiscoveryEnabled());
+    APSARA_TEST_EQUAL(optionalGoPipelineJson.toStyledString(), optionalGoPipeline.toStyledString());
+}
 
+void InputFileUnittest::TestCreateInnerProcessors() {
+    unique_ptr<InputFile> input;
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    uint32_t pluginIdx = 0;
+    filesystem::path filePath = filesystem::absolute("*.log");
+    {
+        // no multiline
         configStr = R"(
             {
                 "Type": "input_file",
                 "FilePaths": [],
-                "EnableContainerDiscovery": true,
-                "ContainerFilters": {
-                    "K8sNamespaceRegex": "default"
-                }
-            }
-        )";
-        optionalGoPipelineStr = R"(
-            {
-                "global": {
-                    "AlwaysOnline": true
-                },
-                "inputs": [
-                    {                
-                        "type": "metric_container_info",
-                        "detail": {
-                            "FilePattern": "*.log",
-                            "K8sNamespaceRegex": "default",
-                            "MaxDepth": 0,
-                            "LogPath": ""
-                        }
-                    }
-                ]
+                "AppendingLogPositionMeta": true
             }
         )";
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-        APSARA_TEST_TRUE(ParseJsonTable(optionalGoPipelineStr, optionalGoPipelineJson, errorMsg));
         configJson["FilePaths"].append(Json::Value(filePath.string()));
-        optionalGoPipelineJson["global"]["DefaultLogQueueSize"]
-            = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
-        optionalGoPipelineJson["inputs"][0]["detail"]["LogPath"] = Json::Value(filePath.parent_path().string());
         input.reset(new InputFile());
         input->SetContext(ctx);
         input->SetMetricsRecordRef(InputFile::sName, "1");
-        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
-        APSARA_TEST_TRUE(input->mFileDiscovery.IsContainerDiscoveryEnabled());
-        APSARA_TEST_EQUAL(optionalGoPipelineJson.toStyledString(), optionalGoPipeline.toStyledString());
+        APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
+        auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
+        APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
+        APSARA_TEST_EQUAL('\n', plugin->mSplitChar);
+        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
+        APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
+    }
+    {
+        // custom multiline
+        configStr = R"(
+            {
+                "Type": "input_file",
+                "FilePaths": [],
+                "Multiline": {
+                    "StartPattern": "\\d+",
+                    "EndPattern": "end",
+                    "IgnoringUnmatchWarning": true,
+                    "UnmatchedContentTreatment": "discard"
+                },
+                "AppendingLogPositionMeta": true
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputFile());
+        input->SetContext(ctx);
+        input->SetMetricsRecordRef(InputFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(ProcessorSplitMultilineLogStringNative::sName, input->mInnerProcessors[0]->Name());
+        auto plugin = static_cast<ProcessorSplitMultilineLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
+        APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
+        APSARA_TEST_EQUAL(MultilineOptions::Mode::CUSTOM, plugin->mMultiline.mMode);
+        APSARA_TEST_STREQ("\\d+", plugin->mMultiline.mStartPattern.c_str());
+        APSARA_TEST_STREQ("", plugin->mMultiline.mContinuePattern.c_str());
+        APSARA_TEST_STREQ("end", plugin->mMultiline.mEndPattern.c_str());
+        APSARA_TEST_TRUE(plugin->mMultiline.mIgnoringUnmatchWarning);
+        APSARA_TEST_EQUAL(MultilineOptions::UnmatchedContentTreatment::DISCARD,
+                          plugin->mMultiline.mUnmatchedContentTreatment);
+        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
+        APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
+    }
+    {
+        // json multiline, first processor is json parser
+        ctx.SetIsFirstProcessorJsonFlag(true);
+        configStr = R"(
+            {
+                "Type": "input_file",
+                "FilePaths": [],
+                "AppendingLogPositionMeta": true
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputFile());
+        input->SetContext(ctx);
+        input->SetMetricsRecordRef(InputFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
+        auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
+        APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
+        APSARA_TEST_EQUAL('\0', plugin->mSplitChar);
+        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
+        APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
+        ctx.SetIsFirstProcessorJsonFlag(false);
+    }
+    {
+        // json multiline, json mode
+        ctx.SetIsFirstProcessorJsonFlag(true);
+        configStr = R"(
+            {
+                "Type": "input_file",
+                "FilePaths": [],
+                "Multiline": {
+                    "Mode": "JSON"
+                },
+                "AppendingLogPositionMeta": true
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputFile());
+        input->SetContext(ctx);
+        input->SetMetricsRecordRef(InputFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+        APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
+        APSARA_TEST_EQUAL(ProcessorSplitLogStringNative::sName, input->mInnerProcessors[0]->Name());
+        auto plugin = static_cast<ProcessorSplitLogStringNative*>(input->mInnerProcessors[0]->mPlugin.get());
+        APSARA_TEST_EQUAL(DEFAULT_CONTENT_KEY, plugin->mSourceKey);
+        APSARA_TEST_EQUAL('\0', plugin->mSplitChar);
+        APSARA_TEST_TRUE(plugin->mAppendingLogPositionMeta);
+        APSARA_TEST_EQUAL(ProcessorTagNative::sName, input->mInnerProcessors[1]->Name());
+        ctx.SetIsFirstProcessorJsonFlag(false);
     }
 }
 
@@ -267,6 +347,7 @@ void InputFileUnittest::OnPipelineUpdate() {
     Json::Value configJson, optionalGoPipeline;
     InputFile input;
     string configStr, errorMsg;
+    uint32_t pluginIdx = 0;
     filesystem::path filePath = filesystem::absolute("*.log");
 
     configStr = R"(
@@ -278,8 +359,8 @@ void InputFileUnittest::OnPipelineUpdate() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     configJson["FilePaths"].append(Json::Value(filePath.string()));
-    APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
     input.SetContext(ctx);
+    APSARA_TEST_TRUE(input.Init(configJson, pluginIdx, optionalGoPipeline));
 
     APSARA_TEST_TRUE(input.Start());
     APSARA_TEST_NOT_EQUAL(nullptr, FileServer::GetInstance()->GetFileDiscoveryConfig("test_config").first);
@@ -295,46 +376,44 @@ void InputFileUnittest::OnPipelineUpdate() {
 }
 
 void InputFileUnittest::TestSetContainerBaseDir() {
-    // Create an InputFile object
     InputFile inputFile;
-    {
-        ContainerInfo containerInfo;
-        containerInfo.mID = "testContainer";
-        containerInfo.mUpperDir = "/UpperDir";
-        containerInfo.mMounts.push_back(Mount("/source1", "/data1"));
-        containerInfo.mMounts.push_back(Mount("/source2", "/data1/data2"));
-        containerInfo.mMounts.push_back(Mount("/source3", "/data1/data2/data3"));
-        containerInfo.mMounts.push_back(Mount("/source4", "/data1/data2/data3/data4"));
+    ContainerInfo containerInfo;
+    containerInfo.mID = "testContainer";
+    containerInfo.mUpperDir = "/UpperDir";
+    containerInfo.mMounts.push_back(Mount("/source1", "/data1"));
+    containerInfo.mMounts.push_back(Mount("/source2", "/data1/data2"));
+    containerInfo.mMounts.push_back(Mount("/source3", "/data1/data2/data3"));
+    containerInfo.mMounts.push_back(Mount("/source4", "/data1/data2/data3/data4"));
 
-        containerInfo.mRealBaseDir = "";
-        ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data2/log"));
-        APSARA_TEST_EQUAL("/logtail_host/UpperDir/data2/log", containerInfo.mRealBaseDir);
+    containerInfo.mRealBaseDir = "";
+    ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data2/log"));
+    APSARA_TEST_EQUAL("/logtail_host/UpperDir/data2/log", containerInfo.mRealBaseDir);
 
-        containerInfo.mRealBaseDir = "";
-        ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/log"));
-        APSARA_TEST_EQUAL("/logtail_host/source1/log", containerInfo.mRealBaseDir);
+    containerInfo.mRealBaseDir = "";
+    ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/log"));
+    APSARA_TEST_EQUAL("/logtail_host/source1/log", containerInfo.mRealBaseDir);
 
-        containerInfo.mRealBaseDir = "";
-        ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/log"));
-        APSARA_TEST_EQUAL("/logtail_host/source2/log", containerInfo.mRealBaseDir);
+    containerInfo.mRealBaseDir = "";
+    ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/log"));
+    APSARA_TEST_EQUAL("/logtail_host/source2/log", containerInfo.mRealBaseDir);
 
-        containerInfo.mRealBaseDir = "";
-        ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/log"));
-        APSARA_TEST_EQUAL("/logtail_host/source3/log", containerInfo.mRealBaseDir);
+    containerInfo.mRealBaseDir = "";
+    ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/log"));
+    APSARA_TEST_EQUAL("/logtail_host/source3/log", containerInfo.mRealBaseDir);
 
-        containerInfo.mRealBaseDir = "";
-        ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/data4/log"));
-        APSARA_TEST_EQUAL("/logtail_host/source4/log", containerInfo.mRealBaseDir);
+    containerInfo.mRealBaseDir = "";
+    ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/data4/log"));
+    APSARA_TEST_EQUAL("/logtail_host/source4/log", containerInfo.mRealBaseDir);
 
-        containerInfo.mRealBaseDir = "";
-        ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/data4/data5/log"));
-        APSARA_TEST_EQUAL("/logtail_host/source4/data5/log", containerInfo.mRealBaseDir);
-    }
+    containerInfo.mRealBaseDir = "";
+    ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data1/data2/data3/data4/data5/log"));
+    APSARA_TEST_EQUAL("/logtail_host/source4/data5/log", containerInfo.mRealBaseDir);
 }
 
 UNIT_TEST_CASE(InputFileUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputFileUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputFileUnittest, OnEnableContainerDiscovery)
+UNIT_TEST_CASE(InputFileUnittest, TestCreateInnerProcessors)
 UNIT_TEST_CASE(InputFileUnittest, OnPipelineUpdate)
 UNIT_TEST_CASE(InputFileUnittest, TestSetContainerBaseDir)
 
