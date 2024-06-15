@@ -408,7 +408,7 @@ public:
     friend class PipelineUnittest;
     friend class InputFileUnittest;
     friend class InputContainerStdioUnittest;
-    friend class AggregatorUnittest;
+    friend class BatcherUnittest;
 #endif
 };
 

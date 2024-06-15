@@ -16,33 +16,27 @@
 
 #pragma once
 
-#include "plugin/interface/Flusher.h"
+#include <json/json.h>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
-#include <json/json.h>
-
+#include "batch/Batcher.h"
+#include "batch/BatchStatus.h"
 #include "common/LogstoreFeedbackKey.h"
+#include "compression/Compressor.h"
+#include "models/PipelineEventGroup.h"
+#include "plugin/interface/Flusher.h"
+#include "serializer/SLSSerializer.h"
 
 namespace logtail {
 
 class FlusherSLS : public Flusher {
 public:
-    enum class CompressType { NONE, LZ4, ZSTD };
     enum class TelemetryType { LOG, METRIC };
-
-    struct Batch {
-        enum class MergeType { TOPIC, LOGSTORE };
-
-        Batch();
-
-        MergeType mMergeType = MergeType::TOPIC;
-        uint32_t mSendIntervalSecs;
-        std::vector<std::string> mShardHashKeys;
-    };
 
     static const std::string sName;
 
@@ -50,27 +44,56 @@ public:
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
-    bool Start() override;
-    bool Stop(bool isPipelineRemoving) override;
+    bool Register() override;
+    bool Unregister(bool isPipelineRemoving) override;
+    void Send(PipelineEventGroup&& g) override;
+    void Flush(size_t key) override;
+    void FlushAll() override;
+
     LogstoreFeedBackKey GetLogstoreKey() const { return mLogstoreKey; }
+    CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
+
+    // for use of Go pipeline, stream, observer and shennong
+    bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
     std::string mProject;
     std::string mLogstore;
     std::string mRegion;
     std::string mEndpoint;
     std::string mAliuid;
-    CompressType mCompressType = CompressType::LZ4;
     TelemetryType mTelemetryType = TelemetryType::LOG;
     uint32_t mFlowControlExpireTime = 0;
     int32_t mMaxSendRate = -1;
-    Batch mBatch;
+    std::vector<std::string> mShardHashKeys;
 
 private:
     static const std::unordered_set<std::string> sNativeParam;
 
     void GenerateGoPlugin(const Json::Value& config, Json::Value& res) const;
+    void SerializeAndPush(std::vector<BatchedEventsList>&& groupLists);
+    void SerializeAndPush(BatchedEventsList&& groupList);
+    void SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
+    std::string GetShardHashKey(const BatchedEvents& g) const;
+    void AddPackId(BatchedEvents& g) const;
+
+    // TODO: remove after sender queue refactorization
+    void PushToQueue(std::string&& data,
+                     size_t rawSize,
+                     SEND_DATA_TYPE type,
+                     const std::string& logstore = "",
+                     const std::string& shardHashKey = "",
+                     const RangeCheckpointPtr& eoo = RangeCheckpointPtr());
 
     LogstoreFeedBackKey mLogstoreKey = 0;
+
+    Batcher<SLSEventBatchStatus> mBatcher;
+    std::unique_ptr<EventGroupSerializer> mGroupSerializer;
+    std::unique_ptr<Serializer<std::vector<CompressedLogGroup>>> mGroupListSerializer;
+    std::unique_ptr<Compressor> mCompressor;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class FlusherSLSUnittest;
+#endif
 };
 
 } // namespace logtail

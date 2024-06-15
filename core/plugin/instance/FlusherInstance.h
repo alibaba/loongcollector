@@ -16,14 +16,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include <json/json.h>
 
+#include <memory>
+
+#include "common/LogstoreSenderQueue.h"
+#include "pipeline/PipelineContext.h"
 #include "plugin/instance/PluginInstance.h"
 #include "plugin/interface/Flusher.h"
-#include "pipeline/PipelineContext.h"
-#include "common/LogstoreSenderQueue.h"
 
 namespace logtail {
 
@@ -35,8 +35,10 @@ public:
     const Flusher* GetPlugin() const { return mPlugin.get(); }
 
     bool Init(const Json::Value& config, PipelineContext& context, Json::Value& optionalGoPipeline);
-    bool Start() { return mPlugin->Start(); }
-    bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
+    bool Start() { return mPlugin->Register(); }
+    bool Stop(bool isPipelineRemoving) { return mPlugin->Unregister(isPipelineRemoving); }
+    void Send(PipelineEventGroup&& g) { mPlugin->Send(std::move(g)); }
+    void FlushAll() { mPlugin->FlushAll(); }
     SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue() const { return mPlugin->GetSenderQueue(); }
 
 private:

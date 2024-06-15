@@ -22,6 +22,8 @@
 #include "logger/Logger.h"
 #include "monitor/MetricConstants.h"
 
+using namespace std;
+
 namespace logtail {
 
 bool ProcessorInstance::Init(const Json::Value& config, PipelineContext& context) {
@@ -39,7 +41,7 @@ bool ProcessorInstance::Init(const Json::Value& config, PipelineContext& context
     return true;
 }
 
-void ProcessorInstance::Process(std::vector<PipelineEventGroup>& logGroupList) {
+void ProcessorInstance::Process(vector<PipelineEventGroup>& logGroupList) {
     if (logGroupList.empty()) {
         return;
     } 

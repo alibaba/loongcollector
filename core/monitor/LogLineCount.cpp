@@ -26,6 +26,7 @@
 #include "LogtailAlarm.h"
 #include "application/Application.h"
 #include "common/TimeUtil.h"
+#include "profile_sender/ProfileSender.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -51,7 +52,7 @@ void LogLineCount::NotifySuccess(LoggroupTimeValue* data) {
     const std::string& region = data->mRegion;
     const std::string& projectName = data->mProjectName;
     const std::string& logStore = data->mLogstore;
-    const std::string& filename = data->mFilename;
+    std::string filename;
 
     // empty filename, filter metric data and data-integrity data
     if (filename.empty()) {
@@ -83,7 +84,7 @@ void LogLineCount::NotifySuccess(LoggroupTimeValue* data) {
     }
     LogStoreLineCount* lineCount = projectLogStoreIter->second;
 
-    const int32_t logLines = data->mLogLines;
+    const int32_t logLines = 0;
     const int32_t minuteTime = data->mLogTimeInMinute;
     LogStoreLineCount::LogCountPerMinuteMap::iterator minuteIter = lineCount->mLogCountPerMinuteMap.find(minuteTime);
     if (minuteIter == lineCount->mLogCountPerMinuteMap.end())

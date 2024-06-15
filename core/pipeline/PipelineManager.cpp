@@ -240,6 +240,8 @@ void PipelineManager::StopAllPipelines() {
     }
     LogProcess::GetInstance()->HoldOn();
 
+    FlushAllBatch();
+
     LogtailPlugin::GetInstance()->HoldOn(true);
 
     // Sender should be stopped after profiling threads are stopped.
@@ -253,6 +255,12 @@ shared_ptr<Pipeline> PipelineManager::BuildPipeline(Config&& config) {
         return nullptr;
     }
     return p;
+}
+
+void PipelineManager::FlushAllBatch() {
+    for (const auto& item : mPipelineNameEntityMap) {
+        item.second->FlushBatch();
+    }
 }
 
 void PipelineManager::IncreasePluginUsageCnt(const unordered_map<string, unordered_map<string, uint32_t>>& statistics) {

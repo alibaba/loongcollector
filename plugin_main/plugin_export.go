@@ -141,7 +141,7 @@ func ProcessRawLog(configName string, rawLog []byte, packID string, topic string
 
 	// rawLog will be copied when it is converted to string, packID and topic
 	// are unused now, so deep copy is unnecessary.
-	return plugin.ProcessRawLog(rawLog, packID, topic)
+	return plugin.ProcessRawLog(rawLog, util.StringDeepCopy(packID), topic)
 }
 
 //export ProcessRawLogV2
@@ -150,7 +150,7 @@ func ProcessRawLogV2(configName string, rawLog []byte, packID string, topic stri
 	if !exists {
 		return -1
 	}
-	return config.ProcessRawLogV2(rawLog, packID, util.StringDeepCopy(topic), tags)
+	return config.ProcessRawLogV2(rawLog, util.StringDeepCopy(packID), util.StringDeepCopy(topic), tags)
 }
 
 //export ProcessLog
@@ -160,7 +160,7 @@ func ProcessLog(configName string, logBytes []byte, packID string, topic string,
 		logger.Debug(context.Background(), "config not found", configName)
 		return -1
 	}
-	return config.ProcessLog(logBytes, packID, util.StringDeepCopy(topic), tags)
+	return config.ProcessLog(logBytes, util.StringDeepCopy(packID), util.StringDeepCopy(topic), tags)
 }
 
 //export ProcessLogGroup
@@ -170,7 +170,7 @@ func ProcessLogGroup(configName string, logBytes []byte, packID string) int {
 		logger.Debug(context.Background(), "config not found", configName)
 		return -1
 	}
-	return config.ProcessLogGroup(logBytes, packID)
+	return config.ProcessLogGroup(logBytes, util.StringDeepCopy(packID))
 }
 
 //export HoldOn

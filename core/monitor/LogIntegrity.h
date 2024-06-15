@@ -24,7 +24,7 @@
 namespace logtail {
 // forward declaration
 struct LoggroupTimeValue;
-struct MergeItem;
+// struct MergeItem;
 
 struct LogTimeInfo {
     LogTimeInfo() {}
@@ -142,7 +142,7 @@ public:
     }
 
 public:
-    void RecordIntegrityInfo(MergeItem* item);
+    // void RecordIntegrityInfo(MergeItem* item);
     void Notify(LoggroupTimeValue* data, bool flag);
     void SendLogIntegrityInfo();
     void EraseItemInMap(const std::string& region, const std::string& projectName, const std::string& logstore);
@@ -182,7 +182,7 @@ private:
     static void SerializeListNodes(const std::list<LogTimeInfo>& logTimeInfoList, Json::Value& value);
     static void DeSerializeListNodes(const Json::Value& value, std::list<LogTimeInfo>& logTimeInfoList);
     void FillLogTimeInfo(LogIntegrityInfo* info, const std::string& name, const Json::Value& value);
-    std::string GetLastLogLine(MergeItem* item);
+    // std::string GetLastLogLine(MergeItem* item);
     void InsertItemIntoOutDatedFileMap(LogIntegrityInfo* info);
     time_t EraseItemInOutDatedFileMap(const std::string& region,
                                       const std::string& project,

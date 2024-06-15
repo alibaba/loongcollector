@@ -15,10 +15,11 @@
  */
 
 #pragma once
-#include "config/IntegrityConfig.h"
-#include "monitor/LogtailAlarm.h"
 #include "FileInfo.h"
 #include "RangeCheckpoint.h"
+#include "config/IntegrityConfig.h"
+#include "monitor/LogtailAlarm.h"
+#include "sls_logs.pb.h"
 
 namespace logtail {
 

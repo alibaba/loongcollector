@@ -83,6 +83,8 @@ public:
     void SetIsFirstProcessorApsaraFlag(bool flag) { mIsFirstProcessorApsara = flag; }
     bool IsFirstProcessorJson() const { return mIsFirstProcessorJson; }
     void SetIsFirstProcessorJsonFlag(bool flag) { mIsFirstProcessorJson = flag; }
+    bool IsExactlyOnceEnabled() const {return mEnableExactlyOnce; }
+    void SetExactlyOnceFlag(bool flag) { mEnableExactlyOnce = flag; }
 
     ProcessProfile& GetProcessProfile() const { return mProcessProfile; }
     // LogFileProfiler& GetProfiler() { return *mProfiler; }
@@ -98,10 +100,12 @@ private:
     QueueKey mProcessQueueKey = -1;
     Pipeline* mPipeline = nullptr;
 
+    // special members for compatability
     const FlusherSLS* mSLSInfo = nullptr;
     bool mRequiringJsonReader = false;
     bool mIsFirstProcessorApsara = false;
     bool mIsFirstProcessorJson = false;
+    bool mEnableExactlyOnce = false;
 
     mutable ProcessProfile mProcessProfile;
     // LogFileProfiler* mProfiler = LogFileProfiler::GetInstance();

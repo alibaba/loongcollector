@@ -14,9 +14,9 @@
 
 #include "profile_sender/ProfileSender.h"
 
-#include <unordered_set>
-
 #include <json/json.h>
+
+#include <unordered_set>
 
 #include "common/CompressTools.h"
 #include "common/Flags.h"
@@ -156,7 +156,7 @@ void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
     try {
         time_t curTime = time(NULL);
         unique_ptr<LoggroupTimeValue> data(new LoggroupTimeValue(
-            project, logstore, "", "", false, "", region, LOGGROUP_COMPRESSED, 1, logBody.size(), curTime, "", 0));
+            project, logstore, "", false, "", region, LOGGROUP_COMPRESSED, logBody.size(), curTime, "", 0));
 
         if (!CompressLz4(logBody, data->mLogData)) {
             LOG_ERROR(sLogger, ("lz4 compress data", "fail"));

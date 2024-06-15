@@ -17,15 +17,22 @@
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
+#include "batch/FlushStrategy.h"
 #include "common/EndpointUtil.h"
+#include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
+#include "compression/CompressorFactory.h"
 #include "pipeline/Pipeline.h"
+#include "sdk/Common.h"
+#include "sender/PackIdManager.h"
 #include "sender/Sender.h"
 
 using namespace std;
 
 DEFINE_FLAG_INT32(batch_send_interval, "batch sender interval (second)(default 3)", 3);
+DEFINE_FLAG_INT32(merge_log_count_limit, "log count in one logGroup at most", 4000);
+DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 256KB)", 256 * 1024);
 
 namespace logtail {
 
@@ -39,12 +46,10 @@ const unordered_set<string> FlusherSLS::sNativeParam = {"Project",
                                                         "TelemetryType",
                                                         "FlowControlExpireTime",
                                                         "MaxSendRate",
+                                                        "ShardHashKeys",
                                                         "Batch"};
 
 FlusherSLS::FlusherSLS() : mRegion(Sender::Instance()->GetDefaultRegion()) {
-}
-
-FlusherSLS::Batch::Batch() : mSendIntervalSecs(static_cast<uint32_t>(INT32_FLAG(batch_send_interval))) {
 }
 
 bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
@@ -141,34 +146,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 
     // CompressType
     if (BOOL_FLAG(sls_client_send_compress)) {
-        string compressType;
-        if (!GetOptionalStringParam(config, "CompressType", compressType, errorMsg)) {
-            PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                                  mContext->GetAlarm(),
-                                  errorMsg,
-                                  "lz4",
-                                  sName,
-                                  mContext->GetConfigName(),
-                                  mContext->GetProjectName(),
-                                  mContext->GetLogstoreName(),
-                                  mContext->GetRegion());
-        } else if (compressType == "zstd") {
-            mCompressType = CompressType::ZSTD;
-        } else if (compressType == "none") {
-            mCompressType = CompressType::NONE;
-        } else if (!compressType.empty() && compressType != "lz4") {
-            PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                                  mContext->GetAlarm(),
-                                  "string param CompressType is not valid",
-                                  "lz4",
-                                  sName,
-                                  mContext->GetConfigName(),
-                                  mContext->GetProjectName(),
-                                  mContext->GetLogstoreName(),
-                                  mContext->GetRegion());
-        }
-    } else {
-        mCompressType = CompressType::NONE;
+        mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, CompressType::LZ4);
     }
 
     // TelemetryType
@@ -237,76 +215,118 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                                  mContext->GetProjectName(),
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
-        } else {
-            // MergeType
-            string mergeType;
-            if (!GetOptionalStringParam(*itr, "Batch.MergeType", mergeType, errorMsg)) {
-                PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                                      mContext->GetAlarm(),
-                                      errorMsg,
-                                      "topic",
-                                      sName,
-                                      mContext->GetConfigName(),
-                                      mContext->GetProjectName(),
-                                      mContext->GetLogstoreName(),
-                                      mContext->GetRegion());
-            } else if (mergeType == "logstore") {
-                mBatch.mMergeType = Batch::MergeType::LOGSTORE;
-            } else if (!mergeType.empty() && mergeType != "topic") {
-                PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                                      mContext->GetAlarm(),
-                                      "string param Batch.MergeType is not valid",
-                                      "topic",
-                                      sName,
-                                      mContext->GetConfigName(),
-                                      mContext->GetProjectName(),
-                                      mContext->GetLogstoreName(),
-                                      mContext->GetRegion());
-            }
+        }
 
-            // SendIntervalSecs
-            if (!GetOptionalUIntParam(*itr, "Batch.SendIntervalSecs", mBatch.mSendIntervalSecs, errorMsg)) {
-                PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                                      mContext->GetAlarm(),
-                                      errorMsg,
-                                      mBatch.mSendIntervalSecs,
-                                      sName,
-                                      mContext->GetConfigName(),
-                                      mContext->GetProjectName(),
-                                      mContext->GetLogstoreName(),
-                                      mContext->GetRegion());
-            }
-
-            // ShardHashKeys
-            if (!GetOptionalListParam<string>(*itr, "Batch.ShardHashKeys", mBatch.mShardHashKeys, errorMsg)) {
-                PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                     mContext->GetAlarm(),
-                                     errorMsg,
-                                     sName,
-                                     mContext->GetConfigName(),
-                                     mContext->GetProjectName(),
-                                     mContext->GetLogstoreName(),
-                                     mContext->GetRegion());
-            }
+        // Deprecated, use ShardHashKeys instead
+        if (!GetOptionalListParam<string>(*itr, "Batch.ShardHashKeys", mShardHashKeys, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
         }
     }
+
+    DefaultFlushStrategyOptions strategy{static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
+                                         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
+                                         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
+    if (!mBatcher.Init(
+            itr ? *itr : Json::Value(), this, strategy, !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty())) {
+        // when either exactly once is enabled or ShardHashKeys is not empty, we don't enable group batch
+        return false;
+    }
+
+    // ShardHashKeys
+    if (!GetOptionalListParam<string>(config, "ShardHashKeys", mShardHashKeys, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    } else if (!mShardHashKeys.empty() && mContext->IsExactlyOnceEnabled()) {
+        mShardHashKeys.clear();
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             "exactly once enabled when ShardHashKeys is not empty",
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    mGroupSerializer = make_unique<SLSEventGroupSerializer>(this);
+    mGroupListSerializer = make_unique<SLSEventGroupListSerializer>(this);
 
     GenerateGoPlugin(config, optionalGoPipeline);
 
     return true;
 }
 
-bool FlusherSLS::Start() {
+bool FlusherSLS::Register() {
     Sender::Instance()->IncreaseProjectReferenceCnt(mProject);
     Sender::Instance()->IncreaseRegionReferenceCnt(mRegion);
     Sender::Instance()->IncreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
     return true;
 }
 
-bool FlusherSLS::Stop(bool isPipelineRemoving) {
+bool FlusherSLS::Unregister(bool isPipelineRemoving) {
     Sender::Instance()->DecreaseProjectReferenceCnt(mProject);
     Sender::Instance()->DecreaseRegionReferenceCnt(mRegion);
     Sender::Instance()->DecreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
+    return true;
+}
+
+void FlusherSLS::Send(PipelineEventGroup&& g) {
+    if (g.IsReplay()) {
+        SerializeAndPush(std::move(g));
+    } else {
+        vector<BatchedEventsList> res;
+        mBatcher.Add(std::move(g), res);
+        SerializeAndPush(std::move(res));
+    }
+}
+
+void FlusherSLS::Flush(size_t key) {
+    BatchedEventsList res;
+    mBatcher.FlushQueue(key, res);
+    SerializeAndPush(std::move(res));
+}
+
+// TODO: currently, if sender queue is blocked, data will be lost during pipeline update
+// this should be fixed during sender queue refactorization, where all batch should be put into sender queue
+void FlusherSLS::FlushAll() {
+    vector<BatchedEventsList> res;
+    mBatcher.FlushAll(res);
+    SerializeAndPush(std::move(res));
+}
+
+bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
+    string compressedData;
+    if (mCompressor) {
+        string errorMsg;
+        if (!mCompressor->Compress(data, compressedData, errorMsg)) {
+            LOG_WARNING(mContext->GetLogger(),
+                        ("failed to compress data",
+                         errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+            mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
+                                           "failed to compress data: " + errorMsg + "\taction: discard data\tplugin: "
+                                               + sName + "\tconfig: " + mContext->GetConfigName(),
+                                           mContext->GetProjectName(),
+                                           mContext->GetLogstoreName(),
+                                           mContext->GetRegion());
+            return false;
+        }
+    } else {
+        compressedData = data;
+    }
+    PushToQueue(std::move(compressedData), data.size(), LOGGROUP_COMPRESSED, logstore);
     return true;
 }
 
@@ -323,6 +343,204 @@ void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) c
         plugin["detail"] = detail;
         res["flushers"].append(plugin);
     }
+}
+
+void FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
+    string serializedData, compressedData;
+    BatchedEvents g(std::move(group.MutableEvents()),
+                    std::move(group.GetSizedTags()),
+                    std::move(group.GetSourceBuffer()),
+                    group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                    std::move(group.GetExactlyOnceCheckpoint()));
+    AddPackId(g);
+    string errorMsg;
+    if (!mGroupSerializer->Serialize(std::move(g), serializedData, errorMsg)) {
+        LOG_WARNING(mContext->GetLogger(),
+                    ("failed to serialize event group",
+                     errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+        mContext->GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
+                                       "failed to serialize event group: " + errorMsg
+                                           + "\taction: discard data\tplugin: " + sName
+                                           + "\tconfig: " + mContext->GetConfigName(),
+                                       mContext->GetProjectName(),
+                                       mContext->GetLogstoreName(),
+                                       mContext->GetRegion());
+        return;
+    }
+    if (mCompressor) {
+        if (!mCompressor->Compress(serializedData, compressedData, errorMsg)) {
+            LOG_WARNING(mContext->GetLogger(),
+                        ("failed to compress event group",
+                         errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+            mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
+                                           "failed to compress event group: " + errorMsg
+                                               + "\taction: discard data\tplugin: " + sName
+                                               + "\tconfig: " + mContext->GetConfigName(),
+                                           mContext->GetProjectName(),
+                                           mContext->GetLogstoreName(),
+                                           mContext->GetRegion());
+            return;
+        }
+    } else {
+        compressedData = serializedData;
+    }
+    PushToQueue(std::move(compressedData),
+                serializedData.size(),
+                LOGGROUP_COMPRESSED,
+                "",
+                g.mExactlyOnceCheckpoint->data.hash_key(),
+                g.mExactlyOnceCheckpoint);
+}
+
+void FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
+    if (groupList.empty()) {
+        return;
+    }
+    vector<CompressedLogGroup> compressedLogGroups;
+    string shardHashKey, serializedData, compressedData;
+    size_t packageSize = 0;
+    bool enablePackageList = groupList.size() > 1;
+
+    for (auto& group : groupList) {
+        if (!mShardHashKeys.empty()) {
+            shardHashKey = GetShardHashKey(group);
+        }
+        AddPackId(group);
+        string errorMsg;
+        if (!mGroupSerializer->Serialize(std::move(group), serializedData, errorMsg)) {
+            LOG_WARNING(mContext->GetLogger(),
+                        ("failed to serialize event group",
+                         errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+            mContext->GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
+                                           "failed to serialize event group: " + errorMsg
+                                               + "\taction: discard data\tplugin: " + sName
+                                               + "\tconfig: " + mContext->GetConfigName(),
+                                           mContext->GetProjectName(),
+                                           mContext->GetLogstoreName(),
+                                           mContext->GetRegion());
+            return;
+        }
+        if (mCompressor) {
+            if (!mCompressor->Compress(serializedData, compressedData, errorMsg)) {
+                LOG_WARNING(mContext->GetLogger(),
+                            ("failed to compress event group",
+                             errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+                mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
+                                               "failed to compress event group: " + errorMsg
+                                                   + "\taction: discard data\tplugin: " + sName
+                                                   + "\tconfig: " + mContext->GetConfigName(),
+                                               mContext->GetProjectName(),
+                                               mContext->GetLogstoreName(),
+                                               mContext->GetRegion());
+                return;
+            }
+        } else {
+            compressedData = serializedData;
+        }
+        if (enablePackageList) {
+            packageSize += serializedData.size();
+            compressedLogGroups.emplace_back(std::move(compressedData), serializedData.size());
+        } else {
+            if (group.mExactlyOnceCheckpoint) {
+                PushToQueue(std::move(compressedData),
+                            serializedData.size(),
+                            LOGGROUP_COMPRESSED,
+                            "",
+                            group.mExactlyOnceCheckpoint->data.hash_key(),
+                            group.mExactlyOnceCheckpoint);
+            } else {
+                PushToQueue(std::move(compressedData), serializedData.size(), LOGGROUP_COMPRESSED, "", shardHashKey);
+            }
+        }
+    }
+    if (enablePackageList) {
+        string errorMsg;
+        mGroupListSerializer->Serialize(std::move(compressedLogGroups), serializedData, errorMsg);
+        PushToQueue(std::move(compressedData), packageSize, LOG_PACKAGE_LIST);
+    }
+}
+
+void FlusherSLS::SerializeAndPush(vector<BatchedEventsList>&& groupLists) {
+    for (auto& groupList : groupLists) {
+        SerializeAndPush(std::move(groupList));
+    }
+}
+
+string FlusherSLS::GetShardHashKey(const BatchedEvents& g) const {
+    // TODO: improve performance
+    string key;
+    for (size_t i = 0; i < mShardHashKeys.size(); ++i) {
+        if (mShardHashKeys[i] == "__source__") {
+            key += LogFileProfiler::mIpAddr;
+        } else {
+            for (auto& item : g.mTags.mInner) {
+                if (item.first == mShardHashKeys[i]) {
+                    key += item.second.to_string();
+                    break;
+                }
+            }
+        }
+        if (i != mShardHashKeys.size() - 1) {
+            key += "_";
+        }
+    }
+    return sdk::CalcMD5(key);
+}
+
+void FlusherSLS::AddPackId(BatchedEvents& g) const {
+    string packIdPrefixStr = g.mPackIdPrefix.to_string();
+    int64_t packidPrefix = HashString(packIdPrefixStr);
+    int64_t packSeq = PackIdManager::GetInstance()->GetAndIncPackSeq(
+        HashString(packIdPrefixStr + "_" + mProject + "_" + mLogstore));
+    auto packId = g.mSourceBuffers[0]->CopyString(ToHexString(packidPrefix) + "-" + ToHexString(packSeq));
+    g.mTags.Insert(LOG_RESERVED_KEY_PACKAGE_ID, StringView(packId.data, packId.size));
+}
+
+void FlusherSLS::PushToQueue(string&& data,
+                             size_t rawSize,
+                             SEND_DATA_TYPE type,
+                             const string& logstore,
+                             const string& shardHashKey,
+                             const RangeCheckpointPtr& eoo) {
+    sls_logs::SlsCompressType compressType = sls_logs::SLS_CMP_NONE;
+    switch (mCompressor->GetCompressType()) {
+        case CompressType::LZ4:
+            compressType = sls_logs::SLS_CMP_LZ4;
+            break;
+        case CompressType::ZSTD:
+            compressType = sls_logs::SLS_CMP_ZSTD;
+            break;
+        default:
+            break;
+    }
+    LogGroupContext ctx(mRegion,
+                        mProject,
+                        mLogstore,
+                        compressType,
+                        FileInfoPtr(),
+                        IntegrityConfigPtr(),
+                        LineCountConfigPtr(),
+                        -1,
+                        false,
+                        false,
+                        eoo);
+    auto& cpt = ctx.mExactlyOnceCheckpoint;
+    LoggroupTimeValue* item = new LoggroupTimeValue(
+        mProject,
+        logstore.empty() ? mLogstore : logstore,
+        mContext ? mContext->GetConfigName() : "",
+        cpt ? false : true,
+        mAliuid,
+        mRegion,
+        type,
+        rawSize,
+        time(nullptr),
+        shardHashKey,
+        cpt ? cpt->fbKey : mLogstoreKey, // TODO: current implementation is incorrect. When route is enabled in Go
+                                         // pipeline, logstore key should depend on logstore, not mLogstoreKey
+        ctx);
+    item->mLogData.swap(data);
+    Sender::Instance()->PutIntoBatchMap(item);
 }
 
 } // namespace logtail

@@ -47,12 +47,4 @@ bool UncompressZstd(const char* srcPtr, const uint32_t srcSize, const uint32_t r
 bool CompressZstd(const char* srcPtr, const uint32_t srcSize, std::string& dst, int32_t level);
 bool CompressZstd(const std::string& src, std::string& dst, int32_t level);
 
-// old mode , with 8 bytes leading raw size
-bool RawCompress(std::string& data);
-bool Compress(std::string& data);
-bool Compress(const char* data, int64_t srcLen, std::string& compressedData);
-char* Compress(const char* data, int64_t srcLen, int64_t& dstLen);
-bool Uncompress(const std::string& src, std::string& dst);
-char* Uncompress(const char* src, int64_t srcLen, int64_t& dstLen);
-
 } // namespace logtail

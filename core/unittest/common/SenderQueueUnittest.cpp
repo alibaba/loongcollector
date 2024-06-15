@@ -16,7 +16,7 @@
 #include "common/LogstoreSenderQueue.h"
 #include "common/FileSystemUtil.h"
 #include "sender/SenderQueueParam.h"
-#include "aggregator/Aggregator.h"
+#include "batch/Batcher.h"
 #include "app_config/AppConfig.h"
 
 namespace logtail {

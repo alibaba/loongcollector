@@ -302,13 +302,6 @@ void SetLogTime(sls_logs::Log* log, time_t second) {
     log->set_time(second);
 }
 
-void SetLogTimeWithNano(sls_logs::Log* log, time_t second, std::optional<uint32_t> nanosecond) {
-    log->set_time(second);
-    if (nanosecond) {
-        log->set_time_ns(nanosecond.value());
-    }
-}
-
 LogtailTime GetCurrentLogtailTime() {
     LogtailTime ts;
     auto now = std::chrono::system_clock::now().time_since_epoch();

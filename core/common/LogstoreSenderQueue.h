@@ -25,8 +25,8 @@
 #include "LogGroupContext.h"
 #include "common/FeedbackInterface.h"
 #include "common/LogstoreFeedbackKey.h"
-#include "logger/Logger.h"
 #include "common/LogstoreFeedbackQueue.h"
+#include "logger/Logger.h"
 #include "sender/SenderQueueParam.h"
 
 namespace logtail {
@@ -56,12 +56,10 @@ struct LoggroupTimeValue {
     SEND_DATA_TYPE mDataType;
     std::string mLogData;
     int32_t mRawSize;
-    int32_t mLogLines;
     bool mBufferOrNot; // false only when use exactly once
     std::string mProjectName;
     std::string mLogstore;
     std::string mConfigName;
-    std::string mFilename;
 
     // truncate info
     std::string mTruncateInfo;
@@ -84,12 +82,10 @@ struct LoggroupTimeValue {
     LoggroupTimeValue(const std::string& projectName,
                       const std::string& logstore,
                       const std::string& configName,
-                      const std::string& filename,
                       bool bufferOrNot,
                       const std::string& aliuid,
                       const std::string& region,
                       SEND_DATA_TYPE dataType,
-                      int32_t lines,
                       int32_t rawSize,
                       int32_t lastUpdateTime,
                       const std::string& shardHashKey,
@@ -98,12 +94,10 @@ struct LoggroupTimeValue {
         mProjectName = projectName;
         mLogstore = logstore;
         mConfigName = configName;
-        mFilename = filename;
         mBufferOrNot = bufferOrNot;
         mAliuid = aliuid;
         mRegion = region;
         mDataType = dataType;
-        mLogLines = lines;
         mRawSize = rawSize;
         mEnqueueTime = lastUpdateTime;
         mSendRetryTimes = 0;
@@ -369,10 +363,9 @@ public:
             }
         }
         if (index == this->mWrite) {
-            APSARA_LOG_ERROR(
-                sLogger,
-                ("find no sender item, project", item->mProjectName)("logstore", item->mLogstore)(
-                    "lines", item->mLogLines)("read", this->mRead)("write", this->mWrite)("size", this->mSize));
+            APSARA_LOG_ERROR(sLogger,
+                             ("find no sender item, project", item->mProjectName)("logstore", item->mLogstore)(
+                                 "read", this->mRead)("write", this->mWrite)("size", this->mSize));
             return 0;
         }
         // need to check mWrite to avoid dead while
@@ -492,17 +485,21 @@ public:
 
     bool IsValidToPush(int64_t key) const override {
         PTScopedLock dataLock(mLock);
-        const auto& singleQueue = mLogstoreSenderQueueMap.at(key);
+        auto iter = mLogstoreSenderQueueMap.find(key);
+        if (iter == mLogstoreSenderQueueMap.end()) {
+            // this only happens when go self telemetry is sent to sls
+            return true;
+        }
 
         // For correctness, exactly once queue should ignore mUrgentFlag.
-        if (singleQueue.GetQueueType() == QueueType::ExactlyOnce) {
-            return singleQueue.IsValid();
+        if (iter->second.GetQueueType() == QueueType::ExactlyOnce) {
+            return iter->second.IsValid();
         }
 
         if (mUrgentFlag) {
             return true;
         }
-        return singleQueue.IsValid();
+        return iter->second.IsValid();
     }
 
     void SetLogstoreFlowControl(const LogstoreFeedBackKey& key, int32_t maxBytes, int32_t expireTime) {

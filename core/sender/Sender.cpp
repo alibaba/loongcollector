@@ -33,7 +33,6 @@
 #include "common/FileEncryption.h"
 #include "common/FileSystemUtil.h"
 #include "common/HashUtil.h"
-#include "common/LogFileCollectOffsetIndicator.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RandomUtil.h"
 #include "common/RuntimeUtil.h"
@@ -53,6 +52,7 @@
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
+#include "sender/PackIdManager.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -61,7 +61,6 @@ DEFINE_FLAG_INT32(buffer_check_period, "check logtail local storage buffer perio
 DEFINE_FLAG_INT32(quota_exceed_wait_interval, "when daemon buffer thread get quotaExceed error, sleep 5 seconds", 5);
 DEFINE_FLAG_INT32(secondary_buffer_count_limit, "data ready for write buffer file", 20);
 DEFINE_FLAG_BOOL(enable_mock_send, "if enable mock send in ut", false);
-DEFINE_FLAG_INT32(merge_log_count_limit, "log count in one logGroup at most", 4000);
 DEFINE_FLAG_INT32(buffer_file_alive_interval, "the max alive time of a bufferfile, 5 minutes", 300);
 DEFINE_FLAG_INT32(write_secondary_wait_timeout, "interval of dump seconary buffer from memory to file, seconds", 2);
 DEFINE_FLAG_BOOL(e2e_send_throughput_test, "dump file for e2e throughpt test", false);
@@ -79,7 +78,7 @@ DEFINE_FLAG_DOUBLE(send_server_error_retry_ratio, "", 0.3);
 DEFINE_FLAG_DOUBLE(send_server_error_ratio_smoothing_factor, "", 5.0);
 DEFINE_FLAG_INT32(send_statistic_entry_timeout, "seconds", 7200);
 DEFINE_FLAG_INT32(sls_host_update_interval, "seconds", 5);
-DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
+// DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 DEFINE_FLAG_BOOL(dump_reduced_send_result, "for performance test", false);
 DEFINE_FLAG_INT32(test_network_normal_interval, "if last check is normal, test network again after seconds ", 30);
 DEFINE_FLAG_INT32(same_topic_merge_send_count,
@@ -106,6 +105,7 @@ DEFINE_FLAG_INT32(log_expire_time, "log expire time", 24 * 3600);
 
 DECLARE_FLAG_STRING(default_access_key_id);
 DECLARE_FLAG_STRING(default_access_key);
+DECLARE_FLAG_INT32(max_send_log_group_size);
 
 namespace logtail {
 const string Sender::BUFFER_FILE_NAME_PREFIX = "logtail_buffer_file_";
@@ -121,14 +121,13 @@ void SendClosure::OnSuccess(sdk::Response* response) {
     if (sLogger->should_log(spdlog::level::debug)) {
         time_t curTime = time(NULL);
         bool isProfileData = Sender::IsProfileData(mDataPtr->mRegion, mDataPtr->mProjectName, mDataPtr->mLogstore);
-        LOG_DEBUG(
-            sLogger,
-            ("SendSucess", "OK")("RequestId", response->requestId)("StatusCode", response->statusCode)(
-                "ResponseTime", curTime - mDataPtr->mLastSendTime)("Region", mDataPtr->mRegion)(
-                "Project", mDataPtr->mProjectName)("Logstore", mDataPtr->mLogstore)("Config", mDataPtr->mConfigName)(
-                "RetryTimes", mDataPtr->mSendRetryTimes)("TotalSendCost", curTime - mDataPtr->mEnqueueTime)(
-                "LogLines", mDataPtr->mLogLines)("Bytes", mDataPtr->mLogData.size())(
-                "Endpoint", mDataPtr->mCurrentEndpoint)("IsProfileData", isProfileData));
+        LOG_DEBUG(sLogger,
+                  ("SendSucess", "OK")("RequestId", response->requestId)("StatusCode", response->statusCode)(
+                      "ResponseTime", curTime - mDataPtr->mLastSendTime)("Region", mDataPtr->mRegion)(
+                      "Project", mDataPtr->mProjectName)("Logstore", mDataPtr->mLogstore)(
+                      "Config", mDataPtr->mConfigName)("RetryTimes", mDataPtr->mSendRetryTimes)(
+                      "TotalSendCost", curTime - mDataPtr->mEnqueueTime)("Bytes", mDataPtr->mLogData.size())(
+                      "Endpoint", mDataPtr->mCurrentEndpoint)("IsProfileData", isProfileData));
     }
 
     if (BOOL_FLAG(e2e_send_throughput_test))
@@ -141,10 +140,6 @@ void SendClosure::OnSuccess(sdk::Response* response) {
     if (mDataPtr->mLogGroupContext.mLineCountConfigPtr.get() != NULL
         && mDataPtr->mLogGroupContext.mLineCountConfigPtr->mLineCountSwitch)
         LogLineCount::GetInstance()->NotifySuccess(mDataPtr);
-
-    if (mDataPtr->mLogGroupContext.mMarkOffsetFlag) {
-        LogFileCollectOffsetIndicator::GetInstance()->NotifySuccess(mDataPtr);
-    }
 
     auto& cpt = mDataPtr->mLogGroupContext.mExactlyOnceCheckpoint;
     if (cpt) {
@@ -326,8 +321,8 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
             //  the possibility of hash key conflict is very low, so data is
             //  dropped here.
             cpt->Commit();
-            failDetail << ", drop exactly once log group and commit checkpoint"
-                       << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
+            failDetail << ", drop exactly once log group and commit checkpoint" << " checkpointKey:" << cpt->key
+                       << " checkpoint:" << cpt->data.DebugString();
             suggestion << "no suggestion";
             LogtailAlarm::GetInstance()->SendAlarm(EXACTLY_ONCE_ALARM,
                                                    "drop exactly once log group because of invalid sequence ID, cpt:"
@@ -367,8 +362,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
         "RequestId", response->requestId)("StatusCode", response->statusCode)("ErrorCode", errorCode)( \
         "ErrorMessage", errorMessage)("ResponseTime", curTime - mDataPtr->mLastSendTime)("Region", mDataPtr->mRegion)( \
         "Project", mDataPtr->mProjectName)("Logstore", mDataPtr->mLogstore)("Config", mDataPtr->mConfigName)( \
-        "RetryTimes", mDataPtr->mSendRetryTimes)("TotalSendCost", \
-                                                 curTime - mDataPtr->mEnqueueTime)("LogLines", mDataPtr->mLogLines)( \
+        "RetryTimes", mDataPtr->mSendRetryTimes)("TotalSendCost", curTime - mDataPtr->mEnqueueTime)( \
         "Bytes", mDataPtr->mLogData.size())("Endpoint", mDataPtr->mCurrentEndpoint)("IsProfileData", isProfileData)
 
     // Log warning if retry for too long or will discard data
@@ -398,8 +392,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
             if (!isProfileData) {
                 LogtailAlarm::GetInstance()->SendAlarm(
                     SEND_DATA_FAIL_ALARM,
-                    "lines:" + ToString(mDataPtr->mLogLines) + ", errorCode:" + errorCode
-                        + ", errorMessage:" + errorMessage + ", requestId:" + response->requestId
+                    "errorCode:" + errorCode + ", errorMessage:" + errorMessage + ", requestId:" + response->requestId
                         + ", endpoint:" + mDataPtr->mCurrentEndpoint + ", config:" + mDataPtr->mConfigName,
                     mDataPtr->mProjectName,
                     mDataPtr->mLogstore,
@@ -639,10 +632,10 @@ bool Sender::WriteToFile(LoggroupTimeValue* value, bool sendPerformance) {
     if (outfile.good()) {
         if (sendPerformance)
             outfile << value->mProjectName << "\t" << value->mLogstore << "\t" << time(NULL) << "\t" << value->mRawSize
-                    << "\t" << value->mLogLines << endl;
+                    << endl;
         else
             outfile << value->mProjectName << "\t" << value->mLogstore << "\t" << value->mEnqueueTime << "\t"
-                    << value->mRawSize << "\t" << value->mLogLines << endl;
+                    << value->mRawSize << endl;
         outfile.close();
         return true;
     } else {
@@ -680,10 +673,6 @@ bool Sender::LZ4CompressLogGroup(const sls_logs::LogGroup& logGroup, std::string
 
 bool Sender::Init(void) {
     SLSControl::GetInstance()->Init();
-
-    static Aggregator* aggregator = Aggregator::GetInstance();
-    aggregator->CleanLogPackSeqMap();
-
 
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
     MockAsyncSend = NULL;
@@ -1372,7 +1361,6 @@ void Sender::WriteSecondary() {
             for (vector<LoggroupTimeValue*>::iterator itr = logGroupToDump.begin(); itr != logGroupToDump.end();
                  ++itr) {
                 SendToBufferFile(*itr);
-                LOG_DEBUG(sLogger, ("Write LogGroup to Secondary File, logs", (*itr)->mLogLines));
                 delete *itr;
             }
             logGroupToDump.clear();
@@ -1397,11 +1385,9 @@ void Sender::DaemonSender() {
     int32_t lastUpdateMetricTime = time(NULL);
     int32_t sendBufferCount = 0;
     size_t sendBufferBytes = 0;
-    size_t sendLines = 0;
     size_t sendNetBodyBytes = 0;
     mLastDaemonRunTime = lastUpdateMetricTime;
     mLastSendDataTime = lastUpdateMetricTime;
-    Aggregator* aggregator = Aggregator::GetInstance();
     while (true) {
         vector<LoggroupTimeValue*> logGroupToSend;
         mSenderQueue.Wait(1000);
@@ -1448,10 +1434,8 @@ void Sender::DaemonSender() {
             sMonitor->UpdateMetric("send_tps", 1.0 * sendBufferCount / (curTime - lastUpdateMetricTime));
             sMonitor->UpdateMetric("send_bytes_ps", 1.0 * sendBufferBytes / (curTime - lastUpdateMetricTime));
             sMonitor->UpdateMetric("send_net_bytes_ps", 1.0 * sendNetBodyBytes / (curTime - lastUpdateMetricTime));
-            sMonitor->UpdateMetric("send_lines_ps", 1.0 * sendLines / (curTime - lastUpdateMetricTime));
             lastUpdateMetricTime = curTime;
             sendBufferCount = 0;
-            sendLines = 0;
             sendNetBodyBytes = 0;
             sendBufferBytes = 0;
 
@@ -1551,7 +1535,6 @@ void Sender::DaemonSender() {
                 AddSendingBufferCount();
                 sendBufferBytes += data->mRawSize;
                 sendNetBodyBytes += data->mLogData.size();
-                sendLines += data->mLogLines;
                 SendToNetAsync(data);
 #ifdef __ENTERPRISE__
             }
@@ -1562,12 +1545,11 @@ void Sender::DaemonSender() {
         if ((time(NULL) - mLastCheckSendClientTime) > INT32_FLAG(check_send_client_timeout_interval)) {
             CleanTimeoutSendClient();
             CleanTimeoutSendStatistic();
-            aggregator->CleanTimeoutLogPackSeq();
+            PackIdManager::GetInstance()->CleanTimeoutEntry();
             mLastCheckSendClientTime = time(NULL);
         }
 
-        if (IsFlush() && aggregator->IsMergeMapEmpty() && IsBatchMapEmpty() && GetSendingCount() == 0
-            && IsSecondaryBufferEmpty())
+        if (IsFlush() && IsBatchMapEmpty() && GetSendingCount() == 0 && IsSecondaryBufferEmpty())
             ResetFlush();
     }
     LOG_INFO(sLogger, ("SendThread", "exit"));
@@ -1603,10 +1585,10 @@ void Sender::PutIntoSecondaryBuffer(LoggroupTimeValue* dataPtr, int32_t retryTim
     } else {
         LOG_ERROR(sLogger,
                   ("write to secondary buffer fail", "discard data")("projectName", dataPtr->mProjectName)(
-                      "logstore", dataPtr->mLogstore)("RetryTimes", dataPtr->mSendRetryTimes)(
-                      "LogLines", dataPtr->mLogLines)("bytes", dataPtr->mLogData.size()));
+                      "logstore", dataPtr->mLogstore)("RetryTimes",
+                                                      dataPtr->mSendRetryTimes)("bytes", dataPtr->mLogData.size()));
         LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
-                                               "write to buffer file fail, logs:" + ToString(dataPtr->mLogLines),
+                                               "write to buffer file fail",
                                                dataPtr->mProjectName,
                                                dataPtr->mLogstore,
                                                dataPtr->mRegion);
@@ -1708,7 +1690,7 @@ bool Sender::SendToBufferFile(LoggroupTimeValue* dataPtr) {
     if (ftell(fout) > AppConfig::GetInstance()->GetLocalFileSize())
         CreateNewFile();
     fclose(fout);
-    LOG_DEBUG(sLogger, ("write buffer file", bufferFileName)("loglines", dataPtr->mLogLines));
+    LOG_DEBUG(sLogger, ("write buffer file", bufferFileName));
     return true;
 }
 
@@ -1733,52 +1715,6 @@ void Sender::FlowControl(int32_t dataSize, SEND_THREAD_TYPE type) {
 
 bool Sender::IsValidToSend(const LogstoreFeedBackKey& logstoreKey) {
     return mSenderQueue.IsValidToPush(logstoreKey);
-}
-
-bool Sender::SendPb(const FlusherSLS* pConfig,
-                    char* pbBuffer,
-                    int32_t pbSize,
-                    int32_t lines,
-                    const std::string& logstore,
-                    const std::string& shardHash) {
-    // if logstore is specific, use this key, otherwise use pConfig->->mCategory
-    string compressStr = "zstd";
-    if (pConfig->mCompressType == FlusherSLS::CompressType::NONE) {
-        compressStr = "none";
-    } else if (pConfig->mCompressType == FlusherSLS::CompressType::LZ4) {
-        compressStr = "lz4";
-    }
-    sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(compressStr);
-    LogGroupContext logGroupContext(pConfig->mRegion, pConfig->mProject, pConfig->mLogstore, compressType);
-    LoggroupTimeValue* pData = new LoggroupTimeValue(pConfig->mProject,
-                                                     logstore.empty() ? pConfig->mLogstore : logstore,
-                                                     pConfig->HasContext() ? pConfig->GetContext().GetConfigName() : "",
-                                                     "", // only used for ant, set empty for simplicity
-                                                     true,
-                                                     pConfig->mAliuid,
-                                                     pConfig->mRegion,
-                                                     LOGGROUP_COMPRESSED,
-                                                     lines,
-                                                     pbSize,
-                                                     time(NULL),
-                                                     shardHash,
-                                                     pConfig->GetLogstoreKey(),
-                                                     logGroupContext);
-    // apsara::timing::TimeInNsec startT = apsara::timing::GetCurrentTimeInNanoSeconds();
-    if (!CompressData(logGroupContext.mCompressType, pbBuffer, pbSize, pData->mLogData)) {
-        LOG_ERROR(
-            sLogger,
-            ("compress data fail", "discard data")("projectName", pConfig->mProject)("logstore", pConfig->mLogstore));
-        delete pData;
-        return false;
-    } else {
-        // apsara::timing::TimeInNsec endT = apsara::timing::GetCurrentTimeInNanoSeconds();
-        PutIntoBatchMap(pData);
-        // apsara::timing::TimeInNsec endT2 = apsara::timing::GetCurrentTimeInNanoSeconds();
-        // printf("compress and insert %d %d %d %d\n", (int)(endT - startT), (int)(endT2 - endT), (int)(pbSize),
-        // (int)(pData->mLogData.size()));
-    }
-    return true;
 }
 
 void Sender::AddEndpointEntry(const std::string& region, const std::string& endpoint, bool isDefault, bool isProxy) {
@@ -2126,7 +2062,7 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
     sendClosure->mDataPtr = dataPtr;
     LOG_DEBUG(sLogger,
               ("region", dataPtr->mRegion)("endpoint", dataPtr->mCurrentEndpoint)("project", dataPtr->mProjectName)(
-                  "logstore", dataPtr->mLogstore)("LogLines", dataPtr->mLogLines)("bytes", dataPtr->mLogData.size()));
+                  "logstore", dataPtr->mLogstore)("bytes", dataPtr->mLogData.size()));
     if (BOOL_FLAG(enable_mock_send)) {
         if (MockAsyncSend && !MockIntegritySend)
             MockAsyncSend(dataPtr->mProjectName,
@@ -2181,30 +2117,6 @@ void Sender::SendToNetAsync(LoggroupTimeValue* dataPtr) {
     }
 }
 
-// config NULL means Logtail Profiling data
-bool Sender::Send(const std::string& projectName,
-                  const std::string& sourceId,
-                  LogGroup& logGroup,
-                  int64_t logGroupKey,
-                  const FlusherSLS* config,
-                  FlusherSLS::Batch::MergeType mergeType,
-                  const uint32_t logGroupSize,
-                  const string& defaultRegion,
-                  const string& filename,
-                  const LogGroupContext& context) {
-    static Aggregator* aggregator = Aggregator::GetInstance();
-    return aggregator->Add(projectName,
-                           sourceId,
-                           logGroup,
-                           logGroupKey,
-                           config,
-                           mergeType,
-                           logGroupSize,
-                           defaultRegion,
-                           filename,
-                           context);
-}
-
 bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
                            const std::string& aliuid,
                            const std::string& region,
@@ -2235,12 +2147,10 @@ bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
     LoggroupTimeValue* data = new LoggroupTimeValue(projectName,
                                                     logstore,
                                                     "",
-                                                    "",
                                                     false,
                                                     aliuid,
                                                     region,
                                                     LOGGROUP_COMPRESSED,
-                                                    logSize,
                                                     oriData.size(),
                                                     curTime,
                                                     shardHashKey,
@@ -2256,184 +2166,6 @@ bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
 
     PutIntoBatchMap(data);
     return true;
-}
-
-void Sender::SendCompressed(const std::string& projectName,
-                            sls_logs::LogGroup& logGroup,
-                            const std::vector<int32_t>& neededLogIndex,
-                            const std::string& configName,
-                            const std::string& aliuid,
-                            const std::string& region,
-                            const std::string& filename,
-                            const LogGroupContext& context) {
-    string oriData;
-    auto lines = static_cast<int32_t>(logGroup.logs_size());
-    auto const neededLogLines = static_cast<int32_t>(neededLogIndex.size());
-    int32_t logTimeInMinute = 0;
-    if (neededLogLines == lines) {
-        logGroup.SerializeToString(&oriData);
-        logTimeInMinute = logGroup.logs(0).time() - logGroup.logs(0).time() % 60;
-    } else {
-        sls_logs::LogGroup filteredLogGroup;
-        filteredLogGroup.set_category(logGroup.category());
-        filteredLogGroup.set_topic(logGroup.topic());
-        filteredLogGroup.set_machineuuid(Application::GetInstance()->GetUUID());
-        filteredLogGroup.set_source(logGroup.has_source() ? logGroup.source() : LogFileProfiler::mIpAddr);
-        filteredLogGroup.mutable_logtags()->Swap(logGroup.mutable_logtags());
-
-        auto mutableLogPtr = logGroup.mutable_logs()->mutable_data();
-        int32_t needIdx = 0;
-        for (int32_t logIdx = 0; logIdx < lines; ++logIdx) {
-            if (!(needIdx < neededLogLines && logIdx == neededLogIndex[needIdx])) {
-                continue;
-            }
-            filteredLogGroup.mutable_logs()->AddAllocated(*(mutableLogPtr + logIdx));
-            needIdx++;
-        }
-        lines = neededLogLines;
-        filteredLogGroup.SerializeToString(&oriData);
-        logTimeInMinute = filteredLogGroup.logs(0).time() - filteredLogGroup.logs(0).time() % 60;
-    }
-
-    auto& cpt = context.mExactlyOnceCheckpoint;
-    auto data = new LoggroupTimeValue(projectName,
-                                      logGroup.category(),
-                                      configName,
-                                      filename,
-                                      false,
-                                      aliuid,
-                                      region,
-                                      LOGGROUP_COMPRESSED,
-                                      lines,
-                                      oriData.size(),
-                                      time(NULL),
-                                      "",
-                                      cpt->fbKey,
-                                      context);
-    data->mLogTimeInMinute = logTimeInMinute;
-    data->mLogGroupContext.mSeqNum = ++mLogGroupContextSeq;
-
-    if (!CompressData(data->mLogGroupContext.mCompressType, oriData, data->mLogData)) {
-        LOG_ERROR(sLogger,
-                  ("compress data fail", "discard data")("projectName", projectName)("logstore", logGroup.category()));
-        LogtailAlarm::GetInstance()->SendAlarm(
-            SEND_COMPRESS_FAIL_ALARM, string("lines :") + ToString(lines), projectName, logGroup.category(), region);
-        delete data;
-    } else {
-        PutIntoBatchMap(data);
-    }
-}
-
-void Sender::SendCompressed(std::vector<MergeItem*>& sendDataVec) {
-    for (auto item : sendDataVec) {
-        string oriData;
-        item->mLogGroup.SerializeToString(&oriData);
-        mLogGroupContextSeq++;
-        auto& context = item->mLogGroupContext;
-        auto& cpt = context.mExactlyOnceCheckpoint;
-        context.mSeqNum = mLogGroupContextSeq;
-        LoggroupTimeValue* data = new LoggroupTimeValue(item->mProjectName,
-                                                        item->mLogGroup.category(),
-                                                        item->mConfigName,
-                                                        item->mFilename,
-                                                        cpt ? false : item->mBufferOrNot,
-                                                        item->mAliuid,
-                                                        item->mRegion,
-                                                        LOGGROUP_COMPRESSED,
-                                                        item->mLines,
-                                                        oriData.size(),
-                                                        item->mLastUpdateTime,
-                                                        cpt ? "" : item->mShardHashKey,
-                                                        cpt ? cpt->fbKey : item->mLogstoreKey,
-                                                        context);
-        data->mLogTimeInMinute = item->mLogTimeInMinute;
-
-        if (!CompressData(data->mLogGroupContext.mCompressType, oriData, data->mLogData)) {
-            LOG_ERROR(sLogger,
-                      ("compress data fail",
-                       "discard data")("projectName", item->mProjectName)("logstore", item->mLogGroup.category()));
-            LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
-                                                   string("lines :") + ToString(item->mLines),
-                                                   item->mProjectName,
-                                                   item->mLogGroup.category(),
-                                                   item->mRegion);
-            delete data;
-        } else {
-            if (data->mLogGroupContext.mMarkOffsetFlag) {
-                LogFileCollectOffsetIndicator::GetInstance()->RecordFileOffset(data);
-            }
-
-            // raw logs are merged, then pushed into sendDataVec, here we record integrity info and put it into list
-            LogIntegrity::GetInstance()->RecordIntegrityInfo(item);
-
-            PutIntoBatchMap(data);
-        }
-        delete item;
-    }
-}
-
-// all data in sendDataVec shoud have same key
-void Sender::SendLogPackageList(std::vector<MergeItem*>& sendDataVec) {
-    SlsLogPackageList logPackageList;
-    int32_t bytes = 0;
-    int32_t lines = 0;
-    uint32_t totalLogGroupCount = sendDataVec.size();
-    for (uint32_t idx = 0; idx < totalLogGroupCount; ++idx) {
-        string compressedData;
-        string oriData;
-        sendDataVec[idx]->mLogGroup.SerializeToString(&oriData);
-        if (!CompressData(sendDataVec[idx]->mLogGroupContext.mCompressType, oriData, compressedData)) {
-            LOG_ERROR(sLogger,
-                      ("compress data fail", "discard data")("projectName", sendDataVec[idx]->mProjectName)(
-                          "logstore", sendDataVec[idx]->mLogGroup.category()));
-            LogtailAlarm::GetInstance()->SendAlarm(SEND_COMPRESS_FAIL_ALARM,
-                                                   string("lines :") + ToString(sendDataVec[idx]->mLines),
-                                                   sendDataVec[idx]->mProjectName,
-                                                   sendDataVec[idx]->mLogGroup.category(),
-                                                   sendDataVec[idx]->mRegion);
-            delete sendDataVec[idx];
-            continue;
-        }
-        SlsLogPackage* package = logPackageList.add_packages();
-        package->set_data(compressedData);
-        package->set_uncompress_size(oriData.size());
-        package->set_compress_type(sendDataVec[idx]->mLogGroupContext.mCompressType);
-        lines += sendDataVec[idx]->mLines;
-        bytes += sendDataVec[idx]->mRawBytes;
-        if (bytes >= AppConfig::GetInstance()->GetMaxHoldedDataSize() || idx == totalLogGroupCount - 1) {
-            mLogGroupContextSeq++;
-            sendDataVec[idx]->mLogGroupContext.mSeqNum = mLogGroupContextSeq;
-            LoggroupTimeValue* data = new LoggroupTimeValue(sendDataVec[idx]->mProjectName,
-                                                            sendDataVec[idx]->mLogGroup.category(),
-                                                            sendDataVec[idx]->mConfigName,
-                                                            sendDataVec[idx]->mFilename,
-                                                            sendDataVec[idx]->mBufferOrNot,
-                                                            sendDataVec[idx]->mAliuid,
-                                                            sendDataVec[idx]->mRegion,
-                                                            LOG_PACKAGE_LIST,
-                                                            lines,
-                                                            bytes,
-                                                            sendDataVec[idx]->mLastUpdateTime,
-                                                            sendDataVec[idx]->mShardHashKey,
-                                                            sendDataVec[idx]->mLogstoreKey,
-                                                            sendDataVec[idx]->mLogGroupContext);
-            data->mLogTimeInMinute = sendDataVec[idx]->mLogTimeInMinute;
-            logPackageList.SerializeToString(&(data->mLogData));
-            logPackageList.Clear();
-            bytes = 0;
-            lines = 0;
-
-            if (data->mLogGroupContext.mMarkOffsetFlag) {
-                LogFileCollectOffsetIndicator::GetInstance()->RecordFileOffset(data);
-            }
-
-            // raw logs are merged, then pushed into sendDataVec, here we record integrity info and put it into list
-            LogIntegrity::GetInstance()->RecordIntegrityInfo(sendDataVec[idx]);
-
-            PutIntoBatchMap(data);
-        }
-        delete sendDataVec[idx];
-    }
 }
 
 void Sender::PutIntoBatchMap(LoggroupTimeValue* data) {
@@ -2453,7 +2185,7 @@ void Sender::PutIntoBatchMap(LoggroupTimeValue* data) {
         DISCARD_DATA_ALARM, "push file data into batch map fail", data->mProjectName, data->mLogstore, data->mRegion);
     LOG_ERROR(sLogger,
               ("push file data into batch map fail, discard log lines",
-               data->mLogLines)("project", data->mProjectName)("logstore", data->mLogstore));
+               "")("project", data->mProjectName)("logstore", data->mLogstore));
     delete data;
 }
 
@@ -2552,8 +2284,6 @@ void Sender::ResetRegionConcurrency(const std::string& region) {
 }
 
 bool Sender::FlushOut(int32_t time_interval_in_mili_seconds) {
-    static Aggregator* aggregator = Aggregator::GetInstance();
-    aggregator->FlushReadyBuffer();
     SetFlush();
     for (int i = 0; i < time_interval_in_mili_seconds / 100; ++i) {
         mSenderQueue.Signal();
@@ -2565,9 +2295,7 @@ bool Sender::FlushOut(int32_t time_interval_in_mili_seconds) {
             // double check, fix bug #13758589
             // TODO: this is not necessary, the task of checking whether all data has been flushed should be done in
             // this func, not in Sender thread
-            aggregator->FlushReadyBuffer();
-            if (aggregator->IsMergeMapEmpty() && IsBatchMapEmpty() && GetSendingCount() == 0
-                && IsSecondaryBufferEmpty()) {
+            if (IsBatchMapEmpty() && GetSendingCount() == 0 && IsSecondaryBufferEmpty()) {
                 return true;
             } else {
                 SetFlush();

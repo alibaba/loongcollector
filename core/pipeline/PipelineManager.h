@@ -56,6 +56,7 @@ private:
         const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& statistics);
     void DecreasePluginUsageCnt(
         const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& statistics);
+    void FlushAllBatch();
     // 过渡使用
     void CheckIfInputUpdated(const Json::Value& config,
                              bool& isInputObserverChanged,

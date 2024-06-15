@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <json/json.h>
+
 #include <memory>
 #include <string>
-
-#include <json/json.h>
 
 #include "common/JsonUtil.h"
 #include "common/LogstoreFeedbackKey.h"
@@ -27,6 +27,10 @@
 #include "pipeline/PipelineContext.h"
 #include "sender/Sender.h"
 #include "unittest/Unittest.h"
+
+DECLARE_FLAG_INT32(batch_send_interval);
+DECLARE_FLAG_INT32(merge_log_count_limit);
+DECLARE_FLAG_INT32(batch_send_metric_size);
 
 using namespace std;
 
@@ -71,13 +75,23 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
     APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
     APSARA_TEST_EQUAL("", flusher->mAliuid);
-    APSARA_TEST_EQUAL(FlusherSLS::CompressType::LZ4, flusher->mCompressType);
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
     APSARA_TEST_EQUAL(0U, flusher->mFlowControlExpireTime);
     APSARA_TEST_EQUAL(-1, flusher->mMaxSendRate);
-    APSARA_TEST_EQUAL(FlusherSLS::Batch::MergeType::TOPIC, flusher->mBatch.mMergeType);
-    APSARA_TEST_EQUAL(INT32_FLAG(batch_send_interval), flusher->mBatch.mSendIntervalSecs);
-    APSARA_TEST_TRUE(flusher->mBatch.mShardHashKeys.empty());
+    APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
+    APSARA_TEST_EQUAL(CompressType::LZ4, flusher->mCompressor->GetCompressType());
+    APSARA_TEST_TRUE(flusher->mGroupSerializer);
+    APSARA_TEST_TRUE(flusher->mGroupListSerializer);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
+                      flusher->mBatcher.mEventFlushStrategy.GetMaxCnt());
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
+                      flusher->mBatcher.mEventFlushStrategy.GetMaxSizeBytes());
+    uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(batch_send_interval)) / 2;
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_interval)) - timeout,
+                      flusher->mBatcher.mEventFlushStrategy.GetTimeoutSecs());
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
+                      flusher->mBatcher.mGroupFlushStrategy->GetMaxSizeBytes());
+    APSARA_TEST_EQUAL(timeout, flusher->mBatcher.mGroupFlushStrategy->GetTimeoutSecs());
 
     // valid optional param
     configStr = R"(
@@ -92,13 +106,9 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "TelemetryType": "metrics",
             "FlowControlExpireTime": 123456789,
             "MaxSendRate": 5,
-            "Batch": {
-                "MergeType": "logstore",
-                "SendIntervalSecs": 1,
-                "ShardHashKeys": [
-                    "__source__"
-                ]
-            }
+            "ShardHashKeys": [
+                "__source__"
+            ]
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -112,13 +122,11 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
 #else
     APSARA_TEST_EQUAL("", flusher->mAliuid);
 #endif
-    APSARA_TEST_EQUAL(FlusherSLS::CompressType::ZSTD, flusher->mCompressType);
+    APSARA_TEST_EQUAL(CompressType::ZSTD, flusher->mCompressor->GetCompressType());
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::METRIC, flusher->mTelemetryType);
     APSARA_TEST_EQUAL(123456789U, flusher->mFlowControlExpireTime);
     APSARA_TEST_EQUAL(5, flusher->mMaxSendRate);
-    APSARA_TEST_EQUAL(FlusherSLS::Batch::MergeType::LOGSTORE, flusher->mBatch.mMergeType);
-    APSARA_TEST_EQUAL(1U, flusher->mBatch.mSendIntervalSecs);
-    APSARA_TEST_EQUAL(1U, flusher->mBatch.mShardHashKeys.size());
+    APSARA_TEST_EQUAL(1U, flusher->mShardHashKeys.size());
 
     // invalid optional param
     configStr = R"(
@@ -133,11 +141,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "TelemetryType": true,
             "FlowControlExpireTime": true,
             "MaxSendRate": true,
-            "Batch": {
-                "MergeType": true,
-                "SendIntervalSecs": true,
-                "ShardHashKeys": true
-            }
+            "ShardHashKeys": true
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -147,13 +151,11 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
     APSARA_TEST_EQUAL("", flusher->mAliuid);
-    APSARA_TEST_EQUAL(FlusherSLS::CompressType::LZ4, flusher->mCompressType);
+    APSARA_TEST_EQUAL(CompressType::LZ4, flusher->mCompressor->GetCompressType());
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
     APSARA_TEST_EQUAL(0U, flusher->mFlowControlExpireTime);
     APSARA_TEST_EQUAL(-1, flusher->mMaxSendRate);
-    APSARA_TEST_EQUAL(FlusherSLS::Batch::MergeType::TOPIC, flusher->mBatch.mMergeType);
-    APSARA_TEST_EQUAL(INT32_FLAG(batch_send_interval), flusher->mBatch.mSendIntervalSecs);
-    APSARA_TEST_TRUE(flusher->mBatch.mShardHashKeys.empty());
+    APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
 
 #ifdef __ENTERPRISE__
     // region
@@ -195,58 +197,6 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_NOT_EQUAL(iter->second->mEndpointDetailMap.end(),
                           iter->second->mEndpointDetailMap.find("http://cn-hangzhou.log.aliyuncs.com"));
 
-    // CompressType
-    configStr = R"(
-        {
-            "Type": "flusher_sls",
-            "Project": "test_project",
-            "Logstore": "test_logstore",
-            "Region": "cn-hangzhou",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
-            "CompressType": "none"
-        }
-    )";
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    flusher.reset(new FlusherSLS());
-    flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
-    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(FlusherSLS::CompressType::NONE, flusher->mCompressType);
-
-    configStr = R"(
-        {
-            "Type": "flusher_sls",
-            "Project": "test_project",
-            "Logstore": "test_logstore",
-            "Region": "cn-hangzhou",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
-            "CompressType": "lz4"
-        }
-    )";
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    flusher.reset(new FlusherSLS());
-    flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
-    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(FlusherSLS::CompressType::LZ4, flusher->mCompressType);
-
-    configStr = R"(
-        {
-            "Type": "flusher_sls",
-            "Project": "test_project",
-            "Logstore": "test_logstore",
-            "Region": "cn-hangzhou",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
-            "CompressType": "unknown"
-        }
-    )";
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    flusher.reset(new FlusherSLS());
-    flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
-    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(FlusherSLS::CompressType::LZ4, flusher->mCompressType);
-
     // TelemetryType
     configStr = R"(
         {
@@ -281,45 +231,6 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
-
-    // Batch.MergeType
-    configStr = R"(
-        {
-            "Type": "flusher_sls",
-            "Project": "test_project",
-            "Logstore": "test_logstore",
-            "Region": "cn-hangzhou",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
-            "Batch": {
-                "MergeType": "topic"
-            }
-        }
-    )";
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    flusher.reset(new FlusherSLS());
-    flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
-    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(FlusherSLS::Batch::MergeType::TOPIC, flusher->mBatch.mMergeType);
-
-    configStr = R"(
-        {
-            "Type": "flusher_sls",
-            "Project": "test_project",
-            "Logstore": "test_logstore",
-            "Region": "cn-hangzhou",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
-            "Batch": {
-                "MergeType": "unknown"
-            }
-        }
-    )";
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    flusher.reset(new FlusherSLS());
-    flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
-    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(FlusherSLS::Batch::MergeType::TOPIC, flusher->mBatch.mMergeType);
 
     // additional param
     configStr = R"(
@@ -450,6 +361,8 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
 
     Json::Value configJson, optionalGoPipeline;
     FlusherSLS flusher1, flusher2;
+    flusher1.SetContext(ctx1);
+    flusher2.SetContext(ctx2);
     string configStr, errorMsg;
 
     configStr = R"(
@@ -463,7 +376,6 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     APSARA_TEST_TRUE(flusher1.Init(configJson, optionalGoPipeline));
-    flusher1.SetContext(ctx1);
 
     configStr = R"(
         {
@@ -477,14 +389,13 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     APSARA_TEST_TRUE(flusher2.Init(configJson, optionalGoPipeline));
-    flusher2.SetContext(ctx2);
 
-    APSARA_TEST_TRUE(flusher1.Start());
+    APSARA_TEST_TRUE(flusher1.Register());
     APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
 
-    APSARA_TEST_TRUE(flusher2.Start());
+    APSARA_TEST_TRUE(flusher2.Register());
     APSARA_TEST_EQUAL(2U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
 #ifdef __ENTERPRISE__
@@ -493,12 +404,12 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
 #endif
 
-    APSARA_TEST_TRUE(flusher2.Stop(true));
+    APSARA_TEST_TRUE(flusher2.Unregister(true));
     APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
 
-    APSARA_TEST_TRUE(flusher1.Stop(true));
+    APSARA_TEST_TRUE(flusher1.Unregister(true));
     APSARA_TEST_TRUE(Sender::Instance()->mProjectRefCntMap.empty());
     APSARA_TEST_FALSE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_TRUE(Sender::Instance()->GetRegionAliuids("cn-hangzhou").empty());

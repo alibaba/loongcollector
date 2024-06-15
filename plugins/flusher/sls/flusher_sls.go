@@ -85,7 +85,6 @@ func (p *SlsFlusher) Flush(projectName string, logstoreName string, configName s
 		p.lenCounter.Add(int64(bufLen))
 
 		var rst int
-		// TODO: why use logGroup.Category which is usually empty, why not use logstoreName
 		if !p.EnableShardHash {
 			rst = logtail.SendPb(configName, logGroup.Category, buf, len(logGroup.Logs))
 		} else {

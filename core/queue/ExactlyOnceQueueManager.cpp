@@ -32,8 +32,8 @@ namespace logtail {
 
 bool ExactlyOnceQueueManager::CreateOrUpdateQueue(QueueKey key,
                                                   uint32_t priority,
-                                                  const std::string& config,
-                                                  const std::vector<RangeCheckpointPtr>& checkpoints) {
+                                                  const string& config,
+                                                  const vector<RangeCheckpointPtr>& checkpoints) {
     {
         lock_guard<mutex> lock(mGCMux);
         mQueueDeletionTimeMap.erase(key);
@@ -114,7 +114,7 @@ bool ExactlyOnceQueueManager::IsAllProcessQueueEmpty() const {
     return true;
 }
 
-void ExactlyOnceQueueManager::InvalidatePop(const std::string& configName) {
+void ExactlyOnceQueueManager::InvalidatePop(const string& configName) {
     lock_guard<mutex> lock(mProcessQueueMux);
     for (auto& iter : mProcessQueues) {
         if (iter.second->GetConfigName() == configName) {
@@ -123,7 +123,7 @@ void ExactlyOnceQueueManager::InvalidatePop(const std::string& configName) {
     }
 }
 
-void ExactlyOnceQueueManager::ValidatePop(const std::string& configName) {
+void ExactlyOnceQueueManager::ValidatePop(const string& configName) {
     lock_guard<mutex> lock(mProcessQueueMux);
     for (auto& iter : mProcessQueues) {
         if (iter.second->GetConfigName() == configName) {

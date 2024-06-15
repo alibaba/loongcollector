@@ -430,7 +430,6 @@ public:
     const std::string& GetRegion() const { return mRegion; }
     const std::string& GetConfigName() const { return mConfigName; }
 
-    int64_t GetLogGroupKey() const { return mLogGroupKey; }
     FileReaderOptions::InputType GetInputType() { return mReaderConfig.first->mInputType; }
 
     void SetEventGroupMetaAndTag(PipelineEventGroup& group);
@@ -523,7 +522,7 @@ protected:
 
     FileReaderConfig mReaderConfig;
     MultilineConfig mMultilineConfig;
-    int64_t mLogGroupKey = 0;
+    // int64_t mLogGroupKey = 0;
 
     // since reader is destructed after the corresponding pipeline is removed, pipeline context used in destructor
     // should be copied explicitly from context.

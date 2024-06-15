@@ -21,7 +21,6 @@
 #include "LogInput.h"
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
-#include "common/LogFileCollectOffsetIndicator.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
@@ -272,15 +271,6 @@ void CreateModifyHandler::Handle(const Event& event) {
                 LOG_DEBUG(sLogger,
                           ("Process event with multi config", pConfigVec.size())(event.GetSource(), event.GetObject()));
                 GetOrCreateModifyHandler(configIter->second->GetConfigName(), *configIter)->Handle(event);
-
-                // 废弃
-                // if (pConfig->mIsFuseMode) {
-                //     FuseFileBlacklist::GetInstance()->RemoveFromBlackList(path);
-                // }
-                // // if file is deleted or moved, inode may be wrong
-                // if ((event.IsMoveFrom() || event.IsDeleted()) && pConfig->mMarkOffsetFlag) {
-                //     LogFileCollectOffsetIndicator::GetInstance()->DeleteItem(pConfig->mConfigName, path);
-                // }
             }
         }
     }

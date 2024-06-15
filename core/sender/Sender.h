@@ -22,15 +22,14 @@
 #include <vector>
 
 #include "SenderQueueParam.h"
-#include "aggregator/Aggregator.h"
 #include "common/Lock.h"
+#include "common/LogstoreFeedbackQueue.h"
 #include "common/LogstoreSenderQueue.h"
 #include "common/Thread.h"
 #include "common/WaitObject.h"
 #include "log_pb/logtail_buffer_meta.pb.h"
 #include "log_pb/sls_logs.pb.h"
 #include "sdk/Closure.h"
-#include "common/LogstoreFeedbackQueue.h"
 
 namespace logtail {
 
@@ -333,7 +332,6 @@ private:
     std::string GetBufferFileHeader();
     void TestNetwork();
     bool TestEndpoint(const std::string& region, const std::string& endpoint);
-    void PutIntoBatchMap(LoggroupTimeValue* data);
 
     /*
      * only increase total count
@@ -366,19 +364,6 @@ public:
     static bool IsProfileData(const std::string& region, const std::string& project, const std::string& logstore);
     // void ResetProfileSender();
     bool Init(); // Backward compatible
-    // from collector to batchmap
-    bool Send(const std::string& projectName,
-              const std::string& sourceId,
-              sls_logs::LogGroup& logGroup,
-              int64_t logGroupKey,
-              const FlusherSLS* config,
-              FlusherSLS::Batch::MergeType mergeType,
-              const uint32_t logGroupSize,
-              const std::string& defaultRegion = "",
-              const std::string& filename = "",
-              const LogGroupContext& context = LogGroupContext());
-
-    // bool LoadConfig(const Json::Value& secondary);
 
     // added by xianzhi(bowen.gbw@antfin.com)
     // no merge and wait, send instantly
@@ -469,25 +454,6 @@ public:
     LogstoreSenderStatistics GetSenderStatistics(const LogstoreFeedBackKey& key);
     void
     SetLogstoreFlowControl(const LogstoreFeedBackKey& logstoreKey, int32_t maxSendBytesPerSecond, int32_t expireTime);
-    bool SendPb(const FlusherSLS* pConfig,
-                char* pbBuffer,
-                int32_t pbSize,
-                int32_t lines,
-                const std::string& logstore = "",
-                const std::string& shardHash = "");
-
-    // only used by exactly once
-    void SendCompressed(const std::string& projectName,
-                        sls_logs::LogGroup& logGroup,
-                        const std::vector<int32_t>& neededLogIndex,
-                        const std::string& configName,
-                        const std::string& aliuid,
-                        const std::string& region,
-                        const std::string& filename,
-                        const LogGroupContext& context);
-
-    void SendCompressed(std::vector<MergeItem*>& sendDataVec);
-    void SendLogPackageList(std::vector<MergeItem*>& sendDataVec);
 
     std::string GetAllProjects();
     void IncreaseProjectReferenceCnt(const std::string& project);
@@ -504,6 +470,7 @@ public:
     void SetDefaultRegion(const std::string& region);
 
     SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue(QueueKey key);
+    void PutIntoBatchMap(LoggroupTimeValue* data);
 
     friend class SendClosure;
 

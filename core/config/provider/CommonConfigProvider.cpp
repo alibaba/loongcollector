@@ -106,7 +106,7 @@ void CommonConfigProvider::CheckUpdateThread() {
             GetConfigUpdate();
             lastCheckTime = curTime;
         }
-        if (mStopCV.wait_for(lock, std::chrono::seconds(3), [this]() { return !mIsThreadRunning; })) {
+        if (mStopCV.wait_for(lock, chrono::seconds(3), [this]() { return !mIsThreadRunning; })) {
             break;
         }
     }
@@ -119,7 +119,7 @@ CommonConfigProvider::ConfigServerAddress CommonConfigProvider::GetOneConfigServ
 
     // Return a random address
     if (changeConfigServer) {
-        std::random_device rd;
+        random_device rd;
         int tmpId = rd() % mConfigServerAddresses.size();
         while (mConfigServerAddresses.size() > 1 && tmpId == mConfigServerAddressId) {
             tmpId = rd() % mConfigServerAddresses.size();

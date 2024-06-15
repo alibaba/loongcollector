@@ -1,4 +1,4 @@
-# Copyright 2022 iLogtail Authors
+# Copyright 2024 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,16 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+ 
 cmake_minimum_required(VERSION 3.22)
-project(aggregator)
+project(serializer_unittest)
 
-file(GLOB LIB_SOURCE_FILES *.cpp *.h)
-append_source_files(LIB_SOURCE_FILES)
-add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} logger)
-target_link_libraries(${PROJECT_NAME} common)
-target_link_libraries(${PROJECT_NAME} config_manager)
-target_link_libraries(${PROJECT_NAME} sender)
-target_link_libraries(${PROJECT_NAME} monitor)
-target_link_libraries(${PROJECT_NAME} application)
+add_executable(sls_serializer_unittest SLSSerializerUnittest.cpp)
+target_link_libraries(sls_serializer_unittest unittest_base)
+
+include(GoogleTest)
+gtest_discover_tests(sls_serializer_unittest)

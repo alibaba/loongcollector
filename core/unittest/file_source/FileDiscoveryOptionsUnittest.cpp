@@ -56,7 +56,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
     APSARA_TEST_EQUAL(1U, config->mFilePaths.size());
-    APSARA_TEST_EQUAL(0U, config->mMaxDirSearchDepth);
+    APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
     APSARA_TEST_EQUAL(-1, config->mPreservedDirDepth);
     APSARA_TEST_EQUAL(0U, config->mExcludeFilePaths.size());
     APSARA_TEST_EQUAL(0U, config->mExcludeFiles.size());
@@ -82,8 +82,8 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
     APSARA_TEST_EQUAL(1U, config->mFilePaths.size());
-    APSARA_TEST_EQUAL(0U, config->mMaxDirSearchDepth);
-    APSARA_TEST_EQUAL(0U, config->mPreservedDirDepth);
+    APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
+    APSARA_TEST_EQUAL(0, config->mPreservedDirDepth);
     APSARA_TEST_EQUAL(1U, config->mExcludeFilePaths.size());
     APSARA_TEST_EQUAL(1U, config->mExcludeFiles.size());
     APSARA_TEST_EQUAL(1U, config->mExcludeDirs.size());
@@ -108,7 +108,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
     APSARA_TEST_EQUAL(1U, config->mFilePaths.size());
-    APSARA_TEST_EQUAL(0U, config->mMaxDirSearchDepth);
+    APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
     APSARA_TEST_EQUAL(-1, config->mPreservedDirDepth);
     APSARA_TEST_EQUAL(0U, config->mExcludeFilePaths.size());
     APSARA_TEST_EQUAL(0U, config->mExcludeFiles.size());
@@ -246,7 +246,7 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     configJson["MaxDirSearchDepth"] = Json::Value(1);
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
-    APSARA_TEST_EQUAL(0U, config->mMaxDirSearchDepth);
+    APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
     APSARA_TEST_EQUAL((filesystem::current_path() / "test").string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
     configJson.clear();
@@ -257,7 +257,7 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     configJson["MaxDirSearchDepth"] = Json::Value(1);
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
-    APSARA_TEST_EQUAL(0U, config->mMaxDirSearchDepth);
+    APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
     APSARA_TEST_EQUAL((filesystem::current_path() / "*" / "test" / "?").string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
     APSARA_TEST_EQUAL(4U, config->GetWildcardPaths().size());
@@ -277,7 +277,7 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     configJson["MaxDirSearchDepth"] = Json::Value(1);
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
-    APSARA_TEST_EQUAL(1U, config->mMaxDirSearchDepth);
+    APSARA_TEST_EQUAL(1, config->mMaxDirSearchDepth);
     APSARA_TEST_EQUAL((filesystem::current_path() / "*" / "test").string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
 }

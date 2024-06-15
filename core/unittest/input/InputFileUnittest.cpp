@@ -105,8 +105,8 @@ void InputFileUnittest::OnSuccessfulInit() {
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
-    APSARA_TEST_EQUAL(1, input->mMaxCheckpointDirSearchDepth);
-    APSARA_TEST_EQUAL(1, input->mExactlyOnceConcurrency);
+    APSARA_TEST_EQUAL(1U, input->mMaxCheckpointDirSearchDepth);
+    APSARA_TEST_EQUAL(1U, input->mExactlyOnceConcurrency);
 
     // invalid optional param
     configStr = R"(
@@ -346,6 +346,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
 void InputFileUnittest::OnPipelineUpdate() {
     Json::Value configJson, optionalGoPipeline;
     InputFile input;
+    input.SetContext(ctx);
     string configStr, errorMsg;
     uint32_t pluginIdx = 0;
     filesystem::path filePath = filesystem::absolute("*.log");

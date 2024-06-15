@@ -342,7 +342,6 @@ void Application::Exit() {
         LOG_INFO(sLogger, ("flush SLS sender data", "succeeded"));
     }
 
-
 #if defined(_MSC_VER)
     ReleaseWindowsSignalObject();
 #endif

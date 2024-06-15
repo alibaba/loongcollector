@@ -152,6 +152,7 @@ bool InputFile::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value
                               mContext->GetRegion());
     } else {
         mExactlyOnceConcurrency = exactlyOnceConcurrency;
+        mContext->SetExactlyOnceFlag(true);
     }
 
     return CreateInnerProcessors(pluginIdx);

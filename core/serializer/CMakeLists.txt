@@ -11,10 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
- 
-cmake_minimum_required(VERSION 3.22)
-project(aggregator_unittest)
- 
-add_executable(aggregator_unittest AggregatorUnittest.cpp)
-target_link_libraries(aggregator_unittest unittest_base)
 
+cmake_minimum_required(VERSION 3.22)
+project(serializer)
+
+file(GLOB LIB_SOURCE_FILES *.cpp *.h)
+append_source_files(LIB_SOURCE_FILES)
+add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
+target_link_libraries(${PROJECT_NAME} logger)
+target_link_libraries(${PROJECT_NAME} models)
+target_link_libraries(${PROJECT_NAME} batch)
+target_link_libraries(${PROJECT_NAME} plugin)
+target_link_libraries(${PROJECT_NAME} application)
+target_link_libraries(${PROJECT_NAME} common)
+target_link_libraries(${PROJECT_NAME} compression)
+target_link_libraries(${PROJECT_NAME} flusher)

@@ -13,27 +13,28 @@
 // limitations under the License.
 
 #include "NetworkObserver.h"
-#include "logger/Logger.h"
+
+#include "Constants.h"
+#include "FileSystemUtil.h"
+#include "LogFileProfiler.h"
+#include "MachineInfoUtil.h"
+#include "Monitor.h"
 #include "ProcessObserver.h"
-#include "network/protocols/ProtocolEventAggregators.h"
-#include "metas/ContainerProcessGroup.h"
-#include "sources/pcap/PCAPWrapper.h"
-#include "sources/ebpf/EBPFWrapper.h"
+#include "Sender.h"
 #include "common/LogtailCommonFlags.h"
 #include "config_manager/ConfigManager.h"
-#include "MachineInfoUtil.h"
-#include "FileSystemUtil.h"
-#include "Monitor.h"
-#include "metas/ConnectionMetaManager.h"
-#include "Sender.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "Constants.h"
-#include "LogFileProfiler.h"
+#include "logger/Logger.h"
+#include "metas/ConnectionMetaManager.h"
+#include "metas/ContainerProcessGroup.h"
+#include "network/protocols/ProtocolEventAggregators.h"
+#include "sources/ebpf/EBPFWrapper.h"
+#include "sources/pcap/PCAPWrapper.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
-#include "flusher/FlusherSLS.h"
 #include "common/HashUtil.h"
+#include "flusher/FlusherSLS.h"
 
 DEFINE_FLAG_INT64(sls_observer_network_ebpf_connection_gc_interval,
                   "SLS Observer NetWork connection gc interval seconds",
@@ -501,8 +502,8 @@ void NetworkObserver::EventLoop() {
             sPStat->FlushMetrics();
             sPDStat->FlushMetrics(BOOL_FLAG(sls_observer_network_protocol_stat));
             mNetworkStatistic->FlushMetrics();
-            LogtailMonitor::GetInstance()->UpdateMetric("observer_container_category",
-                                                     ContainerProcessGroupManager::GetInstance()->GetContainerType());
+            LogtailMonitor::GetInstance()->UpdateMetric(
+                "observer_container_category", ContainerProcessGroupManager::GetInstance()->GetContainerType());
             lastProfilingTime = nowTimeNs;
         }
         if (!hasMoreData) {
@@ -538,7 +539,6 @@ int NetworkObserver::OutputPluginProcess(std::vector<sls_logs::Log>& logs, const
 
 int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, const Pipeline* config) {
     const FlusherSLS* plugin = static_cast<const FlusherSLS*>(config->GetFlushers()[0]->GetPlugin());
-    static auto sSenderInstance = Sender::Instance();
     const size_t maxCount = INT32_FLAG(merge_log_count_limit) / 4;
     for (size_t beginIndex = 0; beginIndex < logs.size(); beginIndex += maxCount) {
         size_t endIndex = beginIndex + maxCount;
@@ -569,24 +569,7 @@ int NetworkObserver::OutputDirectly(std::vector<sls_logs::Log>& logs, const Pipe
             log->mutable_contents()->CopyFrom(*(logs[i].mutable_contents()));
             SetLogTime(log, now.tv_sec);
         }
-        int64_t logGroupKey = HashString(plugin->mProject + "_" + logGroup.category() + "_" + logGroup.topic()
-                                                         + "_" + logGroup.source() + "_" + "" + "_" + "");
-        if (!sSenderInstance->Send(plugin->mProject,
-                                   "",
-                                   logGroup,
-                                   logGroupKey,
-                                   plugin,
-                                   plugin->mBatch.mMergeType,
-                                   (uint32_t)((endIndex - beginIndex) * 1024))) {
-            LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
-                                                   "push observer data into batch map fail",
-                                                   config->GetContext().GetProjectName(),
-                                                   config->GetContext().GetLogstoreName(),
-                                                   config->GetContext().GetRegion());
-            LOG_ERROR(sLogger,
-                      ("push observer data into batch map fail, discard logs", logGroup.logs_size())(
-                          "project", config->GetContext().GetProjectName())("logstore",
-                                                                            config->GetContext().GetLogstoreName()));
+        if (!const_cast<FlusherSLS*>(plugin)->Send(logGroup.SerializeAsString(), "")) {
             return -1;
         }
     }

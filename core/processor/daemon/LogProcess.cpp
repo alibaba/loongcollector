@@ -12,76 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LogProcess.h"
+#include "processor/daemon/LogProcess.h"
 
-#include <sys/types.h>
-#include <time.h>
-
-#include <algorithm>
-#if defined(__linux__)
-#include <sys/syscall.h>
-#include <unistd.h>
-#endif
-#include "aggregator/Aggregator.h"
+#include "batch/TimeoutFlushManager.h"
 #include "app_config/AppConfig.h"
-#include "common/Constants.h"
-#include "common/LogFileCollectOffsetIndicator.h"
-#include "common/LogGroupContext.h"
-#include "common/LogtailCommonFlags.h"
-#include "common/StringTools.h"
-#include "common/TimeUtil.h"
-#include "config/IntegrityConfig.h"
-#include "config_manager/ConfigManager.h"
-#include "fuse/FuseFileBlacklist.h"
+#include "common/Flags.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "log_pb/sls_logs.pb.h"
-#include "logger/Logger.h"
-#include "models/PipelineEventGroup.h"
 #include "monitor/LogFileProfiler.h"
-#include "monitor/LogIntegrity.h"
-#include "monitor/LogLineCount.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
-#include "processor/inner/ProcessorParseContainerLogNative.h"
-#include "sdk/Client.h"
-#include "sender/Sender.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
-#include "pipeline/Pipeline.h"
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
+#include "sender/Sender.h"
 
+DECLARE_FLAG_INT32(max_send_log_group_size);
 
-using namespace sls_logs;
 using namespace std;
 
-DEFINE_FLAG_INT32(process_buffer_count_upperlimit_perthread, "", 25);
-DEFINE_FLAG_INT32(merge_send_packet_interval, "", 1);
-DEFINE_FLAG_INT32(debug_logprocess_queue_flag, "0 disable, 1 true, 2 false", 0);
 #if defined(_MSC_VER)
 // On Windows, if Chinese config base path is used, the log path will be converted to GBK,
 // so the __tag__.__path__ have to be converted back to UTF8 to avoid bad display.
 // Note: enable this will spend CPU to do transformation.
 DEFINE_FLAG_BOOL(enable_chinese_tag_path, "Enable Chinese __tag__.__path__", true);
 #endif
-DEFINE_FLAG_STRING(raw_log_tag, "", "__raw__");
 DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
-DEFINE_FLAG_BOOL(enable_new_pipeline, "use C++ pipline with refactoried plugins", true);
 
 namespace logtail {
 
 LogProcess::LogProcess() : mAccessProcessThreadRWL(ReadWriteLock::PREFER_WRITER) {
-    // size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
-    // if (concurrencyCount < 20) {
-    //     concurrencyCount = 20;
-    // }
-    // if (concurrencyCount > 50) {
-    //     concurrencyCount = 50;
-    // }
-    // mLogFeedbackQueue.SetParam(concurrencyCount, (size_t)(concurrencyCount * 1.5), 100);
 }
 
 LogProcess::~LogProcess() {
@@ -95,16 +55,12 @@ LogProcess::~LogProcess() {
     delete[] mProcessThreads;
 }
 
-// Start() should only be called once except for UT
 void LogProcess::Start() {
     if (mInitialized)
         return;
     mInitialized = true;
-    // mLocalTimeZoneOffsetSecond = GetLocalTimeZoneOffsetSecond();
-    // LOG_INFO(sLogger, ("local timezone offset second", mLocalTimeZoneOffsetSecond));
     Sender::Instance()->SetFeedBackInterface(ProcessQueueManager::GetInstance());
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();
-    // mBufferCountLimit = INT32_FLAG(process_buffer_count_upperlimit_perthread) * mThreadCount;
     mProcessThreads = new ThreadPtr[mThreadCount];
     mThreadFlags = new std::atomic_bool[mThreadCount];
     for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
@@ -194,9 +150,8 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
 
         int32_t curTime = time(NULL);
         if (threadNo == 0 && curTime - lastMergeTime >= INT32_FLAG(default_flush_merged_buffer_interval)) {
+            TimeoutFlushManager::GetInstance()->FlushTimeoutBatch();
             lastMergeTime = curTime;
-            static Aggregator* aggregator = Aggregator::GetInstance();
-            aggregator->FlushReadyBuffer();
         }
 
         if (threadNo == 0 && curTime - lastUpdateMetricTime >= 40) {
@@ -220,13 +175,6 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 sMonitor->UpdateMetric("eo_process_queue_total",
                                        ExactlyOnceQueueManager::GetInstance()->GetProcessQueueCnt());
             }
-        }
-
-        if (threadNo == 0) {
-            LogIntegrity::GetInstance()->SendLogIntegrityInfo();
-            LogLineCount::GetInstance()->SendLineCountData();
-
-            DoFuseHandling();
         }
 
         {
@@ -265,15 +213,15 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             pipeline->Process(eventGroupList, item->mInputIndex);
             int32_t elapsedTime = (int32_t)time(NULL) - startTime;
             if (elapsedTime > 1) {
-                LogtailAlarm::GetInstance()->SendAlarm(PROCESS_TOO_SLOW_ALARM,
-                                                       string("event processing took too long, elapsed time: ")
-                                                           + ToString(elapsedTime) + "s\tconfig: " + pipeline->Name(),
-                                                       pipeline->GetContext().GetProjectName(),
-                                                       pipeline->GetContext().GetLogstoreName(),
-                                                       pipeline->GetContext().GetRegion());
-                LOG_WARNING(sLogger,
-                            ("event processing took too long, elapsed time",
-                             ToString(elapsedTime) + "s")("config", pipeline->Name()));
+                LOG_WARNING(pipeline->GetContext().GetLogger(),
+                            ("event processing took too long, elapsed time", ToString(elapsedTime) + "s")("config",
+                                                                                                          configName));
+                pipeline->GetContext().GetAlarm().SendAlarm(PROCESS_TOO_SLOW_ALARM,
+                                                            string("event processing took too long, elapsed time: ")
+                                                                + ToString(elapsedTime) + "s\tconfig: " + configName,
+                                                            pipeline->GetContext().GetProjectName(),
+                                                            pipeline->GetContext().GetLogstoreName(),
+                                                            pipeline->GetContext().GetRegion());
             }
 
             s_processCount++;
@@ -282,84 +230,51 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 s_processLines += profile.splitLines;
             }
 
-            // send part
-            std::vector<std::unique_ptr<sls_logs::LogGroup>> logGroupList;
-            bool needSend = ProcessBuffer(pipeline, eventGroupList, logGroupList);
-
-            int logSize = 0;
-            for (auto& pLogGroup : logGroupList) {
-                logSize += pLogGroup->logs_size();
-            }
-            if (logSize > 0 && needSend) { // send log group
-                const FlusherSLS* flusherSLS = static_cast<const FlusherSLS*>(pipeline->GetFlushers()[0]->GetPlugin());
-
-                string compressStr = "zstd";
-                if (flusherSLS->mCompressType == FlusherSLS::CompressType::NONE) {
-                    compressStr = "none";
-                } else if (flusherSLS->mCompressType == FlusherSLS::CompressType::LZ4) {
-                    compressStr = "lz4";
-                }
-                sls_logs::SlsCompressType compressType = sdk::Client::GetCompressType(compressStr);
-
-                const std::string& projectName = pipeline->GetContext().GetProjectName();
-                const std::string& category = pipeline->GetContext().GetLogstoreName();
-                string convertedPath = eventGroupList[0].GetMetadata(EventGroupMetaKey::LOG_FILE_PATH).to_string();
-                string hostLogPath
-                    = eventGroupList[0].GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED).to_string();
-#if defined(_MSC_VER)
-                if (BOOL_FLAG(enable_chinese_tag_path)) {
-                    convertedPath = EncodingConverter::GetInstance()->FromACPToUTF8(convertedPath);
-                    hostLogPath = EncodingConverter::GetInstance()->FromACPToUTF8(hostLogPath);
-                }
-#endif
-
-                for (auto& pLogGroup : logGroupList) {
-                    LogGroupContext context(flusherSLS->mRegion,
-                                            projectName,
-                                            flusherSLS->mLogstore,
-                                            compressType,
-                                            FileInfoPtr(),
-                                            IntegrityConfigPtr(),
-                                            LineCountConfigPtr(),
-                                            -1,
-                                            false,
-                                            false,
-                                            eventGroupList[0].GetExactlyOnceCheckpoint());
-                    if (!Sender::Instance()->Send(
-                            projectName,
-                            eventGroupList[0].GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string(),
-                            *(pLogGroup.get()),
-                            std::stol(eventGroupList[0].GetMetadata(EventGroupMetaKey::LOGGROUP_KEY).to_string()),
-                            flusherSLS,
-                            flusherSLS->mBatch.mMergeType,
-                            (uint32_t)(profile.logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
-                            "",
-                            convertedPath,
-                            context)) {
-                        LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
-                                                               "push file data into batch map fail",
-                                                               projectName,
-                                                               category,
-                                                               pipeline->GetContext().GetRegion());
-                        LOG_ERROR(sLogger,
-                                  ("push file data into batch map fail, discard logs", pLogGroup->logs_size())(
-                                      "project", projectName)("logstore", category)("filename", convertedPath));
-                    }
-                }
-
+            if (pipeline->IsFlushingThroughGoPipeline()) {
                 if (isLog) {
-                    std::vector<sls_logs::LogTag> logTags;
-                    for (auto& item : logGroupList[0]->logtags()) {
-                        logTags.push_back(item);
+                    for (auto& group : eventGroupList) {
+                        string res, errorMsg;
+                        if (!Serialize(group,
+                                       pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond,
+                                       res,
+                                       errorMsg)) {
+                            LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                        ("failed to serialize event group",
+                                         errorMsg)("action", "discard data")("config", configName));
+                            pipeline->GetContext().GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
+                                                                        "failed to serialize event group: " + errorMsg
+                                                                            + "\taction: discard data\tconfig: "
+                                                                            + configName,
+                                                                        pipeline->GetContext().GetProjectName(),
+                                                                        pipeline->GetContext().GetLogstoreName(),
+                                                                        pipeline->GetContext().GetRegion());
+                            continue;
+                        }
+                        LogtailPlugin::GetInstance()->ProcessLogGroup(
+                            pipeline->GetContext().GetConfigName(),
+                            res,
+                            group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
                     }
+                }
+            } else {
+                if (isLog) {
+                    string convertedPath = eventGroupList[0].GetMetadata(EventGroupMetaKey::LOG_FILE_PATH).to_string();
+                    string hostLogPath
+                        = eventGroupList[0].GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED).to_string();
+#if defined(_MSC_VER)
+                    if (BOOL_FLAG(enable_chinese_tag_path)) {
+                        convertedPath = EncodingConverter::GetInstance()->FromACPToUTF8(convertedPath);
+                        hostLogPath = EncodingConverter::GetInstance()->FromACPToUTF8(hostLogPath);
+                    }
+#endif
                     LogFileProfiler::GetInstance()->AddProfilingData(
                         pipeline->Name(),
                         pipeline->GetContext().GetRegion(),
-                        projectName,
-                        category,
+                        pipeline->GetContext().GetProjectName(),
+                        pipeline->GetContext().GetLogstoreName(),
                         convertedPath,
                         hostLogPath,
-                        logTags, // warning: this is not the same as reader extra tags!
+                        std::vector<sls_logs::LogTag>(), // warning: this cannot be recovered!
                         profile.readBytes,
                         profile.skipBytes,
                         profile.splitLines,
@@ -370,81 +285,51 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                         0,
                         ""); // TODO: I don't think errorLine is useful
                 }
+                pipeline->Send(std::move(eventGroupList));
             }
-            logGroupList.clear();
         }
     }
     LOG_WARNING(sLogger, ("LogProcessThread", "Exit")("threadNo", threadNo));
     return NULL;
 }
 
-bool LogProcess::ProcessBuffer(const std::shared_ptr<Pipeline>& pipeline,
-                               std::vector<PipelineEventGroup>& eventGroupList,
-                               std::vector<std::unique_ptr<sls_logs::LogGroup>>& resultGroupList) {
-    for (auto& eventGroup : eventGroupList) {
-        // fill protobuf
-        resultGroupList.emplace_back(new sls_logs::LogGroup());
-        auto& resultGroup = resultGroupList.back();
-        FillLogGroupLogs(eventGroup, *resultGroup, pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond);
-        FillLogGroupTags(eventGroup, pipeline->GetContext().GetLogstoreName(), *resultGroup);
-        if (pipeline->IsFlushingThroughGoPipeline()) {
-            // LogGroup will be deleted outside
-            LogtailPlugin::GetInstance()->ProcessLogGroup(
-                pipeline->GetContext().GetConfigName(),
-                *resultGroup,
-                eventGroup.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
+bool LogProcess::Serialize(const PipelineEventGroup& group, bool enableNanosecond, string& res, string& errorMsg) {
+    sls_logs::LogGroup logGroup;
+    for (const auto& e : group.GetEvents()) {
+        if (e.Is<LogEvent>()) {
+            const auto& logEvent = e.Cast<LogEvent>();
+            auto log = logGroup.add_logs();
+            for (const auto& kv : logEvent) {
+                auto contPtr = log->add_contents();
+                contPtr->set_key(kv.first.to_string());
+                contPtr->set_value(kv.second.to_string());
+            }
+            log->set_time(logEvent.GetTimestamp());
+            if (enableNanosecond && logEvent.GetTimestampNanosecond()) {
+                log->set_time_ns(logEvent.GetTimestampNanosecond().value());
+            }
+        } else {
+            errorMsg = "unsupported event type in event group";
             return false;
         }
     }
-    return true;
-}
-
-void LogProcess::FillLogGroupLogs(const PipelineEventGroup& eventGroup,
-                                  sls_logs::LogGroup& resultGroup,
-                                  bool enableTimestampNanosecond) const {
-    for (auto& event : eventGroup.GetEvents()) {
-        if (!event.Is<LogEvent>()) {
-            continue;
-        }
-        sls_logs::Log* log = resultGroup.add_logs();
-        auto& logEvent = event.Cast<LogEvent>();
-        if (enableTimestampNanosecond) {
-            SetLogTimeWithNano(log, logEvent.GetTimestamp(), logEvent.GetTimestampNanosecond());
+    for (const auto& tag : group.GetTags()) {
+        if (tag.first == LOG_RESERVED_KEY_TOPIC) {
+            logGroup.set_topic(tag.second.to_string());
         } else {
-            SetLogTime(log, logEvent.GetTimestamp());
-        }
-        for (const auto& kv : logEvent) {
-            sls_logs::Log_Content* contPtr = log->add_contents();
-            // need to rename EVENT_META_LOG_FILE_OFFSET
-            contPtr->set_key(kv.first.to_string());
-            contPtr->set_value(kv.second.to_string());
+            auto logTag = logGroup.add_logtags();
+            logTag->set_key(tag.first.to_string());
+            logTag->set_value(tag.second.to_string());
         }
     }
-}
-
-void LogProcess::FillLogGroupTags(const PipelineEventGroup& eventGroup,
-                                  const std::string& logstore,
-                                  sls_logs::LogGroup& resultGroup) const {
-    for (auto& tag : eventGroup.GetTags()) {
-        auto logTagPtr = resultGroup.add_logtags();
-        logTagPtr->set_key(tag.first.to_string());
-        logTagPtr->set_value(tag.second.to_string());
+    size_t size = logGroup.ByteSizeLong();
+    if (static_cast<int32_t>(size) > INT32_FLAG(max_send_log_group_size)) {
+        errorMsg = "log group exceeds size limit\tgroup size: " + ToString(size)
+            + "\tsize limit: " + ToString(INT32_FLAG(max_send_log_group_size));
+        return false;
     }
-
-    if (resultGroup.category() != logstore) {
-        resultGroup.set_category(logstore);
-    }
-
-    if (resultGroup.topic().empty()) {
-        resultGroup.set_topic(eventGroup.GetMetadata(EventGroupMetaKey::TOPIC).to_string());
-    }
-    // source is set by sender
-}
-
-void LogProcess::DoFuseHandling() {
-    LogFileCollectOffsetIndicator::GetInstance()->CalcFileOffset();
-    LogFileCollectOffsetIndicator::GetInstance()->EliminateOutDatedItem();
-    LogFileCollectOffsetIndicator::GetInstance()->ShrinkLogFileOffsetInfoMap();
+    res = logGroup.SerializeAsString();
+    return true;
 }
 
 } // namespace logtail

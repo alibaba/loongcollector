@@ -20,6 +20,9 @@
 #include "pipeline/Pipeline.h"
 #include "processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 namespace logtail {
 

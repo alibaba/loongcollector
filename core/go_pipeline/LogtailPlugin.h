@@ -20,13 +20,13 @@
 #include <stddef.h>
 #endif
 
+#include <json/json.h>
+
 #include <cstdint>
 #include <numeric>
 #include <sstream>
 #include <unordered_map>
 #include <utility>
-
-#include <json/json.h>
 
 #include "flusher/FlusherSLS.h"
 #include "log_pb/sls_logs.pb.h"
@@ -202,16 +202,16 @@ public:
 
     bool IsPluginOpened() { return mPluginValid; }
 
-    void ProcessRawLog(const std::string& configName,
-                       logtail::StringView rawLog,
-                       const std::string& packId,
-                       const std::string& topic);
+    // void ProcessRawLog(const std::string& configName,
+    //                    logtail::StringView rawLog,
+    //                    const std::string& packId,
+    //                    const std::string& topic);
 
-    void ProcessRawLogV2(const std::string& configName,
-                         logtail::StringView rawLog,
-                         const std::string& packId,
-                         const std::string& topic,
-                         const std::string& tags);
+    // void ProcessRawLogV2(const std::string& configName,
+    //                      logtail::StringView rawLog,
+    //                      const std::string& packId,
+    //                      const std::string& topic,
+    //                      const std::string& tags);
 
     void ProcessLog(const std::string& configName,
                     sls_logs::Log& log,
@@ -219,7 +219,7 @@ public:
                     const std::string& topic,
                     const std::string& tags);
 
-    void ProcessLogGroup(const std::string& configName, sls_logs::LogGroup& logGroup, const std::string& packId);
+    void ProcessLogGroup(const std::string& configName, const std::string& logGroup, const std::string& packId);
 
     static int IsValidToSend(long long logstoreKey);
 
@@ -231,6 +231,8 @@ public:
                       int32_t pbSize,
                       int32_t lines);
 
+    // because go pipeline supports route, but only use one flusher, so the actual logstore is given by go, not by the
+    // logstore param in FlusherSLS
     static int SendPbV2(const char* configName,
                         int32_t configNameSize,
                         const char* logstore,

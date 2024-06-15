@@ -18,6 +18,7 @@
 
 #include <sstream>
 
+#include "common/HashUtil.h"
 #include "logger/Logger.h"
 #include "processor/inner/ProcessorParseContainerLogNative.h"
 
@@ -148,6 +149,16 @@ void PipelineEventGroup::DelTag(StringView key) {
     mTags.Erase(key);
 }
 
+size_t PipelineEventGroup::GetTagsHash() const {
+    size_t seed = 0;
+    for (const auto& item : mTags.mInner) {
+        HashCombine(seed, hash<string>{}(item.first.to_string()));
+        HashCombine(seed, hash<string>{}(item.second.to_string()));
+    }
+    HashCombine(seed, hash<string>{}(GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string()));
+    return seed;
+}
+
 size_t PipelineEventGroup::DataSize() const {
     size_t eventsSize = sizeof(decltype(mEvents));
     for (const auto& item : mEvents) {
@@ -161,15 +172,9 @@ bool PipelineEventGroup::IsReplay() const {
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-// const string EVENT_GROUP_META_AGENT_TAG = "agent.tag";
-// const string EVENT_GROUP_META_HOST_IP = "host.ip";
-// const string EVENT_GROUP_META_HOST_NAME = "host.name";
-// const string EVENT_GROUP_META_LOG_TOPIC = "log.topic";
 const string EVENT_GROUP_META_LOG_FILE_PATH = "log.file.path";
 const string EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED = "log.file.path_resolved";
 const string EVENT_GROUP_META_LOG_FILE_INODE = "log.file.inode";
-// const string EVENT_GROUP_META_LOG_FILE_OFFSET = "log.file.offset";
-// const string EVENT_GROUP_META_LOG_FILE_LENGTH = "log.file.length";
 const string EVENT_GROUP_META_CONTAINER_TYPE = "container.type";
 const string EVENT_GROUP_META_HAS_PART_LOG = "has.part.log";
 
@@ -187,7 +192,6 @@ const string EVENT_GROUP_META_CONTAINER_IMAGE_ID = "container.image.id";
 const string EVENT_GROUP_META_CONTAINERD_TEXT = "containerd_text";
 const string EVENT_GROUP_META_DOCKER_JSON_FILE = "docker_json-file";
 const string EVENT_GROUP_META_SOURCE_ID = "source.id";
-const string EVENT_GROUP_META_TOPIC = "topic";
 
 const string& EventGroupMetaKeyToString(EventGroupMetaKey key) {
     switch (key) {
@@ -199,8 +203,6 @@ const string& EventGroupMetaKeyToString(EventGroupMetaKey key) {
             return EVENT_GROUP_META_LOG_FILE_INODE;
         case EventGroupMetaKey::SOURCE_ID:
             return EVENT_GROUP_META_SOURCE_ID;
-        case EventGroupMetaKey::TOPIC:
-            return EVENT_GROUP_META_TOPIC;
         case EventGroupMetaKey::LOG_FORMAT:
             return EVENT_GROUP_META_CONTAINER_TYPE;
         case EventGroupMetaKey::HAS_PART_LOG:
@@ -226,7 +228,6 @@ EventGroupMetaKey StringToEventGroupMetaKey(const string& key) {
         {EVENT_GROUP_META_LOG_FILE_PATH_RESOLVED, EventGroupMetaKey::LOG_FILE_PATH_RESOLVED},
         {EVENT_GROUP_META_LOG_FILE_INODE, EventGroupMetaKey::LOG_FILE_INODE},
         {EVENT_GROUP_META_SOURCE_ID, EventGroupMetaKey::SOURCE_ID},
-        {EVENT_GROUP_META_TOPIC, EventGroupMetaKey::TOPIC},
         {EVENT_GROUP_META_HAS_PART_LOG, EventGroupMetaKey::HAS_PART_LOG}};
     auto it = sStringToEnum.find(key);
     if (it != sStringToEnum.end()) {

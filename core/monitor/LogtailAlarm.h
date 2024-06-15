@@ -27,7 +27,6 @@
 #include <vector>
 
 #include "common/Lock.h"
-#include "profile_sender/ProfileSender.h"
 
 namespace logtail {
 
@@ -98,6 +97,8 @@ enum LogtailAlarmType {
     OBSERVER_STOP_ALARM = 63,
     INVALID_CONTAINER_PATH_ALARM = 64,
     ALL_LOGTAIL_ALARM_NUM = 65,
+    COMPRESS_FAIL_ALARM = 66,
+    SERIALIZE_FAIL_ALARM = 67
 };
 
 struct LogtailAlarmMessage {

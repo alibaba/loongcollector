@@ -24,6 +24,7 @@
 #include "common/version.h"
 #include "config_manager/ConfigManager.h"
 #include "log_pb/sls_logs.pb.h"
+#include "profile_sender/ProfileSender.h"
 #include "sender/Sender.h"
 
 DEFINE_FLAG_INT32(logtail_alarm_interval, "the interval of two same type alarm message", 30);

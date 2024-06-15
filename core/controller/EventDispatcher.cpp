@@ -61,9 +61,6 @@
 #include "go_pipeline/LogtailPlugin.h"
 #include "pipeline/PipelineManager.h"
 #include "plugin/PluginRegistry.h"
-#if !defined(_MSC_VER)
-#include "LogtailInsightDispatcher.h"
-#endif
 #include "file_server/FileServer.h"
 #include "input/InputContainerStdio.h"
 #include "input/InputFile.h"

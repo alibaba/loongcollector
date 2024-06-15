@@ -14,9 +14,11 @@
 
 #include "plugin/interface/Processor.h"
 
+using namespace std;
+
 namespace logtail {
 
-void Processor::Process(std::vector<PipelineEventGroup>& logGroupList) {
+void Processor::Process(vector<PipelineEventGroup>& logGroupList) {
     for (auto& logGroup : logGroupList) {
         Process(logGroup);
     }

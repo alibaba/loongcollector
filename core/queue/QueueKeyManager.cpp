@@ -30,7 +30,7 @@ QueueKey QueueKeyManager::GetKey(const string& name) {
     return mNextKey - 1;
 }
 
-bool QueueKeyManager::HasKey(const std::string& name) {
+bool QueueKeyManager::HasKey(const string& name) {
     lock_guard<mutex> lock(mMux);
     return mNameKeyMap.find(name) != mNameKeyMap.end();
 }
@@ -46,7 +46,7 @@ bool QueueKeyManager::RemoveKey(QueueKey key) {
     return true;
 }
 
-const std::string& QueueKeyManager::GetName(QueueKey key) {
+const string& QueueKeyManager::GetName(QueueKey key) {
     static string sEmpty = "";
     lock_guard<mutex> lock(mMux);
     auto iter = mKeyNameMap.find(key);

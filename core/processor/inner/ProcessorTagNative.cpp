@@ -19,15 +19,21 @@
 #include <vector>
 
 #include "app_config/AppConfig.h"
+#include "application/Application.h"
 #include "common/Flags.h"
 #include "log_pb/sls_logs.pb.h"
 #include "pipeline/Pipeline.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
 
+using namespace std;
+
 namespace logtail {
 
-const std::string ProcessorTagNative::sName = "processor_tag_native";
+const string ProcessorTagNative::sName = "processor_tag_native";
 
 bool ProcessorTagNative::Init(const Json::Value& config) {
     return true;
@@ -49,7 +55,7 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
 #endif
 
     if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
-        std::vector<sls_logs::LogTag>& fileTags = AppConfig::GetInstance()->GetFileTags();
+        vector<sls_logs::LogTag>& fileTags = AppConfig::GetInstance()->GetFileTags();
         if (!fileTags.empty()) { // reloadable, so we must get it every time and copy value
             for (size_t i = 0; i < fileTags.size(); ++i) {
                 logGroup.SetTag(fileTags[i].key(), fileTags[i].value());
@@ -61,11 +67,11 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
         return;
     }
 
-    // group level
-    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LogFileProfiler::mHostname);
-
     // process level
-    static const std::vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LogFileProfiler::mHostname);
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LogFileProfiler::mIpAddr);
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, Application::GetInstance()->GetUUID());
+    static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
     if (!sEnvTags.empty()) {
         for (size_t i = 0; i < sEnvTags.size(); ++i) {
             logGroup.SetTagNoCopy(sEnvTags[i].key(), sEnvTags[i].value());

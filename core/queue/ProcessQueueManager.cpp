@@ -196,7 +196,7 @@ bool ProcessQueueManager::SetDownStreamQueues(QueueKey key,
     return true;
 }
 
-bool ProcessQueueManager::SetFeedbackInterface(QueueKey key, std::vector<FeedbackInterface*>& feedback) {
+bool ProcessQueueManager::SetFeedbackInterface(QueueKey key, vector<FeedbackInterface*>& feedback) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter == mQueues.end()) {
@@ -206,7 +206,7 @@ bool ProcessQueueManager::SetFeedbackInterface(QueueKey key, std::vector<Feedbac
     return true;
 }
 
-void ProcessQueueManager::InvalidatePop(const std::string& configName) {
+void ProcessQueueManager::InvalidatePop(const string& configName) {
     if (QueueKeyManager::GetInstance()->HasKey(configName)) {
         auto key = QueueKeyManager::GetInstance()->GetKey(configName);
         lock_guard<mutex> lock(mQueueMux);
@@ -219,7 +219,7 @@ void ProcessQueueManager::InvalidatePop(const std::string& configName) {
     }
 }
 
-void ProcessQueueManager::ValidatePop(const std::string& configName) {
+void ProcessQueueManager::ValidatePop(const string& configName) {
     if (QueueKeyManager::GetInstance()->HasKey(configName)) {
         auto key = QueueKeyManager::GetInstance()->GetKey(configName);
         lock_guard<mutex> lock(mQueueMux);

@@ -43,14 +43,14 @@ void SourceBufferUnittest::TestBufferAllocatorAllocate() {
     const size_t alloc_size2 = 4000;
     char* alloc2 = static_cast<char*>(allocator.Allocate(alloc_size2));
     APSARA_TEST_NOT_EQUAL(nullptr, alloc2);
-    APSARA_TEST_EQUAL(allocator.mAllocatedChunks.size(), 2);
+    APSARA_TEST_EQUAL(allocator.mAllocatedChunks.size(), 2U);
     alloc2[0] = 'b';
 
     // alloc_size >= 2*mChunkSize
     const size_t alloc_size3 = 10000;
     char* alloc3 = static_cast<char*>(allocator.Allocate(alloc_size3));
     APSARA_TEST_NOT_EQUAL(nullptr, alloc3);
-    APSARA_TEST_EQUAL(allocator.mAllocatedChunks.size(), 3);
+    APSARA_TEST_EQUAL(allocator.mAllocatedChunks.size(), 3U);
     alloc3[0] = 'c';
 
     // ensure ptr is still valid

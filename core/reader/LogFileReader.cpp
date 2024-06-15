@@ -37,7 +37,6 @@
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/HashUtil.h"
-#include "common/LogFileCollectOffsetIndicator.h"
 #include "common/RandomUtil.h"
 #include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
@@ -268,14 +267,8 @@ bool LogFileReader::ShouldForceReleaseDeletedFileFd() {
 }
 
 void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t eoConcurrency) {
-    string buffer = LogFileProfiler::mIpAddr + "_" + mHostLogPath + "_" + CalculateRandomUUID();
-    uint64_t cityHash = CityHash64(buffer.c_str(), buffer.size());
-    mSourceId = ToHexString(cityHash);
-    FileDiscoveryConfig config
-        = FileServer::GetInstance()->GetFileDiscoveryConfig(mReaderConfig.second->GetConfigName());
-    mLogGroupKey = HashString(mReaderConfig.second->GetProjectName() + "_" + mReaderConfig.second->GetLogstoreName()
-                              + "_" + mTopicName + "_" + LogFileProfiler::mIpAddr + "_"
-                              + (config.first->GetBasePath() + config.first->GetFilePattern()) + "_" + mSourceId);
+    mSourceId = LogFileProfiler::mIpAddr + "_" + mReaderConfig.second->GetConfigName() + "_" + mHostLogPath + "_"
+        + CalculateRandomUUID();
 
     if (!tailExisted) {
         static CheckPointManager* checkPointManagerPtr = CheckPointManager::Instance();
@@ -1249,8 +1242,6 @@ bool LogFileReader::CloseTimeoutFilePtr(int32_t curTime) {
                          "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                          "file size", mLastFileSize)("last file position", mLastFilePos));
             CloseFilePtr();
-            // delete item in LogFileCollectOffsetIndicator map
-            LogFileCollectOffsetIndicator::GetInstance()->DeleteItem(mHostLogPath, mDevInode);
             return true;
         }
     }
@@ -2527,8 +2518,6 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
         group.SetMetadata(EventGroupMetaKey::LOG_FILE_INODE, ToString(GetDevInode().inode));
     }
     group.SetMetadata(EventGroupMetaKey::SOURCE_ID, ToString(GetSourceId()));
-    group.SetMetadata(EventGroupMetaKey::TOPIC, GetTopicName());
-    group.SetMetadata(EventGroupMetaKey::LOGGROUP_KEY, ToString(GetLogGroupKey()));
 
     // for source-specific info without fixed key, we store them in tags directly
     // for log, these includes:
@@ -2540,6 +2529,8 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
     for (size_t i = 0; i < extraTags.size(); ++i) {
         group.SetTag(extraTags[i].key(), extraTags[i].value());
     }
+    StringBuffer b = group.GetSourceBuffer()->CopyString(GetTopicName());
+    group.SetTagNoCopy(LOG_RESERVED_KEY_TOPIC, StringView(b.data, b.size));
 }
 
 PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, LogBuffer* logBuffer) {

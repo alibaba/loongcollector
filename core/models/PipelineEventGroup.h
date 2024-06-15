@@ -51,9 +51,7 @@ enum class EventGroupMetaKey {
     CONTAINER_IMAGE_NAME,
     CONTAINER_IMAGE_ID,
 
-    SOURCE_ID,
-    TOPIC,
-    LOGGROUP_KEY // TODO: temporarily used here, should be removed in flusher refactorization
+    SOURCE_ID
 };
 
 using GroupMetadata = std::map<EventGroupMetaKey, StringView>;
@@ -99,9 +97,12 @@ public:
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     StringView GetTag(StringView key) const;
     const GroupTags& GetTags() const { return mTags.mInner; };
+    SizedMap& GetSizedTags() { return mTags; };
     bool HasTag(StringView key) const;
     void SetTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
+
+    size_t GetTagsHash() const;
 
     void SetExactlyOnceCheckpoint(const RangeCheckpointPtr& checkpoint) { mExactlyOnceCheckpoint = checkpoint; }
     RangeCheckpointPtr GetExactlyOnceCheckpoint() const { return mExactlyOnceCheckpoint; }

@@ -32,4 +32,6 @@ bool CheckFileSignature(const std::string& filePath, uint64_t sigHash, uint32_t 
 int64_t HashString(const std::string& str);
 int64_t HashSignatureString(const char* str, size_t strLen);
 
+void HashCombine(size_t &seed, size_t value);
+
 } // namespace logtail

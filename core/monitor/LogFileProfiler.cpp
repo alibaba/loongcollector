@@ -13,19 +13,22 @@
 // limitations under the License.
 
 #include "LogFileProfiler.h"
+
 #include <string>
-#include "common/version.h"
-#include "common/Constants.h"
-#include "common/StringTools.h"
-#include "common/MachineInfoUtil.h"
-#include "common/LogtailCommonFlags.h"
-#include "common/RuntimeUtil.h"
-#include "common/TimeUtil.h"
-#include "common/ErrorUtil.h"
-#include "logger/Logger.h"
-#include "sender/Sender.h"
-#include "config_manager/ConfigManager.h"
+
 #include "app_config/AppConfig.h"
+#include "common/Constants.h"
+#include "common/ErrorUtil.h"
+#include "common/LogtailCommonFlags.h"
+#include "common/MachineInfoUtil.h"
+#include "common/RuntimeUtil.h"
+#include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "common/version.h"
+#include "config_manager/ConfigManager.h"
+#include "logger/Logger.h"
+#include "profile_sender/ProfileSender.h"
+#include "sender/Sender.h"
 
 DEFINE_FLAG_INT32(profile_data_send_interval, "interval of send LogFile/DomainSocket profile data, seconds", 600);
 DEFINE_FLAG_STRING(logtail_profile_snapshot, "reader profile on local disk", "logtail_profile_snapshot");
@@ -72,7 +75,7 @@ bool LogFileProfiler::GetProfileData(LogGroup& logGroup, LogStoreStatistic* stat
     Log* logPtr = logGroup.add_logs();
     auto now = GetCurrentLogtailTime();
     SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec);
-    
+
     Log_Content* contentPtr = logPtr->add_contents();
     contentPtr->set_key("logreader_project_name");
     contentPtr->set_value(statistic->mProjectName);
@@ -265,8 +268,8 @@ void LogFileProfiler::SendProfileData(bool forceSend) {
 
 
 // 1. when in container, convertedPath is the file path in container, hostLogPath is the file path on host.
-//    eg. /home/admin/access.log in container, convertedPath = "/home/admin/access.log", hostLogPath="/logtail_host/xxx/home/admin/access.log".
-//    so hostLogPath is unique.
+//    eg. /home/admin/access.log in container, convertedPath = "/home/admin/access.log",
+//    hostLogPath="/logtail_host/xxx/home/admin/access.log". so hostLogPath is unique.
 // 2. On host, convertedPath = hostLogPath.
 void LogFileProfiler::AddProfilingData(const std::string& configName,
                                        const std::string& region,
@@ -324,39 +327,39 @@ void LogFileProfiler::AddProfilingData(const std::string& configName,
         if (hostLogPath.empty()) {
             std::vector<sls_logs::LogTag> empty;
             statistic = new LogStoreStatistic(configName,
-                                                projectName,
-                                                category,
-                                                convertedPath,
-                                                hostLogPath,
-                                                empty,
-                                                readBytes,
-                                                skipBytes,
-                                                splitLines,
-                                                parseFailures,
-                                                regexMatchFailures,
-                                                parseTimeFailures,
-                                                historyFailures,
-                                                sendFailures,
-                                                errorLine);
+                                              projectName,
+                                              category,
+                                              convertedPath,
+                                              hostLogPath,
+                                              empty,
+                                              readBytes,
+                                              skipBytes,
+                                              splitLines,
+                                              parseFailures,
+                                              regexMatchFailures,
+                                              parseTimeFailures,
+                                              historyFailures,
+                                              sendFailures,
+                                              errorLine);
         } else {
             statistic = new LogStoreStatistic(configName,
-                                                projectName,
-                                                category,
-                                                convertedPath,
-                                                hostLogPath,
-                                                tags,
-                                                readBytes,
-                                                skipBytes,
-                                                splitLines,
-                                                parseFailures,
-                                                regexMatchFailures,
-                                                parseTimeFailures,
-                                                historyFailures,
-                                                sendFailures,
-                                                errorLine);
+                                              projectName,
+                                              category,
+                                              convertedPath,
+                                              hostLogPath,
+                                              tags,
+                                              readBytes,
+                                              skipBytes,
+                                              splitLines,
+                                              parseFailures,
+                                              regexMatchFailures,
+                                              parseTimeFailures,
+                                              historyFailures,
+                                              sendFailures,
+                                              errorLine);
         }
-        statisticsMap.insert(std::pair<string, LogStoreStatistic*>(key, statistic));  
-    }    
+        statisticsMap.insert(std::pair<string, LogStoreStatistic*>(key, statistic));
+    }
 }
 
 void LogFileProfiler::AddProfilingSkipBytes(const std::string& configName,

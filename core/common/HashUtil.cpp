@@ -17,6 +17,7 @@
 #include "FileSystemUtil.h"
 #include "murmurhash3.h"
 #include "LogFileOperator.h"
+#include <boost/functional/hash.hpp>
 
 namespace logtail {
 
@@ -367,5 +368,11 @@ int64_t HashSignatureString(const char* str, size_t strLen) {
     MurmurHash3_x64_128(str, strLen, 0xdeadbeaf, hashVal);
     return *(int64_t*)hashVal;
 }
+
+void HashCombine(size_t &seed, size_t value) {
+    boost::hash_combine(seed, value);
+}
+
+
 
 } // namespace logtail

@@ -84,8 +84,6 @@ uint64_t GetPreciseTimestampFromLogtailTime(LogtailTime logTime, const PreciseTi
 
 void SetLogTime(sls_logs::Log* log, time_t second);
 
-void SetLogTimeWithNano(sls_logs::Log* log, time_t second, std::optional<uint32_t> nanosecond);
-
 LogtailTime GetCurrentLogtailTime();
 
 uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,

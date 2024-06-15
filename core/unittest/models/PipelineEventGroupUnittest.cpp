@@ -64,7 +64,7 @@ void PipelineEventGroupUnittest::TestSetMetadata() {
     }
     std::string value("value4");
     { // StringView nocopy
-        mEventGroup->SetMetadataNoCopy(EventGroupMetaKey::TOPIC, StringView(value));
+        mEventGroup->SetMetadataNoCopy(EventGroupMetaKey::SOURCE_ID, StringView(value));
     }
     size_t afterAlloc = mSourceBuffer->mAllocator.TotalAllocated();
     APSARA_TEST_EQUAL_FATAL(beforeAlloc, afterAlloc);
@@ -72,7 +72,7 @@ void PipelineEventGroupUnittest::TestSetMetadata() {
         {EventGroupMetaKey::LOG_FILE_PATH, "value1"},
         {EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, "value2"},
         {EventGroupMetaKey::LOG_FILE_INODE, "value3"},
-        {EventGroupMetaKey::TOPIC, "value4"}
+        {EventGroupMetaKey::SOURCE_ID, "value4"}
     };
     for (const auto kv : answers) {
         APSARA_TEST_TRUE_FATAL(mEventGroup->HasMetadata(kv.first));

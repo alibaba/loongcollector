@@ -18,6 +18,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/DynamicLibHelper.h"
+#include "common/HashUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
@@ -27,6 +28,7 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/PipelineManager.h"
+#include "profile_sender/ProfileSender.h"
 #include "sender/Sender.h"
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
@@ -121,74 +123,6 @@ void LogtailPlugin::Resume() {
     }
 }
 
-void LogtailPlugin::ProcessRawLog(const std::string& configName,
-                                  StringView rawLog,
-                                  const std::string& packId,
-                                  const std::string& topic) {
-    if (rawLog.empty()) {
-        return;
-    }
-    if (mPluginValid && mProcessRawLogFun != NULL) {
-        std::string realConfigName = configName + "/2";
-        GoString goConfigName;
-        GoSlice goRawLog;
-        GoString goPackId;
-        GoString goTopic;
-
-        goConfigName.n = realConfigName.size();
-        goConfigName.p = realConfigName.c_str();
-        goRawLog.len = rawLog.size();
-        goRawLog.cap = rawLog.size();
-        goRawLog.data = (void*)rawLog.data();
-        goPackId.n = packId.size();
-        goPackId.p = packId.c_str();
-        goTopic.n = topic.size();
-        goTopic.p = topic.c_str();
-        GoInt rst = mProcessRawLogFun(goConfigName, goRawLog, goPackId, goTopic);
-        if (rst != (GoInt)0) {
-            LOG_WARNING(sLogger, ("process raw log error", configName)("result", rst));
-        }
-    }
-}
-
-const std::string tagDelimiter = "^^^";
-const std::string tagSeparator = "~=~";
-const std::string tagPrefix = "__tag__:";
-
-void LogtailPlugin::ProcessRawLogV2(const std::string& configName,
-                                    StringView rawLog,
-                                    const std::string& packId,
-                                    const std::string& topic,
-                                    const std::string& tags) {
-    if (rawLog.empty() || !(mPluginValid && mProcessRawLogV2Fun != NULL)) {
-        return;
-    }
-    std::string realConfigName = configName + "/2";
-
-    GoString goConfigName;
-    GoSlice goRawLog;
-    GoString goPackId;
-    GoString goTopic;
-    GoSlice goTags;
-
-    goConfigName.n = realConfigName.size();
-    goConfigName.p = realConfigName.c_str();
-    goRawLog.data = (void*)rawLog.data();
-    goRawLog.len = rawLog.size();
-    goRawLog.cap = rawLog.size();
-    goPackId.n = packId.size();
-    goPackId.p = packId.c_str();
-    goTopic.n = topic.size();
-    goTopic.p = topic.c_str();
-    goTags.data = (void*)tags.c_str();
-    goTags.len = goTags.cap = tags.length();
-
-    GoInt rst = mProcessRawLogV2Fun(goConfigName, goRawLog, goPackId, goTopic, goTags);
-    if (rst != (GoInt)0) {
-        LOG_WARNING(sLogger, ("process raw log V2 error", configName)("result", rst));
-    }
-}
-
 int LogtailPlugin::IsValidToSend(long long logstoreKey) {
     return Sender::Instance()->GetSenderFeedBackInterface()->IsValidToPush(logstoreKey) ? 0 : -1;
 }
@@ -260,7 +194,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
     if (shardHashSize > 0) {
         shardHashStr.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
-    return Sender::Instance()->SendPb(pConfig, pbBuffer, pbSize, lines, logstore, shardHashStr) ? 0 : -1;
+    return pConfig->Send(std::string(pbBuffer, pbSize), shardHash, logstore) ? 0 : -1;
 }
 
 int LogtailPlugin::ExecPluginCmd(
@@ -460,6 +394,8 @@ void LogtailPlugin::ProcessLog(const std::string& configName,
     if (!log.has_time() || !(mPluginValid && mProcessLogsFun != NULL)) {
         return;
     }
+
+    std::string packIdPrefix = ToHexString(HashString(packId));
     std::string realConfigName = configName + "/2";
     GoString goConfigName;
     GoSlice goLog;
@@ -468,8 +404,8 @@ void LogtailPlugin::ProcessLog(const std::string& configName,
     GoSlice goTags;
     goConfigName.n = realConfigName.size();
     goConfigName.p = realConfigName.c_str();
-    goPackId.n = packId.size();
-    goPackId.p = packId.c_str();
+    goPackId.n = packIdPrefix.size();
+    goPackId.p = packIdPrefix.c_str();
     goTopic.n = topic.size();
     goTopic.p = topic.c_str();
     goTags.data = (void*)tags.c_str();
@@ -484,22 +420,22 @@ void LogtailPlugin::ProcessLog(const std::string& configName,
 }
 
 void LogtailPlugin::ProcessLogGroup(const std::string& configName,
-                                    sls_logs::LogGroup& logGroup,
+                                    const std::string& logGroup,
                                     const std::string& packId) {
-    if (!logGroup.logs_size() || !(mPluginValid && mProcessLogsFun != NULL)) {
+    if (logGroup.empty() || !(mPluginValid && mProcessLogsFun != NULL)) {
         return;
     }
     std::string realConfigName = configName + "/2";
+    std::string packIdPrefix = ToHexString(HashString(packId));
     GoString goConfigName;
     GoSlice goLog;
     GoString goPackId;
     goConfigName.n = realConfigName.size();
     goConfigName.p = realConfigName.c_str();
-    goPackId.n = packId.size();
-    goPackId.p = packId.c_str();
-    std::string sLog = logGroup.SerializeAsString();
-    goLog.len = goLog.cap = sLog.length();
-    goLog.data = (void*)sLog.c_str();
+    goPackId.n = packIdPrefix.size();
+    goPackId.p = packIdPrefix.c_str();
+    goLog.len = goLog.cap = logGroup.length();
+    goLog.data = (void*)logGroup.c_str();
     GoInt rst = mProcessLogGroupFun(goConfigName, goLog, goPackId);
     if (rst != (GoInt)0) {
         LOG_WARNING(sLogger, ("process loggroup error", configName)("result", rst));

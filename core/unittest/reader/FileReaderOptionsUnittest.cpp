@@ -52,12 +52,12 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileReaderOptions());
     APSARA_TEST_EQUAL(FileReaderOptions::Encoding::UTF8, config->mFileEncoding);
     APSARA_TEST_FALSE(config->mTailingAllMatchedFiles);
-    APSARA_TEST_EQUAL(INT32_FLAG(default_tail_limit_kb), config->mTailSizeKB);
-    APSARA_TEST_EQUAL(INT32_FLAG(default_reader_flush_timeout), config->mFlushTimeoutSecs);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_tail_limit_kb)), config->mTailSizeKB);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_reader_flush_timeout)), config->mFlushTimeoutSecs);
     APSARA_TEST_EQUAL(0U, config->mReadDelaySkipThresholdBytes);
-    APSARA_TEST_EQUAL(INT32_FLAG(delay_bytes_upperlimit), config->mReadDelayAlertThresholdBytes);
-    APSARA_TEST_EQUAL(INT32_FLAG(reader_close_unused_file_time), config->mCloseUnusedReaderIntervalSec);
-    APSARA_TEST_EQUAL(INT32_FLAG(logreader_max_rotate_queue_size), config->mRotatorQueueSize);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(delay_bytes_upperlimit)), config->mReadDelayAlertThresholdBytes);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(reader_close_unused_file_time)), config->mCloseUnusedReaderIntervalSec);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(logreader_max_rotate_queue_size)), config->mRotatorQueueSize);
     APSARA_TEST_FALSE(config->mAppendingLogPositionMeta);
 
     // valid optional param
@@ -106,12 +106,12 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
     APSARA_TEST_EQUAL(FileReaderOptions::Encoding::GBK, config->mFileEncoding);
     APSARA_TEST_FALSE(config->mTailingAllMatchedFiles);
-    APSARA_TEST_EQUAL(INT32_FLAG(default_tail_limit_kb), config->mTailSizeKB);
-    APSARA_TEST_EQUAL(INT32_FLAG(default_reader_flush_timeout), config->mFlushTimeoutSecs);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_tail_limit_kb)), config->mTailSizeKB);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_reader_flush_timeout)), config->mFlushTimeoutSecs);
     APSARA_TEST_EQUAL(0U, config->mReadDelaySkipThresholdBytes);
-    APSARA_TEST_EQUAL(INT32_FLAG(delay_bytes_upperlimit), config->mReadDelayAlertThresholdBytes);
-    APSARA_TEST_EQUAL(INT32_FLAG(reader_close_unused_file_time), config->mCloseUnusedReaderIntervalSec);
-    APSARA_TEST_EQUAL(INT32_FLAG(logreader_max_rotate_queue_size), config->mRotatorQueueSize);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(delay_bytes_upperlimit)), config->mReadDelayAlertThresholdBytes);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(reader_close_unused_file_time)), config->mCloseUnusedReaderIntervalSec);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(logreader_max_rotate_queue_size)), config->mRotatorQueueSize);
     APSARA_TEST_FALSE(config->mAppendingLogPositionMeta);
 
     // FileEncoding
@@ -136,7 +136,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     config.reset(new FileReaderOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
     APSARA_TEST_EQUAL(FileReaderOptions::Encoding::GBK, config->mFileEncoding);
-    APSARA_TEST_EQUAL(INT32_FLAG(default_tail_limit_kb), config->mTailSizeKB);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_tail_limit_kb)), config->mTailSizeKB);
 }
 
 void FileReaderOptionsUnittest::OnFailedInit() const {
