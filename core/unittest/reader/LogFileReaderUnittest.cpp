@@ -269,9 +269,11 @@ void LogFileReaderUnittest::TestReadGBK() {
         expectedPart.resize(firstReadSize);
         reader.ReadGBK(logBuffer, 127, moreData, false); // first line without \n
         APSARA_TEST_FALSE_FATAL(moreData);
-        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
-        APSARA_TEST_EQUAL_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_FALSE_FATAL(reader.mLastForceRead);
+        reader.ReadGBK(logBuffer, 127, moreData, false); // force read, clear cache
         APSARA_TEST_TRUE_FATAL(reader.mLastForceRead);
+        APSARA_TEST_EQUAL_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
 
         // second read, start with \n but with other lines
         reader.ReadGBK(logBuffer, fileSize - 1, moreData);
@@ -472,9 +474,11 @@ void LogFileReaderUnittest::TestReadUTF8() {
         reader.mLastForceRead = true;
         reader.ReadUTF8(logBuffer, firstReadSize, moreData, false);
         APSARA_TEST_FALSE_FATAL(moreData);
-        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
-        APSARA_TEST_EQUAL_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_FALSE_FATAL(reader.mLastForceRead);
+        reader.ReadUTF8(logBuffer, firstReadSize, moreData, false); // force read, clear cache
         APSARA_TEST_TRUE_FATAL(reader.mLastForceRead);
+        APSARA_TEST_EQUAL_FATAL(reader.mCache.size(), 0UL);
+        APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
 
         // second read, start with \n but with other lines
         reader.ReadUTF8(logBuffer, fileSize - 1, moreData);

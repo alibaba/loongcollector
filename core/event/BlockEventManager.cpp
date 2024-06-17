@@ -13,10 +13,11 @@
 // limitations under the License.
 
 #include "BlockEventManager.h"
-#include "processor/daemon/LogProcess.h"
+
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
 #include "polling/PollingEventQueue.h"
+#include "processor/daemon/LogProcess.h"
 #include "queue/ProcessQueueManager.h"
 
 DEFINE_FLAG_INT32(max_block_event_timeout, "max block event timeout, seconds", 3);
@@ -49,8 +50,9 @@ void BlockedEventManager::UpdateBlockEvent(QueueKey logstoreKey,
             .append(pEvent->GetConfigName());
         hashKey = HashSignatureString(key.c_str(), key.size());
     }
-    // LOG_DEBUG(sLogger, ("Add block event ", pEvent->GetSource())(pEvent->GetObject(),
-    // pEvent->GetInode())(pEvent->GetConfigName(), hashKey));
+    LOG_DEBUG(sLogger,
+              ("Add block event ", pEvent->GetSource())(pEvent->GetObject(),
+                                                        pEvent->GetInode())(pEvent->GetConfigName(), hashKey));
     ScopedSpinLock lock(mLock);
     mBlockEventMap[hashKey].Update(logstoreKey, pEvent, curTime);
 }

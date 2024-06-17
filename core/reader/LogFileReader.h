@@ -37,9 +37,9 @@
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
 #include "models/StringView.h"
+#include "queue/FeedbackQueueKey.h"
 #include "rapidjson/allocators.h"
 #include "reader/FileReaderOptions.h"
-#include "queue/FeedbackQueueKey.h"
 
 namespace logtail {
 
@@ -380,7 +380,7 @@ public:
         mExtraTags.insert(mExtraTags.end(), tags.begin(), tags.end());
     }
 
-    QueueKey GetQueueKey() const { return mReaderConfig.second->GetProcessQueueKey();}
+    QueueKey GetQueueKey() const { return mReaderConfig.second->GetProcessQueueKey(); }
 
     // void SetDelaySkipBytes(int64_t value) { mReadDelaySkipBytes = value; }
 
@@ -435,9 +435,9 @@ public:
     void SetEventGroupMetaAndTag(PipelineEventGroup& group);
 
 protected:
-    bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool allowRollback = true);
-    void ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool allowRollback = true);
-    void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool allowRollback = true);
+    bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback = true);
+    void ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true);
+    void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true);
 
     size_t
     ReadFile(LogFileOperator& logFileOp, void* buf, size_t size, int64_t& offset, TruncateInfo** truncateInfo = NULL);
@@ -677,6 +677,7 @@ private:
     friend class LastMatchedContainerdTextLineUnittest;
     friend class LastMatchedDockerJsonFileUnittest;
     friend class LastMatchedContainerdTextWithDockerJsonUnittest;
+    friend class ForceReadUnittest;
 
 protected:
     void UpdateReaderManual();

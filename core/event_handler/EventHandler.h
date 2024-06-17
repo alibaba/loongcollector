@@ -104,6 +104,7 @@ public:
     friend class EventDispatcherTest;
     friend class SenderUnittest;
     friend class ModifyHandlerUnittest;
+    friend class ForceReadUnittest;
 #endif
 };
 
