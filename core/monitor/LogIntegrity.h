@@ -22,9 +22,6 @@
 #include "common/Lock.h"
 
 namespace logtail {
-// forward declaration
-struct LoggroupTimeValue;
-// struct MergeItem;
 
 struct LogTimeInfo {
     LogTimeInfo() {}
@@ -143,7 +140,6 @@ public:
 
 public:
     // void RecordIntegrityInfo(MergeItem* item);
-    void Notify(LoggroupTimeValue* data, bool flag);
     void SendLogIntegrityInfo();
     void EraseItemInMap(const std::string& region, const std::string& projectName, const std::string& logstore);
     void DumpIntegrityDataToLocal();
