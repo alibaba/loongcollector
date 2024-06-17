@@ -94,7 +94,6 @@ void ProcessorMergeMultilineLogNative::Process(PipelineEventGroup& logGroup) {
         logGroup.DelMetadata(EventGroupMetaKey::HAS_PART_LOG);
     }
     *mSplitLines = logGroup.GetEvents().size();
-    return;
 }
 
 bool ProcessorMergeMultilineLogNative::IsSupportedEvent(const PipelineEventPtr& e) const {

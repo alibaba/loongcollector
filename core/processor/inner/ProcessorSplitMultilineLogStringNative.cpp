@@ -92,6 +92,7 @@ void ProcessorSplitMultilineLogStringNative::Process(PipelineEventGroup& logGrou
     }
     mProcMatchedLinesCnt->Add(inputLines - unmatchLines);
     mProcUnmatchedLinesCnt->Add(unmatchLines);
+    *mSplitLines = newEvents.size();
     logGroup.SwapEvents(newEvents);
 }
 

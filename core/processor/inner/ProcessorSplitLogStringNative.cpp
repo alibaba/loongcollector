@@ -83,8 +83,6 @@ void ProcessorSplitLogStringNative::Process(PipelineEventGroup& logGroup) {
     }
     *mSplitLines = newEvents.size();
     logGroup.SwapEvents(newEvents);
-
-    return;
 }
 
 bool ProcessorSplitLogStringNative::IsSupportedEvent(const PipelineEventPtr& e) const {
