@@ -31,6 +31,7 @@
 | TextToString | Boolean，`false` | 是否将text类型的数据转换成字符串。不设置时，默认为false，表示不转换。|
 | PackValues | Boolean，`false` | 是否将事件数据打包成JSON格式。默认为false，表示不打包。如果设置为true，Logtail会将事件数据以JSON格式集中打包到data和old_data两个字段中，其中old_data仅在row_update事件中有意义。 示例：假设数据表有三列数据c1，c2，c3，设置为false，row_insert事件数据中会有c1，c2，c3三个字段，而设置为true时，c1，c2，c3会被统一打包为data字段，值为`{"c1":"...", "c2": "...", "c3": "..."}`。|
 | EnableEventMeta | Boolean，`false` | 是否采集事件的元数据，默认为false，表示不采集。 Binlog事件的元数据包括event_time、event_log_position、event_size和event_server_id。|
+| UseDecimal | Boolean，`false` | Binlog解析DECIMAL类型时，是否保持原格式输出，而不是使用科学计数法。如果未设置，系统默认为false，即默认使用科学计数法。|
 
 ## 样例
 
