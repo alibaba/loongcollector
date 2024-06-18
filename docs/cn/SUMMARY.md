@@ -137,6 +137,7 @@
   * [开源插件开发引导](docs/cn/developer-guide/plugin-development/plugin-development-guide.md)
   * [Checkpoint接口](developer-guide/plugin-development/checkpoint-api.md)
   * [Logger接口](developer-guide/plugin-development/logger-api.md)
+  * [自监控指标接口](developer-guide/plugin-development/plugin-self-monitor-guide.md)
   * [如何开发Input插件](developer-guide/plugin-development/how-to-write-input-plugins.md)
   * [如何开发Processor插件](developer-guide/plugin-development/how-to-write-processor-plugins.md)
   * [如何开发Aggregator插件](developer-guide/plugin-development/how-to-write-aggregator-plugins.md)

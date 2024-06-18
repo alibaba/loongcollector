@@ -102,13 +102,12 @@ func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
 		logger.Warning(m.Context.GetRuntimeContext(), initAlarmName, "init rdbFunc error", err)
 	}
 
-	m.collectLatency = helper.NewLatencyMetric(fmt.Sprintf("%s_collect_avg_cost", m.Driver))
-	m.collectTotal = helper.NewCounterMetric(fmt.Sprintf("%s_collect_total", m.Driver))
-	m.Context.RegisterCounterMetric(m.collectTotal)
-	m.Context.RegisterLatencyMetric(m.collectLatency)
+	metricsRecord := m.Context.GetMetricRecord()
+
+	m.collectLatency = helper.NewLatencyMetricAndRegister(metricsRecord, fmt.Sprintf("%s_collect_avg_cost", m.Driver))
+	m.collectTotal = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%s_collect_total", m.Driver))
 	if m.CheckPoint {
-		m.checkpointMetric = helper.NewStringMetric(fmt.Sprintf("%s_checkpoint", m.Driver))
-		m.Context.RegisterStringMetric(m.checkpointMetric)
+		m.checkpointMetric = helper.NewStringMetricAndRegister(metricsRecord, fmt.Sprintf("%s_checkpoint", m.Driver))
 	}
 	return 10000, nil
 }
@@ -195,12 +194,11 @@ func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFun
 		select {
 		case <-timer.C:
 			startTime := time.Now()
-			m.collectLatency.Begin()
 			err = m.Collect(collector, columnResolverFuncMap)
 			if err != nil {
 				logger.Error(m.Context.GetRuntimeContext(), queryAlarmName, "collect err", err)
 			}
-			m.collectLatency.End()
+			m.collectLatency.Observe(float64(time.Since(startTime)))
 			endTime := time.Now()
 			if endTime.Sub(startTime) > time.Duration(m.IntervalMs)*time.Millisecond/2 {
 				logger.Warning(m.Context.GetRuntimeContext(), timeoutAlarmName, "sql collect cost very long time, start", startTime, "end", endTime, "intervalMs", m.IntervalMs)

@@ -160,14 +160,11 @@ func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
 	}
 	idf.updateEmptyFlag = true
 
-	idf.avgInstanceMetric = helper.NewAverageMetric("container_count")
-	idf.addMetric = helper.NewCounterMetric("add_container")
-	idf.deleteMetric = helper.NewCounterMetric("remove_container")
-	idf.updateMetric = helper.NewCounterMetric("update_container")
-	idf.context.RegisterCounterMetric(idf.avgInstanceMetric)
-	idf.context.RegisterCounterMetric(idf.addMetric)
-	idf.context.RegisterCounterMetric(idf.deleteMetric)
-	idf.context.RegisterCounterMetric(idf.updateMetric)
+	metricsRecord := idf.context.GetMetricRecord()
+	idf.avgInstanceMetric = helper.NewAverageMetricAndRegister(metricsRecord, "container_count")
+	idf.addMetric = helper.NewCounterMetricAndRegister(metricsRecord, "add_container")
+	idf.deleteMetric = helper.NewCounterMetricAndRegister(metricsRecord, "remove_container")
+	idf.updateMetric = helper.NewCounterMetricAndRegister(metricsRecord, "update_container")
 
 	var err error
 	idf.IncludeEnv, idf.IncludeEnvRegex, err = helper.SplitRegexFromMap(idf.IncludeEnv)

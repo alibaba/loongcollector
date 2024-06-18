@@ -105,13 +105,12 @@ func (m *Mysql) Init(context pipeline.Context) (int, error) {
 		m.StateMent += " limit ?, " + strconv.Itoa(m.PageSize)
 	}
 
-	m.collectLatency = helper.NewLatencyMetric("mysql_collect_avg_cost")
-	m.collectTotal = helper.NewCounterMetric("mysql_collect_total")
-	m.context.RegisterCounterMetric(m.collectTotal)
-	m.context.RegisterLatencyMetric(m.collectLatency)
+	metricsRecord := m.context.GetMetricRecord()
+	m.collectLatency = helper.NewLatencyMetricAndRegister(metricsRecord, "mysql_collect_avg_cost")
+	m.collectTotal = helper.NewCounterMetricAndRegister(metricsRecord, "mysql_collect_total")
+
 	if m.CheckPoint {
-		m.checkpointMetric = helper.NewStringMetric("mysql_checkpoint")
-		m.context.RegisterStringMetric(m.checkpointMetric)
+		m.checkpointMetric = helper.NewStringMetricAndRegister(metricsRecord, "mysql_checkpoint")
 	}
 	return 10000, nil
 }
@@ -273,12 +272,11 @@ func (m *Mysql) Start(collector pipeline.Collector) error {
 		select {
 		case <-timer.C:
 			startTime := time.Now()
-			m.collectLatency.Begin()
 			err = m.Collect(collector)
 			if err != nil {
 				logger.Error(m.context.GetRuntimeContext(), "MYSQL_QUERY_ALARM", "sql query error", err)
 			}
-			m.collectLatency.End()
+			m.collectLatency.Observe(float64(time.Since(startTime)))
 			endTime := time.Now()
 			if endTime.Sub(startTime) > time.Duration(m.IntervalMs)*time.Millisecond/2 {
 				logger.Warning(m.context.GetRuntimeContext(), "MYSQL_TIMEOUT_ALARM", "sql collect cost very long time, start", startTime, "end", endTime, "intervalMs", m.IntervalMs)

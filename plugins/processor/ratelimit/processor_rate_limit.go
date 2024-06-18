@@ -44,10 +44,10 @@ func (p *ProcessorRateLimit) Init(context pipeline.Context) error {
 		return err
 	}
 	p.Algorithm = newTokenBucket(limit)
-	p.limitMetric = helper.NewCounterMetric(fmt.Sprintf("%v_limited", pluginName))
-	p.context.RegisterCounterMetric(p.limitMetric)
-	p.processedMetric = helper.NewCounterMetric(fmt.Sprintf("%v_processed", pluginName))
-	p.context.RegisterCounterMetric(p.processedMetric)
+
+	metricsRecord := p.context.GetMetricRecord()
+	p.limitMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_limited", pluginName))
+	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginName))
 	return nil
 }
 

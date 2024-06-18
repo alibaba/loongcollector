@@ -347,9 +347,9 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 				if allReady {
 					for _, flusher := range p.FlusherPlugins {
 						p.LogstoreConfig.Statistics.FlushReadyMetric.Add(1)
-						p.LogstoreConfig.Statistics.FlushLatencyMetric.Begin()
+						begin := time.Now()
 						err := flusher.Export(data, p.FlushPipeContext)
-						p.LogstoreConfig.Statistics.FlushLatencyMetric.End()
+						p.LogstoreConfig.Statistics.FlushLatencyMetric.Observe(float64(time.Since(begin)))
 						if err != nil {
 							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "FLUSH_DATA_ALARM", "flush data error",
 								p.LogstoreConfig.ProjectName, p.LogstoreConfig.LogstoreName, err)

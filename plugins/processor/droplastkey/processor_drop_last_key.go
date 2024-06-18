@@ -37,8 +37,8 @@ type ProcessorDropLastKey struct {
 func (p *ProcessorDropLastKey) Init(context pipeline.Context) error {
 	p.context = context
 
-	p.filterMetric = helper.NewCounterMetric("drop_key_count")
-	p.context.RegisterCounterMetric(p.filterMetric)
+	metricsRecord := p.context.GetMetricRecord()
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, "drop_key_count")
 
 	if len(p.DropKey) == 0 {
 		return fmt.Errorf("Invalid config, DropKey is empty")

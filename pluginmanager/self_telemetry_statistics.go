@@ -35,11 +35,13 @@ func (r *InputStatistics) Description() string {
 
 func (r *InputStatistics) Collect(collector pipeline.Collector) error {
 	for _, config := range LogtailConfig {
-		log := &protocol.Log{}
-		config.Context.MetricSerializeToPB(log)
-		if len(log.Contents) > 0 && StatisticsConfig != nil {
-			StatisticsConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
-			logger.Debug(r.context.GetRuntimeContext(), "statistics", *log)
+		logGroup := &protocol.LogGroup{}
+		config.Context.MetricSerializeToPB(logGroup)
+		if len(logGroup.Logs) > 0 && StatisticsConfig != nil {
+			for _, log := range logGroup.Logs {
+				StatisticsConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
+				logger.Debug(r.context.GetRuntimeContext(), "statistics", *log)
+			}
 		}
 	}
 	return nil

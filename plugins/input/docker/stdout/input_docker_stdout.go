@@ -193,21 +193,13 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	if sds.MaxLogSize > 1024*1024*20 {
 		sds.MaxLogSize = 1024 * 1024 * 20
 	}
-	sds.tracker = helper.NewReaderMetricTracker()
-	sds.context.RegisterCounterMetric(sds.tracker.CloseCounter)
-	sds.context.RegisterCounterMetric(sds.tracker.OpenCounter)
-	sds.context.RegisterCounterMetric(sds.tracker.ReadSizeCounter)
-	sds.context.RegisterCounterMetric(sds.tracker.ReadCounter)
-	sds.context.RegisterCounterMetric(sds.tracker.FileSizeCounter)
-	sds.context.RegisterCounterMetric(sds.tracker.FileRotatorCounter)
-	sds.context.RegisterLatencyMetric(sds.tracker.ProcessLatency)
 
-	sds.avgInstanceMetric = helper.NewAverageMetric("container_count")
-	sds.addMetric = helper.NewCounterMetric("add_container")
-	sds.deleteMetric = helper.NewCounterMetric("remove_container")
-	sds.context.RegisterCounterMetric(sds.avgInstanceMetric)
-	sds.context.RegisterCounterMetric(sds.addMetric)
-	sds.context.RegisterCounterMetric(sds.deleteMetric)
+	metricsRecord := sds.context.GetMetricRecord()
+	sds.tracker = helper.NewReaderMetricTracker(metricsRecord)
+
+	sds.avgInstanceMetric = helper.NewAverageMetricAndRegister(metricsRecord, "container_count")
+	sds.addMetric = helper.NewCounterMetricAndRegister(metricsRecord, "add_container")
+	sds.deleteMetric = helper.NewCounterMetricAndRegister(metricsRecord, "remove_container")
 
 	var err error
 	sds.IncludeEnv, sds.IncludeEnvRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)

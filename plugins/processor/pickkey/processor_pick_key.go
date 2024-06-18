@@ -42,11 +42,9 @@ type ProcessorPickKey struct {
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorPickKey) Init(context pipeline.Context) error {
 	p.context = context
-
-	p.filterMetric = helper.NewCounterMetric("pick_key_lost")
-	p.context.RegisterCounterMetric(p.filterMetric)
-	p.processedMetric = helper.NewCounterMetric(fmt.Sprintf("%v_processed", pluginName))
-	p.context.RegisterCounterMetric(p.processedMetric)
+	metricsRecord := p.context.GetMetricRecord()
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, "pick_key_lost")
+	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginName))
 
 	if len(p.Include) > 0 {
 		p.includeMap = make(map[string]struct{})

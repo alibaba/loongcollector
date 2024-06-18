@@ -67,10 +67,9 @@ func (p *ProcessorRegexFilter) Init(context pipeline.Context) error {
 			p.excludeRegex[key] = reg
 		}
 	}
-	p.filterMetric = helper.NewCounterMetric(fmt.Sprintf("%v_filtered", pluginName))
-	p.context.RegisterCounterMetric(p.filterMetric)
-	p.processedMetric = helper.NewCounterMetric(fmt.Sprintf("%v_processed", pluginName))
-	p.context.RegisterCounterMetric(p.processedMetric)
+	metricsRecord := p.context.GetMetricRecord()
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_filtered", pluginName))
+	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginName))
 	return nil
 }
 

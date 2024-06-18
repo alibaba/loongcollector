@@ -16,7 +16,9 @@ package helper
 
 import (
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"testing"
@@ -59,4 +61,43 @@ func TestMetricLabels_Append(t *testing.T) {
 	log = NewMetricLog("name@", 1691646109945, 1, &ml2)
 	require.Equal(t, `Time:1691646109 Contents:<Key:"__name__" Value:"name_" > Contents:<Key:"__time_nano__" Value:"1691646109945000000" > Contents:<Key:"__labels__" Value:"key_#$#val_" > Contents:<Key:"__value__" Value:"1" > Time_ns:945000000 `, log.String())
 
+}
+
+func Test_GetMetricName(t *testing.T) {
+	type args struct {
+		log *protocol.Log
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "test1",
+			args: struct {
+				log *protocol.Log
+			}{log: &protocol.Log{
+				Contents: []*protocol.Log_Content{{Key: SelfMetricNameKey, Value: "metric1"}}},
+			},
+			want: "metric1",
+		},
+
+		{
+			name: "test2",
+			args: struct {
+				log *protocol.Log
+			}{log: &protocol.Log{
+				Contents: []*protocol.Log_Content{
+					{Key: "first", Value: "metric1"},
+					{Key: SelfMetricNameKey, Value: "metric2"},
+				}},
+			},
+			want: "metric2",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, GetMetricName(tt.args.log), "GetMetricName(%v, %v)", tt.args.log)
+		})
+	}
 }

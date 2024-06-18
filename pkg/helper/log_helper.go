@@ -374,3 +374,20 @@ func ReplaceInvalidChars(in *string) {
 		}
 	}
 }
+
+func GetMetricName(log *protocol.Log) string {
+	for _, cnt := range log.Contents {
+		if cnt.GetKey() == SelfMetricNameKey {
+			return cnt.GetValue()
+		}
+	}
+	return ""
+}
+
+func LogContentsToMap(contents []*protocol.Log_Content) map[string]string {
+	result := make(map[string]string)
+	for _, content := range contents {
+		result[content.GetKey()] = content.GetValue()
+	}
+	return result
+}

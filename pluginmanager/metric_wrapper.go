@@ -39,9 +39,9 @@ func (p *MetricWrapper) Run(control *pipeline.AsyncControl) {
 	defer panicRecover(p.Input.Description())
 	for {
 		exitFlag := util.RandomSleep(p.Interval, 0.1, control.CancelToken())
-		p.LatencyMetric.Begin()
+		startTime := time.Now()
 		err := p.Input.Collect(p)
-		p.LatencyMetric.End()
+		p.LatencyMetric.Observe(float64(time.Since(startTime)))
 		if err != nil {
 			logger.Error(p.Config.Context.GetRuntimeContext(), "INPUT_COLLECT_ALARM", "error", err)
 		}

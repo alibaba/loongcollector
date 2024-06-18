@@ -15,7 +15,6 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"strconv"
@@ -188,44 +187,4 @@ func getNameWithLables(name string, labels []*protocol.Log_Content) string {
 		n = n + "#" + lable.Key + "=" + lable.Value
 	}
 	return n
-}
-
-func NewCounterMetric(n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
-	return &NormalMetric{name: n, labels: lables}
-}
-
-func NewAverageMetric(n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
-	return &AvgMetric{name: n, labels: lables}
-}
-
-func NewStringMetric(n string, lables ...*protocol.Log_Content) pipeline.StringMetric {
-	return &StrMetric{name: n, labels: lables}
-}
-
-func NewLatencyMetric(n string, lables ...*protocol.Log_Content) pipeline.LatencyMetric {
-	return &LatMetric{name: n, labels: lables}
-}
-
-func NewCounterMetricAndRegister(c pipeline.Context, n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
-	metric := &NormalMetric{name: n, labels: lables}
-	c.RegisterCounterMetric(metric)
-	return metric
-}
-
-func NewAverageMetricAndRegister(c pipeline.Context, n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
-	metric := &AvgMetric{name: n, labels: lables}
-	c.RegisterCounterMetric(metric)
-	return metric
-}
-
-func NewStringMetricAndRegister(c pipeline.Context, n string, lables ...*protocol.Log_Content) pipeline.StringMetric {
-	metric := &StrMetric{name: n, labels: lables}
-	c.RegisterStringMetric(metric)
-	return metric
-}
-
-func NewLatencyMetricAndRegister(c pipeline.Context, n string, lables ...*protocol.Log_Content) pipeline.LatencyMetric {
-	metric := &LatMetric{name: n, labels: lables}
-	c.RegisterLatencyMetric(metric)
-	return metric
 }

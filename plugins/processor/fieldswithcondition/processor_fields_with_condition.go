@@ -202,10 +202,9 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 			}
 		}
 	}
-	p.filterMetric = helper.NewCounterMetric(fmt.Sprintf("%v_filtered", PluginName))
-	p.context.RegisterCounterMetric(p.filterMetric)
-	p.processedMetric = helper.NewCounterMetric(fmt.Sprintf("%v_processed", PluginName))
-	p.context.RegisterCounterMetric(p.processedMetric)
+	metricsRecord := p.context.GetMetricRecord()
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_filtered", PluginName))
+	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", PluginName))
 	return nil
 }
 
