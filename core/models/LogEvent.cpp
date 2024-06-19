@@ -23,6 +23,10 @@ namespace logtail {
 LogEvent::LogEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::LOG, ptr) {
 }
 
+unique_ptr<PipelineEvent> LogEvent::Copy() const {
+    return make_unique<LogEvent>(*this);
+}
+
 StringView LogEvent::GetContent(StringView key) const {
     auto it = mIndex.find(key);
     if (it != mIndex.end()) {

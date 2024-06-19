@@ -23,6 +23,10 @@ namespace logtail {
 MetricEvent::MetricEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::METRIC, ptr) {
 }
 
+unique_ptr<PipelineEvent> MetricEvent::Copy() const {
+    return make_unique<MetricEvent>(*this);
+}
+
 void MetricEvent::SetName(const string& name) {
     const StringBuffer& b = GetSourceBuffer()->CopyString(name);
     mName = StringView(b.data, b.size);

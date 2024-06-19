@@ -291,7 +291,13 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
 void Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
     for (auto& group : groupList) {
         // TODO: support route
-        mFlushers[0]->Send(std::move(group));
+        for (size_t i = 0; i < mFlushers.size(); ++i) {
+            if (i + 1 != mFlushers.size()) {
+                mFlushers[i]->Send(group.Copy());
+            } else {
+                mFlushers[i]->Send(std::move(group));
+            }
+        }
     }
 }
 

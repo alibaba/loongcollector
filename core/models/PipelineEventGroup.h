@@ -61,13 +61,14 @@ using GroupTags = std::map<StringView, StringView>;
 // We cannot just use default copy constructor as it won't deep copy PipelineEvent pointed in Events vector.
 using EventsContainer = std::vector<PipelineEventPtr>;
 
+// only movable
 class PipelineEventGroup {
 public:
-    PipelineEventGroup(std::shared_ptr<SourceBuffer> sourceBuffer) : mSourceBuffer(sourceBuffer) {}
-    PipelineEventGroup(const PipelineEventGroup&) = delete;
-    PipelineEventGroup& operator=(const PipelineEventGroup&) = delete;
+    PipelineEventGroup(const std::shared_ptr<SourceBuffer>& sourceBuffer) : mSourceBuffer(sourceBuffer) {}
     PipelineEventGroup(PipelineEventGroup&&) noexcept;
     PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept;
+
+    PipelineEventGroup Copy() const;
 
     std::unique_ptr<LogEvent> CreateLogEvent();
     std::unique_ptr<MetricEvent> CreateMetricEvent();

@@ -187,6 +187,10 @@ const string SpanEvent::OTLP_SCOPE_VERSION = "otlp.scope.version";
 SpanEvent::SpanEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::SPAN, ptr) {
 }
 
+unique_ptr<PipelineEvent> SpanEvent::Copy() const {
+    return make_unique<SpanEvent>(*this);
+}
+
 void SpanEvent::SetTraceId(const string& traceId) {
     const StringBuffer& b = GetSourceBuffer()->CopyString(traceId);
     mTraceId = StringView(b.data, b.size);

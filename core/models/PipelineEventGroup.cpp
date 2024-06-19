@@ -49,6 +49,18 @@ PipelineEventGroup& PipelineEventGroup::operator=(PipelineEventGroup&& rhs) noex
     return *this;
 }
 
+PipelineEventGroup PipelineEventGroup::Copy() const {
+    PipelineEventGroup res(mSourceBuffer);
+    res.mMetadata = mMetadata;
+    res.mTags = mTags;
+    res.mExactlyOnceCheckpoint = mExactlyOnceCheckpoint;
+    for (auto& event : mEvents) {
+        res.mEvents.emplace_back(event.Copy());
+        res.mEvents.back()->ResetPipelineEventGroup(&res);
+    }
+    return res;
+}
+
 unique_ptr<LogEvent> PipelineEventGroup::CreateLogEvent() {
     // cannot use make_unique here because the private constructor is friend only to PipelineEventGroup
     return unique_ptr<LogEvent>(new LogEvent(this));

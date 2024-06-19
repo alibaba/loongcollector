@@ -120,6 +120,8 @@ public:
     static const std::string OTLP_SCOPE_NAME;
     static const std::string OTLP_SCOPE_VERSION;
 
+    std::unique_ptr<PipelineEvent> Copy() const override;
+
     StringView GetTraceId() const { return mTraceId; }
     void SetTraceId(const std::string& traceId);
 

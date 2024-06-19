@@ -24,6 +24,7 @@ public:
     void TestIs();
     void TestGet();
     void TestCast();
+    void TestCopy();
 
 protected:
     void SetUp() override {
@@ -53,21 +54,46 @@ void PipelineEventPtrUnittest::TestIs() {
 
 void PipelineEventPtrUnittest::TestGet() {
     auto logUPtr = mEventGroup->CreateLogEvent();
-    auto logAddr = logUPtr.get();
-    PipelineEventPtr logEventPtr(mEventGroup->CreateLogEvent());
-    LogEvent* log = logEventPtr.Get<LogEvent>();
-    APSARA_TEST_EQUAL_FATAL(logAddr, log);
+    auto addr = logUPtr.get();
+    PipelineEventPtr logEventPtr(std::move(logUPtr));
+    APSARA_TEST_EQUAL_FATAL(addr, logEventPtr.Get<LogEvent>());
 }
 
 void PipelineEventPtrUnittest::TestCast() {
     auto logUPtr = mEventGroup->CreateLogEvent();
-    auto logAddr = logUPtr.get();
-    PipelineEventPtr logEventPtr(mEventGroup->CreateLogEvent());
-    LogEvent& log = logEventPtr.Cast<LogEvent>();
-    APSARA_TEST_EQUAL_FATAL(logAddr, &log);
+    auto addr = logUPtr.get();
+    PipelineEventPtr logEventPtr(std::move(logUPtr));
+    APSARA_TEST_EQUAL_FATAL(addr, &logEventPtr.Cast<LogEvent>());
+}
+
+void PipelineEventPtrUnittest::TestCopy() {
+    mEventGroup->AddLogEvent();
+    mEventGroup->AddMetricEvent();
+    mEventGroup->AddSpanEvent();
+    {
+        auto& event = mEventGroup->MutableEvents()[0];
+        event->SetTimestamp(12345678901);
+        auto res = event.Copy();
+        APSARA_TEST_NOT_EQUAL(event.Get<LogEvent>(), res.Get<LogEvent>());
+    }
+    {
+        auto& event = mEventGroup->MutableEvents()[1];
+        event->SetTimestamp(12345678901);
+        auto res = event.Copy();
+        APSARA_TEST_NOT_EQUAL(event.Get<MetricEvent>(), res.Get<MetricEvent>());
+    }
+    {
+        auto& event = mEventGroup->MutableEvents()[2];
+        event->SetTimestamp(12345678901);
+        auto res = event.Copy();
+        APSARA_TEST_NOT_EQUAL(event.Get<SpanEvent>(), res.Get<SpanEvent>());
+    }
 }
 
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestIs)
+UNIT_TEST_CASE(PipelineEventPtrUnittest, TestGet)
+UNIT_TEST_CASE(PipelineEventPtrUnittest, TestCast)
+UNIT_TEST_CASE(PipelineEventPtrUnittest, TestCopy)
 
 } // namespace logtail
 

@@ -68,6 +68,8 @@ public:
     using ConstContentIterator = BaseContentIterator<ContentsContainer::const_iterator, const LogContent>;
     using ContentIterator = BaseContentIterator<ContentsContainer::iterator, LogContent>;
 
+    std::unique_ptr<PipelineEvent> Copy() const override;
+
     StringView GetContent(StringView key) const;
     bool HasContent(StringView key) const;
     ContentIterator FindContent(StringView key);

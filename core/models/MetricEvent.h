@@ -30,6 +30,8 @@ class MetricEvent : public PipelineEvent {
     friend class PipelineEventGroup;
 
 public:
+    std::unique_ptr<PipelineEvent> Copy() const override;
+    
     StringView GetName() const { return mName; }
     void SetName(const std::string& name);
 

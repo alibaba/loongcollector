@@ -40,6 +40,8 @@ public:
 
     virtual ~PipelineEvent() = default;
 
+    virtual std::unique_ptr<PipelineEvent> Copy() const = 0;
+
     Type GetType() const { return mType; }
     time_t GetTimestamp() const { return mTimestamp; }
     std::optional<uint32_t> GetTimestampNanosecond() const { return mTimestampNanosecond; }
@@ -71,6 +73,10 @@ protected:
     time_t mTimestamp = 0;
     std::optional<uint32_t> mTimestampNanosecond;
     PipelineEventGroup* mPipelineEventGroupPtr = nullptr;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class PipelineEventGroupUnittest;
+#endif
 };
 
 const std::string& PipelineEventTypeToString(PipelineEvent::Type t);
