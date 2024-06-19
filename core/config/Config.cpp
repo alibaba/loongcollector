@@ -141,6 +141,7 @@ bool Config::Parse() {
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and
     // extensions module parsing will rely on their results.
     bool hasObserverInput = false;
+    bool hasFileInput = false;
 #ifdef __ENTERPRISE__
     bool hasStreamInput = false;
 #endif
@@ -224,16 +225,7 @@ bool Config::Parse() {
                         sLogger, alarm, "unsupported input plugin", pluginName, mName, mProject, mLogstore, mRegion);
                 }
             } else {
-                if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginName)) {
-                    PARAM_ERROR_RETURN(sLogger,
-                                       alarm,
-                                       "more than 1 native input plugin is given",
-                                       noModule,
-                                       mName,
-                                       mProject,
-                                       mLogstore,
-                                       mRegion);
-                } else if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+                if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
                     PARAM_ERROR_RETURN(sLogger,
                                        alarm,
                                        "native and extended input plugins coexist",
@@ -249,8 +241,11 @@ bool Config::Parse() {
             }
         }
         mInputs.push_back(&plugin);
+        // TODO: remove these special restrictions
         if (pluginName == "input_observer_network") {
             hasObserverInput = true;
+        } else if (pluginName == "input_file" || pluginName == "input_container_stdio") {
+            hasFileInput = true;
 #ifdef __ENTERPRISE__
         } else if (pluginName == "input_stream") {
             if (!AppConfig::GetInstance()->GetOpenStreamLog()) {
@@ -261,7 +256,22 @@ bool Config::Parse() {
 #endif
         }
     }
-    bool isSPL = false;
+    // TODO: remove these special restrictions
+    bool hasSpecialInput = hasObserverInput || hasFileInput;
+#ifdef __ENTERPRISE__
+    hasSpecialInput = hasSpecialInput || hasStreamInput;
+#endif
+    if (hasSpecialInput && (*mDetail)["inputs"].size() > 1) {
+        PARAM_ERROR_RETURN(sLogger,
+                           alarm,
+                           "more than 1 input_file or input_container_stdio plugin is given",
+                           noModule,
+                           mName,
+                           mProject,
+                           mLogstore,
+                           mRegion);
+    }
+
     key = "processors";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (itr) {
@@ -276,6 +286,7 @@ bool Config::Parse() {
                                mRegion);
         }
 #ifdef __ENTERPRISE__
+        // TODO: remove these special restrictions
         if (hasStreamInput && !itr->empty()) {
             PARAM_ERROR_RETURN(sLogger,
                                alarm,
@@ -348,6 +359,18 @@ bool Config::Parse() {
             } else {
                 if (isCurrentPluginNative) {
                     if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+                        // TODO: remove these special restrictions
+                        if (!hasObserverInput && !hasFileInput) {
+                            PARAM_ERROR_RETURN(sLogger,
+                                               alarm,
+                                               "extended processor plugins coexist with native input plugins other "
+                                               "than input_file or input_container_stdio",
+                                               noModule,
+                                               mName,
+                                               mProject,
+                                               mLogstore,
+                                               mRegion);
+                        }
                         isCurrentPluginNative = false;
                         mHasGoProcessor = true;
                     } else if (!PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin(pluginName)) {
@@ -360,18 +383,18 @@ bool Config::Parse() {
                                            mLogstore,
                                            mRegion);
                     } else if (pluginName == "processor_spl") {
-                        isSPL = true;
                         if (i != 0 || itr->size() != 1) {
                             PARAM_ERROR_RETURN(sLogger,
-                                            alarm,
-                                            "native processor plugins coexist with spl processor",
-                                            noModule,
-                                            mName,
-                                            mProject,
-                                            mLogstore,
-                                            mRegion);
+                                               alarm,
+                                               "native processor plugins coexist with spl processor",
+                                               noModule,
+                                               mName,
+                                               mProject,
+                                               mLogstore,
+                                               mRegion);
                         }
                     } else {
+                        // TODO: remove these special restrictions
                         if (hasObserverInput) {
                             PARAM_ERROR_RETURN(sLogger,
                                                alarm,
@@ -417,6 +440,8 @@ bool Config::Parse() {
         }
     }
 
+    bool hasFlusherSLS = false;
+    uint32_t nativeFlusherCnt = 0;
     key = "flushers";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (!itr) {
@@ -473,20 +498,32 @@ bool Config::Parse() {
         }
         const string pluginName = it->asString();
         if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+            // TODO: remove these special restrictions
+            if (mHasNativeInput && !hasFileInput && !hasObserverInput) {
+                PARAM_ERROR_RETURN(sLogger,
+                                   alarm,
+                                   "extended flusher plugins coexist with native input plugins other than "
+                                   "input_file or input_container_stdio",
+                                   noModule,
+                                   mName,
+                                   mProject,
+                                   mLogstore,
+                                   mRegion);
+            }
             mHasGoFlusher = true;
         } else if (PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin(pluginName)) {
             mHasNativeFlusher = true;
-            // processor spl could change pipelineEventGroup tags and affect the merge logic of aggregator
-            // so force specify the MergeType as logstore, loggroup will be merged into a List.
-            if (isSPL) {
-                Json::Value& tmp = const_cast<Json::Value&>(plugin);
-                tmp["Batch"]["MergeType"] = Json::Value("logstore");
+            // TODO: remove these special restrictions
+            ++nativeFlusherCnt;
+            if (pluginName == "flusher_sls") {
+                hasFlusherSLS = true;
             }
         } else {
             PARAM_ERROR_RETURN(
                 sLogger, alarm, "unsupported flusher plugin", pluginName, mName, mProject, mLogstore, mRegion);
         }
 #ifdef __ENTERPRISE__
+        // TODO: remove these special restrictions
         if (hasStreamInput && pluginName != "flusher_sls") {
             PARAM_ERROR_RETURN(sLogger,
                                alarm,
@@ -499,6 +536,27 @@ bool Config::Parse() {
         }
 #endif
         mFlushers.push_back(&plugin);
+    }
+    // TODO: remove these special restrictions
+    if (mHasGoFlusher && nativeFlusherCnt > 1) {
+        PARAM_ERROR_RETURN(sLogger,
+                           alarm,
+                           "more than 1 native flusehr plugins coexist with extended flusher plugins",
+                           noModule,
+                           mName,
+                           mProject,
+                           mLogstore,
+                           mRegion);
+    }
+    if (mHasGoFlusher && nativeFlusherCnt == 1 && !hasFlusherSLS) {
+        PARAM_ERROR_RETURN(sLogger,
+                           alarm,
+                           "native flusher plugins other than flusher_sls coexist with extended flusher plugins",
+                           noModule,
+                           mName,
+                           mProject,
+                           mLogstore,
+                           mRegion);
     }
 
     key = "aggregators";

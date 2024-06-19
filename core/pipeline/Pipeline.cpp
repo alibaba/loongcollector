@@ -144,7 +144,7 @@ bool Pipeline::Init(Config&& config) {
             }
             if (name == FlusherSLS::sName) {
                 hasFlusherSLS = true;
-                mContext.SetSLSInfo(static_cast<const FlusherSLS*>(mFlushers[0]->GetPlugin()));
+                mContext.SetSLSInfo(static_cast<const FlusherSLS*>(mFlushers.back()->GetPlugin()));
             }
         } else {
             if (ShouldAddPluginToGoPipelineWithInput()) {

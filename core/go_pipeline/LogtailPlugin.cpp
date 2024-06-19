@@ -188,6 +188,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
                          "logstore", logstore));
             return -2;
         }
+        // TODO: support multi-flusher
         pConfig = const_cast<FlusherSLS*>(static_cast<const FlusherSLS*>(p->GetFlushers()[0]->GetPlugin()));
     }
     std::string shardHashStr;
