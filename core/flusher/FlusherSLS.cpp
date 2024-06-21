@@ -326,7 +326,7 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
     } else {
         compressedData = data;
     }
-    PushToQueue(std::move(compressedData), data.size(), LOGGROUP_COMPRESSED, logstore);
+    PushToQueue(std::move(compressedData), data.size(), RawDataType::EVENT_GROUP, logstore);
     return true;
 }
 
@@ -386,10 +386,10 @@ void FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
     }
     PushToQueue(std::move(compressedData),
                 serializedData.size(),
-                LOGGROUP_COMPRESSED,
+                RawDataType::EVENT_GROUP,
                 "",
                 g.mExactlyOnceCheckpoint->data.hash_key(),
-                g.mExactlyOnceCheckpoint);
+                std::move(g.mExactlyOnceCheckpoint));
 }
 
 void FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
@@ -444,19 +444,20 @@ void FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
             if (group.mExactlyOnceCheckpoint) {
                 PushToQueue(std::move(compressedData),
                             serializedData.size(),
-                            LOGGROUP_COMPRESSED,
+                            RawDataType::EVENT_GROUP,
                             "",
                             group.mExactlyOnceCheckpoint->data.hash_key(),
-                            group.mExactlyOnceCheckpoint);
+                            std::move(group.mExactlyOnceCheckpoint));
             } else {
-                PushToQueue(std::move(compressedData), serializedData.size(), LOGGROUP_COMPRESSED, "", shardHashKey);
+                PushToQueue(
+                    std::move(compressedData), serializedData.size(), RawDataType::EVENT_GROUP, "", shardHashKey);
             }
         }
     }
     if (enablePackageList) {
         string errorMsg;
         mGroupListSerializer->Serialize(std::move(compressedLogGroups), serializedData, errorMsg);
-        PushToQueue(std::move(compressedData), packageSize, LOG_PACKAGE_LIST);
+        PushToQueue(std::move(compressedData), packageSize, RawDataType::EVENT_GROUP_LIST);
     }
 }
 
@@ -498,12 +499,25 @@ void FlusherSLS::AddPackId(BatchedEvents& g) const {
 
 void FlusherSLS::PushToQueue(string&& data,
                              size_t rawSize,
-                             SEND_DATA_TYPE type,
+                             RawDataType type,
                              const string& logstore,
                              const string& shardHashKey,
-                             const RangeCheckpointPtr& eoo) {
+                             RangeCheckpointPtr&& eoo) {
+    SLSSenderQueueItem* item = new SLSSenderQueueItem(std::move(data),
+                                                      rawSize,
+                                                      this,
+                                                      eoo ? eoo->fbKey : mLogstoreKey,
+                                                      shardHashKey,
+                                                      std::move(eoo),
+                                                      type,
+                                                      eoo ? false : true,
+                                                      logstore.empty() ? mLogstore : logstore);
+    Sender::Instance()->PutIntoBatchMap(item, mRegion);
+}
+
+sls_logs::SlsCompressType ConvertCompressType(CompressType type) {
     sls_logs::SlsCompressType compressType = sls_logs::SLS_CMP_NONE;
-    switch (mCompressor->GetCompressType()) {
+    switch (type) {
         case CompressType::LZ4:
             compressType = sls_logs::SLS_CMP_LZ4;
             break;
@@ -513,34 +527,7 @@ void FlusherSLS::PushToQueue(string&& data,
         default:
             break;
     }
-    LogGroupContext ctx(mRegion,
-                        mProject,
-                        mLogstore,
-                        compressType,
-                        FileInfoPtr(),
-                        IntegrityConfigPtr(),
-                        LineCountConfigPtr(),
-                        -1,
-                        false,
-                        false,
-                        eoo);
-    auto& cpt = ctx.mExactlyOnceCheckpoint;
-    LoggroupTimeValue* item = new LoggroupTimeValue(
-        mProject,
-        logstore.empty() ? mLogstore : logstore,
-        mContext ? mContext->GetConfigName() : "",
-        cpt ? false : true,
-        mAliuid,
-        mRegion,
-        type,
-        rawSize,
-        time(nullptr),
-        shardHashKey,
-        cpt ? cpt->fbKey : mLogstoreKey, // TODO: current implementation is incorrect. When route is enabled in Go
-                                         // pipeline, logstore key should depend on logstore, not mLogstoreKey
-        ctx);
-    item->mLogData.swap(data);
-    Sender::Instance()->PutIntoBatchMap(item);
+    return compressType;
 }
 
 } // namespace logtail

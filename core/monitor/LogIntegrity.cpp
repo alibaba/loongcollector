@@ -164,38 +164,6 @@ LogIntegrity::~LogIntegrity() {
     mRegionOutDatedFileMap.clear();
 }
 
-void LogIntegrity::Notify(LoggroupTimeValue* data, bool flag) {
-    const string& region = data->mRegion;
-    const string& projectName = data->mProjectName;
-    const string& logstore = data->mLogstore;
-    string filename;
-
-    // empty filename, filter metric data and data-integrity data
-    if (filename.empty()) {
-        LOG_DEBUG(sLogger,
-                  ("successfully send metric data or integrity data, region",
-                   region)("project", projectName)("logstore", logstore));
-        return;
-    }
-    LOG_DEBUG(sLogger,
-              (flag ? "notify success, region" : "notify fail, region",
-               region)("project_name", projectName)("logstore", logstore)("filename", filename)(
-                  "seq num", data->mLogGroupContext.mSeqNum));
-
-    // lock
-    PTScopedLock lock(mLogIntegrityMapLock);
-    LogIntegrityInfo* info = NULL;
-    if (FindLogIntegrityInfo(region, projectName, logstore, filename, info)) {
-        info->mLastUpdateTime = data->mEnqueueTime;
-        
-        info->SetStatus(data->mLogGroupContext.mSeqNum,
-                        0,
-                        flag ? LogTimeInfo::LogIntegrityStatus_SendOK : LogTimeInfo::LogIntegrityStatus_SendFail);
-        if (!flag)
-            info->mSendSucceededFlag = false;
-    }
-}
-
 void LogIntegrity::SendLogIntegrityInfo() {
     static int32_t lastSendTime = 0, lastEliminateTime = 0, lastSendEliminatedFileTime = 0;
 

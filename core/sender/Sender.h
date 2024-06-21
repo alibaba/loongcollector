@@ -29,6 +29,8 @@
 #include "common/WaitObject.h"
 #include "log_pb/logtail_buffer_meta.pb.h"
 #include "log_pb/sls_logs.pb.h"
+#include "queue/FeedbackQueueKey.h"
+#include "queue/SenderQueueItem.h"
 #include "sdk/Closure.h"
 
 namespace logtail {
@@ -139,9 +141,7 @@ public:
     virtual void OnSuccess(sdk::Response* response);
     virtual void OnFail(sdk::Response* response, const std::string& errorCode, const std::string& errorMessage);
     OperationOnFail DefaultOperation();
-    OperationOnFail
-    RecompressData(sdk::Response* response, const std::string& errorCode, const std::string& errorMessage);
-    LoggroupTimeValue* mDataPtr;
+    SenderQueueItem* mDataPtr;
 };
 
 struct SlsClientInfo {
@@ -170,10 +170,10 @@ private:
     Sender& operator=(const Sender&);
     void setupServerSwitchPolicy();
     bool WriteToFile(const std::string& projectName, const sls_logs::LogGroup& logGroup, bool sendPerformance);
-    bool WriteToFile(LoggroupTimeValue* value, bool sendPerformance);
-    bool DumpDebugFile(LoggroupTimeValue* value, bool sendPerformance = false);
+    bool WriteToFile(SenderQueueItem* value, bool sendPerformance);
+    bool DumpDebugFile(SenderQueueItem* value, bool sendPerformance = false);
     void DaemonSender();
-    void SendToNetAsync(LoggroupTimeValue* dataPtr);
+    void SendToNetAsync(SenderQueueItem* dataPtr);
     SendResult SendToNetSync(sdk::Client* sendClient,
                              const sls_logs::LogtailBufferMeta& bufferMeta,
                              const std::string& logData,
@@ -181,7 +181,7 @@ private:
     SendResult SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta,
                                   const std::string& logData,
                                   std::string& errorCode);
-    bool SendToBufferFile(LoggroupTimeValue* dataPtr);
+    bool SendToBufferFile(SenderQueueItem* dataPtr);
     void FlowControl(int32_t dataSize, SEND_THREAD_TYPE type);
 
     bool IsValidToSend(const LogstoreFeedBackKey& logstoreKey);
@@ -191,7 +191,7 @@ private:
 
     WaitObject mWriteSecondaryWait; // semaphore between SendThreads & DumpSecondaryThread
     PTMutex mSecondaryMutexLock; // lock for mSecondaryBuffer
-    std::vector<LoggroupTimeValue*> mSecondaryBuffer;
+    std::vector<SenderQueueItem*> mSecondaryBuffer;
 
     // for flow control: value[0] for realtime thread, value[1] for replay thread
     int64_t mSendLastTime[SEND_THREAD_TYPE_COUNT];
@@ -320,7 +320,7 @@ private:
     void SubSendingBufferCount();
 
     bool IsBatchMapEmpty();
-    void PutIntoSecondaryBuffer(LoggroupTimeValue* dataPtr, int32_t retryTimes);
+    void PutIntoSecondaryBuffer(SenderQueueItem* dataPtr, int32_t retryTimes);
 
     /*
      * add memory barrier for config varibles.
@@ -391,30 +391,30 @@ public:
     void (*MockAsyncSend)(const std::string& projectName,
                           const std::string& logstore,
                           const std::string& logData,
-                          SEND_DATA_TYPE dataType,
+                          RawDataType dataType,
                           int32_t rawSize,
                           sls_logs::SlsCompressType compressType,
                           SendClosure* sendClosure);
     void (*MockSyncSend)(const std::string& projectName,
                          const std::string& logstore,
                          const std::string& logData,
-                         SEND_DATA_TYPE dataType,
+                         RawDataType dataType,
                          int32_t rawSize,
                          sls_logs::SlsCompressType compressType);
     void (*MockTestEndpoint)(const std::string& projectName,
                              const std::string& logstore,
                              const std::string& logData,
-                             SEND_DATA_TYPE dataType,
+                             RawDataType dataType,
                              int32_t rawSize,
                              sls_logs::SlsCompressType compressType);
-    void (*MockIntegritySend)(LoggroupTimeValue* data);
+    void (*MockIntegritySend)(SenderQueueItem* data);
     sdk::GetRealIpResponse (*MockGetRealIp)(const std::string& projectName, const std::string& logstore);
     static bool ParseLogGroupFromCompressedData(const std::string& logData,
                                                 int32_t rawSize,
                                                 sls_logs::SlsCompressType compressType,
                                                 sls_logs::LogGroup& logGroupPb);
     static void ParseLogGroupFromString(const std::string& logData,
-                                        SEND_DATA_TYPE dataType,
+                                        RawDataType dataType,
                                         int32_t rawSize,
                                         sls_logs::SlsCompressType compressType,
                                         std::vector<sls_logs::LogGroup>& logGroupVec);
@@ -426,7 +426,7 @@ public:
                           bool isProxy = false);
     FeedbackInterface* GetSenderFeedBackInterface();
     void SetFeedBackInterface(FeedbackInterface* pProcessInterface);
-    void OnSendDone(LoggroupTimeValue* mDataPtr, LogstoreSenderInfo::SendResult sendRst);
+    void OnSendDone(SenderQueueItem* mDataPtr, LogstoreSenderInfo::SendResult sendRst);
 
     bool IsFlush();
     void SetFlush();
@@ -470,7 +470,7 @@ public:
     void SetDefaultRegion(const std::string& region);
 
     SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue(QueueKey key);
-    void PutIntoBatchMap(LoggroupTimeValue* data);
+    void PutIntoBatchMap(SenderQueueItem* data, const std::string& region = "");
 
     friend class SendClosure;
 

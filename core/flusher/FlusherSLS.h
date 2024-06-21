@@ -31,6 +31,7 @@
 #include "models/PipelineEventGroup.h"
 #include "plugin/interface/Flusher.h"
 #include "serializer/SLSSerializer.h"
+#include "queue/SenderQueueItem.h"
 
 namespace logtail {
 
@@ -79,10 +80,10 @@ private:
     // TODO: remove after sender queue refactorization
     void PushToQueue(std::string&& data,
                      size_t rawSize,
-                     SEND_DATA_TYPE type,
+                     RawDataType type,
                      const std::string& logstore = "",
                      const std::string& shardHashKey = "",
-                     const RangeCheckpointPtr& eoo = RangeCheckpointPtr());
+                     RangeCheckpointPtr&& eoo = RangeCheckpointPtr());
 
     LogstoreFeedBackKey mLogstoreKey = 0;
 
@@ -95,5 +96,7 @@ private:
     friend class FlusherSLSUnittest;
 #endif
 };
+
+sls_logs::SlsCompressType ConvertCompressType(CompressType type);
 
 } // namespace logtail

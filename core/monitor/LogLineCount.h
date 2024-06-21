@@ -23,9 +23,6 @@
 
 namespace logtail {
 
-// forward declaration
-struct LoggroupTimeValue;
-
 class LogLineCount {
 public:
     static LogLineCount* GetInstance() {
@@ -34,7 +31,6 @@ public:
     }
 
 public:
-    void NotifySuccess(LoggroupTimeValue* data);
     void InsertLineCountDataToLogGroup(sls_logs::LogGroup& logGroup,
                                        const std::string& region,
                                        const std::string& projectName,

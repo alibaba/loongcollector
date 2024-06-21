@@ -59,7 +59,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             logTag->set_value(tag.second.to_string());
         }
     }
-    logGroup.set_category(static_cast<const FlusherSLS*>(mFlusher)->mLogstore);
+    // loggroup.category is deprecated, no need to set
     size_t size = logGroup.ByteSizeLong();
     if (static_cast<int32_t>(size) > INT32_FLAG(max_send_log_group_size)) {
         errorMsg = "log group exceeds size limit\tgroup size: " + ToString(size)
