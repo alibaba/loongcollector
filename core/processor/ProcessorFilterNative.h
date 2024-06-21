@@ -17,10 +17,9 @@
 #pragma once
 
 #include "app_config/AppConfig.h"
+#include "common/LogGroupContext.h"
 #include "models/LogEvent.h"
 #include "plugin/interface/Processor.h"
-
-#include <boost/regex.hpp>
 
 namespace logtail {
 
@@ -37,6 +36,7 @@ public:
     virtual ~BaseFilterNode() {}
 
 public:
+    virtual bool Match(const sls_logs::Log& log, const LogGroupContext& context) { return true; }
     virtual bool Match(const LogEvent& contents, const PipelineContext& mContext) { return true; }
 
 public:
@@ -56,6 +56,7 @@ public:
     virtual ~BinaryFilterOperatorNode(){};
 
 public:
+    virtual bool Match(const sls_logs::Log& log, const LogGroupContext& context);
     virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
 
 private:
@@ -73,6 +74,8 @@ public:
     virtual ~RegexFilterValueNode() {}
 
 public:
+    virtual bool Match(const sls_logs::Log& log, const LogGroupContext& context);
+
     virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
 
 private:
@@ -89,6 +92,8 @@ public:
     virtual ~UnaryFilterOperatorNode(){};
 
 public:
+    virtual bool Match(const sls_logs::Log& log, const LogGroupContext& context);
+
     virtual bool Match(const LogEvent& contents, const PipelineContext& mContext);
 
 private:

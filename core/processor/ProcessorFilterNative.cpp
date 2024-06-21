@@ -479,6 +479,18 @@ bool GetNodeFuncType(const std::string& type, FilterNodeFunctionType& func) {
     return true;
 }
 
+
+bool BinaryFilterOperatorNode::Match(const sls_logs::Log& log, const LogGroupContext& context) {
+    if (BOOST_LIKELY(left && right)) {
+        if (op == AND_OPERATOR) {
+            return left->Match(log, context) && right->Match(log, context);
+        } else if (op == OR_OPERATOR) {
+            return left->Match(log, context) || right->Match(log, context);
+        }
+    }
+    return false;
+}
+
 bool BinaryFilterOperatorNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
     if (BOOST_LIKELY(left && right)) {
         if (op == AND_OPERATOR) {
@@ -489,6 +501,28 @@ bool BinaryFilterOperatorNode::Match(const LogEvent& contents, const PipelineCon
     }
     return false;
 }
+
+
+bool RegexFilterValueNode::Match(const sls_logs::Log& log, const LogGroupContext& context) {
+    for (int i = 0; i < log.contents_size(); ++i) {
+        const sls_logs::Log_Content& content = log.contents(i);
+        if (content.key() != key) {
+            continue;
+        }
+
+        std::string exception;
+        bool result = BoostRegexMatch(content.value().c_str(), content.value().size(), reg, exception);
+        if (!result && !exception.empty() && AppConfig::GetInstance()->IsLogParseAlarmValid()) {
+            LOG_ERROR(sLogger, ("regex_match in Filter fail", exception));
+            if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+                context.SendAlarm(REGEX_MATCH_ALARM, "regex_match in Filter fail:" + exception);
+            }
+        }
+        return result;
+    }
+    return false;
+}
+
 
 bool RegexFilterValueNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
     const auto& content = contents.FindContent(key);
@@ -510,6 +544,15 @@ bool RegexFilterValueNode::Match(const LogEvent& contents, const PipelineContext
     }
     return result;
 }
+
+
+bool UnaryFilterOperatorNode::Match(const sls_logs::Log& log, const LogGroupContext& context) {
+    if (BOOST_LIKELY(child.get() != NULL)) {
+        return !child->Match(log, context);
+    }
+    return false;
+}
+
 
 bool UnaryFilterOperatorNode::Match(const LogEvent& contents, const PipelineContext& mContext) {
     if (BOOST_LIKELY(child.get() != NULL)) {

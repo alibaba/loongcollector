@@ -34,6 +34,7 @@ protected:
         mCtx.SetConfigName("test_config");
         sFlusher->SetContext(mCtx);
         sFlusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+        sFlusher->mLogstore = "logstore";
     }
 
 private:
@@ -66,6 +67,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         APSARA_TEST_STREQ("machine_uuid", logGroup.machineuuid().c_str());
         APSARA_TEST_STREQ("source", logGroup.source().c_str());
         APSARA_TEST_STREQ("topic", logGroup.topic().c_str());
+        APSARA_TEST_STREQ("logstore", logGroup.category().c_str());
     }
     {
         // nano second enabled, and set

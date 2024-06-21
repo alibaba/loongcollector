@@ -171,8 +171,6 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     flusher.reset(new FlusherSLS());
-    flusher->SetContext(ctx);
-    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
     EnterpriseConfigProvider::GetInstance()->mIsPrivateCloud = false;
@@ -327,7 +325,6 @@ void FlusherSLSUnittest::OnFailedInit() {
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_FALSE(flusher->Init(configJson, optionalGoPipeline));
 
-#ifndef __ENTERPRISE__
     // invalid Endpoint
     configStr = R"(
         {
@@ -355,7 +352,6 @@ void FlusherSLSUnittest::OnFailedInit() {
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_FALSE(flusher->Init(configJson, optionalGoPipeline));
-#endif
 }
 
 void FlusherSLSUnittest::OnPipelineUpdate() {

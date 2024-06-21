@@ -22,14 +22,18 @@
 #include <unordered_map>
 
 #include "Lock.h"
+#include "LogGroupContext.h"
 #include "common/FeedbackInterface.h"
 #include "common/LogstoreFeedbackKey.h"
 #include "common/LogstoreFeedbackQueue.h"
 #include "logger/Logger.h"
-#include "queue/SenderQueueItem.h"
 #include "sender/SenderQueueParam.h"
 
 namespace logtail {
+
+enum LoggroupSendStatus { LoggroupSendStatus_Idle, LoggroupSendStatus_Sending, LoggroupSendStatus_Ok };
+
+enum SEND_DATA_TYPE { LOG_PACKAGE_LIST, LOGGROUP_COMPRESSED };
 
 struct LogstoreSenderStatistics {
     LogstoreSenderStatistics();
@@ -45,6 +49,72 @@ struct LogstoreSenderStatistics {
     uint32_t mSendSuccessCount;
     bool mSendBlockFlag;
     bool mValidToSendFlag;
+};
+
+struct LoggroupTimeValue {
+    int32_t mEnqueueTime;
+    SEND_DATA_TYPE mDataType;
+    std::string mLogData;
+    int32_t mRawSize;
+    bool mBufferOrNot; // false only when use exactly once
+    std::string mProjectName;
+    std::string mLogstore;
+    std::string mConfigName;
+
+    // truncate info
+    std::string mTruncateInfo;
+
+    int32_t mSendRetryTimes;
+    int32_t mLastSendTime;
+    int32_t mLastLogWarningTime;
+    std::string mAliuid;
+    std::string mRegion;
+    std::string mShardHashKey;
+    std::string mCurrentEndpoint;
+    LoggroupSendStatus mStatus;
+    LogstoreFeedBackKey mLogstoreKey;
+    bool mRealIpFlag;
+
+    // each succeeded sending log group only contains logs in the same minute
+    int32_t mLogTimeInMinute;
+    LogGroupContext mLogGroupContext;
+
+    LoggroupTimeValue(const std::string& projectName,
+                      const std::string& logstore,
+                      const std::string& configName,
+                      bool bufferOrNot,
+                      const std::string& aliuid,
+                      const std::string& region,
+                      SEND_DATA_TYPE dataType,
+                      int32_t rawSize,
+                      int32_t lastUpdateTime,
+                      const std::string& shardHashKey,
+                      const LogstoreFeedBackKey& logstoreKey,
+                      const LogGroupContext& context = LogGroupContext()) {
+        mProjectName = projectName;
+        mLogstore = logstore;
+        mConfigName = configName;
+        mBufferOrNot = bufferOrNot;
+        mAliuid = aliuid;
+        mRegion = region;
+        mDataType = dataType;
+        mRawSize = rawSize;
+        mEnqueueTime = lastUpdateTime;
+        mSendRetryTimes = 0;
+        mLastSendTime = 0;
+        mLastLogWarningTime = 0;
+        mLogData.clear();
+        mShardHashKey = shardHashKey;
+        mStatus = LoggroupSendStatus_Idle;
+        mLogstoreKey = logstoreKey;
+        mRealIpFlag = false;
+        mLogTimeInMinute = -1;
+        mLogGroupContext = context;
+    }
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    LoggroupTimeValue() {}
+#endif
 };
 
 struct LogstoreSenderInfo {
@@ -85,7 +155,7 @@ struct LogstoreSenderInfo {
 };
 
 template <class PARAM>
-class SingleLogstoreSenderManager : public SingleLogstoreFeedbackQueue<SenderQueueItem*, PARAM> {
+class SingleLogstoreSenderManager : public SingleLogstoreFeedbackQueue<LoggroupTimeValue*, PARAM> {
 public:
     SingleLogstoreSenderManager()
         : mLastSendTimeSecond(0), mLastSecondTotalBytes(0), mMaxSendBytesPerSecond(-1), mFlowControlExpireTime(0) {}
@@ -95,7 +165,7 @@ public:
         mFlowControlExpireTime = expireTime;
     }
 
-    void GetAllIdleLoggroup(std::vector<SenderQueueItem*>& logGroupVec) {
+    void GetAllIdleLoggroup(std::vector<LoggroupTimeValue*>& logGroupVec) {
         if (this->mSize == 0) {
             return;
         }
@@ -103,18 +173,18 @@ public:
         uint64_t index = QueueType::ExactlyOnce == this->mType ? 0 : this->mRead;
         const uint64_t endIndex = QueueType::ExactlyOnce == this->mType ? this->SIZE : this->mWrite;
         for (; index < endIndex; ++index) {
-            SenderQueueItem* item = this->mArray[index % this->SIZE];
+            LoggroupTimeValue* item = this->mArray[index % this->SIZE];
             if (item == NULL) {
                 continue;
             }
-            if (item->mStatus == SendingStatus::IDLE) {
-                item->mStatus = SendingStatus::SENDING;
+            if (item->mStatus == LoggroupSendStatus_Idle) {
+                item->mStatus = LoggroupSendStatus_Sending;
                 logGroupVec.push_back(item);
             }
         }
     }
 
-    void GetAllIdleLoggroupWithLimit(std::vector<SenderQueueItem*>& logGroupVec,
+    void GetAllIdleLoggroupWithLimit(std::vector<LoggroupTimeValue*>& logGroupVec,
                                      int32_t nowTime,
                                      std::unordered_map<std::string, int>& regionConcurrencyLimits) {
         bool expireFlag = (mFlowControlExpireTime > 0 && nowTime > mFlowControlExpireTime);
@@ -137,11 +207,11 @@ public:
         uint64_t index = QueueType::ExactlyOnce == this->mType ? 0 : this->mRead;
         const uint64_t endIndex = QueueType::ExactlyOnce == this->mType ? this->SIZE : this->mWrite;
         for (; index < endIndex; ++index) {
-            SenderQueueItem* item = this->mArray[index % this->SIZE];
+            LoggroupTimeValue* item = this->mArray[index % this->SIZE];
             if (item == NULL) {
                 continue;
             }
-            if (item->mStatus == SendingStatus::IDLE) {
+            if (item->mStatus == LoggroupSendStatus_Idle) {
                 // check consurrency
                 // check first, when mMaxSendBytesPerSecond is 1000, and the packet size is 10K, we should send this
                 // packet. if not, this logstore will block
@@ -151,7 +221,7 @@ public:
                 }
                 mSenderInfo.ConcurrencyDec();
                 mLastSecondTotalBytes += item->mRawSize;
-                item->mStatus = SendingStatus::SENDING;
+                item->mStatus = LoggroupSendStatus_Sending;
                 logGroupVec.push_back(item);
                 if (-1 != regionConcurrency) {
                     if (0 == --regionConcurrency) {
@@ -165,8 +235,8 @@ public:
         }
     }
 
-    bool insertExactlyOnceItem(SLSSenderQueueItem* item) {
-        auto& eo = item->mExactlyOnceCheckpoint;
+    bool insertExactlyOnceItem(LoggroupTimeValue* item) {
+        auto& eo = item->mLogGroupContext.mExactlyOnceCheckpoint;
         if (eo->IsComplete()) {
             // Checkpoint is complete, which means it is a replayed checkpoint,
             //  use it directly.
@@ -216,12 +286,10 @@ public:
     }
 
     // with empty item
-    bool InsertItem(SenderQueueItem* item, const std::string& region) {
-        if (!region.empty()) {
-            mSenderInfo.SetRegion(region);
-        }
+    bool InsertItem(LoggroupTimeValue* item) {
+        mSenderInfo.SetRegion(item->mRegion);
         if (QueueType::ExactlyOnce == this->mType) {
-            return insertExactlyOnceItem(static_cast<SLSSenderQueueItem*>(item));
+            return insertExactlyOnceItem(item);
         }
 
         if (this->IsFull()) {
@@ -249,15 +317,15 @@ public:
         return true;
     }
 
-    int32_t removeExactlyOnceItem(SLSSenderQueueItem* item) {
-        auto& checkpoint = item->mExactlyOnceCheckpoint;
+    int32_t removeExactlyOnceItem(LoggroupTimeValue* item) {
+        auto& checkpoint = item->mLogGroupContext.mExactlyOnceCheckpoint;
         this->mArray[checkpoint->index] = NULL;
         this->mSize--;
         delete item;
         if (!mExtraBuffers.empty()) {
             auto extraItem = mExtraBuffers.front();
             mExtraBuffers.pop_front();
-            auto& eo = extraItem->mExactlyOnceCheckpoint;
+            auto& eo = extraItem->mLogGroupContext.mExactlyOnceCheckpoint;
             APSARA_LOG_DEBUG(sLogger,
                              ("process extra item at first",
                               "after item removed")("fb key", eo->fbKey)("checkpoint", eo->data.DebugString()));
@@ -269,13 +337,13 @@ public:
     }
 
     // with empty item
-    int32_t RemoveItem(SenderQueueItem* item, bool deleteFlag) {
+    int32_t RemoveItem(LoggroupTimeValue* item, bool deleteFlag) {
         if (this->IsEmpty()) {
             return 0;
         }
 
         if (QueueType::ExactlyOnce == this->mType) {
-            return removeExactlyOnceItem(static_cast<SLSSenderQueueItem*>(item));
+            return removeExactlyOnceItem(item);
         }
 
         auto index = this->mRead;
@@ -295,8 +363,9 @@ public:
             }
         }
         if (index == this->mWrite) {
-            APSARA_LOG_ERROR(
-                sLogger, ("find no sender item", "")("read", this->mRead)("write", this->mWrite)("size", this->mSize));
+            APSARA_LOG_ERROR(sLogger,
+                             ("find no sender item, project", item->mProjectName)("logstore", item->mLogstore)(
+                                 "read", this->mRead)("write", this->mWrite)("size", this->mSize));
             return 0;
         }
         // need to check mWrite to avoid dead while
@@ -325,16 +394,16 @@ public:
         int32_t minSendTime = INT32_MAX;
         int32_t maxSendTime = 0;
         for (size_t i = 0; i < this->mSize; ++i, ++index) {
-            SenderQueueItem* item = this->mArray[index % this->SIZE];
+            LoggroupTimeValue* item = this->mArray[index % this->SIZE];
             if (item == NULL) {
                 continue;
             }
 
-            if (item->mEnqueTime < minSendTime) {
-                minSendTime = item->mEnqueTime;
+            if (item->mEnqueueTime < minSendTime) {
+                minSendTime = item->mEnqueueTime;
             }
-            if (item->mEnqueTime > maxSendTime) {
-                maxSendTime = item->mEnqueTime;
+            if (item->mEnqueueTime > maxSendTime) {
+                maxSendTime = item->mEnqueueTime;
             }
             ++statisticsItem.mSendQueueSize;
         }
@@ -345,28 +414,27 @@ public:
         return statisticsItem;
     }
 
-    int32_t OnSendDone(SenderQueueItem* item, LogstoreSenderInfo::SendResult sendRst, bool& needTrigger) {
+    int32_t OnSendDone(LoggroupTimeValue* item, LogstoreSenderInfo::SendResult sendRst, bool& needTrigger) {
         needTrigger = mSenderInfo.RecordSendResult(sendRst, mSenderStatistics);
-        // if (!mSenderInfo.mNetworkValidFlag) {
-        //     LOG_WARNING(sLogger,
-        //                 ("Network fail, pause logstore", flusher->mLogstore)("project", flusher->mProject)(
-        //                     "region", mSenderInfo.mRegion)("retry interval", mSenderInfo.mNetworkRetryInterval));
-        // }
-        // if (!mSenderInfo.mQuotaValidFlag) {
-        //     LOG_WARNING(sLogger,
-        //                 ("Quota fail, pause logstore", flusher->mLogstore)("project", flusher->mProject)(
-        //                     "region", mSenderInfo.mRegion)("retry interval", mSenderInfo.mQuotaRetryInterval));
-        // }
-
+        if (!mSenderInfo.mNetworkValidFlag) {
+            LOG_WARNING(sLogger,
+                        ("Network fail, pause logstore", item->mLogstore)("project", item->mProjectName)(
+                            "region", mSenderInfo.mRegion)("retry interval", mSenderInfo.mNetworkRetryInterval));
+        }
+        if (!mSenderInfo.mQuotaValidFlag) {
+            LOG_WARNING(sLogger,
+                        ("Quota fail, pause logstore", item->mLogstore)("project", item->mProjectName)(
+                            "region", mSenderInfo.mRegion)("retry interval", mSenderInfo.mQuotaRetryInterval));
+        }
         // if send error, reset status to idle, and wait to send again
         // network fail or quota fail
         if (sendRst != LogstoreSenderInfo::SendResult_OK && sendRst != LogstoreSenderInfo::SendResult_Buffered
             && sendRst != LogstoreSenderInfo::SendResult_DiscardFail) {
-            item->mStatus = SendingStatus::IDLE;
+            item->mStatus = LoggroupSendStatus_Idle;
             return 0;
         }
-        if (mSenderStatistics.mMaxSendSuccessTime < item->mEnqueTime) {
-            mSenderStatistics.mMaxSendSuccessTime = item->mEnqueTime;
+        if (mSenderStatistics.mMaxSendSuccessTime < item->mEnqueueTime) {
+            mSenderStatistics.mMaxSendSuccessTime = item->mEnqueueTime;
         }
         // else remove item except buffered
         return RemoveItem(item, sendRst != LogstoreSenderInfo::SendResult_Buffered);
@@ -385,7 +453,7 @@ public:
     volatile int32_t mFlowControlExpireTime; // <=0 no expire
 
     std::vector<RangeCheckpointPtr> mRangeCheckpoints;
-    std::deque<SLSSenderQueueItem*> mExtraBuffers;
+    std::deque<LoggroupTimeValue*> mExtraBuffers;
 };
 
 template <class PARAM>
@@ -455,11 +523,11 @@ public:
         return singleQueue.IsValid();
     }
 
-    bool PushItem(const LogstoreFeedBackKey& key, SenderQueueItem* const& item, const std::string& region = "") {
+    bool PushItem(const LogstoreFeedBackKey& key, LoggroupTimeValue* const& item) {
         {
             PTScopedLock dataLock(mLock);
             SingleLogStoreManager& singleQueue = mLogstoreSenderQueueMap[key];
-            if (!singleQueue.InsertItem(item, region)) {
+            if (!singleQueue.InsertItem(item)) {
                 return false;
             }
         }
@@ -467,7 +535,7 @@ public:
         return true;
     }
 
-    void CheckAndPopAllItem(std::vector<SenderQueueItem*>& itemVec,
+    void CheckAndPopAllItem(std::vector<LoggroupTimeValue*>& itemVec,
                             int32_t curTime,
                             bool& singleQueueFullFlag,
                             std::unordered_map<std::string, int>& regionConcurrencyLimits) {
@@ -492,7 +560,7 @@ public:
 
     static void PopItem(LogstoreFeedBackQueueMapIterator beginIter,
                         LogstoreFeedBackQueueMapIterator endIter,
-                        std::vector<SenderQueueItem*>& itemVec,
+                        std::vector<LoggroupTimeValue*>& itemVec,
                         int32_t curTime,
                         std::unordered_map<std::string, int>& regionConcurrencyLimits,
                         bool& singleQueueFullFlag) {
@@ -506,7 +574,7 @@ public:
         }
     }
 
-    void PopAllItem(std::vector<SenderQueueItem*>& itemVec, int32_t curTime, bool& singleQueueFullFlag) {
+    void PopAllItem(std::vector<LoggroupTimeValue*>& itemVec, int32_t curTime, bool& singleQueueFullFlag) {
         singleQueueFullFlag = false;
         PTScopedLock dataLock(mLock);
         for (LogstoreFeedBackQueueMapIterator iter = mLogstoreSenderQueueMap.begin();
@@ -517,12 +585,12 @@ public:
         }
     }
 
-    void OnLoggroupSendDone(SenderQueueItem* item, LogstoreSenderInfo::SendResult sendRst) {
+    void OnLoggroupSendDone(LoggroupTimeValue* item, LogstoreSenderInfo::SendResult sendRst) {
         if (item == NULL) {
             return;
         }
 
-        LogstoreFeedBackKey key = item->mQueueKey;
+        LogstoreFeedBackKey key = item->mLogstoreKey;
         int rst = 0;
         bool needTrigger = false;
         {

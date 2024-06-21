@@ -22,7 +22,6 @@
 #include "common/LogstoreSenderQueue.h"
 
 namespace logtail {
-
 class Flusher : public Plugin {
 public:
     virtual ~Flusher() = default;
