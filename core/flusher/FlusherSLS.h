@@ -32,6 +32,7 @@
 #include "plugin/interface/Flusher.h"
 #include "serializer/SLSSerializer.h"
 #include "queue/SenderQueueItem.h"
+#include "sender/ConcurrencyLimiter.h"
 
 namespace logtail {
 
@@ -50,6 +51,7 @@ public:
     void Send(PipelineEventGroup&& g) override;
     void Flush(size_t key) override;
     void FlushAll() override;
+    sdk::AsynRequest* BuildRequest(SenderQueueItem* item) const override;
 
     LogstoreFeedBackKey GetLogstoreKey() const { return mLogstoreKey; }
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
@@ -66,6 +68,8 @@ public:
     uint32_t mFlowControlExpireTime = 0;
     int32_t mMaxSendRate = -1;
     std::vector<std::string> mShardHashKeys;
+
+    static ConcurrencyLimiter sRegionConcurrencyLimiter; // TODO: move to private
 
 private:
     static const std::unordered_set<std::string> sNativeParam;

@@ -54,7 +54,9 @@
 #endif
 #include "flusher/FlusherSLS.h"
 #include "pipeline/PipelineManager.h"
+#include "sdk/CurlAsynInstance.h"
 #include "sender/PackIdManager.h"
+#include "sender/SLSClientManager.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -62,11 +64,8 @@ using namespace sls_logs;
 DEFINE_FLAG_INT32(buffer_check_period, "check logtail local storage buffer period", 60);
 DEFINE_FLAG_INT32(quota_exceed_wait_interval, "when daemon buffer thread get quotaExceed error, sleep 5 seconds", 5);
 DEFINE_FLAG_INT32(secondary_buffer_count_limit, "data ready for write buffer file", 20);
-DEFINE_FLAG_BOOL(enable_mock_send, "if enable mock send in ut", false);
 DEFINE_FLAG_INT32(buffer_file_alive_interval, "the max alive time of a bufferfile, 5 minutes", 300);
 DEFINE_FLAG_INT32(write_secondary_wait_timeout, "interval of dump seconary buffer from memory to file, seconds", 2);
-DEFINE_FLAG_BOOL(e2e_send_throughput_test, "dump file for e2e throughpt test", false);
-DEFINE_FLAG_INT32(send_client_timeout_interval, "recycle clients avoid memory increment", 12 * 3600);
 DEFINE_FLAG_INT32(check_send_client_timeout_interval, "", 600);
 DEFINE_FLAG_INT32(send_retry_sleep_interval, "sleep microseconds when sync send fail, 50ms", 50000);
 DEFINE_FLAG_INT32(unauthorized_send_retrytimes,
@@ -79,35 +78,21 @@ DEFINE_FLAG_INT32(unauthorized_allowed_delay_after_reset, "allowed delay to retr
 DEFINE_FLAG_DOUBLE(send_server_error_retry_ratio, "", 0.3);
 DEFINE_FLAG_DOUBLE(send_server_error_ratio_smoothing_factor, "", 5.0);
 DEFINE_FLAG_INT32(send_statistic_entry_timeout, "seconds", 7200);
-DEFINE_FLAG_INT32(sls_host_update_interval, "seconds", 5);
-// DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 DEFINE_FLAG_BOOL(dump_reduced_send_result, "for performance test", false);
-DEFINE_FLAG_INT32(test_network_normal_interval, "if last check is normal, test network again after seconds ", 30);
-DEFINE_FLAG_INT32(same_topic_merge_send_count,
-                  "merge package if topic is same and package count per send is greater than",
-                  10);
 DEFINE_FLAG_INT32(discard_send_fail_interval, "discard data when send fail after 6 * 3600 seconds", 6 * 3600);
-DEFINE_FLAG_BOOL(send_prefer_real_ip, "use real ip to send data", false);
-DEFINE_FLAG_INT32(send_switch_real_ip_interval, "seconds", 60);
-DEFINE_FLAG_INT32(send_check_real_ip_interval, "seconds", 2);
 DEFINE_FLAG_BOOL(global_network_success, "global network success flag, default false", false);
 DEFINE_FLAG_INT32(reset_region_concurrency_error_count,
                   "reset region concurrency if the number of continuous error exceeds, 5",
                   5);
 DEFINE_FLAG_INT32(unknow_error_try_max, "discard data when try times > this value", 5);
-DEFINE_FLAG_INT32(test_unavailable_endpoint_interval, "test unavailable endpoint interval", 60);
 static const int SEND_BLOCK_COST_TIME_ALARM_INTERVAL_SECOND = 3;
 static const int LOG_GROUP_WAIT_IN_QUEUE_ALARM_INTERVAL_SECOND = 6;
 static const int ON_FAIL_LOG_WARNING_INTERVAL_SECOND = 10;
-DEFINE_FLAG_STRING(data_endpoint_policy,
-                   "policy for switching between data server endpoints, possible options include "
-                   "'designated_first'(default) and 'designated_locked'",
-                   "designated_first");
 DEFINE_FLAG_INT32(log_expire_time, "log expire time", 24 * 3600);
 
 DECLARE_FLAG_STRING(default_access_key_id);
 DECLARE_FLAG_STRING(default_access_key);
-DECLARE_FLAG_INT32(max_send_log_group_size);
+DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
 namespace logtail {
 const string Sender::BUFFER_FILE_NAME_PREFIX = "logtail_buffer_file_";
@@ -144,7 +129,7 @@ void SendClosure::OnSuccess(sdk::Response* response) {
             LOG_DEBUG(sLogger, ("increase sequence id", cpt->key)("checkpoint", cpt->data.DebugString()));
         }
 
-        Sender::Instance()->IncreaseRegionConcurrency(flusher->mRegion);
+        FlusherSLS::sRegionConcurrencyLimiter.PostPop(flusher->mRegion);
         Sender::Instance()->IncTotalSendStatistic(flusher->mProject, data->mLogstore, time(NULL));
     }
     Sender::Instance()->OnSendDone(mDataPtr, LogstoreSenderInfo::SendResult_OK); // mDataPtr is released here
@@ -207,7 +192,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                 // just set force update flag
                 // mDataPtr->mRealIpFlag = false;
                 // Sender::Instance()->ResetSendClientEndpoint(mDataPtr->mAliuid, mDataPtr->mRegion, curTime);
-                Sender::Instance()->ForceUpdateRealIp(flusher->mRegion);
+                SLSClientManager::GetInstance()->ForceUpdateRealIp(flusher->mRegion);
             }
             double serverErrorRatio
                 = Sender::Instance()->IncSendServerErrorStatistic(flusher->mProject, data->mLogstore, curTime);
@@ -218,16 +203,19 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                 if (sendResult == SEND_NETWORK_ERROR) {
                     // only set network stat when no real ip
                     if (!BOOL_FLAG(send_prefer_real_ip) || !data->mRealIpFlag) {
-                        Sender::Instance()->SetNetworkStat(flusher->mRegion, data->mCurrentEndpoint, false);
+                        SLSClientManager::GetInstance()->UpdateEndpointStatus(
+                            flusher->mRegion, data->mCurrentEndpoint, false);
                         recordRst = LogstoreSenderInfo::SendResult_NetworkFail;
-                        if (Sender::Instance()->mDataServerSwitchPolicy == dataServerSwitchPolicy::DESIGNATED_FIRST) {
-                            Sender::Instance()->ResetSendClientEndpoint(flusher->mAliuid, flusher->mRegion, curTime);
+                        if (SLSClientManager::GetInstance()->GetServerSwitchPolicy()
+                            == SLSClientManager::EndpointSwitchPolicy::DESIGNATED_FIRST) {
+                            SLSClientManager::GetInstance()->ResetClientEndpoint(
+                                flusher->mAliuid, flusher->mRegion, curTime);
                         }
                     }
                 }
                 operation = data->mBufferOrNot ? RECORD_ERROR_WHEN_FAIL : DISCARD_WHEN_FAIL;
             }
-            Sender::Instance()->ResetRegionConcurrency(flusher->mRegion);
+            FlusherSLS::sRegionConcurrencyLimiter.Reset(flusher->mRegion);
         } else if (sendResult == SEND_QUOTA_EXCEED) {
             BOOL_FLAG(global_network_success) = true;
             if (errorCode == sdk::LOGE_SHARD_WRITE_QUOTA_EXCEED) {
@@ -261,7 +249,8 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                 } else {
 #endif
                     int32_t lastUpdateTime;
-                    sdk::Client* sendClient = Sender::Instance()->GetSendClient(flusher->mRegion, flusher->mAliuid);
+                    sdk::Client* sendClient
+                        = SLSClientManager::GetInstance()->GetClient(flusher->mRegion, flusher->mAliuid);
                     if (SLSControl::GetInstance()->SetSlsSendClientAuth(
                             flusher->mAliuid, false, sendClient, lastUpdateTime))
                         operation = RETRY_ASYNC_WHEN_FAIL;
@@ -421,26 +410,9 @@ SendResult ConvertErrorCode(const std::string& errorCode) {
 }
 
 Sender::Sender() : mDefaultRegion(STRING_FLAG(default_region_name)) {
-    setupServerSwitchPolicy();
-
     srand(time(NULL));
     mFlushLog = false;
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
-    mTestNetworkClient.reset(new sdk::Client("",
-                                             STRING_FLAG(default_access_key_id),
-                                             STRING_FLAG(default_access_key),
-                                             INT32_FLAG(sls_client_send_timeout),
-                                             LogFileProfiler::mIpAddr,
-                                             AppConfig::GetInstance()->GetBindInterface()));
-    SLSControl::GetInstance()->SetSlsSendClientCommonParam(mTestNetworkClient.get());
-
-    mUpdateRealIpClient.reset(new sdk::Client("",
-                                              STRING_FLAG(default_access_key_id),
-                                              STRING_FLAG(default_access_key),
-                                              INT32_FLAG(sls_client_send_timeout),
-                                              LogFileProfiler::mIpAddr,
-                                              AppConfig::GetInstance()->GetBindInterface()));
-    SLSControl::GetInstance()->SetSlsSendClientCommonParam(mUpdateRealIpClient.get());
     SetSendingBufferCount(0);
     size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
     if (concurrencyCount < 10) {
@@ -451,11 +423,6 @@ Sender::Sender() : mDefaultRegion(STRING_FLAG(default_region_name)) {
     }
     mSenderQueue.SetParam((size_t)(concurrencyCount * 1.5), (size_t)(concurrencyCount * 2), 200);
     LOG_INFO(sLogger, ("Set sender queue param depend value", concurrencyCount));
-    new Thread(bind(&Sender::TestNetwork, this)); // be careful: this thread will not stop until process exit
-    if (BOOL_FLAG(send_prefer_real_ip)) {
-        LOG_INFO(sLogger, ("start real ip update thread", ""));
-        new Thread(bind(&Sender::RealIpUpdateThread, this)); // be careful: this thread will not stop until process exit
-    }
     new Thread(bind(&Sender::DaemonSender, this)); // be careful: this thread will not stop until process exit
     new Thread(bind(&Sender::WriteSecondary, this)); // be careful: this thread will not stop until process exit
 }
@@ -465,25 +432,10 @@ Sender* Sender::Instance() {
     return senderPtr;
 }
 
-void Sender::setupServerSwitchPolicy() {
-    if (STRING_FLAG(data_endpoint_policy) == "designated_locked") {
-        mDataServerSwitchPolicy = dataServerSwitchPolicy::DESIGNATED_LOCKED;
-    } else if (STRING_FLAG(data_endpoint_policy) == "designated_first") {
-        mDataServerSwitchPolicy = dataServerSwitchPolicy::DESIGNATED_FIRST;
-    } else {
-        mDataServerSwitchPolicy = dataServerSwitchPolicy::DESIGNATED_FIRST;
-    }
-}
-
 bool Sender::Init(void) {
     SLSControl::GetInstance()->Init();
 
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
-    MockAsyncSend = NULL;
-    MockSyncSend = NULL;
-    MockTestEndpoint = NULL;
-    MockIntegritySend = NULL;
-    MockGetRealIp = NULL;
     mFlushLog = false;
     mBufferDivideTime = time(NULL);
     mCheckPeriod = INT32_FLAG(buffer_check_period);
@@ -512,44 +464,9 @@ void Sender::SetBufferFilePath(const std::string& bufferfilepath) {
     mBufferFileName = "";
 }
 
-void Sender::SetNetworkStat(const std::string& region, const std::string& endpoint, bool status, int32_t latency) {
-    PTScopedLock lock(mRegionEndpointEntryMapLock);
-    std::unordered_map<std::string, RegionEndpointEntry*>::iterator iter = mRegionEndpointEntryMap.find(region);
-    // should not create endpoint when set net work stat
-    if (iter != mRegionEndpointEntryMap.end())
-        (iter->second)->UpdateEndpointDetail(endpoint, status, latency, false);
-}
-
-std::string Sender::GetRegionCurrentEndpoint(const std::string& region) {
-    PTScopedLock lock(mRegionEndpointEntryMapLock);
-    std::unordered_map<std::string, RegionEndpointEntry*>::iterator iter = mRegionEndpointEntryMap.find(region);
-    if (iter != mRegionEndpointEntryMap.end())
-        return (iter->second)->GetCurrentEndpoint();
-    else
-        return "";
-}
-
-std::string Sender::GetRegionFromEndpoint(const std::string& endpoint) {
-    PTScopedLock lock(mRegionEndpointEntryMapLock);
-    for (std::unordered_map<std::string, RegionEndpointEntry*>::iterator iter = mRegionEndpointEntryMap.begin();
-         iter != mRegionEndpointEntryMap.end();
-         ++iter) {
-        for (std::unordered_map<std::string, EndpointDetail>::iterator epIter
-             = ((iter->second)->mEndpointDetailMap).begin();
-             epIter != ((iter->second)->mEndpointDetailMap).end();
-             ++epIter) {
-            if (epIter->first == endpoint)
-                return iter->first;
-        }
-    }
-    return STRING_FLAG(default_region_name);
-}
-
-
 FeedbackInterface* Sender::GetSenderFeedBackInterface() {
     return (FeedbackInterface*)&mSenderQueue;
 }
-
 
 void Sender::SetFeedBackInterface(FeedbackInterface* pProcessInterface) {
     mSenderQueue.SetFeedBackObject(pProcessInterface);
@@ -557,124 +474,6 @@ void Sender::SetFeedBackInterface(FeedbackInterface* pProcessInterface) {
 
 void Sender::OnSendDone(SenderQueueItem* mDataPtr, LogstoreSenderInfo::SendResult sendRst) {
     mSenderQueue.OnLoggroupSendDone(mDataPtr, sendRst);
-}
-
-bool Sender::HasNetworkAvailable() {
-    static int32_t lastCheckTime = time(NULL);
-    int32_t curTime = time(NULL);
-    if (curTime - lastCheckTime >= 3600) {
-        lastCheckTime = curTime;
-        return true;
-    }
-    {
-        PTScopedLock lock(mRegionEndpointEntryMapLock);
-        for (std::unordered_map<std::string, RegionEndpointEntry*>::iterator iter = mRegionEndpointEntryMap.begin();
-             iter != mRegionEndpointEntryMap.end();
-             ++iter) {
-            for (std::unordered_map<std::string, EndpointDetail>::iterator epIter
-                 = ((iter->second)->mEndpointDetailMap).begin();
-                 epIter != ((iter->second)->mEndpointDetailMap).end();
-                 ++epIter) {
-                if ((epIter->second).mStatus)
-                    return true;
-            }
-        }
-    }
-    return false;
-}
-
-sdk::Client* Sender::GetSendClient(const std::string& region, const std::string& aliuid, bool createIfNotFound) {
-    string key = region + "_" + aliuid;
-    {
-        PTScopedLock lock(mSendClientLock);
-        unordered_map<string, SlsClientInfo*>::iterator iter = mSendClientMap.find(key);
-        if (iter != mSendClientMap.end()) {
-            (iter->second)->lastUsedTime = time(NULL);
-
-            return (iter->second)->sendClient;
-        }
-    }
-    if (!createIfNotFound) {
-        return nullptr;
-    }
-
-    int32_t lastUpdateTime;
-    string endpoint = GetRegionCurrentEndpoint(region);
-    sdk::Client* sendClient = new sdk::Client(endpoint,
-                                              "",
-                                              "",
-                                              INT32_FLAG(sls_client_send_timeout),
-                                              LogFileProfiler::mIpAddr,
-                                              AppConfig::GetInstance()->GetBindInterface());
-    SLSControl::GetInstance()->SetSlsSendClientCommonParam(sendClient);
-    ResetPort(region, sendClient);
-    LOG_INFO(sLogger,
-             ("init endpoint for sender, region", region)("uid", aliuid)("hostname", GetHostFromEndpoint(endpoint))(
-                 "use https", ToString(sendClient->IsUsingHTTPS())));
-    SLSControl::GetInstance()->SetSlsSendClientAuth(aliuid, true, sendClient, lastUpdateTime);
-    SlsClientInfo* clientInfo = new SlsClientInfo(sendClient, time(NULL));
-    {
-        PTScopedLock lock(mSendClientLock);
-        mSendClientMap.insert(pair<string, SlsClientInfo*>(key, clientInfo));
-    }
-    return sendClient;
-}
-
-bool Sender::ResetSendClientEndpoint(const std::string aliuid, const std::string region, int32_t curTime) {
-    sdk::Client* sendClient = GetSendClient(region, aliuid, false);
-    if (sendClient == nullptr) {
-        return false;
-    }
-    if (curTime - sendClient->GetSlsHostUpdateTime() < INT32_FLAG(sls_host_update_interval))
-        return false;
-    sendClient->SetSlsHostUpdateTime(curTime);
-    string endpoint = GetRegionCurrentEndpoint(region);
-    if (endpoint.empty())
-        return false;
-    string originalEndpoint = sendClient->GetRawSlsHost();
-    if (originalEndpoint == endpoint) {
-        return false;
-    }
-    mSenderQueue.OnRegionRecover(region);
-    sendClient->SetSlsHost(endpoint);
-    ResetPort(region, sendClient);
-    LOG_INFO(
-        sLogger,
-        ("reset endpoint for sender, region", region)("uid", aliuid)("from", GetHostFromEndpoint(originalEndpoint))(
-            "to", GetHostFromEndpoint(endpoint))("use https", ToString(sendClient->IsUsingHTTPS())));
-    return true;
-}
-
-void Sender::ResetPort(const string& region, sdk::Client* sendClient) {
-    if (AppConfig::GetInstance()->GetDataServerPort() == 80) {
-        PTScopedLock lock(mRegionEndpointEntryMapLock);
-        if (mRegionEndpointEntryMap.find(region) != mRegionEndpointEntryMap.end()) {
-            string defaultEndpoint = mRegionEndpointEntryMap.at(region)->mDefaultEndpoint;
-            if (defaultEndpoint.size() != 0) {
-                if (IsHttpsEndpoint(defaultEndpoint)) {
-                    sendClient->SetPort(443);
-                }
-            } else {
-                if (IsHttpsEndpoint(sendClient->GetRawSlsHost())) {
-                    sendClient->SetPort(443);
-                }
-            }
-        }
-    }
-}
-
-void Sender::CleanTimeoutSendClient() {
-    PTScopedLock lock(mSendClientLock);
-    int32_t curTime = time(NULL);
-    std::unordered_map<string, SlsClientInfo*>::iterator iter = mSendClientMap.begin();
-    for (; iter != mSendClientMap.end();) {
-        if ((curTime - (iter->second)->lastUsedTime) > INT32_FLAG(send_client_timeout_interval)) {
-            delete (iter->second)->sendClient;
-            delete iter->second;
-            iter = mSendClientMap.erase(iter);
-        } else
-            iter++;
-    }
 }
 
 std::string Sender::GetBufferFilePath() {
@@ -872,7 +671,7 @@ void Sender::DaemonBufferSender() {
     mBufferSenderThreadIsRunning = true;
     LOG_DEBUG(sLogger, ("SendBufferThread", "start"));
     while (mBufferSenderThreadIsRunning) {
-        if (!HasNetworkAvailable()) {
+        if (!SLSClientManager::GetInstance()->HasNetworkAvailable()) {
             if (!mBufferSenderThreadIsRunning)
                 break;
             sleep(mCheckPeriod);
@@ -1201,30 +1000,7 @@ void Sender::DaemonSender() {
         if (Application::GetInstance()->IsExiting()) {
             mSenderQueue.PopAllItem(logGroupToSend, curTime, singleBatchMapFull);
         } else {
-            std::unordered_map<std::string, int32_t> regionConcurrencyLimits;
-            {
-                PTScopedLock lock(mRegionEndpointEntryMapLock);
-                for (auto iter = mRegionEndpointEntryMap.begin(); iter != mRegionEndpointEntryMap.end(); ++iter) {
-                    regionConcurrencyLimits.insert(std::make_pair(iter->first, iter->second->mConcurrency));
-                }
-            }
-
-            mSenderQueue.CheckAndPopAllItem(logGroupToSend, curTime, singleBatchMapFull, regionConcurrencyLimits);
-
-#ifdef LOGTAIL_DEBUG_FLAG
-            if (logGroupToSend.size() > 0) {
-                static size_t s_totalCount = 0;
-                static int32_t s_lastTime = 0;
-                s_totalCount += logGroupToSend.size();
-                LOG_DEBUG(sLogger, ("CheckAndPopAllItem logs", logGroupToSend.size()));
-                if (curTime - s_lastTime > 60) {
-                    LOG_INFO(sLogger,
-                             ("CheckAndPopAllItem logs", s_totalCount)("singleBatchMap", ToString(singleBatchMapFull)));
-                    s_lastTime = curTime;
-                    s_totalCount = 0;
-                }
-            }
-#endif
+            mSenderQueue.CheckAndPopAllItem(logGroupToSend, curTime, singleBatchMapFull);
         }
         mLastDaemonRunTime = curTime;
         IncSendingCount((int32_t)logGroupToSend.size());
@@ -1285,10 +1061,6 @@ void Sender::DaemonSender() {
         ///////////////////////////////////////
 
         for (vector<SenderQueueItem*>::iterator itr = logGroupToSend.begin(); itr != logGroupToSend.end(); ++itr) {
-            // TODO: temporary used
-            if (!PipelineManager::GetInstance()->FindPipelineByName((*itr)->mConfigName)) {
-                continue;
-            }
             int32_t logGroupWaitTime = curTime - (*itr)->mEnqueTime;
 
             if (logGroupWaitTime > LOG_GROUP_WAIT_IN_QUEUE_ALARM_INTERVAL_SECOND) {
@@ -1342,7 +1114,7 @@ void Sender::DaemonSender() {
         logGroupToSend.clear();
 
         if ((time(NULL) - mLastCheckSendClientTime) > INT32_FLAG(check_send_client_timeout_interval)) {
-            CleanTimeoutSendClient();
+            SLSClientManager::GetInstance()->CleanTimeoutClient();
             CleanTimeoutSendStatistic();
             PackIdManager::GetInstance()->CleanTimeoutEntry();
             mLastCheckSendClientTime = time(NULL);
@@ -1485,8 +1257,6 @@ bool Sender::SendToBufferFile(SenderQueueItem* dataPtr) {
         return false;
     }
     delete[] buffer;
-    if (BOOL_FLAG(enable_mock_send))
-        fflush(fout);
     if (ftell(fout) > AppConfig::GetInstance()->GetLocalFileSize())
         CreateNewFile();
     fclose(fout);
@@ -1517,180 +1287,6 @@ bool Sender::IsValidToSend(const LogstoreFeedBackKey& logstoreKey) {
     return mSenderQueue.IsValidToPush(logstoreKey);
 }
 
-void Sender::AddEndpointEntry(const std::string& region, const std::string& endpoint, bool isDefault, bool isProxy) {
-    LOG_DEBUG(sLogger,
-              ("AddEndpointEntry, region", region)("endpoint", endpoint)("isDefault", isDefault)("isProxy", isProxy));
-    PTScopedLock lock(mRegionEndpointEntryMapLock);
-    std::unordered_map<std::string, RegionEndpointEntry*>::iterator iter = mRegionEndpointEntryMap.find(region);
-    RegionEndpointEntry* entryPtr;
-    if (iter == mRegionEndpointEntryMap.end()) {
-        entryPtr = new RegionEndpointEntry();
-        mRegionEndpointEntryMap.insert(std::make_pair(region, entryPtr));
-        // if (!isDefault && region.size() > 2) {
-        //     string possibleMainRegion = region.substr(0, region.size() - 2);
-        //     if (mRegionEndpointEntryMap.find(possibleMainRegion) != mRegionEndpointEntryMap.end()) {
-        //         string mainRegionEndpoint = mRegionEndpointEntryMap[possibleMainRegion]->mDefaultEndpoint;
-        //         string subRegionEndpoint = mainRegionEndpoint;
-        //         size_t pos = mainRegionEndpoint.find(possibleMainRegion);
-        //         if (pos != string::npos) {
-        //             subRegionEndpoint = mainRegionEndpoint.substr(0, pos) + region
-        //                 + mainRegionEndpoint.substr(pos + possibleMainRegion.size());
-        //         }
-        //         if (entryPtr->AddDefaultEndpoint(subRegionEndpoint)) {
-        //             LOG_INFO(sLogger,
-        //                      ("add default data server endpoint, region", region)("endpoint", endpoint)(
-        //                          "isProxy", "false")("#endpoint", entryPtr->mEndpointDetailMap.size()));
-        //         }
-        //     }
-        // }
-    } else
-        entryPtr = iter->second;
-
-    if (isDefault) {
-        if (entryPtr->AddDefaultEndpoint(endpoint)) {
-            LOG_INFO(sLogger,
-                     ("add default data server endpoint, region", region)("endpoint", endpoint)("isProxy", "false")(
-                         "#endpoint", entryPtr->mEndpointDetailMap.size()));
-        }
-    } else {
-        if (entryPtr->AddEndpoint(endpoint, true, -1, isProxy)) {
-            LOG_INFO(sLogger,
-                     ("add data server endpoint, region", region)("endpoint", endpoint)("isProxy", ToString(isProxy))(
-                         "#endpoint", entryPtr->mEndpointDetailMap.size()));
-        }
-    }
-}
-
-void Sender::TestNetwork() {
-    // pair<int32_t, string> represents the weight of each endpoint
-    map<string, vector<pair<int32_t, string>>> unavaliableEndpoints;
-    set<string> unavaliableRegions;
-    int32_t lastCheckAllTime = 0;
-    while (true) {
-        unavaliableEndpoints.clear();
-        unavaliableRegions.clear();
-        {
-            PTScopedLock lock(mRegionEndpointEntryMapLock);
-            for (std::unordered_map<std::string, RegionEndpointEntry*>::iterator iter = mRegionEndpointEntryMap.begin();
-                 iter != mRegionEndpointEntryMap.end();
-                 ++iter) {
-                bool unavaliable = true;
-                for (std::unordered_map<std::string, EndpointDetail>::iterator epIter
-                     = ((iter->second)->mEndpointDetailMap).begin();
-                     epIter != ((iter->second)->mEndpointDetailMap).end();
-                     ++epIter) {
-                    if (!(epIter->second).mStatus) {
-                        if (mDataServerSwitchPolicy == dataServerSwitchPolicy::DESIGNATED_FIRST) {
-                            if (epIter->first == iter->second->mDefaultEndpoint) {
-                                unavaliableEndpoints[iter->first].emplace_back(0, epIter->first);
-                            } else {
-                                unavaliableEndpoints[iter->first].emplace_back(10, epIter->first);
-                            }
-                        } else {
-                            unavaliableEndpoints[iter->first].emplace_back(10, epIter->first);
-                        }
-                    } else {
-                        unavaliable = false;
-                    }
-                }
-                sort(unavaliableEndpoints[iter->first].begin(), unavaliableEndpoints[iter->first].end());
-                if (unavaliable)
-                    unavaliableRegions.insert(iter->first);
-            }
-        }
-        if (unavaliableEndpoints.size() == 0) {
-            sleep(INT32_FLAG(test_network_normal_interval));
-            continue;
-        }
-        int32_t curTime = time(NULL);
-        bool flag = false;
-        bool wakeUp = false;
-        for (const auto& value : unavaliableEndpoints) {
-            const string& region = value.first;
-            bool endpointChanged = false;
-            vector<string> uids = GetRegionAliuids(region);
-            for (const auto& item : value.second) {
-                const string& endpoint = item.second;
-                const int32_t priority = item.first;
-                if (unavaliableRegions.find(region) == unavaliableRegions.end()) {
-                    if (!endpointChanged && priority != 10) {
-                        if (TestEndpoint(region, endpoint)) {
-                            for (const auto& uid : uids) {
-                                ResetSendClientEndpoint(uid, region, curTime);
-                            }
-                            endpointChanged = true;
-                        }
-                    } else {
-                        if (curTime - lastCheckAllTime >= 1800) {
-                            TestEndpoint(region, endpoint);
-                            flag = true;
-                        }
-                    }
-                } else {
-                    if (TestEndpoint(region, endpoint)) {
-                        LOG_DEBUG(sLogger, ("Region recover success", "")(region, endpoint));
-                        wakeUp = true;
-                        mSenderQueue.OnRegionRecover(region);
-                        if (!endpointChanged && priority != 10) {
-                            for (const auto& uid : uids) {
-                                ResetSendClientEndpoint(uid, region, curTime);
-                            }
-                            endpointChanged = true;
-                        }
-                    }
-                }
-            }
-        }
-        if (flag)
-            lastCheckAllTime = curTime;
-        if (wakeUp && (!mIsSendingBuffer)) {
-            mSenderQueue.Signal();
-        }
-        sleep(INT32_FLAG(test_unavailable_endpoint_interval));
-    }
-}
-
-bool Sender::TestEndpoint(const std::string& region, const std::string& endpoint) {
-    // if region status not ok, skip test endpoint
-    if (!GetRegionStatus(region)) {
-        return false;
-    }
-    if (mTestNetworkClient == NULL)
-        return true;
-    if (endpoint.size() == 0)
-        return false;
-    static LogGroup logGroup;
-    mTestNetworkClient->SetSlsHost(endpoint);
-    ResetPort(region, mTestNetworkClient.get());
-    bool status = true;
-    int64_t beginTime = GetCurrentTimeInMicroSeconds();
-    try {
-        if (BOOL_FLAG(enable_mock_send) && MockTestEndpoint) {
-            string logData;
-            MockTestEndpoint("logtail-test-network-project",
-                             "logtail-test-network-logstore",
-                             logData,
-                             RawDataType::EVENT_GROUP,
-                             0,
-                             SLS_CMP_LZ4);
-        } else
-            status = mTestNetworkClient->TestNetwork();
-    } catch (sdk::LOGException& ex) {
-        const string& errorCode = ex.GetErrorCode();
-        LOG_DEBUG(sLogger, ("test network", "send fail")("errorCode", errorCode)("errorMessage", ex.GetMessage()));
-        SendResult sendRst = ConvertErrorCode(errorCode);
-        if (sendRst == SEND_NETWORK_ERROR)
-            status = false;
-    } catch (...) {
-        LOG_ERROR(sLogger, ("test network", "send fail")("exception", "unknown"));
-    }
-    int64_t endTime = GetCurrentTimeInMicroSeconds();
-    int32_t latency = int32_t((endTime - beginTime) / 1000); // ms
-    LOG_DEBUG(sLogger, ("TestEndpoint, region", region)("endpoint", endpoint)("status", status)("latency", latency));
-    SetNetworkStat(region, endpoint, status, latency);
-    return status;
-}
-
 bool Sender::IsProfileData(const string& region, const std::string& project, const std::string& logstore) {
     if ((logstore == "shennong_log_profile" || logstore == "logtail_alarm" || logstore == "logtail_status_profile"
          || logstore == "logtail_suicide_profile")
@@ -1705,9 +1301,9 @@ Sender::SendBufferFileData(const LogtailBufferMeta& bufferMeta, const std::strin
     FlowControl(bufferMeta.rawsize(), REPLAY_SEND_THREAD);
     string region = bufferMeta.endpoint();
     if (region.find("http://") == 0) // old buffer file which record the endpoint
-        region = GetRegionFromEndpoint(region);
+        region = SLSClientManager::GetInstance()->GetRegionFromEndpoint(region);
 
-    sdk::Client* sendClient = GetSendClient(region, bufferMeta.aliuid());
+    sdk::Client* sendClient = SLSClientManager::GetInstance()->GetClient(region, bufferMeta.aliuid());
     SendResult sendRes;
     const string& endpoint = sendClient->GetRawSlsHost();
     if (endpoint.empty())
@@ -1716,8 +1312,8 @@ Sender::SendBufferFileData(const LogtailBufferMeta& bufferMeta, const std::strin
         sendRes = SendToNetSync(sendClient, bufferMeta, logData, errorCode);
     }
     if (sendRes == SEND_NETWORK_ERROR) {
-        SetNetworkStat(region, endpoint, false);
-        Sender::Instance()->ResetSendClientEndpoint(bufferMeta.aliuid(), region, time(NULL));
+        SLSClientManager::GetInstance()->UpdateEndpointStatus(region, endpoint, false);
+        SLSClientManager::GetInstance()->ResetClientEndpoint(bufferMeta.aliuid(), region, time(NULL));
         LOG_DEBUG(sLogger,
                   ("SendBufferFileData",
                    "SEND_NETWORK_ERROR")("region", region)("aliuid", bufferMeta.aliuid())("endpoint", endpoint));
@@ -1737,17 +1333,7 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
     while (true) {
         ++retryTimes;
         try {
-            if (BOOL_FLAG(enable_mock_send)) {
-                // if (MockSyncSend)
-                //     MockSyncSend(bufferMeta.project(),
-                //                  bufferMeta.logstore(),
-                //                  logData,
-                //                  (SEND_DATA_TYPE)bufferMeta.datatype(),
-                //                  bufferMeta.rawsize(),
-                //                  bufferMeta.compresstype());
-                // else
-                //     LOG_ERROR(sLogger, ("MockSyncSend", "uninitialized"));
-            } else if (bufferMeta.datatype() == int(RawDataType::EVENT_GROUP)) {
+            if (bufferMeta.datatype() == int(RawDataType::EVENT_GROUP)) {
                 if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
                     sendClient->PostLogStoreLogs(bufferMeta.project(),
                                                  bufferMeta.logstore(),
@@ -1821,9 +1407,7 @@ SendResult Sender::SendToNetSync(sdk::Client* sendClient,
 
 void Sender::SendToNetAsync(SenderQueueItem* dataPtr) {
     if (dataPtr->mFlusher->Name() == "flusher_sls") {
-        auto data = static_cast<SLSSenderQueueItem*>(dataPtr);
-        auto flusher = static_cast<const FlusherSLS*>(data->mFlusher);
-        auto& exactlyOnceCpt = data->mExactlyOnceCheckpoint;
+        auto& exactlyOnceCpt = static_cast<SLSSenderQueueItem*>(dataPtr)->mExactlyOnceCheckpoint;
         if (!BOOL_FLAG(enable_full_drain_mode)
             && Application::GetInstance()->IsExiting()) // write local file avoid binary update fail
         {
@@ -1839,66 +1423,6 @@ void Sender::SendToNetAsync(SenderQueueItem* dataPtr) {
             DescSendingCount();
             return;
         }
-        static int32_t lastResetEndpointTime = 0;
-        sdk::Client* sendClient = GetSendClient(flusher->mRegion, flusher->mAliuid);
-        int32_t curTime = time(NULL);
-
-        data->mCurrentEndpoint = sendClient->GetRawSlsHost();
-        if (data->mCurrentEndpoint.empty()) {
-            if (curTime - lastResetEndpointTime >= 30) {
-                ResetSendClientEndpoint(flusher->mAliuid, flusher->mRegion, curTime);
-                data->mCurrentEndpoint = sendClient->GetRawSlsHost();
-                lastResetEndpointTime = curTime;
-            }
-        }
-        if (BOOL_FLAG(send_prefer_real_ip)) {
-            if (curTime - sendClient->GetSlsRealIpUpdateTime() >= INT32_FLAG(send_check_real_ip_interval)) {
-                UpdateSendClientRealIp(sendClient, flusher->mRegion);
-            }
-            data->mRealIpFlag = sendClient->GetRawSlsHostFlag();
-        }
-
-        SendClosure* sendClosure = new SendClosure;
-        dataPtr->mLastSendTime = curTime;
-        sendClosure->mDataPtr = dataPtr;
-        LOG_DEBUG(sLogger,
-                  ("region", flusher->mRegion)("endpoint", data->mCurrentEndpoint)("project", flusher->mProject)(
-                      "logstore", data->mLogstore)("bytes", data->mData.size()));
-        if (data->mType == RawDataType::EVENT_GROUP) {
-            const auto& hashKey = exactlyOnceCpt ? exactlyOnceCpt->data.hash_key() : data->mShardHashKey;
-            if (hashKey.empty()) {
-                sendClient->PostLogStoreLogs(flusher->mProject,
-                                             data->mLogstore,
-                                             ConvertCompressType(flusher->GetCompressType()),
-                                             data->mData,
-                                             data->mRawSize,
-                                             sendClosure);
-            } else {
-                int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
-                sendClient->PostLogStoreLogs(flusher->mProject,
-                                             data->mLogstore,
-                                             ConvertCompressType(flusher->GetCompressType()),
-                                             data->mData,
-                                             data->mRawSize,
-                                             sendClosure,
-                                             hashKey,
-                                             hashKeySeqID);
-            }
-        } else {
-            if (data->mShardHashKey.empty())
-                sendClient->PostLogStoreLogPackageList(flusher->mProject,
-                                                       data->mLogstore,
-                                                       ConvertCompressType(flusher->GetCompressType()),
-                                                       data->mData,
-                                                       sendClosure);
-            else
-                sendClient->PostLogStoreLogPackageList(flusher->mProject,
-                                                       data->mLogstore,
-                                                       ConvertCompressType(flusher->GetCompressType()),
-                                                       data->mData,
-                                                       sendClosure,
-                                                       data->mShardHashKey);
-        }
     } else {
         if (!BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()) {
             SubSendingBufferCount();
@@ -1906,10 +1430,10 @@ void Sender::SendToNetAsync(SenderQueueItem* dataPtr) {
             DescSendingCount();
             return;
         }
-        // SendClosure* sendClosure = new SendClosure;
-        // dataPtr->mLastSendTime = curTime;
-        // sendClosure->mDataPtr = dataPtr;
     }
+    sdk::AsynRequest* req = dataPtr->mFlusher->BuildRequest(dataPtr);
+    dataPtr->mLastSendTime = time(nullptr);
+    sdk::CurlAsynInstance::GetInstance()->AddRequest(req);
 }
 
 bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
@@ -1964,6 +1488,16 @@ bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
 }
 
 void Sender::PutIntoBatchMap(SenderQueueItem* data, const std::string& region) {
+    // TODO: temporarily set here
+    if (data->mFlusher->HasContext()) {
+        data->mPipeline
+            = PipelineManager::GetInstance()->FindPipelineByName(data->mFlusher->GetContext().GetConfigName());
+        if (!data->mPipeline) {
+            // should not happen
+            return;
+        }
+    }
+
     int32_t tryTime = 0;
     while (tryTime < 1000) {
         if (mSenderQueue.PushItem(data->mQueueKey, data, region)) {
@@ -2036,43 +1570,6 @@ LogstoreSenderStatistics Sender::GetSenderStatistics(const LogstoreFeedBackKey& 
     return mSenderQueue.GetSenderStatistics(key);
 }
 
-void Sender::IncreaseRegionConcurrency(const std::string& region) {
-    PTScopedLock lock(mRegionEndpointEntryMapLock);
-    auto iter = mRegionEndpointEntryMap.find(region);
-    if (mRegionEndpointEntryMap.end() == iter)
-        return;
-
-    auto regionInfo = iter->second;
-    regionInfo->mContinuousErrorCount = 0;
-    if (-1 == regionInfo->mConcurrency)
-        return;
-    if (++regionInfo->mConcurrency >= AppConfig::GetInstance()->GetSendRequestConcurrency()) {
-        LOG_INFO(sLogger, ("Set region concurrency to unlimited", region));
-        regionInfo->mConcurrency = -1;
-    }
-}
-
-void Sender::ResetRegionConcurrency(const std::string& region) {
-    PTScopedLock lock(mRegionEndpointEntryMapLock);
-    auto iter = mRegionEndpointEntryMap.find(region);
-    if (mRegionEndpointEntryMap.end() == iter)
-        return;
-
-    auto regionInfo = iter->second;
-    if (++regionInfo->mContinuousErrorCount >= INT32_FLAG(reset_region_concurrency_error_count)) {
-        auto oldConcurrency = regionInfo->mConcurrency;
-        regionInfo->mConcurrency
-            = AppConfig::GetInstance()->GetSendRequestConcurrency() / mRegionEndpointEntryMap.size();
-        if (regionInfo->mConcurrency <= 0) {
-            regionInfo->mConcurrency = 1;
-        }
-        if (oldConcurrency != regionInfo->mConcurrency) {
-            LOG_INFO(sLogger,
-                     ("Decrease region concurrency", region)("from", oldConcurrency)("to", regionInfo->mConcurrency));
-        }
-    }
-}
-
 bool Sender::FlushOut(int32_t time_interval_in_mili_seconds) {
     SetFlush();
     for (int i = 0; i < time_interval_in_mili_seconds / 100; ++i) {
@@ -2104,9 +1601,6 @@ Sender::~Sender() {
         LOG_ERROR(sLogger, ("cannot flush data in 3 seconds when destruct Sender", "discard data"));
     }
     RemoveSender();
-    if (mTestNetworkClient) {
-        mTestNetworkClient = NULL;
-    }
 }
 
 double Sender::IncTotalSendStatistic(const std::string& projectName, const std::string& logstore, int32_t curTime) {
@@ -2201,159 +1695,10 @@ void Sender::SetLogstoreFlowControl(const LogstoreFeedBackKey& logstoreKey,
 }
 
 
-SlsClientInfo::SlsClientInfo(sdk::Client* client, int32_t updateTime) {
-    sendClient = client;
-    lastUsedTime = updateTime;
-}
-
-
-void Sender::ForceUpdateRealIp(const std::string& region) {
-    mRegionRealIpLock.lock();
-    RegionRealIpInfoMap::iterator iter = mRegionRealIpMap.find(region);
-    if (iter != mRegionRealIpMap.end()) {
-        iter->second->mForceFlushFlag = true;
-    }
-    mRegionRealIpLock.unlock();
-}
-
-void Sender::UpdateSendClientRealIp(sdk::Client* client, const std::string& region) {
-    string realIp;
-
-    mRegionRealIpLock.lock();
-    RealIpInfo* pInfo = NULL;
-    RegionRealIpInfoMap::iterator iter = mRegionRealIpMap.find(region);
-    if (iter != mRegionRealIpMap.end()) {
-        pInfo = iter->second;
-    } else {
-        pInfo = new RealIpInfo;
-        mRegionRealIpMap.insert(std::make_pair(region, pInfo));
-    }
-#ifdef LOGTAIL_DEBUG_FLAG
-    LOG_DEBUG(sLogger,
-              ("update real ip", pInfo->mRealIp)("region", region)("real ip update time", pInfo->mLastUpdateTime)(
-                  "client update time", client->GetSlsRealIpUpdateTime()));
-#endif
-    realIp = pInfo->mRealIp;
-    mRegionRealIpLock.unlock();
-
-    if (!realIp.empty()) {
-        client->SetSlsHost(realIp);
-        client->SetSlsRealIpUpdateTime(time(NULL));
-    } else if (pInfo->mLastUpdateTime >= client->GetSlsRealIpUpdateTime()) {
-        const std::string& defaultEndpoint = GetRegionCurrentEndpoint(region);
-        if (!defaultEndpoint.empty()) {
-            client->SetSlsHost(defaultEndpoint);
-            client->SetSlsRealIpUpdateTime(time(NULL));
-        }
-    }
-}
-
-void Sender::RealIpUpdateThread() {
-    int32_t lastUpdateRealIpTime = 0;
-    vector<string> regionEndpointArray;
-    vector<string> regionArray;
-    while (!mStopRealIpThread) {
-        int32_t curTime = time(NULL);
-        bool updateFlag = curTime - lastUpdateRealIpTime > INT32_FLAG(send_switch_real_ip_interval);
-        {
-            // check force update
-            mRegionRealIpLock.lock();
-            RegionRealIpInfoMap::iterator iter = mRegionRealIpMap.begin();
-            for (; iter != mRegionRealIpMap.end(); ++iter) {
-                if (iter->second->mForceFlushFlag) {
-                    iter->second->mForceFlushFlag = false;
-                    updateFlag = true;
-                    LOG_INFO(sLogger, ("force update real ip", iter->first));
-                }
-            }
-            mRegionRealIpLock.unlock();
-        }
-        if (updateFlag) {
-            LOG_DEBUG(sLogger, ("start update real ip", ""));
-            regionEndpointArray.clear();
-            regionArray.clear();
-            {
-                PTScopedLock lock(mRegionEndpointEntryMapLock);
-                std::unordered_map<std::string, RegionEndpointEntry*>::iterator iter = mRegionEndpointEntryMap.begin();
-                for (; iter != mRegionEndpointEntryMap.end(); ++iter) {
-                    regionEndpointArray.push_back((iter->second)->GetCurrentEndpoint());
-                    regionArray.push_back(iter->first);
-                }
-            }
-            for (size_t i = 0; i < regionEndpointArray.size(); ++i) {
-                // no available endpoint
-                if (regionEndpointArray[i].empty()) {
-                    continue;
-                }
-
-                EndpointStatus status = UpdateRealIp(regionArray[i], regionEndpointArray[i]);
-                if (status == STATUS_ERROR) {
-                    SetNetworkStat(regionArray[i], regionEndpointArray[i], false);
-                }
-            }
-            lastUpdateRealIpTime = time(NULL);
-        }
-        usleep(1000 * 1000);
-    }
-}
-
-EndpointStatus Sender::UpdateRealIp(const std::string& region, const std::string& endpoint) {
-    mUpdateRealIpClient->SetSlsHost(endpoint);
-    EndpointStatus status = STATUS_ERROR;
-    int64_t beginTime = GetCurrentTimeInMicroSeconds();
-    try {
-        sdk::GetRealIpResponse rsp;
-        if (BOOL_FLAG(enable_mock_send) && MockGetRealIp)
-            rsp = MockGetRealIp("logtail-test-network-project", "logtail-test-network-logstore");
-        else
-            rsp = mUpdateRealIpClient->GetRealIp();
-
-        if (!rsp.realIp.empty()) {
-            SetRealIp(region, rsp.realIp);
-            status = STATUS_OK_WITH_IP;
-        } else {
-            status = STATUS_OK_WITH_ENDPOINT;
-            static int32_t sUpdateRealIpWarningCount = 0;
-            if (sUpdateRealIpWarningCount++ % 100 == 0) {
-                sUpdateRealIpWarningCount %= 100;
-                LOG_WARNING(sLogger,
-                            ("get real ip request succeeded but server did not give real ip, region",
-                             region)("endpoint", endpoint));
-            }
-
-            // we should set real ip to empty string if server did not give real ip
-            SetRealIp(region, "");
-        }
-    }
-    // GetRealIp's implement should not throw LOGException, but we catch it to hold implement changing
-    catch (sdk::LOGException& ex) {
-        const string& errorCode = ex.GetErrorCode();
-        LOG_DEBUG(sLogger, ("get real ip", "send fail")("errorCode", errorCode)("errorMessage", ex.GetMessage()));
-        SendResult sendRst = ConvertErrorCode(errorCode);
-        if (sendRst == SEND_NETWORK_ERROR)
-            status = STATUS_ERROR;
-    } catch (...) {
-        LOG_ERROR(sLogger, ("get real ip", "send fail")("exception", "unknown"));
-    }
-    int64_t endTime = GetCurrentTimeInMicroSeconds();
-    int32_t latency = int32_t((endTime - beginTime) / 1000); // ms
-    LOG_DEBUG(sLogger, ("Get real ip, region", region)("endpoint", endpoint)("status", status)("latency", latency));
-    return status;
-}
-
-void Sender::SetRealIp(const std::string& region, const std::string& ip) {
-    PTScopedLock lock(mRegionRealIpLock);
-    RealIpInfo* pInfo = NULL;
-    RegionRealIpInfoMap::iterator iter = mRegionRealIpMap.find(region);
-    if (iter != mRegionRealIpMap.end()) {
-        pInfo = iter->second;
-    } else {
-        pInfo = new RealIpInfo;
-        mRegionRealIpMap.insert(std::make_pair(region, pInfo));
-    }
-    LOG_DEBUG(sLogger, ("set real ip, last", pInfo->mRealIp)("now", ip)("region", region));
-    pInfo->SetRealIp(ip);
-}
+// SlsClientInfo::SlsClientInfo(sdk::Client* client, int32_t updateTime) {
+//     sendClient = client;
+//     lastUsedTime = updateTime;
+// }
 
 std::string Sender::GetAllProjects() {
     string result;
@@ -2400,40 +1745,6 @@ void Sender::DecreaseRegionReferenceCnt(const std::string& region) {
     }
     if (--iter->second == 0) {
         mRegionRefCntMap.erase(iter);
-    }
-}
-
-vector<string> Sender::GetRegionAliuids(const std::string& region) {
-    PTScopedLock lock(mRegionAliuidRefCntMapLock);
-    vector<string> aliuids;
-    for (const auto& item : mRegionAliuidRefCntMap[region]) {
-        aliuids.push_back(item.first);
-    }
-    return aliuids;
-}
-
-void Sender::IncreaseAliuidReferenceCntForRegion(const std::string& region, const std::string& aliuid) {
-    PTScopedLock lock(mRegionAliuidRefCntMapLock);
-    ++mRegionAliuidRefCntMap[region][aliuid];
-}
-
-void Sender::DecreaseAliuidReferenceCntForRegion(const std::string& region, const std::string& aliuid) {
-    PTScopedLock lock(mRegionAliuidRefCntMapLock);
-    auto outerIter = mRegionAliuidRefCntMap.find(region);
-    if (outerIter == mRegionAliuidRefCntMap.end()) {
-        // should not happen
-        return;
-    }
-    auto innerIter = outerIter->second.find(aliuid);
-    if (innerIter == outerIter->second.end()) {
-        // should not happen
-        return;
-    }
-    if (--innerIter->second == 0) {
-        outerIter->second.erase(innerIter);
-    }
-    if (outerIter->second.empty()) {
-        mRegionAliuidRefCntMap.erase(outerIter);
     }
 }
 

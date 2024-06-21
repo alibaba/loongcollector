@@ -18,8 +18,10 @@
 
 #include <json/json.h>
 
-#include "plugin/interface/Plugin.h"
 #include "common/LogstoreSenderQueue.h"
+#include "plugin/interface/Plugin.h"
+#include "queue/SenderQueueItem.h"
+#include "sdk/Common.h"
 
 namespace logtail {
 
@@ -28,11 +30,14 @@ public:
     virtual ~Flusher() = default;
 
     virtual bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) = 0;
-    virtual bool Register() = 0;
-    virtual bool Unregister(bool isPipelineRemoving) = 0;
+    virtual bool Register() { return true; }
+    virtual bool Unregister(bool isPipelineRemoving) { return true; }
     virtual void Send(PipelineEventGroup&& g) = 0;
     virtual void Flush(size_t key) = 0;
     virtual void FlushAll() = 0;
+    virtual sdk::AsynRequest* BuildRequest(SenderQueueItem* item) const = 0;
+    // virtual void OnSucess() {}
+    // virtual void OnFail() = 0;
 
     SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue() const { return mSenderQueue; }
 

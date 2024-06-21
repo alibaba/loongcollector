@@ -41,8 +41,6 @@ struct SenderQueueItem {
     const Flusher* mFlusher = nullptr;
     QueueKey mQueueKey;
 
-    std::string mConfigName; // TODO: temporarily used, should be replaced by mPipeline
-
     SendingStatus mStatus = SendingStatus::IDLE;
     time_t mEnqueTime = 0;
     time_t mLastSendTime = 0;
@@ -53,7 +51,14 @@ struct SenderQueueItem {
                     const Flusher* flusher,
                     QueueKey key,
                     RawDataType type = RawDataType::EVENT_GROUP,
-                    bool bufferOrNot = true);
+                    bool bufferOrNot = true)
+        : mData(std::move(data)),
+          mRawSize(rawSize),
+          mType(type),
+          mBufferOrNot(bufferOrNot),
+          mFlusher(flusher),
+          mQueueKey(key),
+          mEnqueTime(time(nullptr)) {}
 };
 
 struct SLSSenderQueueItem : public SenderQueueItem {

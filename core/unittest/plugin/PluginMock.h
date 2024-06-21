@@ -84,11 +84,10 @@ public:
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override { return true; }
-    bool Register() override { return true; }
-    bool Unregister(bool isPipelineRemoving) override { return true; }
     void Send(PipelineEventGroup&& g) override {}
     void Flush(size_t key) override { mFlushedQueues.push_back(key); }
     void FlushAll() override {}
+    sdk::AsynRequest* BuildRequest(SenderQueueItem* item) const override { return nullptr; }
 
     std::vector<size_t> mFlushedQueues;
 };

@@ -70,42 +70,47 @@ void ProfileSender::SetDefaultProfileProjectName(const string& profileProjectNam
     mDefaultProfileProjectName = profileProjectName;
 }
 
-string ProfileSender::GetProfileProjectName(const string& region, bool* existFlag) {
+string ProfileSender::GetProfileProjectName(const string& region) {
     ScopedSpinLock lock(mProfileLock);
     if (region.empty()) {
-        if (existFlag != NULL) {
-            *existFlag = false;
-        }
         return mDefaultProfileProjectName;
     }
-    unordered_map<string, string>::iterator iter = mAllProfileProjectNames.find(region);
-    if (iter == mAllProfileProjectNames.end()) {
-        if (existFlag != NULL) {
-            *existFlag = false;
-        }
+    auto iter = mRegionFlusherMap.find(region);
+    if (iter == mRegionFlusherMap.end()) {
         return mDefaultProfileProjectName;
     }
-    if (existFlag != NULL) {
-        *existFlag = true;
-    }
-    return iter->second;
+    return iter->second.mProject;
 }
 
 void ProfileSender::GetAllProfileRegion(vector<string>& allRegion) {
     ScopedSpinLock lock(mProfileLock);
-    if (mAllProfileProjectNames.find(mDefaultProfileRegion) == mAllProfileProjectNames.end()) {
+    if (mRegionFlusherMap.find(mDefaultProfileRegion) == mRegionFlusherMap.end()) {
         allRegion.push_back(mDefaultProfileRegion);
     }
-    for (unordered_map<string, string>::iterator iter = mAllProfileProjectNames.begin();
-         iter != mAllProfileProjectNames.end();
-         ++iter) {
+    for (auto iter = mRegionFlusherMap.begin(); iter != mRegionFlusherMap.end(); ++iter) {
         allRegion.push_back(iter->first);
     }
 }
 
 void ProfileSender::SetProfileProjectName(const string& region, const string& profileProject) {
     ScopedSpinLock lock(mProfileLock);
-    mAllProfileProjectNames[region] = profileProject;
+    FlusherSLS& flusher = mRegionFlusherMap[region];
+    flusher.mProject = profileProject;
+    flusher.mRegion = region;
+    flusher.mAliuid = STRING_FLAG(logtail_profile_aliuid);
+    // logstore is given at send time
+}
+
+FlusherSLS* ProfileSender::GetFlusher(const string& region) {
+    ScopedSpinLock lock(mProfileLock);
+    if (region.empty()) {
+        return &mRegionFlusherMap[mDefaultProfileRegion];
+    }
+    auto iter = mRegionFlusherMap.find(region);
+    if (iter == mRegionFlusherMap.end()) {
+        return &mRegionFlusherMap[mDefaultProfileRegion];
+    }
+    return &iter->second;
 }
 
 void ProfileSender::SendToProfileProject(const string& region, sls_logs::LogGroup& logGroup) {

@@ -27,9 +27,12 @@
 #include "common/LogstoreFeedbackQueue.h"
 #include "logger/Logger.h"
 #include "queue/SenderQueueItem.h"
+#include "sender/ConcurrencyLimiter.h"
 #include "sender/SenderQueueParam.h"
 
 namespace logtail {
+
+class FlusherSLS;
 
 struct LogstoreSenderStatistics {
     LogstoreSenderStatistics();
@@ -114,9 +117,7 @@ public:
         }
     }
 
-    void GetAllIdleLoggroupWithLimit(std::vector<SenderQueueItem*>& logGroupVec,
-                                     int32_t nowTime,
-                                     std::unordered_map<std::string, int>& regionConcurrencyLimits) {
+    void GetAllIdleLoggroupWithLimit(std::vector<SenderQueueItem*>& logGroupVec, int32_t nowTime) {
         bool expireFlag = (mFlowControlExpireTime > 0 && nowTime > mFlowControlExpireTime);
         if (this->mSize == 0 || (!expireFlag && mMaxSendBytesPerSecond == 0)) {
             return;
@@ -126,12 +127,10 @@ public:
             mLastSendTimeSecond = nowTime;
         }
 
-        int regionConcurrency = -1;
-        auto iter = regionConcurrencyLimits.find(mSenderInfo.mRegion);
-        if (iter != regionConcurrencyLimits.end())
-            regionConcurrency = iter->second;
-        if (0 == regionConcurrency) {
-            return;
+        for (auto &limiter: mLimiters) {
+            if (limiter->IsValidToPop(mSenderInfo.mRegion)) {
+                return;
+            }
         }
 
         uint64_t index = QueueType::ExactlyOnce == this->mType ? 0 : this->mRead;
@@ -153,15 +152,10 @@ public:
                 mLastSecondTotalBytes += item->mRawSize;
                 item->mStatus = SendingStatus::SENDING;
                 logGroupVec.push_back(item);
-                if (-1 != regionConcurrency) {
-                    if (0 == --regionConcurrency) {
-                        break;
-                    }
+                for (auto &limiter: mLimiters) {
+                    limiter->PostPop(mSenderInfo.mRegion);
                 }
             }
-        }
-        if (iter != regionConcurrencyLimits.end()) {
-            iter->second = regionConcurrency;
         }
     }
 
@@ -386,6 +380,8 @@ public:
 
     std::vector<RangeCheckpointPtr> mRangeCheckpoints;
     std::deque<SLSSenderQueueItem*> mExtraBuffers;
+
+    std::vector<Limiter*> mLimiters;
 };
 
 template <class PARAM>
@@ -467,10 +463,7 @@ public:
         return true;
     }
 
-    void CheckAndPopAllItem(std::vector<SenderQueueItem*>& itemVec,
-                            int32_t curTime,
-                            bool& singleQueueFullFlag,
-                            std::unordered_map<std::string, int>& regionConcurrencyLimits) {
+    void CheckAndPopAllItem(std::vector<SenderQueueItem*>& itemVec, int32_t curTime, bool& singleQueueFullFlag) {
         singleQueueFullFlag = false;
         PTScopedLock dataLock(mLock);
         if (mLogstoreSenderQueueMap.empty()) {
@@ -484,24 +477,21 @@ public:
         LogstoreFeedBackQueueMapIterator beginIter = mLogstoreSenderQueueMap.begin();
         std::advance(beginIter, mSenderQueueBeginIndex++);
 
-        PopItem(
-            beginIter, mLogstoreSenderQueueMap.end(), itemVec, curTime, regionConcurrencyLimits, singleQueueFullFlag);
-        PopItem(
-            mLogstoreSenderQueueMap.begin(), beginIter, itemVec, curTime, regionConcurrencyLimits, singleQueueFullFlag);
+        PopItem(beginIter, mLogstoreSenderQueueMap.end(), itemVec, curTime, singleQueueFullFlag);
+        PopItem(mLogstoreSenderQueueMap.begin(), beginIter, itemVec, curTime, singleQueueFullFlag);
     }
 
     static void PopItem(LogstoreFeedBackQueueMapIterator beginIter,
                         LogstoreFeedBackQueueMapIterator endIter,
                         std::vector<SenderQueueItem*>& itemVec,
                         int32_t curTime,
-                        std::unordered_map<std::string, int>& regionConcurrencyLimits,
                         bool& singleQueueFullFlag) {
         for (LogstoreFeedBackQueueMapIterator iter = beginIter; iter != endIter; ++iter) {
             SingleLogStoreManager& singleQueue = iter->second;
             if (!singleQueue.IsValidToSend(curTime)) {
                 continue;
             }
-            singleQueue.GetAllIdleLoggroupWithLimit(itemVec, curTime, regionConcurrencyLimits);
+            singleQueue.GetAllIdleLoggroupWithLimit(itemVec, curTime);
             singleQueueFullFlag |= !singleQueue.IsValid();
         }
     }

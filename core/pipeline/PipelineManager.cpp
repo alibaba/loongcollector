@@ -83,6 +83,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
     if (isFileServerStarted && (isInputFileChanged || isInputContainerStdioChanged)) {
         FileServer::GetInstance()->Pause();
     }
+    Sender::Instance()->SetQueueUrgent(); // TODO: temporary used
     LogProcess::GetInstance()->HoldOn();
     LogtailPlugin::GetInstance()->HoldOn(false);
 #endif
@@ -186,6 +187,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         ShennongManager::GetInstance()->Resume();
     }
 #endif
+    Sender::Instance()->ResetQueueUrgent(); // TODO: temporary used
 #endif
 }
 

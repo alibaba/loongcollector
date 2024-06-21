@@ -26,6 +26,7 @@
 #include "pipeline/Pipeline.h"
 #include "sdk/Common.h"
 #include "sender/PackIdManager.h"
+#include "sender/SLSClientManager.h"
 #include "sender/Sender.h"
 
 using namespace std;
@@ -33,6 +34,9 @@ using namespace std;
 DEFINE_FLAG_INT32(batch_send_interval, "batch sender interval (second)(default 3)", 3);
 DEFINE_FLAG_INT32(merge_log_count_limit, "log count in one logGroup at most", 4000);
 DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 256KB)", 256 * 1024);
+DEFINE_FLAG_INT32(send_check_real_ip_interval, "seconds", 2);
+
+DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
 namespace logtail {
 
@@ -80,6 +84,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
     mLogstoreKey = GenerateLogstoreFeedBackKey(mProject, mLogstore);
     mSenderQueue = Sender::Instance()->GetSenderQueue(mLogstoreKey);
+    mSenderQueue->mLimiters.emplace_back(&sRegionConcurrencyLimiter); // TODO: temporary solution
 
 #ifdef __ENTERPRISE__
     if (EnterpriseConfigProvider::GetInstance()->IsDataServerPrivateCloud()) {
@@ -125,7 +130,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 #endif
             mEndpoint = TrimString(mEndpoint);
             if (!mEndpoint.empty()) {
-                Sender::Instance()->AddEndpointEntry(mRegion, StandardizeEndpoint(mEndpoint, mEndpoint));
+                SLSClientManager::GetInstance()->AddEndpointEntry(mRegion, StandardizeEndpoint(mEndpoint, mEndpoint));
             }
         }
 #ifdef __ENTERPRISE__
@@ -272,14 +277,14 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 bool FlusherSLS::Register() {
     Sender::Instance()->IncreaseProjectReferenceCnt(mProject);
     Sender::Instance()->IncreaseRegionReferenceCnt(mRegion);
-    Sender::Instance()->IncreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
+    SLSClientManager::GetInstance()->IncreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
     return true;
 }
 
 bool FlusherSLS::Unregister(bool isPipelineRemoving) {
     Sender::Instance()->DecreaseProjectReferenceCnt(mProject);
     Sender::Instance()->DecreaseRegionReferenceCnt(mRegion);
-    Sender::Instance()->DecreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
+    SLSClientManager::GetInstance()->DecreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
     return true;
 }
 
@@ -305,6 +310,64 @@ void FlusherSLS::FlushAll() {
     vector<BatchedEventsList> res;
     mBatcher.FlushAll(res);
     SerializeAndPush(std::move(res));
+}
+
+sdk::AsynRequest* FlusherSLS::BuildRequest(SenderQueueItem* item) const {
+    auto data = static_cast<SLSSenderQueueItem*>(item);
+    static int32_t lastResetEndpointTime = 0;
+    sdk::Client* sendClient = SLSClientManager::GetInstance()->GetClient(mRegion, mAliuid);
+    int32_t curTime = time(NULL);
+
+    data->mCurrentEndpoint = sendClient->GetRawSlsHost();
+    if (data->mCurrentEndpoint.empty()) {
+        if (curTime - lastResetEndpointTime >= 30) {
+            SLSClientManager::GetInstance()->ResetClientEndpoint(mAliuid, mRegion, curTime);
+            data->mCurrentEndpoint = sendClient->GetRawSlsHost();
+            lastResetEndpointTime = curTime;
+        }
+    }
+    if (BOOL_FLAG(send_prefer_real_ip)) {
+        if (curTime - sendClient->GetSlsRealIpUpdateTime() >= INT32_FLAG(send_check_real_ip_interval)) {
+            SLSClientManager::GetInstance()->UpdateSendClientRealIp(sendClient, mRegion);
+        }
+        data->mRealIpFlag = sendClient->GetRawSlsHostFlag();
+    }
+
+    SendClosure* sendClosure = new SendClosure;
+    sendClosure->mDataPtr = item;
+    if (data->mType == RawDataType::EVENT_GROUP) {
+        auto& exactlyOnceCpt = data->mExactlyOnceCheckpoint;
+        const auto& hashKey = exactlyOnceCpt ? exactlyOnceCpt->data.hash_key() : data->mShardHashKey;
+        if (hashKey.empty()) {
+            return sendClient->CreatePostLogStoreLogsRequest(mProject,
+                                                             data->mLogstore,
+                                                             ConvertCompressType(GetCompressType()),
+                                                             data->mData,
+                                                             data->mRawSize,
+                                                             sendClosure);
+        } else {
+            int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
+            return sendClient->CreatePostLogStoreLogsRequest(mProject,
+                                                             data->mLogstore,
+                                                             ConvertCompressType(GetCompressType()),
+                                                             data->mData,
+                                                             data->mRawSize,
+                                                             sendClosure,
+                                                             hashKey,
+                                                             hashKeySeqID);
+        }
+    } else {
+        if (data->mShardHashKey.empty())
+            return sendClient->CreatePostLogStoreLogPackageListRequest(
+                mProject, data->mLogstore, ConvertCompressType(GetCompressType()), data->mData, sendClosure);
+        else
+            return sendClient->CreatePostLogStoreLogPackageListRequest(mProject,
+                                                                       data->mLogstore,
+                                                                       ConvertCompressType(GetCompressType()),
+                                                                       data->mData,
+                                                                       sendClosure,
+                                                                       data->mShardHashKey);
+    }
 }
 
 bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
@@ -529,5 +592,7 @@ sls_logs::SlsCompressType ConvertCompressType(CompressType type) {
     }
     return compressType;
 }
+
+ConcurrencyLimiter FlusherSLS::sRegionConcurrencyLimiter;
 
 } // namespace logtail

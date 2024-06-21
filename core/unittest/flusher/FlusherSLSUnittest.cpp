@@ -25,6 +25,7 @@
 #endif
 #include "flusher/FlusherSLS.h"
 #include "pipeline/PipelineContext.h"
+#include "sender/SLSClientManager.h"
 #include "sender/Sender.h"
 #include "unittest/Unittest.h"
 
@@ -194,10 +195,10 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
-    auto iter = Sender::Instance()->mRegionEndpointEntryMap.find("cn-hangzhou");
-    APSARA_TEST_NOT_EQUAL(Sender::Instance()->mRegionEndpointEntryMap.end(), iter);
-    APSARA_TEST_NOT_EQUAL(iter->second->mEndpointDetailMap.end(),
-                          iter->second->mEndpointDetailMap.find("http://cn-hangzhou.log.aliyuncs.com"));
+    auto iter = SLSClientManager::GetInstance()->mRegionEndpointEntryMap.find("cn-hangzhou");
+    APSARA_TEST_NOT_EQUAL(SLSClientManager::GetInstance()->mRegionEndpointEntryMap.end(), iter);
+    APSARA_TEST_NOT_EQUAL(iter->second.mEndpointInfoMap.end(),
+                          iter->second.mEndpointInfoMap.find("http://cn-hangzhou.log.aliyuncs.com"));
 
     // TelemetryType
     configStr = R"(
@@ -397,26 +398,26 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(flusher1.Register());
     APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
-    APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
+    APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 
     APSARA_TEST_TRUE(flusher2.Register());
     APSARA_TEST_EQUAL(2U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
 #ifdef __ENTERPRISE__
-    APSARA_TEST_EQUAL(2U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
+    APSARA_TEST_EQUAL(2U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 #else
-    APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
+    APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 #endif
 
     APSARA_TEST_TRUE(flusher2.Unregister(true));
     APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
-    APSARA_TEST_EQUAL(1U, Sender::Instance()->GetRegionAliuids("cn-hangzhou").size());
+    APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 
     APSARA_TEST_TRUE(flusher1.Unregister(true));
     APSARA_TEST_TRUE(Sender::Instance()->mProjectRefCntMap.empty());
     APSARA_TEST_FALSE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
-    APSARA_TEST_TRUE(Sender::Instance()->GetRegionAliuids("cn-hangzhou").empty());
+    APSARA_TEST_TRUE(SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").empty());
 }
 
 UNIT_TEST_CASE(FlusherSLSUnittest, OnSuccessfulInit)
