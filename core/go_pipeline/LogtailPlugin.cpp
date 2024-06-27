@@ -195,7 +195,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
     if (shardHashSize > 0) {
         shardHashStr.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
-    return pConfig->Send(std::string(pbBuffer, pbSize), shardHash, logstore) ? 0 : -1;
+    return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
 }
 
 int LogtailPlugin::ExecPluginCmd(
