@@ -234,7 +234,7 @@ bool Config::Parse() {
                                        mProject,
                                        mLogstore,
                                        mRegion);
-                } else {
+                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginName)) {
                     PARAM_ERROR_RETURN(
                         sLogger, alarm, "unsupported input plugin", pluginName, mName, mProject, mLogstore, mRegion);
                 }
