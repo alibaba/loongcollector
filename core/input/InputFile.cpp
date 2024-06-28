@@ -150,7 +150,7 @@ bool InputFile::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value
                               mContext->GetProjectName(),
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
-    } else {
+    } else if (exactlyOnceConcurrency > 0) {
         mExactlyOnceConcurrency = exactlyOnceConcurrency;
         mContext->SetExactlyOnceFlag(true);
     }
