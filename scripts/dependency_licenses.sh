@@ -34,7 +34,7 @@ function find_go_dependencies() {
   		*) continue;;
   	esac
     cd  $main_path
-  	GOOS=${target%%/*} GOARCH=${target##*/} go list -deps -f '{{with .Module}}{{.Path}}@@@{{.Replace}}{{end}}' . >> "${output_file}-temp"
+  	GOOS=${target%%/*} GOARCH=${target##*/} go list -deps -f '{{with .Module}}{{.Path}}@@@{{.Replace}}{{end}}' ./... >> "${output_file}-temp"
   	cd -
   done
   LC_ALL=C sort -u "${output_file}-temp" > "${output_file}-compress"

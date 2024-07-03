@@ -170,26 +170,22 @@ check-dependency-licenses: clean import_plugins
 docs: clean build
 	./bin/ilogtail --doc
 
-.PHONY: e2e-docs
-e2e-docs: clean
-	cd test && go build -o ilogtail-test-tool  . && ./ilogtail-test-tool docs && rm -f ilogtail-test-tool
-
 # e2e test
 .PHONY: e2e
 e2e: clean gocdocker e2edocker
-	TEST_DEBUG=$(TEST_DEBUG) TEST_PROFILE=$(TEST_PROFILE)  ./scripts/e2e.sh behavior $(TEST_SCOPE)
+	./scripts/e2e.sh e2e
 
 .PHONY: e2e-core
 e2e-core: clean gocdocker e2edocker
-	TEST_DEBUG=$(TEST_DEBUG) TEST_PROFILE=$(TEST_PROFILE)  ./scripts/e2e.sh core $(TEST_SCOPE)
+	./scripts/e2e.sh e2e core
 
 .PHONY: e2e-performance
 e2e-performance: clean docker gocdocker
-	TEST_DEBUG=$(TEST_DEBUG) TEST_PROFILE=$(TEST_PROFILE)  ./scripts/e2e.sh performance $(TEST_SCOPE)
+	./scripts/e2e.sh e2e performance
 
 .PHONY: unittest_e2e_engine
 unittest_e2e_engine: clean gocdocker
-	cd test && go test  ./... -coverprofile=../e2e-engine-coverage.txt -covermode=atomic -tags docker_ready
+	cd test && go test  $$(go list ./... | grep -Ev "engine|e2e") -coverprofile=../e2e-engine-coverage.txt -covermode=atomic -tags docker_ready
 
 .PHONY: unittest_plugin
 unittest_plugin: clean import_plugins
