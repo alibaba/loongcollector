@@ -25,6 +25,8 @@ MAINTAINER TomYu yyuuttaaoo@gmail.com
 
 ENV container docker
 
+RUN curl -L -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
+
 RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 
 ARG HOST_OS=Linux
