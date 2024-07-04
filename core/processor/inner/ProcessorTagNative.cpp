@@ -48,9 +48,10 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
 
     // process level
 #ifdef __ENTERPRISE__
-    const string& agent_tag = EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
-    if (!agent_tag.empty()) {
-        logGroup.SetTagNoCopy(LOG_RESERVED_KEY_USER_DEFINED_ID, agent_tag);
+    string agentTag = EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
+    if (!agentTag.empty()) {
+        auto sb = logGroup.GetSourceBuffer()->CopyString(agentTag);
+        logGroup.SetTagNoCopy(LOG_RESERVED_KEY_USER_DEFINED_ID, StringView(sb.data, sb.size));
     }
 #endif
 
@@ -70,7 +71,8 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     // process level
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LogFileProfiler::mHostname);
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LogFileProfiler::mIpAddr);
-    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, Application::GetInstance()->GetUUID());
+    auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
     static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();
     if (!sEnvTags.empty()) {
         for (size_t i = 0; i < sEnvTags.size(); ++i) {
