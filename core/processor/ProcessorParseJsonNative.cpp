@@ -176,7 +176,7 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
 
 std::string ProcessorParseJsonNative::RapidjsonValueToString(const rapidjson::Value& value) {
     if (value.IsString())
-        return value.GetString();
+        return std::string(value.GetString(), value.GetStringLength());
     else if (value.IsBool())
         return ToString(value.GetBool());
     else if (value.IsInt())
@@ -196,7 +196,7 @@ std::string ProcessorParseJsonNative::RapidjsonValueToString(const rapidjson::Va
         rapidjson::StringBuffer buffer;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
         value.Accept(writer);
-        return buffer.GetString();
+        return std::string(buffer.GetString(), buffer.GetLength());
     }
 }
 
