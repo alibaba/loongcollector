@@ -1,4 +1,4 @@
-# Copyright 2022 iLogtail Authors
+# Copyright 2024 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,17 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# This file is used to collect all source files in common directory
 
-cmake_minimum_required(VERSION 3.22)
-project(checkpoint)
+# Add include directory
+include_directories(flusher)
 
-file(GLOB LIB_SOURCE_FILES *.cpp *.h)
-append_source_files(LIB_SOURCE_FILES)
-add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} common)
-target_link_libraries(${PROJECT_NAME} logger)
-target_link_libraries(${PROJECT_NAME} monitor)
-target_link_libraries(${PROJECT_NAME} config_manager)
-target_link_libraries(${PROJECT_NAME} app_config)
-target_link_libraries(${PROJECT_NAME} input)
-link_leveldb(${PROJECT_NAME})
+# Add source files
+file(GLOB THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/flusher/*.c ${CMAKE_SOURCE_DIR}/flusher/*.cc ${CMAKE_SOURCE_DIR}/flusher/*.cpp ${CMAKE_SOURCE_DIR}/flusher/*.h)
+
+# Set source files to parent
+set(SUBDIR_SOURCE_FILES ${SUBDIR_SOURCE_FILES} ${THIS_SOURCE_FILES})
