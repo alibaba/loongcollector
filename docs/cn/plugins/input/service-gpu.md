@@ -2,7 +2,7 @@
 
 ## 简介
 
-`service_gpu_metric` `input`插件可以采集 英伟达 GPU 相关指标（如未按照英伟达驱动，此插件无法正常工作）。
+`service_gpu_metric` `input`插件可以采集 英伟达 GPU 相关指标（如未安装英伟达驱动，此插件无法正常工作）。
 
 ## 版本
 
