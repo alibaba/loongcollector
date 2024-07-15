@@ -63,6 +63,10 @@ public:
     void SetTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
 
+    std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
+    std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+    size_t TagsSize() const { return mTags.mInner.size(); }
+
     size_t DataSize() const override;
 
 #ifdef APSARA_UNIT_TEST_MAIN
