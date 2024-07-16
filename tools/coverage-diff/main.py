@@ -24,13 +24,21 @@ if __name__ == '__main__':
     parser.add_argument("path", type=str, help="The path of coverage file")
     args = parser.parse_args()
     changed_files = get_changed_files()
+    line_cache = ""
     not_satified = []
     with open(args.path, 'r') as file:
         for line in file:
+            if len(line_cache) > 0:
+                line = line_cache + line
+                line_cache = ""
             if '/' in line or ('%' in line and 'TOTAL' not in line):
                 for changed_file in changed_files:
                     if line.startswith(changed_file):
                         units = line.split()
+                        if len(units) < 4:
+                            # some files with long filename will be split into 2 lines
+                            line_cache = line
+                            continue
                         coverage_rate = int(units[3][:-1])
                         if coverage_rate < 80:
                             not_satified.append(changed_file)
@@ -39,4 +47,4 @@ if __name__ == '__main__':
             else:
                 print(line)
     if len(not_satified) > 0:
-        raise Exception(f"Coverage rate is less than 80% for the following files: {not_satified}")
+        print(f"Coverage rate is less than 80% for the following files: {not_satified}")

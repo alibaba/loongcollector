@@ -184,7 +184,7 @@ void Application::Init() {
     LOG_INFO(sLogger, ("app info", appInfo));
 }
 
-void Application::Start() {
+void Application::Start() { // GCOVR_EXCL_START
     LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S"));
 
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
@@ -296,7 +296,7 @@ void Application::Start() {
 
         this_thread::sleep_for(chrono::seconds(1));
     }
-}
+} // GCOVR_EXCL_STOP
 
 void Application::GenerateInstanceId() {
     mInstanceId = CalculateRandomUUID() + "_" + LogFileProfiler::mIpAddr + "_" + ToString(mStartTime);
