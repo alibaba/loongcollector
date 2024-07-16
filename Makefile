@@ -20,6 +20,7 @@ BUILD_REPOSITORY ?= aliyun/ilogtail_build
 GENERATED_HOME ?= generated_files
 PLUGINS_CONFIG_FILE ?= "plugins.yml,external_plugins.yml"
 GO_MOD_FILE ?= go.mod
+PATH_IN_DOCER ?= /src
 DOCKER_BUILD_EXPORT_GO_ENVS ?= true
 DOCKER_BUILD_COPY_GIT_CONFIGS ?= true
 DOCKER_BUILD_USE_BUILDKIT ?=
@@ -119,7 +120,7 @@ lint-e2e: clean tools
 
 .PHONY: core
 core: clean import_plugins
-	./scripts/gen_build_scripts.sh core $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR) $(DOCKER_BUILD_EXPORT_GO_ENVS) $(DOCKER_BUILD_COPY_GIT_CONFIGS) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE)
+	./scripts/gen_build_scripts.sh core $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR) $(DOCKER_BUILD_EXPORT_GO_ENVS) $(DOCKER_BUILD_COPY_GIT_CONFIGS) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE) $(PATH_IN_DOCKER)
 	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false $(DOCKER_BUILD_USE_BUILDKIT)
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
