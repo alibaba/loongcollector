@@ -36,9 +36,9 @@ public:
         return &instance;
     }
 
-    void UpdatePipelines(ConfigDiff& diff);
-    std::shared_ptr<Pipeline> FindPipelineByName(const std::string& configName) const;
-    std::vector<std::string> GetAllPipelineNames() const;
+    void UpdatePipelines(PipelineConfigDiff& diff);
+    std::shared_ptr<Pipeline> FindConfigByName(const std::string& configName) const;
+    std::vector<std::string> GetAllConfigNames() const;
     std::string GetPluginStatistics() const;
     // for shennong only
     const std::unordered_map<std::string, std::shared_ptr<Pipeline>>& GetAllPipelines() const {
@@ -51,7 +51,7 @@ private:
     PipelineManager() = default;
     ~PipelineManager() = default;
 
-    virtual std::shared_ptr<Pipeline> BuildPipeline(Config&& config); // virtual for ut
+    virtual std::shared_ptr<Pipeline> BuildPipeline(PipelineConfig&& config); // virtual for ut
     void IncreasePluginUsageCnt(
         const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& statistics);
     void DecreasePluginUsageCnt(

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,30 +14,24 @@
  * limitations under the License.
  */
 
-#pragma once
 
-#include <filesystem>
-#include <mutex>
-#include <string>
+#include "config/feedbacker/ConfigFeedbackable.h"
 
 namespace logtail {
 
-class ConfigProvider {
-public:
-    ConfigProvider(const ConfigProvider&) = delete;
-    ConfigProvider& operator=(const ConfigProvider&) = delete;
-
-    virtual void Init(const std::string& dir);
-    virtual void Stop() = 0;
-
-protected:
-    ConfigProvider() = default;
-    virtual ~ConfigProvider() = default;
-
-    std::filesystem::path mPipelineSourceDir;
-    std::filesystem::path mProcessSourceDir;
-    mutable std::mutex mPipelineMux;
-    mutable std::mutex mProcessMux;
-};
+std::string_view ToStringView(ConfigFeedbackStatus status) {
+    switch (status) {
+        case ConfigFeedbackStatus::APPLYING:
+            return "APPLYING";
+        case ConfigFeedbackStatus::APPLIED:
+            return "APPLIED";
+        case ConfigFeedbackStatus::FAILED:
+            return "FAILED";
+        case ConfigFeedbackStatus::DELETED:
+            return "DELETED";
+        default:
+            return "UNKNOWN";
+    }
+}
 
 } // namespace logtail

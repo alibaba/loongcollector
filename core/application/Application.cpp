@@ -42,7 +42,8 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/MetricExportor.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineManager.h"
+#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/ProcessConfigManager.h"
 #include "plugin/PluginRegistry.h"
 #include "processor/daemon/LogProcess.h"
 #include "sender/Sender.h"
@@ -193,17 +194,32 @@ void Application::Start() { // GCOVR_EXCL_START
     // flusher_sls should always be loaded, since profiling will rely on this.
     Sender::Instance()->Init();
 
-    // add local config dir
-    filesystem::path localConfigPath
-        = filesystem::path(AppConfig::GetInstance()->GetLogtailSysConfDir()) / "config" / "local";
-    error_code ec;
-    filesystem::create_directories(localConfigPath, ec);
-    if (ec) {
-        LOG_WARNING(sLogger,
-                    ("failed to create dir for local config",
-                     "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
+    {
+        // add local config dir
+        filesystem::path localConfigPath
+            = filesystem::path(AppConfig::GetInstance()->GetLogtailSysConfDir()) / "config" / "local";
+        error_code ec;
+        filesystem::create_directories(localConfigPath, ec);
+        if (ec) {
+            LOG_WARNING(sLogger,
+                        ("failed to create dir for local pipelineconfig",
+                         "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
+        }
+        ConfigWatcher::GetInstance()->AddPipelineSource(localConfigPath.string());
     }
-    ConfigWatcher::GetInstance()->AddSource(localConfigPath.string());
+    {
+        // add local config dir
+        filesystem::path localConfigPath
+            = filesystem::path(AppConfig::GetInstance()->GetLogtailSysConfDir()) / "processconfig" / "local";
+        error_code ec;
+        filesystem::create_directories(localConfigPath, ec);
+        if (ec) {
+            LOG_WARNING(sLogger,
+                        ("failed to create dir for local processconfig",
+                         "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
+        }
+        ConfigWatcher::GetInstance()->AddProcessSource(localConfigPath.string());
+    }
 
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
@@ -251,9 +267,13 @@ void Application::Start() { // GCOVR_EXCL_START
             lastCheckTagsTime = curTime;
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
-            ConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-            if (!diff.IsEmpty()) {
-                PipelineManager::GetInstance()->UpdatePipelines(diff);
+            PipelineConfigDiff pipelineConfigDiff = ConfigWatcher::GetInstance()->CheckPipelineConfigDiff();
+            if (!pipelineConfigDiff.IsEmpty()) {
+                PipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff);
+            }
+            ProcessConfigDiff processConfigDiff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+            if (!processConfigDiff.IsEmpty()) {
+                ProcessConfigManager::GetInstance()->UpdateProcessConfigs(processConfigDiff);
             }
             lastConfigCheckTime = curTime;
         }

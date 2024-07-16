@@ -18,7 +18,7 @@
 
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "plugin/instance/ProcessorInstance.h"
 #include "processor/ProcessorParseTimestampNative.h"
 #include "unittest/Unittest.h"

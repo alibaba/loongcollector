@@ -59,7 +59,7 @@
 #include "application/Application.h"
 #include "config_manager/ConfigManager.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "pipeline/PipelineManager.h"
+#include "pipeline/PipelineConfigManager.h"
 #include "plugin/PluginRegistry.h"
 #include "file_server/FileServer.h"
 #include "input/InputContainerStdio.h"
@@ -402,7 +402,7 @@ void EventDispatcher::AddExistedFileEvents(const char* path, int wd) {
 
 EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
     CheckPointPtr& checkpoint, map<DevInode, SplitedFilePath>& cachePathDevInodeMap, vector<Event*>& eventVec) {
-    shared_ptr<Pipeline> config = PipelineManager::GetInstance()->FindPipelineByName(checkpoint->mConfigName);
+    shared_ptr<Pipeline> config = PipelineManager::GetInstance()->FindConfigByName(checkpoint->mConfigName);
     if (config == NULL) {
         LOG_INFO(sLogger,
                  ("delete checkpoint", "the corresponding config is deleted")("config", checkpoint->mConfigName)(

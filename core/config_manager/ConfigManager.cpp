@@ -54,7 +54,7 @@
 #include "monitor/LogLineCount.h"
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
+#include "pipeline/PipelineConfigManager.h"
 #include "processor/daemon/LogProcess.h"
 #include "sender/Sender.h"
 

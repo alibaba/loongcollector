@@ -17,7 +17,7 @@
 
 #include "common/Constants.h"
 #include "common/JsonUtil.h"
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
 

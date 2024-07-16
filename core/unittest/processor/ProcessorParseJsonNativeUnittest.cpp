@@ -14,7 +14,7 @@
 #include <cstdlib>
 
 #include "common/JsonUtil.h"
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "models/LogEvent.h"
 #include "plugin/instance/ProcessorInstance.h"
 #include "processor/ProcessorParseJsonNative.h"

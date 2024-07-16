@@ -23,7 +23,7 @@
 #include "boost/utility/string_view.hpp"
 #include "common/Constants.h"
 #include "common/JsonUtil.h"
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "models/LogEvent.h"
 #include "processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "processor/inner/ProcessorParseContainerLogNative.h"

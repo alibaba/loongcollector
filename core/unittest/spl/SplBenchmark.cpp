@@ -15,7 +15,7 @@
 #include "unittest/Unittest.h"
 
 #include "common/JsonUtil.h"
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "processor/ProcessorSPL.h"
 #include "processor/ProcessorParseRegexNative.h"
 #include "processor/ProcessorParseJsonNative.h"

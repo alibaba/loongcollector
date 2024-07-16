@@ -45,7 +45,7 @@ void AddExtendedGlobalParamToGoPipeline(const Json::Value& extendedParams, Json:
     }
 }
 
-bool Pipeline::Init(Config&& config) {
+bool Pipeline::Init(PipelineConfig&& config) {
     mName = config.mName;
     mConfig = std::move(config.mDetail);
     mContext.SetConfigName(mName);

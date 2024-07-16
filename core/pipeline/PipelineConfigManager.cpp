@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "pipeline/PipelineManager.h"
+#include "pipeline/PipelineConfigManager.h"
 
 #include "config_manager/ConfigManager.h"
 #include "file_server/FileServer.h"
@@ -29,6 +29,7 @@
 #include "shennong/ShennongManager.h"
 #include "streamlog/StreamLogManager.h"
 #endif
+#include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 
@@ -36,7 +37,7 @@ using namespace std;
 
 namespace logtail {
 
-void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
+void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
 #ifndef APSARA_UNIT_TEST_MAIN
     // 过渡使用
     static bool isFileServerStarted = false, isInputObserverStarted = false;
@@ -93,6 +94,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
         iter->second->RemoveProcessQueue();
         mPipelineNameEntityMap.erase(iter);
+        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(name, ConfigFeedbackStatus::DELETED);
     }
     for (auto& config : diff.mModified) {
         auto p = BuildPipeline(std::move(config));
@@ -107,8 +109,10 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
                 config.mLogstore,
                 config.mRegion);
             diff.mUnchanged.push_back(config.mName);
+            ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::FAILED);
             continue;
         }
+        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
         LOG_INFO(sLogger,
                  ("pipeline building for existing config succeeded",
                   "stop the old pipeline and start the new one")("config", config.mName));
@@ -131,10 +135,12 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
                 config.mProject,
                 config.mLogstore,
                 config.mRegion);
+            ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::FAILED);
             continue;
         }
         LOG_INFO(sLogger,
                  ("pipeline building for new config succeeded", "begin to start pipeline")("config", config.mName));
+        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
         mPipelineNameEntityMap[config.mName] = p;
         IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();
@@ -189,7 +195,7 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
 #endif
 }
 
-shared_ptr<Pipeline> PipelineManager::FindPipelineByName(const string& configName) const {
+shared_ptr<Pipeline> PipelineManager::FindConfigByName(const string& configName) const {
     auto it = mPipelineNameEntityMap.find(configName);
     if (it != mPipelineNameEntityMap.end()) {
         return it->second;
@@ -197,7 +203,7 @@ shared_ptr<Pipeline> PipelineManager::FindPipelineByName(const string& configNam
     return nullptr;
 }
 
-vector<string> PipelineManager::GetAllPipelineNames() const {
+vector<string> PipelineManager::GetAllConfigNames() const {
     vector<string> res;
     for (const auto& item : mPipelineNameEntityMap) {
         res.push_back(item.first);
@@ -248,7 +254,7 @@ void PipelineManager::StopAllPipelines() {
     LOG_INFO(sLogger, ("stop all pipelines", "succeeded"));
 }
 
-shared_ptr<Pipeline> PipelineManager::BuildPipeline(Config&& config) {
+shared_ptr<Pipeline> PipelineManager::BuildPipeline(PipelineConfig&& config) {
     shared_ptr<Pipeline> p = make_shared<Pipeline>();
     // only config.mDetail is removed, other members can be safely used later
     if (!p->Init(std::move(config))) {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 
 #include <string>
 
@@ -94,7 +94,7 @@ static void ReplaceEnvVarRef(Json::Value& value, bool& res) {
     }
 }
 
-bool Config::Parse() {
+bool PipelineConfig::Parse() {
     if (BOOL_FLAG(enable_env_ref_in_config)) {
         if (ReplaceEnvVar()) {
             LOG_INFO(sLogger, ("env vars in config are replaced, config", mDetail->toStyledString())("config", mName));
@@ -698,7 +698,7 @@ bool Config::Parse() {
     return true;
 }
 
-bool Config::ReplaceEnvVar() {
+bool PipelineConfig::ReplaceEnvVar() {
     bool res = false;
     ReplaceEnvVarRef(*mDetail, res);
     return res;

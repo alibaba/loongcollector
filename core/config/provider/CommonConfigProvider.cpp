@@ -285,19 +285,19 @@ void CommonConfigProvider::UpdateRemoteConfig(
     const google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>& checkResults,
     const google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail>& configDetails) {
     error_code ec;
-    filesystem::create_directories(mSourceDir, ec);
+    filesystem::create_directories(mPipelineSourceDir, ec);
     if (ec) {
         StopUsingConfigServer();
         LOG_ERROR(sLogger,
                   ("failed to create dir for common configs", "stop receiving config from common config server")(
-                      "dir", mSourceDir.string())("error code", ec.value())("error msg", ec.message()));
+                      "dir", mPipelineSourceDir.string())("error code", ec.value())("error msg", ec.message()));
         return;
     }
 
-    lock_guard<mutex> lock(mMux);
+    lock_guard<mutex> lock(mPipelineMux);
     for (const auto& checkResult : checkResults) {
-        filesystem::path filePath = mSourceDir / (checkResult.name() + ".yaml");
-        filesystem::path tmpFilePath = mSourceDir / (checkResult.name() + ".yaml.new");
+        filesystem::path filePath = mPipelineSourceDir / (checkResult.name() + ".yaml");
+        filesystem::path tmpFilePath = mPipelineSourceDir / (checkResult.name() + ".yaml.new");
         switch (checkResult.check_status()) {
             case configserver::proto::DELETED:
                 mConfigNameVersionMap.erase(checkResult.name());

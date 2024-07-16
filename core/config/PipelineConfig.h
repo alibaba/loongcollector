@@ -27,7 +27,7 @@
 
 namespace logtail {
 
-struct Config {
+struct PipelineConfig {
     std::string mName;
     std::unique_ptr<Json::Value> mDetail;
     uint32_t mCreateTime = 0;
@@ -49,7 +49,7 @@ struct Config {
     std::string mLogstore;
     std::string mRegion;
 
-    Config(const std::string& name, std::unique_ptr<Json::Value>&& detail) : mName(name), mDetail(std::move(detail)) {}
+    PipelineConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail) : mName(name), mDetail(std::move(detail)) {}
 
     bool Parse();
 
@@ -75,11 +75,11 @@ struct Config {
     bool ReplaceEnvVar();
 };
 
-inline bool operator==(const Config& lhs, const Config& rhs) {
+inline bool operator==(const PipelineConfig& lhs, const PipelineConfig& rhs) {
     return (lhs.mName == rhs.mName) && (*lhs.mDetail == *rhs.mDetail);
 }
 
-inline bool operator!=(const Config& lhs, const Config& rhs) {
+inline bool operator!=(const PipelineConfig& lhs, const PipelineConfig& rhs) {
     return !(lhs == rhs);
 }
 
