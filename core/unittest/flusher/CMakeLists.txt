@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(flusher_unittest)
 
 add_executable(flusher_sls_unittest FlusherSLSUnittest.cpp)
-target_link_libraries(flusher_sls_unittest unittest_base)
+target_link_libraries(flusher_sls_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(flusher_sls_unittest)

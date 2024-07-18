@@ -17,13 +17,13 @@ name: E2E Core Test
 on:
   pull_request:
     paths-ignore:
-      - 'docs/**'
-      - 'example_config/**'
-      - 'docker/**'
-      - 'k8s_template/**'
-      - 'changes/**'
-      - 'licenses/**'
-      - 'CHANGELOG.md'
+      - "docs/**"
+      - "example_config/**"
+      - "docker/**"
+      - "k8s_template/**"
+      - "changes/**"
+      - "licenses/**"
+      - "CHANGELOG.md"
   push:
     branches:
       - main
@@ -34,8 +34,8 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        go-version: [ 1.19.10 ]
-        runner: [ ubuntu-latest ]
+        go-version: [1.19.10]
+        runner: [ubuntu-latest]
       fail-fast: true
     steps:
       # Clean up space to prevent action from running out of disk space.
@@ -81,7 +81,7 @@ jobs:
   result:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [ CI ]
+    needs: [CI]
     steps:
       - name: Build Result
         run: echo "Just to make the GitHub merge button green"

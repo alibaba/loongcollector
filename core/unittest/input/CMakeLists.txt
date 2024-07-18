@@ -16,10 +16,10 @@ cmake_minimum_required(VERSION 3.22)
 project(input_unittest)
 
 add_executable(input_file_unittest InputFileUnittest.cpp)
-target_link_libraries(input_file_unittest unittest_base)
+target_link_libraries(input_file_unittest ${UT_BASE_TARGET})
 
 add_executable(input_container_stdio_unittest InputContainerStdioUnittest.cpp)
-target_link_libraries(input_container_stdio_unittest unittest_base)
+target_link_libraries(input_container_stdio_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(input_file_unittest)

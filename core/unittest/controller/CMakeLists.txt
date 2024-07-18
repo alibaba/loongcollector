@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(controller_unittest)
 
 add_executable(event_dispatcher_dir_unittest EventDispatcherDirUnittest.cpp)
-target_link_libraries(event_dispatcher_dir_unittest unittest_base)
+target_link_libraries(event_dispatcher_dir_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(event_dispatcher_dir_unittest)

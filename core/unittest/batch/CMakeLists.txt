@@ -16,19 +16,19 @@ cmake_minimum_required(VERSION 3.22)
 project(batch_unittest)
 
 add_executable(flush_strategy_unittest FlushStrategyUnittest.cpp)
-target_link_libraries(flush_strategy_unittest unittest_base)
+target_link_libraries(flush_strategy_unittest ${UT_BASE_TARGET})
 
 add_executable(batch_status_unittest BatchStatusUnittest.cpp)
-target_link_libraries(batch_status_unittest unittest_base)
+target_link_libraries(batch_status_unittest ${UT_BASE_TARGET})
 
 add_executable(batch_item_unittest BatchItemUnittest.cpp)
-target_link_libraries(batch_item_unittest unittest_base)
+target_link_libraries(batch_item_unittest ${UT_BASE_TARGET})
 
 add_executable(batcher_unittest BatcherUnittest.cpp)
-target_link_libraries(batcher_unittest unittest_base)
+target_link_libraries(batcher_unittest ${UT_BASE_TARGET})
 
 add_executable(timeout_flush_manager_unittest TimeoutFlushManagerUnittest.cpp)
-target_link_libraries(timeout_flush_manager_unittest unittest_base)
+target_link_libraries(timeout_flush_manager_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(flush_strategy_unittest)

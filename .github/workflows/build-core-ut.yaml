@@ -74,14 +74,15 @@ jobs:
           ENABLE_COMPATIBLE_MODE: OFF
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
-          MAKE_JOBS: 8
+          MAKE_JOBS: 16
+          # BUILD_TYPE: Debug # TODO: Uncomment when memory management is refined
         run: CURRENT_DIR=$(pwd) && sed -i "s|/src|$CURRENT_DIR|g" docker/Dockerfile_build && make core PATH_IN_DOCKER=$(pwd)
 
       - name: Unit Test
         run: make unittest_core
 
       - name: Unit Test Coverage
-        run: docker build -t unittest_coverage -f ./docker/Dockerfile_coverage . && docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --root . --lcov coverage.lcov --txt coverage.txt"
+        run: docker build -t unittest_coverage -f ./docker/Dockerfile_coverage . && docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --root . --lcov coverage.lcov --txt coverage.txt -e \".*sdk.*\" -e \".*observer.*\" -e \".*log_pb.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*fuse.*\" -e \".*go_pipeline.*\""
 
       - name: Setup Python3.10
         uses: actions/setup-python@v5

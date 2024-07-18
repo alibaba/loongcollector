@@ -26,10 +26,7 @@ list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 file(GLOB THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/processor/inner/*.c ${CMAKE_SOURCE_DIR}/processor/inner/*.cc ${CMAKE_SOURCE_DIR}/processor/inner/*.cpp ${CMAKE_SOURCE_DIR}/processor/inner/*.h)
 list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 
-if(NOT LINUX OR WITHOUTSPL)
-    # remove spl related files in processor
-    list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/processor/ProcessorSPL.cpp ${CMAKE_SOURCE_DIR}/processor/ProcessorSPL.h)
-endif()
-
 # Set source files to parent
-set(SUBDIR_SOURCE_FILES ${SUBDIR_SOURCE_FILES} ${THIS_SOURCE_FILES_LIST})
+list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/processor/ProcessorSPL.cpp ${CMAKE_SOURCE_DIR}/processor/ProcessorSPL.h)
+set(PLUGIN_SOURCE_FILES_CORE ${PLUGIN_SOURCE_FILES_CORE} ${THIS_SOURCE_FILES_LIST})
+set(PLUGIN_SOURCE_FILES_SPL ${PLUGIN_SOURCE_FILES_SPL} ${CMAKE_SOURCE_DIR}/processor/ProcessorSPL.cpp ${CMAKE_SOURCE_DIR}/processor/ProcessorSPL.h)

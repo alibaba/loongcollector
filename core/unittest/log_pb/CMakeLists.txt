@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(log_pb_unittest)
 
 add_executable(log_pb_unittest PBUnittest.cpp)
-target_link_libraries(log_pb_unittest unittest_base)
+target_link_libraries(log_pb_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(log_pb_unittest)

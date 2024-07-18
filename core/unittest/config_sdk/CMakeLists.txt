@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(config_sdk_unittest)
 
 add_executable(config_sdk_unittest config_sdk_unittest.cpp)
-target_link_libraries(config_sdk_unittest unittest_base)
+target_link_libraries(config_sdk_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(config_sdk_unittest)
