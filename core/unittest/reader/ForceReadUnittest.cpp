@@ -23,7 +23,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "config_manager/ConfigManager.h"
 #include "event/BlockEventManager.h"
 #include "event/Event.h"
