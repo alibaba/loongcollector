@@ -19,6 +19,7 @@
 #include "polling/PollingEventQueue.h"
 #include "processor/daemon/LogProcess.h"
 #include "queue/ProcessQueueManager.h"
+#include "logger/Logger.h"
 
 DEFINE_FLAG_INT32(max_block_event_timeout, "max block event timeout, seconds", 3);
 

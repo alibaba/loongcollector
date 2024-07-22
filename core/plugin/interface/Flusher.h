@@ -18,8 +18,12 @@
 
 #include <json/json.h>
 
-#include "common/LogstoreSenderQueue.h"
+#include <cstdint>
+#include <memory>
+
+#include "models/PipelineEventGroup.h"
 #include "plugin/interface/Plugin.h"
+#include "queue/FeedbackQueueKey.h"
 #include "queue/SenderQueueItem.h"
 #include "sdk/Common.h"
 
@@ -30,21 +34,26 @@ public:
     virtual ~Flusher() = default;
 
     virtual bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) = 0;
-    virtual bool Register() { return true; }
-    virtual bool Unregister(bool isPipelineRemoving) { return true; }
-    virtual void Send(PipelineEventGroup&& g) = 0;
-    virtual void Flush(size_t key) = 0;
-    virtual void FlushAll() = 0;
+    virtual bool Start() { return true; }
+    virtual bool Stop(bool isPipelineRemoving);
+    virtual bool Send(PipelineEventGroup&& g) = 0;
+    virtual bool Flush(size_t key) = 0;
+    virtual bool FlushAll() = 0;
     virtual sdk::AsynRequest* BuildRequest(SenderQueueItem* item) const = 0;
     // virtual void OnSucess() {}
     // virtual void OnFail() = 0;
 
-    SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue() const { return mSenderQueue; }
+    QueueKey GetQueueKey() const { return mQueueKey; }
 
 protected:
-    // TODO: replace queue type
-    SingleLogstoreSenderManager<SenderQueueParam>* mSenderQueue;
-    // SenderQueue* mSenderQueue;
+    void GenerateQueueKey(const std::string& target);
+    bool PushToQueue(std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
+
+    QueueKey mQueueKey;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class FlusherInstanceUnittest;
+#endif
 };
 
 } // namespace logtail

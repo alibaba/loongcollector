@@ -41,8 +41,8 @@ public:
     void Start();
     void Stop(bool isRemoving);
     void Process(std::vector<PipelineEventGroup>& logGroupList, size_t inputIndex);
-    void Send(std::vector<PipelineEventGroup>&& groupList);
-    void FlushBatch();
+    bool Send(std::vector<PipelineEventGroup>&& groupList);
+    bool FlushBatch();
     void RemoveProcessQueue() const;
 
     const std::string& Name() const { return mName; }

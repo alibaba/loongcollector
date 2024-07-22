@@ -21,7 +21,6 @@
 #include <memory>
 #include <string>
 
-#include "checkpoint/RangeCheckpoint.h"
 #include "queue/FeedbackQueueKey.h"
 
 namespace logtail {
@@ -59,33 +58,9 @@ struct SenderQueueItem {
           mFlusher(flusher),
           mQueueKey(key),
           mEnqueTime(time(nullptr)) {}
-};
+    virtual ~SenderQueueItem() = default;
 
-struct SLSSenderQueueItem : public SenderQueueItem {
-    std::string mShardHashKey;
-    // it normally equals to flusher_sls.Logstore, except for the following situations:
-    // 1. when route is enabled in Go pipeline, it is designated explicitly
-    // 2. self telemetry data from C++ pipelines
-    std::string mLogstore;
-    RangeCheckpointPtr mExactlyOnceCheckpoint;
-
-    std::string mCurrentEndpoint;
-    bool mRealIpFlag = false;
-    int32_t mLastLogWarningTime = 0; // temporaily used
-
-    SLSSenderQueueItem(std::string&& data,
-                       size_t rawSize,
-                       const Flusher* flusher,
-                       QueueKey key,
-                       const std::string& shardHashKey = "",
-                       RangeCheckpointPtr&& exactlyOnceCheckpoint = RangeCheckpointPtr(),
-                       RawDataType type = RawDataType::EVENT_GROUP,
-                       bool bufferOrNot = true,
-                       const std::string& logstore = "")
-        : SenderQueueItem(std::move(data), rawSize, flusher, key, type, bufferOrNot),
-          mShardHashKey(shardHashKey),
-          mLogstore(logstore),
-          mExactlyOnceCheckpoint(std::move(exactlyOnceCheckpoint)) {}
+    virtual SenderQueueItem* Clone() { return new SenderQueueItem(*this); }
 };
 
 } // namespace logtail

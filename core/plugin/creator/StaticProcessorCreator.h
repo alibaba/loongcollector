@@ -27,7 +27,7 @@ public:
     const char* Name() override { return T::sName.c_str(); }
     bool IsDynamic() override { return false; }
     std::unique_ptr<PluginInstance> Create(const std::string& pluginId) override {
-        return std::unique_ptr<ProcessorInstance>(new ProcessorInstance(new T, pluginId));
+        return std::make_unique<ProcessorInstance>(new T, pluginId);
     }
 };
 

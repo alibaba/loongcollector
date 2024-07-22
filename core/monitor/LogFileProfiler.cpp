@@ -28,6 +28,7 @@
 #include "config_manager/ConfigManager.h"
 #include "logger/Logger.h"
 #include "profile_sender/ProfileSender.h"
+#include "queue/QueueKeyManager.h"
 #include "sender/Sender.h"
 
 DEFINE_FLAG_INT32(profile_data_send_interval, "interval of send LogFile/DomainSocket profile data, seconds", 600);
@@ -164,41 +165,42 @@ bool LogFileProfiler::GetProfileData(LogGroup& logGroup, LogStoreStatistic* stat
     }
 
     // get logstore send info
-    if (statistic->mHostLogPath.empty()) {
-        LogstoreFeedBackKey fbKey = GenerateLogstoreFeedBackKey(statistic->mProjectName, statistic->mCategory);
-        LogstoreSenderStatistics senderStatistics = Sender::Instance()->GetSenderStatistics(fbKey);
+    // if (statistic->mHostLogPath.empty()) {
+    //     QueueKey fbKey = QueueKeyManager::GetInstance()->GetKey("-flusher_sls-" + statistic->mProjectName + "#"
+    //                                                             + statistic->mCategory);
+    //     LogstoreSenderStatistics senderStatistics = Sender::Instance()->GetSenderStatistics(fbKey);
 
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("max_unsend_time");
-        contentPtr->set_value(ToString(senderStatistics.mMaxUnsendTime));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("min_unsend_time");
-        contentPtr->set_value(ToString(senderStatistics.mMinUnsendTime));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("max_send_success_time");
-        contentPtr->set_value(ToString(senderStatistics.mMaxSendSuccessTime));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("send_queue_size");
-        contentPtr->set_value(ToString(senderStatistics.mSendQueueSize));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("send_network_error");
-        contentPtr->set_value(ToString(senderStatistics.mSendNetWorkErrorCount));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("send_quota_error");
-        contentPtr->set_value(ToString(senderStatistics.mSendQuotaErrorCount));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("send_discard_error");
-        contentPtr->set_value(ToString(senderStatistics.mSendDiscardErrorCount));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("send_success_count");
-        contentPtr->set_value(ToString(senderStatistics.mSendSuccessCount));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("send_block_flag");
-        contentPtr->set_value(ToString(senderStatistics.mSendBlockFlag));
-        contentPtr = logPtr->add_contents();
-        contentPtr->set_key("sender_valid_flag");
-        contentPtr->set_value(ToString(senderStatistics.mValidToSendFlag));
-    }
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("max_unsend_time");
+    //     contentPtr->set_value(ToString(senderStatistics.mMaxUnsendTime));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("min_unsend_time");
+    //     contentPtr->set_value(ToString(senderStatistics.mMinUnsendTime));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("max_send_success_time");
+    //     contentPtr->set_value(ToString(senderStatistics.mMaxSendSuccessTime));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("send_queue_size");
+    //     contentPtr->set_value(ToString(senderStatistics.mSendQueueSize));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("send_network_error");
+    //     contentPtr->set_value(ToString(senderStatistics.mSendNetWorkErrorCount));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("send_quota_error");
+    //     contentPtr->set_value(ToString(senderStatistics.mSendQuotaErrorCount));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("send_discard_error");
+    //     contentPtr->set_value(ToString(senderStatistics.mSendDiscardErrorCount));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("send_success_count");
+    //     contentPtr->set_value(ToString(senderStatistics.mSendSuccessCount));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("send_block_flag");
+    //     contentPtr->set_value(ToString(senderStatistics.mSendBlockFlag));
+    //     contentPtr = logPtr->add_contents();
+    //     contentPtr->set_key("sender_valid_flag");
+    //     contentPtr->set_value(ToString(senderStatistics.mValidToSendFlag));
+    // }
 
     return true;
 }

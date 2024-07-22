@@ -18,8 +18,8 @@
 #include <string>
 
 #include "app_config/AppConfig.h"
+#include "batch/TimeoutFlushManager.h"
 #include "common/JsonUtil.h"
-#include "common/LogstoreFeedbackKey.h"
 #include "config/Config.h"
 #include "input/InputFeedbackInterfaceRegistry.h"
 #include "pipeline/Pipeline.h"
@@ -44,6 +44,8 @@ public:
     void OnInputFileWithJsonMultiline() const;
     void OnInputFileWithContainerDiscovery() const;
     void TestProcess() const;
+    void TestSend() const;
+    void TestFlushBatch() const;
 
 protected:
     static void SetUpTestCase() {
@@ -54,6 +56,12 @@ protected:
     }
 
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+
+    void TearDown() override {
+        TimeoutFlushManager::GetInstance()->mTimeoutRecords.clear();
+        QueueKeyManager::GetInstance()->Clear();
+        ProcessQueueManager::GetInstance()->Clear();
+    }
 
 private:
     const string configName = "test_config";
@@ -101,7 +109,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL("test_project", pipeline->GetContext().GetProjectName());
     APSARA_TEST_EQUAL("test_logstore", pipeline->GetContext().GetLogstoreName());
     APSARA_TEST_EQUAL("test_region", pipeline->GetContext().GetRegion());
-    APSARA_TEST_EQUAL(GenerateLogstoreFeedBackKey("test_project", "test_logstore"),
+    APSARA_TEST_EQUAL(QueueKeyManager::GetInstance()->GetKey("test_config-flusher_sls-test_project#test_logstore"),
                       pipeline->GetContext().GetLogstoreKey());
 
     // without sls flusher
@@ -135,7 +143,8 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL("", pipeline->GetContext().GetLogstoreName());
     APSARA_TEST_EQUAL("", pipeline->GetContext().GetRegion());
 #ifndef __ENTERPRISE__
-    APSARA_TEST_EQUAL(GenerateLogstoreFeedBackKey("", ""), pipeline->GetContext().GetLogstoreKey());
+    APSARA_TEST_EQUAL(QueueKeyManager::GetInstance()->GetKey("test_config-flusher_sls-"),
+                      pipeline->GetContext().GetLogstoreKey());
 #endif
 
     // extensions and extended global param
@@ -2677,6 +2686,73 @@ void PipelineUnittest::TestProcess() const {
     APSARA_TEST_EQUAL(1U, static_cast<const ProcessorMock*>(pipeline.mProcessorLine[0]->mPlugin.get())->mCnt);
 }
 
+void PipelineUnittest::TestSend() const {
+    {
+        // flush to all native flushers
+        Pipeline pipeline;
+        PipelineContext ctx;
+        uint32_t pluginIdx = 0;
+        Json::Value tmp;
+        {
+            auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+            flusher->Init(Json::Value(), ctx, tmp);
+            pipeline.mFlushers.emplace_back(std::move(flusher));
+        }
+        {
+            auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+            flusher->Init(Json::Value(), ctx, tmp);
+            pipeline.mFlushers.emplace_back(std::move(flusher));
+        }
+        {
+            // all valid
+            vector<PipelineEventGroup> group;
+            group.emplace_back(make_shared<SourceBuffer>());
+            APSARA_TEST_TRUE(pipeline.Send(std::move(group)));
+        }
+        {
+            // some flusher not valid
+            const_cast<FlusherMock*>(static_cast<const FlusherMock*>(pipeline.mFlushers[0]->GetPlugin()))->mIsValid
+                = false;
+            vector<PipelineEventGroup> group;
+            group.emplace_back(make_shared<SourceBuffer>());
+            APSARA_TEST_FALSE(pipeline.Send(std::move(group)));
+        }
+    }
+}
+
+void PipelineUnittest::TestFlushBatch() const {
+    Pipeline pipeline;
+    pipeline.mName = configName;
+    PipelineContext ctx;
+    uint32_t pluginIdx = 0;
+    Json::Value tmp;
+    {
+        auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+        flusher->Init(Json::Value(), ctx, tmp);
+        pipeline.mFlushers.emplace_back(std::move(flusher));
+    }
+    {
+        auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+        flusher->Init(Json::Value(), ctx, tmp);
+        pipeline.mFlushers.emplace_back(std::move(flusher));
+    }
+    {
+        // all successful
+        TimeoutFlushManager::GetInstance()->UpdateRecord(configName, 0, 1, 3, nullptr);
+        TimeoutFlushManager::GetInstance()->UpdateRecord(configName, 1, 1, 3, nullptr);
+        APSARA_TEST_TRUE(pipeline.FlushBatch());
+        APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mTimeoutRecords.empty());
+    }
+    {
+        // some failed
+        const_cast<FlusherMock*>(static_cast<const FlusherMock*>(pipeline.mFlushers[0]->GetPlugin()))->mIsValid = false;
+        TimeoutFlushManager::GetInstance()->UpdateRecord(configName, 0, 1, 3, nullptr);
+        TimeoutFlushManager::GetInstance()->UpdateRecord(configName, 1, 1, 3, nullptr);
+        APSARA_TEST_FALSE(pipeline.FlushBatch());
+        APSARA_TEST_TRUE(TimeoutFlushManager::GetInstance()->mTimeoutRecords.empty());
+    }
+}
+
 UNIT_TEST_CASE(PipelineUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(PipelineUnittest, OnFailedInit)
 UNIT_TEST_CASE(PipelineUnittest, TestProcessQueue)
@@ -2684,6 +2760,8 @@ UNIT_TEST_CASE(PipelineUnittest, OnInitVariousTopology)
 UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithJsonMultiline)
 UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithContainerDiscovery)
 UNIT_TEST_CASE(PipelineUnittest, TestProcess)
+UNIT_TEST_CASE(PipelineUnittest, TestSend)
+UNIT_TEST_CASE(PipelineUnittest, TestFlushBatch)
 
 } // namespace logtail
 

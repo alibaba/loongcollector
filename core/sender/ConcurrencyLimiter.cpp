@@ -14,61 +14,25 @@
 
 #include "sender/ConcurrencyLimiter.h"
 
-// TODO: temporarily used
-#include "app_config/AppConfig.h"
-#include "sender/Sender.h"
-
 using namespace std;
 
 namespace logtail {
 
-// TODO: this is temporary, should be redefined after sender refactor
-bool ConcurrencyLimiter::IsValidToPop(const string& key) {
-    lock_guard<mutex> lock(mMux);
-    auto iter = mLimitMap.find(key);
-    if (iter == mLimitMap.end()) {
-        mLimitMap[key] = -1;
-        return true;
-    }
-    if (iter->second != 0) {
-        return true;
-    }
-    return false;
+bool ConcurrencyLimiter::IsValidToPop() {
+    return mLimit != 0;
 }
 
-void ConcurrencyLimiter::PostPop(const string& key) {
-    lock_guard<mutex> lock(mMux);
-    auto iter = mLimitMap.find(key);
-    if (iter != mLimitMap.end()) {
-        if (iter->second > 0) {
-            --iter->second;
-        }
+void ConcurrencyLimiter::PostPop() {
+    if (mLimit <= 0) {
+        return;
     }
+    --mLimit;
 }
 
-void ConcurrencyLimiter::OnSendDone(const string& key) {
-    lock_guard<mutex> lock(mMux);
-    auto iter = mLimitMap.find(key);
-    if (iter != mLimitMap.end()) {
-        if (iter->second >= 0) {
-            if (++iter->second > AppConfig::GetInstance()->GetSendRequestConcurrency()) {
-                iter->second = -1;
-            }
-        }
-    }
+void ConcurrencyLimiter::OnSuccess() {
 }
 
-void ConcurrencyLimiter::Reset(const string& key) {
-    lock_guard<mutex> lock(mMux);
-    auto iter = mLimitMap.find(key);
-    if (iter != mLimitMap.end()) {
-        if (Sender::Instance()->mRegionRefCntMap.empty()) {
-            iter->second = AppConfig::GetInstance()->GetSendRequestConcurrency();
-        } else {
-            iter->second
-                = AppConfig::GetInstance()->GetSendRequestConcurrency() / Sender::Instance()->mRegionRefCntMap.size();
-        }
-    }
+void ConcurrencyLimiter::OnFail(time_t curTime) {
 }
 
 } // namespace logtail

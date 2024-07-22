@@ -20,10 +20,11 @@
 
 #include <memory>
 
-#include "common/LogstoreSenderQueue.h"
+#include "models/PipelineEventGroup.h"
 #include "pipeline/PipelineContext.h"
 #include "plugin/instance/PluginInstance.h"
 #include "plugin/interface/Flusher.h"
+#include "queue/FeedbackQueueKey.h"
 
 namespace logtail {
 
@@ -35,11 +36,11 @@ public:
     const Flusher* GetPlugin() const { return mPlugin.get(); }
 
     bool Init(const Json::Value& config, PipelineContext& context, Json::Value& optionalGoPipeline);
-    bool Start() { return mPlugin->Register(); }
-    bool Stop(bool isPipelineRemoving) { return mPlugin->Unregister(isPipelineRemoving); }
-    void Send(PipelineEventGroup&& g) { mPlugin->Send(std::move(g)); }
-    void FlushAll() { mPlugin->FlushAll(); }
-    SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue() const { return mPlugin->GetSenderQueue(); }
+    bool Start() { return mPlugin->Start(); }
+    bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
+    bool Send(PipelineEventGroup&& g) { return mPlugin->Send(std::move(g)); }
+    bool FlushAll() { return mPlugin->FlushAll(); }
+    QueueKey GetQueueKey() const { return mPlugin->GetQueueKey(); }
 
 private:
     std::unique_ptr<Flusher> mPlugin;

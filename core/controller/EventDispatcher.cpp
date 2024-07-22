@@ -45,14 +45,11 @@
 #include "log_pb/metric.pb.h"
 #include "log_pb/sls_logs.pb.h"
 #include "monitor/LogFileProfiler.h"
-#include "monitor/LogIntegrity.h"
-#include "monitor/LogLineCount.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/MetricExportor.h"
 #include "polling/PollingDirFile.h"
 #include "polling/PollingModify.h"
 #include "processor/daemon/LogProcess.h"
-#include "sender/Sender.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "polling/PollingEventQueue.h"
 #endif

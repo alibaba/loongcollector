@@ -196,7 +196,7 @@ public:
                       const std::string& project = "",
                       const std::string& logstore = "",
                       const std::string& region = "",
-                      logtail::LogstoreFeedBackKey logstoreKey = 0);
+                      logtail::QueueKey logstoreKey = 0);
     void HoldOn(bool exitFlag);
     void Resume();
 

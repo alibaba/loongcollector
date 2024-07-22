@@ -263,7 +263,6 @@ bool SLSClientManager::ResetClientEndpoint(const string& aliuid, const string& r
     }
     sendClient->SetSlsHost(endpoint);
     ResetClientPort(region, sendClient);
-    Sender::Instance()->OnRegionRecover(region);
     LOG_INFO(
         sLogger,
         ("reset endpoint for sender, region", region)("uid", aliuid)("from", GetHostFromEndpoint(originalEndpoint))(
@@ -441,7 +440,7 @@ void SLSClientManager::ProbeNetworkThread() {
                 } else {
                     if (TestEndpoint(region, endpoint)) {
                         // wakeUp = true;
-                        Sender::Instance()->OnRegionRecover(region);
+                        // Sender::Instance()->OnRegionRecover(region);
                         if (!endpointChanged) {
                             for (const auto& uid : uids) {
                                 ResetClientEndpoint(uid, region, curTime);

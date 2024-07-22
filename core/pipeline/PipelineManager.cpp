@@ -23,7 +23,6 @@
 #include "observer/ObserverManager.h"
 #endif
 #include "processor/daemon/LogProcess.h"
-#include "sender/Sender.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
 #include "shennong/ShennongManager.h"
@@ -83,7 +82,6 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
     if (isFileServerStarted && (isInputFileChanged || isInputContainerStdioChanged)) {
         FileServer::GetInstance()->Pause();
     }
-    Sender::Instance()->SetQueueUrgent(); // TODO: temporary used
     LogProcess::GetInstance()->HoldOn();
     LogtailPlugin::GetInstance()->HoldOn(false);
 #endif
@@ -187,7 +185,6 @@ void logtail::PipelineManager::UpdatePipelines(ConfigDiff& diff) {
         ShennongManager::GetInstance()->Resume();
     }
 #endif
-    Sender::Instance()->ResetQueueUrgent(); // TODO: temporary used
 #endif
 }
 
@@ -230,7 +227,6 @@ void PipelineManager::StopAllPipelines() {
 #endif
     FileServer::GetInstance()->Stop();
 
-    Sender::Instance()->SetQueueUrgent();
     bool logProcessFlushFlag = false;
     for (int i = 0; !logProcessFlushFlag && i < 500; ++i) {
         logProcessFlushFlag = LogProcess::GetInstance()->FlushOut(10);

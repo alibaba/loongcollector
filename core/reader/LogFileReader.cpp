@@ -55,7 +55,6 @@
 #include "rapidjson/document.h"
 #include "reader/JsonLogFileReader.h"
 #include "sdk/Common.h"
-#include "sender/Sender.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -2217,13 +2216,13 @@ size_t LogFileReader::AlignLastCharacter(char* buffer, size_t size) {
 }
 
 std::unique_ptr<Event> LogFileReader::CreateFlushTimeoutEvent() {
-    auto result = std::unique_ptr<Event>(new Event(mHostLogPathDir,
-                                                   mHostLogPathFile,
-                                                   EVENT_READER_FLUSH_TIMEOUT | EVENT_MODIFY,
-                                                   -1,
-                                                   0,
-                                                   mDevInode.dev,
-                                                   mDevInode.inode));
+    auto result = std::make_unique<Event>(mHostLogPathDir,
+                                          mHostLogPathFile,
+                                          EVENT_READER_FLUSH_TIMEOUT | EVENT_MODIFY,
+                                          -1,
+                                          0,
+                                          mDevInode.dev,
+                                          mDevInode.inode);
     result->SetLastFilePos(mLastFilePos);
     result->SetLastReadPos(GetLastReadPos());
     return result;
@@ -2533,7 +2532,7 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
         group.SetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, GetHostLogPath());
         group.SetMetadata(EventGroupMetaKey::LOG_FILE_INODE, ToString(GetDevInode().inode));
     }
-    group.SetMetadata(EventGroupMetaKey::SOURCE_ID, ToString(GetSourceId()));
+    group.SetMetadata(EventGroupMetaKey::SOURCE_ID, GetSourceId());
 
     // for source-specific info without fixed key, we store them in tags directly
     // for log, these includes:

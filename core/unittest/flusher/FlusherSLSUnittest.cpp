@@ -18,13 +18,19 @@
 #include <string>
 
 #include "common/JsonUtil.h"
-#include "common/LogstoreFeedbackKey.h"
 #include "common/LogtailCommonFlags.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
+#include "compression/CompressorFactory.h"
 #include "flusher/FlusherSLS.h"
 #include "pipeline/PipelineContext.h"
+#include "queue/ExactlyOnceQueueManager.h"
+#include "queue/ProcessQueueManager.h"
+#include "queue/QueueKeyManager.h"
+#include "queue/SLSSenderQueueItem.h"
+#include "queue/SenderQueueManager.h"
+#include "sender/PackIdManager.h"
 #include "sender/SLSClientManager.h"
 #include "sender/Sender.h"
 #include "unittest/Unittest.h"
@@ -32,6 +38,7 @@
 DECLARE_FLAG_INT32(batch_send_interval);
 DECLARE_FLAG_INT32(merge_log_count_limit);
 DECLARE_FLAG_INT32(batch_send_metric_size);
+DECLARE_FLAG_INT32(max_send_log_group_size);
 
 using namespace std;
 
@@ -42,9 +49,21 @@ public:
     void OnSuccessfulInit();
     void OnFailedInit();
     void OnPipelineUpdate();
+    void TestSend();
+    void TestFlush();
+    void TestFlushAll();
+    void TestAddPackId();
+    void OnGoPipelineSend();
 
 protected:
     void SetUp() override { ctx.SetConfigName("test_config"); }
+
+    void TearDown() override {
+        PackIdManager::GetInstance()->mPackIdSeq.clear();
+        QueueKeyManager::GetInstance()->Clear();
+        SenderQueueManager::GetInstance()->Clear();
+        ExactlyOnceQueueManager::GetInstance()->Clear();
+    }
 
 private:
     PipelineContext ctx;
@@ -60,11 +79,13 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
         {
             "Type": "flusher_sls",
             "Project": "test_project",
-            "Logstore": "test_logstore",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com"
+            "Logstore": "test_logstore"
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+#ifndef __ENTERPRISE__
+    configJson["Endpoint"] = "cn-hangzhou.log.aliyuncs.com";
+#endif
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
@@ -72,27 +93,35 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(optionalGoPipeline.isNull());
     APSARA_TEST_EQUAL("test_project", flusher->mProject);
     APSARA_TEST_EQUAL("test_logstore", flusher->mLogstore);
-    APSARA_TEST_EQUAL(GenerateLogstoreFeedBackKey("test_project", "test_logstore"), flusher->GetLogstoreKey());
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
+#ifndef __ENTERPRISE__
     APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
+#else
+    APSARA_TEST_EQUAL("", flusher->mEndpoint);
+#endif
     APSARA_TEST_EQUAL("", flusher->mAliuid);
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
-    APSARA_TEST_EQUAL(0U, flusher->mFlowControlExpireTime);
-    APSARA_TEST_EQUAL(-1, flusher->mMaxSendRate);
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
-    APSARA_TEST_EQUAL(CompressType::LZ4, flusher->mCompressor->GetCompressType());
-    APSARA_TEST_TRUE(flusher->mGroupSerializer);
-    APSARA_TEST_TRUE(flusher->mGroupListSerializer);
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
-                      flusher->mBatcher.mEventFlushStrategy.GetMaxCnt());
+                      flusher->mBatcher.GetEventFlushStrategy().GetMaxCnt());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
-                      flusher->mBatcher.mEventFlushStrategy.GetMaxSizeBytes());
+                      flusher->mBatcher.GetEventFlushStrategy().GetMaxSizeBytes());
     uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(batch_send_interval)) / 2;
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_interval)) - timeout,
-                      flusher->mBatcher.mEventFlushStrategy.GetTimeoutSecs());
+                      flusher->mBatcher.GetEventFlushStrategy().GetTimeoutSecs());
+    APSARA_TEST_TRUE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
-                      flusher->mBatcher.mGroupFlushStrategy->GetMaxSizeBytes());
-    APSARA_TEST_EQUAL(timeout, flusher->mBatcher.mGroupFlushStrategy->GetTimeoutSecs());
+                      flusher->mBatcher.GetGroupFlushStrategy()->GetMaxSizeBytes());
+    APSARA_TEST_EQUAL(timeout, flusher->mBatcher.GetGroupFlushStrategy()->GetTimeoutSecs());
+    APSARA_TEST_TRUE(flusher->mGroupSerializer);
+    APSARA_TEST_TRUE(flusher->mGroupListSerializer);
+    APSARA_TEST_EQUAL(CompressType::LZ4, flusher->mCompressor->GetCompressType());
+    APSARA_TEST_EQUAL(QueueKeyManager::GetInstance()->GetKey("test_config-flusher_sls-test_project#test_logstore"),
+                      flusher->GetQueueKey());
+    auto que = SenderQueueManager::GetInstance()->GetQueue(flusher->GetQueueKey());
+    APSARA_TEST_NOT_EQUAL(nullptr, que);
+    APSARA_TEST_FALSE(que->GetRateLimiter().has_value());
+    APSARA_TEST_EQUAL(2U, que->GetConcurrencyLimiters().size());
 
     // valid optional param
     configStr = R"(
@@ -103,10 +132,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "Region": "cn-hangzhou",
             "Endpoint": "cn-hangzhou.log.aliyuncs.com",
             "Aliuid": "123456789",
-            "CompressType": "zstd",
             "TelemetryType": "metrics",
-            "FlowControlExpireTime": 123456789,
-            "MaxSendRate": 5,
             "ShardHashKeys": [
                 "__source__"
             ]
@@ -121,13 +147,12 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
 #ifdef __ENTERPRISE__
     APSARA_TEST_EQUAL("123456789", flusher->mAliuid);
 #else
+    APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
     APSARA_TEST_EQUAL("", flusher->mAliuid);
 #endif
-    APSARA_TEST_EQUAL(CompressType::ZSTD, flusher->mCompressor->GetCompressType());
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::METRIC, flusher->mTelemetryType);
-    APSARA_TEST_EQUAL(123456789U, flusher->mFlowControlExpireTime);
-    APSARA_TEST_EQUAL(5, flusher->mMaxSendRate);
     APSARA_TEST_EQUAL(1U, flusher->mShardHashKeys.size());
+    SenderQueueManager::GetInstance()->Clear();
 
     // invalid optional param
     configStr = R"(
@@ -136,27 +161,29 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "Project": "test_project",
             "Logstore": "test_logstore",
             "Region": true,
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
             "Aliuid": true,
-            "CompressType": true,
             "TelemetryType": true,
-            "FlowControlExpireTime": true,
-            "MaxSendRate": true,
             "ShardHashKeys": true
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+#ifdef __ENTERPRISE__
+    configJson["Endpoint"] = true;
+#else
+    configJson["Endpoint"] = "cn-hangzhou.log.aliyuncs.com";
+#endif
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
+#ifdef __ENTERPRISE__
+    APSARA_TEST_EQUAL("", flusher->mEndpoint);
+#endif
     APSARA_TEST_EQUAL("", flusher->mAliuid);
-    APSARA_TEST_EQUAL(CompressType::LZ4, flusher->mCompressor->GetCompressType());
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
-    APSARA_TEST_EQUAL(0U, flusher->mFlowControlExpireTime);
-    APSARA_TEST_EQUAL(-1, flusher->mMaxSendRate);
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
+    SenderQueueManager::GetInstance()->Clear();
 
 #ifdef __ENTERPRISE__
     // region
@@ -177,9 +204,10 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
     EnterpriseConfigProvider::GetInstance()->mIsPrivateCloud = false;
+    SenderQueueManager::GetInstance()->Clear();
 #endif
 
-    // endpoint
+    // Endpoint
     configStr = R"(
         {
             "Type": "flusher_sls",
@@ -199,6 +227,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_NOT_EQUAL(SLSClientManager::GetInstance()->mRegionEndpointEntryMap.end(), iter);
     APSARA_TEST_NOT_EQUAL(iter->second.mEndpointInfoMap.end(),
                           iter->second.mEndpointInfoMap.find("http://cn-hangzhou.log.aliyuncs.com"));
+    SenderQueueManager::GetInstance()->Clear();
 
     // TelemetryType
     configStr = R"(
@@ -217,6 +246,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
+    SenderQueueManager::GetInstance()->Clear();
 
     configStr = R"(
         {
@@ -234,6 +264,71 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
+    SenderQueueManager::GetInstance()->Clear();
+
+    // ShardHashKeys
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "cn-hangzhou",
+            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+            "ShardHashKeys": [
+                "__source__"
+            ]
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    flusher.reset(new FlusherSLS());
+    ctx.SetExactlyOnceFlag(true);
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
+    ctx.SetExactlyOnceFlag(false);
+    SenderQueueManager::GetInstance()->Clear();
+
+    // group batch && sender queue
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "cn-hangzhou",
+            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+            "ShardHashKeys": [
+                "__source__"
+            ]
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
+    SenderQueueManager::GetInstance()->Clear();
+
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "cn-hangzhou",
+            "Endpoint": "cn-hangzhou.log.aliyuncs.com"
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    flusher.reset(new FlusherSLS());
+    ctx.SetExactlyOnceFlag(true);
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_FALSE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
+    APSARA_TEST_EQUAL(nullptr, SenderQueueManager::GetInstance()->GetQueue(flusher->GetQueueKey()));
+    ctx.SetExactlyOnceFlag(false);
+    SenderQueueManager::GetInstance()->Clear();
 
     // additional param
     configStr = R"(
@@ -265,6 +360,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(optionalGoPipelineJson == optionalGoPipeline);
+    SenderQueueManager::GetInstance()->Clear();
 }
 
 void FlusherSLSUnittest::OnFailedInit() {
@@ -395,12 +491,12 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     APSARA_TEST_TRUE(flusher2.Init(configJson, optionalGoPipeline));
 
-    APSARA_TEST_TRUE(flusher1.Register());
+    APSARA_TEST_TRUE(flusher1.Start());
     APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 
-    APSARA_TEST_TRUE(flusher2.Register());
+    APSARA_TEST_TRUE(flusher2.Start());
     APSARA_TEST_EQUAL(2U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
 #ifdef __ENTERPRISE__
@@ -409,20 +505,501 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 #endif
 
-    APSARA_TEST_TRUE(flusher2.Unregister(true));
+    APSARA_TEST_TRUE(flusher2.Stop(true));
     APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
     APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 
-    APSARA_TEST_TRUE(flusher1.Unregister(true));
+    APSARA_TEST_TRUE(flusher1.Stop(true));
     APSARA_TEST_TRUE(Sender::Instance()->mProjectRefCntMap.empty());
     APSARA_TEST_FALSE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_TRUE(SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").empty());
 }
 
+void FlusherSLSUnittest::TestSend() {
+    {
+        // exactly once enabled
+        // create flusher
+        Json::Value configJson, optionalGoPipeline;
+        string configStr, errorMsg;
+        configStr = R"(
+            {
+                "Type": "flusher_sls",
+                "Project": "test_project",
+                "Logstore": "test_logstore",
+                "Region": "cn-hangzhou",
+                "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+                "Aliuid": "123456789"
+            }
+        )";
+        ParseJsonTable(configStr, configJson, errorMsg);
+        FlusherSLS flusher;
+        PipelineContext ctx;
+        ctx.SetConfigName("test_config");
+        ctx.SetExactlyOnceFlag(true);
+        flusher.SetContext(ctx);
+        flusher.Init(configJson, optionalGoPipeline);
+
+        // create exactly once queue
+        vector<RangeCheckpointPtr> checkpoints;
+        for (size_t i = 0; i < 2; ++i) {
+            auto cpt = make_shared<RangeCheckpoint>();
+            cpt->index = i;
+            cpt->data.set_hash_key("hash_key_" + ToString(i));
+            cpt->data.set_sequence_id(0);
+            checkpoints.emplace_back(cpt);
+        }
+        QueueKey eooKey = QueueKeyManager::GetInstance()->GetKey("eoo");
+        ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(
+            eooKey, ProcessQueueManager::sMaxPriority, flusher.GetContext().GetConfigName(), checkpoints);
+
+        {
+            // replayed group
+            PipelineEventGroup group(make_shared<SourceBuffer>());
+            group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+            group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
+            group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
+            group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
+            group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
+            auto cpt = make_shared<RangeCheckpoint>();
+            cpt->index = 1;
+            cpt->fbKey = eooKey;
+            cpt->data.set_hash_key("hash_key_1");
+            cpt->data.set_sequence_id(0);
+            cpt->data.set_read_offset(0);
+            cpt->data.set_read_length(10);
+            group.SetExactlyOnceCheckpoint(cpt);
+            auto e = group.AddLogEvent();
+            e->SetTimestamp(1234567890);
+            e->SetContent(string("content_key"), string("content_value"));
+
+            APSARA_TEST_TRUE(flusher.Send(std::move(group)));
+            vector<SenderQueueItem*> res;
+            ExactlyOnceQueueManager::GetInstance()->GetAllAvailableSenderQueueItems(res);
+            APSARA_TEST_EQUAL(1U, res.size());
+            auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+            APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
+            APSARA_TEST_FALSE(item->mBufferOrNot);
+            APSARA_TEST_EQUAL(&flusher, item->mFlusher);
+            APSARA_TEST_EQUAL(eooKey, item->mQueueKey);
+            APSARA_TEST_EQUAL("hash_key_1", item->mShardHashKey);
+            APSARA_TEST_EQUAL(flusher.mLogstore, item->mLogstore);
+            APSARA_TEST_EQUAL(cpt, item->mExactlyOnceCheckpoint);
+
+            auto compressor
+                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+            string output, errorMsg;
+            output.resize(item->mRawSize);
+            APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
+
+            sls_logs::LogGroup logGroup;
+            APSARA_TEST_TRUE(logGroup.ParseFromString(output));
+            APSARA_TEST_EQUAL("topic", logGroup.topic());
+            APSARA_TEST_EQUAL("uuid", logGroup.machineuuid());
+            APSARA_TEST_EQUAL("172.0.0.1", logGroup.source());
+            APSARA_TEST_EQUAL(2, logGroup.logtags_size());
+            APSARA_TEST_EQUAL("__hostname__", logGroup.logtags(0).key());
+            APSARA_TEST_EQUAL("hostname", logGroup.logtags(0).value());
+            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(1).key());
+            APSARA_TEST_EQUAL(1, logGroup.logs_size());
+            APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
+            APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
+            APSARA_TEST_EQUAL("content_key", logGroup.logs(0).contents(0).key());
+            APSARA_TEST_EQUAL("content_value", logGroup.logs(0).contents(0).value());
+
+            ExactlyOnceQueueManager::GetInstance()->RemoveSenderQueueItem(eooKey, item);
+        }
+        {
+            // non-replay group
+            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(1);
+            PipelineEventGroup group(make_shared<SourceBuffer>());
+            group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+            group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
+            group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
+            group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
+            group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
+            auto cpt = make_shared<RangeCheckpoint>();
+            cpt->fbKey = eooKey;
+            cpt->data.set_read_offset(0);
+            cpt->data.set_read_length(10);
+            group.SetExactlyOnceCheckpoint(cpt);
+            auto e = group.AddLogEvent();
+            e->SetTimestamp(1234567890);
+            e->SetContent(string("content_key"), string("content_value"));
+
+            APSARA_TEST_TRUE(flusher.Send(std::move(group)));
+            vector<SenderQueueItem*> res;
+            ExactlyOnceQueueManager::GetInstance()->GetAllAvailableSenderQueueItems(res);
+            APSARA_TEST_EQUAL(1U, res.size());
+            auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+            APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
+            APSARA_TEST_FALSE(item->mBufferOrNot);
+            APSARA_TEST_EQUAL(&flusher, item->mFlusher);
+            APSARA_TEST_EQUAL(eooKey, item->mQueueKey);
+            APSARA_TEST_EQUAL("hash_key_0", item->mShardHashKey);
+            APSARA_TEST_EQUAL(flusher.mLogstore, item->mLogstore);
+            APSARA_TEST_EQUAL(checkpoints[0], item->mExactlyOnceCheckpoint);
+
+            auto compressor
+                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+            string output, errorMsg;
+            output.resize(item->mRawSize);
+            APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
+
+            sls_logs::LogGroup logGroup;
+            APSARA_TEST_TRUE(logGroup.ParseFromString(output));
+            APSARA_TEST_EQUAL("topic", logGroup.topic());
+            APSARA_TEST_EQUAL("uuid", logGroup.machineuuid());
+            APSARA_TEST_EQUAL("172.0.0.1", logGroup.source());
+            APSARA_TEST_EQUAL(2, logGroup.logtags_size());
+            APSARA_TEST_EQUAL("__hostname__", logGroup.logtags(0).key());
+            APSARA_TEST_EQUAL("hostname", logGroup.logtags(0).value());
+            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(1).key());
+            APSARA_TEST_EQUAL(1, logGroup.logs_size());
+            APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
+            APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
+            APSARA_TEST_EQUAL("content_key", logGroup.logs(0).contents(0).key());
+            APSARA_TEST_EQUAL("content_value", logGroup.logs(0).contents(0).value());
+
+            ExactlyOnceQueueManager::GetInstance()->RemoveSenderQueueItem(eooKey, item);
+        }
+    }
+    {
+        // normal flusher, without group batch
+        Json::Value configJson, optionalGoPipeline;
+        string configStr, errorMsg;
+        configStr = R"(
+            {
+                "Type": "flusher_sls",
+                "Project": "test_project",
+                "Logstore": "test_logstore",
+                "Region": "cn-hangzhou",
+                "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+                "Aliuid": "123456789",
+                "ShardHashKeys": [
+                    "tag_key"
+                ]
+            }
+        )";
+        ParseJsonTable(configStr, configJson, errorMsg);
+        FlusherSLS flusher;
+        flusher.SetContext(ctx);
+        flusher.Init(configJson, optionalGoPipeline);
+        {
+            // empty group
+            PipelineEventGroup group(make_shared<SourceBuffer>());
+            APSARA_TEST_TRUE(flusher.Send(std::move(group)));
+            vector<SenderQueueItem*> res;
+            SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+            APSARA_TEST_TRUE(res.empty());
+        }
+        {
+            // group
+            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(1);
+            PipelineEventGroup group(make_shared<SourceBuffer>());
+            group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+            group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
+            group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
+            group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
+            group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
+            group.SetTag(string("tag_key"), string("tag_value"));
+            auto e = group.AddLogEvent();
+            e->SetTimestamp(1234567890);
+            e->SetContent(string("content_key"), string("content_value"));
+
+            APSARA_TEST_TRUE(flusher.Send(std::move(group)));
+            vector<SenderQueueItem*> res;
+            SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+            APSARA_TEST_EQUAL(1U, res.size());
+            auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+            APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
+            APSARA_TEST_TRUE(item->mBufferOrNot);
+            APSARA_TEST_EQUAL(&flusher, item->mFlusher);
+            APSARA_TEST_EQUAL(flusher.mQueueKey, item->mQueueKey);
+            APSARA_TEST_EQUAL(sdk::CalcMD5("tag_value"), item->mShardHashKey);
+            APSARA_TEST_EQUAL(flusher.mLogstore, item->mLogstore);
+
+            auto compressor
+                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+            string output, errorMsg;
+            output.resize(item->mRawSize);
+            APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
+
+            sls_logs::LogGroup logGroup;
+            APSARA_TEST_TRUE(logGroup.ParseFromString(output));
+            APSARA_TEST_EQUAL("topic", logGroup.topic());
+            APSARA_TEST_EQUAL("uuid", logGroup.machineuuid());
+            APSARA_TEST_EQUAL("172.0.0.1", logGroup.source());
+            APSARA_TEST_EQUAL(3, logGroup.logtags_size());
+            APSARA_TEST_EQUAL("__hostname__", logGroup.logtags(0).key());
+            APSARA_TEST_EQUAL("hostname", logGroup.logtags(0).value());
+            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(1).key());
+            APSARA_TEST_EQUAL("tag_key", logGroup.logtags(2).key());
+            APSARA_TEST_EQUAL("tag_value", logGroup.logtags(2).value());
+            APSARA_TEST_EQUAL(1, logGroup.logs_size());
+            APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
+            APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
+            APSARA_TEST_EQUAL("content_key", logGroup.logs(0).contents(0).key());
+            APSARA_TEST_EQUAL("content_value", logGroup.logs(0).contents(0).value());
+
+            SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(4000);
+        }
+        {
+            // oversized group
+            INT32_FLAG(max_send_log_group_size) = 1;
+            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(1);
+            PipelineEventGroup group(make_shared<SourceBuffer>());
+            auto e = group.AddLogEvent();
+            e->SetTimestamp(1234567890);
+            e->SetContent(string("content_key"), string("content_value"));
+            APSARA_TEST_FALSE(flusher.Send(std::move(group)));
+            INT32_FLAG(max_send_log_group_size) = 10 * 1024 * 1024;
+            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(4000);
+        }
+    }
+    {
+        // normal flusher, with group batch
+        Json::Value configJson, optionalGoPipeline;
+        string configStr, errorMsg;
+        configStr = R"(
+            {
+                "Type": "flusher_sls",
+                "Project": "test_project",
+                "Logstore": "test_logstore",
+                "Region": "cn-hangzhou",
+                "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+                "Aliuid": "123456789"
+            }
+        )";
+        ParseJsonTable(configStr, configJson, errorMsg);
+        FlusherSLS flusher;
+        flusher.SetContext(ctx);
+        flusher.Init(configJson, optionalGoPipeline);
+
+        PipelineEventGroup group(make_shared<SourceBuffer>());
+        group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+        group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
+        group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
+        group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
+        group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
+        {
+            auto e = group.AddLogEvent();
+            e->SetTimestamp(1234567890);
+            e->SetContent(string("content_key"), string("content_value"));
+        }
+        {
+            auto e = group.AddLogEvent();
+            e->SetTimestamp(1234567990);
+            e->SetContent(string("content_key"), string("content_value"));
+        }
+        flusher.mBatcher.GetGroupFlushStrategy()->SetMaxSizeBytes(group.DataSize());
+        // flush the above two events from group item by the following event
+        {
+            auto e = group.AddLogEvent();
+            e->SetTimestamp(1234568990);
+            e->SetContent(string("content_key"), string("content_value"));
+        }
+
+        APSARA_TEST_TRUE(flusher.Send(std::move(group)));
+        vector<SenderQueueItem*> res;
+        SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+        APSARA_TEST_EQUAL(1U, res.size());
+        auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+        APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP_LIST, item->mType);
+        APSARA_TEST_TRUE(item->mBufferOrNot);
+        APSARA_TEST_EQUAL(&flusher, item->mFlusher);
+        APSARA_TEST_EQUAL(flusher.mQueueKey, item->mQueueKey);
+        APSARA_TEST_EQUAL("", item->mShardHashKey);
+        APSARA_TEST_EQUAL(flusher.mLogstore, item->mLogstore);
+
+        auto compressor
+            = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+
+        sls_logs::SlsLogPackageList packageList;
+        APSARA_TEST_TRUE(packageList.ParseFromString(item->mData));
+        APSARA_TEST_EQUAL(2, packageList.packages_size());
+        uint32_t rawSize = 0;
+        for (size_t i = 0; i < 2; ++i) {
+            APSARA_TEST_EQUAL(sls_logs::SlsCompressType::SLS_CMP_LZ4, packageList.packages(i).compress_type());
+
+            string output, errorMsg;
+            rawSize += packageList.packages(i).uncompress_size();
+            output.resize(packageList.packages(i).uncompress_size());
+            APSARA_TEST_TRUE(compressor->UnCompress(packageList.packages(i).data(), output, errorMsg));
+
+            sls_logs::LogGroup logGroup;
+            APSARA_TEST_TRUE(logGroup.ParseFromString(output));
+            APSARA_TEST_EQUAL("topic", logGroup.topic());
+            APSARA_TEST_EQUAL("uuid", logGroup.machineuuid());
+            APSARA_TEST_EQUAL("172.0.0.1", logGroup.source());
+            APSARA_TEST_EQUAL(2, logGroup.logtags_size());
+            APSARA_TEST_EQUAL("__hostname__", logGroup.logtags(0).key());
+            APSARA_TEST_EQUAL("hostname", logGroup.logtags(0).value());
+            APSARA_TEST_EQUAL("__pack_id__", logGroup.logtags(1).key());
+            APSARA_TEST_EQUAL(1, logGroup.logs_size());
+            if (i == 0) {
+                APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
+            } else {
+                APSARA_TEST_EQUAL(1234567990U, logGroup.logs(0).time());
+            }
+            APSARA_TEST_EQUAL(1, logGroup.logs(0).contents_size());
+            APSARA_TEST_EQUAL("content_key", logGroup.logs(0).contents(0).key());
+            APSARA_TEST_EQUAL("content_value", logGroup.logs(0).contents(0).value());
+        }
+        APSARA_TEST_EQUAL(rawSize, item->mRawSize);
+
+        SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+        flusher.FlushAll();
+        res.clear();
+        SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+        for (auto& tmp : res) {
+            SenderQueueManager::GetInstance()->RemoveItem(tmp->mQueueKey, tmp);
+        }
+        flusher.mBatcher.GetGroupFlushStrategy()->SetMaxSizeBytes(256 * 1024);
+    }
+}
+
+void FlusherSLSUnittest::TestFlush() {
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "cn-hangzhou",
+            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+            "Aliuid": "123456789"
+        }
+    )";
+    ParseJsonTable(configStr, configJson, errorMsg);
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.Init(configJson, optionalGoPipeline);
+
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+    group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
+    group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
+    group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
+    group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
+    {
+        auto e = group.AddLogEvent();
+        e->SetTimestamp(1234567890);
+        e->SetContent(string("content_key"), string("content_value"));
+    }
+
+    size_t batchKey = group.GetTagsHash();
+    flusher.Send(std::move(group));
+
+    flusher.Flush(batchKey);
+    vector<SenderQueueItem*> res;
+    SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+    APSARA_TEST_EQUAL(0U, res.size());
+
+    flusher.Flush(0);
+    SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+    APSARA_TEST_EQUAL(1U, res.size());
+}
+
+void FlusherSLSUnittest::TestFlushAll() {
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "cn-hangzhou",
+            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+            "Aliuid": "123456789"
+        }
+    )";
+    ParseJsonTable(configStr, configJson, errorMsg);
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.Init(configJson, optionalGoPipeline);
+
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+    group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
+    group.SetTag(LOG_RESERVED_KEY_SOURCE, "172.0.0.1");
+    group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "uuid");
+    group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
+    {
+        auto e = group.AddLogEvent();
+        e->SetTimestamp(1234567890);
+        e->SetContent(string("content_key"), string("content_value"));
+    }
+
+    flusher.Send(std::move(group));
+
+    flusher.FlushAll();
+    vector<SenderQueueItem*> res;
+    SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+    APSARA_TEST_EQUAL(1U, res.size());
+}
+
+void FlusherSLSUnittest::TestAddPackId() {
+    FlusherSLS flusher;
+    flusher.mProject = "test_project";
+    flusher.mLogstore = "test_logstore";
+
+    BatchedEvents batch;
+    batch.mPackIdPrefix = "source-id";
+    batch.mSourceBuffers.emplace_back(make_shared<SourceBuffer>());
+    flusher.AddPackId(batch);
+    APSARA_TEST_STREQ("34451096883514E2-0", batch.mTags.mInner["__pack_id__"].data());
+}
+
+void FlusherSLSUnittest::OnGoPipelineSend() {
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "cn-hangzhou",
+            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+            "Aliuid": "123456789"
+        }
+    )";
+    ParseJsonTable(configStr, configJson, errorMsg);
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.Init(configJson, optionalGoPipeline);
+
+    APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));
+
+    vector<SenderQueueItem*> res;
+    SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+
+    APSARA_TEST_EQUAL(1U, res.size());
+    auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+    APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
+    APSARA_TEST_TRUE(item->mBufferOrNot);
+    APSARA_TEST_EQUAL(&flusher, item->mFlusher);
+    APSARA_TEST_EQUAL(flusher.mQueueKey, item->mQueueKey);
+    APSARA_TEST_EQUAL("shardhash_key", item->mShardHashKey);
+    APSARA_TEST_EQUAL("other_logstore", item->mLogstore);
+
+    auto compressor = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+    string output;
+    output.resize(item->mRawSize);
+    APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
+    APSARA_TEST_EQUAL("content", output);
+}
+
 UNIT_TEST_CASE(FlusherSLSUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnFailedInit)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnPipelineUpdate)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSend)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestFlush)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestFlushAll)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestAddPackId)
+UNIT_TEST_CASE(FlusherSLSUnittest, OnGoPipelineSend)
 
 } // namespace logtail
 

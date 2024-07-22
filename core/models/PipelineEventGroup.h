@@ -106,7 +106,7 @@ public:
     size_t GetTagsHash() const;
 
     void SetExactlyOnceCheckpoint(const RangeCheckpointPtr& checkpoint) { mExactlyOnceCheckpoint = checkpoint; }
-    RangeCheckpointPtr GetExactlyOnceCheckpoint() const { return mExactlyOnceCheckpoint; }
+    RangeCheckpointPtr& GetExactlyOnceCheckpoint() { return mExactlyOnceCheckpoint; }
     bool IsReplay() const;
 
     size_t DataSize() const;

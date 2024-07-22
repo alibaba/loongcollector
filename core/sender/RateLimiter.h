@@ -18,34 +18,26 @@
 
 #include <cstdint>
 #include <ctime>
-#include <mutex>
-#include <unordered_map>
 
 namespace logtail {
 
-class PackIdManager {
+class RateLimiter {
 public:
-    PackIdManager(const PackIdManager&) = delete;
-    PackIdManager& operator=(const PackIdManager&) = delete;
+    RateLimiter(uint32_t maxRate) : mMaxSendBytesPerSecond(maxRate) {}
 
-    static PackIdManager* GetInstance() {
-        static PackIdManager instance;
-        return &instance;
-    }
+    bool IsValidToPop();
+    void PostPop(size_t size);
 
-    int64_t GetAndIncPackSeq(int64_t key);
-    void CleanTimeoutEntry();
+    uint32_t mMaxSendBytesPerSecond = 0;
 
 private:
-    PackIdManager() = default;
-    ~PackIdManager() = default;
-
-    std::unordered_map<int64_t, std::pair<uint32_t, time_t>> mPackIdSeq;
-    std::mutex mMux;
+    time_t mLastSendTimeSecond = 0;
+    uint32_t mLastSecondTotalBytes = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class PackIdManagerUnittest;
-    friend class FlusherSLSUnittest;
+    friend class SenderQueueUnittest;
+    friend class ExactlyOnceSenderQueueUnittest;
+    friend class ExactlyOnceQueueManagerUnittest;
 #endif
 };
 

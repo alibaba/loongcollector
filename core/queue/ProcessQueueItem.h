@@ -16,10 +16,13 @@
 
 #pragma once
 
+#include <memory>
+
 #include "models/PipelineEventGroup.h"
-#include "pipeline/Pipeline.h"
 
 namespace logtail {
+
+class Pipeline;
 
 struct ProcessQueueItem {
     PipelineEventGroup mEventGroup;

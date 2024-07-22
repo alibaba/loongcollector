@@ -23,8 +23,6 @@
 
 #include "SenderQueueParam.h"
 #include "common/Lock.h"
-#include "common/LogstoreFeedbackQueue.h"
-#include "common/LogstoreSenderQueue.h"
 #include "common/Thread.h"
 #include "common/WaitObject.h"
 #include "log_pb/logtail_buffer_meta.pb.h"
@@ -163,6 +161,14 @@ enum SendResult {
     SEND_PARAMETER_INVALID
 };
 SendResult ConvertErrorCode(const std::string& errorCode);
+enum GroupSendResult {
+    SendResult_OK,
+    SendResult_Buffered, // move to file buffer
+    SendResult_NetworkFail,
+    SendResult_QuotaFail,
+    SendResult_DiscardFail,
+    SendResult_OtherFail
+};
 
 class Sender {
 private:
@@ -185,7 +191,7 @@ private:
     bool SendToBufferFile(SenderQueueItem* dataPtr);
     void FlowControl(int32_t dataSize, SEND_THREAD_TYPE type);
 
-    bool IsValidToSend(const LogstoreFeedBackKey& logstoreKey);
+    // bool IsValidToSend(const LogstoreFeedBackKey& logstoreKey);
 
     // PTMutex mRegionEndpointEntryMapLock;
     // std::unordered_map<std::string, RegionEndpointEntry*> mRegionEndpointEntryMap;
@@ -198,7 +204,7 @@ private:
     int64_t mSendLastTime[SEND_THREAD_TYPE_COUNT];
     int32_t mSendLastByte[SEND_THREAD_TYPE_COUNT];
 
-    LogstoreSenderQueue<SenderQueueParam> mSenderQueue;
+    // LogstoreSenderQueue<SenderQueueParam> mSenderQueue;
 
     // for encryption buffer file
     struct EncryptionStateMeta {
@@ -423,16 +429,16 @@ public:
     //                       const std::string& endpoint,
     //                       bool isDefault = false,
     //                       bool isProxy = false);
-    FeedbackInterface* GetSenderFeedBackInterface();
-    void SetFeedBackInterface(FeedbackInterface* pProcessInterface);
-    void OnSendDone(SenderQueueItem* mDataPtr, LogstoreSenderInfo::SendResult sendRst);
+    // FeedbackInterface* GetSenderFeedBackInterface();
+    // void SetFeedBackInterface(FeedbackInterface* pProcessInterface);
+    void OnSendDone(SenderQueueItem* mDataPtr, GroupSendResult sendRst);
 
     bool IsFlush();
     void SetFlush();
     void ResetFlush();
 
-    void SetQueueUrgent();
-    void ResetQueueUrgent();
+    // void SetQueueUrgent();
+    // void ResetQueueUrgent();
 
     // void IncreaseRegionConcurrency(const std::string& region);
     // void ResetRegionConcurrency(const std::string& region);
@@ -448,11 +454,11 @@ public:
         mLastSendDataTime = 0;
     }
 
-    LogstoreSenderQueue<SenderQueueParam>& GetQueue() { return mSenderQueue; }
+    // LogstoreSenderQueue<SenderQueueParam>& GetQueue() { return mSenderQueue; }
 
-    LogstoreSenderStatistics GetSenderStatistics(const LogstoreFeedBackKey& key);
-    void
-    SetLogstoreFlowControl(const LogstoreFeedBackKey& logstoreKey, int32_t maxSendBytesPerSecond, int32_t expireTime);
+    // LogstoreSenderStatistics GetSenderStatistics(const int64_t& key);
+    // void
+    // SetLogstoreFlowControl(const int64_t& logstoreKey, int32_t maxSendBytesPerSecond, int32_t expireTime);
 
     std::string GetAllProjects();
     void IncreaseProjectReferenceCnt(const std::string& project);
@@ -466,13 +472,13 @@ public:
     void UpdateRegionStatus(const std::string& region, bool status);
 
     // std::vector<std::string> GetRegionAliuids(const std::string& region);
-    void OnRegionRecover(const std::string& region) { mSenderQueue.OnRegionRecover(region); }
+    // void OnRegionRecover(const std::string& region) { mSenderQueue.OnRegionRecover(region); }
 
     const std::string& GetDefaultRegion() const;
     void SetDefaultRegion(const std::string& region);
 
-    SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue(QueueKey key);
-    void PutIntoBatchMap(SenderQueueItem* data, const std::string& region = "");
+    // SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue(QueueKey key);
+    // void PutIntoBatchMap(SenderQueueItem* data, const std::string& region = "");
 
     friend class SendClosure;
     friend class ConcurrencyLimiter;

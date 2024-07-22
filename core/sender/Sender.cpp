@@ -42,8 +42,6 @@
 #include "config_manager/ConfigManager.h"
 #include "fuse/UlogfsHandler.h"
 #include "monitor/LogFileProfiler.h"
-#include "monitor/LogIntegrity.h"
-#include "monitor/LogLineCount.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
 #include "processor/daemon/LogProcess.h"
@@ -54,9 +52,13 @@
 #endif
 #include "flusher/FlusherSLS.h"
 #include "pipeline/PipelineManager.h"
+#include "queue/QueueKeyManager.h"
+#include "queue/SLSSenderQueueItem.h"
+#include "queue/SenderQueueManager.h"
 #include "sdk/CurlAsynInstance.h"
 #include "sender/PackIdManager.h"
 #include "sender/SLSClientManager.h"
+#include "common/MemoryBarrier.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -129,10 +131,10 @@ void SendClosure::OnSuccess(sdk::Response* response) {
             LOG_DEBUG(sLogger, ("increase sequence id", cpt->key)("checkpoint", cpt->data.DebugString()));
         }
 
-        FlusherSLS::sRegionConcurrencyLimiter.PostPop(flusher->mRegion);
+        // FlusherSLS::sRegionConcurrencyLimiter.PostPop(flusher->mRegion);
         Sender::Instance()->IncTotalSendStatistic(flusher->mProject, data->mLogstore, time(NULL));
     }
-    Sender::Instance()->OnSendDone(mDataPtr, LogstoreSenderInfo::SendResult_OK); // mDataPtr is released here
+    Sender::Instance()->OnSendDone(mDataPtr, GroupSendResult::SendResult_OK); // mDataPtr is released here
 
     delete this;
 }
@@ -171,7 +173,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
         data->mSendRetryTimes++;
         int32_t curTime = time(NULL);
         OperationOnFail operation;
-        LogstoreSenderInfo::SendResult recordRst = LogstoreSenderInfo::SendResult_OtherFail;
+        GroupSendResult recordRst = GroupSendResult::SendResult_OtherFail;
         SendResult sendResult = ConvertErrorCode(errorCode);
         std::ostringstream failDetail, suggestion;
         std::string failEndpoint = data->mCurrentEndpoint;
@@ -205,7 +207,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                     if (!BOOL_FLAG(send_prefer_real_ip) || !data->mRealIpFlag) {
                         SLSClientManager::GetInstance()->UpdateEndpointStatus(
                             flusher->mRegion, data->mCurrentEndpoint, false);
-                        recordRst = LogstoreSenderInfo::SendResult_NetworkFail;
+                        recordRst = GroupSendResult::SendResult_NetworkFail;
                         if (SLSClientManager::GetInstance()->GetServerSwitchPolicy()
                             == SLSClientManager::EndpointSwitchPolicy::DESIGNATED_FIRST) {
                             SLSClientManager::GetInstance()->ResetClientEndpoint(
@@ -215,7 +217,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                 }
                 operation = data->mBufferOrNot ? RECORD_ERROR_WHEN_FAIL : DISCARD_WHEN_FAIL;
             }
-            FlusherSLS::sRegionConcurrencyLimiter.Reset(flusher->mRegion);
+            // FlusherSLS::sRegionConcurrencyLimiter.Reset(flusher->mRegion);
         } else if (sendResult == SEND_QUOTA_EXCEED) {
             BOOL_FLAG(global_network_success) = true;
             if (errorCode == sdk::LOGE_SHARD_WRITE_QUOTA_EXCEED) {
@@ -234,7 +236,7 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                                                    data->mLogstore,
                                                    flusher->mRegion);
             operation = RECORD_ERROR_WHEN_FAIL;
-            recordRst = LogstoreSenderInfo::SendResult_QuotaFail;
+            recordRst = GroupSendResult::SendResult_QuotaFail;
         } else if (sendResult == SEND_UNAUTHORIZED) {
             failDetail << "write unauthorized";
             suggestion << "check https connection to endpoint or access keys provided";
@@ -368,13 +370,13 @@ void SendClosure::OnFail(sdk::Response* response, const string& errorCode, const
                 }
                 Sender::Instance()->SubSendingBufferCount();
                 // set ok to delete data
-                Sender::Instance()->OnSendDone(mDataPtr, LogstoreSenderInfo::SendResult_DiscardFail);
+                Sender::Instance()->OnSendDone(mDataPtr, GroupSendResult::SendResult_DiscardFail);
                 Sender::Instance()->DescSendingCount();
         }
 #undef LOG_PATTERN
     } else {
         Sender::Instance()->SubSendingBufferCount();
-        Sender::Instance()->OnSendDone(mDataPtr, LogstoreSenderInfo::SendResult_DiscardFail);
+        Sender::Instance()->OnSendDone(mDataPtr, GroupSendResult::SendResult_DiscardFail);
         Sender::Instance()->DescSendingCount();
     }
     delete this;
@@ -414,17 +416,10 @@ Sender::Sender() : mDefaultRegion(STRING_FLAG(default_region_name)) {
     mFlushLog = false;
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
     SetSendingBufferCount(0);
-    size_t concurrencyCount = (size_t)AppConfig::GetInstance()->GetSendRequestConcurrency();
-    if (concurrencyCount < 10) {
-        concurrencyCount = 10;
-    }
-    if (concurrencyCount > 50) {
-        concurrencyCount = 50;
-    }
-    mSenderQueue.SetParam((size_t)(concurrencyCount * 1.5), (size_t)(concurrencyCount * 2), 200);
-    LOG_INFO(sLogger, ("Set sender queue param depend value", concurrencyCount));
+#ifndef APSARA_UNIT_TEST_MAIN
     new Thread(bind(&Sender::DaemonSender, this)); // be careful: this thread will not stop until process exit
     new Thread(bind(&Sender::WriteSecondary, this)); // be careful: this thread will not stop until process exit
+#endif
 }
 
 Sender* Sender::Instance() {
@@ -464,16 +459,13 @@ void Sender::SetBufferFilePath(const std::string& bufferfilepath) {
     mBufferFileName = "";
 }
 
-FeedbackInterface* Sender::GetSenderFeedBackInterface() {
-    return (FeedbackInterface*)&mSenderQueue;
-}
-
-void Sender::SetFeedBackInterface(FeedbackInterface* pProcessInterface) {
-    mSenderQueue.SetFeedBackObject(pProcessInterface);
-}
-
-void Sender::OnSendDone(SenderQueueItem* mDataPtr, LogstoreSenderInfo::SendResult sendRst) {
-    mSenderQueue.OnLoggroupSendDone(mDataPtr, sendRst);
+void Sender::OnSendDone(SenderQueueItem* mDataPtr, GroupSendResult sendRst) {
+    if (sendRst != GroupSendResult::SendResult_OK && sendRst != GroupSendResult::SendResult_Buffered
+        && sendRst != GroupSendResult::SendResult_DiscardFail) {
+        mDataPtr->mStatus = SendingStatus::IDLE;
+        return;
+    }
+    SenderQueueManager::GetInstance()->RemoveItem(mDataPtr->mQueueKey, mDataPtr);
 }
 
 std::string Sender::GetBufferFilePath() {
@@ -913,7 +905,7 @@ bool Sender::WriteBackMeta(int32_t pos, const void* buf, int32_t length, const s
 }
 bool Sender::RemoveSender() {
     mBufferSenderThreadIsRunning = false;
-    mSenderQueue.Signal();
+    // mSenderQueue.Signal();
     {
         WaitObject::Lock lock(mBufferWait);
         mBufferWait.signal();
@@ -927,7 +919,7 @@ bool Sender::RemoveSender() {
         if (mSendBufferThreadId.get() != NULL) {
             mSendBufferThreadId->GetValue(200 * 1000);
         }
-        mSenderQueue.RemoveAll();
+        // mSenderQueue.RemoveAll();
     } catch (const ExceptionBase& e) {
         LOG_ERROR(sLogger,
                   ("Remove SendBufferThread fail, message", e.GetExceptionMessage())("exception", e.ToString()));
@@ -972,7 +964,7 @@ void Sender::WriteSecondary() {
 }
 
 bool Sender::IsBatchMapEmpty() {
-    return mSenderQueue.IsEmpty();
+    return SenderQueueManager::GetInstance()->IsAllQueueEmpty();
 }
 
 bool Sender::IsSecondaryBufferEmpty() {
@@ -992,15 +984,15 @@ void Sender::DaemonSender() {
     mLastSendDataTime = lastUpdateMetricTime;
     while (true) {
         vector<SenderQueueItem*> logGroupToSend;
-        mSenderQueue.Wait(1000);
+        SenderQueueManager::GetInstance()->Wait(1000);
 
         uint32_t bufferPackageCount = 0;
         bool singleBatchMapFull = false;
         int32_t curTime = time(NULL);
         if (Application::GetInstance()->IsExiting()) {
-            mSenderQueue.PopAllItem(logGroupToSend, curTime, singleBatchMapFull);
+            SenderQueueManager::GetInstance()->GetAllAvailableItems(logGroupToSend, false);
         } else {
-            mSenderQueue.CheckAndPopAllItem(logGroupToSend, curTime, singleBatchMapFull);
+            SenderQueueManager::GetInstance()->GetAllAvailableItems(logGroupToSend);
         }
         mLastDaemonRunTime = curTime;
         IncSendingCount((int32_t)logGroupToSend.size());
@@ -1019,22 +1011,22 @@ void Sender::DaemonSender() {
             sendBufferBytes = 0;
 
             // update process queue status
-            int32_t invalidCount = 0;
-            int32_t invalidSenderCount = 0;
-            int32_t totalCount = 0;
-            int32_t eoInvalidCount = 0;
-            int32_t eoInvalidSenderCount = 0;
-            int32_t eoTotalCount = 0;
-            mSenderQueue.GetStatus(
-                invalidCount, invalidSenderCount, totalCount, eoInvalidCount, eoInvalidSenderCount, eoTotalCount);
-            sMonitor->UpdateMetric("send_queue_full", invalidCount);
-            sMonitor->UpdateMetric("send_queue_total", totalCount);
-            sMonitor->UpdateMetric("sender_invalid", invalidSenderCount);
-            if (eoTotalCount > 0) {
-                sMonitor->UpdateMetric("eo_send_queue_full", eoInvalidCount);
-                sMonitor->UpdateMetric("eo_send_queue_total", eoTotalCount);
-                sMonitor->UpdateMetric("eo_sender_invalid", eoInvalidSenderCount);
-            }
+            // int32_t invalidCount = 0;
+            // int32_t invalidSenderCount = 0;
+            // int32_t totalCount = 0;
+            // int32_t eoInvalidCount = 0;
+            // int32_t eoInvalidSenderCount = 0;
+            // int32_t eoTotalCount = 0;
+            // mSenderQueue.GetStatus(
+            //     invalidCount, invalidSenderCount, totalCount, eoInvalidCount, eoInvalidSenderCount, eoTotalCount);
+            // sMonitor->UpdateMetric("send_queue_full", invalidCount);
+            // sMonitor->UpdateMetric("send_queue_total", totalCount);
+            // sMonitor->UpdateMetric("sender_invalid", invalidSenderCount);
+            // if (eoTotalCount > 0) {
+            //     sMonitor->UpdateMetric("eo_send_queue_full", eoInvalidCount);
+            //     sMonitor->UpdateMetric("eo_send_queue_total", eoTotalCount);
+            //     sMonitor->UpdateMetric("eo_sender_invalid", eoInvalidSenderCount);
+            // }
 
             // Collect at most 15 stats, similar to Linux load 1,5,15.
             static SlidingWindowCounter sNetErrCounter = CreateLoadCounter();
@@ -1076,7 +1068,7 @@ void Sender::DaemonSender() {
 #ifdef __ENTERPRISE__
             if (BOOST_UNLIKELY(EnterpriseConfigProvider::GetInstance()->IsDebugMode())) {
                 // DumpDebugFile(*itr);
-                // OnSendDone(*itr, LogstoreSenderInfo::SendResult_OK);
+                // OnSendDone(*itr, GroupSendResult::SendResult_OK);
                 // DescSendingCount();
             } else {
 #endif
@@ -1283,10 +1275,6 @@ void Sender::FlowControl(int32_t dataSize, SEND_THREAD_TYPE type) {
     }
 }
 
-bool Sender::IsValidToSend(const LogstoreFeedBackKey& logstoreKey) {
-    return mSenderQueue.IsValidToPush(logstoreKey);
-}
-
 bool Sender::IsProfileData(const string& region, const std::string& project, const std::string& logstore) {
     if ((logstore == "shennong_log_profile" || logstore == "logtail_alarm" || logstore == "logtail_status_profile"
          || logstore == "logtail_suicide_profile")
@@ -1413,20 +1401,22 @@ void Sender::SendToNetAsync(SenderQueueItem* dataPtr) {
         {
             SubSendingBufferCount();
             if (!exactlyOnceCpt) {
-                PutIntoSecondaryBuffer(dataPtr, 3);
+                // explicitly clone the data to avoid dataPtr be destructed by queue
+                auto copy = dataPtr->Clone();
+                PutIntoSecondaryBuffer(copy, 3);
             } else {
                 LOG_INFO(sLogger,
                          ("no need to flush exactly once data to local",
                           exactlyOnceCpt->key)("checkpoint", exactlyOnceCpt->data.DebugString()));
             }
-            OnSendDone(dataPtr, LogstoreSenderInfo::SendResult_Buffered);
+            OnSendDone(dataPtr, GroupSendResult::SendResult_Buffered);
             DescSendingCount();
             return;
         }
     } else {
         if (!BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()) {
             SubSendingBufferCount();
-            OnSendDone(dataPtr, LogstoreSenderInfo::SendResult_DiscardFail);
+            OnSendDone(dataPtr, GroupSendResult::SendResult_DiscardFail);
             DescSendingCount();
             return;
         }
@@ -1487,32 +1477,6 @@ bool Sender::SendInstantly(sls_logs::LogGroup& logGroup,
     return true;
 }
 
-void Sender::PutIntoBatchMap(SenderQueueItem* data, const std::string& region) {
-    // TODO: temporarily set here
-    if (data->mFlusher->HasContext()) {
-        data->mPipeline
-            = PipelineManager::GetInstance()->FindPipelineByName(data->mFlusher->GetContext().GetConfigName());
-        if (!data->mPipeline) {
-            // should not happen
-            return;
-        }
-    }
-
-    int32_t tryTime = 0;
-    while (tryTime < 1000) {
-        if (mSenderQueue.PushItem(data->mQueueKey, data, region)) {
-            return;
-        }
-        if (tryTime++ == 0) {
-            LOG_WARNING(sLogger, ("Push to sender buffer map fail, try again, data size", ToString(data->mRawSize)));
-        }
-        usleep(10 * 1000);
-    }
-    LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM, "push file data into batch map fail");
-    LOG_ERROR(sLogger, ("push file data into batch map fail, discard log lines", ""));
-    delete data;
-}
-
 void Sender::ResetSendingCount() {
     mSendingLogGroupCount = 0;
 }
@@ -1557,23 +1521,10 @@ void Sender::ResetFlush() {
     mFlushLog = false;
 }
 
-void Sender::SetQueueUrgent() {
-    mSenderQueue.SetUrgent();
-}
-
-
-void Sender::ResetQueueUrgent() {
-    mSenderQueue.ResetUrgent();
-}
-
-LogstoreSenderStatistics Sender::GetSenderStatistics(const LogstoreFeedBackKey& key) {
-    return mSenderQueue.GetSenderStatistics(key);
-}
-
 bool Sender::FlushOut(int32_t time_interval_in_mili_seconds) {
     SetFlush();
     for (int i = 0; i < time_interval_in_mili_seconds / 100; ++i) {
-        mSenderQueue.Signal();
+        // mSenderQueue.Signal();
         {
             WaitObject::Lock lock(mWriteSecondaryWait);
             mWriteSecondaryWait.signal();
@@ -1687,19 +1638,6 @@ void Sender::CleanTimeoutSendStatistic() {
     }
 }
 
-
-void Sender::SetLogstoreFlowControl(const LogstoreFeedBackKey& logstoreKey,
-                                    int32_t maxSendBytesPerSecond,
-                                    int32_t expireTime) {
-    mSenderQueue.SetLogstoreFlowControl(logstoreKey, maxSendBytesPerSecond, expireTime);
-}
-
-
-// SlsClientInfo::SlsClientInfo(sdk::Client* client, int32_t updateTime) {
-//     sendClient = client;
-//     lastUsedTime = updateTime;
-// }
-
 std::string Sender::GetAllProjects() {
     string result;
     ScopedSpinLock lock(mProjectRefCntMapLock);
@@ -1774,10 +1712,6 @@ const string& Sender::GetDefaultRegion() const {
 void Sender::SetDefaultRegion(const string& region) {
     ScopedSpinLock lock(mDefaultRegionLock);
     mDefaultRegion = region;
-}
-
-SingleLogstoreSenderManager<SenderQueueParam>* Sender::GetSenderQueue(QueueKey key) {
-    return mSenderQueue.GetQueue(key);
 }
 
 } // namespace logtail

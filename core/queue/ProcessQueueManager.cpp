@@ -79,6 +79,7 @@ bool ProcessQueueManager::DeleteQueue(QueueKey key) {
             mCurrentQueueIndex.second = nextQueIter;
         }
     }
+    QueueKeyManager::GetInstance()->RemoveKey(iter->first);
     mQueues.erase(iter);
     return true;
 }
@@ -170,6 +171,10 @@ bool ProcessQueueManager::PopItem(int64_t threadNo, unique_ptr<ProcessQueueItem>
         }
     }
     ResetCurrentQueueIndex();
+    {
+        unique_lock<mutex> lock(mStateMux);
+        mValidToPop = false;
+    }
     return false;
 }
 
@@ -185,24 +190,23 @@ bool ProcessQueueManager::IsAllQueueEmpty() const {
     return ExactlyOnceQueueManager::GetInstance()->IsAllProcessQueueEmpty();
 }
 
-bool ProcessQueueManager::SetDownStreamQueues(QueueKey key,
-                                              vector<SingleLogstoreSenderManager<SenderQueueParam>*>& ques) {
+bool ProcessQueueManager::SetDownStreamQueues(QueueKey key, vector<SenderQueueInterface*>&& ques) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter == mQueues.end()) {
         return false;
     }
-    iter->second->SetDownStreamQueues(ques);
+    iter->second->SetDownStreamQueues(std::move(ques));
     return true;
 }
 
-bool ProcessQueueManager::SetFeedbackInterface(QueueKey key, vector<FeedbackInterface*>& feedback) {
+bool ProcessQueueManager::SetFeedbackInterface(QueueKey key, vector<FeedbackInterface*>&& feedback) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter == mQueues.end()) {
         return false;
     }
-    iter->second->SetUpStreamFeedbacks(feedback);
+    iter->second->SetUpStreamFeedbacks(std::move(feedback));
     return true;
 }
 
@@ -215,7 +219,7 @@ void ProcessQueueManager::InvalidatePop(const string& configName) {
             iter->second->InvalidatePop();
         }
     } else {
-        ExactlyOnceQueueManager::GetInstance()->InvalidatePop(configName);
+        ExactlyOnceQueueManager::GetInstance()->InvalidatePopProcessQueue(configName);
     }
 }
 
@@ -228,15 +232,19 @@ void ProcessQueueManager::ValidatePop(const string& configName) {
             iter->second->ValidatePop();
         }
     } else {
-        ExactlyOnceQueueManager::GetInstance()->ValidatePop(configName);
+        ExactlyOnceQueueManager::GetInstance()->ValidatePopProcessQueue(configName);
     }
 }
 
 bool ProcessQueueManager::Wait(uint64_t ms) {
+    // TODO: use semaphore instead
     unique_lock<mutex> lock(mStateMux);
     mCond.wait_for(lock, chrono::milliseconds(ms), [this] { return mValidToPop; });
-    mValidToPop = false;
-    return true;
+    if (mValidToPop) {
+        mValidToPop = false;
+        return true;
+    }
+    return false;
 }
 
 void ProcessQueueManager::Trigger() {

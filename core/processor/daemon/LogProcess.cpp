@@ -14,8 +14,8 @@
 
 #include "processor/daemon/LogProcess.h"
 
-#include "batch/TimeoutFlushManager.h"
 #include "app_config/AppConfig.h"
+#include "batch/TimeoutFlushManager.h"
 #include "common/Flags.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "monitor/LogFileProfiler.h"
@@ -25,7 +25,6 @@
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
-#include "sender/Sender.h"
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
@@ -59,10 +58,9 @@ void LogProcess::Start() {
     if (mInitialized)
         return;
     mInitialized = true;
-    Sender::Instance()->SetFeedBackInterface(ProcessQueueManager::GetInstance());
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();
     mProcessThreads = new ThreadPtr[mThreadCount];
-    mThreadFlags = new std::atomic_bool[mThreadCount];
+    mThreadFlags = new atomic_bool[mThreadCount];
     for (int32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
         mThreadFlags[threadNo] = false;
         mProcessThreads[threadNo] = CreateThread([this, threadNo]() { ProcessLoop(threadNo); });
@@ -71,8 +69,7 @@ void LogProcess::Start() {
 }
 
 bool LogProcess::PushBuffer(QueueKey key, size_t inputIndex, PipelineEventGroup&& group, uint32_t retryTimes) {
-    std::unique_ptr<ProcessQueueItem> item
-        = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), inputIndex));
+    unique_ptr<ProcessQueueItem> item = make_unique<ProcessQueueItem>(std::move(group), inputIndex);
     for (size_t i = 0; i < retryTimes; ++i) {
         if (ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item)) == 0) {
             return true;
@@ -83,7 +80,7 @@ bool LogProcess::PushBuffer(QueueKey key, size_t inputIndex, PipelineEventGroup&
                          "retry again")("config", QueueKeyManager::GetInstance()->GetName(key))("input index",
                                                                                                 ToString(inputIndex)));
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        this_thread::sleep_for(chrono::milliseconds(10));
     }
     return false;
 }
@@ -180,8 +177,8 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
         {
             ReadLock lock(mAccessProcessThreadRWL);
 
-            std::unique_ptr<ProcessQueueItem> item;
-            std::string configName;
+            unique_ptr<ProcessQueueItem> item;
+            string configName;
             if (!ProcessQueueManager::GetInstance()->PopItem(threadNo, item, configName)) {
                 ProcessQueueManager::GetInstance()->Wait(100);
                 continue;
@@ -208,7 +205,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             processProfile.Reset();
 
             int32_t startTime = (int32_t)time(NULL);
-            std::vector<PipelineEventGroup> eventGroupList;
+            vector<PipelineEventGroup> eventGroupList;
             eventGroupList.emplace_back(std::move(item->mEventGroup));
             pipeline->Process(eventGroupList, item->mInputIndex);
             int32_t elapsedTime = (int32_t)time(NULL) - startTime;
@@ -274,7 +271,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                         pipeline->GetContext().GetLogstoreName(),
                         convertedPath,
                         hostLogPath,
-                        std::vector<sls_logs::LogTag>(), // warning: this cannot be recovered!
+                        vector<sls_logs::LogTag>(), // warning: this cannot be recovered!
                         profile.readBytes,
                         profile.skipBytes,
                         profile.splitLines,

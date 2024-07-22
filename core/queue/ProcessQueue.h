@@ -16,16 +16,16 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <queue>
+#include <string>
 #include <vector>
 
+#include "common/FeedbackInterface.h"
 #include "queue/FeedbackQueue.h"
 #include "queue/ProcessQueueItem.h"
-// TODO: temporarily used
-#include "common/LogstoreFeedbackQueue.h"
-#include "common/LogstoreSenderQueue.h"
-#include "sender/SenderQueueParam.h"
+#include "queue/SenderQueueInterface.h"
 
 namespace logtail {
 
@@ -43,29 +43,29 @@ public:
     void SetPriority(uint32_t priority) { mPriority = priority; }
     uint32_t GetPriority() const { return mPriority; }
 
+    void SetConfigName(const std::string& config) { mConfigName = config; }
     const std::string& GetConfigName() const { return mConfigName; }
 
-    void SetDownStreamQueues(std::vector<SingleLogstoreSenderManager<SenderQueueParam>*>& ques) {
-        mDownStreamQueues.swap(ques);
-    }
-    void SetUpStreamFeedbacks(std::vector<FeedbackInterface*>& feedbacks) { mUpStreamFeedbacks.swap(feedbacks); }
+    void SetDownStreamQueues(std::vector<SenderQueueInterface*>&& ques);
+    void SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks);
+
+    void Reset(size_t cap, size_t low, size_t high);
 
 private:
     size_t Size() const override { return mQueue.size(); }
 
-    void GiveFeedback();
+    void GiveFeedback() const;
     bool IsDownStreamQueuesValidToPush() const override;
 
     std::queue<std::unique_ptr<ProcessQueueItem>> mQueue;
     uint32_t mPriority;
     std::string mConfigName;
 
-    // TODO: replace the sender queue type
-    std::vector<SingleLogstoreSenderManager<SenderQueueParam>*> mDownStreamQueues;
-    // std::vector<SenderQueue> mDownStreamQueues;
+    std::vector<SenderQueueInterface*> mDownStreamQueues;
     std::vector<FeedbackInterface*> mUpStreamFeedbacks;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    friend class ProcessQueueUnittest;
     friend class ProcessQueueManagerUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
     friend class PipelineUnittest;

@@ -16,25 +16,26 @@
 
 #pragma once
 
-#include <cstdint>
-#include <map>
-#include <mutex>
-
-#include "sender/Limiter.h"
+#include <atomic>
+#include <ctime>
 
 namespace logtail {
 
-class ConcurrencyLimiter : public Limiter {
+class ConcurrencyLimiter {
 public:
-    bool IsValidToPop(const std::string& key) override;
-    void PostPop(const std::string& key) override;
-    void OnSendDone(const std::string& key);
+    bool IsValidToPop();
+    void PostPop();
+    void OnSuccess();
+    void OnFail(time_t curTime);
 
-    void Reset(const std::string& key); // TODO: temporarily used
+#ifdef APSARA_UNIT_TEST_MAIN
+    void Reset() { mLimit = -1; }
+    void SetLimit(int limit) { mLimit = limit; }
+    int GetLimit() const { return mLimit; }
+#endif
 
 private:
-    mutable std::mutex mMux;
-    std::map<std::string, int32_t> mLimitMap; // should be uint32_t after refactor
+    std::atomic_int mLimit = -1;
 };
 
 } // namespace logtail

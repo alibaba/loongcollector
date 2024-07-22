@@ -34,7 +34,7 @@ public:
 
     bool IsValidToPush() const { return mValidToPush; }
 
-    bool Empty() const { return Size() == 0; }
+    virtual bool Empty() const { return Size() == 0; }
 
     QueueKey GetKey() const { return mKey; }
 
@@ -43,6 +43,8 @@ public:
 
 protected:
     bool IsValidToPop() const { return mValidToPop && !Empty() && IsDownStreamQueuesValidToPush(); }
+
+    bool Full() const { return Size() == mCapacity; }
 
     bool ChangeStateIfNeededAfterPush() {
         if (Size() == mHighWatermark) {
@@ -60,25 +62,38 @@ protected:
         return false;
     }
 
+    void Reset(size_t cap, size_t low, size_t high) {
+        mCapacity = cap;
+        mLowWatermark = low;
+        mHighWatermark = high;
+        Reset();
+    }
+
+    void Reset() {
+        mValidToPush = true;
+        mValidToPop = true;
+    }
+
     const QueueKey mKey;
+    size_t mCapacity = 0;
 
 private:
     virtual size_t Size() const = 0;
 
-    bool Full() const { return Size() == mCapacity; }
-
     virtual bool IsDownStreamQueuesValidToPush() const = 0;
 
-    const size_t mCapacity;
-
-    size_t mLowWatermark;
-    size_t mHighWatermark;
+    size_t mLowWatermark = 0;
+    size_t mHighWatermark = 0;
 
     bool mValidToPush = true;
     bool mValidToPop = true;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    friend class ProcessQueueUnittest;
     friend class ProcessQueueManagerUnittest;
+    friend class SenderQueueUnittest;
+    friend class SenderQueueManagerUnittest;
+    friend class ExactlyOnceSenderQueueUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
 #endif
 };

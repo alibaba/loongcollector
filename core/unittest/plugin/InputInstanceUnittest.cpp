@@ -31,20 +31,18 @@ public:
     void TestStop() const;
 
 protected:
-    static void SetUpTestCase() {
-        LoadPluginMock();
-    }
+    static void SetUpTestCase() { LoadPluginMock(); }
 
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 };
 
 void InputInstanceUnittest::TestName() const {
-    unique_ptr<InputInstance> input = unique_ptr<InputInstance>(new InputInstance(new InputMock(), "0"));
+    unique_ptr<InputInstance> input = make_unique<InputInstance>(new InputMock(), "0");
     APSARA_TEST_EQUAL(InputMock::sName, input->Name());
 }
 
 void InputInstanceUnittest::TestInit() const {
-    unique_ptr<InputInstance> input = unique_ptr<InputInstance>(new InputInstance(new InputMock(), "0"));
+    unique_ptr<InputInstance> input = make_unique<InputInstance>(new InputMock(), "0");
     Json::Value config, opt;
     PipelineContext context;
     uint32_t pluginIdx = 0;
@@ -54,12 +52,12 @@ void InputInstanceUnittest::TestInit() const {
 }
 
 void InputInstanceUnittest::TestStart() const {
-    unique_ptr<InputInstance> input = unique_ptr<InputInstance>(new InputInstance(new InputMock(), "0"));
+    unique_ptr<InputInstance> input = make_unique<InputInstance>(new InputMock(), "0");
     APSARA_TEST_TRUE(input->Start());
 }
 
 void InputInstanceUnittest::TestStop() const {
-    unique_ptr<InputInstance> input = unique_ptr<InputInstance>(new InputInstance(new InputMock(), "0"));
+    unique_ptr<InputInstance> input = make_unique<InputInstance>(new InputMock(), "0");
     APSARA_TEST_TRUE(input->Stop(true));
 }
 

@@ -29,7 +29,7 @@
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/PipelineManager.h"
 #include "profile_sender/ProfileSender.h"
-#include "sender/Sender.h"
+#include "queue/SenderQueueManager.h"
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
 DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,
@@ -74,7 +74,7 @@ bool LogtailPlugin::LoadPipeline(const std::string& pipelineName,
                                  const std::string& project,
                                  const std::string& logstore,
                                  const std::string& region,
-                                 logtail::LogstoreFeedBackKey logstoreKey) {
+                                 logtail::QueueKey logstoreKey) {
     if (!mPluginValid) {
         LoadPluginBase();
     }
@@ -124,7 +124,7 @@ void LogtailPlugin::Resume() {
 }
 
 int LogtailPlugin::IsValidToSend(long long logstoreKey) {
-    return Sender::Instance()->GetSenderFeedBackInterface()->IsValidToPush(logstoreKey) ? 0 : -1;
+    return SenderQueueManager::GetInstance()->IsValidToPush(logstoreKey) ? 0 : -1;
 }
 
 int LogtailPlugin::SendPb(const char* configName,
