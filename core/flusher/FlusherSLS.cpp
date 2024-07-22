@@ -632,7 +632,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
     // TODO: temporarily set here, should be removed after independent config update refactor
     if (item->mFlusher->HasContext()) {
         item->mPipeline
-            = PipelineManager::GetInstance()->FindPipelineByName(item->mFlusher->GetContext().GetConfigName());
+            = PipelineManager::GetInstance()->FindConfigByName(item->mFlusher->GetContext().GetConfigName());
         if (!item->mPipeline) {
             // should not happen
             return false;

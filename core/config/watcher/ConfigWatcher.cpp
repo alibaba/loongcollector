@@ -19,7 +19,7 @@
 #include <unordered_set>
 
 #include "logger/Logger.h"
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 #include "pipeline/ProcessConfigManager.h"
 
 using namespace std;

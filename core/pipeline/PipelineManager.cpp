@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 
 #include "config_manager/ConfigManager.h"
 #include "file_server/FileServer.h"

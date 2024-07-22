@@ -48,7 +48,7 @@
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 
 using namespace std;
 using namespace sls_logs;

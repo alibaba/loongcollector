@@ -27,7 +27,7 @@
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 #include "profile_sender/ProfileSender.h"
 #include "queue/SenderQueueManager.h"
 
