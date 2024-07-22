@@ -31,16 +31,24 @@ void TimeoutFlushManager::UpdateRecord(
 }
 
 void TimeoutFlushManager::FlushTimeoutBatch() {
-    lock_guard<mutex> lock(mMux);
-    for (auto& item : mTimeoutRecords) {
-        for (auto it = item.second.begin(); it != item.second.end();) {
-            if (time(nullptr) - it->second.mUpdateTime >= it->second.mTimeoutSecs) {
-                it->second.mFlusher->Flush(it->second.mKey);
-                it = item.second.erase(it);
-            } else {
-                ++it;
+    vector<pair<Flusher*, size_t>> records;
+    {
+        lock_guard<mutex> lock(mMux);
+        for (auto& item : mTimeoutRecords) {
+            for (auto it = item.second.begin(); it != item.second.end();) {
+                if (time(nullptr) - it->second.mUpdateTime >= it->second.mTimeoutSecs) {
+                    // cannot flush here, since flush may also update record, which will lead to both deadlock and map
+                    // iterator invalidation problems
+                    records.emplace_back(it->second.mFlusher, it->second.mKey);
+                    it = item.second.erase(it);
+                } else {
+                    ++it;
+                }
             }
         }
+    }
+    for (auto& item : records) {
+        item.first->Flush(item.second);
     }
 }
 

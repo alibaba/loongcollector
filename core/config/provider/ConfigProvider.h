@@ -34,8 +34,10 @@ protected:
     ConfigProvider() = default;
     virtual ~ConfigProvider() = default;
 
-    std::filesystem::path mSourceDir;
-    mutable std::mutex mMux;
+    std::filesystem::path mPipelineSourceDir;
+    std::filesystem::path mProcessSourceDir;
+    mutable std::mutex mPipelineMux;
+    mutable std::mutex mProcessMux;
 };
 
 } // namespace logtail

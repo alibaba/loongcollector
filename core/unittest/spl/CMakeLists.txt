@@ -18,6 +18,6 @@ project(spl_unittest)
 
 add_executable(spl_unittest SplUnittest.cpp)
 add_executable(spl_benchmark_test SplBenchmark.cpp)
-target_link_libraries(spl_unittest unittest_base)
+target_link_libraries(spl_unittest ${UT_BASE_TARGET})
 
-target_link_libraries(spl_benchmark_test unittest_base)
+target_link_libraries(spl_benchmark_test ${UT_BASE_TARGET})

@@ -16,13 +16,13 @@ cmake_minimum_required(VERSION 3.22)
 project(compression_unittest)
 
 add_executable(compressor_factory_unittest CompressorFactoryUnittest.cpp)
-target_link_libraries(compressor_factory_unittest unittest_base)
+target_link_libraries(compressor_factory_unittest ${UT_BASE_TARGET})
 
 add_executable(lz4_compressor_unittest LZ4CompressorUnittest.cpp)
-target_link_libraries(lz4_compressor_unittest unittest_base)
+target_link_libraries(lz4_compressor_unittest ${UT_BASE_TARGET})
 
 add_executable(zstd_compressor_unittest ZstdCompressorUnittest.cpp)
-target_link_libraries(zstd_compressor_unittest unittest_base)
+target_link_libraries(zstd_compressor_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(compressor_factory_unittest)

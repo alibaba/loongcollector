@@ -15,7 +15,7 @@
  */
 
 #pragma once
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "file_server/AdhocFileManager.h"
 
 namespace logtail {
@@ -33,7 +33,7 @@ public:
     InputStaticFile(/* args */);
     ~InputStaticFile();
 
-    void Init(Config &&config);
+    void Init(PipelineConfig &&config);
     void Start();
     void Stop(bool isRemoving);
 };

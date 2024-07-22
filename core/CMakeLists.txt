@@ -25,13 +25,19 @@ endif ()
 
 # Options.
 option(BUILD_LOGTAIL "Build Logtail executable and tools" ON)
+# Used under the Android environment.
 option(BUILD_LOGTAIL_SHARED_LIBRARY "Build Logtail shared library")
 option(ENABLE_ENTERPRISE "enable enterprise feature")
 cmake_dependent_option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF "LINUX" OFF)
 cmake_dependent_option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF "LINUX" OFF)
 option(WITHOUTGDB "Build Logtail without gdb")
-option(WITHOUTSPL "Build Logtail and UT without SPL")
+option(WITHSPL "Build Logtail and UT with SPL" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
+
+if (BUILD_LOGTAIL_SHARED_LIBRARY AND WITHSPL)
+    message(FATEL_ERROR, "Generating logtail shared library is not supported to be linked with SPL. WITHSPL should be set OFF.")
+    return()
+endif()
 
 if (ENABLE_ENTERPRISE)
     message(STATUS "Enable Enterprise Feature.")
@@ -41,7 +47,7 @@ else ()
     include(${CMAKE_CURRENT_SOURCE_DIR}/options.cmake)
 endif ()
 
-if (WITHOUTSPL)
+if (NOT WITHSPL)
     add_definitions(-D__EXCLUDE_SPL__)
 endif()
 
@@ -59,8 +65,15 @@ if (UNIX)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
     string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
     string(REPLACE "-O3" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+    if (BUILD_LOGTAIL_UT)
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+        SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
+        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
+    endif ()
 elseif (MSVC)
     add_definitions(-DNOMINMAX)
+    add_definitions(-DTARGETLIBS=Psapi.lib)
+    add_definitions(-DPSAPI_VERSION=1)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT /MP /Zi")
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
@@ -84,21 +97,28 @@ endif ()
 # Dependencies.
 include(${CMAKE_CURRENT_SOURCE_DIR}/utils.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/links.cmake)
+set(PLUGIN_SOURCE_FILES_CORE "")
+set(PLUGIN_SOURCE_FILES_SPL "")
+include(${CMAKE_CURRENT_SOURCE_DIR}/common/common.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/common/links.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/input/input.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/input/links.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/processor/processor.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/processor/links.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/flusher/flusher.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/flusher/links.cmake)
 
-# Subdirectories (modules).
+# Subdirectories (modules). except for common, input, processor, flusher, observer, helper and spl.
 set(SUB_DIRECTORIES_LIST
-        batch application app_config checkpoint common compression config config/provider config/watcher config_manager config_server_pb 
-        container_manager controller event event_handler event_listener file_server flusher go_pipeline helper input log_pb logger 
-        models monitor parser pipeline plugin plugin/creator plugin/instance plugin/interface polling processor processor/daemon processor/inner
+        batch application app_config checkpoint compression config config/feedbacker config/provider config/watcher config_manager config_server_pb/v1 config_server_pb/v2 
+        container_manager controller event event_handler event_listener file_server go_pipeline log_pb logger 
+        models monitor parser pipeline plugin plugin/creator plugin/instance plugin/interface polling
         profile_sender queue reader sdk sender serializer sls_control fuse
         )
 if (LINUX)
-    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} observer)
-    if (NOT WITHOUTSPL)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} spl)
-    endif()
     if (ENABLE_ENTERPRISE)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong streamlog)
+        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk streamlog aggregator)
     endif()
 elseif(MSVC)
     if (ENABLE_ENTERPRISE)
@@ -109,67 +129,105 @@ if (ENABLE_ENTERPRISE)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} config_sdk)
 endif()
 
-# Collect source files for UT.
-set(ALL_SOURCE_FILES "")
-macro(append_source_files source_files)
-    set(ALL_SOURCE_FILES ${ALL_SOURCE_FILES} ${${source_files}} PARENT_SCOPE)
-endmacro()
-# Module includes & add_subdirectory.
+# Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories("/opt/logtail_spl/include")
+if (LINUX)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/observer)
+    if (WITHSPL)
+        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/spl)
+    endif()
+endif()
+
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})
 endforeach (DIR_NAME)
+
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
-    add_subdirectory(${DIR_NAME})
+    file(GLOB TEMP_SOURCE_FILES ${DIR_NAME}/*.c ${DIR_NAME}/*.cc ${DIR_NAME}/*.cpp)
+    list(APPEND FRAMEWORK_SOURCE_FILES ${TEMP_SOURCE_FILES})
 endforeach (DIR_NAME)
 
-# Logtail executable.
+if (ENABLE_ENTERPRISE)
+    # remove several files in shennong/sdk
+    list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/shennong/sdk/sample.cpp)
+endif()
+
+# remove several files in go_pipeline
+list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.cpp ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.h)
+
+if(MSVC)
+    # remove linux event listener
+    file(GLOB REMOVE_EVENT_LISTENER_SOURCES event_listener/*_Linux.cpp event_listener/*_Linux.h)
+    list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${REMOVE_EVENT_LISTENER_SOURCES})
+elseif(UNIX)
+    # remove windows event listener
+    file(GLOB REMOVE_EVENT_LISTENER_SOURCES event_listener/*_Windows.cpp event_listener/*_Windows.h)
+    list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${REMOVE_EVENT_LISTENER_SOURCES})
+    if (LINUX)
+        # observer
+        file(GLOB_RECURSE APPEND_OBSERVER_SOURCES observer/*)
+        list(APPEND FRAMEWORK_SOURCE_FILES ${APPEND_OBSERVER_SOURCES})
+        if (WITHSPL)
+            set(SRC_FILES ${PLUGIN_SOURCE_FILES_SPL})
+        endif()
+    endif()
+endif()
+set(SRC_FILES ${SRC_FILES} ${FRAMEWORK_SOURCE_FILES} ${PLUGIN_SOURCE_FILES_CORE})
+
+# Generate SPL library.
+if (LINUX)
+    if (WITHSPL)
+        add_subdirectory(spl)
+    endif()
+endif()
+
+# Logtail executable or shared library.
 if (BUILD_LOGTAIL)
     if (ENABLE_ENTERPRISE)
         if (UNIX)
-            add_executable(${LOGTAIL_TARGET} enterprise_logtail.cpp)
+            add_executable(${LOGTAIL_TARGET} enterprise_logtail.cpp ${SRC_FILES})
         elseif (MSVC)
-            add_executable(${LOGTAIL_TARGET} enterprise_logtail_windows.cpp)
+            add_executable(${LOGTAIL_TARGET} enterprise_logtail_windows.cpp ${SRC_FILES})
         endif ()
     else ()
         if (UNIX)
-            add_executable(${LOGTAIL_TARGET} logtail.cpp)
+            add_executable(${LOGTAIL_TARGET} logtail.cpp ${SRC_FILES})
         elseif (MSVC)
-            add_executable(${LOGTAIL_TARGET} logtail_windows.cpp)
+            add_executable(${LOGTAIL_TARGET} logtail_windows.cpp ${SRC_FILES})
         endif ()
     endif()
-    target_link_libraries(${LOGTAIL_TARGET} application)
-    if (ENABLE_COMPATIBLE_MODE)
-        target_link_libraries(${LOGTAIL_TARGET} rt -static-libstdc++ -static-libgcc)
-    endif ()
-    if (ENABLE_STATIC_LINK_CRT)
-        target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
-    endif ()
 endif()
 
-if (BUILD_LOGTAIL_SHARED_LIBRARY)
+if (BUILD_LOGTAIL_SHARED_LIBRARY)  
     if (ENABLE_ENTERPRISE)
         if (UNIX)
-            add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail.cpp)
+            add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail.cpp ${SRC_FILES})
         elseif (MSVC)
-            add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail_windows.cpp)
+            add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail_windows.cpp ${SRC_FILES})
         endif ()
     else ()
         if (UNIX)
-            add_library(${LOGTAIL_TARGET} SHARED logtail.cpp)
+            add_library(${LOGTAIL_TARGET} SHARED logtail.cpp ${SRC_FILES})
         elseif (MSVC)
-            add_library(${LOGTAIL_TARGET} SHARED logtail_windows.cpp)
+            add_library(${LOGTAIL_TARGET} SHARED logtail_windows.cpp ${SRC_FILES})
         endif ()
     endif()
-    target_link_libraries(${LOGTAIL_TARGET} application)
-    if (ENABLE_COMPATIBLE_MODE)
-        target_link_libraries(${LOGTAIL_TARGET} rt -static-libstdc++ -static-libgcc)
-    endif ()
-    if (ENABLE_STATIC_LINK_CRT)
-        target_link_libraries(${LOGTAIL_TARGET} -static-libstdc++ -static-libgcc)
-    endif ()
 endif ()
+
+# Generate independent libraries.
+# add_subdirectory(helper)
+add_subdirectory(go_pipeline)
+add_subdirectory(common)
+
+# Link libraries.
+if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
+    input_link(${LOGTAIL_TARGET})
+    processor_link(${LOGTAIL_TARGET} ${WITHSPL})
+    flusher_link(${LOGTAIL_TARGET})
+    all_link(${LOGTAIL_TARGET})
+    common_link(${LOGTAIL_TARGET})
+endif()
 
 # Logtail UT.
 if (BUILD_LOGTAIL_UT)

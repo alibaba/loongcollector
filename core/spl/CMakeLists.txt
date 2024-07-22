@@ -16,7 +16,6 @@ cmake_minimum_required(VERSION 2.9)
 project (spl)
 
 file(GLOB LIB_SOURCE_FILES *.cpp *.h .c)
-append_source_files(LIB_SOURCE_FILES)
 add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
 
 link_directories("/opt/logtail_spl/lib")

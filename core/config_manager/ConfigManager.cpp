@@ -52,7 +52,7 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
+#include "pipeline/PipelineConfigManager.h"
 #include "processor/daemon/LogProcess.h"
 
 using namespace std;

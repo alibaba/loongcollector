@@ -13,30 +13,34 @@
 // limitations under the License.
 
 #include "MachineInfoUtil.h"
+
 #include <string.h>
 #if defined(__linux__)
-#include <sys/socket.h>
 #include <arpa/inet.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
 #include <ifaddrs.h>
-#include <sys/utsname.h>
-#include <pwd.h>
+#include <net/if.h>
 #include <netdb.h>
-#include <map>
-#include <list>
+#include <pwd.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/utsname.h>
+
 #include <algorithm>
+#include <list>
+#include <map>
 #elif defined(_MSC_VER)
 #include <WinSock2.h>
 #include <Windows.h>
 #endif
-#include "logger/Logger.h"
-#include "StringTools.h"
-#include "FileSystemUtil.h"
-#include <thread>
 #include <curl/curl.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+
+#include <thread>
+
+#include "FileSystemUtil.h"
+#include "StringTools.h"
+#include "logger/Logger.h"
 
 
 #if defined(_MSC_VER)
@@ -164,10 +168,10 @@ std::string GetHostName() {
     return std::string(hostname);
 }
 
-std::list<std::string> GetNicIpv4IPList() {
+std::unordered_set<std::string> GetNicIpv4IPSet() {
     struct ifaddrs* ifAddrStruct = NULL;
     void* tmpAddrPtr = NULL;
-    std::list<std::string> ipList;
+    std::unordered_set<std::string> ipSet;
     getifaddrs(&ifAddrStruct);
     for (struct ifaddrs* ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr == NULL) {
@@ -183,11 +187,11 @@ std::list<std::string> GetNicIpv4IPList() {
             if (0 == strcmp("lo", ifa->ifa_name) || ip.empty() || StartWith(ip, "127.")) {
                 continue;
             }
-            ipList.emplace_back(std::move(ip));
+            ipSet.insert(std::move(ip));
         }
     }
     freeifaddrs(ifAddrStruct);
-    return ipList;
+    return ipSet;
 }
 
 std::string GetHostIpByHostName() {
@@ -199,64 +203,73 @@ std::string GetHostIpByHostName() {
         return "";
     }
 
-    struct hostent* entry = gethostbyname(hostname.c_str());
-    if (entry == NULL) {
+    struct addrinfo hints, *res = nullptr;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    int status = getaddrinfo(hostname.c_str(), NULL, &hints, &res);
+    if (status != 0 || res == nullptr) {
+        LOG_WARNING(sLogger,
+                    ("failed get address info", "will use other methods to obtain ip")("errMsg", gai_strerror(status)));
         return "";
     }
+
+    std::vector<sockaddr_in> addrs;
+    for (auto p = res; p != nullptr; p = p->ai_next) {
+        if (p->ai_family == AF_INET) {
+            addrs.emplace_back(*(struct sockaddr_in*)p->ai_addr);
+        }
+    }
+    freeaddrinfo(res);
+
+    std::string firstIp;
+    char ipStr[INET_ADDRSTRLEN + 1] = "";
 #if defined(__linux__)
-    int i = 0;
-    std::list<std::string> ipList;
-    ipList = GetNicIpv4IPList();
-    if (!ipList.empty()) {
-        int isExistValidIP = 0;
-        while (entry->h_addr_list[i] != NULL) {
-            struct in_addr addr;
-            memcpy(&addr, entry->h_addr_list[i], sizeof(struct in_addr));
-            auto item = std::find(ipList.begin(), ipList.end(), inet_ntoa(addr));
-            if (item != ipList.end()) {
-                isExistValidIP = 1;
-                break;
+    auto ipSet = GetNicIpv4IPSet();
+    for (size_t i = 0; i < addrs.size(); ++i) {
+        auto p = inet_ntop(AF_INET, &addrs[i].sin_addr, ipStr, INET_ADDRSTRLEN);
+        if (p == nullptr) {
+            continue;
+        }
+        auto tmp = std::string(ipStr);
+        if (ipSet.find(tmp) != ipSet.end()) {
+            return tmp;
+        }
+        if (i == 0) {
+            firstIp = tmp;
+            if (ipSet.empty()) {
+                LOG_INFO(sLogger, ("no entry from getifaddrs", "use first entry from getaddrinfo"));
+                return firstIp;
             }
-            i++;
-        }
-        if (0 == isExistValidIP) {
-            i = 0;
         }
     }
-    struct in_addr* addr = (struct in_addr*)entry->h_addr_list[i];
-    if (addr == NULL) {
-        return "";
-    }
-    char* ipaddr = inet_ntoa(*addr);
-    if (ipaddr == NULL) {
-        return "";
-    }
-    return std::string(ipaddr);
 #elif defined(_MSC_VER)
-    std::string ip;
-    while (*(entry->h_addr_list) != NULL) {
-        if (AF_INET == entry->h_addrtype) {
-            // According to RFC 1918 (http://www.faqs.org/rfcs/rfc1918.html), private IP ranges are as bellow:
-            //   10.0.0.0        -   10.255.255.255  (10/8 prefix)
-            //   172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
-            //   192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
-            //   100.*.*.* , 30.*.*.* - alibaba office network
-            std::string curIP = inet_ntoa(*(struct in_addr*)*entry->h_addr_list);
-            ip = curIP;
-            if (curIP.find("10.") == 0 || curIP.find("100.") == 0 || curIP.find("30.") == 0
-                || curIP.find("192.168.") == 0 || curIP.find("172.16.") == 0 || curIP.find("172.17.") == 0
-                || curIP.find("172.18.") == 0 || curIP.find("172.19.") == 0 || curIP.find("172.20.") == 0
-                || curIP.find("172.21.") == 0 || curIP.find("172.22.") == 0 || curIP.find("172.23.") == 0
-                || curIP.find("172.24.") == 0 || curIP.find("172.25.") == 0 || curIP.find("172.26.") == 0
-                || curIP.find("172.27.") == 0 || curIP.find("172.28.") == 0 || curIP.find("172.29.") == 0
-                || curIP.find("172.30.") == 0 || curIP.find("172.31.") == 0) {
-                return curIP;
-            }
+    for (size_t i = 0; i < addrs.size(); ++i) {
+        auto p = inet_ntop(AF_INET, &addrs[i].sin_addr, ipStr, INET_ADDRSTRLEN);
+        if (p == nullptr) {
+            continue;
         }
-        entry->h_addr_list++;
+        auto tmp = std::string(ipStr);
+        // According to RFC 1918 (http://www.faqs.org/rfcs/rfc1918.html), private IP ranges are as bellow:
+        //   10.0.0.0        -   10.255.255.255  (10/8 prefix)
+        //   172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+        //   192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+        //   100.*.*.* , 30.*.*.* - alibaba office network
+        if (tmp.find("10.") == 0 || tmp.find("100.") == 0 || tmp.find("30.") == 0 || tmp.find("192.168.") == 0
+            || tmp.find("172.16.") == 0 || tmp.find("172.17.") == 0 || tmp.find("172.18.") == 0
+            || tmp.find("172.19.") == 0 || tmp.find("172.20.") == 0 || tmp.find("172.21.") == 0
+            || tmp.find("172.22.") == 0 || tmp.find("172.23.") == 0 || tmp.find("172.24.") == 0
+            || tmp.find("172.25.") == 0 || tmp.find("172.26.") == 0 || tmp.find("172.27.") == 0
+            || tmp.find("172.28.") == 0 || tmp.find("172.29.") == 0 || tmp.find("172.30.") == 0
+            || tmp.find("172.31.") == 0) {
+            return tmp;
+        }
+        if (i == 0) {
+            firstIp = tmp;
+        }
     }
-    return ip;
 #endif
+    LOG_INFO(sLogger, ("no entry from getaddrinfo matches entry from getifaddrs", "use first entry from getaddrinfo"));
+    return firstIp;
 }
 
 std::string GetHostIpByInterface(const std::string& intf) {
@@ -314,10 +327,9 @@ std::string GetAnyAvailableIP() {
 #if defined(__linux__)
     std::string retIP;
     char host[NI_MAXHOST];
-    std::list<std::string> ipList;
-    ipList = GetNicIpv4IPList();
-    if (!ipList.empty()) {
-        for (std::string ip : ipList) {
+    auto ipSet = GetNicIpv4IPSet();
+    if (!ipSet.empty()) {
+        for (auto& ip : ipSet) {
             struct sockaddr_in sa;
             sa.sin_family = AF_INET;
             sa.sin_port = 0;

@@ -16,4 +16,4 @@ cmake_minimum_required(VERSION 3.22)
 project(polling_unittest)
 
 # add_executable(polling_unittest PollingUnittest.cpp)
-# target_link_libraries(polling_unittest unittest_base)
+# target_link_libraries(polling_unittest ${UT_BASE_TARGET})

@@ -24,7 +24,7 @@ InputStaticFile::InputStaticFile(/* args */) {
 InputStaticFile::~InputStaticFile() {
 }
 
-void InputStaticFile::Init(Config &&config) {
+void InputStaticFile::Init(PipelineConfig &&config) {
     // mAdhocFileManager = AdhocFileManager::GetInstance();
     // GetStaticFileList();
 }

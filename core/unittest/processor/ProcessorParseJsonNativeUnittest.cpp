@@ -14,7 +14,7 @@
 #include <cstdlib>
 
 #include "common/JsonUtil.h"
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "models/LogEvent.h"
 #include "plugin/instance/ProcessorInstance.h"
 #include "processor/ProcessorParseJsonNative.h"
@@ -29,6 +29,7 @@ public:
 
     void TestInit();
     void TestProcessJson();
+    void TestProcessJsonEscapedNullByte();
     void TestAddLog();
     void TestProcessEventKeepUnmatch();
     void TestProcessEventDiscardUnmatch();
@@ -44,6 +45,8 @@ UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestInit);
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestAddLog);
 
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessJson);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessJsonEscapedNullByte);
 
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessEventKeepUnmatch);
 
@@ -255,6 +258,63 @@ void ProcessorParseJsonNativeUnittest::TestAddLog() {
     // check observability
     APSARA_TEST_EQUAL_FATAL(int(strlen(key) + strlen(value) + 5),
                             processor.GetContext().GetProcessProfile().logGroupSize);
+}
+
+void ProcessorParseJsonNativeUnittest::TestProcessJsonEscapedNullByte() {
+    // make config
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+
+    // make events
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{\"level\":\"ERROR\",\"time\":\"2024-07-04T06:59:23.078Z\",\"msg\":\"expect { or n, but found \\u0000, error found in #0 byte of ...\"}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+    // run function
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    std::string pluginId = "testID";
+    ProcessorInstance processorInstance(&processor, pluginId);
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+    // judge result
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "level": "ERROR",
+	                "msg": "expect { or n, but found \u0000, error found in #0 byte of ...",
+	                "time": "2024-07-04T06:59:23.078Z"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+    APSARA_TEST_GT_FATAL(processorInstance.mProcTimeMS->GetValue(), uint64_t(0));
 }
 
 void ProcessorParseJsonNativeUnittest::TestProcessJson() {

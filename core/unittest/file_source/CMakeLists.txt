@@ -16,10 +16,10 @@ cmake_minimum_required(VERSION 3.22)
 project(file_source_unittest)
 
 add_executable(file_discovery_options_unittest FileDiscoveryOptionsUnittest.cpp)
-target_link_libraries(file_discovery_options_unittest unittest_base)
+target_link_libraries(file_discovery_options_unittest ${UT_BASE_TARGET})
 
 add_executable(multiline_options_unittest MultilineOptionsUnittest.cpp)
-target_link_libraries(multiline_options_unittest unittest_base)
+target_link_libraries(multiline_options_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(file_discovery_options_unittest)

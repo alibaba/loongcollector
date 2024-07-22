@@ -35,5 +35,7 @@ search_files() {
 }
 
 # Maybe some unittest depend on relative paths, so execute in the unittest directory
+UT_BASE_PATH="$(pwd)/${TARGET_ARTIFACT_PATH:2}"
+export LD_LIBRARY_PATH=${UT_BASE_PATH}:$LD_LIBRARY_PATH
 cd $TARGET_ARTIFACT_PATH
 search_files .

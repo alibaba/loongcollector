@@ -20,6 +20,7 @@ BUILD_REPOSITORY ?= aliyun/ilogtail_build
 GENERATED_HOME ?= generated_files
 PLUGINS_CONFIG_FILE ?= "plugins.yml,external_plugins.yml"
 GO_MOD_FILE ?= go.mod
+PATH_IN_DOCER ?= /src
 DOCKER_BUILD_EXPORT_GO_ENVS ?= true
 DOCKER_BUILD_COPY_GIT_CONFIGS ?= true
 DOCKER_BUILD_USE_BUILDKIT ?=
@@ -119,7 +120,7 @@ lint-e2e: clean tools
 
 .PHONY: core
 core: clean import_plugins
-	./scripts/gen_build_scripts.sh core $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR) $(DOCKER_BUILD_EXPORT_GO_ENVS) $(DOCKER_BUILD_COPY_GIT_CONFIGS) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE)
+	./scripts/gen_build_scripts.sh core $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR) $(DOCKER_BUILD_EXPORT_GO_ENVS) $(DOCKER_BUILD_COPY_GIT_CONFIGS) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE) $(PATH_IN_DOCKER)
 	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false $(DOCKER_BUILD_USE_BUILDKIT)
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
@@ -170,26 +171,22 @@ check-dependency-licenses: clean import_plugins
 docs: clean build
 	./bin/ilogtail --doc
 
-.PHONY: e2e-docs
-e2e-docs: clean
-	cd test && go build -o ilogtail-test-tool  . && ./ilogtail-test-tool docs && rm -f ilogtail-test-tool
-
 # e2e test
 .PHONY: e2e
 e2e: clean gocdocker e2edocker
-	TEST_DEBUG=$(TEST_DEBUG) TEST_PROFILE=$(TEST_PROFILE)  ./scripts/e2e.sh behavior $(TEST_SCOPE)
+	./scripts/e2e.sh e2e
 
 .PHONY: e2e-core
 e2e-core: clean gocdocker e2edocker
-	TEST_DEBUG=$(TEST_DEBUG) TEST_PROFILE=$(TEST_PROFILE)  ./scripts/e2e.sh core $(TEST_SCOPE)
+	./scripts/e2e.sh e2e core
 
 .PHONY: e2e-performance
 e2e-performance: clean docker gocdocker
-	TEST_DEBUG=$(TEST_DEBUG) TEST_PROFILE=$(TEST_PROFILE)  ./scripts/e2e.sh performance $(TEST_SCOPE)
+	./scripts/e2e.sh e2e performance
 
 .PHONY: unittest_e2e_engine
 unittest_e2e_engine: clean gocdocker
-	cd test && go test  ./... -coverprofile=../e2e-engine-coverage.txt -covermode=atomic -tags docker_ready
+	cd test && go test  $$(go list ./... | grep -Ev "engine|e2e") -coverprofile=../e2e-engine-coverage.txt -covermode=atomic -tags docker_ready
 
 .PHONY: unittest_plugin
 unittest_plugin: clean import_plugins

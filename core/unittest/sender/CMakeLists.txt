@@ -16,10 +16,10 @@ cmake_minimum_required(VERSION 3.22)
 project(sender_unittest)
 
 add_executable(pack_id_manager_unittest PackIdManagerUnittest.cpp)
-target_link_libraries(pack_id_manager_unittest unittest_base)
+target_link_libraries(pack_id_manager_unittest ${UT_BASE_TARGET})
 
 # add_executable(sender_unittest SenderUnittest.cpp)
-# target_link_libraries(sender_unittest unittest_base)
+# target_link_libraries(sender_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(pack_id_manager_unittest)

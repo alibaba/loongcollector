@@ -16,24 +16,27 @@ cmake_minimum_required(VERSION 3.22)
 project(config_unittest)
 
 # add_executable(config_match_unittest ConfigMatchUnittest.cpp)
-# target_link_libraries(config_match_unittest unittest_base)
+# target_link_libraries(config_match_unittest ${UT_BASE_TARGET})
 
 # add_executable(config_updator_unittest ConfigUpdatorUnittest.cpp)
-# target_link_libraries(config_updator_unittest unittest_base)
+# target_link_libraries(config_updator_unittest ${UT_BASE_TARGET})
 
 add_executable(config_unittest ConfigUnittest.cpp)
-target_link_libraries(config_unittest unittest_base)
+target_link_libraries(config_unittest ${UT_BASE_TARGET})
 
 add_executable(config_watcher_unittest ConfigWatcherUnittest.cpp)
-target_link_libraries(config_watcher_unittest unittest_base)
+target_link_libraries(config_watcher_unittest ${UT_BASE_TARGET})
 
 add_executable(config_update_unittest ConfigUpdateUnittest.cpp)
-target_link_libraries(config_update_unittest unittest_base)
+target_link_libraries(config_update_unittest ${UT_BASE_TARGET})
 
 if (ENABLE_ENTERPRISE)
     add_executable(legacy_config_provider_unittest LegacyConfigProviderUnittest.cpp)
-    target_link_libraries(legacy_config_provider_unittest unittest_base)
+    target_link_libraries(legacy_config_provider_unittest ${UT_BASE_TARGET})
 endif ()
+
+add_executable(config_feedbackable_unittest ConfigFeedbackableUnittest.cpp)
+target_link_libraries(config_feedbackable_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(config_unittest)
@@ -42,3 +45,4 @@ gtest_discover_tests(config_update_unittest)
 if (ENABLE_ENTERPRISE)
     gtest_discover_tests(legacy_config_provider_unittest)
 endif ()
+gtest_discover_tests(config_feedbackable_unittest)

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "pipeline/Pipeline.h"
-#include "pipeline/PipelineManager.h"
+#include "pipeline/PipelineConfigManager.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -29,9 +29,9 @@ void PipelineManagerUnittest::TestPipelineManagement() const {
     PipelineManager::GetInstance()->mPipelineNameEntityMap["test1"] = make_shared<Pipeline>();
     PipelineManager::GetInstance()->mPipelineNameEntityMap["test2"] = make_shared<Pipeline>();
 
-    APSARA_TEST_EQUAL(2U, PipelineManager::GetInstance()->GetAllPipelineNames().size());
-    APSARA_TEST_NOT_EQUAL(nullptr, PipelineManager::GetInstance()->FindPipelineByName("test1"));
-    APSARA_TEST_EQUAL(nullptr, PipelineManager::GetInstance()->FindPipelineByName("test3"));
+    APSARA_TEST_EQUAL(2U, PipelineManager::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_NOT_EQUAL(nullptr, PipelineManager::GetInstance()->FindConfigByName("test1"));
+    APSARA_TEST_EQUAL(nullptr, PipelineManager::GetInstance()->FindConfigByName("test3"));
 }
 
 UNIT_TEST_CASE(PipelineManagerUnittest, TestPipelineManagement)

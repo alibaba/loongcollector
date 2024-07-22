@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(logtail_metric_unittest)
 
 add_executable(logtail_metric_unittest LogtailMetricUnittest.cpp)
-target_link_libraries(logtail_metric_unittest unittest_base)
+target_link_libraries(logtail_metric_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(logtail_metric_unittest)

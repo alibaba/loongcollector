@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(event_unittest)
 
 add_executable(event_unittest EventUnittest.cpp)
-target_link_libraries(event_unittest unittest_base)
+target_link_libraries(event_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(event_unittest)

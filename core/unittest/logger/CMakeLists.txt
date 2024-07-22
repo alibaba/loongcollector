@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(logger_unittest)
 
 add_executable(logger_unittest logger_unittest.cpp)
-target_link_libraries(logger_unittest unittest_base)
+target_link_libraries(logger_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(logger_unittest)

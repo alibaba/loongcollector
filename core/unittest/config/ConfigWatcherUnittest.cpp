@@ -31,27 +31,44 @@ public:
     void DuplicateConfigs() const;
 
 protected:
-    void SetUp() override { ConfigWatcher::GetInstance()->AddSource(configDir.string()); }
+    void SetUp() override {
+        ConfigWatcher::GetInstance()->AddPipelineSource(configDir.string());
+        ConfigWatcher::GetInstance()->AddProcessSource(processConfigDir.string());
+    }
 
     void TearDown() override { ConfigWatcher::GetInstance()->ClearEnvironment(); }
 
 private:
     static const filesystem::path configDir;
+    static const filesystem::path processConfigDir;
 };
 
 const filesystem::path ConfigWatcherUnittest::configDir = "./config";
+const filesystem::path ConfigWatcherUnittest::processConfigDir = "./processconfig";
 
 void ConfigWatcherUnittest::InvalidConfigDirFound() const {
-    ConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
+    {
+    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckPipelineConfigDiff();
     APSARA_TEST_TRUE(diff.IsEmpty());
 
     { ofstream fout("config"); }
-    diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
+    diff = ConfigWatcher::GetInstance()->CheckPipelineConfigDiff();
     APSARA_TEST_TRUE(diff.IsEmpty());
     filesystem::remove("config");
+    }
+    {
+        ProcessConfigDiff diff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+        APSARA_TEST_TRUE(diff.IsEmpty());
+
+        { ofstream fout("processconfig"); }
+        diff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+        APSARA_TEST_TRUE(diff.IsEmpty());
+        filesystem::remove("processconfig");
+    }
 }
 
 void ConfigWatcherUnittest::InvalidConfigFileFound() const {
+    {
     filesystem::create_directories(configDir);
 
     filesystem::create_directories(configDir / "dir");
@@ -61,15 +78,31 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
         ofstream fout(configDir / "invalid_format.json");
         fout << "[}";
     }
-    ConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
+    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckPipelineConfigDiff();
     APSARA_TEST_TRUE(diff.IsEmpty());
     filesystem::remove_all(configDir);
+    }
+    {
+        filesystem::create_directories(processConfigDir);
+
+        filesystem::create_directories(processConfigDir / "dir");
+        { ofstream fout(processConfigDir / "unsupported_extenstion.zip"); }
+        { ofstream fout(processConfigDir / "empty_file.json"); }
+        {
+            ofstream fout(processConfigDir / "invalid_format.json");
+            fout << "[}";
+        }
+        ProcessConfigDiff diff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+        APSARA_TEST_TRUE(diff.IsEmpty());
+        filesystem::remove_all(processConfigDir);
+    }
 }
 
 void ConfigWatcherUnittest::DuplicateConfigs() const {
+    {
     PluginRegistry::GetInstance()->LoadPlugins();
-    ConfigWatcher::GetInstance()->AddSource("dir1");
-    ConfigWatcher::GetInstance()->AddSource("dir2");
+    ConfigWatcher::GetInstance()->AddPipelineSource("dir1");
+    ConfigWatcher::GetInstance()->AddPipelineSource("dir2");
 
     filesystem::create_directories("config");
     filesystem::create_directories("dir1");
@@ -93,7 +126,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         )";
     }
     { ofstream fout("dir2/config.json"); }
-    ConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
+    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckPipelineConfigDiff();
     APSARA_TEST_FALSE(diff.IsEmpty());
     APSARA_TEST_EQUAL(1U, diff.mAdded.size());
 
@@ -101,6 +134,37 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
     filesystem::remove_all("dir2");
     filesystem::remove_all("config");
     PluginRegistry::GetInstance()->UnloadPlugins();
+    }
+    {
+        PluginRegistry::GetInstance()->LoadPlugins();
+        ConfigWatcher::GetInstance()->AddProcessSource("dir1");
+        ConfigWatcher::GetInstance()->AddProcessSource("dir2");
+
+        filesystem::create_directories("processconfig");
+        filesystem::create_directories("dir1");
+        filesystem::create_directories("dir2");
+
+        {
+            ofstream fout("dir1/config.json");
+            fout << R"(
+            {
+                "enable": true,
+                "max_bytes_per_sec": 1234,
+                "mem_usage_limit": 456,
+                "cpu_usage_limit": 2
+            }
+        )";
+        }
+        { ofstream fout("dir2/config.json"); }
+        ProcessConfigDiff diff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+        APSARA_TEST_FALSE(diff.IsEmpty());
+        APSARA_TEST_EQUAL(1U, diff.mAdded.size());
+
+        filesystem::remove_all("dir1");
+        filesystem::remove_all("dir2");
+        filesystem::remove_all("processconfig");
+        PluginRegistry::GetInstance()->UnloadPlugins();
+    }
 }
 
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigDirFound)

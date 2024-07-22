@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(serializer_unittest)
 
 add_executable(sls_serializer_unittest SLSSerializerUnittest.cpp)
-target_link_libraries(sls_serializer_unittest unittest_base)
+target_link_libraries(sls_serializer_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(sls_serializer_unittest)

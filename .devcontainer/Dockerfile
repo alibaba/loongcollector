@@ -28,6 +28,18 @@ RUN wget http://mirrors.ustc.edu.cn/gnu/libc/glibc-2.18.tar.gz && \
     cd ../ && \
     rm -fr glibc-2.18*
 
+# install python3.8
+RUN cd /opt && curl -O https://cdn.npmmirror.com/binaries/python/3.8.12/Python-3.8.12.tgz && \
+    tar -zxvf Python-3.8.12.tgz && cd Python-3.8.12 && \
+    mkdir /usr/local/python3 && \
+    ./configure --prefix=/usr/local/python3 && \
+    make clean && make && make install && \
+    cp /usr/local/python3/bin/python3.8 /usr/bin/python3
+# install gcovr
+RUN python3 -m pip install --upgrade pip
+RUN cp /usr/local/python3/bin/pip3 /usr/bin/pip3 && pip3 install gcovr==7.0
+RUN cp /usr/local/python3/bin/gcovr /usr/bin/gcovr
+
 # Create the user
 COPY .env /tmp/.env
 RUN source /tmp/.env && rm /tmp/.env; \
@@ -42,7 +54,5 @@ RUN source /tmp/.env && rm /tmp/.env; \
     chmod 0440 /etc/sudoers.d/$USERNAME; \
     chown -R $USERNAME:$GROUPNAME /opt $(eval echo ~$USERNAME); \
     chmod -R 755 $(eval echo ~$USERNAME);
-
-USER $USERNAME
 
 RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct

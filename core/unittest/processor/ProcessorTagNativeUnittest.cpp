@@ -15,7 +15,7 @@
 #include <cstdlib>
 
 #include "common/Constants.h"
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "config_manager/ConfigManager.h"
 #include "pipeline/Pipeline.h"
 #include "processor/inner/ProcessorTagNative.h"

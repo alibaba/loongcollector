@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(observer_unittest)
 
 add_executable(observer_config_unittest ObserverConfigUnittest.cpp)
-target_link_libraries(observer_config_unittest unittest_base)
+target_link_libraries(observer_config_unittest ${UT_BASE_TARGET})
 
 # protocol unittest
 # add_executable(protocol_dns_unittest ProtocolDnsUnittest.cpp)
@@ -25,29 +25,29 @@ target_link_libraries(observer_config_unittest unittest_base)
 # add_executable(protocol_pgsql_unittest ProtocolPgsqlUnittest.cpp)
 # add_executable(protocol_mysql_unittest ProtocolMySqlUnittest.cpp)
 
-# target_link_libraries(protocol_dns_unittest unittest_base)
-# target_link_libraries(protocol_http_unittest unittest_base)
-# target_link_libraries(protocol_redis_unittest unittest_base)
-# target_link_libraries(protocol_pgsql_unittest unittest_base)
-# target_link_libraries(protocol_mysql_unittest unittest_base)
+# target_link_libraries(protocol_dns_unittest ${UT_BASE_TARGET})
+# target_link_libraries(protocol_http_unittest ${UT_BASE_TARGET})
+# target_link_libraries(protocol_redis_unittest ${UT_BASE_TARGET})
+# target_link_libraries(protocol_pgsql_unittest ${UT_BASE_TARGET})
+# target_link_libraries(protocol_mysql_unittest ${UT_BASE_TARGET})
 
 # cgoutp meta unittest
 # add_executable(cgroup_meta_unittest CGoupMetaUnittest.cpp)
-# target_link_libraries(cgroup_meta_unittest unittest_base)
+# target_link_libraries(cgroup_meta_unittest ${UT_BASE_TARGET})
 add_executable(netlink_meta_unittest NetLinkUnittest.cpp)
-target_link_libraries(netlink_meta_unittest unittest_base)
+target_link_libraries(netlink_meta_unittest ${UT_BASE_TARGET})
 
 add_executable(hostname_meta_unittest HostnameMetaUnittest.cpp)
-target_link_libraries(hostname_meta_unittest unittest_base)
+target_link_libraries(hostname_meta_unittest ${UT_BASE_TARGET})
 
 # framework unittest
 add_executable(network_observer_unittest NetworkObserverUnittest.cpp)
 add_executable(protocol_util_unittest ProtocolUtilUnittest.cpp)
 add_executable(protocol_infer_unittest ProtocolInferUnittest.cpp)
 
-target_link_libraries(network_observer_unittest unittest_base)
-target_link_libraries(protocol_util_unittest unittest_base)
-target_link_libraries(protocol_infer_unittest unittest_base)
+target_link_libraries(network_observer_unittest ${UT_BASE_TARGET})
+target_link_libraries(protocol_util_unittest ${UT_BASE_TARGET})
+target_link_libraries(protocol_infer_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(observer_config_unittest)

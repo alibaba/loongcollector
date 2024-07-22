@@ -17,13 +17,13 @@ name: Build Core
 on:
   pull_request:
     paths-ignore:
-      - 'docs/**'
-      - 'example_config/**'
-      - 'docker/**'
-      - 'k8s_template/**'
-      - 'changes/**'
-      - 'licenses/**'
-      - 'CHANGELOG.md'
+      - "docs/**"
+      - "example_config/**"
+      - "docker/**"
+      - "k8s_template/**"
+      - "changes/**"
+      - "licenses/**"
+      - "CHANGELOG.md"
   push:
     branches:
       - main
@@ -37,7 +37,7 @@ jobs:
       matrix:
         go-version: [1.19]
         # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on
-        runner: [ arc-runner-set-ilogtail ]
+        runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
       - name: prepare ubuntu environment
@@ -60,7 +60,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-          
+
       - name: Check out code
         uses: actions/checkout@v4
         with:

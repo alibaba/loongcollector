@@ -23,7 +23,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "config/Config.h"
+#include "config/PipelineConfig.h"
 #include "input/InputContainerStdio.h"
 #include "input/InputFile.h"
 #include "models/PipelineEventGroup.h"
@@ -37,7 +37,7 @@ namespace logtail {
 class Pipeline {
 public:
     // copy/move control functions are deleted because of mContext
-    bool Init(Config&& config);
+    bool Init(PipelineConfig&& config);
     void Start();
     void Stop(bool isRemoving);
     void Process(std::vector<PipelineEventGroup>& logGroupList, size_t inputIndex);

@@ -27,7 +27,7 @@
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
-#include "pipeline/PipelineManager.h"
+#include "pipeline/PipelineConfigManager.h"
 #include "profile_sender/ProfileSender.h"
 #include "queue/SenderQueueManager.h"
 
@@ -181,7 +181,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
             return 0;
         }
     } else {
-        shared_ptr<Pipeline> p = PipelineManager::GetInstance()->FindPipelineByName(configNameStr);
+        shared_ptr<Pipeline> p = PipelineManager::GetInstance()->FindConfigByName(configNameStr);
         if (!p) {
             LOG_INFO(sLogger,
                      ("error", "SendPbV2 can not find config, maybe config updated")("config", configNameStr)(

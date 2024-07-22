@@ -30,6 +30,7 @@ public:
     void TestSize();
     void TestToJson();
     void TestFromJson();
+    void TestTagsIterator();
 
 protected:
     void SetUp() override {
@@ -108,7 +109,7 @@ void MetricEventUnittest::TestSize() {
     size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(UntypedSingleValue) + sizeof(map<StringView, StringView>);
     mMetricEvent->SetName("test");
     basicSize += 4;
-    
+
     mMetricEvent->SetValue(UntypedSingleValue{10.0});
 
     // add tag, and key not existed
@@ -177,12 +178,36 @@ void MetricEventUnittest::TestFromJson() {
     APSARA_TEST_EQUAL("value1", mMetricEvent->GetTag("key1").to_string());
 }
 
+void MetricEventUnittest::TestTagsIterator() {
+    string key1 = "key1";
+    string value1 = "value1";
+    string key2 = "key2";
+    string value2 = "value2";
+    string key3 = "key3";
+    string value3 = "value3";
+
+    map<string, string> rawMap;
+    rawMap[key1] = value1;
+    rawMap[key2] = value2;
+    rawMap[key3] = value3;
+
+    mMetricEvent->SetTag(key1, value1);
+    mMetricEvent->SetTag(key2, value2);
+    mMetricEvent->SetTag(key3, value3);
+
+    for (auto it = mMetricEvent->TagsBegin(); it != mMetricEvent->TagsEnd(); ++it) {
+        APSARA_TEST_EQUAL(rawMap[it->first.to_string()], it->second.to_string());
+    }
+    APSARA_TEST_EQUAL((size_t)3, mMetricEvent->TagsSize());
+}
+
 UNIT_TEST_CASE(MetricEventUnittest, TestName)
 UNIT_TEST_CASE(MetricEventUnittest, TestValue)
 UNIT_TEST_CASE(MetricEventUnittest, TestTag)
 UNIT_TEST_CASE(MetricEventUnittest, TestSize)
 UNIT_TEST_CASE(MetricEventUnittest, TestToJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestFromJson)
+UNIT_TEST_CASE(MetricEventUnittest, TestTagsIterator)
 
 } // namespace logtail
 

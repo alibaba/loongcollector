@@ -30,7 +30,7 @@ fi
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 PACKAGE=$1
 
-cd "$ROOTDIR"/"$PACKAGE"/report
+cd "$ROOTDIR"/test/"$PACKAGE"/report
 
 FILES=""
 for file in `ls .|grep "coverage.out"`

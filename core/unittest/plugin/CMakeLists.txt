@@ -16,25 +16,25 @@ cmake_minimum_required(VERSION 3.22)
 project(plugin_unittest)
 
 add_executable(static_input_creator_unittest StaticInputCreatorUnittest.cpp)
-target_link_libraries(static_input_creator_unittest unittest_base)
+target_link_libraries(static_input_creator_unittest ${UT_BASE_TARGET})
 
 add_executable(static_processor_creator_unittest StaticProcessorCreatorUnittest.cpp)
-target_link_libraries(static_processor_creator_unittest unittest_base)
+target_link_libraries(static_processor_creator_unittest ${UT_BASE_TARGET})
 
 add_executable(static_flusher_creator_unittest StaticFlusherCreatorUnittest.cpp)
-target_link_libraries(static_flusher_creator_unittest unittest_base)
+target_link_libraries(static_flusher_creator_unittest ${UT_BASE_TARGET})
 
 add_executable(input_instance_unittest InputInstanceUnittest.cpp)
-target_link_libraries(input_instance_unittest unittest_base)
+target_link_libraries(input_instance_unittest ${UT_BASE_TARGET})
 
 add_executable(processor_instance_unittest ProcessorInstanceUnittest.cpp)
-target_link_libraries(processor_instance_unittest unittest_base)
+target_link_libraries(processor_instance_unittest ${UT_BASE_TARGET})
 
 add_executable(flusher_instance_unittest FlusherInstanceUnittest.cpp)
-target_link_libraries(flusher_instance_unittest unittest_base)
+target_link_libraries(flusher_instance_unittest ${UT_BASE_TARGET})
 
 add_executable(plugin_registry_unittest PluginRegistryUnittest.cpp)
-target_link_libraries(plugin_registry_unittest unittest_base)
+target_link_libraries(plugin_registry_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(static_input_creator_unittest)

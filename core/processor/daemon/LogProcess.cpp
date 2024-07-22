@@ -21,7 +21,7 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineManager.h"
+#include "pipeline/PipelineConfigManager.h"
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
@@ -185,7 +185,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             }
 
             mThreadFlags[threadNo] = true;
-            auto pipeline = PipelineManager::GetInstance()->FindPipelineByName(configName);
+            auto pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
             if (!pipeline) {
                 LOG_INFO(sLogger,
                          ("pipeline not found during processing, perhaps due to config deletion",
