@@ -21,6 +21,7 @@
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/MultilineOptions.h"
+#include "monitor/PluginMetricManager.h"
 #include "plugin/interface/Input.h"
 #include "reader/FileReaderOptions.h"
 
@@ -45,6 +46,8 @@ public:
     ContainerDiscoveryOptions mContainerDiscovery;
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;
+    PluginMetricManagerPtr mPluginMetricManager;
+    GaugePtr mInputFileMonitorTotal;
     // others
     uint32_t mMaxCheckpointDirSearchDepth = 0;
     uint32_t mExactlyOnceConcurrency = 0;

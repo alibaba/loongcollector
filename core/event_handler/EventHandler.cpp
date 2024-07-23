@@ -1050,6 +1050,7 @@ void ModifyHandler::ForceReadLogAndPush(LogFileReaderPtr reader) {
 int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer) {
     int32_t pushRetry = 0;
     if (!logBuffer->rawBuffer.empty()) {
+        reader->ReportMetrics(logBuffer->readLength);
         LogFileProfiler::GetInstance()->AddProfilingReadBytes(reader->GetConfigName(),
                                                               reader->GetRegion(),
                                                               reader->GetProject(),

@@ -26,6 +26,28 @@ const std::string METRIC_TOPIC_FIELD_NAME = "__topic__";
 const std::string LABEL_PREFIX = "label.";
 const std::string VALUE_PREFIX = "value.";
 
+// common plugin labels
+const std::string METRIC_LABEL_PROJECT = "project";
+const std::string METRIC_LABEL_LOGSTORE = "logstore";
+const std::string METRIC_LABEL_REGION = "region";
+const std::string METRIC_LABEL_CONFIG_NAME = "config_name";
+const std::string METRIC_LABEL_PLUGIN_NAME = "plugin_name";
+const std::string METRIC_LABEL_PLUGIN_ID = "plugin_id";
+
+// input file plugin labels
+const std::string METRIC_LABEL_FILE_DEV = "file_dev";
+const std::string METRIC_LABEL_FILE_INODE = "file_inode";
+const std::string METRIC_LABEL_FILE_NAME = "file_name";
+
+// input file metrics
+const std::string METRIC_INPUT_RECORDS_TOTAL = "input_records_total"; 
+const std::string METRIC_INPUT_RECORDS_SIZE_BYTES = "input_records_size_bytes";
+const std::string METRIC_INPUT_BATCH_TOTAL = "input_batch_total"; 
+const std::string METRIC_INPUT_READ_TOTAL = "input_read_total"; 
+const std::string METRIC_INPUT_FILE_SIZE_BYTES = "input_file_size_bytes";
+const std::string METRIC_INPUT_FILE_READ_DELAY_TIME_MS = "input_file_read_delay_time_ms";
+const std::string METRIC_INPUT_FILE_OFFSET_BYTES = "input_file_offset_bytes";
+const std::string METRIC_INPUT_FILE_MONITOR_TOTAL = "input_file_monitor_total";
 
 // processor common metrics
 const std::string METRIC_PROC_IN_RECORDS_TOTAL = "proc_in_records_total";

@@ -15,13 +15,19 @@
  */
 
 #pragma once
-#include <string>
 #include <atomic>
+#include <string>
+
 #include "common/Lock.h"
 #include "log_pb/sls_logs.pb.h"
 
 
 namespace logtail {
+
+enum class MetricType {
+    METRIC_TYPE_COUNTER,
+    METRIC_TYPE_GAUGE,
+};
 
 class Counter {
 private:
@@ -33,7 +39,7 @@ public:
     uint64_t GetValue() const;
     const std::string& GetName() const;
     void Add(uint64_t val);
-    Counter* CopyAndReset();
+    Counter* Collect();
 };
 
 using CounterPtr = std::shared_ptr<Counter>;
@@ -48,7 +54,7 @@ public:
     uint64_t GetValue() const;
     const std::string& GetName() const;
     void Set(uint64_t val);
-    Gauge* CopyAndReset();
+    Gauge* Collect();
 };
 
 using GaugePtr = std::shared_ptr<Gauge>;
@@ -74,7 +80,7 @@ public:
     const std::vector<GaugePtr>& GetGauges() const;
     CounterPtr CreateCounter(const std::string& name);
     GaugePtr CreateGauge(const std::string& name);
-    MetricsRecord* CopyAndReset();
+    MetricsRecord* Collect();
     void SetNext(MetricsRecord* next);
     MetricsRecord* GetNext() const;
 };
@@ -82,6 +88,8 @@ public:
 class MetricsRecordRef {
 private:
     MetricsRecord* mMetrics = nullptr;
+    std::vector<CounterPtr> mCounters;
+    std::vector<GaugePtr> mGauges;
 
 public:
     ~MetricsRecordRef();
@@ -91,10 +99,25 @@ public:
     MetricsRecordRef(MetricsRecordRef&&) = delete;
     MetricsRecordRef& operator=(MetricsRecordRef&&) = delete;
     void SetMetricsRecord(MetricsRecord* metricRecord);
+    const LabelsPtr& GetLabels() const;
     CounterPtr CreateCounter(const std::string& name);
     GaugePtr CreateGauge(const std::string& name);
     const MetricsRecord* operator->() const;
 };
+
+class ReentrantMetricsRecord {
+private:
+    MetricsRecordRef mMetricsRecordRef;
+    std::unordered_map<std::string, CounterPtr> mCounters;
+    std::unordered_map<std::string, GaugePtr> mGauges;
+
+public:
+    void Init(MetricLabels& labels, std::unordered_map<std::string, MetricType>& metricKeys);
+    const LabelsPtr& GetLabels() const;
+    CounterPtr GetCounter(const std::string& name);
+    GaugePtr GetGauge(const std::string& name);
+};
+using ReentrantMetricsRecordRef = std::shared_ptr<ReentrantMetricsRecord>;
 
 class WriteMetrics {
 private:
@@ -142,6 +165,7 @@ public:
         return ptr;
     }
     void ReadAsLogGroup(std::map<std::string, sls_logs::LogGroup*>& logGroupMap) const;
+    void ReadAsFileBuffer(std::string& metricsContent) const;
     void UpdateMetrics();
 
 #ifdef APSARA_UNIT_TEST_MAIN

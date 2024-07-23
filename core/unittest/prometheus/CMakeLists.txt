@@ -1,4 +1,4 @@
-# Copyright 2022 iLogtail Authors
+# Copyright 2024 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,11 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.22)
-project(logtail_metric_unittest)
+project(prometheus_unittest)
 
-add_executable(logtail_metric_unittest LogtailMetricUnittest.cpp)
-target_link_libraries(logtail_metric_unittest ${UT_BASE_TARGET})
-
-add_executable(plugin_metric_manager_unittest PluginMetricManagerUnittest.cpp)
-target_link_libraries(plugin_metric_manager_unittest ${UT_BASE_TARGET})
+add_executable(textparser_unittest TextParserUnittest.cpp)
+target_link_libraries(textparser_unittest unittest_base)
 
 include(GoogleTest)
-gtest_discover_tests(logtail_metric_unittest)
-gtest_discover_tests(plugin_metric_manager_unittest)
+
+gtest_discover_tests(textparser_unittest)
