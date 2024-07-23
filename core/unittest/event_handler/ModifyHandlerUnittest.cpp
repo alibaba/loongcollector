@@ -26,6 +26,7 @@
 #include "event/Event.h"
 #include "event_handler/EventHandler.h"
 #include "file_server/FileServer.h"
+#include "pipeline/Pipeline.h"
 #include "queue/ProcessQueueManager.h"
 #include "reader/LogFileReader.h"
 #include "unittest/Unittest.h"

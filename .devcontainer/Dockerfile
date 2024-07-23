@@ -55,4 +55,6 @@ RUN source /tmp/.env && rm /tmp/.env; \
     chown -R $USERNAME:$GROUPNAME /opt $(eval echo ~$USERNAME); \
     chmod -R 755 $(eval echo ~$USERNAME);
 
+USER $USERNAME
+
 RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct
