@@ -48,6 +48,7 @@
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
+#include "monitor/MetricConstants.h"
 #include "processor/inner/ProcessorParseContainerLogNative.h"
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
@@ -170,6 +171,8 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
         }
 #endif
 
+        reader->SetMetrics();
+
         reader->InitReader(
             readerConfig.first->mTailingAllMatchedFiles, LogFileReader::BACKWARD_TO_FIXED_POS, exactlyonceConcurrency);
     }
@@ -197,6 +200,26 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = GetParser<RawTextParser>(0);
     mLineParsers.emplace_back(baseLineParsePtr);
+}
+
+void LogFileReader::SetMetrics() {
+    mMetricLabels = {{METRIC_LABEL_FILE_NAME, GetConvertedPath()},
+                     {METRIC_LABEL_FILE_DEV, std::to_string(GetDevInode().dev)},
+                     {METRIC_LABEL_FILE_INODE, std::to_string(GetDevInode().inode)}};
+    mMetricsRecordRef = FileServer::GetInstance()->GetOrCreateReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
+    if (mMetricsRecordRef == nullptr) {
+        LOG_ERROR(sLogger,
+                  ("failed to init metrics", "cannot get config's metricRecordRef")("config name", GetConfigName()));
+        mMetricsEnabled = false;
+        return;
+    }
+    
+    mMetricsEnabled = true;
+
+    mInputRecordsSizeBytesCounter = mMetricsRecordRef->GetCounter(METRIC_INPUT_RECORDS_SIZE_BYTES);
+    mInputReadTotalCounter = mMetricsRecordRef->GetCounter(METRIC_INPUT_READ_TOTAL);
+    mInputFileSizeBytesGauge = mMetricsRecordRef->GetGauge(METRIC_INPUT_FILE_SIZE_BYTES);
+    mInputFileOffsetBytesGauge = mMetricsRecordRef->GetGauge(METRIC_INPUT_FILE_OFFSET_BYTES);
 }
 
 void LogFileReader::DumpMetaToMem(bool checkConfigFlag) {
@@ -2229,6 +2252,16 @@ std::unique_ptr<Event> LogFileReader::CreateFlushTimeoutEvent() {
     return result;
 }
 
+void LogFileReader::ReportMetrics(uint64_t readSize) {
+    if (mMetricsEnabled) {
+        mInputReadTotalCounter->Add(1);
+        mInputRecordsSizeBytesCounter->Add(readSize);
+        mInputFileOffsetBytesGauge->Set(GetLastFilePos());
+        mInputFileSizeBytesGauge->Set(GetFileSize());
+    }
+}
+
+
 LogFileReader::~LogFileReader() {
     // if (mLogBeginRegPtr != NULL) {
     //     delete mLogBeginRegPtr;
@@ -2249,6 +2282,7 @@ LogFileReader::~LogFileReader() {
                  "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                  "file size", mLastFileSize)("last file position", mLastFilePos));
     CloseFilePtr();
+    FileServer::GetInstance()->ReleaseReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
 
     // Mark GC so that corresponding resources can be released.
     // For config update, reader will be recreated, which will retrieve these

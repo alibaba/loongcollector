@@ -361,6 +361,7 @@ void InputFileUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     input.SetContext(ctx);
+    input.SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input.Init(configJson, pluginIdx, optionalGoPipeline));
 
     APSARA_TEST_TRUE(input.Start());

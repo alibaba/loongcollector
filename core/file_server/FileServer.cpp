@@ -109,6 +109,7 @@ void FileServer::Stop() {
 
 // 获取给定名称的文件发现配置
 FileDiscoveryConfig FileServer::GetFileDiscoveryConfig(const string& name) const {
+    ReadLock lock(mReadWriteLock);
     auto itr = mPipelineNameFileDiscoveryConfigsMap.find(name);
     if (itr != mPipelineNameFileDiscoveryConfigsMap.end()) {
         return itr->second;
@@ -118,16 +119,19 @@ FileDiscoveryConfig FileServer::GetFileDiscoveryConfig(const string& name) const
 
 // 添加文件发现配置
 void FileServer::AddFileDiscoveryConfig(const string& name, FileDiscoveryOptions* opts, const PipelineContext* ctx) {
+    WriteLock lock(mReadWriteLock);
     mPipelineNameFileDiscoveryConfigsMap[name] = make_pair(opts, ctx);
 }
 
 // 移除给定名称的文件发现配置
 void FileServer::RemoveFileDiscoveryConfig(const string& name) {
+    WriteLock lock(mReadWriteLock);
     mPipelineNameFileDiscoveryConfigsMap.erase(name);
 }
 
 // 获取给定名称的文件读取器配置
 FileReaderConfig FileServer::GetFileReaderConfig(const string& name) const {
+    ReadLock lock(mReadWriteLock);
     auto itr = mPipelineNameFileReaderConfigsMap.find(name);
     if (itr != mPipelineNameFileReaderConfigsMap.end()) {
         return itr->second;
@@ -137,16 +141,19 @@ FileReaderConfig FileServer::GetFileReaderConfig(const string& name) const {
 
 // 添加文件读取器配置
 void FileServer::AddFileReaderConfig(const string& name, const FileReaderOptions* opts, const PipelineContext* ctx) {
+    WriteLock lock(mReadWriteLock);
     mPipelineNameFileReaderConfigsMap[name] = make_pair(opts, ctx);
 }
 
 // 移除给定名称的文件读取器配置
 void FileServer::RemoveFileReaderConfig(const string& name) {
+    WriteLock lock(mReadWriteLock);
     mPipelineNameFileReaderConfigsMap.erase(name);
 }
 
 // 获取给定名称的多行配置
 MultilineConfig FileServer::GetMultilineConfig(const string& name) const {
+    ReadLock lock(mReadWriteLock);
     auto itr = mPipelineNameMultilineConfigsMap.find(name);
     if (itr != mPipelineNameMultilineConfigsMap.end()) {
         return itr->second;
@@ -156,21 +163,25 @@ MultilineConfig FileServer::GetMultilineConfig(const string& name) const {
 
 // 添加多行配置
 void FileServer::AddMultilineConfig(const string& name, const MultilineOptions* opts, const PipelineContext* ctx) {
+    WriteLock lock(mReadWriteLock);
     mPipelineNameMultilineConfigsMap[name] = make_pair(opts, ctx);
 }
 
 // 移除给定名称的多行配置
 void FileServer::RemoveMultilineConfig(const string& name) {
+    WriteLock lock(mReadWriteLock);
     mPipelineNameMultilineConfigsMap.erase(name);
 }
 
 // 保存容器信息
 void FileServer::SaveContainerInfo(const string& pipeline, const shared_ptr<vector<ContainerInfo>>& info) {
+    WriteLock lock(mReadWriteLock);
     mAllContainerInfoMap[pipeline] = info;
 }
 
 // 获取并移除给定管道的容器信息
 shared_ptr<vector<ContainerInfo>> FileServer::GetAndRemoveContainerInfo(const string& pipeline) {
+    WriteLock lock(mReadWriteLock);
     auto iter = mAllContainerInfoMap.find(pipeline);
     if (iter == mAllContainerInfoMap.end()) {
         return make_shared<vector<ContainerInfo>>();
@@ -182,11 +193,53 @@ shared_ptr<vector<ContainerInfo>> FileServer::GetAndRemoveContainerInfo(const st
 
 // 清除所有容器信息
 void FileServer::ClearContainerInfo() {
+    WriteLock lock(mReadWriteLock);
     mAllContainerInfoMap.clear();
+}
+
+// 获取插件的指标管理器
+PluginMetricManagerPtr FileServer::GetPluginMetricManager(const std::string& name) const {
+    ReadLock lock(mReadWriteLock);
+    auto itr = mPipelineNamePluginMetricManagersMap.find(name);
+    if (itr != mPipelineNamePluginMetricManagersMap.end()) {
+        return itr->second;
+    }
+    return nullptr;
+}
+
+// 添加插件的指标管理器
+void FileServer::AddPluginMetricManager(const std::string& name, PluginMetricManagerPtr PluginMetricManager) {
+    WriteLock lock(mReadWriteLock);
+    mPipelineNamePluginMetricManagersMap[name] = PluginMetricManager;
+}
+
+// 移除插件的指标管理器
+void FileServer::RemovePluginMetricManager(const std::string& name) {
+    WriteLock lock(mReadWriteLock);
+    mPipelineNamePluginMetricManagersMap.erase(name);
+}
+
+// 获取“ReentrantMetricsRecordRef”指标记录对象
+ReentrantMetricsRecordRef FileServer::GetOrCreateReentrantMetricsRecordRef(const std::string& name,
+                                                                           MetricLabels& labels) {
+    PluginMetricManagerPtr filePluginMetricManager = GetPluginMetricManager(name);
+    if (filePluginMetricManager != nullptr) {
+        return filePluginMetricManager->GetOrCreateReentrantMetricsRecordRef(labels);
+    }
+    return nullptr;
+}
+
+// 释放“ReentrantMetricsRecordRef”指标记录对象
+void FileServer::ReleaseReentrantMetricsRecordRef(const std::string& name, MetricLabels& labels) {
+    PluginMetricManagerPtr filePluginMetricManager = GetPluginMetricManager(name);
+    if (filePluginMetricManager != nullptr) {
+        filePluginMetricManager->ReleaseReentrantMetricsRecordRef(labels);
+    }
 }
 
 // 获取给定名称的“ExactlyOnce”并发级别
 uint32_t FileServer::GetExactlyOnceConcurrency(const string& name) const {
+    ReadLock lock(mReadWriteLock);
     auto itr = mPipelineNameEOConcurrencyMap.find(name);
     if (itr != mPipelineNameEOConcurrencyMap.end()) {
         return itr->second;
@@ -196,6 +249,7 @@ uint32_t FileServer::GetExactlyOnceConcurrency(const string& name) const {
 
 // 获取所有配置了“ExactlyOnce”选项的配置名列表
 vector<string> FileServer::GetExactlyOnceConfigs() const {
+    ReadLock lock(mReadWriteLock);
     vector<string> res;
     for (const auto& item : mPipelineNameEOConcurrencyMap) {
         if (item.second > 0) {
@@ -207,11 +261,13 @@ vector<string> FileServer::GetExactlyOnceConfigs() const {
 
 // 添加“ExactlyOnce”并发配置
 void FileServer::AddExactlyOnceConcurrency(const string& name, uint32_t concurrency) {
+    WriteLock lock(mReadWriteLock);
     mPipelineNameEOConcurrencyMap[name] = concurrency;
 }
 
 // 移除给定名称的“ExactlyOnce”并发配置
 void FileServer::RemoveExactlyOnceConcurrency(const string& name) {
+    WriteLock lock(mReadWriteLock);
     mPipelineNameEOConcurrencyMap.erase(name);
 }
 

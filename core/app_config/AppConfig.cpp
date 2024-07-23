@@ -150,6 +150,7 @@ DEFINE_FLAG_INT32(max_holded_data_size,
 DEFINE_FLAG_INT32(pub_max_holded_data_size,
                   "for every id and metric name, the max data size can be holded in memory (default 512KB)",
                   512 * 1024);
+DEFINE_FLAG_STRING(metrics_report_method, "method to report metrics (default none, means logtail will not report metrics)", "sls");
 
 namespace logtail {
 AppConfig::AppConfig() {

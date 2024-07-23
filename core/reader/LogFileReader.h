@@ -33,6 +33,7 @@
 #include "common/memory/SourceBuffer.h"
 #include "event/Event.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/FileServer.h"
 #include "file_server/MultilineOptions.h"
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
@@ -434,6 +435,9 @@ public:
 
     void SetEventGroupMetaAndTag(PipelineEventGroup& group);
 
+    void SetMetrics();
+    void ReportMetrics(uint64_t readSize);
+
 protected:
     bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback = true);
     void ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true);
@@ -530,6 +534,14 @@ protected:
     std::string mLogstore;
     std::string mConfigName;
     std::string mRegion;
+
+    MetricLabels mMetricLabels;
+    bool mMetricsEnabled;
+    ReentrantMetricsRecordRef mMetricsRecordRef;
+    CounterPtr mInputRecordsSizeBytesCounter;
+    CounterPtr mInputReadTotalCounter;
+    GaugePtr mInputFileSizeBytesGauge;
+    GaugePtr mInputFileOffsetBytesGauge;
 
 private:
     bool mHasReadContainerBom = false;

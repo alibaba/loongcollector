@@ -31,6 +31,9 @@ public:
 
 private:
     MetricExportor();
+
+    void SendToSLS();
+    void SendToLocalFile();
     
     int32_t mSendInterval;
     int32_t mLastSendTime;
