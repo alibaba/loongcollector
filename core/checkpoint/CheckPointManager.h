@@ -15,13 +15,15 @@
  */
 
 #pragma once
-#include <string>
-#include <memory>
-#include <unordered_map>
-#include <set>
-#include <ctime>
 #include <json/json.h>
+
 #include <boost/optional.hpp>
+#include <ctime>
+#include <memory>
+#include <set>
+#include <string>
+#include <unordered_map>
+
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
 #include "common/SplitedFilePath.h"
@@ -47,6 +49,7 @@ public:
     std::string mConfigName;
     std::string mFileName;
     std::string mRealFileName;
+    int32_t mPositionInReaderArray = -1; // default not in the reader queue
 
     CheckPoint() {}
 

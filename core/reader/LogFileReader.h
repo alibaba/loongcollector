@@ -147,6 +147,8 @@ public:
     LogFormat mFileLogFormat = LogFormat::TEXT;
 
     static size_t BUFFER_SIZE;
+    static const int32_t CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY = -1;
+    static const int32_t CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY = -2;
     std::vector<BaseLineParse*> mLineParsers = {};
     template <typename T>
     T* GetParser(size_t size) {
@@ -239,6 +241,10 @@ public:
 
     int64_t GetLastFilePos() const { return mLastFilePos; }
 
+    int32_t GetIdxInReaderArrayFromLastCpt() const { return mIdxInReaderArrayFromLastCpt; }
+
+    void SetIdxInReaderArrayFromLastCpt(int32_t idx) { mIdxInReaderArrayFromLastCpt = idx; }
+
     void ResetLastFilePos() { mLastFilePos = 0; }
 
     bool NeedSkipFirstModify() const { return mSkipFirstModify; }
@@ -258,7 +264,7 @@ public:
     void
     InitReader(bool tailExisted = false, FileReadPolicy policy = BACKWARD_TO_FIXED_POS, uint32_t eoConcurrency = 0);
 
-    void DumpMetaToMem(bool checkConfigFlag = false);
+    void DumpMetaToMem(bool checkConfigFlag = false, int32_t idxInReaderArray = -1);
 
     std::string GetSourceId() { return mSourceId; }
 
@@ -479,6 +485,8 @@ protected:
     int64_t mLastFileSize = 0;
     time_t mLastMTime = 0;
     std::string mCache;
+    // >= 0: index of reader array, -1: new reader, -2: not in reader array
+    int32_t mIdxInReaderArrayFromLastCpt = CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
     // std::string mProjectName;
     std::string mTopicName;
     time_t mLastUpdateTime;
