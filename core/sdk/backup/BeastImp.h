@@ -39,18 +39,6 @@ namespace sdk {
                           HttpMessage& httpMessage,
                           const std::string& interface,
                           const bool httpsFlag);
-        virtual void AsynSend(const std::string& httpMethod,
-                              const std::string& host,
-                              const int32_t port,
-                              const std::string& url,
-                              const std::string& queryString,
-                              const std::map<std::string, std::string>& header,
-                              const std::string& body,
-                              const int32_t timeout,
-                              LogsClosure* callBack,
-                              const std::string& interface,
-                              const bool httpsFlag);
-    };
 
 } // namespace sdk
 } // namespace logtail

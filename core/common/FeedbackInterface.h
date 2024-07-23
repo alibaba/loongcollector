@@ -25,9 +25,6 @@ public:
     virtual ~FeedbackInterface() = default;
 
     virtual void Feedback(int64_t key) = 0;
-
-    // TODO: should not be a common method after flusher refactorization
-    virtual bool IsValidToPush(int64_t key) const { return true; }
 };
 
 } // namespace logtail

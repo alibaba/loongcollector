@@ -18,11 +18,13 @@
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
+#include "queue/QueueParam.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
 
 namespace logtail {
+
 class ProcessQueueManagerUnittest : public testing::Test {
 public:
     void TestUpdateQueue();
@@ -34,7 +36,11 @@ public:
     void OnPipelineUpdate();
 
 protected:
-    static void SetUpTestCase() { sEventGroup.reset(new PipelineEventGroup(make_shared<SourceBuffer>())); }
+    static void SetUpTestCase() {
+        sEventGroup.reset(new PipelineEventGroup(make_shared<SourceBuffer>()));
+        sProcessQueueManager = ProcessQueueManager::GetInstance();
+    }
+
     void TearDown() override {
         QueueKeyManager::GetInstance()->Clear();
         sProcessQueueManager->Clear();
@@ -47,16 +53,22 @@ private:
 };
 
 unique_ptr<PipelineEventGroup> ProcessQueueManagerUnittest::sEventGroup;
-ProcessQueueManager* ProcessQueueManagerUnittest::sProcessQueueManager = ProcessQueueManager::GetInstance();
+ProcessQueueManager* ProcessQueueManagerUnittest::sProcessQueueManager;
 
 void ProcessQueueManagerUnittest::TestUpdateQueue() {
     // create queue
     //   and current index is invalid before creation
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateQueue(0, 0));
+    QueueKey key = QueueKeyManager::GetInstance()->GetKey("test_config_1");
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateQueue(key, 0));
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mPriorityQueue[0].size());
-    APSARA_TEST_TRUE(sProcessQueueManager->mQueues[0] == prev(sProcessQueueManager->mPriorityQueue[0].end()));
-    APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[0]);
+    auto iter = sProcessQueueManager->mQueues[key];
+    APSARA_TEST_TRUE(iter == prev(sProcessQueueManager->mPriorityQueue[0].end()));
+    APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == iter);
+    APSARA_TEST_EQUAL(ProcessQueueParam::GetInstance()->mCapacity, iter->mCapacity);
+    APSARA_TEST_EQUAL(ProcessQueueParam::GetInstance()->mLowWatermark, iter->mLowWatermark);
+    APSARA_TEST_EQUAL(ProcessQueueParam::GetInstance()->mHighWatermark, iter->mHighWatermark);
+    APSARA_TEST_EQUAL("test_config_1", iter->GetConfigName());
 
     // create queue
     //   and current index is valid before creation
@@ -126,56 +138,62 @@ void ProcessQueueManagerUnittest::TestUpdateQueue() {
 }
 
 void ProcessQueueManagerUnittest::TestDeleteQueue() {
-    sProcessQueueManager->CreateOrUpdateQueue(0, 0);
-    sProcessQueueManager->CreateOrUpdateQueue(1, 0);
-    sProcessQueueManager->CreateOrUpdateQueue(2, 0);
-    sProcessQueueManager->CreateOrUpdateQueue(3, 0);
-    sProcessQueueManager->mCurrentQueueIndex.second = sProcessQueueManager->mQueues[2];
+    QueueKey key1 = QueueKeyManager::GetInstance()->GetKey("test_config_1");
+    QueueKey key2 = QueueKeyManager::GetInstance()->GetKey("test_config_2");
+    QueueKey key3 = QueueKeyManager::GetInstance()->GetKey("test_config_3");
+    QueueKey key4 = QueueKeyManager::GetInstance()->GetKey("test_config_4");
+    sProcessQueueManager->CreateOrUpdateQueue(key1, 0);
+    sProcessQueueManager->CreateOrUpdateQueue(key2, 0);
+    sProcessQueueManager->CreateOrUpdateQueue(key3, 0);
+    sProcessQueueManager->CreateOrUpdateQueue(key4, 0);
+    sProcessQueueManager->mCurrentQueueIndex.second = sProcessQueueManager->mQueues[key3];
 
     // current index not equal to the deleted queue
-    APSARA_TEST_TRUE(sProcessQueueManager->DeleteQueue(0));
+    APSARA_TEST_TRUE(sProcessQueueManager->DeleteQueue(key1));
     APSARA_TEST_EQUAL(3U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(3U, sProcessQueueManager->mPriorityQueue[0].size());
-    APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[2]);
+    APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[key3]);
+    APSARA_TEST_EQUAL("", QueueKeyManager::GetInstance()->GetName(key1));
 
     // current index equals to the deleted queue
     //   and the deleted queue is not the last in the list
-    APSARA_TEST_TRUE(sProcessQueueManager->DeleteQueue(2));
+    APSARA_TEST_TRUE(sProcessQueueManager->DeleteQueue(key3));
     APSARA_TEST_EQUAL(2U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(2U, sProcessQueueManager->mPriorityQueue[0].size());
-    APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[3]);
+    APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[key4]);
+    APSARA_TEST_EQUAL("", QueueKeyManager::GetInstance()->GetName(key3));
 
     // current index equals to the deleted queue
     //   and the deleted queue is the last in the list
     //     and more queues exist
-    APSARA_TEST_TRUE(sProcessQueueManager->DeleteQueue(3));
+    APSARA_TEST_TRUE(sProcessQueueManager->DeleteQueue(key4));
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mPriorityQueue[0].size());
-    APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[1]);
+    APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[key2]);
+    APSARA_TEST_EQUAL("", QueueKeyManager::GetInstance()->GetName(key4));
 
     // current index equals to the deleted queue
     //   and the deleted queue is the last in the list
     //     and no more queue exists
-    APSARA_TEST_TRUE(sProcessQueueManager->DeleteQueue(1));
+    APSARA_TEST_TRUE(sProcessQueueManager->DeleteQueue(key2));
     APSARA_TEST_EQUAL(0U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(0U, sProcessQueueManager->mPriorityQueue[0].size());
     APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mPriorityQueue[0].end());
+    APSARA_TEST_EQUAL("", QueueKeyManager::GetInstance()->GetName(key2));
 
     // queue not exist
-    APSARA_TEST_FALSE(sProcessQueueManager->DeleteQueue(0));
+    APSARA_TEST_FALSE(sProcessQueueManager->DeleteQueue(key1));
 }
 
 void ProcessQueueManagerUnittest::TestSetQueueUpstreamAndDownStream() {
     sProcessQueueManager->CreateOrUpdateQueue(0, 0);
 
-    vector<SingleLogstoreSenderManager<SenderQueueParam>*> queues;
-    vector<FeedbackInterface*> feedbacks;
     // queue exists
-    APSARA_TEST_TRUE(sProcessQueueManager->SetDownStreamQueues(0, queues));
-    APSARA_TEST_TRUE(sProcessQueueManager->SetFeedbackInterface(0, feedbacks));
+    APSARA_TEST_TRUE(sProcessQueueManager->SetDownStreamQueues(0, vector<SenderQueueInterface*>()));
+    APSARA_TEST_TRUE(sProcessQueueManager->SetFeedbackInterface(0, vector<FeedbackInterface*>()));
     // queue not exists
-    APSARA_TEST_FALSE(sProcessQueueManager->SetDownStreamQueues(1, queues));
-    APSARA_TEST_FALSE(sProcessQueueManager->SetFeedbackInterface(1, feedbacks));
+    APSARA_TEST_FALSE(sProcessQueueManager->SetDownStreamQueues(1, vector<SenderQueueInterface*>()));
+    APSARA_TEST_FALSE(sProcessQueueManager->SetFeedbackInterface(1, vector<FeedbackInterface*>()));
 }
 
 void ProcessQueueManagerUnittest::TestPushQueue() {
@@ -184,34 +202,24 @@ void ProcessQueueManagerUnittest::TestPushQueue() {
 
     // queue belongs to normal process queue
     APSARA_TEST_TRUE(sProcessQueueManager->IsValidToPush(0));
-    APSARA_TEST_EQUAL(0,
-                      sProcessQueueManager->PushQueue(
-                          0, unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_EQUAL(0, sProcessQueueManager->PushQueue(0, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0)));
 
     // queue belongs to exactly once process queue
     APSARA_TEST_TRUE(sProcessQueueManager->IsValidToPush(1));
-    APSARA_TEST_EQUAL(0,
-                      sProcessQueueManager->PushQueue(
-                          1, unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_EQUAL(0, sProcessQueueManager->PushQueue(1, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0)));
 
     // no queue exists
     APSARA_TEST_FALSE(sProcessQueueManager->IsValidToPush(2));
-    APSARA_TEST_EQUAL(2,
-                      sProcessQueueManager->PushQueue(
-                          2, unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_EQUAL(2, sProcessQueueManager->PushQueue(2, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0)));
 
     // invalid to push
     sProcessQueueManager->mQueues[0]->mValidToPush = false;
     APSARA_TEST_FALSE(sProcessQueueManager->IsValidToPush(0));
-    APSARA_TEST_EQUAL(1,
-                      sProcessQueueManager->PushQueue(
-                          0, unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_EQUAL(1, sProcessQueueManager->PushQueue(0, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0)));
 
     ExactlyOnceQueueManager::GetInstance()->mProcessQueues[1]->mValidToPush = false;
     APSARA_TEST_FALSE(sProcessQueueManager->IsValidToPush(1));
-    APSARA_TEST_EQUAL(1,
-                      sProcessQueueManager->PushQueue(
-                          1, unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_EQUAL(1, sProcessQueueManager->PushQueue(1, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0)));
 }
 
 void ProcessQueueManagerUnittest::TestPopItem() {
@@ -228,10 +236,8 @@ void ProcessQueueManagerUnittest::TestPopItem() {
     sProcessQueueManager->CreateOrUpdateQueue(key4, 1);
     ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(5, 0, "test_config_5", vector<RangeCheckpointPtr>(5));
 
-    sProcessQueueManager->PushQueue(key2,
-                                    unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
-    sProcessQueueManager->PushQueue(key3,
-                                    unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
+    sProcessQueueManager->PushQueue(key2, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0));
+    sProcessQueueManager->PushQueue(key3, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0));
     sProcessQueueManager->mCurrentQueueIndex = {1, prev(prev(sProcessQueueManager->mPriorityQueue[1].end()))};
 
     // the item comes from the queue between current index and queue list end
@@ -246,8 +252,7 @@ void ProcessQueueManagerUnittest::TestPopItem() {
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mCurrentQueueIndex.first);
     APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[key3]);
 
-    sProcessQueueManager->PushQueue(key1,
-                                    unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
+    sProcessQueueManager->PushQueue(key1, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0));
     // the item comes from queue list other than the one pointed by current index
     APSARA_TEST_TRUE(sProcessQueueManager->PopItem(0, item, configName));
     APSARA_TEST_EQUAL("test_config_1", configName);
@@ -255,7 +260,7 @@ void ProcessQueueManagerUnittest::TestPopItem() {
     APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[key1]);
 
     sProcessQueueManager->mCurrentQueueIndex = {1, prev(sProcessQueueManager->mPriorityQueue[1].end())};
-    sProcessQueueManager->PushQueue(5, unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
+    sProcessQueueManager->PushQueue(5, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0));
     // the item comes from exactly once queue
     APSARA_TEST_TRUE(sProcessQueueManager->PopItem(0, item, configName));
     APSARA_TEST_EQUAL("test_config_5", configName);
@@ -277,7 +282,7 @@ void ProcessQueueManagerUnittest::TestIsAllQueueEmpty() {
     APSARA_TEST_TRUE(sProcessQueueManager->IsAllQueueEmpty());
 
     // non empty normal process queue
-    sProcessQueueManager->PushQueue(0, unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
+    sProcessQueueManager->PushQueue(0, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0));
     APSARA_TEST_FALSE(sProcessQueueManager->IsAllQueueEmpty());
 
     unique_ptr<ProcessQueueItem> item;
@@ -286,7 +291,7 @@ void ProcessQueueManagerUnittest::TestIsAllQueueEmpty() {
     APSARA_TEST_TRUE(sProcessQueueManager->IsAllQueueEmpty());
 
     // non empty exactly once process queue
-    sProcessQueueManager->PushQueue(2, unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
+    sProcessQueueManager->PushQueue(2, make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0));
     APSARA_TEST_FALSE(sProcessQueueManager->IsAllQueueEmpty());
 
     sProcessQueueManager->PopItem(0, item, configName);

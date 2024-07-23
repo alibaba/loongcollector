@@ -15,6 +15,7 @@
 #include "pipeline/PipelineContext.h"
 
 #include "flusher/FlusherSLS.h"
+#include "queue/QueueKeyManager.h"
 
 using namespace std;
 
@@ -34,11 +35,11 @@ const string& PipelineContext::GetRegion() const {
     return mSLSInfo ? mSLSInfo->mRegion : sEmptyString;
 }
 
-LogstoreFeedBackKey PipelineContext::GetLogstoreKey() const {
+QueueKey PipelineContext::GetLogstoreKey() const {
     if (mSLSInfo) {
-        return mSLSInfo->GetLogstoreKey();
+        return mSLSInfo->GetQueueKey();
     }
-    static LogstoreFeedBackKey key = GenerateLogstoreFeedBackKey(sEmptyString, sEmptyString);
+    static QueueKey key = QueueKeyManager::GetInstance()->GetKey(mConfigName + "-flusher_sls-");
     return key;
 }
 

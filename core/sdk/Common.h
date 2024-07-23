@@ -400,7 +400,6 @@ namespace sdk {
                           const std::string& intf,
                           const bool httpsFlag)
             = 0;
-        virtual void AsynSend(AsynRequest* request) = 0;
     };
 
 } // namespace sdk

@@ -21,7 +21,7 @@
 #include "logger/Logger.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
-#include "sender/Sender.h"
+#include "queue/QueueParam.h"
 
 DEFINE_FLAG_INT32(logtail_queue_gc_threshold_sec, "2min", 2 * 60);
 DEFINE_FLAG_INT64(logtail_queue_max_used_time_per_round_in_msec, "500ms", 500);
@@ -38,7 +38,19 @@ bool ExactlyOnceQueueManager::CreateOrUpdateQueue(QueueKey key,
         lock_guard<mutex> lock(mGCMux);
         mQueueDeletionTimeMap.erase(key);
     }
-    Sender::Instance()->GetQueue().ConvertToExactlyOnceQueue(key, checkpoints);
+    vector<SenderQueueInterface*> senderQueue;
+    {
+        lock_guard<mutex> lock(mSenderQueueMux);
+        auto iter = mSenderQueues.find(key);
+        if (iter != mSenderQueues.end()) {
+            iter->second.Reset(checkpoints);
+        } else {
+            mSenderQueues.try_emplace(key, checkpoints, key);
+            iter = mSenderQueues.find(key);
+        }
+        // limiters are set on first push to the queue
+        senderQueue.emplace_back(&iter->second);
+    }
     {
         lock_guard<mutex> lock(mProcessQueueMux);
         auto iter = mProcessQueues.find(key);
@@ -49,29 +61,47 @@ bool ExactlyOnceQueueManager::CreateOrUpdateQueue(QueueKey key,
                                                        iter->second);
                 iter->second->SetPriority(priority);
             }
+            iter->second->SetConfigName(config);
+            // note: do not reset process queue, to be the same as original implementation
         } else {
-            mProcessPriorityQueue[priority].emplace_back(
-                checkpoints.size(), 0, checkpoints.size(), key, priority, config);
+            // note: Ideally, queue capacity should be the same as checkpoint size. However, since process queue cannot
+            // be reset during update, we temporarily use common param. If checkpoints size is larger than common
+            // capacity, performance will restricted.
+            mProcessPriorityQueue[priority].emplace_back(ProcessQueueParam::GetInstance()->mCapacity,
+                                                         ProcessQueueParam::GetInstance()->mLowWatermark,
+                                                         ProcessQueueParam::GetInstance()->mHighWatermark,
+                                                         key,
+                                                         priority,
+                                                         config);
+            // mProcessPriorityQueue[priority].emplace_back(
+            //     checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key, priority, config);
             mProcessQueues[key] = prev(mProcessPriorityQueue[priority].end());
         }
         // for exactly once, the feedback is one to one
-        vector<SingleLogstoreSenderManager<SenderQueueParam>*> senderqueue{Sender::Instance()->GetSenderQueue(key)};
-        mProcessQueues[key]->SetDownStreamQueues(senderqueue);
-
+        mProcessQueues[key]->SetDownStreamQueues(std::move(senderQueue));
         // exactly once can only be applied to input_file
         vector<FeedbackInterface*> feedbacks{
             InputFeedbackInterfaceRegistry::GetInstance()->GetFeedbackInterface(InputFile::sName)};
-        mProcessQueues[key]->SetUpStreamFeedbacks(feedbacks);
+        mProcessQueues[key]->SetUpStreamFeedbacks(std::move(feedbacks));
     }
     return true;
 }
 
 bool ExactlyOnceQueueManager::DeleteQueue(QueueKey key) {
+    bool isProcessQueueExisted = false, isSenderQueueExisted = false;
     {
         lock_guard<mutex> lock(mProcessQueueMux);
-        if (mProcessQueues.find(key) == mProcessQueues.end()) {
-            return false;
-        }
+        isProcessQueueExisted = mProcessQueues.find(key) != mProcessQueues.end();
+    }
+    {
+        lock_guard<mutex> lock(mSenderQueueMux);
+        isSenderQueueExisted = mSenderQueues.find(key) != mSenderQueues.end();
+    }
+    if (!isProcessQueueExisted && !isSenderQueueExisted) {
+        return false;
+    }
+    if (!isProcessQueueExisted || !isSenderQueueExisted) {
+        // should not happen
     }
     {
         lock_guard<mutex> lock(mGCMux);
@@ -114,7 +144,7 @@ bool ExactlyOnceQueueManager::IsAllProcessQueueEmpty() const {
     return true;
 }
 
-void ExactlyOnceQueueManager::InvalidatePop(const string& configName) {
+void ExactlyOnceQueueManager::InvalidatePopProcessQueue(const string& configName) {
     lock_guard<mutex> lock(mProcessQueueMux);
     for (auto& iter : mProcessQueues) {
         if (iter.second->GetConfigName() == configName) {
@@ -123,13 +153,51 @@ void ExactlyOnceQueueManager::InvalidatePop(const string& configName) {
     }
 }
 
-void ExactlyOnceQueueManager::ValidatePop(const string& configName) {
+void ExactlyOnceQueueManager::ValidatePopProcessQueue(const string& configName) {
     lock_guard<mutex> lock(mProcessQueueMux);
     for (auto& iter : mProcessQueues) {
         if (iter.second->GetConfigName() == configName) {
             iter.second->ValidatePop();
         }
     }
+}
+
+int ExactlyOnceQueueManager::PushSenderQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item) {
+    lock_guard<mutex> lock(mSenderQueueMux);
+    auto iter = mSenderQueues.find(key);
+    if (iter == mSenderQueues.end()) {
+        return 2;
+    }
+    if (!iter->second.Push(std::move(item))) {
+        return 1;
+    }
+    return 0;
+}
+
+void ExactlyOnceQueueManager::GetAllAvailableSenderQueueItems(std::vector<SenderQueueItem*>& item, bool withLimits) {
+    lock_guard<mutex> lock(mSenderQueueMux);
+    for (auto iter = mSenderQueues.begin(); iter != mSenderQueues.end(); ++iter) {
+        iter->second.GetAllAvailableItems(item, withLimits);
+    }
+}
+
+bool ExactlyOnceQueueManager::RemoveSenderQueueItem(QueueKey key, SenderQueueItem* item) {
+    lock_guard<mutex> lock(mSenderQueueMux);
+    auto iter = mSenderQueues.find(key);
+    if (iter == mSenderQueues.end()) {
+        return false;
+    }
+    return iter->second.Remove(item);
+}
+
+bool ExactlyOnceQueueManager::IsAllSenderQueueEmpty() const {
+    lock_guard<mutex> lock(mSenderQueueMux);
+    for (const auto& q : mSenderQueues) {
+        if (!q.second.Empty()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void ExactlyOnceQueueManager::ClearTimeoutQueues() {
@@ -148,14 +216,27 @@ void ExactlyOnceQueueManager::ClearTimeoutQueues() {
         }
         {
             lock_guard<mutex> lock(mProcessQueueMux);
-            if (!mProcessQueues[iter->first]->Empty()) {
+            auto itr = mProcessQueues.find(iter->first);
+            if (itr == mProcessQueues.end()) {
+                // should not happen
+                continue;
+            }
+            if (!itr->second->Empty()) {
                 ++iter;
                 continue;
             }
         }
-        if (!Sender::Instance()->GetQueue().IsEmpty(iter->first)) {
-            ++iter;
-            continue;
+        {
+            lock_guard<mutex> lock(mSenderQueueMux);
+            auto itr = mSenderQueues.find(iter->first);
+            if (itr == mSenderQueues.end()) {
+                // should not happen
+                continue;
+            }
+            if (!itr->second.Empty()) {
+                ++iter;
+                continue;
+            }
         }
         {
             lock_guard<mutex> lock(mProcessQueueMux);
@@ -163,7 +244,10 @@ void ExactlyOnceQueueManager::ClearTimeoutQueues() {
             mProcessPriorityQueue[queueItr->second->GetPriority()].erase(queueItr->second);
             mProcessQueues.erase(queueItr);
         }
-        Sender::Instance()->GetQueue().Delete(iter->first);
+        {
+            lock_guard<mutex> lock(mSenderQueueMux);
+            mSenderQueues.erase(iter->first);
+        }
         QueueKeyManager::GetInstance()->RemoveKey(iter->first);
         iter = mQueueDeletionTimeMap.erase(iter);
     }
@@ -187,10 +271,16 @@ uint32_t ExactlyOnceQueueManager::GetProcessQueueCnt() const {
 
 #ifdef APSARA_UNIT_TEST_MAIN
 void ExactlyOnceQueueManager::Clear() {
-    lock_guard<mutex> lock(mProcessQueueMux);
-    mProcessQueues.clear();
-    for (size_t i = 0; i <= ProcessQueueManager::sMaxPriority; ++i) {
-        mProcessPriorityQueue[i].clear();
+    {
+        lock_guard<mutex> lock(mProcessQueueMux);
+        mProcessQueues.clear();
+        for (size_t i = 0; i <= ProcessQueueManager::sMaxPriority; ++i) {
+            mProcessPriorityQueue[i].clear();
+        }
+    }
+    {
+        lock_guard<mutex> lock(mSenderQueueMux);
+        mSenderQueues.clear();
     }
 }
 #endif

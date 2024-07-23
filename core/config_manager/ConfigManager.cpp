@@ -50,13 +50,10 @@
 #include "event_handler/EventHandler.h"
 #include "file_server/FileServer.h"
 #include "monitor/LogFileProfiler.h"
-#include "monitor/LogIntegrity.h"
-#include "monitor/LogLineCount.h"
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/Pipeline.h"
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 #include "processor/daemon/LogProcess.h"
-#include "sender/Sender.h"
 
 using namespace std;
 

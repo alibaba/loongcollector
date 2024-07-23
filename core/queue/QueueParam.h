@@ -44,4 +44,28 @@ private:
     ~ProcessQueueParam() = default;
 };
 
+struct SenderQueueParam {
+    SenderQueueParam(const SenderQueueParam&) = delete;
+    SenderQueueParam& operator=(const SenderQueueParam&) = delete;
+
+    static SenderQueueParam* GetInstance() {
+        static SenderQueueParam instance;
+        return &instance;
+    }
+
+    void SetParam(size_t cap, size_t lowSize, size_t highSize) {
+        mCapacity = cap;
+        mLowWatermark = lowSize;
+        mHighWatermark = highSize;
+    }
+
+    size_t mCapacity = 15;
+    size_t mLowWatermark = 10;
+    size_t mHighWatermark = 15;
+
+private:
+    SenderQueueParam() = default;
+    ~SenderQueueParam() = default;
+};
+
 } // namespace logtail

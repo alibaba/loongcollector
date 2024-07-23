@@ -19,7 +19,7 @@
 #include <unordered_set>
 
 #include "logger/Logger.h"
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 #include "pipeline/ProcessConfigManager.h"
 
 using namespace std;
@@ -88,7 +88,7 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
             filesystem::file_time_type mTime = filesystem::last_write_time(path, ec);
             if (iter == fileInfoMap.end()) {
                 fileInfoMap[filepath] = make_pair(size, mTime);
-                unique_ptr<Json::Value> detail = unique_ptr<Json::Value>(new Json::Value());
+                unique_ptr<Json::Value> detail = make_unique<Json::Value>();
                 if (!LoadConfigDetailFromFile(path, *detail)) {
                     continue;
                 }
@@ -114,7 +114,7 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
             } else if (iter->second.first != size || iter->second.second != mTime) {
                 // for config currently running, we leave it untouched if new config is invalid
                 fileInfoMap[filepath] = make_pair(size, mTime);
-                unique_ptr<Json::Value> detail = unique_ptr<Json::Value>(new Json::Value());
+                unique_ptr<Json::Value> detail = make_unique<Json::Value>();
                 if (!LoadConfigDetailFromFile(path, *detail)) {
                     if (configManager->FindConfigByName(configName)) {
                         diff.mUnchanged.push_back(configName);

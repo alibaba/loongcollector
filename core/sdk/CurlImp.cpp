@@ -191,11 +191,5 @@ namespace sdk {
         }
     }
 
-    void CurlClient::AsynSend(AsynRequest* request) {
-        CurlAsynInstance* instance = CurlAsynInstance::GetInstance();
-        instance->AddRequest(request);
-    }
-
-
 } // namespace sdk
 } // namespace logtail

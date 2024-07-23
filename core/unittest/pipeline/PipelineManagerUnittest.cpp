@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "pipeline/Pipeline.h"
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

@@ -45,6 +45,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PackIdManagerUnittest;
+    friend class FlusherSLSUnittest;
 #endif
 };
 

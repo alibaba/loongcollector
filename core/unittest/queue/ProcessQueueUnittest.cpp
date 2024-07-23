@@ -13,30 +13,23 @@
 // limitations under the License.
 
 #include <memory>
-#include <unordered_set>
 
 #include "common/FeedbackInterface.h"
 #include "models/PipelineEventGroup.h"
 #include "queue/ProcessQueue.h"
+#include "queue/SenderQueue.h"
 #include "unittest/Unittest.h"
+#include "unittest/queue/FeedbackInterfaceMock.h"
 
 using namespace std;
 
 namespace logtail {
-class FeedbackInterfaceMock : public FeedbackInterface {
-public:
-    void Feedback(QueueKey key) override { mFeedbackedKeys.insert(key); };
-
-    size_t HasFeedback(QueueKey key) const { return mFeedbackedKeys.find(key) != mFeedbackedKeys.end(); }
-
-private:
-    unordered_set<QueueKey> mFeedbackedKeys;
-};
 
 class ProcessQueueUnittest : public testing::Test {
 public:
     void TestPush();
     void TestPop();
+    void TestReset();
 
 protected:
     static void SetUpTestCase() { sEventGroup.reset(new PipelineEventGroup(make_shared<SourceBuffer>())); }
@@ -44,15 +37,13 @@ protected:
     void SetUp() override {
         mQueue.reset(new ProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, "test_config"));
 
-        mSenderQueue1.reset(new SingleLogstoreSenderManager<SenderQueueParam>);
-        mSenderQueue2.reset(new SingleLogstoreSenderManager<SenderQueueParam>);
-        vector<SingleLogstoreSenderManager<SenderQueueParam>*> queues{mSenderQueue1.get(), mSenderQueue2.get()};
-        mQueue->SetDownStreamQueues(queues);
+        mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0));
+        mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0));
+        mQueue->SetDownStreamQueues(vector<SenderQueueInterface*>{mSenderQueue1.get(), mSenderQueue2.get()});
 
         mFeedback1.reset(new FeedbackInterfaceMock);
         mFeedback2.reset(new FeedbackInterfaceMock);
-        vector<FeedbackInterface*> feedbacks{mFeedback1.get(), mFeedback2.get()};
-        mQueue->SetUpStreamFeedbacks(feedbacks);
+        mQueue->SetUpStreamFeedbacks(vector<FeedbackInterface*>{mFeedback1.get(), mFeedback2.get()});
     }
 
 private:
@@ -62,30 +53,34 @@ private:
     static const size_t sLowWatermark = 2;
     static const size_t sHighWatermark = 4;
 
+    unique_ptr<ProcessQueueItem> GenerateItem() {
+        return make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0);
+    }
+
     unique_ptr<ProcessQueue> mQueue;
     unique_ptr<FeedbackInterface> mFeedback1;
     unique_ptr<FeedbackInterface> mFeedback2;
-    unique_ptr<SingleLogstoreSenderManager<SenderQueueParam>> mSenderQueue1;
-    unique_ptr<SingleLogstoreSenderManager<SenderQueueParam>> mSenderQueue2;
+    unique_ptr<SenderQueueInterface> mSenderQueue1;
+    unique_ptr<SenderQueueInterface> mSenderQueue2;
 };
 
 unique_ptr<PipelineEventGroup> ProcessQueueUnittest::sEventGroup;
 
 void ProcessQueueUnittest::TestPush() {
     // push first
-    APSARA_TEST_TRUE(mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
-    APSARA_TEST_TRUE(mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
-    APSARA_TEST_TRUE(mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
-    APSARA_TEST_TRUE(mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
+    APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
+    APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
+    APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
     // now queue size comes to high watermark, push is forbidden
-    APSARA_TEST_FALSE(mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_FALSE(mQueue->Push(GenerateItem()));
     // still not valid to push when low watermark is reached
     unique_ptr<ProcessQueueItem> item;
     mQueue->Pop(item);
-    APSARA_TEST_FALSE(mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_FALSE(mQueue->Push(GenerateItem()));
     mQueue->Pop(item);
     // now queue size comes to low watermark, push can be resumed
-    APSARA_TEST_TRUE(mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0))));
+    APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
 }
 
 void ProcessQueueUnittest::TestPop() {
@@ -93,22 +88,22 @@ void ProcessQueueUnittest::TestPop() {
     // nothing to pop
     APSARA_TEST_EQUAL(0, mQueue->Pop(item));
 
-    mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
+    mQueue->Push(GenerateItem());
     // invalidate pop
     mQueue->InvalidatePop();
     APSARA_TEST_EQUAL(0, mQueue->Pop(item));
     mQueue->ValidatePop();
 
     // downstream queues are not valid to push
-    mSenderQueue1->mValid = false;
+    mSenderQueue1->mValidToPush = false;
     APSARA_TEST_EQUAL(0, mQueue->Pop(item));
-    mSenderQueue1->mValid = true;
+    mSenderQueue1->mValidToPush = true;
 
     // push to high watermark
-    mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
-    mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
-    mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
-    mQueue->Push(unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(*sEventGroup), 0)));
+    mQueue->Push(GenerateItem());
+    mQueue->Push(GenerateItem());
+    mQueue->Push(GenerateItem());
+    mQueue->Push(GenerateItem());
     // from high watermark to low wartermark
     APSARA_TEST_TRUE(mQueue->Pop(item));
     APSARA_TEST_FALSE(static_cast<FeedbackInterfaceMock*>(mFeedback1.get())->HasFeedback(sKey));
@@ -118,8 +113,24 @@ void ProcessQueueUnittest::TestPop() {
     APSARA_TEST_TRUE(static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->HasFeedback(sKey));
 }
 
+void ProcessQueueUnittest::TestReset() {
+    mQueue->mHighWatermark = 1;
+    mQueue->Push(GenerateItem());
+    mQueue->InvalidatePop();
+    mQueue->Reset(5, 4, 5);
+    APSARA_TEST_TRUE(mQueue->Empty());
+    APSARA_TEST_TRUE(mQueue->mDownStreamQueues.empty());
+    APSARA_TEST_TRUE(mQueue->mUpStreamFeedbacks.empty());
+    APSARA_TEST_TRUE(mQueue->mValidToPop);
+    APSARA_TEST_TRUE(mQueue->mValidToPush);
+    APSARA_TEST_EQUAL(5U, mQueue->mCapacity);
+    APSARA_TEST_EQUAL(4U, mQueue->mLowWatermark);
+    APSARA_TEST_EQUAL(5U, mQueue->mHighWatermark);
+}
+
 UNIT_TEST_CASE(ProcessQueueUnittest, TestPush)
 UNIT_TEST_CASE(ProcessQueueUnittest, TestPop)
+UNIT_TEST_CASE(ProcessQueueUnittest, TestReset)
 
 } // namespace logtail
 

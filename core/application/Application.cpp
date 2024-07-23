@@ -42,7 +42,7 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/MetricExportor.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 #include "pipeline/ProcessConfigManager.h"
 #include "plugin/PluginRegistry.h"
 #include "processor/daemon/LogProcess.h"
@@ -58,6 +58,7 @@
 #include "config/provider/CommonConfigProvider.h"
 #endif
 #include "queue/ExactlyOnceQueueManager.h"
+#include "queue/SenderQueueManager.h"
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
 DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
@@ -191,6 +192,7 @@ void Application::Start() { // GCOVR_EXCL_START
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
     InitWindowsSignalObject();
 #endif
+    SenderQueueInterface::SetFeedback(ProcessQueueManager::GetInstance());
     // flusher_sls should always be loaded, since profiling will rely on this.
     Sender::Instance()->Init();
 
@@ -290,6 +292,7 @@ void Application::Start() { // GCOVR_EXCL_START
 #endif
         if (curTime - lastQueueGCTime >= INT32_FLAG(queue_check_gc_interval_sec)) {
             ExactlyOnceQueueManager::GetInstance()->ClearTimeoutQueues();
+            SenderQueueManager::GetInstance()->ClearUnusedQueues();
             lastQueueGCTime = curTime;
         }
         if (curTime - lastUpdateMetricTime >= 40) {

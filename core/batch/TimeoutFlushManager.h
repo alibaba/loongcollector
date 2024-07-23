@@ -61,6 +61,7 @@ private:
     std::map<std::string, std::map<std::pair<size_t, size_t>, TimeoutRecord>> mTimeoutRecords;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    friend class PipelineUnittest;
     friend class TimeoutFlushManagerUnittest;
     friend class BatcherUnittest;
 #endif

@@ -27,7 +27,6 @@
 #include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
 #include "reader/LogFileReader.h"
-#include "sender/Sender.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif

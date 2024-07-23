@@ -13,10 +13,11 @@
 // limitations under the License.
 
 #include "Client.h"
-#include "logger/Logger.h"
+
+#include "CurlImp.h"
 #include "Exception.h"
 #include "Result.h"
-#include "CurlImp.h"
+#include "logger/Logger.h"
 
 namespace logtail {
 namespace sdk {
@@ -91,7 +92,7 @@ namespace sdk {
     }
 
     Client::~Client() throw() {
-        if (mClient != NULL){
+        if (mClient != NULL) {
             delete mClient;
         }
     }
@@ -245,14 +246,14 @@ namespace sdk {
         return SynPostLogStoreLogs(project, logstore, packageListData, httpHeader, hashKey);
     }
 
-    void Client::PostLogStoreLogs(const std::string& project,
-                                  const std::string& logstore,
-                                  sls_logs::SlsCompressType compressType,
-                                  const std::string& compressedLogGroup,
-                                  uint32_t rawSize,
-                                  PostLogStoreLogsClosure* callBack,
-                                  const std::string& hashKey,
-                                  int64_t hashKeySeqID) {
+    AsynRequest* Client::CreatePostLogStoreLogsRequest(const std::string& project,
+                                                       const std::string& logstore,
+                                                       sls_logs::SlsCompressType compressType,
+                                                       const std::string& compressedLogGroup,
+                                                       uint32_t rawSize,
+                                                       PostLogStoreLogsClosure* callBack,
+                                                       const std::string& hashKey,
+                                                       int64_t hashKeySeqID) {
         map<string, string> httpHeader;
         httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
         if (!mKeyProvider.empty()) {
@@ -260,15 +261,16 @@ namespace sdk {
         }
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(rawSize);
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
-        AsynPostLogStoreLogs(project, logstore, compressedLogGroup, httpHeader, callBack, hashKey, hashKeySeqID);
+        return CreateAsynPostLogStoreLogsRequest(
+            project, logstore, compressedLogGroup, httpHeader, callBack, hashKey, hashKeySeqID);
     }
 
-    void Client::PostLogStoreLogPackageList(const std::string& project,
-                                            const std::string& logstore,
-                                            sls_logs::SlsCompressType compressType,
-                                            const std::string& packageListData,
-                                            PostLogStoreLogsClosure* callBack,
-                                            const std::string& hashKey) {
+    AsynRequest* Client::CreatePostLogStoreLogPackageListRequest(const std::string& project,
+                                                                 const std::string& logstore,
+                                                                 sls_logs::SlsCompressType compressType,
+                                                                 const std::string& packageListData,
+                                                                 PostLogStoreLogsClosure* callBack,
+                                                                 const std::string& hashKey) {
         map<string, string> httpHeader;
         httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
         if (!mKeyProvider.empty()) {
@@ -277,7 +279,8 @@ namespace sdk {
         httpHeader[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(packageListData.size());
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
-        AsynPostLogStoreLogs(project, logstore, packageListData, httpHeader, callBack, hashKey, kInvalidHashKeySeqID);
+        return CreateAsynPostLogStoreLogsRequest(
+            project, logstore, packageListData, httpHeader, callBack, hashKey, kInvalidHashKeySeqID);
     }
 
     void Client::SendRequest(const std::string& project,
@@ -311,13 +314,13 @@ namespace sdk {
         }
     }
 
-    void Client::AsynPostLogStoreLogs(const std::string& project,
-                                      const std::string& logstore,
-                                      const std::string& body,
-                                      std::map<std::string, std::string>& httpHeader,
-                                      PostLogStoreLogsClosure* callBack,
-                                      const std::string& hashKey,
-                                      int64_t hashKeySeqID) {
+    AsynRequest* Client::CreateAsynPostLogStoreLogsRequest(const std::string& project,
+                                                           const std::string& logstore,
+                                                           const std::string& body,
+                                                           std::map<std::string, std::string>& httpHeader,
+                                                           PostLogStoreLogsClosure* callBack,
+                                                           const std::string& hashKey,
+                                                           int64_t hashKeySeqID) {
         string operation = LOGSTORES;
         operation.append("/").append(logstore);
         if (hashKey.empty())
@@ -348,19 +351,18 @@ namespace sdk {
             port = 443;
         }
         Response* response = new PostLogStoreLogsResponse();
-        AsynRequest* request = new AsynRequest(HTTP_POST,
-                                               host,
-                                               port,
-                                               operation,
-                                               queryString,
-                                               httpHeader,
-                                               body,
-                                               mTimeout,
-                                               mInterface,
-                                               mUsingHTTPS,
-                                               callBack,
-                                               response);
-        mClient->AsynSend(request);
+        return new AsynRequest(HTTP_POST,
+                               host,
+                               port,
+                               operation,
+                               queryString,
+                               httpHeader,
+                               body,
+                               mTimeout,
+                               mInterface,
+                               mUsingHTTPS,
+                               callBack,
+                               response);
     }
 
     PostLogStoreLogsResponse

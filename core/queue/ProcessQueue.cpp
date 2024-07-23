@@ -39,18 +39,46 @@ bool ProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     return true;
 }
 
+void ProcessQueue::Reset(size_t cap, size_t low, size_t high) {
+    FeedbackQueue::Reset(cap, low, high);
+    std::queue<std::unique_ptr<ProcessQueueItem>>().swap(mQueue);
+    mDownStreamQueues.clear();
+    mUpStreamFeedbacks.clear();
+}
+
 bool ProcessQueue::IsDownStreamQueuesValidToPush() const {
     // TODO: support other strategy
     for (const auto& q : mDownStreamQueues) {
-        // TODO: replace IsValid with IsValidToPush
-        if (!q->IsValid()) {
+        if (!q->IsValidToPush()) {
             return false;
         }
     }
     return true;
 }
 
-void ProcessQueue::GiveFeedback() {
+void ProcessQueue::SetDownStreamQueues(std::vector<SenderQueueInterface*>&& ques) {
+    mDownStreamQueues.clear();
+    for (auto& item : ques) {
+        if (item == nullptr) {
+            // should not happen
+            continue;
+        }
+        mDownStreamQueues.emplace_back(item);
+    }
+}
+
+void ProcessQueue::SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks) {
+    mUpStreamFeedbacks.clear();
+    for (auto& item : feedbacks) {
+        if (item == nullptr) {
+            // should not happen
+            continue;
+        }
+        mUpStreamFeedbacks.emplace_back(item);
+    }
+}
+
+void ProcessQueue::GiveFeedback() const {
     for (auto& item : mUpStreamFeedbacks) {
         item->Feedback(mKey);
     }

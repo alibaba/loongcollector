@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,27 @@
  */
 
 #pragma once
-#include <string>
+
+#include <atomic>
+#include <ctime>
 
 namespace logtail {
 
-typedef int64_t LogstoreFeedBackKey;
+class ConcurrencyLimiter {
+public:
+    bool IsValidToPop();
+    void PostPop();
+    void OnSuccess();
+    void OnFail(time_t curTime);
 
-LogstoreFeedBackKey GenerateLogstoreFeedBackKey(const std::string& project, const std::string& logStore);
+#ifdef APSARA_UNIT_TEST_MAIN
+    void Reset() { mLimit = -1; }
+    void SetLimit(int limit) { mLimit = limit; }
+    int GetLimit() const { return mLimit; }
+#endif
+
+private:
+    std::atomic_int mLimit = -1;
+};
 
 } // namespace logtail

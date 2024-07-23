@@ -38,7 +38,6 @@ namespace sdk {
                           HttpMessage& httpMessage,
                           const std::string& intf,
                           const bool httpsFlag);
-        virtual void AsynSend(AsynRequest* request);
     };
 
 } // namespace sdk

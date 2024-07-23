@@ -17,20 +17,26 @@
 #pragma once
 
 #include <condition_variable>
+#include <cstdint>
 #include <list>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "common/FeedbackInterface.h"
+#include "queue/FeedbackQueueKey.h"
 #include "queue/ProcessQueue.h"
 #include "queue/ProcessQueueItem.h"
+#include "queue/SenderQueueInterface.h"
 
 namespace logtail {
 
 class ProcessQueueManager : public FeedbackInterface {
 public:
+    static constexpr uint32_t sMaxPriority = 3;
+
     ProcessQueueManager(const ProcessQueueManager&) = delete;
     ProcessQueueManager& operator=(const ProcessQueueManager&) = delete;
 
@@ -43,13 +49,13 @@ public:
 
     bool CreateOrUpdateQueue(QueueKey key, uint32_t priority);
     bool DeleteQueue(QueueKey key);
-    bool IsValidToPush(QueueKey key) const override;
+    bool IsValidToPush(QueueKey key) const;
     // 0: success, 1: queue is full, 2: queue not found
     int PushQueue(QueueKey key, std::unique_ptr<ProcessQueueItem>&& item);
     bool PopItem(int64_t threadNo, std::unique_ptr<ProcessQueueItem>& item, std::string& configName);
     bool IsAllQueueEmpty() const;
-    bool SetDownStreamQueues(QueueKey key, std::vector<SingleLogstoreSenderManager<SenderQueueParam>*>& ques);
-    bool SetFeedbackInterface(QueueKey key, std::vector<FeedbackInterface*>& feedback);
+    bool SetDownStreamQueues(QueueKey key, std::vector<SenderQueueInterface*>&& ques);
+    bool SetFeedbackInterface(QueueKey key, std::vector<FeedbackInterface*>&& feedback);
     void InvalidatePop(const std::string& configName);
     void ValidatePop(const std::string& configName);
 
@@ -59,8 +65,6 @@ public:
     // TODO: should be removed when self-telemetry is refactored
     uint32_t GetInvalidCnt() const;
     uint32_t GetCnt() const;
-
-    static constexpr uint32_t sMaxPriority = 3;
 
 private:
     ProcessQueueManager();

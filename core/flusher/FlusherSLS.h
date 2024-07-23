@@ -24,19 +24,26 @@
 #include <unordered_set>
 #include <vector>
 
-#include "batch/Batcher.h"
 #include "batch/BatchStatus.h"
-#include "common/LogstoreFeedbackKey.h"
+#include "batch/Batcher.h"
 #include "compression/Compressor.h"
 #include "models/PipelineEventGroup.h"
 #include "plugin/interface/Flusher.h"
+#include "queue/SenderQueueItem.h"
+#include "sender/ConcurrencyLimiter.h"
 #include "serializer/SLSSerializer.h"
 
 namespace logtail {
 
 class FlusherSLS : public Flusher {
+    // TODO: temporarily used
+    friend class ProfileSender;
 public:
     enum class TelemetryType { LOG, METRIC };
+
+    static std::shared_ptr<ConcurrencyLimiter> GetProjectConcurrencyLimiter(const std::string& project);
+    static std::shared_ptr<ConcurrencyLimiter> GetRegionConcurrencyLimiter(const std::string& region);
+    static void ClearInvalidConcurrencyLimiters();
 
     static const std::string sName;
 
@@ -44,13 +51,13 @@ public:
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
-    bool Register() override;
-    bool Unregister(bool isPipelineRemoving) override;
-    void Send(PipelineEventGroup&& g) override;
-    void Flush(size_t key) override;
-    void FlushAll() override;
+    bool Start() override;
+    bool Stop(bool isPipelineRemoving) override;
+    bool Send(PipelineEventGroup&& g) override;
+    bool Flush(size_t key) override;
+    bool FlushAll() override;
+    sdk::AsynRequest* BuildRequest(SenderQueueItem* item) const override;
 
-    LogstoreFeedBackKey GetLogstoreKey() const { return mLogstoreKey; }
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
 
     // for use of Go pipeline, stream, observer and shennong
@@ -62,29 +69,24 @@ public:
     std::string mEndpoint;
     std::string mAliuid;
     TelemetryType mTelemetryType = TelemetryType::LOG;
-    uint32_t mFlowControlExpireTime = 0;
-    int32_t mMaxSendRate = -1;
     std::vector<std::string> mShardHashKeys;
+    uint32_t mMaxSendRate = 0; // preserved only for exactly once
+    uint32_t mFlowControlExpireTime = 0;
 
 private:
     static const std::unordered_set<std::string> sNativeParam;
 
+    static std::mutex sMux;
+    static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sProjectConcurrencyLimiterMap;
+    static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sRegionConcurrencyLimiterMap;
+
     void GenerateGoPlugin(const Json::Value& config, Json::Value& res) const;
-    void SerializeAndPush(std::vector<BatchedEventsList>&& groupLists);
-    void SerializeAndPush(BatchedEventsList&& groupList);
-    void SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
+    bool SerializeAndPush(std::vector<BatchedEventsList>&& groupLists);
+    bool SerializeAndPush(BatchedEventsList&& groupList);
+    bool SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
+    bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
     std::string GetShardHashKey(const BatchedEvents& g) const;
     void AddPackId(BatchedEvents& g) const;
-
-    // TODO: remove after sender queue refactorization
-    void PushToQueue(std::string&& data,
-                     size_t rawSize,
-                     SEND_DATA_TYPE type,
-                     const std::string& logstore = "",
-                     const std::string& shardHashKey = "",
-                     const RangeCheckpointPtr& eoo = RangeCheckpointPtr());
-
-    LogstoreFeedBackKey mLogstoreKey = 0;
 
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;
@@ -95,5 +97,7 @@ private:
     friend class FlusherSLSUnittest;
 #endif
 };
+
+sls_logs::SlsCompressType ConvertCompressType(CompressType type);
 
 } // namespace logtail

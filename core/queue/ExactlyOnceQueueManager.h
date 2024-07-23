@@ -16,21 +16,25 @@
 
 #pragma once
 
+#include <cstdint>
 #include <list>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
 
 #include "checkpoint/RangeCheckpoint.h"
 #include "common/FeedbackInterface.h"
+#include "queue/ExactlyOnceSenderQueue.h"
+#include "queue/FeedbackQueueKey.h"
 #include "queue/ProcessQueue.h"
+#include "queue/ProcessQueueItem.h"
 #include "queue/ProcessQueueManager.h"
+#include "queue/SenderQueueItem.h"
 
 namespace logtail {
-
-class ProcessQueueManager;
 
 class ExactlyOnceQueueManager {
     friend class ProcessQueueManager;
@@ -54,8 +58,14 @@ public:
     // 0: success, 1: queue is full, 2: queue not found
     int PushProcessQueue(QueueKey key, std::unique_ptr<ProcessQueueItem>&& item);
     bool IsAllProcessQueueEmpty() const;
-    void InvalidatePop(const std::string& configName);
-    void ValidatePop(const std::string& configName);
+    void InvalidatePopProcessQueue(const std::string& configName);
+    void ValidatePopProcessQueue(const std::string& configName);
+
+    // 0: success, 1: queue is full, 2: queue not found
+    int PushSenderQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item);
+    void GetAllAvailableSenderQueueItems(std::vector<SenderQueueItem*>& item, bool withLimits = true);
+    bool RemoveSenderQueueItem(QueueKey key, SenderQueueItem* item);
+    bool IsAllSenderQueueEmpty() const;
 
     void ClearTimeoutQueues();
 
@@ -75,12 +85,16 @@ private:
     std::unordered_map<QueueKey, std::list<ProcessQueue>::iterator> mProcessQueues;
     std::list<ProcessQueue> mProcessPriorityQueue[ProcessQueueManager::sMaxPriority + 1];
 
+    mutable std::mutex mSenderQueueMux;
+    std::unordered_map<QueueKey, ExactlyOnceSenderQueue> mSenderQueues;
+
     mutable std::mutex mGCMux;
     std::unordered_map<QueueKey, time_t> mQueueDeletionTimeMap;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ExactlyOnceQueueManagerUnittest;
     friend class ProcessQueueManagerUnittest;
+    friend class SenderQueueManagerUnittest;
 #endif
 };
 

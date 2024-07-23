@@ -81,12 +81,14 @@ void InputFileUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     input.reset(new InputFile());
+    ctx.SetExactlyOnceFlag(false);
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(0U, input->mMaxCheckpointDirSearchDepth);
     APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
+    APSARA_TEST_FALSE(ctx.IsExactlyOnceEnabled());
 
     // valid optional param
     configStr = R"(
@@ -101,12 +103,14 @@ void InputFileUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     input.reset(new InputFile());
+    ctx.SetExactlyOnceFlag(false);
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(1U, input->mMaxCheckpointDirSearchDepth);
     APSARA_TEST_EQUAL(1U, input->mExactlyOnceConcurrency);
+    APSARA_TEST_TRUE(ctx.IsExactlyOnceEnabled());
 
     // invalid optional param
     configStr = R"(
@@ -121,12 +125,14 @@ void InputFileUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     input.reset(new InputFile());
+    ctx.SetExactlyOnceFlag(false);
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(0U, input->mMaxCheckpointDirSearchDepth);
     APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
+    APSARA_TEST_FALSE(ctx.IsExactlyOnceEnabled());
 
     // TailingAllMatchedFiles
     configStr = R"(
@@ -139,6 +145,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     input.reset(new InputFile());
+    ctx.SetExactlyOnceFlag(false);
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
@@ -156,10 +163,12 @@ void InputFileUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     input.reset(new InputFile());
+    ctx.SetExactlyOnceFlag(false);
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputFile::sName, "1");
     APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
     APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
+    APSARA_TEST_FALSE(ctx.IsExactlyOnceEnabled());
 }
 
 void InputFileUnittest::OnFailedInit() {

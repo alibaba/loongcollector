@@ -123,10 +123,11 @@ namespace sdk {
         }
         request->mCallBack->mHTTPMessage.statusCode = (int32_t)http_code;
         curl_easy_cleanup(curl);
-        if (!request->mCallBack->mHTTPMessage.IsLogServiceResponse()) {
-            request->mCallBack->OnFail(request->mResponse, LOGE_REQUEST_ERROR, "Get invalid response");
-            return;
-        }
+        // TODO: temporary disabed to allow other flusher response to pass
+        // if (!request->mCallBack->mHTTPMessage.IsLogServiceResponse()) {
+        //     request->mCallBack->OnFail(request->mResponse, LOGE_REQUEST_ERROR, "Get invalid response");
+        //     return;
+        // }
 
         const auto& httpMsg = request->mCallBack->mHTTPMessage;
 

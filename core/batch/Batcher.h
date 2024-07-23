@@ -204,6 +204,11 @@ public:
         mEventQueueMap.clear();
     }
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    EventFlushStrategy<T>& GetEventFlushStrategy() { return mEventFlushStrategy; }
+    std::optional<GroupFlushStrategy>& GetGroupFlushStrategy() { return mGroupFlushStrategy; }
+#endif
+
 private:
     std::mutex mMux;
     std::map<size_t, EventBatchItem<T>> mEventQueueMap;
@@ -216,7 +221,6 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class BatcherUnittest;
-    friend class FlusherSLSUnittest;
 #endif
 };
 

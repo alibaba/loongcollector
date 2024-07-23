@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 
 #include "config_manager/ConfigManager.h"
 #include "file_server/FileServer.h"
@@ -23,7 +23,6 @@
 #include "observer/ObserverManager.h"
 #endif
 #include "processor/daemon/LogProcess.h"
-#include "sender/Sender.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
 #include "shennong/ShennongManager.h"
@@ -234,7 +233,6 @@ void PipelineManager::StopAllPipelines() {
 #endif
     FileServer::GetInstance()->Stop();
 
-    Sender::Instance()->SetQueueUrgent();
     bool logProcessFlushFlag = false;
     for (int i = 0; !logProcessFlushFlag && i < 500; ++i) {
         logProcessFlushFlag = LogProcess::GetInstance()->FlushOut(10);

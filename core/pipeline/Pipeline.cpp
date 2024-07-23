@@ -29,6 +29,7 @@
 #include "processor/ProcessorParseApsaraNative.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
+#include "queue/SenderQueueManager.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
 
@@ -60,7 +61,7 @@ bool Pipeline::Init(PipelineConfig&& config) {
 
 #ifdef __ENTERPRISE__
     // to send alarm before flusherSLS is built, a temporary object is made, which will be overriden shortly after.
-    unique_ptr<FlusherSLS> SLSTmp = unique_ptr<FlusherSLS>(new FlusherSLS());
+    unique_ptr<FlusherSLS> SLSTmp = make_unique<FlusherSLS>();
     SLSTmp->mProject = config.mProject;
     SLSTmp->mLogstore = config.mLogstore;
     SLSTmp->mRegion = config.mRegion;
@@ -243,14 +244,14 @@ bool Pipeline::Init(PipelineConfig&& config) {
                 feedbackSet.insert(feedback);
             }
         }
-        vector<FeedbackInterface*> feedbacks(feedbackSet.begin(), feedbackSet.end());
-        ProcessQueueManager::GetInstance()->SetFeedbackInterface(mContext.GetProcessQueueKey(), feedbacks);
+        ProcessQueueManager::GetInstance()->SetFeedbackInterface(
+            mContext.GetProcessQueueKey(), vector<FeedbackInterface*>(feedbackSet.begin(), feedbackSet.end()));
 
-        vector<SingleLogstoreSenderManager<SenderQueueParam>*> senderQueues;
+        vector<SenderQueueInterface*> senderQueues;
         for (const auto& flusher : mFlushers) {
-            senderQueues.push_back(flusher->GetSenderQueue());
+            senderQueues.push_back(SenderQueueManager::GetInstance()->GetQueue(flusher->GetQueueKey()));
         }
-        ProcessQueueManager::GetInstance()->SetDownStreamQueues(mContext.GetProcessQueueKey(), senderQueues);
+        ProcessQueueManager::GetInstance()->SetDownStreamQueues(mContext.GetProcessQueueKey(), std::move(senderQueues));
     }
 
     return true;
@@ -288,24 +289,28 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
     }
 }
 
-void Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
+bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
+    bool allSucceeded = true;
     for (auto& group : groupList) {
         // TODO: support route
         for (size_t i = 0; i < mFlushers.size(); ++i) {
             if (i + 1 != mFlushers.size()) {
-                mFlushers[i]->Send(group.Copy());
+                allSucceeded = mFlushers[i]->Send(group.Copy()) && allSucceeded;
             } else {
-                mFlushers[i]->Send(std::move(group));
+                allSucceeded = mFlushers[i]->Send(std::move(group)) && allSucceeded;
             }
         }
     }
+    return allSucceeded;
 }
 
-void Pipeline::FlushBatch() {
+bool Pipeline::FlushBatch() {
+    bool allSucceeded = true;
     for (auto& flusher : mFlushers) {
-        flusher->FlushAll();
+        allSucceeded = flusher->FlushAll() && allSucceeded;
     }
     TimeoutFlushManager::GetInstance()->ClearRecords(mName);
+    return allSucceeded;
 }
 
 void Pipeline::Stop(bool isRemoving) {
@@ -337,7 +342,6 @@ void Pipeline::Stop(bool isRemoving) {
 
 void Pipeline::RemoveProcessQueue() const {
     ProcessQueueManager::GetInstance()->DeleteQueue(mContext.GetProcessQueueKey());
-    QueueKeyManager::GetInstance()->RemoveKey(mContext.GetProcessQueueKey());
 }
 
 void Pipeline::MergeGoPipeline(const Json::Value& src, Json::Value& dst) {

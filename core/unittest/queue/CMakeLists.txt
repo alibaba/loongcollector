@@ -24,6 +24,15 @@ target_link_libraries(process_queue_unittest ${UT_BASE_TARGET})
 add_executable(process_queue_manager_unittest ProcessQueueManagerUnittest.cpp)
 target_link_libraries(process_queue_manager_unittest ${UT_BASE_TARGET})
 
+add_executable(sender_queue_unittest SenderQueueUnittest.cpp)
+target_link_libraries(sender_queue_unittest unittest_base)
+
+add_executable(sender_queue_manager_unittest SenderQueueManagerUnittest.cpp)
+target_link_libraries(sender_queue_manager_unittest unittest_base)
+
+add_executable(exactly_once_sender_queue_unittest ExactlyOnceSenderQueueUnittest.cpp)
+target_link_libraries(exactly_once_sender_queue_unittest unittest_base)
+
 add_executable(exactly_once_queue_manager_unittest ExactlyOnceQueueManagerUnittest.cpp)
 target_link_libraries(exactly_once_queue_manager_unittest ${UT_BASE_TARGET})
 
@@ -31,4 +40,7 @@ include(GoogleTest)
 gtest_discover_tests(queue_key_manager_unittest)
 gtest_discover_tests(process_queue_unittest)
 gtest_discover_tests(process_queue_manager_unittest)
+gtest_discover_tests(sender_queue_unittest)
+gtest_discover_tests(sender_queue_manager_unittest)
+gtest_discover_tests(exactly_once_sender_queue_unittest)
 gtest_discover_tests(exactly_once_queue_manager_unittest)

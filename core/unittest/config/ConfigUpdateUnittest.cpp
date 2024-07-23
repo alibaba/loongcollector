@@ -21,7 +21,7 @@
 #include "config/PipelineConfig.h"
 #include "config/watcher/ConfigWatcher.h"
 #include "pipeline/Pipeline.h"
-#include "pipeline/PipelineConfigManager.h"
+#include "pipeline/PipelineManager.h"
 #include "plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
 

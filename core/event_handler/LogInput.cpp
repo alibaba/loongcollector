@@ -40,7 +40,6 @@
 #include "processor/daemon/LogProcess.h"
 #include "reader/GloablFileDescriptorManager.h"
 #include "reader/LogFileReader.h"
-#include "sender/Sender.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif

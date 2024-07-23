@@ -24,19 +24,83 @@
 #include "common/ParamExtractor.h"
 #include "compression/CompressorFactory.h"
 #include "pipeline/Pipeline.h"
+#include "queue/QueueKeyManager.h"
+#include "queue/SLSSenderQueueItem.h"
+#include "queue/SenderQueueManager.h"
 #include "sdk/Common.h"
 #include "sender/PackIdManager.h"
+#include "sender/SLSClientManager.h"
 #include "sender/Sender.h"
+// TODO: temporarily used here
+#include "pipeline/PipelineManager.h"
 
 using namespace std;
 
 DEFINE_FLAG_INT32(batch_send_interval, "batch sender interval (second)(default 3)", 3);
 DEFINE_FLAG_INT32(merge_log_count_limit, "log count in one logGroup at most", 4000);
 DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 256KB)", 256 * 1024);
+DEFINE_FLAG_INT32(send_check_real_ip_interval, "seconds", 2);
+
+DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
 namespace logtail {
 
+mutex FlusherSLS::sMux;
+unordered_map<string, weak_ptr<ConcurrencyLimiter>> FlusherSLS::sProjectConcurrencyLimiterMap;
+unordered_map<string, weak_ptr<ConcurrencyLimiter>> FlusherSLS::sRegionConcurrencyLimiterMap;
+
+shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const string& project) {
+    lock_guard<mutex> lock(sMux);
+    auto iter = sProjectConcurrencyLimiterMap.find(project);
+    if (iter == sProjectConcurrencyLimiterMap.end()) {
+        auto limiter = make_shared<ConcurrencyLimiter>();
+        sProjectConcurrencyLimiterMap.try_emplace(project, limiter);
+        return limiter;
+    }
+    if (iter->second.expired()) {
+        auto limiter = make_shared<ConcurrencyLimiter>();
+        iter->second = limiter;
+        return limiter;
+    }
+    return iter->second.lock();
+}
+
+shared_ptr<ConcurrencyLimiter> FlusherSLS::GetRegionConcurrencyLimiter(const string& region) {
+    lock_guard<mutex> lock(sMux);
+    auto iter = sRegionConcurrencyLimiterMap.find(region);
+    if (iter == sRegionConcurrencyLimiterMap.end()) {
+        auto limiter = make_shared<ConcurrencyLimiter>();
+        sRegionConcurrencyLimiterMap.try_emplace(region, limiter);
+        return limiter;
+    }
+    if (iter->second.expired()) {
+        auto limiter = make_shared<ConcurrencyLimiter>();
+        iter->second = limiter;
+        return limiter;
+    }
+    return iter->second.lock();
+}
+
+void FlusherSLS::ClearInvalidConcurrencyLimiters() {
+    lock_guard<mutex> lock(sMux);
+    for (auto iter = sProjectConcurrencyLimiterMap.begin(); iter != sProjectConcurrencyLimiterMap.end();) {
+        if (iter->second.expired()) {
+            iter = sProjectConcurrencyLimiterMap.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto iter = sRegionConcurrencyLimiterMap.begin(); iter != sRegionConcurrencyLimiterMap.end();) {
+        if (iter->second.expired()) {
+            iter = sRegionConcurrencyLimiterMap.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
 const string FlusherSLS::sName = "flusher_sls";
+
 const unordered_set<string> FlusherSLS::sNativeParam = {"Project",
                                                         "Logstore",
                                                         "Region",
@@ -78,8 +142,6 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-    mLogstoreKey = GenerateLogstoreFeedBackKey(mProject, mLogstore);
-    mSenderQueue = Sender::Instance()->GetSenderQueue(mLogstoreKey);
 
 #ifdef __ENTERPRISE__
     if (EnterpriseConfigProvider::GetInstance()->IsDataServerPrivateCloud()) {
@@ -125,7 +187,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 #endif
             mEndpoint = TrimString(mEndpoint);
             if (!mEndpoint.empty()) {
-                Sender::Instance()->AddEndpointEntry(mRegion, StandardizeEndpoint(mEndpoint, mEndpoint));
+                SLSClientManager::GetInstance()->AddEndpointEntry(mRegion, StandardizeEndpoint(mEndpoint, mEndpoint));
             }
         }
 #ifdef __ENTERPRISE__
@@ -143,11 +205,6 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                              mContext->GetRegion());
     }
 #endif
-
-    // CompressType
-    if (BOOL_FLAG(sls_client_send_compress)) {
-        mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, CompressType::LZ4);
-    }
 
     // TelemetryType
     string telemetryType;
@@ -174,33 +231,6 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
     }
-
-    // FlowControlExpireTime
-    if (!GetOptionalUIntParam(config, "FlowControlExpireTime", mFlowControlExpireTime, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              mFlowControlExpireTime,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    }
-
-    // MaxSendRate
-    if (!GetOptionalIntParam(config, "MaxSendRate", mMaxSendRate, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              mMaxSendRate,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    }
-    Sender::Instance()->SetLogstoreFlowControl(mLogstoreKey, mMaxSendRate, mFlowControlExpireTime);
 
     // Batch
     const char* key = "Batch";
@@ -230,15 +260,6 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         }
     }
 
-    DefaultFlushStrategyOptions strategy{static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
-                                         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
-                                         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
-    if (!mBatcher.Init(
-            itr ? *itr : Json::Value(), this, strategy, !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty())) {
-        // when either exactly once is enabled or ShardHashKeys is not empty, we don't enable group batch
-        return false;
-    }
-
     // ShardHashKeys
     if (!GetOptionalListParam<string>(config, "ShardHashKeys", mShardHashKeys, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
@@ -261,50 +282,160 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                              mContext->GetRegion());
     }
 
+    DefaultFlushStrategyOptions strategy{static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
+                                         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
+                                         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};
+    if (!mBatcher.Init(
+            itr ? *itr : Json::Value(), this, strategy, !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty())) {
+        // when either exactly once is enabled or ShardHashKeys is not empty, we don't enable group batch
+        return false;
+    }
+
+    // CompressType
+    if (BOOL_FLAG(sls_client_send_compress)) {
+        mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, CompressType::LZ4);
+    }
+
     mGroupSerializer = make_unique<SLSEventGroupSerializer>(this);
     mGroupListSerializer = make_unique<SLSEventGroupListSerializer>(this);
+
+    // MaxSendRate
+    // For legacy reason, MaxSendRate should be int, where negative number means unlimited. However, this can be
+    // compatable with the following logic.
+    if (!GetOptionalUIntParam(config, "MaxSendRate", mMaxSendRate, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mMaxSendRate,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    if (!mContext->IsExactlyOnceEnabled()) {
+        GenerateQueueKey(mProject + "#" + mLogstore);
+        SenderQueueManager::GetInstance()->CreateQueue(
+            mQueueKey,
+            vector<shared_ptr<ConcurrencyLimiter>>{GetRegionConcurrencyLimiter(mRegion),
+                                                   GetProjectConcurrencyLimiter(mProject)},
+            mMaxSendRate);
+    }
+
+    // (Deprecated) FlowControlExpireTime
+    if (!GetOptionalUIntParam(config, "FlowControlExpireTime", mFlowControlExpireTime, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mFlowControlExpireTime,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
 
     GenerateGoPlugin(config, optionalGoPipeline);
 
     return true;
 }
 
-bool FlusherSLS::Register() {
+bool FlusherSLS::Start() {
     Sender::Instance()->IncreaseProjectReferenceCnt(mProject);
     Sender::Instance()->IncreaseRegionReferenceCnt(mRegion);
-    Sender::Instance()->IncreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
+    SLSClientManager::GetInstance()->IncreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
     return true;
 }
 
-bool FlusherSLS::Unregister(bool isPipelineRemoving) {
+bool FlusherSLS::Stop(bool isPipelineRemoving) {
+    Flusher::Stop(isPipelineRemoving);
+
     Sender::Instance()->DecreaseProjectReferenceCnt(mProject);
     Sender::Instance()->DecreaseRegionReferenceCnt(mRegion);
-    Sender::Instance()->DecreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
+    SLSClientManager::GetInstance()->DecreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
     return true;
 }
 
-void FlusherSLS::Send(PipelineEventGroup&& g) {
+bool FlusherSLS::Send(PipelineEventGroup&& g) {
     if (g.IsReplay()) {
-        SerializeAndPush(std::move(g));
+        return SerializeAndPush(std::move(g));
     } else {
         vector<BatchedEventsList> res;
         mBatcher.Add(std::move(g), res);
-        SerializeAndPush(std::move(res));
+        return SerializeAndPush(std::move(res));
     }
 }
 
-void FlusherSLS::Flush(size_t key) {
+bool FlusherSLS::Flush(size_t key) {
     BatchedEventsList res;
     mBatcher.FlushQueue(key, res);
-    SerializeAndPush(std::move(res));
+    return SerializeAndPush(std::move(res));
 }
 
 // TODO: currently, if sender queue is blocked, data will be lost during pipeline update
 // this should be fixed during sender queue refactorization, where all batch should be put into sender queue
-void FlusherSLS::FlushAll() {
+bool FlusherSLS::FlushAll() {
     vector<BatchedEventsList> res;
     mBatcher.FlushAll(res);
-    SerializeAndPush(std::move(res));
+    return SerializeAndPush(std::move(res));
+}
+
+sdk::AsynRequest* FlusherSLS::BuildRequest(SenderQueueItem* item) const {
+    auto data = static_cast<SLSSenderQueueItem*>(item);
+    static int32_t lastResetEndpointTime = 0;
+    sdk::Client* sendClient = SLSClientManager::GetInstance()->GetClient(mRegion, mAliuid);
+    int32_t curTime = time(NULL);
+
+    data->mCurrentEndpoint = sendClient->GetRawSlsHost();
+    if (data->mCurrentEndpoint.empty()) {
+        if (curTime - lastResetEndpointTime >= 30) {
+            SLSClientManager::GetInstance()->ResetClientEndpoint(mAliuid, mRegion, curTime);
+            data->mCurrentEndpoint = sendClient->GetRawSlsHost();
+            lastResetEndpointTime = curTime;
+        }
+    }
+    if (BOOL_FLAG(send_prefer_real_ip)) {
+        if (curTime - sendClient->GetSlsRealIpUpdateTime() >= INT32_FLAG(send_check_real_ip_interval)) {
+            SLSClientManager::GetInstance()->UpdateSendClientRealIp(sendClient, mRegion);
+        }
+        data->mRealIpFlag = sendClient->GetRawSlsHostFlag();
+    }
+
+    SendClosure* sendClosure = new SendClosure;
+    sendClosure->mDataPtr = item;
+    if (data->mType == RawDataType::EVENT_GROUP) {
+        if (data->mShardHashKey.empty()) {
+            return sendClient->CreatePostLogStoreLogsRequest(mProject,
+                                                             data->mLogstore,
+                                                             ConvertCompressType(GetCompressType()),
+                                                             data->mData,
+                                                             data->mRawSize,
+                                                             sendClosure);
+        } else {
+            auto& exactlyOnceCpt = data->mExactlyOnceCheckpoint;
+            int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
+            return sendClient->CreatePostLogStoreLogsRequest(mProject,
+                                                             data->mLogstore,
+                                                             ConvertCompressType(GetCompressType()),
+                                                             data->mData,
+                                                             data->mRawSize,
+                                                             sendClosure,
+                                                             data->mShardHashKey,
+                                                             hashKeySeqID);
+        }
+    } else {
+        if (data->mShardHashKey.empty())
+            return sendClient->CreatePostLogStoreLogPackageListRequest(
+                mProject, data->mLogstore, ConvertCompressType(GetCompressType()), data->mData, sendClosure);
+        else
+            return sendClient->CreatePostLogStoreLogPackageListRequest(mProject,
+                                                                       data->mLogstore,
+                                                                       ConvertCompressType(GetCompressType()),
+                                                                       data->mData,
+                                                                       sendClosure,
+                                                                       data->mShardHashKey);
+    }
 }
 
 bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
@@ -326,8 +457,8 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
     } else {
         compressedData = data;
     }
-    PushToQueue(std::move(compressedData), data.size(), LOGGROUP_COMPRESSED, logstore);
-    return true;
+    return Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(
+        std::move(compressedData), data.size(), this, mQueueKey, logstore, RawDataType::EVENT_GROUP, shardHashKey));
 }
 
 void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) const {
@@ -345,7 +476,7 @@ void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) c
     }
 }
 
-void FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
+bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
     string serializedData, compressedData;
     BatchedEvents g(std::move(group.MutableEvents()),
                     std::move(group.GetSizedTags()),
@@ -365,7 +496,7 @@ void FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
                                        mContext->GetProjectName(),
                                        mContext->GetLogstoreName(),
                                        mContext->GetRegion());
-        return;
+        return false;
     }
     if (mCompressor) {
         if (!mCompressor->Compress(serializedData, compressedData, errorMsg)) {
@@ -379,28 +510,35 @@ void FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
                                            mContext->GetProjectName(),
                                            mContext->GetLogstoreName(),
                                            mContext->GetRegion());
-            return;
+            return false;
         }
     } else {
         compressedData = serializedData;
     }
-    PushToQueue(std::move(compressedData),
-                serializedData.size(),
-                LOGGROUP_COMPRESSED,
-                "",
-                g.mExactlyOnceCheckpoint->data.hash_key(),
-                g.mExactlyOnceCheckpoint);
+    // must create a tmp, because eoo checkpoint is moved in second param
+    auto fbKey = g.mExactlyOnceCheckpoint->fbKey;
+    return PushToQueue(fbKey,
+                       make_unique<SLSSenderQueueItem>(std::move(compressedData),
+                                                       serializedData.size(),
+                                                       this,
+                                                       fbKey,
+                                                       mLogstore,
+                                                       RawDataType::EVENT_GROUP,
+                                                       g.mExactlyOnceCheckpoint->data.hash_key(),
+                                                       std::move(g.mExactlyOnceCheckpoint),
+                                                       false));
 }
 
-void FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
+bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
     if (groupList.empty()) {
-        return;
+        return true;
     }
     vector<CompressedLogGroup> compressedLogGroups;
     string shardHashKey, serializedData, compressedData;
     size_t packageSize = 0;
     bool enablePackageList = groupList.size() > 1;
 
+    bool allSucceeded = true;
     for (auto& group : groupList) {
         if (!mShardHashKeys.empty()) {
             shardHashKey = GetShardHashKey(group);
@@ -418,7 +556,8 @@ void FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
                                            mContext->GetProjectName(),
                                            mContext->GetLogstoreName(),
                                            mContext->GetRegion());
-            return;
+            allSucceeded = false;
+            continue;
         }
         if (mCompressor) {
             if (!mCompressor->Compress(serializedData, compressedData, errorMsg)) {
@@ -432,7 +571,8 @@ void FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
                                                mContext->GetProjectName(),
                                                mContext->GetLogstoreName(),
                                                mContext->GetRegion());
-                return;
+                allSucceeded = false;
+                continue;
             }
         } else {
             compressedData = serializedData;
@@ -442,42 +582,104 @@ void FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
             compressedLogGroups.emplace_back(std::move(compressedData), serializedData.size());
         } else {
             if (group.mExactlyOnceCheckpoint) {
-                PushToQueue(std::move(compressedData),
-                            serializedData.size(),
-                            LOGGROUP_COMPRESSED,
-                            "",
-                            group.mExactlyOnceCheckpoint->data.hash_key(),
-                            group.mExactlyOnceCheckpoint);
+                // must create a tmp, because eoo checkpoint is moved in second param
+                auto fbKey = group.mExactlyOnceCheckpoint->fbKey;
+                allSucceeded
+                    = PushToQueue(fbKey,
+                                  make_unique<SLSSenderQueueItem>(std::move(compressedData),
+                                                                  serializedData.size(),
+                                                                  this,
+                                                                  fbKey,
+                                                                  mLogstore,
+                                                                  RawDataType::EVENT_GROUP,
+                                                                  group.mExactlyOnceCheckpoint->data.hash_key(),
+                                                                  std::move(group.mExactlyOnceCheckpoint),
+                                                                  false))
+                    && allSucceeded;
             } else {
-                PushToQueue(std::move(compressedData), serializedData.size(), LOGGROUP_COMPRESSED, "", shardHashKey);
+                allSucceeded = Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(compressedData),
+                                                                                    serializedData.size(),
+                                                                                    this,
+                                                                                    mQueueKey,
+                                                                                    mLogstore,
+                                                                                    RawDataType::EVENT_GROUP,
+                                                                                    shardHashKey))
+                    && allSucceeded;
             }
         }
     }
     if (enablePackageList) {
         string errorMsg;
         mGroupListSerializer->Serialize(std::move(compressedLogGroups), serializedData, errorMsg);
-        PushToQueue(std::move(compressedData), packageSize, LOG_PACKAGE_LIST);
+        allSucceeded
+            = Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(
+                  std::move(serializedData), packageSize, this, mQueueKey, mLogstore, RawDataType::EVENT_GROUP_LIST))
+            && allSucceeded;
     }
+    return allSucceeded;
 }
 
-void FlusherSLS::SerializeAndPush(vector<BatchedEventsList>&& groupLists) {
+bool FlusherSLS::SerializeAndPush(vector<BatchedEventsList>&& groupLists) {
+    bool allSucceeded = true;
     for (auto& groupList : groupLists) {
-        SerializeAndPush(std::move(groupList));
+        allSucceeded = SerializeAndPush(std::move(groupList)) && allSucceeded;
     }
+    return allSucceeded;
+}
+
+bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes) {
+#ifndef APSARA_UNIT_TEST_MAIN
+    // TODO: temporarily set here, should be removed after independent config update refactor
+    if (item->mFlusher->HasContext()) {
+        item->mPipeline
+            = PipelineManager::GetInstance()->FindConfigByName(item->mFlusher->GetContext().GetConfigName());
+        if (!item->mPipeline) {
+            // should not happen
+            return false;
+        }
+    }
+#endif
+
+    const string& str = QueueKeyManager::GetInstance()->GetName(key);
+    for (size_t i = 0; i < retryTimes; ++i) {
+        int rst = SenderQueueManager::GetInstance()->PushQueue(key, std::move(item));
+        if (rst == 0) {
+            return true;
+        }
+        if (rst == 2) {
+            // should not happen
+            LOG_ERROR(sLogger,
+                      ("failed to push data to sender queue",
+                       "queue not found")("action", "discard data")("config-flusher-dst", str));
+            LogtailAlarm::GetInstance()->SendAlarm(
+                DISCARD_DATA_ALARM,
+                "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
+            return false;
+        }
+        if (i % 100 == 0) {
+            LOG_WARNING(sLogger,
+                        ("push attempts to sender queue continuously failed for the past second",
+                         "retry again")("config-flusher-dst", str));
+        }
+        this_thread::sleep_for(chrono::milliseconds(10));
+    }
+    LOG_WARNING(
+        sLogger,
+        ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
+    LogtailAlarm::GetInstance()->SendAlarm(
+        DISCARD_DATA_ALARM,
+        "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
+    return false;
 }
 
 string FlusherSLS::GetShardHashKey(const BatchedEvents& g) const {
     // TODO: improve performance
     string key;
     for (size_t i = 0; i < mShardHashKeys.size(); ++i) {
-        if (mShardHashKeys[i] == "__source__") {
-            key += LogFileProfiler::mIpAddr;
-        } else {
-            for (auto& item : g.mTags.mInner) {
-                if (item.first == mShardHashKeys[i]) {
-                    key += item.second.to_string();
-                    break;
-                }
+        for (auto& item : g.mTags.mInner) {
+            if (item.first == mShardHashKeys[i]) {
+                key += item.second.to_string();
+                break;
             }
         }
         if (i != mShardHashKeys.size() - 1) {
@@ -496,14 +698,9 @@ void FlusherSLS::AddPackId(BatchedEvents& g) const {
     g.mTags.Insert(LOG_RESERVED_KEY_PACKAGE_ID, StringView(packId.data, packId.size));
 }
 
-void FlusherSLS::PushToQueue(string&& data,
-                             size_t rawSize,
-                             SEND_DATA_TYPE type,
-                             const string& logstore,
-                             const string& shardHashKey,
-                             const RangeCheckpointPtr& eoo) {
+sls_logs::SlsCompressType ConvertCompressType(CompressType type) {
     sls_logs::SlsCompressType compressType = sls_logs::SLS_CMP_NONE;
-    switch (mCompressor->GetCompressType()) {
+    switch (type) {
         case CompressType::LZ4:
             compressType = sls_logs::SLS_CMP_LZ4;
             break;
@@ -513,34 +710,7 @@ void FlusherSLS::PushToQueue(string&& data,
         default:
             break;
     }
-    LogGroupContext ctx(mRegion,
-                        mProject,
-                        mLogstore,
-                        compressType,
-                        FileInfoPtr(),
-                        IntegrityConfigPtr(),
-                        LineCountConfigPtr(),
-                        -1,
-                        false,
-                        false,
-                        eoo);
-    auto& cpt = ctx.mExactlyOnceCheckpoint;
-    LoggroupTimeValue* item = new LoggroupTimeValue(
-        mProject,
-        logstore.empty() ? mLogstore : logstore,
-        mContext ? mContext->GetConfigName() : "",
-        cpt ? false : true,
-        mAliuid,
-        mRegion,
-        type,
-        rawSize,
-        time(nullptr),
-        shardHashKey,
-        cpt ? cpt->fbKey : mLogstoreKey, // TODO: current implementation is incorrect. When route is enabled in Go
-                                         // pipeline, logstore key should depend on logstore, not mLogstoreKey
-        ctx);
-    item->mLogData.swap(data);
-    Sender::Instance()->PutIntoBatchMap(item);
+    return compressType;
 }
 
 } // namespace logtail
