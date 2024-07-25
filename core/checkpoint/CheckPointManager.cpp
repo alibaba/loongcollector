@@ -13,19 +13,22 @@
 // limitations under the License.
 
 #include "CheckPointManager.h"
-#include <string>
-#include <fstream>
-#include <thread>
+
 #include <fcntl.h>
-#include "monitor/LogtailAlarm.h"
+
+#include <fstream>
+#include <string>
+#include <thread>
+
 #include "app_config/AppConfig.h"
-#include "config_manager/ConfigManager.h"
+#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
-#include "common/FileSystemUtil.h"
-#include "logger/Logger.h"
+#include "config_manager/ConfigManager.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "logger/Logger.h"
+#include "monitor/LogtailAlarm.h"
 
 using namespace std;
 #if defined(__linux__)
@@ -200,6 +203,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             int32_t fileOpenFlag = 0; // default, we close file ptr
             int32_t containerStopped = 0;
             int32_t lastForceRead = 0;
+            int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
             if (meta.isMember("real_file_name")) {
                 realFilePath = meta["real_file_name"].asString();
             }
@@ -237,6 +241,9 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             if (meta.isMember("last_force_read")) {
                 lastForceRead = meta["last_force_read"].asInt();
             }
+            if (meta.isMember("idx_in_reader_array")) {
+                idxInReaderArray = meta["idx_in_reader_array"].asInt();
+            }
             // can not get file's dev inode
             if (!devInode.IsValid()) {
                 LOG_WARNING(sLogger, ("can not find check point dev inode, discard it", filePath));
@@ -258,6 +265,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
                                                  containerStopped != 0,
                                                  lastForceRead != 0);
                 ptr->mLastUpdateTime = update_time;
+                ptr->mIdxInReaderArray = idxInReaderArray;
                 AddCheckPoint(ptr);
             } else {
                 // find config
@@ -290,6 +298,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
                                                      containerStopped != 0,
                                                      lastForceRead != 0);
                     ptr->mLastUpdateTime = update_time;
+                    ptr->mIdxInReaderArray = idxInReaderArray;
                     AddCheckPoint(ptr);
                 }
             }
@@ -336,6 +345,7 @@ bool CheckPointManager::DumpCheckPointToLocal() {
             leaf["config_name"] = Json::Value(checkPointPtr->mConfigName);
             // forward compatible
             leaf["sig"] = Json::Value(string(""));
+            leaf["idx_in_reader_array"] = Json::Value(checkPointPtr->mIdxInReaderArray);
             // use filename + dev + inode + configName to prevent same filename conflict
             root[checkPointPtr->mFileName + "*" + ToString(checkPointPtr->mDevInode.dev) + "*"
                  + ToString(checkPointPtr->mDevInode.inode) + "*" + checkPointPtr->mConfigName]
@@ -365,6 +375,7 @@ bool CheckPointManager::DumpCheckPointToLocal() {
             leaf["config_name"] = Json::Value(checkPointPtr->mConfigName);
             // forward compatible
             leaf["sig"] = Json::Value(string(""));
+            leaf["idx_in_reader_array"] = Json::Value(checkPointPtr->mIdxInReaderArray);
             // use filename + dev + inode + configName to prevent same filename conflict
             root[checkPointPtr->mFileName + "*" + ToString(checkPointPtr->mDevInode.dev) + "*"
                  + ToString(checkPointPtr->mDevInode.inode) + "*" + checkPointPtr->mConfigName]

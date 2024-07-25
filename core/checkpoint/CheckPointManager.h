@@ -27,6 +27,7 @@
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
 #include "common/SplitedFilePath.h"
+#include "reader/LogFileReader.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "AppConfig.h"
@@ -49,7 +50,7 @@ public:
     std::string mConfigName;
     std::string mFileName;
     std::string mRealFileName;
-    int32_t mPositionInReaderArray = -1; // default not in the reader queue
+    int32_t mIdxInReaderArray = LogFileReader::CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
 
     CheckPoint() {}
 

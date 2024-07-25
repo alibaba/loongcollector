@@ -264,7 +264,7 @@ public:
     void
     InitReader(bool tailExisted = false, FileReadPolicy policy = BACKWARD_TO_FIXED_POS, uint32_t eoConcurrency = 0);
 
-    void DumpMetaToMem(bool checkConfigFlag = false, int32_t idxInReaderArray = -1);
+    void DumpMetaToMem(bool checkConfigFlag = false, int32_t idxInReaderArray = CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY);
 
     std::string GetSourceId() { return mSourceId; }
 
