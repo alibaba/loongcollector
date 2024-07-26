@@ -256,8 +256,8 @@ func (k *InputKafka) Stop() error {
 	k.readyCloser.Do(func() {
 		close(k.ready)
 	})
-	k.wg.Wait()
 	k.cancelConsumer()
+	k.wg.Wait()
 	err := k.consumerGroupClient.Close()
 	if err != nil {
 		e := fmt.Errorf("[inputs.kafka_consumer] Error closing consumer: %v", err)
