@@ -15,9 +15,17 @@
 cmake_minimum_required(VERSION 3.22)
 project(prometheus_unittest)
 
+add_executable(labels_unittest LabelsUnittest.cpp)
+target_link_libraries(labels_unittest unittest_base)
+
+add_executable(relabel_unittest RelabelUnittest.cpp)
+target_link_libraries(relabel_unittest unittest_base)
+
 add_executable(textparser_unittest TextParserUnittest.cpp)
 target_link_libraries(textparser_unittest unittest_base)
 
 include(GoogleTest)
 
+gtest_discover_tests(labels_unittest)
+gtest_discover_tests(relabel_unittest)
 gtest_discover_tests(textparser_unittest)
