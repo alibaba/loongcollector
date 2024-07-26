@@ -16,6 +16,7 @@ package dockercompose
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,7 +41,6 @@ import (
 const (
 	composeCategory = "docker-compose"
 	finalFileName   = "testcase-compose.yaml"
-	identifier      = "e2e"
 	template        = `version: '3.8'
 services:
   goc:
@@ -107,7 +107,11 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	if err := c.createComposeFile(ctx); err != nil {
 		return err
 	}
-	compose := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, identifier).WithCommand([]string{"up", "-d", "--build"})
+	projectName := strings.Split(config.CaseHome, "/")[len(strings.Split(config.CaseHome, "/"))-2]
+	hasher := sha256.New()
+	hasher.Write([]byte(projectName))
+	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
+	compose := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).WithCommand([]string{"up", "-d", "--build"})
 	strategyWrappers := withExposedService(compose)
 	execError := compose.Invoke()
 	if execError.Error != nil {
@@ -122,7 +126,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	c.cli = cli
 
 	list, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", "e2e-ilogtailC")),
+		Filters: filters.NewArgs(filters.Arg("name", fmt.Sprintf("%s-ilogtailC", projectName))),
 	})
 	if len(list) != 1 {
 		logger.Errorf(context.Background(), "LOGTAIL_COMPOSE_ALARM", "logtail container size is not equal 1, got %d count", len(list))
@@ -167,7 +171,11 @@ func (c *ComposeBooter) Stop() error {
 			logger.Error(context.Background(), "FETCH_COVERAGE_ALARM", "err", err)
 		}
 	}
-	execError := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, identifier).Down()
+	projectName := strings.Split(config.CaseHome, "/")[len(strings.Split(config.CaseHome, "/"))-2]
+	hasher := sha256.New()
+	hasher.Write([]byte(projectName))
+	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
+	execError := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
 	if execError.Error != nil {
 		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
 			"stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())

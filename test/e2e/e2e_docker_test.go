@@ -24,10 +24,11 @@ func TestE2EOnDockerCompose(t *testing.T) {
 		Name:                "E2EOnDockerCompose",
 		ScenarioInitializer: scenarioInitializer,
 		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"test_cases"},
-			Tags:     "@e2e && @docker-compose && ~@ebpf",
-			TestingT: t,
+			Format:    "pretty",
+			Paths:     []string{"test_cases"},
+			Tags:      "@e2e && @docker-compose && ~@ebpf",
+			TestingT:  t,
+			Randomize: -1,
 		},
 	}
 	if suite.Run() != 0 {

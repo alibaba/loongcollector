@@ -23,8 +23,8 @@ Feature: input container stdio
     Then there is at least {1} logs
     Then the log tags match kv
     """
-    _image_name_: "^e2e_container:latest$"
-    _container_name_: "^e2e-container-1$"
+    _image_name_: ".*_container:latest$"
+    _container_name_: ".*-container-1$"
     _container_ip_: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
     """
     Then the log fields match kv

@@ -2,7 +2,7 @@
 Feature: aggregator context
   Test aggregator context
 
-  @e2e @docker-compose @WIP
+  @e2e @docker-compose
   Scenario: TestAggregatorContext
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config

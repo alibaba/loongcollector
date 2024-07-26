@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM mcr.microsoft.com/mssql/server:2022-latest
+FROM mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04
 
 USER root
 # Create app directory
