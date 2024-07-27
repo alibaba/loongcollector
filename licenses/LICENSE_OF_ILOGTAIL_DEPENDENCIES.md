@@ -5,6 +5,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 ## Apache 2.0 licenses
 
 - [github.com/openkruise/kruise-api](https://pkg.go.dev/github.com/openkruise/kruise-api?tab=licenses)
+- [github.com/pingcap/failpoint](https://pkg.go.dev/github.com/pingcap/failpoint?tab=licenses)
+- [github.com/pingcap/tidb/pkg/parser](https://pkg.go.dev/github.com/pingcap/tidb/pkg/parser?tab=licenses)
 - [sigs.k8s.io/gateway-api](https://pkg.go.dev/sigs.k8s.io/gateway-api?tab=licenses)
 - [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/containerd/cgroups](https://pkg.go.dev/github.com/containerd/cgroups?tab=licenses)
@@ -102,6 +104,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 ## BSD licenses
 
+- [github.com/cznic/mathutil](https://pkg.go.dev/github.com/cznic/mathutil?tab=licenses)
 - [github.com/klauspost/compress](https://pkg.go.dev/github.com/klauspost/compress?tab=licenses)
 - [github.com/danwakefield/fnmatch](https://pkg.go.dev/github.com/danwakefield/fnmatch?tab=licenses)
 - [github.com/denisenkom/go-mssqldb](https://pkg.go.dev/github.com/denisenkom/go-mssqldb?tab=licenses)
@@ -109,6 +112,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/knz/strtime](https://pkg.go.dev/github.com/knz/strtime?tab=licenses)
 - [github.com/pingcap/errors](https://pkg.go.dev/github.com/pingcap/errors?tab=licenses)
 - [github.com/pkg/errors](https://pkg.go.dev/github.com/pkg/errors?tab=licenses)
+- [github.com/remyoudompheng/bigfft](https://pkg.go.dev/github.com/remyoudompheng/bigfft?tab=licenses)
 - [github.com/syndtr/goleveldb](https://pkg.go.dev/github.com/syndtr/goleveldb?tab=licenses)
 - [github.com/rcrowley/go-metrics](https://pkg.go.dev/github.com/rcrowley/go-metrics?tab=licenses)
 - [github.com/cihub/seelog](https://pkg.go.dev/github.com/cihub/seelog?tab=licenses)
@@ -130,6 +134,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/spaolacci/murmur3](https://pkg.go.dev/github.com/spaolacci/murmur3?tab=licenses)
 - [github.com/bits-and-blooms/bitset](https://pkg.go.dev/github.com/bits-and-blooms/bitset?tab=licenses)
 - [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto?tab=licenses)
+- [golang.org/x/exp](https://pkg.go.dev/golang.org/x/exp?tab=licenses)
 - [golang.org/x/net](https://pkg.go.dev/golang.org/x/net?tab=licenses)
 - [golang.org/x/oauth2](https://pkg.go.dev/golang.org/x/oauth2?tab=licenses)
 - [golang.org/x/sync](https://pkg.go.dev/golang.org/x/sync?tab=licenses)
@@ -150,11 +155,13 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 ## MIT licenses
 
 - [github.com/valyala/gozstd](https://pkg.go.dev/github.com/valyala/gozstd?tab=licenses)
+- [github.com/goccy/go-json](https://pkg.go.dev/github.com/goccy/go-json?tab=licenses)
 - [github.com/gofrs/uuid](https://pkg.go.dev/github.com/gofrs/uuid?tab=licenses)
 - [github.com/go-kit/log](https://pkg.go.dev/github.com/go-kit/log?tab=licenses)
 - [github.com/narqo/go-dogstatsd-parser](https://pkg.go.dev/github.com/narqo/go-dogstatsd-parser?tab=licenses)
 - [sigs.k8s.io/yaml](https://pkg.go.dev/sigs.k8s.io/yaml?tab=licenses)
 - [github.com/BurntSushi/toml](https://pkg.go.dev/github.com/BurntSushi/toml?tab=licenses)
+- [github.com/Masterminds/semver](https://pkg.go.dev/github.com/Masterminds/semver?tab=licenses)
 - [github.com/Microsoft/go-winio](https://pkg.go.dev/github.com/Microsoft/go-winio?tab=licenses)
 - [github.com/Microsoft/hcsshim](https://pkg.go.dev/github.com/Microsoft/hcsshim?tab=licenses)
 - [github.com/IBM/sarama](https://pkg.go.dev/github.com/IBM/sarama?tab=licenses)
@@ -187,7 +194,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/mitchellh/mapstructure](https://pkg.go.dev/github.com/mitchellh/mapstructure?tab=licenses)
 - [github.com/paulbellamy/ratecounter](https://pkg.go.dev/github.com/paulbellamy/ratecounter?tab=licenses)
 - [github.com/richardartoul/molecule](https://pkg.go.dev/github.com/richardartoul/molecule?tab=licenses)
-- [github.com/satori/go.uuid](https://pkg.go.dev/github.com/satori/go.uuid?tab=licenses)
 - [github.com/shopspring/decimal](https://pkg.go.dev/github.com/shopspring/decimal?tab=licenses)
 - [github.com/siddontang/go](https://pkg.go.dev/github.com/siddontang/go?tab=licenses)
 - [github.com/siddontang/go-log](https://pkg.go.dev/github.com/siddontang/go-log?tab=licenses)
@@ -218,10 +224,8 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/blang/semver](https://pkg.go.dev/github.com/blang/semver?tab=licenses)
 - [github.com/cilium/ebpf](https://pkg.go.dev/github.com/cilium/ebpf?tab=licenses)
 - [go.etcd.io/bbolt](https://pkg.go.dev/go.etcd.io/bbolt?tab=licenses)
-- [github.com/benbjohnson/clock](https://pkg.go.dev/github.com/benbjohnson/clock?tab=licenses)
 - [github.com/ClickHouse/clickhouse-go](https://pkg.go.dev/github.com/ClickHouse/clickhouse-go?tab=licenses)
 - [github.com/andybalholm/brotli](https://pkg.go.dev/github.com/andybalholm/brotli?tab=licenses)
-- [github.com/benbjohnson/clock](https://pkg.go.dev/github.com/benbjohnson/clock?tab=licenses)
 - [github.com/go-faster/city](https://pkg.go.dev/github.com/go-faster/city?tab=licenses)
 - [github.com/paulmach/orb](https://pkg.go.dev/github.com/paulmach/orb?tab=licenses)
 - [github.com/segmentio/asm](https://pkg.go.dev/github.com/segmentio/asm?tab=licenses)
@@ -256,7 +260,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/iLogtail/VictoriaMetrics fork from github.com/VictoriaMetrics/VictoriaMetrics](http://github.com/iLogtail/VictoriaMetrics) based on Apache-2.0
 - [github.com/iLogtail/jfr-parser fork from github.com/pyroscope-io/jfr-parser](http://github.com/iLogtail/jfr-parser) based on Apache-2.0
 - [github.com/iLogtail/metrics fork from github.com/VictoriaMetrics/metrics](http://github.com/iLogtail/metrics) based on MIT
-- [github.com/iLogtail/parser fork from github.com/pingcap/parser](http://github.com/iLogtail/parser) based on Apache-2.0
 - [github.com/iLogtail/pyroscope-lib fork from github.com/pyroscope-io/pyroscope](http://github.com/iLogtail/pyroscope-lib) based on Apache-2.0
 - [github.com/iLogtail/gonvml fork from github.com/mindprince/gonvml](https://github.com/iLogtail/gonvml) based on Apache-2.0
 - [github.com/iLogtail/handy fork from github.com/streadway/handy](http://github.com/iLogtail/handy) based on BSD-2-Clause
