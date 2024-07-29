@@ -3,7 +3,40 @@ FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.
 ARG TARGETPLATFORM
 
 # install dependencies
+RUN sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^#baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    /etc/yum.repos.d/*.repo
 RUN yum -y install epel-release centos-release-scl
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+    sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^# baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl.repo && \
+    sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^#baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^# baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    -e 's/vault\.centos\.org\/centos/vault.centos.org\/altarch/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl.repo && \
+    sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^#baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    -e 's/vault\.centos\.org\/centos/vault.centos.org\/altarch/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo; \
+    else \
+    echo "Unsupported platform"; \
+    exit 1; \
+    fi
 RUN yum -y install devtoolset-9-gcc devtoolset-9-gcc-c++ make
 RUN yum -y install curl-devel expat-devel gettext-devel openssl-devel perl-devel python3-devel zlib-devel \
     asciidoc xmlto docbook2X wget bison
@@ -35,17 +68,10 @@ RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/too
     mkdir llvm-project-14.0.0.src/build && \
     cd llvm-project-14.0.0.src/build && \
     cmake -G 'Unix Makefiles' -D CMAKE_C_COMPILER=/opt/rh/devtoolset-9/root/usr/bin/gcc \
-        -D CMAKE_CXX_COMPILER=/opt/rh/devtoolset-9/root/usr/bin/g++ \
-        -D LLVM_ENABLE_PROJECTS='clang' \
-        -D CMAKE_BUILD_TYPE=Release ../llvm && \
+    -D CMAKE_CXX_COMPILER=/opt/rh/devtoolset-9/root/usr/bin/g++ \
+    -D LLVM_ENABLE_PROJECTS='clang' \
+    -D CMAKE_BUILD_TYPE=Release ../llvm && \
     make -sj$(nproc) clang-format && \
-    cd /
-
-# build git
-RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/git-2.29.3.tar.xz && \
-    tar -xf git-2.29.3.tar.xz && \
-    cd git-2.29.3 && \
-    make -sj$(nproc) install install-man prefix=$PWD/build && \
     cd /
 
 # prepare go
@@ -59,10 +85,54 @@ RUN wget -nv https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/too
 
 FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/centos7-cve-fix:1.0.0
 
+ARG TARGETPLATFORM
+
 # install dev tool set and debug utilities
+RUN sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^#baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    /etc/yum.repos.d/*.repo
 RUN yum -y install centos-release-scl
-RUN yum -y install devtoolset-9-gcc devtoolset-9-gcc-c++ devtoolset-9-libasan-devel make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients sudo
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+    sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^# baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl.repo && \
+    sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^#baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^# baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    -e 's/vault\.centos\.org\/centos/vault.centos.org\/altarch/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl.repo && \
+    sed -i \
+    -e 's/^mirrorlist/#mirrorlist/' \
+    -e 's/^#baseurl/baseurl/' \
+    -e 's/mirror\.centos\.org/vault.centos.org/' \
+    -e 's/vault\.centos\.org\/centos/vault.centos.org\/altarch/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo; \
+    else \
+    echo "Unsupported platform"; \
+    exit 1; \
+    fi
+RUN yum -y install devtoolset-9-gcc devtoolset-9-gcc-c++ devtoolset-9-libasan-devel make libuuid-devel libstdc++-static systemd-devel iproute gdb net-tools which wget vim tree man openssh-clients sudo openssl-devel zlib-devel
+
 RUN yum -y clean all && rm -fr /var/cache && rm -rf /core.*
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    sed -i \
+    -e 's/debuginfo\.centos\.org\/centos/debuginfo.centos.org\/altarch/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl.repo && \
+    sed -i \
+    -e 's/debuginfo\.centos\.org\/centos/debuginfo.centos.org\/altarch/' \
+    /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo; \
+    fi
 RUN [[ ${TARGETPLATFORM##*/} == 'amd64' ]] && ARCH='x86_64' || ARCH='aarch64' && \
     debuginfo-install -y glibc-2.17-326.el7_9.${ARCH} libuuid-2.23.2-65.el7_9.1.${ARCH}
 
@@ -90,9 +160,6 @@ RUN go install golang.org/x/tools/gopls@v0.12.2 && \
     go install github.com/cweill/gotests/gotests@v1.6.0 && \
     go install honnef.co/go/tools/cmd/staticcheck@v0.4.3
 
-# install git
-COPY --from=toolchain-build /git-2.29.3/git /usr/bin
-
 # using gcc9
 ENV MANPATH=/opt/rh/devtoolset-9/root/usr/share/man \
     PERL5LIB=/opt/rh/devtoolset-9/root//usr/lib64/perl5/vendor_perl:/opt/rh/devtoolset-9/root/usr/lib/perl5:/opt/rh/devtoolset-9/root//usr/share/perl5/vendor_perl \
@@ -103,5 +170,3 @@ ENV MANPATH=/opt/rh/devtoolset-9/root/usr/share/man \
     PYTHONPATH=/opt/rh/devtoolset-9/root/usr/lib64/python2.7/site-packages:/opt/rh/devtoolset-9/root/usr/lib/python2.7/site-packages \
     PKG_CONFIG_PATH=/opt/rh/devtoolset-9/root/usr/lib64/pkgconfig \
     INFOPATH=/opt/rh/devtoolset-9/root/usr/share/info
-RUN chmod +x /usr/bin/git
-

@@ -1,11 +1,11 @@
-FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-toolchain-linux:gcc_9.3.1-1 as dep-build
+FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-toolchain-linux:2.0.3 as dep-build
 
 ARG TARGETPLATFORM
 
 RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz -o goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz && \
     tar -xzf goc-v1.4.1-linux-${TARGETPLATFORM##*/}.tar.gz
 
-RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.linux-${TARGETPLATFORM##*/}-2.0.2.tar.gz -o ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz && \
+RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.linux-${TARGETPLATFORM##*/}-2.0.3.tar.gz -o ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz && \
     mkdir ilogtail-deps &&\
     tar -xzvf ilogtail-deps.linux-${TARGETPLATFORM##*/}.tar.gz -C ilogtail-deps --strip-components 1
 
@@ -13,7 +13,7 @@ RUN curl -sSfL https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/l
     mkdir ilogtail-spl  &&\
     tar -xzvf ilogtail-spl.linux-${TARGETPLATFORM##*/}.tar.gz -C ilogtail-spl --strip-components 1
 
-FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-toolchain-linux:gcc_9.3.1-1
+FROM --platform=$TARGETPLATFORM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-toolchain-linux:2.0.3
 RUN mkdir -p /usr/local/bin /opt/logtail /opt/logtail_spl
 
 # install goc for coverage

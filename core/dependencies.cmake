@@ -242,7 +242,7 @@ macro(link_lz4 target_name)
     if (lz4_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${lz4_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${lz4_${LIBRARY_DIR_SUFFIX}}/liblz4.so")
+        target_link_libraries(${target_name} "${lz4_${LIBRARY_DIR_SUFFIX}}/liblz4.a")
     elseif (MSVC)
         target_link_libraries(${target_name}
                 debug "liblz4_staticd"
@@ -306,7 +306,7 @@ macro(link_unwind target_name)
     elseif (ANDROID)
         # target_link_libraries(${target_name} "${unwind_${LIBRARY_DIR_SUFFIX}}/libunwindstack.a")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${unwind_${LIBRARY_DIR_SUFFIX}}/libunwind.so")
+        target_link_libraries(${target_name} "${unwind_${LIBRARY_DIR_SUFFIX}}/libunwind.a")
     elseif (MSVC)
         target_link_libraries(${target_name}
                 debug "breakpad_commond.lib"

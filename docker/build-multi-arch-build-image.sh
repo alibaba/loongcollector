@@ -18,12 +18,12 @@
 #        --no-cache -f Dockerfile.centos7-cve-fix .
 
 #docker buildx build --platform linux/amd64,linux/arm64 \
-#        -t sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-toolchain-linux:1.2.0 \
+#        -t sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-toolchain-linux:2.0.3 \
 #        -o type=registry \
 #        --no-cache -f Dockerfile.ilogtail-toolchain-linux .
 
 #docker buildx build --sbom=false --provenance=false --platform linux/amd64,linux/arm64 \
-#        -t sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:2.0.1 \
+#        -t sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:2.0.3 \
 #        -o type=registry \
 #        --no-cache -f Dockerfile.ilogtail-build-linux .
 
