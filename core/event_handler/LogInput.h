@@ -25,6 +25,7 @@
 
 #include "common/Lock.h"
 #include "common/LogRunnable.h"
+#include "monitor/Monitor.h"
 
 namespace logtail {
 
@@ -78,6 +79,8 @@ private:
     volatile bool mIdleFlag;
     int32_t mEventProcessCount;
     int32_t mLastUpdateMetricTime;
+    IntGaugePtr mGlobalOpenFdTotal;
+    IntGaugePtr mGlobalRegisterHandlerTotal;
 
     std::atomic_int mLastReadEventTime{0};
     mutable std::mutex mThreadRunningMux;

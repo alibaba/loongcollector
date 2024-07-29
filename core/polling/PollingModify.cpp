@@ -13,19 +13,20 @@
 // limitations under the License.
 
 #include "PollingModify.h"
+
 #include "PollingEventQueue.h"
 #if defined(__linux__)
 #include <sys/file.h>
 #endif
 #include <sys/stat.h>
+
+#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
-#include "common/FileSystemUtil.h"
 #include "event/Event.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
-#include "monitor/Monitor.h"
 
 using namespace std;
 
@@ -46,6 +47,8 @@ PollingModify::~PollingModify() {
 
 void PollingModify::Start() {
     ClearCache();
+    mGlobalPollingModifySizeTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_POLLING_MODIFY_SIZE_TOTAL);
+
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
 }
@@ -246,7 +249,9 @@ void PollingModify::Polling() {
             vector<SplitedFilePath> deletedFileVec;
             vector<Event*> pollingEventVec;
             int32_t statCount = 0;
-            LogtailMonitor::GetInstance()->UpdateMetric("polling_modify_size", mModifyCacheMap.size());
+            size_t pollingModifySizeTotal = mModifyCacheMap.size();
+            LogtailMonitor::GetInstance()->UpdateMetric("polling_modify_size", pollingModifySizeTotal);
+            mGlobalPollingModifySizeTotal->Set(pollingModifySizeTotal);
             for (auto iter = mModifyCacheMap.begin(); iter != mModifyCacheMap.end(); ++iter) {
                 if (!mRuningFlag || mHoldOnFlag)
                     break;

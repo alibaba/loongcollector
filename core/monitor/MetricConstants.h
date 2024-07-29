@@ -28,6 +28,38 @@ extern const std::string METRIC_TOPIC_FIELD_NAME;
 extern const std::string LABEL_PREFIX;
 extern const std::string VALUE_PREFIX;
 
+// global metrics labels
+
+extern const std::string METRIC_LABEL_ALIUIDS;
+extern const std::string METRIC_LABEL_INSTANCE_ID;
+extern const std::string METRIC_LABEL_IP;
+extern const std::string METRIC_LABEL_OS;
+extern const std::string METRIC_LABEL_OS_DETAIL;
+extern const std::string METRIC_LABEL_PROJECTS;
+extern const std::string METRIC_LABEL_USER_DEFINED_ID;
+extern const std::string METRIC_LABEL_UUID;
+extern const std::string METRIC_LABEL_VERSION;
+
+// global metrics values
+
+extern const std::string METRIC_GLOBAL_CPU;
+extern const std::string METRIC_GLOBAL_MEMORY;
+extern const std::string METRIC_GLOBAL_OPEN_FD_TOTAL;
+extern const std::string METRIC_GLOBAL_POLLING_DIR_CACHE_SIZE_TOTAL;
+extern const std::string METRIC_GLOBAL_POLLING_FILE_CACHE_SIZE_TOTAL;
+extern const std::string METRIC_GLOBAL_POLLING_MODIFY_SIZE_TOTAL;
+extern const std::string METRIC_GLOBAL_REGISTER_HANDLER_TOTAL;
+extern const std::string METRIC_GLOBAL_CONFIG_TOTAL;
+extern const std::string METRIC_GLOBAL_ENV_CONFIG_TOTAL;
+extern const std::string METRIC_GLOBAL_CRD_CONFIG_TOTAL;
+extern const std::string METRIC_GLOBAL_CONSOLE_CONFIG_TOTAL;
+extern const std::string METRIC_GLOBAL_PLUGIN_TOTAL;
+extern const std::string METRIC_GLOBAL_PROCESS_QUEUE_FULL_TOTAL;
+extern const std::string METRIC_GLOBAL_PROCESS_QUEUE_TOTAL;
+extern const std::string METRIC_GLOBAL_SEND_QUEUE_FULL_TOTAL;
+extern const std::string METRIC_GLOBAL_SEND_QUEUE_TOTAL;
+extern const std::string METRIC_GLOBAL_USED_SENDING_CONCURRENCY;
+
 // common plugin labels
 extern const std::string METRIC_LABEL_PROJECT;
 extern const std::string METRIC_LABEL_LOGSTORE;
@@ -42,10 +74,10 @@ extern const std::string METRIC_LABEL_FILE_INODE;
 extern const std::string METRIC_LABEL_FILE_NAME;
 
 // input file metrics
-extern const std::string METRIC_INPUT_RECORDS_TOTAL; 
+extern const std::string METRIC_INPUT_RECORDS_TOTAL;
 extern const std::string METRIC_INPUT_RECORDS_SIZE_BYTES;
-extern const std::string METRIC_INPUT_BATCH_TOTAL; 
-extern const std::string METRIC_INPUT_READ_TOTAL; 
+extern const std::string METRIC_INPUT_BATCH_TOTAL;
+extern const std::string METRIC_INPUT_READ_TOTAL;
 extern const std::string METRIC_INPUT_FILE_SIZE_BYTES;
 extern const std::string METRIC_INPUT_FILE_READ_DELAY_TIME_MS;
 extern const std::string METRIC_INPUT_FILE_OFFSET_BYTES;

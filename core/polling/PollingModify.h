@@ -15,16 +15,18 @@
  */
 
 #pragma once
-#include "PollingCache.h"
-#include <map>
 #include <deque>
+#include <map>
 #include <vector>
+
+#include "PollingCache.h"
 #include "common/Lock.h"
-#include "common/Thread.h"
 #include "common/LogRunnable.h"
+#include "common/Thread.h"
 #ifdef APSARA_UINT_TEST_MAIN
 #include "common/SplitedFilePath.h"
 #endif
+#include "monitor/Monitor.h"
 
 namespace logtail {
 
@@ -98,6 +100,8 @@ private:
     std::deque<SplitedFilePath> mDeletedFileNameQueue;
 
     ModifyCheckCacheMap mModifyCacheMap;
+
+    IntGaugePtr mGlobalPollingModifySizeTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PollingUnittest;

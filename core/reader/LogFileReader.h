@@ -548,8 +548,8 @@ protected:
     ReentrantMetricsRecordRef mMetricsRecordRef;
     CounterPtr mInputRecordsSizeBytesCounter;
     CounterPtr mInputReadTotalCounter;
-    GaugePtr mInputFileSizeBytesGauge;
-    GaugePtr mInputFileOffsetBytesGauge;
+    IntGaugePtr mInputFileSizeBytesGauge;
+    IntGaugePtr mInputFileOffsetBytesGauge;
 
 private:
     bool mHasReadContainerBom = false;

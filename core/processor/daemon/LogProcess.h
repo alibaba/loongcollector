@@ -23,6 +23,7 @@
 #include "common/LogRunnable.h"
 #include "common/Thread.h"
 #include "models/PipelineEventGroup.h"
+#include "monitor/Monitor.h"
 #include "queue/FeedbackQueueKey.h"
 
 namespace logtail {
@@ -54,6 +55,9 @@ private:
     int32_t mThreadCount = 1;
     std::atomic_bool* mThreadFlags;
     ReadWriteLock mAccessProcessThreadRWL;
+
+    IntGaugePtr mGlobalProcessQueueFullTotal;
+    IntGaugePtr mGlobalProcessQueueTotal;
 };
 
 } // namespace logtail

@@ -20,7 +20,6 @@
 #include "go_pipeline/LogtailPlugin.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
-#include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
@@ -57,6 +56,9 @@ LogProcess::~LogProcess() {
 void LogProcess::Start() {
     if (mInitialized)
         return;
+    mGlobalProcessQueueFullTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_PROCESS_QUEUE_FULL_TOTAL);
+    mGlobalProcessQueueTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_PROCESS_QUEUE_TOTAL);
+
     mInitialized = true;
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();
     mProcessThreads = new ThreadPtr[mThreadCount];
@@ -164,8 +166,12 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             s_processLines = 0;
 
             // update process queue status
-            sMonitor->UpdateMetric("process_queue_full", ProcessQueueManager::GetInstance()->GetInvalidCnt());
-            sMonitor->UpdateMetric("process_queue_total", ProcessQueueManager::GetInstance()->GetCnt());
+            uint32_t InvalidProcessQueueTotal = ProcessQueueManager::GetInstance()->GetInvalidCnt();
+            sMonitor->UpdateMetric("process_queue_full", InvalidProcessQueueTotal);
+            mGlobalProcessQueueFullTotal->Set(InvalidProcessQueueTotal);
+            uint32_t ProcessQueueTotal = ProcessQueueManager::GetInstance()->GetCnt();
+            sMonitor->UpdateMetric("process_queue_total", ProcessQueueTotal);
+            mGlobalProcessQueueTotal->Set(ProcessQueueTotal);
             if (ExactlyOnceQueueManager::GetInstance()->GetProcessQueueCnt() > 0) {
                 sMonitor->UpdateMetric("eo_process_queue_full",
                                        ExactlyOnceQueueManager::GetInstance()->GetInvalidProcessQueueCnt());

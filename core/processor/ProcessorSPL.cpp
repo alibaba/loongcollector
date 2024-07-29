@@ -114,7 +114,7 @@ bool ProcessorSPL::Init(const Json::Value& config) {
     mProcessMicros = GetMetricsRecordRef().CreateCounter("proc_spl_process_micros");
     mInputMicros = GetMetricsRecordRef().CreateCounter("proc_spl_input_micros");
     mOutputMicros = GetMetricsRecordRef().CreateCounter("proc_spl_output_micros");
-    mMemPeakBytes = GetMetricsRecordRef().CreateGauge("proc_spl_mem_peak_bytes");
+    mMemPeakBytes = GetMetricsRecordRef().CreateIntGauge("proc_spl_mem_peak_bytes");
     mTotalTaskCount = GetMetricsRecordRef().CreateCounter("proc_spl_total_task_count");
     mSuccTaskCount = GetMetricsRecordRef().CreateCounter("proc_spl_succ_task_count");
     mFailTaskCount = GetMetricsRecordRef().CreateCounter("proc_spl_fail_task_count");

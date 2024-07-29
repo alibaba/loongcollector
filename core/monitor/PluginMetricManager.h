@@ -23,13 +23,13 @@ namespace logtail {
 
 class PluginMetricManager {
 public:
-    PluginMetricManager(const LabelsPtr defaultLabels, std::unordered_map<std::string, MetricType> metricKeys)
+    PluginMetricManager(const MetricLabelsPtr defaultLabels, std::unordered_map<std::string, MetricType> metricKeys)
         : mDefaultLabels(defaultLabels->begin(), defaultLabels->end()), mMetricKeys(metricKeys) {}
 
     ReentrantMetricsRecordRef GetOrCreateReentrantMetricsRecordRef(MetricLabels labels);
     void ReleaseReentrantMetricsRecordRef(MetricLabels labels);
 
-    void RegisterSizeGauge(GaugePtr ptr) { mSizeGauge = ptr; }
+    void RegisterSizeGauge(IntGaugePtr ptr) { mSizeGauge = ptr; }
 
 private:
     std::string GenerateKey(MetricLabels& labels);
@@ -39,7 +39,7 @@ private:
     std::unordered_map<std::string, ReentrantMetricsRecordRef> mReentrantMetricsRecordRefsMap;
     mutable std::mutex mutex;
 
-    GaugePtr mSizeGauge;
+    IntGaugePtr mSizeGauge;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PluginMetricManagerUnittest;

@@ -43,13 +43,13 @@
 #include "fuse/UlogfsHandler.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
-#include "monitor/Monitor.h"
 #include "processor/daemon/LogProcess.h"
 #include "sdk/Client.h"
 #include "sdk/Exception.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
+#include "common/MemoryBarrier.h"
 #include "flusher/FlusherSLS.h"
 #include "pipeline/PipelineManager.h"
 #include "queue/QueueKeyManager.h"
@@ -58,7 +58,6 @@
 #include "sdk/CurlAsynInstance.h"
 #include "sender/PackIdManager.h"
 #include "sender/SLSClientManager.h"
-#include "common/MemoryBarrier.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -429,6 +428,10 @@ Sender* Sender::Instance() {
 
 bool Sender::Init(void) {
     SLSControl::GetInstance()->Init();
+
+    // TODO：Sender的初始化在LoongCollectorMonitor之前，这里会Get失败。等完善输出模块插件指标时一起解决
+    // mGlobalSendQueueFullTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_SEND_QUEUE_FULL_TOTAL);
+    // mGlobalSendQueueTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_SEND_QUEUE_TOTAL);
 
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
     mFlushLog = false;

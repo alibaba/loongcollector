@@ -21,7 +21,7 @@ namespace logtail {
 class PluginMetricManagerUnittest : public ::testing::Test {
 public:
     void SetUp() {
-        LabelsPtr defaultLabels = std::make_shared<MetricLabels>();
+        MetricLabelsPtr defaultLabels = std::make_shared<MetricLabels>();
         defaultLabels->emplace_back(METRIC_LABEL_PROJECT, "default_project");
         defaultLabels->emplace_back(METRIC_LABEL_LOGSTORE, "default_logstore");
         defaultLabels->emplace_back(METRIC_LABEL_REGION, "default_region");
@@ -31,7 +31,7 @@ public:
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(*defaultLabels));
         std::unordered_map<std::string, MetricType> metricKeys;
         metricKeys.emplace("default_counter", MetricType::METRIC_TYPE_COUNTER);
-        metricKeys.emplace("default_gauge", MetricType::METRIC_TYPE_GAUGE);
+        metricKeys.emplace("default_gauge", MetricType::METRIC_TYPE_INT_GAUGE);
         pluginMetricManager = std::make_shared<PluginMetricManager>(mMetricsRecordRef->GetLabels(), metricKeys);
     }
 
@@ -94,7 +94,7 @@ void PluginMetricManagerUnittest::TestReleaseMetricsRecordRefPtr() {
 }
 
 void PluginMetricManagerUnittest::TestRegisterSizeGauge() {
-    GaugePtr sizeGauge = mMetricsRecordRef.CreateGauge("test_gauge");
+    IntGaugePtr sizeGauge = mMetricsRecordRef.CreateIntGauge("test_gauge");
     pluginMetricManager->RegisterSizeGauge(sizeGauge);
 
     MetricLabels labels;

@@ -26,6 +26,38 @@ const std::string METRIC_TOPIC_FIELD_NAME = "__topic__";
 const std::string LABEL_PREFIX = "label.";
 const std::string VALUE_PREFIX = "value.";
 
+// global metrics labels
+
+const std::string METRIC_LABEL_ALIUIDS = "aliuids";
+const std::string METRIC_LABEL_INSTANCE_ID = "instance_id";
+const std::string METRIC_LABEL_IP = "ip";
+const std::string METRIC_LABEL_OS = "os";
+const std::string METRIC_LABEL_OS_DETAIL = "os_detail";
+const std::string METRIC_LABEL_PROJECTS = "projects";
+const std::string METRIC_LABEL_USER_DEFINED_ID = "user_defined_id";
+const std::string METRIC_LABEL_UUID = "uuid";
+const std::string METRIC_LABEL_VERSION = "version";
+
+// global metrics values
+
+const std::string METRIC_GLOBAL_CPU = "global_cpu_used_cores";
+const std::string METRIC_GLOBAL_MEMORY = "global_memory_used_mb";
+const std::string METRIC_GLOBAL_OPEN_FD_TOTAL = "global_open_fd_total";
+const std::string METRIC_GLOBAL_POLLING_DIR_CACHE_SIZE_TOTAL = "global_polling_dir_cache_size_total";
+const std::string METRIC_GLOBAL_POLLING_FILE_CACHE_SIZE_TOTAL = "global_polling_file_cache_size_total";
+const std::string METRIC_GLOBAL_POLLING_MODIFY_SIZE_TOTAL = "global_polling_modify_size_total";
+const std::string METRIC_GLOBAL_REGISTER_HANDLER_TOTAL = "global_register_handler_total";
+const std::string METRIC_GLOBAL_CONFIG_TOTAL = "global_config_total";
+const std::string METRIC_GLOBAL_ENV_CONFIG_TOTAL = "global_env_config_total";
+const std::string METRIC_GLOBAL_CRD_CONFIG_TOTAL = "global_crd_config_total";
+const std::string METRIC_GLOBAL_CONSOLE_CONFIG_TOTAL = "global_console_config_total";
+const std::string METRIC_GLOBAL_PLUGIN_TOTAL = "global_plugin_total";
+const std::string METRIC_GLOBAL_PROCESS_QUEUE_FULL_TOTAL = "global_process_queue_full_total";
+const std::string METRIC_GLOBAL_PROCESS_QUEUE_TOTAL = "global_process_queue_total";
+const std::string METRIC_GLOBAL_SEND_QUEUE_FULL_TOTAL = "global_send_queue_full_total";
+const std::string METRIC_GLOBAL_SEND_QUEUE_TOTAL = "global_send_queue_total";
+const std::string METRIC_GLOBAL_USED_SENDING_CONCURRENCY = "global_used_sending_concurrency";
+
 // common plugin labels
 const std::string METRIC_LABEL_PROJECT = "project";
 const std::string METRIC_LABEL_LOGSTORE = "logstore";
@@ -40,10 +72,10 @@ const std::string METRIC_LABEL_FILE_INODE = "file_inode";
 const std::string METRIC_LABEL_FILE_NAME = "file_name";
 
 // input file metrics
-const std::string METRIC_INPUT_RECORDS_TOTAL = "input_records_total"; 
+const std::string METRIC_INPUT_RECORDS_TOTAL = "input_records_total";
 const std::string METRIC_INPUT_RECORDS_SIZE_BYTES = "input_records_size_bytes";
-const std::string METRIC_INPUT_BATCH_TOTAL = "input_batch_total"; 
-const std::string METRIC_INPUT_READ_TOTAL = "input_read_total"; 
+const std::string METRIC_INPUT_BATCH_TOTAL = "input_batch_total";
+const std::string METRIC_INPUT_READ_TOTAL = "input_read_total";
 const std::string METRIC_INPUT_FILE_SIZE_BYTES = "input_file_size_bytes";
 const std::string METRIC_INPUT_FILE_READ_DELAY_TIME_MS = "input_file_read_delay_time_ms";
 const std::string METRIC_INPUT_FILE_OFFSET_BYTES = "input_file_offset_bytes";

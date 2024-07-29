@@ -111,6 +111,14 @@ bool LogtailMonitor::Init() {
     mCpuArrayForScaleIdx = 0;
 #endif
 
+    // init metrics
+    mGlobalCpuGauge = LoongCollectorMonitor::GetInstance()->GetDoubleGauge(METRIC_GLOBAL_CPU);
+    mGlobalMemoryGauge = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_MEMORY);
+    mGlobalPluginTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_PLUGIN_TOTAL);
+    mGlobalEnvConfigTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_ENV_CONFIG_TOTAL);
+    mGlobalUsedSendingConcurrency
+        = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_USED_SENDING_CONCURRENCY);
+
     // Initialize monitor thread.
     mThreadRes = async(launch::async, &LogtailMonitor::Monitor, this);
     return true;
@@ -246,12 +254,14 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec);
     // CPU usage of Logtail process.
     AddLogContent(logPtr, "cpu", mCpuStat.mCpuUsage);
+    mGlobalCpuGauge->Set(mCpuStat.mCpuUsage);
 #if defined(__linux__) // TODO: Remove this if auto scale is available on Windows.
     // CPU usage of system.
     AddLogContent(logPtr, "os_cpu", mOsCpuStatForScale.mOsCpuUsage);
 #endif
     // Memory usage of Logtail process.
     AddLogContent(logPtr, "mem", mMemStat.mRss);
+    mGlobalMemoryGauge->Set(mMemStat.mRss);
     // The version, uuid of Logtail.
     AddLogContent(logPtr, "version", ILOGTAIL_VERSION);
     AddLogContent(logPtr, "uuid", Application::GetInstance()->GetUUID());
@@ -287,14 +297,19 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
 #endif
     UpdateMetric("config_prefer_real_ip", BOOL_FLAG(send_prefer_real_ip));
     UpdateMetric("plugin_enabled", LogtailPlugin::GetInstance()->IsPluginOpened());
+    mGlobalPluginTotal->Set(LogtailPlugin::GetInstance()->IsPluginOpened());
 #if defined(__linux__) && !defined(__ANDROID__)
     UpdateMetric("observer_enabled", ObserverManager::GetInstance()->Status());
 #endif
     const std::vector<sls_logs::LogTag>& envTags = AppConfig::GetInstance()->GetEnvTags();
     if (!envTags.empty()) {
-        UpdateMetric("env_config_count", envTags.size());
+        size_t envConfigCount = envTags.size();
+        UpdateMetric("env_config_count", envConfigCount);
+        mGlobalEnvConfigTotal->Set(envConfigCount);
     }
-    UpdateMetric("used_sending_concurrency", Sender::Instance()->GetSendingBufferCount());
+    int32_t usedSendingConcurrency = Sender::Instance()->GetSendingBufferCount();
+    UpdateMetric("used_sending_concurrency", usedSendingConcurrency);
+    mGlobalUsedSendingConcurrency->Set(usedSendingConcurrency);
 
     AddLogContent(logPtr, "metric_json", MetricToString());
     AddLogContent(logPtr, "status", CheckLogtailStatus());
@@ -661,5 +676,90 @@ bool LogtailMonitor::CalOsCpuStat() {
 #endif
 }
 #endif
+
+LoongCollectorMonitor* LoongCollectorMonitor::GetInstance() {
+    static LoongCollectorMonitor instance;
+    return &instance;
+}
+
+void LoongCollectorMonitor::Init() {
+    // create metric record
+    MetricLabels labels;
+    labels.emplace_back(METRIC_LABEL_INSTANCE_ID, Application::GetInstance()->GetInstanceId());
+    labels.emplace_back(METRIC_LABEL_IP, LogFileProfiler::mIpAddr);
+    labels.emplace_back(METRIC_LABEL_OS, OS_NAME);
+    labels.emplace_back(METRIC_LABEL_OS_DETAIL, LogFileProfiler::mOsDetail);
+    labels.emplace_back(METRIC_LABEL_UUID, Application::GetInstance()->GetUUID());
+    labels.emplace_back(METRIC_LABEL_VERSION, ILOGTAIL_VERSION);
+    DynamicMetricLabels dynamicLabels;
+    dynamicLabels.emplace_back(METRIC_LABEL_PROJECTS,
+                               []() -> std::string { return Sender::Instance()->GetAllProjects(); });
+#ifdef __ENTERPRISE__
+    dynamicLabels.emplace_back(METRIC_LABEL_ALIUIDS,
+                               []() -> std::string { return EnterpriseConfigProvider::GetInstance()->GetAliuidSet(); });
+    dynamicLabels.emplace_back(METRIC_LABEL_USER_DEFINED_ID, []() -> std::string {
+        return EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
+    });
+#endif
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        mMetricsRecordRef, std::move(labels), std::move(dynamicLabels));
+    // init value
+    mDoubleGauges[METRIC_GLOBAL_CPU] = mMetricsRecordRef.CreateDoubleGauge(METRIC_GLOBAL_CPU);
+    mIntGauges[METRIC_GLOBAL_MEMORY] = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_MEMORY);
+    mIntGauges[METRIC_GLOBAL_OPEN_FD_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_OPEN_FD_TOTAL);
+    mIntGauges[METRIC_GLOBAL_POLLING_DIR_CACHE_SIZE_TOTAL]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_POLLING_DIR_CACHE_SIZE_TOTAL);
+    mIntGauges[METRIC_GLOBAL_POLLING_FILE_CACHE_SIZE_TOTAL]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_POLLING_FILE_CACHE_SIZE_TOTAL);
+    mIntGauges[METRIC_GLOBAL_POLLING_MODIFY_SIZE_TOTAL]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_POLLING_MODIFY_SIZE_TOTAL);
+    mIntGauges[METRIC_GLOBAL_REGISTER_HANDLER_TOTAL]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_REGISTER_HANDLER_TOTAL);
+    mIntGauges[METRIC_GLOBAL_CONFIG_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_CONFIG_TOTAL);
+    mIntGauges[METRIC_GLOBAL_ENV_CONFIG_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_ENV_CONFIG_TOTAL);
+    mIntGauges[METRIC_GLOBAL_CRD_CONFIG_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_CRD_CONFIG_TOTAL);
+    mIntGauges[METRIC_GLOBAL_CONSOLE_CONFIG_TOTAL]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_CONSOLE_CONFIG_TOTAL);
+    mIntGauges[METRIC_GLOBAL_PLUGIN_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_PLUGIN_TOTAL);
+    mIntGauges[METRIC_GLOBAL_PROCESS_QUEUE_FULL_TOTAL]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_PROCESS_QUEUE_FULL_TOTAL);
+    mIntGauges[METRIC_GLOBAL_PROCESS_QUEUE_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_PROCESS_QUEUE_TOTAL);
+    mIntGauges[METRIC_GLOBAL_SEND_QUEUE_FULL_TOTAL]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_SEND_QUEUE_FULL_TOTAL);
+    mIntGauges[METRIC_GLOBAL_SEND_QUEUE_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_SEND_QUEUE_TOTAL);
+    mIntGauges[METRIC_GLOBAL_USED_SENDING_CONCURRENCY]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_GLOBAL_USED_SENDING_CONCURRENCY);
+    LOG_INFO(sLogger, ("LoongCollectorMonitor", "started"));
+}
+
+void LoongCollectorMonitor::Stop() {
+}
+
+CounterPtr LoongCollectorMonitor::GetCounter(std::string key) {
+    auto it = mCounters.find(key);
+    if (it != mCounters.end()) {
+        return it->second;
+    }
+    LOG_WARNING(sLogger, ("get global counter failed, counter key", key));
+    return nullptr;
+}
+
+IntGaugePtr LoongCollectorMonitor::GetIntGauge(std::string key) {
+    auto it = mIntGauges.find(key);
+    if (it != mIntGauges.end()) {
+        return it->second;
+    }
+    LOG_WARNING(sLogger, ("get global gauge failed, gauge key", key));
+    return nullptr;
+}
+
+DoubleGaugePtr LoongCollectorMonitor::GetDoubleGauge(std::string key) {
+    auto it = mDoubleGauges.find(key);
+    if (it != mDoubleGauges.end()) {
+        return it->second;
+    }
+    LOG_WARNING(sLogger, ("get global gauge failed, gauge key", key));
+    return nullptr;
+}
 
 } // namespace logtail

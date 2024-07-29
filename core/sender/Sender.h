@@ -27,6 +27,7 @@
 #include "common/WaitObject.h"
 #include "log_pb/logtail_buffer_meta.pb.h"
 #include "log_pb/sls_logs.pb.h"
+#include "monitor/Monitor.h"
 #include "queue/FeedbackQueueKey.h"
 #include "queue/SenderQueueItem.h"
 #include "sdk/Closure.h"
@@ -240,6 +241,9 @@ private:
 
     PTMutex mSendStatisticLock;
     std::unordered_map<std::string, std::vector<SendStatistic*>> mSendStatisticMap;
+
+    IntGaugePtr mGlobalSendQueueFullTotal;
+    IntGaugePtr mGlobalSendQueueTotal;
 
     // PTMutex mSendClientLock;
     // std::unordered_map<std::string, SlsClientInfo*> mSendClientMap;
