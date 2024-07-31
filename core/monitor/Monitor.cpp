@@ -140,7 +140,7 @@ void LogtailMonitor::Stop() {
 
 void LogtailMonitor::Monitor() {
     LOG_INFO(sLogger, ("profiling", "started"));
-    int32_t lastMonitorTime = time(NULL);
+    int32_t lastMonitorTime = time(NULL), lastCheckHardLimitTime = time(nullptr);
     CpuStat curCpuStat;
     {
         unique_lock<mutex> lock(mThreadRunningMux);
@@ -172,40 +172,54 @@ void LogtailMonitor::Monitor() {
             }
 #endif
 
+            static int32_t checkHardLimitInterval
+                = INT32_FLAG(monitor_interval) > 30 ? INT32_FLAG(monitor_interval) / 6 : 5;
+            if ((monitorTime - lastCheckHardLimitTime) >= checkHardLimitInterval) {
+                lastCheckHardLimitTime = monitorTime;
+
+                GetMemStat();
+                CalCpuStat(curCpuStat, mCpuStat);
+                if (CheckHardCpuLimit() || CheckHardMemLimit()) {
+                    LOG_ERROR(sLogger,
+                              ("Resource used by program exceeds hard limit",
+                               "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
+                    Suicide();
+                }
+            }
+
+
             // Update statistics and send to logtail_status_profile regularly.
             // If CPU or memory limit triggered, send to logtail_suicide_profile.
-            if ((monitorTime - lastMonitorTime) < INT32_FLAG(monitor_interval))
-                continue;
-            lastMonitorTime = monitorTime;
+            if ((monitorTime - lastMonitorTime) >= INT32_FLAG(monitor_interval)) {
+                lastMonitorTime = monitorTime;
 
-            // Memory usage has exceeded limit, try to free some timeout objects.
-            if (1 == mMemStat.mViolateNum) {
-                LOG_DEBUG(sLogger, ("Memory is upper limit", "run gabbage collection."));
-                LogInput::GetInstance()->SetForceClearFlag(true);
-            }
-            GetMemStat();
-            CalCpuStat(curCpuStat, mCpuStat);
-            // CalCpuLimit and CalMemLimit will check if the number of violation (CPU
-            // or memory exceeds limit) // is greater or equal than limits (
-            // flag(cpu_limit_num) and flag(mem_limit_num)).
-            // Returning true means too much violations, so we have to prepare to restart
-            // logtail to release resource.
-            // Mainly for controlling memory because we have no idea to descrease memory usage.
-            if (CheckCpuLimit() || CheckMemLimit()) {
-                LOG_ERROR(sLogger,
-                          ("Resource used by program exceeds upper limit",
-                           "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
-                Suicide();
-            }
+                // Memory usage has exceeded limit, try to free some timeout objects.
+                if (1 == mMemStat.mViolateNum) {
+                    LOG_DEBUG(sLogger, ("Memory is upper limit", "run gabbage collection."));
+                    LogInput::GetInstance()->SetForceClearFlag(true);
+                }
+                // CalCpuLimit and CalMemLimit will check if the number of violation (CPU
+                // or memory exceeds limit) // is greater or equal than limits (
+                // flag(cpu_limit_num) and flag(mem_limit_num)).
+                // Returning true means too much violations, so we have to prepare to restart
+                // logtail to release resource.
+                // Mainly for controlling memory because we have no idea to descrease memory usage.
+                if (CheckSoftCpuLimit() || CheckSoftMemLimit()) {
+                    LOG_ERROR(sLogger,
+                              ("Resource used by program exceeds upper limit for some time",
+                               "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
+                    Suicide();
+                }
 
-            if (IsHostIpChanged()) {
-                Suicide();
-            }
+                if (IsHostIpChanged()) {
+                    Suicide();
+                }
 
-            SendStatusProfile(false);
-            if (BOOL_FLAG(logtail_dump_monitor_info)) {
-                if (!DumpMonitorInfo(monitorTime))
-                    LOG_ERROR(sLogger, ("Fail to dump monitor info", ""));
+                SendStatusProfile(false);
+                if (BOOL_FLAG(logtail_dump_monitor_info)) {
+                    if (!DumpMonitorInfo(monitorTime))
+                        LOG_ERROR(sLogger, ("Fail to dump monitor info", ""));
+                }
             }
         }
     }
@@ -439,7 +453,7 @@ void LogtailMonitor::CalCpuStat(const CpuStat& curCpu, CpuStat& savedCpu) {
 #endif
 }
 
-bool LogtailMonitor::CheckCpuLimit() {
+bool LogtailMonitor::CheckSoftCpuLimit() {
     float cpuUsageLimit = AppConfig::GetInstance()->IsResourceAutoScale()
         ? AppConfig::GetInstance()->GetScaledCpuUsageUpLimit()
         : AppConfig::GetInstance()->GetCpuUsageUpLimit();
@@ -451,13 +465,24 @@ bool LogtailMonitor::CheckCpuLimit() {
     return false;
 }
 
-bool LogtailMonitor::CheckMemLimit() {
+bool LogtailMonitor::CheckSoftMemLimit() {
     if (mMemStat.mRss > AppConfig::GetInstance()->GetMemUsageUpLimit()) {
         if (++mMemStat.mViolateNum > INT32_FLAG(mem_limit_num))
             return true;
     } else
         mMemStat.mViolateNum = 0;
     return false;
+}
+
+bool LogtailMonitor::CheckHardCpuLimit() {
+    float cpuUsageLimit = AppConfig::GetInstance()->IsResourceAutoScale()
+        ? AppConfig::GetInstance()->GetScaledCpuUsageUpLimit()
+        : AppConfig::GetInstance()->GetCpuUsageUpLimit();
+    return mCpuStat.mCpuUsage > 10 * cpuUsageLimit;
+}
+
+bool LogtailMonitor::CheckHardMemLimit() {
+    return mMemStat.mRss > 10 * AppConfig::GetInstance()->GetMemUsageUpLimit();
 }
 
 void LogtailMonitor::DumpToLocal(const sls_logs::LogGroup& logGroup) {

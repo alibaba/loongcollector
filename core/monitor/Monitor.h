@@ -107,12 +107,15 @@ private:
     // set @curCpu to @savedCpu after calculation.
     void CalCpuStat(const CpuStat& curCpu, CpuStat& savedCpu);
 
-    // CheckCpuLimit checks if current cpu usage exceeds limit.
+    // CheckSoftCpuLimit checks if current cpu usage exceeds limit.
     // @return true if the cpu usage exceeds limit continuously.
-    bool CheckCpuLimit();
-    // CheckMemLimit checks if the memory usage exceeds limit.
+    bool CheckSoftCpuLimit();
+    // CheckSoftMemLimit checks if the memory usage exceeds limit.
     // @return true if the memory usage exceeds limit continuously.
-    bool CheckMemLimit();
+    bool CheckSoftMemLimit();
+
+    bool CheckHardCpuLimit();
+    bool CheckHardMemLimit();
 
     // SendStatusProfile collects status profile and send them to server.
     // @suicide indicates if the target LogStore is logtail_suicide_profile.
