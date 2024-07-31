@@ -57,6 +57,7 @@ private:
     unique_ptr<SenderQueue> mQueue;
 };
 
+const QueueKey SenderQueueUnittest::sKey;
 const size_t SenderQueueUnittest::sDataSize;
 shared_ptr<ConcurrencyLimiter> SenderQueueUnittest::sConcurrencyLimiter;
 FeedbackInterfaceMock SenderQueueUnittest::sFeedback;

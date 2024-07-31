@@ -44,6 +44,7 @@ set(DEP_NAME_LIST
         spdlog                  # header-only
         rapidjson               # header-only
         gtest
+        gmock
         protobuf
         re2
         cityhash
@@ -99,13 +100,15 @@ endif ()
 # gtest
 macro(link_gtest target_name)
     if (gtest_${LINK_OPTION_SUFFIX})
-        target_link_libraries(${target_name} "${gtest_${LINK_OPTION_SUFFIX}}")
+        target_link_libraries(${target_name} "${gtest_${LINK_OPTION_SUFFIX}}" "${gmock_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${gtest_${LIBRARY_DIR_SUFFIX}}/libgtest.a")
+        target_link_libraries(${target_name} "${gtest_${LIBRARY_DIR_SUFFIX}}/libgtest.a" "${gmock_${LIBRARY_DIR_SUFFIX}}/libgmock.a")
     elseif (MSVC)
         target_link_libraries(${target_name}
                 debug "gtestd"
-                optimized "gtest")
+                optimized "gtest"
+                debug "gmockd"
+                optimized "gmock")
     endif ()
 endmacro()
 

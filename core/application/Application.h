@@ -42,6 +42,7 @@ public:
 
     std::string GetInstanceId() { return mInstanceId; }
     bool TryGetUUID();
+    int32_t GetStartTime() {return mStartTime;}
     std::string GetUUID() {
         mUUIDLock.lock();
         std::string uuid(mUUID);

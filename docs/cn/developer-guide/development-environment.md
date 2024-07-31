@@ -82,7 +82,7 @@ go install ...
 
 ```json
 {
-  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:2.0.1",
+  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:2.0.3",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -186,7 +186,7 @@ cp -a ./core/build/go_pipeline/libPluginAdapter.so ./output
 ```bash
 docker run --name ilogtail-build -d \
   -v `pwd`:/src -w /src \
-  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:2.0.1 \
+  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:2.0.3 \
   bash -c "sleep infinity"
 ```
 

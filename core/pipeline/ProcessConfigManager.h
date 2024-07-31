@@ -47,6 +47,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessConfigManagerUnittest;
+    friend class CommonConfigProviderUnittest;
 #endif
 };
 
