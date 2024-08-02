@@ -25,13 +25,13 @@ add_executable(process_queue_manager_unittest ProcessQueueManagerUnittest.cpp)
 target_link_libraries(process_queue_manager_unittest ${UT_BASE_TARGET})
 
 add_executable(sender_queue_unittest SenderQueueUnittest.cpp)
-target_link_libraries(sender_queue_unittest unittest_base)
+target_link_libraries(sender_queue_unittest ${UT_BASE_TARGET})
 
 add_executable(sender_queue_manager_unittest SenderQueueManagerUnittest.cpp)
-target_link_libraries(sender_queue_manager_unittest unittest_base)
+target_link_libraries(sender_queue_manager_unittest ${UT_BASE_TARGET})
 
 add_executable(exactly_once_sender_queue_unittest ExactlyOnceSenderQueueUnittest.cpp)
-target_link_libraries(exactly_once_sender_queue_unittest unittest_base)
+target_link_libraries(exactly_once_sender_queue_unittest ${UT_BASE_TARGET})
 
 add_executable(exactly_once_queue_manager_unittest ExactlyOnceQueueManagerUnittest.cpp)
 target_link_libraries(exactly_once_queue_manager_unittest ${UT_BASE_TARGET})

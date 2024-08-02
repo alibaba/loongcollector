@@ -28,7 +28,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "flusher/FlusherSLS.h"
+#include "flusher/sls/FlusherSLS.h"
 #include "log_pb/sls_logs.pb.h"
 
 extern "C" {

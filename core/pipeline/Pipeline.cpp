@@ -22,7 +22,7 @@
 #include "batch/TimeoutFlushManager.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
-#include "flusher/FlusherSLS.h"
+#include "flusher/sls/FlusherSLS.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/PluginRegistry.h"

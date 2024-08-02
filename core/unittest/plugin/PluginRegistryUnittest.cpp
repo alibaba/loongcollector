@@ -18,8 +18,9 @@
 #include "plugin/creator/StaticFlusherCreator.h"
 #include "plugin/creator/StaticInputCreator.h"
 #include "plugin/creator/StaticProcessorCreator.h"
-#include "unittest/plugin/PluginMock.h"
+#include "sender/FlusherRunner.h"
 #include "unittest/Unittest.h"
+#include "unittest/plugin/PluginMock.h"
 
 using namespace std;
 
@@ -31,13 +32,10 @@ public:
     void TestCreateProcessor() const;
     void TestCreateFlusher() const;
     void TestValidPlugin() const;
+    void TestRegisterFlusherSinkType() const;
 
 protected:
-    void SetUp() override {
-        PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock>());
-        PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock>());
-        PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());
-    }
+    void SetUp() override { LoadPluginMock(); }
     void TearDown() override { PluginRegistry::GetInstance()->UnloadPlugins(); }
 };
 

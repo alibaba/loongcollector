@@ -14,10 +14,10 @@
 
 #include "CurlImp.h"
 #include "Exception.h"
-#include "CurlAsynInstance.h"
 #include "DNSCache.h"
 #include "app_config/AppConfig.h"
 #include <curl/curl.h>
+#include "common/http/Curl.h"
 
 using namespace std;
 
@@ -25,11 +25,6 @@ namespace logtail {
 namespace sdk {
 
     static CURLcode globalInitCode = curl_global_init(CURL_GLOBAL_ALL);
-
-    CurlClient::CurlClient() {
-        // Initliaze sending threads.
-        CurlAsynInstance::GetInstance();
-    }
 
     // callback function to store the response
     static size_t data_write_callback(char* buffer, size_t size, size_t nmemb, string* write_buf) {

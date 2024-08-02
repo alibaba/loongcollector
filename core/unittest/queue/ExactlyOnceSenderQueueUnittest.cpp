@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "flusher/FlusherSLS.h"
+#include "flusher/sls/FlusherSLS.h"
 #include "queue/ExactlyOnceSenderQueue.h"
 #include "queue/SLSSenderQueueItem.h"
 #include "unittest/Unittest.h"

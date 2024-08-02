@@ -193,18 +193,6 @@ namespace sdk {
               content(para_content) {}
 
         bool IsLogServiceResponse() const;
-
-        void FillResponse(const int32_t para_statusCode, const std::string& para_content) {
-            statusCode = para_statusCode;
-            content = para_content;
-        }
-
-        std::string RequestID() const {
-            const auto iter = header.find(X_LOG_REQUEST_ID);
-            return iter != header.end() ? iter->second : "";
-        }
-
-        time_t GetServerTimeFromHeader() const;
     };
 
     /*
@@ -215,13 +203,6 @@ namespace sdk {
         std::string requestId;
 
         virtual ~Response() {}
-
-        virtual void ParseSuccess(const HttpMessage& message);
-
-        void SetError(int32_t code, const std::string& request) {
-            statusCode = code;
-            requestId = request;
-        }
     };
 
     struct PostLogStoreLogsResponse : public Response {
@@ -317,7 +298,7 @@ namespace sdk {
         SHA1 in, out;
     };
 
-    class SpinLock {
+        class SpinLock {
         std::atomic_flag locked = ATOMIC_FLAG_INIT;
 
         SpinLock(const SpinLock&) = delete;
@@ -336,71 +317,6 @@ namespace sdk {
     };
 
     using ScopedSpinLock = std::lock_guard<SpinLock>;
-
-    class LogsClosure;
-
-    struct AsynRequest {
-        AsynRequest(const std::string& httpMethod,
-                    const std::string& host,
-                    const int32_t port,
-                    const std::string& url,
-                    const std::string& queryString,
-                    const std::map<std::string, std::string>& header,
-                    const std::string& body,
-                    const int32_t timeout,
-                    const std::string& intf,
-                    const bool httpsFlag,
-                    LogsClosure* callBack,
-                    Response* response)
-            : mHTTPMethod(httpMethod),
-              mHost(host),
-              mPort(port),
-              mUrl(url),
-              mQueryString(queryString),
-              mHeader(header),
-              mBody(body),
-              mTimeout(timeout),
-              mInterface(intf),
-              mHTTPSFlag(httpsFlag),
-              mCallBack(callBack),
-              mPrivateData(NULL),
-              mResponse(response)
-
-        {}
-
-        ~AsynRequest() { delete mResponse; }
-
-        std::string mHTTPMethod;
-        std::string mHost;
-        int32_t mPort = 80;
-        std::string mUrl;
-        std::string mQueryString;
-        std::map<std::string, std::string> mHeader;
-        std::string mBody;
-        int32_t mTimeout = 15;
-        std::string mInterface;
-        bool mHTTPSFlag = false;
-        LogsClosure* mCallBack = NULL;
-        void* mPrivateData;
-        Response* mResponse;
-    };
-
-    class HTTPClient {
-    public:
-        virtual ~HTTPClient() {}
-        virtual void Send(const std::string& httpMethod,
-                          const std::string& host,
-                          const int32_t port,
-                          const std::string& url,
-                          const std::string& queryString,
-                          const std::map<std::string, std::string>& header,
-                          const std::string& body,
-                          const int32_t timeout,
-                          HttpMessage& httpMessage,
-                          const std::string& intf,
-                          const bool httpsFlag)
-            = 0;
-    };
 
 } // namespace sdk
 } // namespace logtail

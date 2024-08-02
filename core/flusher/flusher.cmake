@@ -17,7 +17,7 @@
 include_directories(flusher)
 
 # Add source files
-file(GLOB THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/flusher/*.c ${CMAKE_SOURCE_DIR}/flusher/*.cc ${CMAKE_SOURCE_DIR}/flusher/*.cpp ${CMAKE_SOURCE_DIR}/flusher/*.h)
+file(GLOB_RECURSE THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/flusher/*.c ${CMAKE_SOURCE_DIR}/flusher/*.cc ${CMAKE_SOURCE_DIR}/flusher/*.cpp ${CMAKE_SOURCE_DIR}/flusher/*.h)
 
 # Set source files to parent
 set(PLUGIN_SOURCE_FILES_CORE ${PLUGIN_SOURCE_FILES_CORE} ${THIS_SOURCE_FILES_LIST})

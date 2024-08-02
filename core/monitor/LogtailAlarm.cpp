@@ -27,7 +27,6 @@
 #include "profile_sender/ProfileSender.h"
 #include "queue/QueueKeyManager.h"
 #include "queue/SenderQueueManager.h"
-#include "sender/Sender.h"
 
 DEFINE_FLAG_INT32(logtail_alarm_interval, "the interval of two same type alarm message", 30);
 DEFINE_FLAG_INT32(logtail_low_level_alarm_speed, "the speed(count/second) which logtail's low level alarm allow", 100);
@@ -300,7 +299,7 @@ void LogtailAlarm::SendAlarm(const LogtailAlarmType alarmType,
     }
 
     // ignore alarm for profile data
-    if (Sender::IsProfileData(region, projectName, category)) {
+    if (ProfileSender::GetInstance()->IsProfileData(region, projectName, category)) {
         return;
     }
     // LOG_DEBUG(sLogger, ("Add Alarm", region)("projectName", projectName)("alarm index",

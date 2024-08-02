@@ -15,11 +15,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(sender_unittest)
 
-add_executable(pack_id_manager_unittest PackIdManagerUnittest.cpp)
-target_link_libraries(pack_id_manager_unittest ${UT_BASE_TARGET})
-
-# add_executable(sender_unittest SenderUnittest.cpp)
-# target_link_libraries(sender_unittest ${UT_BASE_TARGET})
+add_executable(flusher_runner_unittest FlusherRunnerUnittest.cpp)
+target_link_libraries(flusher_runner_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
-gtest_discover_tests(pack_id_manager_unittest)
+gtest_discover_tests(flusher_runner_unittest)

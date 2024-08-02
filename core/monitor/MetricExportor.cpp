@@ -23,7 +23,6 @@
 #include "common/RuntimeUtil.h"
 #include "config_manager/ConfigManager.h"
 #include "log_pb/sls_logs.pb.h"
-#include "sender/Sender.h"
 
 using namespace sls_logs;
 using namespace std;

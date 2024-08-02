@@ -22,6 +22,7 @@ namespace logtail {
 
 bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
     if (Full()) {
+        item->mEnqueTime = time(nullptr);
         mExtraBuffer.push(std::move(item));
         return true;
     }
@@ -32,6 +33,7 @@ bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
             break;
         }
     }
+    item->mEnqueTime = time(nullptr);
     mQueue[index % mCapacity] = std::move(item);
     if (index == mWrite) {
         ++mWrite;

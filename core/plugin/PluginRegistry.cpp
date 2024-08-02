@@ -24,7 +24,9 @@
 #include <string>
 
 #include "app_config/AppConfig.h"
-#include "flusher/FlusherSLS.h"
+#include "common/Flags.h"
+#include "flusher/blackhole/FlusherBlackHole.h"
+#include "flusher/sls/FlusherSLS.h"
 #include "input/InputContainerStdio.h"
 #include "input/InputFile.h"
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -54,7 +56,6 @@
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
 #include "processor/ProcessorSPL.h"
 #endif
-#include "common/Flags.h"
 
 
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
@@ -144,6 +145,7 @@ void PluginRegistry::LoadStaticPlugins() {
 #endif
 
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
 }
 
 void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {

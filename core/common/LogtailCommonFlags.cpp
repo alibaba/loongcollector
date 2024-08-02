@@ -75,9 +75,8 @@
 // DEFINE_FLAG_STRING(local_machine_uuid, "use this value if not empty, for ut/debug", "");
 // DEFINE_FLAG_STRING(logtail_status_snapshot, "status on local disk", "logtail_status_snapshot");
 
-// TODO: remove these flags
-DEFINE_FLAG_STRING(logtail_line_count_snapshot, "line count file on local disk", "logtail_line_count_snapshot.json");
-DEFINE_FLAG_STRING(logtail_integrity_snapshot, "integrity file on local disk", "logtail_integrity_snapshot.json");
+// DEFINE_FLAG_STRING(logtail_line_count_snapshot, "line count file on local disk", "logtail_line_count_snapshot.json");
+// DEFINE_FLAG_STRING(logtail_integrity_snapshot, "integrity file on local disk", "logtail_integrity_snapshot.json");
 
 // app config
 DEFINE_FLAG_STRING(ilogtail_config,

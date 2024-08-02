@@ -246,14 +246,14 @@ namespace sdk {
         return SynPostLogStoreLogs(project, logstore, packageListData, httpHeader, hashKey);
     }
 
-    AsynRequest* Client::CreatePostLogStoreLogsRequest(const std::string& project,
-                                                       const std::string& logstore,
-                                                       sls_logs::SlsCompressType compressType,
-                                                       const std::string& compressedLogGroup,
-                                                       uint32_t rawSize,
-                                                       PostLogStoreLogsClosure* callBack,
-                                                       const std::string& hashKey,
-                                                       int64_t hashKeySeqID) {
+    unique_ptr<HttpSinkRequest> Client::CreatePostLogStoreLogsRequest(const std::string& project,
+                                                                      const std::string& logstore,
+                                                                      sls_logs::SlsCompressType compressType,
+                                                                      const std::string& compressedLogGroup,
+                                                                      uint32_t rawSize,
+                                                                      SenderQueueItem* item,
+                                                                      const std::string& hashKey,
+                                                                      int64_t hashKeySeqID) {
         map<string, string> httpHeader;
         httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
         if (!mKeyProvider.empty()) {
@@ -262,15 +262,15 @@ namespace sdk {
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(rawSize);
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         return CreateAsynPostLogStoreLogsRequest(
-            project, logstore, compressedLogGroup, httpHeader, callBack, hashKey, hashKeySeqID);
+            project, logstore, compressedLogGroup, httpHeader, hashKey, hashKeySeqID, item);
     }
 
-    AsynRequest* Client::CreatePostLogStoreLogPackageListRequest(const std::string& project,
-                                                                 const std::string& logstore,
-                                                                 sls_logs::SlsCompressType compressType,
-                                                                 const std::string& packageListData,
-                                                                 PostLogStoreLogsClosure* callBack,
-                                                                 const std::string& hashKey) {
+    unique_ptr<HttpSinkRequest> Client::CreatePostLogStoreLogPackageListRequest(const std::string& project,
+                                                                                const std::string& logstore,
+                                                                                sls_logs::SlsCompressType compressType,
+                                                                                const std::string& packageListData,
+                                                                                SenderQueueItem* item,
+                                                                                const std::string& hashKey) {
         map<string, string> httpHeader;
         httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
         if (!mKeyProvider.empty()) {
@@ -280,7 +280,7 @@ namespace sdk {
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(packageListData.size());
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         return CreateAsynPostLogStoreLogsRequest(
-            project, logstore, packageListData, httpHeader, callBack, hashKey, kInvalidHashKeySeqID);
+            project, logstore, packageListData, httpHeader, hashKey, kInvalidHashKeySeqID, item);
     }
 
     void Client::SendRequest(const std::string& project,
@@ -314,13 +314,14 @@ namespace sdk {
         }
     }
 
-    AsynRequest* Client::CreateAsynPostLogStoreLogsRequest(const std::string& project,
-                                                           const std::string& logstore,
-                                                           const std::string& body,
-                                                           std::map<std::string, std::string>& httpHeader,
-                                                           PostLogStoreLogsClosure* callBack,
-                                                           const std::string& hashKey,
-                                                           int64_t hashKeySeqID) {
+    unique_ptr<HttpSinkRequest>
+    Client::CreateAsynPostLogStoreLogsRequest(const std::string& project,
+                                              const std::string& logstore,
+                                              const std::string& body,
+                                              std::map<std::string, std::string>& httpHeader,
+                                              const std::string& hashKey,
+                                              int64_t hashKeySeqID,
+                                              SenderQueueItem* item) {
         string operation = LOGSTORES;
         operation.append("/").append(logstore);
         if (hashKey.empty())
@@ -346,23 +347,8 @@ namespace sdk {
         string queryString;
         GetQueryString(parameterList, queryString);
 
-        int32_t port = mPort;
-        if (mPort == 80 && mUsingHTTPS) {
-            port = 443;
-        }
-        Response* response = new PostLogStoreLogsResponse();
-        return new AsynRequest(HTTP_POST,
-                               host,
-                               port,
-                               operation,
-                               queryString,
-                               httpHeader,
-                               body,
-                               mTimeout,
-                               mInterface,
-                               mUsingHTTPS,
-                               callBack,
-                               response);
+        return make_unique<HttpSinkRequest>(
+            HTTP_POST, mUsingHTTPS, host, operation, queryString, httpHeader, body, item);
     }
 
     PostLogStoreLogsResponse

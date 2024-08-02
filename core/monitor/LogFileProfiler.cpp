@@ -29,7 +29,6 @@
 #include "logger/Logger.h"
 #include "profile_sender/ProfileSender.h"
 #include "queue/QueueKeyManager.h"
-#include "sender/Sender.h"
 
 DEFINE_FLAG_INT32(profile_data_send_interval, "interval of send LogFile/DomainSocket profile data, seconds", 600);
 DEFINE_FLAG_STRING(logtail_profile_snapshot, "reader profile on local disk", "logtail_profile_snapshot");
@@ -168,7 +167,7 @@ bool LogFileProfiler::GetProfileData(LogGroup& logGroup, LogStoreStatistic* stat
     // if (statistic->mHostLogPath.empty()) {
     //     QueueKey fbKey = QueueKeyManager::GetInstance()->GetKey("-flusher_sls-" + statistic->mProjectName + "#"
     //                                                             + statistic->mCategory);
-    //     LogstoreSenderStatistics senderStatistics = Sender::Instance()->GetSenderStatistics(fbKey);
+    //     LogstoreSenderStatistics senderStatistics = Sender::GetInstance()->GetSenderStatistics(fbKey);
 
     //     contentPtr = logPtr->add_contents();
     //     contentPtr->set_key("max_unsend_time");

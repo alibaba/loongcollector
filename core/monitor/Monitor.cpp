@@ -34,12 +34,13 @@
 #include "common/version.h"
 #include "config_manager/ConfigManager.h"
 #include "event_handler/LogInput.h"
+#include "flusher/sls/FlusherSLS.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
-#include "sender/Sender.h"
+#include "sender/FlusherRunner.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "ObserverManager.h"
 #endif
@@ -283,7 +284,7 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     AddLogContent(logPtr, "user_defined_id", EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
     AddLogContent(logPtr, "aliuids", EnterpriseConfigProvider::GetInstance()->GetAliuidSet());
 #endif
-    AddLogContent(logPtr, "projects", Sender::Instance()->GetAllProjects());
+    AddLogContent(logPtr, "projects", FlusherSLS::GetAllProjects());
     AddLogContent(logPtr, "instance_id", Application::GetInstance()->GetInstanceId());
     AddLogContent(logPtr, "instance_key", id);
     AddLogContent(logPtr, "syslog_open", AppConfig::GetInstance()->GetOpenStreamLog());
@@ -321,7 +322,7 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
         UpdateMetric("env_config_count", envConfigCount);
         mGlobalEnvConfigTotal->Set(envConfigCount);
     }
-    int32_t usedSendingConcurrency = Sender::Instance()->GetSendingBufferCount();
+    int32_t usedSendingConcurrency = FlusherRunner::GetInstance()->GetSendingBufferCount();
     UpdateMetric("used_sending_concurrency", usedSendingConcurrency);
     mGlobalUsedSendingConcurrency->Set(usedSendingConcurrency);
 
@@ -338,13 +339,13 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     // Dump to local and send to enabled regions.
     DumpToLocal(logGroup);
     for (size_t i = 0; i < allProfileRegion.size(); ++i) {
-        if (BOOL_FLAG(check_profile_region) && !Sender::Instance()->IsRegionContainingConfig(allProfileRegion[i])) {
+        if (BOOL_FLAG(check_profile_region) && !FlusherSLS::IsRegionContainingConfig(allProfileRegion[i])) {
             LOG_DEBUG(sLogger, ("region does not contain config for this instance", allProfileRegion[i]));
             continue;
         }
 
         // Check if the region is disabled.
-        if (!Sender::Instance()->GetRegionStatus(allProfileRegion[i])) {
+        if (!FlusherSLS::GetRegionStatus(allProfileRegion[i])) {
             LOG_DEBUG(sLogger, ("disabled region, do not send status profile to region", allProfileRegion[i]));
             continue;
         }
@@ -718,7 +719,7 @@ void LoongCollectorMonitor::Init() {
     labels.emplace_back(METRIC_LABEL_VERSION, ILOGTAIL_VERSION);
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_PROJECTS,
-                               []() -> std::string { return Sender::Instance()->GetAllProjects(); });
+                               []() -> std::string { return FlusherSLS::GetAllProjects(); });
 #ifdef __ENTERPRISE__
     dynamicLabels.emplace_back(METRIC_LABEL_ALIUIDS,
                                []() -> std::string { return EnterpriseConfigProvider::GetInstance()->GetAliuidSet(); });

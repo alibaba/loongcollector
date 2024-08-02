@@ -27,6 +27,7 @@
 #include "plugin/instance/InputInstance.h"
 #include "plugin/instance/PluginInstance.h"
 #include "plugin/instance/ProcessorInstance.h"
+#include "sink/SinkType.h"
 
 struct processor_interface_t;
 

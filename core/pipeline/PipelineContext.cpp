@@ -14,7 +14,7 @@
 
 #include "pipeline/PipelineContext.h"
 
-#include "flusher/FlusherSLS.h"
+#include "flusher/sls/FlusherSLS.h"
 #include "queue/QueueKeyManager.h"
 
 using namespace std;

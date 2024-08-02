@@ -28,22 +28,33 @@
 #include "batch/Batcher.h"
 #include "compression/Compressor.h"
 #include "models/PipelineEventGroup.h"
-#include "plugin/interface/Flusher.h"
-#include "queue/SenderQueueItem.h"
+#include "plugin/interface/HttpFlusher.h"
 #include "sender/ConcurrencyLimiter.h"
 #include "serializer/SLSSerializer.h"
 
 namespace logtail {
 
-class FlusherSLS : public Flusher {
+class FlusherSLS : public HttpFlusher {
     // TODO: temporarily used
     friend class ProfileSender;
+
 public:
     enum class TelemetryType { LOG, METRIC };
 
     static std::shared_ptr<ConcurrencyLimiter> GetProjectConcurrencyLimiter(const std::string& project);
     static std::shared_ptr<ConcurrencyLimiter> GetRegionConcurrencyLimiter(const std::string& region);
     static void ClearInvalidConcurrencyLimiters();
+
+    static void RecycleResourceIfNotUsed();
+
+    static std::string GetDefaultRegion();
+    static void SetDefaultRegion(const std::string& region);
+    static std::string GetAllProjects();
+    static bool IsRegionContainingConfig(const std::string& region);
+
+    // TODO: should be moved to enterprise config provider
+    static bool GetRegionStatus(const std::string& region);
+    static void UpdateRegionStatus(const std::string& region, bool status);
 
     static const std::string sName;
 
@@ -56,7 +67,8 @@ public:
     bool Send(PipelineEventGroup&& g) override;
     bool Flush(size_t key) override;
     bool FlushAll() override;
-    sdk::AsynRequest* BuildRequest(SenderQueueItem* item) const override;
+    std::unique_ptr<HttpSinkRequest> BuildRequest(SenderQueueItem* item) const override;
+    void OnSendDone(const HttpResponse& response, SenderQueueItem* item) override;
 
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
 
@@ -76,9 +88,28 @@ public:
 private:
     static const std::unordered_set<std::string> sNativeParam;
 
+    static void InitResource();
+
+    static void IncreaseProjectReferenceCnt(const std::string& project);
+    static void DecreaseProjectReferenceCnt(const std::string& project);
+    static void IncreaseRegionReferenceCnt(const std::string& region);
+    static void DecreaseRegionReferenceCnt(const std::string& region);
+
     static std::mutex sMux;
     static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sProjectConcurrencyLimiterMap;
     static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sRegionConcurrencyLimiterMap;
+
+    static std::mutex sDefaultRegionLock;
+    static std::string sDefaultRegion;
+
+    static std::mutex sProjectRefCntMapLock;
+    static std::unordered_map<std::string, int32_t> sProjectRefCntMap;
+    static std::mutex sRegionRefCntMapLock;
+    static std::unordered_map<std::string, int32_t> sRegionRefCntMap;
+
+    // TODO: should be moved to enterprise config provider
+    static std::mutex sRegionStatusLock;
+    static std::unordered_map<std::string, bool> sAllRegionStatus;
 
     void GenerateGoPlugin(const Json::Value& config, Json::Value& res) const;
     bool SerializeAndPush(std::vector<BatchedEventsList>&& groupLists);

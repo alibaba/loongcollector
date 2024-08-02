@@ -48,7 +48,11 @@ private:
     LogProcess();
     ~LogProcess();
 
-    bool Serialize(const PipelineEventGroup& group, bool enableNanosecond, std::string& res, std::string& errorMsg);
+    bool Serialize(const PipelineEventGroup& group,
+                   bool enableNanosecond,
+                   const std::string& logstore,
+                   std::string& res,
+                   std::string& errorMsg);
 
     bool mInitialized = false;
     ThreadPtr* mProcessThreads;

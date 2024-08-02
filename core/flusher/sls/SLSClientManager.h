@@ -125,8 +125,6 @@ private:
     EndpointStatus UpdateRealIp(const std::string& region, const std::string& endpoint);
     void SetRealIp(const std::string& region, const std::string& ip);
 
-    bool mIsInitialized = false;
-
     mutable std::mutex mRegionAliuidRefCntMapLock;
     std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mRegionAliuidRefCntMap;
 

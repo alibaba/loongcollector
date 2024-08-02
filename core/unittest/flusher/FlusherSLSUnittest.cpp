@@ -23,16 +23,15 @@
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
 #include "compression/CompressorFactory.h"
-#include "flusher/FlusherSLS.h"
+#include "flusher/sls/FlusherSLS.h"
+#include "flusher/sls/PackIdManager.h"
+#include "flusher/sls/SLSClientManager.h"
 #include "pipeline/PipelineContext.h"
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 #include "queue/SLSSenderQueueItem.h"
 #include "queue/SenderQueueManager.h"
-#include "sender/PackIdManager.h"
-#include "sender/SLSClientManager.h"
-#include "sender/Sender.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(batch_send_interval);
@@ -492,13 +491,13 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(flusher2.Init(configJson, optionalGoPipeline));
 
     APSARA_TEST_TRUE(flusher1.Start());
-    APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
-    APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
+    APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
+    APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 
     APSARA_TEST_TRUE(flusher2.Start());
-    APSARA_TEST_EQUAL(2U, Sender::Instance()->mProjectRefCntMap.size());
-    APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
+    APSARA_TEST_EQUAL(2U, FlusherSLS::sProjectRefCntMap.size());
+    APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
 #ifdef __ENTERPRISE__
     APSARA_TEST_EQUAL(2U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 #else
@@ -506,13 +505,13 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
 #endif
 
     APSARA_TEST_TRUE(flusher2.Stop(true));
-    APSARA_TEST_EQUAL(1U, Sender::Instance()->mProjectRefCntMap.size());
-    APSARA_TEST_TRUE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
+    APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
+    APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 
     APSARA_TEST_TRUE(flusher1.Stop(true));
-    APSARA_TEST_TRUE(Sender::Instance()->mProjectRefCntMap.empty());
-    APSARA_TEST_FALSE(Sender::Instance()->IsRegionContainingConfig("cn-hangzhou"));
+    APSARA_TEST_TRUE(FlusherSLS::sProjectRefCntMap.empty());
+    APSARA_TEST_FALSE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_TRUE(SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").empty());
 }
 
@@ -970,26 +969,38 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
     FlusherSLS flusher;
     flusher.SetContext(ctx);
     flusher.Init(configJson, optionalGoPipeline);
+    {
+        APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));
 
-    APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));
+        vector<SenderQueueItem*> res;
+        SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
 
-    vector<SenderQueueItem*> res;
-    SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+        APSARA_TEST_EQUAL(1U, res.size());
+        auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+        APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
+        APSARA_TEST_TRUE(item->mBufferOrNot);
+        APSARA_TEST_EQUAL(&flusher, item->mFlusher);
+        APSARA_TEST_EQUAL(flusher.mQueueKey, item->mQueueKey);
+        APSARA_TEST_EQUAL("shardhash_key", item->mShardHashKey);
+        APSARA_TEST_EQUAL("other_logstore", item->mLogstore);
 
-    APSARA_TEST_EQUAL(1U, res.size());
-    auto item = static_cast<SLSSenderQueueItem*>(res[0]);
-    APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
-    APSARA_TEST_TRUE(item->mBufferOrNot);
-    APSARA_TEST_EQUAL(&flusher, item->mFlusher);
-    APSARA_TEST_EQUAL(flusher.mQueueKey, item->mQueueKey);
-    APSARA_TEST_EQUAL("shardhash_key", item->mShardHashKey);
-    APSARA_TEST_EQUAL("other_logstore", item->mLogstore);
+        auto compressor
+            = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+        string output;
+        output.resize(item->mRawSize);
+        APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
+        APSARA_TEST_EQUAL("content", output);
+    }
+    {
+        APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", ""));
 
-    auto compressor = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
-    string output;
-    output.resize(item->mRawSize);
-    APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
-    APSARA_TEST_EQUAL("content", output);
+        vector<SenderQueueItem*> res;
+        SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+
+        APSARA_TEST_EQUAL(1U, res.size());
+        auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+        APSARA_TEST_EQUAL("test_logstore", item->mLogstore);
+    }
 }
 
 UNIT_TEST_CASE(FlusherSLSUnittest, OnSuccessfulInit)

@@ -16,14 +16,23 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
+
+#include "common/http/HttpResponse.h"
 
 namespace logtail {
 
-class Limiter {
-public:
-    virtual bool IsValidToPop(const std::string& key) = 0;
-    virtual void PostPop(const std::string& key) = 0;
+struct SLSResponse {
+    int32_t mStatusCode = 0;
+    std::string mRequestId;
+    std::string mErrorCode;
+    std::string mErrorMsg;
+
+    bool Parse(const HttpResponse& response);
 };
+
+bool IsSLSResponse(const HttpResponse& response);
+time_t GetServerTime(const HttpResponse& response);
 
 } // namespace logtail

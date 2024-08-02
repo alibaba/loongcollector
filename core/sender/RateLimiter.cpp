@@ -13,7 +13,11 @@
 // limitations under the License.
 
 #include "sender/RateLimiter.h"
+
 #include "logger/Logger.h"
+// TODO: temporarily used
+#include "app_config/AppConfig.h"
+#include "common/TimeUtil.h"
 
 using namespace std;
 
@@ -32,6 +36,23 @@ bool RateLimiter::IsValidToPop() {
 
 void RateLimiter::PostPop(size_t size) {
     mLastSecondTotalBytes += size;
+}
+
+void RateLimiter::FlowControl(int32_t dataSize, int64_t& lastSendTime, int32_t& lastSendByte, bool isRealTime) {
+    int64_t curTime = GetCurrentTimeInMicroSeconds();
+    int32_t bps = isRealTime ? AppConfig::GetInstance()->GetMaxBytePerSec() : AppConfig::GetInstance()->GetBytePerSec();
+    if (curTime < lastSendTime || curTime - lastSendTime >= 1000 * 1000) {
+        lastSendTime = curTime;
+        lastSendByte = dataSize;
+    } else {
+        if (lastSendByte > bps) {
+            usleep(1000 * 1000 - (curTime - lastSendTime));
+            lastSendTime = GetCurrentTimeInMicroSeconds();
+            lastSendByte = dataSize;
+        } else {
+            lastSendByte += dataSize;
+        }
+    }
 }
 
 } // namespace logtail

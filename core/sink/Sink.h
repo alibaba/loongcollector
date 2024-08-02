@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,33 +16,25 @@
 
 #pragma once
 
+#include <memory>
+
+#include "common/SafeQueue.h"
 
 namespace logtail {
 
-class SenderQueueParam {
+template <class T>
+class Sink {
 public:
-    SenderQueueParam() : SIZE(100), LOW_SIZE(10), HIGH_SIZE(20) {}
-
-    static SenderQueueParam* GetInstance() {
-        static auto sQueueParam = new SenderQueueParam;
-        return sQueueParam;
+    virtual bool Init() = 0;
+    virtual void Stop() = 0;
+    
+    bool AddRequest(std::unique_ptr<T>&& request) {
+        mQueue.Push(std::move(request));
+        return true;
     }
 
-    size_t GetLowSize() { return LOW_SIZE; }
-
-    size_t GetHighSize() { return HIGH_SIZE; }
-
-    size_t GetMaxSize() { return SIZE; }
-
-    void SetLowSize(size_t lowSize) { LOW_SIZE = lowSize; }
-
-    void SetHighSize(size_t highSize) { HIGH_SIZE = highSize; }
-
-    void SetMaxSize(size_t maxSize) { SIZE = maxSize; }
-
-    size_t SIZE;
-    size_t LOW_SIZE;
-    size_t HIGH_SIZE;
+protected:
+    SafeQueue<std::unique_ptr<T>> mQueue;
 };
 
 } // namespace logtail

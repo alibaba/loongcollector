@@ -38,7 +38,7 @@ struct SLSSenderQueueItem : public SenderQueueItem {
 
     SLSSenderQueueItem(std::string&& data,
                        size_t rawSize,
-                       const Flusher* flusher,
+                       Flusher* flusher,
                        QueueKey key,
                        const std::string& logstore,
                        RawDataType type = RawDataType::EVENT_GROUP,

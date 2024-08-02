@@ -1,4 +1,4 @@
-// Copyright 2024 iLogtail Authors
+// Copyright 2023 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,30 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sender/PackIdManager.h"
-#include "unittest/Unittest.h"
+#include "flusher/blackhole/FlusherBlackHole.h"
+
+#include "queue/SenderQueueManager.h"
 
 using namespace std;
 
 namespace logtail {
 
-class PackIdManagerUnittest : public ::testing::Test {
-public:
-    void TestGetSeq();
+const string FlusherBlackHole::sName = "flusher_blackhole";
 
-protected:
-    void TearDown() { PackIdManager::GetInstance()->mPackIdSeq.clear(); }
-};
-
-void PackIdManagerUnittest::TestGetSeq() {
-    // key not existed
-    APSARA_TEST_EQUAL(0, PackIdManager::GetInstance()->GetAndIncPackSeq(0));
-    // key existed
-    APSARA_TEST_EQUAL(1, PackIdManager::GetInstance()->GetAndIncPackSeq(0));
+bool FlusherBlackHole::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+    static uint32_t cnt = 0;
+    GenerateQueueKey(to_string(++cnt));
+    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey);
+    return true;
 }
 
-UNIT_TEST_CASE(PackIdManagerUnittest, TestGetSeq)
+bool FlusherBlackHole::Send(PipelineEventGroup&& g) {
+    return PushToQueue(make_unique<SenderQueueItem>("", 0, this, mQueueKey));
+}
 
 } // namespace logtail
-
-UNIT_TEST_MAIN

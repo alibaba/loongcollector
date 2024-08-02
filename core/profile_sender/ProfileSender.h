@@ -22,7 +22,7 @@
 
 #include "common/Lock.h"
 #include "log_pb/sls_logs.pb.h"
-#include "flusher/FlusherSLS.h"
+#include "flusher/sls/FlusherSLS.h"
 
 namespace logtail {
 
@@ -43,15 +43,9 @@ public:
     void GetAllProfileRegion(std::vector<std::string>& allRegion);
     void SetProfileProjectName(const std::string& region, const std::string& profileProject);
 
-    virtual void SendToProfileProject(const std::string& region, sls_logs::LogGroup& logGroup);
+    bool IsProfileData(const std::string& region, const std::string& project, const std::string& logstore);
 
-    virtual bool SendInstantly(sls_logs::LogGroup& logGroup,
-                               const std::string& aliuid,
-                               const std::string& region,
-                               const std::string& projectName,
-                               const std::string& logstore);
-    virtual void
-    SendToLineCountProject(const std::string& region, const std::string& projectName, sls_logs::LogGroup& logGroup);
+    virtual void SendToProfileProject(const std::string& region, sls_logs::LogGroup& logGroup);
 
 protected:
     ProfileSender();

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sender/SLSClientManager.h"
+#include "flusher/sls/SLSClientManager.h"
 
 #include "app_config/AppConfig.h"
 #include "common/EndpointUtil.h"
@@ -20,10 +20,11 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "flusher/sls/FlusherSLS.h"
+#include "flusher/sls/SendResult.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "sdk/Exception.h"
-#include "sender/Sender.h"
 #include "sls_control/SLSControl.h"
 
 DEFINE_FLAG_STRING(data_endpoint_policy,
@@ -108,17 +109,14 @@ std::string SLSClientManager::RegionEndpointsInfo::GetAvailableEndpointWithTopPr
 }
 
 void SLSClientManager::Init() {
-    if (mIsInitialized) {
-        return;
-    }
     InitEndpointSwitchPolicy();
     if (mDataServerSwitchPolicy == EndpointSwitchPolicy::DESIGNATED_FIRST) {
         mProbeNetworkClient.reset(new sdk::Client("",
-                                                 STRING_FLAG(default_access_key_id),
-                                                 STRING_FLAG(default_access_key),
-                                                 INT32_FLAG(sls_client_send_timeout),
-                                                 LogFileProfiler::mIpAddr,
-                                                 AppConfig::GetInstance()->GetBindInterface()));
+                                                  STRING_FLAG(default_access_key_id),
+                                                  STRING_FLAG(default_access_key),
+                                                  INT32_FLAG(sls_client_send_timeout),
+                                                  LogFileProfiler::mIpAddr,
+                                                  AppConfig::GetInstance()->GetBindInterface()));
         SLSControl::GetInstance()->SetSlsSendClientCommonParam(mProbeNetworkClient.get());
         mProbeNetworkThreadRes = async(launch::async, &SLSClientManager::ProbeNetworkThread, this);
     }
@@ -440,7 +438,7 @@ void SLSClientManager::ProbeNetworkThread() {
                 } else {
                     if (TestEndpoint(region, endpoint)) {
                         // wakeUp = true;
-                        // Sender::Instance()->OnRegionRecover(region);
+                        // Sender::GetInstance()->OnRegionRecover(region);
                         if (!endpointChanged) {
                             for (const auto& uid : uids) {
                                 ResetClientEndpoint(uid, region, curTime);
@@ -467,7 +465,7 @@ void SLSClientManager::ProbeNetworkThread() {
 
 bool SLSClientManager::TestEndpoint(const string& region, const string& endpoint) {
     // TODO: this should be removed, since control-plane status is not the same as data-plane
-    if (!Sender::Instance()->GetRegionStatus(region)) {
+    if (!FlusherSLS::GetRegionStatus(region)) {
         return false;
     }
     if (endpoint.empty()) {
@@ -616,7 +614,8 @@ SLSClientManager::EndpointStatus SLSClientManager::UpdateRealIp(const string& re
     }
     int64_t endTime = GetCurrentTimeInMicroSeconds();
     int32_t latency = int32_t((endTime - beginTime) / 1000); // ms
-    LOG_DEBUG(sLogger, ("Get real ip, region", region)("endpoint", endpoint)("status", int(status))("latency", latency));
+    LOG_DEBUG(sLogger,
+              ("Get real ip, region", region)("endpoint", endpoint)("status", int(status))("latency", latency));
     return status;
 }
 

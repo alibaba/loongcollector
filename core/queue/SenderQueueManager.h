@@ -46,7 +46,8 @@ public:
     void Feedback(QueueKey key) override { Trigger(); }
 
     bool CreateQueue(QueueKey key,
-                     std::vector<std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimiters,
+                     std::vector<std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimiters
+                     = std::vector<std::shared_ptr<ConcurrencyLimiter>>(),
                      uint32_t maxRate = 0);
     SenderQueue* GetQueue(QueueKey key);
     bool DeleteQueue(QueueKey key);
@@ -85,6 +86,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderQueueManagerUnittest;
+    friend class FlusherRunnerUnittest;
 #endif
 };
 

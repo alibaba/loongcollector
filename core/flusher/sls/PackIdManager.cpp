@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sender/PackIdManager.h"
+#include "flusher/sls/PackIdManager.h"
 
 using namespace std;
 

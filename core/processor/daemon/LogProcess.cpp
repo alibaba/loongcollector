@@ -239,6 +239,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                         string res, errorMsg;
                         if (!Serialize(group,
                                        pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond,
+                                       pipeline->GetContext().GetLogstoreName(),
                                        res,
                                        errorMsg)) {
                             LOG_WARNING(pipeline->GetContext().GetLogger(),
@@ -296,7 +297,7 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
     return NULL;
 }
 
-bool LogProcess::Serialize(const PipelineEventGroup& group, bool enableNanosecond, string& res, string& errorMsg) {
+bool LogProcess::Serialize(const PipelineEventGroup& group, bool enableNanosecond, const string& logstore, string& res, string& errorMsg) {
     sls_logs::LogGroup logGroup;
     for (const auto& e : group.GetEvents()) {
         if (e.Is<LogEvent>()) {
@@ -325,6 +326,7 @@ bool LogProcess::Serialize(const PipelineEventGroup& group, bool enableNanosecon
             logTag->set_value(tag.second.to_string());
         }
     }
+    logGroup.set_category(logstore);
     size_t size = logGroup.ByteSizeLong();
     if (static_cast<int32_t>(size) > INT32_FLAG(max_send_log_group_size)) {
         errorMsg = "log group exceeds size limit\tgroup size: " + ToString(size)

@@ -16,7 +16,7 @@
 
 #include <iostream>
 
-#include "flusher/FlusherSLS.h"
+#include "flusher/sls/FlusherSLS.h"
 #include "logger/Logger.h"
 #include "queue/SLSSenderQueueItem.h"
 
@@ -46,6 +46,7 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
             // should not happen
             return false;
         }
+        item->mEnqueTime = time(nullptr);
         mQueue[eo->index] = std::move(item);
     } else {
         for (size_t idx = 0; idx < mCapacity; ++idx, ++mWrite) {
@@ -53,6 +54,7 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
             if (mQueue[index] != nullptr) {
                 continue;
             }
+            item->mEnqueTime = time(nullptr);
             mQueue[index] = std::move(item);
             auto& newCpt = mRangeCheckpoints[index];
             newCpt->data.set_read_offset(eo->data.read_offset());
@@ -63,6 +65,7 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
             break;
         }
         if (!eo->IsComplete()) {
+            item->mEnqueTime = time(nullptr);
             mExtraBuffer.push(std::move(item));
             return true;
         }

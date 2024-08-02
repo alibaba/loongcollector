@@ -18,10 +18,6 @@
 
 #include "common/Flags.h"
 
-// TODO: remove these flags
-DECLARE_FLAG_STRING(logtail_line_count_snapshot);
-DECLARE_FLAG_STRING(logtail_integrity_snapshot);
-
 // app config
 DECLARE_FLAG_STRING(ilogtail_config);
 DECLARE_FLAG_BOOL(enable_full_drain_mode);

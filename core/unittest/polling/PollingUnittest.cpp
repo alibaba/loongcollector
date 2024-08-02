@@ -24,7 +24,6 @@
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "event/Event.h"
-#include "sender/Sender.h"
 #if defined(__linux__)
 #include <pthread.h>
 #include <unistd.h>

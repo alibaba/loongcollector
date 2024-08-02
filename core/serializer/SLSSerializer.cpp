@@ -17,7 +17,7 @@
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "compression/CompressType.h"
-#include "flusher/FlusherSLS.h"
+#include "flusher/sls/FlusherSLS.h"
 
 DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 

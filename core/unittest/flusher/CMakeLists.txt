@@ -18,5 +18,9 @@ project(flusher_unittest)
 add_executable(flusher_sls_unittest FlusherSLSUnittest.cpp)
 target_link_libraries(flusher_sls_unittest ${UT_BASE_TARGET})
 
+add_executable(pack_id_manager_unittest PackIdManagerUnittest.cpp)
+target_link_libraries(pack_id_manager_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(flusher_sls_unittest)
+gtest_discover_tests(pack_id_manager_unittest)

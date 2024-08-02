@@ -16,7 +16,6 @@
 #include "sdk/Common.h"
 #include "sdk/Client.h"
 #include "sdk/Exception.h"
-#include "sender/Sender.h"
 #include "common/CompressTools.h"
 #include "sls_control/SLSControl.h"
 

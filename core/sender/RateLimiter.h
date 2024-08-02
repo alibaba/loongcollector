@@ -30,6 +30,9 @@ public:
 
     uint32_t mMaxSendBytesPerSecond = 0;
 
+    // TODO: temporarily used, should use rate limiter instead
+    static void FlowControl(int32_t dataSize, int64_t& lastSendTime, int32_t& lastSendByte, bool isRealTime);
+
 private:
     time_t mLastSendTimeSecond = 0;
     uint32_t mLastSecondTotalBytes = 0;

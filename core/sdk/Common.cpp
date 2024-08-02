@@ -156,43 +156,6 @@ namespace sdk {
         return !iter->second.empty();
     }
 
-    time_t HttpMessage::GetServerTimeFromHeader() const {
-#define METHOD_LOG_PATTERN ("method", "GetServerTimeFromHeader")
-        // Priority: x-log-time -> Date
-        std::string errMsg;
-        try {
-            const auto iter = header.find("x-log-time");
-            if (iter != header.end()) {
-                return StringTo<time_t>(iter->second);
-            }
-        } catch (const std::exception& e) {
-            errMsg = e.what();
-        } catch (...) {
-            errMsg = "unknown";
-        }
-        if (!errMsg.empty()) {
-            LOG_ERROR(sLogger, METHOD_LOG_PATTERN("parse x-log-time error", errMsg));
-        }
-
-        const auto iter = header.find("Date");
-        if (iter == header.end()) {
-            LOG_WARNING(sLogger, METHOD_LOG_PATTERN("no Date in HTTP header", ""));
-            return 0;
-        }
-        // Date sample: Thu, 18 Feb 2021 03:09:29 GMT
-        LogtailTime ts;
-        int nanosecondLength;
-        if (Strptime(iter->second.c_str(), "%a, %d %b %Y %H:%M:%S", &ts, nanosecondLength) == NULL) {
-            LOG_ERROR(sLogger,
-                      METHOD_LOG_PATTERN("parse Date error", ErrnoToString(GetErrno()))("value", iter->second));
-            return 0;
-        }
-        time_t serverTime = ts.tv_sec;
-        static auto sOffset = GetLocalTimeZoneOffsetSecond();
-        return serverTime + sOffset;
-#undef METHOD_LOG_PATTERN
-    }
-
     static unsigned char ToHex(unsigned char x) {
         return x > 9 ? x + 55 : x + 48;
     }
@@ -914,13 +877,6 @@ namespace sdk {
         in.add((uint8_t*)ipad, sizeof(ipad));
         out.add((uint8_t*)opad, sizeof(opad));
     }
-
-
-    void Response::ParseSuccess(const HttpMessage& message) {
-        statusCode = 200;
-        requestId = message.RequestID();
-    }
-
 
 } // namespace sdk
 } // namespace logtail

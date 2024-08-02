@@ -17,7 +17,6 @@
 #pragma once
 #include <string>
 #include <map>
-#include "Closure.h"
 #include "Common.h"
 #include "rapidjson/document.h"
 

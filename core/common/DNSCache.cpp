@@ -23,8 +23,6 @@
 #endif
 
 namespace logtail {
-namespace sdk {
-
     // ParseHost only supports IPv4 now.
     bool DnsCache::ParseHost(const char* host, std::string& ip) {
 #if defined(__linux__)
@@ -106,5 +104,4 @@ namespace sdk {
 #endif
     }
 
-} // namespace sdk
 } // namespace logtail
