@@ -395,4 +395,14 @@ bool ParseLogTimeZoneOffsetSecond(const std::string& logTZ, int& logTimeZoneOffs
     return true;
 }
 
+std::string NumberToDigitString(uint32_t number, uint8_t length) {
+    std::ostringstream oss;
+    oss << std::setw(length) << std::setfill('0') << number;
+    std::string result = oss.str();
+    if (result.length() > length) {
+        result = result.substr(result.length() - length, length);
+    }
+    return result;
+}
+
 } // namespace logtail

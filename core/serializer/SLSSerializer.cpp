@@ -16,14 +16,26 @@
 
 #include "application/Application.h"
 #include "common/Flags.h"
+#include "common/TimeUtil.h"
 #include "compression/CompressType.h"
 #include "flusher/sls/FlusherSLS.h"
 
+
 DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
+
+const std::string METRIC_RESERVED_KEY_NAME = "__name__";
+const std::string METRIC_RESERVED_KEY_LABELS  = "__labels__";
+const std::string METRIC_RESERVED_KEY_VALUE = "__value__";
+const std::string METRIC_RESERVED_KEY_TIME_NANO = "__time_nano__";
+
+const std::string METRIC_LABELS_SEPARATOR = "|";
+const std::string METRIC_LABELS_KEY_VALUE_SEPARATOR = "#$#";
 
 using namespace std;
 
 namespace logtail {
+
+
 
 bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
     sls_logs::LogGroup logGroup;
@@ -41,6 +53,46 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 && logEvent.GetTimestampNanosecond()) {
                 log->set_time_ns(logEvent.GetTimestampNanosecond().value());
             }
+        } else if (e.Is<MetricEvent>()) {
+            const auto& metricEvent = e.Cast<MetricEvent>();
+            if (metricEvent.Is<std::monostate>()) {
+                 continue;
+            }
+            auto log = logGroup.add_logs();
+            std::ostringstream oss;
+            // set __labels__
+            bool hasPrev = false;
+            for (auto it = metricEvent.TagsBegin(); it != metricEvent.TagsEnd(); ++it) {
+                if (hasPrev) {
+                    oss << METRIC_LABELS_SEPARATOR;
+                }
+                hasPrev = true;
+                oss << it->first << METRIC_LABELS_KEY_VALUE_SEPARATOR << it->second;
+            }
+            auto logPtr = log->add_contents();
+            logPtr->set_key(METRIC_RESERVED_KEY_LABELS);
+            logPtr->set_value(oss.str());
+            // set time, no need to set nanosecond for metric
+            log->set_time(metricEvent.GetTimestamp());
+            // set __time_nano__
+            logPtr = log->add_contents();
+            logPtr->set_key(METRIC_RESERVED_KEY_TIME_NANO);
+            if (metricEvent.GetTimestampNanosecond()) {
+                logPtr->set_value(std::to_string(metricEvent.GetTimestamp()) + NumberToDigitString(metricEvent.GetTimestampNanosecond().value(), 9));   
+            } else {
+                logPtr->set_value(std::to_string(metricEvent.GetTimestamp()));   
+            }
+            // set __value__
+            if (metricEvent.Is<UntypedSingleValue>()) {
+                double value = metricEvent.GetValue<UntypedSingleValue>()->mValue;
+                logPtr = log->add_contents();
+                logPtr->set_key(METRIC_RESERVED_KEY_VALUE);
+                logPtr->set_value(std::to_string(value));
+            } 
+            // set __name__
+            logPtr = log->add_contents();
+            logPtr->set_key(METRIC_RESERVED_KEY_NAME);
+            logPtr->set_value(metricEvent.GetName().to_string());
         } else {
             errorMsg = "unsupported event type in event group";
             return false;
