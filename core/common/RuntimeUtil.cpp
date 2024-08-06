@@ -29,12 +29,17 @@
 #include "LogtailCommonFlags.h"
 #include "FileSystemUtil.h"
 
+DECLARE_FLAG_STRING(logtail_sys_conf_dir);
+
 namespace logtail {
 
 // TODO: In ConfigManager.cpp, some places use / to concat path, which might fail on Windows,
 // replace them with PATH_SEPARATOR.
 std::string GetProcessExecutionDir(void) {
-#if defined(__linux__)
+#if defined(__ANDROID__)
+    // In Android, runtime configuration files cannot be stored in the same directory as the executable
+    return STRING_FLAG(logtail_sys_conf_dir);
+#elif defined(__linux__)
     char exePath[PATH_MAX + 1] = "";
     readlink("/proc/self/exe", exePath, sizeof(exePath));
     std::string fullPath(exePath);

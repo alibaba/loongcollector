@@ -149,7 +149,9 @@ int main(int argc, char** argv) {
     gflags::SetUsageMessage(
         std::string("The Lightweight Collector of SLS in Alibaba Cloud\nUsage: ./ilogtail [OPTION]"));
     gflags::SetVersionString(std::string(ILOGTAIL_VERSION) + " Community Edition");
-    google::ParseCommandLineFlags(&argc, &argv, true);
+    if (argc != 0) {
+        google::ParseCommandLineFlags(&argc, &argv, true);
+    }
 
     if (setenv("TCMALLOC_RELEASE_RATE", "10.0", 1) == -1) {
         exit(3);
