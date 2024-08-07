@@ -19,6 +19,8 @@
 
 #include <string>
 #include <vector>
+
+#include "models/LogEvent.h"
 #include "models/StringView.h"
 
 /*
@@ -58,17 +60,39 @@ public:
 
 public:
     static bool HandleSeparator(char ch, DelimiterModeFsm& fsm, std::vector<std::string>& columnValues);
-    static bool HandleSeparator(const char* ch, int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, std::vector<StringView>& columnValues);
+    static bool HandleSeparator(const char* ch,
+                                const char quote,
+                                int& fieldStart,
+                                int& fieldEnd,
+                                DelimiterModeFsm& fsm,
+                                std::vector<StringView>& columnValues,
+                                int& doubleQuoteNum,
+                                LogEvent& event);
+    static void AddFieldWithUnQuote(const char* ch,
+                                    const char quote,
+                                    int& fieldStart,
+                                    int& fieldEnd,
+                                    std::vector<StringView>& columnValues,
+                                    int& doubleQuoteNum,
+                                    LogEvent& event);
     static bool HandleQuote(char ch, DelimiterModeFsm& fsm);
-    static bool HandleQuote(int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm);
+    static bool HandleQuote(int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, int& doubleQuoteNum);
     static bool HandleData(char ch, DelimiterModeFsm& fsm);
     static bool HandleData(int& fieldEnd, DelimiterModeFsm& fsm);
     static bool HandleEOF(DelimiterModeFsm& fsm, std::vector<std::string>& columnValues);
-    static bool HandleEOF(const char* ch, int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, std::vector<StringView>& columnValues);
+    static bool HandleEOF(const char* ch,
+                          const char quote,
+                          int& fieldStart,
+                          int& fieldEnd,
+                          DelimiterModeFsm& fsm,
+                          std::vector<StringView>& columnValues,
+                          int& doubleQuoteNum,
+                          LogEvent& event);
 
 public:
     bool ParseDelimiterLine(const char* buffer, int begin, int end, std::vector<std::string>& columnValues);
-    bool ParseDelimiterLine(StringView buffer, int begin, int end, std::vector<StringView>& columnValues);
+    bool
+    ParseDelimiterLine(StringView buffer, int begin, int end, std::vector<StringView>& columnValues, LogEvent& event);
 
 private:
     const char quote;

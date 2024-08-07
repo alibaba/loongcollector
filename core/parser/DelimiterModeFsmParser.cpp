@@ -46,10 +46,17 @@ bool DelimiterModeFsmParser::HandleSeparator(char ch, DelimiterModeFsm& fsm, std
     }
 }
 
-bool DelimiterModeFsmParser::HandleSeparator(const char* ch, int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, std::vector<StringView>& columnValues) {
+bool DelimiterModeFsmParser::HandleSeparator(const char* ch,
+                                             const char quote,
+                                             int& fieldStart,
+                                             int& fieldEnd,
+                                             DelimiterModeFsm& fsm,
+                                             std::vector<StringView>& columnValues,
+                                             int& doubleQuoteNum,
+                                             LogEvent& event) {
     switch (fsm.currentState) {
         case STATE_INITIAL:
-            columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+            AddFieldWithUnQuote(ch, quote, fieldStart, fieldEnd, columnValues, doubleQuoteNum, event);
             fieldStart = ++fieldEnd;
             return true;
         case STATE_QUOTE:
@@ -57,12 +64,13 @@ bool DelimiterModeFsmParser::HandleSeparator(const char* ch, int& fieldStart, in
             return true;
         case STATE_DATA:
             fsm.currentState = STATE_INITIAL;
-            columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+            AddFieldWithUnQuote(ch, quote, fieldStart, fieldEnd, columnValues, doubleQuoteNum, event);
             fieldStart = ++fieldEnd;
             return true;
         case STATE_DOUBLE_QUOTE:
             fsm.currentState = STATE_INITIAL;
-            columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+            doubleQuoteNum--;
+            AddFieldWithUnQuote(ch, quote, fieldStart, fieldEnd, columnValues, doubleQuoteNum, event);
             // Skip the quote
             fieldEnd += 2;
             fieldStart = fieldEnd;
@@ -70,6 +78,38 @@ bool DelimiterModeFsmParser::HandleSeparator(const char* ch, int& fieldStart, in
         default:
             return false;
     }
+}
+
+void DelimiterModeFsmParser::AddFieldWithUnQuote(const char* ch,
+                                                 const char quote,
+                                                 int& fieldStart,
+                                                 int& fieldEnd,
+                                                 std::vector<StringView>& columnValues,
+                                                 int& doubleQuoteNum,
+                                                 LogEvent& event) {
+    if (doubleQuoteNum == 0) {
+        columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+        return;
+    }
+    StringBuffer sb = event.GetSourceBuffer()->AllocateStringBuffer(fieldEnd - fieldStart - doubleQuoteNum);
+    char* field = sb.data;
+    int j = 0;
+    for (int i = fieldStart; i < fieldEnd; ++i) {
+        if (ch[i] == quote) {
+            if (i + 1 < fieldEnd && ch[i + 1] == quote) {
+                field[j] = quote;
+                ++i;
+                ++j;
+                continue;
+            }
+        } else {
+            field[j] = ch[i];
+            ++j;
+        }
+    }
+
+    columnValues.emplace_back(field, fieldEnd - fieldStart - doubleQuoteNum);
+    doubleQuoteNum = 0;
 }
 
 bool DelimiterModeFsmParser::HandleQuote(char ch, DelimiterModeFsm& fsm) {
@@ -91,7 +131,7 @@ bool DelimiterModeFsmParser::HandleQuote(char ch, DelimiterModeFsm& fsm) {
     }
 }
 
-bool DelimiterModeFsmParser::HandleQuote(int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm) {
+bool DelimiterModeFsmParser::HandleQuote(int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, int& doubleQuoteNum) {
     switch (fsm.currentState) {
         case STATE_INITIAL:
             fsm.currentState = STATE_QUOTE;
@@ -99,12 +139,14 @@ bool DelimiterModeFsmParser::HandleQuote(int& fieldStart, int& fieldEnd, Delimit
             return true;
         case STATE_QUOTE:
             fsm.currentState = STATE_DOUBLE_QUOTE;
+            doubleQuoteNum++;
             fieldEnd++;
             return true;
         case STATE_DATA:
             return false;
         case STATE_DOUBLE_QUOTE:
             fsm.currentState = STATE_QUOTE;
+            fieldEnd++;
             return true;
         default:
             return false;
@@ -156,12 +198,19 @@ bool DelimiterModeFsmParser::HandleEOF(DelimiterModeFsm& fsm, std::vector<std::s
     }
 }
 
-bool DelimiterModeFsmParser::HandleEOF(const char* ch, int& fieldStart, int& fieldEnd, DelimiterModeFsm& fsm, std::vector<StringView>& columnValues) {
+bool DelimiterModeFsmParser::HandleEOF(const char* ch,
+                                       const char quote,
+                                       int& fieldStart,
+                                       int& fieldEnd,
+                                       DelimiterModeFsm& fsm,
+                                       std::vector<StringView>& columnValues,
+                                       int& doubleQuoteNum,
+                                       LogEvent& event) {
     switch (fsm.currentState) {
         case STATE_INITIAL:
         case STATE_DATA:
         case STATE_DOUBLE_QUOTE:
-            columnValues.emplace_back(ch + fieldStart, fieldEnd - fieldStart);
+            AddFieldWithUnQuote(ch, quote, fieldStart, fieldEnd, columnValues, doubleQuoteNum, event);
             fieldStart = ++fieldEnd;
             return true;
         case STATE_QUOTE:
@@ -205,13 +254,13 @@ bool DelimiterModeFsmParser::ParseDelimiterLine(const char* buffer,
     return result;
 }
 
-bool DelimiterModeFsmParser::ParseDelimiterLine(StringView buffer,
-                                                int begin,
-                                                int end,
-                                                std::vector<StringView>& columnValues) {
+bool DelimiterModeFsmParser::ParseDelimiterLine(
+    StringView buffer, int begin, int end, std::vector<StringView>& columnValues, LogEvent& event) {
     bool result = true;
     DelimiterModeFsm fsm(STATE_INITIAL, "");
 
+    // when there is a double quote, we need to allocate a new buffer to store the unquoted field
+    int doubleQuoteNum = 0;
     // here we won't check whether element in buffer is '\0',
     // because we consider that all element in this buffer is valid,
     // despite some '\0' elements which are brought from file system due to system crash
@@ -220,9 +269,9 @@ bool DelimiterModeFsmParser::ParseDelimiterLine(StringView buffer,
     int fieldEnd = begin;
     for (int i = begin; i < end; ++i) {
         if (ch[i] == separator) {
-            result = HandleSeparator(ch, fieldStart, fieldEnd, fsm, columnValues);
+            result = HandleSeparator(ch, quote, fieldStart, fieldEnd, fsm, columnValues, doubleQuoteNum, event);
         } else if (ch[i] == quote) {
-            result = HandleQuote(fieldStart, fieldEnd, fsm);
+            result = HandleQuote(fieldStart, fieldEnd, fsm, doubleQuoteNum);
         } else // data
         {
             result = HandleData(fieldEnd, fsm);
@@ -234,7 +283,7 @@ bool DelimiterModeFsmParser::ParseDelimiterLine(StringView buffer,
         }
     }
 
-    result = HandleEOF(ch, fieldStart, fieldEnd, fsm, columnValues);
+    result = HandleEOF(ch, quote, fieldStart, fieldEnd, fsm, columnValues, doubleQuoteNum, event);
     // clear all columns if failed to parse
     if (!result) {
         columnValues.clear();

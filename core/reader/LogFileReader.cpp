@@ -598,131 +598,6 @@ void LogFileReader::SetReadFromBeginning() {
     mFirstWatched = false;
 }
 
-int32_t LogFileReader::ParseTimeInBuffer(LogFileOperator& op,
-                                         int64_t begin,
-                                         int64_t end,
-                                         int32_t bootTime,
-                                         const std::string& timeFormat,
-                                         int64_t& filePos,
-                                         bool& found) {
-    if (begin >= end)
-        return -1;
-
-    if (!op.IsOpen()) {
-        return -1;
-    }
-
-    // we should fix begin and end
-    int64_t mid = (begin + end) / 2;
-    begin = std::max(begin, (int64_t)(mid - BUFFER_SIZE));
-    end = std::min((int64_t)(mid + BUFFER_SIZE), end);
-    size_t size = (size_t)(end - begin) + 1;
-
-    char* buffer = new char[size]();
-    size_t nbytes = ReadFile(op, buffer, size, begin);
-
-    // find start pos and end pos, searching for '\n'
-    int lineBegin = 0, lineEnd = (int)nbytes - 1;
-    // if begin is 0, we should not find \n from begin
-    while (begin != 0 && lineBegin < (int)nbytes - 1) {
-        if (buffer[lineBegin++] == '\n')
-            break;
-    }
-    while (lineEnd > 0) {
-        if (buffer[lineEnd] == '\n')
-            break;
-        --lineEnd;
-    }
-
-    if (lineBegin > lineEnd) {
-        delete[] buffer;
-        return -1;
-    }
-
-    // now lineBegin is the beginning of first whole line
-    // and lineEnd is the end of last whole, specially, buffer[lineEnd] is \n
-    // so sz is the size of whole lines
-    size_t sz = (size_t)(lineEnd - lineBegin) + 1;
-    int32_t parsedTime = -1, pos = -1;
-    int result = ParseAllLines(buffer + lineBegin, sz, bootTime, timeFormat, parsedTime, pos);
-
-    if (result == 1)
-        filePos = begin + lineBegin + pos;
-    else if (result == 2)
-        filePos = begin + lineEnd + 1;
-    else {
-        if (result == 0) {
-            found = true;
-            filePos = begin + lineBegin + pos;
-        }
-        // if result == -1, parsedTime is -1
-    }
-
-    delete[] buffer;
-    return parsedTime;
-}
-
-int LogFileReader::ParseAllLines(
-    char* buffer, size_t size, int32_t bootTime, const std::string& timeFormat, int32_t& parsedTime, int& pos) {
-    std::vector<int> lineFeedPos;
-    int begin = 0;
-    // here we push back 0 because the pos 0 must be the beginning of the first line
-    lineFeedPos.push_back(begin);
-
-    // data in buffer is between [0, size)
-    for (int i = 1; i < (int)size; ++i) {
-        if (buffer[i] == '\n') {
-            buffer[i] = '\0';
-            begin = i + 1;
-            // if begin == size, we meet the end of all lines buffer
-            if (begin < (int)size)
-                lineFeedPos.push_back(begin);
-        }
-    }
-
-    // parse first and last line
-    size_t firstLogIndex = 0, lastLogIndex = lineFeedPos.size() - 1;
-    int32_t firstLogTime = -1, lastLogTime = -1;
-    for (size_t i = 0; i < lineFeedPos.size(); ++i) {
-        firstLogTime = ParseTime(buffer + lineFeedPos[i], timeFormat);
-        if (firstLogTime != -1) {
-            firstLogIndex = i;
-            break;
-        }
-    }
-    if (firstLogTime >= bootTime) {
-        parsedTime = firstLogTime;
-        pos = lineFeedPos[firstLogIndex];
-        return 1;
-    }
-
-    for (int i = (int)lineFeedPos.size() - 1; i >= 0; --i) {
-        lastLogTime = ParseTime(buffer + lineFeedPos[i], timeFormat);
-        if (lastLogTime != -1) {
-            lastLogIndex = (size_t)i;
-            break;
-        }
-    }
-    if (lastLogTime < bootTime) {
-        parsedTime = lastLogTime;
-        pos = lineFeedPos[lastLogIndex];
-        return 2;
-    }
-
-    // parse all lines, now fisrtLogTime < bootTime, lastLogTime >= booTime
-    for (size_t i = firstLogIndex + 1; i < lastLogIndex; ++i) {
-        parsedTime = ParseTime(buffer + lineFeedPos[i], timeFormat);
-        if (parsedTime >= bootTime) {
-            pos = lineFeedPos[i];
-            return 0;
-        }
-    }
-
-    parsedTime = lastLogTime;
-    pos = lineFeedPos[lastLogIndex];
-    return 0;
-}
-
 int32_t LogFileReader::ParseTime(const char* buffer, const std::string& timeFormat) {
     struct tm tm;
     memset(&tm, 0, sizeof(tm));
@@ -1058,15 +933,6 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
         // If flush timeout event, we should filter whether the event is legacy.
         if (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
             && event->GetInode() == mDevInode.inode) {
-            // For the scenario: log rotation, the last line needs to be read by timeout, which is a normal situation.
-            // So here only local warning is given, don't raise alarm.
-            LOG_WARNING(sLogger,
-                        ("read log", "timeout")("project", GetProject())("logstore", GetLogstore())(
-                            "config", GetConfigName())("log reader queue name", mHostLogPath)("log path", mRealLogPath)(
-                            "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
-                            "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
-                            "last file position", mLastFilePos)("last file size", mLastFileSize)(
-                            "read size", mLastFilePos - lastFilePos)("log", logBuffer.rawBuffer));
             tryRollback = false;
         } else {
             return false;
@@ -1081,6 +947,17 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
             }
             logBuffer.exactlyOnceCheckpoint = mEOOption->selectedCheckpoint;
         }
+    }
+    if (!tryRollback && !moreData) {
+        // For the scenario: log rotation, the last line needs to be read by timeout, which is a normal situation.
+        // So here only local warning is given, don't raise alarm.
+        LOG_WARNING(sLogger,
+                    ("read log timeout", "force read")("project", GetProject())("logstore", GetLogstore())(
+                        "config", GetConfigName())("log reader queue name", mHostLogPath)("log path", mRealLogPath)(
+                        "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
+                        "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
+                        "last file position", mLastFilePos)("last file size", mLastFileSize)(
+                        "read size", mLastFilePos - lastFilePos)("log", logBuffer.rawBuffer));
     }
     LOG_DEBUG(sLogger,
               ("read log file", mRealLogPath)("last file pos", mLastFilePos)("last file size", mLastFileSize)(
