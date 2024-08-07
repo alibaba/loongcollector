@@ -21,7 +21,7 @@ project(config_unittest)
 # add_executable(config_updator_unittest ConfigUpdatorUnittest.cpp)
 # target_link_libraries(config_updator_unittest ${UT_BASE_TARGET})
 
-add_executable(config_unittest ConfigUnittest.cpp)
+add_executable(config_unittest PipelineConfigUnittest.cpp)
 target_link_libraries(config_unittest ${UT_BASE_TARGET})
 
 add_executable(config_watcher_unittest ConfigWatcherUnittest.cpp)

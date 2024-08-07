@@ -541,7 +541,7 @@ bool PipelineConfig::Parse() {
     if (mHasGoFlusher && nativeFlusherCnt > 1) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,
-                           "more than 1 native flusehr plugins coexist with extended flusher plugins",
+                           "more than 1 native flusher plugins coexist with extended flusher plugins",
                            noModule,
                            mName,
                            mProject,
@@ -557,6 +557,26 @@ bool PipelineConfig::Parse() {
                            mProject,
                            mLogstore,
                            mRegion);
+    }
+
+    key = "Match";
+    for (size_t i = 0; i < mFlushers.size(); ++i) {
+        auto itr = mFlushers[i]->find(key.c_str(), key.c_str() + key.size());
+        if (itr) {
+            if (IsFlushingThroughGoPipelineExisted()) {
+                PARAM_ERROR_RETURN(sLogger,
+                                   alarm,
+                                   "route found in non-native flushing mode",
+                                   noModule,
+                                   mName,
+                                   mProject,
+                                   mLogstore,
+                                   mRegion);
+            }
+            mRouter.emplace_back(i, itr);
+        } else {
+            mRouter.emplace_back(i, nullptr);
+        }
     }
 
     key = "aggregators";

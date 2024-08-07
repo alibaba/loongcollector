@@ -238,6 +238,49 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL(goPipelineWithoutInput.toStyledString(), pipeline->mGoPipelineWithoutInput.toStyledString());
     goPipelineWithInput.clear();
     goPipelineWithoutInput.clear();
+
+    // router
+    configStr = R"(
+        {
+            "createTime": 123456789,
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore_1",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                },
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore_2",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "Match": {
+                        "Type": "event_type",
+                        "Value": "log"
+                    }
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new PipelineConfig(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+    APSARA_TEST_EQUAL(1U, pipeline->mRouter.mConditions.size());
+    APSARA_TEST_EQUAL(1U, pipeline->mRouter.mAlwaysMatchedFlusherIdx.size());
 }
 
 void PipelineUnittest::OnFailedInit() const {
@@ -322,6 +365,37 @@ void PipelineUnittest::OnFailedInit() const {
             "flushers": [
                 {
                     "Type": "flusher_sls"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new PipelineConfig(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_FALSE(pipeline->Init(std::move(*config)));
+
+    // invalid router
+    configStr = R"(
+        {
+            "createTime": 123456789,
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore_1",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "Match": "unknown"
                 }
             ]
         }
@@ -2688,7 +2762,7 @@ void PipelineUnittest::TestProcess() const {
 
 void PipelineUnittest::TestSend() const {
     {
-        // flush to all native flushers
+        // no route
         Pipeline pipeline;
         PipelineContext ctx;
         uint32_t pluginIdx = 0;
@@ -2703,6 +2777,10 @@ void PipelineUnittest::TestSend() const {
             flusher->Init(Json::Value(), ctx, tmp);
             pipeline.mFlushers.emplace_back(std::move(flusher));
         }
+        vector<pair<size_t, const Json::Value*>> configs;
+        configs.emplace_back(0, nullptr);
+        configs.emplace_back(1, nullptr);
+        pipeline.mRouter.Init(configs, ctx);
         {
             // all valid
             vector<PipelineEventGroup> group;
@@ -2716,6 +2794,60 @@ void PipelineUnittest::TestSend() const {
             vector<PipelineEventGroup> group;
             group.emplace_back(make_shared<SourceBuffer>());
             APSARA_TEST_FALSE(pipeline.Send(std::move(group)));
+            const_cast<FlusherMock*>(static_cast<const FlusherMock*>(pipeline.mFlushers[0]->GetPlugin()))->mIsValid
+                = true;
+        }
+    }
+    {
+        // with route
+        Pipeline pipeline;
+        PipelineContext ctx;
+        uint32_t pluginIdx = 0;
+        Json::Value tmp;
+        {
+            auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+            flusher->Init(Json::Value(), ctx, tmp);
+            pipeline.mFlushers.emplace_back(std::move(flusher));
+        }
+        {
+            auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+            flusher->Init(Json::Value(), ctx, tmp);
+            pipeline.mFlushers.emplace_back(std::move(flusher));
+        }
+
+        Json::Value configJson;
+        string errorMsg;
+        string configStr = R"(
+            [
+                {
+                    "Type": "event_type",
+                    "Value": "log"
+                }
+            ]
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        vector<pair<size_t, const Json::Value*>> configs;
+        for (Json::Value::ArrayIndex i = 0; i < configJson.size(); ++i) {
+            configs.emplace_back(i, &configJson[i]);
+        }
+        configs.emplace_back(configJson.size(), nullptr);
+        pipeline.mRouter.Init(configs, ctx);
+
+        {
+            vector<PipelineEventGroup> group;
+            group.emplace_back(make_shared<SourceBuffer>());
+            group[0].AddLogEvent();
+            APSARA_TEST_TRUE(pipeline.Send(std::move(group)));
+        }
+        {
+            const_cast<FlusherMock*>(static_cast<const FlusherMock*>(pipeline.mFlushers[0]->GetPlugin()))->mIsValid
+                = false;
+            vector<PipelineEventGroup> group;
+            group.emplace_back(make_shared<SourceBuffer>());
+            group[0].AddMetricEvent();
+            APSARA_TEST_TRUE(pipeline.Send(std::move(group)));
+            const_cast<FlusherMock*>(static_cast<const FlusherMock*>(pipeline.mFlushers[0]->GetPlugin()))->mIsValid
+                = true;
         }
     }
 }

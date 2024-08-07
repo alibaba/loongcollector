@@ -19,6 +19,7 @@
 |  Logstore  |  stirng  |  是  |  /  |  LogStrore名称。  |
 |  Region  |  string  |  是  |  /  |  Project所在区域。  |
 |  Endpoint  |  string  |  是  |  /  |  [SLS接入点地址](https://help.aliyun.com/document\_detail/29008.html)。  |
+|  Match  |  map  |  否  |  /  |  发送路由，当pipeline event group的属性满足指定的条件时，该group才会发送到当前flusher。如果该字段为空，则表示所有group均会发送到当前flusher。具体参数详见[路由](router.md)。  |
 
 ## 安全性说明
 

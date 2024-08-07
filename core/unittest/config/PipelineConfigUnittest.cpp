@@ -26,7 +26,7 @@ using namespace std;
 
 namespace logtail {
 
-class ConfigUnittest : public testing::Test {
+class PipelineConfigUnittest : public testing::Test {
 public:
     void HandleValidConfig() const;
     void HandleInvalidCreateTime() const;
@@ -46,7 +46,7 @@ private:
     const string configName = "test";
 };
 
-void ConfigUnittest::HandleValidConfig() const {
+void PipelineConfigUnittest::HandleValidConfig() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
     unique_ptr<PipelineConfig> config;
@@ -118,7 +118,11 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_sls"
+                    "Type": "flusher_sls",
+                    "Match": {
+                        "Type": "event_type",
+                        "Value": "log"
+                    }
                 }
             ]
         }
@@ -130,6 +134,7 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_EQUAL(1U, config->mInputs.size());
     APSARA_TEST_EQUAL(1U, config->mProcessors.size());
     APSARA_TEST_EQUAL(1U, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mRouter.size());
     APSARA_TEST_FALSE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_FALSE(config->IsFlushingThroughGoPipelineExisted());
     // APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -399,7 +404,11 @@ void ConfigUnittest::HandleValidConfig() const {
             ],
             "flushers": [
                 {
-                    "Type": "flusher_sls"
+                    "Type": "flusher_sls",
+                    "Match": {
+                        "Type": "event_type",
+                        "Value": "log"
+                    }
                 }
             ]
         }
@@ -411,6 +420,7 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_EQUAL(1U, config->mInputs.size());
     APSARA_TEST_EQUAL(0U, config->mProcessors.size());
     APSARA_TEST_EQUAL(1U, config->mFlushers.size());
+    APSARA_TEST_EQUAL(1U, config->mRouter.size());
     APSARA_TEST_FALSE(config->ShouldNativeFlusherConnectedByGoPipeline());
     APSARA_TEST_FALSE(config->IsFlushingThroughGoPipelineExisted());
     // APSARA_TEST_TRUE(config->IsProcessRunnerInvolved());
@@ -1264,7 +1274,7 @@ void ConfigUnittest::HandleValidConfig() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
-void ConfigUnittest::HandleInvalidCreateTime() const {
+void PipelineConfigUnittest::HandleInvalidCreateTime() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
     unique_ptr<PipelineConfig> config;
@@ -1291,7 +1301,7 @@ void ConfigUnittest::HandleInvalidCreateTime() const {
     APSARA_TEST_EQUAL(0U, config->mCreateTime);
 }
 
-void ConfigUnittest::HandleInvalidGlobal() const {
+void PipelineConfigUnittest::HandleInvalidGlobal() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
     unique_ptr<PipelineConfig> config;
@@ -1308,7 +1318,7 @@ void ConfigUnittest::HandleInvalidGlobal() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
-void ConfigUnittest::HandleInvalidInputs() const {
+void PipelineConfigUnittest::HandleInvalidInputs() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
     unique_ptr<PipelineConfig> config;
@@ -1551,7 +1561,7 @@ void ConfigUnittest::HandleInvalidInputs() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
-void ConfigUnittest::HandleInvalidProcessors() const {
+void PipelineConfigUnittest::HandleInvalidProcessors() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
     unique_ptr<PipelineConfig> config;
@@ -1800,7 +1810,7 @@ void ConfigUnittest::HandleInvalidProcessors() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
-void ConfigUnittest::HandleInvalidAggregators() const {
+void PipelineConfigUnittest::HandleInvalidAggregators() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
     unique_ptr<PipelineConfig> config;
@@ -1978,7 +1988,7 @@ void ConfigUnittest::HandleInvalidAggregators() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
-void ConfigUnittest::HandleInvalidFlushers() const {
+void PipelineConfigUnittest::HandleInvalidFlushers() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
     unique_ptr<PipelineConfig> config;
@@ -2109,7 +2119,7 @@ void ConfigUnittest::HandleInvalidFlushers() const {
     APSARA_TEST_TRUE(config->Parse());
 }
 
-void ConfigUnittest::HandleInvalidExtensions() const {
+void PipelineConfigUnittest::HandleInvalidExtensions() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
     unique_ptr<PipelineConfig> config;
@@ -2259,7 +2269,7 @@ void ConfigUnittest::HandleInvalidExtensions() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
-void ConfigUnittest::TestReplaceEnvVarRef() const {
+void PipelineConfigUnittest::TestReplaceEnvVarRef() const {
 #if defined(__linux__)
     setenv("__path4ut", "_home/$work", 1);
     setenv("__file4ut", "!transaction/~un-do.log", 1);
@@ -2306,15 +2316,15 @@ void ConfigUnittest::TestReplaceEnvVarRef() const {
     APSARA_TEST_TRUE(*config->mDetail == resJson);
 }
 
-UNIT_TEST_CASE(ConfigUnittest, HandleValidConfig)
-UNIT_TEST_CASE(ConfigUnittest, HandleInvalidCreateTime)
-UNIT_TEST_CASE(ConfigUnittest, HandleInvalidGlobal)
-UNIT_TEST_CASE(ConfigUnittest, HandleInvalidInputs)
-UNIT_TEST_CASE(ConfigUnittest, HandleInvalidProcessors)
-UNIT_TEST_CASE(ConfigUnittest, HandleInvalidAggregators)
-UNIT_TEST_CASE(ConfigUnittest, HandleInvalidFlushers)
-UNIT_TEST_CASE(ConfigUnittest, HandleInvalidExtensions)
-UNIT_TEST_CASE(ConfigUnittest, TestReplaceEnvVarRef)
+UNIT_TEST_CASE(PipelineConfigUnittest, HandleValidConfig)
+UNIT_TEST_CASE(PipelineConfigUnittest, HandleInvalidCreateTime)
+UNIT_TEST_CASE(PipelineConfigUnittest, HandleInvalidGlobal)
+UNIT_TEST_CASE(PipelineConfigUnittest, HandleInvalidInputs)
+UNIT_TEST_CASE(PipelineConfigUnittest, HandleInvalidProcessors)
+UNIT_TEST_CASE(PipelineConfigUnittest, HandleInvalidAggregators)
+UNIT_TEST_CASE(PipelineConfigUnittest, HandleInvalidFlushers)
+UNIT_TEST_CASE(PipelineConfigUnittest, HandleInvalidExtensions)
+UNIT_TEST_CASE(PipelineConfigUnittest, TestReplaceEnvVarRef)
 
 } // namespace logtail
 

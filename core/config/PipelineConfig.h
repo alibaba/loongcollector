@@ -37,6 +37,7 @@ struct PipelineConfig {
     std::vector<const Json::Value*> mAggregators;
     std::vector<const Json::Value*> mFlushers;
     std::vector<const Json::Value*> mExtensions;
+    std::vector<std::pair<size_t, const Json::Value*>> mRouter;
     bool mHasNativeInput = false;
     bool mHasGoInput = false;
     bool mHasNativeProcessor = false;

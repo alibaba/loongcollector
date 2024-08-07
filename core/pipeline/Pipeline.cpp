@@ -157,6 +157,11 @@ bool Pipeline::Init(PipelineConfig&& config) {
         ++mPluginCntMap["flushers"][name];
     }
 
+    // route is only enabled in native flushing mode, thus the index in config is the same as that in mFlushers
+    if (!mRouter.Init(config.mRouter, mContext)) {
+        return false;
+    }
+
     for (auto detail : config.mExtensions) {
         if (!mGoPipelineWithInput.isNull()) {
             AddPluginToGoPipeline(*detail, "extensions", mGoPipelineWithInput);
@@ -292,12 +297,19 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
 bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
     bool allSucceeded = true;
     for (auto& group : groupList) {
-        // TODO: support route
-        for (size_t i = 0; i < mFlushers.size(); ++i) {
-            if (i + 1 != mFlushers.size()) {
-                allSucceeded = mFlushers[i]->Send(group.Copy()) && allSucceeded;
+        auto flusherIdx = mRouter.Route(group);
+        for (size_t i = 0; i < flusherIdx.size(); ++i) {
+            if (flusherIdx[i] >= mFlushers.size()) {
+                LOG_ERROR(
+                    sLogger,
+                    ("unexpected error", "invalid flusher index")("flusher index", flusherIdx[i])("config", mName));
+                allSucceeded = false;
+                continue;
+            }
+            if (i + 1 != flusherIdx.size()) {
+                allSucceeded = mFlushers[flusherIdx[i]]->Send(group.Copy()) && allSucceeded;
             } else {
-                allSucceeded = mFlushers[i]->Send(std::move(group)) && allSucceeded;
+                allSucceeded = mFlushers[flusherIdx[i]]->Send(std::move(group)) && allSucceeded;
             }
         }
     }

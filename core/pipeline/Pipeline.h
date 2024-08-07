@@ -31,6 +31,7 @@
 #include "plugin/instance/FlusherInstance.h"
 #include "plugin/instance/InputInstance.h"
 #include "plugin/instance/ProcessorInstance.h"
+#include "route/Router.h"
 
 namespace logtail {
 
@@ -68,6 +69,7 @@ private:
     std::vector<std::unique_ptr<InputInstance>> mInputs;
     std::vector<std::unique_ptr<ProcessorInstance>> mProcessorLine;
     std::vector<std::unique_ptr<FlusherInstance>> mFlushers;
+    Router mRouter;
     Json::Value mGoPipelineWithInput;
     Json::Value mGoPipelineWithoutInput;
     mutable PipelineContext mContext;
