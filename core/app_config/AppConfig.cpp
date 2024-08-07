@@ -1028,24 +1028,38 @@ void AppConfig::ReadFlagsFromMap(const std::unordered_map<std::string, std::stri
     LOG_DEBUG(sLogger, ("ReadFlagsFromMap", flagMap.size()));
 }
 
-void AppConfig::ParseJsonToFlags(const Json::Value& confJson) {
-    const static unordered_set<string> sForceKeySet = {"config_server_address_list"};
+void AppConfig::RecurseParseJsonToFlags(const Json::Value& confJson, std::string prefix) {
     const static unordered_set<string> sIgnoreKeySet = {"data_server_list"};
+    const static unordered_set<string> sForceKeySet = {"config_server_address_list"};
     for (auto name : confJson.getMemberNames()) {
-        if (sIgnoreKeySet.find(name) != sIgnoreKeySet.end()) {
-            continue;
-        }
         auto jsonvalue = confJson[name];
-        if (jsonvalue.isConvertibleTo(Json::stringValue)) {
-            SetConfigFlag(name, jsonvalue.asString());
-        } else if (sForceKeySet.find(name) != sForceKeySet.end()) {
-            SetConfigFlag(name, jsonvalue.toStyledString());
+        string fullName;
+        if (prefix.empty()) {
+            fullName = name;
         } else {
-            APSARA_LOG_INFO(sLogger,
-                            ("Set config flag failed", "can not convert json value to flag")("flag name", name)(
+            fullName = prefix + "_" + name;
+        }
+        if (jsonvalue.isObject()) {
+            RecurseParseJsonToFlags(jsonvalue, fullName);
+        } else {
+            if (sIgnoreKeySet.find(fullName) != sIgnoreKeySet.end()) {
+                continue;
+            }
+            if (jsonvalue.isConvertibleTo(Json::stringValue)) {
+                SetConfigFlag(fullName, jsonvalue.asString());
+            } else if (sForceKeySet.find(fullName) != sForceKeySet.end()) {
+                SetConfigFlag(fullName, jsonvalue.toStyledString());
+            } else {
+                APSARA_LOG_INFO(sLogger,
+                            ("Set config flag failed", "can not convert json value to flag")("flag name", fullName)(
                                 "jsonvalue", jsonvalue.toStyledString()));
+            }
         }
     }
+}
+
+void AppConfig::ParseJsonToFlags(const Json::Value& confJson) {
+    RecurseParseJsonToFlags(confJson, "");
 }
 
 void AppConfig::CheckAndAdjustParameters() {
