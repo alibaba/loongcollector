@@ -45,6 +45,12 @@ target_link_libraries(yaml_util_unittest ${UT_BASE_TARGET})
 add_executable(safe_queue_unittest SafeQueueUnittest.cpp)
 target_link_libraries(safe_queue_unittest ${UT_BASE_TARGET})
 
+add_executable(http_request_timer_event_unittest timer/HttpRequestTimerEventUnittest.cpp)
+target_link_libraries(http_request_timer_event_unittest ${UT_BASE_TARGET})
+
+add_executable(timer_unittest timer/TimerUnittest.cpp)
+target_link_libraries(timer_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(common_simple_utils_unittest)
 gtest_discover_tests(common_logfileoperator_unittest)
@@ -54,3 +60,5 @@ gtest_discover_tests(common_machine_info_util_unittest)
 gtest_discover_tests(encoding_converter_unittest)
 gtest_discover_tests(yaml_util_unittest)
 gtest_discover_tests(safe_queue_unittest)
+gtest_discover_tests(http_request_timer_event_unittest)
+gtest_discover_tests(timer_unittest)

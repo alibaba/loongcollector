@@ -70,9 +70,9 @@ CURL* CreateCurlHandler(const std::string& method,
                         const std::string& body,
                         HttpResponse& response,
                         curl_slist*& headers,
+                        uint32_t timeout,
                         bool replaceHostWithIp,
-                        const std::string& intf,
-                        uint32_t timeout) {
+                        const std::string& intf) {
     static DnsCache* dnsCache = DnsCache::GetInstance();
 
     CURL* curl = curl_easy_init();

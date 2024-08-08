@@ -35,8 +35,8 @@ CURL* CreateCurlHandler(const std::string& method,
                         const std::string& body,
                         HttpResponse& response,
                         curl_slist*& headers,
+                        uint32_t timeout,
                         bool replaceHostWithIp = true,
-                        const std::string& intf = "",
-                        uint32_t timeout = 15);
+                        const std::string& intf = "");
 
 } // namespace logtail
