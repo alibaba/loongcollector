@@ -32,10 +32,13 @@ public:
 private:
     MetricExportor();
 
-    void SendToSLS();
-    void SendToLocalFile();
-    
+    void PushCppMetrics();
+    void PushGoPluginMetrics();
+
+    void SendToSLS(std::map<std::string, sls_logs::LogGroup*>& logGroupMap);
+    void SendToLocalFile(std::string& metricsContent, const std::string metricsFileNamePrefix);
+
     int32_t mSendInterval;
     int32_t mLastSendTime;
 };
-}
+} // namespace logtail

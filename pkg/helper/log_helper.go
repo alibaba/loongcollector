@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -377,7 +378,7 @@ func ReplaceInvalidChars(in *string) {
 
 func GetMetricName(log *protocol.Log) string {
 	for _, cnt := range log.Contents {
-		if cnt.GetKey() == SelfMetricNameKey {
+		if cnt.GetKey() == pipeline.SelfMetricNameKey {
 			return cnt.GetValue()
 		}
 	}

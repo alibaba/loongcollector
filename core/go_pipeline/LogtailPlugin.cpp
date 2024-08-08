@@ -310,31 +310,37 @@ bool LogtailPlugin::LoadPluginBase() {
                 return mPluginValid;
             }
         }
+        // 加载全局配置，目前应该没有调用点
         mLoadGlobalConfigFun = (LoadGlobalConfigFun)loader.LoadMethod("LoadGlobalConfig", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load LoadGlobalConfig error, Message", error));
             return mPluginValid;
         }
+        // 加载单个配置，目前应该是Resume的时候，全量加载一次
         mLoadConfigFun = (LoadConfigFun)loader.LoadMethod("LoadConfig", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load LoadConfig error, Message", error));
             return mPluginValid;
         }
+        // 更新配置，目前应该没有调用点
         mUnloadConfigFun = (UnloadConfigFun)loader.LoadMethod("UnloadConfig", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load UnloadConfig error, Message", error));
             return mPluginValid;
         }
+        // 插件暂停
         mHoldOnFun = (HoldOnFun)loader.LoadMethod("HoldOn", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load HoldOn error, Message", error));
             return mPluginValid;
         }
+        // 插件恢复
         mResumeFun = (ResumeFun)loader.LoadMethod("Resume", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load Resume error, Message", error));
             return mPluginValid;
         }
+        // C++传递原始二进制数据到golang插件，v1和v2的区别:是否传递tag
         mProcessRawLogFun = (ProcessRawLogFun)loader.LoadMethod("ProcessRawLog", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load ProcessRawLog error, Message", error));
@@ -345,20 +351,28 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load ProcessRawLogV2 error, Message", error));
             return mPluginValid;
         }
-
+        // C++获取容器信息的
         mGetContainerMetaFun = (GetContainerMetaFun)loader.LoadMethod("GetContainerMeta", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load GetContainerMeta error, Message", error));
             return mPluginValid;
         }
+        // C++传递单条数据到golang插件
         mProcessLogsFun = (ProcessLogsFun)loader.LoadMethod("ProcessLog", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load ProcessLogs error, Message", error));
             return mPluginValid;
         }
+        // C++传递数据到golang插件
         mProcessLogGroupFun = (ProcessLogGroupFun)loader.LoadMethod("ProcessLogGroup", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load ProcessLogGroup error, Message", error));
+            return mPluginValid;
+        }
+        // 获取golang插件部分统计信息
+        mGetPipelineMetricsFun = (GetPipelineMetricsFun)loader.LoadMethod("GetPipelineMetrics", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetPipelineMetrics error, Message", error));
             return mPluginValid;
         }
 
@@ -440,6 +454,34 @@ void LogtailPlugin::ProcessLogGroup(const std::string& configName,
     GoInt rst = mProcessLogGroupFun(goConfigName, goLog, goPackId);
     if (rst != (GoInt)0) {
         LOG_WARNING(sLogger, ("process loggroup error", configName)("result", rst));
+    }
+}
+
+void LogtailPlugin::GetPipelineMetrics(std::vector<std::map<std::string, std::string>>& metircsList) {
+    if (mGetPipelineMetricsFun != nullptr) {
+        auto metrics = mGetPipelineMetricsFun();
+        if (metrics != nullptr) {
+            for (int i = 0; i < metrics->count; ++i) {
+                std::map<std::string, std::string> item;
+                InnerPluginMetric* innerpm = metrics->metrics[i];
+                if (innerpm != nullptr) {
+                    for (int j = 0; j < innerpm->count; ++j) {
+                        InnerKeyValue* innerkv = innerpm->keyValues[j];
+                        if (innerkv != nullptr) {
+                            item.insert(std::make_pair(std::string(innerkv->key), std::string(innerkv->value)));
+                            free(innerkv->key);
+                            free(innerkv->value);
+                            free(innerkv);
+                        }
+                    }
+                    free(innerpm->keyValues);
+                    free(innerpm);
+                }
+                metircsList.emplace_back(item);
+            }
+            free(metrics->metrics);
+            free(metrics);
+        }
     }
 }
 

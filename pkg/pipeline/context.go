@@ -30,6 +30,10 @@ type CommonContext struct {
 
 type LabelPair = Label
 
+const SelfMetricNameKey = "__name__"
+const MetricLabelPrefix = "label."
+const MetricValuePrefix = "value."
+
 type MetricsRecord struct {
 	Context Context
 	Labels  []LabelPair
@@ -46,7 +50,7 @@ func (m *MetricsRecord) appendLabels(log *protocol.Log) {
 
 func (m *MetricsRecord) insertLabels(record map[string]string) {
 	for _, label := range m.Labels {
-		record[label.Key] = label.Value
+		record[MetricLabelPrefix+label.Key] = label.Value
 	}
 }
 
@@ -75,24 +79,26 @@ func (m *MetricsRecord) Serialize(logGroup *protocol.LogGroup) {
 
 // ExportMetricRecords is used for exporting metrics records.
 // It will replace Serialize in the future.
-func (m *MetricsRecord) ExportMetricRecords() []map[string]string {
+func (m *MetricsRecord) ExportMetricRecords() map[string]string {
 	m.RLock()
 	defer m.RUnlock()
 
-	records := make([]map[string]string, 0)
+	record := map[string]string{}
+	m.insertLabels(record)
 	for _, metricCollector := range m.MetricCollectors {
 		metrics := metricCollector.Collect()
+
 		for _, metric := range metrics {
-			record := metric.Export()
-			if len(record) == 0 {
+			singleMetricRecord := metric.Export()
+			if len(singleMetricRecord) == 0 {
 				continue
 			}
-
-			m.insertLabels(record)
-			records = append(records, record)
+			valueName := singleMetricRecord[SelfMetricNameKey]
+			valueValue := singleMetricRecord[valueName]
+			record[MetricValuePrefix+valueName] = valueValue
 		}
 	}
-	return records
+	return record
 }
 
 func GetCommonLabels(context Context, pluginMeta *PluginMeta) []LabelPair {
@@ -138,6 +144,6 @@ type Context interface {
 	// APIs for self monitor
 	RegisterMetricRecord(labels []LabelPair) *MetricsRecord // for v1.8.8 compatible
 	GetMetricRecord() *MetricsRecord                        // for v1.8.8 compatible
-	ExportMetricRecords() []map[string]string               // for v1.8.8 compatible
+	ExportMetricRecords() []map[string]string
 	MetricSerializeToPB(logGroup *protocol.LogGroup)
 }

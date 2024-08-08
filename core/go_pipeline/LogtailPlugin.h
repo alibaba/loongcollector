@@ -77,6 +77,22 @@ struct innerContainerMeta {
     char** envsKey;
     char** envsVal;
 };
+
+typedef struct {
+    char* key;
+    char* value;
+} InnerKeyValue;
+
+typedef struct {
+    InnerKeyValue** keyValues;
+    int count;
+} InnerPluginMetric;
+
+typedef struct {
+    InnerPluginMetric** metrics;
+    int count;
+} InnerPluginMetrics;
+
 struct K8sContainerMeta {
     std::string PodName;
     std::string K8sNamespace;
@@ -127,6 +143,7 @@ typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
 typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
 typedef GoInt (*ProcessLogGroupFun)(GoString c, GoSlice l, GoString p);
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
+typedef InnerPluginMetrics* (*GetPipelineMetricsFun)();
 
 // Methods export by adapter.
 typedef int (*IsValidToSendFun)(long long logstoreKey);
@@ -247,6 +264,8 @@ public:
 
     K8sContainerMeta GetContainerMeta(const std::string& containerID);
 
+    void GetPipelineMetrics(std::vector<std::map<std::string, std::string>>& metircsList);
+
 private:
     void* mPluginBasePtr;
     void* mPluginAdapterPtr;
@@ -265,6 +284,7 @@ private:
     ProcessLogsFun mProcessLogsFun;
     ProcessLogGroupFun mProcessLogGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
+    GetPipelineMetricsFun mGetPipelineMetricsFun;
 
     // Configuration for plugin system in JSON format.
     Json::Value mPluginCfg;

@@ -122,7 +122,7 @@ func (p *LocalContext) ExportMetricRecords() []map[string]string {
 
 	records := make([]map[string]string, 0)
 	for _, metricsRecord := range p.MetricsRecords {
-		records = append(records, metricsRecord.ExportMetricRecords()...)
+		records = append(records, metricsRecord.ExportMetricRecords())
 	}
 	return records
 }

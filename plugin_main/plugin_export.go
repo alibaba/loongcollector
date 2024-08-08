@@ -35,7 +35,7 @@ import (
 /*
 #include <stdlib.h>
 static char**makeCharArray(int size) {
-        return malloc(sizeof(char*)*  size);
+        return malloc(sizeof(char*) * size);
 }
 
 static void setArrayString(char **a, char *s, int n) {
@@ -57,6 +57,37 @@ struct containerMeta{
 	char** envsKey;
 	char** envsVal;
 };
+
+typedef struct {
+    char* key;
+    char* value;
+} KeyValue;
+
+typedef struct {
+    KeyValue** keyValues;
+    int count;
+} PluginMetric;
+
+typedef struct {
+    PluginMetric** metrics;
+    int count;
+} PluginMetrics;
+
+static KeyValue** makeKeyValueArray(int size) {
+    return malloc(sizeof(KeyValue*) * size);
+}
+
+static void setArrayKeyValue(KeyValue **a, KeyValue *s, int n) {
+    a[n] = s;
+}
+
+static PluginMetric** makePluginMetricArray(int size) {
+    return malloc(sizeof(KeyValue*) * size);
+}
+
+static void setArrayPluginMetric(PluginMetric **a, PluginMetric *s, int n) {
+    a[n] = s;
+}
 */
 import "C" //nolint:typecheck
 
@@ -262,6 +293,38 @@ func GetContainerMeta(containerID string) *C.struct_containerMeta {
 		}
 	}
 	return returnStruct
+}
+
+//export GetPipelineMetrics
+func GetPipelineMetrics() *C.PluginMetrics {
+	results := pluginmanager.GetMetrics()
+	// 统计所有键值对的总数，用于分配内存
+	numMetrics := len(results)
+
+	cPluginMetrics := (*C.PluginMetrics)(C.malloc(C.sizeof_PluginMetrics))
+	cPluginMetrics.count = C.int(numMetrics)
+	cPluginMetrics.metrics = C.makePluginMetricArray(cPluginMetrics.count)
+	// 填充 PluginMetrics 中的 keyValues
+	for i, metric := range results {
+		metricLen := len(metric)
+		cMetric := (*C.PluginMetric)(C.malloc(C.sizeof_PluginMetric))
+		cMetric.count = C.int(metricLen)
+		cMetric.keyValues = C.makeKeyValueArray(cMetric.count)
+
+		j := 0
+		for k, v := range metric {
+			cKey := C.CString(k)
+			cValue := C.CString(v)
+			cKeyValue := (*C.KeyValue)(C.malloc(C.sizeof_KeyValue))
+			cKeyValue.key = cKey
+			cKeyValue.value = cValue
+
+			C.setArrayKeyValue(cMetric.keyValues, cKeyValue, C.int(j))
+			j++
+		}
+		C.setArrayPluginMetric(cPluginMetrics.metrics, cMetric, C.int(i))
+	}
+	return cPluginMetrics
 }
 
 func initPluginBase(cfgStr string) int {

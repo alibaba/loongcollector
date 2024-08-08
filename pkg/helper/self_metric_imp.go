@@ -15,15 +15,14 @@
 package helper
 
 import (
-	"github.com/alibaba/ilogtail/pkg/protocol"
-
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
-)
 
-const SelfMetricNameKey = "__name__"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+)
 
 var mu sync.Mutex
 
@@ -51,7 +50,7 @@ func (s *StrMetric) Get() string {
 }
 
 func (s *StrMetric) Serialize(log *protocol.Log) {
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: s.Get()}, &protocol.Log_Content{Key: SelfMetricNameKey, Value: s.name})
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: s.Get()}, &protocol.Log_Content{Key: pipeline.SelfMetricNameKey, Value: s.name})
 	log.Contents = append(log.Contents, s.labels...)
 }
 
@@ -78,7 +77,7 @@ func (s *NormalMetric) Name() string {
 }
 
 func (s *NormalMetric) Serialize(log *protocol.Log) {
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatInt(s.Get(), 10)}, &protocol.Log_Content{Key: SelfMetricNameKey, Value: s.name})
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatInt(s.Get(), 10)}, &protocol.Log_Content{Key: pipeline.SelfMetricNameKey, Value: s.name})
 	log.Contents = append(log.Contents, s.labels...)
 }
 
@@ -128,7 +127,7 @@ func (s *AvgMetric) Name() string {
 }
 
 func (s *AvgMetric) Serialize(log *protocol.Log) {
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(s.GetAvg(), 'f', 4, 64)}, &protocol.Log_Content{Key: SelfMetricNameKey, Value: s.name})
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(s.GetAvg(), 'f', 4, 64)}, &protocol.Log_Content{Key: pipeline.SelfMetricNameKey, Value: s.name})
 	log.Contents = append(log.Contents, s.labels...)
 }
 
@@ -177,7 +176,7 @@ func (s *LatMetric) Get() int64 {
 }
 
 func (s *LatMetric) Serialize(log *protocol.Log) {
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(float64(s.Get())/1000, 'f', 4, 64)}, &protocol.Log_Content{Key: SelfMetricNameKey, Value: s.name})
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: s.name, Value: strconv.FormatFloat(float64(s.Get())/1000, 'f', 4, 64)}, &protocol.Log_Content{Key: pipeline.SelfMetricNameKey, Value: s.name})
 	log.Contents = append(log.Contents, s.labels...)
 }
 

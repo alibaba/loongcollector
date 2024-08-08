@@ -16,6 +16,7 @@ package helper
 
 import (
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/stretchr/testify/assert"
@@ -77,7 +78,7 @@ func Test_GetMetricName(t *testing.T) {
 			args: struct {
 				log *protocol.Log
 			}{log: &protocol.Log{
-				Contents: []*protocol.Log_Content{{Key: SelfMetricNameKey, Value: "metric1"}}},
+				Contents: []*protocol.Log_Content{{Key: pipeline.SelfMetricNameKey, Value: "metric1"}}},
 			},
 			want: "metric1",
 		},
@@ -89,7 +90,7 @@ func Test_GetMetricName(t *testing.T) {
 			}{log: &protocol.Log{
 				Contents: []*protocol.Log_Content{
 					{Key: "first", Value: "metric1"},
-					{Key: SelfMetricNameKey, Value: "metric2"},
+					{Key: pipeline.SelfMetricNameKey, Value: "metric2"},
 				}},
 			},
 			want: "metric2",
