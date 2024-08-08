@@ -38,7 +38,7 @@
 #include "log_pb/sls_logs.pb.h"
 #include "logger/Logger.h"
 #include "models/StringView.h"
-#include "queue/FeedbackQueueKey.h"
+#include "queue/QueueKey.h"
 #include "rapidjson/allocators.h"
 #include "reader/FileReaderOptions.h"
 

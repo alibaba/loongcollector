@@ -38,7 +38,7 @@ bool ExactlyOnceQueueManager::CreateOrUpdateQueue(QueueKey key,
         lock_guard<mutex> lock(mGCMux);
         mQueueDeletionTimeMap.erase(key);
     }
-    vector<SenderQueueInterface*> senderQueue;
+    vector<BoundedSenderQueueInterface*> senderQueue;
     {
         lock_guard<mutex> lock(mSenderQueueMux);
         auto iter = mSenderQueues.find(key);

@@ -23,7 +23,7 @@
 
 #include "models/PipelineEventGroup.h"
 #include "plugin/interface/Plugin.h"
-#include "queue/FeedbackQueueKey.h"
+#include "queue/QueueKey.h"
 #include "queue/SenderQueueItem.h"
 #include "sink/SinkType.h"
 

@@ -16,7 +16,7 @@
 
 #include "common/FeedbackInterface.h"
 #include "models/PipelineEventGroup.h"
-#include "queue/ProcessQueue.h"
+#include "queue/BoundedProcessQueue.h"
 #include "queue/SenderQueue.h"
 #include "unittest/Unittest.h"
 #include "unittest/queue/FeedbackInterfaceMock.h"
@@ -25,7 +25,7 @@ using namespace std;
 
 namespace logtail {
 
-class ProcessQueueUnittest : public testing::Test {
+class BoundedProcessQueueUnittest : public testing::Test {
 public:
     void TestPush();
     void TestPop();
@@ -35,11 +35,11 @@ protected:
     static void SetUpTestCase() { sEventGroup.reset(new PipelineEventGroup(make_shared<SourceBuffer>())); }
 
     void SetUp() override {
-        mQueue.reset(new ProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, "test_config"));
+        mQueue.reset(new BoundedProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, "test_config"));
 
         mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0));
         mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0));
-        mQueue->SetDownStreamQueues(vector<SenderQueueInterface*>{mSenderQueue1.get(), mSenderQueue2.get()});
+        mQueue->SetDownStreamQueues(vector<BoundedSenderQueueInterface*>{mSenderQueue1.get(), mSenderQueue2.get()});
 
         mFeedback1.reset(new FeedbackInterfaceMock);
         mFeedback2.reset(new FeedbackInterfaceMock);
@@ -53,20 +53,18 @@ private:
     static const size_t sLowWatermark = 2;
     static const size_t sHighWatermark = 4;
 
-    unique_ptr<ProcessQueueItem> GenerateItem() {
-        return make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0);
-    }
+    unique_ptr<ProcessQueueItem> GenerateItem() { return make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0); }
 
-    unique_ptr<ProcessQueue> mQueue;
+    unique_ptr<BoundedProcessQueue> mQueue;
     unique_ptr<FeedbackInterface> mFeedback1;
     unique_ptr<FeedbackInterface> mFeedback2;
-    unique_ptr<SenderQueueInterface> mSenderQueue1;
-    unique_ptr<SenderQueueInterface> mSenderQueue2;
+    unique_ptr<BoundedSenderQueueInterface> mSenderQueue1;
+    unique_ptr<BoundedSenderQueueInterface> mSenderQueue2;
 };
 
-unique_ptr<PipelineEventGroup> ProcessQueueUnittest::sEventGroup;
+unique_ptr<PipelineEventGroup> BoundedProcessQueueUnittest::sEventGroup;
 
-void ProcessQueueUnittest::TestPush() {
+void BoundedProcessQueueUnittest::TestPush() {
     // push first
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
@@ -83,7 +81,7 @@ void ProcessQueueUnittest::TestPush() {
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
 }
 
-void ProcessQueueUnittest::TestPop() {
+void BoundedProcessQueueUnittest::TestPop() {
     unique_ptr<ProcessQueueItem> item;
     // nothing to pop
     APSARA_TEST_EQUAL(0, mQueue->Pop(item));
@@ -113,7 +111,7 @@ void ProcessQueueUnittest::TestPop() {
     APSARA_TEST_TRUE(static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->HasFeedback(sKey));
 }
 
-void ProcessQueueUnittest::TestReset() {
+void BoundedProcessQueueUnittest::TestReset() {
     mQueue->mHighWatermark = 1;
     mQueue->Push(GenerateItem());
     mQueue->InvalidatePop();
@@ -128,9 +126,9 @@ void ProcessQueueUnittest::TestReset() {
     APSARA_TEST_EQUAL(5U, mQueue->mHighWatermark);
 }
 
-UNIT_TEST_CASE(ProcessQueueUnittest, TestPush)
-UNIT_TEST_CASE(ProcessQueueUnittest, TestPop)
-UNIT_TEST_CASE(ProcessQueueUnittest, TestReset)
+UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPush)
+UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPop)
+UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestReset)
 
 } // namespace logtail
 

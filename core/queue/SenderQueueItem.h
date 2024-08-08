@@ -21,7 +21,7 @@
 #include <memory>
 #include <string>
 
-#include "queue/FeedbackQueueKey.h"
+#include "queue/QueueKey.h"
 
 namespace logtail {
 

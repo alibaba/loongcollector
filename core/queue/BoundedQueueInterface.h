@@ -16,38 +16,27 @@
 
 #pragma once
 
-#include "queue/FeedbackQueueKey.h"
+#include "queue/QueueInterface.h"
 
 namespace logtail {
 
 template <typename T>
-class FeedbackQueue {
+class BoundedQueueInterface : virtual public QueueInterface<T> {
 public:
-    FeedbackQueue(QueueKey key, size_t cap, size_t low, size_t high)
-        : mKey(key), mCapacity(cap), mLowWatermark(low), mHighWatermark(high) {}
+    BoundedQueueInterface(QueueKey key, size_t cap, size_t low, size_t high)
+        : QueueInterface<T>(key, cap), mLowWatermark(low), mHighWatermark(high) {}
+    virtual ~BoundedQueueInterface() = default;
 
-    FeedbackQueue(const FeedbackQueue& que) = delete;
-    FeedbackQueue& operator=(const FeedbackQueue&) = delete;
-
-    virtual bool Push(T&& item) = 0;
-    virtual bool Pop(T& item) = 0;
+    BoundedQueueInterface(const BoundedQueueInterface& que) = delete;
+    BoundedQueueInterface& operator=(const BoundedQueueInterface&) = delete;
 
     bool IsValidToPush() const { return mValidToPush; }
 
-    virtual bool Empty() const { return Size() == 0; }
-
-    QueueKey GetKey() const { return mKey; }
-
-    void InvalidatePop() { mValidToPop = false; }
-    void ValidatePop() { mValidToPop = true; }
-
 protected:
-    bool IsValidToPop() const { return mValidToPop && !Empty() && IsDownStreamQueuesValidToPush(); }
-
-    bool Full() const { return Size() == mCapacity; }
+    bool Full() const { return this->Size() == this->mCapacity; }
 
     bool ChangeStateIfNeededAfterPush() {
-        if (Size() == mHighWatermark) {
+        if (this->Size() == mHighWatermark) {
             mValidToPush = false;
             return true;
         }
@@ -55,46 +44,35 @@ protected:
     }
 
     bool ChangeStateIfNeededAfterPop() {
-        if (!mValidToPush && Size() == mLowWatermark) {
+        if (!mValidToPush && this->Size() == mLowWatermark) {
             mValidToPush = true;
             return true;
         }
         return false;
     }
 
-    void Reset(size_t cap, size_t low, size_t high) {
-        mCapacity = cap;
+    void Reset(size_t low, size_t high) {
         mLowWatermark = low;
         mHighWatermark = high;
-        Reset();
-    }
-
-    void Reset() {
         mValidToPush = true;
-        mValidToPop = true;
     }
-
-    const QueueKey mKey;
-    size_t mCapacity = 0;
 
 private:
+    virtual void GiveFeedback() const = 0;
     virtual size_t Size() const = 0;
-
-    virtual bool IsDownStreamQueuesValidToPush() const = 0;
 
     size_t mLowWatermark = 0;
     size_t mHighWatermark = 0;
 
     bool mValidToPush = true;
-    bool mValidToPop = true;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class ProcessQueueUnittest;
-    friend class ProcessQueueManagerUnittest;
-    friend class SenderQueueUnittest;
-    friend class SenderQueueManagerUnittest;
+    friend class BoundedProcessQueueUnittest;
+    friend class CircularProcessQueueUnittest;
     friend class ExactlyOnceSenderQueueUnittest;
+    friend class ProcessQueueManagerUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
+    friend class SenderQueueManagerUnittest;
 #endif
 };
 

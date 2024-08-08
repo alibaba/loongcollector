@@ -134,7 +134,7 @@ void ExactlyOnceSenderQueue::GetAllAvailableItems(vector<SenderQueueItem*>& item
 }
 
 void ExactlyOnceSenderQueue::Reset(const vector<RangeCheckpointPtr>& checkpoints) {
-    SenderQueueInterface::Reset(checkpoints.size(), checkpoints.size() - 1, checkpoints.size());
+    BoundedSenderQueueInterface::Reset(checkpoints.size(), checkpoints.size() - 1, checkpoints.size());
     mQueue.resize(checkpoints.size());
     mQueue.clear();
     mWrite = mSize = 0;

@@ -172,7 +172,6 @@ void ExactlyOnceSenderQueueUnittest::TestReset() {
     for (size_t i = 0; i <= sCheckpoints.size(); ++i) {
         mQueue->Push(GenerateItem());
     }
-    mQueue->InvalidatePop();
 
     vector<RangeCheckpointPtr> newCheckpoints;
     for (size_t i = 0; i < 5; ++i) {
@@ -188,7 +187,6 @@ void ExactlyOnceSenderQueueUnittest::TestReset() {
     APSARA_TEST_EQUAL(newCheckpoints.size(), mQueue->mHighWatermark);
     APSARA_TEST_TRUE(mQueue->Empty());
     APSARA_TEST_TRUE(mQueue->mExtraBuffer.empty());
-    APSARA_TEST_TRUE(mQueue->mValidToPop);
     APSARA_TEST_TRUE(mQueue->mValidToPush);
     APSARA_TEST_TRUE(mQueue->mConcurrencyLimiters.empty());
     APSARA_TEST_FALSE(mQueue->mRateLimiter.has_value());

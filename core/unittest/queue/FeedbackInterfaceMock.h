@@ -19,7 +19,7 @@
 #include <unordered_set>
 
 #include "common/FeedbackInterface.h"
-#include "queue/FeedbackQueueKey.h"
+#include "queue/QueueKey.h"
 
 namespace logtail {
 

@@ -71,7 +71,6 @@ protected:
         string configStr, errorMsg;
         unique_ptr<PipelineConfig> config;
         unique_ptr<Pipeline> pipeline;
-        list<ProcessQueue>::iterator que;
 
         // new pipeline
         configStr = R"(
@@ -119,7 +118,7 @@ protected:
         FileServer::GetInstance()->AddFileDiscoveryConfig(mConfigName, &discoveryOpts, &ctx);
         FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
-        ProcessQueueManager::GetInstance()->CreateOrUpdateQueue(0, 0);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateQueue(0, 0, ProcessQueueManager::QueueType::BOUNDED);
     }
 
     void TearDown() override { remove(utf8File.c_str()); }

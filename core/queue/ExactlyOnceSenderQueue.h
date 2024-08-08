@@ -21,18 +21,19 @@
 
 #include "checkpoint/RangeCheckpoint.h"
 #include "logger/Logger.h"
-#include "queue/FeedbackQueueKey.h"
-#include "queue/SenderQueueInterface.h"
+#include "queue/BoundedSenderQueueInterface.h"
+#include "queue/QueueKey.h"
 #include "queue/SenderQueueItem.h"
 
 namespace logtail {
 
 // not thread-safe, should be protected explicitly by queue manager
-class ExactlyOnceSenderQueue : public SenderQueueInterface {
+class ExactlyOnceSenderQueue : public BoundedSenderQueueInterface {
 public:
     // mFlusher will be set on first push
     ExactlyOnceSenderQueue(const std::vector<RangeCheckpointPtr>& checkpoints, QueueKey key)
-        : SenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key),
+        : QueueInterface(key, checkpoints.size()),
+          BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key),
           mRangeCheckpoints(checkpoints) {
         mQueue.resize(checkpoints.size());
     }

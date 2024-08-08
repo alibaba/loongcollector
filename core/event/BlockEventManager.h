@@ -22,7 +22,7 @@
 #include "common/FeedbackInterface.h"
 #include "common/Flags.h"
 #include "common/Lock.h"
-#include "queue/FeedbackQueueKey.h"
+#include "queue/QueueKey.h"
 
 DECLARE_FLAG_INT32(max_block_event_timeout);
 

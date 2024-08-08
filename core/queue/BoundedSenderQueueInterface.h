@@ -22,8 +22,8 @@
 #include <vector>
 
 #include "common/FeedbackInterface.h"
-#include "queue/FeedbackQueue.h"
-#include "queue/FeedbackQueueKey.h"
+#include "queue/BoundedQueueInterface.h"
+#include "queue/QueueKey.h"
 #include "queue/SenderQueueItem.h"
 #include "sender/ConcurrencyLimiter.h"
 #include "sender/RateLimiter.h"
@@ -33,12 +33,12 @@ namespace logtail {
 class Flusher;
 
 // not thread-safe, should be protected explicitly by queue manager
-class SenderQueueInterface : public FeedbackQueue<std::unique_ptr<SenderQueueItem>> {
+class BoundedSenderQueueInterface : public BoundedQueueInterface<std::unique_ptr<SenderQueueItem>> {
 public:
     static void SetFeedback(FeedbackInterface* feedback);
 
-    SenderQueueInterface(size_t cap, size_t low, size_t high, QueueKey key)
-        : FeedbackQueue<std::unique_ptr<SenderQueueItem>>(key, cap, low, high) {}
+    BoundedSenderQueueInterface(size_t cap, size_t low, size_t high, QueueKey key)
+        : QueueInterface(key, cap), BoundedQueueInterface<std::unique_ptr<SenderQueueItem>>(key, cap, low, high) {}
 
     bool Pop(std::unique_ptr<SenderQueueItem>& item) override { return false; }
 
@@ -56,16 +56,13 @@ public:
 protected:
     static FeedbackInterface* sFeedback;
 
-    void GiveFeedback() const;
+    void GiveFeedback() const override;
     void Reset(size_t cap, size_t low, size_t high);
 
     std::optional<RateLimiter> mRateLimiter;
     std::vector<std::shared_ptr<ConcurrencyLimiter>> mConcurrencyLimiters;
 
     std::queue<std::unique_ptr<SenderQueueItem>> mExtraBuffer;
-
-private:
-    bool IsDownStreamQueuesValidToPush() const override { return true; }
 };
 
 } // namespace logtail

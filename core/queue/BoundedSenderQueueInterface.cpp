@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "queue/SenderQueueInterface.h"
+#include "queue/BoundedSenderQueueInterface.h"
 
 
 using namespace std;
 
 namespace logtail {
 
-FeedbackInterface* SenderQueueInterface::sFeedback = nullptr;
+FeedbackInterface* BoundedSenderQueueInterface::sFeedback = nullptr;
 
-void SenderQueueInterface::SetFeedback(FeedbackInterface* feedback) {
+void BoundedSenderQueueInterface::SetFeedback(FeedbackInterface* feedback) {
     if (feedback == nullptr) {
         // should not happen
         return;
@@ -29,13 +29,13 @@ void SenderQueueInterface::SetFeedback(FeedbackInterface* feedback) {
     sFeedback = feedback;
 }
 
-void SenderQueueInterface::SetRateLimiter(uint32_t maxRate) {
+void BoundedSenderQueueInterface::SetRateLimiter(uint32_t maxRate) {
     if (maxRate > 0) {
         mRateLimiter = RateLimiter(maxRate);
     }
 }
 
-void SenderQueueInterface::SetConcurrencyLimiters(std::vector<std::shared_ptr<ConcurrencyLimiter>>&& limiters) {
+void BoundedSenderQueueInterface::SetConcurrencyLimiters(std::vector<std::shared_ptr<ConcurrencyLimiter>>&& limiters) {
     mConcurrencyLimiters.clear();
     for (auto& item : limiters) {
         if (item == nullptr) {
@@ -46,16 +46,17 @@ void SenderQueueInterface::SetConcurrencyLimiters(std::vector<std::shared_ptr<Co
     }
 }
 
-void SenderQueueInterface::GiveFeedback() const {
+void BoundedSenderQueueInterface::GiveFeedback() const {
     // 0 is just a placeholder
     sFeedback->Feedback(0);
 }
 
-void SenderQueueInterface::Reset(size_t cap, size_t low, size_t high) {
-    FeedbackQueue::Reset(cap, low, high);
+void BoundedSenderQueueInterface::Reset(size_t cap, size_t low, size_t high) {
     queue<unique_ptr<SenderQueueItem>>().swap(mExtraBuffer);
     mRateLimiter.reset();
     mConcurrencyLimiters.clear();
+    BoundedQueueInterface::Reset(low, high);
+    QueueInterface::Reset(cap);
 }
 
 } // namespace logtail

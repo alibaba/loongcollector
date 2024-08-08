@@ -195,7 +195,7 @@ void Application::Start() { // GCOVR_EXCL_START
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
     InitWindowsSignalObject();
 #endif
-    SenderQueueInterface::SetFeedback(ProcessQueueManager::GetInstance());
+    BoundedSenderQueueInterface::SetFeedback(ProcessQueueManager::GetInstance());
 
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();

@@ -20,7 +20,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "queue/FeedbackQueueKey.h"
+#include "queue/QueueKey.h"
 
 namespace logtail {
 

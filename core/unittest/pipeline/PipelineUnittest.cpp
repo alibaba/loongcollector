@@ -26,6 +26,7 @@
 #include "plugin/PluginRegistry.h"
 #include "processor/inner/ProcessorSplitLogStringNative.h"
 #include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
+#include "queue/BoundedProcessQueue.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 #include "unittest/Unittest.h"
@@ -2400,7 +2401,7 @@ void PipelineUnittest::TestProcessQueue() const {
     unique_ptr<PipelineConfig> config;
     unique_ptr<Pipeline> pipeline;
     QueueKey key;
-    list<ProcessQueue>::iterator que;
+    ProcessQueueManager::ProcessQueueIterator que;
 
     // new pipeline
     configStr = R"(
@@ -2435,22 +2436,22 @@ void PipelineUnittest::TestProcessQueue() const {
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
 
     key = QueueKeyManager::GetInstance()->GetKey(configName);
-    que = ProcessQueueManager::GetInstance()->mQueues[key];
+    que = ProcessQueueManager::GetInstance()->mQueues[key].first;
     // queue level
-    APSARA_TEST_EQUAL(configName, que->GetConfigName());
-    APSARA_TEST_EQUAL(key, que->GetKey());
-    APSARA_TEST_EQUAL(0U, que->GetPriority());
-    APSARA_TEST_EQUAL(1U, que->mUpStreamFeedbacks.size());
+    APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
+    APSARA_TEST_EQUAL(key, (*que)->GetKey());
+    APSARA_TEST_EQUAL(0U, (*que)->GetPriority());
+    APSARA_TEST_EQUAL(1U, static_cast<BoundedProcessQueue*>(que->get())->mUpStreamFeedbacks.size());
     APSARA_TEST_EQUAL(InputFeedbackInterfaceRegistry::GetInstance()->GetFeedbackInterface("input_file"),
-                      que->mUpStreamFeedbacks[0]);
-    APSARA_TEST_EQUAL(1U, que->mDownStreamQueues.size());
+                      static_cast<BoundedProcessQueue*>(que->get())->mUpStreamFeedbacks[0]);
+    APSARA_TEST_EQUAL(1U, (*que)->mDownStreamQueues.size());
     // pipeline level
     APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());
     // manager level
     APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mQueues.size());
     APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[0].size());
     APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[0].begin()
-                     == ProcessQueueManager::GetInstance()->mQueues[key]);
+                     == ProcessQueueManager::GetInstance()->mQueues[key].first);
 
     // update pipeline with different priority
     configStr = R"(
@@ -2482,22 +2483,22 @@ void PipelineUnittest::TestProcessQueue() const {
     APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
 
     key = QueueKeyManager::GetInstance()->GetKey(configName);
-    que = ProcessQueueManager::GetInstance()->mQueues[key];
+    que = ProcessQueueManager::GetInstance()->mQueues[key].first;
     // queue level
-    APSARA_TEST_EQUAL(configName, que->GetConfigName());
-    APSARA_TEST_EQUAL(key, que->GetKey());
-    APSARA_TEST_EQUAL(3U, que->GetPriority());
-    APSARA_TEST_EQUAL(1U, que->mUpStreamFeedbacks.size());
+    APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
+    APSARA_TEST_EQUAL(key, (*que)->GetKey());
+    APSARA_TEST_EQUAL(3U, (*que)->GetPriority());
+    APSARA_TEST_EQUAL(1U, static_cast<BoundedProcessQueue*>(que->get())->mUpStreamFeedbacks.size());
     APSARA_TEST_EQUAL(InputFeedbackInterfaceRegistry::GetInstance()->GetFeedbackInterface("input_file"),
-                      que->mUpStreamFeedbacks[0]);
-    APSARA_TEST_EQUAL(1U, que->mDownStreamQueues.size());
+                      static_cast<BoundedProcessQueue*>(que->get())->mUpStreamFeedbacks[0]);
+    APSARA_TEST_EQUAL(1U, (*que)->mDownStreamQueues.size());
     // pipeline level
     APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());
     // manager level
     APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mQueues.size());
     APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[3].size());
     APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[3].begin()
-                     == ProcessQueueManager::GetInstance()->mQueues[key]);
+                     == ProcessQueueManager::GetInstance()->mQueues[key].first);
 
     // delete pipeline
     pipeline->RemoveProcessQueue();

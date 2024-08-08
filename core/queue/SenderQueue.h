@@ -19,8 +19,8 @@
 #include <memory>
 #include <vector>
 
-#include "queue/FeedbackQueueKey.h"
-#include "queue/SenderQueueInterface.h"
+#include "queue/QueueKey.h"
+#include "queue/BoundedSenderQueueInterface.h"
 #include "queue/SenderQueueItem.h"
 
 namespace logtail {
@@ -28,10 +28,10 @@ namespace logtail {
 class Flusher;
 
 // not thread-safe, should be protected explicitly by queue manager
-class SenderQueue : public SenderQueueInterface {
+class SenderQueue : public BoundedSenderQueueInterface {
 public:
     SenderQueue(size_t cap, size_t low, size_t high, QueueKey key)
-        : SenderQueueInterface(cap, low, high, key) {
+        : QueueInterface(key, cap), BoundedSenderQueueInterface(cap, low, high, key) {
         mQueue.resize(cap);
     }
 

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "queue/ProcessQueue.h"
+#include "queue/BoundedProcessQueue.h"
 
 using namespace std;
 
 namespace logtail {
 
-bool ProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
+bool BoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     if (!IsValidToPush()) {
         return false;
     }
@@ -27,7 +27,7 @@ bool ProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     return true;
 }
 
-bool ProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
+bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     if (!IsValidToPop()) {
         return false;
     }
@@ -39,35 +39,7 @@ bool ProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     return true;
 }
 
-void ProcessQueue::Reset(size_t cap, size_t low, size_t high) {
-    FeedbackQueue::Reset(cap, low, high);
-    std::queue<std::unique_ptr<ProcessQueueItem>>().swap(mQueue);
-    mDownStreamQueues.clear();
-    mUpStreamFeedbacks.clear();
-}
-
-bool ProcessQueue::IsDownStreamQueuesValidToPush() const {
-    // TODO: support other strategy
-    for (const auto& q : mDownStreamQueues) {
-        if (!q->IsValidToPush()) {
-            return false;
-        }
-    }
-    return true;
-}
-
-void ProcessQueue::SetDownStreamQueues(std::vector<SenderQueueInterface*>&& ques) {
-    mDownStreamQueues.clear();
-    for (auto& item : ques) {
-        if (item == nullptr) {
-            // should not happen
-            continue;
-        }
-        mDownStreamQueues.emplace_back(item);
-    }
-}
-
-void ProcessQueue::SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks) {
+void BoundedProcessQueue::SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks) {
     mUpStreamFeedbacks.clear();
     for (auto& item : feedbacks) {
         if (item == nullptr) {
@@ -78,7 +50,15 @@ void ProcessQueue::SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedba
     }
 }
 
-void ProcessQueue::GiveFeedback() const {
+void BoundedProcessQueue::Reset(size_t cap, size_t low, size_t high) {
+    std::queue<std::unique_ptr<ProcessQueueItem>>().swap(mQueue);
+    mUpStreamFeedbacks.clear();
+    ProcessQueueInterface::Reset();
+    BoundedQueueInterface::Reset(low, high);
+    QueueInterface::Reset(cap);
+}
+
+void BoundedProcessQueue::GiveFeedback() const {
     for (auto& item : mUpStreamFeedbacks) {
         item->Feedback(mKey);
     }

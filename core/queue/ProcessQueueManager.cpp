@@ -29,33 +29,32 @@ ProcessQueueManager::ProcessQueueManager() {
     ResetCurrentQueueIndex();
 }
 
-bool ProcessQueueManager::CreateOrUpdateQueue(QueueKey key, uint32_t priority) {
+bool ProcessQueueManager::CreateOrUpdateQueue(QueueKey key, uint32_t priority, QueueType type) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {
-        if (iter->second->GetPriority() == priority) {
-            return false;
-        }
-        uint32_t oldPriority = iter->second->GetPriority();
-        auto queIter = iter->second;
-        auto nextQueIter = next(queIter);
-        mPriorityQueue[priority].splice(mPriorityQueue[priority].end(), mPriorityQueue[oldPriority], queIter);
-        iter->second->SetPriority(priority);
-        if (mCurrentQueueIndex.first == oldPriority && mCurrentQueueIndex.second == queIter) {
-            if (nextQueIter == mPriorityQueue[oldPriority].end()) {
-                mCurrentQueueIndex.second = mPriorityQueue[oldPriority].begin();
-            } else {
-                mCurrentQueueIndex.second = nextQueIter;
+        if (iter->second.second != type) {
+            DeleteQueueEntity(iter->second.first);
+            CreateQueue(key, priority, type);
+        } else {
+            if ((*iter->second.first)->GetPriority() == priority) {
+                return false;
+            }
+            uint32_t oldPriority = (*iter->second.first)->GetPriority();
+            auto queIter = iter->second.first;
+            auto nextQueIter = next(queIter);
+            mPriorityQueue[priority].splice(mPriorityQueue[priority].end(), mPriorityQueue[oldPriority], queIter);
+            (*iter->second.first)->SetPriority(priority);
+            if (mCurrentQueueIndex.first == oldPriority && mCurrentQueueIndex.second == queIter) {
+                if (nextQueIter == mPriorityQueue[oldPriority].end()) {
+                    mCurrentQueueIndex.second = mPriorityQueue[oldPriority].begin();
+                } else {
+                    mCurrentQueueIndex.second = nextQueIter;
+                }
             }
         }
     } else {
-        mPriorityQueue[priority].emplace_back(ProcessQueueParam::GetInstance()->mCapacity,
-                                              ProcessQueueParam::GetInstance()->mLowWatermark,
-                                              ProcessQueueParam::GetInstance()->mHighWatermark,
-                                              key,
-                                              priority,
-                                              QueueKeyManager::GetInstance()->GetName(key));
-        mQueues[key] = prev(mPriorityQueue[priority].end());
+        CreateQueue(key, priority, type);
     }
     if (mCurrentQueueIndex.second == mPriorityQueue[mCurrentQueueIndex.first].end()) {
         mCurrentQueueIndex.second = mPriorityQueue[mCurrentQueueIndex.first].begin();
@@ -69,16 +68,7 @@ bool ProcessQueueManager::DeleteQueue(QueueKey key) {
     if (iter == mQueues.end()) {
         return false;
     }
-    uint32_t priority = iter->second->GetPriority();
-    auto queIter = iter->second;
-    auto nextQueIter = mPriorityQueue[priority].erase(iter->second);
-    if (mCurrentQueueIndex.first == priority && mCurrentQueueIndex.second == queIter) {
-        if (nextQueIter == mPriorityQueue[priority].end()) {
-            mCurrentQueueIndex.second = mPriorityQueue[priority].begin();
-        } else {
-            mCurrentQueueIndex.second = nextQueIter;
-        }
-    }
+    DeleteQueueEntity(iter->second.first);
     QueueKeyManager::GetInstance()->RemoveKey(iter->first);
     mQueues.erase(iter);
     return true;
@@ -88,7 +78,11 @@ bool ProcessQueueManager::IsValidToPush(QueueKey key) const {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {
-        return iter->second->IsValidToPush();
+        if (iter->second.second == QueueType::BOUNDED) {
+            return static_cast<BoundedProcessQueue*>(iter->second.first->get())->IsValidToPush();
+        } else {
+            return true;
+        }
     }
     return ExactlyOnceQueueManager::GetInstance()->IsValidToPushProcessQueue(key);
 }
@@ -98,7 +92,7 @@ int ProcessQueueManager::PushQueue(QueueKey key, unique_ptr<ProcessQueueItem>&& 
         lock_guard<mutex> lock(mQueueMux);
         auto iter = mQueues.find(key);
         if (iter != mQueues.end()) {
-            if (!iter->second->Push(std::move(item))) {
+            if (!(*iter->second.first)->Push(std::move(item))) {
                 return 1;
             }
         } else {
@@ -116,30 +110,30 @@ bool ProcessQueueManager::PopItem(int64_t threadNo, unique_ptr<ProcessQueueItem>
     configName.clear();
     lock_guard<mutex> lock(mQueueMux);
     for (size_t i = 0; i <= sMaxPriority; ++i) {
-        list<ProcessQueue>::iterator iter;
+        ProcessQueueIterator iter;
         if (mCurrentQueueIndex.first == i) {
             for (iter = mCurrentQueueIndex.second; iter != mPriorityQueue[i].end(); ++iter) {
-                if (!iter->Pop(item)) {
+                if (!(*iter)->Pop(item)) {
                     continue;
                 }
-                configName = iter->GetConfigName();
+                configName = (*iter)->GetConfigName();
                 break;
             }
             if (configName.empty()) {
                 for (iter = mPriorityQueue[i].begin(); iter != mCurrentQueueIndex.second; ++iter) {
-                    if (!iter->Pop(item)) {
+                    if (!(*iter)->Pop(item)) {
                         continue;
                     }
-                    configName = iter->GetConfigName();
+                    configName = (*iter)->GetConfigName();
                     break;
                 }
             }
         } else {
             for (iter = mPriorityQueue[i].begin(); iter != mPriorityQueue[i].end(); ++iter) {
-                if (!iter->Pop(item)) {
+                if (!(*iter)->Pop(item)) {
                     continue;
                 }
-                configName = iter->GetConfigName();
+                configName = (*iter)->GetConfigName();
                 break;
             }
         }
@@ -182,7 +176,7 @@ bool ProcessQueueManager::IsAllQueueEmpty() const {
     {
         lock_guard<mutex> lock(mQueueMux);
         for (const auto& q : mQueues) {
-            if (!q.second->Empty()) {
+            if (!(*q.second.first)->Empty()) {
                 return false;
             }
         }
@@ -190,13 +184,13 @@ bool ProcessQueueManager::IsAllQueueEmpty() const {
     return ExactlyOnceQueueManager::GetInstance()->IsAllProcessQueueEmpty();
 }
 
-bool ProcessQueueManager::SetDownStreamQueues(QueueKey key, vector<SenderQueueInterface*>&& ques) {
+bool ProcessQueueManager::SetDownStreamQueues(QueueKey key, vector<BoundedSenderQueueInterface*>&& ques) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter == mQueues.end()) {
         return false;
     }
-    iter->second->SetDownStreamQueues(std::move(ques));
+    (*iter->second.first)->SetDownStreamQueues(std::move(ques));
     return true;
 }
 
@@ -206,7 +200,10 @@ bool ProcessQueueManager::SetFeedbackInterface(QueueKey key, vector<FeedbackInte
     if (iter == mQueues.end()) {
         return false;
     }
-    iter->second->SetUpStreamFeedbacks(std::move(feedback));
+    if (iter->second.second == QueueType::CIRCULAR) {
+        return false;
+    }
+    static_cast<BoundedProcessQueue*>(iter->second.first->get())->SetUpStreamFeedbacks(std::move(feedback));
     return true;
 }
 
@@ -216,7 +213,7 @@ void ProcessQueueManager::InvalidatePop(const string& configName) {
         lock_guard<mutex> lock(mQueueMux);
         auto iter = mQueues.find(key);
         if (iter != mQueues.end()) {
-            iter->second->InvalidatePop();
+            (*iter->second.first)->InvalidatePop();
         }
     } else {
         ExactlyOnceQueueManager::GetInstance()->InvalidatePopProcessQueue(configName);
@@ -229,7 +226,7 @@ void ProcessQueueManager::ValidatePop(const string& configName) {
         lock_guard<mutex> lock(mQueueMux);
         auto iter = mQueues.find(key);
         if (iter != mQueues.end()) {
-            iter->second->ValidatePop();
+            (*iter->second.first)->ValidatePop();
         }
     } else {
         ExactlyOnceQueueManager::GetInstance()->ValidatePopProcessQueue(configName);
@@ -255,6 +252,36 @@ void ProcessQueueManager::Trigger() {
     mCond.notify_one();
 }
 
+void ProcessQueueManager::CreateQueue(QueueKey key, uint32_t priority, QueueType type) {
+    switch (type) {
+        case QueueType::BOUNDED:
+            mPriorityQueue[priority].emplace_back(
+                make_unique<BoundedProcessQueue>(ProcessQueueParam::GetInstance()->mCapacity,
+                                                 ProcessQueueParam::GetInstance()->mLowWatermark,
+                                                 ProcessQueueParam::GetInstance()->mHighWatermark,
+                                                 key,
+                                                 priority,
+                                                 QueueKeyManager::GetInstance()->GetName(key)));
+            break;
+        case QueueType::CIRCULAR:
+            // TODO: implement
+            break;
+    }
+    mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), type);
+}
+
+void ProcessQueueManager::DeleteQueueEntity(const ProcessQueueIterator& iter) {
+    uint32_t priority = (*iter)->GetPriority();
+    auto nextQueIter = mPriorityQueue[priority].erase(iter);
+    if (mCurrentQueueIndex.first == priority && mCurrentQueueIndex.second == iter) {
+        if (nextQueIter == mPriorityQueue[priority].end()) {
+            mCurrentQueueIndex.second = mPriorityQueue[priority].begin();
+        } else {
+            mCurrentQueueIndex.second = nextQueIter;
+        }
+    }
+}
+
 void ProcessQueueManager::ResetCurrentQueueIndex() {
     mCurrentQueueIndex.first = 0;
     mCurrentQueueIndex.second = mPriorityQueue[0].begin();
@@ -264,7 +291,8 @@ uint32_t ProcessQueueManager::GetInvalidCnt() const {
     uint32_t res = 0;
     lock_guard<mutex> lock(mQueueMux);
     for (const auto& q : mQueues) {
-        if (q.second->IsValidToPush()) {
+        if (q.second.second == QueueType::BOUNDED
+            && static_cast<BoundedProcessQueue*>(q.second.first->get())->IsValidToPush()) {
             ++res;
         }
     }
