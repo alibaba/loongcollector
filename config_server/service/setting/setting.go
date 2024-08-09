@@ -23,9 +23,12 @@ import (
 
 type Setting struct {
 	IP                  string `json:"ip"`                    // default: "127.0.0.1"
-	StoreMode           string `json:"store_mode"`            // support "leveldb", "mysql"
+	StoreMode           string `json:"store_mode"`            // support "leveldb", "gorm"
 	Port                string `json:"port"`                  // default: "8899"
 	DbPath              string `json:"db_path"`               // default: "./DB"
+	Driver              string `json:"driver"`                // support "mysql", "postgre", "sqlite", "sqlserver"
+	Dsn                 string `json:"dsn"`                   // gorm dsn
+	AutoMigrateSchema   bool   `json:"auto_migrate_schema"`   // auto migrate schema
 	AgentUpdateInterval int    `json:"agent_update_interval"` // default: 1s
 	ConfigSyncInterval  int    `json:"config_sync_interval"`  // default: 3s
 }
@@ -83,6 +86,14 @@ func init() {
 	}
 	if mySetting.StoreMode == "" {
 		panic("Please set store mode")
+	}
+	if mySetting.StoreMode == "gorm" {
+		if mySetting.Driver == "" {
+			panic("Please set driver")
+		}
+		if mySetting.Dsn == "" {
+			panic("Please set dsn")
+		}
 	}
 	if mySetting.AgentUpdateInterval == 0 {
 		mySetting.AgentUpdateInterval = 1

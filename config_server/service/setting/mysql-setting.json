@@ -1,0 +1,11 @@
+{
+    "ip":"127.0.0.1",
+    "store_mode": "gorm",
+    "port": "8899",
+    "db_path": "./DB",
+    "driver": "mysql",
+    "dsn": "ilogtail:123456@tcp(127.0.0.1:3306)/ilogtail_config_server?charset=utf8&parseTime=True&loc=Local",
+    "auto_migrate_schema": true,
+    "agent_update_interval": 1,
+    "config_sync_interval": 3
+}

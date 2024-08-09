@@ -15,6 +15,7 @@
 package model
 
 import (
+	"config-server/common"
 	proto "config-server/proto"
 )
 
@@ -25,11 +26,15 @@ var ConfigType = map[string]proto.ConfigType{
 
 type ConfigDetail struct {
 	Type    string `json:"Type"`
-	Name    string `json:"Name"`
+	Name    string `json:"Name" gorm:"primaryKey"`
 	Version int64  `json:"Version"`
 	Context string `json:"Context"`
 	Detail  string `json:"Detail"`
 	DelTag  bool   `json:"DelTag"`
+}
+
+func (ConfigDetail) TableName() string {
+	return common.TypeConfigDetail
 }
 
 func (c *ConfigDetail) ToProto() *proto.ConfigDetail {

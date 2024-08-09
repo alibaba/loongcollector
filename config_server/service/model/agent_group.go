@@ -14,7 +14,13 @@
 
 package model
 
-import proto "config-server/proto"
+import (
+	"config-server/common"
+	proto "config-server/proto"
+	"encoding/json"
+
+	"gorm.io/gorm"
+)
 
 type AgentGroupTag struct {
 	Name  string `json:"Name"`
@@ -22,10 +28,50 @@ type AgentGroupTag struct {
 }
 
 type AgentGroup struct {
-	Name           string           `json:"Name"`
-	Description    string           `json:"Description"`
-	Tags           []AgentGroupTag  `json:"Tags"`
-	AppliedConfigs map[string]int64 `json:"AppliedConfigs"`
+	Name                     string           `json:"Name" gorm:"primaryKey"`
+	Description              string           `json:"Description"`
+	Tags                     []AgentGroupTag  `json:"Tags" gorm:"-"`
+	SerializedTags           string           `json:"-" gorm:"column:tags;type:json"`
+	AppliedConfigs           map[string]int64 `json:"AppliedConfigs" gorm:"-"`
+	SerializedAppliedConfigs string           `json:"-" gorm:"column:applied_configs;type:json"`
+}
+
+func (AgentGroup) TableName() string {
+	return common.TypeAgentGROUP
+}
+
+func (a *AgentGroup) AfterFind(tx *gorm.DB) (err error) {
+	if a.SerializedTags != "" {
+		err = json.Unmarshal([]byte(a.SerializedTags), &a.Tags)
+		if err != nil {
+			return err
+		}
+	}
+	if a.SerializedAppliedConfigs != "" {
+		err = json.Unmarshal([]byte(a.SerializedAppliedConfigs), &a.AppliedConfigs)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *AgentGroup) BeforeSave(tx *gorm.DB) (err error) {
+	if a.Tags != nil {
+		data, err := json.Marshal(a.Tags)
+		if err != nil {
+			return err
+		}
+		tx.Statement.SetColumn("tags", string(data))
+	}
+	if a.AppliedConfigs != nil {
+		data, err := json.Marshal(a.AppliedConfigs)
+		if err != nil {
+			return err
+		}
+		tx.Statement.SetColumn("applied_configs", string(data))
+	}
+	return nil
 }
 
 func (a *AgentGroup) ToProto() *proto.AgentGroup {

@@ -15,7 +15,13 @@
 package model
 
 import (
+	"config-server/common"
 	proto "config-server/proto"
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
+
+	"gorm.io/gorm"
 )
 
 type AgentAttributes struct {
@@ -26,6 +32,27 @@ type AgentAttributes struct {
 	Region   string            `json:"Region"`
 	Zone     string            `json:"Zone"`
 	Extras   map[string]string `json:"Extras"`
+}
+
+func (a *AgentAttributes) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("value is not []byte, value: %v", value)
+	}
+
+	return json.Unmarshal(b, a)
+}
+
+func (a AgentAttributes) Value() (driver.Value, error) {
+	v, err := json.Marshal(a)
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 func (a *AgentAttributes) ToProto() *proto.AgentAttributes {
@@ -51,13 +78,43 @@ func (a *AgentAttributes) ParseProto(pa *proto.AgentAttributes) {
 }
 
 type Agent struct {
-	AgentID       string          `json:"AgentID"`
-	AgentType     string          `json:"AgentType"`
-	Attributes    AgentAttributes `json:"Attributes"`
-	Tags          []string        `json:"Tags"`
-	RunningStatus string          `json:"RunningStatus"`
-	StartupTime   int64           `json:"StartupTime"`
-	Interval      int32           `json:"Interval"`
+	AgentID        string          `json:"AgentID" gorm:"primaryKey;column:agent_id"`
+	AgentType      string          `json:"AgentType"`
+	Attributes     AgentAttributes `json:"Attributes"`
+	Tags           []string        `json:"Tags" gorm:"-"`
+	SerializedTags string          `json:"-" gorm:"column:tags;type:json"`
+	RunningStatus  string          `json:"RunningStatus"`
+	StartupTime    int64           `json:"StartupTime"`
+	Interval       int32           `json:"Interval"`
+}
+
+func (Agent) TableName() string {
+	return common.TypeAgent
+}
+
+func (a *Agent) AfterFind(tx *gorm.DB) (err error) {
+	if a.SerializedTags == "" {
+		return nil
+	}
+	err = json.Unmarshal([]byte(a.SerializedTags), &a.Tags)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *Agent) BeforeSave(tx *gorm.DB) (err error) {
+	if a.Tags == nil {
+		return nil
+	}
+	data, err := json.Marshal(a.Tags)
+	if err != nil {
+		return err
+	}
+	tx.Statement.SetColumn("tags", string(data))
+
+	return nil
 }
 
 func (a *Agent) ToProto() *proto.Agent {

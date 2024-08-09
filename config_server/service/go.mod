@@ -6,11 +6,26 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/syndtr/goleveldb v1.0.0
 	google.golang.org/protobuf v1.28.0
+	gorm.io/driver/mysql v1.5.4
+	gorm.io/driver/postgres v1.5.7
+	gorm.io/driver/sqlite v1.5.5
+	gorm.io/driver/sqlserver v1.5.3
+	gorm.io/gorm v1.25.7
 )
 
 require (
+	github.com/go-sql-driver/mysql v1.7.0 // indirect
+	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
+	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgx/v5 v5.4.3 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
+	github.com/mattn/go-sqlite3 v1.14.17 // indirect
+	github.com/microsoft/go-mssqldb v1.6.0 // indirect
 	github.com/smartystreets/assertions v1.2.0 // indirect
 )
 
@@ -29,11 +44,10 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/ugorji/go/codec v1.2.7 // indirect
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
-	golang.org/x/net v0.0.0-20220812174116-3211cb980234 // indirect
-	golang.org/x/sys v0.0.0-20220817070843-5a390386f1f2 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/net v0.14.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

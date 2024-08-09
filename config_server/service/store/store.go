@@ -16,6 +16,7 @@ package store
 
 import (
 	"config-server/setting"
+	"config-server/store/gorm"
 	database "config-server/store/interface_database"
 	"config-server/store/leveldb"
 )
@@ -27,6 +28,8 @@ Store Factory
 */
 func newStore(storeType string) database.Database {
 	switch storeType {
+	case "gorm":
+		return new(gorm.Store)
 	case "leveldb":
 		return new(leveldb.Store)
 	default:

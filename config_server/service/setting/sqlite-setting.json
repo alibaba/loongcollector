@@ -1,0 +1,10 @@
+{
+    "ip":"127.0.0.1",
+    "store_mode": "gorm",
+    "port": "8899",
+    "driver": "sqlite",
+    "dsn": "sqlite.db",
+    "auto_migrate_schema": true,
+    "agent_update_interval": 1,
+    "config_sync_interval": 3
+}
