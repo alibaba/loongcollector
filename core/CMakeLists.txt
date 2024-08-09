@@ -114,7 +114,7 @@ set(SUB_DIRECTORIES_LIST
         batch application app_config checkpoint compression config config/feedbacker config/provider config/watcher config_manager config_server_pb/v1 config_server_pb/v2 
         container_manager controller event event_handler event_listener file_server go_pipeline log_pb logger 
         models monitor parser pipeline plugin plugin/creator plugin/instance plugin/interface polling
-        profile_sender queue reader sdk sender serializer sls_control fuse prometheus sink/http route
+        profile_sender queue reader sdk sender serializer sls_control fuse prometheus sink/http route ebpf/observer ebpf/security ebpf/handler ebpf
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)

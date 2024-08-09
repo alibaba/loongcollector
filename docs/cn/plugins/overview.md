@@ -26,6 +26,10 @@
 | [`service_otlp`](input/service-otlp.md)<br>OTLP数据                             | 社区<br>[`Zhu Shunjia`](https://github.com/shunjiazhu)       | 通过http/grpc协议，接收OTLP数据。                               |
 | [`service_pgsql`](input/service-pgsql.md)<br>PostgreSQL查询数据                   | SLS官方                                                      | 将PostgresSQL数据输入到iLogtail。                            |
 | [`service_syslog`](input/service-syslog.md)<br>Syslog数据                       | SLS官方                                                      | 采集syslog数据。                                           |
+| [`input_ebpf_file_security`](input/input-ebpf-file-security.md)<br> eBPF文件安全数据                                      | SLS官方 | eBPF文件安全数据采集。                                                 |
+| [`input_ebpf_network_observer`](input/input-ebpf-network-observer.md)<br> eBPF网络可观测数据                                      | SLS官方 | eBPF网络可观测数据采集。                                                 |
+| [`input_ebpf_network_security`](input/input-ebpf-network-security.md)<br> eBPF网络安全数据                                      | SLS官方 | eBPF网络安全数据采集。                                                 |
+| [`input_ebpf_process_security`](input/input-ebpf-process-security.md)<br> eBPF进程安全数据                                      | SLS官方 | eBPF进程安全数据采集。                                                 |
 
 ## 处理
 

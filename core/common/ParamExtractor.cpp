@@ -84,6 +84,20 @@ bool GetOptionalStringParam(const Json::Value& config, const string& key, string
     return true;
 }
 
+bool GetOptionalDoubleParam(const Json::Value& config, const string& key, double& param, string& errorMsg) {
+    errorMsg.clear();
+    string curKey = ExtractCurrentKey(key);
+    const Json::Value* itr = config.find(curKey.c_str(), curKey.c_str() + curKey.length());
+    if (itr != nullptr) {
+        if (!itr->isDouble()) {
+            errorMsg = "param " + key + " is not of type double";
+            return false;
+        }
+        param = itr->asDouble();
+    }
+    return true;
+}
+
 bool GetMandatoryBoolParam(const Json::Value& config, const string& key, bool& param, string& errorMsg) {
     errorMsg.clear();
     if (!config.isMember(ExtractCurrentKey(key))) {
@@ -127,6 +141,15 @@ bool GetMandatoryStringParam(const Json::Value& config, const string& key, strin
     return true;
 }
 
+bool GetMandatoryDoubleParam(const Json::Value& config, const std::string& key, double& param, std::string& errorMsg) {
+    errorMsg.clear();
+    if (!config.isMember(ExtractCurrentKey(key))) {
+        errorMsg = "madatory param " + key + " is missing";
+        return false;
+    }
+    return GetOptionalDoubleParam(config, key, param, errorMsg);
+}
+
 bool IsRegexValid(const string& regStr) {
     if (regStr.empty()) {
         return true;
@@ -134,6 +157,36 @@ bool IsRegexValid(const string& regStr) {
     try {
         boost::regex reg(regStr);
     } catch (...) {
+        return false;
+    }
+    return true;
+}
+
+bool IsValidList(const Json::Value& config, const string& key, string& errorMsg) {
+    errorMsg.clear();
+    string curKey = ExtractCurrentKey(key);
+    const Json::Value* itr = config.find(curKey.c_str(), curKey.c_str() + curKey.length());
+    if (itr == nullptr) {
+        errorMsg = "param " + key + " is missing";
+        return false;
+    }
+    if (!itr->isArray()) {
+        errorMsg = "param " + key + " is not of type list";
+        return false;
+    }
+    return true;
+}
+
+bool IsValidMap(const Json::Value& config, const string& key, string& errorMsg) {
+    errorMsg.clear();
+    string curKey = ExtractCurrentKey(key);
+    const Json::Value* itr = config.find(curKey.c_str(), curKey.c_str() + curKey.length());
+    if (itr == nullptr) {
+        errorMsg = "param " + key + " is missing";
+        return false;
+    }
+    if (!itr->isObject()) {
+        errorMsg = "param " + key + " is not of type map";
         return false;
     }
     return true;

@@ -30,3 +30,6 @@ fi
 echo "cn_time_connect=$cn_time_connect us_time_connect=$us_time_connect OSS_REGION=$OSS_REGION"
 
 curl -sfL -m 30 https://$OSS_REGION/kubernetes/libebpf.so -o ${DOWNLOAD_DIR}/libebpf.so
+
+curl -sfL -m 30 https://$OSS_REGION/kubernetes/libnetwork_observer.so -o ${DOWNLOAD_DIR}/libnetwork_observer.so
+curl -sfL -m 30 https://$OSS_REGION/kubernetes/libcoolbpf.so.1.0.0 -o ${DOWNLOAD_DIR}/libcoolbpf.so.1.0.0
