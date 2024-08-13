@@ -77,6 +77,7 @@ bool AsynCurlRunner::AddRequestToClient(unique_ptr<AsynHttpRequest>&& request) {
     CURL* curl = CreateCurlHandler(request->mMethod,
                                    request->mHTTPSFlag,
                                    request->mHost,
+                                   request->mPort,
                                    request->mUrl,
                                    request->mQueryString,
                                    request->mHeader,

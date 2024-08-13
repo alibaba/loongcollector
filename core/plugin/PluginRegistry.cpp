@@ -29,6 +29,7 @@
 #include "flusher/sls/FlusherSLS.h"
 #include "input/InputContainerStdio.h"
 #include "input/InputFile.h"
+#include "input/InputPrometheus.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "input/InputEBPFFileSecurity.h"
 #include "input/InputEBPFNetworkObserver.h"
@@ -52,8 +53,10 @@
 #include "processor/ProcessorParseJsonNative.h"
 #include "processor/ProcessorParseRegexNative.h"
 #include "processor/ProcessorParseTimestampNative.h"
+#include "processor/inner/ProcessorPromParseMetricNative.h"
 #include "processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "processor/inner/ProcessorParseContainerLogNative.h"
+#include "processor/inner/ProcessorPromRelabelMetricNative.h"
 #include "processor/inner/ProcessorSplitLogStringNative.h"
 #include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "processor/inner/ProcessorTagNative.h"
@@ -121,6 +124,7 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 
 void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputFile>());
+    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
     RegisterInputCreator(new StaticInputCreator<InputEBPFFileSecurity>());
@@ -146,6 +150,8 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseRegexNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseTimestampNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorFilterNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
     if (BOOL_FLAG(enable_processor_spl)) {
         RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSPL>());

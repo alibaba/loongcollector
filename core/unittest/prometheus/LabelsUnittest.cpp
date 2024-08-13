@@ -17,7 +17,8 @@
 #include <cstdint>
 #include <string>
 
-#include "prometheus/Labels.h"
+#include "prometheus/Constants.h"
+#include "prometheus/labels/Labels.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -64,14 +65,13 @@ void LabelsUnittest::TestHash() {
     labels.Push(Label{"port", "9100"});
     uint64_t hash = labels.Hash();
 
-    // 以字典序生成hash值
-    uint64_t expect = offset64;
+    uint64_t expect = prometheus::OFFSET64;
     string raw;
     raw = raw + "host" + "\xff" + "172.17.0.3:9100" + "\xff" + "ip" + "\xff" + "172.17.0.3" + "\xff" + "port" + "\xff"
         + "9100" + "\xff";
     for (auto i : raw) {
         expect ^= (uint64_t)i;
-        expect *= prime64;
+        expect *= prometheus::PRIME64;
     }
 
     APSARA_TEST_EQUAL(expect, hash);
@@ -82,10 +82,8 @@ void LabelsUnittest::TestGet() {
     labels.Push(Label{"host", "172.17.0.3:9100"});
     APSARA_TEST_EQUAL(1UL, labels.Size());
 
-    // 不存在返回空值
     APSARA_TEST_EQUAL("", labels.Get("hosts"));
 
-    // 存在返回value
     APSARA_TEST_EQUAL("172.17.0.3:9100", labels.Get("host"));
 }
 
@@ -94,7 +92,6 @@ void LabelsUnittest::TestPush() {
 
     labels.Push(Label{"host", "172.17.0.3:9100"});
 
-    // 存在Label{"host", "172.17.0.3:9100"}
     APSARA_TEST_EQUAL("172.17.0.3:9100", labels.Get("host"));
 }
 
@@ -122,7 +119,7 @@ void LabelsBuilderUnittest::TestReset() {
     labels.Push(Label{"host", ""});
     lb.Reset(labels);
     APSARA_TEST_EQUAL("", lb.mBase.Get("host"));
-    APSARA_TEST_EQUAL("host", lb.mDeleteLabelNameList.front());
+    APSARA_TEST_EQUAL(1UL, lb.mDeleteLabelNameList.count("host"));
 }
 
 void LabelsBuilderUnittest::TestDeleteLabel() {
@@ -144,13 +141,11 @@ void LabelsBuilderUnittest::TestSet() {
     lb.Reset(labels);
     APSARA_TEST_EQUAL("172.17.0.3:9100", lb.Get("host"));
 
-    lb.mAddLabelList.push_back(Label("host", "127.0.0.1"));
+    lb.mAddLabelList.emplace("host", "127.0.0.1");
 
-    // 根据key修改value
     lb.Set("host", "172.17.0.3:9300");
     APSARA_TEST_EQUAL("172.17.0.3:9300", lb.Get("host"));
 
-    // 如果VALUE为空字符串则删除
     lb.Set("host", "");
     APSARA_TEST_EQUAL("", lb.Get("host"));
 }

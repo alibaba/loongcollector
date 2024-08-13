@@ -17,15 +17,36 @@ project(prometheus_unittest)
 
 add_executable(labels_unittest LabelsUnittest.cpp)
 target_link_libraries(labels_unittest ${UT_BASE_TARGET})
+target_link_libraries(labels_unittest ${UT_BASE_TARGET})
 
 add_executable(relabel_unittest RelabelUnittest.cpp)
 target_link_libraries(relabel_unittest ${UT_BASE_TARGET})
 
+add_executable(target_subscriber_scheduler_unittest TargetSubscriberSchedulerUnittest.cpp)
+target_link_libraries(target_subscriber_scheduler_unittest ${UT_BASE_TARGET})
+
+add_executable(scrape_scheduler_unittest ScrapeSchedulerUnittest.cpp)
+target_link_libraries(scrape_scheduler_unittest ${UT_BASE_TARGET})
+
+add_executable(prometheus_input_runner_unittest PrometheusInputRunnerUnittest.cpp)
+target_link_libraries(prometheus_input_runner_unittest ${UT_BASE_TARGET})
+
 add_executable(textparser_unittest TextParserUnittest.cpp)
 target_link_libraries(textparser_unittest ${UT_BASE_TARGET})
+
+add_executable(textparser_benchmark TextParserBenchmark.cpp)
+target_link_libraries(textparser_benchmark ${UT_BASE_TARGET})
+
+add_executable(scrape_config_unittest ScrapeConfigUnittest.cpp)
+target_link_libraries(scrape_config_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 
 gtest_discover_tests(labels_unittest)
 gtest_discover_tests(relabel_unittest)
+gtest_discover_tests(scrape_scheduler_unittest)
+gtest_discover_tests(target_subscriber_scheduler_unittest)
+gtest_discover_tests(prometheus_input_runner_unittest)
 gtest_discover_tests(textparser_unittest)
+gtest_discover_tests(textparser_benchmark)
+gtest_discover_tests(scrape_config_unittest)

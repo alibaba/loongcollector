@@ -348,7 +348,7 @@ namespace sdk {
         GetQueryString(parameterList, queryString);
 
         return make_unique<HttpSinkRequest>(
-            HTTP_POST, mUsingHTTPS, host, operation, queryString, httpHeader, body, item);
+            HTTP_POST, mUsingHTTPS, host, mPort, operation, queryString, httpHeader, body, item);
     }
 
     PostLogStoreLogsResponse

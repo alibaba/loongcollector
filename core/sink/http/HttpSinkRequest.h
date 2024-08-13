@@ -27,12 +27,13 @@ struct HttpSinkRequest : public AsynHttpRequest {
     HttpSinkRequest(const std::string& method,
                     bool httpsFlag,
                     const std::string& host,
+                    int32_t port,
                     const std::string& url,
                     const std::string& query,
                     const std::map<std::string, std::string>& header,
                     const std::string& body,
                     SenderQueueItem* item)
-        : AsynHttpRequest(method, httpsFlag, host, url, query, header, body), mItem(item) {}
+        : AsynHttpRequest(method, httpsFlag, host, port, url, query, header, body), mItem(item) {}
 
     bool IsContextValid() const override { return true; }
     void OnSendDone(const HttpResponse& response) override {}

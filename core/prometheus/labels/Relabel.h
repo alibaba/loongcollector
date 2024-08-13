@@ -20,7 +20,7 @@
 #include <boost/regex.hpp>
 #include <string>
 
-#include "prometheus/Labels.h"
+#include "prometheus/labels/Labels.h"
 
 namespace logtail {
 
@@ -82,11 +82,11 @@ private:
 };
 
 
-namespace relabel {
+namespace prometheus {
     bool Process(const Labels& lbls, const std::vector<RelabelConfig>& cfgs, Labels& ret);
     bool ProcessBuilder(LabelsBuilder& lb, const std::vector<RelabelConfig>& cfgs);
     bool Relabel(const RelabelConfig& cfg, LabelsBuilder& lb);
-} // namespace relabel
+} // namespace prometheus
 
 
 } // namespace logtail

@@ -151,6 +151,10 @@ DEFINE_FLAG_INT32(pub_max_holded_data_size,
                   512 * 1024);
 DEFINE_FLAG_STRING(metrics_report_method, "method to report metrics (default none, means logtail will not report metrics)", "sls");
 
+DEFINE_FLAG_STRING(loong_collector_operator_service, "loong collector operator service", "");
+DEFINE_FLAG_INT32(loong_collector_operator_service_port, "loong collector operator service port", 8888);
+DEFINE_FLAG_STRING(_pod_name_, "agent pod name", "");
+
 namespace logtail {
 AppConfig::AppConfig() {
     LOG_INFO(sLogger, ("AppConfig AppConfig", "success"));

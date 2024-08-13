@@ -78,6 +78,7 @@ bool HttpSink::AddRequestToClient(std::unique_ptr<HttpSinkRequest>&& request) {
     CURL* curl = CreateCurlHandler(request->mMethod,
                                    request->mHTTPSFlag,
                                    request->mHost,
+                                   request->mPort,
                                    request->mUrl,
                                    request->mQueryString,
                                    request->mHeader,

@@ -20,27 +20,26 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "models/MetricEvent.h"
 
 namespace logtail {
 
-const uint64_t prime64 = 1099511628211;
-const uint64_t offset64 = 14695981039346656037ULL;
-
 // Label is a key/value pair of strings.
 struct Label {
     std::string name;
     std::string value;
-    Label(std::string name, std::string value) : name(name), value(value) {}
+    Label(std::string name, std::string value) : name(std::move(name)), value(std::move(value)) {}
 };
 
 using LabelMap = std::map<std::string, std::string>;
 /// @brief Labels is a sorted set of labels. Order has to be guaranteed upon instantiation
 class Labels {
 public:
-    Labels();
+    Labels() = default;
     size_t Size() const;
     uint64_t Hash();
     void RemoveMetaLabels();
@@ -51,14 +50,12 @@ public:
 
     void Range(const std::function<void(Label)>&);
 
-    // 为常量对象提供只读访问
     LabelMap::const_iterator Begin() const;
     LabelMap::const_iterator End() const;
 
 private:
     LabelMap mLabels;
 
-    // TODO: 现阶段metricEventPtr永远为空，后续作为适配器直接操作MetricEvent提高效率
     MetricEvent* mMetricEventPtr = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -69,7 +66,6 @@ private:
 class LabelsBuilder {
 public:
     LabelsBuilder();
-    // LabelsBuilder(Labels);
     void DeleteLabel(const std::vector<std::string>&);
     void DeleteLabel(std::string);
 
@@ -86,8 +82,8 @@ public:
 private:
     Labels mBase;
 
-    std::vector<std::string> mDeleteLabelNameList;
-    std::vector<Label> mAddLabelList;
+    std::unordered_set<std::string> mDeleteLabelNameList;
+    std::unordered_map<std::string, std::string> mAddLabelList;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class LabelsBuilderUnittest;

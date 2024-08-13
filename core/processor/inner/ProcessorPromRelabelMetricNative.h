@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,31 +16,33 @@
 
 #pragma once
 
-#include <re2/re2.h>
-
 #include <string>
 
 #include "models/PipelineEventGroup.h"
+#include "models/PipelineEventPtr.h"
+#include "plugin/interface/Processor.h"
+#include "prometheus/labels/Relabel.h"
 
 namespace logtail {
-
-extern const std::string SAMPLE_RE;
-
-class TextParser {
+class ProcessorPromRelabelMetricNative : public Processor {
 public:
-    TextParser() : mSampleRegex(SAMPLE_RE) {}
-    PipelineEventGroup Parse(const std::string& content);
+    static const std::string sName;
 
+    const std::string& Name() const override { return sName; }
+    bool Init(const Json::Value& config) override;
+    void Process(PipelineEventGroup& metricGroup) override;
 
-    PipelineEventGroup Parse(const std::string& content,
-                             std::time_t defaultTs,
-                             const std::string& jobName = "",
-                             const std::string& instance = "");
+protected:
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override;
+
 private:
-    RE2 mSampleRegex;
+    bool ProcessEvent(PipelineEventPtr& e);
+
+    std::vector<RelabelConfig> mRelabelConfigs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class TextParserUnittest;
+    friend class ProcessorPromRelabelMetricNativeUnittest;
+    friend class InputPrometheusUnittest;
 #endif
 };
 

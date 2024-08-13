@@ -24,14 +24,15 @@ struct AsynHttpRequestMock : public AsynHttpRequest {
     AsynHttpRequestMock(const string& method,
                         bool httpsFlag,
                         const string& host,
+                        int32_t port,
                         const string& url,
                         const string& query,
                         const map<string, string>& header,
                         const string& body)
-        : AsynHttpRequest(method, httpsFlag, host, url, query, header, body) {}
+        : AsynHttpRequest(method, httpsFlag, host, port, url, query, header, body) {}
 
     bool IsContextValid() const override { return true; };
-    void OnSendDone(const HttpResponse& response) {};
+    void OnSendDone(const HttpResponse& response){};
 };
 
 class HttpRequestTimerEventUnittest : public ::testing::Test {
@@ -42,13 +43,13 @@ public:
 
 void HttpRequestTimerEventUnittest::TestValid() {
     HttpRequestTimerEvent event(chrono::steady_clock::now(),
-                                make_unique<AsynHttpRequestMock>("", false, "", "", "", map<string, string>(), ""));
+                                make_unique<AsynHttpRequestMock>("", false, "", 80, "", "", map<string, string>(), ""));
     APSARA_TEST_TRUE(event.IsValid());
 }
 
 void HttpRequestTimerEventUnittest::TestExecute() {
     HttpRequestTimerEvent event(chrono::steady_clock::now(),
-                                make_unique<AsynHttpRequestMock>("", false, "", "", "", map<string, string>(), ""));
+                                make_unique<AsynHttpRequestMock>("", false, "", 80, "", "", map<string, string>(), ""));
     event.Execute();
     APSARA_TEST_EQUAL(1U, AsynCurlRunner::GetInstance()->mQueue.Size());
 }

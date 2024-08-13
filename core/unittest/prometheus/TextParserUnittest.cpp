@@ -18,7 +18,7 @@
 
 #include "MetricEvent.h"
 #include "models/PipelineEventGroup.h"
-#include "prometheus/TextParser.h"
+#include "prometheus/labels/TextParser.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -85,12 +85,11 @@ void TextParserUnittest::TestParseMetricWithTagsAndTimestamp() const {
     const auto eGroup = parser.Parse(R"""(
     test_metric{k1="v1", k2="v2"} 9.9410452992e+10 1715829785083
     test_metric2{k1="v1", k2="v2"} 2.0 1715829785083
-    test_metric3{k1="v1",k2="v2"} 4.2 1715829785083
+    test_metric3{k1="v1",k2="v2"} 4.2 92233720368547758080000
     )""");
 
     // test_metric
     const auto& events = &eGroup.GetEvents();
-    APSARA_TEST_EQUAL(3UL, events->size());
     const auto& event = events->front();
     const auto& metric = event.Get<MetricEvent>();
     APSARA_TEST_STREQ("test_metric", metric->GetName().data());
@@ -108,14 +107,8 @@ void TextParserUnittest::TestParseMetricWithTagsAndTimestamp() const {
     APSARA_TEST_STREQ("v1", metric2->GetTag("k1").data());
     APSARA_TEST_STREQ("v2", metric2->GetTag("k2").data());
 
-    // test_metric3
-    auto& event3 = events->at(2);
-    const auto& metric3 = event3.Get<MetricEvent>();
-    APSARA_TEST_STREQ("test_metric3", metric3->GetName().data());
-    APSARA_TEST_EQUAL(1715829785, metric3->GetTimestamp());
-    APSARA_TEST_TRUE(isDoubleEqual(4.2, metric3->GetValue<UntypedSingleValue>()->mValue));
-    APSARA_TEST_STREQ("v1", metric3->GetTag("k1").data());
-    APSARA_TEST_STREQ("v2", metric3->GetTag("k2").data());
+    // test_metric3 is not generated because of timestamp overflow
+    APSARA_TEST_EQUAL(2UL, events->size());
 }
 UNIT_TEST_CASE(TextParserUnittest, TestParseMetricWithTagsAndTimestamp)
 

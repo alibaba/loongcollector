@@ -38,6 +38,7 @@ struct HttpRequest {
     std::map<std::string, std::string> mHeader;
     std::string mBody;
     std::string mHost;
+    int32_t mPort;
     uint32_t mTimeout = sDefaultTimeoutSec;
     uint32_t mMaxTryCnt = sDefaultMaxTryCnt;
 
@@ -47,6 +48,7 @@ struct HttpRequest {
     HttpRequest(const std::string& method,
                 bool httpsFlag,
                 const std::string& host,
+                int32_t port,
                 const std::string& url,
                 const std::string& query,
                 const std::map<std::string, std::string>& header,
@@ -60,6 +62,7 @@ struct HttpRequest {
           mHeader(header),
           mBody(body),
           mHost(host),
+          mPort(port),
           mTimeout(timeout),
           mMaxTryCnt(maxTryCnt) {}
     virtual ~HttpRequest() = default;
@@ -73,13 +76,14 @@ struct AsynHttpRequest : public HttpRequest {
     AsynHttpRequest(const std::string& method,
                     bool httpsFlag,
                     const std::string& host,
+                    int32_t port,
                     const std::string& url,
                     const std::string& query,
                     const std::map<std::string, std::string>& header,
                     const std::string& body,
                     uint32_t timeout = sDefaultTimeoutSec,
                     uint32_t maxTryCnt = sDefaultMaxTryCnt)
-        : HttpRequest(method, httpsFlag, host, url, query, header, body, timeout, maxTryCnt) {}
+        : HttpRequest(method, httpsFlag, host, port, url, query, header, body, timeout, maxTryCnt) {}
 
     virtual bool IsContextValid() const = 0;
     virtual void OnSendDone(const HttpResponse& response) = 0;

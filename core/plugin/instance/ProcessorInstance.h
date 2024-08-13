@@ -56,6 +56,7 @@ private:
     friend class ProcessorFilterNativeUnittest;
     friend class ProcessorDesensitizeNativeUnittest;
     friend class InputFileUnittest;
+    friend class InputPrometheusUnittest;
     friend class PipelineUnittest;
 #endif
 };

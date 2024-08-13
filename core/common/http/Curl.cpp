@@ -64,6 +64,7 @@ static size_t header_write_callback(char* buffer,
 CURL* CreateCurlHandler(const std::string& method,
                         bool httpsFlag,
                         const std::string& host,
+                        int32_t port,
                         const std::string& url,
                         const std::string& queryString,
                         const std::map<std::string, std::string>& header,
@@ -98,6 +99,7 @@ CURL* CreateCurlHandler(const std::string& method,
     if (headers != NULL) {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     }
+    curl_easy_setopt(curl, CURLOPT_PORT, port);
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, method.c_str());
     if (!body.empty()) {
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, (void*)body.c_str());

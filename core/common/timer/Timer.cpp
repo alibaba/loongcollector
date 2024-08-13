@@ -55,7 +55,7 @@ void Timer::Run() {
         unique_lock<mutex> queueLock(mQueueMux);
         if (mQueue.empty()) {
             queueLock.unlock();
-            mCV.wait(threadLock, [this]() { return !mIsThreadRunning; });
+            mCV.wait(threadLock, [this]() { return !mIsThreadRunning || !mQueue.empty(); });
         } else {
             auto now = chrono::steady_clock::now();
             while (!mQueue.empty()) {

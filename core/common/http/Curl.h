@@ -29,6 +29,7 @@ namespace logtail {
 CURL* CreateCurlHandler(const std::string& method,
                         bool httpsFlag,
                         const std::string& host,
+                        int32_t port,
                         const std::string& url,
                         const std::string& queryString,
                         const std::map<std::string, std::string>& header,

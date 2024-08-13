@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "prometheus/TextParser.h"
+#include "prometheus/labels/TextParser.h"
 
 #include <re2/re2.h>
 
@@ -29,15 +29,13 @@
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
+#include "prometheus/Constants.h"
 
 using namespace std;
 
 namespace logtail {
 
-// TODO: 830移除正则依赖
 const std::string SAMPLE_RE = R"""(^(?P<name>\w+)(\{(?P<labels>[^}]+)\})?\s+(?P<value>\S+)(\s+(?P<timestamp>\S+))?)""";
-const string JOB = "job";
-const string INSTANCE = "instance";
 
 PipelineEventGroup TextParser::Parse(const string& content) {
     auto now = std::chrono::system_clock::now();
@@ -47,7 +45,82 @@ PipelineEventGroup TextParser::Parse(const string& content) {
     return Parse(content, defaultTsInSecs, "", "");
 }
 
-// TODO: jobName和instance在后续移动到接近业务的位置
+bool TextParser::ParseLine(const string& line, MetricEvent& e, time_t defaultTsInSecs) {
+    string argName;
+    string argLabels;
+    string argUnwrappedLabels;
+    string argValue;
+    string argSuffix;
+    string argTimestamp;
+    if (RE2::FullMatch(line,
+                       mSampleRegex,
+                       RE2::Arg(&argName),
+                       RE2::Arg(&argLabels),
+                       RE2::Arg(&argUnwrappedLabels),
+                       RE2::Arg(&argValue),
+                       RE2::Arg(&argSuffix),
+                       RE2::Arg(&argTimestamp))
+        == false) {
+        return false;
+    }
+
+    // skip any sample that has no name
+    if (argName.empty()) {
+        return false;
+    }
+
+    // skip any sample that has a NaN value
+    double value = 0;
+    try {
+        value = stod(argValue);
+    } catch (const exception&) {
+        LOG_WARNING(sLogger, ("invalid value", argValue)("raw line", line));
+        return false;
+    }
+    if (isnan(value)) {
+        return false;
+    }
+
+    // set timestamp to `defaultTsInSecs` if timestamp is empty, otherwise parse it
+    // if timestamp is not empty but not a valid integer, skip it
+    time_t timestamp = 0;
+    if (argTimestamp.empty()) {
+        timestamp = defaultTsInSecs;
+    } else {
+        try {
+            if (argTimestamp.length() > 3) {
+                timestamp = stol(argTimestamp.substr(0, argTimestamp.length() - 3));
+            } else {
+                timestamp = 0;
+            }
+        } catch (const exception&) {
+            LOG_WARNING(sLogger, ("invalid value", argTimestamp)("raw line", line));
+            return false;
+        }
+    }
+
+    e.SetName(argName);
+    e.SetTimestamp(timestamp);
+    e.SetValue<UntypedSingleValue>(value);
+
+    if (!argUnwrappedLabels.empty()) {
+        string kvPair;
+        istringstream iss(argUnwrappedLabels);
+        while (getline(iss, kvPair, ',')) {
+            kvPair = TrimString(kvPair);
+
+            size_t equalsPos = kvPair.find('=');
+            if (equalsPos != string::npos) {
+                string key = kvPair.substr(0, equalsPos);
+                string value = kvPair.substr(equalsPos + 1);
+                value = TrimString(value, '\"', '\"');
+                e.SetTag(key, value);
+            }
+        }
+    }
+    return true;
+}
+
 PipelineEventGroup
 TextParser::Parse(const string& content, const time_t defaultTsInSecs, const string& jobName, const string& instance) {
     string line;
@@ -107,14 +180,16 @@ TextParser::Parse(const string& content, const time_t defaultTsInSecs, const str
 
         // set timestamp to `defaultTsInSecs` if timestamp is empty, otherwise parse it
         // if timestamp is not empty but not a valid integer, skip it
-        time_t timestamp;
+        time_t timestamp = 0;
         if (argTimestamp.empty()) {
             timestamp = defaultTsInSecs;
         } else {
             try {
-                // TODO: check if timestamp is out of window （e.g. 24h)
-                timestamp = stol(argTimestamp) / 1000;
-                // TODO: convert milli-second part into nano-second
+                if (argTimestamp.length() > 3) {
+                    timestamp = stol(argTimestamp.substr(0, argTimestamp.length() - 3));
+                } else {
+                    timestamp = 0;
+                }
             } catch (const exception&) {
                 LOG_WARNING(sLogger, ("invalid value", argTimestamp)("raw line", line));
                 continue;
@@ -142,10 +217,10 @@ TextParser::Parse(const string& content, const time_t defaultTsInSecs, const str
             }
         }
         if (!jobName.empty()) {
-            e->SetTag(JOB, jobName);
+            e->SetTag(string(prometheus::JOB), jobName);
         }
         if (!instance.empty()) {
-            e->SetTag(INSTANCE, instance);
+            e->SetTag(prometheus::INSTANCE, instance);
         }
     }
 
