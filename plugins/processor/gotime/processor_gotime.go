@@ -28,6 +28,7 @@ const (
 	fixedSecondsTimestampPattern      = "seconds"
 	fixedMillisecondsTimestampPattern = "milliseconds"
 	fixedMicrosecondsTimestampPattern = "microseconds"
+	fixedNanosecondsTimestampPattern  = "nanoseconds"
 )
 
 type ProcessorGotime struct {
@@ -91,6 +92,11 @@ func (p *ProcessorGotime) Init(context pipeline.Context) error {
 	case fixedMillisecondsTimestampPattern:
 		p.timestampParseFunc = func(timestamp int64) time.Time {
 			return time.Unix(timestamp/1e3, (timestamp%1e3)*1e6)
+		}
+		p.timestampFormat = true
+	case fixedNanosecondsTimestampPattern:
+		p.timestampParseFunc = func(timestamp int64) time.Time {
+			return time.Unix(0, timestamp)
 		}
 		p.timestampFormat = true
 	}

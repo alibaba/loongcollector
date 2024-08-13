@@ -160,6 +160,21 @@ func TestSourceFormatTimestampMicroseconds(t *testing.T) {
 	assert.Equal(t, "2022/02/23 14:47:36.807000", log.Contents[1].Value)
 }
 
+func TestSourceFormatTimestampNanoseconds(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+
+	log := &protocol.Log{Time: 0}
+	unixStr := "1645595256807000123"
+	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: unixStr})
+	processor.SourceFormat = fixedNanosecondsTimestampPattern
+	processor.DestFormat = "2006/01/02 15:04:05.000000000"
+	_ = processor.Init(processor.context)
+	processor.processLog(log)
+	assert.Equal(t, "d_key", log.Contents[1].Key)
+	assert.Equal(t, "2022/02/23 14:47:36.807000123", log.Contents[1].Value)
+}
+
 func TestEmptyTimezone(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	processor := &ProcessorGotime{
