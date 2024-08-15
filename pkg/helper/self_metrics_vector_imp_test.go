@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 func Test_MetricVectorWithEmptyLabel(t *testing.T) {
@@ -61,10 +60,9 @@ func Test_MetricVectorWithConstLabel(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "test", counter.Name())
 		assert.Equal(t, 2.0, counter.Collect().Value)
-		log := &protocol.Log{}
-		v.Serialize(log)
-		for _, v := range log.Contents {
-			assert.Equal(t, expectedContents[i][v.Key], v.Value)
+		records := v.Export()
+		for k, v := range records {
+			assert.Equal(t, expectedContents[i][k], v)
 		}
 	}
 }
@@ -108,11 +106,10 @@ func Test_CounterMetricVectorWithDynamicLabel(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, metricName, counter.Name())
 		valueAsIndex := int(counter.Collect().Value)
-		log := &protocol.Log{}
-		metric.Serialize(log)
+		records := metric.Export()
 		if valueAsIndex >= 0 {
-			for _, v := range log.Contents {
-				assert.Equal(t, expectedContents[valueAsIndex][v.Key], v.Value)
+			for k, v := range records {
+				assert.Equal(t, expectedContents[valueAsIndex][k], v)
 			}
 		}
 	}
@@ -157,12 +154,11 @@ func Test_AverageMetricVectorWithDynamicLabel(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, metricName, counter.Name())
 		valueAsIndex := int(counter.Collect().Value)
-		log := &protocol.Log{}
-		metric.Serialize(log)
+		records := metric.Export()
 		if valueAsIndex >= 0 {
-			for _, v := range log.Contents {
-				if expectedContents[valueAsIndex][v.Key] != v.Value {
-					t.Errorf("index: %d, actual: %v vs expcted: %v", i, v.Value, expectedContents[valueAsIndex][v.Key])
+			for k, v := range records {
+				if expectedContents[valueAsIndex][k] != v {
+					t.Errorf("index: %d, actual: %v vs expcted: %v", i, v, expectedContents[valueAsIndex][k])
 				}
 			}
 		}
@@ -208,21 +204,27 @@ func Test_LatencyMetricVectorWithDynamicLabel(t *testing.T) {
 		latency, ok := metric.(*latencyImp)
 		assert.True(t, ok)
 		assert.Equal(t, metricName, latency.Name())
-		log := &protocol.Log{}
-		metric.Serialize(log)
+		records := metric.Export()
 		valueAsIndex := 0 // int(latency.Collect().Value / 1000)
-		metricName := GetMetricName(log)
-		for _, v := range log.Contents {
-			if v.Key == metricName {
-				valueAsIndexF, _ := strconv.ParseFloat(v.Value, 64)
+		metricName := func() string {
+			for k, v := range records {
+				if k == pipeline.SelfMetricNameKey {
+					return v
+				}
+			}
+			return ""
+		}()
+		for k, v := range records {
+			if k == metricName {
+				valueAsIndexF, _ := strconv.ParseFloat(v, 64)
 				valueAsIndex = int(valueAsIndexF)
 				break
 			}
 		}
 		if valueAsIndex >= 0 && valueAsIndex < len(expectedContents) {
-			for _, v := range log.Contents {
-				if expectedContents[valueAsIndex][v.Key] != v.Value {
-					t.Errorf("index: %d, actual: %v vs expcted: %v", i, v.Value, expectedContents[valueAsIndex][v.Key])
+			for k, v := range records {
+				if expectedContents[valueAsIndex][k] != v {
+					t.Errorf("index: %d, actual: %v vs expcted: %v", i, v, expectedContents[valueAsIndex][k])
 				}
 			}
 		}
@@ -269,12 +271,11 @@ func Test_GaugeMetricVectorWithDynamicLabel(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, metricName, counter.Name())
 		valueAsIndex := int(counter.Collect().Value)
-		log := &protocol.Log{}
-		metric.Serialize(log)
+		records := metric.Export()
 		if valueAsIndex >= 0 && valueAsIndex < len(expectedContents) {
-			for _, v := range log.Contents {
-				if expectedContents[valueAsIndex][v.Key] != v.Value {
-					t.Errorf("index: %d, actual: %v vs expcted: %v", i, v.Value, expectedContents[valueAsIndex][v.Key])
+			for k, v := range records {
+				if expectedContents[valueAsIndex][k] != v {
+					t.Errorf("index: %d, actual: %v vs expcted: %v", i, v, expectedContents[valueAsIndex][k])
 				}
 			}
 		}
@@ -323,12 +324,11 @@ func Test_StrMetricVectorWithDynamicLabel(t *testing.T) {
 		assert.Equal(t, metricName, counter.Name())
 		valueAsIndex, err := strconv.Atoi(counter.Collect().Value)
 		assert.NoError(t, err)
-		log := &protocol.Log{}
-		metric.Serialize(log)
+		records := metric.Export()
 		if valueAsIndex >= 0 && valueAsIndex < len(expectedContents) {
-			for _, v := range log.Contents {
-				if expectedContents[valueAsIndex][v.Key] != v.Value {
-					t.Errorf("index: %d, actual: %v vs expcted: %v", i, v.Value, expectedContents[valueAsIndex][v.Key])
+			for k, v := range records {
+				if expectedContents[valueAsIndex][k] != v {
+					t.Errorf("index: %d, actual: %v vs expcted: %v", i, v, expectedContents[valueAsIndex][k])
 				}
 			}
 		}

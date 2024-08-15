@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -43,11 +44,11 @@ type pluginv2Runner struct {
 	AggregateControl     *pipeline.AsyncControl
 	FlushControl         *pipeline.AsyncControl
 
-	MetricPlugins     []pipeline.MetricInputV2
-	ServicePlugins    []pipeline.ServiceInputV2
-	ProcessorPlugins  []pipeline.ProcessorV2
-	AggregatorPlugins []pipeline.AggregatorV2
-	FlusherPlugins    []pipeline.FlusherV2
+	MetricPlugins     []*MetricWrapperV2
+	ServicePlugins    []*ServiceWrapperV2
+	ProcessorPlugins  []*ProcessorWrapperV2
+	AggregatorPlugins []*AggregatorWrapperV2
+	FlusherPlugins    []*FlusherWrapperV2
 	ExtensionPlugins  map[string]pipeline.Extension
 	TimerRunner       []*timerRunner
 
@@ -60,61 +61,65 @@ func (p *pluginv2Runner) Init(inputQueueSize int, flushQueueSize int) error {
 	p.ProcessControl = pipeline.NewAsyncControl()
 	p.AggregateControl = pipeline.NewAsyncControl()
 	p.FlushControl = pipeline.NewAsyncControl()
-	p.MetricPlugins = make([]pipeline.MetricInputV2, 0)
-	p.ServicePlugins = make([]pipeline.ServiceInputV2, 0)
-	p.ProcessorPlugins = make([]pipeline.ProcessorV2, 0)
-	p.AggregatorPlugins = make([]pipeline.AggregatorV2, 0)
-	p.FlusherPlugins = make([]pipeline.FlusherV2, 0)
+	p.MetricPlugins = make([]*MetricWrapperV2, 0)
+	p.ServicePlugins = make([]*ServiceWrapperV2, 0)
+	p.ProcessorPlugins = make([]*ProcessorWrapperV2, 0)
+	p.AggregatorPlugins = make([]*AggregatorWrapperV2, 0)
+	p.FlusherPlugins = make([]*FlusherWrapperV2, 0)
 	p.ExtensionPlugins = make(map[string]pipeline.Extension, 0)
-	p.InputPipeContext = pipeline.NewObservePipelineConext(inputQueueSize)
-	p.ProcessPipeContext = pipeline.NewGroupedPipelineConext()
-	p.AggregatePipeContext = pipeline.NewObservePipelineConext(flushQueueSize)
-	p.FlushPipeContext = pipeline.NewNoopPipelineConext()
+	p.InputPipeContext = helper.NewObservePipelineConext(inputQueueSize)
+	p.ProcessPipeContext = helper.NewGroupedPipelineConext()
+	p.AggregatePipeContext = helper.NewObservePipelineConext(flushQueueSize)
+	p.FlushPipeContext = helper.NewNoopPipelineConext()
 	p.FlushOutStore.Write(p.AggregatePipeContext.Collector().Observe())
 	return nil
 }
 
-func (p *pluginv2Runner) Initialized() error {
+func (p *pluginv2Runner) AddDefaultAggregatorIfEmpty() error {
 	if len(p.AggregatorPlugins) == 0 {
+		pluginMeta := p.LogstoreConfig.genPluginMeta("aggregator_default", true, false)
 		logger.Debug(p.LogstoreConfig.Context.GetRuntimeContext(), "add default aggregator")
-		if err := loadAggregator("aggregator_default", p.LogstoreConfig, nil); err != nil {
+		if err := loadAggregator(pluginMeta, p.LogstoreConfig, nil); err != nil {
 			return err
 		}
 	}
-	// TODO Implement default flusher v2
 	return nil
 }
 
-func (p *pluginv2Runner) AddPlugin(pluginName string, category pluginCategory, plugin interface{}, config map[string]interface{}) error {
+func (p *pluginv2Runner) AddDefaultFlusherIfEmpty() error {
+	return nil
+}
+
+func (p *pluginv2Runner) AddPlugin(pluginMeta *pipeline.PluginMeta, category pluginCategory, plugin interface{}, config map[string]interface{}) error {
 	switch category {
 	case pluginMetricInput:
 		if metric, ok := plugin.(pipeline.MetricInputV2); ok {
-			return p.addMetricInput(metric, config["interval"].(int))
+			return p.addMetricInput(pluginMeta, metric, config["interval"].(int))
 		}
 	case pluginServiceInput:
 		if service, ok := plugin.(pipeline.ServiceInputV2); ok {
-			return p.addServiceInput(service)
+			return p.addServiceInput(pluginMeta, service)
 		}
 	case pluginProcessor:
 		if processor, ok := plugin.(pipeline.ProcessorV2); ok {
-			return p.addProcessor(processor, config["priority"].(int))
+			return p.addProcessor(pluginMeta, processor, config["priority"].(int))
 		}
 	case pluginAggregator:
 		if aggregator, ok := plugin.(pipeline.AggregatorV2); ok {
-			return p.addAggregator(aggregator)
+			return p.addAggregator(pluginMeta, aggregator)
 		}
 	case pluginFlusher:
 		if flusher, ok := plugin.(pipeline.FlusherV2); ok {
-			return p.addFlusher(flusher)
+			return p.addFlusher(pluginMeta, flusher)
 		}
 	case pluginExtension:
 		if extension, ok := plugin.(pipeline.Extension); ok {
-			return p.addExtension(pluginName, extension)
+			return p.addExtension(pluginMeta.PluginTypeWithID, extension)
 		}
 	default:
 		return pluginCategoryUndefinedError(category)
 	}
-	return pluginUnImplementError(category, v2, pluginName)
+	return pluginUnImplementError(category, v2, pluginMeta.PluginTypeWithID)
 }
 
 func (p *pluginv2Runner) GetExtension(name string) (pipeline.Extension, bool) {
@@ -137,49 +142,67 @@ func (p *pluginv2Runner) RunPlugins(category pluginCategory, control *pipeline.A
 	}
 }
 
-func (p *pluginv2Runner) addMetricInput(input pipeline.MetricInputV2, interval int) error {
-	p.MetricPlugins = append(p.MetricPlugins, input)
+func (p *pluginv2Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input pipeline.MetricInputV2, inputInterval int) error {
+	var wrapper MetricWrapperV2
+	wrapper.Config = p.LogstoreConfig
+	wrapper.Input = input
+	err := wrapper.Init(pluginMeta, inputInterval)
+	if err != nil {
+		return err
+	}
+	p.MetricPlugins = append(p.MetricPlugins, &wrapper)
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
 		state:         input,
-		interval:      time.Duration(interval) * time.Millisecond,
+		interval:      wrapper.Interval * time.Millisecond,
 		context:       p.LogstoreConfig.Context,
 		latencyMetric: p.LogstoreConfig.Statistics.CollecLatencytMetric,
 	})
-	return nil
+	return err
 }
 
-func (p *pluginv2Runner) addServiceInput(input pipeline.ServiceInputV2) error {
-	p.ServicePlugins = append(p.ServicePlugins, input)
-	return nil
+func (p *pluginv2Runner) addServiceInput(pluginMeta *pipeline.PluginMeta, input pipeline.ServiceInputV2) error {
+	var wrapper ServiceWrapperV2
+	wrapper.Config = p.LogstoreConfig
+	wrapper.Input = input
+	p.ServicePlugins = append(p.ServicePlugins, &wrapper)
+	err := wrapper.Init(pluginMeta)
+	return err
 }
 
-func (p *pluginv2Runner) addProcessor(processor pipeline.ProcessorV2, _ int) error {
-	p.ProcessorPlugins = append(p.ProcessorPlugins, processor)
-	return nil
+func (p *pluginv2Runner) addProcessor(pluginMeta *pipeline.PluginMeta, processor pipeline.ProcessorV2, _ int) error {
+	var wrapper ProcessorWrapperV2
+	wrapper.Config = p.LogstoreConfig
+	wrapper.Processor = processor
+	p.ProcessorPlugins = append(p.ProcessorPlugins, &wrapper)
+	return wrapper.Init(pluginMeta)
 }
 
-func (p *pluginv2Runner) addAggregator(aggregator pipeline.AggregatorV2) error {
-	p.AggregatorPlugins = append(p.AggregatorPlugins, aggregator)
-	interval, err := aggregator.Init(p.LogstoreConfig.Context, &AggregatorWrapper{})
+func (p *pluginv2Runner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregator pipeline.AggregatorV2) error {
+	var wrapper AggregatorWrapperV2
+	wrapper.Config = p.LogstoreConfig
+	wrapper.Aggregator = aggregator
+	err := wrapper.Init(pluginMeta)
 	if err != nil {
 		logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", aggregator.Description(), "error", err)
 		return err
 	}
-	if interval == 0 {
-		interval = p.LogstoreConfig.GlobalConfig.AggregatIntervalMs
-	}
+	p.AggregatorPlugins = append(p.AggregatorPlugins, &wrapper)
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
 		state:         aggregator,
-		interval:      time.Millisecond * time.Duration(interval),
+		interval:      time.Millisecond * wrapper.Interval,
 		context:       p.LogstoreConfig.Context,
 		latencyMetric: p.LogstoreConfig.Statistics.CollecLatencytMetric,
 	})
 	return nil
 }
 
-func (p *pluginv2Runner) addFlusher(flusher pipeline.FlusherV2) error {
-	p.FlusherPlugins = append(p.FlusherPlugins, flusher)
-	return nil
+func (p *pluginv2Runner) addFlusher(pluginMeta *pipeline.PluginMeta, flusher pipeline.FlusherV2) error {
+	var wrapper FlusherWrapperV2
+	wrapper.Config = p.LogstoreConfig
+	wrapper.Flusher = flusher
+	wrapper.Interval = time.Millisecond * time.Duration(p.LogstoreConfig.GlobalConfig.FlushIntervalMs)
+	p.FlusherPlugins = append(p.FlusherPlugins, &wrapper)
+	return wrapper.Init(pluginMeta)
 }
 
 func (p *pluginv2Runner) addExtension(name string, extension pipeline.Extension) error {
@@ -194,18 +217,18 @@ func (p *pluginv2Runner) runInput() {
 		service := input
 		p.InputControl.Run(func(c *pipeline.AsyncControl) {
 			logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "start run service", service)
-			defer panicRecover(service.Description())
+			defer panicRecover(service.Input.Description())
 			if err := service.StartService(p.InputPipeContext); err != nil {
 				logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "PLUGIN_ALARM", "start service error, err", err)
 			}
-			logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "service done", service.Description())
+			logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "service done", service.Input.Description())
 		})
 	}
 }
 
 func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 	for _, t := range p.TimerRunner {
-		if plugin, ok := t.state.(pipeline.MetricInputV2); ok {
+		if plugin, ok := t.state.(*MetricWrapperV2); ok {
 			metric := plugin
 			timer := t
 			control.Run(func(cc *pipeline.AsyncControl) {
@@ -338,7 +361,7 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 			for {
 				allReady := true
 				for _, flusher := range p.FlusherPlugins {
-					if !flusher.IsReady(p.LogstoreConfig.ProjectName,
+					if !flusher.Flusher.IsReady(p.LogstoreConfig.ProjectName,
 						p.LogstoreConfig.LogstoreName, p.LogstoreConfig.LogstoreKey) {
 						allReady = false
 						break
@@ -373,10 +396,10 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 
 func (p *pluginv2Runner) Stop(exit bool) error {
 	for _, flusher := range p.FlusherPlugins {
-		flusher.SetUrgent(exit)
+		flusher.Flusher.SetUrgent(exit)
 	}
 	for _, serviceInput := range p.ServicePlugins {
-		_ = serviceInput.Stop()
+		_ = serviceInput.Input.Stop()
 	}
 	p.InputControl.WaitCancel()
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "metric plugins stop", "done", "service plugins stop", "done")
@@ -391,17 +414,21 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	p.FlushControl.WaitCancel()
 
 	if exit && p.FlushOutStore.Len() > 0 {
+		flushers := make([]pipeline.FlusherV2, len(p.FlusherPlugins))
+		for idx, flusher := range p.FlusherPlugins {
+			flushers[idx] = flusher.Flusher
+		}
 		logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "Flushout group events, count", p.FlushOutStore.Len())
-		rst := flushOutStore(p.LogstoreConfig, p.FlushOutStore, p.FlusherPlugins, func(lc *LogstoreConfig, pf pipeline.FlusherV2, store *FlushOutStore[models.PipelineGroupEvents]) error {
+		rst := flushOutStore(p.LogstoreConfig, p.FlushOutStore, p.FlusherPlugins, func(lc *LogstoreConfig, pf *FlusherWrapperV2, store *FlushOutStore[models.PipelineGroupEvents]) error {
 			return pf.Export(store.Get(), p.FlushPipeContext)
 		})
 		logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "Flushout group events, result", rst)
 	}
 	for idx, flusher := range p.FlusherPlugins {
-		if err := flusher.Stop(); err != nil {
+		if err := flusher.Flusher.Stop(); err != nil {
 			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "STOP_FLUSHER_ALARM",
 				"Failed to stop %vth flusher (description: %v): %v",
-				idx, flusher.Description(), err)
+				idx, flusher.Flusher.Description(), err)
 		}
 	}
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "Flusher plugins stop", "done")

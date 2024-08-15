@@ -30,11 +30,11 @@ type pluginv1Runner struct {
 	LogsChan      chan *pipeline.LogWithContext
 	LogGroupsChan chan *protocol.LogGroup
 
-	MetricPlugins     []*MetricWrapper
-	ServicePlugins    []*ServiceWrapper
-	ProcessorPlugins  []*ProcessorWrapper
-	AggregatorPlugins []*AggregatorWrapper
-	FlusherPlugins    []*FlusherWrapper
+	MetricPlugins     []*MetricWrapperV1
+	ServicePlugins    []*ServiceWrapperV1
+	ProcessorPlugins  []*ProcessorWrapperV1
+	AggregatorPlugins []*AggregatorWrapperV1
+	FlusherPlugins    []*FlusherWrapperV1
 	ExtensionPlugins  map[string]pipeline.Extension
 
 	FlushOutStore  *FlushOutStore[protocol.LogGroup]
@@ -51,11 +51,11 @@ func (p *pluginv1Runner) Init(inputQueueSize int, flushQueueSize int) error {
 	p.ProcessControl = pipeline.NewAsyncControl()
 	p.AggregateControl = pipeline.NewAsyncControl()
 	p.FlushControl = pipeline.NewAsyncControl()
-	p.MetricPlugins = make([]*MetricWrapper, 0)
-	p.ServicePlugins = make([]*ServiceWrapper, 0)
-	p.ProcessorPlugins = make([]*ProcessorWrapper, 0)
-	p.AggregatorPlugins = make([]*AggregatorWrapper, 0)
-	p.FlusherPlugins = make([]*FlusherWrapper, 0)
+	p.MetricPlugins = make([]*MetricWrapperV1, 0)
+	p.ServicePlugins = make([]*ServiceWrapperV1, 0)
+	p.ProcessorPlugins = make([]*ProcessorWrapperV1, 0)
+	p.AggregatorPlugins = make([]*AggregatorWrapperV1, 0)
+	p.FlusherPlugins = make([]*FlusherWrapperV1, 0)
 	p.ExtensionPlugins = make(map[string]pipeline.Extension, 0)
 	p.LogsChan = make(chan *pipeline.LogWithContext, inputQueueSize)
 	p.LogGroupsChan = make(chan *protocol.LogGroup, helper.Max(flushQueueSize, p.FlushOutStore.Len()))
@@ -63,53 +63,59 @@ func (p *pluginv1Runner) Init(inputQueueSize int, flushQueueSize int) error {
 	return nil
 }
 
-func (p *pluginv1Runner) Initialized() error {
+func (p *pluginv1Runner) AddDefaultAggregatorIfEmpty() error {
 	if len(p.AggregatorPlugins) == 0 {
+		pluginMeta := p.LogstoreConfig.genPluginMeta("aggregator_default", true, false)
 		logger.Debug(p.LogstoreConfig.Context.GetRuntimeContext(), "add default aggregator")
-		if err := loadAggregator("aggregator_default", p.LogstoreConfig, nil); err != nil {
-			return err
-		}
-	}
-	if len(p.FlusherPlugins) == 0 {
-		logger.Debug(p.LogstoreConfig.Context.GetRuntimeContext(), "add default flusher")
-		category, options := flags.GetFlusherConfiguration()
-		if err := loadFlusher(category, p.LogstoreConfig, options); err != nil {
+		if err := loadAggregator(pluginMeta, p.LogstoreConfig, nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *pluginv1Runner) AddPlugin(pluginName string, category pluginCategory, plugin interface{}, config map[string]interface{}) error {
+func (p *pluginv1Runner) AddDefaultFlusherIfEmpty() error {
+	if len(p.FlusherPlugins) == 0 {
+		logger.Debug(p.LogstoreConfig.Context.GetRuntimeContext(), "add default flusher")
+		category, options := flags.GetFlusherConfiguration()
+		pluginMeta := p.LogstoreConfig.genPluginMeta(category, true, true)
+		if err := loadFlusher(pluginMeta, p.LogstoreConfig, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *pluginv1Runner) AddPlugin(pluginMeta *pipeline.PluginMeta, category pluginCategory, plugin interface{}, config map[string]interface{}) error {
 	switch category {
 	case pluginMetricInput:
 		if metric, ok := plugin.(pipeline.MetricInputV1); ok {
-			return p.addMetricInput(metric, config["interval"].(int))
+			return p.addMetricInput(pluginMeta, metric, config["interval"].(int))
 		}
 	case pluginServiceInput:
 		if service, ok := plugin.(pipeline.ServiceInputV1); ok {
-			return p.addServiceInput(service)
+			return p.addServiceInput(pluginMeta, service)
 		}
 	case pluginProcessor:
 		if processor, ok := plugin.(pipeline.ProcessorV1); ok {
-			return p.addProcessor(processor, config["priority"].(int))
+			return p.addProcessor(pluginMeta, processor, config["priority"].(int))
 		}
 	case pluginAggregator:
 		if aggregator, ok := plugin.(pipeline.AggregatorV1); ok {
-			return p.addAggregator(aggregator)
+			return p.addAggregator(pluginMeta, aggregator)
 		}
 	case pluginFlusher:
 		if flusher, ok := plugin.(pipeline.FlusherV1); ok {
-			return p.addFlusher(flusher)
+			return p.addFlusher(pluginMeta, flusher)
 		}
 	case pluginExtension:
 		if extension, ok := plugin.(pipeline.Extension); ok {
-			return p.addExtension(pluginName, extension)
+			return p.addExtension(pluginMeta.PluginTypeWithID, extension)
 		}
 	default:
 		return pluginCategoryUndefinedError(category)
 	}
-	return pluginUnImplementError(category, v1, pluginName)
+	return pluginUnImplementError(category, v1, pluginMeta.PluginTypeWithID)
 }
 
 func (p *pluginv1Runner) GetExtension(name string) (pipeline.Extension, bool) {
@@ -132,62 +138,53 @@ func (p *pluginv1Runner) RunPlugins(category pluginCategory, control *pipeline.A
 	}
 }
 
-func (p *pluginv1Runner) addMetricInput(input pipeline.MetricInputV1, interval int) error {
-	var wrapper MetricWrapper
+func (p *pluginv1Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input pipeline.MetricInputV1, inputInterval int) error {
+	var wrapper MetricWrapperV1
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Input = input
-	wrapper.Interval = time.Duration(interval) * time.Millisecond
+
 	wrapper.LogsChan = p.LogsChan
 	wrapper.LatencyMetric = p.LogstoreConfig.Statistics.CollecLatencytMetric
 	p.MetricPlugins = append(p.MetricPlugins, &wrapper)
-	return nil
+	return wrapper.Init(pluginMeta, inputInterval)
 }
 
-func (p *pluginv1Runner) addServiceInput(input pipeline.ServiceInputV1) error {
-	var wrapper ServiceWrapper
+func (p *pluginv1Runner) addServiceInput(pluginMeta *pipeline.PluginMeta, input pipeline.ServiceInputV1) error {
+	var wrapper ServiceWrapperV1
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Input = input
 	wrapper.LogsChan = p.LogsChan
 	p.ServicePlugins = append(p.ServicePlugins, &wrapper)
-	return nil
+	return wrapper.Init(pluginMeta)
 }
 
-func (p *pluginv1Runner) addProcessor(processor pipeline.ProcessorV1, priority int) error {
-	var wrapper ProcessorWrapper
+func (p *pluginv1Runner) addProcessor(pluginMeta *pipeline.PluginMeta, processor pipeline.ProcessorV1, priority int) error {
+	var wrapper ProcessorWrapperV1
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Processor = processor
 	wrapper.LogsChan = p.LogsChan
 	wrapper.Priority = priority
 	p.ProcessorPlugins = append(p.ProcessorPlugins, &wrapper)
-	return nil
+	return wrapper.Init(pluginMeta)
 }
 
-func (p *pluginv1Runner) addAggregator(aggregator pipeline.AggregatorV1) error {
-	var wrapper AggregatorWrapper
+func (p *pluginv1Runner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregator pipeline.AggregatorV1) error {
+	var wrapper AggregatorWrapperV1
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Aggregator = aggregator
 	wrapper.LogGroupsChan = p.LogGroupsChan
-	interval, err := aggregator.Init(p.LogstoreConfig.Context, &wrapper)
-	if err != nil {
-		logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", aggregator.Description(), "error", err)
-		return err
-	}
-	if interval == 0 {
-		interval = p.LogstoreConfig.GlobalConfig.AggregatIntervalMs
-	}
-	wrapper.Interval = time.Millisecond * time.Duration(interval)
 	p.AggregatorPlugins = append(p.AggregatorPlugins, &wrapper)
-	return nil
+	return wrapper.Init(pluginMeta)
 }
 
-func (p *pluginv1Runner) addFlusher(flusher pipeline.FlusherV1) error {
-	var wrapper FlusherWrapper
+func (p *pluginv1Runner) addFlusher(pluginMeta *pipeline.PluginMeta, flusher pipeline.FlusherV1) error {
+	var wrapper FlusherWrapperV1
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Flusher = flusher
 	wrapper.LogGroupsChan = p.LogGroupsChan
 	wrapper.Interval = time.Millisecond * time.Duration(p.LogstoreConfig.GlobalConfig.FlushIntervalMs)
 	p.FlusherPlugins = append(p.FlusherPlugins, &wrapper)
-	return nil
+	return wrapper.Init(pluginMeta)
 }
 
 func (p *pluginv1Runner) addExtension(name string, extension pipeline.Extension) error {
@@ -240,7 +237,7 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 			logs := []*protocol.Log{logCtx.Log}
 			p.LogstoreConfig.Statistics.RawLogMetric.Add(int64(len(logs)))
 			for _, processor := range p.ProcessorPlugins {
-				logs = processor.Processor.ProcessLogs(logs)
+				logs = processor.Process(logs)
 				if len(logs) == 0 {
 					break
 				}
@@ -352,7 +349,7 @@ func (p *pluginv1Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 					for _, flusher := range p.FlusherPlugins {
 						p.LogstoreConfig.Statistics.FlushReadyMetric.Add(1)
 						begin := time.Now()
-						err := flusher.Flusher.Flush(p.LogstoreConfig.ProjectName,
+						err := flusher.Flush(p.LogstoreConfig.ProjectName,
 							p.LogstoreConfig.LogstoreName, p.LogstoreConfig.ConfigName, logGroups)
 						p.LogstoreConfig.Statistics.FlushLatencyMetric.Observe(float64(time.Since(begin)))
 						if err != nil {
@@ -401,8 +398,8 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 			flushers[idx] = flusher.Flusher
 		}
 		logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "flushout loggroups, count", p.FlushOutStore.Len())
-		rst := flushOutStore(p.LogstoreConfig, p.FlushOutStore, flushers, func(lc *LogstoreConfig, sf pipeline.FlusherV1, store *FlushOutStore[protocol.LogGroup]) error {
-			return sf.Flush(lc.Context.GetProject(), lc.Context.GetLogstore(), lc.Context.GetConfigName(), store.Get())
+		rst := flushOutStore(p.LogstoreConfig, p.FlushOutStore, p.FlusherPlugins, func(lc *LogstoreConfig, sf *FlusherWrapperV1, store *FlushOutStore[protocol.LogGroup]) error {
+			return sf.Flusher.Flush(lc.Context.GetProject(), lc.Context.GetLogstore(), lc.Context.GetConfigName(), store.Get())
 		})
 		logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "flushout loggroups, result", rst)
 	}

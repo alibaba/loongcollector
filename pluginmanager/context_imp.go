@@ -24,12 +24,12 @@ import (
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ContextImp struct {
-	MetricsRecords []*pipeline.MetricsRecord
+	MetricsRecords             []*pipeline.MetricsRecord
+	logstoreConfigMetricRecord *pipeline.MetricsRecord
 
 	common      *pkg.LogtailContextMeta
 	pluginNames string
@@ -54,21 +54,21 @@ func (p *ContextImp) GetExtension(name string, cfg any) (pipeline.Extension, err
 	}
 
 	// if it's a naming extension, we won't do further create
-	if getPluginType(name) != getPluginTypeWithID(name) {
+	if isPluginTypeWithID(name) {
 		return nil, fmt.Errorf("not found extension: %s", name)
 	}
 
 	// create if not found
-	typeWithID := genEmbeddedPluginName(getPluginType(name))
-	err := loadExtension(typeWithID, p.logstoreC, cfg)
+	pluginMeta := p.logstoreC.genPluginMeta(name, false, false)
+	err := loadExtension(pluginMeta, p.logstoreC, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	// get the new created extension
-	exists, ok = p.logstoreC.PluginRunner.GetExtension(typeWithID)
+	exists, ok = p.logstoreC.PluginRunner.GetExtension(pluginMeta.PluginTypeWithID)
 	if !ok {
-		return nil, fmt.Errorf("failed to load extension: %s", typeWithID)
+		return nil, fmt.Errorf("failed to load extension: %s", pluginMeta.PluginTypeWithID)
 	}
 	return exists, nil
 }
@@ -104,18 +104,22 @@ func (p *ContextImp) RegisterMetricRecord(labels []pipeline.LabelPair) *pipeline
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 
-	metricsRecord := &pipeline.MetricsRecord{Context: p}
-	metricsRecord.Labels = append(metricsRecord.Labels, pipeline.Label{Key: "project", Value: p.GetProject()})
-	metricsRecord.Labels = append(metricsRecord.Labels, pipeline.Label{Key: "config_name", Value: p.GetConfigName()})
-	metricsRecord.Labels = append(metricsRecord.Labels, pipeline.Label{Key: "plugins", Value: p.pluginNames})
-	metricsRecord.Labels = append(metricsRecord.Labels, pipeline.Label{Key: "category", Value: p.GetProject()})
-	metricsRecord.Labels = append(metricsRecord.Labels, pipeline.Label{Key: "source_ip", Value: util.GetIPAddress()})
-	for _, label := range labels {
-		metricsRecord.Labels = append(metricsRecord.Labels, pipeline.Label{Key: label.Key, Value: label.Value})
-	}
+	metricsRecord := &pipeline.MetricsRecord{Context: p, Labels: labels}
 
 	p.MetricsRecords = append(p.MetricsRecords, metricsRecord)
 	return metricsRecord
+}
+
+func (p *ContextImp) RegisterLogstoreConfigMetricRecord(labels []pipeline.LabelPair) *pipeline.MetricsRecord {
+	p.logstoreConfigMetricRecord = &pipeline.MetricsRecord{
+		Context: p,
+		Labels:  labels,
+	}
+	return p.logstoreConfigMetricRecord
+}
+
+func (p *ContextImp) GetLogstoreConfigMetricRecord() *pipeline.MetricsRecord {
+	return p.logstoreConfigMetricRecord
 }
 
 func (p *ContextImp) GetMetricRecord() *pipeline.MetricsRecord {
@@ -126,18 +130,6 @@ func (p *ContextImp) GetMetricRecord() *pipeline.MetricsRecord {
 	}
 	contextMutex.RUnlock()
 	return p.RegisterMetricRecord(nil)
-}
-
-func (p *ContextImp) MetricSerializeToPB(logGroup *protocol.LogGroup) {
-	if logGroup == nil {
-		return
-	}
-
-	contextMutex.Lock()
-	defer contextMutex.Unlock()
-	for _, metricsRecord := range p.MetricsRecords {
-		metricsRecord.Serialize(logGroup)
-	}
 }
 
 // ExportMetricRecords is used for exporting metrics records.

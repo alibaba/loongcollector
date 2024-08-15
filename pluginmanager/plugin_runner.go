@@ -1,4 +1,4 @@
-// Copyright 2022 iLogtail Authors
+// Copyright 2024 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,13 +40,15 @@ const (
 type PluginRunner interface {
 	Init(inputQueueSize int, aggrQueueSize int) error
 
-	Initialized() error
+	AddDefaultAggregatorIfEmpty() error
+
+	AddDefaultFlusherIfEmpty() error
 
 	ReceiveRawLog(log *pipeline.LogWithContext)
 
 	ReceiveLogGroup(logGroup pipeline.LogGroupWithContext)
 
-	AddPlugin(pluginName string, category pluginCategory, plugin interface{}, config map[string]interface{}) error
+	AddPlugin(pluginMeta *pipeline.PluginMeta, category pluginCategory, plugin interface{}, config map[string]interface{}) error
 
 	GetExtension(name string) (pipeline.Extension, bool)
 

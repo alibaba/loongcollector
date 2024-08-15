@@ -14,10 +14,6 @@
 
 package pipeline
 
-import (
-	"github.com/alibaba/ilogtail/pkg/protocol"
-)
-
 type SelfMetricType int
 
 const (
@@ -72,8 +68,8 @@ type MetricVector[T Metric] interface {
 }
 
 type Metric interface {
-	Serialize(log *protocol.Log)
-	Export() map[string]string // Export as a map[string]string, It will replace Serialize in the future.
+	// Export as a map[string]string
+	Export() map[string]string
 }
 
 // CounterMetric has three implementations:

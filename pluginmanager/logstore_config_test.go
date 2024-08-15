@@ -524,7 +524,54 @@ func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 	}
 }
 
-func Test_genEmbeddedPluginName(t *testing.T) {
-	result := genEmbeddedPluginName("testPlugin")
-	assert.Regexp(t, `testPlugin/_gen_embedded_\d+`, result)
+func Test_genPluginMeta(t *testing.T) {
+	l := new(LogstoreConfig)
+	{
+		result := l.genPluginMeta("testPlugin", false, false)
+		assert.Equal(t, "testPlugin", result.PluginType)
+		assert.Regexp(t, `testPlugin/\d+`, result.PluginTypeWithID)
+		assert.Regexp(t, `\d+`, result.PluginID)
+		assert.Equal(t, "", result.NodeID)
+		assert.Equal(t, "", result.ChildNodeID)
+	}
+	{
+		result := l.genPluginMeta("testPlugin", true, false)
+		assert.Equal(t, "testPlugin", result.PluginType)
+		assert.Regexp(t, `testPlugin/\d+`, result.PluginTypeWithID)
+		assert.Regexp(t, `\d+`, result.PluginID)
+		assert.Regexp(t, `\d+`, result.NodeID)
+		assert.Regexp(t, `\d+`, result.ChildNodeID)
+	}
+	{
+		result := l.genPluginMeta("testPlugin", true, true)
+		assert.Equal(t, "testPlugin", result.PluginType)
+		assert.Regexp(t, `testPlugin/\d+`, result.PluginTypeWithID)
+		assert.Regexp(t, `\d+`, result.PluginID)
+		assert.Regexp(t, `\d+`, result.NodeID)
+		assert.Regexp(t, `-1`, result.ChildNodeID)
+	}
+	{
+		result := l.genPluginMeta("testPlugin/customID", false, false)
+		assert.Equal(t, "testPlugin", result.PluginType)
+		assert.Equal(t, "testPlugin/customID", result.PluginTypeWithID)
+		assert.Equal(t, "customID", result.PluginID)
+		assert.Equal(t, "", result.NodeID)
+		assert.Equal(t, "", result.ChildNodeID)
+	}
+	{
+		result := l.genPluginMeta("testPlugin/customID", true, false)
+		assert.Equal(t, "testPlugin", result.PluginType)
+		assert.Equal(t, "testPlugin/customID", result.PluginTypeWithID)
+		assert.Equal(t, "customID", result.PluginID)
+		assert.Regexp(t, `\d+`, result.NodeID)
+		assert.Regexp(t, `\d+`, result.ChildNodeID)
+	}
+	{
+		result := l.genPluginMeta("testPlugin/customID", true, true)
+		assert.Equal(t, "testPlugin", result.PluginType)
+		assert.Equal(t, "testPlugin/customID", result.PluginTypeWithID)
+		assert.Equal(t, "customID", result.PluginID)
+		assert.Regexp(t, `\d+`, result.NodeID)
+		assert.Regexp(t, `-1`, result.ChildNodeID)
+	}
 }

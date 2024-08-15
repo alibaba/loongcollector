@@ -20,8 +20,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -90,7 +90,7 @@ func TestMetadataGroupAggregatorRecord(t *testing.T) {
 
 		Convey("record events with ByteArray, when byte length exceeds GroupMaxByteLength", func() {
 			agg.GroupMaxByteLength = len([]byte(RawData)) * 5
-			ctx := pipeline.NewObservePipelineConext(100)
+			ctx := helper.NewObservePipelineConext(100)
 			groupEvent := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
 			for _, group := range groupEvent {
 				err := agg.Record(group, ctx)
@@ -122,7 +122,7 @@ func TestMetadataGroupAggregatorRecord(t *testing.T) {
 
 		Convey("record with metric events,when events length exceeds GroupMaxEventLength", func() {
 			agg.GroupMaxEventLength = 5
-			ctx := pipeline.NewObservePipelineConext(100)
+			ctx := helper.NewObservePipelineConext(100)
 			groupEvent := generateMetricEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
 			for _, group := range groupEvent {
 				err := agg.Record(group, ctx)
@@ -160,7 +160,7 @@ func TestMetadataGroupAggregatorRecordWithNonexistentKey(t *testing.T) {
 		agg.GroupMetadataKeys = []string{"nonexistentKEY"}
 
 		Convey("record events with ByteArray, when metadata key not existed: all groups aggregate in one aggregator", func() {
-			ctx := pipeline.NewObservePipelineConext(100)
+			ctx := helper.NewObservePipelineConext(100)
 			agg.GroupMaxByteLength = len([]byte(RawData)) * 5
 			groups := generateByteArrayEvents(5, map[string]string{"a": "1"})
 			for _, group := range groups {
@@ -188,7 +188,7 @@ func TestMetadataGroupAggregatorRecordWithNonexistentKey(t *testing.T) {
 
 		Convey("record with metric events,when events length exceeds GroupMaxEventLength", func() {
 			agg.GroupMaxEventLength = 5
-			ctx := pipeline.NewObservePipelineConext(100)
+			ctx := helper.NewObservePipelineConext(100)
 			groupEvent := generateMetricEvents(5, map[string]string{"a": "1"})
 			for _, group := range groupEvent {
 				err := agg.Record(group, ctx)
@@ -243,7 +243,7 @@ func TestMetadataGroupAggregatorGetResult(t *testing.T) {
 		agg.GroupMetadataKeys = []string{"a", "b"}
 
 		Convey("record ByteArray Events, then GetResult", func() {
-			ctx := pipeline.NewObservePipelineConext(100)
+			ctx := helper.NewObservePipelineConext(100)
 			groupEvent := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
 			groupEvent = append(groupEvent,
 				generateByteArrayEvents(5, map[string]string{"a": "1", "b": "1", "c": "3"})...)
@@ -266,7 +266,7 @@ func TestMetadataGroupAggregatorGetResult(t *testing.T) {
 func TestMetadataGroupGroup_Record_Directly(t *testing.T) {
 	p := new(AggregatorMetadataGroup)
 	p.GroupMaxEventLength = 5
-	ctx := pipeline.NewObservePipelineConext(100)
+	ctx := helper.NewObservePipelineConext(100)
 
 	err := p.Record(constructEvents(104, map[string]string{}, map[string]string{}), ctx)
 	require.NoError(t, err)
@@ -282,7 +282,7 @@ func TestMetadataGroupGroup_Record_Tag(t *testing.T) {
 	}, map[string]string{
 		"tag": "tagval",
 	})
-	ctx := pipeline.NewObservePipelineConext(100)
+	ctx := helper.NewObservePipelineConext(100)
 	p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
 	err := p.Record(events, ctx)
 	require.NoError(t, err)
@@ -295,7 +295,7 @@ func TestMetadataGroupGroup_Record_Tag(t *testing.T) {
 func TestMetadataGroupGroup_Record_Timer(t *testing.T) {
 	p := new(AggregatorMetadataGroup)
 	p.GroupMaxEventLength = 500
-	ctx := pipeline.NewObservePipelineConext(100)
+	ctx := helper.NewObservePipelineConext(100)
 	p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
 	err := p.Record(constructEvents(104, map[string]string{}, map[string]string{}), ctx)
 	require.NoError(t, err)
@@ -312,7 +312,7 @@ func TestMetadataGroupGroup_Oversize(t *testing.T) {
 		p.GroupMaxEventLength = 500
 		p.GroupMaxByteLength = 1
 		p.DropOversizeEvent = true
-		ctx := pipeline.NewObservePipelineConext(100)
+		ctx := helper.NewObservePipelineConext(100)
 		p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
 
 		events := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
@@ -328,7 +328,7 @@ func TestMetadataGroupGroup_Oversize(t *testing.T) {
 		p.GroupMaxEventLength = 500
 		p.GroupMaxByteLength = 1
 		p.DropOversizeEvent = false
-		ctx := pipeline.NewObservePipelineConext(100)
+		ctx := helper.NewObservePipelineConext(100)
 		p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
 
 		events := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})

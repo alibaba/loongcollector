@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 )
@@ -99,7 +99,7 @@ func InvalidTestInputKafka(t *testing.T) {
 	_, input, err := newInput()
 	require.NoError(t, err)
 	collector := &mockCollector{}
-	pipelineCxt := pipeline.NewGroupedPipelineConext()
+	pipelineCxt := helper.NewGroupedPipelineConext()
 	err = input.StartService(pipelineCxt)
 	require.NoError(t, err)
 	time.Sleep(time.Second * 2)

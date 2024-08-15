@@ -56,7 +56,7 @@ func (p *timerRunner) Run(task func(state interface{}) error, cc *pipeline.Async
 	}
 }
 
-func flushOutStore[T FlushData, F pipeline.Flusher](lc *LogstoreConfig, store *FlushOutStore[T], flushers []F, flushFunc func(*LogstoreConfig, F, *FlushOutStore[T]) error) bool {
+func flushOutStore[T FlushData, F FlusherWrapperInterface](lc *LogstoreConfig, store *FlushOutStore[T], flushers []F, flushFunc func(*LogstoreConfig, F, *FlushOutStore[T]) error) bool {
 	for _, flusher := range flushers {
 		for waitCount := 0; !flusher.IsReady(lc.ProjectName, lc.LogstoreName, lc.LogstoreKey); waitCount++ {
 			if waitCount > maxFlushOutTime*100 {
@@ -117,7 +117,7 @@ func GetConfigFlushers(runner PluginRunner) []pipeline.Flusher {
 		}
 	} else if r, ok := runner.(*pluginv2Runner); ok {
 		for _, f := range r.FlusherPlugins {
-			flushers = append(flushers, f)
+			flushers = append(flushers, f.Flusher)
 		}
 	}
 	return flushers

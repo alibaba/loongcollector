@@ -18,6 +18,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type InputStatistics struct {
@@ -35,13 +36,30 @@ func (r *InputStatistics) Description() string {
 
 func (r *InputStatistics) Collect(collector pipeline.Collector) error {
 	for _, config := range LogtailConfig {
-		logGroup := &protocol.LogGroup{}
-		config.Context.MetricSerializeToPB(logGroup)
-		if len(logGroup.Logs) > 0 && StatisticsConfig != nil {
-			for _, log := range logGroup.Logs {
-				StatisticsConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
-				logger.Debug(r.context.GetRuntimeContext(), "statistics", *log)
+		log := &protocol.Log{}
+		metricRecord := config.Context.GetLogstoreConfigMetricRecord()
+
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project", Value: config.Context.GetProject()})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "config_name", Value: config.Context.GetConfigName()})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "category", Value: config.Context.GetLogstore()})
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "source_ip", Value: util.GetIPAddress()})
+
+		for _, metricCollector := range metricRecord.MetricCollectors {
+			metrics := metricCollector.Collect()
+			for _, metric := range metrics {
+				record := metric.Export()
+				if len(record) == 0 {
+					continue
+				}
+				for k, v := range record {
+					log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
+				}
 			}
+		}
+
+		if len(log.Contents) > 0 && StatisticsConfig != nil {
+			StatisticsConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
+			logger.Debug(r.context.GetRuntimeContext(), "statistics", *log)
 		}
 	}
 	return nil

@@ -19,54 +19,61 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 
 	"time"
 )
 
-type MetricWrapper struct {
-	Input    pipeline.MetricInputV1
-	Config   *LogstoreConfig
-	Tags     map[string]string
-	Interval time.Duration
-
-	LogsChan      chan *pipeline.LogWithContext
-	LatencyMetric pipeline.LatencyMetric
+type ServiceWrapperV1 struct {
+	ServiceWrapper
+	LogsChan chan *pipeline.LogWithContext
+	Input    pipeline.ServiceInputV1
 }
 
-func (p *MetricWrapper) Run(control *pipeline.AsyncControl) {
-	logger.Info(p.Config.Context.GetRuntimeContext(), "start run metric ", p.Input.Description())
-	defer panicRecover(p.Input.Description())
-	for {
-		exitFlag := util.RandomSleep(p.Interval, 0.1, control.CancelToken())
-		startTime := time.Now()
-		err := p.Input.Collect(p)
-		p.LatencyMetric.Observe(float64(time.Since(startTime)))
+func (p *ServiceWrapperV1) Init(pluginMeta *pipeline.PluginMeta) error {
+	p.InitMetricRecord(pluginMeta)
+
+	_, err := p.Input.Init(p.Config.Context)
+	return err
+}
+
+func (p *ServiceWrapperV1) Run(cc *pipeline.AsyncControl) {
+	logger.Info(p.Config.Context.GetRuntimeContext(), "start run service", p.Input)
+
+	go func() {
+		defer panicRecover(p.Input.Description())
+		err := p.Input.Start(p)
 		if err != nil {
-			logger.Error(p.Config.Context.GetRuntimeContext(), "INPUT_COLLECT_ALARM", "error", err)
+			logger.Error(p.Config.Context.GetRuntimeContext(), "PLUGIN_ALARM", "start service error, err", err)
 		}
-		if exitFlag {
-			return
-		}
-	}
+		logger.Info(p.Config.Context.GetRuntimeContext(), "service done", p.Input.Description())
+	}()
+
 }
 
-func (p *MetricWrapper) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
+func (p *ServiceWrapperV1) Stop() error {
+	err := p.Input.Stop()
+	if err != nil {
+		logger.Error(p.Config.Context.GetRuntimeContext(), "PLUGIN_ALARM", "stop service error, err", err)
+	}
+	return err
+}
+
+func (p *ServiceWrapperV1) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
 	p.AddDataWithContext(tags, fields, nil, t...)
 }
 
-func (p *MetricWrapper) AddDataArray(tags map[string]string,
+func (p *ServiceWrapperV1) AddDataArray(tags map[string]string,
 	columns []string,
 	values []string,
 	t ...time.Time) {
 	p.AddDataArrayWithContext(tags, columns, values, nil, t...)
 }
 
-func (p *MetricWrapper) AddRawLog(log *protocol.Log) {
+func (p *ServiceWrapperV1) AddRawLog(log *protocol.Log) {
 	p.AddRawLogWithContext(log, nil)
 }
 
-func (p *MetricWrapper) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
+func (p *ServiceWrapperV1) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
 	var logTime time.Time
 	if len(t) == 0 {
 		logTime = time.Now()
@@ -74,10 +81,12 @@ func (p *MetricWrapper) AddDataWithContext(tags map[string]string, fields map[st
 		logTime = t[0]
 	}
 	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, p.Tags, tags, fields)
+	p.inputRecordsTotal.Add(1)
+	p.inputRecordsSizeBytes.Add(int64(slsLog.Size()))
 	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *MetricWrapper) AddDataArrayWithContext(tags map[string]string,
+func (p *ServiceWrapperV1) AddDataArrayWithContext(tags map[string]string,
 	columns []string,
 	values []string,
 	ctx map[string]interface{},
@@ -89,9 +98,13 @@ func (p *MetricWrapper) AddDataArrayWithContext(tags map[string]string,
 		logTime = t[0]
 	}
 	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, p.Tags, tags, columns, values)
+	p.inputRecordsTotal.Add(1)
+	p.inputRecordsSizeBytes.Add(int64(slsLog.Size()))
 	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *MetricWrapper) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
+func (p *ServiceWrapperV1) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
+	p.inputRecordsTotal.Add(1)
+	p.inputRecordsSizeBytes.Add(int64(log.Size()))
 	p.LogsChan <- &pipeline.LogWithContext{Log: log, Context: ctx}
 }

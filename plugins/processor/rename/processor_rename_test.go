@@ -15,9 +15,9 @@
 package rename
 
 import (
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
@@ -145,7 +145,7 @@ func TestNoKeyErrorV2(t *testing.T) {
 		Events: []models.PipelineEvent{log},
 	}
 	// construct test context
-	context := pipeline.NewObservePipelineConext(10)
+	context := helper.NewObservePipelineConext(10)
 	// run test function
 	processor.Process(logs, context)
 	// collect test results

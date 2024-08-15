@@ -22,7 +22,7 @@ import (
 // Processor also can be a filter
 type Processor interface {
 	// Init called for init some system resources, like socket, mutex...
-	Init(Context) error
+	Init(pipelineContext Context) error
 
 	// Description returns a one-sentence description on the Input
 	Description() string

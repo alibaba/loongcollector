@@ -247,6 +247,10 @@ func (m *Metric) GetTypedValue() MetricTypedValues {
 	return NilTypedValues
 }
 
+func (m *Metric) GetSize() int64 {
+	return int64(len(m.String()))
+}
+
 func (m *Metric) Clone() PipelineEvent {
 	if m != nil {
 		return &Metric{

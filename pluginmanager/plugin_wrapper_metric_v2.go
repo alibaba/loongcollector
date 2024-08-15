@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2024 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,23 +16,29 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+
+	"time"
 )
 
-type ProcessorWrapper struct {
-	Processor pipeline.ProcessorV1
-	Config    *LogstoreConfig
-	LogsChan  chan *pipeline.LogWithContext
-	Priority  int
+type MetricWrapperV2 struct {
+	MetricWrapper
+	Input pipeline.MetricInputV2
 }
 
-type ProcessorWrapperArray []*ProcessorWrapper
+func (p *MetricWrapperV2) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
+	p.InitMetricRecord(pluginMeta)
 
-func (c ProcessorWrapperArray) Len() int {
-	return len(c)
+	interval, err := p.Input.Init(p.Config.Context)
+	if err != nil {
+		return err
+	}
+	if interval == 0 {
+		interval = inputInterval
+	}
+	p.Interval = time.Duration(interval) * time.Millisecond
+	return nil
 }
-func (c ProcessorWrapperArray) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-func (c ProcessorWrapperArray) Less(i, j int) bool {
-	return c[i].Priority < c[j].Priority
+
+func (p *MetricWrapperV2) Read(pipelineContext pipeline.PipelineContext) error {
+	return p.Input.Read(pipelineContext)
 }

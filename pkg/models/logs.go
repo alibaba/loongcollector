@@ -163,6 +163,10 @@ func (m *Log) GetIndices() LogContents {
 	return NilInterfaceValues
 }
 
+func (m *Log) GetSize() int64 {
+	return int64(len(m.GetBody()))
+}
+
 func (m *Log) Clone() PipelineEvent {
 	if m != nil {
 		return &Log{

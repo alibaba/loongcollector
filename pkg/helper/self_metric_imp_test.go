@@ -134,32 +134,6 @@ func TestStrMetric_Get(t *testing.T) {
 	}
 }
 
-func TestStrMetric_Serialize(t *testing.T) {
-	type fields struct {
-		name  string
-		value string
-	}
-	type args struct {
-		log *protocol.Log
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &StrMetric{
-				name:  tt.fields.name,
-				value: tt.fields.value,
-			}
-			s.Serialize(tt.args.log)
-		})
-	}
-}
-
 func TestNormalMetric_Add(t *testing.T) {
 	type fields struct {
 		name  string
@@ -258,32 +232,6 @@ func TestNormalMetric_Name(t *testing.T) {
 			if got := s.Name(); got != tt.want {
 				t.Errorf("NormalMetric.Name() = %v, want %v", got, tt.want)
 			}
-		})
-	}
-}
-
-func TestNormalMetric_Serialize(t *testing.T) {
-	type fields struct {
-		name  string
-		value int64
-	}
-	type args struct {
-		log *protocol.Log
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &NormalMetric{
-				name:  tt.fields.name,
-				value: tt.fields.value,
-			}
-			s.Serialize(tt.args.log)
 		})
 	}
 }
@@ -435,36 +383,6 @@ func TestAvgMetric_Name(t *testing.T) {
 	}
 }
 
-func TestAvgMetric_Serialize(t *testing.T) {
-	type fields struct {
-		name    string
-		value   int64
-		count   int64
-		prevAvg float64
-	}
-	type args struct {
-		log *protocol.Log
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &AvgMetric{
-				name:    tt.fields.name,
-				value:   tt.fields.value,
-				count:   tt.fields.count,
-				prevAvg: tt.fields.prevAvg,
-			}
-			s.Serialize(tt.args.log)
-		})
-	}
-}
-
 func TestLatMetric_Name(t *testing.T) {
 	type fields struct {
 		name       string
@@ -597,36 +515,6 @@ func TestLatMetric_Get(t *testing.T) {
 			if got := s.Get(); got != tt.want {
 				t.Errorf("LatMetric.Get() = %v, want %v", got, tt.want)
 			}
-		})
-	}
-}
-
-func TestLatMetric_Serialize(t *testing.T) {
-	type fields struct {
-		name       string
-		t          time.Time
-		count      int
-		latencySum time.Duration
-	}
-	type args struct {
-		log *protocol.Log
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &LatMetric{
-				name:       tt.fields.name,
-				t:          tt.fields.t,
-				count:      tt.fields.count,
-				latencySum: tt.fields.latencySum,
-			}
-			s.Serialize(tt.args.log)
 		})
 	}
 }
