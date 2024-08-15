@@ -68,11 +68,11 @@ static const int64_t NANO_CONVERTING = 1000000000;
 
 void PollingDirFile::Start() {
     ClearCache();
-    mGlobalConfigTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_CONFIG_TOTAL);
+    mGlobalConfigTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
     mGlobalPollingDirCacheSizeTotal
-        = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_POLLING_DIR_CACHE_SIZE_TOTAL);
+        = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_POLLING_DIR_CACHE_SIZE_TOTAL);
     mGlobalPollingFileCacheSizeTotal
-        = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_POLLING_FILE_CACHE_SIZE_TOTAL);
+        = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_POLLING_FILE_CACHE_SIZE_TOTAL);
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
 }

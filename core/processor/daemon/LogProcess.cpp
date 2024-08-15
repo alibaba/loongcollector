@@ -56,8 +56,8 @@ LogProcess::~LogProcess() {
 void LogProcess::Start() {
     if (mInitialized)
         return;
-    mGlobalProcessQueueFullTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_PROCESS_QUEUE_FULL_TOTAL);
-    mGlobalProcessQueueTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_PROCESS_QUEUE_TOTAL);
+    mGlobalProcessQueueFullTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PROCESS_QUEUE_FULL_TOTAL);
+    mGlobalProcessQueueTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PROCESS_QUEUE_TOTAL);
 
     mInitialized = true;
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();

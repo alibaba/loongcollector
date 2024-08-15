@@ -40,23 +40,26 @@ const std::string METRIC_LABEL_VERSION = "version";
 
 // global metrics values
 
-const std::string METRIC_GLOBAL_CPU = "global_cpu_used_cores";
-const std::string METRIC_GLOBAL_MEMORY = "global_memory_used_mb";
-const std::string METRIC_GLOBAL_OPEN_FD_TOTAL = "global_open_fd_total";
-const std::string METRIC_GLOBAL_POLLING_DIR_CACHE_SIZE_TOTAL = "global_polling_dir_cache_size_total";
-const std::string METRIC_GLOBAL_POLLING_FILE_CACHE_SIZE_TOTAL = "global_polling_file_cache_size_total";
-const std::string METRIC_GLOBAL_POLLING_MODIFY_SIZE_TOTAL = "global_polling_modify_size_total";
-const std::string METRIC_GLOBAL_REGISTER_HANDLER_TOTAL = "global_register_handler_total";
-const std::string METRIC_GLOBAL_CONFIG_TOTAL = "global_config_total";
-const std::string METRIC_GLOBAL_ENV_CONFIG_TOTAL = "global_env_config_total";
-const std::string METRIC_GLOBAL_CRD_CONFIG_TOTAL = "global_crd_config_total";
-const std::string METRIC_GLOBAL_CONSOLE_CONFIG_TOTAL = "global_console_config_total";
-const std::string METRIC_GLOBAL_PLUGIN_TOTAL = "global_plugin_total";
-const std::string METRIC_GLOBAL_PROCESS_QUEUE_FULL_TOTAL = "global_process_queue_full_total";
-const std::string METRIC_GLOBAL_PROCESS_QUEUE_TOTAL = "global_process_queue_total";
-const std::string METRIC_GLOBAL_SEND_QUEUE_FULL_TOTAL = "global_send_queue_full_total";
-const std::string METRIC_GLOBAL_SEND_QUEUE_TOTAL = "global_send_queue_total";
-const std::string METRIC_GLOBAL_USED_SENDING_CONCURRENCY = "global_used_sending_concurrency";
+const std::string METRIC_AGENT_CPU = "agent_cpu_percent";
+const std::string METRIC_AGENT_CPU_GO = "agent_go_cpu_percent";
+const std::string METRIC_AGENT_MEMORY = "agent_memory_used_mb";
+const std::string METRIC_AGENT_MEMORY_GO = "agent_go_memory_used_mb";
+const std::string METRIC_AGENT_OPEN_FD_TOTAL = "agent_open_fd_total";
+const std::string METRIC_AGENT_POLLING_DIR_CACHE_SIZE_TOTAL = "agent_polling_dir_cache_size_total";
+const std::string METRIC_AGENT_POLLING_FILE_CACHE_SIZE_TOTAL = "agent_polling_file_cache_size_total";
+const std::string METRIC_AGENT_POLLING_MODIFY_SIZE_TOTAL = "agent_polling_modify_size_total";
+const std::string METRIC_AGENT_REGISTER_HANDLER_TOTAL = "agent_register_handler_total";
+const std::string METRIC_AGENT_INSTANCE_CONFIG_TOTAL = "agent_instance_config_total";
+const std::string METRIC_AGENT_PIPELINE_CONFIG_TOTAL = "agent_pipeline_config_total";
+const std::string METRIC_AGENT_ENV_PIPELINE_CONFIG_TOTAL = "agent_env_pipeline_config_total";
+const std::string METRIC_AGENT_CRD_PIPELINE_CONFIG_TOTAL = "agent_crd_pipeline_config_total";
+const std::string METRIC_AGENT_CONSOLE_PIPELINE_CONFIG_TOTAL = "agent_console_pipeline_config_total";
+const std::string METRIC_AGENT_PLUGIN_TOTAL = "agent_plugin_total";
+const std::string METRIC_AGENT_PROCESS_QUEUE_FULL_TOTAL = "agent_process_queue_full_total";
+const std::string METRIC_AGENT_PROCESS_QUEUE_TOTAL = "agent_process_queue_total";
+const std::string METRIC_AGENT_SEND_QUEUE_FULL_TOTAL = "agent_send_queue_full_total";
+const std::string METRIC_AGENT_SEND_QUEUE_TOTAL = "agent_send_queue_total";
+const std::string METRIC_AGENT_USED_SENDING_CONCURRENCY = "agent_used_sending_concurrency";
 
 // common plugin labels
 const std::string METRIC_LABEL_PROJECT = "project";

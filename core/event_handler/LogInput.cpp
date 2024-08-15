@@ -89,8 +89,8 @@ void LogInput::Start() {
 
     mInteruptFlag = false;
 
-    mGlobalOpenFdTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_OPEN_FD_TOTAL);
-    mGlobalRegisterHandlerTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_REGISTER_HANDLER_TOTAL);
+    mGlobalOpenFdTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
+    mGlobalRegisterHandlerTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_REGISTER_HANDLER_TOTAL);
 
     new Thread([this]() { ProcessLoop(); });
 }

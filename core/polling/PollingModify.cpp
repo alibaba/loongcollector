@@ -47,7 +47,7 @@ PollingModify::~PollingModify() {
 
 void PollingModify::Start() {
     ClearCache();
-    mGlobalPollingModifySizeTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_GLOBAL_POLLING_MODIFY_SIZE_TOTAL);
+    mGlobalPollingModifySizeTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_POLLING_MODIFY_SIZE_TOTAL);
 
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });

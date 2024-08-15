@@ -166,8 +166,6 @@ private:
     MemStat mMemStat;
     IntGaugePtr mGlobalMemoryGauge;
 
-    IntGaugePtr mGlobalPluginTotal;
-    IntGaugePtr mGlobalEnvConfigTotal;
     IntGaugePtr mGlobalUsedSendingConcurrency;
 
     // Current scale up level, updated by CheckScaledCpuUsageUpLimit.
@@ -208,9 +206,6 @@ private:
     std::unordered_map<std::string, CounterPtr> mCounters;
     std::unordered_map<std::string, IntGaugePtr> mIntGauges;
     std::unordered_map<std::string, DoubleGaugePtr> mDoubleGauges;
-
-    // IntGaugePtr mGlobalCrdConfigTotal;
-    // IntGaugePtr mGlobalConsoleConfigTotal;
 };
 
 } // namespace logtail
