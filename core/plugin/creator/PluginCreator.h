@@ -28,7 +28,7 @@ public:
     virtual ~PluginCreator() {}
     virtual const char* Name() = 0;
     virtual bool IsDynamic() = 0;
-    virtual std::unique_ptr<PluginInstance> Create(const std::string& pluginId) = 0;
+    virtual std::unique_ptr<PluginInstance> Create(const PluginInstance::PluginMeta& pluginMeta) = 0;
 };
 
 } // namespace logtail

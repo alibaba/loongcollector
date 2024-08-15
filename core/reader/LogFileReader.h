@@ -535,7 +535,7 @@ protected:
     std::string mRegion;
 
     MetricLabels mMetricLabels;
-    bool mMetricsEnabled;
+    bool mMetricInited;
     ReentrantMetricsRecordRef mMetricsRecordRef;
     CounterPtr mInputRecordsSizeBytesCounter;
     CounterPtr mInputReadTotalCounter;

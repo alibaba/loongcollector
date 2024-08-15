@@ -23,7 +23,7 @@ namespace logtail {
 
 const std::string InputEBPFProcessSecurity::sName = "input_ebpf_processprobe_security";
 
-bool InputEBPFProcessSecurity::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) {
+bool InputEBPFProcessSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::PROCESS_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {

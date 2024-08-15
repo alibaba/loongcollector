@@ -32,7 +32,7 @@ namespace logtail {
 
 const string InputContainerStdio::sName = "input_container_stdio";
 
-bool InputContainerStdio::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) {
+bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     string errorMsg;
     if (!AppConfig::GetInstance()->IsPurageContainerMode()) {
         PARAM_ERROR_RETURN(mContext->GetLogger(),
@@ -158,7 +158,7 @@ bool InputContainerStdio::Init(const Json::Value& config, uint32_t& pluginIdx, J
                                        GetContext().GetRegion());
     }
 
-    return CreateInnerProcessors(pluginIdx);
+    return CreateInnerProcessors();
 }
 
 std::string InputContainerStdio::TryGetRealPath(const std::string& path) {
@@ -269,13 +269,13 @@ bool InputContainerStdio::Stop(bool isPipelineRemoving) {
     return true;
 }
 
-bool InputContainerStdio::CreateInnerProcessors(uint32_t& pluginIdx) {
+bool InputContainerStdio::CreateInnerProcessors() {
     unique_ptr<ProcessorInstance> processor;
     // ProcessorSplitLogStringNative
     {
         Json::Value detail;
         processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitLogStringNative::sName,
-                                                                   to_string(++pluginIdx));
+                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
         detail["SplitChar"] = Json::Value('\n');
         if (!processor->Init(detail, *mContext)) {
             return false;
@@ -286,7 +286,7 @@ bool InputContainerStdio::CreateInnerProcessors(uint32_t& pluginIdx) {
     {
         Json::Value detail;
         processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseContainerLogNative::sName,
-                                                                   to_string(++pluginIdx));
+                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
         detail["IgnoringStdout"] = Json::Value(mIgnoringStdout);
         detail["IgnoringStderr"] = Json::Value(mIgnoringStderr);
         detail["KeepingSourceWhenParseFail"] = Json::Value(mKeepingSourceWhenParseFail);
@@ -300,7 +300,7 @@ bool InputContainerStdio::CreateInnerProcessors(uint32_t& pluginIdx) {
     {
         Json::Value detail;
         processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMergeMultilineLogNative::sName,
-                                                                   to_string(++pluginIdx));
+                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
         detail["MergeType"] = Json::Value("flag");
         if (!processor->Init(detail, *mContext)) {
             return false;
@@ -311,12 +311,12 @@ bool InputContainerStdio::CreateInnerProcessors(uint32_t& pluginIdx) {
         Json::Value detail;
         if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
             mContext->SetRequiringJsonReaderFlag(true);
-            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorSplitLogStringNative::sName,
-                                                                       to_string(++pluginIdx));
+            processor = PluginRegistry::GetInstance()->CreateProcessor(
+                ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
             detail["SplitChar"] = Json::Value('\0');
         } else {
-            processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMergeMultilineLogNative::sName,
-                                                                       to_string(++pluginIdx));
+            processor = PluginRegistry::GetInstance()->CreateProcessor(
+                ProcessorMergeMultilineLogNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
             detail["Mode"] = Json::Value("custom");
             detail["MergeType"] = Json::Value("regex");
             detail["StartPattern"] = Json::Value(mMultiline.mStartPattern);
@@ -337,7 +337,8 @@ bool InputContainerStdio::CreateInnerProcessors(uint32_t& pluginIdx) {
     }
     {
         Json::Value detail;
-        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName, to_string(++pluginIdx));
+        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorTagNative::sName,
+                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
         if (!processor->Init(detail, *mContext)) {
             // should not happen
             return false;

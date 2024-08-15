@@ -35,7 +35,10 @@ public:
     bool HasContext() const { return mContext != nullptr; }
     void SetContext(PipelineContext& context) { mContext = &context; }
     MetricsRecordRef& GetMetricsRecordRef() const { return mMetricsRecordRef; }
-    void SetMetricsRecordRef(const std::string& name, const std::string& id) {
+    void SetMetricsRecordRef(const std::string& name,
+                             const std::string& id,
+                             const std::string& nodeID,
+                             const std::string& childNodeID) {
         std::vector<std::pair<std::string, std::string>> labels;
         WriteMetrics::GetInstance()->PreparePluginCommonLabels(mContext->GetProjectName(),
                                                                mContext->GetLogstoreName(),
@@ -43,6 +46,8 @@ public:
                                                                mContext->GetConfigName(),
                                                                name,
                                                                id,
+                                                               nodeID,
+                                                               childNodeID,
                                                                labels);
 
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(labels));

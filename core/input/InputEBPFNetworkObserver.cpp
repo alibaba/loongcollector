@@ -25,7 +25,7 @@ namespace logtail {
 
 const std::string InputEBPFNetworkObserver::sName = "input_ebpf_sockettraceprobe_observer";
 
-bool InputEBPFNetworkObserver::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) {
+bool InputEBPFNetworkObserver::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {

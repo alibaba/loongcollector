@@ -52,7 +52,6 @@ void InputEBPFNetworkSecurityUnittest::OnSuccessfulInit() {
     unique_ptr<InputEBPFNetworkSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // valid optional param
     configStr = R"(
@@ -81,7 +80,7 @@ void InputEBPFNetworkSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_sockettraceprobe_security");
     nami::SecurityNetworkFilter thisFilter1 = std::get<nami::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::NETWORK, input->mSecurityOptions.filter_Type);
@@ -104,7 +103,6 @@ void InputEBPFNetworkSecurityUnittest::OnFailedInit() {
     unique_ptr<InputEBPFNetworkSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // invalid optional param
     configStr = R"(
@@ -133,7 +131,7 @@ void InputEBPFNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_sockettraceprobe_security");
     nami::SecurityNetworkFilter thisFilter1 = std::get<nami::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::NETWORK, input->mSecurityOptions.filter_Type);
@@ -169,7 +167,7 @@ void InputEBPFNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     nami::SecurityNetworkFilter thisFilter3 = std::get<nami::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL(0, thisFilter3.mDestAddrList.size());
     APSARA_TEST_EQUAL(0, thisFilter3.mDestPortList.size());
@@ -195,7 +193,7 @@ void InputEBPFNetworkSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     nami::SecurityNetworkFilter thisFilter4 = std::get<nami::SecurityNetworkFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     APSARA_TEST_EQUAL(2, thisFilter4.mDestAddrList.size());
     APSARA_TEST_EQUAL(1, thisFilter4.mDestPortList.size());
@@ -205,7 +203,6 @@ void InputEBPFNetworkSecurityUnittest::OnSuccessfulStart() {
     unique_ptr<InputEBPFNetworkSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // valid optional param
     configStr = R"(
@@ -234,7 +231,7 @@ void InputEBPFNetworkSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
@@ -245,7 +242,6 @@ void InputEBPFNetworkSecurityUnittest::OnSuccessfulStop() {
     unique_ptr<InputEBPFNetworkSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // valid optional param
     configStr = R"(
@@ -274,7 +270,7 @@ void InputEBPFNetworkSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();

@@ -54,7 +54,6 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulInit() {
     unique_ptr<InputEBPFFileSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // only mandatory param
     configStr = R"(
@@ -78,7 +77,7 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFFileSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
     nami::SecurityFileFilter thisFilter1 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::FILE, input->mSecurityOptions.filter_Type);
@@ -113,7 +112,7 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFFileSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
     nami::SecurityFileFilter thisFilter2 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::FILE, input->mSecurityOptions.filter_Type);
@@ -129,7 +128,6 @@ void InputEBPFFileSecurityUnittest::OnFailedInit() {
     unique_ptr<InputEBPFFileSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // invalid mandatory param
     configStr = R"(
@@ -151,7 +149,7 @@ void InputEBPFFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFFileSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_FALSE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
 
     // invalid optional param
     configStr = R"(
@@ -173,7 +171,7 @@ void InputEBPFFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFFileSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
     nami::SecurityFileFilter thisFilter1 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::FILE, input->mSecurityOptions.filter_Type);
@@ -200,7 +198,7 @@ void InputEBPFFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFFileSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_FALSE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
 
     // error param level
     configStr = R"(
@@ -217,7 +215,7 @@ void InputEBPFFileSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFFileSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::FILE, input->mSecurityOptions.filter_Type);
     APSARA_TEST_EQUAL("security_file_permission", input->mSecurityOptions.mOptionList[0].call_names_[0]);
@@ -229,7 +227,6 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulStart() {
     unique_ptr<InputEBPFFileSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // only mandatory param
     configStr = R"(
@@ -253,7 +250,7 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFFileSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
@@ -264,7 +261,6 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulStop() {
     unique_ptr<InputEBPFFileSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // only mandatory param
     configStr = R"(
@@ -288,7 +284,7 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFFileSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();

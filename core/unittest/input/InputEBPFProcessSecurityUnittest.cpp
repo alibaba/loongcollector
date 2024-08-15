@@ -52,7 +52,6 @@ void InputEBPFProcessSecurityUnittest::OnSuccessfulInit() {
     unique_ptr<InputEBPFProcessSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // only NamespaceFilter
     configStr = R"(
@@ -81,7 +80,7 @@ void InputEBPFProcessSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFProcessSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_processprobe_security");
     nami::SecurityProcessFilter thisFilter1 = std::get<nami::SecurityProcessFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::PROCESS, input->mSecurityOptions.filter_Type);
@@ -117,7 +116,7 @@ void InputEBPFProcessSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFProcessSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_processprobe_security");
     nami::SecurityProcessFilter thisFilter2 = std::get<nami::SecurityProcessFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::PROCESS, input->mSecurityOptions.filter_Type);
@@ -139,7 +138,7 @@ void InputEBPFProcessSecurityUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFProcessSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_processprobe_security");
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::PROCESS, input->mSecurityOptions.filter_Type);
 }
@@ -148,7 +147,6 @@ void InputEBPFProcessSecurityUnittest::OnFailedInit() {
     unique_ptr<InputEBPFProcessSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // invalid param
     configStr = R"(
@@ -169,7 +167,7 @@ void InputEBPFProcessSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFProcessSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_processprobe_security");
     nami::SecurityProcessFilter thisFilter1 = std::get<nami::SecurityProcessFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::PROCESS, input->mSecurityOptions.filter_Type);
@@ -200,7 +198,7 @@ void InputEBPFProcessSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFProcessSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_processprobe_security");
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::PROCESS, input->mSecurityOptions.filter_Type);
     nami::SecurityProcessFilter thisFilter2 = std::get<nami::SecurityProcessFilter>(input->mSecurityOptions.mOptionList[0].filter_);
@@ -232,7 +230,7 @@ void InputEBPFProcessSecurityUnittest::OnFailedInit() {
     // APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     // input.reset(new InputEBPFProcessSecurity());
     // input->SetContext(ctx);
-    // APSARA_TEST_FALSE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    // APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
 
     // error param level
     configStr = R"(
@@ -257,7 +255,7 @@ void InputEBPFProcessSecurityUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFProcessSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_processprobe_security");
     nami::SecurityProcessFilter thisFilter3 = std::get<nami::SecurityProcessFilter>(input->mSecurityOptions.mOptionList[0].filter_);
     // APSARA_TEST_EQUAL(ebpf::SecurityFilterType::PROCESS, input->mSecurityOptions.filter_Type);
@@ -269,7 +267,6 @@ void InputEBPFProcessSecurityUnittest::OnSuccessfulStart() {
     unique_ptr<InputEBPFProcessSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // only NamespaceFilter
     configStr = R"(
@@ -298,7 +295,7 @@ void InputEBPFProcessSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFProcessSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::PROCESS_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();
@@ -309,7 +306,6 @@ void InputEBPFProcessSecurityUnittest::OnSuccessfulStop() {
     unique_ptr<InputEBPFProcessSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // only NamespaceFilter
     configStr = R"(
@@ -338,7 +334,7 @@ void InputEBPFProcessSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFProcessSecurity());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::PROCESS_SECURITY);
     string pipelineName = input->GetContext().GetConfigName();

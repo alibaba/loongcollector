@@ -52,7 +52,6 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulInit() {
     unique_ptr<InputEBPFNetworkObserver> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // valid optional param
     configStr = R"(
@@ -72,7 +71,7 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkObserver());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_sockettraceprobe_observer");
     nami::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1);
@@ -86,7 +85,6 @@ void InputEBPFNetworkObserverUnittest::OnFailedInit() {
     unique_ptr<InputEBPFNetworkObserver> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     // invalid optional param
     configStr = R"(
@@ -106,7 +104,7 @@ void InputEBPFNetworkObserverUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkObserver());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_ebpf_sockettraceprobe_observer");
     nami::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1);
@@ -130,7 +128,7 @@ void InputEBPFNetworkObserverUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkObserver());
     input->SetContext(ctx);
-    APSARA_TEST_FALSE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
 }
 
 void InputEBPFNetworkObserverUnittest::OnSuccessfulStart() {
@@ -156,7 +154,7 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkObserver());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
     string pipelineName = input->GetContext().GetConfigName();
@@ -167,7 +165,6 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulStop() {
     unique_ptr<InputEBPFNetworkObserver> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     configStr = R"(
         {
@@ -186,7 +183,7 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputEBPFNetworkObserver());
     input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIdx, optionalGoPipeline));
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
     string serverPipelineName = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
     string pipelineName = input->GetContext().GetConfigName();

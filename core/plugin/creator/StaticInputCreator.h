@@ -26,8 +26,8 @@ class StaticInputCreator : public PluginCreator {
 public:
     const char* Name() override { return T::sName.c_str(); }
     bool IsDynamic() override { return false; }
-    std::unique_ptr<PluginInstance> Create(const std::string& pluginId) override {
-        return std::make_unique<InputInstance>(new T, pluginId);
+    std::unique_ptr<PluginInstance> Create(const PluginInstance::PluginMeta& pluginMeta) override {
+        return std::make_unique<InputInstance>(new T, pluginMeta);
     }
 };
 

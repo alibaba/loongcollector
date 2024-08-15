@@ -33,7 +33,7 @@ protected:
     void SetUp() override {
         mCtx.SetConfigName("test_config");
         sFlusher->SetContext(mCtx);
-        sFlusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+        sFlusher->SetMetricsRecordRef(FlusherSLS::sName, "1", "1", "1");
     }
 
 private:

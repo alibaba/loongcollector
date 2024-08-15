@@ -71,7 +71,6 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     unique_ptr<InputPrometheus> input;
     Json::Value configJson;
     Json::Value optionalGoPipeline;
-    uint32_t pluginIndex = 0;
     string configStr;
     string errorMsg;
     // only mandatory param
@@ -90,8 +89,8 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(input->Name(), "1");
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIndex, optionalGoPipeline));
+    input->SetMetricsRecordRef(input->Name(), "1", "1", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
 
     APSARA_TEST_EQUAL("_arms-prom/node-exporter/0", input->mTargetSubscirber->mJobName);
     APSARA_TEST_EQUAL("/metrics", input->mTargetSubscirber->mScrapeConfigPtr->mMetricsPath);
@@ -125,8 +124,8 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(InputPrometheus::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIndex, optionalGoPipeline));
+    input->SetMetricsRecordRef(InputPrometheus::sName, "1", "1", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
 
     APSARA_TEST_EQUAL("_arms-prom/node-exporter/0", input->mTargetSubscirber->mJobName);
     APSARA_TEST_EQUAL("/metrics", input->mTargetSubscirber->mScrapeConfigPtr->mMetricsPath);
@@ -141,7 +140,6 @@ void InputPrometheusUnittest::OnFailedInit() {
     unique_ptr<InputPrometheus> input;
     Json::Value configJson;
     Json::Value optionalGoPipeline;
-    uint32_t pluginIndex = 0;
     string configStr;
     string errorMsg;
     // only mandatory param
@@ -153,8 +151,8 @@ void InputPrometheusUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(InputPrometheus::sName, "1");
-    APSARA_TEST_FALSE(input->Init(configJson, pluginIndex, optionalGoPipeline));
+    input->SetMetricsRecordRef(InputPrometheus::sName, "1", "1", "1");
+    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
 
     // with invalid ScrapeConfig
     configStr = R"(
@@ -177,15 +175,14 @@ void InputPrometheusUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(InputPrometheus::sName, "1");
-    APSARA_TEST_FALSE(input->Init(configJson, pluginIndex, optionalGoPipeline));
+    input->SetMetricsRecordRef(InputPrometheus::sName, "1", "1", "1");
+    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
 }
 
 void InputPrometheusUnittest::OnPipelineUpdate() {
     unique_ptr<InputPrometheus> input;
     Json::Value configJson;
     Json::Value optionalGoPipeline;
-    uint32_t pluginIndex = 0;
     string configStr;
     string errorMsg;
     configStr = R"(
@@ -208,8 +205,8 @@ void InputPrometheusUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input = make_unique<InputPrometheus>();
     input->SetContext(ctx);
-    input->SetMetricsRecordRef(InputPrometheus::sName, "1");
-    APSARA_TEST_TRUE(input->Init(configJson, pluginIndex, optionalGoPipeline));
+    input->SetMetricsRecordRef(InputPrometheus::sName, "1", "1", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
 
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
@@ -225,7 +222,6 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
     unique_ptr<InputPrometheus> input;
     Json::Value configJson;
     Json::Value optionalGoPipeline;
-    uint32_t pluginIndex = 0;
     string configStr;
     string errorMsg;
     {
@@ -250,9 +246,9 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         input = make_unique<InputPrometheus>();
         input->SetContext(ctx);
-        input->SetMetricsRecordRef(InputPrometheus::sName, "1");
+        input->SetMetricsRecordRef(InputPrometheus::sName, "1", "1", "1");
 
-        APSARA_TEST_TRUE(input->Init(configJson, pluginIndex, optionalGoPipeline));
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
 
         APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorPromParseMetricNative::sName, input->mInnerProcessors[0]->Name());
@@ -357,9 +353,9 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         input = make_unique<InputPrometheus>();
         input->SetContext(ctx);
-        input->SetMetricsRecordRef(InputPrometheus::sName, "1");
+        input->SetMetricsRecordRef(InputPrometheus::sName, "1", "1", "1");
 
-        APSARA_TEST_TRUE(input->Init(configJson, pluginIndex, optionalGoPipeline));
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
 
         APSARA_TEST_EQUAL(2U, input->mInnerProcessors.size());
         APSARA_TEST_EQUAL(ProcessorPromParseMetricNative::sName, input->mInnerProcessors[0]->Name());

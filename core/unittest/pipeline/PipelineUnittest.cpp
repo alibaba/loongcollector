@@ -2743,13 +2743,16 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
 
 void PipelineUnittest::TestProcess() const {
     Pipeline pipeline;
-    uint32_t pluginIdx = 0;
+    pipeline.mPluginID.store(0);
     PipelineContext ctx;
+    ctx.SetPipeline(pipeline);
     Json::Value tmp;
-    auto input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, to_string(++pluginIdx));
-    input->Init(Json::Value(), ctx, pluginIdx, 0, tmp);
+
+    auto input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, pipeline.GenNextPluginMeta(false));
+    input->Init(Json::Value(), ctx, 0, tmp);
     pipeline.mInputs.emplace_back(std::move(input));
-    auto processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMock::sName, to_string(++pluginIdx));
+    auto processor
+        = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMock::sName, pipeline.GenNextPluginMeta(false));
     processor->Init(Json::Value(), ctx);
     pipeline.mProcessorLine.emplace_back(std::move(processor));
 
@@ -2765,16 +2768,19 @@ void PipelineUnittest::TestSend() const {
     {
         // no route
         Pipeline pipeline;
+        pipeline.mPluginID.store(0);
         PipelineContext ctx;
-        uint32_t pluginIdx = 0;
+        ctx.SetPipeline(pipeline);
         Json::Value tmp;
         {
-            auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+            auto flusher
+                = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, pipeline.GenNextPluginMeta(false));
             flusher->Init(Json::Value(), ctx, tmp);
             pipeline.mFlushers.emplace_back(std::move(flusher));
         }
         {
-            auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+            auto flusher
+                = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, pipeline.GenNextPluginMeta(false));
             flusher->Init(Json::Value(), ctx, tmp);
             pipeline.mFlushers.emplace_back(std::move(flusher));
         }
@@ -2802,16 +2808,19 @@ void PipelineUnittest::TestSend() const {
     {
         // with route
         Pipeline pipeline;
+        pipeline.mPluginID.store(0);
         PipelineContext ctx;
-        uint32_t pluginIdx = 0;
+        ctx.SetPipeline(pipeline);
         Json::Value tmp;
         {
-            auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+            auto flusher
+                = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, pipeline.GenNextPluginMeta(false));
             flusher->Init(Json::Value(), ctx, tmp);
             pipeline.mFlushers.emplace_back(std::move(flusher));
         }
         {
-            auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+            auto flusher
+                = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, pipeline.GenNextPluginMeta(false));
             flusher->Init(Json::Value(), ctx, tmp);
             pipeline.mFlushers.emplace_back(std::move(flusher));
         }
@@ -2856,16 +2865,19 @@ void PipelineUnittest::TestSend() const {
 void PipelineUnittest::TestFlushBatch() const {
     Pipeline pipeline;
     pipeline.mName = configName;
+    pipeline.mPluginID.store(0);
     PipelineContext ctx;
-    uint32_t pluginIdx = 0;
+    ctx.SetPipeline(pipeline);
     Json::Value tmp;
     {
-        auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+        auto flusher
+            = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, pipeline.GenNextPluginMeta(false));
         flusher->Init(Json::Value(), ctx, tmp);
         pipeline.mFlushers.emplace_back(std::move(flusher));
     }
     {
-        auto flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, to_string(++pluginIdx));
+        auto flusher
+            = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, pipeline.GenNextPluginMeta(false));
         flusher->Init(Json::Value(), ctx, tmp);
         pipeline.mFlushers.emplace_back(std::move(flusher));
     }

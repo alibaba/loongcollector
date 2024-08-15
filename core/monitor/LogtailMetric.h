@@ -110,6 +110,8 @@ public:
                                    const std::string& configName,
                                    const std::string& pluginName,
                                    const std::string& pluginID,
+                                   const std::string& nodeID, 
+                                   const std::string& childNodeID,
                                    MetricLabels& labels);
     void PrepareMetricsRecordRef(MetricsRecordRef& ref, MetricLabels&& labels, DynamicMetricLabels&& dynamicLabels = {});
     MetricsRecord* DoSnapshot();

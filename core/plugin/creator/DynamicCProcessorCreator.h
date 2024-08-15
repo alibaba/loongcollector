@@ -27,7 +27,7 @@ public:
     ~DynamicCProcessorCreator();
     const char* Name() override { return mPlugin ? mPlugin->name : ""; }
     bool IsDynamic() override { return true; }
-    std::unique_ptr<PluginInstance> Create(const std::string& pluginId) override;
+    std::unique_ptr<PluginInstance> Create(const PluginInstance::PluginMeta& pluginMeta) override;
 
 private:
     const processor_interface_t* mPlugin;

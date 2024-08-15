@@ -27,7 +27,7 @@ const std::string InputEBPFNetworkSecurity::sName = "input_ebpf_sockettraceprobe
 // enable: init -> start
 // update: init -> stop(false) -> start
 // stop: stop(true)
-bool InputEBPFNetworkSecurity::Init(const Json::Value& config, uint32_t& pluginIdx, Json::Value& optionalGoPipeline) {
+bool InputEBPFNetworkSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {

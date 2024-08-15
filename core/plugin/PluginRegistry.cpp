@@ -91,17 +91,21 @@ void PluginRegistry::UnloadPlugins() {
     mPluginDict.clear();
 }
 
-unique_ptr<InputInstance> PluginRegistry::CreateInput(const string& name, const string& pluginId) {
-    return unique_ptr<InputInstance>(static_cast<InputInstance*>(Create(INPUT_PLUGIN, name, pluginId).release()));
+unique_ptr<InputInstance> PluginRegistry::CreateInput(const string& name,
+                                                      const PluginInstance::PluginMeta& pluginMeta) {
+    return unique_ptr<InputInstance>(static_cast<InputInstance*>(Create(INPUT_PLUGIN, name, pluginMeta).release()));
 }
 
-unique_ptr<ProcessorInstance> PluginRegistry::CreateProcessor(const string& name, const string& pluginId) {
+unique_ptr<ProcessorInstance> PluginRegistry::CreateProcessor(const string& name,
+                                                              const PluginInstance::PluginMeta& pluginMeta) {
     return unique_ptr<ProcessorInstance>(
-        static_cast<ProcessorInstance*>(Create(PROCESSOR_PLUGIN, name, pluginId).release()));
+        static_cast<ProcessorInstance*>(Create(PROCESSOR_PLUGIN, name, pluginMeta).release()));
 }
 
-unique_ptr<FlusherInstance> PluginRegistry::CreateFlusher(const string& name, const string& pluginId) {
-    return unique_ptr<FlusherInstance>(static_cast<FlusherInstance*>(Create(FLUSHER_PLUGIN, name, pluginId).release()));
+unique_ptr<FlusherInstance> PluginRegistry::CreateFlusher(const string& name,
+                                                          const PluginInstance::PluginMeta& pluginMeta) {
+    return unique_ptr<FlusherInstance>(
+        static_cast<FlusherInstance*>(Create(FLUSHER_PLUGIN, name, pluginMeta).release()));
 }
 
 bool PluginRegistry::IsValidGoPlugin(const string& name) const {
@@ -223,11 +227,11 @@ void PluginRegistry::RegisterCreator(PluginCat cat, PluginCreator* creator) {
     mPluginDict.emplace(PluginKey(cat, creator->Name()), shared_ptr<PluginCreator>(creator));
 }
 
-unique_ptr<PluginInstance> PluginRegistry::Create(PluginCat cat, const string& name, const string& pluginId) {
+unique_ptr<PluginInstance> PluginRegistry::Create(PluginCat cat, const string& name, const PluginInstance::PluginMeta& pluginMeta) {
     unique_ptr<PluginInstance> ins;
     auto creatorEntry = mPluginDict.find(PluginKey(cat, name));
     if (creatorEntry != mPluginDict.end()) {
-        ins = creatorEntry->second->Create(pluginId);
+        ins = creatorEntry->second->Create(pluginMeta);
     }
     return ins;
 }

@@ -32,10 +32,10 @@ DynamicCProcessorCreator::~DynamicCProcessorCreator() {
     }
 }
 
-std::unique_ptr<PluginInstance> DynamicCProcessorCreator::Create(const std::string& pluginId) {
+std::unique_ptr<PluginInstance> DynamicCProcessorCreator::Create(const PluginInstance::PluginMeta& pluginMeta) {
     DynamicCProcessorProxy* plugin = new DynamicCProcessorProxy(mPlugin->name);
     plugin->SetCProcessor(mPlugin);
-    return std::make_unique<ProcessorInstance>(plugin, pluginId);
+    return std::make_unique<ProcessorInstance>(plugin, pluginMeta);
 }
 
 } // namespace logtail

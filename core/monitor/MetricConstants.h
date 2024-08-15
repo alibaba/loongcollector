@@ -67,6 +67,8 @@ extern const std::string METRIC_LABEL_REGION;
 extern const std::string METRIC_LABEL_CONFIG_NAME;
 extern const std::string METRIC_LABEL_PLUGIN_NAME;
 extern const std::string METRIC_LABEL_PLUGIN_ID;
+extern const std::string METRIC_LABEL_NODE_ID;
+extern const std::string METRIC_LABEL_CHILD_NODE_ID;
 
 // input file plugin labels
 extern const std::string METRIC_LABEL_FILE_DEV;

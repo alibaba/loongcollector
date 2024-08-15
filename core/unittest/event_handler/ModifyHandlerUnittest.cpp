@@ -163,7 +163,7 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped)
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
 
 void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
-    LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestHandleContainerStoppedEventWhenReadToEnd() begin", time(NULL)));
     Event event1(gRootDir, "", EVENT_MODIFY, 0);
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->ReadLog(logbuf, &event1)); // false means no more data
@@ -176,7 +176,7 @@ void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
 }
 
 void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenNotReadToEnd() {
-    LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestHandleContainerStoppedEventWhenNotReadToEnd() begin", time(NULL)));
     APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
 
     // send event to close reader
@@ -187,7 +187,7 @@ void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenNotReadToEnd() {
 }
 
 void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerStopped() {
-    LOG_INFO(sLogger, ("TestFindAllSubDirAndHandler() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestHandleModifyEventWhenContainerStopped() begin", time(NULL)));
     APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
 
     // SetContainerStopped to reader
@@ -200,6 +200,7 @@ void ModifyHandlerUnittest::TestHandleModifyEventWhenContainerStopped() {
 }
 
 void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
+    LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpoint() begin", time(NULL)));
     std::string basicLogName = "rotate.log";
     std::string logPath = gRootDir + PATH_SEPARATOR + basicLogName;
     std::string signature = "a sample log";

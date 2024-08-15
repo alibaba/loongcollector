@@ -196,6 +196,8 @@ void WriteMetrics::PreparePluginCommonLabels(const std::string& projectName,
                                              const std::string& configName,
                                              const std::string& pluginName,
                                              const std::string& pluginID,
+                                             const std::string& nodeID,
+                                             const std::string& childNodeID,
                                              MetricLabels& labels) {
     labels.emplace_back(std::make_pair(METRIC_LABEL_PROJECT, projectName));
     labels.emplace_back(std::make_pair(METRIC_LABEL_LOGSTORE, logstoreName));
@@ -203,6 +205,8 @@ void WriteMetrics::PreparePluginCommonLabels(const std::string& projectName,
     labels.emplace_back(std::make_pair(METRIC_LABEL_CONFIG_NAME, configName));
     labels.emplace_back(std::make_pair(METRIC_LABEL_PLUGIN_NAME, pluginName));
     labels.emplace_back(std::make_pair(METRIC_LABEL_PLUGIN_ID, pluginID));
+    labels.emplace_back(std::make_pair(METRIC_LABEL_NODE_ID, nodeID));
+    labels.emplace_back(std::make_pair(METRIC_LABEL_CHILD_NODE_ID, childNodeID));
 }
 
 void WriteMetrics::PrepareMetricsRecordRef(MetricsRecordRef& ref,
@@ -320,7 +324,7 @@ void ReadMetrics::ReadAsLogGroup(std::map<std::string, sls_logs::LogGroup*>& log
     MetricsRecord* tmp = mHead;
     while (tmp) {
         Log* logPtr = nullptr;
-        // for (auto &item: tmp->GetLabels()) {
+
         for (auto item = tmp->GetLabels()->begin(); item != tmp->GetLabels()->end(); ++item) {
             std::pair<std::string, std::string> pair = *item;
             if (METRIC_FIELD_REGION == pair.first) {

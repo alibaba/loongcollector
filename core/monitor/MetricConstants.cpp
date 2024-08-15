@@ -65,6 +65,8 @@ const std::string METRIC_LABEL_REGION = "region";
 const std::string METRIC_LABEL_CONFIG_NAME = "config_name";
 const std::string METRIC_LABEL_PLUGIN_NAME = "plugin_name";
 const std::string METRIC_LABEL_PLUGIN_ID = "plugin_id";
+const std::string METRIC_LABEL_NODE_ID = "node_id";
+const std::string METRIC_LABEL_CHILD_NODE_ID = "child_node_id";
 
 // input file plugin labels
 const std::string METRIC_LABEL_FILE_DEV = "file_dev";

@@ -31,7 +31,7 @@ protected:
         sFlusher = make_unique<FlusherMock>();
         sCtx.SetConfigName("test_config");
         sFlusher->SetContext(sCtx);
-        sFlusher->SetMetricsRecordRef(FlusherMock::sName, "1");
+        sFlusher->SetMetricsRecordRef(FlusherMock::sName, "1", "1", "1");
     }
 
     void TearDown() override { TimeoutFlushManager::GetInstance()->mTimeoutRecords.clear(); }
