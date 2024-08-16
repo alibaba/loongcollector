@@ -407,6 +407,38 @@ void PipelineUnittest::OnFailedInit() const {
     APSARA_TEST_TRUE(config->Parse());
     pipeline.reset(new Pipeline());
     APSARA_TEST_FALSE(pipeline->Init(std::move(*config)));
+
+    // invalid inputs ack support
+    configStr = R"(
+        {
+            "createTime": 123456789,
+            "inputs": [
+                {
+                    "Type": "input_mock"
+                },
+                {
+                    "Type": "input_mock",
+                    "SupportAck": false
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore_1",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint",
+                    "Match": "unknown"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new PipelineConfig(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_FALSE(pipeline->Init(std::move(*config)));
 }
 
 void PipelineUnittest::OnInitVariousTopology() const {
@@ -2437,6 +2469,7 @@ void PipelineUnittest::TestProcessQueue() const {
 
     key = QueueKeyManager::GetInstance()->GetKey(configName);
     que = ProcessQueueManager::GetInstance()->mQueues[key].first;
+    APSARA_TEST_EQUAL(ProcessQueueManager::QueueType::BOUNDED, ProcessQueueManager::GetInstance()->mQueues[key].second);
     // queue level
     APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
     APSARA_TEST_EQUAL(key, (*que)->GetKey());
@@ -2458,10 +2491,7 @@ void PipelineUnittest::TestProcessQueue() const {
         {
             "inputs": [
                 {
-                    "Type": "input_file",
-                    "FilePaths": [
-                        "/home/test.log"
-                    ]
+                    "Type": "input_mock"
                 }
             ],
             "flushers": [
@@ -2484,13 +2514,59 @@ void PipelineUnittest::TestProcessQueue() const {
 
     key = QueueKeyManager::GetInstance()->GetKey(configName);
     que = ProcessQueueManager::GetInstance()->mQueues[key].first;
+    APSARA_TEST_EQUAL(ProcessQueueManager::QueueType::BOUNDED, ProcessQueueManager::GetInstance()->mQueues[key].second);
     // queue level
     APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
     APSARA_TEST_EQUAL(key, (*que)->GetKey());
     APSARA_TEST_EQUAL(3U, (*que)->GetPriority());
-    APSARA_TEST_EQUAL(1U, static_cast<BoundedProcessQueue*>(que->get())->mUpStreamFeedbacks.size());
-    APSARA_TEST_EQUAL(InputFeedbackInterfaceRegistry::GetInstance()->GetFeedbackInterface("input_file"),
-                      static_cast<BoundedProcessQueue*>(que->get())->mUpStreamFeedbacks[0]);
+    APSARA_TEST_EQUAL(1U, (*que)->mDownStreamQueues.size());
+    // pipeline level
+    APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());
+    // manager level
+    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mQueues.size());
+    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[3].size());
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[3].begin()
+                     == ProcessQueueManager::GetInstance()->mQueues[key].first);
+
+    // update pipeline with different type
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_mock",
+                    "SupportAck": false
+                },
+                {
+                    "Type": "input_mock",
+                    "SupportAck": false
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new PipelineConfig(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+
+    key = QueueKeyManager::GetInstance()->GetKey(configName);
+    que = ProcessQueueManager::GetInstance()->mQueues[key].first;
+    APSARA_TEST_EQUAL(ProcessQueueManager::QueueType::CIRCULAR,
+                      ProcessQueueManager::GetInstance()->mQueues[key].second);
+    // queue level
+    APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
+    APSARA_TEST_EQUAL(key, (*que)->GetKey());
+    APSARA_TEST_EQUAL(3U, (*que)->GetPriority());
     APSARA_TEST_EQUAL(1U, (*que)->mDownStreamQueues.size());
     // pipeline level
     APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());

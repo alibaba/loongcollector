@@ -17,13 +17,16 @@
 #include "common/Flags.h"
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/QueueKeyManager.h"
-#include "queue/QueueParam.h"
 
 DEFINE_FLAG_INT32(sender_queue_gc_threshold_sec, "30s", 30);
+DEFINE_FLAG_INT32(sender_queue_capacity, "", 10);
 
 using namespace std;
 
 namespace logtail {
+
+SenderQueueManager::SenderQueueManager() : mQueueParam(INT32_FLAG(sender_queue_capacity)) {
+}
 
 bool SenderQueueManager::CreateQueue(QueueKey key,
                                      vector<shared_ptr<ConcurrencyLimiter>>&& concurrencyLimiters,
@@ -36,11 +39,8 @@ bool SenderQueueManager::CreateQueue(QueueKey key,
         lock_guard<mutex> lock(mQueueMux);
         auto iter = mQueues.find(key);
         if (iter == mQueues.end()) {
-            mQueues.try_emplace(key,
-                                SenderQueueParam::GetInstance()->mCapacity,
-                                SenderQueueParam::GetInstance()->mLowWatermark,
-                                SenderQueueParam::GetInstance()->mHighWatermark,
-                                key);
+            mQueues.try_emplace(
+                key, mQueueParam.GetCapacity(), mQueueParam.GetLowWatermark(), mQueueParam.GetHighWatermark(), key);
             iter = mQueues.find(key);
         }
         iter->second.SetConcurrencyLimiters(std::move(concurrencyLimiters));

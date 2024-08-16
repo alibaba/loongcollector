@@ -233,6 +233,9 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                 s_processLines += profile.splitLines;
             }
 
+            if (eventGroupList.empty()) {
+                continue;
+            }
             if (pipeline->IsFlushingThroughGoPipeline()) {
                 if (isLog) {
                     for (auto& group : eventGroupList) {
@@ -297,7 +300,8 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
     return NULL;
 }
 
-bool LogProcess::Serialize(const PipelineEventGroup& group, bool enableNanosecond, const string& logstore, string& res, string& errorMsg) {
+bool LogProcess::Serialize(
+    const PipelineEventGroup& group, bool enableNanosecond, const string& logstore, string& res, string& errorMsg) {
     sls_logs::LogGroup logGroup;
     for (const auto& e : group.GetEvents()) {
         if (e.Is<LogEvent>()) {

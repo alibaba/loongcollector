@@ -111,6 +111,8 @@ private:
     static std::mutex sRegionStatusLock;
     static std::unordered_map<std::string, bool> sAllRegionStatus;
 
+    static bool sIsResourceInited;
+
     void GenerateGoPlugin(const Json::Value& config, Json::Value& res) const;
     bool SerializeAndPush(std::vector<BatchedEventsList>&& groupLists);
     bool SerializeAndPush(BatchedEventsList&& groupList);

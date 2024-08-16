@@ -50,14 +50,6 @@ void BoundedProcessQueue::SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&&
     }
 }
 
-void BoundedProcessQueue::Reset(size_t cap, size_t low, size_t high) {
-    std::queue<std::unique_ptr<ProcessQueueItem>>().swap(mQueue);
-    mUpStreamFeedbacks.clear();
-    ProcessQueueInterface::Reset();
-    BoundedQueueInterface::Reset(low, high);
-    QueueInterface::Reset(cap);
-}
-
 void BoundedProcessQueue::GiveFeedback() const {
     for (auto& item : mUpStreamFeedbacks) {
         item->Feedback(mKey);

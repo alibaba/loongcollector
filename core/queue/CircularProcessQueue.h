@@ -17,42 +17,36 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <memory>
-#include <queue>
-#include <vector>
 
-#include "common/FeedbackInterface.h"
-#include "queue/BoundedQueueInterface.h"
 #include "queue/ProcessQueueInterface.h"
+#include "queue/QueueInterface.h"
 
 namespace logtail {
 
 // not thread-safe, should be protected explicitly by queue manager
-class BoundedProcessQueue : public BoundedQueueInterface<std::unique_ptr<ProcessQueueItem>>,
-                            public ProcessQueueInterface {
+class CircularProcessQueue : virtual public QueueInterface<std::unique_ptr<ProcessQueueItem>>,
+                             public ProcessQueueInterface {
 public:
-    BoundedProcessQueue(size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const std::string& config)
-        : QueueInterface(key, cap),
-          BoundedQueueInterface(key, cap, low, high),
+    CircularProcessQueue(size_t cap, int64_t key, uint32_t priority, const std::string& config)
+        : QueueInterface<std::unique_ptr<ProcessQueueItem>>(key, cap),
           ProcessQueueInterface(key, cap, priority, config) {}
 
     bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
     bool Pop(std::unique_ptr<ProcessQueueItem>& item) override;
 
-    void SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks);
+    void Reset(size_t cap);
 
 private:
-    size_t Size() const override { return mQueue.size(); }
+    size_t Size() const override { return mEventCnt; }
 
-    void GiveFeedback() const override;
-
-    std::queue<std::unique_ptr<ProcessQueueItem>> mQueue;
-    std::vector<FeedbackInterface*> mUpStreamFeedbacks;
+    std::deque<std::unique_ptr<ProcessQueueItem>> mQueue;
+    size_t mEventCnt = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class BoundedProcessQueueUnittest;
+    friend class CircularProcessQueueUnittest;
     friend class ProcessQueueManagerUnittest;
-    friend class ExactlyOnceQueueManagerUnittest;
     friend class PipelineUnittest;
 #endif
 };

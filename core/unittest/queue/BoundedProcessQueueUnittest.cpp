@@ -29,7 +29,6 @@ class BoundedProcessQueueUnittest : public testing::Test {
 public:
     void TestPush();
     void TestPop();
-    void TestReset();
 
 protected:
     static void SetUpTestCase() { sEventGroup.reset(new PipelineEventGroup(make_shared<SourceBuffer>())); }
@@ -111,24 +110,8 @@ void BoundedProcessQueueUnittest::TestPop() {
     APSARA_TEST_TRUE(static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->HasFeedback(sKey));
 }
 
-void BoundedProcessQueueUnittest::TestReset() {
-    mQueue->mHighWatermark = 1;
-    mQueue->Push(GenerateItem());
-    mQueue->InvalidatePop();
-    mQueue->Reset(5, 4, 5);
-    APSARA_TEST_TRUE(mQueue->Empty());
-    APSARA_TEST_TRUE(mQueue->mDownStreamQueues.empty());
-    APSARA_TEST_TRUE(mQueue->mUpStreamFeedbacks.empty());
-    APSARA_TEST_TRUE(mQueue->mValidToPop);
-    APSARA_TEST_TRUE(mQueue->mValidToPush);
-    APSARA_TEST_EQUAL(5U, mQueue->mCapacity);
-    APSARA_TEST_EQUAL(4U, mQueue->mLowWatermark);
-    APSARA_TEST_EQUAL(5U, mQueue->mHighWatermark);
-}
-
 UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPush)
 UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPop)
-UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestReset)
 
 } // namespace logtail
 

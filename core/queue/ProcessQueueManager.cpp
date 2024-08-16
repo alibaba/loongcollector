@@ -15,9 +15,12 @@
 #include "queue/ProcessQueueManager.h"
 
 #include "common/Flags.h"
+#include "queue/BoundedProcessQueue.h"
+#include "queue/CircularProcessQueue.h"
 #include "queue/ExactlyOnceQueueManager.h"
 #include "queue/QueueKeyManager.h"
-#include "queue/QueueParam.h"
+
+DEFINE_FLAG_INT32(bounded_process_queue_capacity, "", 15);
 
 DECLARE_FLAG_INT32(process_thread_count);
 
@@ -25,36 +28,52 @@ using namespace std;
 
 namespace logtail {
 
-ProcessQueueManager::ProcessQueueManager() {
+ProcessQueueManager::ProcessQueueManager() : mBoundedQueueParam(INT32_FLAG(bounded_process_queue_capacity)) {
     ResetCurrentQueueIndex();
 }
 
-bool ProcessQueueManager::CreateOrUpdateQueue(QueueKey key, uint32_t priority, QueueType type) {
+bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key, uint32_t priority) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {
-        if (iter->second.second != type) {
+        if (iter->second.second != QueueType::BOUNDED) {
+            // queue type change only happen when all input plugin types are changed. in such case, old input data not
+            // been processed can be discarded since whole pipeline is actually changed.
             DeleteQueueEntity(iter->second.first);
-            CreateQueue(key, priority, type);
+            CreateBoundedQueue(key, priority);
         } else {
             if ((*iter->second.first)->GetPriority() == priority) {
                 return false;
             }
-            uint32_t oldPriority = (*iter->second.first)->GetPriority();
-            auto queIter = iter->second.first;
-            auto nextQueIter = next(queIter);
-            mPriorityQueue[priority].splice(mPriorityQueue[priority].end(), mPriorityQueue[oldPriority], queIter);
-            (*iter->second.first)->SetPriority(priority);
-            if (mCurrentQueueIndex.first == oldPriority && mCurrentQueueIndex.second == queIter) {
-                if (nextQueIter == mPriorityQueue[oldPriority].end()) {
-                    mCurrentQueueIndex.second = mPriorityQueue[oldPriority].begin();
-                } else {
-                    mCurrentQueueIndex.second = nextQueIter;
-                }
-            }
+            AdjustQueuePriority(iter->second.first, priority);
         }
     } else {
-        CreateQueue(key, priority, type);
+        CreateBoundedQueue(key, priority);
+    }
+    if (mCurrentQueueIndex.second == mPriorityQueue[mCurrentQueueIndex.first].end()) {
+        mCurrentQueueIndex.second = mPriorityQueue[mCurrentQueueIndex.first].begin();
+    }
+    return true;
+}
+
+bool ProcessQueueManager::CreateOrUpdateCircularQueue(QueueKey key, uint32_t priority, size_t capacity) {
+    lock_guard<mutex> lock(mQueueMux);
+    auto iter = mQueues.find(key);
+    if (iter != mQueues.end()) {
+        if (iter->second.second != QueueType::CIRCULAR) {
+            // queue type change only happen when all input plugin types are changed. in such case, old input data not
+            // been processed can be discarded since whole pipeline is actually changed.
+            DeleteQueueEntity(iter->second.first);
+            CreateCircularQueue(key, priority, capacity);
+        } else {
+            static_cast<CircularProcessQueue*>(iter->second.first->get())->Reset(capacity);
+            if ((*iter->second.first)->GetPriority() == priority) {
+                return false;
+            }
+            AdjustQueuePriority(iter->second.first, priority);
+        }
+    } else {
+        CreateCircularQueue(key, priority, capacity);
     }
     if (mCurrentQueueIndex.second == mPriorityQueue[mCurrentQueueIndex.first].end()) {
         mCurrentQueueIndex.second = mPriorityQueue[mCurrentQueueIndex.first].begin();
@@ -252,22 +271,35 @@ void ProcessQueueManager::Trigger() {
     mCond.notify_one();
 }
 
-void ProcessQueueManager::CreateQueue(QueueKey key, uint32_t priority, QueueType type) {
-    switch (type) {
-        case QueueType::BOUNDED:
-            mPriorityQueue[priority].emplace_back(
-                make_unique<BoundedProcessQueue>(ProcessQueueParam::GetInstance()->mCapacity,
-                                                 ProcessQueueParam::GetInstance()->mLowWatermark,
-                                                 ProcessQueueParam::GetInstance()->mHighWatermark,
-                                                 key,
-                                                 priority,
-                                                 QueueKeyManager::GetInstance()->GetName(key)));
-            break;
-        case QueueType::CIRCULAR:
-            // TODO: implement
-            break;
+void ProcessQueueManager::CreateBoundedQueue(QueueKey key, uint32_t priority) {
+    mPriorityQueue[priority].emplace_back(
+        make_unique<BoundedProcessQueue>(mBoundedQueueParam.GetCapacity(),
+                                         mBoundedQueueParam.GetLowWatermark(),
+                                         mBoundedQueueParam.GetHighWatermark(),
+                                         key,
+                                         priority,
+                                         QueueKeyManager::GetInstance()->GetName(key)));
+    mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::BOUNDED);
+}
+
+void ProcessQueueManager::CreateCircularQueue(QueueKey key, uint32_t priority, size_t capacity) {
+    mPriorityQueue[priority].emplace_back(
+        make_unique<CircularProcessQueue>(capacity, key, priority, QueueKeyManager::GetInstance()->GetName(key)));
+    mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::CIRCULAR);
+}
+
+void ProcessQueueManager::AdjustQueuePriority(const ProcessQueueIterator& iter, uint32_t priority) {
+    uint32_t oldPriority = (*iter)->GetPriority();
+    auto nextQueIter = next(iter);
+    mPriorityQueue[priority].splice(mPriorityQueue[priority].end(), mPriorityQueue[oldPriority], iter);
+    (*iter)->SetPriority(priority);
+    if (mCurrentQueueIndex.first == oldPriority && mCurrentQueueIndex.second == iter) {
+        if (nextQueIter == mPriorityQueue[oldPriority].end()) {
+            mCurrentQueueIndex.second = mPriorityQueue[oldPriority].begin();
+        } else {
+            mCurrentQueueIndex.second = nextQueIter;
+        }
     }
-    mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), type);
 }
 
 void ProcessQueueManager::DeleteQueueEntity(const ProcessQueueIterator& iter) {

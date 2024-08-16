@@ -40,7 +40,9 @@ protected:
     static void SetUpTestCase() {
         sManager = SenderQueueManager::GetInstance();
         sConcurrencyLimiter = make_shared<ConcurrencyLimiter>();
-        SenderQueueParam::GetInstance()->SetParam(2, 1, 2);
+        sManager->mQueueParam.mCapacity = 2;
+        sManager->mQueueParam.mLowWatermark = 1;
+        sManager->mQueueParam.mHighWatermark = 3;
         for (size_t i = 0; i < 2; ++i) {
             auto cpt = make_shared<RangeCheckpoint>();
             cpt->index = i;
@@ -90,9 +92,9 @@ void SenderQueueManagerUnittest::TestCreateQueue() {
             sManager->CreateQueue(0, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, maxRate));
         APSARA_TEST_EQUAL(1U, sManager->mQueues.size());
         auto& queue = sManager->mQueues.at(0);
-        APSARA_TEST_EQUAL(SenderQueueParam::GetInstance()->mCapacity, queue.mCapacity);
-        APSARA_TEST_EQUAL(SenderQueueParam::GetInstance()->mLowWatermark, queue.mLowWatermark);
-        APSARA_TEST_EQUAL(SenderQueueParam::GetInstance()->mHighWatermark, queue.mHighWatermark);
+        APSARA_TEST_EQUAL(sManager->mQueueParam.GetCapacity(), queue.mCapacity);
+        APSARA_TEST_EQUAL(sManager->mQueueParam.GetLowWatermark(), queue.mLowWatermark);
+        APSARA_TEST_EQUAL(sManager->mQueueParam.GetHighWatermark(), queue.mHighWatermark);
         APSARA_TEST_EQUAL(1U, queue.mConcurrencyLimiters.size());
         APSARA_TEST_EQUAL(sConcurrencyLimiter, queue.mConcurrencyLimiters[0]);
         APSARA_TEST_TRUE(queue.mRateLimiter.has_value());
@@ -177,7 +179,7 @@ void SenderQueueManagerUnittest::TestGetAllAvailableItems() {
     // prepare nomal queue
     sManager->CreateQueue(
         0, vector<shared_ptr<ConcurrencyLimiter>>{FlusherSLS::GetRegionConcurrencyLimiter(mFlusher.mRegion)}, sMaxRate);
-    for (size_t i = 0; i <= SenderQueueParam::GetInstance()->mCapacity; ++i) {
+    for (size_t i = 0; i <= sManager->mQueueParam.GetCapacity(); ++i) {
         sManager->PushQueue(0, GenerateItem());
     }
 

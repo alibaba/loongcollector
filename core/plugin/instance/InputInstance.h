@@ -38,6 +38,7 @@ public:
               Json::Value& optionalGoPipeline);
     bool Start() { return mPlugin->Start(); }
     bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
+    bool SupportAck() const { return mPlugin->SupportAck(); }
     std::vector<std::unique_ptr<ProcessorInstance>>& GetInnerProcessors() { return mPlugin->GetInnerProcessors(); }
 
     // just for special treatment of exactly once of input_file, should not be used otherwise!

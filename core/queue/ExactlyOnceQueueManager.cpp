@@ -21,14 +21,18 @@
 #include "logger/Logger.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
-#include "queue/QueueParam.h"
 
 DEFINE_FLAG_INT32(logtail_queue_gc_threshold_sec, "2min", 2 * 60);
 DEFINE_FLAG_INT64(logtail_queue_max_used_time_per_round_in_msec, "500ms", 500);
 
+DECLARE_FLAG_INT32(bounded_process_queue_capacity);
+
 using namespace std;
 
 namespace logtail {
+
+ExactlyOnceQueueManager::ExactlyOnceQueueManager() : mProcessQueueParam(INT32_FLAG(bounded_process_queue_capacity)) {
+}
 
 bool ExactlyOnceQueueManager::CreateOrUpdateQueue(QueueKey key,
                                                   uint32_t priority,
@@ -67,9 +71,9 @@ bool ExactlyOnceQueueManager::CreateOrUpdateQueue(QueueKey key,
             // note: Ideally, queue capacity should be the same as checkpoint size. However, since process queue cannot
             // be reset during update, we temporarily use common param. If checkpoints size is larger than common
             // capacity, performance will restricted.
-            mProcessPriorityQueue[priority].emplace_back(ProcessQueueParam::GetInstance()->mCapacity,
-                                                         ProcessQueueParam::GetInstance()->mLowWatermark,
-                                                         ProcessQueueParam::GetInstance()->mHighWatermark,
+            mProcessPriorityQueue[priority].emplace_back(mProcessQueueParam.GetCapacity(),
+                                                         mProcessQueueParam.GetLowWatermark(),
+                                                         mProcessQueueParam.GetHighWatermark(),
                                                          key,
                                                          priority,
                                                          config);

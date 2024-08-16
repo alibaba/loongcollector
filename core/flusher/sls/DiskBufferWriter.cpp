@@ -112,7 +112,6 @@ bool DiskBufferWriter::PushToDiskBuffer(SenderQueueItem* item, uint32_t retryTim
         flusher->mProject,
         slsItem->mLogstore,
         flusher->mRegion);
-    delete item;
     return false;
 }
 

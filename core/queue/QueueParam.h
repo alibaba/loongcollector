@@ -20,52 +20,28 @@
 
 namespace logtail {
 
-struct ProcessQueueParam {
-    ProcessQueueParam(const ProcessQueueParam&) = delete;
-    ProcessQueueParam& operator=(const ProcessQueueParam&) = delete;
-
-    static ProcessQueueParam* GetInstance() {
-        static ProcessQueueParam instance;
-        return &instance;
+class BoundedQueueParam {
+public:
+    BoundedQueueParam(size_t cap, double ratio = 2.0 / 3)
+        : mCapacity(cap), mHighWatermark(cap), mLowWatermark(cap * ratio), mRatio(ratio) {
+        if (cap == 0) {
+            mCapacity = mHighWatermark = 1;
+        }
     }
 
-    void SetParam(size_t cap, size_t lowSize, size_t highSize) {
-        mCapacity = cap;
-        mLowWatermark = lowSize;
-        mHighWatermark = highSize;
-    }
-
-    size_t mCapacity = 20;
-    size_t mLowWatermark = 10;
-    size_t mHighWatermark = 15;
+    size_t GetCapacity() const { return mCapacity; }
+    size_t GetHighWatermark() const { return mHighWatermark; }
+    size_t GetLowWatermark() const { return mLowWatermark; }
 
 private:
-    ProcessQueueParam() = default;
-    ~ProcessQueueParam() = default;
-};
+    size_t mCapacity;
+    size_t mHighWatermark;
+    size_t mLowWatermark;
+    double mRatio = 2.0 / 3;
 
-struct SenderQueueParam {
-    SenderQueueParam(const SenderQueueParam&) = delete;
-    SenderQueueParam& operator=(const SenderQueueParam&) = delete;
-
-    static SenderQueueParam* GetInstance() {
-        static SenderQueueParam instance;
-        return &instance;
-    }
-
-    void SetParam(size_t cap, size_t lowSize, size_t highSize) {
-        mCapacity = cap;
-        mLowWatermark = lowSize;
-        mHighWatermark = highSize;
-    }
-
-    size_t mCapacity = 15;
-    size_t mLowWatermark = 10;
-    size_t mHighWatermark = 15;
-
-private:
-    SenderQueueParam() = default;
-    ~SenderQueueParam() = default;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class SenderQueueManagerUnittest;
+#endif
 };
 
 } // namespace logtail

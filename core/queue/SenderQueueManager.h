@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "common/FeedbackInterface.h"
+#include "queue/QueueParam.h"
 #include "queue/SenderQueue.h"
 #include "queue/SenderQueueItem.h"
 #include "sender/ConcurrencyLimiter.h"
@@ -69,8 +70,10 @@ public:
 #endif
 
 private:
-    SenderQueueManager() = default;
+    SenderQueueManager();
     ~SenderQueueManager() = default;
+
+    BoundedQueueParam mQueueParam;
 
     mutable std::mutex mQueueMux;
     std::unordered_map<QueueKey, SenderQueue> mQueues;

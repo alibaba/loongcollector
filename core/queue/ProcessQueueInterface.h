@@ -48,7 +48,6 @@ public:
 
     void Reset() {
         mDownStreamQueues.clear();
-        mValidToPop = true;
     }
 
 protected:

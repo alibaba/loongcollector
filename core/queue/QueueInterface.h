@@ -19,7 +19,7 @@
 #include "queue/QueueKey.h"
 
 namespace logtail {
-    
+
 template <typename T>
 class QueueInterface {
 public:

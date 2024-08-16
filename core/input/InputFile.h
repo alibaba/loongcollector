@@ -40,6 +40,7 @@ public:
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
     bool Start() override;
     bool Stop(bool isPipelineRemoving) override;
+    bool SupportAck() const override { return true; }
 
     FileDiscoveryOptions mFileDiscovery;
     bool mEnableContainerDiscovery = false;

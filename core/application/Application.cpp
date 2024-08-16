@@ -369,7 +369,9 @@ void Application::Exit() {
 
     FlusherRunner::GetInstance()->Stop();
     HttpSink::GetInstance()->Stop();
-    DiskBufferWriter::GetInstance()->Stop();
+
+    // TODO: make it common
+    FlusherSLS::RecycleResourceIfNotUsed();
 
 #if defined(_MSC_VER)
     ReleaseWindowsSignalObject();
