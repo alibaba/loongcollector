@@ -38,21 +38,22 @@ const (
 )
 
 type InputKubernetesMeta struct {
-	Pod                    bool
-	Node                   bool
-	Service                bool
-	Deployment             bool
-	DaemonSet              bool
-	StatefulSet            bool
-	Configmap              bool
-	Secret                 bool
-	Job                    bool
-	CronJob                bool
-	Namespace              bool
-	PersistentVolume       bool
-	PersistentVolumeClaim  bool
-	StorageClass           bool
-	Ingress                bool
+	Pod                   bool
+	Node                  bool
+	Service               bool
+	Deployment            bool
+	DaemonSet             bool
+	StatefulSet           bool
+	Configmap             bool
+	Secret                bool
+	Job                   bool
+	CronJob               bool
+	Namespace             bool
+	PersistentVolume      bool
+	PersistentVolumeClaim bool
+	StorageClass          bool
+	Ingress               bool
+
 	DisableReportParents   bool
 	KubeConfigPath         string
 	SelectedNamespaces     []string
@@ -132,6 +133,7 @@ func (in *InputKubernetesMeta) Init(context pipeline.Context) (int, error) {
 	in.cronjobMapping = make(map[string]string, 16)
 	in.ingressRelationMapping = make(map[string]map[string]map[string]struct{}, 16)
 	in.ingressMapping = make(map[string]string, 16)
+
 	return 0, nil
 }
 

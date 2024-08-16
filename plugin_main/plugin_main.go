@@ -21,6 +21,7 @@ import (
 	"runtime"
 
 	"github.com/alibaba/ilogtail/pkg/doc"
+	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/signals"
@@ -53,6 +54,17 @@ func main() {
 	} else if InitPluginBaseV2(globalCfg) != 0 {
 		return
 	}
+	if *flags.DeployMode == flags.DeploySingleton && *flags.EnableKubernetesMeta {
+		instance := k8smeta.GetMetaManagerInstance()
+		err := instance.Init("")
+		if err != nil {
+			logger.Error(context.Background(), "K8S_META_INIT_FAIL", "init k8s meta manager fail", err)
+			return
+		}
+		stopCh := make(chan struct{})
+		instance.Run(stopCh)
+	}
+
 	// load the static configs.
 	for i, cfg := range pluginCfgs {
 		p := fmt.Sprintf("PluginProject_%d", i)
@@ -63,6 +75,7 @@ func main() {
 			return
 		}
 	}
+
 	Resume()
 
 	// handle the first shutdown signal gracefully, and exit directly if FileIOFlag is true

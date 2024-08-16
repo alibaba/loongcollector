@@ -32,26 +32,34 @@ const (
 	defaultFlusherConfig = `{"type":"flusher_sls","detail":{}}`
 )
 
+const (
+	DeployDaemonset   = "daemonset"
+	DeployStatefulSet = "statefulset"
+	DeploySingleton   = "singleton"
+)
+
 // flags used to control ilogtail.
 var (
-	GlobalConfig     = flag.String("global", "./global.json", "global config.")
-	PluginConfig     = flag.String("plugin", "./plugin.json", "plugin config.")
-	FlusherConfig    = flag.String("flusher", "./default_flusher.json", "the default flusher configuration is used not only in the plugins without flusher but also to transfer the self telemetry data.")
-	ForceSelfCollect = flag.Bool("force-statics", false, "force collect self telemetry data before closing.")
-	AutoProfile      = flag.Bool("prof-auto", true, "auto dump prof file when prof-flag is open.")
-	HTTPProfFlag     = flag.Bool("prof-flag", false, "http pprof flag.")
-	Cpuprofile       = flag.String("cpu-profile", "cpu.prof", "write cpu profile to file.")
-	Memprofile       = flag.String("mem-profile", "mem.prof", "write mem profile to file.")
-	HTTPAddr         = flag.String("server", ":18689", "http server address.")
-	Doc              = flag.Bool("doc", false, "generate plugin docs")
-	DocPath          = flag.String("docpath", "./docs/en/plugins", "generate plugin docs")
-	HTTPLoadFlag     = flag.Bool("http-load", false, "export http endpoint for load plugin config.")
-	FileIOFlag       = flag.Bool("file-io", false, "use file for input or output.")
-	InputFile        = flag.String("input-file", "./input.log", "input file")
-	InputField       = flag.String("input-field", "content", "input file")
-	InputLineLimit   = flag.Int("input-line-limit", 1000, "input file")
-	OutputFile       = flag.String("output-file", "./output.log", "output file")
-	StatefulSetFlag  = flag.Bool("ALICLOUD_LOG_STATEFULSET_FLAG", false, "alibaba log export ports flag, set true if you want to use it")
+	GlobalConfig         = flag.String("global", "./global.json", "global config.")
+	PluginConfig         = flag.String("plugin", "./plugin.json", "plugin config.")
+	FlusherConfig        = flag.String("flusher", "./default_flusher.json", "the default flusher configuration is used not only in the plugins without flusher but also to transfer the self telemetry data.")
+	ForceSelfCollect     = flag.Bool("force-statics", false, "force collect self telemetry data before closing.")
+	AutoProfile          = flag.Bool("prof-auto", true, "auto dump prof file when prof-flag is open.")
+	HTTPProfFlag         = flag.Bool("prof-flag", false, "http pprof flag.")
+	Cpuprofile           = flag.String("cpu-profile", "cpu.prof", "write cpu profile to file.")
+	Memprofile           = flag.String("mem-profile", "mem.prof", "write mem profile to file.")
+	HTTPAddr             = flag.String("server", ":18689", "http server address.")
+	Doc                  = flag.Bool("doc", false, "generate plugin docs")
+	DocPath              = flag.String("docpath", "./docs/en/plugins", "generate plugin docs")
+	HTTPLoadFlag         = flag.Bool("http-load", false, "export http endpoint for load plugin config.")
+	FileIOFlag           = flag.Bool("file-io", false, "use file for input or output.")
+	InputFile            = flag.String("input-file", "./input.log", "input file")
+	InputField           = flag.String("input-field", "content", "input file")
+	InputLineLimit       = flag.Int("input-line-limit", 1000, "input file")
+	OutputFile           = flag.String("output-file", "./output.log", "output file")
+	DeployMode           = flag.String("DEPLOY_MODE", DeployDaemonset, "alibaba log deploy mode, daemonset or statefulset or singleton")
+	StatefulSetFlag      = flag.Bool("ALICLOUD_LOG_STATEFULSET_FLAG", false, "alibaba log export ports flag, set true if you want to use it")
+	EnableKubernetesMeta = flag.Bool("ENABLE_KUBERNETES_META", false, "enable kubernetes meta")
 )
 
 var (
@@ -140,6 +148,8 @@ func OverrideByEnv() {
 	_ = util.InitFromEnvBool("LOGTAIL_FORCE_COLLECT_SELF_TELEMETRY", ForceSelfCollect, *ForceSelfCollect)
 	_ = util.InitFromEnvBool("LOGTAIL_HTTP_LOAD_CONFIG", HTTPLoadFlag, *HTTPLoadFlag)
 	_ = util.InitFromEnvBool("ALICLOUD_LOG_STATEFULSET_FLAG", StatefulSetFlag, *StatefulSetFlag)
+	_ = util.InitFromEnvString("DEPLOY_MODE", DeployMode, *DeployMode)
+	_ = util.InitFromEnvBool("ENABLE_KUBERNETES_META", EnableKubernetesMeta, *EnableKubernetesMeta)
 }
 
 type pipelineConfig struct {

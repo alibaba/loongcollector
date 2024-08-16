@@ -26,6 +26,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugin_main/flags"
@@ -337,6 +338,16 @@ func initPluginBase(cfgStr string) int {
 		setGCPercentForSlowStart()
 		logger.Info(context.Background(), "init plugin base, version", config.BaseVersion)
 		LoadGlobalConfig(cfgStr)
+		if *flags.DeployMode == flags.DeploySingleton && *flags.EnableKubernetesMeta {
+			instance := k8smeta.GetMetaManagerInstance()
+			err := instance.Init("")
+			if err != nil {
+				logger.Error(context.Background(), "K8S_META_INIT_FAIL", "init k8s meta manager fail", err)
+				return
+			}
+			stopCh := make(chan struct{})
+			instance.Run(stopCh)
+		}
 		if err := pluginmanager.Init(); err != nil {
 			logger.Error(context.Background(), "PLUGIN_ALARM", "init plugin error", err)
 			rst = 1

@@ -101,6 +101,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [go.opentelemetry.io/proto/otlp](https://pkg.go.dev/go.opentelemetry.io/proto/otlp?tab=licenses)
 - [go.opencensus.io](https://pkg.go.dev/go.opencensus.io?tab=licenses)
 - [github.com/golang/groupcache](https://pkg.go.dev/github.com/golang/groupcache?tab=licenses)
+- [sigs.k8s.io/controller-runtime](https://pkg.go.dev/sigs.k8s.io/controller-runtime?tab=licenses)
 
 ## BSD licenses
 
