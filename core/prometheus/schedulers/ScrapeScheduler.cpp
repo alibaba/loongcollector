@@ -64,7 +64,7 @@ bool ScrapeScheduler::operator<(const ScrapeScheduler& other) const {
 
 void ScrapeScheduler::OnMetricResult(const HttpResponse& response) {
     // TODO(liqiang): get scrape timestamp
-    time_t timestampInNs = GetCurrentTimeInNanoSeconds();
+    time_t timestamp = time(nullptr);
     if (response.mStatusCode != 200) {
         string headerStr;
         for (const auto& [k, v] : mScrapeConfigPtr->mHeaders) {
@@ -74,7 +74,7 @@ void ScrapeScheduler::OnMetricResult(const HttpResponse& response) {
                     ("scrape failed, status code", response.mStatusCode)("target", mHash)("http header", headerStr));
         return;
     }
-    auto eventGroup = BuildPipelineEventGroup(response.mBody, timestampInNs);
+    auto eventGroup = BuildPipelineEventGroup(response.mBody, timestamp);
 
     PushEventGroup(std::move(eventGroup));
 }
