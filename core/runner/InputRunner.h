@@ -24,7 +24,7 @@ public:
 
     virtual void Init() = 0;
     virtual void Stop() = 0;
-    virtual void StopIfNotInUse() = 0;
+    virtual bool HasRegisteredPlugins() const = 0;
 };
 
 } // namespace logtail
