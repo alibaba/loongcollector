@@ -1,9 +1,9 @@
 @input
-Feature: input canal
-  Test input canal
+Feature: input canal binfile mode
+  Test input canal binfile mode
 
   @e2e @docker-compose @input-canal
-  Scenario: TestInputCanal
+  Scenario: TestInputCanalBinfileMode
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """

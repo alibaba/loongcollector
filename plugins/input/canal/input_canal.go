@@ -496,12 +496,16 @@ func (sc *ServiceCanal) OnGTID(_ *replication.EventHeader, e mysql.BinlogGTIDEve
 // OnPosSynced is called right after RotateEvent, XIDEvent and DDLEvent
 // If our handle do not return err, we do not need to save checkpoint in those handlers
 func (sc *ServiceCanal) OnPosSynced(_ *replication.EventHeader, pos mysql.Position, gset mysql.GTIDSet, force bool) error {
-	logger.Debugf(sc.context.GetRuntimeContext(), "[CANAL_DEBUG] OnPosSynced: %v", gset.String())
+	GTID := ""
+	if gset != nil {
+		GTID = gset.String()
+	}
+	logger.Debugf(sc.context.GetRuntimeContext(), "[CANAL_DEBUG] OnPosSynced. Position: %v GTID: %v", pos, GTID)
 	sc.syncCounter.Add(1)
 	sc.checkpoint.FileName = pos.Name
 	sc.checkpoint.Offset = pos.Pos
-	if sc.checkpoint.GTID != "" {
-		sc.checkpoint.GTID = gset.String()
+	if sc.checkpoint.GTID != "" && GTID != "" {
+		sc.checkpoint.GTID = GTID
 	}
 	nowTime := time.Now()
 	// save checkpoint 3 second per time

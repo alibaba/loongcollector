@@ -90,7 +90,7 @@ else
   REMOVE_SSH_MOUNT='sed s/--mount=type=ssh//'
 fi
 
-echo "# syntax=docker/dockerfile:1.5" > $GEN_DOCKERFILE;
+echo "# syntax=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/common/dockerfile:1.5" > $GEN_DOCKERFILE;
 if [[ $CATEGORY = "goc" || $CATEGORY = "build" ]]; then
     cat $ROOTDIR/docker/Dockerfile_$CATEGORY | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT >> $GEN_DOCKERFILE;
 elif [[ $CATEGORY = "development" ]]; then

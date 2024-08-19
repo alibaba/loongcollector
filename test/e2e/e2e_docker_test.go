@@ -14,18 +14,24 @@
 package e2e
 
 import (
+	"os"
 	"testing"
 
 	"github.com/cucumber/godog"
 )
 
 func TestE2EOnDockerCompose(t *testing.T) {
+	caseName := os.Getenv("TEST_CASE")
+	featurePath := "test_cases"
+	if caseName != "" {
+		featurePath += "/" + caseName
+	}
 	suite := godog.TestSuite{
 		Name:                "E2EOnDockerCompose",
 		ScenarioInitializer: scenarioInitializer,
 		Options: &godog.Options{
 			Format:    "pretty",
-			Paths:     []string{"test_cases"},
+			Paths:     []string{featurePath},
 			Tags:      "@e2e && @docker-compose && ~@ebpf",
 			TestingT:  t,
 			Randomize: -1,

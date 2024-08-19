@@ -18,7 +18,7 @@ DOCKER_PUSH ?= false
 DOCKER_REPOSITORY ?= aliyun/ilogtail
 BUILD_REPOSITORY ?= aliyun/ilogtail_build
 GENERATED_HOME ?= generated_files
-PLUGINS_CONFIG_FILE ?= "plugins.yml,external_plugins.yml"
+PLUGINS_CONFIG_FILE ?= plugins.yml,external_plugins.yml
 GO_MOD_FILE ?= go.mod
 PATH_IN_DOCER ?= /src
 DOCKER_BUILD_EXPORT_GO_ENVS ?= true
@@ -79,14 +79,14 @@ tools:
 
 .PHONY: clean
 clean:
-	rm -rf $(LICENSE_COVERAGE_FILE)
-	rm -rf $(OUT_DIR) $(DIST_DIR)
+	rm -rf "$(LICENSE_COVERAGE_FILE)"
+	rm -rf "$(OUT_DIR)" "$(DIST_DIR)"
 	rm -rf behavior-test
 	rm -rf performance-test
 	rm -rf core-test
 	rm -rf e2e-engine-coverage.txt
 	rm -rf find_licenses
-	rm -rf $(GENERATED_HOME)
+	rm -rf "$(GENERATED_HOME)"
 	rm -rf .testCoverage.txt
 	rm -rf .coretestCoverage.txt
 	rm -rf core/build
@@ -96,7 +96,7 @@ clean:
 	rm -rf plugins/all/all_debug.go
 	rm -rf plugins/all/all_windows.go
 	rm -rf plugins/all/all_linux.go
-	go mod tidy -modfile $(GO_MOD_FILE) || true
+	go mod tidy -modfile "$(GO_MOD_FILE)" || true
 
 .PHONY: license
 license:  clean tools import_plugins
@@ -120,14 +120,14 @@ lint-e2e: clean tools
 
 .PHONY: core
 core: clean import_plugins
-	./scripts/gen_build_scripts.sh core $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR) $(DOCKER_BUILD_EXPORT_GO_ENVS) $(DOCKER_BUILD_COPY_GIT_CONFIGS) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE) $(PATH_IN_DOCKER)
-	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false $(DOCKER_BUILD_USE_BUILDKIT)
+	./scripts/gen_build_scripts.sh core "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)" "$(PATH_IN_DOCKER)"
+	./scripts/docker_build.sh build "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" false "$(DOCKER_BUILD_USE_BUILDKIT)"
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
 .PHONY: plugin
 plugin: clean import_plugins
-	./scripts/gen_build_scripts.sh plugin $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR) $(DOCKER_BUILD_EXPORT_GO_ENVS) $(DOCKER_BUILD_COPY_GIT_CONFIGS) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE)
-	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false $(DOCKER_BUILD_USE_BUILDKIT)
+	./scripts/gen_build_scripts.sh plugin "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)"
+	./scripts/docker_build.sh build "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" false "$(DOCKER_BUILD_USE_BUILDKIT)"
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
 .PHONY: upgrade_adapter_lib
@@ -150,13 +150,13 @@ import_plugins:
 
 .PHONY: e2edocker
 e2edocker: clean import_plugins
-	./scripts/gen_build_scripts.sh e2e $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(OUT_DIR) $(DOCKER_BUILD_EXPORT_GO_ENVS) $(DOCKER_BUILD_COPY_GIT_CONFIGS) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE)
-	./scripts/docker_build.sh development $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) false $(DOCKER_BUILD_USE_BUILDKIT)
+	./scripts/gen_build_scripts.sh e2e "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)"
+	./scripts/docker_build.sh development "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" false "$(DOCKER_BUILD_USE_BUILDKIT)"
 
 # provide a goc server for e2e testing
 .PHONY: gocdocker
 gocdocker: clean
-	./scripts/docker_build.sh goc $(GENERATED_HOME) latest goc-server false $(DOCKER_BUILD_USE_BUILDKIT)
+	./scripts/docker_build.sh goc "$(GENERATED_HOME)" latest goc-server false "$(DOCKER_BUILD_USE_BUILDKIT)"
 
 .PHONY: vendor
 vendor: clean import_plugins
@@ -212,13 +212,13 @@ unittest_pluginmanager: clean import_plugins
 
 .PHONY: all
 all: clean import_plugins
-	./scripts/gen_build_scripts.sh all $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) $(OUT_DIR) $(DOCKER_BUILD_EXPORT_GO_ENVS) $(DOCKER_BUILD_COPY_GIT_CONFIGS) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE)
-	./scripts/docker_build.sh build $(GENERATED_HOME) $(VERSION) $(BUILD_REPOSITORY) false $(DOCKER_BUILD_USE_BUILDKIT)
+	./scripts/gen_build_scripts.sh all "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)"
+	./scripts/docker_build.sh build "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" false "$(DOCKER_BUILD_USE_BUILDKIT)"
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
 .PHONY: dist
 dist: all
-	./scripts/dist.sh $(OUT_DIR) $(DIST_DIR) $(PACKAGE_DIR)
+	./scripts/dist.sh "$(OUT_DIR)" "$(DIST_DIR)" "$(PACKAGE_DIR)"
 
 $(DIST_FILE):
 	@echo 'ilogtail-$(VERSION) dist does not exist! Please download or run `make dist` first!'
@@ -226,9 +226,9 @@ $(DIST_FILE):
 
 .PHONY: docker
 docker: $(DIST_FILE)
-	./scripts/docker_build.sh production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH) $(DOCKER_BUILD_USE_BUILDKIT)
+	./scripts/docker_build.sh production "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" "$(DOCKER_PUSH)" "$(DOCKER_BUILD_USE_BUILDKIT)"
 
 .PHONY: multi-arch-docker
 multi-arch-docker: $(DIST_FILE)
 	@echo "will push to $(DOCKER_REPOSITORY):edge. Make sure this tag does not exist or push will fail."
-	./scripts/docker_build.sh multi-arch-production $(GENERATED_HOME) $(VERSION) $(DOCKER_REPOSITORY) $(DOCKER_PUSH) $(DOCKER_BUILD_USE_BUILDKIT)
+	./scripts/docker_build.sh multi-arch-production "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" "$(DOCKER_PUSH)" "$(DOCKER_BUILD_USE_BUILDKIT)"
