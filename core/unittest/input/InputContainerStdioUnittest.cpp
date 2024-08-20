@@ -231,6 +231,7 @@ void InputContainerStdioUnittest::OnPipelineUpdate() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.SetContext(ctx);
+    input.SetMetricsRecordRef(InputContainerStdio::sName, "1", "1", "1");
     APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
 
     APSARA_TEST_TRUE(input.Start());

@@ -566,6 +566,13 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             LOG_WARNING(sLogger,
                         ("too many sub directoried for path",
                          dirPath)("dirCount", dirCount)("basePath", pConfig.first->GetBasePath()));
+            LogtailAlarm::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
+                                                   string("too many sub directoried for path:" + dirPath
+                                                          + " dirCount: " + ToString(dirCount) + " basePath"
+                                                          + pConfig.first->GetBasePath()),
+                                                   pConfig.second->GetProjectName(),
+                                                   pConfig.second->GetLogstoreName(),
+                                                   pConfig.second->GetRegion());
             break;
         }
 

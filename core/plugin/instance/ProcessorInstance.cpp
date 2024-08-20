@@ -49,9 +49,9 @@ void ProcessorInstance::Process(vector<PipelineEventGroup>& logGroupList) {
         mProcInRecordsTotal->Add(logGroup.GetEvents().size());
     }
 
-    uint64_t startTime = GetCurrentTimeInMicroSeconds();
+    uint64_t startTime = GetCurrentTimeInMilliSeconds();
     mPlugin->Process(logGroupList);
-    uint64_t durationTime = GetCurrentTimeInMicroSeconds() - startTime;
+    uint64_t durationTime = GetCurrentTimeInMilliSeconds() - startTime;
 
     mProcTimeMS->Add(durationTime);
 
