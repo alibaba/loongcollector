@@ -25,12 +25,12 @@
 
 #include "config/ConfigDiff.h"
 #include "config/PipelineConfig.h"
-#include "config/ProcessConfig.h"
+#include "config/InstanceConfig.h"
 
 namespace logtail {
 
 class PipelineManager;
-class ProcessConfigManager;
+class InstanceConfigManager;
 
 class ConfigWatcher {
 public:
@@ -43,15 +43,15 @@ public:
     }
 
     PipelineConfigDiff CheckPipelineConfigDiff();
-    ProcessConfigDiff CheckProcessConfigDiff();
+    InstanceConfigDiff CheckInstanceConfigDiff();
 
     void AddPipelineSource(const std::string& dir, std::mutex* mux = nullptr);
-    void AddProcessSource(const std::string& dir, std::mutex* mux = nullptr);
+    void AddInstanceSource(const std::string& dir, std::mutex* mux = nullptr);
     void AddCommandSource(const std::string& dir, std::mutex* mux = nullptr);
 
     // for ut
     void SetPipelineManager(const PipelineManager* pm) { mPipelineManager = pm; }
-    void SetProcessConfigManager(const ProcessConfigManager* pm) { mProcessConfigManager = pm; }
+    void SetInstanceConfigManager(const InstanceConfigManager* pm) { mInstanceConfigManager = pm; }
     void ClearEnvironment();
 
 private:
@@ -69,8 +69,8 @@ private:
     std::vector<std::filesystem::path> mPipelineConfigDir;
     std::unordered_map<std::string, std::mutex*> mPipelineConfigDirMutexMap;
 
-    std::vector<std::filesystem::path> mProcessConfigDir;
-    std::unordered_map<std::string, std::mutex*> mProcessConfigDirMutexMap;
+    std::vector<std::filesystem::path> mInstanceConfigDir;
+    std::unordered_map<std::string, std::mutex*> mInstanceConfigDirMutexMap;
 
     std::vector<std::filesystem::path> mCommandConfigDir;
     std::unordered_map<std::string, std::mutex*> mCommandConfigDirMutexMap;
@@ -78,8 +78,8 @@ private:
     std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>> mPipelineFileInfoMap;
     const PipelineManager* mPipelineManager = nullptr;
 
-    std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>> mProcessFileInfoMap;
-    const ProcessConfigManager* mProcessConfigManager = nullptr;
+    std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>> mInstanceFileInfoMap;
+    const InstanceConfigManager* mInstanceConfigManager = nullptr;
 
     bool CheckDirectoryStatus(const std::filesystem::path& dir);
 };

@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "config/PipelineConfig.h"
-#include "config/ProcessConfig.h"
+#include "config/InstanceConfig.h"
 
 namespace logtail {
 
@@ -33,10 +33,10 @@ public:
     bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }
 };
 
-class ProcessConfigDiff {
+class InstanceConfigDiff {
 public:
-    std::vector<ProcessConfig> mAdded;
-    std::vector<ProcessConfig> mModified;
+    std::vector<InstanceConfig> mAdded;
+    std::vector<InstanceConfig> mModified;
     std::vector<std::string> mRemoved;
     std::vector<std::string> mUnchanged; // 过渡使用，仅供插件系统用
     bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }

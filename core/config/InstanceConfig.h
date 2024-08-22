@@ -27,7 +27,7 @@
 
 namespace logtail {
 
-struct ProcessConfig {
+struct InstanceConfig {
     std::string mName;
     std::unique_ptr<Json::Value> mDetail;
 
@@ -36,13 +36,13 @@ struct ProcessConfig {
     std::string mLogstore;
     std::string mRegion;
 
-    ProcessConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail)
+    InstanceConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail)
         : mName(name), mDetail(std::move(detail)) {
         mProject = "";
         mLogstore = "";
         mRegion = "";
     }
-    ProcessConfig(const logtail::ProcessConfig& config) {
+    InstanceConfig(const logtail::InstanceConfig& config) {
         mName = config.mName;
         mDetail = std::make_unique<Json::Value>(*config.mDetail);
         mProject = "";
@@ -50,7 +50,7 @@ struct ProcessConfig {
         mRegion = "";
     }
 
-    ProcessConfig& operator=(ProcessConfig&& other) {
+    InstanceConfig& operator=(InstanceConfig&& other) {
         if (this != &other) {
             mName = std::move(other.mName);
             mDetail = std::move(other.mDetail);
@@ -61,7 +61,7 @@ struct ProcessConfig {
         return *this;
     }
 
-    ProcessConfig& operator=(const ProcessConfig& other) {
+    InstanceConfig& operator=(const InstanceConfig& other) {
         if (this != &other) {
             mName = other.mName;
             mDetail = std::make_unique<Json::Value>(*other.mDetail);
@@ -77,11 +77,11 @@ struct ProcessConfig {
     const Json::Value& GetConfig() const { return *mDetail; }
 };
 
-inline bool operator==(const ProcessConfig& lhs, const ProcessConfig& rhs) {
+inline bool operator==(const InstanceConfig& lhs, const InstanceConfig& rhs) {
     return (lhs.mName == rhs.mName) && (*lhs.mDetail == *rhs.mDetail);
 }
 
-inline bool operator!=(const ProcessConfig& lhs, const ProcessConfig& rhs) {
+inline bool operator!=(const InstanceConfig& lhs, const InstanceConfig& rhs) {
     return !(lhs == rhs);
 }
 

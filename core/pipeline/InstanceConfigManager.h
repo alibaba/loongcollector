@@ -22,31 +22,31 @@
 
 #include "common/Lock.h"
 #include "config/ConfigDiff.h"
-#include "config/ProcessConfig.h"
+#include "config/InstanceConfig.h"
 
 namespace logtail {
 
-class ProcessConfigManager {
+class InstanceConfigManager {
 public:
-    ProcessConfigManager(const ProcessConfigManager&) = delete;
-    ProcessConfigManager& operator=(const ProcessConfigManager&) = delete;
+    InstanceConfigManager(const InstanceConfigManager&) = delete;
+    InstanceConfigManager& operator=(const InstanceConfigManager&) = delete;
 
-    static ProcessConfigManager* GetInstance() {
-        static ProcessConfigManager instance;
+    static InstanceConfigManager* GetInstance() {
+        static InstanceConfigManager instance;
         return &instance;
     }
 
-    void UpdateProcessConfigs(ProcessConfigDiff& diff);
-    std::shared_ptr<ProcessConfig> FindConfigByName(const std::string& configName) const;
+    void UpdateInstanceConfigs(InstanceConfigDiff& diff);
+    std::shared_ptr<InstanceConfig> FindConfigByName(const std::string& configName) const;
     std::vector<std::string> GetAllConfigNames() const;
 
 private:
-    ProcessConfigManager();
-    ~ProcessConfigManager() = default;
-    std::map<std::string, std::shared_ptr<ProcessConfig>> mProcessConfigMap;
+    InstanceConfigManager();
+    ~InstanceConfigManager() = default;
+    std::map<std::string, std::shared_ptr<InstanceConfig>> mInstanceConfigMap;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class ProcessConfigManagerUnittest;
+    friend class InstanceConfigManagerUnittest;
     friend class CommonConfigProviderUnittest;
 #endif
 };

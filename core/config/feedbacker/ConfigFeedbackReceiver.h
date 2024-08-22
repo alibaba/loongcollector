@@ -29,20 +29,20 @@ class ConfigFeedbackReceiver {
 public:
     static ConfigFeedbackReceiver& GetInstance();
     void RegisterPipelineConfig(const std::string& name, ConfigFeedbackable* feedbackable);
-    void RegisterProcessConfig(const std::string& name, ConfigFeedbackable* feedbackable);
+    void RegisterInstanceConfig(const std::string& name, ConfigFeedbackable* feedbackable);
     void RegisterCommand(const std::string& type, const std::string& name, ConfigFeedbackable* feedbackable);
     void UnregisterPipelineConfig(const std::string& name);
-    void UnregisterProcessConfig(const std::string& name);
+    void UnregisterInstanceConfig(const std::string& name);
     void UnregisterCommand(const std::string& type, const std::string& name);
     void FeedbackPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status);
-    void FeedbackProcessConfigStatus(const std::string& name, ConfigFeedbackStatus status);
+    void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status);
     void FeedbackCommandConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status);
 
 private:
     ConfigFeedbackReceiver() {}
     std::mutex mMutex;
     std::unordered_map<std::string, ConfigFeedbackable*> mPipelineConfigFeedbackableMap;
-    std::unordered_map<std::string, ConfigFeedbackable*> mProcessConfigFeedbackableMap;
+    std::unordered_map<std::string, ConfigFeedbackable*> mInstanceConfigFeedbackableMap;
     std::unordered_map<std::string, ConfigFeedbackable*> mCommandFeedbackableMap;
 };
 

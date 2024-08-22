@@ -83,6 +83,9 @@ extern CommandDetailDefaultTypeInternal _CommandDetail_default_instance_;
 class CommandInfo;
 class CommandInfoDefaultTypeInternal;
 extern CommandInfoDefaultTypeInternal _CommandInfo_default_instance_;
+class CommonResponse;
+class CommonResponseDefaultTypeInternal;
+extern CommonResponseDefaultTypeInternal _CommonResponse_default_instance_;
 class ConfigDetail;
 class ConfigDetailDefaultTypeInternal;
 extern ConfigDetailDefaultTypeInternal _ConfigDetail_default_instance_;
@@ -101,9 +104,6 @@ extern HeartbeatRequestDefaultTypeInternal _HeartbeatRequest_default_instance_;
 class HeartbeatResponse;
 class HeartbeatResponseDefaultTypeInternal;
 extern HeartbeatResponseDefaultTypeInternal _HeartbeatResponse_default_instance_;
-class ServerErrorResponse;
-class ServerErrorResponseDefaultTypeInternal;
-extern ServerErrorResponseDefaultTypeInternal _ServerErrorResponse_default_instance_;
 }  // namespace v2
 }  // namespace proto
 }  // namespace configserver
@@ -114,13 +114,13 @@ template<> ::configserver::proto::v2::AgentAttributes_ExtrasEntry_DoNotUse* Aren
 template<> ::configserver::proto::v2::AgentGroupTag* Arena::CreateMaybeMessage<::configserver::proto::v2::AgentGroupTag>(Arena*);
 template<> ::configserver::proto::v2::CommandDetail* Arena::CreateMaybeMessage<::configserver::proto::v2::CommandDetail>(Arena*);
 template<> ::configserver::proto::v2::CommandInfo* Arena::CreateMaybeMessage<::configserver::proto::v2::CommandInfo>(Arena*);
+template<> ::configserver::proto::v2::CommonResponse* Arena::CreateMaybeMessage<::configserver::proto::v2::CommonResponse>(Arena*);
 template<> ::configserver::proto::v2::ConfigDetail* Arena::CreateMaybeMessage<::configserver::proto::v2::ConfigDetail>(Arena*);
 template<> ::configserver::proto::v2::ConfigInfo* Arena::CreateMaybeMessage<::configserver::proto::v2::ConfigInfo>(Arena*);
 template<> ::configserver::proto::v2::FetchConfigRequest* Arena::CreateMaybeMessage<::configserver::proto::v2::FetchConfigRequest>(Arena*);
 template<> ::configserver::proto::v2::FetchConfigResponse* Arena::CreateMaybeMessage<::configserver::proto::v2::FetchConfigResponse>(Arena*);
 template<> ::configserver::proto::v2::HeartbeatRequest* Arena::CreateMaybeMessage<::configserver::proto::v2::HeartbeatRequest>(Arena*);
 template<> ::configserver::proto::v2::HeartbeatResponse* Arena::CreateMaybeMessage<::configserver::proto::v2::HeartbeatResponse>(Arena*);
-template<> ::configserver::proto::v2::ServerErrorResponse* Arena::CreateMaybeMessage<::configserver::proto::v2::ServerErrorResponse>(Arena*);
 }  // namespace protobuf
 }  // namespace google
 namespace configserver {
@@ -153,7 +153,7 @@ inline bool ConfigStatus_Parse(
 enum AgentCapabilities {
   UnspecifiedAgentCapability = 0,
   AcceptsPipelineConfig = 1,
-  AcceptsProcessConfig = 2,
+  AcceptsInstanceConfig = 2,
   AcceptsCustomCommand = 4,
   AgentCapabilities_INT_MIN_SENTINEL_DO_NOT_USE_ = ::google::protobuf::kint32min,
   AgentCapabilities_INT_MAX_SENTINEL_DO_NOT_USE_ = ::google::protobuf::kint32max
@@ -198,7 +198,7 @@ enum ServerCapabilities {
   UnspecifiedServerCapability = 0,
   RembersAttribute = 1,
   RembersPipelineConfigStatus = 2,
-  RembersProcessConfigStatus = 4,
+  RembersInstanceConfigStatus = 4,
   RembersCustomCommandStatus = 8,
   ServerCapabilities_INT_MIN_SENTINEL_DO_NOT_USE_ = ::google::protobuf::kint32min,
   ServerCapabilities_INT_MAX_SENTINEL_DO_NOT_USE_ = ::google::protobuf::kint32max
@@ -222,13 +222,13 @@ enum ResponseFlags {
   ResponseFlagsUnspecified = 0,
   ReportFullState = 1,
   FetchPipelineConfigDetail = 2,
-  FetchProcessConfigDetail = 4,
+  FetchInstanceConfigDetail = 4,
   ResponseFlags_INT_MIN_SENTINEL_DO_NOT_USE_ = ::google::protobuf::kint32min,
   ResponseFlags_INT_MAX_SENTINEL_DO_NOT_USE_ = ::google::protobuf::kint32max
 };
 bool ResponseFlags_IsValid(int value);
 const ResponseFlags ResponseFlags_MIN = ResponseFlagsUnspecified;
-const ResponseFlags ResponseFlags_MAX = FetchProcessConfigDetail;
+const ResponseFlags ResponseFlags_MAX = FetchInstanceConfigDetail;
 const int ResponseFlags_ARRAYSIZE = ResponseFlags_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* ResponseFlags_descriptor();
@@ -946,17 +946,17 @@ class HeartbeatRequest : public ::google::protobuf::Message /* @@protoc_insertio
   const ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigInfo >&
       pipeline_configs() const;
 
-  // repeated .configserver.proto.v2.ConfigInfo process_configs = 11;
-  int process_configs_size() const;
-  void clear_process_configs();
-  static const int kProcessConfigsFieldNumber = 11;
-  ::configserver::proto::v2::ConfigInfo* mutable_process_configs(int index);
+  // repeated .configserver.proto.v2.ConfigInfo instance_configs = 11;
+  int instance_configs_size() const;
+  void clear_instance_configs();
+  static const int kInstanceConfigsFieldNumber = 11;
+  ::configserver::proto::v2::ConfigInfo* mutable_instance_configs(int index);
   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigInfo >*
-      mutable_process_configs();
-  const ::configserver::proto::v2::ConfigInfo& process_configs(int index) const;
-  ::configserver::proto::v2::ConfigInfo* add_process_configs();
+      mutable_instance_configs();
+  const ::configserver::proto::v2::ConfigInfo& instance_configs(int index) const;
+  ::configserver::proto::v2::ConfigInfo* add_instance_configs();
   const ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigInfo >&
-      process_configs() const;
+      instance_configs() const;
 
   // repeated .configserver.proto.v2.CommandInfo custom_commands = 12;
   int custom_commands_size() const;
@@ -1082,7 +1082,7 @@ class HeartbeatRequest : public ::google::protobuf::Message /* @@protoc_insertio
   ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::AgentGroupTag > tags_;
   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigInfo > pipeline_configs_;
-  ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigInfo > process_configs_;
+  ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigInfo > instance_configs_;
   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::CommandInfo > custom_commands_;
   ::google::protobuf::internal::ArenaStringPtr request_id_;
   ::google::protobuf::internal::ArenaStringPtr instance_id_;
@@ -1380,124 +1380,6 @@ class CommandDetail : public ::google::protobuf::Message /* @@protoc_insertion_p
 };
 // -------------------------------------------------------------------
 
-class ServerErrorResponse : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:configserver.proto.v2.ServerErrorResponse) */ {
- public:
-  ServerErrorResponse();
-  virtual ~ServerErrorResponse();
-
-  ServerErrorResponse(const ServerErrorResponse& from);
-
-  inline ServerErrorResponse& operator=(const ServerErrorResponse& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  #if LANG_CXX11
-  ServerErrorResponse(ServerErrorResponse&& from) noexcept
-    : ServerErrorResponse() {
-    *this = ::std::move(from);
-  }
-
-  inline ServerErrorResponse& operator=(ServerErrorResponse&& from) noexcept {
-    if (GetArenaNoVirtual() == from.GetArenaNoVirtual()) {
-      if (this != &from) InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-  #endif
-  static const ::google::protobuf::Descriptor* descriptor();
-  static const ServerErrorResponse& default_instance();
-
-  static void InitAsDefaultInstance();  // FOR INTERNAL USE ONLY
-  static inline const ServerErrorResponse* internal_default_instance() {
-    return reinterpret_cast<const ServerErrorResponse*>(
-               &_ServerErrorResponse_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    8;
-
-  void Swap(ServerErrorResponse* other);
-  friend void swap(ServerErrorResponse& a, ServerErrorResponse& b) {
-    a.Swap(&b);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline ServerErrorResponse* New() const final {
-    return CreateMaybeMessage<ServerErrorResponse>(NULL);
-  }
-
-  ServerErrorResponse* New(::google::protobuf::Arena* arena) const final {
-    return CreateMaybeMessage<ServerErrorResponse>(arena);
-  }
-  void CopyFrom(const ::google::protobuf::Message& from) final;
-  void MergeFrom(const ::google::protobuf::Message& from) final;
-  void CopyFrom(const ServerErrorResponse& from);
-  void MergeFrom(const ServerErrorResponse& from);
-  void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  bool MergePartialFromCodedStream(
-      ::google::protobuf::io::CodedInputStream* input) final;
-  void SerializeWithCachedSizes(
-      ::google::protobuf::io::CodedOutputStream* output) const final;
-  ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
-      bool deterministic, ::google::protobuf::uint8* target) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(ServerErrorResponse* other);
-  private:
-  inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
-    return NULL;
-  }
-  inline void* MaybeArenaPtr() const {
-    return NULL;
-  }
-  public:
-
-  ::google::protobuf::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  // string error_message = 2;
-  void clear_error_message();
-  static const int kErrorMessageFieldNumber = 2;
-  const ::std::string& error_message() const;
-  void set_error_message(const ::std::string& value);
-  #if LANG_CXX11
-  void set_error_message(::std::string&& value);
-  #endif
-  void set_error_message(const char* value);
-  void set_error_message(const char* value, size_t size);
-  ::std::string* mutable_error_message();
-  ::std::string* release_error_message();
-  void set_allocated_error_message(::std::string* error_message);
-
-  // int32 error_code = 1;
-  void clear_error_code();
-  static const int kErrorCodeFieldNumber = 1;
-  ::google::protobuf::int32 error_code() const;
-  void set_error_code(::google::protobuf::int32 value);
-
-  // @@protoc_insertion_point(class_scope:configserver.proto.v2.ServerErrorResponse)
- private:
-
-  ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
-  ::google::protobuf::internal::ArenaStringPtr error_message_;
-  ::google::protobuf::int32 error_code_;
-  mutable ::google::protobuf::internal::CachedSize _cached_size_;
-  friend struct ::protobuf_v2_2fagent_2eproto::TableStruct;
-};
-// -------------------------------------------------------------------
-
 class HeartbeatResponse : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:configserver.proto.v2.HeartbeatResponse) */ {
  public:
   HeartbeatResponse();
@@ -1533,7 +1415,7 @@ class HeartbeatResponse : public ::google::protobuf::Message /* @@protoc_inserti
                &_HeartbeatResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    9;
+    8;
 
   void Swap(HeartbeatResponse* other);
   friend void swap(HeartbeatResponse& a, HeartbeatResponse& b) {
@@ -1597,17 +1479,17 @@ class HeartbeatResponse : public ::google::protobuf::Message /* @@protoc_inserti
   const ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail >&
       pipeline_config_updates() const;
 
-  // repeated .configserver.proto.v2.ConfigDetail process_config_updates = 5;
-  int process_config_updates_size() const;
-  void clear_process_config_updates();
-  static const int kProcessConfigUpdatesFieldNumber = 5;
-  ::configserver::proto::v2::ConfigDetail* mutable_process_config_updates(int index);
+  // repeated .configserver.proto.v2.ConfigDetail instance_config_updates = 5;
+  int instance_config_updates_size() const;
+  void clear_instance_config_updates();
+  static const int kInstanceConfigUpdatesFieldNumber = 5;
+  ::configserver::proto::v2::ConfigDetail* mutable_instance_config_updates(int index);
   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail >*
-      mutable_process_config_updates();
-  const ::configserver::proto::v2::ConfigDetail& process_config_updates(int index) const;
-  ::configserver::proto::v2::ConfigDetail* add_process_config_updates();
+      mutable_instance_config_updates();
+  const ::configserver::proto::v2::ConfigDetail& instance_config_updates(int index) const;
+  ::configserver::proto::v2::ConfigDetail* add_instance_config_updates();
   const ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail >&
-      process_config_updates() const;
+      instance_config_updates() const;
 
   // repeated .configserver.proto.v2.CommandDetail custom_command_updates = 6;
   int custom_command_updates_size() const;
@@ -1649,17 +1531,17 @@ class HeartbeatResponse : public ::google::protobuf::Message /* @@protoc_inserti
   ::std::string* release_opaque();
   void set_allocated_opaque(::std::string* opaque);
 
-  // .configserver.proto.v2.ServerErrorResponse error_response = 2;
-  bool has_error_response() const;
-  void clear_error_response();
-  static const int kErrorResponseFieldNumber = 2;
+  // .configserver.proto.v2.CommonResponse commonResponse = 2;
+  bool has_commonresponse() const;
+  void clear_commonresponse();
+  static const int kCommonResponseFieldNumber = 2;
   private:
-  const ::configserver::proto::v2::ServerErrorResponse& _internal_error_response() const;
+  const ::configserver::proto::v2::CommonResponse& _internal_commonresponse() const;
   public:
-  const ::configserver::proto::v2::ServerErrorResponse& error_response() const;
-  ::configserver::proto::v2::ServerErrorResponse* release_error_response();
-  ::configserver::proto::v2::ServerErrorResponse* mutable_error_response();
-  void set_allocated_error_response(::configserver::proto::v2::ServerErrorResponse* error_response);
+  const ::configserver::proto::v2::CommonResponse& commonresponse() const;
+  ::configserver::proto::v2::CommonResponse* release_commonresponse();
+  ::configserver::proto::v2::CommonResponse* mutable_commonresponse();
+  void set_allocated_commonresponse(::configserver::proto::v2::CommonResponse* commonresponse);
 
   // uint64 capabilities = 3;
   void clear_capabilities();
@@ -1678,11 +1560,11 @@ class HeartbeatResponse : public ::google::protobuf::Message /* @@protoc_inserti
 
   ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail > pipeline_config_updates_;
-  ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail > process_config_updates_;
+  ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail > instance_config_updates_;
   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::CommandDetail > custom_command_updates_;
   ::google::protobuf::internal::ArenaStringPtr request_id_;
   ::google::protobuf::internal::ArenaStringPtr opaque_;
-  ::configserver::proto::v2::ServerErrorResponse* error_response_;
+  ::configserver::proto::v2::CommonResponse* commonresponse_;
   ::google::protobuf::uint64 capabilities_;
   ::google::protobuf::uint64 flags_;
   mutable ::google::protobuf::internal::CachedSize _cached_size_;
@@ -1725,7 +1607,7 @@ class FetchConfigRequest : public ::google::protobuf::Message /* @@protoc_insert
                &_FetchConfigRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    10;
+    9;
 
   void Swap(FetchConfigRequest* other);
   friend void swap(FetchConfigRequest& a, FetchConfigRequest& b) {
@@ -1864,7 +1746,7 @@ class FetchConfigResponse : public ::google::protobuf::Message /* @@protoc_inser
                &_FetchConfigResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    11;
+    10;
 
   void Swap(FetchConfigResponse* other);
   friend void swap(FetchConfigResponse& a, FetchConfigResponse& b) {
@@ -1942,17 +1824,17 @@ class FetchConfigResponse : public ::google::protobuf::Message /* @@protoc_inser
   ::std::string* release_request_id();
   void set_allocated_request_id(::std::string* request_id);
 
-  // .configserver.proto.v2.ServerErrorResponse error_response = 2;
-  bool has_error_response() const;
-  void clear_error_response();
-  static const int kErrorResponseFieldNumber = 2;
+  // .configserver.proto.v2.CommonResponse commonResponse = 2;
+  bool has_commonresponse() const;
+  void clear_commonresponse();
+  static const int kCommonResponseFieldNumber = 2;
   private:
-  const ::configserver::proto::v2::ServerErrorResponse& _internal_error_response() const;
+  const ::configserver::proto::v2::CommonResponse& _internal_commonresponse() const;
   public:
-  const ::configserver::proto::v2::ServerErrorResponse& error_response() const;
-  ::configserver::proto::v2::ServerErrorResponse* release_error_response();
-  ::configserver::proto::v2::ServerErrorResponse* mutable_error_response();
-  void set_allocated_error_response(::configserver::proto::v2::ServerErrorResponse* error_response);
+  const ::configserver::proto::v2::CommonResponse& commonresponse() const;
+  ::configserver::proto::v2::CommonResponse* release_commonresponse();
+  ::configserver::proto::v2::CommonResponse* mutable_commonresponse();
+  void set_allocated_commonresponse(::configserver::proto::v2::CommonResponse* commonresponse);
 
   // @@protoc_insertion_point(class_scope:configserver.proto.v2.FetchConfigResponse)
  private:
@@ -1960,7 +1842,125 @@ class FetchConfigResponse : public ::google::protobuf::Message /* @@protoc_inser
   ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail > config_details_;
   ::google::protobuf::internal::ArenaStringPtr request_id_;
-  ::configserver::proto::v2::ServerErrorResponse* error_response_;
+  ::configserver::proto::v2::CommonResponse* commonresponse_;
+  mutable ::google::protobuf::internal::CachedSize _cached_size_;
+  friend struct ::protobuf_v2_2fagent_2eproto::TableStruct;
+};
+// -------------------------------------------------------------------
+
+class CommonResponse : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:configserver.proto.v2.CommonResponse) */ {
+ public:
+  CommonResponse();
+  virtual ~CommonResponse();
+
+  CommonResponse(const CommonResponse& from);
+
+  inline CommonResponse& operator=(const CommonResponse& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  #if LANG_CXX11
+  CommonResponse(CommonResponse&& from) noexcept
+    : CommonResponse() {
+    *this = ::std::move(from);
+  }
+
+  inline CommonResponse& operator=(CommonResponse&& from) noexcept {
+    if (GetArenaNoVirtual() == from.GetArenaNoVirtual()) {
+      if (this != &from) InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+  #endif
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const CommonResponse& default_instance();
+
+  static void InitAsDefaultInstance();  // FOR INTERNAL USE ONLY
+  static inline const CommonResponse* internal_default_instance() {
+    return reinterpret_cast<const CommonResponse*>(
+               &_CommonResponse_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    11;
+
+  void Swap(CommonResponse* other);
+  friend void swap(CommonResponse& a, CommonResponse& b) {
+    a.Swap(&b);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline CommonResponse* New() const final {
+    return CreateMaybeMessage<CommonResponse>(NULL);
+  }
+
+  CommonResponse* New(::google::protobuf::Arena* arena) const final {
+    return CreateMaybeMessage<CommonResponse>(arena);
+  }
+  void CopyFrom(const ::google::protobuf::Message& from) final;
+  void MergeFrom(const ::google::protobuf::Message& from) final;
+  void CopyFrom(const CommonResponse& from);
+  void MergeFrom(const CommonResponse& from);
+  void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input) final;
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const final;
+  ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
+      bool deterministic, ::google::protobuf::uint8* target) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(CommonResponse* other);
+  private:
+  inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
+    return NULL;
+  }
+  inline void* MaybeArenaPtr() const {
+    return NULL;
+  }
+  public:
+
+  ::google::protobuf::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // bytes errorMessage = 2;
+  void clear_errormessage();
+  static const int kErrorMessageFieldNumber = 2;
+  const ::std::string& errormessage() const;
+  void set_errormessage(const ::std::string& value);
+  #if LANG_CXX11
+  void set_errormessage(::std::string&& value);
+  #endif
+  void set_errormessage(const char* value);
+  void set_errormessage(const void* value, size_t size);
+  ::std::string* mutable_errormessage();
+  ::std::string* release_errormessage();
+  void set_allocated_errormessage(::std::string* errormessage);
+
+  // int32 status = 1;
+  void clear_status();
+  static const int kStatusFieldNumber = 1;
+  ::google::protobuf::int32 status() const;
+  void set_status(::google::protobuf::int32 value);
+
+  // @@protoc_insertion_point(class_scope:configserver.proto.v2.CommonResponse)
+ private:
+
+  ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
+  ::google::protobuf::internal::ArenaStringPtr errormessage_;
+  ::google::protobuf::int32 status_;
   mutable ::google::protobuf::internal::CachedSize _cached_size_;
   friend struct ::protobuf_v2_2fagent_2eproto::TableStruct;
 };
@@ -2951,34 +2951,34 @@ HeartbeatRequest::pipeline_configs() const {
   return pipeline_configs_;
 }
 
-// repeated .configserver.proto.v2.ConfigInfo process_configs = 11;
-inline int HeartbeatRequest::process_configs_size() const {
-  return process_configs_.size();
+// repeated .configserver.proto.v2.ConfigInfo instance_configs = 11;
+inline int HeartbeatRequest::instance_configs_size() const {
+  return instance_configs_.size();
 }
-inline void HeartbeatRequest::clear_process_configs() {
-  process_configs_.Clear();
+inline void HeartbeatRequest::clear_instance_configs() {
+  instance_configs_.Clear();
 }
-inline ::configserver::proto::v2::ConfigInfo* HeartbeatRequest::mutable_process_configs(int index) {
-  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.HeartbeatRequest.process_configs)
-  return process_configs_.Mutable(index);
+inline ::configserver::proto::v2::ConfigInfo* HeartbeatRequest::mutable_instance_configs(int index) {
+  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.HeartbeatRequest.instance_configs)
+  return instance_configs_.Mutable(index);
 }
 inline ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigInfo >*
-HeartbeatRequest::mutable_process_configs() {
-  // @@protoc_insertion_point(field_mutable_list:configserver.proto.v2.HeartbeatRequest.process_configs)
-  return &process_configs_;
+HeartbeatRequest::mutable_instance_configs() {
+  // @@protoc_insertion_point(field_mutable_list:configserver.proto.v2.HeartbeatRequest.instance_configs)
+  return &instance_configs_;
 }
-inline const ::configserver::proto::v2::ConfigInfo& HeartbeatRequest::process_configs(int index) const {
-  // @@protoc_insertion_point(field_get:configserver.proto.v2.HeartbeatRequest.process_configs)
-  return process_configs_.Get(index);
+inline const ::configserver::proto::v2::ConfigInfo& HeartbeatRequest::instance_configs(int index) const {
+  // @@protoc_insertion_point(field_get:configserver.proto.v2.HeartbeatRequest.instance_configs)
+  return instance_configs_.Get(index);
 }
-inline ::configserver::proto::v2::ConfigInfo* HeartbeatRequest::add_process_configs() {
-  // @@protoc_insertion_point(field_add:configserver.proto.v2.HeartbeatRequest.process_configs)
-  return process_configs_.Add();
+inline ::configserver::proto::v2::ConfigInfo* HeartbeatRequest::add_instance_configs() {
+  // @@protoc_insertion_point(field_add:configserver.proto.v2.HeartbeatRequest.instance_configs)
+  return instance_configs_.Add();
 }
 inline const ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigInfo >&
-HeartbeatRequest::process_configs() const {
-  // @@protoc_insertion_point(field_list:configserver.proto.v2.HeartbeatRequest.process_configs)
-  return process_configs_;
+HeartbeatRequest::instance_configs() const {
+  // @@protoc_insertion_point(field_list:configserver.proto.v2.HeartbeatRequest.instance_configs)
+  return instance_configs_;
 }
 
 // repeated .configserver.proto.v2.CommandInfo custom_commands = 12;
@@ -3381,77 +3381,6 @@ inline void CommandDetail::set_expire_time(::google::protobuf::int64 value) {
 
 // -------------------------------------------------------------------
 
-// ServerErrorResponse
-
-// int32 error_code = 1;
-inline void ServerErrorResponse::clear_error_code() {
-  error_code_ = 0;
-}
-inline ::google::protobuf::int32 ServerErrorResponse::error_code() const {
-  // @@protoc_insertion_point(field_get:configserver.proto.v2.ServerErrorResponse.error_code)
-  return error_code_;
-}
-inline void ServerErrorResponse::set_error_code(::google::protobuf::int32 value) {
-  
-  error_code_ = value;
-  // @@protoc_insertion_point(field_set:configserver.proto.v2.ServerErrorResponse.error_code)
-}
-
-// string error_message = 2;
-inline void ServerErrorResponse::clear_error_message() {
-  error_message_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-}
-inline const ::std::string& ServerErrorResponse::error_message() const {
-  // @@protoc_insertion_point(field_get:configserver.proto.v2.ServerErrorResponse.error_message)
-  return error_message_.GetNoArena();
-}
-inline void ServerErrorResponse::set_error_message(const ::std::string& value) {
-  
-  error_message_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
-  // @@protoc_insertion_point(field_set:configserver.proto.v2.ServerErrorResponse.error_message)
-}
-#if LANG_CXX11
-inline void ServerErrorResponse::set_error_message(::std::string&& value) {
-  
-  error_message_.SetNoArena(
-    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
-  // @@protoc_insertion_point(field_set_rvalue:configserver.proto.v2.ServerErrorResponse.error_message)
-}
-#endif
-inline void ServerErrorResponse::set_error_message(const char* value) {
-  GOOGLE_DCHECK(value != NULL);
-  
-  error_message_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
-  // @@protoc_insertion_point(field_set_char:configserver.proto.v2.ServerErrorResponse.error_message)
-}
-inline void ServerErrorResponse::set_error_message(const char* value, size_t size) {
-  
-  error_message_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-      ::std::string(reinterpret_cast<const char*>(value), size));
-  // @@protoc_insertion_point(field_set_pointer:configserver.proto.v2.ServerErrorResponse.error_message)
-}
-inline ::std::string* ServerErrorResponse::mutable_error_message() {
-  
-  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.ServerErrorResponse.error_message)
-  return error_message_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-}
-inline ::std::string* ServerErrorResponse::release_error_message() {
-  // @@protoc_insertion_point(field_release:configserver.proto.v2.ServerErrorResponse.error_message)
-  
-  return error_message_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-}
-inline void ServerErrorResponse::set_allocated_error_message(::std::string* error_message) {
-  if (error_message != NULL) {
-    
-  } else {
-    
-  }
-  error_message_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), error_message);
-  // @@protoc_insertion_point(field_set_allocated:configserver.proto.v2.ServerErrorResponse.error_message)
-}
-
-// -------------------------------------------------------------------
-
 // HeartbeatResponse
 
 // bytes request_id = 1;
@@ -3507,58 +3436,58 @@ inline void HeartbeatResponse::set_allocated_request_id(::std::string* request_i
   // @@protoc_insertion_point(field_set_allocated:configserver.proto.v2.HeartbeatResponse.request_id)
 }
 
-// .configserver.proto.v2.ServerErrorResponse error_response = 2;
-inline bool HeartbeatResponse::has_error_response() const {
-  return this != internal_default_instance() && error_response_ != NULL;
+// .configserver.proto.v2.CommonResponse commonResponse = 2;
+inline bool HeartbeatResponse::has_commonresponse() const {
+  return this != internal_default_instance() && commonresponse_ != NULL;
 }
-inline void HeartbeatResponse::clear_error_response() {
-  if (GetArenaNoVirtual() == NULL && error_response_ != NULL) {
-    delete error_response_;
+inline void HeartbeatResponse::clear_commonresponse() {
+  if (GetArenaNoVirtual() == NULL && commonresponse_ != NULL) {
+    delete commonresponse_;
   }
-  error_response_ = NULL;
+  commonresponse_ = NULL;
 }
-inline const ::configserver::proto::v2::ServerErrorResponse& HeartbeatResponse::_internal_error_response() const {
-  return *error_response_;
+inline const ::configserver::proto::v2::CommonResponse& HeartbeatResponse::_internal_commonresponse() const {
+  return *commonresponse_;
 }
-inline const ::configserver::proto::v2::ServerErrorResponse& HeartbeatResponse::error_response() const {
-  const ::configserver::proto::v2::ServerErrorResponse* p = error_response_;
-  // @@protoc_insertion_point(field_get:configserver.proto.v2.HeartbeatResponse.error_response)
-  return p != NULL ? *p : *reinterpret_cast<const ::configserver::proto::v2::ServerErrorResponse*>(
-      &::configserver::proto::v2::_ServerErrorResponse_default_instance_);
+inline const ::configserver::proto::v2::CommonResponse& HeartbeatResponse::commonresponse() const {
+  const ::configserver::proto::v2::CommonResponse* p = commonresponse_;
+  // @@protoc_insertion_point(field_get:configserver.proto.v2.HeartbeatResponse.commonResponse)
+  return p != NULL ? *p : *reinterpret_cast<const ::configserver::proto::v2::CommonResponse*>(
+      &::configserver::proto::v2::_CommonResponse_default_instance_);
 }
-inline ::configserver::proto::v2::ServerErrorResponse* HeartbeatResponse::release_error_response() {
-  // @@protoc_insertion_point(field_release:configserver.proto.v2.HeartbeatResponse.error_response)
+inline ::configserver::proto::v2::CommonResponse* HeartbeatResponse::release_commonresponse() {
+  // @@protoc_insertion_point(field_release:configserver.proto.v2.HeartbeatResponse.commonResponse)
   
-  ::configserver::proto::v2::ServerErrorResponse* temp = error_response_;
-  error_response_ = NULL;
+  ::configserver::proto::v2::CommonResponse* temp = commonresponse_;
+  commonresponse_ = NULL;
   return temp;
 }
-inline ::configserver::proto::v2::ServerErrorResponse* HeartbeatResponse::mutable_error_response() {
+inline ::configserver::proto::v2::CommonResponse* HeartbeatResponse::mutable_commonresponse() {
   
-  if (error_response_ == NULL) {
-    auto* p = CreateMaybeMessage<::configserver::proto::v2::ServerErrorResponse>(GetArenaNoVirtual());
-    error_response_ = p;
+  if (commonresponse_ == NULL) {
+    auto* p = CreateMaybeMessage<::configserver::proto::v2::CommonResponse>(GetArenaNoVirtual());
+    commonresponse_ = p;
   }
-  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.HeartbeatResponse.error_response)
-  return error_response_;
+  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.HeartbeatResponse.commonResponse)
+  return commonresponse_;
 }
-inline void HeartbeatResponse::set_allocated_error_response(::configserver::proto::v2::ServerErrorResponse* error_response) {
+inline void HeartbeatResponse::set_allocated_commonresponse(::configserver::proto::v2::CommonResponse* commonresponse) {
   ::google::protobuf::Arena* message_arena = GetArenaNoVirtual();
   if (message_arena == NULL) {
-    delete error_response_;
+    delete commonresponse_;
   }
-  if (error_response) {
+  if (commonresponse) {
     ::google::protobuf::Arena* submessage_arena = NULL;
     if (message_arena != submessage_arena) {
-      error_response = ::google::protobuf::internal::GetOwnedMessage(
-          message_arena, error_response, submessage_arena);
+      commonresponse = ::google::protobuf::internal::GetOwnedMessage(
+          message_arena, commonresponse, submessage_arena);
     }
     
   } else {
     
   }
-  error_response_ = error_response;
-  // @@protoc_insertion_point(field_set_allocated:configserver.proto.v2.HeartbeatResponse.error_response)
+  commonresponse_ = commonresponse;
+  // @@protoc_insertion_point(field_set_allocated:configserver.proto.v2.HeartbeatResponse.commonResponse)
 }
 
 // uint64 capabilities = 3;
@@ -3605,34 +3534,34 @@ HeartbeatResponse::pipeline_config_updates() const {
   return pipeline_config_updates_;
 }
 
-// repeated .configserver.proto.v2.ConfigDetail process_config_updates = 5;
-inline int HeartbeatResponse::process_config_updates_size() const {
-  return process_config_updates_.size();
+// repeated .configserver.proto.v2.ConfigDetail instance_config_updates = 5;
+inline int HeartbeatResponse::instance_config_updates_size() const {
+  return instance_config_updates_.size();
 }
-inline void HeartbeatResponse::clear_process_config_updates() {
-  process_config_updates_.Clear();
+inline void HeartbeatResponse::clear_instance_config_updates() {
+  instance_config_updates_.Clear();
 }
-inline ::configserver::proto::v2::ConfigDetail* HeartbeatResponse::mutable_process_config_updates(int index) {
-  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.HeartbeatResponse.process_config_updates)
-  return process_config_updates_.Mutable(index);
+inline ::configserver::proto::v2::ConfigDetail* HeartbeatResponse::mutable_instance_config_updates(int index) {
+  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.HeartbeatResponse.instance_config_updates)
+  return instance_config_updates_.Mutable(index);
 }
 inline ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail >*
-HeartbeatResponse::mutable_process_config_updates() {
-  // @@protoc_insertion_point(field_mutable_list:configserver.proto.v2.HeartbeatResponse.process_config_updates)
-  return &process_config_updates_;
+HeartbeatResponse::mutable_instance_config_updates() {
+  // @@protoc_insertion_point(field_mutable_list:configserver.proto.v2.HeartbeatResponse.instance_config_updates)
+  return &instance_config_updates_;
 }
-inline const ::configserver::proto::v2::ConfigDetail& HeartbeatResponse::process_config_updates(int index) const {
-  // @@protoc_insertion_point(field_get:configserver.proto.v2.HeartbeatResponse.process_config_updates)
-  return process_config_updates_.Get(index);
+inline const ::configserver::proto::v2::ConfigDetail& HeartbeatResponse::instance_config_updates(int index) const {
+  // @@protoc_insertion_point(field_get:configserver.proto.v2.HeartbeatResponse.instance_config_updates)
+  return instance_config_updates_.Get(index);
 }
-inline ::configserver::proto::v2::ConfigDetail* HeartbeatResponse::add_process_config_updates() {
-  // @@protoc_insertion_point(field_add:configserver.proto.v2.HeartbeatResponse.process_config_updates)
-  return process_config_updates_.Add();
+inline ::configserver::proto::v2::ConfigDetail* HeartbeatResponse::add_instance_config_updates() {
+  // @@protoc_insertion_point(field_add:configserver.proto.v2.HeartbeatResponse.instance_config_updates)
+  return instance_config_updates_.Add();
 }
 inline const ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail >&
-HeartbeatResponse::process_config_updates() const {
-  // @@protoc_insertion_point(field_list:configserver.proto.v2.HeartbeatResponse.process_config_updates)
-  return process_config_updates_;
+HeartbeatResponse::instance_config_updates() const {
+  // @@protoc_insertion_point(field_list:configserver.proto.v2.HeartbeatResponse.instance_config_updates)
+  return instance_config_updates_;
 }
 
 // repeated .configserver.proto.v2.CommandDetail custom_command_updates = 6;
@@ -3929,58 +3858,58 @@ inline void FetchConfigResponse::set_allocated_request_id(::std::string* request
   // @@protoc_insertion_point(field_set_allocated:configserver.proto.v2.FetchConfigResponse.request_id)
 }
 
-// .configserver.proto.v2.ServerErrorResponse error_response = 2;
-inline bool FetchConfigResponse::has_error_response() const {
-  return this != internal_default_instance() && error_response_ != NULL;
+// .configserver.proto.v2.CommonResponse commonResponse = 2;
+inline bool FetchConfigResponse::has_commonresponse() const {
+  return this != internal_default_instance() && commonresponse_ != NULL;
 }
-inline void FetchConfigResponse::clear_error_response() {
-  if (GetArenaNoVirtual() == NULL && error_response_ != NULL) {
-    delete error_response_;
+inline void FetchConfigResponse::clear_commonresponse() {
+  if (GetArenaNoVirtual() == NULL && commonresponse_ != NULL) {
+    delete commonresponse_;
   }
-  error_response_ = NULL;
+  commonresponse_ = NULL;
 }
-inline const ::configserver::proto::v2::ServerErrorResponse& FetchConfigResponse::_internal_error_response() const {
-  return *error_response_;
+inline const ::configserver::proto::v2::CommonResponse& FetchConfigResponse::_internal_commonresponse() const {
+  return *commonresponse_;
 }
-inline const ::configserver::proto::v2::ServerErrorResponse& FetchConfigResponse::error_response() const {
-  const ::configserver::proto::v2::ServerErrorResponse* p = error_response_;
-  // @@protoc_insertion_point(field_get:configserver.proto.v2.FetchConfigResponse.error_response)
-  return p != NULL ? *p : *reinterpret_cast<const ::configserver::proto::v2::ServerErrorResponse*>(
-      &::configserver::proto::v2::_ServerErrorResponse_default_instance_);
+inline const ::configserver::proto::v2::CommonResponse& FetchConfigResponse::commonresponse() const {
+  const ::configserver::proto::v2::CommonResponse* p = commonresponse_;
+  // @@protoc_insertion_point(field_get:configserver.proto.v2.FetchConfigResponse.commonResponse)
+  return p != NULL ? *p : *reinterpret_cast<const ::configserver::proto::v2::CommonResponse*>(
+      &::configserver::proto::v2::_CommonResponse_default_instance_);
 }
-inline ::configserver::proto::v2::ServerErrorResponse* FetchConfigResponse::release_error_response() {
-  // @@protoc_insertion_point(field_release:configserver.proto.v2.FetchConfigResponse.error_response)
+inline ::configserver::proto::v2::CommonResponse* FetchConfigResponse::release_commonresponse() {
+  // @@protoc_insertion_point(field_release:configserver.proto.v2.FetchConfigResponse.commonResponse)
   
-  ::configserver::proto::v2::ServerErrorResponse* temp = error_response_;
-  error_response_ = NULL;
+  ::configserver::proto::v2::CommonResponse* temp = commonresponse_;
+  commonresponse_ = NULL;
   return temp;
 }
-inline ::configserver::proto::v2::ServerErrorResponse* FetchConfigResponse::mutable_error_response() {
+inline ::configserver::proto::v2::CommonResponse* FetchConfigResponse::mutable_commonresponse() {
   
-  if (error_response_ == NULL) {
-    auto* p = CreateMaybeMessage<::configserver::proto::v2::ServerErrorResponse>(GetArenaNoVirtual());
-    error_response_ = p;
+  if (commonresponse_ == NULL) {
+    auto* p = CreateMaybeMessage<::configserver::proto::v2::CommonResponse>(GetArenaNoVirtual());
+    commonresponse_ = p;
   }
-  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.FetchConfigResponse.error_response)
-  return error_response_;
+  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.FetchConfigResponse.commonResponse)
+  return commonresponse_;
 }
-inline void FetchConfigResponse::set_allocated_error_response(::configserver::proto::v2::ServerErrorResponse* error_response) {
+inline void FetchConfigResponse::set_allocated_commonresponse(::configserver::proto::v2::CommonResponse* commonresponse) {
   ::google::protobuf::Arena* message_arena = GetArenaNoVirtual();
   if (message_arena == NULL) {
-    delete error_response_;
+    delete commonresponse_;
   }
-  if (error_response) {
+  if (commonresponse) {
     ::google::protobuf::Arena* submessage_arena = NULL;
     if (message_arena != submessage_arena) {
-      error_response = ::google::protobuf::internal::GetOwnedMessage(
-          message_arena, error_response, submessage_arena);
+      commonresponse = ::google::protobuf::internal::GetOwnedMessage(
+          message_arena, commonresponse, submessage_arena);
     }
     
   } else {
     
   }
-  error_response_ = error_response;
-  // @@protoc_insertion_point(field_set_allocated:configserver.proto.v2.FetchConfigResponse.error_response)
+  commonresponse_ = commonresponse;
+  // @@protoc_insertion_point(field_set_allocated:configserver.proto.v2.FetchConfigResponse.commonResponse)
 }
 
 // repeated .configserver.proto.v2.ConfigDetail config_details = 3;
@@ -4011,6 +3940,77 @@ inline const ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::Co
 FetchConfigResponse::config_details() const {
   // @@protoc_insertion_point(field_list:configserver.proto.v2.FetchConfigResponse.config_details)
   return config_details_;
+}
+
+// -------------------------------------------------------------------
+
+// CommonResponse
+
+// int32 status = 1;
+inline void CommonResponse::clear_status() {
+  status_ = 0;
+}
+inline ::google::protobuf::int32 CommonResponse::status() const {
+  // @@protoc_insertion_point(field_get:configserver.proto.v2.CommonResponse.status)
+  return status_;
+}
+inline void CommonResponse::set_status(::google::protobuf::int32 value) {
+  
+  status_ = value;
+  // @@protoc_insertion_point(field_set:configserver.proto.v2.CommonResponse.status)
+}
+
+// bytes errorMessage = 2;
+inline void CommonResponse::clear_errormessage() {
+  errormessage_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline const ::std::string& CommonResponse::errormessage() const {
+  // @@protoc_insertion_point(field_get:configserver.proto.v2.CommonResponse.errorMessage)
+  return errormessage_.GetNoArena();
+}
+inline void CommonResponse::set_errormessage(const ::std::string& value) {
+  
+  errormessage_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
+  // @@protoc_insertion_point(field_set:configserver.proto.v2.CommonResponse.errorMessage)
+}
+#if LANG_CXX11
+inline void CommonResponse::set_errormessage(::std::string&& value) {
+  
+  errormessage_.SetNoArena(
+    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+  // @@protoc_insertion_point(field_set_rvalue:configserver.proto.v2.CommonResponse.errorMessage)
+}
+#endif
+inline void CommonResponse::set_errormessage(const char* value) {
+  GOOGLE_DCHECK(value != NULL);
+  
+  errormessage_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
+  // @@protoc_insertion_point(field_set_char:configserver.proto.v2.CommonResponse.errorMessage)
+}
+inline void CommonResponse::set_errormessage(const void* value, size_t size) {
+  
+  errormessage_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
+      ::std::string(reinterpret_cast<const char*>(value), size));
+  // @@protoc_insertion_point(field_set_pointer:configserver.proto.v2.CommonResponse.errorMessage)
+}
+inline ::std::string* CommonResponse::mutable_errormessage() {
+  
+  // @@protoc_insertion_point(field_mutable:configserver.proto.v2.CommonResponse.errorMessage)
+  return errormessage_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline ::std::string* CommonResponse::release_errormessage() {
+  // @@protoc_insertion_point(field_release:configserver.proto.v2.CommonResponse.errorMessage)
+  
+  return errormessage_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline void CommonResponse::set_allocated_errormessage(::std::string* errormessage) {
+  if (errormessage != NULL) {
+    
+  } else {
+    
+  }
+  errormessage_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), errormessage);
+  // @@protoc_insertion_point(field_set_allocated:configserver.proto.v2.CommonResponse.errorMessage)
 }
 
 #ifdef __GNUC__

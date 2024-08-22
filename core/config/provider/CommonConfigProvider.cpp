@@ -145,7 +145,7 @@ void CommonConfigProvider::LoadConfigFile() {
             mPipelineConfigInfoMap[info.name] = info;
         }
     }
-    for (auto const& entry : filesystem::directory_iterator(mProcessSourceDir, ec)) {
+    for (auto const& entry : filesystem::directory_iterator(mInstanceSourceDir, ec)) {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
             ConfigInfo info;
@@ -156,8 +156,8 @@ void CommonConfigProvider::LoadConfigFile() {
             }
             info.status = ConfigFeedbackStatus::APPLYING;
             info.detail = detail.toStyledString();
-            lock_guard<mutex> infomaplock(mProcessInfoMapMux);
-            mProcessConfigInfoMap[info.name] = info;
+            lock_guard<mutex> infomaplock(mInstanceInfoMapMux);
+            mInstanceConfigInfoMap[info.name] = info;
         }
     }
 }
@@ -247,10 +247,10 @@ void CommonConfigProvider::GetConfigUpdate() {
         LOG_DEBUG(sLogger, ("fetch pipelineConfig, config file number", pipelineConfig.size()));
         UpdateRemotePipelineConfig(pipelineConfig);
     }
-    ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail> processConfig;
-    if (FetchProcessConfig(heartbeatResponse, processConfig) && !processConfig.empty()) {
-        LOG_DEBUG(sLogger, ("fetch processConfig config, config file number", processConfig.size()));
-        UpdateRemoteProcessConfig(processConfig);
+    ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail> instanceConfig;
+    if (FetchInstanceConfig(heartbeatResponse, instanceConfig) && !instanceConfig.empty()) {
+        LOG_DEBUG(sLogger, ("fetch instanceConfig config, config file number", instanceConfig.size()));
+        UpdateRemoteInstanceConfig(instanceConfig);
     }
     ++mSequenceNum;
 }
@@ -260,7 +260,7 @@ configserver::proto::v2::HeartbeatRequest CommonConfigProvider::PrepareHeartbeat
     string requestID = CalculateRandomUUID();
     heartbeatReq.set_request_id(requestID);
     heartbeatReq.set_sequence_num(mSequenceNum);
-    heartbeatReq.set_capabilities(configserver::proto::v2::AcceptsProcessConfig
+    heartbeatReq.set_capabilities(configserver::proto::v2::AcceptsInstanceConfig
                                   | configserver::proto::v2::AcceptsPipelineConfig);
     heartbeatReq.set_instance_id(GetInstanceId());
     heartbeatReq.set_agent_type("LoongCollector");
@@ -278,9 +278,9 @@ configserver::proto::v2::HeartbeatRequest CommonConfigProvider::PrepareHeartbeat
     for (const auto& configInfo : mPipelineConfigInfoMap) {
         addConfigInfoToRequest(configInfo, heartbeatReq.add_pipeline_configs());
     }
-    lock_guard<mutex> processinfomaplock(mProcessInfoMapMux);
-    for (const auto& configInfo : mProcessConfigInfoMap) {
-        addConfigInfoToRequest(configInfo, heartbeatReq.add_process_configs());
+    lock_guard<mutex> instanceinfomaplock(mInstanceInfoMapMux);
+    for (const auto& configInfo : mInstanceConfigInfoMap) {
+        addConfigInfoToRequest(configInfo, heartbeatReq.add_instance_configs());
     }
 
     for (auto& configInfo : mCommandInfoMap) {
@@ -373,13 +373,13 @@ bool CommonConfigProvider::FetchPipelineConfig(
     }
 }
 
-bool CommonConfigProvider::FetchProcessConfig(
+bool CommonConfigProvider::FetchInstanceConfig(
     configserver::proto::v2::HeartbeatResponse& heartbeatResponse,
     ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>& result) {
     if (heartbeatResponse.flags() & ::configserver::proto::v2::FetchPipelineConfigDetail) {
-        return FetchProcessConfigFromServer(heartbeatResponse, result);
+        return FetchInstanceConfigFromServer(heartbeatResponse, result);
     } else {
-        result.Swap(heartbeatResponse.mutable_process_config_updates());
+        result.Swap(heartbeatResponse.mutable_instance_config_updates());
         return true;
     }
 }
@@ -452,10 +452,10 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
     }
 }
 
-void CommonConfigProvider::UpdateRemoteProcessConfig(
+void CommonConfigProvider::UpdateRemoteInstanceConfig(
     const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs) {
     error_code ec;
-    const std::filesystem::path& sourceDir = mProcessSourceDir;
+    const std::filesystem::path& sourceDir = mInstanceSourceDir;
     filesystem::create_directories(sourceDir, ec);
     if (ec) {
         StopUsingConfigServer();
@@ -465,56 +465,56 @@ void CommonConfigProvider::UpdateRemoteProcessConfig(
         return;
     }
 
-    lock_guard<mutex> lock(mProcessMux);
-    lock_guard<mutex> infomaplock(mProcessInfoMapMux);
+    lock_guard<mutex> lock(mInstanceMux);
+    lock_guard<mutex> infomaplock(mInstanceInfoMapMux);
     for (const auto& config : configs) {
         filesystem::path filePath = sourceDir / (config.name() + ".json");
         if (config.version() == -1) {
-            mProcessConfigInfoMap.erase(config.name());
+            mInstanceConfigInfoMap.erase(config.name());
             filesystem::remove(filePath, ec);
-            ConfigFeedbackReceiver::GetInstance().UnregisterProcessConfig(config.name());
+            ConfigFeedbackReceiver::GetInstance().UnregisterInstanceConfig(config.name());
         } else {
             filesystem::path filePath = sourceDir / (config.name() + ".json");
             if (config.version() == -1) {
-                mProcessConfigInfoMap.erase(config.name());
+                mInstanceConfigInfoMap.erase(config.name());
                 filesystem::remove(filePath, ec);
-                ConfigFeedbackReceiver::GetInstance().UnregisterProcessConfig(config.name());
+                ConfigFeedbackReceiver::GetInstance().UnregisterInstanceConfig(config.name());
             } else {
                 if (!DumpConfigFile(config, sourceDir)) {
-                    mProcessConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
+                    mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
                                                                       .version = config.version(),
                                                                       .status = ConfigFeedbackStatus::FAILED,
                                                                       .detail = config.detail()};
                     continue;
                 }
-                mProcessConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
+                mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
                                                                   .version = config.version(),
                                                                   .status = ConfigFeedbackStatus::APPLYING,
                                                                   .detail = config.detail()};
-                ConfigFeedbackReceiver::GetInstance().RegisterProcessConfig(config.name(), this);
+                ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
             }
         }
     }
 }
 
-bool CommonConfigProvider::FetchProcessConfigFromServer(
+bool CommonConfigProvider::FetchInstanceConfigFromServer(
     ::configserver::proto::v2::HeartbeatResponse& heartbeatResponse,
     ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>& res) {
     configserver::proto::v2::FetchConfigRequest fetchConfigRequest;
     string requestID = CalculateRandomUUID();
     fetchConfigRequest.set_request_id(requestID);
     fetchConfigRequest.set_instance_id(GetInstanceId());
-    for (const auto& config : heartbeatResponse.process_config_updates()) {
+    for (const auto& config : heartbeatResponse.instance_config_updates()) {
         auto reqConfig = fetchConfigRequest.add_req_configs();
         reqConfig->set_name(config.name());
         reqConfig->set_version(config.version());
     }
     string operation = sdk::CONFIGSERVERAGENT;
-    operation.append("/FetchProcessConfig");
+    operation.append("/FetchInstanceConfig");
     string reqBody;
     fetchConfigRequest.SerializeToString(&reqBody);
     string fetchConfigResponse;
-    if (SendHttpRequest(operation, reqBody, "FetchProcessConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
+    if (SendHttpRequest(operation, reqBody, "FetchInstanceConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
         configserver::proto::v2::FetchConfigResponse fetchConfigResponsePb;
         fetchConfigResponsePb.ParseFromString(fetchConfigResponse);
         res.Swap(fetchConfigResponsePb.mutable_config_details());
@@ -558,14 +558,14 @@ void CommonConfigProvider::FeedbackPipelineConfigStatus(const std::string& name,
     LOG_DEBUG(sLogger,
               ("CommonConfigProvider", "FeedbackPipelineConfigStatus")("name", name)("status", ToStringView(status)));
 }
-void CommonConfigProvider::FeedbackProcessConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
-    lock_guard<mutex> infomaplock(mProcessInfoMapMux);
-    auto info = mProcessConfigInfoMap.find(name);
-    if (info != mProcessConfigInfoMap.end()) {
+void CommonConfigProvider::FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
+    lock_guard<mutex> infomaplock(mInstanceInfoMapMux);
+    auto info = mInstanceConfigInfoMap.find(name);
+    if (info != mInstanceConfigInfoMap.end()) {
         info->second.status = status;
     }
     LOG_DEBUG(sLogger,
-              ("CommonConfigProvider", "FeedbackProcessConfigStatus")("name", name)("status", ToStringView(status)));
+              ("CommonConfigProvider", "FeedbackInstanceConfigStatus")("name", name)("status", ToStringView(status)));
 }
 void CommonConfigProvider::FeedbackCommandConfigStatus(const std::string& type,
                                                        const std::string& name,

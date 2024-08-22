@@ -38,9 +38,9 @@ extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::
 extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::internal::SCCInfo<0> scc_info_AgentGroupTag;
 extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::internal::SCCInfo<0> scc_info_CommandDetail;
 extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::internal::SCCInfo<0> scc_info_CommandInfo;
+extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::internal::SCCInfo<0> scc_info_CommonResponse;
 extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::internal::SCCInfo<0> scc_info_ConfigDetail;
 extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::internal::SCCInfo<0> scc_info_ConfigInfo;
-extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::internal::SCCInfo<0> scc_info_ServerErrorResponse;
 extern PROTOBUF_INTERNAL_EXPORT_protobuf_v2_2fagent_2eproto ::google::protobuf::internal::SCCInfo<1> scc_info_AgentAttributes;
 }  // namespace protobuf_v2_2fagent_2eproto
 namespace configserver {
@@ -86,11 +86,6 @@ class CommandDetailDefaultTypeInternal {
   ::google::protobuf::internal::ExplicitlyConstructed<CommandDetail>
       _instance;
 } _CommandDetail_default_instance_;
-class ServerErrorResponseDefaultTypeInternal {
- public:
-  ::google::protobuf::internal::ExplicitlyConstructed<ServerErrorResponse>
-      _instance;
-} _ServerErrorResponse_default_instance_;
 class HeartbeatResponseDefaultTypeInternal {
  public:
   ::google::protobuf::internal::ExplicitlyConstructed<HeartbeatResponse>
@@ -106,6 +101,11 @@ class FetchConfigResponseDefaultTypeInternal {
   ::google::protobuf::internal::ExplicitlyConstructed<FetchConfigResponse>
       _instance;
 } _FetchConfigResponse_default_instance_;
+class CommonResponseDefaultTypeInternal {
+ public:
+  ::google::protobuf::internal::ExplicitlyConstructed<CommonResponse>
+      _instance;
+} _CommonResponse_default_instance_;
 }  // namespace v2
 }  // namespace proto
 }  // namespace configserver
@@ -226,20 +226,6 @@ static void InitDefaultsCommandDetail() {
 ::google::protobuf::internal::SCCInfo<0> scc_info_CommandDetail =
     {{ATOMIC_VAR_INIT(::google::protobuf::internal::SCCInfoBase::kUninitialized), 0, InitDefaultsCommandDetail}, {}};
 
-static void InitDefaultsServerErrorResponse() {
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
-
-  {
-    void* ptr = &::configserver::proto::v2::_ServerErrorResponse_default_instance_;
-    new (ptr) ::configserver::proto::v2::ServerErrorResponse();
-    ::google::protobuf::internal::OnShutdownDestroyMessage(ptr);
-  }
-  ::configserver::proto::v2::ServerErrorResponse::InitAsDefaultInstance();
-}
-
-::google::protobuf::internal::SCCInfo<0> scc_info_ServerErrorResponse =
-    {{ATOMIC_VAR_INIT(::google::protobuf::internal::SCCInfoBase::kUninitialized), 0, InitDefaultsServerErrorResponse}, {}};
-
 static void InitDefaultsHeartbeatResponse() {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -253,7 +239,7 @@ static void InitDefaultsHeartbeatResponse() {
 
 ::google::protobuf::internal::SCCInfo<3> scc_info_HeartbeatResponse =
     {{ATOMIC_VAR_INIT(::google::protobuf::internal::SCCInfoBase::kUninitialized), 3, InitDefaultsHeartbeatResponse}, {
-      &protobuf_v2_2fagent_2eproto::scc_info_ServerErrorResponse.base,
+      &protobuf_v2_2fagent_2eproto::scc_info_CommonResponse.base,
       &protobuf_v2_2fagent_2eproto::scc_info_ConfigDetail.base,
       &protobuf_v2_2fagent_2eproto::scc_info_CommandDetail.base,}};
 
@@ -285,8 +271,22 @@ static void InitDefaultsFetchConfigResponse() {
 
 ::google::protobuf::internal::SCCInfo<2> scc_info_FetchConfigResponse =
     {{ATOMIC_VAR_INIT(::google::protobuf::internal::SCCInfoBase::kUninitialized), 2, InitDefaultsFetchConfigResponse}, {
-      &protobuf_v2_2fagent_2eproto::scc_info_ServerErrorResponse.base,
+      &protobuf_v2_2fagent_2eproto::scc_info_CommonResponse.base,
       &protobuf_v2_2fagent_2eproto::scc_info_ConfigDetail.base,}};
+
+static void InitDefaultsCommonResponse() {
+  GOOGLE_PROTOBUF_VERIFY_VERSION;
+
+  {
+    void* ptr = &::configserver::proto::v2::_CommonResponse_default_instance_;
+    new (ptr) ::configserver::proto::v2::CommonResponse();
+    ::google::protobuf::internal::OnShutdownDestroyMessage(ptr);
+  }
+  ::configserver::proto::v2::CommonResponse::InitAsDefaultInstance();
+}
+
+::google::protobuf::internal::SCCInfo<0> scc_info_CommonResponse =
+    {{ATOMIC_VAR_INIT(::google::protobuf::internal::SCCInfoBase::kUninitialized), 0, InitDefaultsCommonResponse}, {}};
 
 void InitDefaults() {
   ::google::protobuf::internal::InitSCC(&scc_info_AgentGroupTag.base);
@@ -297,10 +297,10 @@ void InitDefaults() {
   ::google::protobuf::internal::InitSCC(&scc_info_HeartbeatRequest.base);
   ::google::protobuf::internal::InitSCC(&scc_info_ConfigDetail.base);
   ::google::protobuf::internal::InitSCC(&scc_info_CommandDetail.base);
-  ::google::protobuf::internal::InitSCC(&scc_info_ServerErrorResponse.base);
   ::google::protobuf::internal::InitSCC(&scc_info_HeartbeatResponse.base);
   ::google::protobuf::internal::InitSCC(&scc_info_FetchConfigRequest.base);
   ::google::protobuf::internal::InitSCC(&scc_info_FetchConfigResponse.base);
+  ::google::protobuf::internal::InitSCC(&scc_info_CommonResponse.base);
 }
 
 ::google::protobuf::Metadata file_level_metadata[12];
@@ -365,7 +365,7 @@ const ::google::protobuf::uint32 TableStruct::offsets[] GOOGLE_PROTOBUF_ATTRIBUT
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatRequest, running_status_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatRequest, startup_time_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatRequest, pipeline_configs_),
-  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatRequest, process_configs_),
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatRequest, instance_configs_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatRequest, custom_commands_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatRequest, flags_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatRequest, opaque_),
@@ -387,22 +387,15 @@ const ::google::protobuf::uint32 TableStruct::offsets[] GOOGLE_PROTOBUF_ATTRIBUT
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::CommandDetail, detail_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::CommandDetail, expire_time_),
   ~0u,  // no _has_bits_
-  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::ServerErrorResponse, _internal_metadata_),
-  ~0u,  // no _extensions_
-  ~0u,  // no _oneof_case_
-  ~0u,  // no _weak_field_map_
-  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::ServerErrorResponse, error_code_),
-  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::ServerErrorResponse, error_message_),
-  ~0u,  // no _has_bits_
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, _internal_metadata_),
   ~0u,  // no _extensions_
   ~0u,  // no _oneof_case_
   ~0u,  // no _weak_field_map_
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, request_id_),
-  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, error_response_),
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, commonresponse_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, capabilities_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, pipeline_config_updates_),
-  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, process_config_updates_),
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, instance_config_updates_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, custom_command_updates_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, flags_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::HeartbeatResponse, opaque_),
@@ -420,8 +413,15 @@ const ::google::protobuf::uint32 TableStruct::offsets[] GOOGLE_PROTOBUF_ATTRIBUT
   ~0u,  // no _oneof_case_
   ~0u,  // no _weak_field_map_
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::FetchConfigResponse, request_id_),
-  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::FetchConfigResponse, error_response_),
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::FetchConfigResponse, commonresponse_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::FetchConfigResponse, config_details_),
+  ~0u,  // no _has_bits_
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::CommonResponse, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::CommonResponse, status_),
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::configserver::proto::v2::CommonResponse, errormessage_),
 };
 static const ::google::protobuf::internal::MigrationSchema schemas[] GOOGLE_PROTOBUF_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, sizeof(::configserver::proto::v2::AgentGroupTag)},
@@ -432,10 +432,10 @@ static const ::google::protobuf::internal::MigrationSchema schemas[] GOOGLE_PROT
   { 43, -1, sizeof(::configserver::proto::v2::HeartbeatRequest)},
   { 62, -1, sizeof(::configserver::proto::v2::ConfigDetail)},
   { 70, -1, sizeof(::configserver::proto::v2::CommandDetail)},
-  { 79, -1, sizeof(::configserver::proto::v2::ServerErrorResponse)},
-  { 86, -1, sizeof(::configserver::proto::v2::HeartbeatResponse)},
-  { 99, -1, sizeof(::configserver::proto::v2::FetchConfigRequest)},
-  { 107, -1, sizeof(::configserver::proto::v2::FetchConfigResponse)},
+  { 79, -1, sizeof(::configserver::proto::v2::HeartbeatResponse)},
+  { 92, -1, sizeof(::configserver::proto::v2::FetchConfigRequest)},
+  { 100, -1, sizeof(::configserver::proto::v2::FetchConfigResponse)},
+  { 108, -1, sizeof(::configserver::proto::v2::CommonResponse)},
 };
 
 static ::google::protobuf::Message const * const file_default_instances[] = {
@@ -447,10 +447,10 @@ static ::google::protobuf::Message const * const file_default_instances[] = {
   reinterpret_cast<const ::google::protobuf::Message*>(&::configserver::proto::v2::_HeartbeatRequest_default_instance_),
   reinterpret_cast<const ::google::protobuf::Message*>(&::configserver::proto::v2::_ConfigDetail_default_instance_),
   reinterpret_cast<const ::google::protobuf::Message*>(&::configserver::proto::v2::_CommandDetail_default_instance_),
-  reinterpret_cast<const ::google::protobuf::Message*>(&::configserver::proto::v2::_ServerErrorResponse_default_instance_),
   reinterpret_cast<const ::google::protobuf::Message*>(&::configserver::proto::v2::_HeartbeatResponse_default_instance_),
   reinterpret_cast<const ::google::protobuf::Message*>(&::configserver::proto::v2::_FetchConfigRequest_default_instance_),
   reinterpret_cast<const ::google::protobuf::Message*>(&::configserver::proto::v2::_FetchConfigResponse_default_instance_),
+  reinterpret_cast<const ::google::protobuf::Message*>(&::configserver::proto::v2::_CommonResponse_default_instance_),
 };
 
 void protobuf_AssignDescriptors() {
@@ -486,7 +486,7 @@ void AddDescriptorsImpl() {
       "(\014\022\020\n\010hostname\030\003 \001(\014\022B\n\006extras\030d \003(\01322.c"
       "onfigserver.proto.v2.AgentAttributes.Ext"
       "rasEntry\032-\n\013ExtrasEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005"
-      "value\030\002 \001(\014:\0028\001\"\356\003\n\020HeartbeatRequest\022\022\n\n"
+      "value\030\002 \001(\014:\0028\001\"\357\003\n\020HeartbeatRequest\022\022\n\n"
       "request_id\030\001 \001(\014\022\024\n\014sequence_num\030\002 \001(\004\022\024"
       "\n\014capabilities\030\003 \001(\004\022\023\n\013instance_id\030\004 \001("
       "\014\022\022\n\nagent_type\030\005 \001(\t\022:\n\nattributes\030\006 \001("
@@ -495,51 +495,50 @@ void AddDescriptorsImpl() {
       "AgentGroupTag\022\026\n\016running_status\030\010 \001(\t\022\024\n"
       "\014startup_time\030\t \001(\003\022;\n\020pipeline_configs\030"
       "\n \003(\0132!.configserver.proto.v2.ConfigInfo"
-      "\022:\n\017process_configs\030\013 \003(\0132!.configserver"
-      ".proto.v2.ConfigInfo\022;\n\017custom_commands\030"
-      "\014 \003(\0132\".configserver.proto.v2.CommandInf"
-      "o\022\r\n\005flags\030\r \001(\004\022\016\n\006opaque\030\016 \001(\014\"=\n\014Conf"
-      "igDetail\022\014\n\004name\030\001 \001(\t\022\017\n\007version\030\002 \001(\003\022"
-      "\016\n\006detail\030\003 \001(\014\"P\n\rCommandDetail\022\014\n\004type"
-      "\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022\016\n\006detail\030\003 \001(\014\022\023\n\013"
-      "expire_time\030\004 \001(\003\"@\n\023ServerErrorResponse"
-      "\022\022\n\nerror_code\030\001 \001(\005\022\025\n\rerror_message\030\002 "
-      "\001(\t\"\361\002\n\021HeartbeatResponse\022\022\n\nrequest_id\030"
-      "\001 \001(\014\022B\n\016error_response\030\002 \001(\0132*.configse"
-      "rver.proto.v2.ServerErrorResponse\022\024\n\014cap"
-      "abilities\030\003 \001(\004\022D\n\027pipeline_config_updat"
-      "es\030\004 \003(\0132#.configserver.proto.v2.ConfigD"
-      "etail\022C\n\026process_config_updates\030\005 \003(\0132#."
-      "configserver.proto.v2.ConfigDetail\022D\n\026cu"
-      "stom_command_updates\030\006 \003(\0132$.configserve"
-      "r.proto.v2.CommandDetail\022\r\n\005flags\030\007 \001(\004\022"
-      "\016\n\006opaque\030\010 \001(\014\"u\n\022FetchConfigRequest\022\022\n"
-      "\nrequest_id\030\001 \001(\014\022\023\n\013instance_id\030\002 \001(\014\0226"
-      "\n\013req_configs\030\003 \003(\0132!.configserver.proto"
-      ".v2.ConfigInfo\"\252\001\n\023FetchConfigResponse\022\022"
-      "\n\nrequest_id\030\001 \001(\014\022B\n\016error_response\030\002 \001"
-      "(\0132*.configserver.proto.v2.ServerErrorRe"
-      "sponse\022;\n\016config_details\030\003 \003(\0132#.configs"
-      "erver.proto.v2.ConfigDetail*@\n\014ConfigSta"
-      "tus\022\t\n\005UNSET\020\000\022\014\n\010APPLYING\020\001\022\013\n\007APPLIED\020"
-      "\002\022\n\n\006FAILED\020\003*\202\001\n\021AgentCapabilities\022\036\n\032U"
-      "nspecifiedAgentCapability\020\000\022\031\n\025AcceptsPi"
-      "pelineConfig\020\001\022\030\n\024AcceptsProcessConfig\020\002"
-      "\022\030\n\024AcceptsCustomCommand\020\004*:\n\014RequestFla"
-      "gs\022\033\n\027RequestFlagsUnspecified\020\000\022\r\n\tFullS"
-      "tate\020\001*\254\001\n\022ServerCapabilities\022\037\n\033Unspeci"
-      "fiedServerCapability\020\000\022\024\n\020RembersAttribu"
-      "te\020\001\022\037\n\033RembersPipelineConfigStatus\020\002\022\036\n"
-      "\032RembersProcessConfigStatus\020\004\022\036\n\032Rembers"
-      "CustomCommandStatus\020\010*\177\n\rResponseFlags\022\034"
-      "\n\030ResponseFlagsUnspecified\020\000\022\023\n\017ReportFu"
-      "llState\020\001\022\035\n\031FetchPipelineConfigDetail\020\002"
-      "\022\034\n\030FetchProcessConfigDetail\020\004B6Z4/confi"
-      "g_server/service/protov2;configserver_pr"
-      "oto_v2b\006proto3"
+      "\022;\n\020instance_configs\030\013 \003(\0132!.configserve"
+      "r.proto.v2.ConfigInfo\022;\n\017custom_commands"
+      "\030\014 \003(\0132\".configserver.proto.v2.CommandIn"
+      "fo\022\r\n\005flags\030\r \001(\004\022\016\n\006opaque\030\016 \001(\014\"=\n\014Con"
+      "figDetail\022\014\n\004name\030\001 \001(\t\022\017\n\007version\030\002 \001(\003"
+      "\022\016\n\006detail\030\003 \001(\014\"P\n\rCommandDetail\022\014\n\004typ"
+      "e\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022\016\n\006detail\030\003 \001(\014\022\023\n"
+      "\013expire_time\030\004 \001(\003\"\355\002\n\021HeartbeatResponse"
+      "\022\022\n\nrequest_id\030\001 \001(\014\022=\n\016commonResponse\030\002"
+      " \001(\0132%.configserver.proto.v2.CommonRespo"
+      "nse\022\024\n\014capabilities\030\003 \001(\004\022D\n\027pipeline_co"
+      "nfig_updates\030\004 \003(\0132#.configserver.proto."
+      "v2.ConfigDetail\022D\n\027instance_config_updat"
+      "es\030\005 \003(\0132#.configserver.proto.v2.ConfigD"
+      "etail\022D\n\026custom_command_updates\030\006 \003(\0132$."
+      "configserver.proto.v2.CommandDetail\022\r\n\005f"
+      "lags\030\007 \001(\004\022\016\n\006opaque\030\010 \001(\014\"u\n\022FetchConfi"
+      "gRequest\022\022\n\nrequest_id\030\001 \001(\014\022\023\n\013instance"
+      "_id\030\002 \001(\014\0226\n\013req_configs\030\003 \003(\0132!.configs"
+      "erver.proto.v2.ConfigInfo\"\245\001\n\023FetchConfi"
+      "gResponse\022\022\n\nrequest_id\030\001 \001(\014\022=\n\016commonR"
+      "esponse\030\002 \001(\0132%.configserver.proto.v2.Co"
+      "mmonResponse\022;\n\016config_details\030\003 \003(\0132#.c"
+      "onfigserver.proto.v2.ConfigDetail\"6\n\016Com"
+      "monResponse\022\016\n\006status\030\001 \001(\005\022\024\n\014errorMess"
+      "age\030\002 \001(\014*@\n\014ConfigStatus\022\t\n\005UNSET\020\000\022\014\n\010"
+      "APPLYING\020\001\022\013\n\007APPLIED\020\002\022\n\n\006FAILED\020\003*\203\001\n\021"
+      "AgentCapabilities\022\036\n\032UnspecifiedAgentCap"
+      "ability\020\000\022\031\n\025AcceptsPipelineConfig\020\001\022\031\n\025"
+      "AcceptsInstanceConfig\020\002\022\030\n\024AcceptsCustom"
+      "Command\020\004*:\n\014RequestFlags\022\033\n\027RequestFlag"
+      "sUnspecified\020\000\022\r\n\tFullState\020\001*\255\001\n\022Server"
+      "Capabilities\022\037\n\033UnspecifiedServerCapabil"
+      "ity\020\000\022\024\n\020RembersAttribute\020\001\022\037\n\033RembersPi"
+      "pelineConfigStatus\020\002\022\037\n\033RembersInstanceC"
+      "onfigStatus\020\004\022\036\n\032RembersCustomCommandSta"
+      "tus\020\010*\200\001\n\rResponseFlags\022\034\n\030ResponseFlags"
+      "Unspecified\020\000\022\023\n\017ReportFullState\020\001\022\035\n\031Fe"
+      "tchPipelineConfigDetail\020\002\022\035\n\031FetchInstan"
+      "ceConfigDetail\020\004B6Z4/config_server/servi"
+      "ce/protov2;configserver_proto_v2b\006proto3"
   };
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
-      descriptor, 2494);
+      descriptor, 2480);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "v2/agent.proto", &protobuf_RegisterTypes);
 }
@@ -2220,7 +2219,7 @@ const int HeartbeatRequest::kTagsFieldNumber;
 const int HeartbeatRequest::kRunningStatusFieldNumber;
 const int HeartbeatRequest::kStartupTimeFieldNumber;
 const int HeartbeatRequest::kPipelineConfigsFieldNumber;
-const int HeartbeatRequest::kProcessConfigsFieldNumber;
+const int HeartbeatRequest::kInstanceConfigsFieldNumber;
 const int HeartbeatRequest::kCustomCommandsFieldNumber;
 const int HeartbeatRequest::kFlagsFieldNumber;
 const int HeartbeatRequest::kOpaqueFieldNumber;
@@ -2238,7 +2237,7 @@ HeartbeatRequest::HeartbeatRequest(const HeartbeatRequest& from)
       _internal_metadata_(NULL),
       tags_(from.tags_),
       pipeline_configs_(from.pipeline_configs_),
-      process_configs_(from.process_configs_),
+      instance_configs_(from.instance_configs_),
       custom_commands_(from.custom_commands_) {
   _internal_metadata_.MergeFrom(from._internal_metadata_);
   request_id_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
@@ -2319,7 +2318,7 @@ void HeartbeatRequest::Clear() {
 
   tags_.Clear();
   pipeline_configs_.Clear();
-  process_configs_.Clear();
+  instance_configs_.Clear();
   custom_commands_.Clear();
   request_id_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   instance_id_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
@@ -2480,12 +2479,12 @@ bool HeartbeatRequest::MergePartialFromCodedStream(
         break;
       }
 
-      // repeated .configserver.proto.v2.ConfigInfo process_configs = 11;
+      // repeated .configserver.proto.v2.ConfigInfo instance_configs = 11;
       case 11: {
         if (static_cast< ::google::protobuf::uint8>(tag) ==
             static_cast< ::google::protobuf::uint8>(90u /* 90 & 0xFF */)) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadMessage(
-                input, add_process_configs()));
+                input, add_instance_configs()));
         } else {
           goto handle_unusual;
         }
@@ -2627,12 +2626,12 @@ void HeartbeatRequest::SerializeWithCachedSizes(
       output);
   }
 
-  // repeated .configserver.proto.v2.ConfigInfo process_configs = 11;
+  // repeated .configserver.proto.v2.ConfigInfo instance_configs = 11;
   for (unsigned int i = 0,
-      n = static_cast<unsigned int>(this->process_configs_size()); i < n; i++) {
+      n = static_cast<unsigned int>(this->instance_configs_size()); i < n; i++) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
       11,
-      this->process_configs(static_cast<int>(i)),
+      this->instance_configs(static_cast<int>(i)),
       output);
   }
 
@@ -2744,12 +2743,12 @@ void HeartbeatRequest::SerializeWithCachedSizes(
         10, this->pipeline_configs(static_cast<int>(i)), deterministic, target);
   }
 
-  // repeated .configserver.proto.v2.ConfigInfo process_configs = 11;
+  // repeated .configserver.proto.v2.ConfigInfo instance_configs = 11;
   for (unsigned int i = 0,
-      n = static_cast<unsigned int>(this->process_configs_size()); i < n; i++) {
+      n = static_cast<unsigned int>(this->instance_configs_size()); i < n; i++) {
     target = ::google::protobuf::internal::WireFormatLite::
       InternalWriteMessageToArray(
-        11, this->process_configs(static_cast<int>(i)), deterministic, target);
+        11, this->instance_configs(static_cast<int>(i)), deterministic, target);
   }
 
   // repeated .configserver.proto.v2.CommandInfo custom_commands = 12;
@@ -2811,14 +2810,14 @@ size_t HeartbeatRequest::ByteSizeLong() const {
     }
   }
 
-  // repeated .configserver.proto.v2.ConfigInfo process_configs = 11;
+  // repeated .configserver.proto.v2.ConfigInfo instance_configs = 11;
   {
-    unsigned int count = static_cast<unsigned int>(this->process_configs_size());
+    unsigned int count = static_cast<unsigned int>(this->instance_configs_size());
     total_size += 1UL * count;
     for (unsigned int i = 0; i < count; i++) {
       total_size +=
         ::google::protobuf::internal::WireFormatLite::MessageSize(
-          this->process_configs(static_cast<int>(i)));
+          this->instance_configs(static_cast<int>(i)));
     }
   }
 
@@ -2932,7 +2931,7 @@ void HeartbeatRequest::MergeFrom(const HeartbeatRequest& from) {
 
   tags_.MergeFrom(from.tags_);
   pipeline_configs_.MergeFrom(from.pipeline_configs_);
-  process_configs_.MergeFrom(from.process_configs_);
+  instance_configs_.MergeFrom(from.instance_configs_);
   custom_commands_.MergeFrom(from.custom_commands_);
   if (from.request_id().size() > 0) {
 
@@ -2997,7 +2996,7 @@ void HeartbeatRequest::InternalSwap(HeartbeatRequest* other) {
   using std::swap;
   CastToBase(&tags_)->InternalSwap(CastToBase(&other->tags_));
   CastToBase(&pipeline_configs_)->InternalSwap(CastToBase(&other->pipeline_configs_));
-  CastToBase(&process_configs_)->InternalSwap(CastToBase(&other->process_configs_));
+  CastToBase(&instance_configs_)->InternalSwap(CastToBase(&other->instance_configs_));
   CastToBase(&custom_commands_)->InternalSwap(CastToBase(&other->custom_commands_));
   request_id_.Swap(&other->request_id_, &::google::protobuf::internal::GetEmptyStringAlreadyInited(),
     GetArenaNoVirtual());
@@ -3737,297 +3736,16 @@ void CommandDetail::InternalSwap(CommandDetail* other) {
 
 // ===================================================================
 
-void ServerErrorResponse::InitAsDefaultInstance() {
-}
-#if !defined(_MSC_VER) || _MSC_VER >= 1900
-const int ServerErrorResponse::kErrorCodeFieldNumber;
-const int ServerErrorResponse::kErrorMessageFieldNumber;
-#endif  // !defined(_MSC_VER) || _MSC_VER >= 1900
-
-ServerErrorResponse::ServerErrorResponse()
-  : ::google::protobuf::Message(), _internal_metadata_(NULL) {
-  ::google::protobuf::internal::InitSCC(
-      &protobuf_v2_2fagent_2eproto::scc_info_ServerErrorResponse.base);
-  SharedCtor();
-  // @@protoc_insertion_point(constructor:configserver.proto.v2.ServerErrorResponse)
-}
-ServerErrorResponse::ServerErrorResponse(const ServerErrorResponse& from)
-  : ::google::protobuf::Message(),
-      _internal_metadata_(NULL) {
-  _internal_metadata_.MergeFrom(from._internal_metadata_);
-  error_message_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  if (from.error_message().size() > 0) {
-    error_message_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.error_message_);
-  }
-  error_code_ = from.error_code_;
-  // @@protoc_insertion_point(copy_constructor:configserver.proto.v2.ServerErrorResponse)
-}
-
-void ServerErrorResponse::SharedCtor() {
-  error_message_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  error_code_ = 0;
-}
-
-ServerErrorResponse::~ServerErrorResponse() {
-  // @@protoc_insertion_point(destructor:configserver.proto.v2.ServerErrorResponse)
-  SharedDtor();
-}
-
-void ServerErrorResponse::SharedDtor() {
-  error_message_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-}
-
-void ServerErrorResponse::SetCachedSize(int size) const {
-  _cached_size_.Set(size);
-}
-const ::google::protobuf::Descriptor* ServerErrorResponse::descriptor() {
-  ::protobuf_v2_2fagent_2eproto::protobuf_AssignDescriptorsOnce();
-  return ::protobuf_v2_2fagent_2eproto::file_level_metadata[kIndexInFileMessages].descriptor;
-}
-
-const ServerErrorResponse& ServerErrorResponse::default_instance() {
-  ::google::protobuf::internal::InitSCC(&protobuf_v2_2fagent_2eproto::scc_info_ServerErrorResponse.base);
-  return *internal_default_instance();
-}
-
-
-void ServerErrorResponse::Clear() {
-// @@protoc_insertion_point(message_clear_start:configserver.proto.v2.ServerErrorResponse)
-  ::google::protobuf::uint32 cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  error_message_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  error_code_ = 0;
-  _internal_metadata_.Clear();
-}
-
-bool ServerErrorResponse::MergePartialFromCodedStream(
-    ::google::protobuf::io::CodedInputStream* input) {
-#define DO_(EXPRESSION) if (!GOOGLE_PREDICT_TRUE(EXPRESSION)) goto failure
-  ::google::protobuf::uint32 tag;
-  // @@protoc_insertion_point(parse_start:configserver.proto.v2.ServerErrorResponse)
-  for (;;) {
-    ::std::pair<::google::protobuf::uint32, bool> p = input->ReadTagWithCutoffNoLastTag(127u);
-    tag = p.first;
-    if (!p.second) goto handle_unusual;
-    switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
-      // int32 error_code = 1;
-      case 1: {
-        if (static_cast< ::google::protobuf::uint8>(tag) ==
-            static_cast< ::google::protobuf::uint8>(8u /* 8 & 0xFF */)) {
-
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
-                 input, &error_code_)));
-        } else {
-          goto handle_unusual;
-        }
-        break;
-      }
-
-      // string error_message = 2;
-      case 2: {
-        if (static_cast< ::google::protobuf::uint8>(tag) ==
-            static_cast< ::google::protobuf::uint8>(18u /* 18 & 0xFF */)) {
-          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
-                input, this->mutable_error_message()));
-          DO_(::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-            this->error_message().data(), static_cast<int>(this->error_message().length()),
-            ::google::protobuf::internal::WireFormatLite::PARSE,
-            "configserver.proto.v2.ServerErrorResponse.error_message"));
-        } else {
-          goto handle_unusual;
-        }
-        break;
-      }
-
-      default: {
-      handle_unusual:
-        if (tag == 0) {
-          goto success;
-        }
-        DO_(::google::protobuf::internal::WireFormat::SkipField(
-              input, tag, _internal_metadata_.mutable_unknown_fields()));
-        break;
-      }
-    }
-  }
-success:
-  // @@protoc_insertion_point(parse_success:configserver.proto.v2.ServerErrorResponse)
-  return true;
-failure:
-  // @@protoc_insertion_point(parse_failure:configserver.proto.v2.ServerErrorResponse)
-  return false;
-#undef DO_
-}
-
-void ServerErrorResponse::SerializeWithCachedSizes(
-    ::google::protobuf::io::CodedOutputStream* output) const {
-  // @@protoc_insertion_point(serialize_start:configserver.proto.v2.ServerErrorResponse)
-  ::google::protobuf::uint32 cached_has_bits = 0;
-  (void) cached_has_bits;
-
-  // int32 error_code = 1;
-  if (this->error_code() != 0) {
-    ::google::protobuf::internal::WireFormatLite::WriteInt32(1, this->error_code(), output);
-  }
-
-  // string error_message = 2;
-  if (this->error_message().size() > 0) {
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-      this->error_message().data(), static_cast<int>(this->error_message().length()),
-      ::google::protobuf::internal::WireFormatLite::SERIALIZE,
-      "configserver.proto.v2.ServerErrorResponse.error_message");
-    ::google::protobuf::internal::WireFormatLite::WriteStringMaybeAliased(
-      2, this->error_message(), output);
-  }
-
-  if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
-    ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
-        (::google::protobuf::internal::GetProto3PreserveUnknownsDefault()   ? _internal_metadata_.unknown_fields()   : _internal_metadata_.default_instance()), output);
-  }
-  // @@protoc_insertion_point(serialize_end:configserver.proto.v2.ServerErrorResponse)
-}
-
-::google::protobuf::uint8* ServerErrorResponse::InternalSerializeWithCachedSizesToArray(
-    bool deterministic, ::google::protobuf::uint8* target) const {
-  (void)deterministic; // Unused
-  // @@protoc_insertion_point(serialize_to_array_start:configserver.proto.v2.ServerErrorResponse)
-  ::google::protobuf::uint32 cached_has_bits = 0;
-  (void) cached_has_bits;
-
-  // int32 error_code = 1;
-  if (this->error_code() != 0) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(1, this->error_code(), target);
-  }
-
-  // string error_message = 2;
-  if (this->error_message().size() > 0) {
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-      this->error_message().data(), static_cast<int>(this->error_message().length()),
-      ::google::protobuf::internal::WireFormatLite::SERIALIZE,
-      "configserver.proto.v2.ServerErrorResponse.error_message");
-    target =
-      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
-        2, this->error_message(), target);
-  }
-
-  if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
-    target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
-        (::google::protobuf::internal::GetProto3PreserveUnknownsDefault()   ? _internal_metadata_.unknown_fields()   : _internal_metadata_.default_instance()), target);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:configserver.proto.v2.ServerErrorResponse)
-  return target;
-}
-
-size_t ServerErrorResponse::ByteSizeLong() const {
-// @@protoc_insertion_point(message_byte_size_start:configserver.proto.v2.ServerErrorResponse)
-  size_t total_size = 0;
-
-  if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
-    total_size +=
-      ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
-        (::google::protobuf::internal::GetProto3PreserveUnknownsDefault()   ? _internal_metadata_.unknown_fields()   : _internal_metadata_.default_instance()));
-  }
-  // string error_message = 2;
-  if (this->error_message().size() > 0) {
-    total_size += 1 +
-      ::google::protobuf::internal::WireFormatLite::StringSize(
-        this->error_message());
-  }
-
-  // int32 error_code = 1;
-  if (this->error_code() != 0) {
-    total_size += 1 +
-      ::google::protobuf::internal::WireFormatLite::Int32Size(
-        this->error_code());
-  }
-
-  int cached_size = ::google::protobuf::internal::ToCachedSize(total_size);
-  SetCachedSize(cached_size);
-  return total_size;
-}
-
-void ServerErrorResponse::MergeFrom(const ::google::protobuf::Message& from) {
-// @@protoc_insertion_point(generalized_merge_from_start:configserver.proto.v2.ServerErrorResponse)
-  GOOGLE_DCHECK_NE(&from, this);
-  const ServerErrorResponse* source =
-      ::google::protobuf::internal::DynamicCastToGenerated<const ServerErrorResponse>(
-          &from);
-  if (source == NULL) {
-  // @@protoc_insertion_point(generalized_merge_from_cast_fail:configserver.proto.v2.ServerErrorResponse)
-    ::google::protobuf::internal::ReflectionOps::Merge(from, this);
-  } else {
-  // @@protoc_insertion_point(generalized_merge_from_cast_success:configserver.proto.v2.ServerErrorResponse)
-    MergeFrom(*source);
-  }
-}
-
-void ServerErrorResponse::MergeFrom(const ServerErrorResponse& from) {
-// @@protoc_insertion_point(class_specific_merge_from_start:configserver.proto.v2.ServerErrorResponse)
-  GOOGLE_DCHECK_NE(&from, this);
-  _internal_metadata_.MergeFrom(from._internal_metadata_);
-  ::google::protobuf::uint32 cached_has_bits = 0;
-  (void) cached_has_bits;
-
-  if (from.error_message().size() > 0) {
-
-    error_message_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.error_message_);
-  }
-  if (from.error_code() != 0) {
-    set_error_code(from.error_code());
-  }
-}
-
-void ServerErrorResponse::CopyFrom(const ::google::protobuf::Message& from) {
-// @@protoc_insertion_point(generalized_copy_from_start:configserver.proto.v2.ServerErrorResponse)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-void ServerErrorResponse::CopyFrom(const ServerErrorResponse& from) {
-// @@protoc_insertion_point(class_specific_copy_from_start:configserver.proto.v2.ServerErrorResponse)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-bool ServerErrorResponse::IsInitialized() const {
-  return true;
-}
-
-void ServerErrorResponse::Swap(ServerErrorResponse* other) {
-  if (other == this) return;
-  InternalSwap(other);
-}
-void ServerErrorResponse::InternalSwap(ServerErrorResponse* other) {
-  using std::swap;
-  error_message_.Swap(&other->error_message_, &::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-    GetArenaNoVirtual());
-  swap(error_code_, other->error_code_);
-  _internal_metadata_.Swap(&other->_internal_metadata_);
-}
-
-::google::protobuf::Metadata ServerErrorResponse::GetMetadata() const {
-  protobuf_v2_2fagent_2eproto::protobuf_AssignDescriptorsOnce();
-  return ::protobuf_v2_2fagent_2eproto::file_level_metadata[kIndexInFileMessages];
-}
-
-
-// ===================================================================
-
 void HeartbeatResponse::InitAsDefaultInstance() {
-  ::configserver::proto::v2::_HeartbeatResponse_default_instance_._instance.get_mutable()->error_response_ = const_cast< ::configserver::proto::v2::ServerErrorResponse*>(
-      ::configserver::proto::v2::ServerErrorResponse::internal_default_instance());
+  ::configserver::proto::v2::_HeartbeatResponse_default_instance_._instance.get_mutable()->commonresponse_ = const_cast< ::configserver::proto::v2::CommonResponse*>(
+      ::configserver::proto::v2::CommonResponse::internal_default_instance());
 }
 #if !defined(_MSC_VER) || _MSC_VER >= 1900
 const int HeartbeatResponse::kRequestIdFieldNumber;
-const int HeartbeatResponse::kErrorResponseFieldNumber;
+const int HeartbeatResponse::kCommonResponseFieldNumber;
 const int HeartbeatResponse::kCapabilitiesFieldNumber;
 const int HeartbeatResponse::kPipelineConfigUpdatesFieldNumber;
-const int HeartbeatResponse::kProcessConfigUpdatesFieldNumber;
+const int HeartbeatResponse::kInstanceConfigUpdatesFieldNumber;
 const int HeartbeatResponse::kCustomCommandUpdatesFieldNumber;
 const int HeartbeatResponse::kFlagsFieldNumber;
 const int HeartbeatResponse::kOpaqueFieldNumber;
@@ -4044,7 +3762,7 @@ HeartbeatResponse::HeartbeatResponse(const HeartbeatResponse& from)
   : ::google::protobuf::Message(),
       _internal_metadata_(NULL),
       pipeline_config_updates_(from.pipeline_config_updates_),
-      process_config_updates_(from.process_config_updates_),
+      instance_config_updates_(from.instance_config_updates_),
       custom_command_updates_(from.custom_command_updates_) {
   _internal_metadata_.MergeFrom(from._internal_metadata_);
   request_id_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
@@ -4055,10 +3773,10 @@ HeartbeatResponse::HeartbeatResponse(const HeartbeatResponse& from)
   if (from.opaque().size() > 0) {
     opaque_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.opaque_);
   }
-  if (from.has_error_response()) {
-    error_response_ = new ::configserver::proto::v2::ServerErrorResponse(*from.error_response_);
+  if (from.has_commonresponse()) {
+    commonresponse_ = new ::configserver::proto::v2::CommonResponse(*from.commonresponse_);
   } else {
-    error_response_ = NULL;
+    commonresponse_ = NULL;
   }
   ::memcpy(&capabilities_, &from.capabilities_,
     static_cast<size_t>(reinterpret_cast<char*>(&flags_) -
@@ -4069,9 +3787,9 @@ HeartbeatResponse::HeartbeatResponse(const HeartbeatResponse& from)
 void HeartbeatResponse::SharedCtor() {
   request_id_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   opaque_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  ::memset(&error_response_, 0, static_cast<size_t>(
+  ::memset(&commonresponse_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&flags_) -
-      reinterpret_cast<char*>(&error_response_)) + sizeof(flags_));
+      reinterpret_cast<char*>(&commonresponse_)) + sizeof(flags_));
 }
 
 HeartbeatResponse::~HeartbeatResponse() {
@@ -4082,7 +3800,7 @@ HeartbeatResponse::~HeartbeatResponse() {
 void HeartbeatResponse::SharedDtor() {
   request_id_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   opaque_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  if (this != internal_default_instance()) delete error_response_;
+  if (this != internal_default_instance()) delete commonresponse_;
 }
 
 void HeartbeatResponse::SetCachedSize(int size) const {
@@ -4106,14 +3824,14 @@ void HeartbeatResponse::Clear() {
   (void) cached_has_bits;
 
   pipeline_config_updates_.Clear();
-  process_config_updates_.Clear();
+  instance_config_updates_.Clear();
   custom_command_updates_.Clear();
   request_id_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   opaque_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  if (GetArenaNoVirtual() == NULL && error_response_ != NULL) {
-    delete error_response_;
+  if (GetArenaNoVirtual() == NULL && commonresponse_ != NULL) {
+    delete commonresponse_;
   }
-  error_response_ = NULL;
+  commonresponse_ = NULL;
   ::memset(&capabilities_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&flags_) -
       reinterpret_cast<char*>(&capabilities_)) + sizeof(flags_));
@@ -4142,12 +3860,12 @@ bool HeartbeatResponse::MergePartialFromCodedStream(
         break;
       }
 
-      // .configserver.proto.v2.ServerErrorResponse error_response = 2;
+      // .configserver.proto.v2.CommonResponse commonResponse = 2;
       case 2: {
         if (static_cast< ::google::protobuf::uint8>(tag) ==
             static_cast< ::google::protobuf::uint8>(18u /* 18 & 0xFF */)) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadMessage(
-               input, mutable_error_response()));
+               input, mutable_commonresponse()));
         } else {
           goto handle_unusual;
         }
@@ -4180,12 +3898,12 @@ bool HeartbeatResponse::MergePartialFromCodedStream(
         break;
       }
 
-      // repeated .configserver.proto.v2.ConfigDetail process_config_updates = 5;
+      // repeated .configserver.proto.v2.ConfigDetail instance_config_updates = 5;
       case 5: {
         if (static_cast< ::google::protobuf::uint8>(tag) ==
             static_cast< ::google::protobuf::uint8>(42u /* 42 & 0xFF */)) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadMessage(
-                input, add_process_config_updates()));
+                input, add_instance_config_updates()));
         } else {
           goto handle_unusual;
         }
@@ -4262,10 +3980,10 @@ void HeartbeatResponse::SerializeWithCachedSizes(
       1, this->request_id(), output);
   }
 
-  // .configserver.proto.v2.ServerErrorResponse error_response = 2;
-  if (this->has_error_response()) {
+  // .configserver.proto.v2.CommonResponse commonResponse = 2;
+  if (this->has_commonresponse()) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
-      2, this->_internal_error_response(), output);
+      2, this->_internal_commonresponse(), output);
   }
 
   // uint64 capabilities = 3;
@@ -4282,12 +4000,12 @@ void HeartbeatResponse::SerializeWithCachedSizes(
       output);
   }
 
-  // repeated .configserver.proto.v2.ConfigDetail process_config_updates = 5;
+  // repeated .configserver.proto.v2.ConfigDetail instance_config_updates = 5;
   for (unsigned int i = 0,
-      n = static_cast<unsigned int>(this->process_config_updates_size()); i < n; i++) {
+      n = static_cast<unsigned int>(this->instance_config_updates_size()); i < n; i++) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
       5,
-      this->process_config_updates(static_cast<int>(i)),
+      this->instance_config_updates(static_cast<int>(i)),
       output);
   }
 
@@ -4332,11 +4050,11 @@ void HeartbeatResponse::SerializeWithCachedSizes(
         1, this->request_id(), target);
   }
 
-  // .configserver.proto.v2.ServerErrorResponse error_response = 2;
-  if (this->has_error_response()) {
+  // .configserver.proto.v2.CommonResponse commonResponse = 2;
+  if (this->has_commonresponse()) {
     target = ::google::protobuf::internal::WireFormatLite::
       InternalWriteMessageToArray(
-        2, this->_internal_error_response(), deterministic, target);
+        2, this->_internal_commonresponse(), deterministic, target);
   }
 
   // uint64 capabilities = 3;
@@ -4352,12 +4070,12 @@ void HeartbeatResponse::SerializeWithCachedSizes(
         4, this->pipeline_config_updates(static_cast<int>(i)), deterministic, target);
   }
 
-  // repeated .configserver.proto.v2.ConfigDetail process_config_updates = 5;
+  // repeated .configserver.proto.v2.ConfigDetail instance_config_updates = 5;
   for (unsigned int i = 0,
-      n = static_cast<unsigned int>(this->process_config_updates_size()); i < n; i++) {
+      n = static_cast<unsigned int>(this->instance_config_updates_size()); i < n; i++) {
     target = ::google::protobuf::internal::WireFormatLite::
       InternalWriteMessageToArray(
-        5, this->process_config_updates(static_cast<int>(i)), deterministic, target);
+        5, this->instance_config_updates(static_cast<int>(i)), deterministic, target);
   }
 
   // repeated .configserver.proto.v2.CommandDetail custom_command_updates = 6;
@@ -4408,14 +4126,14 @@ size_t HeartbeatResponse::ByteSizeLong() const {
     }
   }
 
-  // repeated .configserver.proto.v2.ConfigDetail process_config_updates = 5;
+  // repeated .configserver.proto.v2.ConfigDetail instance_config_updates = 5;
   {
-    unsigned int count = static_cast<unsigned int>(this->process_config_updates_size());
+    unsigned int count = static_cast<unsigned int>(this->instance_config_updates_size());
     total_size += 1UL * count;
     for (unsigned int i = 0; i < count; i++) {
       total_size +=
         ::google::protobuf::internal::WireFormatLite::MessageSize(
-          this->process_config_updates(static_cast<int>(i)));
+          this->instance_config_updates(static_cast<int>(i)));
     }
   }
 
@@ -4444,11 +4162,11 @@ size_t HeartbeatResponse::ByteSizeLong() const {
         this->opaque());
   }
 
-  // .configserver.proto.v2.ServerErrorResponse error_response = 2;
-  if (this->has_error_response()) {
+  // .configserver.proto.v2.CommonResponse commonResponse = 2;
+  if (this->has_commonresponse()) {
     total_size += 1 +
       ::google::protobuf::internal::WireFormatLite::MessageSize(
-        *error_response_);
+        *commonresponse_);
   }
 
   // uint64 capabilities = 3;
@@ -4493,7 +4211,7 @@ void HeartbeatResponse::MergeFrom(const HeartbeatResponse& from) {
   (void) cached_has_bits;
 
   pipeline_config_updates_.MergeFrom(from.pipeline_config_updates_);
-  process_config_updates_.MergeFrom(from.process_config_updates_);
+  instance_config_updates_.MergeFrom(from.instance_config_updates_);
   custom_command_updates_.MergeFrom(from.custom_command_updates_);
   if (from.request_id().size() > 0) {
 
@@ -4503,8 +4221,8 @@ void HeartbeatResponse::MergeFrom(const HeartbeatResponse& from) {
 
     opaque_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.opaque_);
   }
-  if (from.has_error_response()) {
-    mutable_error_response()->::configserver::proto::v2::ServerErrorResponse::MergeFrom(from.error_response());
+  if (from.has_commonresponse()) {
+    mutable_commonresponse()->::configserver::proto::v2::CommonResponse::MergeFrom(from.commonresponse());
   }
   if (from.capabilities() != 0) {
     set_capabilities(from.capabilities());
@@ -4539,13 +4257,13 @@ void HeartbeatResponse::Swap(HeartbeatResponse* other) {
 void HeartbeatResponse::InternalSwap(HeartbeatResponse* other) {
   using std::swap;
   CastToBase(&pipeline_config_updates_)->InternalSwap(CastToBase(&other->pipeline_config_updates_));
-  CastToBase(&process_config_updates_)->InternalSwap(CastToBase(&other->process_config_updates_));
+  CastToBase(&instance_config_updates_)->InternalSwap(CastToBase(&other->instance_config_updates_));
   CastToBase(&custom_command_updates_)->InternalSwap(CastToBase(&other->custom_command_updates_));
   request_id_.Swap(&other->request_id_, &::google::protobuf::internal::GetEmptyStringAlreadyInited(),
     GetArenaNoVirtual());
   opaque_.Swap(&other->opaque_, &::google::protobuf::internal::GetEmptyStringAlreadyInited(),
     GetArenaNoVirtual());
-  swap(error_response_, other->error_response_);
+  swap(commonresponse_, other->commonresponse_);
   swap(capabilities_, other->capabilities_);
   swap(flags_, other->flags_);
   _internal_metadata_.Swap(&other->_internal_metadata_);
@@ -4881,12 +4599,12 @@ void FetchConfigRequest::InternalSwap(FetchConfigRequest* other) {
 // ===================================================================
 
 void FetchConfigResponse::InitAsDefaultInstance() {
-  ::configserver::proto::v2::_FetchConfigResponse_default_instance_._instance.get_mutable()->error_response_ = const_cast< ::configserver::proto::v2::ServerErrorResponse*>(
-      ::configserver::proto::v2::ServerErrorResponse::internal_default_instance());
+  ::configserver::proto::v2::_FetchConfigResponse_default_instance_._instance.get_mutable()->commonresponse_ = const_cast< ::configserver::proto::v2::CommonResponse*>(
+      ::configserver::proto::v2::CommonResponse::internal_default_instance());
 }
 #if !defined(_MSC_VER) || _MSC_VER >= 1900
 const int FetchConfigResponse::kRequestIdFieldNumber;
-const int FetchConfigResponse::kErrorResponseFieldNumber;
+const int FetchConfigResponse::kCommonResponseFieldNumber;
 const int FetchConfigResponse::kConfigDetailsFieldNumber;
 #endif  // !defined(_MSC_VER) || _MSC_VER >= 1900
 
@@ -4906,17 +4624,17 @@ FetchConfigResponse::FetchConfigResponse(const FetchConfigResponse& from)
   if (from.request_id().size() > 0) {
     request_id_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.request_id_);
   }
-  if (from.has_error_response()) {
-    error_response_ = new ::configserver::proto::v2::ServerErrorResponse(*from.error_response_);
+  if (from.has_commonresponse()) {
+    commonresponse_ = new ::configserver::proto::v2::CommonResponse(*from.commonresponse_);
   } else {
-    error_response_ = NULL;
+    commonresponse_ = NULL;
   }
   // @@protoc_insertion_point(copy_constructor:configserver.proto.v2.FetchConfigResponse)
 }
 
 void FetchConfigResponse::SharedCtor() {
   request_id_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  error_response_ = NULL;
+  commonresponse_ = NULL;
 }
 
 FetchConfigResponse::~FetchConfigResponse() {
@@ -4926,7 +4644,7 @@ FetchConfigResponse::~FetchConfigResponse() {
 
 void FetchConfigResponse::SharedDtor() {
   request_id_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  if (this != internal_default_instance()) delete error_response_;
+  if (this != internal_default_instance()) delete commonresponse_;
 }
 
 void FetchConfigResponse::SetCachedSize(int size) const {
@@ -4951,10 +4669,10 @@ void FetchConfigResponse::Clear() {
 
   config_details_.Clear();
   request_id_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  if (GetArenaNoVirtual() == NULL && error_response_ != NULL) {
-    delete error_response_;
+  if (GetArenaNoVirtual() == NULL && commonresponse_ != NULL) {
+    delete commonresponse_;
   }
-  error_response_ = NULL;
+  commonresponse_ = NULL;
   _internal_metadata_.Clear();
 }
 
@@ -4980,12 +4698,12 @@ bool FetchConfigResponse::MergePartialFromCodedStream(
         break;
       }
 
-      // .configserver.proto.v2.ServerErrorResponse error_response = 2;
+      // .configserver.proto.v2.CommonResponse commonResponse = 2;
       case 2: {
         if (static_cast< ::google::protobuf::uint8>(tag) ==
             static_cast< ::google::protobuf::uint8>(18u /* 18 & 0xFF */)) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadMessage(
-               input, mutable_error_response()));
+               input, mutable_commonresponse()));
         } else {
           goto handle_unusual;
         }
@@ -5036,10 +4754,10 @@ void FetchConfigResponse::SerializeWithCachedSizes(
       1, this->request_id(), output);
   }
 
-  // .configserver.proto.v2.ServerErrorResponse error_response = 2;
-  if (this->has_error_response()) {
+  // .configserver.proto.v2.CommonResponse commonResponse = 2;
+  if (this->has_commonresponse()) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
-      2, this->_internal_error_response(), output);
+      2, this->_internal_commonresponse(), output);
   }
 
   // repeated .configserver.proto.v2.ConfigDetail config_details = 3;
@@ -5072,11 +4790,11 @@ void FetchConfigResponse::SerializeWithCachedSizes(
         1, this->request_id(), target);
   }
 
-  // .configserver.proto.v2.ServerErrorResponse error_response = 2;
-  if (this->has_error_response()) {
+  // .configserver.proto.v2.CommonResponse commonResponse = 2;
+  if (this->has_commonresponse()) {
     target = ::google::protobuf::internal::WireFormatLite::
       InternalWriteMessageToArray(
-        2, this->_internal_error_response(), deterministic, target);
+        2, this->_internal_commonresponse(), deterministic, target);
   }
 
   // repeated .configserver.proto.v2.ConfigDetail config_details = 3;
@@ -5122,11 +4840,11 @@ size_t FetchConfigResponse::ByteSizeLong() const {
         this->request_id());
   }
 
-  // .configserver.proto.v2.ServerErrorResponse error_response = 2;
-  if (this->has_error_response()) {
+  // .configserver.proto.v2.CommonResponse commonResponse = 2;
+  if (this->has_commonresponse()) {
     total_size += 1 +
       ::google::protobuf::internal::WireFormatLite::MessageSize(
-        *error_response_);
+        *commonresponse_);
   }
 
   int cached_size = ::google::protobuf::internal::ToCachedSize(total_size);
@@ -5161,8 +4879,8 @@ void FetchConfigResponse::MergeFrom(const FetchConfigResponse& from) {
 
     request_id_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.request_id_);
   }
-  if (from.has_error_response()) {
-    mutable_error_response()->::configserver::proto::v2::ServerErrorResponse::MergeFrom(from.error_response());
+  if (from.has_commonresponse()) {
+    mutable_commonresponse()->::configserver::proto::v2::CommonResponse::MergeFrom(from.commonresponse());
   }
 }
 
@@ -5193,11 +4911,280 @@ void FetchConfigResponse::InternalSwap(FetchConfigResponse* other) {
   CastToBase(&config_details_)->InternalSwap(CastToBase(&other->config_details_));
   request_id_.Swap(&other->request_id_, &::google::protobuf::internal::GetEmptyStringAlreadyInited(),
     GetArenaNoVirtual());
-  swap(error_response_, other->error_response_);
+  swap(commonresponse_, other->commonresponse_);
   _internal_metadata_.Swap(&other->_internal_metadata_);
 }
 
 ::google::protobuf::Metadata FetchConfigResponse::GetMetadata() const {
+  protobuf_v2_2fagent_2eproto::protobuf_AssignDescriptorsOnce();
+  return ::protobuf_v2_2fagent_2eproto::file_level_metadata[kIndexInFileMessages];
+}
+
+
+// ===================================================================
+
+void CommonResponse::InitAsDefaultInstance() {
+}
+#if !defined(_MSC_VER) || _MSC_VER >= 1900
+const int CommonResponse::kStatusFieldNumber;
+const int CommonResponse::kErrorMessageFieldNumber;
+#endif  // !defined(_MSC_VER) || _MSC_VER >= 1900
+
+CommonResponse::CommonResponse()
+  : ::google::protobuf::Message(), _internal_metadata_(NULL) {
+  ::google::protobuf::internal::InitSCC(
+      &protobuf_v2_2fagent_2eproto::scc_info_CommonResponse.base);
+  SharedCtor();
+  // @@protoc_insertion_point(constructor:configserver.proto.v2.CommonResponse)
+}
+CommonResponse::CommonResponse(const CommonResponse& from)
+  : ::google::protobuf::Message(),
+      _internal_metadata_(NULL) {
+  _internal_metadata_.MergeFrom(from._internal_metadata_);
+  errormessage_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  if (from.errormessage().size() > 0) {
+    errormessage_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.errormessage_);
+  }
+  status_ = from.status_;
+  // @@protoc_insertion_point(copy_constructor:configserver.proto.v2.CommonResponse)
+}
+
+void CommonResponse::SharedCtor() {
+  errormessage_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  status_ = 0;
+}
+
+CommonResponse::~CommonResponse() {
+  // @@protoc_insertion_point(destructor:configserver.proto.v2.CommonResponse)
+  SharedDtor();
+}
+
+void CommonResponse::SharedDtor() {
+  errormessage_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+
+void CommonResponse::SetCachedSize(int size) const {
+  _cached_size_.Set(size);
+}
+const ::google::protobuf::Descriptor* CommonResponse::descriptor() {
+  ::protobuf_v2_2fagent_2eproto::protobuf_AssignDescriptorsOnce();
+  return ::protobuf_v2_2fagent_2eproto::file_level_metadata[kIndexInFileMessages].descriptor;
+}
+
+const CommonResponse& CommonResponse::default_instance() {
+  ::google::protobuf::internal::InitSCC(&protobuf_v2_2fagent_2eproto::scc_info_CommonResponse.base);
+  return *internal_default_instance();
+}
+
+
+void CommonResponse::Clear() {
+// @@protoc_insertion_point(message_clear_start:configserver.proto.v2.CommonResponse)
+  ::google::protobuf::uint32 cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  errormessage_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  status_ = 0;
+  _internal_metadata_.Clear();
+}
+
+bool CommonResponse::MergePartialFromCodedStream(
+    ::google::protobuf::io::CodedInputStream* input) {
+#define DO_(EXPRESSION) if (!GOOGLE_PREDICT_TRUE(EXPRESSION)) goto failure
+  ::google::protobuf::uint32 tag;
+  // @@protoc_insertion_point(parse_start:configserver.proto.v2.CommonResponse)
+  for (;;) {
+    ::std::pair<::google::protobuf::uint32, bool> p = input->ReadTagWithCutoffNoLastTag(127u);
+    tag = p.first;
+    if (!p.second) goto handle_unusual;
+    switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
+      // int32 status = 1;
+      case 1: {
+        if (static_cast< ::google::protobuf::uint8>(tag) ==
+            static_cast< ::google::protobuf::uint8>(8u /* 8 & 0xFF */)) {
+
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
+                 input, &status_)));
+        } else {
+          goto handle_unusual;
+        }
+        break;
+      }
+
+      // bytes errorMessage = 2;
+      case 2: {
+        if (static_cast< ::google::protobuf::uint8>(tag) ==
+            static_cast< ::google::protobuf::uint8>(18u /* 18 & 0xFF */)) {
+          DO_(::google::protobuf::internal::WireFormatLite::ReadBytes(
+                input, this->mutable_errormessage()));
+        } else {
+          goto handle_unusual;
+        }
+        break;
+      }
+
+      default: {
+      handle_unusual:
+        if (tag == 0) {
+          goto success;
+        }
+        DO_(::google::protobuf::internal::WireFormat::SkipField(
+              input, tag, _internal_metadata_.mutable_unknown_fields()));
+        break;
+      }
+    }
+  }
+success:
+  // @@protoc_insertion_point(parse_success:configserver.proto.v2.CommonResponse)
+  return true;
+failure:
+  // @@protoc_insertion_point(parse_failure:configserver.proto.v2.CommonResponse)
+  return false;
+#undef DO_
+}
+
+void CommonResponse::SerializeWithCachedSizes(
+    ::google::protobuf::io::CodedOutputStream* output) const {
+  // @@protoc_insertion_point(serialize_start:configserver.proto.v2.CommonResponse)
+  ::google::protobuf::uint32 cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int32 status = 1;
+  if (this->status() != 0) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt32(1, this->status(), output);
+  }
+
+  // bytes errorMessage = 2;
+  if (this->errormessage().size() > 0) {
+    ::google::protobuf::internal::WireFormatLite::WriteBytesMaybeAliased(
+      2, this->errormessage(), output);
+  }
+
+  if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
+    ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
+        (::google::protobuf::internal::GetProto3PreserveUnknownsDefault()   ? _internal_metadata_.unknown_fields()   : _internal_metadata_.default_instance()), output);
+  }
+  // @@protoc_insertion_point(serialize_end:configserver.proto.v2.CommonResponse)
+}
+
+::google::protobuf::uint8* CommonResponse::InternalSerializeWithCachedSizesToArray(
+    bool deterministic, ::google::protobuf::uint8* target) const {
+  (void)deterministic; // Unused
+  // @@protoc_insertion_point(serialize_to_array_start:configserver.proto.v2.CommonResponse)
+  ::google::protobuf::uint32 cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int32 status = 1;
+  if (this->status() != 0) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(1, this->status(), target);
+  }
+
+  // bytes errorMessage = 2;
+  if (this->errormessage().size() > 0) {
+    target =
+      ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
+        2, this->errormessage(), target);
+  }
+
+  if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
+    target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
+        (::google::protobuf::internal::GetProto3PreserveUnknownsDefault()   ? _internal_metadata_.unknown_fields()   : _internal_metadata_.default_instance()), target);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:configserver.proto.v2.CommonResponse)
+  return target;
+}
+
+size_t CommonResponse::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:configserver.proto.v2.CommonResponse)
+  size_t total_size = 0;
+
+  if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
+    total_size +=
+      ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
+        (::google::protobuf::internal::GetProto3PreserveUnknownsDefault()   ? _internal_metadata_.unknown_fields()   : _internal_metadata_.default_instance()));
+  }
+  // bytes errorMessage = 2;
+  if (this->errormessage().size() > 0) {
+    total_size += 1 +
+      ::google::protobuf::internal::WireFormatLite::BytesSize(
+        this->errormessage());
+  }
+
+  // int32 status = 1;
+  if (this->status() != 0) {
+    total_size += 1 +
+      ::google::protobuf::internal::WireFormatLite::Int32Size(
+        this->status());
+  }
+
+  int cached_size = ::google::protobuf::internal::ToCachedSize(total_size);
+  SetCachedSize(cached_size);
+  return total_size;
+}
+
+void CommonResponse::MergeFrom(const ::google::protobuf::Message& from) {
+// @@protoc_insertion_point(generalized_merge_from_start:configserver.proto.v2.CommonResponse)
+  GOOGLE_DCHECK_NE(&from, this);
+  const CommonResponse* source =
+      ::google::protobuf::internal::DynamicCastToGenerated<const CommonResponse>(
+          &from);
+  if (source == NULL) {
+  // @@protoc_insertion_point(generalized_merge_from_cast_fail:configserver.proto.v2.CommonResponse)
+    ::google::protobuf::internal::ReflectionOps::Merge(from, this);
+  } else {
+  // @@protoc_insertion_point(generalized_merge_from_cast_success:configserver.proto.v2.CommonResponse)
+    MergeFrom(*source);
+  }
+}
+
+void CommonResponse::MergeFrom(const CommonResponse& from) {
+// @@protoc_insertion_point(class_specific_merge_from_start:configserver.proto.v2.CommonResponse)
+  GOOGLE_DCHECK_NE(&from, this);
+  _internal_metadata_.MergeFrom(from._internal_metadata_);
+  ::google::protobuf::uint32 cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from.errormessage().size() > 0) {
+
+    errormessage_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.errormessage_);
+  }
+  if (from.status() != 0) {
+    set_status(from.status());
+  }
+}
+
+void CommonResponse::CopyFrom(const ::google::protobuf::Message& from) {
+// @@protoc_insertion_point(generalized_copy_from_start:configserver.proto.v2.CommonResponse)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+void CommonResponse::CopyFrom(const CommonResponse& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:configserver.proto.v2.CommonResponse)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool CommonResponse::IsInitialized() const {
+  return true;
+}
+
+void CommonResponse::Swap(CommonResponse* other) {
+  if (other == this) return;
+  InternalSwap(other);
+}
+void CommonResponse::InternalSwap(CommonResponse* other) {
+  using std::swap;
+  errormessage_.Swap(&other->errormessage_, &::google::protobuf::internal::GetEmptyStringAlreadyInited(),
+    GetArenaNoVirtual());
+  swap(status_, other->status_);
+  _internal_metadata_.Swap(&other->_internal_metadata_);
+}
+
+::google::protobuf::Metadata CommonResponse::GetMetadata() const {
   protobuf_v2_2fagent_2eproto::protobuf_AssignDescriptorsOnce();
   return ::protobuf_v2_2fagent_2eproto::file_level_metadata[kIndexInFileMessages];
 }
@@ -5233,9 +5220,6 @@ template<> GOOGLE_PROTOBUF_ATTRIBUTE_NOINLINE ::configserver::proto::v2::ConfigD
 template<> GOOGLE_PROTOBUF_ATTRIBUTE_NOINLINE ::configserver::proto::v2::CommandDetail* Arena::CreateMaybeMessage< ::configserver::proto::v2::CommandDetail >(Arena* arena) {
   return Arena::CreateInternal< ::configserver::proto::v2::CommandDetail >(arena);
 }
-template<> GOOGLE_PROTOBUF_ATTRIBUTE_NOINLINE ::configserver::proto::v2::ServerErrorResponse* Arena::CreateMaybeMessage< ::configserver::proto::v2::ServerErrorResponse >(Arena* arena) {
-  return Arena::CreateInternal< ::configserver::proto::v2::ServerErrorResponse >(arena);
-}
 template<> GOOGLE_PROTOBUF_ATTRIBUTE_NOINLINE ::configserver::proto::v2::HeartbeatResponse* Arena::CreateMaybeMessage< ::configserver::proto::v2::HeartbeatResponse >(Arena* arena) {
   return Arena::CreateInternal< ::configserver::proto::v2::HeartbeatResponse >(arena);
 }
@@ -5244,6 +5228,9 @@ template<> GOOGLE_PROTOBUF_ATTRIBUTE_NOINLINE ::configserver::proto::v2::FetchCo
 }
 template<> GOOGLE_PROTOBUF_ATTRIBUTE_NOINLINE ::configserver::proto::v2::FetchConfigResponse* Arena::CreateMaybeMessage< ::configserver::proto::v2::FetchConfigResponse >(Arena* arena) {
   return Arena::CreateInternal< ::configserver::proto::v2::FetchConfigResponse >(arena);
+}
+template<> GOOGLE_PROTOBUF_ATTRIBUTE_NOINLINE ::configserver::proto::v2::CommonResponse* Arena::CreateMaybeMessage< ::configserver::proto::v2::CommonResponse >(Arena* arena) {
+  return Arena::CreateInternal< ::configserver::proto::v2::CommonResponse >(arena);
 }
 }  // namespace protobuf
 }  // namespace google

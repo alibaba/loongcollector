@@ -27,17 +27,17 @@ void ConfigProvider::Init(const string& dir) {
     mPipelineSourceDir /= "config";
     mPipelineSourceDir /= dir;
 
-    mProcessSourceDir.assign(AppConfig::GetInstance()->GetLogtailSysConfDir());
-    mProcessSourceDir /= "processconfig";
-    mProcessSourceDir /= dir;
+    mInstanceSourceDir.assign(AppConfig::GetInstance()->GetLogtailSysConfDir());
+    mInstanceSourceDir /= "instanceconfig";
+    mInstanceSourceDir /= dir;
 
     error_code ec;
     filesystem::create_directories(mPipelineSourceDir, ec);
     ConfigWatcher::GetInstance()->AddPipelineSource(mPipelineSourceDir, &mPipelineMux);
 
     ec.clear();
-    filesystem::create_directories(mProcessSourceDir, ec);
-    ConfigWatcher::GetInstance()->AddProcessSource(mProcessSourceDir, &mProcessMux);
+    filesystem::create_directories(mInstanceSourceDir, ec);
+    ConfigWatcher::GetInstance()->AddInstanceSource(mInstanceSourceDir, &mInstanceMux);
 }
 
 } // namespace logtail

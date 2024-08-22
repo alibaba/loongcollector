@@ -22,7 +22,7 @@
         string running_status = 8;                  // Human readable running status
         int64 startup_time = 9;                     // Required, Agent's startup time
         repeated ConfigInfo pipeline_configs = 10;  // Information about the current PIPELINE_CONFIG held by the Agent
-        repeated ConfigInfo process_configs = 11;   // Information about the current AGENT_CONFIG held by the Agent
+        repeated ConfigInfo instance_configs = 11;   // Information about the current AGENT_CONFIG held by the Agent
         repeated CommandInfo custom_commands = 12;  // Information about command history
         uint64 flags = 13;                          // Predefined command flag
         bytes opaque = 14;                          // Opaque data for extension
@@ -74,8 +74,8 @@
         UnspecifiedAgentCapability = 0;
         // The Agent can accept pipeline configuration from the Server.
         AcceptsPipelineConfig          = 0x00000001;
-        // The Agent can accept process configuration from the Server.
-        AcceptsProcessConfig           = 0x00000002;
+        // The Agent can accept instance configuration from the Server.
+        AcceptsInstanceConfig           = 0x00000002;
         // The Agent can accept custom command from the Server.
         AcceptsCustomCommand           = 0x00000004;
 
@@ -100,7 +100,7 @@
         uint64 capabilities = 3;                            // Bitmask of flags defined by ServerCapabilities enum
 
         repeated ConfigDetail pipeline_config_updates = 4;  // Agent's pipeline config update status
-        repeated ConfigDetail process_config_updates = 5;   // Agent's process config update status
+        repeated ConfigDetail instance_config_updates = 5;   // Agent's instance config update status
         repeated CommandDetail custom_command_updates = 6;  // Agent's commands updates
         uint64 flags = 7;                                   // Predefined command flag
         bytes opaque = 8;                                   // Opaque data for extension
@@ -126,8 +126,8 @@
         RembersAttribute                   = 0x00000001;
         // The Server can remember pipeline config status.
         RembersPipelineConfigStatus        = 0x00000002;
-        // The Server can remember process config status.
-        RembersProcessConfigStatus         = 0x00000004;
+        // The Server can remember instance config status.
+        RembersInstanceConfigStatus         = 0x00000004;
         // The Server can remember custom command status.
         RembersCustomCommandStatus         = 0x00000008;
 
@@ -150,7 +150,7 @@
         // restarted and lost state).
         ReportFullState           = 0x00000001;
         FetchPipelineConfigDetail = 0x00000002;
-        FetchProcessConfigDetail  = 0x00000004;
+        FetchInstanceConfigDetail  = 0x00000004;
         // bits before 2^16 (inclusive) are reserved for future official fields
     }
 
@@ -168,7 +168,7 @@ Server：应当通过capbilitiies上报Server自身的能力，这样如果新�
 
 Client：Agent启动后第一次向Server汇报全量信息，request字段应填尽填。request\_id、sequence\_num、capabilities、instance\_id、agent\_type、startup\_time为必填字段。
 
-Server：Server根据上报的信息返回响应。pipeline\_config\_updates、process\_config\_updates中包含agent需要同步的配置，updates中必然包含name和version，是否包含详情context和detail取决于server端实现。custom\_command_updates包含要求agent执行的命令command中必然包含type、name和expire\_time。
+Server：Server根据上报的信息返回响应。pipeline\_config\_updates、instance\_config\_updates中包含agent需要同步的配置，updates中必然包含name和version，是否包含详情context和detail取决于server端实现。custom\_command_updates包含要求agent执行的命令command中必然包含type、name和expire\_time。
 
 Server是否保存Client信息取决于Server实现，如果服务端找不到或保存的sequence\_num + 1 ≠ 心跳的sequence\_num，那么就立刻返回并且flags中必须设置ReportFullStatus标识位。
 
@@ -192,15 +192,15 @@ Server：同注册
 
 ### 进程配置
 
-若Server的注册/心跳响应中有process\_config\_updates.detail
+若Server的注册/心跳响应中有instance\_config\_updates.detail
 
 Client：直接从response中获得detail，应用成功后下次心跳需要上报完整状态。
 
 若Server的响应不包含detail
 
-Client：根据process\_config\_updates的信息构造FetchProcessConfigRequest
+Client：根据instance\_config\_updates的信息构造FetchInstanceConfigRequest
 
-Server：返回FetchProcessConfigResponse
+Server：返回FetchInstanceConfigResponse
 
 Client获取到多个进程配置时，自动合并，若产生冲突默认行为是未定义。
 

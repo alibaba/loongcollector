@@ -33,18 +33,18 @@ public:
 protected:
     void SetUp() override {
         ConfigWatcher::GetInstance()->AddPipelineSource(configDir.string());
-        ConfigWatcher::GetInstance()->AddProcessSource(processConfigDir.string());
+        ConfigWatcher::GetInstance()->AddInstanceSource(instanceConfigDir.string());
     }
 
     void TearDown() override { ConfigWatcher::GetInstance()->ClearEnvironment(); }
 
 private:
     static const filesystem::path configDir;
-    static const filesystem::path processConfigDir;
+    static const filesystem::path instanceConfigDir;
 };
 
 const filesystem::path ConfigWatcherUnittest::configDir = "./config";
-const filesystem::path ConfigWatcherUnittest::processConfigDir = "./processconfig";
+const filesystem::path ConfigWatcherUnittest::instanceConfigDir = "./instanceconfig";
 
 void ConfigWatcherUnittest::InvalidConfigDirFound() const {
     {
@@ -57,13 +57,13 @@ void ConfigWatcherUnittest::InvalidConfigDirFound() const {
     filesystem::remove("config");
     }
     {
-        ProcessConfigDiff diff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+        InstanceConfigDiff diff = ConfigWatcher::GetInstance()->CheckInstanceConfigDiff();
         APSARA_TEST_TRUE(diff.IsEmpty());
 
-        { ofstream fout("processconfig"); }
-        diff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+        { ofstream fout("instanceconfig"); }
+        diff = ConfigWatcher::GetInstance()->CheckInstanceConfigDiff();
         APSARA_TEST_TRUE(diff.IsEmpty());
-        filesystem::remove("processconfig");
+        filesystem::remove("instanceconfig");
     }
 }
 
@@ -83,18 +83,18 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
     filesystem::remove_all(configDir);
     }
     {
-        filesystem::create_directories(processConfigDir);
+        filesystem::create_directories(instanceConfigDir);
 
-        filesystem::create_directories(processConfigDir / "dir");
-        { ofstream fout(processConfigDir / "unsupported_extenstion.zip"); }
-        { ofstream fout(processConfigDir / "empty_file.json"); }
+        filesystem::create_directories(instanceConfigDir / "dir");
+        { ofstream fout(instanceConfigDir / "unsupported_extenstion.zip"); }
+        { ofstream fout(instanceConfigDir / "empty_file.json"); }
         {
-            ofstream fout(processConfigDir / "invalid_format.json");
+            ofstream fout(instanceConfigDir / "invalid_format.json");
             fout << "[}";
         }
-        ProcessConfigDiff diff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+        InstanceConfigDiff diff = ConfigWatcher::GetInstance()->CheckInstanceConfigDiff();
         APSARA_TEST_TRUE(diff.IsEmpty());
-        filesystem::remove_all(processConfigDir);
+        filesystem::remove_all(instanceConfigDir);
     }
 }
 
@@ -137,10 +137,10 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
     }
     {
         PluginRegistry::GetInstance()->LoadPlugins();
-        ConfigWatcher::GetInstance()->AddProcessSource("dir1");
-        ConfigWatcher::GetInstance()->AddProcessSource("dir2");
+        ConfigWatcher::GetInstance()->AddInstanceSource("dir1");
+        ConfigWatcher::GetInstance()->AddInstanceSource("dir2");
 
-        filesystem::create_directories("processconfig");
+        filesystem::create_directories("instanceconfig");
         filesystem::create_directories("dir1");
         filesystem::create_directories("dir2");
 
@@ -156,13 +156,13 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         )";
         }
         { ofstream fout("dir2/config.json"); }
-        ProcessConfigDiff diff = ConfigWatcher::GetInstance()->CheckProcessConfigDiff();
+        InstanceConfigDiff diff = ConfigWatcher::GetInstance()->CheckInstanceConfigDiff();
         APSARA_TEST_FALSE(diff.IsEmpty());
         APSARA_TEST_EQUAL(1U, diff.mAdded.size());
 
         filesystem::remove_all("dir1");
         filesystem::remove_all("dir2");
-        filesystem::remove_all("processconfig");
+        filesystem::remove_all("instanceconfig");
         PluginRegistry::GetInstance()->UnloadPlugins();
     }
 }

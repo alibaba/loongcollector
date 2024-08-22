@@ -29,7 +29,7 @@ class ConfigFeedbackable {
 public:
     virtual ~ConfigFeedbackable() = default; // LCOV_EXCL_LINE
     virtual void FeedbackPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) = 0;
-    virtual void FeedbackProcessConfigStatus(const std::string& name, ConfigFeedbackStatus status) = 0;
+    virtual void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) = 0;
     virtual void
     FeedbackCommandConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status)
         = 0;

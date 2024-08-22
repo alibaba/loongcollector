@@ -31,9 +31,9 @@ void ConfigFeedbackReceiver::RegisterPipelineConfig(const std::string& name, Con
     mPipelineConfigFeedbackableMap[name] = feedbackable;
 }
 
-void ConfigFeedbackReceiver::RegisterProcessConfig(const std::string& name, ConfigFeedbackable* feedbackable) {
+void ConfigFeedbackReceiver::RegisterInstanceConfig(const std::string& name, ConfigFeedbackable* feedbackable) {
     std::lock_guard<std::mutex> lock(mMutex);
-    mProcessConfigFeedbackableMap[name] = feedbackable;
+    mInstanceConfigFeedbackableMap[name] = feedbackable;
 }
 
 void ConfigFeedbackReceiver::RegisterCommand(const std::string& type,
@@ -48,9 +48,9 @@ void ConfigFeedbackReceiver::UnregisterPipelineConfig(const std::string& name) {
     mPipelineConfigFeedbackableMap.erase(name);
 }
 
-void ConfigFeedbackReceiver::UnregisterProcessConfig(const std::string& name) {
+void ConfigFeedbackReceiver::UnregisterInstanceConfig(const std::string& name) {
     std::lock_guard<std::mutex> lock(mMutex);
-    mProcessConfigFeedbackableMap.erase(name);
+    mInstanceConfigFeedbackableMap.erase(name);
 }
 
 void ConfigFeedbackReceiver::UnregisterCommand(const std::string& type, const std::string& name) {
@@ -66,11 +66,11 @@ void ConfigFeedbackReceiver::FeedbackPipelineConfigStatus(const std::string& nam
     }
 }
 
-void ConfigFeedbackReceiver::FeedbackProcessConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
+void ConfigFeedbackReceiver::FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
     std::lock_guard<std::mutex> lock(mMutex);
-    auto iter = mProcessConfigFeedbackableMap.find(name);
-    if (iter != mProcessConfigFeedbackableMap.end()) {
-        iter->second->FeedbackProcessConfigStatus(name, status);
+    auto iter = mInstanceConfigFeedbackableMap.find(name);
+    if (iter != mInstanceConfigFeedbackableMap.end()) {
+        iter->second->FeedbackInstanceConfigStatus(name, status);
     }
 }
 

@@ -62,7 +62,7 @@ public:
     void Stop() override;
 
     void FeedbackPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
-    void FeedbackProcessConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
+    void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
     void
     FeedbackCommandConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status) override;
     CommonConfigProvider() = default;
@@ -73,7 +73,7 @@ protected:
     virtual bool SendHeartbeat(const configserver::proto::v2::HeartbeatRequest&,
                                configserver::proto::v2::HeartbeatResponse&);
 
-    virtual bool FetchProcessConfig(::configserver::proto::v2::HeartbeatResponse&,
+    virtual bool FetchInstanceConfig(::configserver::proto::v2::HeartbeatResponse&,
                                     ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
 
     virtual bool FetchPipelineConfig(::configserver::proto::v2::HeartbeatResponse&,
@@ -84,10 +84,10 @@ protected:
     void UpdateRemotePipelineConfig(
         const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
     void
-    UpdateRemoteProcessConfig(const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
+    UpdateRemoteInstanceConfig(const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
 
     virtual bool
-    FetchProcessConfigFromServer(::configserver::proto::v2::HeartbeatResponse&,
+    FetchInstanceConfigFromServer(::configserver::proto::v2::HeartbeatResponse&,
                                  ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
     virtual bool
     FetchPipelineConfigFromServer(::configserver::proto::v2::HeartbeatResponse&,
@@ -104,12 +104,12 @@ protected:
     mutable std::condition_variable mStopCV;
     bool mConfigServerAvailable = false;
 
-    mutable std::mutex mProcessInfoMapMux;
+    mutable std::mutex mInstanceInfoMapMux;
     mutable std::mutex mPipelineInfoMapMux;
     mutable std::mutex mCommondInfoMapMux;
 
     std::unordered_map<std::string, ConfigInfo> mPipelineConfigInfoMap;
-    std::unordered_map<std::string, ConfigInfo> mProcessConfigInfoMap;
+    std::unordered_map<std::string, ConfigInfo> mInstanceConfigInfoMap;
     std::unordered_map<std::string, CommandInfo> mCommandInfoMap;
 
 private:

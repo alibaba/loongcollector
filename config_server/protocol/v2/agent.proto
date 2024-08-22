@@ -49,8 +49,8 @@ enum AgentCapabilities {
     UnspecifiedAgentCapability = 0;
     // The Agent can accept pipeline configuration from the Server.
     AcceptsPipelineConfig          = 0x00000001;
-    // The Agent can accept process configuration from the Server.
-    AcceptsProcessConfig           = 0x00000002;
+    // The Agent can accept instance configuration from the Server.
+    AcceptsInstanceConfig           = 0x00000002;
     // The Agent can accept custom command from the Server.
     AcceptsCustomCommand           = 0x00000004;
 
@@ -81,7 +81,7 @@ message HeartbeatRequest {
     string running_status = 8;                  // Human readable running status
     int64 startup_time = 9;                     // Required, Agent's startup time
     repeated ConfigInfo pipeline_configs = 10;  // Information about the current PIPELINE_CONFIG held by the Agent
-    repeated ConfigInfo process_configs = 11;   // Information about the current AGENT_CONFIG held by the Agent
+    repeated ConfigInfo instance_configs = 11;  // Information about the current AGENT_CONFIG held by the Agent
     repeated CommandInfo custom_commands = 12;  // Information about command history
     uint64 flags = 13;                          // Predefined command flag
     bytes opaque = 14;                          // Opaque data for extension
@@ -102,11 +102,6 @@ message CommandDetail {
     int64 expire_time = 4;          // After which the command can be safely removed from history
 }
 
-message ServerErrorResponse {
-    int32 error_code = 1;           // None-zero value indicates error
-    string error_message = 2;       // Error message
-}
-
 enum ServerCapabilities {
     // The capabilities field is unspecified.
     UnspecifiedServerCapability = 0;
@@ -114,8 +109,8 @@ enum ServerCapabilities {
     RembersAttribute                   = 0x00000001;
     // The Server can remember pipeline config status.
     RembersPipelineConfigStatus        = 0x00000002;
-    // The Server can remember process config status.
-    RembersProcessConfigStatus         = 0x00000004;
+    // The Server can remember instance config status.
+    RembersInstanceConfigStatus         = 0x00000004;
     // The Server can remember custom command status.
     RembersCustomCommandStatus         = 0x00000008;
 
@@ -133,25 +128,25 @@ enum ResponseFlags {
     // restarted and lost state).
     ReportFullState           = 0x00000001;
     FetchPipelineConfigDetail = 0x00000002;
-    FetchProcessConfigDetail  = 0x00000004;
+    FetchInstanceConfigDetail = 0x00000004;
     // bits before 2^16 (inclusive) are reserved for future official fields
 }
 
 // ConfigServer's response to Agent's request
 message HeartbeatResponse {
     bytes request_id = 1;  
-    ServerErrorResponse error_response = 2;             // Set value indicates error
+    CommonResponse commonResponse = 2;                  // Set common response
     uint64 capabilities = 3;                            // Bitmask of flags defined by ServerCapabilities enum
 
     repeated ConfigDetail pipeline_config_updates = 4;  // Agent's pipeline config update status
-    repeated ConfigDetail process_config_updates = 5;   // Agent's process config update status
+    repeated ConfigDetail instance_config_updates = 5;  // Agent's instance config update status
     repeated CommandDetail custom_command_updates = 6;  // Agent's commands updates
     uint64 flags = 7;                                   // Predefined command flag
     bytes opaque = 8;                                   // Opaque data for extension
 }
 
 // API: /Agent/FetchPipelineConfig/
-// API: /Agent/FetchProcessConfig/
+// API: /Agent/FetchInstanceConfig/
 // Agent request to ConfigServer, pulling details of the config
 message FetchConfigRequest {
     bytes request_id = 1; 
@@ -162,6 +157,12 @@ message FetchConfigRequest {
 // ConfigServer response to Agent's request
 message FetchConfigResponse {
     bytes request_id = 1;                     
-    ServerErrorResponse error_response = 2;
+    CommonResponse commonResponse = 2;
     repeated ConfigDetail config_details = 3;   // config detail
+}
+
+message CommonResponse
+{
+    int32 status = 1;
+    bytes errorMessage = 2;
 }

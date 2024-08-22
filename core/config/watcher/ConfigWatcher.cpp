@@ -20,7 +20,7 @@
 
 #include "logger/Logger.h"
 #include "pipeline/PipelineManager.h"
-#include "pipeline/ProcessConfigManager.h"
+#include "pipeline/InstanceConfigManager.h"
 
 using namespace std;
 
@@ -29,7 +29,7 @@ namespace logtail {
 bool ReadFile(const string& filepath, string& content);
 
 ConfigWatcher::ConfigWatcher()
-    : mPipelineManager(PipelineManager::GetInstance()), mProcessConfigManager(ProcessConfigManager::GetInstance()) {
+    : mPipelineManager(PipelineManager::GetInstance()), mInstanceConfigManager(InstanceConfigManager::GetInstance()) {
 }
 
 template <typename ConfigManagerType, typename ConfigType, typename ConfigDiffType, typename ManagerConfigType>
@@ -219,10 +219,10 @@ PipelineConfigDiff ConfigWatcher::CheckPipelineConfigDiff() {
         mPipelineConfigDir, mPipelineConfigDirMutexMap, mPipelineFileInfoMap, mPipelineManager, configType);
 }
 
-ProcessConfigDiff ConfigWatcher::CheckProcessConfigDiff() {
-    const static std::string configType = "processConfig";
-    return CheckConfigDiff<ProcessConfigManager, ProcessConfig, ProcessConfigDiff, ProcessConfig>(
-        mProcessConfigDir, mProcessConfigDirMutexMap, mProcessFileInfoMap, mProcessConfigManager, configType);
+InstanceConfigDiff ConfigWatcher::CheckInstanceConfigDiff() {
+    const static std::string configType = "instanceConfig";
+    return CheckConfigDiff<InstanceConfigManager, InstanceConfig, InstanceConfigDiff, InstanceConfig>(
+        mInstanceConfigDir, mInstanceConfigDirMutexMap, mInstanceFileInfoMap, mInstanceConfigManager, configType);
 }
 
 void ConfigWatcher::AddPipelineSource(const string& dir, mutex* mux) {
@@ -232,10 +232,10 @@ void ConfigWatcher::AddPipelineSource(const string& dir, mutex* mux) {
     }
 }
 
-void ConfigWatcher::AddProcessSource(const string& dir, mutex* mux) {
-    mProcessConfigDir.emplace_back(dir);
+void ConfigWatcher::AddInstanceSource(const string& dir, mutex* mux) {
+    mInstanceConfigDir.emplace_back(dir);
     if (mux != nullptr) {
-        mProcessConfigDirMutexMap[dir] = mux;
+        mInstanceConfigDirMutexMap[dir] = mux;
     }
 }
 
@@ -250,8 +250,8 @@ void ConfigWatcher::ClearEnvironment() {
     mPipelineConfigDir.clear();
     mPipelineFileInfoMap.clear();
 
-    mProcessConfigDir.clear();
-    mProcessFileInfoMap.clear();
+    mInstanceConfigDir.clear();
+    mInstanceFileInfoMap.clear();
 
     mCommandConfigDir.clear();
 }
