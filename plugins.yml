@@ -25,6 +25,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/aggregator/skywalking"
     - import: "github.com/alibaba/ilogtail/plugins/extension/basicauth"
     - import: "github.com/alibaba/ilogtail/plugins/extension/default_decoder"
+    - import: "github.com/alibaba/ilogtail/plugins/extension/default_encoder"
     - import: "github.com/alibaba/ilogtail/plugins/extension/group_info_filter"
     - import: "github.com/alibaba/ilogtail/plugins/extension/request_breaker"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/checker"

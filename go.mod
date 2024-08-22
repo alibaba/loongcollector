@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.6.0
 	github.com/IBM/sarama v1.42.2
-	github.com/VictoriaMetrics/VictoriaMetrics v1.83.1
+	github.com/VictoriaMetrics/VictoriaMetrics v1.83.0
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/apache/pulsar-client-go v0.10.0
 	github.com/buger/jsonparser v1.1.1
@@ -44,7 +44,7 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/common v0.42.0
 	github.com/prometheus/procfs v0.8.0
-	github.com/pyroscope-io/pyroscope v0.37.2
+	github.com/pyroscope-io/pyroscope v1.5.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sirupsen/logrus v1.8.1
 	github.com/smartystreets/goconvey v1.7.2

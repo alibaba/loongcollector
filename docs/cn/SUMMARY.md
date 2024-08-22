@@ -115,6 +115,12 @@
   * [Pulsar](plugins/flusher/flusher-pulsar.md)
   * [HTTP](plugins/flusher/flusher-http.md)
   * [Loki](plugins/flusher/loki.md)
+* [扩展](plugins/extension/README.md)
+  * [BasicAuth鉴权](plugins/extension/ext-basicauth.md)
+  * [协议解码/反序列化](plugins/extension/ext-default-decoder.md)
+  * [协议编码/序列化](plugins/extension/ext-default-encoder.md)
+  * [数据筛选](plugins/extension/ext-groupinfo-filter.md)
+  * [请求熔断](plugins/extension/ext-request-breaker.md)
 
 ## 工作原理 <a href="#principle" id="principle"></a>
 
