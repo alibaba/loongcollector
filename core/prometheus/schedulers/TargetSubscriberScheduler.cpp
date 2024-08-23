@@ -58,7 +58,7 @@ bool TargetSubscriberScheduler::operator<(const TargetSubscriberScheduler& other
     return mJobName < other.mJobName;
 }
 
-void TargetSubscriberScheduler::OnSubscription(const HttpResponse& response) {
+void TargetSubscriberScheduler::OnSubscription(const HttpResponse& response, uint64_t) {
     if (response.mStatusCode == 304) {
         // not modified
         return;
@@ -104,12 +104,12 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
                 if (mTimer) {
                     // zero-cost upgrade
                     if (mUnRegisterMs > 0
-                        && (GetCurrentTimeInNanoSeconds() + v->GetRandSleep()
-                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000000000
-                            > mUnRegisterMs * 1000000)
-                        && (GetCurrentTimeInNanoSeconds() + v->GetRandSleep()
-                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000000000 * 2
-                            < mUnRegisterMs * 1000000)) {
+                        && (GetCurrentTimeInMilliSeconds() + v->GetRandSleep()
+                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
+                            > mUnRegisterMs)
+                        && (GetCurrentTimeInMilliSeconds() + v->GetRandSleep()
+                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
+                            < mUnRegisterMs)) {
                         // scrape once just now
                         v->ScrapeOnce(std::chrono::steady_clock::now());
                     }
@@ -213,7 +213,7 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
 
         scrapeScheduler->SetTimer(mTimer);
         auto firstExecTime
-            = std::chrono::steady_clock::now() + std::chrono::nanoseconds(scrapeScheduler->GetRandSleep());
+            = std::chrono::steady_clock::now() + std::chrono::milliseconds(scrapeScheduler->GetRandSleep());
 
         scrapeScheduler->SetFirstExecTime(firstExecTime);
 
@@ -232,8 +232,8 @@ string TargetSubscriberScheduler::GetId() const {
 
 void TargetSubscriberScheduler::ScheduleNext() {
     auto future = std::make_shared<PromFuture>();
-    future->AddDoneCallback([this](const HttpResponse& response) {
-        this->OnSubscription(response);
+    future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampMilliSec) {
+        this->OnSubscription(response, timestampMilliSec);
         this->ExecDone();
         this->ScheduleNext();
     });

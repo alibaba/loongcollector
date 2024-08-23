@@ -45,7 +45,7 @@ public:
 
     bool operator<(const ScrapeScheduler& other) const;
 
-    void OnMetricResult(const HttpResponse&);
+    void OnMetricResult(const HttpResponse&, uint64_t timestampMilliSec);
     void SetTimer(std::shared_ptr<Timer> timer);
 
     std::string GetId() const;
@@ -58,8 +58,9 @@ public:
 
 private:
     void PushEventGroup(PipelineEventGroup&&);
+    void SetAutoMetricMeta(PipelineEventGroup& eGroup);
 
-    PipelineEventGroup BuildPipelineEventGroup(const std::string& content, time_t timestampNs);
+    PipelineEventGroup BuildPipelineEventGroup(const std::string& content);
 
     std::unique_ptr<TimerEvent> BuildScrapeTimerEvent(std::chrono::steady_clock::time_point execTime);
 
@@ -68,11 +69,18 @@ private:
     std::string mHash;
     std::string mHost;
     int32_t mPort;
+    std::string mInstance;
     Labels mLabels;
 
     QueueKey mQueueKey;
     size_t mInputIndex;
     std::shared_ptr<Timer> mTimer;
+
+    // auto metrics
+    uint64_t mScrapeTimestampMilliSec = 0;
+    double mScrapeDurationSeconds = 0;
+    uint64_t mScrapeResponseSizeBytes = 0;
+    bool mUpState = true;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParsePrometheusMetricUnittest;
     friend class ScrapeSchedulerUnittest;

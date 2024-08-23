@@ -153,20 +153,18 @@ void TargetSubscriberSchedulerUnittest::OnInitScrapeJobEvent() {
     APSARA_TEST_EQUAL(targetSubscriber->mJobName, "_kube-state-metrics");
 }
 
-
-
 void TargetSubscriberSchedulerUnittest::TestProcess() {
     std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
     APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
 
     // if status code is not 200
     mHttpResponse.mStatusCode = 404;
-    targetSubscriber->OnSubscription(mHttpResponse);
+    targetSubscriber->OnSubscription(mHttpResponse, 0);
     APSARA_TEST_EQUAL(0UL, targetSubscriber->mScrapeSchedulerMap.size());
 
     // if status code is 200
     mHttpResponse.mStatusCode = 200;
-    targetSubscriber->OnSubscription(mHttpResponse);
+    targetSubscriber->OnSubscription(mHttpResponse, 0);
     APSARA_TEST_EQUAL(2UL, targetSubscriber->mScrapeSchedulerMap.size());
 }
 

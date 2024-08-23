@@ -18,6 +18,7 @@
 #include "MetricEvent.h"
 #include "StringTools.h"
 #include "common/JsonUtil.h"
+#include "models/PipelineEventGroup.h"
 #include "processor/inner/ProcessorPromParseMetricNative.h"
 #include "prometheus/Constants.h"
 #include "prometheus/labels/TextParser.h"
@@ -104,6 +105,9 @@ void ProcessorParsePrometheusMetricUnittest::TestProcess() {
                 # end
                     )""",
                                    0);
+    // set timestamp in nanoseconds
+    auto timestampMilliSec = GetCurrentTimeInMilliSeconds();
+    eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC, ToString(timestampMilliSec));
 
     // run function
     APSARA_TEST_EQUAL((size_t)8, eventGroup.GetEvents().size());
@@ -119,6 +123,9 @@ void ProcessorParsePrometheusMetricUnittest::TestProcess() {
     APSARA_TEST_EQUAL("test_metric6", eventGroup.GetEvents().at(5).Cast<MetricEvent>().GetName());
     APSARA_TEST_EQUAL("test_metric7", eventGroup.GetEvents().at(6).Cast<MetricEvent>().GetName());
     APSARA_TEST_EQUAL("test_metric8", eventGroup.GetEvents().at(7).Cast<MetricEvent>().GetName());
+
+    // judge timestamp
+    APSARA_TEST_EQUAL(timestampMilliSec / 1000, eventGroup.GetEvents().at(0).Cast<MetricEvent>().GetTimestamp());
 }
 
 UNIT_TEST_CASE(ProcessorParsePrometheusMetricUnittest, TestInit)

@@ -20,7 +20,7 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr&) const override;
 
 private:
-    bool ProcessEvent(PipelineEventPtr&, EventsContainer&, PipelineEventGroup&);
+    bool ProcessEvent(PipelineEventPtr&, EventsContainer&, PipelineEventGroup&, uint64_t timestamp, uint32_t nanoSec);
     TextParser mParser;
 
 #ifdef APSARA_UNIT_TEST_MAIN

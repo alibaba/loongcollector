@@ -36,9 +36,23 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    bool ProcessEvent(PipelineEventPtr& e);
+    bool ProcessEvent(PipelineEventPtr& e, StringView instance);
+
+    void AddAutoMetrics(PipelineEventGroup& metricGroup);
+    void AddMetric(PipelineEventGroup& metricGroup,
+                   const std::string& name,
+                   double value,
+                   time_t timestamp,
+                   uint32_t nanoSec,
+                   StringView instance);
 
     std::vector<RelabelConfig> mRelabelConfigs;
+
+    // from config
+    std::string mJobName;
+    int64_t mScrapeTimeoutSeconds;
+    int64_t mSampleLimit;
+    int64_t mSeriesLimit;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorPromRelabelMetricNativeUnittest;

@@ -4,11 +4,11 @@
 
 namespace logtail {
 
-void PromFuture::Process(const HttpResponse& response) {
+void PromFuture::Process(const HttpResponse& response, uint64_t timestampMilliSec) {
     WriteLock lock(mStateRWLock);
     if (mState == PromFutureState::New) {
         for (auto& callback : mDoneCallbacks) {
-            callback(response);
+            callback(response, timestampMilliSec);
         }
         mState = PromFutureState::Done;
     } else {
@@ -16,7 +16,7 @@ void PromFuture::Process(const HttpResponse& response) {
     }
 }
 
-void PromFuture::AddDoneCallback(std::function<void(const HttpResponse&)>&& callback) {
+void PromFuture::AddDoneCallback(std::function<void(const HttpResponse&, uint64_t timestampMilliSec)>&& callback) {
     mDoneCallbacks.emplace_back(std::move(callback));
 }
 

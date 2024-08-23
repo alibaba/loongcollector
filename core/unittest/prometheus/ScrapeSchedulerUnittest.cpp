@@ -91,13 +91,14 @@ void ScrapeSchedulerUnittest::TestProcess() {
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
     // if status code is not 200, no data will be processed
+    // but will continue running, sending self-monitoring metrics
     mHttpResponse.mStatusCode = 503;
-    event.OnMetricResult(mHttpResponse);
-    APSARA_TEST_EQUAL(0UL, event.mItem.size());
+    event.OnMetricResult(mHttpResponse, 0);
+    APSARA_TEST_EQUAL(1UL, event.mItem.size());
     event.mItem.clear();
 
     mHttpResponse.mStatusCode = 200;
-    event.OnMetricResult(mHttpResponse);
+    event.OnMetricResult(mHttpResponse, 0);
     APSARA_TEST_EQUAL(1UL, event.mItem.size());
     APSARA_TEST_EQUAL(11UL, event.mItem[0]->mEventGroup.GetEvents().size());
 }
@@ -108,7 +109,7 @@ void ScrapeSchedulerUnittest::TestSplitByLines() {
     labels.Push({prometheus::ADDRESS_LABEL_NAME, "localhost:8080"});
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
-    auto res = event.BuildPipelineEventGroup(mHttpResponse.mBody, 0);
+    auto res = event.BuildPipelineEventGroup(mHttpResponse.mBody);
     APSARA_TEST_EQUAL(11UL, res.GetEvents().size());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05",
                       res.GetEvents()[0].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());

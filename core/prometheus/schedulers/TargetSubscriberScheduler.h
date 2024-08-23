@@ -40,7 +40,7 @@ public:
     bool Init(const Json::Value& scrapeConfig);
     bool operator<(const TargetSubscriberScheduler& other) const;
 
-    void OnSubscription(const HttpResponse&);
+    void OnSubscription(const HttpResponse&, uint64_t);
     void SetTimer(std::shared_ptr<Timer> timer);
 
     std::string GetId() const;
@@ -63,7 +63,8 @@ public:
 private:
     bool ParseScrapeSchedulerGroup(const std::string& content, std::vector<Labels>& scrapeSchedulerGroup);
 
-    std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>> BuildScrapeSchedulerSet(std::vector<Labels>& scrapeSchedulerGroup);
+    std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>>
+    BuildScrapeSchedulerSet(std::vector<Labels>& scrapeSchedulerGroup);
 
     std::unique_ptr<TimerEvent> BuildSubscriberTimerEvent(std::chrono::steady_clock::time_point execTime);
     void UpdateScrapeScheduler(std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>>&);

@@ -77,12 +77,11 @@ void PipelineEventGroupUnittest::TestSetMetadata() {
     }
     size_t afterAlloc = mSourceBuffer->mAllocator.TotalAllocated();
     APSARA_TEST_EQUAL_FATAL(beforeAlloc, afterAlloc);
-    std::vector<std::pair<EventGroupMetaKey, std::string>> answers = {
-        {EventGroupMetaKey::LOG_FILE_PATH, "value1"},
-        {EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, "value2"},
-        {EventGroupMetaKey::LOG_FILE_INODE, "value3"},
-        {EventGroupMetaKey::SOURCE_ID, "value4"}
-    };
+    std::vector<std::pair<EventGroupMetaKey, std::string>> answers
+        = {{EventGroupMetaKey::LOG_FILE_PATH, "value1"},
+           {EventGroupMetaKey::LOG_FILE_PATH_RESOLVED, "value2"},
+           {EventGroupMetaKey::LOG_FILE_INODE, "value3"},
+           {EventGroupMetaKey::SOURCE_ID, "value4"}};
     for (const auto kv : answers) {
         APSARA_TEST_TRUE_FATAL(mEventGroup->HasMetadata(kv.first));
         APSARA_TEST_STREQ_FATAL(kv.second.c_str(), mEventGroup->GetMetadata(kv.first).data());

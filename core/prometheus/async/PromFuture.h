@@ -10,9 +10,9 @@ enum class PromFutureState { New, Processing, Done };
 class PromFuture {
 public:
     // Process should support oneshot and streaming mode.
-    void Process(const HttpResponse&);
+    void Process(const HttpResponse&, uint64_t timestampMilliSec);
 
-    void AddDoneCallback(std::function<void(const HttpResponse&)>&& callback);
+    void AddDoneCallback(std::function<void(const HttpResponse&, uint64_t timestampMilliSec)>&& callback);
 
     void Cancel();
 
@@ -20,7 +20,7 @@ protected:
     PromFutureState mState = {PromFutureState::New};
     ReadWriteLock mStateRWLock;
 
-    std::vector<std::function<void(const HttpResponse&)>> mDoneCallbacks;
+    std::vector<std::function<void(const HttpResponse&, uint64_t timestampMilliSec)>> mDoneCallbacks;
 };
 
 } // namespace logtail
