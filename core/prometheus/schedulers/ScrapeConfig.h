@@ -11,28 +11,36 @@
 
 
 namespace logtail {
+
 class ScrapeConfig {
 public:
     std::string mJobName;
-    std::string mScheme;
-    std::string mMetricsPath;
     int64_t mScrapeIntervalSeconds;
     int64_t mScrapeTimeoutSeconds;
+    std::string mMetricsPath;
+    std::string mScheme;
+
+    std::map<std::string, std::string> mAuthHeaders;
+
     int64_t mMaxScrapeSizeBytes;
     int64_t mSampleLimit;
     int64_t mSeriesLimit;
     std::vector<RelabelConfig> mRelabelConfigs;
 
     std::map<std::string, std::vector<std::string>> mParams;
-    std::map<std::string, std::string> mHeaders;
 
     std::string mQueryString;
 
     ScrapeConfig();
     bool Init(const Json::Value& config);
 
+private:
+    bool InitBasicAuth(const Json::Value& basicAuth);
+    bool InitAuthorization(const Json::Value& authorization);
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ScrapeConfigUnittest;
 #endif
 };
+
 } // namespace logtail
