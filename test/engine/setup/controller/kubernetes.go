@@ -48,14 +48,24 @@ func (c *DeploymentController) GetDeploymentPods(deploymentName, deploymentNames
 	if err != nil {
 		return nil, err
 	}
-	selector := metav1.FormatLabelSelector(deployment.Spec.Selector)
+	labels := map[string]string{
+		"app": deployment.Spec.Template.Labels["app"],
+	}
+	selector := metav1.FormatLabelSelector(&metav1.LabelSelector{MatchLabels: labels})
 	listOptions := metav1.ListOptions{LabelSelector: selector}
 
 	pods, err := c.k8sClient.CoreV1().Pods(deploymentNamespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return nil, err
 	}
-	// Only return running pods, terminating pods will be excluded
+	return pods, nil
+}
+
+func (c *DeploymentController) GetRunningDeploymentPods(deploymentName, deploymentNamespace string) (*corev1.PodList, error) {
+	pods, err := c.GetDeploymentPods(deploymentName, deploymentNamespace)
+	if err != nil {
+		return nil, err
+	}
 	runningPods := make([]corev1.Pod, 0)
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp == nil {
@@ -142,10 +152,25 @@ func (c *DeploymentController) waitDeploymentAvailable(deploymentName, deploymen
 			if err != nil {
 				return err
 			}
-			if deployment.Status.AvailableReplicas == *deployment.Spec.Replicas && pods != nil && len(pods.Items) == int(*deployment.Spec.Replicas) {
-				return nil
+			if !(deployment.Status.AvailableReplicas == *deployment.Spec.Replicas && pods != nil && len(pods.Items) == int(*deployment.Spec.Replicas)) {
+				return fmt.Errorf("deployment %s/%s not available yet", deploymentNamespace, deploymentName)
 			}
-			return fmt.Errorf("deployment %s/%s not available yet", deploymentNamespace, deploymentName)
+			for _, pod := range pods.Items {
+				deployment.Spec.Template.Labels["pod-template-hash"] = pod.Labels["pod-template-hash"]
+				fmt.Println(pod.Name, pod.Labels, deployment.Spec.Template.Labels)
+				if len(deployment.Spec.Template.Labels) != len(pod.Labels) {
+					return fmt.Errorf("pod %s/%s not match labels", pod.Namespace, pod.Name)
+				}
+				if pod.Status.Phase != corev1.PodRunning {
+					return fmt.Errorf("pod %s/%s not running yet", pod.Namespace, pod.Name)
+				}
+				for label, value := range deployment.Spec.Template.Labels {
+					if v, ok := pod.Labels[label]; !ok || v != value {
+						return fmt.Errorf("pod %s/%s not match label %s=%s", pod.Namespace, pod.Name, label, value)
+					}
+				}
+			}
+			return nil
 		},
 		retry.Context(timeoutCtx),
 		retry.Delay(5*time.Second),

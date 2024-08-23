@@ -13,12 +13,16 @@
 // limitations under the License.
 package setup
 
+import (
+	"context"
+)
+
 var Env TestEnv
 
 type TestEnv interface {
 	GetType() string
 	ExecOnLogtail(command string) error
-	ExecOnSource(command string) error
+	ExecOnSource(ctx context.Context, command string) error
 }
 
 func InitEnv(envType string) {
@@ -29,5 +33,12 @@ func InitEnv(envType string) {
 		Env = NewDaemonSetEnv()
 	case "docker-compose":
 		Env = NewDockerComposeEnv()
+	case "deployment":
+		Env = NewDeploymentEnv()
 	}
+}
+
+func Mkdir(ctx context.Context, dir string) (context.Context, error) {
+	command := "mkdir -p " + dir
+	return ctx, Env.ExecOnSource(ctx, command)
 }

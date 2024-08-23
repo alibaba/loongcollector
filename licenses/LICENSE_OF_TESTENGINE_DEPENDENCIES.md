@@ -104,8 +104,16 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/emicklei/go-restful](https://pkg.go.dev/github.com/emicklei/go-restful?tab=licenses)
 - [github.com/josharian/intern](https://pkg.go.dev/github.com/josharian/intern?tab=licenses)
 - [github.com/mailru/easyjson](https://pkg.go.dev/github.com/mailru/easyjson?tab=licenses)
+- [github.com/cucumber/gherkin/go](https://pkg.go.dev/github.com/cucumber/gherkin/go?tab=licenses)
+- [github.com/cucumber/godog](https://pkg.go.dev/github.com/cucumber/godog?tab=licenses)
+- [github.com/cucumber/messages/go](https://pkg.go.dev/github.com/cucumber/messages/go?tab=licenses)
+- [github.com/gofrs/uuid](https://pkg.go.dev/github.com/gofrs/uuid?tab=licenses)
 
 ## Mozilla Public License 2.0 licenses
+
+- [github.com/hashicorp/go-immutable-radix](https://pkg.go.dev/github.com/hashicorp/go-immutable-radix?tab=licenses)
+- [github.com/hashicorp/go-memdb](https://pkg.go.dev/github.com/hashicorp/go-memdb?tab=licenses)
+- [github.com/hashicorp/golang-lru](https://pkg.go.dev/github.com/hashicorp/golang-lru?tab=licenses)
 
 ## LGPL v3 licenses
 

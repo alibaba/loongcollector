@@ -28,7 +28,7 @@ Feature: input canal binfile mode
     """
     """
     Then there is at least {10} logs
-    Then the log fields match
+    Then the log fields match as below
     """
     - _db_
     - _gtid_

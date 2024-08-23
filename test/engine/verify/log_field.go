@@ -25,6 +25,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
+	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
@@ -44,7 +45,7 @@ func LogField(ctx context.Context, expectFieldStr string) (context.Context, erro
 	var groups []*protocol.LogGroup
 	err = retry.Do(
 		func() error {
-			groups, err = subscriber.TestSubscriber.GetData(from)
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
 			return err
 		},
 		retry.Context(timeoutCtx),
@@ -68,7 +69,7 @@ func LogField(ctx context.Context, expectFieldStr string) (context.Context, erro
 						goto find
 					}
 				}
-				return ctx, fmt.Errorf("want contains field %s, but not found", field)
+				return ctx, fmt.Errorf("want contains field %s, but not found, current: %s", field, log.Contents)
 			find:
 			}
 		}
@@ -92,7 +93,7 @@ func LogFieldKV(ctx context.Context, expectKeyValuesStr string) (context.Context
 	var groups []*protocol.LogGroup
 	err = retry.Do(
 		func() error {
-			groups, err = subscriber.TestSubscriber.GetData(from)
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
 			return err
 		},
 		retry.Context(timeoutCtx),

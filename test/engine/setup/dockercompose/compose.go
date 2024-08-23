@@ -113,11 +113,23 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
 	compose := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).WithCommand([]string{"up", "-d", "--build"})
 	strategyWrappers := withExposedService(compose)
-	execError := compose.Invoke()
-	if execError.Error != nil {
-		logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
-			"stdout", execError.Error.Error())
-		return execError.Error
+	// retry 3 times
+	for i := 0; i < 3; i++ {
+		execError := compose.Invoke()
+		if execError.Error == nil {
+			break
+		}
+		if i == 2 {
+			logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
+				"stdout", execError.Error.Error())
+			return execError.Error
+		}
+		execError = testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
+		if execError.Error != nil {
+			logger.Error(context.Background(), "DOWN_DOCKER_COMPOSE_ERROR",
+				"stdout", execError.Error.Error())
+			return execError.Error
+		}
 	}
 	cli, err := CreateDockerClient()
 	if err != nil {

@@ -31,7 +31,7 @@ Feature: input mssql
     Given iLogtail depends on containers {["setup"]}
     When start docker-compose {input_mssql}
     Then there is at least {4} logs
-    Then the log fields match
+    Then the log fields match as below
     """
     - id
     - name 

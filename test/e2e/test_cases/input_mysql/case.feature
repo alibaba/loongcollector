@@ -31,7 +31,7 @@ Feature: input mysql
     Given iLogtail depends on containers {["mysql"]}
     When start docker-compose {input_mysql}
     Then there is at least {500} logs
-    Then the log fields match
+    Then the log fields match as below
     """
     - help_keyword_id
     - name

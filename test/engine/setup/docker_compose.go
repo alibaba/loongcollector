@@ -113,6 +113,6 @@ func (d *DockerComposeEnv) ExecOnLogtail(command string) error {
 	return fmt.Errorf("not implemented")
 }
 
-func (d *DockerComposeEnv) ExecOnSource(command string) error {
+func (d *DockerComposeEnv) ExecOnSource(ctx context.Context, command string) error {
 	return fmt.Errorf("not implemented")
 }

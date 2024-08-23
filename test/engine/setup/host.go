@@ -42,7 +42,7 @@ func (h *HostEnv) ExecOnLogtail(command string) error {
 	return h.exec(command)
 }
 
-func (h *HostEnv) ExecOnSource(command string) error {
+func (h *HostEnv) ExecOnSource(ctx context.Context, command string) error {
 	return h.exec(command)
 }
 

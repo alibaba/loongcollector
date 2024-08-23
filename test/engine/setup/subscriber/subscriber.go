@@ -44,7 +44,7 @@ type Subscriber interface {
 	// Stop
 	Stop() error
 	// Get data
-	GetData(startTime int32) ([]*protocol.LogGroup, error)
+	GetData(sql string, startTime int32) ([]*protocol.LogGroup, error)
 	// FlusherConfig returns the default flusher config for Ilogtail container to transfer the received or self telemetry data.
 	FlusherConfig() string
 }

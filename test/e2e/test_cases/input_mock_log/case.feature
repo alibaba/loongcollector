@@ -23,7 +23,7 @@ Feature: input mock log
     """
     When start docker-compose {input_mock_log}
     Then there is at least {15} logs
-    Then the log fields match
+    Then the log fields match as below
     """
     - tag1
     - tag2

@@ -24,7 +24,7 @@ Feature: input prometheus
     """
     When start docker-compose {input_prometheus}
     Then there is at least {10} logs
-    Then the log fields match
+    Then the log fields match as below
     """
     - __name__
     - __labels__

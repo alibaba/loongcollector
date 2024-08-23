@@ -31,7 +31,7 @@ Feature: input pgsql
     Given iLogtail depends on containers {["pgsql"]}
     When start docker-compose {input_pgsql}
     Then there is at least {10} logs
-    Then the log fields match
+    Then the log fields match as below
     """
     - id
     - time 

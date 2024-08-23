@@ -24,14 +24,14 @@ Feature: input mock metric
     """
     When start docker-compose {input_mock_metric}
     Then there is at least {15} logs
-    Then the log fields match
+    Then the log fields match as below
     """
     - __labels__
     - __time_nano__
     - __value__
     - __name__
     """
-    Then the log labels match
+    Then the log labels match as below
     """
     - content
     - tag1

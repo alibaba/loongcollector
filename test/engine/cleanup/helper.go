@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup"
@@ -50,4 +51,5 @@ func All() {
 	if subscriber.TestSubscriber != nil {
 		_ = subscriber.TestSubscriber.Stop()
 	}
+	time.Sleep(5 * time.Second)
 }

@@ -3,7 +3,6 @@ package subscriber
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -21,19 +20,15 @@ const SLSFlusherConfigTemplate = `
 flushers:
   - Type: flusher_sls
     Aliuid: "{{.Aliuid}}"
-    TelemetryType: "logs"
+    TelemetryType: "{{.TelemetryType}}"
     Region: {{.Region}}
     Endpoint: {{.Endpoint}}
     Project: {{.Project}}
     Logstore: {{.Logstore}}`
 
-var SLSFlusherConfig string
-var SLSFlusherConfigOnce sync.Once
-
-const queryCountSQL = "* | SELECT * FROM log WHERE from_unixtime(__time__) >= from_unixtime(%v) AND from_unixtime(__time__) < now()"
-
 type SLSSubscriber struct {
-	client *sls.Client
+	client        *sls.Client
+	TelemetryType string
 }
 
 func (s *SLSSubscriber) Name() string {
@@ -44,8 +39,9 @@ func (s *SLSSubscriber) Description() string {
 	return "this a sls subscriber"
 }
 
-func (s *SLSSubscriber) GetData(startTime int32) ([]*protocol.LogGroup, error) {
-	resp, err := s.getLogFromSLS(fmt.Sprintf(queryCountSQL, startTime), startTime)
+func (s *SLSSubscriber) GetData(query string, startTime int32) ([]*protocol.LogGroup, error) {
+	query = s.getCompleteQuery(query)
+	resp, err := s.getLogFromSLS(query, startTime)
 	if err != nil {
 		return nil, err
 	}
@@ -66,23 +62,38 @@ func (s *SLSSubscriber) GetData(startTime int32) ([]*protocol.LogGroup, error) {
 }
 
 func (s *SLSSubscriber) FlusherConfig() string {
-	SLSFlusherConfigOnce.Do(func() {
-		tpl := template.Must(template.New("slsFlusherConfig").Parse(SLSFlusherConfigTemplate))
-		var builder strings.Builder
-		_ = tpl.Execute(&builder, map[string]interface{}{
-			"Aliuid":   config.TestConfig.Aliuid,
-			"Region":   config.TestConfig.Region,
-			"Endpoint": config.TestConfig.Endpoint,
-			"Project":  config.TestConfig.Project,
-			"Logstore": config.TestConfig.Logstore,
-		})
-		SLSFlusherConfig = builder.String()
+	tpl := template.Must(template.New("slsFlusherConfig").Parse(SLSFlusherConfigTemplate))
+	var builder strings.Builder
+	_ = tpl.Execute(&builder, map[string]interface{}{
+		"Aliuid":        config.TestConfig.Aliuid,
+		"Region":        config.TestConfig.Region,
+		"Endpoint":      config.TestConfig.Endpoint,
+		"Project":       config.TestConfig.Project,
+		"Logstore":      config.TestConfig.GetLogstore(s.TelemetryType),
+		"TelemetryType": s.TelemetryType,
 	})
-	return SLSFlusherConfig
+	config := builder.String()
+	return config
 }
 
 func (s *SLSSubscriber) Stop() error {
 	return nil
+}
+
+func (s *SLSSubscriber) getCompleteQuery(query string) string {
+	if query == "" {
+		return "*"
+	}
+	switch s.TelemetryType {
+	case "logs":
+		return query
+	case "metrics":
+		return fmt.Sprintf("* | select promql_query_range('%s') from metrics limit 10000", query)
+	case "traces":
+		return query
+	default:
+		return query
+	}
 }
 
 func (s *SLSSubscriber) getLogFromSLS(sql string, from int32) (*sls.GetLogsResponse, error) {
@@ -90,17 +101,18 @@ func (s *SLSSubscriber) getLogFromSLS(sql string, from int32) (*sls.GetLogsRespo
 	if now == from {
 		now++
 	}
+	fmt.Println("get logs from sls with sql", sql, "from", from, "to", now, "in", config.TestConfig.GetLogstore(s.TelemetryType))
 	req := &sls.GetLogsRequest{
 		Query: tea.String(sql),
 		From:  tea.Int32(from),
 		To:    tea.Int32(now),
 	}
-	resp, err := s.client.GetLogs(tea.String(config.TestConfig.Project), tea.String(config.TestConfig.Logstore), req)
+	resp, err := s.client.GetLogs(tea.String(config.TestConfig.Project), tea.String(config.TestConfig.GetLogstore(s.TelemetryType)), req)
 	if err != nil {
 		return nil, err
 	}
 	if len(resp.Body) == 0 {
-		return nil, fmt.Errorf("failed to get logs with sql %s, no log", sql)
+		return nil, fmt.Errorf("failed to get logs with sql %s from %v, no log", sql, from)
 	}
 	return resp, nil
 }
@@ -117,10 +129,16 @@ func createSLSClient(accessKeyID, accessKeySecret, endpoint string) *sls.Client 
 
 func init() {
 	RegisterCreator(slsName, func(spec map[string]interface{}) (Subscriber, error) {
+		telemetryType := "logs"
+		if v, ok := spec["telemetry_type"]; ok {
+			telemetryType = v.(string)
+		}
+		fmt.Println("create sls subscriber with telemetry type", telemetryType)
 		l := &SLSSubscriber{
-			client: createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, config.TestConfig.QueryEndpoint),
+			client:        createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, config.TestConfig.QueryEndpoint),
+			TelemetryType: telemetryType,
 		}
 		return l, nil
 	})
-	doc.Register("subscriber", lokiName, new(LokiSubscriber))
+	doc.Register("subscriber", slsName, new(SLSSubscriber))
 }

@@ -23,7 +23,7 @@ import (
 
 func AllGeneratedLog(ctx context.Context) (context.Context, error) {
 	command := fmt.Sprintf("rm -rf %s/*", config.TestConfig.GeneratedLogDir)
-	if err := setup.Env.ExecOnSource(command); err != nil {
+	if err := setup.Env.ExecOnSource(ctx, command); err != nil {
 		return ctx, err
 	}
 	return ctx, nil

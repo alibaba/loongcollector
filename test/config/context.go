@@ -16,8 +16,10 @@ package config
 type ContextKey string
 
 const (
-	StartTimeContextKey  ContextKey = "startTime"
-	DependOnContainerKey ContextKey = "dependOnContainer"
-	MountVolumeKey       ContextKey = "mountVolume"
-	ExposePortKey        ContextKey = "exposePort"
+	StartTimeContextKey         ContextKey = "startTime"
+	DependOnContainerKey        ContextKey = "dependOnContainer"
+	MountVolumeKey              ContextKey = "mountVolume"
+	ExposePortKey               ContextKey = "exposePort"
+	CurrentWorkingDeploymentKey ContextKey = "currentWorkingDeployment"
+	QueryKey                    ContextKey = "query"
 )

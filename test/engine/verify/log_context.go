@@ -24,6 +24,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
+	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
@@ -49,7 +50,7 @@ func LogContext(ctx context.Context) (context.Context, error) {
 	var groups []*protocol.LogGroup
 	err = retry.Do(
 		func() error {
-			groups, err = subscriber.TestSubscriber.GetData(from)
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
 			return err
 		},
 		retry.Context(timeoutCtx),

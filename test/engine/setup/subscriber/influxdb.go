@@ -55,7 +55,7 @@ func (i *InfluxdbSubscriber) Description() string {
 	return "this's a influxdb subscriber, which will query inserted records from influxdb periodically."
 }
 
-func (i *InfluxdbSubscriber) GetData(startTime int32) ([]*protocol.LogGroup, error) {
+func (i *InfluxdbSubscriber) GetData(_ string, startTime int32) ([]*protocol.LogGroup, error) {
 	host, err := TryReplacePhysicalAddress(i.DbHost)
 	if err != nil {
 		return nil, err

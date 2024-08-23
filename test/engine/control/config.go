@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	global_config "github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -58,6 +59,7 @@ func AddLocalConfig(ctx context.Context, configName, c string) (context.Context,
 		if err := setup.Env.ExecOnLogtail(command); err != nil {
 			return ctx, err
 		}
+		time.Sleep(5 * time.Second)
 	}
 	return ctx, nil
 }

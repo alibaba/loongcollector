@@ -53,7 +53,7 @@ func (i *ElasticSearchSubscriber) Description() string {
 	return "this's a elasticsearch subscriber, which will query inserted records from elasticsearch periodically."
 }
 
-func (i *ElasticSearchSubscriber) GetData(startTime int32) ([]*protocol.LogGroup, error) {
+func (i *ElasticSearchSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
 	host, err := TryReplacePhysicalAddress(i.Address)
 	if err != nil {
 		return nil, err

@@ -22,6 +22,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
+	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
@@ -41,7 +42,7 @@ func LogCount(ctx context.Context, expect int) (context.Context, error) {
 	err = retry.Do(
 		func() error {
 			count = 0
-			groups, err = subscriber.TestSubscriber.GetData(from)
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
 			if err != nil {
 				return err
 			}
@@ -49,10 +50,49 @@ func LogCount(ctx context.Context, expect int) (context.Context, error) {
 				count += len(group.Logs)
 			}
 			if count != expect {
-				return fmt.Errorf("log count not match, expect %d, got %d", expect, count)
+				return fmt.Errorf("log count not match, expect %d, got %d, from %d", expect, count, from)
 			}
 			if expect == 0 {
 				return fmt.Errorf("log count is 0")
+			}
+			return nil
+		},
+		retry.Context(timeoutCtx),
+		retry.Delay(5*time.Second),
+		retry.DelayType(retry.FixedDelay),
+	)
+	if expect == 0 && count == expect {
+		return ctx, nil
+	}
+	if err != nil {
+		return ctx, err
+	}
+	return ctx, nil
+}
+
+func MetricCount(ctx context.Context, expect int, duration int64) (context.Context, error) {
+	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
+	defer cancel()
+	var groups []*protocol.LogGroup
+	var err error
+	var count int
+	err = retry.Do(
+		func() error {
+			count = 0
+			currTime := time.Now().Unix()
+			lastScrapeTime := int32(currTime - duration)
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), lastScrapeTime)
+			if err != nil {
+				return err
+			}
+			for _, group := range groups {
+				count += len(group.Logs)
+			}
+			if count < expect {
+				return fmt.Errorf("metric count not match, expect %d, got %d, from %d", expect, count, lastScrapeTime)
+			}
+			if expect == 0 {
+				return fmt.Errorf("metric count is 0")
 			}
 			return nil
 		},
@@ -85,7 +125,7 @@ func LogCountAtLeast(ctx context.Context, expect int) (context.Context, error) {
 	err = retry.Do(
 		func() error {
 			count = 0
-			groups, err = subscriber.TestSubscriber.GetData(from)
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
 			if err != nil {
 				return err
 			}
@@ -113,7 +153,7 @@ func LogCountAtLeast(ctx context.Context, expect int) (context.Context, error) {
 	return ctx, nil
 }
 
-func LogCountAtLeastWithFilter(ctx context.Context, expect int, filterKey string, filterValue string) (context.Context, error) {
+func LogCountAtLeastWithFilter(ctx context.Context, sql string, expect int, filterKey string, filterValue string) (context.Context, error) {
 	var from int32
 	value := ctx.Value(config.StartTimeContextKey)
 	if value != nil {
@@ -129,7 +169,7 @@ func LogCountAtLeastWithFilter(ctx context.Context, expect int, filterKey string
 	err = retry.Do(
 		func() error {
 			count = 0
-			groups, err = subscriber.TestSubscriber.GetData(from)
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
 			if err != nil {
 				return err
 			}

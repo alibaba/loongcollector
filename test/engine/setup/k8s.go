@@ -15,6 +15,7 @@ package setup
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -46,6 +47,14 @@ func NewDaemonSetEnv() *K8sEnv {
 	return env
 }
 
+func NewDeploymentEnv() *K8sEnv {
+	env := &K8sEnv{
+		deployType: "deployment",
+	}
+	env.init()
+	return env
+}
+
 func (k *K8sEnv) GetType() string {
 	return k.deployType
 }
@@ -54,9 +63,18 @@ func (k *K8sEnv) ExecOnLogtail(command string) error {
 	if k.k8sClient == nil {
 		return fmt.Errorf("k8s client init failed")
 	}
-	pods, err := k.daemonsetController.GetDaemonSetPods("logtail-ds", "kube-system")
-	if err != nil {
-		return err
+	var pods *corev1.PodList
+	var err error
+	if k.deployType == "daemonset" {
+		pods, err = k.daemonsetController.GetDaemonSetPods("logtail-ds", "kube-system")
+		if err != nil {
+			return err
+		}
+	} else if k.deployType == "deployment" {
+		pods, err = k.deploymentController.GetRunningDeploymentPods("cluster-agent", "loong-collector")
+		if err != nil {
+			return err
+		}
 	}
 	for _, pod := range pods.Items {
 		if err := k.execInPod(k.config, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, []string{"bash", "-c", command}); err != nil {
@@ -66,11 +84,15 @@ func (k *K8sEnv) ExecOnLogtail(command string) error {
 	return nil
 }
 
-func (k *K8sEnv) ExecOnSource(command string) error {
+func (k *K8sEnv) ExecOnSource(ctx context.Context, command string) error {
 	if k.k8sClient == nil {
 		return fmt.Errorf("k8s client init failed")
 	}
-	pods, err := k.deploymentController.GetDeploymentPods("e2e-generator", "default")
+	deploymentName := "e2e-generator"
+	if ctx.Value(config.CurrentWorkingDeploymentKey) != nil {
+		deploymentName = ctx.Value(config.CurrentWorkingDeploymentKey).(string)
+	}
+	pods, err := k.deploymentController.GetRunningDeploymentPods(deploymentName, "default")
 	if err != nil {
 		return err
 	}
@@ -79,6 +101,7 @@ func (k *K8sEnv) ExecOnSource(command string) error {
 		return err
 	}
 	pod := pods.Items[randomIndex.Int64()]
+	fmt.Println("exec on pod: ", pod.Name)
 	if err := k.execInPod(k.config, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, []string{"sh", "-c", command}); err != nil {
 		return err
 	}
@@ -91,6 +114,10 @@ func (k *K8sEnv) AddFilter(filter controller.ContainerFilter) error {
 
 func (k *K8sEnv) RemoveFilter(filter controller.ContainerFilter) error {
 	return k.deploymentController.RemoveFilter("e2e-generator", filter)
+}
+
+func SwitchCurrentWorkingDeployment(ctx context.Context, deploymentName string) (context.Context, error) {
+	return context.WithValue(ctx, config.CurrentWorkingDeploymentKey, deploymentName), nil
 }
 
 func (k *K8sEnv) init() {

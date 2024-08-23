@@ -55,7 +55,7 @@ func (i *ClickHouseSubscriber) Description() string {
 	return "this's a clickhouse subscriber, which will query inserted records from clickhouse periodically."
 }
 
-func (i *ClickHouseSubscriber) GetData(startTime int32) ([]*protocol.LogGroup, error) {
+func (i *ClickHouseSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
 	host, err := TryReplacePhysicalAddress(i.Address)
 	if err != nil {
 		return nil, err

@@ -4,6 +4,8 @@ iLogtail提供了一个完整的E2E测试引擎，方便您快速开展集成测
 
 ## 目前支持的测试行为
 
+可以参考 `test/engine/steps.go` 中的定义，目前支持的测试行为如下：
+
 | 行为类型 | 模板 | 参数 | 说明 |
 | --- | --- | --- | --- |
 | Given | ^\{(\S+)\} environment$ | 环境类型 | 初始化远程测试环境 |
@@ -59,7 +61,7 @@ return context.WithValue(ctx, key, value), nil
 
 ### 2. 注册行为函数
 
-在`test/cases/core/main_test.go`中，您需要注册您的行为函数。注册函数的格式如下所示：
+在`test/engine/steps.go`中，您需要注册您的行为函数。注册函数的格式如下所示：
 
 ```go
 func scenarioInitializer(ctx *godog.ScenarioContext) {

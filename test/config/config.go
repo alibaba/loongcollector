@@ -13,7 +13,13 @@
 // limitations under the License.
 package config
 
-import "time"
+import (
+	"os"
+	"strconv"
+	"time"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+)
 
 var TestConfig Config
 
@@ -33,6 +39,7 @@ type Config struct {
 	// SLS
 	Project         string        `mapstructure:"project" yaml:"project"`
 	Logstore        string        `mapstructure:"logstore" yaml:"logstore"`
+	MetricStore     string        `mapstructure:"metric_store" yaml:"metric_store"`
 	AccessKeyID     string        `mapstructure:"access_key_id" yaml:"access_key_id"`
 	AccessKeySecret string        `mapstructure:"access_key_secret" yaml:"access_key_secret"`
 	Endpoint        string        `mapstructure:"endpoint" yaml:"endpoint"`
@@ -40,4 +47,51 @@ type Config struct {
 	QueryEndpoint   string        `mapstructure:"query_endpoint" yaml:"query_endpoint"`
 	Region          string        `mapstructure:"region" yaml:"region"`
 	RetryTimeout    time.Duration `mapstructure:"retry_timeout" yaml:"retry_timeout"`
+}
+
+func (s *Config) GetLogstore(telemetryType string) string {
+	if s != nil && telemetryType == "metrics" {
+		return s.MetricStore
+	}
+	return s.Logstore
+}
+
+func ParseConfig() {
+	loggerOptions := []logger.ConfigOption{
+		logger.OptionAsyncLogger,
+	}
+	loggerOptions = append(loggerOptions, logger.OptionInfoLevel)
+	logger.InitTestLogger(loggerOptions...)
+
+	TestConfig = Config{}
+	// Log
+	TestConfig.GeneratedLogDir = os.Getenv("GENERATED_LOG_DIR")
+	if len(TestConfig.GeneratedLogDir) == 0 {
+		TestConfig.GeneratedLogDir = "/tmp/ilogtail"
+	}
+	TestConfig.WorkDir = os.Getenv("WORK_DIR")
+
+	// SSH
+	TestConfig.SSHUsername = os.Getenv("SSH_USERNAME")
+	TestConfig.SSHIP = os.Getenv("SSH_IP")
+	TestConfig.SSHPassword = os.Getenv("SSH_PASSWORD")
+
+	// K8s
+	TestConfig.KubeConfigPath = os.Getenv("KUBE_CONFIG_PATH")
+
+	// SLS
+	TestConfig.Project = os.Getenv("PROJECT")
+	TestConfig.Logstore = os.Getenv("LOGSTORE")
+	TestConfig.MetricStore = os.Getenv("METRIC_STORE")
+	TestConfig.AccessKeyID = os.Getenv("ACCESS_KEY_ID")
+	TestConfig.AccessKeySecret = os.Getenv("ACCESS_KEY_SECRET")
+	TestConfig.Endpoint = os.Getenv("ENDPOINT")
+	TestConfig.Aliuid = os.Getenv("ALIUID")
+	TestConfig.QueryEndpoint = os.Getenv("QUERY_ENDPOINT")
+	TestConfig.Region = os.Getenv("REGION")
+	timeout, err := strconv.ParseInt(os.Getenv("RETRY_TIMEOUT"), 10, 64)
+	if err != nil {
+		timeout = 60
+	}
+	TestConfig.RetryTimeout = time.Duration(timeout) * time.Second
 }

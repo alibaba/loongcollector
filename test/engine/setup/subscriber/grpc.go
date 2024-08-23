@@ -52,7 +52,7 @@ type GRPCService struct {
 	protocol.UnimplementedLogReportServiceServer
 }
 
-func (g *GrpcSubscriber) GetData(int32) ([]*protocol.LogGroup, error) {
+func (g *GrpcSubscriber) GetData(string, int32) ([]*protocol.LogGroup, error) {
 	for {
 		select {
 		case logGroup, ok := <-g.channel:

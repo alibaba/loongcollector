@@ -30,7 +30,7 @@ Feature: input http
     """
     When start docker-compose {input_http}
     Then there is at least {4} logs
-    Then the log fields match
+    Then the log fields match as below
     """
     - _method_
     - _address_

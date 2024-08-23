@@ -76,7 +76,7 @@ func (l *LokiSubscriber) Description() string {
 	return "this a loki subscriber, which is the default mock backend for Ilogtail."
 }
 
-func (l *LokiSubscriber) GetData(startTime int32) ([]*protocol.LogGroup, error) {
+func (l *LokiSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
 	host, err := TryReplacePhysicalAddress(l.Address)
 	if err != nil {
 		return nil, err
