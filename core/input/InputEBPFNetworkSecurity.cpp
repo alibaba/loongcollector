@@ -35,7 +35,7 @@ bool InputEBPFNetworkSecurity::Init(const Json::Value& config, Json::Value& opti
         return false;
     }
 
-    return mSecurityOptions.Init(ebpf::SecurityFilterType::NETWORK, config, mContext, sName);
+    return mSecurityOptions.Init(ebpf::SecurityProbeType::NETWORK, config, mContext, sName);
 }
 
 bool InputEBPFNetworkSecurity::Start() {

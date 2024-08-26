@@ -30,7 +30,7 @@ bool InputEBPFProcessSecurity::Init(const Json::Value& config, Json::Value& opti
         LOG_WARNING(sLogger, ("pipeline already loaded", "PROCESS_SECURITY")("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
         return false;
     }
-    return mSecurityOptions.Init(ebpf::SecurityFilterType::PROCESS, config, mContext, sName);
+    return mSecurityOptions.Init(ebpf::SecurityProbeType::PROCESS, config, mContext, sName);
 }
 
 bool InputEBPFProcessSecurity::Start() {

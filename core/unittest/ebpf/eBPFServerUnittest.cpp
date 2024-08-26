@@ -574,31 +574,23 @@ void eBPFServerUnittest::TestEnableProcessPlugin() {
             "Type": "input_ebpf_processprobe_security",
             "ProbeConfig": [
                 {
-                    "NamespaceFilter": [
-                        {
-                            "NamespaceType": "Pid",
-                            "ValueList": [
-                                "4026531833"
-                            ]
-                        },
-                        {
-                            "NamespaceType": "Mnt",
-                            "ValueList": [
-                                "4026531834"
-                            ]
-                        }
+                    "CallNameFilter": [
+                        "sys_enter_execve",
+                        "disassociate_ctty",
+                        "acct_process",
+                        "wake_up_new_task"
                     ]
                 }
             ]
         }
     )";
-    
+
     std::string errorMsg;
     Json::Value configJson;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     std::cout << "1" << std::endl;
     SecurityOptions security_options;
-    security_options.Init(SecurityFilterType::PROCESS, configJson, &ctx, "input_ebpf_processprobe_security");
+    security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "input_ebpf_processprobe_security");
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
         "test", 0,
         nami::PluginType::PROCESS_SECURITY,
@@ -612,11 +604,7 @@ void eBPFServerUnittest::TestEnableProcessPlugin() {
     EXPECT_TRUE(process_conf.process_security_cb_ != nullptr);
     LOG_WARNING(sLogger, ("process_conf.options_ size", process_conf.options_.size()));
     EXPECT_EQ(process_conf.options_.size(), 1);
-    EXPECT_EQ(process_conf.options_[0].call_names_.size(), 0);
-    auto filter = std::get<nami::SecurityProcessFilter>(process_conf.options_[0].filter_);
-    LOG_WARNING(sLogger, ("get filter", filter.mNamespaceFilter.size()));
-    EXPECT_EQ(filter.mNamespaceFilter.size(), 2);
-    EXPECT_EQ(filter.mNamespaceBlackFilter.size(), 0);
+    EXPECT_EQ(process_conf.options_[0].call_names_.size(), 4);
 
     // do suspend
     ebpf::eBPFServer::GetInstance()->SuspendPlugin("test", nami::PluginType::PROCESS_SECURITY);
@@ -646,7 +634,7 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
             "Type": "input_ebpf_sockettraceprobe_security",
             "ProbeConfig": [
                 {
-                    "CallName": ["tcp_connect", "tcp_close"],
+                    "CallNameFilter": ["tcp_connect", "tcp_close"],
                     "AddrFilter": {
                         "DestAddrList": ["10.0.0.0/8","92.168.0.0/16"],
                         "DestPortList": [80],
@@ -655,7 +643,7 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
                     }
                 },
                 {
-                    "CallName": ["tcp_sendmsg"],
+                    "CallNameFilter": ["tcp_sendmsg"],
                     "AddrFilter": {
                         "DestAddrList": ["10.0.0.0/8","92.168.0.0/16"],
                         "DestPortList": [80]
@@ -669,7 +657,7 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
     Json::Value configJson;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     SecurityOptions security_options;
-    security_options.Init(SecurityFilterType::NETWORK, configJson, &ctx, "input_ebpf_sockettraceprobe_security");
+    security_options.Init(SecurityProbeType::NETWORK, configJson, &ctx, "input_ebpf_sockettraceprobe_security");
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
         "input_ebpf_sockettraceprobe_security", 5,
         nami::PluginType::NETWORK_SECURITY,
@@ -718,37 +706,29 @@ void eBPFServerUnittest::TestEnableFileSecurePlugin() {
             "Type": "input_ebpf_fileprobe_security",
             "ProbeConfig": [
                 {
-                    "CallName": ["security_file_permission"],
+                    "CallNameFilter": ["security_file_permission"],
                     "FilePathFilter": [
-                        {
-                            "FilePath": "/etc",
-                            "FileName": "passwd"
-                        },
-                        {
-                            "FilePath": "/etc",
-                            "FileName": "shadow"
-                        },
-                        {
-                            "FilePath": "/bin"
-                        }
+                        "/etc/passwd",
+                        "/etc/shadow",
+                        "/bin"
                     ]
                 }
             ]
         }
     )";
-    
+
     std::string errorMsg;
     Json::Value configJson;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     std::cout << "1" << std::endl;
     SecurityOptions security_options;
-    security_options.Init(SecurityFilterType::FILE, configJson, &ctx, "input_ebpf_fileprobe_security");
+    security_options.Init(SecurityProbeType::FILE, configJson, &ctx, "input_ebpf_fileprobe_security");
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
         "input_ebpf_fileprobe_security", 0,
         nami::PluginType::FILE_SECURITY,
         &ctx,
         &security_options);
-    EXPECT_EQ(std::get<nami::SecurityFileFilter>(security_options.mOptionList[0].filter_).mFileFilterItem.size(), 3);
+    EXPECT_EQ(std::get<nami::SecurityFileFilter>(security_options.mOptionList[0].filter_).mFilePathList.size(), 3);
     EXPECT_TRUE(res);
     auto conf = ebpf::eBPFServer::GetInstance()->mSourceManager->mConfig;
     EXPECT_EQ(conf->plugin_type_, nami::PluginType::FILE_SECURITY);
@@ -758,9 +738,9 @@ void eBPFServerUnittest::TestEnableFileSecurePlugin() {
     EXPECT_EQ(inner_conf.options_.size(), 1);
     EXPECT_EQ(inner_conf.options_[0].call_names_.size(), 1);
     auto filter = std::get<nami::SecurityFileFilter>(inner_conf.options_[0].filter_);
-    EXPECT_EQ(filter.mFileFilterItem.size(), 3);
-    EXPECT_EQ(filter.mFileFilterItem[0].mFileName, "passwd");
-    EXPECT_EQ(filter.mFileFilterItem[0].mFilePath, "/etc");
+    EXPECT_EQ(filter.mFilePathList.size(), 3);
+    EXPECT_EQ(filter.mFilePathList[0], "/etc/passwd");
+    EXPECT_EQ(filter.mFilePathList[1], "/etc/shadow");
 
     // do suspend
     ebpf::eBPFServer::GetInstance()->SuspendPlugin("test", nami::PluginType::FILE_SECURITY);

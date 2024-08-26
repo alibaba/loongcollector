@@ -1,8 +1,8 @@
-# iuput_ebpf_network_observer 插件
+# input_ebpf_network_observer 插件
 
 ## 简介
 
-`iuput_ebpf_network_observer`插件可以实现利用ebpf探针采集网络可观测数据。
+`input_ebpf_network_observer`插件可以实现利用ebpf探针采集网络可观测数据。
 
 ## 版本
 
@@ -12,7 +12,7 @@
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Type  |  string  |  是  |  /  |  插件类型。固定为iuput\_ebpf\_network\_observer  |
+|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_ebpf\_network\_observer  |
 |  ProbeConfig  |  object  |  是  |  /  |  插件配置参数列表  |
 |  ProbeConfig.EnableProtocols  |  \[string\]  |  否  |  空  |  允许的协议类型  |
 |  ProbeConfig.DisableProtocolParse  |  bool  |  否  |  false  |  TODO  |

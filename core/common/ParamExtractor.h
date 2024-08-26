@@ -148,6 +148,58 @@ bool GetOptionalListParam(const Json::Value& config,
 }
 
 template <class T>
+bool GetOptionalListFilterParam(const Json::Value& config,
+                                const std::string& key,
+                                std::vector<T>& param,
+                                std::string& errorMsg) {
+    errorMsg.clear();
+    std::string currentKey = ExtractCurrentKey(key);
+    const Json::Value* itr = config.find(currentKey.c_str(), currentKey.c_str() + currentKey.length());
+    if (itr) {
+        if (!itr->isArray()) {
+            errorMsg = "param " + key + " is not of type list";
+            return false;
+        }
+        for (auto it = itr->begin(); it != itr->end(); ++it) {
+            if constexpr (std::is_same_v<T, bool>) {
+                if (!it->isBool()) {
+                    errorMsg = "element in list param " + key + " is not of type bool";
+                    param.clear();
+                    return false;
+                }
+                param.emplace_back(it->asBool());
+            } else if constexpr (std::is_same_v<T, uint32_t>) {
+                if (!it->isUInt()) {
+                    errorMsg = "element in list param " + key + " is not of type uint";
+                    param.clear();
+                    return false;
+                }
+                param.emplace_back(it->asUInt());
+            } else if constexpr (std::is_same_v<T, int32_t>) {
+                if (!it->isInt()) {
+                    errorMsg = "element in list param " + key + " is not of type int";
+                    param.clear();
+                    return false;
+                }
+                param.emplace_back(it->asInt());
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                if (!it->isString()) {
+                    errorMsg = "element in list param " + key + " is not of type string";
+                    param.clear();
+                    return false;
+                }
+                param.emplace_back(it->asString());
+            } else {
+                errorMsg = "element in list param " + key + " is not supported";
+                param.clear();
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+template <class T>
 bool GetOptionalMapParam(const Json::Value& config,
                          const std::string& key,
                          std::unordered_map<std::string, T>& param,

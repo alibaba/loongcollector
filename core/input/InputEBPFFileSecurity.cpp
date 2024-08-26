@@ -32,7 +32,7 @@ bool InputEBPFFileSecurity::Init(const Json::Value& config, Json::Value& optiona
         LOG_WARNING(sLogger, ("pipeline already loaded", "FILE_SECURITY")("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
         return false;
     }
-    return mSecurityOptions.Init(ebpf::SecurityFilterType::FILE, config, mContext, sName);
+    return mSecurityOptions.Init(ebpf::SecurityProbeType::FILE, config, mContext, sName);
 }
 
 bool InputEBPFFileSecurity::Start() {

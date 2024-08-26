@@ -39,8 +39,11 @@ DEFINE_FLAG_BOOL(ebpf_process_probe_config_enable_oom_detect, "if ebpf process p
 namespace logtail {
 namespace ebpf {
 
-//////
-bool IsProcessNamespaceFilterTypeValid(const std::string& type);
+static const std::unordered_map<SecurityProbeType, std::unordered_set<std::string>> callNameDict
+    = {{SecurityProbeType::PROCESS,
+        {"sys_enter_execve", "sys_enter_clone", "disassociate_ctty", "acct_process", "wake_up_new_task"}},
+       {SecurityProbeType::FILE, {"security_file_permission", "security_file_mmap", "security_path_truncate"}},
+       {SecurityProbeType::NETWORK, {"tcp_connect", "tcp_close", "tcp_sendmsg"}}};
 
 bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                                nami::ObserverNetworkOption& thisObserverNetworkOption,
@@ -150,27 +153,55 @@ bool InitObserverNetworkOption(const Json::Value& config,
     return InitObserverNetworkOptionInner(probeConfig, thisObserverNetworkOption, mContext, sName);
 }
 
-//////
-bool InitSecurityFileFilter(const Json::Value& config,
+void InitSecurityFileFilter(const Json::Value& config,
                             nami::SecurityFileFilter& thisFileFilter,
                             const PipelineContext* mContext,
                             const std::string& sName) {
     std::string errorMsg;
-    for (auto& fileFilterItem : config["FilePathFilter"]) {
-        nami::SecurityFileFilterItem thisFileFilterItem;
-        // FilePath (Mandatory)
-        if (!GetMandatoryStringParam(fileFilterItem, "FilePath", thisFileFilterItem.mFilePath, errorMsg)) {
-            PARAM_ERROR_RETURN(mContext->GetLogger(),
-                               mContext->GetAlarm(),
-                               errorMsg,
-                               sName,
-                               mContext->GetConfigName(),
-                               mContext->GetProjectName(),
-                               mContext->GetLogstoreName(),
-                               mContext->GetRegion());
-        }
-        // FileName (Optional)
-        if (!GetOptionalStringParam(fileFilterItem, "FileName", thisFileFilterItem.mFileName, errorMsg)) {
+    // FilePathFilter (Optional)
+    if (!config.isMember("FilePathFilter")) {
+        // No FilePathFilter, do nothing, no warning
+    } else if (!config["FilePathFilter"].isArray()) {
+        // FilePathFilter is not empty but of wrong type
+        errorMsg = "FilePathFilter is not of type list";
+    } else if (!GetOptionalListFilterParam<std::string>(
+                   config, "FilePathFilter", thisFileFilter.mFilePathList, errorMsg)) {
+        // FilePathFilter has element of wrong type
+    }
+    if (!errorMsg.empty()) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+}
+
+void InitSecurityNetworkFilter(const Json::Value& config,
+                               nami::SecurityNetworkFilter& thisNetworkFilter,
+                               const PipelineContext* mContext,
+                               const std::string& sName) {
+    std::string errorMsg;
+    // AddrFilter (Optional)
+    if (!config.isMember("AddrFilter")) {
+        // No AddrFilter, do nothing
+    } else if (!config["AddrFilter"].isObject()) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             "AddrFilter is not of type map",
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    } else {
+        auto addrFilterConfig = config["AddrFilter"];
+        // DestAddrList (Optional)
+        if (!GetOptionalListFilterParam<std::string>(
+                addrFilterConfig, "DestAddrList", thisNetworkFilter.mDestAddrList, errorMsg)) {
             PARAM_WARNING_IGNORE(mContext->GetLogger(),
                                  mContext->GetAlarm(),
                                  errorMsg,
@@ -180,126 +211,140 @@ bool InitSecurityFileFilter(const Json::Value& config,
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
         }
-        thisFileFilter.mFileFilterItem.emplace_back(thisFileFilterItem);
-    }
-    return true;
-}
-
-bool InitSecurityProcessFilter(const Json::Value& config,
-                               nami::SecurityProcessFilter& thisProcessFilter,
-                               const PipelineContext* mContext,
-                               const std::string& sName) {
-    std::string errorMsg;
-    // NamespaceFilter (Optional)
-    if (config.isMember("NamespaceFilter")) {
-        if (!config["NamespaceFilter"].isArray()) {
+        // DestPortList (Optional)
+        if (!GetOptionalListFilterParam<uint32_t>(
+                addrFilterConfig, "DestPortList", thisNetworkFilter.mDestPortList, errorMsg)) {
             PARAM_WARNING_IGNORE(mContext->GetLogger(),
                                  mContext->GetAlarm(),
-                                 "NamespaceFilter is not of type list",
+                                 errorMsg,
                                  sName,
                                  mContext->GetConfigName(),
                                  mContext->GetProjectName(),
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
-        } else {
-            for (auto& namespaceFilterConfig : config["NamespaceFilter"]) {
-                nami::SecurityProcessNamespaceFilter thisProcessNamespaceFilter;
-                // NamespaceType (Mandatory)
-                if (!GetMandatoryStringParam(
-                        namespaceFilterConfig, "NamespaceType", thisProcessNamespaceFilter.mNamespaceType, errorMsg)
-                    || !IsProcessNamespaceFilterTypeValid(thisProcessNamespaceFilter.mNamespaceType)) {
-                    PARAM_ERROR_RETURN(mContext->GetLogger(),
-                                       mContext->GetAlarm(),
-                                       errorMsg,
-                                       sName,
-                                       mContext->GetConfigName(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetLogstoreName(),
-                                       mContext->GetRegion());
-                }
-                // ValueList (Mandatory)
-                if (!GetMandatoryListParam<std::string>(
-                        namespaceFilterConfig, "ValueList", thisProcessNamespaceFilter.mValueList, errorMsg)) {
-                    PARAM_ERROR_RETURN(mContext->GetLogger(),
-                                       mContext->GetAlarm(),
-                                       errorMsg,
-                                       sName,
-                                       mContext->GetConfigName(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetLogstoreName(),
-                                       mContext->GetRegion());
-                }
-                thisProcessFilter.mNamespaceFilter.emplace_back(thisProcessNamespaceFilter);
-            }
         }
-    }
-
-    // NamespaceBlackFilter (Optional)
-    if (config.isMember("NamespaceBlackFilter")) {
-        // 如果用户两个filter都配置了，不去显式阻塞流水线，但是会打印警告并只执行白名单
-        if (config.isMember("NamespaceFilter")) {
-            PARAM_WARNING_IGNORE(
-                mContext->GetLogger(),
-                mContext->GetAlarm(),
-                "Both NamespaceFilter and NamespaceBlackFilter are configured, only NamespaceFilter will be executed",
-                sName,
-                mContext->GetConfigName(),
-                mContext->GetProjectName(),
-                mContext->GetLogstoreName(),
-                mContext->GetRegion());
-        } else if (!config["NamespaceBlackFilter"].isArray()) {
+        // DestAddrBlackList (Optional)
+        if (!GetOptionalListFilterParam<std::string>(
+                addrFilterConfig, "DestAddrBlackList", thisNetworkFilter.mDestAddrBlackList, errorMsg)) {
             PARAM_WARNING_IGNORE(mContext->GetLogger(),
                                  mContext->GetAlarm(),
-                                 "NamespaceBlackFilter is not of type list",
+                                 errorMsg,
                                  sName,
                                  mContext->GetConfigName(),
                                  mContext->GetProjectName(),
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
-        } else {
-            for (auto& namespaceBlackFilterConfig : config["NamespaceBlackFilter"]) {
-                nami::SecurityProcessNamespaceFilter thisProcessNamespaceFilter;
-                // NamespaceType (Mandatory)
-                if (!GetMandatoryStringParam(namespaceBlackFilterConfig,
-                                             "NamespaceType",
-                                             thisProcessNamespaceFilter.mNamespaceType,
-                                             errorMsg)
-                    || !IsProcessNamespaceFilterTypeValid(thisProcessNamespaceFilter.mNamespaceType)) {
-                    PARAM_ERROR_RETURN(mContext->GetLogger(),
-                                       mContext->GetAlarm(),
-                                       errorMsg,
-                                       sName,
-                                       mContext->GetConfigName(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetLogstoreName(),
-                                       mContext->GetRegion());
-                }
-                // ValueList (Mandatory)
-                if (!GetMandatoryListParam<std::string>(
-                        namespaceBlackFilterConfig, "ValueList", thisProcessNamespaceFilter.mValueList, errorMsg)) {
-                    PARAM_ERROR_RETURN(mContext->GetLogger(),
-                                       mContext->GetAlarm(),
-                                       errorMsg,
-                                       sName,
-                                       mContext->GetConfigName(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetLogstoreName(),
-                                       mContext->GetRegion());
-                }
-                thisProcessFilter.mNamespaceBlackFilter.emplace_back(thisProcessNamespaceFilter);
-            }
+        }
+        // DestPortBlackList (Optional)
+        if (!GetOptionalListFilterParam<uint32_t>(
+                addrFilterConfig, "DestPortBlackList", thisNetworkFilter.mDestPortBlackList, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
+        // SourceAddrList (Optional)
+        if (!GetOptionalListFilterParam<std::string>(
+                addrFilterConfig, "SourceAddrList", thisNetworkFilter.mSourceAddrList, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
+        // SourcePortList (Optional)
+        if (!GetOptionalListFilterParam<uint32_t>(
+                addrFilterConfig, "SourcePortList", thisNetworkFilter.mSourcePortList, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
+        // SourceAddrBlackList (Optional)
+        if (!GetOptionalListFilterParam<std::string>(
+                addrFilterConfig, "SourceAddrBlackList", thisNetworkFilter.mSourceAddrBlackList, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
+        // SourcePortBlackList (Optional)
+        if (!GetOptionalListFilterParam<uint32_t>(
+                addrFilterConfig, "SourcePortBlackList", thisNetworkFilter.mSourcePortBlackList, errorMsg)) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
         }
     }
-    return true;
 }
 
-bool InitSecurityNetworkFilter(const Json::Value& config,
-                               nami::SecurityNetworkFilter& thisNetworkFilter,
-                               const PipelineContext* mContext,
-                               const std::string& sName) {
+void FilterValidSecurityProbeCallName(SecurityProbeType type,
+                                      std::vector<std::string>& callNames,
+                                      std::string& errorMsg) {
+    if (type >= SecurityProbeType::MAX) {
+        errorMsg = "Invalid security eBPF probe type";
+        return;
+    }
+    std::vector<std::string> survivedCallNames;
+    bool allValid = true;
+    for (auto& callName : callNames) {
+        if (callNameDict.at(type).find(callName) == callNameDict.at(type).end()) {
+            if (!allValid) {
+                errorMsg += ", " + callName;
+            } else {
+                errorMsg = "Invalid callnames for security eBPF probe: " + callName;
+                allValid = false;
+            }
+        } else {
+            survivedCallNames.emplace_back(callName);
+        }
+    }
+    callNames.swap(survivedCallNames);
+}
+
+void GetSecurityProbeDefaultCallName(SecurityProbeType type, std::vector<std::string>& callNames) {
+    callNames.assign(callNameDict.at(type).begin(), callNameDict.at(type).end());
+}
+
+void InitCallNameFilter(const Json::Value& config,
+                        std::vector<std::string>& callNames,
+                        const PipelineContext* mContext,
+                        const std::string& sName,
+                        SecurityProbeType probeType) {
     std::string errorMsg;
-    // DestAddrList (Optional)
-    if (!GetOptionalListParam<std::string>(config, "DestAddrList", thisNetworkFilter.mDestAddrList, errorMsg)) {
+    // CallNameFilter (Optional)
+    if (!config.isMember("CallNameFilter")) {
+        // No CallNameFilter, use default callnames, no warning
+    } else if (!config["CallNameFilter"].isArray()) {
+        // CallNameFilter is not empty but of wrong type, use default callnames
+        errorMsg = "CallNameFilter is not of type list";
+    } else if (!GetOptionalListFilterParam<std::string>(config, "CallNameFilter", callNames, errorMsg)) {
+        // CallNameFilter has element of wrong type, use default callnames
+    } else {
+        FilterValidSecurityProbeCallName(probeType, callNames, errorMsg);
+        // If CallNameFilter contains valid callnames, use user defined callnames, otherwise use default callnames
+    }
+    if (!errorMsg.empty()) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -309,195 +354,105 @@ bool InitSecurityNetworkFilter(const Json::Value& config,
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
     }
-    // DestPortList (Optional)
-    if (!GetOptionalListParam<uint32_t>(config, "DestPortList", thisNetworkFilter.mDestPortList, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
+    // Use default callnames
+    if (callNames.empty()) {
+        GetSecurityProbeDefaultCallName(probeType, callNames);
     }
-    // DestAddrBlackList (Optional)
-    if (!GetOptionalListParam<std::string>(config, "DestAddrBlackList", thisNetworkFilter.mDestAddrBlackList, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    }
-    // DestPortBlackList (Optional)
-    if (!GetOptionalListParam<uint32_t>(config, "DestPortBlackList", thisNetworkFilter.mDestPortBlackList, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    }
-    // SourceAddrList (Optional)
-    if (!GetOptionalListParam<std::string>(config, "SourceAddrList", thisNetworkFilter.mSourceAddrList, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    }
-    // SourcePortList (Optional)
-    if (!GetOptionalListParam<uint32_t>(config, "SourcePortList", thisNetworkFilter.mSourcePortList, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    }
-    // SourceAddrBlackList (Optional)
-    if (!GetOptionalListParam<std::string>(
-            config, "SourceAddrBlackList", thisNetworkFilter.mSourceAddrBlackList, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    }
-    // SourcePortBlackList (Optional)
-    if (!GetOptionalListParam<uint32_t>(
-            config, "SourcePortBlackList", thisNetworkFilter.mSourcePortBlackList, errorMsg)) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
+}
+
+bool CheckProbeConfigValid(const Json::Value& config, std::string& errorMsg) {
+    errorMsg.clear();
+    if (!config.isMember("ProbeConfig")) {
+        // No ProbeConfig, use default, no warning
+        return false;
+    } else if (!config["ProbeConfig"].isArray()) {
+        // ProbeConfig is not empty but of wrong type, use default
+        errorMsg = "ProbeConfig is not of type list, use probe config with default filter";
+        return false;
     }
     return true;
 }
 
-bool IsProcessNamespaceFilterTypeValid(const std::string& type) {
-    const std::unordered_set<std::string> dic
-        = {"Uts", "Ipc", "Mnt", "Pid", "PidForChildren", "Net", "Cgroup", "User", "Time", "TimeForChildren"};
-    return dic.find(type) != dic.end();
-}
-
-
-bool SecurityOptions::Init(SecurityFilterType filterType,
+bool SecurityOptions::Init(SecurityProbeType probeType,
                            const Json::Value& config,
                            const PipelineContext* mContext,
                            const std::string& sName) {
     std::string errorMsg;
-    // ProbeConfig (Mandatory)
-    if (!IsValidList(config, "ProbeConfig", errorMsg)) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           errorMsg,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
+
+    // ProbeConfig (Optional)
+    if (!CheckProbeConfigValid(config, errorMsg)) {
+        if (!errorMsg.empty()) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 errorMsg,
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        }
+        nami::SecurityOption thisSecurityOption;
+        GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);
+        mOptionList.emplace_back(thisSecurityOption);
+        return true;
     }
+    std::unordered_set<std::string> thisCallNameSet;
     for (auto& innerConfig : config["ProbeConfig"]) {
         nami::SecurityOption thisSecurityOption;
-
-        std::string errorMsg;
-        // CallName (Optional)
-        if (!GetOptionalListParam<std::string>(innerConfig, "CallName", thisSecurityOption.call_names_, errorMsg)) {
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                mContext->GetAlarm(),
-                                errorMsg,
-                                sName,
-                                mContext->GetConfigName(),
-                                mContext->GetProjectName(),
-                                mContext->GetLogstoreName(),
-                                mContext->GetRegion());
-        }
-
-        // Filter
-        switch (filterType) {
-            case SecurityFilterType::FILE: {
+        // Genral Filter (Optional)
+        std::variant<std::monostate, nami::SecurityFileFilter, nami::SecurityNetworkFilter> thisFilter;
+        switch (probeType) {
+            case SecurityProbeType::FILE: {
                 nami::SecurityFileFilter thisFileFilter;
-                if (!IsValidList(innerConfig, "FilePathFilter", errorMsg)) {
-                    PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                        mContext->GetAlarm(),
-                                        errorMsg,
-                                        sName,
-                                        mContext->GetConfigName(),
-                                        mContext->GetProjectName(),
-                                        mContext->GetLogstoreName(),
-                                        mContext->GetRegion());
-                } else {
-                    if (!InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName)) {
-                        return false;
-                    }
-                }
-                thisSecurityOption.filter_.emplace<nami::SecurityFileFilter>(thisFileFilter);
+                InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
+                thisFilter.emplace<nami::SecurityFileFilter>(thisFileFilter);
                 break;
             }
-            case SecurityFilterType::PROCESS: {
-                nami::SecurityProcessFilter thisProcessFilter;
-                if (!InitSecurityProcessFilter(innerConfig, thisProcessFilter, mContext, sName)) {
-                    return false;
-                }
-                thisSecurityOption.filter_.emplace<nami::SecurityProcessFilter>(thisProcessFilter);
-                break;
-            }
-            case SecurityFilterType::NETWORK: {
+            case SecurityProbeType::NETWORK: {
                 nami::SecurityNetworkFilter thisNetworkFilter;
-                if (!IsValidMap(innerConfig, "AddrFilter", errorMsg)) {
-                    PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                        mContext->GetAlarm(),
-                                        errorMsg,
-                                        sName,
-                                        mContext->GetConfigName(),
-                                        mContext->GetProjectName(),
-                                        mContext->GetLogstoreName(),
-                                        mContext->GetRegion());
-                } else {
-                    const Json::Value& filterConfig = innerConfig["AddrFilter"];
-                    if (!InitSecurityNetworkFilter(filterConfig, thisNetworkFilter, mContext, sName)) {
-                        return false;
-                    }
-                }
-                thisSecurityOption.filter_.emplace<nami::SecurityNetworkFilter>(thisNetworkFilter);
+                InitSecurityNetworkFilter(innerConfig, thisNetworkFilter, mContext, sName);
+                thisFilter.emplace<nami::SecurityNetworkFilter>(thisNetworkFilter);
+                break;
+            }
+            case SecurityProbeType::PROCESS: {
                 break;
             }
             default:
                 PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                    mContext->GetAlarm(),
-                                    "Unknown filter type",
-                                    sName,
-                                    mContext->GetConfigName(),
-                                    mContext->GetProjectName(),
-                                    mContext->GetLogstoreName(),
-                                    mContext->GetRegion());
-                return false;
+                                     mContext->GetAlarm(),
+                                     "Unknown security eBPF probe type",
+                                     sName,
+                                     mContext->GetConfigName(),
+                                     mContext->GetProjectName(),
+                                     mContext->GetLogstoreName(),
+                                     mContext->GetRegion());
         }
-
-
-        // if (!thisSecurityOption.Init(filterType, innerConfig, mContext, sName)) {
-        //     return false;
-        // }
-        mOptionList.emplace_back(thisSecurityOption);
+        // CallNameFilter (Optional)
+        std::vector<std::string> thisCallNames;
+        InitCallNameFilter(innerConfig, thisCallNames, mContext, sName, probeType);
+        // Check duplicate callnames and remove them
+        for (auto& callName : thisCallNames) {
+            if (thisCallNameSet.find(callName) == thisCallNameSet.end()) {
+                thisCallNameSet.insert(callName);
+                thisSecurityOption.call_names_.emplace_back(callName);
+            } else {
+                PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                     mContext->GetAlarm(),
+                                     "Duplicate callname " + callName + " is discarded",
+                                     sName,
+                                     mContext->GetConfigName(),
+                                     mContext->GetProjectName(),
+                                     mContext->GetLogstoreName(),
+                                     mContext->GetRegion());
+            }
+        }
+        // If callnames in this option are all duplicated, discard this option
+        if (!thisSecurityOption.call_names_.empty()) {
+            thisSecurityOption.filter_ = thisFilter;
+            mOptionList.emplace_back(thisSecurityOption);
+        }
     }
-    mFilterType = filterType;
+    mProbeType = probeType;
     return true;
 }
 

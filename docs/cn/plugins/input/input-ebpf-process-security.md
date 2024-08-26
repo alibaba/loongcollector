@@ -1,8 +1,8 @@
-# iuput_ebpf_process_security 插件
+# input_ebpf_process_security 插件
 
 ## 简介
 
-`iuput_ebpf_process_security`插件可以实现利用ebpf探针采集进程安全相关动作。
+`input_ebpf_process_security`插件可以实现利用ebpf探针采集进程安全相关动作。
 
 ## 版本
 
@@ -12,13 +12,9 @@
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Type  |  string  |  是  |  /  |  插件类型。固定为iuput\_ebpf\_process\_security  |
-|  ProbeConfig  |  \[object\]  |  是  |  /  |  插件配置参数列表  |
-|  ProbeConfig.CallName  |  \[string\]  |  否  |  空  |  系统调用函数  |
-|  ProbeConfig.NamespaceFilter  |  object  |  否  |  空  |  命名空间  |
-|  ProbeConfig.NamespaceBlackFilter  |  object  |  否  |  空  |  命名空间  |
-|  ProbeConfig.Namespace\[Black\]Filter.NamespaceType  |  string  |  是  |  /  |  命名空间类型 \[范围：Uts, Ipc, Mnt, Pid, PidForChildren, Net, Cgroup, User, Time, TimeForChildren\] |
-|  ProbeConfig.Namespace\[Black\]Filter.ValueList  |  \[string\]  |  是  |  /  |  特定命名空间类型对应的取值列表 |
+|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_ebpf\_process\_security  |
+|  ProbeConfig  |  \[object\]  |  否  |  ProbeConfig 默认包含一个 Option，其中包含一个默认取全部值的 CallNameFilter，其他 Filter 默认为空  |  ProbeConfig 可以包含多个 Option， Option 内部有多个 Filter，Filter 内部是或的关系，Filter 之间是且的关系，Option 之间是或的关系  |
+|  ProbeConfig[xx].CallNameFilter  |  \[string\]  |  否  |  该插件支持的所有 callname: [ sys_enter_execve sys_enter_clone disassociate_ctty acct_process wake_up_new_task ]  |  内核挂载点过滤器，按照白名单模式运行，不填表示配置该插件所支持的所有挂载点  |
 
 ## 样例
 
@@ -36,14 +32,6 @@ TODO
 enable: true
 inputs:
   - Type: input_ebpf_processprobe_security
-    ProbeConfig:
-      NamespaceFilter:
-        - NamespaceType: "Pid"
-          ValueList: 
-            - "4026531833"
-        - NamespaceType: "Mnt"
-          ValueList: 
-            - "4026531834"
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true

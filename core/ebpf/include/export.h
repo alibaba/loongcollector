@@ -153,37 +153,9 @@ struct ObserverNetworkOption {
 };
 
 // file
-struct SecurityFileFilterItem {
-    std::string mFilePath = "";
-    std::string mFileName = "";
-    bool operator==(const SecurityFileFilterItem& other) const {
-      return mFilePath == other.mFilePath && mFileName == other.mFileName;
-    }
-};
 struct SecurityFileFilter {
-    std::vector<SecurityFileFilterItem> mFileFilterItem;
-    bool operator==(const SecurityFileFilter& other) const {
-      return mFileFilterItem == other.mFileFilterItem;
-    }
-};
-
-// process
-struct SecurityProcessNamespaceFilter {
-  // type of securityNamespaceFilter
-  std::string mNamespaceType = "";
-  std::vector<std::string> mValueList;
-  bool operator==(const SecurityProcessNamespaceFilter& other) const {
-    return mNamespaceType == other.mNamespaceType &&
-              mValueList == other.mValueList;
-  }
-};
-struct SecurityProcessFilter {
-  std::vector<SecurityProcessNamespaceFilter> mNamespaceFilter;
-  std::vector<SecurityProcessNamespaceFilter> mNamespaceBlackFilter;
-  bool operator==(const SecurityProcessFilter& other) const {
-  return mNamespaceFilter == other.mNamespaceFilter &&
-        mNamespaceBlackFilter == other.mNamespaceBlackFilter;
-  }
+    std::vector<std::string> mFilePathList;
+    bool operator==(const SecurityFileFilter& other) const { return mFilePathList == other.mFilePathList; }
 };
 
 // network
@@ -210,7 +182,7 @@ struct SecurityNetworkFilter {
 
 struct SecurityOption {
   std::vector<std::string> call_names_;
-  std::variant<SecurityFileFilter, SecurityNetworkFilter, SecurityProcessFilter> filter_;
+  std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> filter_;
   bool operator==(const SecurityOption& other) const {
     return call_names_ == other.call_names_ &&
             filter_ == other.filter_;

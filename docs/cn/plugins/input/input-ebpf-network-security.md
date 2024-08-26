@@ -12,18 +12,18 @@
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Type  |  string  |  是  |  /  |  插件类型。固定为iuput\_ebpf\_network\_security  |
-|  ProbeConfig  |  \[object\]  |  是  |  /  |  插件配置参数列表  |
-|  ProbeConfig.CallName  |  \[string\]  |  否  |  空  |  系统调用函数  |
-|  ProbeConfig.AddrFilter  |  object  |  是  |  /  |  过滤参数  |
-|  ProbeConfig.AddrFilter.DestAddrList  |  \[string\]  |  否  |  空  |  目的IP地址  |
-|  ProbeConfig.AddrFilter.DestPortList  |  \[string\]  |  否  |  空  |  目的端口  |
-|  ProbeConfig.AddrFilter.DestAddrBlackList  |  \[string\]  |  否  |  空  |  目的IP地址黑名单  |
-|  ProbeConfig.AddrFilter.DestPortBlackList  |  \[string\]  |  否  |  空  |  目的端口黑名单  |
-|  ProbeConfig.AddrFilter.SourceAddrList  |  \[string\]  |  否  |  空  |  源IP地址  |
-|  ProbeConfig.AddrFilter.SourcePortList  |  \[string\]  |  否  |  空  |  源端口  |
-|  ProbeConfig.AddrFilter.SourceAddrBlackList  |  \[string\]  |  否  |  空  |  源IP地址黑名单  |
-|  ProbeConfig.AddrFilter.SourcePortBlackList  |  \[string\]  |  否  |  空  |  源端口黑名单  |
+|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_ebpf\_network\_security  |
+|  ProbeConfig  |  \[object\]  |  否  |  ProbeConfig 默认包含一个 Option，其中包含一个默认取全部值的 CallNameFilter，其他 Filter 默认为空  |  ProbeConfig 可以包含多个 Option， Option 内部有多个 Filter，Filter 内部是或的关系，Filter 之间是且的关系，Option 之间是或的关系  |
+|  ProbeConfig[xx].CallNameFilter  |  \[string\]  |  否  |  该插件支持的所有 callname: [ tcp_connect tcp_close tcp_sendmsg ]  |  内核挂载点过滤器，按照白名单模式运行，不填表示配置该插件所支持的所有挂载点  |
+|  ProbeConfig[xx].AddrFilter  |  object  |  否  |  /  |  网络地址过滤器  |
+|  ProbeConfig[xx].AddrFilter.DestAddrList  |  \[string\]  |  否  |  空  |  目的IP地址白名单，不填表示不进行过滤  |
+|  ProbeConfig[xx].AddrFilter.DestPortList  |  \[string\]  |  否  |  空  |  目的端口白名单，不填表示不进行过滤  |
+|  ProbeConfig[xx].AddrFilter.DestAddrBlackList  |  \[string\]  |  否  |  空  |  目的IP地址黑名单，不填表示不进行过滤  |
+|  ProbeConfig[xx].AddrFilter.DestPortBlackList  |  \[string\]  |  否  |  空  |  目的端口黑名单，不填表示不进行过滤  |
+|  ProbeConfig[xx].AddrFilter.SourceAddrList  |  \[string\]  |  否  |  空  |  源IP地址白名单，不填表示不进行过滤  |
+|  ProbeConfig[xx].AddrFilter.SourcePortList  |  \[string\]  |  否  |  空  |  源端口白名单，不填表示不进行过滤  |
+|  ProbeConfig[xx].AddrFilter.SourceAddrBlackList  |  \[string\]  |  否  |  空  |  源IP地址黑名单，不填表示不进行过滤  |
+|  ProbeConfig[xx].AddrFilter.SourcePortBlackList  |  \[string\]  |  否  |  空  |  源端口黑名单，不填表示不进行过滤  |
 
 ## 样例
 
@@ -42,7 +42,7 @@ enable: true
 inputs:
   - Type: input_ebpf_sockettraceprobe_security
     ProbeConfig:
-      - CallName: 
+      - CallNameFilter: 
         - "tcp_connect"
         - "tcp_close"
         AddrFilter: 
@@ -55,7 +55,7 @@ inputs:
             - "127.0.0.1/8"
           SourcePortBlackList: 
             - 9300
-      - CallName: 
+      - CallNameFilter: 
         - "tcp_sendmsg"
         AddrFilter: 
           DestAddrList: 

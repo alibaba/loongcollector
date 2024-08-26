@@ -36,17 +36,17 @@ bool InitObserverNetworkOption(const Json::Value& config,
 
 /////////////////////  /////////////////////
 
-enum class SecurityFilterType { PROCESS, FILE, NETWORK };
+enum class SecurityProbeType { PROCESS, FILE, NETWORK, MAX };
 
 class SecurityOptions {
 public:
-    bool Init(SecurityFilterType filterType,
+    bool Init(SecurityProbeType filterType,
               const Json::Value& config,
               const PipelineContext* mContext,
               const std::string& sName);
 
     std::vector<nami::SecurityOption> mOptionList;
-    SecurityFilterType mFilterType;
+    SecurityProbeType mProbeType;
 };
 
 ///////////////////// Process Level Config /////////////////////
