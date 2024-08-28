@@ -122,6 +122,39 @@ struct ApplicationBatchSpan {
   std::vector<std::unique_ptr<SingleSpan>> single_spans_;
 };
 
+class SingleEvent {
+public:
+  SingleEvent(std::vector<std::pair<std::string, std::string>>&& tags, uint64_t ts)
+    : tags_(tags), timestamp_(ts) {}
+  std::vector<std::pair<std::string, std::string>> GetAllTags() { return tags_; }
+  uint64_t GetTimestamp() { return timestamp_; }
+  void SetTimestamp(uint64_t ts) { timestamp_ = ts; }
+  void AppendTags(std::pair<std::string, std::string>&& tag) {
+    tags_.emplace_back(std::move(tag));
+  }
+
+private:
+  std::vector<std::pair<std::string, std::string>> tags_;
+  uint64_t timestamp_;
+};
+
+class ApplicationBatchEvent {
+public:
+  ApplicationBatchEvent(const std::string& app_id, std::vector<std::pair<std::string, std::string>>&& tags) : app_id_(app_id), tags_(tags) {}
+  ApplicationBatchEvent(const std::string& app_id, std::vector<std::pair<std::string, std::string>>&& tags, std::vector<std::unique_ptr<SingleEvent>>&& events) 
+    : app_id_(app_id), tags_(tags), events_(std::move(events)) {}
+  void SetEvents(std::vector<std::unique_ptr<SingleEvent>>&& events) { events_ = std::move(events); }
+  void AppendEvent(std::unique_ptr<SingleEvent>&& event) { events_.emplace_back(std::move(event)); }
+  void AppendEvents(std::vector<std::unique_ptr<SingleEvent>>&& events) { 
+    for (auto& x : events) {
+      events_.emplace_back(std::move(x));
+    }
+  }
+  std::string app_id_;
+  std::vector<std::pair<std::string, std::string>> tags_;
+  std::vector<std::unique_ptr<SingleEvent>> events_;
+};
+
 /////// merged config /////////
 
 namespace nami {
@@ -138,8 +171,10 @@ enum class PluginType {
 
 // observe metrics
 using NamiHandleBatchMeasureFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp)>;
-// observe span
+// observe spans
 using NamiHandleBatchSpanFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchSpan>>&&)>;
+// observe events
+using NamiHandleBatchEventFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchEvent>>&&)>;
 // observe security
 using NamiHandleBatchDataEventFn = std::function<void(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events)>;
 
@@ -148,6 +183,9 @@ struct ObserverNetworkOption {
     bool mDisableProtocolParse = false;
     bool mDisableConnStats = false;
     bool mEnableConnTrackerDump = false;
+    bool mEnableSpan = false;
+    bool mEnableMetric = false;
+    bool mEnableLog = true;
     std::string mMeterHandlerType;
     std::string mSpanHandlerType;
 };
@@ -200,8 +238,12 @@ struct NetworkObserveConfig {
   long upca_offset_;
   long upps_offset_;
   long upcr_offset_;
-  NamiHandleBatchMeasureFunc measure_cb_;
-  NamiHandleBatchSpanFunc span_cb_;
+  bool enable_span_;
+  bool enable_metric_;
+  bool enable_event_;
+  NamiHandleBatchMeasureFunc measure_cb_ = nullptr;
+  NamiHandleBatchSpanFunc span_cb_ = nullptr;
+  NamiHandleBatchEventFunc event_cb_ = nullptr;
   bool operator==(const NetworkObserveConfig& other) const {
     return enable_libbpf_debug_ == other.enable_libbpf_debug_ &&
            enable_so_ == other.enable_so_ &&

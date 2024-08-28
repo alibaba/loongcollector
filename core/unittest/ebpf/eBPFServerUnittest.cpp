@@ -73,6 +73,7 @@ private:
     void GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc cb);
     void GenerateBatchSpan(nami::NamiHandleBatchSpanFunc cb);
     void GenerateBatchEvent(nami::NamiHandleBatchDataEventFn cb, SecureEventType);
+    void GenerateBatchAppEvent(nami::NamiHandleBatchEventFunc cb);
     void writeLogtailConfigJSON(const Json::Value& v) {
         LOG_INFO(sLogger, ("writeLogtailConfigJSON", v.toStyledString()));
         OverwriteFile(STRING_FLAG(ilogtail_config), v.toStyledString());
@@ -417,6 +418,26 @@ void eBPFServerUnittest::GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc c
     cb(std::move(batch_app_measures), 100000);
 }
 
+void eBPFServerUnittest::GenerateBatchAppEvent(nami::NamiHandleBatchEventFunc cb) {
+    std::vector<std::unique_ptr<ApplicationBatchEvent>> batch_app_events;
+    std::vector<std::string> apps = {"a6rx69e8me@582846f37273cf8", "a6rx69e8me@582846f37273cf9", "a6rx69e8me@582846f37273c10"};
+    
+    for (int i = 0 ; i < apps.size(); i ++) { // 3 apps
+        std::vector<std::pair<std::string, std::string>> appTags = {{"hh", "hh"}, {"e", "e"}, {"f", std::to_string(i)}};
+        std::unique_ptr<ApplicationBatchEvent> appEvent = std::make_unique<ApplicationBatchEvent>(apps[i], std::move(appTags));
+        for (int j = 0; j < 1000; j ++) {
+            std::vector<std::pair<std::string, std::string>> tags = {{"1", "1"}, {"2", "2"}, {"3",std::to_string(j)}};
+            std::unique_ptr<SingleEvent> se = std::make_unique<SingleEvent>(std::move(tags), 0);
+            appEvent->AppendEvent(std::move(se));
+        }
+        batch_app_events.emplace_back(std::move(appEvent));
+    }
+
+    if (cb) cb(std::move(batch_app_events));
+
+    return;
+}
+
 void eBPFServerUnittest::GenerateBatchSpan(nami::NamiHandleBatchSpanFunc cb) {
     std::vector<std::unique_ptr<ApplicationBatchSpan>> batch_app_spans;
     // agg for app level
@@ -493,12 +514,16 @@ void eBPFServerUnittest::TestEnableNetworkPlugin() {
             "Type": "input_ebpf_sockettraceprobe_observer",
             "ProbeConfig": 
             {
+                "EnableLog": true,
+                "EnableMetric": true,
+                "EnableSpan": true,
                 "EnableProtocols": [
                     "http"
                 ],
                 "DisableProtocolParse": 1,
                 "DisableConnStats": false,
-                "EnableConnTrackerDump": false
+                "EnableConnTrackerDump": false,
+                "EnableEvent": true,
             }
         }
     )";
@@ -554,13 +579,17 @@ void eBPFServerUnittest::TestEnableNetworkPlugin() {
 
     GenerateBatchMeasure(network_conf.measure_cb_);
     GenerateBatchSpan(network_conf.span_cb_);
+    GenerateBatchAppEvent(network_conf.event_cb_);
     auto after_conf = std::get<nami::NetworkObserveConfig>(conf->config_);
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mMeterCB->mQueueKey, ctx.GetProcessQueueKey());
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mSpanCB->mQueueKey, ctx.GetProcessQueueKey());
+    EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mEventCB->mQueueKey, ctx.GetProcessQueueKey());
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mMeterCB->mPluginIdx, 8);
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mSpanCB->mPluginIdx, 8);
+    EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mEventCB->mPluginIdx, 8);
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mMeterCB->mProcessTotalCnt, 19);
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mSpanCB->mProcessTotalCnt, 5);
+    EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mEventCB->mProcessTotalCnt, 3000);
 
     // do stop
     ebpf::eBPFServer::GetInstance()->DisablePlugin("test", nami::PluginType::NETWORK_OBSERVE);

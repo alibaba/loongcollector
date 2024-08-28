@@ -47,6 +47,12 @@ public:
     void handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&&) override;
 };
 
+class EventHandler : public AbstractHandler {
+public:
+    EventHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : AbstractHandler(ctx, key, idx) {}
+    void handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&&);
+};
+
 #ifdef __ENTERPRISE__
 
 class ArmsMeterHandler : public MeterHandler {

@@ -14,6 +14,9 @@
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_ebpf\_network\_observer  |
 |  ProbeConfig  |  object  |  是  |  /  |  插件配置参数列表  |
+|  ProbeConfig.EnableLog  |  bool  |  否  |  true  |  是否开启日志上报  |
+|  ProbeConfig.EnableSpan  |  bool  |  否  |  false  |  是否开启跨度上报  |
+|  ProbeConfig.EnableMetric  |  bool  |  否  |  false  |  是否开启指标上报  |
 |  ProbeConfig.EnableProtocols  |  \[string\]  |  否  |  空  |  允许的协议类型  |
 |  ProbeConfig.DisableProtocolParse  |  bool  |  否  |  false  |  TODO  |
 |  ProbeConfig.DisableConnStats  |  bool  |  否  |  false  |  TODO  |
@@ -36,6 +39,9 @@ enable: true
 inputs:
   - Type: input_ebpf_sockettraceprobe_observer
     ProbeConfig:
+      EnableLog: true
+      EnableMetric: false
+      EnableSpan: false
       EnableProtocols: 
         - "http"
       DisableConnStats: false

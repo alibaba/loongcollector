@@ -50,6 +50,39 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                                const PipelineContext* mContext,
                                const std::string& sName) {
     std::string errorMsg;
+    // EnableEvent (Optional)
+    if (!GetOptionalBoolParam(probeConfig, "EnableLog", thisObserverNetworkOption.mEnableLog, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+    // EnableSpan (Optional)
+    if (!GetOptionalBoolParam(probeConfig, "EnableSpan", thisObserverNetworkOption.mEnableSpan, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+    // EnableMetric (Optional)
+    if (!GetOptionalBoolParam(probeConfig, "EnableMetric", thisObserverNetworkOption.mEnableMetric, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
     // MeterHandlerType (Optional)
     if (!GetOptionalStringParam(probeConfig, "MeterHandlerType", thisObserverNetworkOption.mMeterHandlerType, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),

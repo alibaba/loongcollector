@@ -70,6 +70,7 @@ private:
 
     std::unique_ptr<SourceManager> mSourceManager;
     // source manager
+    std::unique_ptr<EventHandler> mEventCB;
     std::unique_ptr<MeterHandler> mMeterCB;
     std::unique_ptr<SpanHandler> mSpanCB;
     std::unique_ptr<SecurityHandler> mNetworkSecureCB;
