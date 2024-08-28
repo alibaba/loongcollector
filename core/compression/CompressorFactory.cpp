@@ -24,7 +24,7 @@ namespace logtail {
 
 unique_ptr<Compressor> CompressorFactory::Create(const Json::Value& config,
                                                       const PipelineContext& ctx,
-                                                      const string& pluginName,
+                                                      const string& pluginType,
                                                       CompressType defaultType) {
     string compressType, errorMsg;
     if (!GetOptionalStringParam(config, "CompressType", compressType, errorMsg)) {
@@ -32,7 +32,7 @@ unique_ptr<Compressor> CompressorFactory::Create(const Json::Value& config,
                               ctx.GetAlarm(),
                               errorMsg,
                               CompressTypeToString(defaultType),
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
@@ -49,7 +49,7 @@ unique_ptr<Compressor> CompressorFactory::Create(const Json::Value& config,
                               ctx.GetAlarm(),
                               "string param CompressType is not valid",
                               CompressTypeToString(defaultType),
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),

@@ -33,19 +33,19 @@ type ProcessorRename struct {
 	context            pipeline.Context
 }
 
-const pluginName = "processor_rename"
+const pluginType = "processor_rename"
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorRename) Init(context pipeline.Context) error {
 	p.context = context
 	if len(p.SourceKeys) == 0 {
-		return fmt.Errorf("must specify SourceKeys for plugin %v", pluginName)
+		return fmt.Errorf("must specify SourceKeys for plugin %v", pluginType)
 	}
 	if len(p.DestKeys) == 0 {
-		return fmt.Errorf("must specify DestKeys for plugin %v", pluginName)
+		return fmt.Errorf("must specify DestKeys for plugin %v", pluginType)
 	}
 	if len(p.SourceKeys) != len(p.DestKeys) {
-		return fmt.Errorf("The length of SourceKeys does not match the length of DestKeys for plugin %v", pluginName)
+		return fmt.Errorf("The length of SourceKeys does not match the length of DestKeys for plugin %v", pluginType)
 	}
 	p.keyDictionary = make(map[string]string)
 	for i, source := range p.SourceKeys {
@@ -147,7 +147,7 @@ func (p *ProcessorRename) processOtherEvent(event models.PipelineEvent) {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorRename{
 			NoKeyError: false,
 			SourceKeys: nil,

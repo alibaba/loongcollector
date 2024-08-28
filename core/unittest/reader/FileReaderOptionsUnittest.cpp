@@ -39,7 +39,7 @@ public:
     void OnFailedInit() const;
 
 private:
-    const string pluginName = "test";
+    const string pluginType = "test";
     PipelineContext ctx;
 };
 
@@ -76,7 +76,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new FileReaderOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(FileReaderOptions::Encoding::UTF8, config->mFileEncoding);
     APSARA_TEST_TRUE(config->mTailingAllMatchedFiles);
     APSARA_TEST_EQUAL(2048U, config->mTailSizeKB);
@@ -103,7 +103,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new FileReaderOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(FileReaderOptions::Encoding::GBK, config->mFileEncoding);
     APSARA_TEST_FALSE(config->mTailingAllMatchedFiles);
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_tail_limit_kb)), config->mTailSizeKB);
@@ -122,7 +122,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new FileReaderOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(FileReaderOptions::Encoding::UTF16, config->mFileEncoding);
 
     // TailSizeKB
@@ -134,7 +134,7 @@ void FileReaderOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new FileReaderOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(FileReaderOptions::Encoding::GBK, config->mFileEncoding);
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_tail_limit_kb)), config->mTailSizeKB);
 }
@@ -152,7 +152,7 @@ void FileReaderOptionsUnittest::OnFailedInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new FileReaderOptions());
-    APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginType));
 
     configStr = R"(
         {
@@ -161,7 +161,7 @@ void FileReaderOptionsUnittest::OnFailedInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new FileReaderOptions());
-    APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginType));
 }
 
 UNIT_TEST_CASE(FileReaderOptionsUnittest, OnSuccessfulInit)

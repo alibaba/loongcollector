@@ -24,7 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-const pluginName = "processor_filter_key_regex"
+const pluginType = "processor_filter_key_regex"
 
 type ProcessorKeyFilter struct {
 	Include []string
@@ -64,8 +64,8 @@ func (p *ProcessorKeyFilter) Init(context pipeline.Context) error {
 	}
 
 	metricsRecord := p.context.GetMetricRecord()
-	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_filtered", pluginName))
-	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginName))
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_filtered", pluginType))
+	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginType))
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (p *ProcessorKeyFilter) ProcessLogs(logArray []*protocol.Log) []*protocol.L
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorKeyFilter{}
 	}
 }

@@ -38,7 +38,7 @@ func TestCommandTestCollecetUserBase64WithTimeout(t *testing.T) {
 	fmt.Printf("Username %s\n", u.Username)
 
 	ctx := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputCommand)
+	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
 	c := new(test.MockMetricCollector)
 	// Script set to sleep for 5 seconds
 	scriptContent := `sleep 5 &&  echo -e "__labels__:a#\$#1|b#\$#2    __value__:0  __name__:metric_command_example \n __labels__:a#\$#3|b#\$#4    __value__:3  __name__:metric_command_example2"`
@@ -70,7 +70,7 @@ func TestCommandTestCollecetUserBase64(t *testing.T) {
 	}
 	fmt.Printf("Username %s\n", u.Username)
 	ctx := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputCommand)
+	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
 	c := new(test.MockMetricCollector)
 	scriptContent := `echo -e "__labels__:a#\$#1|b#\$#2    __value__:0  __name__:metric_command_example \n __labels__:a#\$#3|b#\$#4    __value__:3  __name__:metric_command_example2"`
 	// base64
@@ -100,7 +100,7 @@ func TestCommandTestCollect(t *testing.T) {
 	fmt.Printf("Username %s\n", u.Username)
 
 	ctx := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputCommand)
+	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
 	c := new(test.MockMetricCollector)
 
 	p.ScriptContent = `echo "test"`
@@ -128,7 +128,7 @@ func TestCommandTestExceptionCollect(t *testing.T) {
 	}
 	fmt.Printf("Username %s\n", u.Username)
 	ctx := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputCommand)
+	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
 	c := new(test.MockMetricCollector)
 
 	p.ScriptContent = `echo "1"`
@@ -157,7 +157,7 @@ func TestCommandTestTimeoutCollect(t *testing.T) {
 	}
 	fmt.Printf("Username %s\n", u.Username)
 	ctx := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputCommand)
+	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
 	c := new(test.MockMetricCollector)
 
 	p.ScriptContent = `sleep 10`
@@ -191,7 +191,7 @@ func TestCommandTestInit(t *testing.T) {
 	fmt.Printf("Username %s\n", u.Username)
 
 	ctx := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputCommand)
+	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
 	_, err = p.Init(ctx)
 	require.Error(t, err)
 	if err != nil {
@@ -295,7 +295,7 @@ func TestErrorCmdPath(t *testing.T) {
 	fmt.Printf("Username %s\n", u.Username)
 
 	ctx := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputCommand)
+	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
 	p.ScriptContent = `echo "test"`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"

@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	pluginName       = "processor_encrypt"
+	pluginType       = "processor_encrypt"
 	defaultAlarmType = "PROCESSOR_ENCRYPT_ALARM"
 	encryptErrorText = "ENCRYPT_ERROR"
 )
@@ -74,7 +74,7 @@ type ProcessorEncrypt struct {
 func (p *ProcessorEncrypt) Init(context pipeline.Context) error {
 	p.context = context
 	if len(p.SourceKeys) == 0 {
-		return fmt.Errorf("plugin %v must specify SourceKey", pluginName)
+		return fmt.Errorf("plugin %v must specify SourceKey", pluginType)
 	}
 	p.keyDict = make(map[string]bool)
 	for _, key := range p.SourceKeys {
@@ -94,7 +94,7 @@ func (p *ProcessorEncrypt) Init(context pipeline.Context) error {
 }
 
 func (*ProcessorEncrypt) Description() string {
-	return fmt.Sprintf("processor %v is used to encrypt data with AES CBC", pluginName)
+	return fmt.Sprintf("processor %v is used to encrypt data with AES CBC", pluginType)
 }
 
 func (p *ProcessorEncrypt) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
@@ -162,7 +162,7 @@ func (p *ProcessorEncrypt) paddingWithPKCS7(data string) []byte {
 
 func (p *ProcessorEncrypt) parseKey() error {
 	if len(p.EncryptionParameters.Key) == 0 && len(p.EncryptionParameters.KeyFilePath) == 0 {
-		return fmt.Errorf("plugin %v must specify Key or KeyFilePath", pluginName)
+		return fmt.Errorf("plugin %v must specify Key or KeyFilePath", pluginType)
 	}
 	var err error
 	if len(p.EncryptionParameters.KeyFilePath) > 0 {
@@ -173,7 +173,7 @@ func (p *ProcessorEncrypt) parseKey() error {
 		}
 		if err != nil {
 			return fmt.Errorf("plugin %v loads key file %v error: %v",
-				pluginName, p.EncryptionParameters.KeyFilePath, err)
+				pluginType, p.EncryptionParameters.KeyFilePath, err)
 		}
 
 		logger.Infof(p.context.GetRuntimeContext(), "read key from file %v, hash: %v", p.EncryptionParameters.KeyFilePath,
@@ -182,10 +182,10 @@ func (p *ProcessorEncrypt) parseKey() error {
 
 	// Decode from hex to bytes.
 	if p.key, err = hex.DecodeString(p.EncryptionParameters.Key); err != nil {
-		return fmt.Errorf("plugin %v decodes key from hex error: %v, try hex", pluginName, err)
+		return fmt.Errorf("plugin %v decodes key from hex error: %v, try hex", pluginType, err)
 	}
 	if p.cipher, err = aes.NewCipher(p.key); err != nil {
-		return fmt.Errorf("plugin %s create cipher with key error: %v", pluginName, err)
+		return fmt.Errorf("plugin %s create cipher with key error: %v", pluginType, err)
 	}
 	p.blockSize = p.cipher.BlockSize()
 	return nil
@@ -193,7 +193,7 @@ func (p *ProcessorEncrypt) parseKey() error {
 
 func (p *ProcessorEncrypt) parseIV() error {
 	if len(p.EncryptionParameters.IV) == 0 {
-		return fmt.Errorf("plugin %s must specify IV", pluginName)
+		return fmt.Errorf("plugin %s must specify IV", pluginType)
 		// [DISABLED] Random IV
 		// logger.Infof("IV is not specified, use random IV and prepend it to ciphertext")
 		// return nil
@@ -201,11 +201,11 @@ func (p *ProcessorEncrypt) parseIV() error {
 
 	var err error
 	if p.iv, err = hex.DecodeString(p.EncryptionParameters.IV); err != nil {
-		return fmt.Errorf("plugin %v decodes IV %v error: %v", pluginName, p.EncryptionParameters.IV, err)
+		return fmt.Errorf("plugin %v decodes IV %v error: %v", pluginType, p.EncryptionParameters.IV, err)
 	}
 	if len(p.iv) != p.blockSize {
 		return fmt.Errorf("plugin %v finds size mismatch between IV(%v) and BlockSize(%v), must be same",
-			pluginName, len(p.iv), p.blockSize)
+			pluginType, len(p.iv), p.blockSize)
 	}
 	return nil
 }
@@ -218,7 +218,7 @@ func newProcessorEncrypt() *ProcessorEncrypt {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return newProcessorEncrypt()
 	}
 }

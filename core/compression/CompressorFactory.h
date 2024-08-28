@@ -41,7 +41,7 @@ public:
 
     std::unique_ptr<Compressor> Create(const Json::Value& config,
                                        const PipelineContext& ctx,
-                                       const std::string& pluginName,
+                                       const std::string& pluginType,
                                        CompressType defaultType);
 
 private:

@@ -24,6 +24,7 @@
 
 #include "file_server/FileDiscoveryOptions.h"
 #include "pipeline/PipelineContext.h"
+#include "plugin/instance/PluginInstance.h"
 
 namespace logtail {
 
@@ -38,7 +39,7 @@ struct ContainerFilters {
     std::unordered_map<std::string, std::string> mIncludeContainerLabel;
     std::unordered_map<std::string, std::string> mExcludeContainerLabel;
 
-    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginName);
+    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginType);
 };
 
 struct ContainerDiscoveryOptions {
@@ -48,9 +49,10 @@ struct ContainerDiscoveryOptions {
     // 启用容器元信息预览
     bool mCollectingContainersMeta = false;
 
-    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginName);
+    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginType);
     void GenerateContainerMetaFetchingGoPipeline(Json::Value& res,
-                                                 const FileDiscoveryOptions* fileDiscovery = nullptr) const;
+                                                 const FileDiscoveryOptions* fileDiscovery = nullptr,
+                                                 const PluginInstance::PluginMeta pluginMeta = {"0", "0", "0"}) const;
 };
 
 using ContainerDiscoveryConfig = std::pair<const ContainerDiscoveryOptions*, const PipelineContext*>;

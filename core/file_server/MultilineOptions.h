@@ -31,7 +31,7 @@ public:
     enum class Mode { CUSTOM, JSON };
     enum class UnmatchedContentTreatment { DISCARD, SINGLE_LINE };
 
-    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginName);
+    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginType);
     const std::shared_ptr<boost::regex>& GetStartPatternReg() const { return mStartPatternRegPtr; }
     const std::shared_ptr<boost::regex>& GetContinuePatternReg() const { return mContinuePatternRegPtr; }
     const std::shared_ptr<boost::regex>& GetEndPatternReg() const { return mEndPatternRegPtr; }

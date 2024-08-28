@@ -31,7 +31,7 @@ public:
     void OnSuccessfulInit() const;
 
 private:
-    const string pluginName = "test";
+    const string pluginType = "test";
     PipelineContext ctx;
 };
 
@@ -63,7 +63,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::Mode::CUSTOM, config->mMode);
     APSARA_TEST_EQUAL("\\d+:\\d+:\\d", config->mStartPattern);
     APSARA_TEST_EQUAL("aaa", config->mContinuePattern);
@@ -86,7 +86,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::Mode::CUSTOM, config->mMode);
     APSARA_TEST_EQUAL("", config->mStartPattern);
     APSARA_TEST_EQUAL("", config->mContinuePattern);
@@ -108,7 +108,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::Mode::JSON, config->mMode);
     APSARA_TEST_EQUAL("", config->mStartPattern);
     APSARA_TEST_EQUAL("", config->mContinuePattern);
@@ -125,7 +125,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::Mode::CUSTOM, config->mMode);
     APSARA_TEST_EQUAL("\\d+:\\d+:\\d", config->mStartPattern);
     APSARA_TEST_EQUAL("aaa", config->mContinuePattern);
@@ -142,7 +142,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::Mode::CUSTOM, config->mMode);
     APSARA_TEST_EQUAL(".*", config->mStartPattern);
     APSARA_TEST_EQUAL(".*", config->mContinuePattern);
@@ -161,7 +161,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::Mode::CUSTOM, config->mMode);
     APSARA_TEST_EQUAL("", config->mStartPattern);
     APSARA_TEST_EQUAL("", config->mContinuePattern);
@@ -180,7 +180,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::Mode::CUSTOM, config->mMode);
     APSARA_TEST_EQUAL("", config->mStartPattern);
     APSARA_TEST_EQUAL("aaa", config->mContinuePattern);
@@ -198,7 +198,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::UnmatchedContentTreatment::DISCARD, config->mUnmatchedContentTreatment);
 
     configStr = R"(
@@ -208,7 +208,7 @@ void MultilineOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new MultilineOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE, config->mUnmatchedContentTreatment);
 }
 

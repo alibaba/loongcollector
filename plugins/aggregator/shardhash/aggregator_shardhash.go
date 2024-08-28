@@ -34,7 +34,7 @@ import (
 const (
 	defaultShardCount = 8
 	maxShardCount     = 512
-	pluginName        = "aggregator_shardhash"
+	pluginType        = "aggregator_shardhash"
 )
 
 // shardAggregator decides which agg (log group) the log belongs to.
@@ -95,7 +95,7 @@ func (s *AggregatorShardHash) Init(context pipeline.Context, que pipeline.LogGro
 	s.queue = que
 
 	if len(s.SourceKeys) == 0 {
-		return 0, fmt.Errorf("plugin %v must specify SourceKeys", pluginName)
+		return 0, fmt.Errorf("plugin %v must specify SourceKeys", pluginType)
 	}
 	if s.ShardCount <= 0 || s.ShardCount > maxShardCount {
 		return 0, fmt.Errorf("invalid ShardCount: %v, range [1, %v]",
@@ -237,7 +237,7 @@ func newAggregatorShardHash() *AggregatorShardHash {
 }
 
 func init() {
-	pipeline.Aggregators[pluginName] = func() pipeline.Aggregator {
+	pipeline.Aggregators[pluginType] = func() pipeline.Aggregator {
 		return newAggregatorShardHash()
 	}
 }

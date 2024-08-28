@@ -85,7 +85,7 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
         }
         mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
         mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
-        mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(optionalGoPipeline, &mFileDiscovery);
+        mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(optionalGoPipeline, &mFileDiscovery, mContext->GetPipeline().GenNextPluginMeta(false));
     }
 
     if (!mFileReader.Init(config, *mContext, sName)) {

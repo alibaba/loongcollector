@@ -35,6 +35,25 @@ DECLARE_FLAG_INT32(default_plugin_log_queue_size);
 
 using namespace std;
 
+namespace {
+class AggregatorDefaultConfig {
+public:
+    static AggregatorDefaultConfig& Instance() {
+        static AggregatorDefaultConfig instance;
+        return instance;
+    }
+
+    Json::Value* GetJsonConfig() { return &aggregatorDefault; }
+
+private:
+    Json::Value aggregatorDefault;
+    AggregatorDefaultConfig() { aggregatorDefault["Type"] = "aggregator_default"; }
+
+    AggregatorDefaultConfig(AggregatorDefaultConfig const&) = delete;
+    void operator=(AggregatorDefaultConfig const&) = delete;
+};
+} // namespace
+
 namespace logtail {
 
 void AddExtendedGlobalParamToGoPipeline(const Json::Value& extendedParams, Json::Value& pipeline) {
@@ -59,20 +78,21 @@ bool Pipeline::Init(PipelineConfig&& config) {
     const InputContainerStdio* inputContainerStdio = nullptr;
     bool hasFlusherSLS = false;
 
-#ifdef __ENTERPRISE__
-    // to send alarm before flusherSLS is built, a temporary object is made, which will be overriden shortly after.
+    // to send alarm and init MetricsRecord before flusherSLS is built, a temporary object is made, which will be
     unique_ptr<FlusherSLS> SLSTmp = make_unique<FlusherSLS>();
-    SLSTmp->mProject = config.mProject;
-    SLSTmp->mLogstore = config.mLogstore;
-    SLSTmp->mRegion = config.mRegion;
-    mContext.SetSLSInfo(SLSTmp.get());
-#endif
+    if (!config.mProject.empty()) {
+        SLSTmp->mProject = config.mProject;
+        SLSTmp->mLogstore = config.mLogstore;
+        SLSTmp->mRegion = config.mRegion;
+        mContext.SetSLSInfo(SLSTmp.get());
+    }
 
     mPluginID.store(0);
     for (size_t i = 0; i < config.mInputs.size(); ++i) {
         const Json::Value& detail = *config.mInputs[i];
-        string name = detail["Type"].asString();
-        unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(name, GenNextPluginMeta(false));
+        string pluginType = detail["Type"].asString();
+        unique_ptr<InputInstance> input
+            = PluginRegistry::GetInstance()->CreateInput(pluginType, GenNextPluginMeta(false));
         if (input) {
             Json::Value optionalGoPipeline;
             if (!input->Init(detail, mContext, i, optionalGoPipeline)) {
@@ -83,56 +103,66 @@ bool Pipeline::Init(PipelineConfig&& config) {
                 MergeGoPipeline(optionalGoPipeline, mGoPipelineWithInput);
             }
             // for special treatment below
-            if (name == InputFile::sName) {
+            if (pluginType == InputFile::sName) {
                 inputFile = static_cast<const InputFile*>(mInputs[0]->GetPlugin());
-            } else if (name == InputContainerStdio::sName) {
+            } else if (pluginType == InputContainerStdio::sName) {
                 inputContainerStdio = static_cast<const InputContainerStdio*>(mInputs[0]->GetPlugin());
             }
         } else {
-            AddPluginToGoPipeline(detail, "inputs", mGoPipelineWithInput);
+            AddPluginToGoPipeline(pluginType, detail, "inputs", mGoPipelineWithInput);
         }
-        ++mPluginCntMap["inputs"][name];
+        ++mPluginCntMap["inputs"][pluginType];
     }
 
     for (size_t i = 0; i < config.mProcessors.size(); ++i) {
-        string name = (*config.mProcessors[i])["Type"].asString();
+        const Json::Value& detail = *config.mProcessors[i];
+        string pluginType = detail["Type"].asString();
         unique_ptr<ProcessorInstance> processor
-            = PluginRegistry::GetInstance()->CreateProcessor(name, GenNextPluginMeta(false));
+            = PluginRegistry::GetInstance()->CreateProcessor(pluginType, GenNextPluginMeta(false));
         if (processor) {
-            if (!processor->Init(*config.mProcessors[i], mContext)) {
+            if (!processor->Init(detail, mContext)) {
                 return false;
             }
             mProcessorLine.emplace_back(std::move(processor));
             // for special treatment of topicformat in apsara mode
-            if (i == 0 && name == ProcessorParseApsaraNative::sName) {
+            if (i == 0 && pluginType == ProcessorParseApsaraNative::sName) {
                 mContext.SetIsFirstProcessorApsaraFlag(true);
             }
         } else {
             if (ShouldAddPluginToGoPipelineWithInput()) {
-                AddPluginToGoPipeline(*config.mProcessors[i], "processors", mGoPipelineWithInput);
+                AddPluginToGoPipeline(pluginType, detail, "processors", mGoPipelineWithInput);
             } else {
-                AddPluginToGoPipeline(*config.mProcessors[i], "processors", mGoPipelineWithoutInput);
+                AddPluginToGoPipeline(pluginType, detail, "processors", mGoPipelineWithoutInput);
             }
         }
-        ++mPluginCntMap["processors"][name];
+        ++mPluginCntMap["processors"][pluginType];
     }
 
-    for (auto detail : config.mAggregators) {
+    if (config.mAggregators.empty() && config.IsFlushingThroughGoPipelineExisted()) {
+        // an aggregator_default plugin will be add to go pipeline when mAggregators is empty and need to send go data
+        // to cpp flusher.
+        config.mAggregators.push_back(AggregatorDefaultConfig::Instance().GetJsonConfig());
+    }
+    for (size_t i = 0; i < config.mAggregators.size(); ++i) {
+        const Json::Value& detail = *config.mAggregators[i];
+        string pluginType = detail["Type"].asString();
+        GenNextPluginMeta(false);
         if (ShouldAddPluginToGoPipelineWithInput()) {
-            AddPluginToGoPipeline(*detail, "aggregators", mGoPipelineWithInput);
+            AddPluginToGoPipeline(pluginType, detail, "aggregators", mGoPipelineWithInput);
         } else {
-            AddPluginToGoPipeline(*detail, "aggregators", mGoPipelineWithoutInput);
+            AddPluginToGoPipeline(pluginType, detail, "aggregators", mGoPipelineWithoutInput);
         }
-        ++mPluginCntMap["aggregators"][(*detail)["Type"].asString()];
+        ++mPluginCntMap["aggregators"][pluginType];
     }
 
-    for (auto detail : config.mFlushers) {
-        string name = (*detail)["Type"].asString();
+    for (size_t i = 0; i < config.mFlushers.size(); ++i) {
+        const Json::Value& detail = *config.mFlushers[i];
+        string pluginType = detail["Type"].asString();
         unique_ptr<FlusherInstance> flusher
-            = PluginRegistry::GetInstance()->CreateFlusher(name, GenNextPluginMeta(false));
+            = PluginRegistry::GetInstance()->CreateFlusher(pluginType, GenNextPluginMeta(false));
         if (flusher) {
             Json::Value optionalGoPipeline;
-            if (!flusher->Init(*detail, mContext, optionalGoPipeline)) {
+            if (!flusher->Init(detail, mContext, optionalGoPipeline)) {
                 return false;
             }
             mFlushers.emplace_back(std::move(flusher));
@@ -143,18 +173,18 @@ bool Pipeline::Init(PipelineConfig&& config) {
                     MergeGoPipeline(optionalGoPipeline, mGoPipelineWithoutInput);
                 }
             }
-            if (name == FlusherSLS::sName) {
+            if (pluginType == FlusherSLS::sName) {
                 hasFlusherSLS = true;
                 mContext.SetSLSInfo(static_cast<const FlusherSLS*>(mFlushers.back()->GetPlugin()));
             }
         } else {
             if (ShouldAddPluginToGoPipelineWithInput()) {
-                AddPluginToGoPipeline(*detail, "flushers", mGoPipelineWithInput);
+                AddPluginToGoPipeline(pluginType, detail, "flushers", mGoPipelineWithInput);
             } else {
-                AddPluginToGoPipeline(*detail, "flushers", mGoPipelineWithoutInput);
+                AddPluginToGoPipeline(pluginType, detail, "flushers", mGoPipelineWithoutInput);
             }
         }
-        ++mPluginCntMap["flushers"][name];
+        ++mPluginCntMap["flushers"][pluginType];
     }
 
     // route is only enabled in native flushing mode, thus the index in config is the same as that in mFlushers
@@ -162,14 +192,17 @@ bool Pipeline::Init(PipelineConfig&& config) {
         return false;
     }
 
-    for (auto detail : config.mExtensions) {
+    for (size_t i = 0; i < config.mExtensions.size(); ++i) {
+        const Json::Value& detail = *config.mExtensions[i];
+        string pluginType = detail["Type"].asString();
+        GenNextPluginMeta(false);
         if (!mGoPipelineWithInput.isNull()) {
-            AddPluginToGoPipeline(*detail, "extensions", mGoPipelineWithInput);
+            AddPluginToGoPipeline(pluginType, detail, "extensions", mGoPipelineWithInput);
         }
         if (!mGoPipelineWithoutInput.isNull()) {
-            AddPluginToGoPipeline(*detail, "extensions", mGoPipelineWithoutInput);
+            AddPluginToGoPipeline(pluginType, detail, "extensions", mGoPipelineWithoutInput);
         }
-        ++mPluginCntMap["extensions"][(*detail)["Type"].asString()];
+        ++mPluginCntMap["extensions"][pluginType];
     }
 
     // global module must be initialized at last, since native input or flusher plugin may generate global param in Go
@@ -393,10 +426,18 @@ void Pipeline::MergeGoPipeline(const Json::Value& src, Json::Value& dst) {
     }
 }
 
-void Pipeline::AddPluginToGoPipeline(const Json::Value& plugin, const string& module, Json::Value& dst) {
+std::string Pipeline::GenPluginTypeWithID(std::string pluginType, std::string pluginID) {
+    return pluginType + "/" + pluginID;
+}
+
+// Rule: pluginTypeWithID=pluginType/pluginID#pluginPriority.
+void Pipeline::AddPluginToGoPipeline(const string& pluginType,
+                                     const Json::Value& plugin,
+                                     const string& module,
+                                     Json::Value& dst) {
     Json::Value res(Json::objectValue), detail = plugin;
     detail.removeMember("Type");
-    res["type"] = plugin["Type"];
+    res["type"] = GenPluginTypeWithID(pluginType, GetNowPluginID());
     res["detail"] = detail;
     dst[module].append(res);
 }
@@ -455,11 +496,6 @@ bool Pipeline::LoadGoPipelines() const {
 }
 
 std::string Pipeline::GetNowPluginID() {
-    return std::to_string(mPluginID.load());
-}
-
-std::string Pipeline::GenNextPluginID() {
-    mPluginID.fetch_add(1);
     return std::to_string(mPluginID.load());
 }
 

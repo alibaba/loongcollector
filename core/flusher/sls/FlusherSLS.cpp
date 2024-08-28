@@ -833,7 +833,7 @@ void FlusherSLS::GenerateGoPlugin(const Json::Value& config, Json::Value& res) c
     }
     if (!detail.empty()) {
         Json::Value plugin(Json::objectValue);
-        plugin["type"] = "flusher_sls";
+        plugin["type"] = Pipeline::GenPluginTypeWithID("flusher_sls", mContext->GetPipeline().GetNowPluginID());
         plugin["detail"] = detail;
         res["flushers"].append(plugin);
     }

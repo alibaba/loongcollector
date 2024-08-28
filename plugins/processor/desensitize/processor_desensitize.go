@@ -39,7 +39,7 @@ type ProcessorDesensitize struct {
 	regexContent *regexp2.Regexp
 }
 
-const pluginName = "processor_desensitize"
+const pluginType = "processor_desensitize"
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
@@ -157,7 +157,7 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorDesensitize{
 			SourceKey:     "",
 			Method:        "const",

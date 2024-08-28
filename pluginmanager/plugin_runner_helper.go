@@ -123,8 +123,8 @@ func GetConfigFlushers(runner PluginRunner) []pipeline.Flusher {
 	return flushers
 }
 
-func pluginUnImplementError(category pluginCategory, version ConfigVersion, pluginName string) error {
-	return fmt.Errorf("plugin does not implement %s%s. pluginType: %s", category, strings.ToUpper(string(version)), pluginName)
+func pluginUnImplementError(category pluginCategory, version ConfigVersion, pluginType string) error {
+	return fmt.Errorf("plugin does not implement %s%s. pluginType: %s", category, strings.ToUpper(string(version)), pluginType)
 }
 
 func pluginCategoryUndefinedError(category pluginCategory) error {

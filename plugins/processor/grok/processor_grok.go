@@ -51,7 +51,7 @@ type ProcessorGrok struct {
 	aliases           map[string]string // Correspondence between alias and original name, e.g. {"pid":"POSINT", "program":"PROG"}
 }
 
-const pluginName = "processor_grok"
+const pluginType = "processor_grok"
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorGrok) Init(context pipeline.Context) error {
@@ -336,7 +336,7 @@ func (p *ProcessorGrok) compileMatchs() error {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorGrok{
 			CustomPatternDir:    []string{},
 			CustomPatterns:      map[string]string{},

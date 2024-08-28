@@ -29,7 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-const pluginName = "metric_meta_host"
+const pluginType = "metric_meta_host"
 
 const (
 	Process = "PROCESS"
@@ -191,7 +191,7 @@ func formatCmd(cmd string) string {
 }
 
 func init() {
-	pipeline.MetricInputs[pluginName] = func() pipeline.MetricInput {
+	pipeline.MetricInputs[pluginType] = func() pipeline.MetricInput {
 		return &InputNodeMeta{
 			CPU:                  true,
 			Memory:               true,

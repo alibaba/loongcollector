@@ -45,7 +45,7 @@ struct FileReaderOptions {
 
     FileReaderOptions();
 
-    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginName);
+    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginType);
 };
 
 using FileReaderConfig = std::pair<const FileReaderOptions*, const PipelineContext*>;

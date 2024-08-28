@@ -30,8 +30,8 @@ type ProcessorRateLimit struct {
 创建指标时，需要将其注册到iLogtail Context 的 MetricRecord 中，以便 iLogtail 能够采集上报数据，在插件的Init方法中，调用context 的 GetMetricRecord()方法来获取MetricRecord，然后调用helper.New**XXX**MetricAndRegister函数去注册一个指标，例如：
 ```go
 metricsRecord := p.context.GetMetricRecord()
-p.limitMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_limited", pluginName))
-p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginName))
+p.limitMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_limited", pluginType))
+p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginType))
 ```
 用户在声明一个Metric时可以还额外注入一些插件级别的静态Label，这是一个可选参数，例如flusher_http就把RemoteURL等配置进行上报：
 ```go

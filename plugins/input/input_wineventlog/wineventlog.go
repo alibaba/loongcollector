@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	pluginName = "service_wineventlog"
+	pluginType = "service_wineventlog"
 )
 
 // WinEventLog represents the plugin to collect Windows event logs.
@@ -160,7 +160,7 @@ func (w *WinEventLog) run() bool {
 		return true
 	}
 	defer func() {
-		logger.Infof(w.context.GetRuntimeContext(), "%s Stopping %v", w.logPrefix, pluginName)
+		logger.Infof(w.context.GetRuntimeContext(), "%s Stopping %v", w.logPrefix, pluginType)
 		err := w.eventLogger.Close()
 		if err != nil {
 			logger.Warningf(w.context.GetRuntimeContext(), "WINEVENTLOG_MAIN_ALARM", "%s Close() error", w.logPrefix, err)
@@ -209,7 +209,7 @@ func (w *WinEventLog) run() bool {
 }
 
 func (w *WinEventLog) initCheckpoint() {
-	checkpointKey := pluginName + "_" + w.Name
+	checkpointKey := pluginType + "_" + w.Name
 	ok := w.context.GetCheckPointObject(checkpointKey, &w.checkpoint)
 	if ok {
 		logger.Infof(w.context.GetRuntimeContext(), "%s Checkpoint loaded: %v", w.logPrefix, w.checkpoint)
@@ -218,7 +218,7 @@ func (w *WinEventLog) initCheckpoint() {
 }
 
 func (w *WinEventLog) saveCheckpoint() {
-	checkpointKey := pluginName + "_" + w.Name
+	checkpointKey := pluginType + "_" + w.Name
 	w.context.SaveCheckPointObject(checkpointKey, &w.checkpoint)
 }
 
@@ -231,7 +231,7 @@ func newWinEventLog() *WinEventLog {
 }
 
 func init() {
-	pipeline.ServiceInputs[pluginName] = func() pipeline.ServiceInput {
+	pipeline.ServiceInputs[pluginType] = func() pipeline.ServiceInput {
 		return newWinEventLog()
 	}
 }

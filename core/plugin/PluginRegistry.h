@@ -77,7 +77,7 @@ private:
     void RegisterInputCreator(PluginCreator* creator);
     void RegisterProcessorCreator(PluginCreator* creator);
     void RegisterFlusherCreator(PluginCreator* creator);
-    PluginCreator* LoadProcessorPlugin(DynamicLibLoader& loader, const std::string pluginName);
+    PluginCreator* LoadProcessorPlugin(DynamicLibLoader& loader, const std::string pluginType);
     void RegisterCreator(PluginCat cat, PluginCreator* creator);
     std::unique_ptr<PluginInstance> Create(PluginCat cat, const std::string& name, const PluginInstance::PluginMeta& pluginMeta);
 

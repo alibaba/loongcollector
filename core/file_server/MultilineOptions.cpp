@@ -19,7 +19,7 @@
 using namespace std;
 
 namespace logtail {
-bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginName) {
+bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginType) {
     string errorMsg;
 
     // Mode
@@ -29,7 +29,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
                               ctx.GetAlarm(),
                               errorMsg,
                               "custom",
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
@@ -42,7 +42,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
                               ctx.GetAlarm(),
                               "string param Multiline.Mode is not valid",
                               "custom",
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
@@ -56,7 +56,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
             PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                  ctx.GetAlarm(),
                                  errorMsg,
-                                 pluginName,
+                                 pluginType,
                                  ctx.GetConfigName(),
                                  ctx.GetProjectName(),
                                  ctx.GetLogstoreName(),
@@ -65,7 +65,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
             PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                  ctx.GetAlarm(),
                                  "string param Multiline.StartPattern is not a valid regex",
-                                 pluginName,
+                                 pluginType,
                                  ctx.GetConfigName(),
                                  ctx.GetProjectName(),
                                  ctx.GetLogstoreName(),
@@ -80,7 +80,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
             PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                  ctx.GetAlarm(),
                                  errorMsg,
-                                 pluginName,
+                                 pluginType,
                                  ctx.GetConfigName(),
                                  ctx.GetProjectName(),
                                  ctx.GetLogstoreName(),
@@ -89,7 +89,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
             PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                  ctx.GetAlarm(),
                                  "string param Multiline.ContinuePattern is not a valid regex",
-                                 pluginName,
+                                 pluginType,
                                  ctx.GetConfigName(),
                                  ctx.GetProjectName(),
                                  ctx.GetLogstoreName(),
@@ -104,7 +104,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
             PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                  ctx.GetAlarm(),
                                  errorMsg,
-                                 pluginName,
+                                 pluginType,
                                  ctx.GetConfigName(),
                                  ctx.GetProjectName(),
                                  ctx.GetLogstoreName(),
@@ -113,7 +113,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
             PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                  ctx.GetAlarm(),
                                  "string param Multiline.EndPattern is not a valid regex",
-                                 pluginName,
+                                 pluginType,
                                  ctx.GetConfigName(),
                                  ctx.GetProjectName(),
                                  ctx.GetLogstoreName(),
@@ -127,11 +127,11 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
             LOG_WARNING(ctx.GetLogger(),
                         ("problem encountered in config parsing",
                          "param Multiline.StartPattern and EndPattern are empty but ContinuePattern is not")(
-                            "action", "ignore multiline config")("module", pluginName)("config", ctx.GetConfigName()));
+                            "action", "ignore multiline config")("module", pluginType)("config", ctx.GetConfigName()));
             ctx.GetAlarm().SendAlarm(CATEGORY_CONFIG_ALARM,
                                      "param Multiline.StartPattern and EndPattern are empty but ContinuePattern is "
                                      "not: ignore multiline config, module: "
-                                         + pluginName + ", config: " + ctx.GetConfigName(),
+                                         + pluginType + ", config: " + ctx.GetConfigName(),
                                      ctx.GetProjectName(),
                                      ctx.GetLogstoreName(),
                                      ctx.GetRegion());
@@ -141,13 +141,13 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
                 ctx.GetLogger(),
                 ("problem encountered in config parsing",
                  "none of param Multiline.StartPattern, Multiline.ContinuePattern and Multiline.EndPattern are empty")(
-                    "action", "ignore param Multiline.ContinuePattern")("module", pluginName)("config",
+                    "action", "ignore param Multiline.ContinuePattern")("module", pluginType)("config",
                                                                                               ctx.GetConfigName()));
             ctx.GetAlarm().SendAlarm(
                 CATEGORY_CONFIG_ALARM,
                 "none of param Multiline.StartPattern, Multiline.ContinuePattern and Multiline.EndPattern are empty: "
                 "ignore param Multiline.ContinuePattern, module: "
-                    + pluginName + ", config: " + ctx.GetConfigName(),
+                    + pluginType + ", config: " + ctx.GetConfigName(),
                 ctx.GetProjectName(),
                 ctx.GetLogstoreName(),
                 ctx.GetRegion());
@@ -164,7 +164,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
                               ctx.GetAlarm(),
                               errorMsg,
                               "single_line",
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
@@ -176,7 +176,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
                               ctx.GetAlarm(),
                               "string param Multiline.UnmatchedContentTreatment is not valid",
                               "single_line",
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
@@ -189,7 +189,7 @@ bool MultilineOptions::Init(const Json::Value& config, const PipelineContext& ct
                               ctx.GetAlarm(),
                               errorMsg,
                               mIgnoringUnmatchWarning,
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),

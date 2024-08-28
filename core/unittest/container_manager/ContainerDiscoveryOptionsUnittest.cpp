@@ -31,7 +31,7 @@ public:
     void OnSuccessfulInit() const;
 
 private:
-    const string pluginName = "test";
+    const string pluginType = "test";
     PipelineContext ctx;
 };
 
@@ -92,7 +92,7 @@ void ContainerDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new ContainerDiscoveryOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL("default", config->mContainerFilters.mK8sNamespaceRegex);
     APSARA_TEST_EQUAL("pod", config->mContainerFilters.mK8sPodRegex);
     APSARA_TEST_EQUAL(1U, config->mContainerFilters.mIncludeK8sLabel.size());
@@ -127,7 +127,7 @@ void ContainerDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new ContainerDiscoveryOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginName));
+    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL("", config->mContainerFilters.mK8sNamespaceRegex);
     APSARA_TEST_EQUAL("", config->mContainerFilters.mK8sPodRegex);
     APSARA_TEST_EQUAL(0U, config->mContainerFilters.mIncludeK8sLabel.size());

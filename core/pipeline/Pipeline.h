@@ -60,12 +60,15 @@ public:
     const std::vector<std::unique_ptr<InputInstance>>& GetInputs() const { return mInputs; }
 
     std::string GetNowPluginID();
-    std::string GenNextPluginID();
+    static std::string GenPluginTypeWithID(std::string pluginType, std::string pluginID);
     PluginInstance::PluginMeta GenNextPluginMeta(bool lastOne);
 
 private:
     void MergeGoPipeline(const Json::Value& src, Json::Value& dst);
-    void AddPluginToGoPipeline(const Json::Value& plugin, const std::string& module, Json::Value& dst);
+    void AddPluginToGoPipeline(const std::string& type,
+                               const Json::Value& plugin,
+                               const std::string& module,
+                               Json::Value& dst);
     void CopyNativeGlobalParamToGoPipeline(Json::Value& root);
     bool ShouldAddPluginToGoPipelineWithInput() const { return mInputs.empty() && mProcessorLine.empty(); }
 

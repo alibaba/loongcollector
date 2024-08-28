@@ -33,7 +33,7 @@ struct CommonParserOptions {
     // for backward compatability only, should not be explicitly used!
     bool mCopingRawLog = false;
 
-    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginName);
+    bool Init(const Json::Value& config, const PipelineContext& ctx, const std::string& pluginType);
     bool ShouldAddSourceContent(bool parseSuccess);
     bool ShouldAddLegacyUnmatchedRawLog(bool parseSuccess);
     bool ShouldEraseEvent(bool parseSuccess, const LogEvent& sourceEvent);

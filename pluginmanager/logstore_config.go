@@ -358,12 +358,15 @@ func hasDockerStdoutInput(plugins map[string]interface{}) bool {
 		if !valid {
 			continue
 		}
-		typeName, valid := cfg["type"]
+		pluginTypeWithID, valid := cfg["type"]
 		if !valid {
 			continue
 		}
-		if val, valid := typeName.(string); valid && val == input.ServiceDockerStdoutPluginName {
-			return true
+		if val, valid := pluginTypeWithID.(string); valid {
+			pluginType := getPluginType(val)
+			if pluginType == input.ServiceDockerStdoutPluginName {
+				return true
+			}
 		}
 	}
 	return false
@@ -444,11 +447,16 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 				if !valid {
 					continue
 				}
-				typeName, valid := cfg["type"]
+				pluginTypeWithID, valid := cfg["type"]
 				if !valid {
 					continue
 				}
-				if val, valid := typeName.(string); valid && (val == input.ServiceDockerStdoutPluginName || val == input.MetricDocierFilePluginName) {
+				val, valid := pluginTypeWithID.(string)
+				if !valid {
+					continue
+				}
+				pluginType := getPluginType(val)
+				if pluginType == input.ServiceDockerStdoutPluginName || pluginType == input.MetricDocierFilePluginName {
 					configDetail, valid := cfg["detail"]
 					if !valid {
 						continue
@@ -547,16 +555,19 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			if !ok {
 				return nil, fmt.Errorf("invalid extension type")
 			}
-			typeName, ok := extension["type"].(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid extension type")
+			if pluginTypeWithID, ok := extension["type"]; ok {
+				pluginTypeWithIDStr, ok := pluginTypeWithID.(string)
+				if !ok {
+					return nil, fmt.Errorf("invalid extension type")
+				}
+				pluginType := getPluginType(pluginTypeWithIDStr)
+				logger.Debug(contextImp.GetRuntimeContext(), "add extension", pluginType)
+				err = loadExtension(logstoreC.genPluginMeta(pluginTypeWithIDStr, false, false), logstoreC, extension["detail"])
+				if err != nil {
+					return nil, err
+				}
+				contextImp.AddPlugin(pluginType)
 			}
-			logger.Debug(contextImp.GetRuntimeContext(), "add extension", typeName)
-			err = loadExtension(logstoreC.genPluginMeta(typeName, false, false), logstoreC, extension["detail"])
-			if err != nil {
-				return nil, err
-			}
-			contextImp.AddPlugin(typeName)
 		}
 	}
 
@@ -567,20 +578,21 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			for _, inputInterface := range inputs {
 				input, ok := inputInterface.(map[string]interface{})
 				if ok {
-					if typeName, ok := input["type"]; ok {
-						if typeNameStr, ok := typeName.(string); ok {
-							if _, isMetricInput := pipeline.MetricInputs[typeNameStr]; isMetricInput {
+					if pluginTypeWithID, ok := input["type"]; ok {
+						if pluginTypeWithIDStr, ok := pluginTypeWithID.(string); ok {
+							pluginType := getPluginType(pluginTypeWithIDStr)
+							if _, isMetricInput := pipeline.MetricInputs[pluginType]; isMetricInput {
 								// Load MetricInput plugin defined in pipeline.MetricInputs
 								// pipeline.MetricInputs will be renamed in a future version
-								err = loadMetric(logstoreC.genPluginMeta(typeNameStr, true, false), logstoreC, input["detail"])
-							} else if _, isServiceInput := pipeline.ServiceInputs[typeNameStr]; isServiceInput {
+								err = loadMetric(logstoreC.genPluginMeta(pluginTypeWithIDStr, true, false), logstoreC, input["detail"])
+							} else if _, isServiceInput := pipeline.ServiceInputs[pluginType]; isServiceInput {
 								// Load ServiceInput plugin defined in pipeline.ServiceInputs
-								err = loadService(logstoreC.genPluginMeta(typeNameStr, true, false), logstoreC, input["detail"])
+								err = loadService(logstoreC.genPluginMeta(pluginTypeWithIDStr, true, false), logstoreC, input["detail"])
 							}
 							if err != nil {
 								return nil, err
 							}
-							contextImp.AddPlugin(typeNameStr)
+							contextImp.AddPlugin(pluginType)
 							continue
 						}
 					}
@@ -598,14 +610,15 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			for i, processorInterface := range processors {
 				processor, ok := processorInterface.(map[string]interface{})
 				if ok {
-					if typeName, ok := processor["type"]; ok {
-						if typeNameStr, ok := typeName.(string); ok {
-							logger.Debug(contextImp.GetRuntimeContext(), "add processor", typeNameStr)
-							err = loadProcessor(logstoreC.genPluginMeta(typeNameStr, true, false), i, logstoreC, processor["detail"])
+					if pluginTypeWithID, ok := processor["type"]; ok {
+						if pluginTypeWithIDStr, ok := pluginTypeWithID.(string); ok {
+							pluginType := getPluginType(pluginTypeWithIDStr)
+							logger.Debug(contextImp.GetRuntimeContext(), "add processor", pluginType)
+							err = loadProcessor(logstoreC.genPluginMeta(pluginTypeWithIDStr, true, false), i, logstoreC, processor["detail"])
 							if err != nil {
 								return nil, err
 							}
-							contextImp.AddPlugin(typeNameStr)
+							contextImp.AddPlugin(pluginType)
 							continue
 						}
 					}
@@ -624,14 +637,15 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			for _, aggregatorInterface := range aggregators {
 				aggregator, ok := aggregatorInterface.(map[string]interface{})
 				if ok {
-					if typeName, ok := aggregator["type"]; ok {
-						if typeNameStr, ok := typeName.(string); ok {
-							logger.Debug(contextImp.GetRuntimeContext(), "add aggregator", typeNameStr)
-							err = loadAggregator(logstoreC.genPluginMeta(typeNameStr, true, false), logstoreC, aggregator["detail"])
+					if pluginTypeWithID, ok := aggregator["type"]; ok {
+						if pluginTypeWithIDStr, ok := pluginTypeWithID.(string); ok {
+							pluginType := getPluginType(pluginTypeWithIDStr)
+							logger.Debug(contextImp.GetRuntimeContext(), "add aggregator", pluginType)
+							err = loadAggregator(logstoreC.genPluginMeta(pluginTypeWithIDStr, true, false), logstoreC, aggregator["detail"])
 							if err != nil {
 								return nil, err
 							}
-							contextImp.AddPlugin(typeNameStr)
+							contextImp.AddPlugin(pluginType)
 							continue
 						}
 					}
@@ -654,18 +668,19 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			for num, flusherInterface := range flushers {
 				flusher, ok := flusherInterface.(map[string]interface{})
 				if ok {
-					if typeName, ok := flusher["type"]; ok {
-						if typeNameStr, ok := typeName.(string); ok {
-							logger.Debug(contextImp.GetRuntimeContext(), "add flusher", typeNameStr)
+					if pluginTypeWithID, ok := flusher["type"]; ok {
+						if pluginTypeWithIDStr, ok := pluginTypeWithID.(string); ok {
+							pluginType := getPluginType(pluginTypeWithIDStr)
+							logger.Debug(contextImp.GetRuntimeContext(), "add flusher", pluginType)
 							lastOne := false
 							if num == flushersLen-1 {
 								lastOne = true
 							}
-							err = loadFlusher(logstoreC.genPluginMeta(typeNameStr, true, lastOne), logstoreC, flusher["detail"])
+							err = loadFlusher(logstoreC.genPluginMeta(pluginTypeWithIDStr, true, lastOne), logstoreC, flusher["detail"])
 							if err != nil {
 								return nil, err
 							}
-							contextImp.AddPlugin(typeNameStr)
+							contextImp.AddPlugin(pluginType)
 							continue
 						}
 					}
@@ -838,14 +853,21 @@ func applyPluginConfig(plugin interface{}, pluginConfig interface{}) error {
 	return err
 }
 
-// Rule: pluginName=pluginType/pluginID#pluginPriority.
-func (lc *LogstoreConfig) genPluginMeta(pluginName string, genNodeID bool, lastOne bool) *pipeline.PluginMeta {
+// Rule: pluginTypeWithID=pluginType/pluginID#pluginPriority.
+func getPluginType(pluginTypeWithID string) string {
+	if ids := strings.IndexByte(pluginTypeWithID, '/'); ids != -1 {
+		return pluginTypeWithID[:ids]
+	}
+	return pluginTypeWithID
+}
+
+func (lc *LogstoreConfig) genPluginMeta(pluginTypeWithID string, genNodeID bool, lastOne bool) *pipeline.PluginMeta {
 	nodeID := ""
 	childNodeID := ""
-	if isPluginTypeWithID(pluginName) {
-		pluginTypeWithID := pluginName
-		if idx := strings.IndexByte(pluginName, '#'); idx != -1 {
-			pluginTypeWithID = pluginName[:idx]
+	if isPluginTypeWithID(pluginTypeWithID) {
+		pluginTypeWithID := pluginTypeWithID
+		if idx := strings.IndexByte(pluginTypeWithID, '#'); idx != -1 {
+			pluginTypeWithID = pluginTypeWithID[:idx]
 		}
 		if ids := strings.IndexByte(pluginTypeWithID, '/'); ids != -1 {
 			if genNodeID {
@@ -863,30 +885,31 @@ func (lc *LogstoreConfig) genPluginMeta(pluginName string, genNodeID bool, lastO
 			}
 		}
 	}
+	pluginType := pluginTypeWithID
 	pluginID := lc.genPluginID()
 	if genNodeID {
 		nodeID, childNodeID = lc.genNodeID(lastOne)
 	}
-	pluginTypeWithID := fmt.Sprintf("%s/%s", pluginName, pluginID)
+	pluginTypeWithID = fmt.Sprintf("%s/%s", pluginType, pluginID)
 	return &pipeline.PluginMeta{
 		PluginTypeWithID: pluginTypeWithID,
-		PluginType:       pluginName,
+		PluginType:       pluginType,
 		PluginID:         pluginID,
 		NodeID:           nodeID,
 		ChildNodeID:      childNodeID,
 	}
 }
 
-func isPluginTypeWithID(pluginName string) bool {
-	if idx := strings.IndexByte(pluginName, '/'); idx != -1 {
+func isPluginTypeWithID(pluginTypeWithID string) bool {
+	if idx := strings.IndexByte(pluginTypeWithID, '/'); idx != -1 {
 		return true
 	}
 	return false
 }
 
-func GetPluginPriority(pluginName string) int {
-	if idx := strings.IndexByte(pluginName, '#'); idx != -1 {
-		val, err := strconv.Atoi(pluginName[idx+1:])
+func GetPluginPriority(pluginTypeWithID string) int {
+	if idx := strings.IndexByte(pluginTypeWithID, '#'); idx != -1 {
+		val, err := strconv.Atoi(pluginTypeWithID[idx+1:])
 		if err != nil {
 			return 0
 		}

@@ -104,8 +104,7 @@ bool PipelineConfig::Parse() {
     string key, errorMsg;
     const Json::Value* itr = nullptr;
     LogtailAlarm& alarm = *LogtailAlarm::GetInstance();
-#ifdef __ENTERPRISE__
-    // to send alarm, project, logstore and region should be extracted first.
+    // to send alarm and init MetricsRecord, project, logstore and region should be extracted first.
     key = "flushers";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (itr && itr->isArray()) {
@@ -122,7 +121,6 @@ bool PipelineConfig::Parse() {
             }
         }
     }
-#endif
 
     if (!GetOptionalUIntParam(*mDetail, "createTime", mCreateTime, errorMsg)) {
         PARAM_WARNING_DEFAULT(sLogger, alarm, errorMsg, mCreateTime, noModule, mName, mProject, mLogstore, mRegion);
@@ -199,19 +197,19 @@ bool PipelineConfig::Parse() {
                                mLogstore,
                                mRegion);
         }
-        const string pluginName = it->asString();
+        const string pluginType = it->asString();
         if (i == 0) {
-            if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+            if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 mHasGoInput = true;
-            } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginName)) {
+            } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType)) {
                 mHasNativeInput = true;
             } else {
                 PARAM_ERROR_RETURN(
-                    sLogger, alarm, "unsupported input plugin", pluginName, mName, mProject, mLogstore, mRegion);
+                    sLogger, alarm, "unsupported input plugin", pluginType, mName, mProject, mLogstore, mRegion);
             }
         } else {
             if (mHasGoInput) {
-                if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginName)) {
+                if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType)) {
                     PARAM_ERROR_RETURN(sLogger,
                                        alarm,
                                        "native and extended input plugins coexist",
@@ -220,12 +218,12 @@ bool PipelineConfig::Parse() {
                                        mProject,
                                        mLogstore,
                                        mRegion);
-                } else if (!PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+                } else if (!PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                     PARAM_ERROR_RETURN(
-                        sLogger, alarm, "unsupported input plugin", pluginName, mName, mProject, mLogstore, mRegion);
+                        sLogger, alarm, "unsupported input plugin", pluginType, mName, mProject, mLogstore, mRegion);
                 }
             } else {
-                if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+                if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                     PARAM_ERROR_RETURN(sLogger,
                                        alarm,
                                        "native and extended input plugins coexist",
@@ -234,20 +232,20 @@ bool PipelineConfig::Parse() {
                                        mProject,
                                        mLogstore,
                                        mRegion);
-                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginName)) {
+                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType)) {
                     PARAM_ERROR_RETURN(
-                        sLogger, alarm, "unsupported input plugin", pluginName, mName, mProject, mLogstore, mRegion);
+                        sLogger, alarm, "unsupported input plugin", pluginType, mName, mProject, mLogstore, mRegion);
                 }
             }
         }
         mInputs.push_back(&plugin);
         // TODO: remove these special restrictions
-        if (pluginName == "input_observer_network") {
+        if (pluginType == "input_observer_network") {
             hasObserverInput = true;
-        } else if (pluginName == "input_file" || pluginName == "input_container_stdio") {
+        } else if (pluginType == "input_file" || pluginType == "input_container_stdio") {
             hasFileInput = true;
 #ifdef __ENTERPRISE__
-        } else if (pluginName == "input_stream") {
+        } else if (pluginType == "input_stream") {
             if (!AppConfig::GetInstance()->GetOpenStreamLog()) {
                 PARAM_ERROR_RETURN(
                     sLogger, alarm, "stream log is not enabled", noModule, mName, mProject, mLogstore, mRegion);
@@ -333,9 +331,9 @@ bool PipelineConfig::Parse() {
                                    mLogstore,
                                    mRegion);
             }
-            const string pluginName = it->asString();
+            const string pluginType = it->asString();
             if (mHasGoInput) {
-                if (PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin(pluginName)) {
+                if (PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin(pluginType)) {
                     PARAM_ERROR_RETURN(sLogger,
                                        alarm,
                                        "native processor plugins coexist with extended input plugins",
@@ -344,13 +342,13 @@ bool PipelineConfig::Parse() {
                                        mProject,
                                        mLogstore,
                                        mRegion);
-                } else if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+                } else if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                     mHasGoProcessor = true;
                 } else {
                     PARAM_ERROR_RETURN(sLogger,
                                        alarm,
                                        "unsupported processor plugin",
-                                       pluginName,
+                                       pluginType,
                                        mName,
                                        mProject,
                                        mLogstore,
@@ -358,7 +356,7 @@ bool PipelineConfig::Parse() {
                 }
             } else {
                 if (isCurrentPluginNative) {
-                    if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+                    if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                         // TODO: remove these special restrictions
                         if (!hasObserverInput && !hasFileInput) {
                             PARAM_ERROR_RETURN(sLogger,
@@ -373,16 +371,16 @@ bool PipelineConfig::Parse() {
                         }
                         isCurrentPluginNative = false;
                         mHasGoProcessor = true;
-                    } else if (!PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin(pluginName)) {
+                    } else if (!PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin(pluginType)) {
                         PARAM_ERROR_RETURN(sLogger,
                                            alarm,
                                            "unsupported processor plugin",
-                                           pluginName,
+                                           pluginType,
                                            mName,
                                            mProject,
                                            mLogstore,
                                            mRegion);
-                    } else if (pluginName == "processor_spl") {
+                    } else if (pluginType == "processor_spl") {
                         if (i != 0 || itr->size() != 1) {
                             PARAM_ERROR_RETURN(sLogger,
                                                alarm,
@@ -408,22 +406,22 @@ bool PipelineConfig::Parse() {
                         mHasNativeProcessor = true;
                     }
                 } else {
-                    if (PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin(pluginName)) {
+                    if (PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin(pluginType)) {
                         PARAM_ERROR_RETURN(sLogger,
                                            alarm,
                                            "native processor plugin comes after extended processor plugin",
-                                           pluginName,
+                                           pluginType,
                                            mName,
                                            mProject,
                                            mLogstore,
                                            mRegion);
-                    } else if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+                    } else if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                         mHasGoProcessor = true;
                     } else {
                         PARAM_ERROR_RETURN(sLogger,
                                            alarm,
                                            "unsupported processor plugin",
-                                           pluginName,
+                                           pluginType,
                                            mName,
                                            mProject,
                                            mLogstore,
@@ -433,7 +431,7 @@ bool PipelineConfig::Parse() {
             }
             mProcessors.push_back(&plugin);
             if (i == 0) {
-                if (pluginName == "processor_parse_json_native" || pluginName == "processor_json") {
+                if (pluginType == "processor_parse_json_native" || pluginType == "processor_json") {
                     mIsFirstProcessorJson = true;
                 }
             }
@@ -496,8 +494,8 @@ bool PipelineConfig::Parse() {
                                mLogstore,
                                mRegion);
         }
-        const string pluginName = it->asString();
-        if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+        const string pluginType = it->asString();
+        if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
             // TODO: remove these special restrictions
             if (mHasNativeInput && !hasFileInput && !hasObserverInput) {
                 PARAM_ERROR_RETURN(sLogger,
@@ -511,20 +509,20 @@ bool PipelineConfig::Parse() {
                                    mRegion);
             }
             mHasGoFlusher = true;
-        } else if (PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin(pluginName)) {
+        } else if (PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin(pluginType)) {
             mHasNativeFlusher = true;
             // TODO: remove these special restrictions
             ++nativeFlusherCnt;
-            if (pluginName == "flusher_sls") {
+            if (pluginType == "flusher_sls") {
                 hasFlusherSLS = true;
             }
         } else {
             PARAM_ERROR_RETURN(
-                sLogger, alarm, "unsupported flusher plugin", pluginName, mName, mProject, mLogstore, mRegion);
+                sLogger, alarm, "unsupported flusher plugin", pluginType, mName, mProject, mLogstore, mRegion);
         }
 #ifdef __ENTERPRISE__
         // TODO: remove these special restrictions
-        if (hasStreamInput && pluginName != "flusher_sls") {
+        if (hasStreamInput && pluginType != "flusher_sls") {
             PARAM_ERROR_RETURN(sLogger,
                                alarm,
                                "flusher plugins other than flusher_sls coexist with input_stream",
@@ -640,10 +638,10 @@ bool PipelineConfig::Parse() {
                                    mLogstore,
                                    mRegion);
             }
-            const string pluginName = it->asString();
-            if (!PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+            const string pluginType = it->asString();
+            if (!PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 PARAM_ERROR_RETURN(
-                    sLogger, alarm, "unsupported aggregator plugin", pluginName, mName, mProject, mLogstore, mRegion);
+                    sLogger, alarm, "unsupported aggregator plugin", pluginType, mName, mProject, mLogstore, mRegion);
             }
             mAggregators.push_back(&plugin);
         }
@@ -706,10 +704,10 @@ bool PipelineConfig::Parse() {
                                    mLogstore,
                                    mRegion);
             }
-            const string pluginName = it->asString();
-            if (!PluginRegistry::GetInstance()->IsValidGoPlugin(pluginName)) {
+            const string pluginType = it->asString();
+            if (!PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 PARAM_ERROR_RETURN(
-                    sLogger, alarm, "unsupported extension plugin", pluginName, mName, mProject, mLogstore, mRegion);
+                    sLogger, alarm, "unsupported extension plugin", pluginType, mName, mProject, mLogstore, mRegion);
             }
             mExtensions.push_back(&plugin);
         }

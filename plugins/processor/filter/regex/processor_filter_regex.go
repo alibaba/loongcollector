@@ -24,7 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-const pluginName = "processor_filter_regex"
+const pluginType = "processor_filter_regex"
 
 // ProcessorRegexFilter is a processor plugin to filter log according to the value of field.
 // Include/Exclude are maps from string to string, key is used to search field in log, value
@@ -68,8 +68,8 @@ func (p *ProcessorRegexFilter) Init(context pipeline.Context) error {
 		}
 	}
 	metricsRecord := p.context.GetMetricRecord()
-	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_filtered", pluginName))
-	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginName))
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_filtered", pluginType))
+	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginType))
 	return nil
 }
 
@@ -132,7 +132,7 @@ func (p *ProcessorRegexFilter) ProcessLogs(logArray []*protocol.Log) []*protocol
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorRegexFilter{}
 	}
 }

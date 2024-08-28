@@ -172,13 +172,13 @@ void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {
     }
     string error;
     auto pluginDir = AppConfig::GetInstance()->GetProcessExecutionDir() + "/plugins";
-    for (auto& pluginName : plugins) {
+    for (auto& pluginType : plugins) {
         DynamicLibLoader loader;
-        if (!loader.LoadDynLib(pluginName, error, pluginDir)) {
-            LOG_ERROR(sLogger, ("open plugin", pluginName)("error", error));
+        if (!loader.LoadDynLib(pluginType, error, pluginDir)) {
+            LOG_ERROR(sLogger, ("open plugin", pluginType)("error", error));
             continue;
         }
-        PluginCreator* creator = LoadProcessorPlugin(loader, pluginName);
+        PluginCreator* creator = LoadProcessorPlugin(loader, pluginType);
         if (creator) {
             RegisterProcessorCreator(creator);
             continue;
@@ -198,7 +198,7 @@ void PluginRegistry::RegisterFlusherCreator(PluginCreator* creator) {
     RegisterCreator(FLUSHER_PLUGIN, creator);
 }
 
-PluginCreator* PluginRegistry::LoadProcessorPlugin(DynamicLibLoader& loader, const string pluginName) {
+PluginCreator* PluginRegistry::LoadProcessorPlugin(DynamicLibLoader& loader, const string pluginType) {
     string error;
     processor_interface_t* plugin = (processor_interface_t*)loader.LoadMethod("processor_interface", error);
     // if (!error.empty()) {
@@ -213,7 +213,7 @@ PluginCreator* PluginRegistry::LoadProcessorPlugin(DynamicLibLoader& loader, con
     }
     if (plugin->version != PROCESSOR_INTERFACE_VERSION) {
         LOG_ERROR(sLogger,
-                  ("load plugin", pluginName)("error", "plugin interface version mismatch")(
+                  ("load plugin", pluginType)("error", "plugin interface version mismatch")(
                       "expected", PROCESSOR_INTERFACE_VERSION)("actual", plugin->version));
         return nullptr;
     }

@@ -29,13 +29,13 @@ type ProcessorAddFields struct {
 	context       pipeline.Context
 }
 
-const pluginName = "processor_add_fields"
+const pluginType = "processor_add_fields"
 
 // Init method would be triggered before working for init some system resources,
 // like socket, mutex. In this plugin, it verifies Fields must not be empty.
 func (p *ProcessorAddFields) Init(context pipeline.Context) error {
 	if len(p.Fields) == 0 {
-		return fmt.Errorf("must specify Fields for plugin %v", pluginName)
+		return fmt.Errorf("must specify Fields for plugin %v", pluginType)
 	}
 	p.context = context
 	return nil
@@ -94,7 +94,7 @@ func (p *ProcessorAddFields) isExist(log *protocol.Log, key string) bool {
 
 // Register the plugin to the Processors array.
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorAddFields{
 			Fields:        nil,
 			IgnoreIfExist: false,

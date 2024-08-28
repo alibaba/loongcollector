@@ -68,8 +68,8 @@ func Generate(path string) {
 	_ = os.WriteFile(fileName, []byte(str), 0600)
 }
 
-func generatePluginDoc(fileName, pluginName string, doc Doc) {
-	str := topLevel + pluginName + lf
+func generatePluginDoc(fileName, pluginType string, doc Doc) {
+	str := topLevel + pluginType + lf
 	str += secondLevel + "Description" + lf
 	str += doc.Description() + lf
 	str += secondLevel + "Config" + lf

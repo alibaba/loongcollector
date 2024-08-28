@@ -28,12 +28,12 @@ type ProcessorDrop struct {
 	context       pipeline.Context
 }
 
-const pluginName = "processor_drop"
+const pluginType = "processor_drop"
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorDrop) Init(context pipeline.Context) error {
 	if len(p.DropKeys) == 0 {
-		return fmt.Errorf("must specify DropKeys for plugin %v", pluginName)
+		return fmt.Errorf("must specify DropKeys for plugin %v", pluginType)
 	}
 
 	p.context = context
@@ -64,7 +64,7 @@ func (p *ProcessorDrop) processLog(log *protocol.Log) {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorDrop{}
 	}
 }

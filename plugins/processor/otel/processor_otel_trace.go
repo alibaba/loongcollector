@@ -38,7 +38,7 @@ type ProcessorOtelTraceParser struct {
 	ParentSpanIDNeedDecode bool
 }
 
-const pluginName = "processor_otel_trace"
+const pluginType = "processor_otel_trace"
 
 func (p *ProcessorOtelTraceParser) Init(context pipeline.Context) error {
 	p.context = context
@@ -145,7 +145,7 @@ func (p *ProcessorOtelTraceParser) processProtoJSONTraceData(val string) ([]*pro
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorOtelTraceParser{
 			SourceKey:  "",
 			NoKeyError: false,

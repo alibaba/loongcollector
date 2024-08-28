@@ -224,7 +224,7 @@ func (in *InputCommand) Description() string {
 }
 
 func init() {
-	pipeline.MetricInputs[pluginName] = func() pipeline.MetricInput {
+	pipeline.MetricInputs[pluginType] = func() pipeline.MetricInput {
 		return &InputCommand{
 			ContentEncoding:     defaultContentType,
 			IntervalMs:          defaultIntervalMs,

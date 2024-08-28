@@ -349,7 +349,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
         {
             "flushers": [
                 {
-                    "type": "flusher_sls",
+                    "type": "flusher_sls/4",
                     "detail": {
                         "EnableShardHash": false
                     }
@@ -359,11 +359,12 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     APSARA_TEST_TRUE(ParseJsonTable(optionalGoPipelineStr, optionalGoPipelineJson, errorMsg));
+    pipeline.mPluginID.store(4);
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1", "1", "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_TRUE(optionalGoPipelineJson == optionalGoPipeline);
+    APSARA_TEST_EQUAL(optionalGoPipelineJson.toStyledString(), optionalGoPipeline.toStyledString());
     SenderQueueManager::GetInstance()->Clear();
 }
 

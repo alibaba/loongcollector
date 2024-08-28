@@ -26,7 +26,7 @@ namespace logtail {
 
 const string CommonParserOptions::legacyUnmatchedRawLogKey = "__raw_log__";
 
-bool CommonParserOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginName) {
+bool CommonParserOptions::Init(const Json::Value& config, const PipelineContext& ctx, const string& pluginType) {
     string errorMsg;
 
     // KeepingSourceWhenParseFail
@@ -35,7 +35,7 @@ bool CommonParserOptions::Init(const Json::Value& config, const PipelineContext&
                               ctx.GetAlarm(),
                               errorMsg,
                               mKeepingSourceWhenParseFail,
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
@@ -48,7 +48,7 @@ bool CommonParserOptions::Init(const Json::Value& config, const PipelineContext&
                               ctx.GetAlarm(),
                               errorMsg,
                               mKeepingSourceWhenParseSucceed,
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
@@ -60,7 +60,7 @@ bool CommonParserOptions::Init(const Json::Value& config, const PipelineContext&
         PARAM_WARNING_IGNORE(ctx.GetLogger(),
                              ctx.GetAlarm(),
                              errorMsg,
-                             pluginName,
+                             pluginType,
                              ctx.GetConfigName(),
                              ctx.GetProjectName(),
                              ctx.GetLogstoreName(),
@@ -77,7 +77,7 @@ bool CommonParserOptions::Init(const Json::Value& config, const PipelineContext&
                               ctx.GetAlarm(),
                               errorMsg,
                               mCopingRawLog,
-                              pluginName,
+                              pluginType,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),

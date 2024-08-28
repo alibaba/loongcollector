@@ -29,7 +29,7 @@ import (
 // Benchmark_CollectNoProcess-64      	     314	   3775773 ns/op
 func Benchmark_CollectNoProcess(b *testing.B) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputNodeMeta)
+	p := pipeline.MetricInputs[pluginType]().(*InputNodeMeta)
 	p.CPU = true
 	p.Memory = true
 	p.Net = true
@@ -56,7 +56,7 @@ func Benchmark_CollectNoProcess(b *testing.B) {
 // Benchmark_CollectWithProcess-64    	     249	   4781412 ns/op
 func Benchmark_CollectWithProcess(b *testing.B) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputNodeMeta)
+	p := pipeline.MetricInputs[pluginType]().(*InputNodeMeta)
 	p.CPU = true
 	p.Memory = true
 	p.Net = true

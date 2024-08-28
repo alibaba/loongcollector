@@ -32,7 +32,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
-const pluginName = "metric_meta_kubernetes"
+const pluginType = "metric_meta_kubernetes"
 const (
 	defaultIntervalMs = 300000
 )
@@ -246,7 +246,7 @@ func (in *InputKubernetesMeta) Stop() error {
 }
 
 func init() {
-	pipeline.MetricInputs[pluginName] = func() pipeline.MetricInput {
+	pipeline.MetricInputs[pluginType] = func() pipeline.MetricInput {
 		return &InputKubernetesMeta{
 			Pod:                   true,
 			Service:               true,

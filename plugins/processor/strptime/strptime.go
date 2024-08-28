@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	pluginName       = "processor_strptime"
+	pluginType       = "processor_strptime"
 	defaultSourceKey = "time"
 	nilUTCOffset     = 15 * 60 * 60
 
@@ -75,7 +75,7 @@ type Strptime struct {
 func (s *Strptime) Init(context pipeline.Context) error {
 	s.context = context
 	if len(s.Format) == 0 {
-		return fmt.Errorf("format can not be empty for plugin %v", pluginName)
+		return fmt.Errorf("format can not be empty for plugin %v", pluginType)
 	}
 	if !s.AdjustUTCOffset {
 		s.UTCOffset = nilUTCOffset
@@ -188,7 +188,7 @@ func newStrptime() *Strptime {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return newStrptime()
 	}
 }

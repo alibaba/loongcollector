@@ -51,23 +51,23 @@ type ProcessorGotime struct {
 }
 
 const (
-	pluginName      = "processor_gotime"
+	pluginType      = "processor_gotime"
 	machineTimeZone = -100
 )
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorGotime) Init(context pipeline.Context) error {
 	if p.SourceKey == "" {
-		return fmt.Errorf("must specify SourceKey for plugin %v", pluginName)
+		return fmt.Errorf("must specify SourceKey for plugin %v", pluginType)
 	}
 	if p.SourceFormat == "" {
-		return fmt.Errorf("must specify SourceFormat for plugin %v", pluginName)
+		return fmt.Errorf("must specify SourceFormat for plugin %v", pluginType)
 	}
 	if p.DestKey == "" {
-		return fmt.Errorf("must specify DestKey for plugin %v", pluginName)
+		return fmt.Errorf("must specify DestKey for plugin %v", pluginType)
 	}
 	if p.DestFormat == "" {
-		return fmt.Errorf("must specify DestFormat for plugin %v", pluginName)
+		return fmt.Errorf("must specify DestFormat for plugin %v", pluginType)
 	}
 	p.sourceLocation = time.Local
 	if p.SourceLocation != machineTimeZone {
@@ -166,7 +166,7 @@ func (p *ProcessorGotime) processLog(log *protocol.Log) {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorGotime{
 			SourceKey:      "",
 			SourceFormat:   "",

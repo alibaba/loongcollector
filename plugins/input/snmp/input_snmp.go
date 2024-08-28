@@ -35,7 +35,7 @@ import (
 	g "github.com/gosnmp/gosnmp"
 )
 
-const pluginName = "service_snmp"
+const pluginType = "service_snmp"
 
 // SNMP is a service input plugin to collect logs following SNMP protocol.
 // It works with SNMP agents configured by users. It uses TCP or UDP
@@ -586,7 +586,7 @@ func (s *Agent) Collect(_ pipeline.Collector) error {
 }
 
 func init() {
-	pipeline.ServiceInputs[pluginName] = func() pipeline.ServiceInput {
+	pipeline.ServiceInputs[pluginType] = func() pipeline.ServiceInput {
 		return &Agent{
 			Port:               "161",
 			Transport:          "udp",

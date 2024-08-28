@@ -41,14 +41,14 @@ type ProcessorAppender struct {
 	context          pipeline.Context
 }
 
-const pluginName = "processor_appender"
+const pluginType = "processor_appender"
 
 var replaceReg = regexp.MustCompile(`{{[^}]+}}`)
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorAppender) Init(context pipeline.Context) error {
 	if len(p.Key) == 0 || len(p.Value) == 0 {
-		return fmt.Errorf("must specify Key and Value for plugin %v", pluginName)
+		return fmt.Errorf("must specify Key and Value for plugin %v", pluginType)
 	}
 	p.context = context
 	manager := platformmeta.GetManager(p.Platform)
@@ -191,7 +191,7 @@ func (p *ProcessorAppender) ParseVariableValue(key string) string {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorAppender{
 			Platform: platformmeta.Mock,
 		}

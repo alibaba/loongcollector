@@ -68,7 +68,7 @@ func TestInputNodeMeta_Collect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := mock.NewEmptyContext("project", "store", "config")
-			p := pipeline.MetricInputs[pluginName]().(*InputNodeMeta)
+			p := pipeline.MetricInputs[pluginType]().(*InputNodeMeta)
 			c := new(test.MockMetricCollector)
 			p.Disk = tt.args.Disk
 			p.CPU = tt.args.CPU

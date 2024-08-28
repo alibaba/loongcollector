@@ -32,15 +32,15 @@ type ProcessorPackjson struct {
 	context           pipeline.Context
 }
 
-const pluginName = "processor_packjson"
+const pluginType = "processor_packjson"
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorPackjson) Init(context pipeline.Context) error {
 	if len(p.SourceKeys) == 0 {
-		return fmt.Errorf("must specify SourceKeys for plugin %v", pluginName)
+		return fmt.Errorf("must specify SourceKeys for plugin %v", pluginType)
 	}
 	if p.DestKey == "" {
-		return fmt.Errorf("must specify DestKey for plugin %v", pluginName)
+		return fmt.Errorf("must specify DestKey for plugin %v", pluginType)
 	}
 	p.keyDictionary = make(map[string]bool)
 	for _, sourceKey := range p.SourceKeys {
@@ -93,7 +93,7 @@ func (p *ProcessorPackjson) processLog(log *protocol.Log) {
 }
 
 func init() {
-	pipeline.Processors[pluginName] = func() pipeline.Processor {
+	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorPackjson{
 			SourceKeys:        nil,
 			DestKey:           "",

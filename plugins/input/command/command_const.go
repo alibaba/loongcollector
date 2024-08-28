@@ -15,7 +15,7 @@
 package command
 
 const (
-	pluginName              = "input_command"
+	pluginType              = "input_command"
 	defaultContentType      = "PlainText"
 	defaultIntervalMs       = 5000 // The default is Alibaba Cloud's collection frequency of 5s
 	defaltExecScriptTimeOut = 3000 // Default 3 seconds timeout

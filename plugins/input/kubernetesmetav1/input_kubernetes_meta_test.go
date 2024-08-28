@@ -36,7 +36,7 @@ import (
 
 func BenchmarkInputKubernetesMeta_Collect(b *testing.B) {
 	cxt := mock.NewEmptyContext("project", "store", "config")
-	p := pipeline.MetricInputs[pluginName]().(*InputKubernetesMeta)
+	p := pipeline.MetricInputs[pluginType]().(*InputKubernetesMeta)
 	p.KubeConfigPath = "default"
 	if _, err := p.Init(cxt); err != nil {
 		b.Errorf("cannot init the mock process plugin: %v", err)

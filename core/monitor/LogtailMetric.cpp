@@ -194,7 +194,7 @@ void WriteMetrics::PreparePluginCommonLabels(const std::string& projectName,
                                              const std::string& logstoreName,
                                              const std::string& region,
                                              const std::string& configName,
-                                             const std::string& pluginName,
+                                             const std::string& pluginType,
                                              const std::string& pluginID,
                                              const std::string& nodeID,
                                              const std::string& childNodeID,
@@ -203,7 +203,7 @@ void WriteMetrics::PreparePluginCommonLabels(const std::string& projectName,
     labels.emplace_back(std::make_pair(METRIC_LABEL_LOGSTORE, logstoreName));
     labels.emplace_back(std::make_pair(METRIC_LABEL_REGION, region));
     labels.emplace_back(std::make_pair(METRIC_LABEL_CONFIG_NAME, configName));
-    labels.emplace_back(std::make_pair(METRIC_LABEL_PLUGIN_NAME, pluginName));
+    labels.emplace_back(std::make_pair(METRIC_LABEL_PLUGIN_NAME, pluginType));
     labels.emplace_back(std::make_pair(METRIC_LABEL_PLUGIN_ID, pluginID));
     labels.emplace_back(std::make_pair(METRIC_LABEL_NODE_ID, nodeID));
     labels.emplace_back(std::make_pair(METRIC_LABEL_CHILD_NODE_ID, childNodeID));
