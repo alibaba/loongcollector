@@ -42,7 +42,7 @@ namespace ebpf {
 static const std::unordered_map<SecurityProbeType, std::unordered_set<std::string>> callNameDict
     = {{SecurityProbeType::PROCESS,
         {"sys_enter_execve", "sys_enter_clone", "disassociate_ctty", "acct_process", "wake_up_new_task"}},
-       {SecurityProbeType::FILE, {"security_file_permission", "security_file_mmap", "security_path_truncate"}},
+       {SecurityProbeType::FILE, {"security_file_permission", "security_mmap_file", "security_path_truncate"}},
        {SecurityProbeType::NETWORK, {"tcp_connect", "tcp_close", "tcp_sendmsg"}}};
 
 bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
