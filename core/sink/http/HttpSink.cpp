@@ -213,6 +213,11 @@ void HttpSink::HandleCompletedRequests() {
                                 "try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(msg->data.result))(
                                 "config-flusher-dst",
                                 QueueKeyManager::GetInstance()->GetName(request->mItem->mFlusher->GetQueueKey())));
+                        // free first，becase mPrivateData will be reset in AddRequestToClient
+                        if (request->mPrivateData) {
+                            curl_slist_free_all((curl_slist*)request->mPrivateData);
+                            request->mPrivateData = nullptr;
+                        }
                         AddRequestToClient(unique_ptr<HttpSinkRequest>(request));
                         requestReused = true;
                     } else {
@@ -222,13 +227,12 @@ void HttpSink::HandleCompletedRequests() {
                     }
                     break;
             }
-
-            if (request->mPrivateData) {
-                curl_slist_free_all((curl_slist*)request->mPrivateData);
-            }
             curl_multi_remove_handle(mClient, handler);
             curl_easy_cleanup(handler);
             if (!requestReused) {
+                if (request->mPrivateData) {
+                    curl_slist_free_all((curl_slist*)request->mPrivateData);
+                }
                 delete request;
             }
         }
