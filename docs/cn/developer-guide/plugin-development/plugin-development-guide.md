@@ -25,6 +25,7 @@ ilogtail 插件的开发主要有以下步骤：
 * [如何开发Aggregator插件](./how-to-write-aggregator-plugins.md)
 * [如何开发Flusher插件](./how-to-write-flusher-plugins.md)
 * [如何开发Extension插件](./how-to-write-extension-plugins.md)
+* [插件配置项基本原则](./principles-of-plugin-configuration.md)
 
 ## 文档撰写流程
 
