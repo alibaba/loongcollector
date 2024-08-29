@@ -745,7 +745,7 @@ func LoadLogstoreConfig(project string, logstore string, configName string, logs
 func loadBuiltinConfig(name string, project string, logstore string,
 	configName string, cfgStr string) (*LogstoreConfig, error) {
 	logger.Infof(context.Background(), "load built-in config %v, config name: %v, logstore: %v", name, configName, logstore)
-	return createLogstoreConfig(project, logstore, configName, 0, cfgStr)
+	return createLogstoreConfig(project, logstore, configName, -1, cfgStr)
 }
 
 // loadMetric creates a metric plugin object and append to logstoreConfig.MetricPlugins.

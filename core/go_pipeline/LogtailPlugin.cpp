@@ -22,6 +22,7 @@
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
+#include "compression/CompressorFactory.h"
 #include "config_manager/ConfigManager.h"
 #include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "logger/Logger.h"
@@ -52,10 +53,16 @@ LogtailPlugin::LogtailPlugin() {
     mPluginValid = false;
     mPluginAlarmConfig.mLogstore = "logtail_alarm";
     mPluginAlarmConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
+    mPluginAlarmConfig.mCompressor
+        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::LZ4);
     mPluginProfileConfig.mLogstore = "shennong_log_profile";
     mPluginProfileConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
+    mPluginProfileConfig.mCompressor
+        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::LZ4);
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
+    mPluginContainerConfig.mCompressor
+        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::LZ4);
 
     mPluginCfg["LogtailSysConfDir"] = AppConfig::GetInstance()->GetLogtailSysConfDir();
     mPluginCfg["HostIP"] = LogFileProfiler::mIpAddr;
@@ -124,6 +131,12 @@ void LogtailPlugin::Resume() {
 }
 
 int LogtailPlugin::IsValidToSend(long long logstoreKey) {
+    // TODO: because go profile pipeline is not controlled by C++, we cannot know queue key in advance
+    // therefore, we assume true here. This could be a potential problem if network is not available for profile info.
+    // However, since go profile pipeline will be stopped only during process exit, it should be fine.
+    if (logstoreKey == -1) {
+        return true;
+    }
     return SenderQueueManager::GetInstance()->IsValidToPush(logstoreKey) ? 0 : -1;
 }
 

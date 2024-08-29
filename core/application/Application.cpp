@@ -298,6 +298,7 @@ void Application::Start() { // GCOVR_EXCL_START
 #endif
         if (curTime - lastQueueGCTime >= INT32_FLAG(queue_check_gc_interval_sec)) {
             ExactlyOnceQueueManager::GetInstance()->ClearTimeoutQueues();
+            // this should be called in the same thread as config update
             SenderQueueManager::GetInstance()->ClearUnusedQueues();
             lastQueueGCTime = curTime;
         }

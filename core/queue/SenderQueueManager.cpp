@@ -31,22 +31,16 @@ SenderQueueManager::SenderQueueManager() : mQueueParam(INT32_FLAG(sender_queue_c
 bool SenderQueueManager::CreateQueue(QueueKey key,
                                      vector<shared_ptr<ConcurrencyLimiter>>&& concurrencyLimiters,
                                      uint32_t maxRate) {
-    {
-        lock_guard<mutex> lock(mGCMux);
-        mQueueDeletionTimeMap.erase(key);
+    lock_guard<mutex> lock(mQueueMux);
+    auto iter = mQueues.find(key);
+    if (iter == mQueues.end()) {
+        mQueues.try_emplace(
+            key, mQueueParam.GetCapacity(), mQueueParam.GetLowWatermark(), mQueueParam.GetHighWatermark(), key);
+        iter = mQueues.find(key);
     }
-    {
-        lock_guard<mutex> lock(mQueueMux);
-        auto iter = mQueues.find(key);
-        if (iter == mQueues.end()) {
-            mQueues.try_emplace(
-                key, mQueueParam.GetCapacity(), mQueueParam.GetLowWatermark(), mQueueParam.GetHighWatermark(), key);
-            iter = mQueues.find(key);
-        }
-        iter->second.SetConcurrencyLimiters(std::move(concurrencyLimiters));
-        iter->second.SetRateLimiter(maxRate);
-        return true;
-    }
+    iter->second.SetConcurrencyLimiters(std::move(concurrencyLimiters));
+    iter->second.SetRateLimiter(maxRate);
+    return true;
 }
 
 SenderQueue* SenderQueueManager::GetQueue(QueueKey key) {
@@ -73,6 +67,16 @@ bool SenderQueueManager::DeleteQueue(QueueKey key) {
         }
         mQueueDeletionTimeMap[key] = time(nullptr);
     }
+    return true;
+}
+
+bool SenderQueueManager::ReuseQueue(QueueKey key) {
+    lock_guard<mutex> lock(mGCMux);
+    auto iter = mQueueDeletionTimeMap.find(key);
+    if (iter == mQueueDeletionTimeMap.end()) {
+        return false;
+    }
+    mQueueDeletionTimeMap.erase(iter);
     return true;
 }
 
@@ -190,6 +194,11 @@ void SenderQueueManager::Clear() {
     lock_guard<mutex> lock(mQueueMux);
     mQueues.clear();
     mQueueDeletionTimeMap.clear();
+}
+
+bool SenderQueueManager::IsQueueMarkedDeleted(QueueKey key) {
+    lock_guard<mutex> lock(mGCMux);
+    return mQueueDeletionTimeMap.find(key) != mQueueDeletionTimeMap.end();
 }
 #endif
 

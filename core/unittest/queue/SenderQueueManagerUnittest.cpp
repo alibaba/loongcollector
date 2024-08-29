@@ -141,7 +141,7 @@ void SenderQueueManagerUnittest::TestDeleteQueue() {
     APSARA_TEST_EQUAL("", QueueKeyManager::GetInstance()->GetName(key1));
 
     // update queue will remove the queue from gc queue
-    sManager->CreateQueue(key2, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
+    sManager->ReuseQueue(key2);
     APSARA_TEST_EQUAL(0U, sManager->mQueueDeletionTimeMap.size());
 }
 

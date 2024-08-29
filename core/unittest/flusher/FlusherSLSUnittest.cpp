@@ -56,7 +56,7 @@ public:
     void OnGoPipelineSend();
 
 protected:
-    void SetUp() override { 
+    void SetUp() override {
         ctx.SetConfigName("test_config");
         ctx.SetPipeline(pipeline);
     }
@@ -461,14 +461,12 @@ void FlusherSLSUnittest::OnFailedInit() {
 }
 
 void FlusherSLSUnittest::OnPipelineUpdate() {
-    PipelineContext ctx1, ctx2;
+    PipelineContext ctx1;
     ctx1.SetConfigName("test_config_1");
-    ctx2.SetConfigName("test_config_2");
 
     Json::Value configJson, optionalGoPipeline;
-    FlusherSLS flusher1, flusher2;
+    FlusherSLS flusher1;
     flusher1.SetContext(ctx1);
-    flusher2.SetContext(ctx2);
     string configStr, errorMsg;
 
     configStr = R"(
@@ -482,43 +480,70 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     APSARA_TEST_TRUE(flusher1.Init(configJson, optionalGoPipeline));
-
-    configStr = R"(
-        {
-            "Type": "flusher_sls",
-            "Project": "test_project_2",
-            "Logstore": "test_logstore_2",
-            "Region": "cn-hangzhou",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
-            "Aliuid": "123456789"
-        }
-    )";
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    APSARA_TEST_TRUE(flusher2.Init(configJson, optionalGoPipeline));
-
     APSARA_TEST_TRUE(flusher1.Start());
     APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
     APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
     APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 
-    APSARA_TEST_TRUE(flusher2.Start());
-    APSARA_TEST_EQUAL(2U, FlusherSLS::sProjectRefCntMap.size());
-    APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
-#ifdef __ENTERPRISE__
-    APSARA_TEST_EQUAL(2U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
-#else
-    APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
-#endif
+    {
+        PipelineContext ctx2;
+        ctx2.SetConfigName("test_config_2");
+        FlusherSLS flusher2;
+        flusher2.SetContext(ctx2);
+        configStr = R"(
+            {
+                "Type": "flusher_sls",
+                "Project": "test_project_2",
+                "Logstore": "test_logstore_2",
+                "Region": "cn-hangzhou",
+                "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+                "Aliuid": "123456789"
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        APSARA_TEST_TRUE(flusher2.Init(configJson, optionalGoPipeline));
 
-    APSARA_TEST_TRUE(flusher2.Stop(true));
-    APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
-    APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
-    APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
+        APSARA_TEST_TRUE(flusher1.Stop(false));
+        APSARA_TEST_TRUE(FlusherSLS::sProjectRefCntMap.empty());
+        APSARA_TEST_FALSE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
+        APSARA_TEST_TRUE(SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").empty());
+        APSARA_TEST_TRUE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher1.GetQueueKey()));
 
-    APSARA_TEST_TRUE(flusher1.Stop(true));
-    APSARA_TEST_TRUE(FlusherSLS::sProjectRefCntMap.empty());
-    APSARA_TEST_FALSE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
-    APSARA_TEST_TRUE(SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").empty());
+        APSARA_TEST_TRUE(flusher2.Start());
+        APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
+        APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
+        APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
+        APSARA_TEST_TRUE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher1.GetQueueKey()));
+        APSARA_TEST_FALSE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher2.GetQueueKey()));
+        flusher2.Stop(true);
+        flusher1.Start();
+    }
+    {
+        PipelineContext ctx2;
+        ctx2.SetConfigName("test_config_1");
+        FlusherSLS flusher2;
+        flusher2.SetContext(ctx2);
+        configStr = R"(
+            {
+                "Type": "flusher_sls",
+                "Project": "test_project",
+                "Logstore": "test_logstore",
+                "Region": "cn-hangzhou",
+                "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+                "Aliuid": "123456789"
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        APSARA_TEST_TRUE(flusher2.Init(configJson, optionalGoPipeline));
+
+        APSARA_TEST_TRUE(flusher1.Stop(false));
+        APSARA_TEST_TRUE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher1.GetQueueKey()));
+
+        APSARA_TEST_TRUE(flusher2.Start());
+        APSARA_TEST_FALSE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher1.GetQueueKey()));
+        APSARA_TEST_FALSE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher2.GetQueueKey()));
+        flusher2.Stop(true);
+    }
 }
 
 void FlusherSLSUnittest::TestSend() {
@@ -959,24 +984,69 @@ void FlusherSLSUnittest::TestAddPackId() {
 }
 
 void FlusherSLSUnittest::OnGoPipelineSend() {
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
-    configStr = R"(
-        {
-            "Type": "flusher_sls",
-            "Project": "test_project",
-            "Logstore": "test_logstore",
-            "Region": "cn-hangzhou",
-            "Endpoint": "cn-hangzhou.log.aliyuncs.com",
-            "Aliuid": "123456789"
-        }
-    )";
-    ParseJsonTable(configStr, configJson, errorMsg);
-    FlusherSLS flusher;
-    flusher.SetContext(ctx);
-    flusher.Init(configJson, optionalGoPipeline);
     {
-        APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));
+        Json::Value configJson, optionalGoPipeline;
+        string configStr, errorMsg;
+        configStr = R"(
+            {
+                "Type": "flusher_sls",
+                "Project": "test_project",
+                "Logstore": "test_logstore",
+                "Region": "cn-hangzhou",
+                "Endpoint": "cn-hangzhou.log.aliyuncs.com",
+                "Aliuid": "123456789"
+            }
+        )";
+        ParseJsonTable(configStr, configJson, errorMsg);
+        FlusherSLS flusher;
+        flusher.SetContext(ctx);
+        flusher.Init(configJson, optionalGoPipeline);
+        {
+            APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));
+
+            vector<SenderQueueItem*> res;
+            SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+
+            APSARA_TEST_EQUAL(1U, res.size());
+            auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+            APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
+            APSARA_TEST_TRUE(item->mBufferOrNot);
+            APSARA_TEST_EQUAL(&flusher, item->mFlusher);
+            APSARA_TEST_EQUAL(flusher.mQueueKey, item->mQueueKey);
+            APSARA_TEST_EQUAL("shardhash_key", item->mShardHashKey);
+            APSARA_TEST_EQUAL("other_logstore", item->mLogstore);
+
+            auto compressor
+                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+            string output;
+            output.resize(item->mRawSize);
+            APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
+            APSARA_TEST_EQUAL("content", output);
+        }
+        {
+            APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", ""));
+
+            vector<SenderQueueItem*> res;
+            SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+
+            APSARA_TEST_EQUAL(1U, res.size());
+            auto item = static_cast<SLSSenderQueueItem*>(res[0]);
+            APSARA_TEST_EQUAL("test_logstore", item->mLogstore);
+        }
+    }
+    {
+        // go profile flusher has no context
+        FlusherSLS flusher;
+        flusher.mProject = "test_project";
+        flusher.mLogstore = "test_logstore";
+        flusher.mCompressor = CompressorFactory::GetInstance()->Create(
+            Json::Value(), PipelineContext(), "flusher_sls", CompressType::LZ4);
+
+        APSARA_TEST_TRUE(flusher.Send("content", ""));
+
+        auto key = QueueKeyManager::GetInstance()->GetKey("test_project-test_logstore");
+
+        APSARA_TEST_NOT_EQUAL(nullptr, SenderQueueManager::GetInstance()->GetQueue(key));
 
         vector<SenderQueueItem*> res;
         SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
@@ -986,26 +1056,16 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
         APSARA_TEST_TRUE(item->mBufferOrNot);
         APSARA_TEST_EQUAL(&flusher, item->mFlusher);
-        APSARA_TEST_EQUAL(flusher.mQueueKey, item->mQueueKey);
-        APSARA_TEST_EQUAL("shardhash_key", item->mShardHashKey);
-        APSARA_TEST_EQUAL("other_logstore", item->mLogstore);
+        APSARA_TEST_EQUAL(key, item->mQueueKey);
+        APSARA_TEST_EQUAL("test_logstore", item->mLogstore);
 
         auto compressor
             = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
         string output;
         output.resize(item->mRawSize);
+        string errorMsg;
         APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
         APSARA_TEST_EQUAL("content", output);
-    }
-    {
-        APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", ""));
-
-        vector<SenderQueueItem*> res;
-        SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
-
-        APSARA_TEST_EQUAL(1U, res.size());
-        auto item = static_cast<SLSSenderQueueItem*>(res[0]);
-        APSARA_TEST_EQUAL("test_logstore", item->mLogstore);
     }
 }
 

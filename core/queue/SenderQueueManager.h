@@ -52,6 +52,7 @@ public:
                      uint32_t maxRate = 0);
     SenderQueue* GetQueue(QueueKey key);
     bool DeleteQueue(QueueKey key);
+    bool ReuseQueue(QueueKey key);
     // 0: success, 1: queue is full, 2: queue not found
     int PushQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item);
     void GetAllAvailableItems(std::vector<SenderQueueItem*>& items, bool withLimits = true);
@@ -67,6 +68,7 @@ public:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
+    bool IsQueueMarkedDeleted(QueueKey key);
 #endif
 
 private:

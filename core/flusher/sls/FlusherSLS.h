@@ -35,9 +35,6 @@
 namespace logtail {
 
 class FlusherSLS : public HttpFlusher {
-    // TODO: temporarily used
-    friend class ProfileSender;
-
 public:
     enum class TelemetryType { LOG, METRIC };
 
@@ -85,6 +82,9 @@ public:
     uint32_t mMaxSendRate = 0; // preserved only for exactly once
     uint32_t mFlowControlExpireTime = 0;
 
+    // TODO: temporarily public for profile
+    std::unique_ptr<Compressor> mCompressor;
+
 private:
     static const std::unordered_set<std::string> sNativeParam;
 
@@ -124,7 +124,6 @@ private:
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;
     std::unique_ptr<Serializer<std::vector<CompressedLogGroup>>> mGroupListSerializer;
-    std::unique_ptr<Compressor> mCompressor;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherSLSUnittest;

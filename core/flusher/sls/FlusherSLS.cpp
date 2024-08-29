@@ -494,6 +494,8 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 }
 
 bool FlusherSLS::Start() {
+    Flusher::Start();
+
     InitResource();
 
     IncreaseProjectReferenceCnt(mProject);
@@ -815,10 +817,18 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
     } else {
         compressedData = data;
     }
+
+    QueueKey key = mQueueKey;
+    if (!HasContext()) {
+        key = QueueKeyManager::GetInstance()->GetKey(mProject + "-" + mLogstore);
+        if (SenderQueueManager::GetInstance()->GetQueue(key) == nullptr) {
+            SenderQueueManager::GetInstance()->CreateQueue(key, vector<shared_ptr<ConcurrencyLimiter>>());
+        }
+    }
     return Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(compressedData),
                                                                 data.size(),
                                                                 this,
-                                                                mQueueKey,
+                                                                key,
                                                                 logstore.empty() ? mLogstore : logstore,
                                                                 RawDataType::EVENT_GROUP,
                                                                 shardHashKey));

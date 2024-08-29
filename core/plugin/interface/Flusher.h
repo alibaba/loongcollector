@@ -34,7 +34,7 @@ public:
     virtual ~Flusher() = default;
 
     virtual bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) = 0;
-    virtual bool Start() { return true; }
+    virtual bool Start();
     virtual bool Stop(bool isPipelineRemoving);
     virtual bool Send(PipelineEventGroup&& g) = 0;
     virtual bool Flush(size_t key) = 0;
