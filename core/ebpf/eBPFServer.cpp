@@ -53,8 +53,16 @@ void eBPFServer::Init() {
 }
 
 void eBPFServer::Stop() {
+    if (!mInited) return;
+    mInited = false;
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
     mSourceManager->StopAll();
+    // destroy source manager 
+    mSourceManager.reset();
+    for (std::size_t i = 0; i < mLoadedPipeline.size(); i ++) {
+        UpdatePipelineName(static_cast<nami::PluginType>(i), "");
+    }
+    
     // UpdateContext must after than StopPlugin
     if (mEventCB) mEventCB->UpdateContext(nullptr, -1, -1);
     if (mMeterCB) mMeterCB->UpdateContext(nullptr, -1, -1);
@@ -147,10 +155,19 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
     return ret;
 }
 
+bool eBPFServer::HasRegisteredPlugins() const {
+    std::lock_guard<std::mutex> lk(mMtx);
+    for (auto& pipeline : mLoadedPipeline) {
+        if (!pipeline.empty()) return true;
+    }
+    return false;
+}
+
 bool eBPFServer::EnablePlugin(const std::string& pipeline_name, uint32_t plugin_index,
                         nami::PluginType type, 
                         const PipelineContext* ctx, 
                         const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options) {
+    Init();
     return StartPluginInternal(pipeline_name, plugin_index, type, ctx, options);
 }
 

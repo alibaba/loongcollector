@@ -62,7 +62,7 @@ public:
     ~SourceManager();
 
 private:
-    void FillCommonConf(nami::eBPFConfig* conf);
+    void FillCommonConf(std::unique_ptr<nami::eBPFConfig>& conf);
     bool LoadDynamicLib(const std::string& lib_name);
     bool DynamicLibSuccess();
     bool UpdatePlugin(nami::PluginType plugin_type, 
@@ -92,7 +92,7 @@ private:
     std::string mFullLibName;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    nami::eBPFConfig* mConfig;
+    std::unique_ptr<nami::eBPFConfig> mConfig;
     friend class eBPFServerUnittest;
 #endif
 };
