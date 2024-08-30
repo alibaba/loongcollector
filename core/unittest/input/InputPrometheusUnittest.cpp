@@ -134,6 +134,7 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(10 * 1024 * 1024, input->mTargetSubscirber->mScrapeConfigPtr->mMaxScrapeSizeBytes);
     APSARA_TEST_EQUAL(1000000, input->mTargetSubscirber->mScrapeConfigPtr->mSampleLimit);
     APSARA_TEST_EQUAL(1000000, input->mTargetSubscirber->mScrapeConfigPtr->mSeriesLimit);
+    PrometheusInputRunner::GetInstance()->Stop();
 }
 
 void InputPrometheusUnittest::OnFailedInit() {
@@ -177,6 +178,7 @@ void InputPrometheusUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputPrometheus::sName, "1", "1", "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    PrometheusInputRunner::GetInstance()->Stop();
 }
 
 void InputPrometheusUnittest::OnPipelineUpdate() {
@@ -216,6 +218,7 @@ void InputPrometheusUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
                      == PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
 
+    PrometheusInputRunner::GetInstance()->Stop();
 }
 
 void InputPrometheusUnittest::TestCreateInnerProcessor() {
@@ -377,6 +380,7 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
                               ->mRelabelConfigs[2]
                               .mAction);
     }
+    PrometheusInputRunner::GetInstance()->Stop();
 }
 
 UNIT_TEST_CASE(InputPrometheusUnittest, OnSuccessfulInit)

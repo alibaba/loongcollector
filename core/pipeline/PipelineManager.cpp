@@ -46,30 +46,27 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
     static bool isInputStreamStarted = false;
 #endif
     bool isInputObserverChanged = false, isInputFileChanged = false, isInputStreamChanged = false,
-         isInputContainerStdioChanged = false, isInputPrometheusChanged = false;
+         isInputContainerStdioChanged = false;
     for (const auto& name : diff.mRemoved) {
         CheckIfInputUpdated(mPipelineNameEntityMap[name]->GetConfig()["inputs"][0],
                             isInputObserverChanged,
                             isInputFileChanged,
                             isInputStreamChanged,
-                            isInputContainerStdioChanged,
-                            isInputPrometheusChanged);
+                            isInputContainerStdioChanged);
     }
     for (const auto& config : diff.mModified) {
         CheckIfInputUpdated(*config.mInputs[0],
                             isInputObserverChanged,
                             isInputFileChanged,
                             isInputStreamChanged,
-                            isInputContainerStdioChanged,
-                            isInputPrometheusChanged);
+                            isInputContainerStdioChanged);
     }
     for (const auto& config : diff.mAdded) {
         CheckIfInputUpdated(*config.mInputs[0],
                             isInputObserverChanged,
                             isInputFileChanged,
                             isInputStreamChanged,
-                            isInputContainerStdioChanged,
-                            isInputPrometheusChanged);
+                            isInputContainerStdioChanged);
     }
 
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
@@ -90,9 +87,6 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
     }
     LogProcess::GetInstance()->HoldOn();
     LogtailPlugin::GetInstance()->HoldOn(false);
-    if (isInputPrometheusChanged) {
-        PrometheusInputRunner::GetInstance()->Start();
-    }
 #endif
 
     for (const auto& name : diff.mRemoved) {
@@ -303,8 +297,7 @@ void PipelineManager::CheckIfInputUpdated(const Json::Value& config,
                                           bool& isInputObserverChanged,
                                           bool& isInputFileChanged,
                                           bool& isInputStreamChanged,
-                                          bool& isInputContainerStdioChanged,
-                                          bool& isInputPrometheusChanged) {
+                                          bool& isInputContainerStdioChanged) {
     string inputType = config["Type"].asString();
     if (inputType == "input_observer_network") {
         isInputObserverChanged = true;
@@ -314,8 +307,6 @@ void PipelineManager::CheckIfInputUpdated(const Json::Value& config,
         isInputStreamChanged = true;
     } else if (inputType == "input_container_stdio") {
         isInputContainerStdioChanged = true;
-    } else if (inputType == "input_prometheus") {
-        isInputPrometheusChanged = true;
     }
 }
 

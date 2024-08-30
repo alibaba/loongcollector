@@ -38,7 +38,6 @@ DECLARE_FLAG_STRING(_pod_name_);
 namespace logtail {
 
 PrometheusInputRunner::PrometheusInputRunner() : mUnRegisterMs(0) {
-    mIsStarted.store(false);
     mClient = std::make_unique<sdk::CurlClient>();
 
     mServiceHost = STRING_FLAG(loong_collector_operator_service);
@@ -55,7 +54,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     targetSubscriber->mServicePort = mServicePort;
     targetSubscriber->mPodName = mPodName;
 
-    targetSubscriber->mUnRegisterMs = mUnRegisterMs;
+    targetSubscriber->mUnRegisterMs = mUnRegisterMs.load();
     targetSubscriber->SetTimer(mTimer);
     targetSubscriber->SetFirstExecTime(std::chrono::steady_clock::now());
     // 1. add subscriber to mTargetSubscriberSchedulerMap
@@ -76,18 +75,22 @@ void PrometheusInputRunner::RemoveScrapeInput(const std::string& jobName) {
 }
 
 /// @brief targets discovery and start scrape work
-void PrometheusInputRunner::Start() {
-    LOG_INFO(sLogger, ("PrometheusInputRunner", "Start"));
-    if (mIsStarted.load()) {
+void PrometheusInputRunner::Init() {
+    std::lock_guard<mutex> lock(mStartMutex);
+    if (mIsStarted) {
         return;
     }
-    mIsStarted.store(true);
+    LOG_INFO(sLogger, ("PrometheusInputRunner", "Start"));
+    mIsStarted = true;
     mTimer->Init();
     AsynCurlRunner::GetInstance()->Init();
 
-    mThreadRes = std::async(launch::async, [this]() {
-        // only register when operator exist
-        if (!mServiceHost.empty()) {
+    LOG_INFO(sLogger, ("PrometheusInputRunner", "register"));
+    // only register when operator exist
+    if (!mServiceHost.empty()) {
+        mIsThreadRunning.store(true);
+        auto res = std::async(launch::async, [this]() {
+            std::lock_guard<mutex> lock(mRegisterMutex);
             int retry = 0;
             while (mIsThreadRunning.load()) {
                 ++retry;
@@ -109,7 +112,7 @@ void PrometheusInputRunner::Start() {
                         }
                         if (responseJson.isMember(prometheus::UNREGISTER_MS)
                             && responseJson[prometheus::UNREGISTER_MS].isUInt64()) {
-                            mUnRegisterMs = responseJson[prometheus::UNREGISTER_MS].asUInt64();
+                            mUnRegisterMs.store(responseJson[prometheus::UNREGISTER_MS].asUInt64());
                         }
                     }
                     LOG_INFO(sLogger, ("Register Success", mPodName));
@@ -117,20 +120,25 @@ void PrometheusInputRunner::Start() {
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
-        }
-    });
+        });
+    }
 }
 
 /// @brief stop scrape work and clear all scrape jobs
 void PrometheusInputRunner::Stop() {
-    LOG_INFO(sLogger, ("PrometheusInputRunner", "Stop"));
+    std::lock_guard<mutex> lock(mStartMutex);
+    if (!mIsStarted) {
+        return;
+    }
 
-    mIsStarted.store(false);
+    mIsStarted = false;
     mIsThreadRunning.store(false);
     mTimer->Stop();
 
+    LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
 
+    LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
     CancelAllTargetSubscriber();
     {
         WriteLock lock(mSubscriberMapRWLock);
@@ -139,7 +147,9 @@ void PrometheusInputRunner::Stop() {
 
     // only unregister when operator exist
     if (!mServiceHost.empty()) {
+        LOG_INFO(sLogger, ("PrometheusInputRunner", "unregister"));
         auto res = std::async(launch::async, [this]() {
+            std::lock_guard<mutex> lock(mRegisterMutex);
             for (int retry = 0; retry < 3; ++retry) {
                 sdk::HttpMessage httpResponse = SendRegisterMessage(prometheus::UNREGISTER_COLLECTOR_PATH);
                 if (httpResponse.statusCode != 200) {
@@ -152,6 +162,12 @@ void PrometheusInputRunner::Stop() {
             }
         });
     }
+    LOG_INFO(sLogger, ("PrometheusInputRunner", "Stop"));
+}
+
+bool PrometheusInputRunner::HasRegisteredPlugins() const {
+    ReadLock lock(mSubscriberMapRWLock);
+    return !mTargetSubscriberSchedulerMap.empty();
 }
 
 sdk::HttpMessage PrometheusInputRunner::SendRegisterMessage(const string& url) const {
@@ -159,6 +175,10 @@ sdk::HttpMessage PrometheusInputRunner::SendRegisterMessage(const string& url) c
     httpHeader[sdk::X_LOG_REQUEST_ID] = prometheus::PROMETHEUS_PREFIX + mPodName;
     sdk::HttpMessage httpResponse;
     httpResponse.header[sdk::X_LOG_REQUEST_ID] = prometheus::PROMETHEUS_PREFIX + mPodName;
+#ifdef APSARA_UNIT_TEST_MAIN
+    httpResponse.statusCode = 200;
+    return httpResponse;
+#endif
     try {
         mClient->Send(sdk::HTTP_GET,
                       mServiceHost,
@@ -177,10 +197,6 @@ sdk::HttpMessage PrometheusInputRunner::SendRegisterMessage(const string& url) c
     return httpResponse;
 }
 
-bool PrometheusInputRunner::HasRegisteredPlugin() {
-    ReadLock lock(mSubscriberMapRWLock);
-    return !mTargetSubscriberSchedulerMap.empty();
-}
 
 void PrometheusInputRunner::CancelAllTargetSubscriber() {
     ReadLock lock(mSubscriberMapRWLock);

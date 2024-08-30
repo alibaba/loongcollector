@@ -65,6 +65,7 @@ bool InputPrometheus::Init(const Json::Value& config, Json::Value&) {
 /// @brief register scrape job by PrometheusInputRunner
 bool InputPrometheus::Start() {
     LOG_INFO(sLogger, ("input config start", mJobName));
+    PrometheusInputRunner::GetInstance()->Init();
 
     mTargetSubscirber->mQueueKey = mContext->GetProcessQueueKey();
 
