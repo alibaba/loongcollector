@@ -199,23 +199,21 @@ test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC, ToString(1715829785083));
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED, ToString(8));
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION, ToString(1.5));
-    eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SERIES_ADDED, ToString(8));
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE, ToString(2325));
-    eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE, ToString(1));
+    eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE, ToString(true));
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_INSTANCE, string("localhost:8080"));
     processor.AddAutoMetrics(eventGroup);
 
-    APSARA_TEST_EQUAL((size_t)16, eventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL((size_t)15, eventGroup.GetEvents().size());
     APSARA_TEST_EQUAL(1.5, eventGroup.GetEvents().at(8).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
     APSARA_TEST_EQUAL(2325, eventGroup.GetEvents().at(9).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
     APSARA_TEST_EQUAL(1000, eventGroup.GetEvents().at(10).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
     APSARA_TEST_EQUAL(8, eventGroup.GetEvents().at(11).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
     APSARA_TEST_EQUAL(8, eventGroup.GetEvents().at(12).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
-    APSARA_TEST_EQUAL(8, eventGroup.GetEvents().at(13).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
-    APSARA_TEST_EQUAL(15, eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
-    APSARA_TEST_EQUAL(1, eventGroup.GetEvents().at(15).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
-    APSARA_TEST_EQUAL("localhost:8080", eventGroup.GetEvents().at(15).Cast<MetricEvent>().GetTag("instance"));
-    APSARA_TEST_EQUAL("test_job", eventGroup.GetEvents().at(15).Cast<MetricEvent>().GetTag("job"));
+    APSARA_TEST_EQUAL(15, eventGroup.GetEvents().at(13).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
+    APSARA_TEST_EQUAL(1, eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetValue<UntypedSingleValue>()->mValue);
+    APSARA_TEST_EQUAL("localhost:8080", eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetTag("instance"));
+    APSARA_TEST_EQUAL("test_job", eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetTag("job"));
 }
 
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestInit)

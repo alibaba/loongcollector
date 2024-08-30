@@ -138,7 +138,8 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& metric
         return;
     }
 
-    StringView scrapeTimestampMilliSecStr = metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
+    StringView scrapeTimestampMilliSecStr
+        = metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
     auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());
     auto timestamp = timestampMilliSec / 1000;
     auto nanoSec = timestampMilliSec % 1000 * 1000000;
@@ -172,15 +173,10 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& metric
 
     AddMetric(metricGroup, prometheus::SCRAPE_SAMPLES_SCRAPED, samplesScraped, timestamp, nanoSec, instance);
 
-    auto seriesAdded
-        = StringTo<uint64_t>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SERIES_ADDED).to_string());
-
-    AddMetric(metricGroup, prometheus::SCRAPE_SERIES_ADDED, seriesAdded, timestamp, nanoSec, instance);
-
     AddMetric(metricGroup, prometheus::SCRAPE_TIMEOUT_SECONDS, mScrapeTimeoutSeconds, timestamp, nanoSec, instance);
 
     // up metric must be the last one
-    bool upState = metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE).to_string() == "1";
+    bool upState = StringTo<bool>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE).to_string());
 
     AddMetric(metricGroup, prometheus::UP, 1.0 * upState, timestamp, nanoSec, instance);
 }
