@@ -21,6 +21,10 @@ protected:
     ReadWriteLock mStateRWLock;
 
     std::vector<std::function<void(const HttpResponse&, uint64_t timestampMilliSec)>> mDoneCallbacks;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class ScrapeSchedulerUnittest;
+#endif
 };
 
 } // namespace logtail

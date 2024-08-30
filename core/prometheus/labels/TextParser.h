@@ -16,28 +16,51 @@
 
 #pragma once
 
-#include <re2/re2.h>
-
 #include <string>
 
+#include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 
 namespace logtail {
 
-extern const std::string SAMPLE_RE;
+enum class TextState { Start, Done, Error };
 
 class TextParser {
 public:
-    TextParser() : mSampleRegex(SAMPLE_RE) {}
-    PipelineEventGroup Parse(const std::string& content);
+    TextParser() = default;
 
+    PipelineEventGroup Parse(const std::string& content, uint64_t defaultTimestamp, uint32_t defaultNanoTs);
+    PipelineEventGroup BuildLogGroup(const std::string& content);
 
-    PipelineEventGroup
-    Parse(const std::string& content, std::time_t defaultTs, const std::string& jobName, const std::string& instance);
-    bool ParseLine(const std::string& line, MetricEvent& e, time_t defaultTs);
+    bool ParseLine(StringView line, uint64_t defaultTimestamp, uint32_t defaultNanoTs, MetricEvent& metricEvent);
 
 private:
-    RE2 mSampleRegex;
+    void HandleError(const std::string& errMsg);
+
+    void HandleStart(MetricEvent& metricEvent);
+    void HandleMetricName(MetricEvent& metricEvent);
+    void HandleOpenBrace(MetricEvent& metricEvent);
+    void HandleLabelName(MetricEvent& metricEvent);
+    void HandleEqualSign(MetricEvent& metricEvent);
+    void HandleLabelValue(MetricEvent& metricEvent);
+    void HandleCommaOrCloseBrace(MetricEvent& metricEvent);
+    void HandleSampleValue(MetricEvent& metricEvent);
+    void HandleTimestamp(MetricEvent& metricEvent);
+    void HandleSpace(MetricEvent& metricEvent);
+
+    inline void SkipLeadingWhitespace();
+
+    TextState mState{TextState::Start};
+    StringView mLine;
+    std::size_t mPos{0};
+
+    StringView mLabelName;
+    std::string mEscapedLabelValue;
+    double mSampleValue{0.0};
+    time_t mTimestamp{0};
+    uint32_t mNanoTimestamp{0};
+    std::size_t mTokenLength{0};
+    std::string mDoubleStr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TextParserUnittest;

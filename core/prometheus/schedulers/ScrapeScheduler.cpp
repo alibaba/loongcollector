@@ -57,10 +57,8 @@ ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
     mHash = mScrapeConfigPtr->mJobName + tmpTargetURL + ToString(mLabels.Hash());
     mInstance = mHost + ":" + ToString(mPort);
     mInterval = mScrapeConfigPtr->mScrapeIntervalSeconds;
-}
 
-bool ScrapeScheduler::operator<(const ScrapeScheduler& other) const {
-    return mHash < other.mHash;
+    mParser = make_unique<TextParser>();
 }
 
 void ScrapeScheduler::OnMetricResult(const HttpResponse& response, uint64_t timestampMilliSec) {
@@ -92,18 +90,7 @@ void ScrapeScheduler::SetAutoMetricMeta(PipelineEventGroup& eGroup) {
 }
 
 PipelineEventGroup ScrapeScheduler::BuildPipelineEventGroup(const std::string& content) {
-    PipelineEventGroup eGroup(std::make_shared<SourceBuffer>());
-
-    for (const auto& line : SplitString(content, "\r\n")) {
-        auto newLine = TrimString(line);
-        if (newLine.empty() || newLine[0] == '#') {
-            continue;
-        }
-        auto* logEvent = eGroup.AddLogEvent();
-        logEvent->SetContent(prometheus::PROMETHEUS, newLine);
-    }
-
-    return eGroup;
+    return mParser->BuildLogGroup(content);
 }
 
 void ScrapeScheduler::PushEventGroup(PipelineEventGroup&& eGroup) {

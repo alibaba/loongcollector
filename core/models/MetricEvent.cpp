@@ -32,6 +32,10 @@ void MetricEvent::SetName(const string& name) {
     mName = StringView(b.data, b.size);
 }
 
+void MetricEvent::SetNameNoCopy(StringView name) {
+    mName = name;
+}
+
 StringView MetricEvent::GetTag(StringView key) const {
     auto it = mTags.mInner.find(key);
     if (it != mTags.mInner.end()) {

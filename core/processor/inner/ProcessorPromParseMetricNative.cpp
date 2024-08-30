@@ -43,7 +43,6 @@ bool ProcessorPromParseMetricNative::IsSupportedEvent(const PipelineEventPtr& e)
     return e.Is<LogEvent>();
 }
 
-// TODO(liqiang): update Parse metricEvent after TextParser merged
 bool ProcessorPromParseMetricNative::ProcessEvent(
     PipelineEventPtr& e, EventsContainer& newEvents, PipelineEventGroup& eGroup, uint64_t timestamp, uint32_t nanoSec) {
     if (!IsSupportedEvent(e)) {
@@ -51,7 +50,7 @@ bool ProcessorPromParseMetricNative::ProcessEvent(
     }
     auto& sourceEvent = e.Cast<LogEvent>();
     std::unique_ptr<MetricEvent> metricEvent = eGroup.CreateMetricEvent();
-    if (mParser.ParseLine(sourceEvent.GetContent(prometheus::PROMETHEUS).to_string(), *metricEvent, timestamp)) {
+    if (mParser.ParseLine(sourceEvent.GetContent(prometheus::PROMETHEUS), timestamp, nanoSec, *metricEvent)) {
         newEvents.emplace_back(std::move(metricEvent));
     }
     return true;

@@ -42,7 +42,8 @@ void ProcessorPromRelabelMetricNativeUnittest::TestInit() {
     processor.SetContext(mContext);
 
     // success config
-    string configStr, errorMsg;
+    string configStr;
+    string errorMsg;
     configStr = R"JSON(
         {
             "metric_relabel_configs": [
@@ -80,7 +81,8 @@ void ProcessorPromRelabelMetricNativeUnittest::TestProcess() {
     ProcessorPromRelabelMetricNative processor;
     processor.SetContext(mContext);
 
-    string configStr, errorMsg;
+    string configStr;
+    string errorMsg;
     configStr = configStr + R"(
         {
             "metric_relabel_configs": [
@@ -115,7 +117,7 @@ void ProcessorPromRelabelMetricNativeUnittest::TestProcess() {
 
     // make events
     auto parser = TextParser();
-    auto eventGroup = parser.Parse(R"""(
+    string rawData = R"""(
 # begin
 
 test_metric1{k1="v1", k2="v2"} 1.0
@@ -128,7 +130,8 @@ test_metric7{k1="v1",k3="2", } 9.9410452992e+10 1715829785083
 test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
 
 # end
-    )""");
+    )""";
+    auto eventGroup = parser.Parse(rawData, 0, 0);
 
     // run function
     std::string pluginId = "testID";
@@ -182,7 +185,9 @@ test_metric6{k1="v1",k2="v2",} 9.9410452992e+10 1715829785083
 test_metric7{k1="v1",k3="2", } 9.9410452992e+10 1715829785083  
 test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
 # end
-    )""");
+    )""",
+                                   0,
+                                   0);
 
     APSARA_TEST_EQUAL((size_t)8, eventGroup.GetEvents().size());
 

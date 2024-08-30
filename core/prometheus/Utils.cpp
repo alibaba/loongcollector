@@ -1,11 +1,9 @@
 #include "prometheus/Utils.h"
 
 #include <iomanip>
-#include <ios>
-#include <iostream>
-#include <sstream>
 
 #include "common/StringTools.h"
+#include "models/StringView.h"
 
 using namespace std;
 
@@ -41,5 +39,32 @@ uint64_t DurationToSecond(const std::string& duration) {
     }
     return 60;
 }
+
+bool IsValidMetric(const StringView& line) {
+    for (auto c : line) {
+        if (c == ' ' || c == '\t') {
+            continue;
+        }
+        if (c == '#') {
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+void SplitStringView(const std::string& s, char delimiter, std::vector<StringView>& result) {
+    size_t start = 0;
+    size_t end = 0;
+
+    while ((end = s.find(delimiter, start)) != std::string::npos) {
+        result.emplace_back(s.data() + start, end - start);
+        start = end + 1;
+    }
+    if (start < s.size()) {
+        result.emplace_back(s.data() + start, s.size() - start);
+    }
+}
+
 
 } // namespace logtail

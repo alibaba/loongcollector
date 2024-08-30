@@ -19,7 +19,9 @@
 #include <string>
 
 #include "common/StringTools.h"
+#include "common/timer/Timer.h"
 #include "prometheus/Constants.h"
+#include "prometheus/async/PromFuture.h"
 #include "prometheus/labels/Labels.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 #include "prometheus/schedulers/ScrapeScheduler.h"
@@ -29,12 +31,24 @@ using namespace std;
 
 namespace logtail {
 
+class MockTimer : public Timer {
+public:
+    void Init() {}
+    void PushEvent(std::unique_ptr<TimerEvent>&& e) { mQueue.push_back(std::move(e)); }
+    void Stop() {}
+    std::vector<std::unique_ptr<TimerEvent>> mQueue;
+};
+
 class ScrapeSchedulerUnittest : public testing::Test {
 public:
     void TestInitscrapeScheduler();
     void TestProcess();
     void TestSplitByLines();
     void TestReceiveMessage();
+    void TestGetRandSleep();
+
+    void TestScheduler();
+
 
 protected:
     void SetUp() override {
@@ -150,9 +164,37 @@ void ScrapeSchedulerUnittest::TestReceiveMessage() {
     APSARA_TEST_EQUAL(false, event->IsCancelled());
 }
 
+void ScrapeSchedulerUnittest::TestGetRandSleep() {
+    Labels labels;
+    labels.Push({prometheus::ADDRESS_LABEL_NAME, "localhost:8080"});
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+
+    Labels labels2;
+    labels2.Push({prometheus::ADDRESS_LABEL_NAME, "localhost:9090"});
+    ScrapeScheduler event2(mScrapeConfig, "localhost", 9090, labels, 0, 0);
+    APSARA_TEST_NOT_EQUAL(event.GetRandSleep(), event2.GetRandSleep());
+}
+
+void ScrapeSchedulerUnittest::TestScheduler() {
+    Labels labels;
+    labels.Push({prometheus::ADDRESS_LABEL_NAME, "localhost:8080"});
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    auto timer = make_shared<MockTimer>();
+    event.SetTimer(timer);
+    event.ScheduleNext();
+
+    APSARA_TEST_TRUE(timer->mQueue.size() == 1);
+
+    event.Cancel();
+
+    APSARA_TEST_TRUE(event.mValidState == false);
+    APSARA_TEST_TRUE(event.mFuture->mState == PromFutureState::Done);
+}
+
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestInitscrapeScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestSplitByLines)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestGetRandSleep)
 
 } // namespace logtail
 

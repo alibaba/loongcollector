@@ -34,6 +34,7 @@ public:
     
     StringView GetName() const { return mName; }
     void SetName(const std::string& name);
+    void SetNameNoCopy(StringView name);
 
     template <typename T>
     bool Is() const {

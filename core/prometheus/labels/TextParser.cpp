@@ -16,215 +16,335 @@
 
 #include "prometheus/labels/TextParser.h"
 
-#include <re2/re2.h>
-
 #include <boost/algorithm/string.hpp>
-#include <chrono>
+#include <charconv>
 #include <cmath>
-#include <exception>
-#include <memory>
-#include <sstream>
 #include <string>
 
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
+#include "models/PipelineEventGroup.h"
+#include "models/StringView.h"
 #include "prometheus/Constants.h"
+#include "prometheus/Utils.h"
 
 using namespace std;
 
 namespace logtail {
 
-const std::string SAMPLE_RE = R"""(^(?P<name>\w+)(\{(?P<labels>[^}]+)\})?\s+(?P<value>\S+)(\s+(?P<timestamp>\S+))?)""";
+bool IsValidNumberChar(char c) {
+    static const unordered_set<char> sValidChars
+        = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-', '+', 'e',
+           'E', 'I', 'N', 'F', 'T', 'Y', 'i', 'n', 'f', 't', 'y', 'X', 'x'};
+    return sValidChars.count(c);
+};
 
-PipelineEventGroup TextParser::Parse(const string& content) {
-    auto now = std::chrono::system_clock::now();
-    auto duration_since_epoch = now.time_since_epoch();
-    auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(duration_since_epoch);
-    std::time_t defaultTsInSecs = seconds_since_epoch.count();
-    return Parse(content, defaultTsInSecs, "", "");
-}
-
-bool TextParser::ParseLine(const string& line, MetricEvent& e, time_t defaultTsInSecs) {
-    string argName;
-    string argLabels;
-    string argUnwrappedLabels;
-    string argValue;
-    string argSuffix;
-    string argTimestamp;
-    if (RE2::FullMatch(line,
-                       mSampleRegex,
-                       RE2::Arg(&argName),
-                       RE2::Arg(&argLabels),
-                       RE2::Arg(&argUnwrappedLabels),
-                       RE2::Arg(&argValue),
-                       RE2::Arg(&argSuffix),
-                       RE2::Arg(&argTimestamp))
-        == false) {
-        return false;
-    }
-
-    // skip any sample that has no name
-    if (argName.empty()) {
-        return false;
-    }
-
-    // skip any sample that has a NaN value
-    double value = 0;
-    try {
-        value = stod(argValue);
-    } catch (const exception&) {
-        LOG_WARNING(sLogger, ("invalid value", argValue)("raw line", line));
-        return false;
-    }
-    if (isnan(value)) {
-        return false;
-    }
-
-    // set timestamp to `defaultTsInSecs` if timestamp is empty, otherwise parse it
-    // if timestamp is not empty but not a valid integer, skip it
-    time_t timestamp = 0;
-    if (argTimestamp.empty()) {
-        timestamp = defaultTsInSecs;
-    } else {
-        try {
-            if (argTimestamp.length() > 3) {
-                timestamp = stol(argTimestamp.substr(0, argTimestamp.length() - 3));
-            } else {
-                timestamp = 0;
-            }
-        } catch (const exception&) {
-            LOG_WARNING(sLogger, ("invalid value", argTimestamp)("raw line", line));
-            return false;
-        }
-    }
-
-    e.SetName(argName);
-    e.SetTimestamp(timestamp);
-    e.SetValue<UntypedSingleValue>(value);
-
-    if (!argUnwrappedLabels.empty()) {
-        string kvPair;
-        istringstream iss(argUnwrappedLabels);
-        while (getline(iss, kvPair, ',')) {
-            kvPair = TrimString(kvPair);
-
-            size_t equalsPos = kvPair.find('=');
-            if (equalsPos != string::npos) {
-                string key = kvPair.substr(0, equalsPos);
-                string value = kvPair.substr(equalsPos + 1);
-                value = TrimString(value, '\"', '\"');
-                e.SetTag(key, value);
-            }
-        }
-    }
-    return true;
-}
-
-PipelineEventGroup
-TextParser::Parse(const string& content, const time_t defaultTsInSecs, const string& jobName, const string& instance) {
-    string line;
-    string argName, argLabels, argUnwrappedLabels, argValue, argSuffix, argTimestamp;
-    istringstream iss(content);
+PipelineEventGroup TextParser::Parse(const string& content, uint64_t defaultTimestamp, uint32_t defaultNanoTs) {
     auto eGroup = PipelineEventGroup(make_shared<SourceBuffer>());
-    while (getline(iss, line)) {
-        // trim line
-        line = TrimString(line);
-
-        // skip any empty line
-        if (line.empty()) {
+    vector<StringView> lines;
+    // pre-reserve vector size by 1024 which is experience value per line
+    lines.reserve(content.size() / 1024);
+    SplitStringView(content, '\n', lines);
+    for (const auto& line : lines) {
+        if (!IsValidMetric(line)) {
             continue;
         }
-
-        // skip any comment
-        if (line[0] == '#') {
-            continue;
-        }
-
-        // parse line
-        // for given sample R"""(test_metric{k1="v1", k2="v2"} 9.9410452992e+10 1715829785083)"""
-        // argName = "test_metric"
-        // argLabels = R"""({"k1="v1", k2="v2"})"""
-        // argUnwrappedLabels = R"""(k1="v1", k2="v2")"""
-        // argValue = "9.9410452992e+10"
-        // argSuffix = " 1715829785083"
-        // argTimestamp = "1715829785083"
-        if (RE2::FullMatch(line,
-                           mSampleRegex,
-                           RE2::Arg(&argName),
-                           RE2::Arg(&argLabels),
-                           RE2::Arg(&argUnwrappedLabels),
-                           RE2::Arg(&argValue),
-                           RE2::Arg(&argSuffix),
-                           RE2::Arg(&argTimestamp))
-            == false) {
-            continue;
-        }
-
-        // skip any sample that has no name
-        if (argName.empty()) {
-            continue;
-        }
-
-        // skip any sample that has a NaN value
-        double value = 0;
-        try {
-            value = stod(argValue);
-        } catch (const exception&) {
-            LOG_WARNING(sLogger, ("invalid value", argValue)("raw line", line));
-            continue;
-        }
-        if (isnan(value)) {
-            continue;
-        }
-
-        // set timestamp to `defaultTsInSecs` if timestamp is empty, otherwise parse it
-        // if timestamp is not empty but not a valid integer, skip it
-        time_t timestamp = 0;
-        if (argTimestamp.empty()) {
-            timestamp = defaultTsInSecs;
-        } else {
-            try {
-                if (argTimestamp.length() > 3) {
-                    timestamp = stol(argTimestamp.substr(0, argTimestamp.length() - 3));
-                } else {
-                    timestamp = 0;
-                }
-            } catch (const exception&) {
-                LOG_WARNING(sLogger, ("invalid value", argTimestamp)("raw line", line));
-                continue;
-            }
-        }
-
-        MetricEvent* e = eGroup.AddMetricEvent();
-        e->SetName(argName);
-        e->SetTimestamp(timestamp);
-        e->SetValue<UntypedSingleValue>(value);
-
-        if (!argUnwrappedLabels.empty()) {
-            string kvPair;
-            istringstream iss(argUnwrappedLabels);
-            while (getline(iss, kvPair, ',')) {
-                kvPair = TrimString(kvPair);
-
-                size_t equalsPos = kvPair.find('=');
-                if (equalsPos != string::npos) {
-                    string key = kvPair.substr(0, equalsPos);
-                    string value = kvPair.substr(equalsPos + 1);
-                    value = TrimString(value, '\"', '\"');
-                    e->SetTag(key, value);
-                }
-            }
-        }
-        if (!jobName.empty()) {
-            e->SetTag(string(prometheus::JOB), jobName);
-        }
-        if (!instance.empty()) {
-            e->SetTag(prometheus::INSTANCE, instance);
+        auto metricEvent = eGroup.CreateMetricEvent();
+        if (ParseLine(line, defaultTimestamp, defaultNanoTs, *metricEvent)) {
+            eGroup.MutableEvents().emplace_back(std::move(metricEvent));
         }
     }
 
     return eGroup;
+}
+
+PipelineEventGroup TextParser::BuildLogGroup(const string& content) {
+    PipelineEventGroup eGroup(std::make_shared<SourceBuffer>());
+
+    vector<StringView> lines;
+    // pre-reserve vector size by 1024 which is experience value per line
+    lines.reserve(content.size() / 1024);
+    SplitStringView(content, '\n', lines);
+    for (const auto& line : lines) {
+        if (!IsValidMetric(line)) {
+            continue;
+        }
+        auto* logEvent = eGroup.AddLogEvent();
+        logEvent->SetContent(prometheus::PROMETHEUS, line);
+    }
+
+    return eGroup;
+}
+
+bool TextParser::ParseLine(StringView line,
+                           uint64_t defaultTimestamp,
+                           uint32_t defaultNanoTs,
+                           MetricEvent& metricEvent) {
+    mLine = line;
+    mPos = 0;
+    mState = TextState::Start;
+    mLabelName.clear();
+    mTokenLength = 0;
+    if (defaultTimestamp > 0) {
+        mTimestamp = defaultTimestamp;
+        mNanoTimestamp = defaultNanoTs;
+    }
+
+    HandleStart(metricEvent);
+
+    if (mState == TextState::Done) {
+        return true;
+    }
+
+    return false;
+}
+
+// start to parse metric sample:test_metric{k1="v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
+void TextParser::HandleStart(MetricEvent& metricEvent) {
+    SkipLeadingWhitespace();
+    auto c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
+    if (std::isalpha(c) || c == '_' || c == ':') {
+        HandleMetricName(metricEvent);
+    } else {
+        HandleError("expected metric name");
+    }
+}
+
+// parse:test_metric{k1="v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
+void TextParser::HandleMetricName(MetricEvent& metricEvent) {
+    char c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
+    while (std::isalpha(c) || c == '_' || c == ':' || std::isdigit(c)) {
+        ++mTokenLength;
+        ++mPos;
+        c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
+    }
+    metricEvent.SetNameNoCopy(mLine.substr(mPos - mTokenLength, mTokenLength));
+    mTokenLength = 0;
+    SkipLeadingWhitespace();
+    if (mPos < mLine.size()) {
+        if (mLine[mPos] == '{') {
+            ++mPos;
+            SkipLeadingWhitespace();
+            HandleLabelName(metricEvent);
+        } else {
+            HandleSampleValue(metricEvent);
+        }
+    } else {
+        HandleError("error end of metric name");
+    }
+}
+
+// parse:k1="v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
+void TextParser::HandleLabelName(MetricEvent& metricEvent) {
+    char c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
+    if (std::isalpha(c) || c == '_') {
+        while (std::isalpha(c) || c == '_' || std::isdigit(c)) {
+            ++mTokenLength;
+            ++mPos;
+            c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
+        }
+        mLabelName = mLine.substr(mPos - mTokenLength, mTokenLength);
+        mTokenLength = 0;
+        SkipLeadingWhitespace();
+        if (mPos == mLine.size() || mLine[mPos] != '=') {
+            HandleError("expected '=' after label name");
+            return;
+        }
+        ++mPos;
+        SkipLeadingWhitespace();
+        HandleEqualSign(metricEvent);
+    } else if (c == '}') {
+        ++mPos;
+        SkipLeadingWhitespace();
+        HandleSampleValue(metricEvent);
+    } else {
+        HandleError("invalid character in label name");
+    }
+}
+
+// parse:"v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
+void TextParser::HandleEqualSign(MetricEvent& metricEvent) {
+    if (mPos < mLine.size() && mLine[mPos] == '"') {
+        ++mPos;
+        HandleLabelValue(metricEvent);
+    } else {
+        HandleError("expected '\"' after '='");
+    }
+}
+
+// parse:v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
+void TextParser::HandleLabelValue(MetricEvent& metricEvent) {
+    // left quote has been consumed
+    // LableValue supports escape char
+    bool escaped = false;
+    auto lPos = mPos;
+    while (mPos < mLine.size() && mLine[mPos] != '"') {
+        if (mLine[mPos] != '\\') {
+            if (escaped) {
+                mEscapedLabelValue.push_back(mLine[mPos]);
+            }
+            ++mPos;
+            ++mTokenLength;
+        } else {
+            if (escaped == false) {
+                // first meet escape char
+                escaped = true;
+                mEscapedLabelValue = mLine.substr(lPos, mPos - lPos).to_string();
+            }
+            if (mPos + 1 < mLine.size()) {
+                // check next char, if it is valid escape char, we can consume two chars and push one escaped char
+                // if not, we neet to push the two chars
+                // valid escape char: \", \\, \n
+                switch (mLine[lPos + 1]) {
+                    case '\\':
+                    case '\"':
+                        mEscapedLabelValue.push_back(mLine[mPos + 1]);
+                        break;
+                    case 'n':
+                        mEscapedLabelValue.push_back('\n');
+                        break;
+                    default:
+                        mEscapedLabelValue.push_back('\\');
+                        mEscapedLabelValue.push_back(mLine[mPos + 1]);
+                        break;
+                }
+                mPos += 2;
+            } else {
+                mEscapedLabelValue.push_back(mLine[mPos + 1]);
+                ++mPos;
+            }
+        }
+    }
+
+    if (mPos == mLine.size()) {
+        HandleError("unexpected end of input in label value");
+        return;
+    }
+
+    if (!escaped) {
+        metricEvent.SetTagNoCopy(mLabelName, mLine.substr(mPos - mTokenLength, mTokenLength));
+    } else {
+        metricEvent.SetTag(mLabelName.to_string(), mEscapedLabelValue);
+        mEscapedLabelValue.clear();
+    }
+    mTokenLength = 0;
+    ++mPos;
+    SkipLeadingWhitespace();
+    if (mPos < mLine.size() && (mLine[mPos] == ',' || mLine[mPos] == '}')) {
+        HandleCommaOrCloseBrace(metricEvent);
+    } else {
+        HandleError("unexpected end of input in label value");
+    }
+}
+
+// parse:, k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
+// or parse:} 9.9410452992e+10 1715829785083 # exemplarsxxx
+void TextParser::HandleCommaOrCloseBrace(MetricEvent& metricEvent) {
+    char c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
+    if (c == ',') {
+        ++mPos;
+        SkipLeadingWhitespace();
+        HandleLabelName(metricEvent);
+    } else if (c == '}') {
+        ++mPos;
+        SkipLeadingWhitespace();
+        HandleSampleValue(metricEvent);
+    } else {
+        HandleError("expected ',' or '}' after label value");
+    }
+}
+
+// parse:9.9410452992e+10 1715829785083 # exemplarsxxx
+void TextParser::HandleSampleValue(MetricEvent& metricEvent) {
+    while (mPos < mLine.size() && IsValidNumberChar(mLine[mPos])) {
+        ++mPos;
+        ++mTokenLength;
+    }
+
+    if (mPos < mLine.size() && mLine[mPos] != ' ' && mLine[mPos] != '\t') {
+        HandleError("unexpected end of input in sample value");
+        return;
+    }
+
+    auto tmpSampleValue = mLine.substr(mPos - mTokenLength, mTokenLength);
+    mDoubleStr = tmpSampleValue.to_string();
+
+    try {
+        mSampleValue = std::stod(mDoubleStr);
+    } catch (...) {
+        HandleError("invalid sample value");
+        mTokenLength = 0;
+        return;
+    }
+    mDoubleStr.clear();
+
+    metricEvent.SetValue<UntypedSingleValue>(mSampleValue);
+    mTokenLength = 0;
+    SkipLeadingWhitespace();
+    if (mPos == mLine.size()) {
+        metricEvent.SetTimestamp(mTimestamp, mNanoTimestamp);
+        mState = TextState::Done;
+    } else {
+        HandleTimestamp(metricEvent);
+    }
+}
+
+// parse:1715829785083 # exemplarsxxx
+// timestamp will be 1715829785.083 in OpenMetrics
+void TextParser::HandleTimestamp(MetricEvent& metricEvent) {
+    // '#' is for exemplars, and we don't need it
+    while (mPos < mLine.size() && IsValidNumberChar(mLine[mPos])) {
+        ++mPos;
+        ++mTokenLength;
+    }
+    if (mPos < mLine.size() && mLine[mPos] != ' ' && mLine[mPos] != '\t' && mLine[mPos] != '#') {
+        HandleError("unexpected end of input in sample timestamp");
+        return;
+    }
+
+    auto tmpTimestamp = mLine.substr(mPos - mTokenLength, mTokenLength);
+    if (tmpTimestamp.size() == 0) {
+        mState = TextState::Done;
+        return;
+    }
+    mDoubleStr = tmpTimestamp.to_string();
+    double milliTimestamp = 0;
+    try {
+        milliTimestamp = stod(mDoubleStr);
+    } catch (...) {
+        HandleError("invalid timestamp");
+        mTokenLength = 0;
+        return;
+    }
+    mDoubleStr.clear();
+
+    if (milliTimestamp > 1ULL << 63) {
+        HandleError("timestamp overflow");
+        mTokenLength = 0;
+        return;
+    }
+    if (milliTimestamp < 1UL << 31) {
+        milliTimestamp *= 1000;
+    }
+    time_t timestamp = (int64_t)milliTimestamp / 1000;
+    auto ns = ((int64_t)milliTimestamp % 1000) * 1000000;
+    metricEvent.SetTimestamp(timestamp, ns);
+
+    mTokenLength = 0;
+
+    mState = TextState::Done;
+}
+
+void TextParser::HandleError(const string& errMsg) {
+    LOG_WARNING(sLogger, ("text parser error parsing line", mLine.to_string() + errMsg));
+    mState = TextState::Error;
+}
+
+inline void TextParser::SkipLeadingWhitespace() {
+    while (mPos < mLine.length() && (mLine[mPos] == ' ' || mLine[mPos] == '\t')) {
+        mPos++;
+    }
 }
 
 } // namespace logtail

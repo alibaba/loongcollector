@@ -23,6 +23,7 @@
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
 #include "models/PipelineEventGroup.h"
+#include "prometheus/labels/TextParser.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 #include "queue/QueueKey.h"
 
@@ -42,8 +43,6 @@ public:
                     size_t inputIndex);
     ScrapeScheduler(const ScrapeScheduler&) = default;
     ~ScrapeScheduler() override = default;
-
-    bool operator<(const ScrapeScheduler& other) const;
 
     void OnMetricResult(const HttpResponse&, uint64_t timestampMilliSec);
     void SetTimer(std::shared_ptr<Timer> timer);
@@ -71,6 +70,8 @@ private:
     int32_t mPort;
     std::string mInstance;
     Labels mLabels;
+
+    std::unique_ptr<TextParser> mParser;
 
     QueueKey mQueueKey;
     size_t mInputIndex;
