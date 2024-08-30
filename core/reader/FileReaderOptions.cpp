@@ -30,7 +30,7 @@ DEFINE_FLAG_INT32(default_tail_limit_kb,
                   "when first open file, if offset little than this value, move offset to beginning, KB",
                   1024 * 50);
 #endif
-DEFINE_FLAG_INT32(default_reader_flush_timeout, "", 5);
+DEFINE_FLAG_INT32(default_reader_flush_timeout, "", 60);
 DEFINE_FLAG_INT32(delay_bytes_upperlimit,
                   "if (total_file_size - current_readed_size) exceed uppperlimit, send READ_LOG_DELAY_ALARM, bytes",
                   200 * 1024 * 1024);

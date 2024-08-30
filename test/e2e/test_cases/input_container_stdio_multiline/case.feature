@@ -20,6 +20,7 @@ Feature: input container stdio multiline
         IgnoringStdout: false
         Multiline:
           StartPattern: "today"
+        FlushTimeoutSecs: 5
     """
     When start docker-compose {input_container_stdio_multiline}
     Then there is at least {1} logs
