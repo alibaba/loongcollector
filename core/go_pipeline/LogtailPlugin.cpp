@@ -54,15 +54,15 @@ LogtailPlugin::LogtailPlugin() {
     mPluginAlarmConfig.mLogstore = "logtail_alarm";
     mPluginAlarmConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginAlarmConfig.mCompressor
-        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::LZ4);
+        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::ZSTD);
     mPluginProfileConfig.mLogstore = "shennong_log_profile";
     mPluginProfileConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginProfileConfig.mCompressor
-        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::LZ4);
+        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::ZSTD);
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor
-        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::LZ4);
+        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::ZSTD);
 
     mPluginCfg["LogtailSysConfDir"] = AppConfig::GetInstance()->GetLogtailSysConfDir();
     mPluginCfg["HostIP"] = LogFileProfiler::mIpAddr;
