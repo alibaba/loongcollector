@@ -21,7 +21,6 @@
 #include <fnmatch.h>
 #endif
 #include <boost/filesystem.hpp>
-
 #include <fstream>
 
 #include "RuntimeUtil.h"
@@ -159,6 +158,20 @@ bool OverwriteFile(const std::string& fileName, const std::string& content) {
     }
     if (fclose(pFile) != 0) {
         APSARA_LOG_ERROR(sLogger, ("close file fail", fileName)("errno", strerror(errno)));
+        return false;
+    }
+    return true;
+}
+
+bool WriteFile(const std::string& fileName, const std::string& content, std::string& errMsg) {
+    ofstream f(fileName, ios::trunc);
+    if (!f.is_open()) {
+        errMsg = "failed to open file " + fileName;
+        return false;
+    }
+    f.write(content.c_str(), content.size());
+    if (f.fail()) {
+        errMsg = strerror(errno);
         return false;
     }
     return true;

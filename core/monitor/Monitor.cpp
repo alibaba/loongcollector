@@ -50,6 +50,7 @@
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
 #include "pipeline/PipelineManager.h"
+#include "profile_sender/ProfileSender.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -177,11 +178,10 @@ void LogtailMonitor::Monitor() {
                 lastCheckHardLimitTime = monitorTime;
 
                 GetMemStat();
-                CalCpuStat(curCpuStat, mCpuStat);
-                if (CheckHardCpuLimit() || CheckHardMemLimit()) {
+                if (CheckHardMemLimit()) {
                     LOG_ERROR(sLogger,
                               ("Resource used by program exceeds hard limit",
-                               "prepare restart Logtail")("cpu_usage", mCpuStat.mCpuUsage)("mem_rss", mMemStat.mRss));
+                               "prepare restart Logtail")("mem_rss", mMemStat.mRss));
                     Suicide();
                 }
             }
@@ -470,15 +470,8 @@ bool LogtailMonitor::CheckSoftMemLimit() {
     return false;
 }
 
-bool LogtailMonitor::CheckHardCpuLimit() {
-    float cpuUsageLimit = AppConfig::GetInstance()->IsResourceAutoScale()
-        ? AppConfig::GetInstance()->GetScaledCpuUsageUpLimit()
-        : AppConfig::GetInstance()->GetCpuUsageUpLimit();
-    return mCpuStat.mCpuUsage > 10 * cpuUsageLimit;
-}
-
 bool LogtailMonitor::CheckHardMemLimit() {
-    return mMemStat.mRss > 10 * AppConfig::GetInstance()->GetMemUsageUpLimit();
+    return mMemStat.mRss > 5 * AppConfig::GetInstance()->GetMemUsageUpLimit();
 }
 
 void LogtailMonitor::DumpToLocal(const sls_logs::LogGroup& logGroup) {
@@ -555,6 +548,13 @@ std::string LogtailMonitor::GetLoadAvg() {
     std::getline(fin, loadStr);
     fin.close();
     return loadStr;
+}
+
+uint32_t LogtailMonitor::GetCpuCores() {
+    if (!CalCpuCores()) {
+        return 0;
+    }
+    return mCpuCores;
 }
 
 // Get the number of cores in CPU.
@@ -713,8 +713,7 @@ void LoongCollectorMonitor::Init() {
     labels.emplace_back(METRIC_LABEL_UUID, Application::GetInstance()->GetUUID());
     labels.emplace_back(METRIC_LABEL_VERSION, ILOGTAIL_VERSION);
     DynamicMetricLabels dynamicLabels;
-    dynamicLabels.emplace_back(METRIC_LABEL_PROJECTS,
-                               []() -> std::string { return FlusherSLS::GetAllProjects(); });
+    dynamicLabels.emplace_back(METRIC_LABEL_PROJECTS, []() -> std::string { return FlusherSLS::GetAllProjects(); });
 #ifdef __ENTERPRISE__
     dynamicLabels.emplace_back(METRIC_LABEL_ALIUIDS,
                                []() -> std::string { return EnterpriseConfigProvider::GetInstance()->GetAliuidSet(); });
@@ -738,10 +737,14 @@ void LoongCollectorMonitor::Init() {
         = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_POLLING_MODIFY_SIZE_TOTAL);
     mIntGauges[METRIC_AGENT_REGISTER_HANDLER_TOTAL]
         = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_REGISTER_HANDLER_TOTAL);
-    // mIntGauges[METRIC_AGENT_INSTANCE_CONFIG_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_INSTANCE_CONFIG_TOTAL);
-    mIntGauges[METRIC_AGENT_PIPELINE_CONFIG_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
-    // mIntGauges[METRIC_AGENT_ENV_PIPELINE_CONFIG_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_ENV_PIPELINE_CONFIG_TOTAL);
-    // mIntGauges[METRIC_AGENT_CRD_PIPELINE_CONFIG_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_CRD_PIPELINE_CONFIG_TOTAL);
+    // mIntGauges[METRIC_AGENT_INSTANCE_CONFIG_TOTAL] =
+    // mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_INSTANCE_CONFIG_TOTAL);
+    mIntGauges[METRIC_AGENT_PIPELINE_CONFIG_TOTAL]
+        = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
+    // mIntGauges[METRIC_AGENT_ENV_PIPELINE_CONFIG_TOTAL] =
+    // mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_ENV_PIPELINE_CONFIG_TOTAL);
+    // mIntGauges[METRIC_AGENT_CRD_PIPELINE_CONFIG_TOTAL] =
+    // mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_CRD_PIPELINE_CONFIG_TOTAL);
     // mIntGauges[METRIC_AGENT_CONSOLE_PIPELINE_CONFIG_TOTAL]
     //     = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_CONSOLE_PIPELINE_CONFIG_TOTAL);
     // mIntGauges[METRIC_AGENT_PLUGIN_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PLUGIN_TOTAL);

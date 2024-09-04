@@ -43,8 +43,8 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/MetricExportor.h"
 #include "monitor/Monitor.h"
-#include "pipeline/PipelineManager.h"
 #include "pipeline/InstanceConfigManager.h"
+#include "pipeline/PipelineManager.h"
 #include "plugin/PluginRegistry.h"
 #include "processor/daemon/LogProcess.h"
 #include "queue/ExactlyOnceQueueManager.h"
@@ -55,6 +55,7 @@
 #include "config/provider/EnterpriseConfigProvider.h"
 #include "config/provider/LegacyConfigProvider.h"
 #if defined(__linux__) && !defined(__ANDROID__)
+#include "common/LinuxDaemonUtil.h"
 #include "shennong/ShennongManager.h"
 #include "streamlog/StreamLogManager.h"
 #endif
@@ -72,6 +73,10 @@ DEFINE_FLAG_INT32(profiling_check_interval, "seconds", 60);
 DEFINE_FLAG_INT32(tcmalloc_release_memory_interval, "force release memory held by tcmalloc, seconds", 300);
 DEFINE_FLAG_INT32(exit_flushout_duration, "exit process flushout duration", 20 * 1000);
 DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
+DEFINE_FLAG_BOOL(enable_cgroup, "", true);
+#endif
+
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
 DECLARE_FLAG_BOOL(global_network_success);
@@ -156,6 +161,12 @@ void Application::Init() {
 
     GenerateInstanceId();
     TryGetUUID();
+
+#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
+    if (BOOL_FLAG(enable_cgroup)) {
+        CreateCGroup();
+    }
+#endif
 
     int32_t systemBootTime = AppConfig::GetInstance()->GetSystemBootTime();
     LogFileProfiler::mSystemBootTime = systemBootTime > 0 ? systemBootTime : GetSystemBootTime();

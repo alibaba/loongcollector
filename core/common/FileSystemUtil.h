@@ -15,18 +15,19 @@
  */
 
 #pragma once
-#include <string>
-#include <memory>
-#include <vector>
 #include <sys/stat.h>
+
 #include <boost/regex.hpp>
+#include <memory>
+#include <string>
+#include <vector>
 #if defined(__linux__)
 #include <dirent.h>
 #elif defined(_MSC_VER)
 #include <Windows.h>
 #endif
-#include "ErrorUtil.h"
 #include "DevInode.h"
+#include "ErrorUtil.h"
 #include "LogtailCommonFlags.h"
 
 // Filesystem utility.
@@ -88,6 +89,8 @@ bool ReadFileContent(const std::string& fileName, std::string& content, uint32_t
 
 // OverwriteFile overwrides @fileName with @content.
 bool OverwriteFile(const std::string& fileName, const std::string& content);
+
+bool WriteFile(const std::string& fileName, const std::string& content, std::string& errMsg);
 
 // IsAccessibleDirectory checks if the @dirPath is a existent directory and accessible.
 // Accessibility means that we can iterate the contents of it.
@@ -251,9 +254,7 @@ namespace fsutil {
         int64_t GetFileSize() const;
 
         // GetMode returns st_mode.
-        int GetMode() const {
-            return static_cast<int>(mRawStat.st_mode);
-        }
+        int GetMode() const { return static_cast<int>(mRawStat.st_mode); }
     };
 
 } // namespace fsutil
