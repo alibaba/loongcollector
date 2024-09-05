@@ -16,6 +16,7 @@ package http
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -25,6 +26,8 @@ import (
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/golang/snappy"
 
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -39,8 +42,9 @@ import (
 const (
 	defaultTimeout = time.Minute
 
-	contentTypeHeader  = "Content-Type"
-	defaultContentType = "application/octet-stream"
+	contentTypeHeader     = "Content-Type"
+	defaultContentType    = "application/octet-stream"
+	contentEncodingHeader = "Content-Encoding"
 )
 
 var contentTypeMaps = map[string]string{
@@ -50,6 +54,11 @@ var contentTypeMaps = map[string]string{
 	converter.EncodingCustom:   defaultContentType,
 }
 
+var supportedCompressionType = map[string]any{
+	"gzip":   nil,
+	"snappy": nil,
+}
+
 type retryConfig struct {
 	Enable        bool          // If enable retry, default is true
 	MaxRetryTimes int           // Max retry times, default is 3
@@ -57,29 +66,60 @@ type retryConfig struct {
 	MaxDelay      time.Duration // max delay time when retry, default is 30s
 }
 
+type Client interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type FlusherHTTP struct {
-	RemoteURL           string                       // RemoteURL to request
-	Headers             map[string]string            // Headers to append to the http request
-	Query               map[string]string            // Query parameters to append to the http request
-	Timeout             time.Duration                // Request timeout, default is 60s
-	Retry               retryConfig                  // Retry strategy, default is retry 3 times with delay time begin from 1second, max to 30 seconds
-	Convert             helper.ConvertConfig         // Convert defines which protocol and format to convert to
-	Concurrency         int                          // How many requests can be performed in concurrent
-	Authenticator       *extensions.ExtensionConfig  // name and options of the extensions.ClientAuthenticator extension to use
-	FlushInterceptor    *extensions.ExtensionConfig  // name and options of the extensions.FlushInterceptor extension to use
-	AsyncIntercept      bool                         // intercept the event asynchronously
-	RequestInterceptors []extensions.ExtensionConfig // custom request interceptor settings
-	QueueCapacity       int                          // capacity of channel
+	RemoteURL              string                       // RemoteURL to request
+	Headers                map[string]string            // Headers to append to the http request
+	Query                  map[string]string            // Query parameters to append to the http request
+	Timeout                time.Duration                // Request timeout, default is 60s
+	Retry                  retryConfig                  // Retry strategy, default is retry 3 times with delay time begin from 1second, max to 30 seconds
+	Encoder                *extensions.ExtensionConfig  // Encoder defines which protocol and format to encode to
+	Convert                helper.ConvertConfig         // Convert defines which protocol and format to convert to
+	Concurrency            int                          // How many requests can be performed in concurrent
+	MaxConnsPerHost        int                          // MaxConnsPerHost for http.Transport
+	MaxIdleConnsPerHost    int                          // MaxIdleConnsPerHost for http.Transport
+	IdleConnTimeout        time.Duration                // IdleConnTimeout for http.Transport
+	WriteBufferSize        int                          // WriteBufferSize for http.Transport
+	Authenticator          *extensions.ExtensionConfig  // name and options of the extensions.ClientAuthenticator extension to use
+	FlushInterceptor       *extensions.ExtensionConfig  // name and options of the extensions.FlushInterceptor extension to use
+	AsyncIntercept         bool                         // intercept the event asynchronously
+	RequestInterceptors    []extensions.ExtensionConfig // custom request interceptor settings
+	QueueCapacity          int                          // capacity of channel
+	DropEventWhenQueueFull bool                         // If true, pipeline events will be dropped when the queue is full
+	Compression            string                       // Compression type, support gzip and snappy at this moment.
 
 	varKeys []string
 
 	context     pipeline.Context
+	encoder     extensions.Encoder
 	converter   *converter.Converter
-	client      *http.Client
+	client      Client
 	interceptor extensions.FlushInterceptor
 
 	queue   chan interface{}
 	counter sync.WaitGroup
+}
+
+func NewHTTPFlusher() *FlusherHTTP {
+	return &FlusherHTTP{
+		QueueCapacity: 1024,
+		Timeout:       defaultTimeout,
+		Concurrency:   1,
+		Convert: helper.ConvertConfig{
+			Protocol:             converter.ProtocolCustomSingle,
+			Encoding:             converter.EncodingJSON,
+			IgnoreUnExpectedData: true,
+		},
+		Retry: retryConfig{
+			Enable:        true,
+			MaxRetryTimes: 3,
+			InitialDelay:  time.Second,
+			MaxDelay:      30 * time.Second,
+		},
+	}
 }
 
 func (f *FlusherHTTP) Description() string {
@@ -101,12 +141,16 @@ func (f *FlusherHTTP) Init(context pipeline.Context) error {
 		return err
 	}
 
-	converter, err := f.getConverter()
-	if err != nil {
+	var err error
+	if err = f.initEncoder(); err != nil {
+		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "http flusher init encoder fail, error", err)
+		return err
+	}
+
+	if err = f.initConverter(); err != nil {
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "http flusher init converter fail, error", err)
 		return err
 	}
-	f.converter = converter
 
 	if f.FlushInterceptor != nil {
 		var ext pipeline.Extension
@@ -140,7 +184,9 @@ func (f *FlusherHTTP) Init(context pipeline.Context) error {
 	f.buildVarKeys()
 	f.fillRequestContentType()
 
-	logger.Info(f.context.GetRuntimeContext(), "http flusher init", "initialized")
+	logger.Info(f.context.GetRuntimeContext(), "http flusher init", "initialized",
+		"timeout", f.Timeout,
+		"compression", f.Compression)
 	return nil
 }
 
@@ -179,12 +225,71 @@ func (f *FlusherHTTP) Stop() error {
 	return nil
 }
 
+func (f *FlusherHTTP) SetHTTPClient(client Client) {
+	f.client = client
+}
+
+func (f *FlusherHTTP) initEncoder() error {
+	if f.Encoder == nil {
+		return nil
+	}
+
+	ext, err := f.context.GetExtension(f.Encoder.Type, f.Encoder.Options)
+	if err != nil {
+		return fmt.Errorf("get extension failed, error: %w", err)
+	}
+
+	enc, ok := ext.(extensions.Encoder)
+	if !ok {
+		return fmt.Errorf("filter(%s) not implement interface extensions.Encoder", f.Encoder)
+	}
+
+	f.encoder = enc
+
+	return nil
+}
+
+func (f *FlusherHTTP) initConverter() error {
+	conv, err := f.getConverter()
+	if err == nil {
+		f.converter = conv
+		return nil
+	}
+
+	if f.encoder == nil {
+		// e.g.
+		// Prometheus http flusher does not config helper.ConvertConfig,
+		// but must config encoder config (i.e. prometheus encoder config).
+		// If err != nil, meanwhile http flusher has no encoder,
+		// flusher cannot work, so should return error.
+		return err
+	}
+
+	return nil
+}
+
+func (f *FlusherHTTP) getConverter() (*converter.Converter, error) {
+	return converter.NewConverterWithSep(f.Convert.Protocol, f.Convert.Encoding, f.Convert.Separator, f.Convert.IgnoreUnExpectedData, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
+}
+
 func (f *FlusherHTTP) initHTTPClient() error {
 	transport := http.DefaultTransport
 	if dt, ok := transport.(*http.Transport); ok {
 		dt = dt.Clone()
 		if f.Concurrency > dt.MaxIdleConnsPerHost {
 			dt.MaxIdleConnsPerHost = f.Concurrency + 1
+		}
+		if f.MaxConnsPerHost > dt.MaxConnsPerHost {
+			dt.MaxConnsPerHost = f.MaxConnsPerHost
+		}
+		if f.MaxIdleConnsPerHost > dt.MaxIdleConnsPerHost {
+			dt.MaxIdleConnsPerHost = f.MaxIdleConnsPerHost
+		}
+		if f.IdleConnTimeout > dt.IdleConnTimeout {
+			dt.IdleConnTimeout = f.IdleConnTimeout
+		}
+		if f.WriteBufferSize > 0 {
+			dt.WriteBufferSize = f.WriteBufferSize
 		}
 		transport = dt
 	}
@@ -245,13 +350,19 @@ func (f *FlusherHTTP) initRequestInterceptors(transport http.RoundTripper) (http
 	return transport, nil
 }
 
-func (f *FlusherHTTP) getConverter() (*converter.Converter, error) {
-	return converter.NewConverterWithSep(f.Convert.Protocol, f.Convert.Encoding, f.Convert.Separator, f.Convert.IgnoreUnExpectedData, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
-}
-
 func (f *FlusherHTTP) addTask(log interface{}) {
 	f.counter.Add(1)
-	f.queue <- log
+
+	if f.DropEventWhenQueueFull {
+		select {
+		case f.queue <- log:
+		default:
+			f.counter.Done()
+			logger.Warningf(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "http flusher dropped a group event since the queue is full")
+		}
+	} else {
+		f.queue <- log
+	}
 }
 
 func (f *FlusherHTTP) countDownTask() {
@@ -259,12 +370,47 @@ func (f *FlusherHTTP) countDownTask() {
 }
 
 func (f *FlusherHTTP) runFlushTask() {
+	flushTaskFn, action := f.convertAndFlush, "convert"
+	if f.encoder != nil {
+		flushTaskFn, action = f.encodeAndFlush, "encode"
+	}
+
 	for data := range f.queue {
-		err := f.convertAndFlush(data)
+		err := flushTaskFn(data)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "http flusher failed convert or flush data, data dropped, error", err)
+			logger.Errorf(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
+				"http flusher failed %s or flush data, data dropped, error: %s", action, err.Error())
 		}
 	}
+}
+
+func (f *FlusherHTTP) encodeAndFlush(event any) error {
+	defer f.countDownTask()
+
+	var data [][]byte
+	var err error
+
+	switch v := event.(type) {
+	case *models.PipelineGroupEvents:
+		data, err = f.encoder.EncodeV2(v)
+
+	default:
+		return errors.New("unsupported event type")
+	}
+
+	if err != nil {
+		return fmt.Errorf("http flusher encode event data fail, error: %w", err)
+	}
+
+	for _, shard := range data {
+		if err = f.flushWithRetry(shard, nil); err != nil {
+			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
+				"http flusher failed flush data after retry, data dropped, error", err,
+				"remote url", f.RemoteURL)
+		}
+	}
+
+	return nil
 }
 
 func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
@@ -345,8 +491,37 @@ func (f *FlusherHTTP) getNextRetryDelay(retryTime int) time.Duration {
 	return time.Duration(harf + jitter.Int64())
 }
 
+func (f *FlusherHTTP) compressData(data []byte) (io.Reader, error) {
+	var reader io.Reader = bytes.NewReader(data)
+	if compressionType, ok := f.Headers[contentEncodingHeader]; ok {
+		switch compressionType {
+		case "gzip":
+			var buf bytes.Buffer
+			gw := gzip.NewWriter(&buf)
+			if _, err := gw.Write(data); err != nil {
+				return nil, err
+			}
+			if err := gw.Close(); err != nil {
+				return nil, err
+			}
+			reader = &buf
+		case "snappy":
+			compressedData := snappy.Encode(nil, data)
+			reader = bytes.NewReader(compressedData)
+		default:
+		}
+	}
+	return reader, nil
+}
+
 func (f *FlusherHTTP) flush(data []byte, varValues map[string]string) (ok, retryable bool, err error) {
-	req, err := http.NewRequest(http.MethodPost, f.RemoteURL, bytes.NewReader(data))
+	reader, err := f.compressData(data)
+	if err != nil {
+		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "create reader error", err)
+		return false, false, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, f.RemoteURL, reader)
 	if err != nil {
 		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "http flusher create request fail, error", err)
 		return false, false, err
@@ -450,6 +625,12 @@ func (f *FlusherHTTP) fillRequestContentType() {
 		f.Headers = make(map[string]string, 4)
 	}
 
+	if f.Compression != "" {
+		if _, ok := supportedCompressionType[f.Compression]; ok {
+			f.Headers[contentEncodingHeader] = f.Compression
+		}
+	}
+
 	_, ok := f.Headers[contentTypeHeader]
 	if ok {
 		return
@@ -464,21 +645,6 @@ func (f *FlusherHTTP) fillRequestContentType() {
 
 func init() {
 	pipeline.Flushers["flusher_http"] = func() pipeline.Flusher {
-		return &FlusherHTTP{
-			QueueCapacity: 1024,
-			Timeout:       defaultTimeout,
-			Concurrency:   1,
-			Convert: helper.ConvertConfig{
-				Protocol:             converter.ProtocolCustomSingle,
-				Encoding:             converter.EncodingJSON,
-				IgnoreUnExpectedData: true,
-			},
-			Retry: retryConfig{
-				Enable:        true,
-				MaxRetryTimes: 3,
-				InitialDelay:  time.Second,
-				MaxDelay:      30 * time.Second,
-			},
-		}
+		return NewHTTPFlusher()
 	}
 }
