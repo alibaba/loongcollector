@@ -20,7 +20,7 @@
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "pipeline/PipelineContext.h"
-#include "reader/FileReaderOptions.h"
+#include "file_server/reader/FileReaderOptions.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_tail_limit_kb);

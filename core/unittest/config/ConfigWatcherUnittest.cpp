@@ -17,7 +17,7 @@
 
 #include "config/ConfigDiff.h"
 #include "config/watcher/ConfigWatcher.h"
-#include "plugin/PluginRegistry.h"
+#include "pipeline/plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

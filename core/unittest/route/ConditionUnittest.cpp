@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "common/JsonUtil.h"
-#include "route/Condition.h"
+#include "pipeline/route/Condition.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

@@ -25,9 +25,9 @@
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
 #include "models/LogEvent.h"
-#include "processor/inner/ProcessorMergeMultilineLogNative.h"
-#include "processor/inner/ProcessorParseContainerLogNative.h"
-#include "processor/inner/ProcessorSplitLogStringNative.h"
+#include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
+#include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
+#include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
 namespace logtail {
 

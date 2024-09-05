@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "compression/CompressorFactory.h"
+#include "pipeline/compression/CompressorFactory.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

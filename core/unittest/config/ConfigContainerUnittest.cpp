@@ -21,8 +21,8 @@
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
-#include "config_manager/ConfigManager.h"
-#include "event/Event.h"
+#include "file_server/ConfigManager.h"
+#include "file_server/event/Event.h"
 #include "file_server/FileServer.h"
 #include "unittest/Unittest.h"
 using namespace std;

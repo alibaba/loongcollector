@@ -30,4 +30,4 @@ RUN python3 -m pip install --upgrade pip
 RUN cp /usr/local/python3/bin/pip3 /usr/bin/pip3 && pip3 install gcovr==7.0
 RUN cp /usr/local/python3/bin/gcovr /usr/bin/gcovr
 
-CMD ["bash", "-c", "gcovr --root . --lcov coverage.lcov --txt coverage.txt -e \".*sdk.*\" -e \".*observer.*\" -e \".*log_pb.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*fuse.*\" -e \".*go_pipeline.*\""]
+CMD ["bash", "-c", "gcovr --root . --lcov coverage.lcov --txt coverage.txt -e \".*sdk.*\" -e \".*observer.*\" -e \".*lo.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*fuse.*\" -e \".*go_pipeline.*\""]

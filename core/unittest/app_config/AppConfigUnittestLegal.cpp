@@ -18,7 +18,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "app_config/AppConfig.h"
-#include "reader/LogFileReader.h"
+#include "file_server/reader/LogFileReader.h"
 
 DECLARE_FLAG_STRING(ilogtail_config);
 DECLARE_FLAG_INT32(logreader_filedeleted_remove_interval);

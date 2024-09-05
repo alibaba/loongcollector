@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/creator/StaticFlusherCreator.h"
-#include "plugin/instance/PluginInstance.h"
+#include "pipeline/plugin/creator/StaticFlusherCreator.h"
+#include "pipeline/plugin/instance/PluginInstance.h"
 #include "unittest/plugin/PluginMock.h"
 #include "unittest/Unittest.h"
 

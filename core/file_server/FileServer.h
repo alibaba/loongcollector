@@ -25,7 +25,7 @@
 #include "file_server/MultilineOptions.h"
 #include "monitor/PluginMetricManager.h"
 #include "pipeline/PipelineContext.h"
-#include "reader/FileReaderOptions.h"
+#include "file_server/reader/FileReaderOptions.h"
 
 namespace logtail {
 

@@ -15,8 +15,8 @@
 #include <memory>
 
 #include "models/PipelineEventGroup.h"
-#include "queue/CircularProcessQueue.h"
-#include "queue/SenderQueue.h"
+#include "pipeline/queue/CircularProcessQueue.h"
+#include "pipeline/queue/SenderQueue.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

@@ -19,7 +19,7 @@
 #include "network.h"
 #include <arpa/inet.h>
 #include <json/value.h>
-#include <log_pb/sls_logs.pb.h>
+#include <protobuf/sls/sls_logs.pb.h>
 #include <sstream>
 #include <string>
 #include <unordered_map>

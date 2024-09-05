@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "queue/SenderQueue.h"
+#include "pipeline/queue/SenderQueue.h"
 #include "unittest/Unittest.h"
 #include "unittest/queue/FeedbackInterfaceMock.h"
 

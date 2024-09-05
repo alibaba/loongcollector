@@ -27,7 +27,7 @@
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
 #include "common/SplitedFilePath.h"
-#include "reader/LogFileReader.h"
+#include "file_server/reader/LogFileReader.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "AppConfig.h"

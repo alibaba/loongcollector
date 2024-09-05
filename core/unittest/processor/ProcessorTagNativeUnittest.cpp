@@ -16,9 +16,9 @@
 
 #include "common/Constants.h"
 #include "config/PipelineConfig.h"
-#include "config_manager/ConfigManager.h"
+#include "file_server/ConfigManager.h"
 #include "pipeline/Pipeline.h"
-#include "processor/inner/ProcessorTagNative.h"
+#include "plugin/processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"

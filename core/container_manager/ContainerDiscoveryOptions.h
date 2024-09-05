@@ -24,7 +24,7 @@
 
 #include "file_server/FileDiscoveryOptions.h"
 #include "pipeline/PipelineContext.h"
-#include "plugin/instance/PluginInstance.h"
+#include "pipeline/plugin/instance/PluginInstance.h"
 
 namespace logtail {
 

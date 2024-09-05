@@ -14,13 +14,13 @@
 
 #include "unittest/Unittest.h"
 #include <json/json.h>
-#include "controller/EventDispatcher.h"
-#include "config_manager/ConfigManager.h"
+#include "file_server/EventDispatcher.h"
+#include "file_server/ConfigManager.h"
 #include "app_config/AppConfig.h"
-#include "reader/LogFileReader.h"
-#include "event_handler/EventHandler.h"
+#include "file_server/reader/LogFileReader.h"
+#include "file_server/event_handler/EventHandler.h"
 #include "monitor/Monitor.h"
-#include "event/Event.h"
+#include "file_server/event/Event.h"
 #include "sender/Sender.h"
 #include <assert.h>
 #if defined(__linux__)
@@ -39,13 +39,13 @@
 #include <iostream>
 #include <fstream>
 #include <boost/regex.hpp>
-#include "log_pb/metric.pb.h"
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/metric.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/LogIntegrity.h"
-#include "event_handler/LogInput.h"
+#include "file_server/event_handler/LogInput.h"
 #include "common/FileEncryption.h"
-#include "processor/daemon/LogProcess.h"
+#include "runner/LogProcess.h"
 #include "common/WaitObject.h"
 #include "common/Lock.h"
 #include "common/MemoryBarrier.h"

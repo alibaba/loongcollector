@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "flusher/sls/FlusherSLS.h"
-#include "serializer/SLSSerializer.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
+#include "pipeline/serializer/SLSSerializer.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(max_send_log_group_size);

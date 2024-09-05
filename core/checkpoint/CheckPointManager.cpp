@@ -25,7 +25,7 @@
 #include "common/Flags.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
-#include "config_manager/ConfigManager.h"
+#include "file_server/ConfigManager.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"

@@ -19,7 +19,7 @@
 #include <string>
 #include <memory>
 #include "common/Flags.h"
-#include "event/Event.h"
+#include "file_server/event/Event.h"
 using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);

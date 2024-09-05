@@ -18,12 +18,12 @@
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
-#include "config_manager/ConfigManager.h"
-#include "controller/EventDispatcher.h"
-#include "event_handler/LogInput.h"
-#include "input/InputFile.h"
-#include "polling/PollingDirFile.h"
-#include "polling/PollingModify.h"
+#include "file_server/EventDispatcher.h"
+#include "file_server/event_handler/LogInput.h"
+#include "file_server/ConfigManager.h"
+#include "plugin/input/InputFile.h"
+#include "file_server/polling/PollingDirFile.h"
+#include "file_server/polling/PollingModify.h"
 
 DEFINE_FLAG_BOOL(enable_polling_discovery, "", true);
 

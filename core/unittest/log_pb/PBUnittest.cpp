@@ -14,8 +14,8 @@
 
 #include <logger/Logger.h>
 #include "unittest/Unittest.h"
-#include "log_pb/RawLogGroup.h"
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/RawLogGroup.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 using namespace std;
 using namespace sls_logs;

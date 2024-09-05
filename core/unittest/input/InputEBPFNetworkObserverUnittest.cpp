@@ -17,7 +17,7 @@
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "ebpf/config.h"
-#include "input/InputEBPFNetworkObserver.h"
+#include "plugin/input/InputEBPFNetworkObserver.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
 #include "unittest/Unittest.h"

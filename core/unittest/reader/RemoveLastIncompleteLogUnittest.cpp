@@ -14,7 +14,7 @@
 
 #include "common/FileSystemUtil.h"
 #include "common/memory/SourceBuffer.h"
-#include "reader/LogFileReader.h"
+#include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

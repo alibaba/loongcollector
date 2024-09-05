@@ -18,7 +18,7 @@
 
 #include "common/ParamExtractor.h"
 #include "pipeline/PipelineContext.h"
-#include "queue/ProcessQueueManager.h"
+#include "pipeline/queue/ProcessQueueManager.h"
 
 using namespace std;
 

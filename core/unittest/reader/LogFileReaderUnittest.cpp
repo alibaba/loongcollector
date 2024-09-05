@@ -21,8 +21,8 @@
 #include "common/RuntimeUtil.h"
 #include "common/memory/SourceBuffer.h"
 #include "file_server/FileServer.h"
-#include "log_pb/sls_logs.pb.h"
-#include "reader/LogFileReader.h"
+#include "protobuf/sls/sls_logs.pb.h"
+#include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);

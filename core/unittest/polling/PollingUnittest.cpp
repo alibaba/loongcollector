@@ -15,15 +15,15 @@
 #include "unittest/Unittest.h"
 #include "common/Flags.h"
 #include <json/json.h>
-#include "controller/EventDispatcher.h"
-#include "config_manager/ConfigManager.h"
+#include "file_server/EventDispatcher.h"
+#include "file_server/ConfigManager.h"
 #include "app_config/AppConfig.h"
-#include "reader/LogFileReader.h"
-#include "event_handler/EventHandler.h"
+#include "file_server/reader/LogFileReader.h"
+#include "file_server/event_handler/EventHandler.h"
 #include "monitor/Monitor.h"
 #include "common/StringTools.h"
 #include "logger/Logger.h"
-#include "event/Event.h"
+#include "file_server/event/Event.h"
 #if defined(__linux__)
 #include <pthread.h>
 #include <unistd.h>
@@ -43,18 +43,18 @@
 #include <fstream>
 #include <algorithm>
 #include <boost/regex.hpp>
-#include "log_pb/metric.pb.h"
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/metric.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #include "monitor/LogtailAlarm.h"
-#include "event_handler/LogInput.h"
+#include "file_server/event_handler/LogInput.h"
 #include "common/FileEncryption.h"
 #include "common/FileSystemUtil.h"
 #include <set>
 #include <vector>
 #include <queue>
-#include "polling/PollingDirFile.h"
-#include "polling/PollingModify.h"
-#include "polling/PollingEventQueue.h"
+#include "file_server/polling/PollingDirFile.h"
+#include "file_server/polling/PollingModify.h"
+#include "file_server/polling/PollingEventQueue.h"
 
 using namespace std;
 using namespace sls_logs;

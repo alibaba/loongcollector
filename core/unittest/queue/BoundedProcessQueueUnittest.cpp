@@ -16,8 +16,8 @@
 
 #include "common/FeedbackInterface.h"
 #include "models/PipelineEventGroup.h"
-#include "queue/BoundedProcessQueue.h"
-#include "queue/SenderQueue.h"
+#include "pipeline/queue/BoundedProcessQueue.h"
+#include "pipeline/queue/SenderQueue.h"
 #include "unittest/Unittest.h"
 #include "unittest/queue/FeedbackInterfaceMock.h"
 

@@ -22,7 +22,7 @@
 #include "config/watcher/ConfigWatcher.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineManager.h"
-#include "plugin/PluginRegistry.h"
+#include "pipeline/plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

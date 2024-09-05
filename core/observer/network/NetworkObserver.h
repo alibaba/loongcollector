@@ -21,7 +21,7 @@
 #include "NetworkConfig.h"
 #include <unordered_map>
 #include <ostream>
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #include "common/Thread.h"
 #include "common/Lock.h"
 #include "common/TimeUtil.h"

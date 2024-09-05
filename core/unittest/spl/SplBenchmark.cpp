@@ -16,12 +16,12 @@
 
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
-#include "processor/ProcessorSPL.h"
-#include "processor/ProcessorParseRegexNative.h"
-#include "processor/ProcessorParseJsonNative.h"
-#include "processor/ProcessorParseDelimiterNative.h"
+#include "plugin/processor/ProcessorSPL.h"
+#include "plugin/processor/ProcessorParseRegexNative.h"
+#include "plugin/processor/ProcessorParseJsonNative.h"
+#include "plugin/processor/ProcessorParseDelimiterNative.h"
 #include "models/LogEvent.h"
-#include "plugin/instance/ProcessorInstance.h"
+#include "pipeline/plugin/instance/ProcessorInstance.h"
 #include <iostream>
 #include <sstream>
 #include "common/TimeUtil.h"

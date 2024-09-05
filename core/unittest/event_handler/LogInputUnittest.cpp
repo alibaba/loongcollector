@@ -20,9 +20,9 @@
 #include <memory>
 #include "common/Flags.h"
 #include "common/FileSystemUtil.h"
-#include "polling/PollingEventQueue.h"
-#include "event/Event.h"
-#include "event_handler/LogInput.h"
+#include "file_server/polling/PollingEventQueue.h"
+#include "file_server/event/Event.h"
+#include "file_server/event_handler/LogInput.h"
 using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);

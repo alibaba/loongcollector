@@ -19,7 +19,7 @@
 #include "StringTools.h"
 #include "common/JsonUtil.h"
 #include "models/PipelineEventGroup.h"
-#include "processor/inner/ProcessorPromParseMetricNative.h"
+#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "prometheus/Constants.h"
 #include "prometheus/labels/TextParser.h"
 #include "prometheus/schedulers/ScrapeScheduler.h"

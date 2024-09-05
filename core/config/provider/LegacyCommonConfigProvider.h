@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "config/provider/ConfigProvider.h"
-#include "config_server_pb/v1/agent.pb.h"
+#include "protobuf/config_server/v1/agent.pb.h"
 
 namespace logtail {
 

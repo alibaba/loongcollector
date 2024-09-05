@@ -5,7 +5,7 @@
 1. 在[管控协议讨论版](https://github.com/alibaba/ilogtail/discussions/404)提出修改意见
 2. 意见通过后，修改[管控协议文件](https://github.com/alibaba/ilogtail/tree/main/config_server/protocol)
 3. 管控协议生成对应语言的版本，并进行代码适配
-    * ilogtail C++ 部分：[agent.proto](https://github.com/alibaba/ilogtail/tree/main/core/config_server_pb)
+    * ilogtail C++ 部分：[agent.proto](https://github.com/alibaba/ilogtail/tree/main/core/protobuf/config_server)
     * ConfigServer Golang 部分：[agent.proto & user.proto](https://github.com/alibaba/ilogtail/tree/main/config_server/service/proto/v1)
 
 ## 开发

@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include <map>
 #include <json/json.h>
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 namespace sls_logs {
 class LogGroup;

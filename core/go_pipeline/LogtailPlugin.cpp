@@ -22,15 +22,15 @@
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
-#include "compression/CompressorFactory.h"
-#include "config_manager/ConfigManager.h"
+#include "pipeline/compression/CompressorFactory.h"
 #include "container_manager/ConfigContainerInfoUpdateCmd.h"
+#include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/PipelineManager.h"
 #include "profile_sender/ProfileSender.h"
-#include "queue/SenderQueueManager.h"
+#include "pipeline/queue/SenderQueueManager.h"
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
 DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,

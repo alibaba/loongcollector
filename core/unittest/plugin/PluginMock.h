@@ -19,15 +19,15 @@
 #include <string>
 
 #include "pipeline/Pipeline.h"
-#include "plugin/PluginRegistry.h"
-#include "plugin/creator/StaticFlusherCreator.h"
-#include "plugin/creator/StaticInputCreator.h"
-#include "plugin/creator/StaticProcessorCreator.h"
-#include "plugin/interface/Flusher.h"
-#include "plugin/interface/HttpFlusher.h"
-#include "plugin/interface/Input.h"
-#include "plugin/interface/Processor.h"
-#include "queue/SenderQueueManager.h"
+#include "pipeline/plugin/PluginRegistry.h"
+#include "pipeline/plugin/creator/StaticFlusherCreator.h"
+#include "pipeline/plugin/creator/StaticInputCreator.h"
+#include "pipeline/plugin/creator/StaticProcessorCreator.h"
+#include "pipeline/plugin/interface/Flusher.h"
+#include "pipeline/plugin/interface/HttpFlusher.h"
+#include "pipeline/plugin/interface/Input.h"
+#include "pipeline/plugin/interface/Processor.h"
+#include "pipeline/queue/SenderQueueManager.h"
 
 namespace logtail {
 

@@ -21,12 +21,12 @@
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
-#include "config_manager/ConfigManager.h"
+#include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
-#include "reader/LogFileReader.h"
+#include "file_server/reader/LogFileReader.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -149,7 +149,9 @@ DEFINE_FLAG_INT32(max_holded_data_size,
 DEFINE_FLAG_INT32(pub_max_holded_data_size,
                   "for every id and metric name, the max data size can be holded in memory (default 512KB)",
                   512 * 1024);
-DEFINE_FLAG_STRING(metrics_report_method, "method to report metrics (default none, means logtail will not report metrics)", "sls");
+DEFINE_FLAG_STRING(metrics_report_method,
+                   "method to report metrics (default none, means logtail will not report metrics)",
+                   "sls");
 
 DEFINE_FLAG_STRING(loong_collector_operator_service, "loong collector operator service", "");
 DEFINE_FLAG_INT32(loong_collector_operator_service_port, "loong collector operator service port", 8888);
@@ -1055,8 +1057,8 @@ void AppConfig::RecurseParseJsonToFlags(const Json::Value& confJson, std::string
                 SetConfigFlag(fullName, jsonvalue.toStyledString());
             } else {
                 APSARA_LOG_INFO(sLogger,
-                            ("Set config flag failed", "can not convert json value to flag")("flag name", fullName)(
-                                "jsonvalue", jsonvalue.toStyledString()));
+                                ("Set config flag failed", "can not convert json value to flag")("flag name", fullName)(
+                                    "jsonvalue", jsonvalue.toStyledString()));
             }
         }
     }

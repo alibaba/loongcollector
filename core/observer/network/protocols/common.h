@@ -18,7 +18,7 @@
 
 #include "interface/protocol.h"
 #include <deque>
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #include "interface/helper.h"
 #include "LogtailAlarm.h"
 #include "metas/ServiceMetaCache.h"

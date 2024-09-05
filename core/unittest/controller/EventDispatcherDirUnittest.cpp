@@ -19,9 +19,9 @@
 #include <string>
 #include <memory>
 #include "common/Flags.h"
-#include "controller/EventDispatcher.h"
-#include "event/Event.h"
-#include "event_handler/EventHandler.h"
+#include "file_server/EventDispatcher.h"
+#include "file_server/event/Event.h"
+#include "file_server/event_handler/EventHandler.h"
 using namespace std;
 
 DECLARE_FLAG_STRING(ilogtail_config);

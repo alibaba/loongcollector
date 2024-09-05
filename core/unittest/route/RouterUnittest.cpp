@@ -14,7 +14,7 @@
 
 #include "common/JsonUtil.h"
 #include "pipeline/Pipeline.h"
-#include "route/Router.h"
+#include "pipeline/route/Router.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

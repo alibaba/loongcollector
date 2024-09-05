@@ -20,7 +20,7 @@
 
 #include "LoongCollectorMetricTypes.h"
 #include "common/Lock.h"
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
 

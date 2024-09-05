@@ -21,13 +21,13 @@
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileServer.h"
-#include "input/InputFile.h"
+#include "plugin/input/InputFile.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
-#include "plugin/PluginRegistry.h"
-#include "processor/inner/ProcessorSplitLogStringNative.h"
-#include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
-#include "processor/inner/ProcessorTagNative.h"
+#include "pipeline/plugin/PluginRegistry.h"
+#include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
+#include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
+#include "plugin/processor/inner/ProcessorTagNative.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);

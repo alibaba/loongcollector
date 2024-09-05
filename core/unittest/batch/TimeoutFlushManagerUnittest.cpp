@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "batch/TimeoutFlushManager.h"
+#include "pipeline/batch/TimeoutFlushManager.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 

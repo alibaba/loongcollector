@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#include "batch/BatchStatus.h"
-#include "batch/FlushStrategy.h"
+#include "pipeline/batch/BatchStatus.h"
+#include "pipeline/batch/FlushStrategy.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

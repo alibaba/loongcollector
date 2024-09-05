@@ -25,10 +25,10 @@
 #include "models/PipelineEventGroup.h"
 #include "prometheus/labels/TextParser.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
-#include "queue/QueueKey.h"
+#include "pipeline/queue/QueueKey.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
-#include "queue/ProcessQueueItem.h"
+#include "pipeline/queue/ProcessQueueItem.h"
 #endif
 
 namespace logtail {

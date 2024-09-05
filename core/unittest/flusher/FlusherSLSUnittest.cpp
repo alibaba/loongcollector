@@ -22,17 +22,17 @@
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
-#include "compression/CompressorFactory.h"
-#include "flusher/sls/FlusherSLS.h"
-#include "flusher/sls/PackIdManager.h"
-#include "flusher/sls/SLSClientManager.h"
+#include "pipeline/compression/CompressorFactory.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/flusher/sls/PackIdManager.h"
+#include "plugin/flusher/sls/SLSClientManager.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
-#include "queue/ExactlyOnceQueueManager.h"
-#include "queue/ProcessQueueManager.h"
-#include "queue/QueueKeyManager.h"
-#include "queue/SLSSenderQueueItem.h"
-#include "queue/SenderQueueManager.h"
+#include "pipeline/queue/ExactlyOnceQueueManager.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+#include "pipeline/queue/QueueKeyManager.h"
+#include "pipeline/queue/SLSSenderQueueItem.h"
+#include "pipeline/queue/SenderQueueManager.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(batch_send_interval);

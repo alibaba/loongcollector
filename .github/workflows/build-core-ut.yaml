@@ -82,7 +82,7 @@ jobs:
         run: make unittest_core
 
       - name: Unit Test Coverage
-        run: docker build -t unittest_coverage -f ./docker/Dockerfile_coverage . && docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --root . --lcov coverage.lcov --txt coverage.txt -e \".*sdk.*\" -e \".*observer.*\" -e \".*log_pb.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*fuse.*\" -e \".*go_pipeline.*\""
+        run: docker build -t unittest_coverage -f ./docker/Dockerfile_coverage . && docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --root . --lcov coverage.lcov --txt coverage.txt -e \".*sdk.*\" -e \".*observer.*\" -e \".*protobuf.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*fuse.*\" -e \".*go_pipeline.*\""
 
       - name: Setup Python3.10
         uses: actions/setup-python@v5

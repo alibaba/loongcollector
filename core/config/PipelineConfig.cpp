@@ -22,7 +22,7 @@
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
 #include "common/YamlUtil.h"
-#include "plugin/PluginRegistry.h"
+#include "pipeline/plugin/PluginRegistry.h"
 
 DEFINE_FLAG_BOOL(enable_env_ref_in_config, "enable environment variable reference replacement in configuration", false);
 

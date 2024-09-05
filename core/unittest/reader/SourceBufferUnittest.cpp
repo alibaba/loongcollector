@@ -15,7 +15,7 @@
 #include "unittest/Unittest.h"
 #include <fstream>
 #include <json/json.h>
-#include "LogFileReader.h"
+#include "file_server/reader/LogFileReader.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
 

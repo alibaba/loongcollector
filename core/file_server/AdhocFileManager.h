@@ -18,7 +18,7 @@
 #include <queue>
 #include <unordered_set>
 #include "checkpoint/AdhocCheckpointManager.h"
-#include "event/Event.h"
+#include "file_server/event/Event.h"
 
 namespace logtail {
 

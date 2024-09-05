@@ -22,7 +22,7 @@
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
 #include "common/YamlUtil.h"
-#include "plugin/PluginRegistry.h"
+#include "pipeline/plugin/PluginRegistry.h"
 
 
 using namespace std;

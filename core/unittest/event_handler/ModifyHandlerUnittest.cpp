@@ -23,12 +23,12 @@
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
-#include "event/Event.h"
-#include "event_handler/EventHandler.h"
+#include "file_server/event/Event.h"
+#include "file_server/event_handler/EventHandler.h"
 #include "file_server/FileServer.h"
 #include "pipeline/Pipeline.h"
-#include "queue/ProcessQueueManager.h"
-#include "reader/LogFileReader.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+#include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

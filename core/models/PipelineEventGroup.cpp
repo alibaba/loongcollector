@@ -20,7 +20,7 @@
 
 #include "common/HashUtil.h"
 #include "logger/Logger.h"
-#include "processor/inner/ProcessorParseContainerLogNative.h"
+#include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 
 using namespace std;
 

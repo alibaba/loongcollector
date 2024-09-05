@@ -14,8 +14,8 @@
 
 #include <memory>
 
-#include "plugin/creator/StaticProcessorCreator.h"
-#include "plugin/instance/InputInstance.h"
+#include "pipeline/plugin/creator/StaticProcessorCreator.h"
+#include "pipeline/plugin/instance/InputInstance.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 

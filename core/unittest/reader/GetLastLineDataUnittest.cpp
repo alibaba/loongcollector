@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "common/FileSystemUtil.h"
-#include "reader/LogFileReader.h"
+#include "file_server/reader/LogFileReader.h"
 #include "common/memory/SourceBuffer.h"
 #include "unittest/Unittest.h"
 

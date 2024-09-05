@@ -26,7 +26,7 @@
 
 #include "config/feedbacker/ConfigFeedbackable.h"
 #include "config/provider/ConfigProvider.h"
-#include "config_server_pb/v2/agent.pb.h"
+#include "protobuf/config_server/v2/agent.pb.h"
 
 namespace logtail {
 

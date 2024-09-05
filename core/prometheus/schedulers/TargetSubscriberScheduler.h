@@ -27,7 +27,7 @@
 #include "prometheus/schedulers/BaseScheduler.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 #include "prometheus/schedulers/ScrapeScheduler.h"
-#include "queue/QueueKey.h"
+#include "pipeline/queue/QueueKey.h"
 
 
 namespace logtail {

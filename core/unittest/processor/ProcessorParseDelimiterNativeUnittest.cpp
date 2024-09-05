@@ -17,11 +17,11 @@
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
 #include "models/LogEvent.h"
-#include "plugin/instance/ProcessorInstance.h"
-#include "processor/ProcessorParseDelimiterNative.h"
-#include "processor/inner/ProcessorMergeMultilineLogNative.h"
-#include "processor/inner/ProcessorSplitLogStringNative.h"
-#include "processor/inner/ProcessorSplitMultilineLogStringNative.h"
+#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "plugin/processor/ProcessorParseDelimiterNative.h"
+#include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
+#include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
+#include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

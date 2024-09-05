@@ -19,7 +19,7 @@
 #include <json/json.h>
 #include "common/JsonUtil.h"
 #include "ExceptionBase.h"
-#include "input/InputObserverNetwork.h"
+#include "plugin/input/InputObserverNetwork.h"
 
 DEFINE_FLAG_INT64(sls_observer_network_gc_interval, "SLS Observer NetWork GC interval seconds", 30);
 DEFINE_FLAG_INT64(sls_observer_network_probe_disable_process_interval,

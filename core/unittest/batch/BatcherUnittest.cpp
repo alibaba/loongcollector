@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-#include "batch/Batcher.h"
+#include "pipeline/batch/Batcher.h"
 #include "common/JsonUtil.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"

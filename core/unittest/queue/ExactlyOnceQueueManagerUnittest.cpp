@@ -14,12 +14,12 @@
 
 #include <memory>
 
-#include "flusher/sls/FlusherSLS.h"
-#include "input/InputFeedbackInterfaceRegistry.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "models/PipelineEventGroup.h"
-#include "queue/ExactlyOnceQueueManager.h"
-#include "queue/QueueKeyManager.h"
-#include "queue/SLSSenderQueueItem.h"
+#include "pipeline/queue/ExactlyOnceQueueManager.h"
+#include "pipeline/queue/QueueKeyManager.h"
+#include "pipeline/queue/SLSSenderQueueItem.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(logtail_queue_gc_threshold_sec);

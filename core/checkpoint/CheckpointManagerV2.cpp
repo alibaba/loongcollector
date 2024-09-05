@@ -21,7 +21,6 @@
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
 #include "app_config/AppConfig.h"
-#include "config_manager/ConfigManager.h"
 #include "checkpoint/CheckPointManager.h"
 
 DEFINE_FLAG_INT32(logtail_checkpoint_check_gc_interval_sec, "60 seconds", 60);

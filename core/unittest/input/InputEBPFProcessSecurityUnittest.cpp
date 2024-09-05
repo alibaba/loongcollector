@@ -17,7 +17,7 @@
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "ebpf/config.h"
-#include "input/InputEBPFProcessSecurity.h"
+#include "plugin/input/InputEBPFProcessSecurity.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
 #include "unittest/Unittest.h"

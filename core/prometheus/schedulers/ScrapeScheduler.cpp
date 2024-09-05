@@ -31,9 +31,9 @@
 #include "logger/Logger.h"
 #include "prometheus/Constants.h"
 #include "prometheus/async/PromHttpRequest.h"
-#include "queue/ProcessQueueItem.h"
-#include "queue/ProcessQueueManager.h"
-#include "queue/QueueKey.h"
+#include "pipeline/queue/ProcessQueueItem.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+#include "pipeline/queue/QueueKey.h"
 
 using namespace std;
 

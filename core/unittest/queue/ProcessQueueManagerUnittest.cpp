@@ -15,10 +15,10 @@
 #include <memory>
 
 #include "models/PipelineEventGroup.h"
-#include "queue/ExactlyOnceQueueManager.h"
-#include "queue/ProcessQueueManager.h"
-#include "queue/QueueKeyManager.h"
-#include "queue/QueueParam.h"
+#include "pipeline/queue/ExactlyOnceQueueManager.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+#include "pipeline/queue/QueueKeyManager.h"
+#include "pipeline/queue/QueueParam.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

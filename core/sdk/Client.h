@@ -20,8 +20,8 @@
 
 #include "Common.h"
 #include "CurlImp.h"
-#include "sink/http/HttpSinkRequest.h"
-#include "log_pb/sls_logs.pb.h"
+#include "runner/sink/http/HttpSinkRequest.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
 namespace sdk {

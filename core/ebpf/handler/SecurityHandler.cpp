@@ -21,8 +21,8 @@
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEvent.h"
 #include "logger/Logger.h"
-#include "queue/ProcessQueueManager.h"
-#include "queue/ProcessQueueItem.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+#include "pipeline/queue/ProcessQueueItem.h"
 #include "common/MachineInfoUtil.h"
 
 namespace logtail {

@@ -14,7 +14,7 @@
 
 #include <memory>
 
-#include "plugin/instance/ProcessorInstance.h"
+#include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 

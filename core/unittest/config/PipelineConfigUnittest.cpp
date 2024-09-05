@@ -19,7 +19,7 @@
 
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
-#include "plugin/PluginRegistry.h"
+#include "pipeline/plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

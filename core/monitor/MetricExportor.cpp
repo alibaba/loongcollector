@@ -23,9 +23,8 @@
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/TimeUtil.h"
-#include "config_manager/ConfigManager.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #include "pipeline/PipelineManager.h"
 
 using namespace sls_logs;

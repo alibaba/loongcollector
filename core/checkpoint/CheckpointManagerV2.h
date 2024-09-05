@@ -22,8 +22,8 @@
 #include <mutex>
 #include <vector>
 #include <leveldb/db.h>
-#include "log_pb/checkpoint.pb.h"
-#include "input/InputFile.h"
+#include "protobuf/sls/checkpoint.pb.h"
+#include "plugin/input/InputFile.h"
 
 namespace logtail {
 

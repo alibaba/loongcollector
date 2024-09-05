@@ -19,17 +19,17 @@
 #include <cstdint>
 #include <utility>
 
-#include "batch/TimeoutFlushManager.h"
+#include "pipeline/batch/TimeoutFlushManager.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
-#include "flusher/sls/FlusherSLS.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "input/InputFeedbackInterfaceRegistry.h"
-#include "plugin/PluginRegistry.h"
-#include "processor/ProcessorParseApsaraNative.h"
-#include "queue/ProcessQueueManager.h"
-#include "queue/QueueKeyManager.h"
-#include "queue/SenderQueueManager.h"
+#include "plugin/input/InputFeedbackInterfaceRegistry.h"
+#include "pipeline/plugin/PluginRegistry.h"
+#include "plugin/processor/ProcessorParseApsaraNative.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+#include "pipeline/queue/QueueKeyManager.h"
+#include "pipeline/queue/SenderQueueManager.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
 

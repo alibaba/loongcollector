@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-#include "batch/BatchItem.h"
+#include "pipeline/batch/BatchItem.h"
 #include "unittest/Unittest.h"
 
 using namespace std;

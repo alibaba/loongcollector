@@ -18,7 +18,7 @@
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
 #include "models/MetricEvent.h"
-#include "processor/inner/ProcessorPromRelabelMetricNative.h"
+#include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 #include "prometheus/Constants.h"
 #include "unittest/Unittest.h"
 

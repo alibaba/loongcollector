@@ -22,7 +22,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <json/json.h>
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 

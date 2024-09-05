@@ -18,8 +18,8 @@
 #include "common/Constants.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
-#include "plugin/instance/ProcessorInstance.h"
-#include "processor/inner/ProcessorSplitLogStringNative.h"
+#include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {

@@ -14,11 +14,11 @@
 
 #include <memory>
 
-#include "plugin/PluginRegistry.h"
-#include "plugin/creator/StaticFlusherCreator.h"
-#include "plugin/creator/StaticInputCreator.h"
-#include "plugin/creator/StaticProcessorCreator.h"
-#include "sender/FlusherRunner.h"
+#include "pipeline/plugin/PluginRegistry.h"
+#include "pipeline/plugin/creator/StaticFlusherCreator.h"
+#include "pipeline/plugin/creator/StaticInputCreator.h"
+#include "pipeline/plugin/creator/StaticProcessorCreator.h"
+#include "runner/FlusherRunner.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 

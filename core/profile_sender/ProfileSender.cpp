@@ -28,7 +28,7 @@
 #include "sdk/Exception.h"
 #include "sls_control/SLSControl.h"
 // TODO: temporarily used
-#include "compression/CompressorFactory.h"
+#include "pipeline/compression/CompressorFactory.h"
 
 using namespace std;
 

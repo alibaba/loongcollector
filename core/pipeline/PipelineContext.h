@@ -26,7 +26,7 @@
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/GlobalConfig.h"
-#include "queue/QueueKey.h"
+#include "pipeline/queue/QueueKey.h"
 
 namespace logtail {
 

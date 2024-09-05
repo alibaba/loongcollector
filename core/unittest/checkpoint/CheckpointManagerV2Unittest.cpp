@@ -15,7 +15,7 @@
 #include "unittest/Unittest.h"
 #include "common/Flags.h"
 #include "app_config/AppConfig.h"
-#include "log_pb/sls_logs.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #include "checkpoint/CheckpointManagerV2.h"
 
 DECLARE_FLAG_INT32(logtail_checkpoint_check_gc_interval_sec);

@@ -28,8 +28,8 @@
 #include <unordered_map>
 #include <utility>
 
-#include "flusher/sls/FlusherSLS.h"
-#include "log_pb/sls_logs.pb.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 extern "C" {
 // The definition of Golang type is copied from PluginAdaptor.h that
