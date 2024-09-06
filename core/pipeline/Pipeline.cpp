@@ -291,7 +291,7 @@ bool Pipeline::Init(PipelineConfig&& config) {
             ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(mContext.GetProcessQueueKey(), priority);
         } else {
             ProcessQueueManager::GetInstance()->CreateOrUpdateCircularQueue(
-                mContext.GetProcessQueueKey(), priority, 100);
+                mContext.GetProcessQueueKey(), priority, 1024);
         }
 
 
