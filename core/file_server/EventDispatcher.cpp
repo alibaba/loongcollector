@@ -42,13 +42,13 @@
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/event_handler/LogInput.h"
-#include "protobuf/sls/metric.pb.h"
-#include "protobuf/sls/sls_logs.pb.h"
+#include "file_server/polling/PollingDirFile.h"
+#include "file_server/polling/PollingModify.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/MetricExportor.h"
-#include "file_server/polling/PollingDirFile.h"
-#include "file_server/polling/PollingModify.h"
+#include "protobuf/sls/metric.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "file_server/polling/PollingEventQueue.h"
 #endif
@@ -56,10 +56,10 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "plugin/input/InputContainerStdio.h"
-#include "plugin/input/InputFile.h"
 #include "pipeline/PipelineManager.h"
 #include "pipeline/plugin/PluginRegistry.h"
+#include "plugin/input/InputContainerStdio.h"
+#include "plugin/input/InputFile.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -464,7 +464,7 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
     int wd = pathIter->second;
     DevInode devInode = GetFileDevInode(realFilePath);
     if (devInode.IsValid() && checkpoint->mDevInode.inode == devInode.inode) {
-        if (!CheckFileSignature(realFilePath, checkpoint->mSignatureHash, checkpoint->mSignatureSize, false)) {
+        if (!CheckFileSignature(realFilePath, checkpoint->mSignatureHash, checkpoint->mSignatureSize)) {
             LOG_INFO(sLogger,
                      ("delete checkpoint", "file device & inode remains the same but signature has changed")(
                          "config", checkpoint->mConfigName)("log reader queue name", checkpoint->mFileName)(
@@ -514,10 +514,8 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
             return ValidateCheckpointResult::kLogDirChanged;
         }
 
-        if (CheckFileSignature(PathJoin(path, findIter->second.mFileName),
-                               checkpoint->mSignatureHash,
-                               checkpoint->mSignatureSize,
-                               false)) {
+        if (CheckFileSignature(
+                PathJoin(path, findIter->second.mFileName), checkpoint->mSignatureHash, checkpoint->mSignatureSize)) {
             checkpoint->mRealFileName = PathJoin(findIter->second.mFileDir, findIter->second.mFileName);
             LOG_INFO(sLogger,
                      ("generate MODIFY event for file with checkpoint",
@@ -567,7 +565,7 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
         = SearchFilePathByDevInodeInDirectory(path, searchDepth, checkpoint->mDevInode, &cachePathDevInodeMap);
     if (searchResult) {
         const auto& newRealPath = searchResult.value();
-        if (CheckFileSignature(newRealPath, checkpoint->mSignatureHash, checkpoint->mSignatureSize, false)) {
+        if (CheckFileSignature(newRealPath, checkpoint->mSignatureHash, checkpoint->mSignatureSize)) {
             checkpoint->mRealFileName = newRealPath;
             LOG_INFO(sLogger,
                      ("generate MODIFY event for file with checkpoint",

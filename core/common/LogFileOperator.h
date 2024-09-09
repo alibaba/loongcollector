@@ -35,21 +35,18 @@ namespace fsutil {
 
 class LogFileOperator {
 public:
-    LogFileOperator(bool fuseMode = false) : mFuseMode(fuseMode) {}
+    LogFileOperator() = default;
     ~LogFileOperator() { Close(); }
 
     // @return file descriptor when fuseMode is enabled or on Linux.
     //   An positve identifier is returned on Windows.
-    int Open(const char* path, bool fuseMode = false);
+    int Open(const char* path);
 
     int64_t Seek(int64_t offset, int whence);
 
     int Stat(fsutil::PathStat& ps) const;
 
     int Pread(void* ptr, size_t size, size_t count, int64_t offset);
-
-    // For FUSE only.
-    size_t SkipHoleRead(void* ptr, size_t size, size_t count, int64_t* offset);
 
     // GetFileSize gets the size of current file.
     int64_t GetFileSize() const;
@@ -77,7 +74,6 @@ private:
     HANDLE mFile = INVALID_HANDLE_VALUE;
 #endif
     int mFd = -1;
-    bool mFuseMode;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class LogFileOperatorUnittest;

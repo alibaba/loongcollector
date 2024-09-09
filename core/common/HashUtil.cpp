@@ -13,11 +13,14 @@
 // limitations under the License.
 
 #include "HashUtil.h"
+
 #include <memory.h>
-#include "FileSystemUtil.h"
-#include "murmurhash3.h"
-#include "LogFileOperator.h"
+
 #include <boost/functional/hash.hpp>
+
+#include "FileSystemUtil.h"
+#include "LogFileOperator.h"
+#include "murmurhash3.h"
 
 namespace logtail {
 
@@ -335,9 +338,9 @@ bool CheckAndUpdateSignature(const std::string& signature, uint64_t& sigHash, ui
     return rst;
 }
 
-bool CheckFileSignature(const std::string& filePath, uint64_t sigHash, uint32_t sigSize, bool fuseMode) {
+bool CheckFileSignature(const std::string& filePath, uint64_t sigHash, uint32_t sigSize) {
     LogFileOperator logFileOp;
-    logFileOp.Open(filePath.c_str(), fuseMode);
+    logFileOp.Open(filePath.c_str());
     if (!logFileOp.IsOpen()) {
         return false;
     }
@@ -369,10 +372,9 @@ int64_t HashSignatureString(const char* str, size_t strLen) {
     return *(int64_t*)hashVal;
 }
 
-void HashCombine(size_t &seed, size_t value) {
+void HashCombine(size_t& seed, size_t value) {
     boost::hash_combine(seed, value);
 }
-
 
 
 } // namespace logtail

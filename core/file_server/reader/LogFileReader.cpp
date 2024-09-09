@@ -28,7 +28,6 @@
 #include <numeric>
 #include <random>
 
-#include "file_server/reader/GloablFileDescriptorManager.h"
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 #include "checkpoint/CheckpointManagerV2.h"
@@ -41,20 +40,20 @@
 #include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
 #include "file_server/ConfigManager.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/LogInput.h"
-#include "file_server/FileServer.h"
-#include "fuse/UlogfsHandler.h"
+#include "file_server/reader/GloablFileDescriptorManager.h"
+#include "file_server/reader/JsonLogFileReader.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/MetricConstants.h"
-#include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
+#include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "rapidjson/document.h"
-#include "file_server/reader/JsonLogFileReader.h"
 #include "sdk/Common.h"
 
 using namespace sls_logs;
@@ -478,8 +477,8 @@ bool LogFileReader::validatePrimaryCheckpoint(const PrimaryCheckpointPB& cpt) {
             filePath = newFilePath;
             return true;
         };
-        if (CheckFileSignature(filePath, sigHash, sigSize, false)
-            || (hasFileBeenRotated() && CheckFileSignature(filePath, sigHash, sigSize, false))) {
+        if (CheckFileSignature(filePath, sigHash, sigSize)
+            || (hasFileBeenRotated() && CheckFileSignature(filePath, sigHash, sigSize))) {
             mLastFileSignatureSize = sigSize;
             mLastFileSignatureHash = sigHash;
             mRealLogPath = filePath;
@@ -621,7 +620,7 @@ bool LogFileReader::CheckForFirstOpen(FileReadPolicy policy) {
     // we just want to set file pos, then a TEMPORARY object for LogFileOperator is needed here, not a class member
     // LogFileOperator we should open file via UpdateFilePtr, then start reading
     LogFileOperator op;
-    op.Open(mHostLogPath.c_str(), false);
+    op.Open(mHostLogPath.c_str());
     if (op.IsOpen() == false) {
         mLastFilePos = 0;
         mCache.clear();
@@ -1062,7 +1061,7 @@ bool LogFileReader::UpdateFilePtr() {
         LOG_DEBUG(sLogger, ("UpdateFilePtr open log file ", mHostLogPath));
         if (mRealLogPath.size() > 0) {
             while (tryTime++ < 5) {
-                mLogFileOp.Open(mRealLogPath.c_str(), false);
+                mLogFileOp.Open(mRealLogPath.c_str());
                 if (mLogFileOp.IsOpen() == false) {
                     usleep(100);
                 } else {
@@ -1097,7 +1096,7 @@ bool LogFileReader::UpdateFilePtr() {
         }
         tryTime = 0;
         while (tryTime++ < 5) {
-            mLogFileOp.Open(mHostLogPath.c_str(), false);
+            mLogFileOp.Open(mHostLogPath.c_str());
             if (mLogFileOp.IsOpen() == false) {
                 usleep(100);
             } else {
@@ -1923,7 +1922,7 @@ LogFileReader::ReadFile(LogFileOperator& op, void* buf, size_t size, int64_t& of
 
 LogFileReader::FileCompareResult LogFileReader::CompareToFile(const string& filePath) {
     LogFileOperator logFileOp;
-    logFileOp.Open(filePath.c_str(), false);
+    logFileOp.Open(filePath.c_str());
     if (logFileOp.IsOpen() == false) {
         return FileCompareResult_Error;
     }

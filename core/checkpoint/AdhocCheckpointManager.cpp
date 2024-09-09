@@ -20,7 +20,6 @@
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
 #include "common/Thread.h"
-#include "fuse/ulogfslib_file.h"
 #include "common/HashUtil.h"
 
 DEFINE_FLAG_INT32(adhoc_checkpoint_dump_thread_wait_interval, "microseconds", 5 * 1000);

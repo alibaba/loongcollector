@@ -28,7 +28,6 @@
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
-#include "fuse/FuseFileBlacklist.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
 #include "runner/LogProcess.h"

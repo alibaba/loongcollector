@@ -27,11 +27,11 @@ void DoMd5(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t md5[16])
 
 bool SignatureToHash(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize);
 bool CheckAndUpdateSignature(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize);
-bool CheckFileSignature(const std::string& filePath, uint64_t sigHash, uint32_t sigSize, bool fuseMode = false);
+bool CheckFileSignature(const std::string& filePath, uint64_t sigHash, uint32_t sigSize);
 
 int64_t HashString(const std::string& str);
 int64_t HashSignatureString(const char* str, size_t strLen);
 
-void HashCombine(size_t &seed, size_t value);
+void HashCombine(size_t& seed, size_t value);
 
 } // namespace logtail
