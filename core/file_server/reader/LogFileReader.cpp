@@ -2483,7 +2483,7 @@ void LogFileReader::UpdateReaderManual() {
     if (mLogFileOp.IsOpen()) {
         mLogFileOp.Close();
     }
-    mLogFileOp.Open(mHostLogPath.c_str(), false);
+    mLogFileOp.Open(mHostLogPath.c_str());
     mDevInode = GetFileDevInode(mHostLogPath);
     mRealLogPath = mHostLogPath;
 }

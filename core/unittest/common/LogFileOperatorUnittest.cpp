@@ -124,7 +124,6 @@ void LogFileOperatorUnittest::MockTruncate(const char* path, off_t keep_length, 
 
 void LogFileOperatorUnittest::TestCons() {
     LogFileOperator logFileOp;
-    APSARA_TEST_EQUAL(logFileOp.mFuseMode, false);
     APSARA_TEST_EQUAL(logFileOp.mFd, -1);
     APSARA_TEST_EQUAL(logFileOp.IsOpen(), false);
 }
@@ -143,12 +142,10 @@ void LogFileOperatorUnittest::TestOpen() {
         fd = logFileOp.Open("");
         APSARA_TEST_TRUE(fd < 0);
         APSARA_TEST_EQUAL(logFileOp.IsOpen(), false);
-        APSARA_TEST_EQUAL(logFileOp.mFuseMode, false);
 
         fd = logFileOp.Open(file.c_str());
         APSARA_TEST_TRUE(fd < 0);
         APSARA_TEST_EQUAL(logFileOp.IsOpen(), false);
-        APSARA_TEST_EQUAL(logFileOp.mFuseMode, false);
 
         { std::ofstream(file, std::ios_base::binary) << ""; }
 
@@ -156,7 +153,6 @@ void LogFileOperatorUnittest::TestOpen() {
         fd = logFileOp.Open(file.c_str());
         APSARA_TEST_TRUE(fd >= 0);
         APSARA_TEST_EQUAL(logFileOp.IsOpen(), true);
-        APSARA_TEST_EQUAL(logFileOp.mFuseMode, false);
     }
 
 #if defined(ENABLE_FUSE)
