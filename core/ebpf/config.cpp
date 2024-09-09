@@ -331,66 +331,8 @@ void InitSecurityNetworkFilter(const Json::Value& config,
     }
 }
 
-void FilterValidSecurityProbeCallName(SecurityProbeType type,
-                                      std::vector<std::string>& callNames,
-                                      std::string& errorMsg) {
-    if (type >= SecurityProbeType::MAX) {
-        errorMsg = "Invalid security eBPF probe type";
-        return;
-    }
-    std::vector<std::string> survivedCallNames;
-    bool allValid = true;
-    for (auto& callName : callNames) {
-        if (callNameDict.at(type).find(callName) == callNameDict.at(type).end()) {
-            if (!allValid) {
-                errorMsg += ", " + callName;
-            } else {
-                errorMsg = "Invalid callnames for security eBPF probe: " + callName;
-                allValid = false;
-            }
-        } else {
-            survivedCallNames.emplace_back(callName);
-        }
-    }
-    callNames.swap(survivedCallNames);
-}
-
 void GetSecurityProbeDefaultCallName(SecurityProbeType type, std::vector<std::string>& callNames) {
     callNames.assign(callNameDict.at(type).begin(), callNameDict.at(type).end());
-}
-
-void InitCallNameFilter(const Json::Value& config,
-                        std::vector<std::string>& callNames,
-                        const PipelineContext* mContext,
-                        const std::string& sName,
-                        SecurityProbeType probeType) {
-    std::string errorMsg;
-    // CallNameFilter (Optional)
-    if (!config.isMember("CallNameFilter")) {
-        // No CallNameFilter, use default callnames, no warning
-    } else if (!config["CallNameFilter"].isArray()) {
-        // CallNameFilter is not empty but of wrong type, use default callnames
-        errorMsg = "CallNameFilter is not of type list";
-    } else if (!GetOptionalListFilterParam<std::string>(config, "CallNameFilter", callNames, errorMsg)) {
-        // CallNameFilter has element of wrong type, use default callnames
-    } else {
-        FilterValidSecurityProbeCallName(probeType, callNames, errorMsg);
-        // If CallNameFilter contains valid callnames, use user defined callnames, otherwise use default callnames
-    }
-    if (!errorMsg.empty()) {
-        PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                             mContext->GetAlarm(),
-                             errorMsg,
-                             sName,
-                             mContext->GetConfigName(),
-                             mContext->GetProjectName(),
-                             mContext->GetLogstoreName(),
-                             mContext->GetRegion());
-    }
-    // Use default callnames
-    if (callNames.empty()) {
-        GetSecurityProbeDefaultCallName(probeType, callNames);
-    }
 }
 
 bool CheckProbeConfigValid(const Json::Value& config, std::string& errorMsg) {
@@ -398,9 +340,9 @@ bool CheckProbeConfigValid(const Json::Value& config, std::string& errorMsg) {
     if (!config.isMember("ProbeConfig")) {
         // No ProbeConfig, use default, no warning
         return false;
-    } else if (!config["ProbeConfig"].isArray()) {
+    } else if (!config["ProbeConfig"].isObject()) {
         // ProbeConfig is not empty but of wrong type, use default
-        errorMsg = "ProbeConfig is not of type list, use probe config with default filter";
+        errorMsg = "ProbeConfig is not of type map, use probe config with default filter";
         return false;
     }
     return true;
@@ -429,62 +371,39 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mOptionList.emplace_back(thisSecurityOption);
         return true;
     }
-    std::unordered_set<std::string> thisCallNameSet;
-    for (auto& innerConfig : config["ProbeConfig"]) {
-        nami::SecurityOption thisSecurityOption;
-        // Genral Filter (Optional)
-        std::variant<std::monostate, nami::SecurityFileFilter, nami::SecurityNetworkFilter> thisFilter;
-        switch (probeType) {
-            case SecurityProbeType::FILE: {
-                nami::SecurityFileFilter thisFileFilter;
-                InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
-                thisFilter.emplace<nami::SecurityFileFilter>(thisFileFilter);
-                break;
-            }
-            case SecurityProbeType::NETWORK: {
-                nami::SecurityNetworkFilter thisNetworkFilter;
-                InitSecurityNetworkFilter(innerConfig, thisNetworkFilter, mContext, sName);
-                thisFilter.emplace<nami::SecurityNetworkFilter>(thisNetworkFilter);
-                break;
-            }
-            case SecurityProbeType::PROCESS: {
-                break;
-            }
-            default:
-                PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                     mContext->GetAlarm(),
-                                     "Unknown security eBPF probe type",
-                                     sName,
-                                     mContext->GetConfigName(),
-                                     mContext->GetProjectName(),
-                                     mContext->GetLogstoreName(),
-                                     mContext->GetRegion());
+    auto innerConfig = config["ProbeConfig"];
+    nami::SecurityOption thisSecurityOption;
+    // Genral Filter (Optional)
+    std::variant<std::monostate, nami::SecurityFileFilter, nami::SecurityNetworkFilter> thisFilter;
+    switch (probeType) {
+        case SecurityProbeType::FILE: {
+            nami::SecurityFileFilter thisFileFilter;
+            InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
+            thisFilter.emplace<nami::SecurityFileFilter>(thisFileFilter);
+            break;
         }
-        // CallNameFilter (Optional)
-        std::vector<std::string> thisCallNames;
-        InitCallNameFilter(innerConfig, thisCallNames, mContext, sName, probeType);
-        // Check duplicate callnames and remove them
-        for (auto& callName : thisCallNames) {
-            if (thisCallNameSet.find(callName) == thisCallNameSet.end()) {
-                thisCallNameSet.insert(callName);
-                thisSecurityOption.call_names_.emplace_back(callName);
-            } else {
-                PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                     mContext->GetAlarm(),
-                                     "Duplicate callname " + callName + " is discarded",
-                                     sName,
-                                     mContext->GetConfigName(),
-                                     mContext->GetProjectName(),
-                                     mContext->GetLogstoreName(),
-                                     mContext->GetRegion());
-            }
+        case SecurityProbeType::NETWORK: {
+            nami::SecurityNetworkFilter thisNetworkFilter;
+            InitSecurityNetworkFilter(innerConfig, thisNetworkFilter, mContext, sName);
+            thisFilter.emplace<nami::SecurityNetworkFilter>(thisNetworkFilter);
+            break;
         }
-        // If callnames in this option are all duplicated, discard this option
-        if (!thisSecurityOption.call_names_.empty()) {
-            thisSecurityOption.filter_ = thisFilter;
-            mOptionList.emplace_back(thisSecurityOption);
+        case SecurityProbeType::PROCESS: {
+            break;
         }
+        default:
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                    mContext->GetAlarm(),
+                                    "Unknown security eBPF probe type",
+                                    sName,
+                                    mContext->GetConfigName(),
+                                    mContext->GetProjectName(),
+                                    mContext->GetLogstoreName(),
+                                    mContext->GetRegion());
     }
+    thisSecurityOption.filter_ = thisFilter;
+    GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);    
+    mOptionList.emplace_back(thisSecurityOption);
     mProbeType = probeType;
     return true;
 }

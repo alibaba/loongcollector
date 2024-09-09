@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/input/InputEBPFNetworkObserver.h"
+#include "plugin/input/InputNetworkObserver.h"
 
 #include "ebpf/include/export.h"
 #include "ebpf/eBPFServer.h"
@@ -23,9 +23,9 @@ using namespace std;
 
 namespace logtail {
 
-const std::string InputEBPFNetworkObserver::sName = "input_ebpf_sockettraceprobe_observer";
+const std::string InputNetworkObserver::sName = "input_network_observer";
 
-bool InputEBPFNetworkObserver::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
@@ -35,11 +35,11 @@ bool InputEBPFNetworkObserver::Init(const Json::Value& config, Json::Value& opti
     return ebpf::InitObserverNetworkOption(config, mNetworkOption, mContext, sName);
 }
 
-bool InputEBPFNetworkObserver::Start() {
+bool InputNetworkObserver::Start() {
     return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_OBSERVE, mContext, &mNetworkOption);
 }
 
-bool InputEBPFNetworkObserver::Stop(bool isPipelineRemoving) {
+bool InputNetworkObserver::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::NETWORK_OBSERVE);
         return true;

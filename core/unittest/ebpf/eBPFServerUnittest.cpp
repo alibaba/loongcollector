@@ -513,7 +513,7 @@ void eBPFServerUnittest::TestInit() {
 void eBPFServerUnittest::TestEnableNetworkPlugin() {
     std::string configStr = R"(
         {
-            "Type": "input_ebpf_sockettraceprobe_observer",
+            "Type": "input_network_observer",
             "ProbeConfig": 
             {
                 "EnableLog": true,
@@ -602,17 +602,7 @@ void eBPFServerUnittest::TestEnableNetworkPlugin() {
 void eBPFServerUnittest::TestEnableProcessPlugin() {
     std::string configStr = R"(
         {
-            "Type": "input_ebpf_processprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": [
-                        "sys_enter_execve",
-                        "disassociate_ctty",
-                        "acct_process",
-                        "wake_up_new_task"
-                    ]
-                }
-            ]
+            "Type": "input_process_security",
         }
     )";
 
@@ -621,7 +611,7 @@ void eBPFServerUnittest::TestEnableProcessPlugin() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     std::cout << "1" << std::endl;
     SecurityOptions security_options;
-    security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "input_ebpf_processprobe_security");
+    security_options.Init(SecurityProbeType::PROCESS, configJson, &ctx, "input_process_security");
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
         "test", 0,
         nami::PluginType::PROCESS_SECURITY,
@@ -635,7 +625,7 @@ void eBPFServerUnittest::TestEnableProcessPlugin() {
     EXPECT_TRUE(process_conf.process_security_cb_ != nullptr);
     LOG_WARNING(sLogger, ("process_conf.options_ size", process_conf.options_.size()));
     EXPECT_EQ(process_conf.options_.size(), 1);
-    EXPECT_EQ(process_conf.options_[0].call_names_.size(), 4);
+    EXPECT_EQ(process_conf.options_[0].call_names_.size(), 5);
 
     // do suspend
     ebpf::eBPFServer::GetInstance()->SuspendPlugin("test", nami::PluginType::PROCESS_SECURITY);
@@ -662,25 +652,16 @@ void eBPFServerUnittest::TestEnableProcessPlugin() {
 void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
     std::string configStr = R"(
         {
-            "Type": "input_ebpf_sockettraceprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["tcp_connect", "tcp_close"],
-                    "AddrFilter": {
-                        "DestAddrList": ["10.0.0.0/8","92.168.0.0/16"],
-                        "DestPortList": [80],
-                        "SourceAddrBlackList": ["127.0.0.1/8"],
-                        "SourcePortBlackList": [9300]
-                    }
-                },
-                {
-                    "CallNameFilter": ["tcp_sendmsg"],
-                    "AddrFilter": {
-                        "DestAddrList": ["10.0.0.0/8","92.168.0.0/16"],
-                        "DestPortList": [80]
-                    }
+            "Type": "input_network_security",
+            "ProbeConfig":
+            {
+                "AddrFilter": {
+                    "DestAddrList": ["10.0.0.0/8","92.168.0.0/16"],
+                    "DestPortList": [80],
+                    "SourceAddrBlackList": ["127.0.0.1/8"],
+                    "SourcePortBlackList": [9300]
                 }
-            ]
+            }
         }
     )";
     
@@ -688,9 +669,9 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
     Json::Value configJson;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     SecurityOptions security_options;
-    security_options.Init(SecurityProbeType::NETWORK, configJson, &ctx, "input_ebpf_sockettraceprobe_security");
+    security_options.Init(SecurityProbeType::NETWORK, configJson, &ctx, "input_network_security");
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_ebpf_sockettraceprobe_security", 5,
+        "input_network_security", 5,
         nami::PluginType::NETWORK_SECURITY,
         &ctx,
         &security_options);
@@ -700,8 +681,8 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
     EXPECT_EQ(conf->type, UpdataType::SECURE_UPDATE_TYPE_ENABLE_PROBE);
     auto inner_conf = std::get<nami::NetworkSecurityConfig>(conf->config_);
     EXPECT_TRUE(inner_conf.network_security_cb_ != nullptr);
-    EXPECT_EQ(inner_conf.options_.size(), 2);
-    EXPECT_EQ(inner_conf.options_[0].call_names_.size(), 2);
+    EXPECT_EQ(inner_conf.options_.size(), 1);
+    EXPECT_EQ(inner_conf.options_[0].call_names_.size(), 3);
     auto filter = std::get<nami::SecurityNetworkFilter>(inner_conf.options_[0].filter_);
     EXPECT_EQ(filter.mDestAddrList.size(), 2);
     EXPECT_EQ(filter.mDestPortList.size(), 1);
@@ -715,7 +696,7 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
     EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager->mRunning[int(nami::PluginType::NETWORK_SECURITY)]);
 
     res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_ebpf_sockettraceprobe_security", 0,
+        "input_network_security", 0,
         nami::PluginType::NETWORK_SECURITY,
         &ctx,
         &security_options);
@@ -736,17 +717,15 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
 void eBPFServerUnittest::TestEnableFileSecurePlugin() {
     std::string configStr = R"(
         {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["security_file_permission"],
-                    "FilePathFilter": [
-                        "/etc/passwd",
-                        "/etc/shadow",
-                        "/bin"
-                    ]
-                }
-            ]
+            "Type": "input_file_security",
+            "ProbeConfig":
+            {
+                "FilePathFilter": [
+                    "/etc/passwd",
+                    "/etc/shadow",
+                    "/bin"
+                ]
+            }
         }
     )";
 
@@ -755,9 +734,9 @@ void eBPFServerUnittest::TestEnableFileSecurePlugin() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     std::cout << "1" << std::endl;
     SecurityOptions security_options;
-    security_options.Init(SecurityProbeType::FILE, configJson, &ctx, "input_ebpf_fileprobe_security");
+    security_options.Init(SecurityProbeType::FILE, configJson, &ctx, "input_file_security");
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_ebpf_fileprobe_security", 0,
+        "input_file_security", 0,
         nami::PluginType::FILE_SECURITY,
         &ctx,
         &security_options);
@@ -769,7 +748,7 @@ void eBPFServerUnittest::TestEnableFileSecurePlugin() {
     auto inner_conf = std::get<nami::FileSecurityConfig>(conf->config_);
     EXPECT_TRUE(inner_conf.file_security_cb_ != nullptr);
     EXPECT_EQ(inner_conf.options_.size(), 1);
-    EXPECT_EQ(inner_conf.options_[0].call_names_.size(), 1);
+    EXPECT_EQ(inner_conf.options_[0].call_names_.size(), 3);
     auto filter = std::get<nami::SecurityFileFilter>(inner_conf.options_[0].filter_);
     EXPECT_EQ(filter.mFilePathList.size(), 3);
     EXPECT_EQ(filter.mFilePathList[0], "/etc/passwd");
@@ -782,7 +761,7 @@ void eBPFServerUnittest::TestEnableFileSecurePlugin() {
     EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mSourceManager->mRunning[int(nami::PluginType::FILE_SECURITY)]);
 
     res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_ebpf_fileprobe_security", 0,
+        "input_file_security", 0,
         nami::PluginType::FILE_SECURITY,
         &ctx,
         &security_options);

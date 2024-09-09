@@ -19,7 +19,7 @@
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "ebpf/config.h"
-#include "plugin/input/InputEBPFFileSecurity.h"
+#include "plugin/input/InputFileSecurity.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
 #include "unittest/Unittest.h"
@@ -29,8 +29,10 @@ using namespace std;
 
 namespace logtail {
 
-class InputEBPFFileSecurityUnittest : public testing::Test {
+class InputFileSecurityUnittest : public testing::Test {
 public:
+    void TestName();
+    void TestSupportAck();
     void OnSuccessfulInit();
     void OnFailedInit();
     void OnSuccessfulStart();
@@ -50,176 +52,151 @@ private:
     PipelineContext ctx;
 };
 
-void InputEBPFFileSecurityUnittest::OnSuccessfulInit() {
-    unique_ptr<InputEBPFFileSecurity> input;
+void InputFileSecurityUnittest::TestName() {
+    InputFileSecurity input;
+    std::string name = input.Name();
+    APSARA_TEST_EQUAL(name, "input_file_security");
+}
+
+void InputFileSecurityUnittest::TestSupportAck() {
+    InputFileSecurity input;
+    bool supportAck = input.SupportAck();
+    APSARA_TEST_FALSE(supportAck);
+}
+
+void InputFileSecurityUnittest::OnSuccessfulInit() {
+    unique_ptr<InputFileSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
 
     // only mandatory param
     configStr = R"(
         {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["security_file_permission"],
-                    "FilePathFilter": [
-                        "/etc",
-                        "/bin"
-                    ]
-                }
-            ]
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [
+                    "/etc",
+                    "/bin"
+                ]
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFFileSecurity());
+    input.reset(new InputFileSecurity());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
+    APSARA_TEST_EQUAL(input->sName, "input_file_security");
     nami::SecurityFileFilter thisFilter1 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
-    // APSARA_TEST_EQUAL(ebpf::SecurityProbeType::FILE, input->mSecurityOptions.filter_Type);
-    APSARA_TEST_EQUAL("security_file_permission", input->mSecurityOptions.mOptionList[0].call_names_[0]);
     APSARA_TEST_EQUAL("/etc", thisFilter1.mFilePathList[0]);
     APSARA_TEST_EQUAL("/bin", thisFilter1.mFilePathList[1]);
 
     // valid optional param
     configStr = R"(
         {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["security_file_permission"],
-                    "FilePathFilter": [
-                        "/etc/passwd",
-                        "/etc/shadow",
-                        "/bin"
-                    ]
-                }
-            ]
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [
+                    "/etc/passwd",
+                    "/etc/shadow",
+                    "/bin"
+                ]
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFFileSecurity());
+    input.reset(new InputFileSecurity());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
+    APSARA_TEST_EQUAL(input->sName, "input_file_security");
     nami::SecurityFileFilter thisFilter2 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
-    // APSARA_TEST_EQUAL(ebpf::SecurityProbeType::FILE, input->mSecurityOptions.filter_Type);
-    APSARA_TEST_EQUAL("security_file_permission", input->mSecurityOptions.mOptionList[0].call_names_[0]);
     APSARA_TEST_EQUAL("/etc/passwd", thisFilter2.mFilePathList[0]);
     APSARA_TEST_EQUAL("/etc/shadow", thisFilter2.mFilePathList[1]);
     APSARA_TEST_EQUAL("/bin", thisFilter2.mFilePathList[2]);
 }
 
-void InputEBPFFileSecurityUnittest::OnFailedInit() {
-    unique_ptr<InputEBPFFileSecurity> input;
+void InputFileSecurityUnittest::OnFailedInit() {
+    unique_ptr<InputFileSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
 
     // invalid mandatory param
     configStr = R"(
         {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["security_file_permission"],
-                    "FilePathFilter": [1]
-                }
-            ]
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [1]
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFFileSecurity());
+    input.reset(new InputFileSecurity());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
+    APSARA_TEST_EQUAL(input->sName, "input_file_security");
     nami::SecurityFileFilter thisFilter = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
-    APSARA_TEST_EQUAL("security_file_permission", input->mSecurityOptions.mOptionList[0].call_names_[0]);
     APSARA_TEST_EQUAL(0, thisFilter.mFilePathList.size());
 
     // invalid optional param
     configStr = R"(
         {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["security_file_permission"],
-                    "FilePathFilter": [
-                        "/etc",
-                        1
-                    ]
-                }
-            ]
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [
+                    "/etc",
+                    1
+                ]
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFFileSecurity());
+    input.reset(new InputFileSecurity());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
+    APSARA_TEST_EQUAL(input->sName, "input_file_security");
     nami::SecurityFileFilter thisFilter1 = std::get<nami::SecurityFileFilter>(input->mSecurityOptions.mOptionList[0].filter_);
-    // APSARA_TEST_EQUAL(ebpf::SecurityProbeType::FILE, input->mSecurityOptions.filter_Type);
-    APSARA_TEST_EQUAL("security_file_permission", input->mSecurityOptions.mOptionList[0].call_names_[0]);
     APSARA_TEST_EQUAL(0, thisFilter1.mFilePathList.size());
 
     // lose mandatory param
     configStr = R"(
         {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                }
-            ]
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFFileSecurity());
+    input.reset(new InputFileSecurity());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
-    APSARA_TEST_EQUAL(1, input->mSecurityOptions.mOptionList.size()); // default callname
-    APSARA_TEST_EQUAL(3, input->mSecurityOptions.mOptionList[0].call_names_.size()); // default callname
-
-    // invalid callname
-    configStr = R"(
-        {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["security_file_permission_error"],
-                }
-            ]
-        }
-    )";
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFFileSecurity());
-    input->SetContext(ctx);
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(input->sName, "input_ebpf_fileprobe_security");
+    APSARA_TEST_EQUAL(input->sName, "input_file_security");
     APSARA_TEST_EQUAL(1, input->mSecurityOptions.mOptionList.size()); // default callname
     APSARA_TEST_EQUAL(3, input->mSecurityOptions.mOptionList[0].call_names_.size()); // default callname
 }
 
-void InputEBPFFileSecurityUnittest::OnSuccessfulStart() {
-    unique_ptr<InputEBPFFileSecurity> input;
+void InputFileSecurityUnittest::OnSuccessfulStart() {
+    unique_ptr<InputFileSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
 
     configStr = R"(
         {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["security_file_permission"],
-                    "FilePathFilter": [
-                        "/etc",
-                        "/bin"
-                    ]
-                }
-            ]
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [
+                    "/etc",
+                    "/bin"
+                ]
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFFileSecurity());
+    input.reset(new InputFileSecurity());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
@@ -228,27 +205,25 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
 }
 
-void InputEBPFFileSecurityUnittest::OnSuccessfulStop() {
-    unique_ptr<InputEBPFFileSecurity> input;
+void InputFileSecurityUnittest::OnSuccessfulStop() {
+    unique_ptr<InputFileSecurity> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
 
     configStr = R"(
         {
-            "Type": "input_ebpf_fileprobe_security",
-            "ProbeConfig": [
-                {
-                    "CallNameFilter": ["security_file_permission"],
-                    "FilePathFilter": [
-                        "/etc",
-                        "/bin"
-                    ]
-                }
-            ]
+            "Type": "input_file_security",
+            "ProbeConfig": 
+            {
+                "FilePathFilter": [
+                    "/etc",
+                    "/bin"
+                ]
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFFileSecurity());
+    input.reset(new InputFileSecurity());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
@@ -263,11 +238,13 @@ void InputEBPFFileSecurityUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 
-UNIT_TEST_CASE(InputEBPFFileSecurityUnittest, OnSuccessfulInit)
-UNIT_TEST_CASE(InputEBPFFileSecurityUnittest, OnFailedInit)
-UNIT_TEST_CASE(InputEBPFFileSecurityUnittest, OnSuccessfulStart)
-UNIT_TEST_CASE(InputEBPFFileSecurityUnittest, OnSuccessfulStop)
-// UNIT_TEST_CASE(InputEBPFFileSecurityUnittest, OnPipelineUpdate)
+UNIT_TEST_CASE(InputFileSecurityUnittest, TestName)
+UNIT_TEST_CASE(InputFileSecurityUnittest, TestSupportAck)   
+UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulInit)
+UNIT_TEST_CASE(InputFileSecurityUnittest, OnFailedInit)
+UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulStart)
+UNIT_TEST_CASE(InputFileSecurityUnittest, OnSuccessfulStop)
+// UNIT_TEST_CASE(InputFileSecurityUnittest, OnPipelineUpdate)
 
 } // namespace logtail
 

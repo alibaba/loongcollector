@@ -17,7 +17,7 @@
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "ebpf/config.h"
-#include "plugin/input/InputEBPFNetworkObserver.h"
+#include "plugin/input/InputNetworkObserver.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
 #include "unittest/Unittest.h"
@@ -27,8 +27,10 @@ using namespace std;
 
 namespace logtail {
 
-class InputEBPFNetworkObserverUnittest : public testing::Test {
+class InputNetworkObserverUnittest : public testing::Test {
 public:
+    void TestName();
+    void TestSupportAck();
     void OnSuccessfulInit();
     void OnFailedInit();
     void OnSuccessfulStart();
@@ -48,15 +50,27 @@ private:
     PipelineContext ctx;
 };
 
-void InputEBPFNetworkObserverUnittest::OnSuccessfulInit() {
-    unique_ptr<InputEBPFNetworkObserver> input;
+void InputNetworkObserverUnittest::TestName() {
+    InputNetworkObserver input;
+    std::string name = input.Name();
+    APSARA_TEST_EQUAL(name, "input_network_observer");
+}
+
+void InputNetworkObserverUnittest::TestSupportAck() {
+    InputNetworkObserver input;
+    bool supportAck = input.SupportAck();
+    APSARA_TEST_FALSE(supportAck);
+}
+
+void InputNetworkObserverUnittest::OnSuccessfulInit() {
+    unique_ptr<InputNetworkObserver> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
 
     // valid optional param
     configStr = R"(
         {
-            "Type": "input_ebpf_sockettraceprobe_observer",
+            "Type": "input_network_observer",
             "ProbeConfig": 
             {
                 "EnableProtocols": [
@@ -69,10 +83,10 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulInit() {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFNetworkObserver());
+    input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(input->sName, "input_ebpf_sockettraceprobe_observer");
+    APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     nami::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1);
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols[0], "http");
@@ -81,15 +95,15 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(false, thisObserver.mEnableConnTrackerDump);
 }
 
-void InputEBPFNetworkObserverUnittest::OnFailedInit() {
-    unique_ptr<InputEBPFNetworkObserver> input;
+void InputNetworkObserverUnittest::OnFailedInit() {
+    unique_ptr<InputNetworkObserver> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
 
     // invalid optional param
     configStr = R"(
         {
-            "Type": "input_ebpf_sockettraceprobe_observer",
+            "Type": "input_network_observer",
             "ProbeConfig": 
             {
                 "EnableProtocols": [
@@ -102,10 +116,10 @@ void InputEBPFNetworkObserverUnittest::OnFailedInit() {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFNetworkObserver());
+    input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(input->sName, "input_ebpf_sockettraceprobe_observer");
+    APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     nami::ObserverNetworkOption thisObserver = input->mNetworkOption;
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1);
     APSARA_TEST_EQUAL(thisObserver.mEnableProtocols[0], "http");
@@ -116,7 +130,7 @@ void InputEBPFNetworkObserverUnittest::OnFailedInit() {
     // lag of mandatory param + error param level
     configStr = R"(
         {
-            "Type": "input_ebpf_sockettraceprobe_observer",
+            "Type": "input_network_observer",
             "EnableProtocols": [
                 "http"
             ],
@@ -126,20 +140,20 @@ void InputEBPFNetworkObserverUnittest::OnFailedInit() {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFNetworkObserver());
+    input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
 }
 
-void InputEBPFNetworkObserverUnittest::OnSuccessfulStart() {
-    unique_ptr<InputEBPFNetworkObserver> input;
+void InputNetworkObserverUnittest::OnSuccessfulStart() {
+    unique_ptr<InputNetworkObserver> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     uint32_t pluginIdx = 0;
 
     configStr = R"(
         {
-            "Type": "input_ebpf_sockettraceprobe_observer",
+            "Type": "input_network_observer",
             "ProbeConfig": 
             {
                 "EnableProtocols": [
@@ -152,7 +166,7 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulStart() {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFNetworkObserver());
+    input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
@@ -161,14 +175,14 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulStart() {
     APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
 }
 
-void InputEBPFNetworkObserverUnittest::OnSuccessfulStop() {
-    unique_ptr<InputEBPFNetworkObserver> input;
+void InputNetworkObserverUnittest::OnSuccessfulStop() {
+    unique_ptr<InputNetworkObserver> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
 
     configStr = R"(
         {
-            "Type": "input_ebpf_sockettraceprobe_observer",
+            "Type": "input_network_observer",
             "ProbeConfig": 
             {
                 "EnableProtocols": [
@@ -181,7 +195,7 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulStop() {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputEBPFNetworkObserver());
+    input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
@@ -196,11 +210,13 @@ void InputEBPFNetworkObserverUnittest::OnSuccessfulStop() {
     APSARA_TEST_TRUE(serverPipelineName.empty());
 }
 
-UNIT_TEST_CASE(InputEBPFNetworkObserverUnittest, OnSuccessfulInit)
-UNIT_TEST_CASE(InputEBPFNetworkObserverUnittest, OnFailedInit)
-UNIT_TEST_CASE(InputEBPFNetworkObserverUnittest, OnSuccessfulStart)
-UNIT_TEST_CASE(InputEBPFNetworkObserverUnittest, OnSuccessfulStop)
-// UNIT_TEST_CASE(InputEBPFNetworkObserverUnittest, OnPipelineUpdate)
+UNIT_TEST_CASE(InputNetworkObserverUnittest, TestName)
+UNIT_TEST_CASE(InputNetworkObserverUnittest, TestSupportAck)
+UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulInit)
+UNIT_TEST_CASE(InputNetworkObserverUnittest, OnFailedInit)
+UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulStart)
+UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulStop)
+// UNIT_TEST_CASE(InputNetworkObserverUnittest, OnPipelineUpdate)
 
 } // namespace logtail
 

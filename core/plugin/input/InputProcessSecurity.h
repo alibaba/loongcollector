@@ -24,7 +24,7 @@
 
 namespace logtail {
 
-class InputEBPFProcessSecurity : public Input {
+class InputProcessSecurity : public Input {
 public:
     static const std::string sName;
 

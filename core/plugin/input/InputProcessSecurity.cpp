@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/input/InputEBPFProcessSecurity.h"
+#include "plugin/input/InputProcessSecurity.h"
 
 #include "ebpf/include/export.h"
 #include "ebpf/eBPFServer.h"
@@ -21,9 +21,9 @@ using namespace std;
 
 namespace logtail {
 
-const std::string InputEBPFProcessSecurity::sName = "input_ebpf_processprobe_security";
+const std::string InputProcessSecurity::sName = "input_process_security";
 
-bool InputEBPFProcessSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputProcessSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::PROCESS_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
@@ -33,11 +33,11 @@ bool InputEBPFProcessSecurity::Init(const Json::Value& config, Json::Value& opti
     return mSecurityOptions.Init(ebpf::SecurityProbeType::PROCESS, config, mContext, sName);
 }
 
-bool InputEBPFProcessSecurity::Start() {
+bool InputProcessSecurity::Start() {
     return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::PROCESS_SECURITY,mContext, &mSecurityOptions);
 }
 
-bool InputEBPFProcessSecurity::Stop(bool isPipelineRemoving) {
+bool InputProcessSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::PROCESS_SECURITY);
         return true;

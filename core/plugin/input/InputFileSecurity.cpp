@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/input/InputEBPFFileSecurity.h"
+#include "plugin/input/InputFileSecurity.h"
 
 // #include "ebpf/security/SecurityServer.h"
 #include "ebpf/include/export.h"
@@ -23,9 +23,9 @@ using namespace std;
 
 namespace logtail {
 
-const std::string InputEBPFFileSecurity::sName = "input_ebpf_fileprobe_security";
+const std::string InputFileSecurity::sName = "input_file_security";
 
-bool InputEBPFFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
@@ -35,11 +35,11 @@ bool InputEBPFFileSecurity::Init(const Json::Value& config, Json::Value& optiona
     return mSecurityOptions.Init(ebpf::SecurityProbeType::FILE, config, mContext, sName);
 }
 
-bool InputEBPFFileSecurity::Start() {
+bool InputFileSecurity::Start() {
     return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::FILE_SECURITY, mContext, &mSecurityOptions);
 }
 
-bool InputEBPFFileSecurity::Stop(bool isPipelineRemoving) {
+bool InputFileSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::FILE_SECURITY);
         return true;

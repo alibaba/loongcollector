@@ -20,11 +20,10 @@
 
 #include "ebpf/config.h"
 #include "pipeline/plugin/interface/Input.h"
-#include "ebpf/include/export.h"
 
 namespace logtail {
 
-class InputEBPFNetworkObserver : public Input {
+class InputNetworkSecurity : public Input {
 public:
     static const std::string sName;
 
@@ -34,7 +33,7 @@ public:
     bool Stop(bool isPipelineRemoving) override;
     bool SupportAck() const override { return false; }
 
-    nami::ObserverNetworkOption mNetworkOption;
+    ebpf::SecurityOptions mSecurityOptions;
 };
 
 } // namespace logtail

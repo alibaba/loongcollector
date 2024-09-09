@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/input/InputEBPFNetworkSecurity.h"
+#include "plugin/input/InputNetworkSecurity.h"
 
 #include "ebpf/include/export.h"
 #include "ebpf/eBPFServer.h"
@@ -22,12 +22,12 @@ using namespace std;
 
 namespace logtail {
 
-const std::string InputEBPFNetworkSecurity::sName = "input_ebpf_sockettraceprobe_security";
+const std::string InputNetworkSecurity::sName = "input_network_security";
 
 // enable: init -> start
 // update: init -> stop(false) -> start
 // stop: stop(true)
-bool InputEBPFNetworkSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputNetworkSecurity::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
@@ -38,11 +38,11 @@ bool InputEBPFNetworkSecurity::Init(const Json::Value& config, Json::Value& opti
     return mSecurityOptions.Init(ebpf::SecurityProbeType::NETWORK, config, mContext, sName);
 }
 
-bool InputEBPFNetworkSecurity::Start() {
+bool InputNetworkSecurity::Start() {
     return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_SECURITY, mContext, &mSecurityOptions);
 }
 
-bool InputEBPFNetworkSecurity::Stop(bool isPipelineRemoving) {
+bool InputNetworkSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::NETWORK_SECURITY);
         return true;

@@ -24,7 +24,7 @@
 
 namespace logtail {
 
-class InputEBPFFileSecurity : public Input {
+class InputFileSecurity : public Input {
 public:
     static const std::string sName;
 

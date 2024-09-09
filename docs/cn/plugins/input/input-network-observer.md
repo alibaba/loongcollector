@@ -1,8 +1,8 @@
-# input_ebpf_network_observer 插件
+# input_network_observer 插件
 
 ## 简介
 
-`input_ebpf_network_observer`插件可以实现利用ebpf探针采集网络可观测数据。
+`input_network_observer`插件可以实现利用ebpf探针采集网络可观测数据。
 
 ## 版本
 
@@ -12,7 +12,7 @@
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_ebpf\_network\_observer  |
+|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_network\_observer  |
 |  ProbeConfig  |  object  |  是  |  /  |  插件配置参数列表  |
 |  ProbeConfig.EnableLog  |  bool  |  否  |  true  |  是否开启日志上报  |
 |  ProbeConfig.EnableSpan  |  bool  |  否  |  false  |  是否开启跨度上报  |
@@ -37,7 +37,7 @@ TODO
 ```yaml
 enable: true
 inputs:
-  - Type: input_ebpf_sockettraceprobe_observer
+  - Type: input_network_observer
     ProbeConfig:
       EnableLog: true
       EnableMetric: false

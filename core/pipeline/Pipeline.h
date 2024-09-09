@@ -92,10 +92,10 @@ private:
     friend class InputPrometheusUnittest;
     friend class ProcessorTagNativeUnittest;
     friend class FlusherSLSUnittest;
-    friend class InputEBPFFileSecurityUnittest;
-    friend class InputEBPFProcessSecurityUnittest;
-    friend class InputEBPFNetworkSecurityUnittest;
-    friend class InputEBPFNetworkObserverUnittest;
+    friend class InputFileSecurityUnittest;
+    friend class InputProcessSecurityUnittest;
+    friend class InputNetworkSecurityUnittest;
+    friend class InputNetworkObserverUnittest;
 #endif
 };
 
