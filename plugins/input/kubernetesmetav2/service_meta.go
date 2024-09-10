@@ -1,22 +1,25 @@
 package kubernetesmetav2
 
 import (
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
-type ProcessFunc func(data *k8smeta.ObjectWrapper, method string) models.PipelineEvent
+type ProcessFunc func(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent
 
 //revive:disable:exported
 type ServiceK8sMeta struct {
 	//revive:enable:exported
 	Interval int
+	Domain   string
 	// entity switch
 	Pod                   bool
 	Node                  bool
 	Service               bool
 	Deployment            bool
+	ReplicaSet            bool
 	DaemonSet             bool
 	StatefulSet           bool
 	Configmap             bool
@@ -28,14 +31,13 @@ type ServiceK8sMeta struct {
 	PersistentVolumeClaim bool
 	StorageClass          bool
 	Ingress               bool
-	// entity link switch
-	PodReplicasetLink bool
-	PodServiceLink    bool
+	Container             bool
 	// other
 	metaManager   *k8smeta.MetaManager
 	collector     pipeline.Collector
 	metaCollector *metaCollector
 	configName    string
+	clusterID     string
 }
 
 // Init called for init some system resources, like socket, mutex...
@@ -61,12 +63,11 @@ func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 	s.collector = collector
 	s.metaCollector = &metaCollector{
 		serviceK8sMeta:   s,
-		processors:       make(map[string][]ProcessFunc),
 		collector:        collector,
-		entityTypes:      []string{},
 		entityBuffer:     make(chan models.PipelineEvent, 100),
 		entityLinkBuffer: make(chan models.PipelineEvent, 100),
 		stopCh:           make(chan struct{}),
+		entityProcessor:  make(map[string]ProcessFunc),
 	}
 	return s.metaCollector.Start()
 }
@@ -74,7 +75,8 @@ func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 func init() {
 	pipeline.ServiceInputs["service_kubernetes_meta"] = func() pipeline.ServiceInput {
 		return &ServiceK8sMeta{
-			Interval: 30,
+			Interval:  60,
+			clusterID: *flags.ClusterID,
 		}
 	}
 }

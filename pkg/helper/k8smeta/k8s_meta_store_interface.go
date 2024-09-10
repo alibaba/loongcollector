@@ -24,7 +24,7 @@ type ObjectWrapper struct {
 
 type IdxFunc func(obj interface{}) ([]string, error)
 
-type SendFunc func(event *K8sMetaEvent)
+type SendFunc func(events []*K8sMetaEvent)
 
 func panicRecover() {
 	if err := recover(); err != nil {

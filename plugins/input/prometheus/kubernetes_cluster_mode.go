@@ -15,10 +15,10 @@
 package prometheus
 
 import (
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugin_main/flags"
 
 	"context"
 	"errors"

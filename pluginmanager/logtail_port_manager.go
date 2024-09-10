@@ -24,8 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/plugin_main/flags"
 )
 
 func getExcludePorts() []int {

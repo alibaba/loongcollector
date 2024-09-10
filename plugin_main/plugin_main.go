@@ -16,20 +16,115 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/alibaba/ilogtail/pkg/doc"
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/signals"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/plugin_main/flags"
 	_ "github.com/alibaba/ilogtail/plugin_main/wrapmemcpy"
 	_ "github.com/alibaba/ilogtail/plugins/all"
 )
+
+// LoadConfig read the plugin content.
+func LoadConfigPurPlugin() (globalCfg string, pluginCfgs []string, err error) {
+	if gCfg, errRead := os.ReadFile(*flags.GlobalConfig); errRead != nil {
+		globalCfg = flags.DefaultGlobalConfig
+	} else {
+		globalCfg = string(gCfg)
+	}
+
+	if !json.Valid([]byte(globalCfg)) {
+		err = fmt.Errorf("illegal input global config:%s", globalCfg)
+		return
+	}
+
+	var pluginCfg string
+	if pCfg, errRead := os.ReadFile(*flags.PluginConfig); errRead == nil {
+		pluginCfg = string(pCfg)
+	} else {
+		pluginCfg = flags.DefaultPluginConfig
+	}
+
+	if !json.Valid([]byte(pluginCfg)) {
+		err = fmt.Errorf("illegal input plugin config:%s", pluginCfg)
+		return
+	}
+
+	var cfgs []map[string]interface{}
+	errUnmarshal := json.Unmarshal([]byte(pluginCfg), &cfgs)
+	if errUnmarshal != nil {
+		pluginCfgs = append(pluginCfgs, changePluginConfigIO(pluginCfg))
+		return
+	}
+	for _, cfg := range cfgs {
+		bytes, _ := json.Marshal(cfg)
+		pluginCfgs = append(pluginCfgs, changePluginConfigIO(string(bytes)))
+	}
+	return
+}
+
+type pipelineConfig struct {
+	Inputs      []interface{} `json:"inputs"`
+	Processors  []interface{} `json:"processors"`
+	Aggregators []interface{} `json:"aggregators"`
+	Flushers    []interface{} `json:"flushers"`
+}
+
+var (
+	fileInput = map[string]interface{}{
+		"type": "metric_debug_file",
+		"detail": map[string]interface{}{
+			"InputFilePath": "./input.log",
+			"FieldName":     "content",
+			"LineLimit":     1000,
+		},
+	}
+	fileOutput = map[string]interface{}{
+		"type": "flusher_stdout",
+		"detail": map[string]interface{}{
+			"FileName": "./output.log",
+		},
+	}
+)
+
+func changePluginConfigIO(pluginCfg string) string {
+	if *flags.FileIOFlag {
+		var newCfg pipelineConfig
+		if err := json.Unmarshal([]byte(pluginCfg), &newCfg); err == nil {
+			// Input
+			fileInput["detail"].(map[string]interface{})["InputFilePath"] = *flags.InputFile
+			fileInput["detail"].(map[string]interface{})["FieldName"] = *flags.InputField
+			fileInput["detail"].(map[string]interface{})["LineLimit"] = *flags.InputLineLimit
+			newCfg.Inputs = []interface{}{fileInput}
+			// Processors
+			if newCfg.Processors == nil {
+				newCfg.Processors = make([]interface{}, 0)
+			}
+			// Aggregators
+			if newCfg.Aggregators == nil {
+				newCfg.Aggregators = make([]interface{}, 0)
+			}
+			// Flushers
+			fileOutput["detail"].(map[string]interface{})["FileName"] = *flags.OutputFile
+			newCfg.Flushers = append(newCfg.Flushers, fileOutput)
+
+			cfg, _ := json.Marshal(newCfg)
+			pluginCfg = string(cfg)
+		} else {
+			logger.Error(context.Background(), "PLUGIN_UNMARSHAL_ALARM", "err", err)
+		}
+		return pluginCfg
+	}
+	return pluginCfg
+}
 
 // main export http control method in pure GO.
 func main() {
@@ -46,7 +141,7 @@ func main() {
 	fmt.Println("hostIP : ", util.GetIPAddress())
 	fmt.Printf("load config %s %s %s\n", *flags.GlobalConfig, *flags.PluginConfig, *flags.FlusherConfig)
 
-	globalCfg, pluginCfgs, err := flags.LoadConfig()
+	globalCfg, pluginCfgs, err := LoadConfigPurPlugin()
 	fmt.Println("global config : ", globalCfg)
 	fmt.Println("plugin config : ", pluginCfgs)
 	if err != nil {

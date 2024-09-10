@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	app "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -69,16 +70,22 @@ func TestProcessPodEntity(t *testing.T) {
 	assert.NotNilf(t, log, "log should not be nil")
 }
 
-func TestProcessPodReplicasetLink(t *testing.T) {
-	obj := &v1.Pod{
+func TestProcessServiceEntity(t *testing.T) {
+	obj := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod2",
 			Namespace: "ns2",
 			UID:       "uid2",
-			OwnerReferences: []metav1.OwnerReference{
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
 				{
-					Kind: "ReplicaSet",
-					Name: "rs1",
+					Name: "port1",
+					Port: 80,
+				},
+				{
+					Name: "port2",
+					Port: 8080,
 				},
 			},
 		},
@@ -91,7 +98,42 @@ func TestProcessPodReplicasetLink(t *testing.T) {
 			Interval: 10,
 		},
 	}
-	log := collector.processPodReplicasetLink(objWrapper, "create")
+	log := collector.processServiceEntity(objWrapper, "create")
+	assert.NotNilf(t, log, "log should not be nil")
+}
+
+func TestProcessPodReplicasetLink(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod2",
+			Namespace: "ns2",
+			UID:       "uid2",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Kind: "ReplicaSet",
+					Name: "rs1",
+				},
+			},
+		},
+	}
+	replicaSet := &app.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rs1",
+			Namespace: "ns2",
+		},
+	}
+	objWrapper := &k8smeta.ObjectWrapper{
+		Raw: &k8smeta.PodReplicaSet{
+			Pod:        pod,
+			ReplicaSet: replicaSet,
+		},
+	}
+	collector := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{
+			Interval: 10,
+		},
+	}
+	log := collector.processPodReplicaSetLink(objWrapper, "create")
 	assert.NotNilf(t, log, "log should not be nil")
 }
 
@@ -111,7 +153,7 @@ func TestProcessPodReplicasetLinkNoOwner(t *testing.T) {
 			Interval: 10,
 		},
 	}
-	log := collector.processPodReplicasetLink(objWrapper, "create")
+	log := collector.processPodReplicaSetLink(objWrapper, "create")
 	assert.Nilf(t, log, "log should not be nil")
 }
 

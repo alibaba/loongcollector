@@ -175,7 +175,7 @@ func (m *DeferredDeletionMetaStore) handleAddEvent(event *K8sMetaEvent) {
 	}
 	m.lock.Unlock()
 	m.sendFuncs.Range(func(key, value interface{}) bool {
-		value.(*SendFuncWithStopCh).SendFunc(event)
+		value.(*SendFuncWithStopCh).SendFunc([]*K8sMetaEvent{event})
 		return true
 	})
 }
@@ -200,7 +200,7 @@ func (m *DeferredDeletionMetaStore) handleUpdateEvent(event *K8sMetaEvent) {
 	}
 	m.lock.Unlock()
 	m.sendFuncs.Range(func(key, value interface{}) bool {
-		value.(*SendFuncWithStopCh).SendFunc(event)
+		value.(*SendFuncWithStopCh).SendFunc([]*K8sMetaEvent{event})
 		return true
 	})
 }
@@ -218,7 +218,7 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 	}
 	m.lock.Unlock()
 	m.sendFuncs.Range(func(key, value interface{}) bool {
-		value.(*SendFuncWithStopCh).SendFunc(event)
+		value.(*SendFuncWithStopCh).SendFunc([]*K8sMetaEvent{event})
 		return true
 	})
 	go func() {
@@ -279,15 +279,17 @@ func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 	timerEvent := event.Object.Raw.(*TimerEvent)
 	if f, ok := m.sendFuncs.Load(timerEvent.ConfigName); ok {
 		sendFuncWithStopCh := f.(*SendFuncWithStopCh)
+		allItems := make([]*K8sMetaEvent, 0)
 		for _, obj := range m.Items {
 			if !obj.Deleted {
 				obj.LastObservedTime = time.Now().Unix()
-				sendFuncWithStopCh.SendFunc(&K8sMetaEvent{
+				allItems = append(allItems, &K8sMetaEvent{
 					EventType: EventTypeUpdate,
 					Object:    obj,
 				})
 			}
 		}
+		sendFuncWithStopCh.SendFunc(allItems)
 	}
 
 }

@@ -15,6 +15,7 @@
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
 | Type | String，无默认值（必填） | 插件类型，固定为`service_syslog`。 |
+| Domain | String，默认值为空（必填） | 实体域，ACK集群填写"acs", 普通集群填写"infra"。 |
 | Interval | int, 30 | 采集间隔时间，单位为秒。 |
 | Pod | bool, false | 是否采集Pod元数据。 |
 | Node | bool, false | 是否采集Node元数据。 |
@@ -31,8 +32,6 @@
 | PersistentVolumeClaim | bool, false | 是否采集PersistentVolumeClaim元数据。 |
 | StorageClass | bool, false | 是否采集StorageClass元数据。 |
 | Ingress | bool, false | 是否采集Ingress元数据。 |
-| PodReplicasetLink | bool, false | 是否采集Pod与ReplicaSet之间的关系。 |
-| PodServiceLink | bool, false | 是否采集Pod与Service之间的关系。 |
 
 ## 环境变量
 
