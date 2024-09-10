@@ -184,12 +184,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 	c.enableCRIDiscover = criRuntimeWrapper != nil
 	c.enableDockerDiscover = dockerCenterInstance.initClient() == nil
 	c.enableStaticDiscover = isStaticContainerInfoEnabled()
-	discoverdRuntime := false
-	if len(os.Getenv("USE_CONTAINERD")) > 0 {
-		discoverdRuntime = c.enableCRIDiscover
-	} else {
-		discoverdRuntime = c.enableCRIDiscover || c.enableDockerDiscover || c.enableStaticDiscover
-	}
+	discoverdRuntime := c.enableCRIDiscover || c.enableDockerDiscover || c.enableStaticDiscover
 	if !discoverdRuntime {
 		return false
 	}

@@ -48,7 +48,6 @@
 
 | 参数                      | 类型     | 说明                                                                                                         |
 | ----------------------- |--------|------------------------------------------------------------------------------------------------------------|
-| `USE_CONTAINERD`       | Bool   | 是否使用containerd runtime，非必选。ilogtail会自动通过接口探测。                                                              |
 | `CONTAINERD_SOCK_PATH`       | String | 自定义containerd sock路径，非必选。默认为/run/containerd/containerd.sock。自定义取值可以通过查看/etc/containerd/config.toml grpc.address字段获取。 |
 | `CONTAINERD_STATE_DIR` | String | 自定义containerd 数据目录，非必选。自定义取值可以通过查看/etc/containerd/config.toml state字段获取。                                             |
 | `LOGTAIL_LOG_LEVEL` | String |  用于控制/apsara/sls/ilogtail和golang插件的日志等级，支持通用日志等级，如trace, debug，info，warning，error，fatal|
