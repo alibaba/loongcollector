@@ -65,3 +65,8 @@ func generate(ctx context.Context, totalLog int, path string, interval int, comm
 	}
 	return context.WithValue(ctx, config.StartTimeContextKey, int32(startTime)), nil
 }
+
+func BeginTrigger(ctx context.Context) (context.Context, error) {
+	startTime := time.Now().Unix()
+	return context.WithValue(ctx, config.StartTimeContextKey, int32(startTime)), nil
+}

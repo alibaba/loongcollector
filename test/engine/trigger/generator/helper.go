@@ -11,14 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package trigger
+package generator
 
 import (
-	"fmt"
+	"os"
 )
 
-const commandTemplate = "/usr/local/go/bin/go test -count=1 -v -run ^%s$ github.com/alibaba/ilogtail/test/engine/trigger/generator"
-
-func getRunTriggerCommand(triggerName string) string {
-	return fmt.Sprintf(commandTemplate, triggerName)
+func getEnvOrDefault(env, fallback string) string {
+	if value, ok := os.LookupEnv(env); ok {
+		return value
+	}
+	return fallback
 }

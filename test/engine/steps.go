@@ -38,6 +38,8 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^generate \{(\d+)\} apsara logs to file \{(.*)\}, with interval \{(\d+)\}ms$`, trigger.Apsara)
 	ctx.When(`^generate \{(\d+)\} delimiter logs to file \{(.*)\}, with interval \{(\d+)\}ms$`, trigger.DelimiterSingle)
 	ctx.When(`^query through \{(.*)\}`, control.SetQuery)
+	ctx.When(`^begin trigger`, trigger.BeginTrigger)
+	ctx.When(`^execute \{(\d+)\} commands to generate file security events on files \{(.*)\}$`, trigger.TrigerFileSecurityEvents)
 
 	// Then
 	ctx.Then(`^there is \{(\d+)\} logs$`, verify.LogCount)
