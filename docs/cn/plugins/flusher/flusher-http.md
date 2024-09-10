@@ -1,4 +1,4 @@
-# 标准输出/文件
+# HTTP
 
 ## 简介
 
@@ -21,6 +21,9 @@
 | Retry.MaxRetryTimes          | Int                | 否    | 最大重试次数，默认为 `3`                                                                                                                                                                             |
 | Retry.InitialDelay           | String             | 否    | 首次重试时间间隔，默认为 `1s`，重试间隔以会2的倍数递增                                                                                                                                                             |
 | Retry.MaxDelay               | String             | 否    | 最大重试时间间隔，默认为 `30s`                                                                                                                                                                         |
+| Encoder                      | Struct             | 否    | ilogtail数据编码协议配置，优先级高于Convert                                                                                                                                                              |
+| Encoder.Type                 | String             | 否    | encoder 插件的类型                                                                                                                                                                              |
+| Encoder.Options              | Map<String,Struct> | 否    | encoder 插件的配置                                                                                                                                                                              |
 | Convert                      | Struct             | 否    | ilogtail数据转换协议配置                                                                                                                                                                           |
 | Convert.Protocol             | String             | 否    | ilogtail数据转换协议，可选值：`custom_single`,`influxdb`, `jsonline`。默认值：`custom_single`<p>v2版本可选值：`raw`</p>                                                                                          |
 | Convert.Encoding             | String             | 否    | ilogtail flusher数据转换编码，可选值：`json`, `custom`，默认值：`json`                                                                                                                                     |
@@ -34,6 +37,9 @@
 | IdleConnTimeout              | String             | 否    | HTTP连接在关闭前保持闲置状态的最长时间，默认`90s`<p>当其值大于http.DefaultTransport.(*http.Transport).IdleConnTimeout时（当前是`90s`），会采用该值                                                                              |
 | WriteBufferSize              | Int                | 否    | 写缓冲区的大小，不填不会给http.DefaultTransport.(*http.Transport).WriteBufferSize赋值，此时采用默认的`4KB`<p>当其值大于0时，会采用该值                                                                                        |
 | QueueCapacity                | Int                | 否    | 内部channel的缓存大小，默认为1024                                                                                                                                                                     
+| Authenticator                | Struct             | 否    | 鉴权扩展插件配置                                                                                                                                                                                   |
+| Authenticator.Type           | String             | 否    | 鉴权扩展插件类型                                                                                                                                                                                   |
+| Authenticator.Options        | Map<String,Struct> | 否    | 鉴权扩展插件配置内容                                                                                                                                                                                 |
 | AsyncIntercept               | Boolean            | 否    | 异步过滤数据，默认为否                                                                                                                                                                                
 | DropEventWhenQueueFull       | Boolean            | 否    | 当队列满时是否丢弃数据，否则需要等待，默认为不丢弃                                                                                                                                                                  |
 | Compression                  | string             | 否    | 压缩策略，目前支持gzip和snappy，默认不开启                                                                                                                                                                 |
@@ -107,6 +113,7 @@ flushers:
     SeriesLimit: 1024
   Authenticator:
     Type: ext_basicauth
+  Compression: 'snappy'
 extensions:
 - Type: ext_basicauth
   Username: 'YOUR_USERNAME'
