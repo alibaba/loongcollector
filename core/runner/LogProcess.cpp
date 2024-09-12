@@ -56,8 +56,8 @@ LogProcess::~LogProcess() {
 void LogProcess::Start() {
     if (mInitialized)
         return;
-    mGlobalProcessQueueFullTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PROCESS_QUEUE_FULL_TOTAL);
-    mGlobalProcessQueueTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PROCESS_QUEUE_TOTAL);
+    mAgentProcessQueueFullTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PROCESS_QUEUE_FULL_TOTAL);
+    mAgentProcessQueueTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PROCESS_QUEUE_TOTAL);
 
     mInitialized = true;
     mThreadCount = AppConfig::GetInstance()->GetProcessThreadCount();
@@ -168,10 +168,10 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
             // update process queue status
             uint32_t InvalidProcessQueueTotal = ProcessQueueManager::GetInstance()->GetInvalidCnt();
             sMonitor->UpdateMetric("process_queue_full", InvalidProcessQueueTotal);
-            mGlobalProcessQueueFullTotal->Set(InvalidProcessQueueTotal);
+            mAgentProcessQueueFullTotal->Set(InvalidProcessQueueTotal);
             uint32_t ProcessQueueTotal = ProcessQueueManager::GetInstance()->GetCnt();
             sMonitor->UpdateMetric("process_queue_total", ProcessQueueTotal);
-            mGlobalProcessQueueTotal->Set(ProcessQueueTotal);
+            mAgentProcessQueueTotal->Set(ProcessQueueTotal);
             if (ExactlyOnceQueueManager::GetInstance()->GetProcessQueueCnt() > 0) {
                 sMonitor->UpdateMetric("eo_process_queue_full",
                                        ExactlyOnceQueueManager::GetInstance()->GetInvalidProcessQueueCnt());

@@ -47,7 +47,7 @@ PollingModify::~PollingModify() {
 
 void PollingModify::Start() {
     ClearCache();
-    mGlobalPollingModifySizeTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_POLLING_MODIFY_SIZE_TOTAL);
+    mAgentPollingModifySizeTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_POLLING_MODIFY_SIZE_TOTAL);
 
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
@@ -251,7 +251,7 @@ void PollingModify::Polling() {
             int32_t statCount = 0;
             size_t pollingModifySizeTotal = mModifyCacheMap.size();
             LogtailMonitor::GetInstance()->UpdateMetric("polling_modify_size", pollingModifySizeTotal);
-            mGlobalPollingModifySizeTotal->Set(pollingModifySizeTotal);
+            mAgentPollingModifySizeTotal->Set(pollingModifySizeTotal);
             for (auto iter = mModifyCacheMap.begin(); iter != mModifyCacheMap.end(); ++iter) {
                 if (!mRuningFlag || mHoldOnFlag)
                     break;

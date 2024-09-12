@@ -19,18 +19,68 @@ import (
 	"strings"
 )
 
-func GetMetrics() []map[string]string {
+const (
+	MetricExportTypeGo  = "direct"
+	MetricExportTypeCpp = "cpp_provided"
+)
+
+func GetMetrics(metricType string) []map[string]string {
+	if metricType == MetricExportTypeGo {
+		return GetGoDirectMetrics()
+	}
+	if metricType == MetricExportTypeCpp {
+		return GetGoCppProvidedMetrics()
+	}
+	return []map[string]string{}
+}
+
+// 直接输出的go指标，例如go插件指标
+//
+//	[]map[string]string{
+//		{
+//			"label.plugin_name": "processor_test",
+//			"value.proc_in_records_total": "100",
+//		},
+//		{
+//			"label.plugin_name": "flusher_stdout",
+//			"value.flusher_in_records_total": "100",
+//		},
+//	}
+func GetGoDirectMetrics() []map[string]string {
+	metrics := make([]map[string]string, 0)
+	// go plugin metrics
+	metrics = append(metrics, GetGoPluginMetrics()...)
+	return metrics
+}
+
+// 由C++定义的指标，go把值传过去，例如go的进程级指标
+//
+//	[]map[string]string{
+//		{
+//			"agent_go_memory_used_mb": "100",
+//			"agent_go_routines_total": "20"
+//		}
+//	}
+func GetGoCppProvidedMetrics() []map[string]string {
+	metrics := make([]map[string]string, 0)
+	// agent-level metrics
+	metrics = append(metrics, GetAgentStat()...)
+	return metrics
+}
+
+// go 插件指标，直接输出
+func GetGoPluginMetrics() []map[string]string {
 	metrics := make([]map[string]string, 0)
 	for _, config := range LogtailConfig {
 		metrics = append(metrics, config.Context.ExportMetricRecords()...)
 	}
-	metrics = append(metrics, GetAgentStat())
 	return metrics
 }
 
-func GetAgentStat() map[string]string {
-	recrods := map[string]string{}
-	recrods["metric-level"] = "agent"
+// go 进程级指标，由C++部分注册
+func GetAgentStat() []map[string]string {
+	metrics := []map[string]string{}
+	metric := map[string]string{}
 	// key is the metric key in runtime/metrics, value is agent's metric key
 	metricNames := map[string]string{
 		// cpu
@@ -50,20 +100,22 @@ func GetAgentStat() map[string]string {
 
 	// push results to recrods
 	for _, sample := range samples {
-		recordName := metricNames[sample.Name]
-		recordValue := sample.Value
-		recordValueString := ""
-		switch recordValue.Kind() {
+		key := metricNames[sample.Name]
+		value := sample.Value
+		valueStr := ""
+		switch value.Kind() {
 		case goruntimemetrics.KindUint64:
-			if strings.HasSuffix(recordName, "_mb") {
-				recordValueString = strconv.FormatUint(recordValue.Uint64()/1024/1024, 10)
+			if strings.HasSuffix(key, "_mb") {
+				valueStr = strconv.FormatUint(value.Uint64()/1024/1024, 10)
 			} else {
-				recordValueString = strconv.FormatUint(recordValue.Uint64(), 10)
+				valueStr = strconv.FormatUint(value.Uint64(), 10)
 			}
 		case goruntimemetrics.KindFloat64:
-			recordValueString = strconv.FormatFloat(recordValue.Float64(), 'g', -1, 64)
+			valueStr = strconv.FormatFloat(value.Float64(), 'g', -1, 64)
 		}
-		recrods[recordName] = recordValueString
+		metric[key] = valueStr
 	}
-	return recrods
+
+	metrics = append(metrics, metric)
+	return metrics
 }

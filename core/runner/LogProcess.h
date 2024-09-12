@@ -60,8 +60,8 @@ private:
     std::atomic_bool* mThreadFlags;
     ReadWriteLock mAccessProcessThreadRWL;
 
-    IntGaugePtr mGlobalProcessQueueFullTotal;
-    IntGaugePtr mGlobalProcessQueueTotal;
+    IntGaugePtr mAgentProcessQueueFullTotal;
+    IntGaugePtr mAgentProcessQueueTotal;
 };
 
 } // namespace logtail

@@ -39,19 +39,21 @@ private:
     // Send Methods
     void SendToSLS(std::map<std::string, sls_logs::LogGroup*>& logGroupMap);
     void SendToLocalFile(std::string& metricsContent, const std::string metricsFileNamePrefix);
-    void SendGoAgentLevelMetrics(std::map<std::string, std::string>& metrics);
 
-    // inner methods
-    void SerializeGoPluginMetricsListToLogGroupMap(std::vector<std::map<std::string, std::string>>& goPluginMetircsList,
-                                                   std::map<std::string, sls_logs::LogGroup*>& goLogGroupMap);
-    void SerializeGoPluginMetricsListToString(std::vector<std::map<std::string, std::string>>& goPluginMetircsList,
+    // go metrics
+    void PushGoDirectMetrics(std::vector<std::map<std::string, std::string>>& metricsList);
+    void PushGoCppProvidedMetrics(std::vector<std::map<std::string, std::string>>& metricsList);
+    void SerializeGoDirectMetricsListToLogGroupMap(std::vector<std::map<std::string, std::string>>& metricsList,
+                                                   std::map<std::string, sls_logs::LogGroup*>& logGroupMap);
+    void SerializeGoDirectMetricsListToString(std::vector<std::map<std::string, std::string>>& metricsList,
                                               std::string& metricsContent);
 
     int32_t mSendInterval;
     int32_t mLastSendTime;
     // go process-level metrics
-    DoubleGaugePtr mGlobalCpuGo;
-    IntGaugePtr mGlobalMemGo;
+    DoubleGaugePtr mAgentCpuGo;
+    IntGaugePtr mAgentMemGo;
+    IntGaugePtr mAgentGoRoutines;
 };
 
 } // namespace logtail

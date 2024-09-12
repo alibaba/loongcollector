@@ -382,10 +382,10 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load ProcessLogGroup error, Message", error));
             return mPluginValid;
         }
-        // 获取golang插件部分统计信息
-        mGetPipelineMetricsFun = (GetPipelineMetricsFun)loader.LoadMethod("GetPipelineMetrics", error);
+        // 获取golang部分指标信息
+        mGetGoMetricsFun = (GetGoMetricsFun)loader.LoadMethod("GetGoMetrics", error);
         if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load GetPipelineMetrics error, Message", error));
+            LOG_ERROR(sLogger, ("load GetGoMetrics error, Message", error));
             return mPluginValid;
         }
 
@@ -470,9 +470,12 @@ void LogtailPlugin::ProcessLogGroup(const std::string& configName,
     }
 }
 
-void LogtailPlugin::GetPipelineMetrics(std::vector<std::map<std::string, std::string>>& metircsList) {
-    if (mGetPipelineMetricsFun != nullptr) {
-        auto metrics = mGetPipelineMetricsFun();
+void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList, const string& metricType) {
+    if (mGetGoMetricsFun != nullptr) {
+        GoString type;
+        type.n = metricType.size();
+        type.p = metricType.c_str();
+        auto metrics = mGetGoMetricsFun(type);
         if (metrics != nullptr) {
             for (int i = 0; i < metrics->count; ++i) {
                 std::map<std::string, std::string> item;

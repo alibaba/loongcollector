@@ -88,8 +88,8 @@ void LogInput::Start() {
 
     mInteruptFlag = false;
 
-    mGlobalOpenFdTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
-    mGlobalRegisterHandlerTotal
+    mAgentOpenFdTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
+    mAgentRegisterHandlerTotal
         = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_REGISTER_HANDLER_TOTAL);
 
     new Thread([this]() { ProcessLoop(); });
@@ -347,10 +347,10 @@ void LogInput::UpdateCriticalMetric(int32_t curTime) {
                                                 1.0 * mEventProcessCount / (curTime - mLastUpdateMetricTime));
     int32_t openFdTotal = GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize();
     LogtailMonitor::GetInstance()->UpdateMetric("open_fd", openFdTotal);
-    mGlobalOpenFdTotal->Set(openFdTotal);
+    mAgentOpenFdTotal->Set(openFdTotal);
     size_t handlerCount = EventDispatcher::GetInstance()->GetHandlerCount();
     LogtailMonitor::GetInstance()->UpdateMetric("register_handler", handlerCount);
-    mGlobalRegisterHandlerTotal->Set(handlerCount);
+    mAgentRegisterHandlerTotal->Set(handlerCount);
     LogtailMonitor::GetInstance()->UpdateMetric("reader_count", CheckPointManager::Instance()->GetReaderCount());
     LogtailMonitor::GetInstance()->UpdateMetric("multi_config", AppConfig::GetInstance()->IsAcceptMultiConfig());
     mEventProcessCount = 0;
