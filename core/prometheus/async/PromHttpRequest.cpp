@@ -1,5 +1,6 @@
 #include "prometheus/async/PromHttpRequest.h"
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 
@@ -23,7 +24,8 @@ PromHttpRequest::PromHttpRequest(const std::string& method,
 }
 
 void PromHttpRequest::OnSendDone(const HttpResponse& response) {
-    mFuture->Process(response, mLastSendTime * 1000);
+    mFuture->Process(response,
+                     std::chrono::duration_cast<std::chrono::milliseconds>(mLastSendTime.time_since_epoch()).count());
 }
 
 [[nodiscard]] bool PromHttpRequest::IsContextValid() const {

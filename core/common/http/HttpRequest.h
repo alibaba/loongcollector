@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -43,7 +44,7 @@ struct HttpRequest {
     uint32_t mMaxTryCnt = sDefaultMaxTryCnt;
 
     uint32_t mTryCnt = 1;
-    time_t mLastSendTime = 0;
+    std::chrono::system_clock::time_point mLastSendTime;
 
     HttpRequest(const std::string& method,
                 bool httpsFlag,

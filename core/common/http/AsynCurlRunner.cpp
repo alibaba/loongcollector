@@ -14,11 +14,12 @@
 
 #include "common/http/AsynCurlRunner.h"
 
+#include <chrono>
+
 #include "app_config/AppConfig.h"
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
 
 using namespace std;
 
@@ -95,7 +96,7 @@ bool AsynCurlRunner::AddRequestToClient(unique_ptr<AsynHttpRequest>&& request) {
 
     request->mPrivateData = headers;
     curl_easy_setopt(curl, CURLOPT_PRIVATE, request.get());
-    request->mLastSendTime = time(nullptr);
+    request->mLastSendTime = std::chrono::system_clock::now();
     auto res = curl_multi_add_handle(mClient, curl);
     if (res != CURLM_OK) {
         LOG_ERROR(sLogger,
@@ -182,8 +183,8 @@ void AsynCurlRunner::HandleCompletedRequests() {
             curl_easy_getinfo(handler, CURLINFO_PRIVATE, &request);
             LOG_DEBUG(sLogger,
                       ("send http request completed, request address",
-                       request)("response time", ToString(time(nullptr) - request->mLastSendTime))(
-                          "try cnt", ToString(request->mTryCnt)));
+                       request)("response time",ToString(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()- request->mLastSendTime).count()) + "ms")
+                      ("try cnt", ToString(request->mTryCnt)));
             switch (msg->data.result) {
                 case CURLE_OK: {
                     long statusCode = 0;

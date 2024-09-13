@@ -18,7 +18,6 @@
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SenderQueueItem.h"
@@ -100,7 +99,8 @@ bool HttpSink::AddRequestToClient(std::unique_ptr<HttpSinkRequest>&& request) {
 
     request->mPrivateData = headers;
     curl_easy_setopt(curl, CURLOPT_PRIVATE, request.get());
-    request->mLastSendTime = time(nullptr);
+    request->mLastSendTime = std::chrono::system_clock::now();
+
     auto res = curl_multi_add_handle(mClient, curl);
     if (res != CURLM_OK) {
         request->mItem->mStatus = SendingStatus::IDLE;
@@ -191,10 +191,10 @@ void HttpSink::HandleCompletedRequests() {
             HttpSinkRequest* request = nullptr;
             curl_easy_getinfo(handler, CURLINFO_PRIVATE, &request);
             LOG_DEBUG(sLogger,
-                      ("send http request completed, item address", request->mItem)(
-                          "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
-                          "response time",
-                          ToString(time(nullptr) - request->mLastSendTime))("try cnt", ToString(request->mTryCnt)));
+                      ("send http request completed, item address", request->mItem)
+                      ("config-flusher-dst", QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))
+                      ("response time",ToString(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()- request->mLastSendTime).count()) + "ms")
+                      ("try cnt", ToString(request->mTryCnt)));
             switch (msg->data.result) {
                 case CURLE_OK: {
                     long statusCode = 0;
