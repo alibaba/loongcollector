@@ -135,7 +135,7 @@ int LogtailPlugin::IsValidToSend(long long logstoreKey) {
     // therefore, we assume true here. This could be a potential problem if network is not available for profile info.
     // However, since go profile pipeline will be stopped only during process exit, it should be fine.
     if (logstoreKey == -1) {
-        return true;
+        return 0;
     }
     return SenderQueueManager::GetInstance()->IsValidToPush(logstoreKey) ? 0 : -1;
 }
