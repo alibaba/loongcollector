@@ -16,8 +16,6 @@
 
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 
-#include <xxhash/xxhash.h>
-
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -102,15 +100,20 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
             if (mScrapeSchedulerMap.find(k) == mScrapeSchedulerMap.end()) {
                 mScrapeSchedulerMap[k] = v;
                 if (mTimer) {
+                    auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
+                    auto tmpRandSleepMilliSec = GetRandSleepMilliSec(
+                        v->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, tmpCurrentMilliSeconds);
+
                     // zero-cost upgrade
                     if (mUnRegisterMs > 0
-                        && (GetCurrentTimeInMilliSeconds() + v->GetRandSleep()
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
                                 - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
                             > mUnRegisterMs)
-                        && (GetCurrentTimeInMilliSeconds() + v->GetRandSleep()
+                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
                                 - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
                             < mUnRegisterMs)) {
                         // scrape once just now
+                        LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
                         v->ScrapeOnce(std::chrono::steady_clock::now());
                     }
                     v->ScheduleNext();
@@ -212,9 +215,10 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
             = std::make_shared<ScrapeScheduler>(mScrapeConfigPtr, host, port, resultLabel, mQueueKey, mInputIndex);
 
         scrapeScheduler->SetTimer(mTimer);
-        auto firstExecTime
-            = std::chrono::steady_clock::now() + std::chrono::milliseconds(scrapeScheduler->GetRandSleep());
 
+        auto randSleepMilliSec = GetRandSleepMilliSec(
+            scrapeScheduler->GetId(), prometheus::RefeshIntervalSeconds, GetCurrentTimeInMilliSeconds());
+        auto firstExecTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
         scrapeScheduler->SetFirstExecTime(firstExecTime);
 
         scrapeSchedulerMap[scrapeScheduler->GetId()] = scrapeScheduler;
@@ -258,6 +262,18 @@ void TargetSubscriberScheduler::Cancel() {
         mValidState = false;
     }
     CancelAllScrapeScheduler();
+}
+
+void TargetSubscriberScheduler::SubscribeOnce(std::chrono::steady_clock::time_point execTime) {
+    auto future = std::make_shared<PromFuture>();
+    future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampNanoSec) {
+        this->OnSubscription(response, timestampNanoSec);
+    });
+    mFuture = future;
+    auto event = BuildSubscriberTimerEvent(execTime);
+    if (mTimer) {
+        mTimer->PushEvent(std::move(event));
+    }
 }
 
 std::unique_ptr<TimerEvent>

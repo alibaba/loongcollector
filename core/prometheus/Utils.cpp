@@ -1,5 +1,7 @@
 #include "prometheus/Utils.h"
 
+#include <xxhash/xxhash.h>
+
 #include <iomanip>
 
 #include "common/StringTools.h"
@@ -66,5 +68,24 @@ void SplitStringView(const std::string& s, char delimiter, std::vector<StringVie
     }
 }
 
+uint64_t GetRandSleepMilliSec(const std::string& key, uint64_t intervalSeconds, uint64_t currentMilliSeconds) {
+    // Pre-compute the inverse of the maximum value of uint64_t
+    static constexpr double sInverseMaxUint64 = 1.0 / static_cast<double>(std::numeric_limits<uint64_t>::max());
 
+    uint64_t h = XXH64(key.c_str(), key.length(), 0);
+
+    // Normalize the hash to the range [0, 1]
+    double normalizedH = static_cast<double>(h) * sInverseMaxUint64;
+
+    // Scale the normalized hash to milliseconds
+    auto randSleep = static_cast<uint64_t>(std::ceil(intervalSeconds * 1000.0 * normalizedH));
+
+    // calculate sleep window start offset, apply random sleep
+    uint64_t sleepOffset = currentMilliSeconds % (intervalSeconds * 1000ULL);
+    if (randSleep < sleepOffset) {
+        randSleep += intervalSeconds * 1000ULL;
+    }
+    randSleep -= sleepOffset;
+    return randSleep;
+}
 } // namespace logtail

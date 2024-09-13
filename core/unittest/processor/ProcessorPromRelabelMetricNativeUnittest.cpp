@@ -46,6 +46,7 @@ void ProcessorPromRelabelMetricNativeUnittest::TestInit() {
     string errorMsg;
     configStr = R"JSON(
         {
+            "job_name": "test_job",
             "metric_relabel_configs": [
                 {
                     "action": "keep",
@@ -85,6 +86,7 @@ void ProcessorPromRelabelMetricNativeUnittest::TestProcess() {
     string errorMsg;
     configStr = configStr + R"(
         {
+            "job_name": "test_job",
             "metric_relabel_configs": [
                 {
                     "action": "drop",

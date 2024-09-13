@@ -44,7 +44,6 @@ bool ProcessorPromRelabelMetricNative::Init(const Json::Value& config) {
                 return false;
             }
         }
-        return true;
     }
 
 

@@ -45,10 +45,8 @@ public:
     void TestProcess();
     void TestSplitByLines();
     void TestReceiveMessage();
-    void TestGetRandSleep();
 
     void TestScheduler();
-
 
 protected:
     void SetUp() override {
@@ -164,17 +162,6 @@ void ScrapeSchedulerUnittest::TestReceiveMessage() {
     APSARA_TEST_EQUAL(false, event->IsCancelled());
 }
 
-void ScrapeSchedulerUnittest::TestGetRandSleep() {
-    Labels labels;
-    labels.Push({prometheus::ADDRESS_LABEL_NAME, "localhost:8080"});
-    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
-
-    Labels labels2;
-    labels2.Push({prometheus::ADDRESS_LABEL_NAME, "localhost:9090"});
-    ScrapeScheduler event2(mScrapeConfig, "localhost", 9090, labels, 0, 0);
-    APSARA_TEST_NOT_EQUAL(event.GetRandSleep(), event2.GetRandSleep());
-}
-
 void ScrapeSchedulerUnittest::TestScheduler() {
     Labels labels;
     labels.Push({prometheus::ADDRESS_LABEL_NAME, "localhost:8080"});
@@ -194,7 +181,6 @@ void ScrapeSchedulerUnittest::TestScheduler() {
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestInitscrapeScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestSplitByLines)
-UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestGetRandSleep)
 
 } // namespace logtail
 

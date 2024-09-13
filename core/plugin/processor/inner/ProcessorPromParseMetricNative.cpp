@@ -20,10 +20,6 @@ bool ProcessorPromParseMetricNative::Init(const Json::Value&) {
 }
 
 void ProcessorPromParseMetricNative::Process(PipelineEventGroup& eGroup) {
-    if (eGroup.GetEvents().empty()) {
-        return;
-    }
-
     EventsContainer& events = eGroup.MutableEvents();
     EventsContainer newEvents;
 
