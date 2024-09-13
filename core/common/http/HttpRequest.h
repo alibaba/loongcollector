@@ -89,4 +89,5 @@ struct AsynHttpRequest : public HttpRequest {
     virtual void OnSendDone(const HttpResponse& response) = 0;
 };
 
+
 } // namespace logtail

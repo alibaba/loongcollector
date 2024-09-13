@@ -21,7 +21,9 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <memory>
 
+#include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 
 namespace logtail {
@@ -39,5 +41,7 @@ CURL* CreateCurlHandler(const std::string& method,
                         uint32_t timeout,
                         bool replaceHostWithIp = true,
                         const std::string& intf = "");
+
+bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& response);
 
 } // namespace logtail

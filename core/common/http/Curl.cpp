@@ -14,7 +14,14 @@
 
 #include "common/http/Curl.h"
 
+#include <cstdint>
+#include <map>
+#include <string>
+
 #include "common/DNSCache.h"
+#include "app_config/AppConfig.h"
+#include "logger/Logger.h"
+#include "common/http/HttpResponse.h"
 
 using namespace std;
 
@@ -128,4 +135,44 @@ CURL* CreateCurlHandler(const std::string& method,
 
     return curl;
 }
+
+bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+    curl_slist* headers = NULL;
+    CURL* curl = CreateCurlHandler(request->mMethod,
+                                request->mHTTPSFlag,
+                                request->mHost,
+                                request->mPort,
+                                request->mUrl,
+                                request->mQueryString,
+                                request->mHeader,
+                                request->mBody,
+                                response,
+                                headers,
+                                request->mTimeout,
+                                AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
+                                AppConfig::GetInstance()->GetBindInterface());
+    if (curl == NULL) {
+        LOG_ERROR(sLogger, ("failed to init curl handler", "failed to init curl client")("request address", request.get()));
+        return false;
+    }
+    bool success = false;
+    while (request->mTryCnt <= request->mMaxTryCnt) {
+        CURLcode res = curl_easy_perform(curl);
+        if (res == CURLE_OK) {
+            long http_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            response.mStatusCode = (int32_t)http_code;
+            success = true;
+            break;
+        } else {
+            LOG_WARNING(sLogger,("failed to send request", "retry immediately")("retryCnt", request->mTryCnt++)("errMsg", curl_easy_strerror(res))("request address", request.get()));
+        }
+    } 
+    if (headers != NULL) {
+        curl_slist_free_all(headers);
+    }
+    curl_easy_cleanup(curl);
+    return success;
+}
+
 } // namespace logtail
