@@ -18,12 +18,31 @@ using namespace std;
 
 namespace logtail {
 
+BoundedProcessQueue::BoundedProcessQueue(
+    size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const PipelineContext& ctx)
+    : QueueInterface(key, cap, ctx),
+      BoundedQueueInterface(key, cap, low, high, ctx),
+      ProcessQueueInterface(key, cap, priority, ctx) {
+    if (ctx.IsExactlyOnceEnabled()) {
+        mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_FLAG, "true"}});
+    }
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
+}
+
 bool BoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     if (!IsValidToPush()) {
         return false;
     }
+    item->mEnqueTime = chrono::system_clock::now();
+    auto size = item->mEventGroup.DataSize();
     mQueue.push(std::move(item));
     ChangeStateIfNeededAfterPush();
+
+    mInItemsCnt->Add(1);
+    mInItemDataSizeBytes->Add(size);
+    mQueueSize->Set(Size());
+    mQueueDataSizeByte->Add(size);
+    mValidToPushFlag->Set(IsValidToPush());
     return true;
 }
 
@@ -36,10 +55,17 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     if (ChangeStateIfNeededAfterPop()) {
         GiveFeedback();
     }
+
+    mOutItemsCnt->Add(1);
+    mTotalDelayMs->Add(
+        chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - item->mEnqueTime).count());
+    mQueueSize->Set(Size());
+    mQueueDataSizeByte->Sub(item->mEventGroup.DataSize());
+    mValidToPushFlag->Set(IsValidToPush());
     return true;
 }
 
-void BoundedProcessQueue::SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks) {
+void BoundedProcessQueue::SetUpStreamFeedbacks(vector<FeedbackInterface*>&& feedbacks) {
     mUpStreamFeedbacks.clear();
     for (auto& item : feedbacks) {
         if (item == nullptr) {

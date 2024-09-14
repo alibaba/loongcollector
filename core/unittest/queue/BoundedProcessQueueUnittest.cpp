@@ -29,15 +29,16 @@ class BoundedProcessQueueUnittest : public testing::Test {
 public:
     void TestPush();
     void TestPop();
+    void TestMetric();
 
 protected:
-    static void SetUpTestCase() { sEventGroup.reset(new PipelineEventGroup(make_shared<SourceBuffer>())); }
+    static void SetUpTestCase() { sCtx.SetConfigName("test_config"); }
 
     void SetUp() override {
-        mQueue.reset(new BoundedProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, "test_config"));
+        mQueue.reset(new BoundedProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, sCtx));
 
-        mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0));
-        mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0));
+        mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
+        mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
         mQueue->SetDownStreamQueues(vector<BoundedSenderQueueInterface*>{mSenderQueue1.get(), mSenderQueue2.get()});
 
         mFeedback1.reset(new FeedbackInterfaceMock);
@@ -46,13 +47,16 @@ protected:
     }
 
 private:
-    static unique_ptr<PipelineEventGroup> sEventGroup;
+    static PipelineContext sCtx;
     static const QueueKey sKey = 0;
     static const size_t sCap = 6;
     static const size_t sLowWatermark = 2;
     static const size_t sHighWatermark = 4;
 
-    unique_ptr<ProcessQueueItem> GenerateItem() { return make_unique<ProcessQueueItem>(std::move(*sEventGroup), 0); }
+    unique_ptr<ProcessQueueItem> GenerateItem() {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        return make_unique<ProcessQueueItem>(std::move(g), 0);
+    }
 
     unique_ptr<BoundedProcessQueue> mQueue;
     unique_ptr<FeedbackInterface> mFeedback1;
@@ -61,7 +65,7 @@ private:
     unique_ptr<BoundedSenderQueueInterface> mSenderQueue2;
 };
 
-unique_ptr<PipelineEventGroup> BoundedProcessQueueUnittest::sEventGroup;
+PipelineContext BoundedProcessQueueUnittest::sCtx;
 
 void BoundedProcessQueueUnittest::TestPush() {
     // push first
@@ -110,8 +114,35 @@ void BoundedProcessQueueUnittest::TestPop() {
     APSARA_TEST_TRUE(static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->HasFeedback(sKey));
 }
 
+void BoundedProcessQueueUnittest::TestMetric() {
+    APSARA_TEST_EQUAL(4U, mQueue->mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_PROJECT, ""));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_CONFIG_NAME, "test_config"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, "process_queue"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_QUEUE_TYPE, "bounded"));
+
+    auto item = GenerateItem();
+    auto e = item->mEventGroup.AddLogEvent();
+    e->SetContent(string("key"), string("value"));
+    auto dataSize = item->mEventGroup.DataSize();
+    mQueue->Push(std::move(item));
+
+    APSARA_TEST_EQUAL(1U, mQueue->mInItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(dataSize, mQueue->mInItemDataSizeBytes->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(dataSize, mQueue->mQueueDataSizeByte->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
+
+    mQueue->Pop(item);
+    APSARA_TEST_EQUAL(1U, mQueue->mOutItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mQueueDataSizeByte->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
+}
+
 UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPush)
 UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPop)
+UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestMetric)
 
 } // namespace logtail
 

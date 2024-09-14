@@ -52,8 +52,8 @@ public:
 
     void Feedback(QueueKey key) override { Trigger(); }
 
-    bool CreateOrUpdateBoundedQueue(QueueKey key, uint32_t priority);
-    bool CreateOrUpdateCircularQueue(QueueKey key, uint32_t priority, size_t capacity);
+    bool CreateOrUpdateBoundedQueue(QueueKey key, uint32_t priority, const PipelineContext& ctx);
+    bool CreateOrUpdateCircularQueue(QueueKey key, uint32_t priority, size_t capacity, const PipelineContext& ctx);
     bool DeleteQueue(QueueKey key);
     bool IsValidToPush(QueueKey key) const;
     // 0: success, 1: queue is full, 2: queue not found
@@ -76,8 +76,8 @@ private:
     ProcessQueueManager();
     ~ProcessQueueManager() = default;
 
-    void CreateBoundedQueue(QueueKey key, uint32_t priority);
-    void CreateCircularQueue(QueueKey key, uint32_t priority, size_t capacity);
+    void CreateBoundedQueue(QueueKey key, uint32_t priority, const PipelineContext& ctx);
+    void CreateCircularQueue(QueueKey key, uint32_t priority, size_t capacity, const PipelineContext& ctx);
     void AdjustQueuePriority(const ProcessQueueIterator& iter, uint32_t priority);
     void DeleteQueueEntity(const ProcessQueueIterator& iter);
     void ResetCurrentQueueIndex();

@@ -29,9 +29,7 @@ namespace logtail {
 class CircularProcessQueue : virtual public QueueInterface<std::unique_ptr<ProcessQueueItem>>,
                              public ProcessQueueInterface {
 public:
-    CircularProcessQueue(size_t cap, int64_t key, uint32_t priority, const std::string& config)
-        : QueueInterface<std::unique_ptr<ProcessQueueItem>>(key, cap),
-          ProcessQueueInterface(key, cap, priority, config) {}
+    CircularProcessQueue(size_t cap, int64_t key, uint32_t priority, const PipelineContext& ctx);
 
     bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
     bool Pop(std::unique_ptr<ProcessQueueItem>& item) override;
@@ -43,6 +41,8 @@ private:
 
     std::deque<std::unique_ptr<ProcessQueueItem>> mQueue;
     size_t mEventCnt = 0;
+
+    CounterPtr mDroppedEventsCnt;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class CircularProcessQueueUnittest;

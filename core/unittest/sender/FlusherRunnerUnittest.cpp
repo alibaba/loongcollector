@@ -33,6 +33,9 @@ void FlusherRunnerUnittest::TestDispatch() {
         // http
         auto flusher = make_unique<FlusherHttpMock>();
         Json::Value tmp;
+        PipelineContext ctx;
+        flusher->SetContext(ctx);
+        flusher->SetMetricsRecordRef("name", "pluginId", "nodeId", "childNodeId");
         flusher->Init(Json::Value(), tmp);
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());
@@ -49,6 +52,9 @@ void FlusherRunnerUnittest::TestDispatch() {
         // unknown
         auto flusher = make_unique<FlusherMock>();
         Json::Value tmp;
+        PipelineContext ctx;
+        flusher->SetContext(ctx);
+        flusher->SetMetricsRecordRef("name", "pluginId", "nodeId", "childNodeId");
         flusher->Init(Json::Value(), tmp);
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());

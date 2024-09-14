@@ -20,6 +20,11 @@ using namespace std;
 
 namespace logtail {
 
+ProcessQueueInterface::ProcessQueueInterface(int64_t key, size_t cap, uint32_t priority, const PipelineContext& ctx)
+    : QueueInterface(key, cap, ctx), mPriority(priority), mConfigName(ctx.GetConfigName()) {
+    mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_COMPONENT_NAME, "process_queue"}});
+}
+
 void ProcessQueueInterface::SetDownStreamQueues(vector<BoundedSenderQueueInterface*>&& ques) {
     mDownStreamQueues.clear();
     for (auto& item : ques) {

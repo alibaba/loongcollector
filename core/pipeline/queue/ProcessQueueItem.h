@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "models/PipelineEventGroup.h"
@@ -28,6 +29,7 @@ struct ProcessQueueItem {
     PipelineEventGroup mEventGroup;
     std::shared_ptr<Pipeline> mPipeline; // not null only during pipeline update
     size_t mInputIndex = 0; // index of the input in the pipeline
+    std::chrono::system_clock::time_point mEnqueTime;
 
     ProcessQueueItem(PipelineEventGroup&& group, size_t index) : mEventGroup(std::move(group)), mInputIndex(index) {}
 };

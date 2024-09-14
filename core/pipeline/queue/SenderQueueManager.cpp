@@ -29,13 +29,20 @@ SenderQueueManager::SenderQueueManager() : mQueueParam(INT32_FLAG(sender_queue_c
 }
 
 bool SenderQueueManager::CreateQueue(QueueKey key,
+                                     const string& flusherId,
+                                     const PipelineContext& ctx,
                                      vector<shared_ptr<ConcurrencyLimiter>>&& concurrencyLimiters,
                                      uint32_t maxRate) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter == mQueues.end()) {
-        mQueues.try_emplace(
-            key, mQueueParam.GetCapacity(), mQueueParam.GetLowWatermark(), mQueueParam.GetHighWatermark(), key);
+        mQueues.try_emplace(key,
+                            mQueueParam.GetCapacity(),
+                            mQueueParam.GetLowWatermark(),
+                            mQueueParam.GetHighWatermark(),
+                            key,
+                            flusherId,
+                            ctx);
         iter = mQueues.find(key);
     }
     iter->second.SetConcurrencyLimiters(std::move(concurrencyLimiters));

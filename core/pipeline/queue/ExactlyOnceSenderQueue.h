@@ -30,13 +30,7 @@ namespace logtail {
 // not thread-safe, should be protected explicitly by queue manager
 class ExactlyOnceSenderQueue : public BoundedSenderQueueInterface {
 public:
-    // mFlusher will be set on first push
-    ExactlyOnceSenderQueue(const std::vector<RangeCheckpointPtr>& checkpoints, QueueKey key)
-        : QueueInterface(key, checkpoints.size()),
-          BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key),
-          mRangeCheckpoints(checkpoints) {
-        mQueue.resize(checkpoints.size());
-    }
+    ExactlyOnceSenderQueue(const std::vector<RangeCheckpointPtr>& checkpoints, QueueKey key, const PipelineContext& ctx);
 
     bool Push(std::unique_ptr<SenderQueueItem>&& item) override;
     bool Remove(SenderQueueItem* item) override;

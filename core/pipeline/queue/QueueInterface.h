@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include "monitor/LogtailMetric.h"
+#include "monitor/MetricConstants.h"
+#include "pipeline/PipelineContext.h"
 #include "pipeline/queue/QueueKey.h"
 
 namespace logtail {
@@ -23,7 +26,20 @@ namespace logtail {
 template <typename T>
 class QueueInterface {
 public:
-    QueueInterface(QueueKey key, size_t cap) : mKey(key), mCapacity(cap) {}
+    QueueInterface(QueueKey key, size_t cap, const PipelineContext& ctx) : mKey(key), mCapacity(cap) {
+        WriteMetrics::GetInstance()->CreateMetricsRecordRef(mMetricsRecordRef,
+                                                            {
+                                                                {METRIC_LABEL_PROJECT, ctx.GetProjectName()},
+                                                                {METRIC_LABEL_CONFIG_NAME, ctx.GetConfigName()},
+                                                            });
+
+        mInItemsCnt = mMetricsRecordRef.CreateCounter("in_items_cnt");
+        mInItemDataSizeBytes = mMetricsRecordRef.CreateCounter("in_item_data_size_bytes");
+        mOutItemsCnt = mMetricsRecordRef.CreateCounter("out_items_cnt");
+        mTotalDelayMs = mMetricsRecordRef.CreateCounter("total_delay_ms");
+        mQueueSize = mMetricsRecordRef.CreateIntGauge("queue_size");
+        mQueueDataSizeByte = mMetricsRecordRef.CreateIntGauge("queue_data_size_bytes");
+    }
     virtual ~QueueInterface() = default;
 
     QueueInterface(const QueueInterface& que) = delete;
@@ -41,6 +57,14 @@ public:
 protected:
     const QueueKey mKey;
     size_t mCapacity = 0;
+
+    mutable MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mInItemsCnt;
+    CounterPtr mInItemDataSizeBytes;
+    CounterPtr mOutItemsCnt;
+    CounterPtr mTotalDelayMs;
+    IntGaugePtr mQueueSize;
+    IntGaugePtr mQueueDataSizeByte;
 
 private:
     virtual size_t Size() const = 0;

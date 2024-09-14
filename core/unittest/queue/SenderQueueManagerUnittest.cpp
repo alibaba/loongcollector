@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/flusher/sls/FlusherSLS.h"
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/QueueParam.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(sender_queue_gc_threshold_sec);
@@ -72,6 +72,8 @@ private:
     static SenderQueueManager* sManager;
     static shared_ptr<ConcurrencyLimiter> sConcurrencyLimiter;
     static vector<RangeCheckpointPtr> sCheckpoints;
+    static PipelineContext sCtx;
+    static string sFlusherId;
 
     unique_ptr<SenderQueueItem> GenerateItem(bool isSLS = false);
 
@@ -83,13 +85,15 @@ const size_t SenderQueueManagerUnittest::sDataSize;
 SenderQueueManager* SenderQueueManagerUnittest::sManager;
 shared_ptr<ConcurrencyLimiter> SenderQueueManagerUnittest::sConcurrencyLimiter;
 vector<RangeCheckpointPtr> SenderQueueManagerUnittest::sCheckpoints;
+PipelineContext SenderQueueManagerUnittest::sCtx;
+string SenderQueueManagerUnittest::sFlusherId;
 
 void SenderQueueManagerUnittest::TestCreateQueue() {
     {
         // new queue
         uint32_t maxRate = 100U;
-        APSARA_TEST_TRUE(
-            sManager->CreateQueue(0, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, maxRate));
+        APSARA_TEST_TRUE(sManager->CreateQueue(
+            0, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, maxRate));
         APSARA_TEST_EQUAL(1U, sManager->mQueues.size());
         auto& queue = sManager->mQueues.at(0);
         APSARA_TEST_EQUAL(sManager->mQueueParam.GetCapacity(), queue.mCapacity);
@@ -104,7 +108,8 @@ void SenderQueueManagerUnittest::TestCreateQueue() {
         // resued queue
         shared_ptr<ConcurrencyLimiter> newLimiter = make_shared<ConcurrencyLimiter>();
         uint32_t maxRate = 10U;
-        APSARA_TEST_TRUE(sManager->CreateQueue(0, vector<shared_ptr<ConcurrencyLimiter>>{newLimiter}, maxRate));
+        APSARA_TEST_TRUE(
+            sManager->CreateQueue(0, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{newLimiter}, maxRate));
         APSARA_TEST_EQUAL(1U, sManager->mQueues.size());
         auto& queue = sManager->mQueues.at(0);
         APSARA_TEST_EQUAL(1U, queue.mConcurrencyLimiters.size());
@@ -122,8 +127,10 @@ void SenderQueueManagerUnittest::TestDeleteQueue() {
 
     QueueKey key1 = QueueKeyManager::GetInstance()->GetKey("name_1");
     QueueKey key2 = QueueKeyManager::GetInstance()->GetKey("name_2");
-    sManager->CreateQueue(key1, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
-    sManager->CreateQueue(key2, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
+    sManager->CreateQueue(
+        key1, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
+    sManager->CreateQueue(
+        key2, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
     sManager->PushQueue(key2, GenerateItem());
 
     // queue exists and not marked deleted
@@ -150,13 +157,13 @@ void SenderQueueManagerUnittest::TestGetQueue() {
     APSARA_TEST_EQUAL(nullptr, sManager->GetQueue(0));
 
     // queue existed
-    sManager->CreateQueue(0, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
+    sManager->CreateQueue(0, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
     APSARA_TEST_NOT_EQUAL(nullptr, sManager->GetQueue(0));
 }
 
 void SenderQueueManagerUnittest::TestPushQueue() {
-    sManager->CreateQueue(0, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
-    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, "test_config", sCheckpoints);
+    sManager->CreateQueue(0, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
+    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, sCtx, sCheckpoints);
 
     // queue belongs to normal queue
     APSARA_TEST_TRUE(sManager->IsValidToPush(0));
@@ -178,7 +185,11 @@ void SenderQueueManagerUnittest::TestPushQueue() {
 void SenderQueueManagerUnittest::TestGetAllAvailableItems() {
     // prepare nomal queue
     sManager->CreateQueue(
-        0, vector<shared_ptr<ConcurrencyLimiter>>{FlusherSLS::GetRegionConcurrencyLimiter(mFlusher.mRegion)}, sMaxRate);
+        0,
+        sFlusherId,
+        sCtx,
+        vector<shared_ptr<ConcurrencyLimiter>>{FlusherSLS::GetRegionConcurrencyLimiter(mFlusher.mRegion)},
+        sMaxRate);
     for (size_t i = 0; i <= sManager->mQueueParam.GetCapacity(); ++i) {
         sManager->PushQueue(0, GenerateItem());
     }
@@ -192,7 +203,7 @@ void SenderQueueManagerUnittest::TestGetAllAvailableItems() {
         cpt->data.set_sequence_id(0);
         checkpoints.emplace_back(cpt);
     }
-    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, "test_config", checkpoints);
+    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, sCtx, checkpoints);
     for (size_t i = 0; i <= 2; ++i) {
         ExactlyOnceQueueManager::GetInstance()->PushSenderQueue(1, GenerateItem(true));
     }
@@ -218,8 +229,8 @@ void SenderQueueManagerUnittest::TestGetAllAvailableItems() {
 }
 
 void SenderQueueManagerUnittest::TestRemoveItem() {
-    sManager->CreateQueue(0, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
-    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, "test_config", sCheckpoints);
+    sManager->CreateQueue(0, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
+    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, sCtx, sCheckpoints);
     {
         // normal queue
         auto item = GenerateItem();
@@ -245,10 +256,10 @@ void SenderQueueManagerUnittest::TestRemoveItem() {
 }
 
 void SenderQueueManagerUnittest::TestIsAllQueueEmpty() {
-    sManager->CreateQueue(0, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
-    sManager->CreateQueue(1, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
-    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(2, 0, "test_config_1", sCheckpoints);
-    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(3, 2, "test_config_2", sCheckpoints);
+    sManager->CreateQueue(0, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
+    sManager->CreateQueue(1, sFlusherId, sCtx, vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter}, sMaxRate);
+    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(2, 0, sCtx, sCheckpoints);
+    ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(3, 2, sCtx, sCheckpoints);
     APSARA_TEST_TRUE(sManager->IsAllQueueEmpty());
     {
         // non-empty normal queue

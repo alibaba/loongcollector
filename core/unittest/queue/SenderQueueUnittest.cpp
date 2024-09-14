@@ -25,12 +25,16 @@ public:
     void TestPush();
     void TestRemove();
     void TestGetAllAvailableItems();
+    void TestMetric();
 
 protected:
-    static void SetUpTestCase() { sConcurrencyLimiter = make_shared<ConcurrencyLimiter>(); }
+    static void SetUpTestCase() {
+        sConcurrencyLimiter = make_shared<ConcurrencyLimiter>();
+        sCtx.SetConfigName("test_config");
+    }
 
     void SetUp() override {
-        mQueue.reset(new SenderQueue(sCap, sLowWatermark, sHighWatermark, sKey));
+        mQueue.reset(new SenderQueue(sCap, sLowWatermark, sHighWatermark, sKey, sFlusherId, sCtx));
         mQueue->SetConcurrencyLimiters(vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter});
         mQueue->mRateLimiter = RateLimiter(100);
         mQueue->SetFeedback(&sFeedback);
@@ -42,7 +46,9 @@ protected:
     }
 
 private:
+    static PipelineContext sCtx;
     static const QueueKey sKey = 0;
+    static const string sFlusherId;
     static const size_t sCap = 2;
     static const size_t sLowWatermark = 1;
     static const size_t sHighWatermark = 2;
@@ -57,7 +63,9 @@ private:
     unique_ptr<SenderQueue> mQueue;
 };
 
+PipelineContext SenderQueueUnittest::sCtx;
 const QueueKey SenderQueueUnittest::sKey;
+const string SenderQueueUnittest::sFlusherId = "1";
 const size_t SenderQueueUnittest::sDataSize;
 shared_ptr<ConcurrencyLimiter> SenderQueueUnittest::sConcurrencyLimiter;
 FeedbackInterfaceMock SenderQueueUnittest::sFeedback;
@@ -162,6 +170,54 @@ void SenderQueueUnittest::TestGetAllAvailableItems() {
     }
 }
 
+void SenderQueueUnittest::TestMetric() {
+    APSARA_TEST_EQUAL(5U, mQueue->mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_PROJECT, ""));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_CONFIG_NAME, "test_config"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, "sender_queue"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_QUEUE_TYPE, "bounded"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_FLUSHER_NODE_ID, sFlusherId));
+
+    auto item1 = GenerateItem();
+    auto dataSize = item1->mData.size();
+    auto ptr1 = item1.get();
+    mQueue->Push(std::move(item1));
+
+    APSARA_TEST_EQUAL(1U, mQueue->mInItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(dataSize, mQueue->mInItemDataSizeBytes->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(dataSize, mQueue->mQueueDataSizeByte->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
+
+    auto item2 = GenerateItem();
+    auto ptr2 = item2.get();
+    mQueue->Push(std::move(item2));
+
+    mQueue->Push(GenerateItem());
+
+    APSARA_TEST_EQUAL(3U, mQueue->mInItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(dataSize * 3, mQueue->mInItemDataSizeBytes->GetValue());
+    APSARA_TEST_EQUAL(2U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(dataSize * 2, mQueue->mQueueDataSizeByte->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mValidToPushFlag->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mExtraBufferSize->GetValue());
+    APSARA_TEST_EQUAL(dataSize, mQueue->mExtraBufferDataSizeBytes->GetValue());
+
+    mQueue->Remove(ptr1);
+    APSARA_TEST_EQUAL(1U, mQueue->mOutItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(2U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(dataSize * 2, mQueue->mQueueDataSizeByte->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mValidToPushFlag->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mExtraBufferSize->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mExtraBufferDataSizeBytes->GetValue());
+
+    mQueue->Remove(ptr2);
+    APSARA_TEST_EQUAL(2U, mQueue->mOutItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(dataSize, mQueue->mQueueDataSizeByte->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
+}
+
 unique_ptr<SenderQueueItem> SenderQueueUnittest::GenerateItem() {
     return make_unique<SenderQueueItem>("content", sDataSize, nullptr, sKey);
 }
@@ -169,6 +225,7 @@ unique_ptr<SenderQueueItem> SenderQueueUnittest::GenerateItem() {
 UNIT_TEST_CASE(SenderQueueUnittest, TestPush)
 UNIT_TEST_CASE(SenderQueueUnittest, TestRemove)
 UNIT_TEST_CASE(SenderQueueUnittest, TestGetAllAvailableItems)
+UNIT_TEST_CASE(SenderQueueUnittest, TestMetric)
 
 } // namespace logtail
 

@@ -445,7 +445,7 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
     mEOOption->fbKey = QueueKeyManager::GetInstance()->GetKey(GetProject() + "-" + mEOOption->primaryCheckpointKey
                                                               + mEOOption->rangeCheckpointPtrs[0]->data.hash_key());
     ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(
-        mEOOption->fbKey, ProcessQueueManager::sMaxPriority, mConfigName, mEOOption->rangeCheckpointPtrs);
+        mEOOption->fbKey, ProcessQueueManager::sMaxPriority, *mReaderConfig.second, mEOOption->rangeCheckpointPtrs);
     for (auto& cpt : mEOOption->rangeCheckpointPtrs) {
         cpt->fbKey = mEOOption->fbKey;
     }

@@ -16,8 +16,8 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
-#include <ctime>
 #include <memory>
 #include <string>
 
@@ -41,7 +41,7 @@ struct SenderQueueItem {
     QueueKey mQueueKey;
 
     SendingStatus mStatus = SendingStatus::IDLE;
-    time_t mEnqueTime = 0;
+    std::chrono::system_clock::time_point mEnqueTime;
     time_t mLastSendTime = 0;
     uint32_t mTryCnt = 1;
 

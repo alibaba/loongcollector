@@ -22,11 +22,11 @@
 #include <vector>
 
 #include "common/FeedbackInterface.h"
+#include "pipeline/limiter/ConcurrencyLimiter.h"
+#include "pipeline/limiter/RateLimiter.h"
 #include "pipeline/queue/BoundedQueueInterface.h"
 #include "pipeline/queue/QueueKey.h"
 #include "pipeline/queue/SenderQueueItem.h"
-#include "pipeline/limiter/ConcurrencyLimiter.h"
-#include "pipeline/limiter/RateLimiter.h"
 
 namespace logtail {
 
@@ -37,8 +37,8 @@ class BoundedSenderQueueInterface : public BoundedQueueInterface<std::unique_ptr
 public:
     static void SetFeedback(FeedbackInterface* feedback);
 
-    BoundedSenderQueueInterface(size_t cap, size_t low, size_t high, QueueKey key)
-        : QueueInterface(key, cap), BoundedQueueInterface<std::unique_ptr<SenderQueueItem>>(key, cap, low, high) {}
+    BoundedSenderQueueInterface(
+        size_t cap, size_t low, size_t high, QueueKey key, const std::string& flusherId, const PipelineContext& ctx);
 
     bool Pop(std::unique_ptr<SenderQueueItem>& item) override { return false; }
 
@@ -63,6 +63,9 @@ protected:
     std::vector<std::shared_ptr<ConcurrencyLimiter>> mConcurrencyLimiters;
 
     std::queue<std::unique_ptr<SenderQueueItem>> mExtraBuffer;
+
+    IntGaugePtr mExtraBufferSize;
+    IntGaugePtr mExtraBufferDataSizeBytes;
 };
 
 } // namespace logtail

@@ -19,17 +19,17 @@
 #include <cstdint>
 #include <utility>
 
-#include "pipeline/batch/TimeoutFlushManager.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
-#include "plugin/flusher/sls/FlusherSLS.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "plugin/input/InputFeedbackInterfaceRegistry.h"
+#include "pipeline/batch/TimeoutFlushManager.h"
 #include "pipeline/plugin/PluginRegistry.h"
-#include "plugin/processor/ProcessorParseApsaraNative.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SenderQueueManager.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/input/InputFeedbackInterfaceRegistry.h"
+#include "plugin/processor/ProcessorParseApsaraNative.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
 
@@ -288,10 +288,11 @@ bool Pipeline::Init(PipelineConfig&& config) {
             ? ProcessQueueManager::sMaxPriority
             : mContext.GetGlobalConfig().mProcessPriority - 1;
         if (isInputSupportAck) {
-            ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(mContext.GetProcessQueueKey(), priority);
+            ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(
+                mContext.GetProcessQueueKey(), priority, mContext);
         } else {
             ProcessQueueManager::GetInstance()->CreateOrUpdateCircularQueue(
-                mContext.GetProcessQueueKey(), priority, 1024);
+                mContext.GetProcessQueueKey(), priority, 1024, mContext);
         }
 
 

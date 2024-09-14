@@ -15,12 +15,15 @@
  */
 
 #pragma once
+
 #include <atomic>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
-#include "common/Lock.h"
 #include "protobuf/sls/sls_logs.pb.h"
-
 
 namespace logtail {
 
@@ -45,20 +48,32 @@ public:
 
 template <typename T>
 class Gauge {
-private:
-    std::string mName;
-    std::atomic<T> mVal;
-
 public:
     Gauge(const std::string& name, T val = 0) : mName(name), mVal(val) {}
+    ~Gauge() = default;
+
     T GetValue() const { return mVal.load(); }
     const std::string& GetName() const { return mName; }
     void Set(T val) { mVal.store(val); }
     Gauge* Collect() { return new Gauge<T>(mName, mVal.load()); }
+
+protected:
+    std::string mName;
+    std::atomic<T> mVal;
+};
+
+class IntGauge : public Gauge<uint64_t> {
+public:
+    IntGauge(const std::string& name, uint64_t val = 0) : Gauge<uint64_t>(name, val) {}
+    ~IntGauge() = default;
+
+    IntGauge* Collect() { return new IntGauge(mName, mVal.load()); }
+    void Add(uint64_t val) { mVal.fetch_add(val); }
+    void Sub(uint64_t val) { mVal.fetch_sub(val); }
 };
 
 using CounterPtr = std::shared_ptr<Counter>;
-using IntGaugePtr = std::shared_ptr<Gauge<uint64_t>>;
+using IntGaugePtr = std::shared_ptr<IntGauge>;
 using DoubleGaugePtr = std::shared_ptr<Gauge<double>>;
 
 using MetricLabels = std::vector<std::pair<std::string, std::string>>;

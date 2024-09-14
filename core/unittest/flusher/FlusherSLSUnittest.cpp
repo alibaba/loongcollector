@@ -581,7 +581,7 @@ void FlusherSLSUnittest::TestSend() {
         }
         QueueKey eooKey = QueueKeyManager::GetInstance()->GetKey("eoo");
         ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(
-            eooKey, ProcessQueueManager::sMaxPriority, flusher.GetContext().GetConfigName(), checkpoints);
+            eooKey, ProcessQueueManager::sMaxPriority, flusher.GetContext(), checkpoints);
 
         {
             // replayed group

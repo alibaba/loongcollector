@@ -41,7 +41,7 @@ protected:
     }
 
     void SetUp() override {
-        mQueue.reset(new ExactlyOnceSenderQueue(sCheckpoints, sKey));
+        mQueue.reset(new ExactlyOnceSenderQueue(sCheckpoints, sKey, sCtx));
         mQueue->SetFeedback(&sFeedback);
         mFlusher.mMaxSendRate = 100;
         mFlusher.mRegion = "region";
@@ -51,6 +51,7 @@ protected:
     void TearDown() override { sFeedback.Clear(); }
 
 private:
+    static PipelineContext sCtx;
     static const QueueKey sKey = 0;
     static const size_t sDataSize = 10;
 
@@ -64,6 +65,7 @@ private:
     unique_ptr<ExactlyOnceSenderQueue> mQueue;
 };
 
+PipelineContext ExactlyOnceSenderQueueUnittest::sCtx;
 const size_t ExactlyOnceSenderQueueUnittest::sDataSize;
 FeedbackInterfaceMock ExactlyOnceSenderQueueUnittest::sFeedback;
 vector<RangeCheckpointPtr> ExactlyOnceSenderQueueUnittest::sCheckpoints;

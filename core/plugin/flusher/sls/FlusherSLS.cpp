@@ -18,28 +18,28 @@
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
 #include "app_config/AppConfig.h"
-#include "pipeline/batch/FlushStrategy.h"
 #include "common/EndpointUtil.h"
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
 #include "common/TimeUtil.h"
+#include "pipeline/Pipeline.h"
+#include "pipeline/batch/FlushStrategy.h"
 #include "pipeline/compression/CompressorFactory.h"
+#include "pipeline/queue/QueueKeyManager.h"
+#include "pipeline/queue/SLSSenderQueueItem.h"
+#include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "plugin/flusher/sls/SLSResponse.h"
 #include "plugin/flusher/sls/SendResult.h"
-#include "pipeline/Pipeline.h"
 #include "profile_sender/ProfileSender.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
-#include "pipeline/queue/SenderQueueManager.h"
-#include "sdk/Common.h"
 #include "runner/FlusherRunner.h"
+#include "sdk/Common.h"
 #include "sls_control/SLSControl.h"
 // TODO: temporarily used here
-#include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "pipeline/PipelineManager.h"
+#include "plugin/flusher/sls/DiskBufferWriter.h"
 
 using namespace std;
 
@@ -470,6 +470,8 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         GenerateQueueKey(mProject + "#" + mLogstore);
         SenderQueueManager::GetInstance()->CreateQueue(
             mQueueKey,
+            mNodeID,
+            *mContext,
             vector<shared_ptr<ConcurrencyLimiter>>{GetRegionConcurrencyLimiter(mRegion),
                                                    GetProjectConcurrencyLimiter(mProject)},
             mMaxSendRate);
@@ -610,6 +612,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
     string configName = HasContext() ? GetContext().GetConfigName() : "";
     bool isProfileData = ProfileSender::GetInstance()->IsProfileData(mRegion, mProject, data->mLogstore);
     int32_t curTime = time(NULL);
+    auto curSystemTime = chrono::system_clock::now();
     if (slsResponse.mStatusCode == 200) {
         auto& cpt = data->mExactlyOnceCheckpoint;
         if (cpt) {
@@ -617,10 +620,13 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             cpt->IncreaseSequenceID();
         }
         LOG_DEBUG(sLogger,
-                  ("send data to sls succeeded, item address", item)("request id", slsResponse.mRequestId)(
-                      "config", configName)("region", mRegion)("project", mProject)("logstore", data->mLogstore)(
-                      "response time", curTime - data->mLastSendTime)("total send time", curTime - data->mEnqueTime)(
-                      "try cnt", data->mTryCnt)("endpoint", data->mCurrentEndpoint)("is profile data", isProfileData));
+                  ("send data to sls succeeded, item address",
+                   item)("request id", slsResponse.mRequestId)("config", configName)("region", mRegion)(
+                      "project", mProject)("logstore", data->mLogstore)("response time", curTime - data->mLastSendTime)(
+                      "total send time",
+                      ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mEnqueTime).count())
+                          + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentEndpoint)("is profile data",
+                                                                                                isProfileData));
         GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
         DealSenderQueueItemAfterSend(item, false);
     } else {
@@ -747,7 +753,8 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             // when retry times > unknow_error_try_max, we will drop this data
             operation = DefaultOperation(item->mTryCnt);
         }
-        if (curTime - data->mEnqueTime > INT32_FLAG(discard_send_fail_interval)) {
+        if (chrono::duration_cast<chrono::seconds>(curSystemTime - item->mEnqueTime).count()
+            > INT32_FLAG(discard_send_fail_interval)) {
             operation = OperationOnFail::DISCARD;
         }
         if (isProfileData && data->mTryCnt >= static_cast<uint32_t>(INT32_FLAG(profile_data_send_retrytimes))) {
@@ -760,8 +767,9 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         "status code", slsResponse.mStatusCode)("error code", slsResponse.mErrorCode)( \
         "errMsg", slsResponse.mErrorMsg)("config", configName)("region", mRegion)("project", mProject)( \
         "logstore", data->mLogstore)("try cnt", data->mTryCnt)("response time", curTime - data->mLastSendTime)( \
-        "total send time", curTime - data->mEnqueTime)("endpoint", data->mCurrentEndpoint)("is profile data", \
-                                                                                           isProfileData)
+        "total send time", \
+        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mEnqueTime).count()) \
+            + "ms")("endpoint", data->mCurrentEndpoint)("is profile data", isProfileData)
 
         switch (operation) {
             case OperationOnFail::RETRY_IMMEDIATELY:
@@ -821,7 +829,8 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
     if (!HasContext()) {
         key = QueueKeyManager::GetInstance()->GetKey(mProject + "-" + mLogstore);
         if (SenderQueueManager::GetInstance()->GetQueue(key) == nullptr) {
-            SenderQueueManager::GetInstance()->CreateQueue(key, vector<shared_ptr<ConcurrencyLimiter>>());
+            PipelineContext ctx;
+            SenderQueueManager::GetInstance()->CreateQueue(key, "", ctx, vector<shared_ptr<ConcurrencyLimiter>>());
         }
     }
     return Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(compressedData),

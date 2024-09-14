@@ -31,10 +31,7 @@ namespace logtail {
 class BoundedProcessQueue : public BoundedQueueInterface<std::unique_ptr<ProcessQueueItem>>,
                             public ProcessQueueInterface {
 public:
-    BoundedProcessQueue(size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const std::string& config)
-        : QueueInterface(key, cap),
-          BoundedQueueInterface(key, cap, low, high),
-          ProcessQueueInterface(key, cap, priority, config) {}
+    BoundedProcessQueue(size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const PipelineContext& ctx);
 
     bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
     bool Pop(std::unique_ptr<ProcessQueueItem>& item) override;

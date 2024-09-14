@@ -31,8 +31,7 @@ class BoundedSenderQueueInterface;
 // not thread-safe, should be protected explicitly by queue manager
 class ProcessQueueInterface : virtual public QueueInterface<std::unique_ptr<ProcessQueueItem>> {
 public:
-    ProcessQueueInterface(int64_t key, size_t cap, uint32_t priority, const std::string& config)
-        : QueueInterface(key, cap), mPriority(priority), mConfigName(config) {}
+    ProcessQueueInterface(int64_t key, size_t cap, uint32_t priority, const PipelineContext& ctx);
     virtual ~ProcessQueueInterface() = default;
 
     void SetPriority(uint32_t priority) { mPriority = priority; }
@@ -46,9 +45,7 @@ public:
     void InvalidatePop() { mValidToPop = false; }
     void ValidatePop() { mValidToPop = true; }
 
-    void Reset() {
-        mDownStreamQueues.clear();
-    }
+    void Reset() { mDownStreamQueues.clear(); }
 
 protected:
     bool IsValidToPop() const;

@@ -118,7 +118,7 @@ protected:
         FileServer::GetInstance()->AddFileDiscoveryConfig(mConfigName, &discoveryOpts, &ctx);
         FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
-        ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0, ctx);
     }
 
     void TearDown() override { remove(utf8File.c_str()); }

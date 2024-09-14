@@ -23,12 +23,12 @@
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
-#include "file_server/FileServer.h"
+#include "file_server/reader/LogFileReader.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/queue/ProcessQueueManager.h"
-#include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -115,7 +115,7 @@ protected:
         FileServer::GetInstance()->AddFileDiscoveryConfig(mConfigName, &discoveryOpts, &ctx);
         FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
-        ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0, ctx);
 
         // build a reader
         mReaderPtr = std::make_shared<LogFileReader>(

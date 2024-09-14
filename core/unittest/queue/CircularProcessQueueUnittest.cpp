@@ -27,17 +27,21 @@ public:
     void TestPush();
     void TestPop();
     void TestReset();
+    void TestMetric();
 
 protected:
-    void SetUp() override {
-        mQueue.reset(new CircularProcessQueue(sCap, sKey, 1, "test_config"));
+    static void SetUpTestCase() { sCtx.SetConfigName("test_config"); }
 
-        mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0));
-        mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0));
+    void SetUp() override {
+        mQueue.reset(new CircularProcessQueue(sCap, sKey, 1, sCtx));
+
+        mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
+        mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
         mQueue->SetDownStreamQueues(vector<BoundedSenderQueueInterface*>{mSenderQueue1.get(), mSenderQueue2.get()});
     }
 
 private:
+    static PipelineContext sCtx;
     static const QueueKey sKey = 0;
     static const size_t sCap = 2;
 
@@ -53,6 +57,8 @@ private:
     unique_ptr<BoundedSenderQueueInterface> mSenderQueue1;
     unique_ptr<BoundedSenderQueueInterface> mSenderQueue2;
 };
+
+PipelineContext CircularProcessQueueUnittest::sCtx;
 
 void CircularProcessQueueUnittest::TestPush() {
     unique_ptr<ProcessQueueItem> res;
@@ -141,9 +147,40 @@ void CircularProcessQueueUnittest::TestReset() {
     }
 }
 
+void CircularProcessQueueUnittest::TestMetric() {
+    APSARA_TEST_EQUAL(4U, mQueue->mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_PROJECT, ""));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_CONFIG_NAME, "test_config"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, "process_queue"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_QUEUE_TYPE, "circular"));
+
+    auto item = GenerateItem(2);
+    auto dataSize1 = item->mEventGroup.DataSize();
+    mQueue->Push(std::move(item));
+    APSARA_TEST_EQUAL(1U, mQueue->mInItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(dataSize1, mQueue->mInItemDataSizeBytes->GetValue());
+    APSARA_TEST_EQUAL(2U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(dataSize1, mQueue->mQueueDataSizeByte->GetValue());
+
+    item = GenerateItem(1);
+    auto dataSize2 = item->mEventGroup.DataSize();
+    mQueue->Push(std::move(item));
+    APSARA_TEST_EQUAL(2U, mQueue->mInItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(dataSize1 + dataSize2, mQueue->mInItemDataSizeBytes->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(dataSize2, mQueue->mQueueDataSizeByte->GetValue());
+    APSARA_TEST_EQUAL(2U, mQueue->mDroppedEventsCnt->GetValue());
+
+    mQueue->Pop(item);
+    APSARA_TEST_EQUAL(1U, mQueue->mOutItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mQueueDataSizeByte->GetValue());
+}
+
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestPush)
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestPop)
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestReset)
+UNIT_TEST_CASE(CircularProcessQueueUnittest, TestMetric)
 
 } // namespace logtail
 

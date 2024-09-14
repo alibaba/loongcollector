@@ -43,6 +43,8 @@ public:
     virtual SinkType GetSinkType() { return SinkType::NONE; }
 
     QueueKey GetQueueKey() const { return mQueueKey; }
+    void SetNodeID(const std::string& nodeID) { mNodeID = nodeID; }
+    const std::string& GetNodeID() const { return mNodeID; }
 
 protected:
     void GenerateQueueKey(const std::string& target);
@@ -50,6 +52,7 @@ protected:
     void DealSenderQueueItemAfterSend(SenderQueueItem* item, bool keep);
 
     QueueKey mQueueKey;
+    std::string mNodeID;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherInstanceUnittest;

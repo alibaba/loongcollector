@@ -32,7 +32,7 @@ ProcessQueueManager::ProcessQueueManager() : mBoundedQueueParam(INT32_FLAG(bound
     ResetCurrentQueueIndex();
 }
 
-bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key, uint32_t priority) {
+bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key, uint32_t priority, const PipelineContext& ctx) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {
@@ -40,7 +40,7 @@ bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key, uint32_t prio
             // queue type change only happen when all input plugin types are changed. in such case, old input data not
             // been processed can be discarded since whole pipeline is actually changed.
             DeleteQueueEntity(iter->second.first);
-            CreateBoundedQueue(key, priority);
+            CreateBoundedQueue(key, priority, ctx);
         } else {
             if ((*iter->second.first)->GetPriority() == priority) {
                 return false;
@@ -48,7 +48,7 @@ bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key, uint32_t prio
             AdjustQueuePriority(iter->second.first, priority);
         }
     } else {
-        CreateBoundedQueue(key, priority);
+        CreateBoundedQueue(key, priority, ctx);
     }
     if (mCurrentQueueIndex.second == mPriorityQueue[mCurrentQueueIndex.first].end()) {
         mCurrentQueueIndex.second = mPriorityQueue[mCurrentQueueIndex.first].begin();
@@ -56,7 +56,10 @@ bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key, uint32_t prio
     return true;
 }
 
-bool ProcessQueueManager::CreateOrUpdateCircularQueue(QueueKey key, uint32_t priority, size_t capacity) {
+bool ProcessQueueManager::CreateOrUpdateCircularQueue(QueueKey key,
+                                                      uint32_t priority,
+                                                      size_t capacity,
+                                                      const PipelineContext& ctx) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {
@@ -64,7 +67,7 @@ bool ProcessQueueManager::CreateOrUpdateCircularQueue(QueueKey key, uint32_t pri
             // queue type change only happen when all input plugin types are changed. in such case, old input data not
             // been processed can be discarded since whole pipeline is actually changed.
             DeleteQueueEntity(iter->second.first);
-            CreateCircularQueue(key, priority, capacity);
+            CreateCircularQueue(key, priority, capacity, ctx);
         } else {
             static_cast<CircularProcessQueue*>(iter->second.first->get())->Reset(capacity);
             if ((*iter->second.first)->GetPriority() == priority) {
@@ -73,7 +76,7 @@ bool ProcessQueueManager::CreateOrUpdateCircularQueue(QueueKey key, uint32_t pri
             AdjustQueuePriority(iter->second.first, priority);
         }
     } else {
-        CreateCircularQueue(key, priority, capacity);
+        CreateCircularQueue(key, priority, capacity, ctx);
     }
     if (mCurrentQueueIndex.second == mPriorityQueue[mCurrentQueueIndex.first].end()) {
         mCurrentQueueIndex.second = mPriorityQueue[mCurrentQueueIndex.first].begin();
@@ -271,20 +274,21 @@ void ProcessQueueManager::Trigger() {
     mCond.notify_one();
 }
 
-void ProcessQueueManager::CreateBoundedQueue(QueueKey key, uint32_t priority) {
-    mPriorityQueue[priority].emplace_back(
-        make_unique<BoundedProcessQueue>(mBoundedQueueParam.GetCapacity(),
-                                         mBoundedQueueParam.GetLowWatermark(),
-                                         mBoundedQueueParam.GetHighWatermark(),
-                                         key,
-                                         priority,
-                                         QueueKeyManager::GetInstance()->GetName(key)));
+void ProcessQueueManager::CreateBoundedQueue(QueueKey key, uint32_t priority, const PipelineContext& ctx) {
+    mPriorityQueue[priority].emplace_back(make_unique<BoundedProcessQueue>(mBoundedQueueParam.GetCapacity(),
+                                                                           mBoundedQueueParam.GetLowWatermark(),
+                                                                           mBoundedQueueParam.GetHighWatermark(),
+                                                                           key,
+                                                                           priority,
+                                                                           ctx));
     mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::BOUNDED);
 }
 
-void ProcessQueueManager::CreateCircularQueue(QueueKey key, uint32_t priority, size_t capacity) {
-    mPriorityQueue[priority].emplace_back(
-        make_unique<CircularProcessQueue>(capacity, key, priority, QueueKeyManager::GetInstance()->GetName(key)));
+void ProcessQueueManager::CreateCircularQueue(QueueKey key,
+                                              uint32_t priority,
+                                              size_t capacity,
+                                              const PipelineContext& ctx) {
+    mPriorityQueue[priority].emplace_back(make_unique<CircularProcessQueue>(capacity, key, priority, ctx));
     mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::CIRCULAR);
 }
 

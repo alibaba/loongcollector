@@ -19,8 +19,8 @@
 #include <memory>
 #include <vector>
 
-#include "pipeline/queue/QueueKey.h"
 #include "pipeline/queue/BoundedSenderQueueInterface.h"
+#include "pipeline/queue/QueueKey.h"
 #include "pipeline/queue/SenderQueueItem.h"
 
 namespace logtail {
@@ -30,10 +30,8 @@ class Flusher;
 // not thread-safe, should be protected explicitly by queue manager
 class SenderQueue : public BoundedSenderQueueInterface {
 public:
-    SenderQueue(size_t cap, size_t low, size_t high, QueueKey key)
-        : QueueInterface(key, cap), BoundedSenderQueueInterface(cap, low, high, key) {
-        mQueue.resize(cap);
-    }
+    SenderQueue(
+        size_t cap, size_t low, size_t high, QueueKey key, const std::string& flusherId, const PipelineContext& ctx);
 
     bool Push(std::unique_ptr<SenderQueueItem>&& item) override;
     bool Remove(SenderQueueItem* item) override;

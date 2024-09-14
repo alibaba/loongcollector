@@ -23,8 +23,11 @@ namespace logtail {
 template <typename T>
 class BoundedQueueInterface : virtual public QueueInterface<T> {
 public:
-    BoundedQueueInterface(QueueKey key, size_t cap, size_t low, size_t high)
-        : QueueInterface<T>(key, cap), mLowWatermark(low), mHighWatermark(high) {}
+    BoundedQueueInterface(QueueKey key, size_t cap, size_t low, size_t high, const PipelineContext& ctx)
+        : QueueInterface<T>(key, cap, ctx), mLowWatermark(low), mHighWatermark(high) {
+        this->mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_QUEUE_TYPE, "bounded"}});
+        mValidToPushFlag = this->mMetricsRecordRef.CreateIntGauge("valid_to_push");
+    }
     virtual ~BoundedQueueInterface() = default;
 
     BoundedQueueInterface(const BoundedQueueInterface& que) = delete;
@@ -56,6 +59,8 @@ protected:
         mHighWatermark = high;
         mValidToPush = true;
     }
+
+    IntGaugePtr mValidToPushFlag;
 
 private:
     virtual void GiveFeedback() const = 0;

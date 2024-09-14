@@ -51,7 +51,7 @@ public:
 
     bool CreateOrUpdateQueue(QueueKey key,
                              uint32_t priority,
-                             const std::string& config,
+                             const PipelineContext& ctx,
                              const std::vector<RangeCheckpointPtr>& checkpoints);
     bool DeleteQueue(QueueKey key);
 
