@@ -137,8 +137,6 @@ const std::string METRIC_PROC_PARSE_STDOUT_TOTAL = "proc_parse_stdout_total";
 const std::string METRIC_PROC_PARSE_STDERR_TOTAL = "proc_parse_stderr_total";
 
 // flusher common metrics
-const std::string METRIC_FLUSHER_IN_RECORDS_TOTAL = "flusher_in_records_total";
-const std::string METRIC_FLUSHER_IN_RECORDS_SIZE_BYTES = "flusher_in_records_size_bytes";
 const std::string METRIC_FLUSHER_ERROR_TOTAL = "flusher_error_total";
 const std::string METRIC_FLUSHER_DISCARD_RECORDS_TOTAL = "flusher_discard_records_total";
 const std::string METRIC_FLUSHER_SUCCESS_RECORDS_TOTAL = "flusher_success_records_total";
@@ -150,5 +148,15 @@ const std::string METRIC_FLUSHER_NETWORK_ERROR_TOTAL = "flusher_network_error_to
 const std::string METRIC_FLUSHER_QUOTA_ERROR_TOTAL = "flusher_quota_error_total";
 const std::string METRIC_FLUSHER_RETRIES_TOTAL = "flusher_retries_total";
 const std::string METRIC_FLUSHER_RETRIES_ERROR_TOTAL = "flusher_retries_error_total";
+
+const std::string METRIC_IN_EVENTS_CNT = "in_events_cnt";
+const std::string METRIC_IN_ITEMS_CNT = "in_items_cnt";
+const std::string METRIC_IN_EVENT_GROUP_SIZE_BYTES = "in_event_group_data_size_bytes";
+const std::string METRIC_IN_ITEM_SIZE_BYTES = "in_item_data_size_bytes";
+const std::string METRIC_OUT_EVENTS_CNT = "out_events_cnt";
+const std::string METRIC_OUT_ITEMS_CNT = "out_items_cnt";
+const std::string METRIC_OUT_EVENT_GROUP_SIZE_BYTES = "out_event_group_data_size_bytes";
+const std::string METRIC_OUT_ITEM_SIZE_BYTES = "out_item_data_size_bytes";
+const std::string METRIC_TOTAL_DELAY_MS = "total_delay_ms";
 
 } // namespace logtail

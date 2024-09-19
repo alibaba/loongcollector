@@ -92,6 +92,7 @@ void EventBatchItemUnittest::TestAdd() {
     APSARA_TEST_EQUAL(1U, mItem.mBatch.mEvents.size());
     APSARA_TEST_EQUAL(1U, mItem.GetStatus().GetCnt());
     APSARA_TEST_EQUAL(size, mItem.GetStatus().GetSize());
+    APSARA_TEST_NOT_EQUAL(0, mItem.mTotalEnqueTimeMs);
 }
 
 void EventBatchItemUnittest::TestFlushEmpty() {
@@ -116,10 +117,12 @@ void EventBatchItemUnittest::TestFlushGroupBatchItem() {
     sEventGroup->AddLogEvent();
     PipelineEventPtr& e = sEventGroup->MutableEvents().back();
     mItem.Add(std::move(e));
+    auto size = mItem.DataSize();
 
     GroupBatchItem res;
     mItem.Flush(res);
     APSARA_TEST_EQUAL(1U, res.mGroups.size());
+    APSARA_TEST_EQUAL(size, res.mGroups[0].mSizeBytes);
 
     APSARA_TEST_TRUE(mItem.IsEmpty());
     APSARA_TEST_TRUE(mItem.mBatch.mTags.mInner.empty());
@@ -130,12 +133,14 @@ void EventBatchItemUnittest::TestFlushGroupBatchItem() {
     APSARA_TEST_EQUAL(0U, mItem.GetStatus().GetCnt());
     APSARA_TEST_EQUAL(0U, mItem.GetStatus().GetSize());
     APSARA_TEST_EQUAL(0, mItem.GetStatus().GetCreateTime());
+    APSARA_TEST_EQUAL(0, mItem.mTotalEnqueTimeMs);
 }
 
 void EventBatchItemUnittest::TestFlushBatchedEvensList() {
     sEventGroup->AddLogEvent();
     PipelineEventPtr& e = sEventGroup->MutableEvents().back();
     mItem.Add(std::move(e));
+    auto size = mItem.DataSize();
 
     BatchedEventsList res;
     mItem.Flush(res);
@@ -145,6 +150,7 @@ void EventBatchItemUnittest::TestFlushBatchedEvensList() {
     APSARA_TEST_NOT_EQUAL(nullptr, res[0].mExactlyOnceCheckpoint);
     APSARA_TEST_STREQ("pack_id", res[0].mPackIdPrefix.data());
     APSARA_TEST_EQUAL(1U, res[0].mSourceBuffers.size());
+    APSARA_TEST_EQUAL(size, res[0].mSizeBytes);
 
     APSARA_TEST_TRUE(mItem.IsEmpty());
     APSARA_TEST_TRUE(mItem.mBatch.mTags.mInner.empty());
@@ -155,12 +161,14 @@ void EventBatchItemUnittest::TestFlushBatchedEvensList() {
     APSARA_TEST_EQUAL(0U, mItem.GetStatus().GetCnt());
     APSARA_TEST_EQUAL(0U, mItem.GetStatus().GetSize());
     APSARA_TEST_EQUAL(0, mItem.GetStatus().GetCreateTime());
+    APSARA_TEST_EQUAL(0, mItem.mTotalEnqueTimeMs);
 }
 
 void EventBatchItemUnittest::TestFlushBatchedEvensLists() {
     sEventGroup->AddLogEvent();
     PipelineEventPtr& e = sEventGroup->MutableEvents().back();
     mItem.Add(std::move(e));
+    auto size = mItem.DataSize();
 
     vector<BatchedEventsList> res;
     mItem.Flush(res);
@@ -171,6 +179,7 @@ void EventBatchItemUnittest::TestFlushBatchedEvensLists() {
     APSARA_TEST_NOT_EQUAL(nullptr, res[0][0].mExactlyOnceCheckpoint);
     APSARA_TEST_STREQ("pack_id", res[0][0].mPackIdPrefix.data());
     APSARA_TEST_EQUAL(1U, res[0][0].mSourceBuffers.size());
+    APSARA_TEST_EQUAL(size, res[0][0].mSizeBytes);
 
     APSARA_TEST_TRUE(mItem.IsEmpty());
     APSARA_TEST_TRUE(mItem.mBatch.mTags.mInner.empty());
@@ -181,6 +190,7 @@ void EventBatchItemUnittest::TestFlushBatchedEvensLists() {
     APSARA_TEST_EQUAL(0U, mItem.GetStatus().GetCnt());
     APSARA_TEST_EQUAL(0U, mItem.GetStatus().GetSize());
     APSARA_TEST_EQUAL(0, mItem.GetStatus().GetCreateTime());
+    APSARA_TEST_EQUAL(0, mItem.mTotalEnqueTimeMs);
 }
 
 void EventBatchItemUnittest::TestExactlyOnce() {
@@ -223,6 +233,7 @@ protected:
         mBatch.mEvents = std::move(eventGroup.MutableEvents());
         mBatch.mSourceBuffers.emplace_back(std::move(eventGroup.GetSourceBuffer()));
         mBatch.mTags = std::move(eventGroup.GetSizedTags());
+        mBatch.mSizeBytes = 100;
     }
 
     void TearDown() override {
@@ -236,11 +247,15 @@ private:
 };
 
 void GroupBatchItemUnittest::TestAdd() {
-    size_t size = mBatch.DataSize();
-    mItem.Add(std::move(mBatch));
+    size_t size = mBatch.mSizeBytes;
+    mItem.Add(std::move(mBatch), 1234567890000);
 
     APSARA_TEST_EQUAL(1U, mItem.mGroups.size());
     APSARA_TEST_EQUAL(size, mItem.GetStatus().GetSize());
+    APSARA_TEST_EQUAL(1234567890000, mItem.TotalEnqueTimeMs());
+    APSARA_TEST_EQUAL(1U, mItem.EventSize());
+    APSARA_TEST_EQUAL(1U, mItem.GroupSize());
+    APSARA_TEST_EQUAL(100U, mItem.DataSize());
 }
 
 void GroupBatchItemUnittest::TestFlushEmpty() {
@@ -257,7 +272,7 @@ void GroupBatchItemUnittest::TestFlushEmpty() {
 }
 
 void GroupBatchItemUnittest::TestFlushBatchedEvensList() {
-    mItem.Add(std::move(mBatch));
+    mItem.Add(std::move(mBatch), 1234567890000);
 
     BatchedEventsList res;
     mItem.Flush(res);
@@ -266,10 +281,14 @@ void GroupBatchItemUnittest::TestFlushBatchedEvensList() {
     APSARA_TEST_TRUE(mItem.IsEmpty());
     APSARA_TEST_EQUAL(0U, mItem.GetStatus().GetSize());
     APSARA_TEST_EQUAL(0, mItem.GetStatus().GetCreateTime());
+    APSARA_TEST_EQUAL(0, mItem.TotalEnqueTimeMs());
+    APSARA_TEST_EQUAL(0U, mItem.EventSize());
+    APSARA_TEST_EQUAL(0U, mItem.GroupSize());
+    APSARA_TEST_EQUAL(0U, mItem.DataSize());
 }
 
 void GroupBatchItemUnittest::TestFlushBatchedEvensLists() {
-    mItem.Add(std::move(mBatch));
+    mItem.Add(std::move(mBatch), 1234567890000);
 
     vector<BatchedEventsList> res;
     mItem.Flush(res);
@@ -279,6 +298,10 @@ void GroupBatchItemUnittest::TestFlushBatchedEvensLists() {
     APSARA_TEST_TRUE(mItem.IsEmpty());
     APSARA_TEST_EQUAL(0U, mItem.GetStatus().GetSize());
     APSARA_TEST_EQUAL(0, mItem.GetStatus().GetCreateTime());
+    APSARA_TEST_EQUAL(0, mItem.TotalEnqueTimeMs());
+    APSARA_TEST_EQUAL(0U, mItem.EventSize());
+    APSARA_TEST_EQUAL(0U, mItem.GroupSize());
+    APSARA_TEST_EQUAL(0U, mItem.DataSize());
 }
 
 UNIT_TEST_CASE(GroupBatchItemUnittest, TestAdd)

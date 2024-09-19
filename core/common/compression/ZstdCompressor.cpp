@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/compression/ZstdCompressor.h"
+#include "common/compression/ZstdCompressor.h"
 
 #include <zstd/zstd.h>
 

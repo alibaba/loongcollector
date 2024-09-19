@@ -21,9 +21,9 @@
 #include <memory>
 #include <string>
 
-#include "pipeline/compression/CompressType.h"
-#include "pipeline/compression/Compressor.h"
 #include "pipeline/PipelineContext.h"
+#include "common/compression/CompressType.h"
+#include "common/compression/Compressor.h"
 
 namespace logtail {
 
@@ -42,13 +42,13 @@ public:
     std::unique_ptr<Compressor> Create(const Json::Value& config,
                                        const PipelineContext& ctx,
                                        const std::string& pluginType,
+                                       const std::string& flusherId,
                                        CompressType defaultType);
+    std::unique_ptr<Compressor> Create(CompressType type);
 
 private:
     CompressorFactory() = default;
     ~CompressorFactory() = default;
-
-    std::unique_ptr<Compressor> Create(CompressType defaultType);
 };
 
 } // namespace logtail

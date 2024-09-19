@@ -15,6 +15,7 @@
 #include "pipeline/route/Router.h"
 
 #include "common/ParamExtractor.h"
+#include "monitor/MetricConstants.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/plugin/interface/Flusher.h"
 
@@ -33,10 +34,20 @@ bool Router::Init(std::vector<pair<size_t, const Json::Value*>> configs, const P
             mAlwaysMatchedFlusherIdx.push_back(item.first);
         }
     }
+
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
+                                                         {{METRIC_LABEL_PROJECT, ctx.GetProjectName()},
+                                                          {METRIC_LABEL_CONFIG_NAME, ctx.GetConfigName()},
+                                                          {METRIC_LABEL_KEY_COMPONENT_NAME, "router"}});
+    mInEventsCnt = mMetricsRecordRef.CreateCounter(METRIC_IN_EVENTS_CNT);
+    mInGroupDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_IN_EVENT_GROUP_SIZE_BYTES);
     return true;
 }
 
 vector<size_t> Router::Route(const PipelineEventGroup& g) const {
+    mInEventsCnt->Add(g.GetEvents().size());
+    mInGroupDataSizeBytes->Add(g.DataSize());
+
     vector<size_t> res(mAlwaysMatchedFlusherIdx);
     for (size_t i = 0; i < mConditions.size(); ++i) {
         if (mConditions[i].second.Check(g)) {

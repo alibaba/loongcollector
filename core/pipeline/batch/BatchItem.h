@@ -20,11 +20,11 @@
 #include <unordered_set>
 #include <vector>
 
+#include "models/PipelineEventGroup.h"
+#include "models/StringView.h"
 #include "pipeline/batch/BatchStatus.h"
 #include "pipeline/batch/BatchedEvents.h"
 #include "pipeline/batch/FlushStrategy.h"
-#include "models/PipelineEventGroup.h"
-#include "models/StringView.h"
 
 namespace logtail {
 
@@ -32,7 +32,9 @@ class GroupBatchItem {
 public:
     GroupBatchItem() { mStatus.Reset(); }
 
-    void Add(BatchedEvents&& g) {
+    void Add(BatchedEvents&& g, int64_t totalEnqueTimeMs) {
+        mEventsCnt += g.mEvents.size();
+        mTotalEnqueTimeMs += totalEnqueTimeMs;
         mGroups.emplace_back(std::move(g));
         mStatus.Update(mGroups.back());
     }
@@ -56,6 +58,10 @@ public:
     }
 
     GroupBatchStatus& GetStatus() { return mStatus; }
+    size_t GroupSize() const { return mGroups.size(); }
+    size_t EventSize() const { return mEventsCnt; }
+    size_t DataSize() const { return mStatus.GetSize(); }
+    int64_t TotalEnqueTimeMs() const { return mTotalEnqueTimeMs; }
 
     bool IsEmpty() { return mGroups.empty(); }
 
@@ -63,11 +69,17 @@ private:
     void Clear() {
         mGroups.clear();
         mStatus.Reset();
+        mEventsCnt = 0;
+        mTotalEnqueTimeMs = 0;
     }
 
     std::vector<BatchedEvents> mGroups;
 
     GroupBatchStatus mStatus;
+    size_t mEventsCnt = 0;
+    // if more than 10^6 events are contained in the batch, the value may overflow
+    // however, this is almost impossible in practice
+    int64_t mTotalEnqueTimeMs = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class EventBatchItemUnittest;
@@ -82,6 +94,9 @@ public:
     void Add(PipelineEventPtr&& e) {
         mBatch.mEvents.emplace_back(std::move(e));
         mStatus.Update(mBatch.mEvents.back());
+        mTotalEnqueTimeMs += std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
+                                 .time_since_epoch()
+                                 .count();
     }
 
     void Flush(GroupBatchItem& res) {
@@ -91,7 +106,8 @@ public:
         if (mBatch.mExactlyOnceCheckpoint) {
             UpdateExactlyOnceLogPosition();
         }
-        res.Add(std::move(mBatch));
+        mBatch.mSizeBytes = DataSize();
+        res.Add(std::move(mBatch), mTotalEnqueTimeMs);
         Clear();
     }
 
@@ -102,6 +118,7 @@ public:
         if (mBatch.mExactlyOnceCheckpoint) {
             UpdateExactlyOnceLogPosition();
         }
+        mBatch.mSizeBytes = DataSize();
         res.emplace_back(std::move(mBatch));
         Clear();
     }
@@ -114,6 +131,7 @@ public:
         if (mBatch.mExactlyOnceCheckpoint) {
             UpdateExactlyOnceLogPosition();
         }
+        mBatch.mSizeBytes = DataSize();
         res.back().emplace_back(std::move(mBatch));
         Clear();
     }
@@ -141,11 +159,16 @@ public:
 
     bool IsEmpty() { return mBatch.mEvents.empty(); }
 
+    size_t DataSize() const { return sizeof(decltype(mBatch.mEvents)) + mStatus.GetSize() + mBatch.mTags.DataSize(); }
+    size_t EventSize() const { return mBatch.mEvents.size(); }
+    int64_t TotalEnqueTimeMs() const { return mTotalEnqueTimeMs; }
+
 private:
     void Clear() {
         mBatch.Clear();
         mSourceBuffers.clear();
         mStatus.Reset();
+        mTotalEnqueTimeMs = 0;
     }
 
     void UpdateExactlyOnceLogPosition() {
@@ -159,6 +182,9 @@ private:
     BatchedEvents mBatch;
     std::unordered_set<SourceBuffer*> mSourceBuffers;
     T mStatus;
+    // if more than 10^6 events are contained in the batch, the value may overflow
+    // however, this is almost impossible in practice
+    int64_t mTotalEnqueTimeMs = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class EventBatchItemUnittest;

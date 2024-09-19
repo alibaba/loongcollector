@@ -27,6 +27,7 @@ class SLSEventGroupSerializer : public Serializer<BatchedEvents> {
 public:
     SLSEventGroupSerializer(Flusher* f) : Serializer<BatchedEvents>(f) {}
 
+private:
     bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override;
 };
 
@@ -37,10 +38,14 @@ struct CompressedLogGroup {
     CompressedLogGroup(std::string&& data, size_t rawSize) : mData(std::move(data)), mRawSize(rawSize) {}
 };
 
+template<>
+bool Serializer<std::vector<CompressedLogGroup>>::DoSerialize(std::vector<CompressedLogGroup>&& p, std::string& output, std::string& errorMsg);
+
 class SLSEventGroupListSerializer : public Serializer<std::vector<CompressedLogGroup>> {
 public:
     SLSEventGroupListSerializer(Flusher* f) : Serializer<std::vector<CompressedLogGroup>>(f) {}
 
+private:
     bool Serialize(std::vector<CompressedLogGroup>&& v, std::string& res, std::string& errorMsg) override;
 };
 

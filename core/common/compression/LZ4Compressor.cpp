@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/compression/LZ4Compressor.h"
+#include "common/compression/LZ4Compressor.h"
 
 #include <lz4/lz4.h>
 

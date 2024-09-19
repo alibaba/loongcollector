@@ -16,8 +16,22 @@
 
 #pragma once
 
+#include "common/compression/Compressor.h"
+
 namespace logtail {
 
-enum class CompressType { NONE, LZ4, ZSTD };
+class ZstdCompressor : public Compressor {
+public:
+    ZstdCompressor(CompressType type, int32_t level = 1) : Compressor(type), mCompressionLevel(level) {};
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    bool UnCompress(const std::string& input, std::string& output, std::string& errorMsg) override;
+#endif
+
+private:
+    bool Compress(const std::string& input, std::string& output, std::string& errorMsg) override;
+
+    int32_t mCompressionLevel = 1;
+};
 
 } // namespace logtail

@@ -16,19 +16,20 @@
 
 #pragma once
 
-#include "pipeline/compression/Compressor.h"
+#include "common/compression/Compressor.h"
 
 namespace logtail {
 
 class LZ4Compressor : public Compressor {
 public:
-    LZ4Compressor(CompressType type) : Compressor(type){};
+    LZ4Compressor(CompressType type) : Compressor(type) {};
 
-    bool Compress(const std::string& input, std::string& output, std::string& errorMsg) override;
-    
 #ifdef APSARA_UNIT_TEST_MAIN
     bool UnCompress(const std::string& input, std::string& output, std::string& errorMsg) override;
 #endif
+
+private:
+    bool Compress(const std::string& input, std::string& output, std::string& errorMsg) override;
 };
 
 } // namespace logtail

@@ -67,7 +67,7 @@ public:
         if (mCreateTime == 0) {
             mCreateTime = time(nullptr);
         }
-        mSizeBytes += g.DataSize();
+        mSizeBytes += g.mSizeBytes;
     }
 
     uint32_t GetSize() const { return mSizeBytes; }

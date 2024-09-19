@@ -33,10 +33,10 @@ public:
                                                                 {METRIC_LABEL_CONFIG_NAME, ctx.GetConfigName()},
                                                             });
 
-        mInItemsCnt = mMetricsRecordRef.CreateCounter("in_items_cnt");
-        mInItemDataSizeBytes = mMetricsRecordRef.CreateCounter("in_item_data_size_bytes");
-        mOutItemsCnt = mMetricsRecordRef.CreateCounter("out_items_cnt");
-        mTotalDelayMs = mMetricsRecordRef.CreateCounter("total_delay_ms");
+        mInItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_IN_ITEMS_CNT);
+        mInItemDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_IN_ITEM_SIZE_BYTES);
+        mOutItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_OUT_ITEMS_CNT);
+        mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_TOTAL_DELAY_MS);
         mQueueSize = mMetricsRecordRef.CreateIntGauge("queue_size");
         mQueueDataSizeByte = mMetricsRecordRef.CreateIntGauge("queue_data_size_bytes");
     }

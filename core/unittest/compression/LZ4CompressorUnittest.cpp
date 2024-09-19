@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/compression/LZ4Compressor.h"
+#include "common/compression/LZ4Compressor.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -29,7 +29,7 @@ void LZ4CompressorUnittest::TestCompress() {
     string input = "hello world";
     string output;
     string errorMsg;
-    APSARA_TEST_TRUE(compressor.Compress(input, output, errorMsg));
+    APSARA_TEST_TRUE(compressor.DoCompress(input, output, errorMsg));
     string decompressed;
     decompressed.resize(input.size());
     APSARA_TEST_TRUE(compressor.UnCompress(output, decompressed, errorMsg));

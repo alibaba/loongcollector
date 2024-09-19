@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "common/JsonUtil.h"
+#include "monitor/MetricConstants.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/route/Router.h"
 #include "unittest/Unittest.h"
@@ -25,6 +26,10 @@ class RouterUnittest : public testing::Test {
 public:
     void TestInit();
     void TestRoute();
+    void TestMetric();
+
+protected:
+    void SetUp() override { ctx.SetConfigName("test_config"); }
 
 private:
     PipelineContext ctx;
@@ -124,8 +129,44 @@ void RouterUnittest::TestRoute() {
     }
 }
 
+void RouterUnittest::TestMetric() {
+    Json::Value configJson;
+    string errorMsg;
+    string configStr = R"(
+        [
+            {
+                "Type": "event_type",
+                "Value": "log"
+            }
+        ]
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    vector<pair<size_t, const Json::Value*>> configs;
+    for (Json::Value::ArrayIndex i = 0; i < configJson.size(); ++i) {
+        configs.emplace_back(i, &configJson[i]);
+    }
+    configs.emplace_back(configJson.size(), nullptr);
+
+    Router router;
+    router.Init(configs, ctx);
+
+    APSARA_TEST_EQUAL(3U, router.mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_PROJECT, ""));
+    APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_CONFIG_NAME, "test_config"));
+    APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, "router"));
+
+    PipelineEventGroup g(make_shared<SourceBuffer>());
+    g.AddLogEvent();
+    auto size = g.DataSize();
+    router.Route(g);
+
+    APSARA_TEST_EQUAL(1U, router.mInEventsCnt->GetValue());
+    APSARA_TEST_EQUAL(size, router.mInGroupDataSizeBytes->GetValue());
+}
+
 UNIT_TEST_CASE(RouterUnittest, TestInit)
 UNIT_TEST_CASE(RouterUnittest, TestRoute)
+UNIT_TEST_CASE(RouterUnittest, TestMetric)
 
 } // namespace logtail
 

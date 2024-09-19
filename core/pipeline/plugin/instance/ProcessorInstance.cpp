@@ -49,11 +49,9 @@ void ProcessorInstance::Process(vector<PipelineEventGroup>& logGroupList) {
         mProcInRecordsTotal->Add(logGroup.GetEvents().size());
     }
 
-    uint64_t startTime = GetCurrentTimeInMilliSeconds();
+    auto before = chrono::system_clock::now();
     mPlugin->Process(logGroupList);
-    uint64_t durationTime = GetCurrentTimeInMilliSeconds() - startTime;
-
-    mProcTimeMS->Add(durationTime);
+    mProcTimeMS->Add(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - before).count());
 
     for (const auto& logGroup : logGroupList) {
         mProcOutRecordsTotal->Add(logGroup.GetEvents().size());

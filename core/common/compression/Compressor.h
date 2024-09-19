@@ -18,7 +18,8 @@
 
 #include <string>
 
-#include "pipeline/compression/CompressType.h"
+#include "monitor/LogtailMetric.h"
+#include "common/compression/CompressType.h"
 
 namespace logtail {
 
@@ -27,7 +28,7 @@ public:
     Compressor(CompressType type) : mType(type) {}
     virtual ~Compressor() = default;
 
-    virtual bool Compress(const std::string& input, std::string& output, std::string& errorMsg) = 0;
+    bool DoCompress(const std::string& input, std::string& output, std::string& errorMsg);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     // buffer shoudl be reserved for output before calling this function
@@ -35,9 +36,27 @@ public:
 #endif
 
     CompressType GetCompressType() const { return mType; }
+    void SetMetricRecordRef(MetricLabels&& labels, DynamicMetricLabels&& dynamicLabels = {});
+
+protected:
+    mutable MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mInItemsCnt;
+    CounterPtr mInItemSizeBytes;
+    CounterPtr mOutItemsCnt;
+    CounterPtr mOutItemSizeBytes;
+    CounterPtr mDiscardedItemsCnt;
+    CounterPtr mDiscardedItemSizeBytes;
+    CounterPtr mTotalDelayMs;
 
 private:
+    virtual bool Compress(const std::string& input, std::string& output, std::string& errorMsg) = 0;
+
     CompressType mType = CompressType::NONE;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class CompressorUnittest;
+    friend class CompressorFactoryUnittest;
+#endif
 };
 
 } // namespace logtail

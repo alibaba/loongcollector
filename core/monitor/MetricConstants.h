@@ -130,8 +130,6 @@ extern const std::string METRIC_PROC_PARSE_STDOUT_TOTAL;
 extern const std::string METRIC_PROC_PARSE_STDERR_TOTAL;
 
 // flusher common metrics
-extern const std::string METRIC_FLUSHER_IN_RECORDS_TOTAL;
-extern const std::string METRIC_FLUSHER_IN_RECORDS_SIZE_BYTES;
 extern const std::string METRIC_FLUSHER_ERROR_TOTAL;
 extern const std::string METRIC_FLUSHER_DISCARD_RECORDS_TOTAL;
 extern const std::string METRIC_FLUSHER_SUCCESS_RECORDS_TOTAL;
@@ -143,5 +141,15 @@ extern const std::string METRIC_FLUSHER_NETWORK_ERROR_TOTAL;
 extern const std::string METRIC_FLUSHER_QUOTA_ERROR_TOTAL;
 extern const std::string METRIC_FLUSHER_RETRIES_TOTAL;
 extern const std::string METRIC_FLUSHER_RETRIES_ERROR_TOTAL;
+
+extern const std::string METRIC_IN_EVENTS_CNT;
+extern const std::string METRIC_IN_ITEMS_CNT;
+extern const std::string METRIC_IN_EVENT_GROUP_SIZE_BYTES;
+extern const std::string METRIC_IN_ITEM_SIZE_BYTES;
+extern const std::string METRIC_OUT_EVENTS_CNT;
+extern const std::string METRIC_OUT_ITEMS_CNT;
+extern const std::string METRIC_OUT_EVENT_GROUP_SIZE_BYTES;
+extern const std::string METRIC_OUT_ITEM_SIZE_BYTES;
+extern const std::string METRIC_TOTAL_DELAY_MS;
 
 } // namespace logtail

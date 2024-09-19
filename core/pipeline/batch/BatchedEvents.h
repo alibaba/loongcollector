@@ -28,6 +28,7 @@ struct BatchedEvents {
     EventsContainer mEvents;
     SizedMap mTags;
     std::vector<std::shared_ptr<SourceBuffer>> mSourceBuffers;
+    size_t mSizeBytes = 0; // only set on completion
     // for flusher_sls only
     RangeCheckpointPtr mExactlyOnceCheckpoint;
     StringView mPackIdPrefix;
@@ -45,20 +46,17 @@ struct BatchedEvents {
           mExactlyOnceCheckpoint(std::move(eoo)),
           mPackIdPrefix(packIdPrefix) {
         mSourceBuffers.emplace_back(std::move(sourceBuffer));
-    }
-
-    size_t DataSize() const {
-        size_t eventsSize = sizeof(decltype(mEvents));
+        mSizeBytes = sizeof(decltype(mEvents)) + mTags.DataSize();
         for (const auto& item : mEvents) {
-            eventsSize += item->DataSize();
+            mSizeBytes += item->DataSize();
         }
-        return eventsSize + mTags.DataSize();
     }
 
     void Clear() {
         mEvents.clear();
         mTags.Clear();
         mSourceBuffers.clear();
+        mSizeBytes = 0;
         mExactlyOnceCheckpoint.reset();
         mPackIdPrefix = StringView();
     }

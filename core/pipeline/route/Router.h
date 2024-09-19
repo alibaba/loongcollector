@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "models/PipelineEventGroup.h"
+#include "monitor/LogtailMetric.h"
 #include "pipeline/route/Condition.h"
 
 namespace logtail {
@@ -36,6 +37,10 @@ public:
 private:
     std::vector<std::pair<size_t, Condition>> mConditions;
     std::vector<size_t> mAlwaysMatchedFlusherIdx;
+
+    mutable MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mInEventsCnt;
+    CounterPtr mInGroupDataSizeBytes;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class RouterUnittest;

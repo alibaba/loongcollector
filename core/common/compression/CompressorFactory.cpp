@@ -12,21 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pipeline/compression/CompressorFactory.h"
+#include "common/compression/CompressorFactory.h"
 
 #include "common/ParamExtractor.h"
-#include "pipeline/compression/LZ4Compressor.h"
-#include "pipeline/compression/ZstdCompressor.h"
+#include "monitor/MetricConstants.h"
+#include "common/compression/LZ4Compressor.h"
+#include "common/compression/ZstdCompressor.h"
 
 using namespace std;
 
 namespace logtail {
 
 unique_ptr<Compressor> CompressorFactory::Create(const Json::Value& config,
-                                                      const PipelineContext& ctx,
-                                                      const string& pluginType,
-                                                      CompressType defaultType) {
+                                                 const PipelineContext& ctx,
+                                                 const string& pluginType,
+                                                 const string& flusherId,
+                                                 CompressType defaultType) {
     string compressType, errorMsg;
+    unique_ptr<Compressor> compressor;
     if (!GetOptionalStringParam(config, "CompressType", compressType, errorMsg)) {
         PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                               ctx.GetAlarm(),
@@ -37,11 +40,11 @@ unique_ptr<Compressor> CompressorFactory::Create(const Json::Value& config,
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
                               ctx.GetRegion());
-        return Create(defaultType);
+        compressor = Create(defaultType);
     } else if (compressType == "lz4") {
-        return Create(CompressType::LZ4);
+        compressor = Create(CompressType::LZ4);
     } else if (compressType == "zstd") {
-        return Create(CompressType::ZSTD);
+        compressor = Create(CompressType::ZSTD);
     } else if (compressType == "none") {
         return nullptr;
     } else if (!compressType.empty()) {
@@ -54,10 +57,15 @@ unique_ptr<Compressor> CompressorFactory::Create(const Json::Value& config,
                               ctx.GetProjectName(),
                               ctx.GetLogstoreName(),
                               ctx.GetRegion());
-        return Create(defaultType);
+        compressor = Create(defaultType);
     } else {
-        return Create(defaultType);
+        compressor = Create(defaultType);
     }
+    compressor->SetMetricRecordRef({{METRIC_LABEL_PROJECT, ctx.GetProjectName()},
+                                    {METRIC_LABEL_CONFIG_NAME, ctx.GetConfigName()},
+                                    {METRIC_LABEL_KEY_COMPONENT_NAME, "compressor"},
+                                    {METRIC_LABEL_KEY_FLUSHER_NODE_ID, flusherId}});
+    return compressor;
 }
 
 unique_ptr<Compressor> CompressorFactory::Create(CompressType type) {

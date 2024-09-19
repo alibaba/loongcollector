@@ -124,6 +124,7 @@ public:
     void TestUpdate();
 
 protected:
+    static void SetUpTestCase() { sBatch.mSizeBytes = 100; }
     void SetUp() override { mStatus.Reset(); }
 
 private:
@@ -142,10 +143,10 @@ void GroupBatchStatusUnittest::TestReset() {
 void GroupBatchStatusUnittest::TestUpdate() {
     mStatus.Update(sBatch);
     time_t createTime = mStatus.GetCreateTime();
-    APSARA_TEST_EQUAL(sBatch.DataSize(), mStatus.GetSize());
+    APSARA_TEST_EQUAL(sBatch.mSizeBytes, mStatus.GetSize());
 
     mStatus.Update(sBatch);
-    APSARA_TEST_EQUAL(2 * sBatch.DataSize(), mStatus.GetSize());
+    APSARA_TEST_EQUAL(2 * sBatch.mSizeBytes, mStatus.GetSize());
     APSARA_TEST_EQUAL(createTime, mStatus.GetCreateTime());
 }
 

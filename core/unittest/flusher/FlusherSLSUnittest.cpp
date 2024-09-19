@@ -22,10 +22,7 @@
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
-#include "pipeline/compression/CompressorFactory.h"
-#include "plugin/flusher/sls/FlusherSLS.h"
-#include "plugin/flusher/sls/PackIdManager.h"
-#include "plugin/flusher/sls/SLSClientManager.h"
+#include "common/compression/CompressorFactory.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
@@ -33,6 +30,9 @@
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/flusher/sls/PackIdManager.h"
+#include "plugin/flusher/sls/SLSClientManager.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(batch_send_interval);
@@ -617,7 +617,7 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_EQUAL(cpt, item->mExactlyOnceCheckpoint);
 
             auto compressor
-                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", "1", CompressType::LZ4);
             string output, errorMsg;
             output.resize(item->mRawSize);
             APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
@@ -671,7 +671,7 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_EQUAL(checkpoints[0], item->mExactlyOnceCheckpoint);
 
             auto compressor
-                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", "1", CompressType::LZ4);
             string output, errorMsg;
             output.resize(item->mRawSize);
             APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
@@ -750,7 +750,7 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_EQUAL(flusher.mLogstore, item->mLogstore);
 
             auto compressor
-                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", "1", CompressType::LZ4);
             string output, errorMsg;
             output.resize(item->mRawSize);
             APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
@@ -844,7 +844,7 @@ void FlusherSLSUnittest::TestSend() {
         APSARA_TEST_EQUAL(flusher.mLogstore, item->mLogstore);
 
         auto compressor
-            = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+            = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", "1", CompressType::LZ4);
 
         sls_logs::SlsLogPackageList packageList;
         APSARA_TEST_TRUE(packageList.ParseFromString(item->mData));
@@ -1017,7 +1017,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
             APSARA_TEST_EQUAL("other_logstore", item->mLogstore);
 
             auto compressor
-                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+                = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", "1", CompressType::LZ4);
             string output;
             output.resize(item->mRawSize);
             APSARA_TEST_TRUE(compressor->UnCompress(item->mData, output, errorMsg));
@@ -1040,7 +1040,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         flusher.mProject = "test_project";
         flusher.mLogstore = "test_logstore";
         flusher.mCompressor = CompressorFactory::GetInstance()->Create(
-            Json::Value(), PipelineContext(), "flusher_sls", CompressType::LZ4);
+            Json::Value(), PipelineContext(), "flusher_sls", "1", CompressType::LZ4);
 
         APSARA_TEST_TRUE(flusher.Send("content", ""));
 
@@ -1060,7 +1060,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         APSARA_TEST_EQUAL("test_logstore", item->mLogstore);
 
         auto compressor
-            = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", CompressType::LZ4);
+            = CompressorFactory::GetInstance()->Create(Json::Value(), ctx, "flusher_sls", "1", CompressType::LZ4);
         string output;
         output.resize(item->mRawSize);
         string errorMsg;

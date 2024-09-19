@@ -23,9 +23,9 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
 #include "common/TimeUtil.h"
+#include "common/compression/CompressorFactory.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/batch/FlushStrategy.h"
-#include "pipeline/compression/CompressorFactory.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
@@ -445,7 +445,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 
     // CompressType
     if (BOOL_FLAG(sls_client_send_compress)) {
-        mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, CompressType::LZ4);
+        mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, mNodeID, CompressType::LZ4);
     }
 
     mGroupSerializer = make_unique<SLSEventGroupSerializer>(this);
@@ -809,7 +809,7 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
     string compressedData;
     if (mCompressor) {
         string errorMsg;
-        if (!mCompressor->Compress(data, compressedData, errorMsg)) {
+        if (!mCompressor->DoCompress(data, compressedData, errorMsg)) {
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to compress data",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
@@ -866,7 +866,7 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
                     std::move(group.GetExactlyOnceCheckpoint()));
     AddPackId(g);
     string errorMsg;
-    if (!mGroupSerializer->Serialize(std::move(g), serializedData, errorMsg)) {
+    if (!mGroupSerializer->DoSerialize(std::move(g), serializedData, errorMsg)) {
         LOG_WARNING(mContext->GetLogger(),
                     ("failed to serialize event group",
                      errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
@@ -880,7 +880,7 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
         return false;
     }
     if (mCompressor) {
-        if (!mCompressor->Compress(serializedData, compressedData, errorMsg)) {
+        if (!mCompressor->DoCompress(serializedData, compressedData, errorMsg)) {
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to compress event group",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
@@ -926,7 +926,7 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
         }
         AddPackId(group);
         string errorMsg;
-        if (!mGroupSerializer->Serialize(std::move(group), serializedData, errorMsg)) {
+        if (!mGroupSerializer->DoSerialize(std::move(group), serializedData, errorMsg)) {
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to serialize event group",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
@@ -941,7 +941,7 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
             continue;
         }
         if (mCompressor) {
-            if (!mCompressor->Compress(serializedData, compressedData, errorMsg)) {
+            if (!mCompressor->DoCompress(serializedData, compressedData, errorMsg)) {
                 LOG_WARNING(mContext->GetLogger(),
                             ("failed to compress event group",
                              errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
@@ -991,7 +991,7 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
     }
     if (enablePackageList) {
         string errorMsg;
-        mGroupListSerializer->Serialize(std::move(compressedLogGroups), serializedData, errorMsg);
+        mGroupListSerializer->DoSerialize(std::move(compressedLogGroups), serializedData, errorMsg);
         allSucceeded
             = Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(
                   std::move(serializedData), packageSize, this, mQueueKey, mLogstore, RawDataType::EVENT_GROUP_LIST))

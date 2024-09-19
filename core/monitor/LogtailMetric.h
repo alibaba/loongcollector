@@ -58,6 +58,8 @@ public:
 
 class MetricsRecordRef {
     friend class WriteMetrics;
+    friend bool operator==(const MetricsRecordRef& lhs, std::nullptr_t rhs);
+    friend bool operator==(std::nullptr_t rhs, const MetricsRecordRef& lhs);
 
 private:
     MetricsRecord* mMetrics = nullptr;
@@ -82,6 +84,22 @@ public:
     bool HasLabel(const std::string& key, const std::string& value) const;
 #endif
 };
+
+inline bool operator==(const MetricsRecordRef& lhs, std::nullptr_t rhs) {
+    return lhs.mMetrics == rhs;
+}
+
+inline bool operator==(std::nullptr_t lhs, const MetricsRecordRef& rhs) {
+    return lhs == rhs.mMetrics;
+}
+
+inline bool operator!=(const MetricsRecordRef& lhs, std::nullptr_t rhs) {
+    return !(lhs == rhs);
+}
+
+inline bool operator!=(std::nullptr_t lhs, const MetricsRecordRef& rhs) {
+    return !(lhs == rhs);
+}
 
 class ReentrantMetricsRecord {
 private:

@@ -52,7 +52,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
     {
         // nano second disabled, and set
         string res, errorMsg;
-        APSARA_TEST_TRUE(serializer.Serialize(CreateBatchedEvents(false), res, errorMsg));
+        APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedEvents(false), res, errorMsg));
         sls_logs::LogGroup logGroup;
         APSARA_TEST_TRUE(logGroup.ParseFromString(res));
         APSARA_TEST_EQUAL(1, logGroup.logs_size());
@@ -72,7 +72,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         // nano second enabled, and set
         const_cast<GlobalConfig&>(mCtx.GetGlobalConfig()).mEnableTimestampNanosecond = true;
         string res, errorMsg;
-        APSARA_TEST_TRUE(serializer.Serialize(CreateBatchedEvents(true), res, errorMsg));
+        APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedEvents(true), res, errorMsg));
         sls_logs::LogGroup logGroup;
         APSARA_TEST_TRUE(logGroup.ParseFromString(res));
         APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
@@ -83,7 +83,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         // nano second enabled, not set
         const_cast<GlobalConfig&>(mCtx.GetGlobalConfig()).mEnableTimestampNanosecond = true;
         string res, errorMsg;
-        APSARA_TEST_TRUE(serializer.Serialize(CreateBatchedEvents(false), res, errorMsg));
+        APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedEvents(false), res, errorMsg));
         sls_logs::LogGroup logGroup;
         APSARA_TEST_TRUE(logGroup.ParseFromString(res));
         APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
@@ -94,13 +94,13 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         // log group exceed size limit
         INT32_FLAG(max_send_log_group_size) = 0;
         string res, errorMsg;
-        APSARA_TEST_FALSE(serializer.Serialize(CreateBatchedEvents(true), res, errorMsg));
+        APSARA_TEST_FALSE(serializer.DoSerialize(CreateBatchedEvents(true), res, errorMsg));
         INT32_FLAG(max_send_log_group_size) = 10 * 1024 * 1024;
     }
     {
         // metric event
         string res, errorMsg;
-        APSARA_TEST_TRUE(serializer.Serialize(CreateBatchedMetricEvents(false, 0, false), res, errorMsg));
+        APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedMetricEvents(false, 0, false), res, errorMsg));
         sls_logs::LogGroup logGroup;
         APSARA_TEST_TRUE(logGroup.ParseFromString(res));
 
@@ -125,7 +125,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         const_cast<GlobalConfig&>(mCtx.GetGlobalConfig()).mEnableTimestampNanosecond = true;
         string res, errorMsg;
         
-        APSARA_TEST_TRUE(serializer.Serialize(CreateBatchedMetricEvents(true, 1, false), res, errorMsg));
+        APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedMetricEvents(true, 1, false), res, errorMsg));
         sls_logs::LogGroup logGroup;
         APSARA_TEST_TRUE(logGroup.ParseFromString(res));
 
@@ -151,7 +151,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         const_cast<GlobalConfig&>(mCtx.GetGlobalConfig()).mEnableTimestampNanosecond = true;
         string res, errorMsg;
         
-        APSARA_TEST_TRUE(serializer.Serialize(CreateBatchedMetricEvents(true, 1999999999, false), res, errorMsg));
+        APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedMetricEvents(true, 1999999999, false), res, errorMsg));
         sls_logs::LogGroup logGroup;
         APSARA_TEST_TRUE(logGroup.ParseFromString(res));
 
@@ -178,7 +178,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         const_cast<GlobalConfig&>(mCtx.GetGlobalConfig()).mEnableTimestampNanosecond = true;
         string res, errorMsg;
         
-        APSARA_TEST_TRUE(serializer.Serialize(CreateBatchedMetricEvents(false, 0, true), res, errorMsg));
+        APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedMetricEvents(false, 0, true), res, errorMsg));
         sls_logs::LogGroup logGroup;
         APSARA_TEST_TRUE(logGroup.ParseFromString(res));
 
@@ -192,7 +192,7 @@ void SLSSerializerUnittest::TestSerializeEventGroupList() {
 
     SLSEventGroupListSerializer serializer(sFlusher.get());
     string res, errorMsg;
-    APSARA_TEST_TRUE(serializer.Serialize(std::move(v), res, errorMsg));
+    APSARA_TEST_TRUE(serializer.DoSerialize(std::move(v), res, errorMsg));
     sls_logs::SlsLogPackageList logPackageList;
     APSARA_TEST_TRUE(logPackageList.ParseFromString(res));
     APSARA_TEST_EQUAL(1, logPackageList.packages_size());

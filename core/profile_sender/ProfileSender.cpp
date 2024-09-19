@@ -28,7 +28,7 @@
 #include "sdk/Exception.h"
 #include "sls_control/SLSControl.h"
 // TODO: temporarily used
-#include "pipeline/compression/CompressorFactory.h"
+#include "common/compression/CompressorFactory.h"
 
 using namespace std;
 
@@ -101,8 +101,8 @@ void ProfileSender::SetProfileProjectName(const string& region, const string& pr
     flusher.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     // logstore is given at send time
     // TODO: temporarily used
-    flusher.mCompressor
-        = CompressorFactory::GetInstance()->Create(Json::Value(), PipelineContext(), "flusher_sls", CompressType::ZSTD);
+    flusher.mCompressor = CompressorFactory::GetInstance()->Create(
+        Json::Value(), PipelineContext(), "flusher_sls", "", CompressType::ZSTD);
 }
 
 FlusherSLS* ProfileSender::GetFlusher(const string& region) {

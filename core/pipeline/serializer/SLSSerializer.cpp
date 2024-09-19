@@ -17,14 +17,14 @@
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "common/TimeUtil.h"
-#include "pipeline/compression/CompressType.h"
+#include "common/compression/CompressType.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 
 
 DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 
 const std::string METRIC_RESERVED_KEY_NAME = "__name__";
-const std::string METRIC_RESERVED_KEY_LABELS  = "__labels__";
+const std::string METRIC_RESERVED_KEY_LABELS = "__labels__";
 const std::string METRIC_RESERVED_KEY_VALUE = "__value__";
 const std::string METRIC_RESERVED_KEY_TIME_NANO = "__time_nano__";
 
@@ -35,7 +35,31 @@ using namespace std;
 
 namespace logtail {
 
+template <>
+bool Serializer<vector<CompressedLogGroup>>::DoSerialize(vector<CompressedLogGroup>&& p,
+                                                         std::string& output,
+                                                         std::string& errorMsg) {
+    auto inputSize = 0;
+    for (auto& item : p) {
+        inputSize += item.mData.size();
+    }
+    mInItemsCnt->Add(1);
+    mInItemSizeBytes->Add(inputSize);
 
+    auto before = std::chrono::system_clock::now();
+    auto res = Serialize(std::move(p), output, errorMsg);
+    mTotalDelayMs->Add(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - before).count());
+
+    if (res) {
+        mOutItemsCnt->Add(1);
+        mOutItemSizeBytes->Add(output.size());
+    } else {
+        mDiscardedItemsCnt->Add(1);
+        mDiscardedItemSizeBytes->Add(inputSize);
+    }
+    return res;
+}
 
 bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
     sls_logs::LogGroup logGroup;
@@ -56,7 +80,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         } else if (e.Is<MetricEvent>()) {
             const auto& metricEvent = e.Cast<MetricEvent>();
             if (metricEvent.Is<std::monostate>()) {
-                 continue;
+                continue;
             }
             auto log = logGroup.add_logs();
             std::ostringstream oss;
@@ -78,9 +102,10 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             logPtr = log->add_contents();
             logPtr->set_key(METRIC_RESERVED_KEY_TIME_NANO);
             if (metricEvent.GetTimestampNanosecond()) {
-                logPtr->set_value(std::to_string(metricEvent.GetTimestamp()) + NumberToDigitString(metricEvent.GetTimestampNanosecond().value(), 9));   
+                logPtr->set_value(std::to_string(metricEvent.GetTimestamp())
+                                  + NumberToDigitString(metricEvent.GetTimestampNanosecond().value(), 9));
             } else {
-                logPtr->set_value(std::to_string(metricEvent.GetTimestamp()));   
+                logPtr->set_value(std::to_string(metricEvent.GetTimestamp()));
             }
             // set __value__
             if (metricEvent.Is<UntypedSingleValue>()) {
@@ -88,7 +113,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 logPtr = log->add_contents();
                 logPtr->set_key(METRIC_RESERVED_KEY_VALUE);
                 logPtr->set_value(std::to_string(value));
-            } 
+            }
             // set __name__
             logPtr = log->add_contents();
             logPtr->set_key(METRIC_RESERVED_KEY_NAME);
@@ -122,9 +147,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
     return true;
 }
 
-bool SLSEventGroupListSerializer::Serialize(vector<CompressedLogGroup>&& v,
-                                            string& res,
-                                            string& errorMsg) {
+bool SLSEventGroupListSerializer::Serialize(vector<CompressedLogGroup>&& v, string& res, string& errorMsg) {
     sls_logs::SlsLogPackageList logPackageList;
     for (const auto& item : v) {
         auto package = logPackageList.add_packages();
