@@ -35,6 +35,7 @@ bool ScrapeConfig::Init(const Json::Value& scrapeConfig) {
         return false;
     }
 
+
     if (scrapeConfig.isMember(prometheus::SCRAPE_INTERVAL) && scrapeConfig[prometheus::SCRAPE_INTERVAL].isString()) {
         string tmpScrapeIntervalString = scrapeConfig[prometheus::SCRAPE_INTERVAL].asString();
         mScrapeIntervalSeconds = DurationToSecond(tmpScrapeIntervalString);
@@ -43,6 +44,23 @@ bool ScrapeConfig::Init(const Json::Value& scrapeConfig) {
         string tmpScrapeTimeoutString = scrapeConfig[prometheus::SCRAPE_TIMEOUT].asString();
         mScrapeTimeoutSeconds = DurationToSecond(tmpScrapeTimeoutString);
     }
+    if (scrapeConfig.isMember(prometheus::SCRAPE_PROTOCOLS) && scrapeConfig[prometheus::SCRAPE_PROTOCOLS].isArray()) {
+        if (!InitScrapeProtocols(scrapeConfig[prometheus::SCRAPE_PROTOCOLS])) {
+            LOG_ERROR(sLogger, ("scrape protocol config error", scrapeConfig[prometheus::SCRAPE_PROTOCOLS]));
+            return false;
+        }
+    } else {
+        Json::Value nullJson;
+        InitScrapeProtocols(nullJson);
+    }
+
+    if (scrapeConfig.isMember(prometheus::ENABLE_COMPRESSION)
+        && scrapeConfig[prometheus::ENABLE_COMPRESSION].isBool()) {
+        InitEnableCompression(scrapeConfig[prometheus::ENABLE_COMPRESSION].asBool());
+    } else {
+        InitEnableCompression(true);
+    }
+
     if (scrapeConfig.isMember(prometheus::METRICS_PATH) && scrapeConfig[prometheus::METRICS_PATH].isString()) {
         mMetricsPath = scrapeConfig[prometheus::METRICS_PATH].asString();
     }
@@ -185,7 +203,7 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
 
     auto token = username + ":" + password;
     auto token64 = sdk::Base64Enconde(token);
-    mAuthHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
+    mRequestHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
     return true;
 }
 
@@ -219,8 +237,98 @@ bool ScrapeConfig::InitAuthorization(const Json::Value& authorization) {
         return false;
     }
 
-    mAuthHeaders[prometheus::A_UTHORIZATION] = type + " " + credentials;
+    mRequestHeaders[prometheus::A_UTHORIZATION] = type + " " + credentials;
     return true;
+}
+
+bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
+    static auto sScrapeProtocolsHeaders = std::map<string, string>{
+        {prometheus::PrometheusProto,
+         "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited"},
+        {prometheus::PrometheusText0_0_4, "text/plain;version=0.0.4"},
+        {prometheus::OpenMetricsText0_0_1, "application/openmetrics-text;version=0.0.1"},
+        {prometheus::OpenMetricsText1_0_0, "application/openmetrics-text;version=1.0.0"},
+    };
+    static auto sDefaultScrapeProtocols = vector<string>{
+        prometheus::PrometheusText0_0_4,
+        prometheus::PrometheusProto,
+        prometheus::OpenMetricsText0_0_1,
+        prometheus::OpenMetricsText1_0_0,
+    };
+
+    auto join = [](const vector<string>& strs, const string& sep) {
+        string result;
+        for (const auto& str : strs) {
+            if (!result.empty()) {
+                result += sep;
+            }
+            result += str;
+        }
+        return result;
+    };
+
+    auto getScrapeProtocols = [](const Json::Value& scrapeProtocols, vector<string>& res) {
+        for (const auto& scrapeProtocol : scrapeProtocols) {
+            if (scrapeProtocol.isString()) {
+                res.push_back(scrapeProtocol.asString());
+            } else {
+                LOG_ERROR(sLogger, ("scrape_protocols config error", ""));
+                return false;
+            }
+        }
+        return true;
+    };
+
+    auto validateScrapeProtocols = [](const vector<string>& scrapeProtocols) {
+        set<string> dups;
+        for (const auto& scrapeProtocol : scrapeProtocols) {
+            if (!sScrapeProtocolsHeaders.count(scrapeProtocol)) {
+                LOG_ERROR(sLogger,
+                          ("unknown scrape protocol prometheusproto", scrapeProtocol)(
+                              "supported",
+                              "[OpenMetricsText0.0.1 OpenMetricsText1.0.0 PrometheusProto PrometheusText0.0.4]"));
+                return false;
+            }
+            if (dups.count(scrapeProtocol)) {
+                LOG_ERROR(sLogger, ("duplicated protocol in scrape_protocols", scrapeProtocol));
+                return false;
+            }
+            dups.insert(scrapeProtocol);
+        }
+        return true;
+    };
+
+    vector<string> tmpScrapeProtocols;
+
+    if (!getScrapeProtocols(scrapeProtocols, tmpScrapeProtocols)) {
+        return false;
+    }
+
+    // if scrape_protocols is empty, use default protocols
+    if (tmpScrapeProtocols.empty()) {
+        tmpScrapeProtocols = sDefaultScrapeProtocols;
+    }
+    if (!validateScrapeProtocols(tmpScrapeProtocols)) {
+        return false;
+    }
+
+    auto weight = tmpScrapeProtocols.size() + 1;
+    for (auto& tmpScrapeProtocol : tmpScrapeProtocols) {
+        auto val = sScrapeProtocolsHeaders[tmpScrapeProtocol];
+        val += ";q=0." + std::to_string(weight--);
+        tmpScrapeProtocol = val;
+    }
+    tmpScrapeProtocols.push_back("*/*;q=0." + ToString(weight));
+    mRequestHeaders[prometheus::ACCEPT] = join(tmpScrapeProtocols, ",");
+    return true;
+}
+
+void ScrapeConfig::InitEnableCompression(bool enableCompression) {
+    if (enableCompression) {
+        mRequestHeaders[prometheus::ACCEPT_ENCODING] = prometheus::GZIP;
+    } else {
+        mRequestHeaders[prometheus::ACCEPT_ENCODING] = prometheus::IDENTITY;
+    }
 }
 
 } // namespace logtail

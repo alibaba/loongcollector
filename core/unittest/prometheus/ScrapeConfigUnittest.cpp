@@ -17,6 +17,8 @@ public:
     void TestAuth();
     void TestBasicAuth();
     void TestAuthorization();
+    void TestScrapeProtocols();
+    void TestEnableCompression();
 
 private:
     void SetUp() override;
@@ -55,6 +57,12 @@ void ScrapeConfigUnittest::TestInit() {
             "scrape_interval": "30s",
             "scrape_timeout": "30s",
             "metrics_path": "/metrics",
+            "scrape_protocols": [
+                "PrometheusText0.0.4",
+                "PrometheusProto",
+                "OpenMetricsText0.0.1"
+            ],
+            "enable_compression": false,
             "scheme": "http",
             "basic_auth": {
                 "username": "test_user",
@@ -92,8 +100,17 @@ void ScrapeConfigUnittest::TestInit() {
     APSARA_TEST_EQUAL(scrapeConfig.mMetricsPath, "/metrics");
     APSARA_TEST_EQUAL(scrapeConfig.mScheme, "http");
 
+    // scrape protocols
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Accept"],
+                      "text/plain;version=0.0.4;q=0.4,application/"
+                      "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.3,"
+                      "application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1");
+
+    // disable compression
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Accept-Encoding"], "identity");
+
     // basic auth
-    APSARA_TEST_EQUAL(scrapeConfig.mAuthHeaders["Authorization"], "Basic dGVzdF91c2VyOnRlc3RfcGFzc3dvcmQ=");
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Basic dGVzdF91c2VyOnRlc3RfcGFzc3dvcmQ=");
 
     APSARA_TEST_EQUAL(scrapeConfig.mMaxScrapeSizeBytes, 1024 * 1024 * 1024);
     APSARA_TEST_EQUAL(scrapeConfig.mSampleLimit, 10000);
@@ -150,9 +167,9 @@ void ScrapeConfigUnittest::TestBasicAuth() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
-    APSARA_TEST_EQUAL(scrapeConfig.mAuthHeaders["Authorization"], "Basic dGVzdF91c2VyOnRlc3RfcGFzc3dvcmQ=");
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Basic dGVzdF91c2VyOnRlc3RfcGFzc3dvcmQ=");
 
-    scrapeConfig.mAuthHeaders.clear();
+    scrapeConfig.mRequestHeaders.clear();
     configStr = R"JSON({
             "job_name": "test_job",
             "scrape_interval": "30s",
@@ -167,10 +184,10 @@ void ScrapeConfigUnittest::TestBasicAuth() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
-    APSARA_TEST_EQUAL(scrapeConfig.mAuthHeaders["Authorization"], "Basic dGVzdF91c2VyOnRlc3RfcGFzc3dvcmQuZmlsZQ==");
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Basic dGVzdF91c2VyOnRlc3RfcGFzc3dvcmQuZmlsZQ==");
 
     // error
-    scrapeConfig.mAuthHeaders.clear();
+    scrapeConfig.mRequestHeaders.clear();
     configStr = R"JSON({
             "job_name": "test_job",
             "scrape_interval": "30s",
@@ -206,12 +223,12 @@ void ScrapeConfigUnittest::TestAuthorization() {
         })JSON";
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
-    scrapeConfig.mAuthHeaders.clear();
+    scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
     // bearer auth
-    APSARA_TEST_EQUAL(scrapeConfig.mAuthHeaders["Authorization"], "Bearer test_token");
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Bearer test_token");
 
-    scrapeConfig.mAuthHeaders.clear();
+    scrapeConfig.mRequestHeaders.clear();
 
     // default Bearer auth
     configStr = R"JSON({
@@ -226,15 +243,179 @@ void ScrapeConfigUnittest::TestAuthorization() {
         })JSON";
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
-    scrapeConfig.mAuthHeaders.clear();
+    scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
-    APSARA_TEST_EQUAL(scrapeConfig.mAuthHeaders["Authorization"], "Bearer " + mKey);
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Bearer " + mKey);
+}
+
+void ScrapeConfigUnittest::TestScrapeProtocols() {
+    Json::Value config;
+    ScrapeConfig scrapeConfig;
+    string errorMsg;
+    string configStr;
+
+    // default
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http"
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL(
+        "text/plain;version=0.0.4;q=0.5,application/"
+        "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.4,application/"
+        "openmetrics-text;version=0.0.1;q=0.3,application/openmetrics-text;version=1.0.0;q=0.2,*/*;q=0.1",
+        scrapeConfig.mRequestHeaders["Accept"]);
+
+    // custom quality protocols
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "scrape_protocols": ["PrometheusProto", "OpenMetricsText1.0.0", "PrometheusText0.0.4", "OpenMetricsText0.0.1"]
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL(
+        "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.5,"
+        "application/openmetrics-text;version=1.0.0;q=0.4,"
+        "text/plain;version=0.0.4;q=0.3,application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1",
+        scrapeConfig.mRequestHeaders["Accept"]);
+
+    // only prometheus0.0.4 protocols
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "scrape_protocols": ["PrometheusText0.0.4"]
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL(
+        "text/plain;version=0.0.4;q=0.2,*/*;q=0.1",
+        scrapeConfig.mRequestHeaders["Accept"]);
+
+    // Capital error
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "scrape_protocols": ["prometheusproto"]
+        })JSON";
+
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+
+    // OpenMetricsText1.0.0 duplication error
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "scrape_protocols": ["OpenMetricsText1.0.0", "PrometheusProto", "OpenMetricsText1.0.0"]
+        })JSON";
+
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+
+    // protocols invalid
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "scrape_protocols": ["OpenMetricsText1.0.0", "PrometheusProto", 999]
+        })JSON";
+
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+
+    // unknown protocol
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "scrape_protocols": ["OpenMetricsText"]
+        })JSON";
+
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+}
+
+void ScrapeConfigUnittest::TestEnableCompression() {
+    Json::Value config;
+    ScrapeConfig scrapeConfig;
+    string errorMsg;
+    string configStr;
+
+    // default
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http"
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL("gzip", scrapeConfig.mRequestHeaders["Accept-Encoding"]);
+
+    // disable
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "enable_compression": false
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL("identity", scrapeConfig.mRequestHeaders["Accept-Encoding"]);
+
+    // enable
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "enable_compression": true
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    scrapeConfig.mRequestHeaders.clear();
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL("gzip", scrapeConfig.mRequestHeaders["Accept-Encoding"]);
 }
 
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestInit);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestAuth);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestBasicAuth);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestAuthorization);
+UNIT_TEST_CASE(ScrapeConfigUnittest, TestScrapeProtocols);
+UNIT_TEST_CASE(ScrapeConfigUnittest, TestEnableCompression);
 
 } // namespace logtail
 

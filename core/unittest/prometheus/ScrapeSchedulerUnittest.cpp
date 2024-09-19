@@ -56,7 +56,7 @@ protected:
         mScrapeConfig->mScrapeIntervalSeconds = 10;
         mScrapeConfig->mScrapeTimeoutSeconds = 10;
         mScrapeConfig->mMetricsPath = "/metrics";
-        mScrapeConfig->mAuthHeaders = {{"Authorization", "Bearer xxxxx"}};
+        mScrapeConfig->mRequestHeaders = {{"Authorization", "Bearer xxxxx"}};
 
         mHttpResponse.mBody
             = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
