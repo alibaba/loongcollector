@@ -60,8 +60,7 @@
 #include "streamlog/StreamLogManager.h"
 #endif
 #else
-#include "config/provider/CommonConfigProvider.h"
-#include "config/provider/LegacyCommonConfigProvider.h"
+#include "provider/Provider.h"
 #endif
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
@@ -242,8 +241,7 @@ void Application::Start() { // GCOVR_EXCL_START
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
     LegacyConfigProvider::GetInstance()->Init("legacy");
 #else
-    CommonConfigProvider::GetInstance()->Init("common_v2");
-    LegacyCommonConfigProvider::GetInstance()->Init("common");
+    InitRemoteConfigProviders();
 #endif
 
     LogtailAlarm::GetInstance()->Init();
@@ -370,8 +368,10 @@ void Application::Exit() {
     EnterpriseConfigProvider::GetInstance()->Stop();
     LegacyConfigProvider::GetInstance()->Stop();
 #else
-    CommonConfigProvider::GetInstance()->Stop();
-    LegacyCommonConfigProvider::GetInstance()->Stop();
+    auto remoteConfigProviders = GetRemoteConfigProviders();
+    for (auto& provider : remoteConfigProviders) {
+        provider->Stop();
+    }
 #endif
 
     LogtailMonitor::GetInstance()->Stop();

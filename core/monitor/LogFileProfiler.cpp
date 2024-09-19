@@ -27,7 +27,7 @@
 #include "common/version.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
-#include "profile_sender/ProfileSender.h"
+#include "provider/Provider.h"
 #include "pipeline/queue/QueueKeyManager.h"
 
 DEFINE_FLAG_INT32(profile_data_send_interval, "interval of send LogFile/DomainSocket profile data, seconds", 600);
@@ -261,7 +261,7 @@ void LogFileProfiler::SendProfileData(bool forceSend) {
             }
         }
         UpdateDumpData(logGroup, detail, logstore);
-        ProfileSender::GetInstance()->SendToProfileProject(region, logGroup);
+        GetProfileSender()->SendToProfileProject(region, logGroup);
     } while (true);
     DumpToLocal(curTime, forceSend, detail, logstore);
     mLastSendTime = curTime;

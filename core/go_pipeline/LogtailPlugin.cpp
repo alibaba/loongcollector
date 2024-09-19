@@ -30,7 +30,7 @@
 #include "monitor/LogtailAlarm.h"
 #include "pipeline/PipelineManager.h"
 #include "pipeline/queue/SenderQueueManager.h"
-#include "profile_sender/ProfileSender.h"
+#include "provider/Provider.h"
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
 DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,
@@ -171,22 +171,22 @@ int LogtailPlugin::SendPbV2(const char* configName,
     FlusherSLS* pConfig = NULL;
     if (configNameStr == alarmConfig->mLogstore) {
         pConfig = alarmConfig;
-        pConfig->mProject = ProfileSender::GetInstance()->GetDefaultProfileProjectName();
-        pConfig->mRegion = ProfileSender::GetInstance()->GetDefaultProfileRegion();
+        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
+        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (pConfig->mProject.empty()) {
             return 0;
         }
     } else if (configNameStr == profileConfig->mLogstore) {
         pConfig = profileConfig;
-        pConfig->mProject = ProfileSender::GetInstance()->GetDefaultProfileProjectName();
-        pConfig->mRegion = ProfileSender::GetInstance()->GetDefaultProfileRegion();
+        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
+        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (pConfig->mProject.empty()) {
             return 0;
         }
     } else if (configNameStr == containerConfig->mLogstore) {
         pConfig = containerConfig;
-        pConfig->mProject = ProfileSender::GetInstance()->GetDefaultProfileProjectName();
-        pConfig->mRegion = ProfileSender::GetInstance()->GetDefaultProfileRegion();
+        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
+        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (pConfig->mProject.empty()) {
             return 0;
         }

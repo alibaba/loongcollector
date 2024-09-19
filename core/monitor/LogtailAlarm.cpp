@@ -23,7 +23,7 @@
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "protobuf/sls/sls_logs.pb.h"
-#include "profile_sender/ProfileSender.h"
+#include "provider/Provider.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SenderQueueManager.h"
 
@@ -195,7 +195,7 @@ void LogtailAlarm::SendAllRegionAlarm() {
             // check sender queue status, if invalid jump this region
 
             QueueKey alarmPrjLogstoreKey = QueueKeyManager::GetInstance()->GetKey(
-                "-flusher_sls-" + ProfileSender::GetInstance()->GetProfileProjectName(region) + "#logtail_alarm");
+                "-flusher_sls-" + GetProfileSender()->GetProfileProjectName(region) + "#logtail_alarm");
             if (!SenderQueueManager::GetInstance()->IsValidToPush(alarmPrjLogstoreKey)) {
                 // jump this region
                 ++sendRegionIndex;
@@ -264,7 +264,7 @@ void LogtailAlarm::SendAllRegionAlarm() {
             continue;
         }
         // this is an anonymous send and non lock send
-        ProfileSender::GetInstance()->SendToProfileProject(region, logGroup);
+        GetProfileSender()->SendToProfileProject(region, logGroup);
     } while (true);
 }
 
@@ -298,7 +298,7 @@ void LogtailAlarm::SendAlarm(const LogtailAlarmType alarmType,
     }
 
     // ignore alarm for profile data
-    if (ProfileSender::GetInstance()->IsProfileData(region, projectName, category)) {
+    if (GetProfileSender()->IsProfileData(region, projectName, category)) {
         return;
     }
     // LOG_DEBUG(sLogger, ("Add Alarm", region)("projectName", projectName)("alarm index",

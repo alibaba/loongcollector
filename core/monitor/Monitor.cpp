@@ -50,7 +50,7 @@
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
 #include "pipeline/PipelineManager.h"
-#include "profile_sender/ProfileSender.h"
+#include "provider/Provider.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -299,7 +299,7 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     AddLogContent(logPtr, "plugin_stats", PipelineManager::GetInstance()->GetPluginStatistics());
     // Metrics.
     vector<string> allProfileRegion;
-    ProfileSender::GetInstance()->GetAllProfileRegion(allProfileRegion);
+    GetProfileSender()->GetAllProfileRegion(allProfileRegion);
     UpdateMetric("region", allProfileRegion);
 #ifdef __ENTERPRISE__
     UpdateMetric("config_update_count", EnterpriseConfigProvider::GetInstance()->GetConfigUpdateTotalCount());
@@ -347,10 +347,10 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
         }
 
         if (i == allProfileRegion.size() - 1) {
-            ProfileSender::GetInstance()->SendToProfileProject(allProfileRegion[i], logGroup);
+            GetProfileSender()->SendToProfileProject(allProfileRegion[i], logGroup);
         } else {
             LogGroup copyLogGroup = logGroup;
-            ProfileSender::GetInstance()->SendToProfileProject(allProfileRegion[i], copyLogGroup);
+            GetProfileSender()->SendToProfileProject(allProfileRegion[i], copyLogGroup);
         }
     }
     return true;

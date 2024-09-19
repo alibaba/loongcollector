@@ -33,7 +33,7 @@
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "plugin/flusher/sls/SLSResponse.h"
 #include "plugin/flusher/sls/SendResult.h"
-#include "profile_sender/ProfileSender.h"
+#include "provider/Provider.h"
 #include "runner/FlusherRunner.h"
 #include "sdk/Common.h"
 #include "sls_control/SLSControl.h"
@@ -610,7 +610,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
     string configName = HasContext() ? GetContext().GetConfigName() : "";
-    bool isProfileData = ProfileSender::GetInstance()->IsProfileData(mRegion, mProject, data->mLogstore);
+    bool isProfileData = GetProfileSender()->IsProfileData(mRegion, mProject, data->mLogstore);
     int32_t curTime = time(NULL);
     auto curSystemTime = chrono::system_clock::now();
     if (slsResponse.mStatusCode == 200) {

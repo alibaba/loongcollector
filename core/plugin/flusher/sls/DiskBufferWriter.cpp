@@ -27,7 +27,7 @@
 #include "protobuf/sls/sls_logs.pb.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
-#include "profile_sender/ProfileSender.h"
+#include "provider/Provider.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "sdk/Exception.h"
@@ -765,7 +765,7 @@ SendResult DiskBufferWriter::SendToNetSync(sdk::Client* sendClient,
                                                            bufferMeta.logstore(),
                                                            "");
                 // no region
-                if (!ProfileSender::GetInstance()->IsProfileData("", bufferMeta.project(), bufferMeta.logstore()))
+                if (!GetProfileSender()->IsProfileData("", bufferMeta.project(), bufferMeta.logstore()))
                     LOG_ERROR(sLogger,
                               ("send data to SLS fail, error_code", errorCode)("error_message", ex.GetMessage())(
                                   "endpoint", sendClient->GetRawSlsHost())("projectName", bufferMeta.project())(

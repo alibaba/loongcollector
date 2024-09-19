@@ -125,7 +125,7 @@ private:
 
     ConfigServerAddress GetOneConfigServerAddress(bool changeConfigServer);
 
-    VIRTUAL bool SendHttpRequest(const std::string& operation,
+    virtual bool SendHttpRequest(const std::string& operation,
                                  const std::string& reqBody,
                                  const std::string& configType,
                                  const std::string& requestId,

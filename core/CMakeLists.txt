@@ -33,6 +33,8 @@ cmake_dependent_option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT stat
 option(WITHOUTGDB "Build Logtail without gdb")
 option(WITHSPL "Build Logtail and UT with SPL" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
+set(PROVIDER_PATH "provider" CACHE PATH "Path to the provider module") # external provider path can be set with -DPROVIDER_PATH
+set(UNITTEST_PATH "unittest" CACHE PATH "Path to the unittest module") # external unittest path can be set with -DUNITTEST_PATH
 
 if (BUILD_LOGTAIL_SHARED_LIBRARY AND WITHSPL)
     message(FATEL_ERROR, "Generating logtail shared library is not supported to be linked with SPL. WITHSPL should be set OFF.")
@@ -109,13 +111,13 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/processor/links.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/flusher.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/links.cmake)
 
-# Subdirectories (modules). except for common, input, processor, flusher, observer, helper and spl.
+# Subdirectories (modules). except for common, input, processor, flusher, observer, helper, spl, and provider.
 set(SUB_DIRECTORIES_LIST
         application app_config checkpoint container_manager logger go_pipeline monitor profile_sender models
-        config config/feedbacker config/provider config/watcher
+        config config/watcher
         pipeline pipeline/batch pipeline/limiter pipeline/plugin pipeline/plugin/creator pipeline/plugin/instance pipeline/plugin/interface pipeline/queue pipeline/route pipeline/serializer
         runner runner/sink/http
-        protobuf/config_server/v1 protobuf/config_server/v2 protobuf/sls
+        protobuf/sls
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         prometheus prometheus/labels prometheus/schedulers prometheus/async
         ebpf ebpf/observer ebpf/security ebpf/handler
@@ -160,6 +162,10 @@ endif()
 
 # remove several files in go_pipeline
 list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.cpp ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.h)
+
+
+# add provider
+add_subdirectory("${PROVIDER_PATH}" "${CMAKE_BINARY_DIR}/provider")
 
 if(MSVC)
     # remove linux event listener
@@ -231,12 +237,12 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     flusher_link(${LOGTAIL_TARGET})
     all_link(${LOGTAIL_TARGET})
     common_link(${LOGTAIL_TARGET})
+    target_link_libraries(${LOGTAIL_TARGET} provider)
 endif()
 
 # Logtail UT.
 if (BUILD_LOGTAIL_UT)
-    message(STATUS "Build unittest.")
-    add_definitions(-DVIRTUAL=virtual)
+    message(STATUS "Build unittest.")    
     function(delete_gcda_files target_directory)
         if(EXISTS "${target_directory}")
             message(STATUS "Deleting .gcda files in ${target_directory}")
@@ -249,7 +255,5 @@ if (BUILD_LOGTAIL_UT)
     delete_gcda_files(".")
     include(CTest)
     enable_testing()
-    add_subdirectory(unittest)
-else()
-    add_definitions(-DVIRTUAL= )
+    add_subdirectory("${UNITTEST_PATH}" "${CMAKE_BINARY_DIR}/unittest")
 endif ()

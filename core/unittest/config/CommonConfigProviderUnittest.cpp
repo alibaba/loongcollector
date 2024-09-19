@@ -19,7 +19,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/version.h"
 #include "config/ConfigDiff.h"
-#include "config/provider/CommonConfigProvider.h"
+#include "config/common_provider/CommonConfigProvider.h"
 #include "config/watcher/ConfigWatcher.h"
 #include "gmock/gmock.h"
 #include "pipeline/PipelineManager.h"

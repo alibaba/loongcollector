@@ -119,3 +119,13 @@ cd 到ilogtail/scripts目录下，执行windows64_build.bat(windows32_build.bat)
 - PluginAdapter.dll (插件接口)
 - PluginBase.dll (插件lib)
 - PluginBase.h
+
+
+## 编译时替换外部模块
+iLogtail通过 Provider 模块暴露出一些拓展点，这些拓展点可以由用户自行实现，并通过编译时CMAKE DPROVIDER_PATH选项替换掉默认的实现。
+
+示例：
+
+```bash
+cmake -DPROVIDER_PATH=../../../core_extensions/provider ..
+```
