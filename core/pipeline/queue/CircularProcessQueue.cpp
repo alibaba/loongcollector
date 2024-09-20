@@ -15,6 +15,7 @@
 #include "pipeline/queue/CircularProcessQueue.h"
 
 #include "logger/Logger.h"
+#include "pipeline/PipelineManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
 
 using namespace std;
@@ -69,6 +70,15 @@ bool CircularProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     mQueueSize->Set(Size());
     mQueueDataSizeByte->Sub(item->mEventGroup.DataSize());
     return true;
+}
+
+void CircularProcessQueue::SetPipelineForItems(const std::string& name) const {
+    auto p = PipelineManager::GetInstance()->FindConfigByName(name);
+    for (auto& item : mQueue) {
+        if (!item->mPipeline) {
+            item->mPipeline = p;
+        }
+    }
 }
 
 void CircularProcessQueue::Reset(size_t cap) {

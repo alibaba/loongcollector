@@ -59,8 +59,8 @@ public:
     // 0: success, 1: queue is full, 2: queue not found
     int PushProcessQueue(QueueKey key, std::unique_ptr<ProcessQueueItem>&& item);
     bool IsAllProcessQueueEmpty() const;
-    void InvalidatePopProcessQueue(const std::string& configName);
-    void ValidatePopProcessQueue(const std::string& configName);
+    void DisablePopProcessQueue(const std::string& configName, bool isPipelineRemoving);
+    void EnablePopProcessQueue(const std::string& configName);
 
     // 0: success, 1: queue is full, 2: queue not found
     int PushSenderQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item);

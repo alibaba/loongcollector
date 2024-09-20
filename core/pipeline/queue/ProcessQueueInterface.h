@@ -42,8 +42,10 @@ public:
 
     void SetDownStreamQueues(std::vector<BoundedSenderQueueInterface*>&& ques);
 
-    void InvalidatePop() { mValidToPop = false; }
-    void ValidatePop() { mValidToPop = true; }
+    void DisablePop() { mValidToPop = false; }
+    void EnablePop() { mValidToPop = true; }
+
+    virtual void SetPipelineForItems(const std::string& name) const = 0;
 
     void Reset() { mDownStreamQueues.clear(); }
 
@@ -57,7 +59,7 @@ private:
     std::string mConfigName;
 
     std::vector<BoundedSenderQueueInterface*> mDownStreamQueues;
-    bool mValidToPop = true;
+    bool mValidToPop = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class BoundedProcessQueueUnittest;

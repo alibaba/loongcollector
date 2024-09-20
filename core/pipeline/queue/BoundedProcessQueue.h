@@ -35,6 +35,7 @@ public:
 
     bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
     bool Pop(std::unique_ptr<ProcessQueueItem>& item) override;
+    void SetPipelineForItems(const std::string& name) const override;
 
     void SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks);
 
@@ -43,7 +44,7 @@ private:
 
     void GiveFeedback() const override;
 
-    std::queue<std::unique_ptr<ProcessQueueItem>> mQueue;
+    std::deque<std::unique_ptr<ProcessQueueItem>> mQueue;
     std::vector<FeedbackInterface*> mUpStreamFeedbacks;
 
 #ifdef APSARA_UNIT_TEST_MAIN

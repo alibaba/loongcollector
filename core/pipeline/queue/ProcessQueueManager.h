@@ -62,8 +62,8 @@ public:
     bool IsAllQueueEmpty() const;
     bool SetDownStreamQueues(QueueKey key, std::vector<BoundedSenderQueueInterface*>&& ques);
     bool SetFeedbackInterface(QueueKey key, std::vector<FeedbackInterface*>&& feedback);
-    void InvalidatePop(const std::string& configName);
-    void ValidatePop(const std::string& configName);
+    void DisablePop(const std::string& configName, bool isPipelineRemoving);
+    void EnablePop(const std::string& configName);
 
     bool Wait(uint64_t ms);
     void Trigger();

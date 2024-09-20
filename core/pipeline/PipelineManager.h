@@ -71,6 +71,10 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineManagerMock;
     friend class PipelineManagerUnittest;
+    friend class ProcessQueueManagerUnittest;
+    friend class ExactlyOnceQueueManagerUnittest;
+    friend class BoundedProcessQueueUnittest;
+    friend class CircularProcessQueueUnittest;
     friend class CommonConfigProviderUnittest;
 #endif
 };

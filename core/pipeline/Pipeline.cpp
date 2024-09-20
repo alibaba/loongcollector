@@ -337,7 +337,7 @@ void Pipeline::Start() {
         // TODO: 加载该Go流水线
     }
 
-    // TODO: 启用Process中改流水线对应的输入队列
+    ProcessQueueManager::GetInstance()->EnablePop(mName);
 
     if (!mGoPipelineWithInput.isNull()) {
         // TODO: 加载该Go流水线

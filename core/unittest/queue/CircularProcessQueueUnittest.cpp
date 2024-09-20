@@ -15,6 +15,7 @@
 #include <memory>
 
 #include "models/PipelineEventGroup.h"
+#include "pipeline/PipelineManager.h"
 #include "pipeline/queue/CircularProcessQueue.h"
 #include "pipeline/queue/SenderQueue.h"
 #include "unittest/Unittest.h"
@@ -28,6 +29,7 @@ public:
     void TestPop();
     void TestReset();
     void TestMetric();
+    void TestSetPipeline();
 
 protected:
     static void SetUpTestCase() { sCtx.SetConfigName("test_config"); }
@@ -38,6 +40,7 @@ protected:
         mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
         mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
         mQueue->SetDownStreamQueues(vector<BoundedSenderQueueInterface*>{mSenderQueue1.get(), mSenderQueue2.get()});
+        mQueue->EnablePop();
     }
 
 private:
@@ -97,9 +100,9 @@ void CircularProcessQueueUnittest::TestPop() {
 
     mQueue->Push(GenerateItem(1));
     // invalidate pop
-    mQueue->InvalidatePop();
+    mQueue->DisablePop();
     APSARA_TEST_FALSE(mQueue->Pop(item));
-    mQueue->ValidatePop();
+    mQueue->EnablePop();
 
     // downstream queues are not valid to push
     mSenderQueue1->mValidToPush = false;
@@ -177,10 +180,31 @@ void CircularProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(0U, mQueue->mQueueDataSizeByte->GetValue());
 }
 
+void CircularProcessQueueUnittest::TestSetPipeline() {
+    auto pipeline = make_shared<Pipeline>();
+    PipelineManager::GetInstance()->mPipelineNameEntityMap["test_config"] = pipeline;
+
+    auto item1 = GenerateItem(1);
+    auto p1 = item1.get();
+    auto pipelineTmp = make_shared<Pipeline>();
+    item1->mPipeline = pipelineTmp;
+
+    auto item2 = GenerateItem(1);
+    auto p2 = item2.get();
+
+    mQueue->Push(std::move(item1));
+    mQueue->Push(std::move(item2));
+    mQueue->SetPipelineForItems("test_config");
+
+    APSARA_TEST_EQUAL(pipelineTmp, p1->mPipeline);
+    APSARA_TEST_EQUAL(pipeline, p2->mPipeline);
+}
+
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestPush)
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestPop)
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestReset)
 UNIT_TEST_CASE(CircularProcessQueueUnittest, TestMetric)
+UNIT_TEST_CASE(CircularProcessQueueUnittest, TestSetPipeline)
 
 } // namespace logtail
 

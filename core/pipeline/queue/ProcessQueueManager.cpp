@@ -229,29 +229,32 @@ bool ProcessQueueManager::SetFeedbackInterface(QueueKey key, vector<FeedbackInte
     return true;
 }
 
-void ProcessQueueManager::InvalidatePop(const string& configName) {
+void ProcessQueueManager::DisablePop(const string& configName, bool isPipelineRemoving) {
     if (QueueKeyManager::GetInstance()->HasKey(configName)) {
         auto key = QueueKeyManager::GetInstance()->GetKey(configName);
         lock_guard<mutex> lock(mQueueMux);
         auto iter = mQueues.find(key);
         if (iter != mQueues.end()) {
-            (*iter->second.first)->InvalidatePop();
+            (*iter->second.first)->DisablePop();
+            if (!isPipelineRemoving) {
+                (*iter->second.first)->SetPipelineForItems(configName);
+            }
         }
     } else {
-        ExactlyOnceQueueManager::GetInstance()->InvalidatePopProcessQueue(configName);
+        ExactlyOnceQueueManager::GetInstance()->DisablePopProcessQueue(configName, isPipelineRemoving);
     }
 }
 
-void ProcessQueueManager::ValidatePop(const string& configName) {
+void ProcessQueueManager::EnablePop(const string& configName) {
     if (QueueKeyManager::GetInstance()->HasKey(configName)) {
         auto key = QueueKeyManager::GetInstance()->GetKey(configName);
         lock_guard<mutex> lock(mQueueMux);
         auto iter = mQueues.find(key);
         if (iter != mQueues.end()) {
-            (*iter->second.first)->ValidatePop();
+            (*iter->second.first)->EnablePop();
         }
     } else {
-        ExactlyOnceQueueManager::GetInstance()->ValidatePopProcessQueue(configName);
+        ExactlyOnceQueueManager::GetInstance()->EnablePopProcessQueue(configName);
     }
 }
 
