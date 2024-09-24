@@ -167,8 +167,6 @@ private:
     MemStat mMemStat;
     IntGaugePtr mAgentMemoryGauge;
 
-    IntGaugePtr mAgentUsedSendingConcurrency;
-
     // Current scale up level, updated by CheckScaledCpuUsageUpLimit.
     float mScaledCpuUsageUpLimit;
 #if defined(__linux__)

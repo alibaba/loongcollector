@@ -16,8 +16,6 @@
 
 #include <time.h>
 
-#include "file_server/event_handler/EventHandler.h"
-#include "file_server/event_handler/HistoryFileImporter.h"
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "checkpoint/CheckPointManager.h"
@@ -27,18 +25,20 @@
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event/BlockEventManager.h"
-#include "file_server/ConfigManager.h"
-#include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
-#include "monitor/Monitor.h"
+#include "file_server/event_handler/EventHandler.h"
+#include "file_server/event_handler/HistoryFileImporter.h"
 #include "file_server/polling/PollingCache.h"
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingEventQueue.h"
 #include "file_server/polling/PollingModify.h"
 #include "file_server/reader/GloablFileDescriptorManager.h"
 #include "file_server/reader/LogFileReader.h"
+#include "logger/Logger.h"
+#include "monitor/LogtailAlarm.h"
+#include "monitor/Monitor.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -88,9 +88,11 @@ void LogInput::Start() {
 
     mInteruptFlag = false;
 
+    mLastRunTime = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
     mAgentOpenFdTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
-    mAgentRegisterHandlerTotal
-        = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_REGISTER_HANDLER_TOTAL);
+    mRegisterdHandlersCnt = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_WATCHED_DIRS_CNT);
+    mActiveReadersCnt = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ACTIVE_READERS_CNT);
+    mEnableFileIncludedByMultiConfigs = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG);
 
     new Thread([this]() { ProcessLoop(); });
 }
@@ -342,6 +344,7 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
 void LogInput::UpdateCriticalMetric(int32_t curTime) {
     LogtailMonitor::GetInstance()->UpdateMetric("last_read_event_time",
                                                 GetTimeStamp(mLastReadEventTime, "%Y-%m-%d %H:%M:%S"));
+    mLastRunTime->Set(mLastReadEventTime.load());
 
     LogtailMonitor::GetInstance()->UpdateMetric("event_tps",
                                                 1.0 * mEventProcessCount / (curTime - mLastUpdateMetricTime));
@@ -350,8 +353,9 @@ void LogInput::UpdateCriticalMetric(int32_t curTime) {
     mAgentOpenFdTotal->Set(openFdTotal);
     size_t handlerCount = EventDispatcher::GetInstance()->GetHandlerCount();
     LogtailMonitor::GetInstance()->UpdateMetric("register_handler", handlerCount);
-    mAgentRegisterHandlerTotal->Set(handlerCount);
+    mRegisterdHandlersCnt->Set(handlerCount);
     LogtailMonitor::GetInstance()->UpdateMetric("reader_count", CheckPointManager::Instance()->GetReaderCount());
+    mActiveReadersCnt->Set(CheckPointManager::Instance()->GetReaderCount());
     LogtailMonitor::GetInstance()->UpdateMetric("multi_config", AppConfig::GetInstance()->IsAcceptMultiConfig());
     mEventProcessCount = 0;
 }

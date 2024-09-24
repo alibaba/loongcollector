@@ -21,8 +21,6 @@
 #endif
 #include <sys/stat.h>
 
-#include "file_server/polling/PollingEventQueue.h"
-#include "file_server/polling/PollingModify.h"
 #include "app_config/AppConfig.h"
 #include "common/ErrorUtil.h"
 #include "common/FileSystemUtil.h"
@@ -30,10 +28,13 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
-#include "file_server/event/Event.h"
 #include "file_server/FileServer.h"
+#include "file_server/event/Event.h"
+#include "file_server/polling/PollingEventQueue.h"
+#include "file_server/polling/PollingModify.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
+#include "monitor/MetricConstants.h"
 
 // Control the check frequency to call ClearUnavailableFileAndDir.
 DEFINE_FLAG_INT32(check_not_exist_file_dir_round, "clear not exist file dir cache, round", 20);
@@ -69,10 +70,10 @@ static const int64_t NANO_CONVERTING = 1000000000;
 void PollingDirFile::Start() {
     ClearCache();
     mAgentConfigTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
-    mAgentPollingDirCacheSizeTotal
-        = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_POLLING_DIR_CACHE_SIZE_TOTAL);
-    mAgentPollingFileCacheSizeTotal
-        = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_POLLING_FILE_CACHE_SIZE_TOTAL);
+    mPollingDirCacheSize
+        = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_POLLING_DIR_CACHE_SIZE);
+    mPollingFileCacheSize
+        = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE);
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
 }
@@ -157,10 +158,10 @@ void PollingDirFile::Polling() {
                 ScopedSpinLock lock(mCacheLock);
                 size_t pollingDirCacheSize = mDirCacheMap.size();
                 LogtailMonitor::GetInstance()->UpdateMetric("polling_dir_cache", pollingDirCacheSize);
-                mAgentPollingDirCacheSizeTotal->Set(pollingDirCacheSize);
+                mPollingDirCacheSize->Set(pollingDirCacheSize);
                 size_t pollingFileCacheSize = mFileCacheMap.size();
                 LogtailMonitor::GetInstance()->UpdateMetric("polling_file_cache", pollingFileCacheSize);
-                mAgentPollingFileCacheSizeTotal->Set(pollingFileCacheSize);
+                mPollingFileCacheSize->Set(pollingFileCacheSize);
             }
 
             // Iterate all normal configs, make sure stat count will not exceed limit.

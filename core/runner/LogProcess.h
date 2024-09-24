@@ -23,6 +23,7 @@
 #include "common/LogRunnable.h"
 #include "common/Thread.h"
 #include "models/PipelineEventGroup.h"
+#include "monitor/LogtailMetric.h"
 #include "monitor/Monitor.h"
 #include "pipeline/queue/QueueKey.h"
 
@@ -60,8 +61,11 @@ private:
     std::atomic_bool* mThreadFlags;
     ReadWriteLock mAccessProcessThreadRWL;
 
-    IntGaugePtr mAgentProcessQueueFullTotal;
-    IntGaugePtr mAgentProcessQueueTotal;
+    thread_local static MetricsRecordRef sMetricsRecordRef;
+    thread_local static CounterPtr sInGroupsCnt;
+    thread_local static CounterPtr sInEventsCnt;
+    thread_local static CounterPtr sInGroupDataSizeBytes;
+    thread_local static IntGaugePtr sLastRunTime;
 };
 
 } // namespace logtail

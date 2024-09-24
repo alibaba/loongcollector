@@ -137,8 +137,8 @@ private:
     uint64_t mCurrentRound;
 
     IntGaugePtr mAgentConfigTotal;
-    IntGaugePtr mAgentPollingDirCacheSizeTotal;
-    IntGaugePtr mAgentPollingFileCacheSizeTotal;
+    IntGaugePtr mPollingDirCacheSize;
+    IntGaugePtr mPollingFileCacheSize;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PollingUnittest;

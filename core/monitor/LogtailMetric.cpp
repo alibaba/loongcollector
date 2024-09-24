@@ -205,34 +205,11 @@ WriteMetrics::~WriteMetrics() {
     Clear();
 }
 
-void WriteMetrics::PreparePluginCommonLabels(const std::string& projectName,
-                                             const std::string& logstoreName,
-                                             const std::string& region,
-                                             const std::string& configName,
-                                             const std::string& pluginType,
-                                             const std::string& pluginID,
-                                             const std::string& nodeID,
-                                             const std::string& childNodeID,
-                                             MetricLabels& labels) {
-    labels.emplace_back(std::make_pair(METRIC_LABEL_PROJECT, projectName));
-    labels.emplace_back(std::make_pair(METRIC_LABEL_LOGSTORE, logstoreName));
-    labels.emplace_back(std::make_pair(METRIC_LABEL_REGION, region));
-    labels.emplace_back(std::make_pair(METRIC_LABEL_CONFIG_NAME, configName));
-    labels.emplace_back(std::make_pair(METRIC_LABEL_PLUGIN_NAME, pluginType));
-    labels.emplace_back(std::make_pair(METRIC_LABEL_PLUGIN_ID, pluginID));
-    labels.emplace_back(std::make_pair(METRIC_LABEL_NODE_ID, nodeID));
-    labels.emplace_back(std::make_pair(METRIC_LABEL_CHILD_NODE_ID, childNodeID));
-}
-
 void WriteMetrics::PrepareMetricsRecordRef(MetricsRecordRef& ref,
                                            MetricLabels&& labels,
                                            DynamicMetricLabels&& dynamicLabels) {
-    MetricsRecord* cur = new MetricsRecord(std::make_shared<MetricLabels>(labels),
-                                           std::make_shared<DynamicMetricLabels>(dynamicLabels));
-    ref.SetMetricsRecord(cur);
-    std::lock_guard<std::mutex> lock(mMutex);
-    cur->SetNext(mHead);
-    mHead = cur;
+    CreateMetricsRecordRef(ref, std::move(labels), std::move(dynamicLabels));
+    CommitMetricsRecordRef(ref);
 }
 
 void WriteMetrics::CreateMetricsRecordRef(MetricsRecordRef& ref,

@@ -23,9 +23,11 @@
 #include "common/Lock.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/MultilineOptions.h"
+#include "file_server/reader/FileReaderOptions.h"
+#include "monitor/LogtailMetric.h"
 #include "monitor/PluginMetricManager.h"
 #include "pipeline/PipelineContext.h"
-#include "file_server/reader/FileReaderOptions.h"
+
 
 namespace logtail {
 
@@ -78,6 +80,7 @@ public:
     // for reader, event_handler ...
     ReentrantMetricsRecordRef GetOrCreateReentrantMetricsRecordRef(const std::string& name, MetricLabels& labels);
     void ReleaseReentrantMetricsRecordRef(const std::string& name, MetricLabels& labels);
+    MetricsRecordRef& GetMetricsRecordRef() { return mMetricsRecordRef; }
 
     // 过渡使用
     void Resume(bool isConfigUpdate = true);
@@ -88,7 +91,7 @@ public:
     void RemoveExactlyOnceConcurrency(const std::string& name);
 
 private:
-    FileServer() = default;
+    FileServer();
     ~FileServer() = default;
 
     void PauseInner();
@@ -102,6 +105,8 @@ private:
     std::unordered_map<std::string, PluginMetricManagerPtr> mPipelineNamePluginMetricManagersMap;
     // 过渡使用
     std::unordered_map<std::string, uint32_t> mPipelineNameEOConcurrencyMap;
+
+    mutable MetricsRecordRef mMetricsRecordRef;
 };
 
 } // namespace logtail

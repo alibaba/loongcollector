@@ -172,7 +172,7 @@ void CircularProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(dataSize1 + dataSize2, mQueue->mInItemDataSizeBytes->GetValue());
     APSARA_TEST_EQUAL(1U, mQueue->mQueueSize->GetValue());
     APSARA_TEST_EQUAL(dataSize2, mQueue->mQueueDataSizeByte->GetValue());
-    APSARA_TEST_EQUAL(2U, mQueue->mDroppedEventsCnt->GetValue());
+    APSARA_TEST_EQUAL(2U, mQueue->mDiscardedEventsCnt->GetValue());
 
     mQueue->Pop(item);
     APSARA_TEST_EQUAL(1U, mQueue->mOutItemsCnt->GetValue());

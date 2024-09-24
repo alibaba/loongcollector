@@ -79,8 +79,12 @@ private:
     volatile bool mIdleFlag;
     int32_t mEventProcessCount;
     int32_t mLastUpdateMetricTime;
+
+    IntGaugePtr mLastRunTime;
     IntGaugePtr mAgentOpenFdTotal;
-    IntGaugePtr mAgentRegisterHandlerTotal;
+    IntGaugePtr mRegisterdHandlersCnt;
+    IntGaugePtr mActiveReadersCnt;
+    IntGaugePtr mEnableFileIncludedByMultiConfigs;
 
     std::atomic_int mLastReadEventTime{0};
     mutable std::mutex mThreadRunningMux;

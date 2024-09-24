@@ -43,7 +43,7 @@ private:
     std::deque<std::unique_ptr<ProcessQueueItem>> mQueue;
     size_t mEventCnt = 0;
 
-    CounterPtr mDroppedEventsCnt;
+    CounterPtr mDiscardedEventsCnt;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class CircularProcessQueueUnittest;

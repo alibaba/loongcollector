@@ -18,18 +18,23 @@
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event_handler/LogInput.h"
-#include "file_server/ConfigManager.h"
-#include "plugin/input/InputFile.h"
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingModify.h"
+#include "plugin/input/InputFile.h"
 
 DEFINE_FLAG_BOOL(enable_polling_discovery, "", true);
 
 using namespace std;
 
 namespace logtail {
+
+FileServer::FileServer() {
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
+                                                         {{METRIC_LABEL_KEY_RUNNER_NAME, "file_server"}});
+}
 
 // 启动文件服务，包括加载配置、处理检查点、注册事件等
 void FileServer::Start() {

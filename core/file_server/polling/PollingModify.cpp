@@ -24,9 +24,11 @@
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/Event.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
+#include "monitor/MetricConstants.h"
 
 using namespace std;
 
@@ -47,7 +49,8 @@ PollingModify::~PollingModify() {
 
 void PollingModify::Start() {
     ClearCache();
-    mAgentPollingModifySizeTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_POLLING_MODIFY_SIZE_TOTAL);
+    mPollingModifySize
+        = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_POLLING_MODIFY_CACHE_SIZE);
 
     mRuningFlag = true;
     mThreadPtr = CreateThread([this]() { Polling(); });
@@ -251,7 +254,7 @@ void PollingModify::Polling() {
             int32_t statCount = 0;
             size_t pollingModifySizeTotal = mModifyCacheMap.size();
             LogtailMonitor::GetInstance()->UpdateMetric("polling_modify_size", pollingModifySizeTotal);
-            mAgentPollingModifySizeTotal->Set(pollingModifySizeTotal);
+            mPollingModifySize->Set(pollingModifySizeTotal);
             for (auto iter = mModifyCacheMap.begin(); iter != mModifyCacheMap.end(); ++iter) {
                 if (!mRuningFlag || mHoldOnFlag)
                     break;

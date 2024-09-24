@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <future>
 
+#include "monitor/LogtailMetric.h"
 #include "pipeline/plugin/interface/Flusher.h"
 #include "pipeline/queue/SenderQueueItem.h"
 #include "runner/sink/SinkType.h"
@@ -62,6 +63,15 @@ private:
     int32_t mLastCheckSendClientTime = 0;
     int64_t mSendLastTime = 0;
     int32_t mSendLastByte = 0;
+
+    mutable MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mInItemsCnt;
+    CounterPtr mInItemDataSizeBytes;
+    CounterPtr mInItemRawDataSizeBytes;
+    CounterPtr mOutItemsCnt;
+    CounterPtr mTotalDelayMs;
+    IntGaugePtr mWaitingItemsCnt;
+    IntGaugePtr mLastRunTime;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PluginRegistryUnittest;

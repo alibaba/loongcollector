@@ -2688,10 +2688,10 @@ void PipelineUnittest::TestProcess() const {
     pipeline.mProcessorLine.emplace_back(std::move(processor));
 
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, {});
-    pipeline.mProcessorsInEventsCnt = pipeline.mMetricsRecordRef.CreateCounter("processors_in_events_cnt");
-    pipeline.mProcessorsInGroupsCnt = pipeline.mMetricsRecordRef.CreateCounter("processors_in_event_groups_cnt");
+    pipeline.mProcessorsInEventsCnt = pipeline.mMetricsRecordRef.CreateCounter("pipeline_processors_in_events_total");
+    pipeline.mProcessorsInGroupsCnt = pipeline.mMetricsRecordRef.CreateCounter("pipeline_processors_in_event_groups_total");
     pipeline.mProcessorsInGroupDataSizeBytes
-        = pipeline.mMetricsRecordRef.CreateCounter("processors_in_event_group_data_size_bytes");
+        = pipeline.mMetricsRecordRef.CreateCounter("processors_in_event_group_size_bytes");
     pipeline.mProcessorsTotalDelayMs = pipeline.mMetricsRecordRef.CreateCounter("processors_total_delay_ms");
 
     vector<PipelineEventGroup> groups;

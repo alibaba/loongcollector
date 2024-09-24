@@ -33,12 +33,12 @@ public:
                                                                 {METRIC_LABEL_CONFIG_NAME, ctx.GetConfigName()},
                                                             });
 
-        mInItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_IN_ITEMS_CNT);
-        mInItemDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_IN_ITEM_SIZE_BYTES);
-        mOutItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_OUT_ITEMS_CNT);
-        mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_TOTAL_DELAY_MS);
-        mQueueSize = mMetricsRecordRef.CreateIntGauge("queue_size");
-        mQueueDataSizeByte = mMetricsRecordRef.CreateIntGauge("queue_data_size_bytes");
+        mInItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_ITEMS_CNT);
+        mInItemDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_ITEM_SIZE_BYTES);
+        mOutItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_OUT_ITEMS_CNT);
+        mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_TOTAL_DELAY_MS);
+        mQueueSize = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_SIZE_CNT);
+        mQueueDataSizeByte = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_SIZE_BYTES);
     }
     virtual ~QueueInterface() = default;
 

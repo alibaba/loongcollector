@@ -25,6 +25,7 @@
 
 #include "runner/sink/Sink.h"
 #include "runner/sink/http/HttpSinkRequest.h"
+#include "monitor/LogtailMetric.h"
 
 namespace logtail {
 
@@ -54,6 +55,15 @@ private:
 
     std::future<void> mThreadRes;
     std::atomic_bool mIsFlush = false;
+
+    mutable MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mInItemsCnt;
+    CounterPtr mOutSuccessfulItemsCnt;
+    CounterPtr mOutFailedItemsCnt;
+    // CounterPtr mTotalDelayMs; // TODO: should record distribution instead of average
+    IntGaugePtr mSendingItemsCnt;
+    IntGaugePtr mSendConcurrency;
+    IntGaugePtr mLastRunTime;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherRunnerUnittest;
