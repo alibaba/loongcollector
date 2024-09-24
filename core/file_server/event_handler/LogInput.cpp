@@ -106,7 +106,7 @@ void LogInput::Resume() {
 
 void LogInput::HoldOn() {
     LOG_INFO(sLogger, ("event handle daemon pause", "starts"));
-    if (BOOL_FLAG(enable_full_drain_mode)) {
+    if (BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()) {
         unique_lock<mutex> lock(mThreadRunningMux);
         mStopCV.wait(lock, [this]() { return mInteruptFlag; });
     } else {
