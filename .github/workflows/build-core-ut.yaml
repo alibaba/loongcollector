@@ -82,7 +82,7 @@ jobs:
         run: make unittest_core
 
       - name: Unit Test Coverage
-        run: docker build -t unittest_coverage -f ./docker/Dockerfile_coverage . && docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --root . --lcov coverage.lcov --txt coverage.txt -e \".*sdk.*\" -e \".*observer.*\" -e \".*protobuf.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*fuse.*\" -e \".*go_pipeline.*\""
+        run: docker build -t unittest_coverage -f ./docker/Dockerfile_coverage . && docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --root . --json coverage.json --json-summary-pretty --json-summary summary.json -e \".*sdk.*\" -e \".*observer.*\" -e \".*logger.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*go_pipeline.*\" -e \".*application.*\" -e \".*protobuf.*\" -e \".*runner.*\""
 
       - name: Setup Python3.10
         uses: actions/setup-python@v5
@@ -90,7 +90,7 @@ jobs:
           python-version: "3.10"
 
       - name: Report code coverage
-        run: python3 tools/coverage-diff/main.py core/coverage.txt
+        run: python3 tools/coverage-diff/main.py --path core/coverage.json --summary core/summary.json
 
   result:
     runs-on: arc-runner-set-ilogtail
