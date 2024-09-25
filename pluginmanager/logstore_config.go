@@ -877,9 +877,9 @@ func (lc *LogstoreConfig) genPluginMeta(pluginTypeWithID string, genNodeID bool,
 				atomic.StoreInt32(&lc.pluginID, int32(pluginID))
 			}
 			return &pipeline.PluginMeta{
-				PluginTypeWithID: pluginTypeWithID,
-				PluginType:       pluginTypeWithID[:ids],
-				PluginID:         pluginTypeWithID[ids+1:],
+				PluginTypeWithID: getPluginTypeWithID(pluginTypeWithID),
+				PluginType:       getPluginType(pluginTypeWithID),
+				PluginID:         getPluginID(pluginTypeWithID),
 				NodeID:           nodeID,
 				ChildNodeID:      childNodeID,
 			}
@@ -892,9 +892,9 @@ func (lc *LogstoreConfig) genPluginMeta(pluginTypeWithID string, genNodeID bool,
 	}
 	pluginTypeWithID = fmt.Sprintf("%s/%s", pluginType, pluginID)
 	return &pipeline.PluginMeta{
-		PluginTypeWithID: pluginTypeWithID,
-		PluginType:       pluginType,
-		PluginID:         pluginID,
+		PluginTypeWithID: getPluginTypeWithID(pluginTypeWithID),
+		PluginType:       getPluginType(pluginTypeWithID),
+		PluginID:         getPluginID(pluginTypeWithID),
 		NodeID:           nodeID,
 		ChildNodeID:      childNodeID,
 	}
@@ -905,6 +905,29 @@ func isPluginTypeWithID(pluginTypeWithID string) bool {
 		return true
 	}
 	return false
+}
+
+func getPluginID(pluginTypeWithID string) string {
+	slashCount := strings.Count(pluginTypeWithID, "/")
+	switch slashCount {
+	case 0:
+		return ""
+	case 1:
+		if idx := strings.IndexByte(pluginTypeWithID, '/'); idx != -1 {
+			return pluginTypeWithID[idx+1:]
+		}
+	default:
+		if firstIdx := strings.IndexByte(pluginTypeWithID, '/'); firstIdx != -1 {
+			if lastIdx := strings.LastIndexByte(pluginTypeWithID, '/'); lastIdx != -1 {
+				return pluginTypeWithID[firstIdx+1 : lastIdx]
+			}
+		}
+	}
+	return ""
+}
+
+func getPluginTypeWithID(pluginTypeWithID string) string {
+	return fmt.Sprintf("%s/%s", getPluginType(pluginTypeWithID), getPluginID(pluginTypeWithID))
 }
 
 func GetPluginPriority(pluginTypeWithID string) int {

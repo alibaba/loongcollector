@@ -153,7 +153,7 @@ func (p *pluginv2Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input p
 	p.MetricPlugins = append(p.MetricPlugins, &wrapper)
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
 		state:         input,
-		interval:      wrapper.Interval * time.Millisecond,
+		interval:      wrapper.Interval,
 		context:       p.LogstoreConfig.Context,
 		latencyMetric: p.LogstoreConfig.Statistics.CollecLatencytMetric,
 	})
@@ -189,7 +189,7 @@ func (p *pluginv2Runner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregat
 	p.AggregatorPlugins = append(p.AggregatorPlugins, &wrapper)
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
 		state:         aggregator,
-		interval:      time.Millisecond * wrapper.Interval,
+		interval:      wrapper.Interval,
 		context:       p.LogstoreConfig.Context,
 		latencyMetric: p.LogstoreConfig.Statistics.CollecLatencytMetric,
 	})
@@ -228,7 +228,7 @@ func (p *pluginv2Runner) runInput() {
 
 func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 	for _, t := range p.TimerRunner {
-		if plugin, ok := t.state.(*MetricWrapperV2); ok {
+		if plugin, ok := t.state.(pipeline.MetricInputV2); ok {
 			metric := plugin
 			timer := t
 			control.Run(func(cc *pipeline.AsyncControl) {
@@ -236,6 +236,8 @@ func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 					return metric.Read(p.InputPipeContext)
 				}, cc)
 			})
+		} else {
+			logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "METRIC_INPUT_V2_START_FAILURE", "type assertion", "failure")
 		}
 	}
 }
