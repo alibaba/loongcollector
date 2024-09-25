@@ -759,9 +759,13 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 		startPos.Pos = sc.checkpoint.Offset
 	}
 	if nil == gtid && 0 == len(startPos.Name) && !sc.StartFromBegining {
-		gtid, err = sc.getLatestGTID()
-		if err != nil {
-			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "Call getLatestGTID failed, error", err)
+		if sc.isGTIDEnabled {
+			gtid, err = sc.getLatestGTID()
+			if err != nil {
+				logger.Warning(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "Call getLatestGTID failed, error", err)
+			}
+		}
+		if gtid == nil {
 			startPos = sc.GetBinlogLatestPos()
 		}
 		logger.Infof(sc.context.GetRuntimeContext(), "Get latest checkpoint GTID: %v Position: %v", gtid, startPos)
