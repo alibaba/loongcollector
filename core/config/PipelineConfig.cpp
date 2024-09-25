@@ -140,9 +140,6 @@ bool PipelineConfig::Parse() {
     // extensions module parsing will rely on their results.
     bool hasObserverInput = false;
     bool hasFileInput = false;
-#ifdef __ENTERPRISE__
-    bool hasStreamInput = false;
-#endif
     key = "inputs";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (!itr) {
@@ -244,21 +241,10 @@ bool PipelineConfig::Parse() {
             hasObserverInput = true;
         } else if (pluginType == "input_file" || pluginType == "input_container_stdio") {
             hasFileInput = true;
-#ifdef __ENTERPRISE__
-        } else if (pluginType == "input_stream") {
-            if (!AppConfig::GetInstance()->GetOpenStreamLog()) {
-                PARAM_ERROR_RETURN(
-                    sLogger, alarm, "stream log is not enabled", noModule, mName, mProject, mLogstore, mRegion);
-            }
-            hasStreamInput = true;
-#endif
         }
     }
     // TODO: remove these special restrictions
     bool hasSpecialInput = hasObserverInput || hasFileInput;
-#ifdef __ENTERPRISE__
-    hasSpecialInput = hasSpecialInput || hasStreamInput;
-#endif
     if (hasSpecialInput && (*mDetail)["inputs"].size() > 1) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,
@@ -283,19 +269,6 @@ bool PipelineConfig::Parse() {
                                mLogstore,
                                mRegion);
         }
-#ifdef __ENTERPRISE__
-        // TODO: remove these special restrictions
-        if (hasStreamInput && !itr->empty()) {
-            PARAM_ERROR_RETURN(sLogger,
-                               alarm,
-                               "processor plugins coexist with input_stream",
-                               noModule,
-                               mName,
-                               mProject,
-                               mLogstore,
-                               mRegion);
-        }
-#endif
         bool isCurrentPluginNative = true;
         for (Json::Value::ArrayIndex i = 0; i < itr->size(); ++i) {
             const Json::Value& plugin = (*itr)[i];
@@ -520,19 +493,6 @@ bool PipelineConfig::Parse() {
             PARAM_ERROR_RETURN(
                 sLogger, alarm, "unsupported flusher plugin", pluginType, mName, mProject, mLogstore, mRegion);
         }
-#ifdef __ENTERPRISE__
-        // TODO: remove these special restrictions
-        if (hasStreamInput && pluginType != "flusher_sls") {
-            PARAM_ERROR_RETURN(sLogger,
-                               alarm,
-                               "flusher plugins other than flusher_sls coexist with input_stream",
-                               noModule,
-                               mName,
-                               mProject,
-                               mLogstore,
-                               mRegion);
-        }
-#endif
         mFlushers.push_back(&plugin);
     }
     // TODO: remove these special restrictions

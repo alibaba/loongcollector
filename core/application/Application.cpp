@@ -57,7 +57,6 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "common/LinuxDaemonUtil.h"
 #include "shennong/ShennongManager.h"
-#include "streamlog/StreamLogManager.h"
 #endif
 #else
 #include "provider/Provider.h"

@@ -61,7 +61,6 @@ private:
     void CheckIfInputUpdated(const Json::Value& config,
                              bool& isInputObserverChanged,
                              bool& isInputFileChanged,
-                             bool& isInputStreamChanged,
                              bool& isInputContainerStdioChanged);
 
     std::unordered_map<std::string, std::shared_ptr<Pipeline>> mPipelineNameEntityMap;

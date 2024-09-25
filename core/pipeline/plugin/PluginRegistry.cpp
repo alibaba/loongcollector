@@ -36,9 +36,6 @@
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
 #include "plugin/input/InputObserverNetwork.h"
-#ifdef __ENTERPRISE__
-#include "plugin/input/InputStream.h"
-#endif
 #endif
 #include "logger/Logger.h"
 #include "pipeline/plugin/creator/CProcessor.h"
@@ -136,9 +133,6 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>());
     RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>());
     RegisterInputCreator(new StaticInputCreator<InputObserverNetwork>());
-#ifdef __ENTERPRISE__
-    RegisterInputCreator(new StaticInputCreator<InputStream>());
-#endif
 #endif
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());

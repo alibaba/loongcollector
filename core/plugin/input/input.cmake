@@ -23,17 +23,10 @@ list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 if(MSVC)
     # remove observer related files in input
     list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/input/InputObserverNetwork.cpp ${CMAKE_SOURCE_DIR}/plugin/input/InputObserverNetwork.h)
-    if (ENABLE_ENTERPRISE)
-        list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/input/InputStream.cpp ${CMAKE_SOURCE_DIR}/plugin/input/InputStream.h)
-    endif ()
 elseif(UNIX)
     if (NOT LINUX)
         # remove observer related files in input
         list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/input/InputObserverNetwork.cpp ${CMAKE_SOURCE_DIR}/plugin/input/InputObserverNetwork.h)
-        # remove inputStream in input
-        if (ENABLE_ENTERPRISE)
-            list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/input/InputStream.cpp ${CMAKE_SOURCE_DIR}/plugin/input/InputStream.h)
-        endif ()
     endif()
 endif()
 

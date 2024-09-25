@@ -28,7 +28,6 @@
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
 #include "shennong/ShennongManager.h"
-#include "streamlog/StreamLogManager.h"
 #endif
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "pipeline/queue/ProcessQueueManager.h"
@@ -42,39 +41,25 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
 #ifndef APSARA_UNIT_TEST_MAIN
     // 过渡使用
     static bool isFileServerStarted = false, isInputObserverStarted = false;
-#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
-    static bool isInputStreamStarted = false;
-#endif
-    bool isInputObserverChanged = false, isInputFileChanged = false, isInputStreamChanged = false,
-         isInputContainerStdioChanged = false;
+    bool isInputObserverChanged = false, isInputFileChanged = false, isInputContainerStdioChanged = false;
     for (const auto& name : diff.mRemoved) {
         CheckIfInputUpdated(mPipelineNameEntityMap[name]->GetConfig()["inputs"][0],
                             isInputObserverChanged,
                             isInputFileChanged,
-                            isInputStreamChanged,
                             isInputContainerStdioChanged);
     }
     for (const auto& config : diff.mModified) {
-        CheckIfInputUpdated(*config.mInputs[0],
-                            isInputObserverChanged,
-                            isInputFileChanged,
-                            isInputStreamChanged,
-                            isInputContainerStdioChanged);
+        CheckIfInputUpdated(
+            *config.mInputs[0], isInputObserverChanged, isInputFileChanged, isInputContainerStdioChanged);
     }
     for (const auto& config : diff.mAdded) {
-        CheckIfInputUpdated(*config.mInputs[0],
-                            isInputObserverChanged,
-                            isInputFileChanged,
-                            isInputStreamChanged,
-                            isInputContainerStdioChanged);
+        CheckIfInputUpdated(
+            *config.mInputs[0], isInputObserverChanged, isInputFileChanged, isInputContainerStdioChanged);
     }
 
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Pause();
-    }
-    if (isInputStreamStarted && isInputStreamChanged) {
-        StreamLogManager::GetInstance()->ShutdownConfigUsage();
     }
 #endif
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -182,16 +167,6 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
     }
 #endif
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
-    if (isInputStreamChanged) {
-        if (isInputStreamStarted) {
-            StreamLogManager::GetInstance()->StartupConfigUsage();
-        } else {
-            if (AppConfig::GetInstance()->GetOpenStreamLog()) {
-                StreamLogManager::GetInstance()->Init();
-                isInputStreamStarted = true;
-            }
-        }
-    }
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Resume();
     }
@@ -228,11 +203,6 @@ string PipelineManager::GetPluginStatistics() const {
 
 void PipelineManager::StopAllPipelines() {
     LOG_INFO(sLogger, ("stop all pipelines", "starts"));
-#if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
-    if (AppConfig::GetInstance()->GetOpenStreamLog()) {
-        StreamLogManager::GetInstance()->Shutdown();
-    }
-#endif
     PrometheusInputRunner::GetInstance()->Stop();
 #if defined(__linux__) && !defined(__ANDROID__)
     ObserverManager::GetInstance()->HoldOn(true);
@@ -296,15 +266,12 @@ void PipelineManager::DecreasePluginUsageCnt(const unordered_map<string, unorder
 void PipelineManager::CheckIfInputUpdated(const Json::Value& config,
                                           bool& isInputObserverChanged,
                                           bool& isInputFileChanged,
-                                          bool& isInputStreamChanged,
                                           bool& isInputContainerStdioChanged) {
     string inputType = config["Type"].asString();
     if (inputType == "input_observer_network") {
         isInputObserverChanged = true;
     } else if (inputType == "input_file") {
         isInputFileChanged = true;
-    } else if (inputType == "input_stream") {
-        isInputStreamChanged = true;
     } else if (inputType == "input_container_stdio") {
         isInputContainerStdioChanged = true;
     }

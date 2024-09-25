@@ -284,7 +284,6 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     AddLogContent(logPtr, "projects", FlusherSLS::GetAllProjects());
     AddLogContent(logPtr, "instance_id", Application::GetInstance()->GetInstanceId());
     AddLogContent(logPtr, "instance_key", id);
-    AddLogContent(logPtr, "syslog_open", AppConfig::GetInstance()->GetOpenStreamLog());
     // Host informations.
     AddLogContent(logPtr, "ip", LogFileProfiler::mIpAddr);
     AddLogContent(logPtr, "hostname", LogFileProfiler::mHostname);

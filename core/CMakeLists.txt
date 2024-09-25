@@ -125,7 +125,7 @@ set(SUB_DIRECTORIES_LIST
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk streamlog aggregator)
+        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk)
     endif()
 elseif(MSVC)
     if (ENABLE_ENTERPRISE)

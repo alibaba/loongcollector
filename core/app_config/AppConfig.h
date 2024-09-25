@@ -57,7 +57,7 @@ private:
     // uint32_t mStreamLogTcpPort;
     // uint32_t mStreamLogPoolSizeInMb;
     // uint32_t mStreamLogRcvLenPerCall;
-    bool mOpenStreamLog;
+    // bool mOpenStreamLog;
 
     // performance
     float mCpuUsageUpLimit;
@@ -285,7 +285,7 @@ public:
 
     // uint32_t GetStreamLogRcvLenPerCall() const { return mStreamLogRcvLenPerCall; }
 
-    bool GetOpenStreamLog() const { return mOpenStreamLog; }
+    // bool GetOpenStreamLog() const { return mOpenStreamLog; }
 
     std::string GetIlogtailConfigJson() {
         ScopedSpinLock lock(mAppConfigLock);
