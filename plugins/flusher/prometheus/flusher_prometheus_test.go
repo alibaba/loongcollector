@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/snappy"
 	"github.com/jarcoal/httpmock"
@@ -239,6 +240,8 @@ func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWit
 			httpmock.ZeroCallCounters()
 			err := flusher.Export(groupEventsSlice, nil)
 			So(err, ShouldBeNil)
+
+			time.Sleep(1 * time.Second) // guarantee that all http requests are handled
 
 			err = flusher.Stop()
 			So(err, ShouldBeNil)
