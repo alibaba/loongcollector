@@ -31,12 +31,12 @@
 #include "pipeline/limiter/ConcurrencyLimiter.h"
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/serializer/SLSSerializer.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
 
 class FlusherSLS : public HttpFlusher {
 public:
-    enum class TelemetryType { LOG, METRIC };
 
     static std::shared_ptr<ConcurrencyLimiter> GetProjectConcurrencyLimiter(const std::string& project);
     static std::shared_ptr<ConcurrencyLimiter> GetRegionConcurrencyLimiter(const std::string& region);
@@ -77,7 +77,7 @@ public:
     std::string mRegion;
     std::string mEndpoint;
     std::string mAliuid;
-    TelemetryType mTelemetryType = TelemetryType::LOG;
+    sls_logs::SlsTelemetryType mTelemetryType = sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS;
     std::vector<std::string> mShardHashKeys;
     uint32_t mMaxSendRate = 0; // preserved only for exactly once
     uint32_t mFlowControlExpireTime = 0;

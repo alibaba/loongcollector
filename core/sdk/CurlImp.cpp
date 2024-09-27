@@ -13,10 +13,12 @@
 // limitations under the License.
 
 #include "CurlImp.h"
-#include "Exception.h"
-#include "DNSCache.h"
-#include "app_config/AppConfig.h"
+
 #include <curl/curl.h>
+
+#include "DNSCache.h"
+#include "Exception.h"
+#include "app_config/AppConfig.h"
 #include "common/http/Curl.h"
 
 using namespace std;

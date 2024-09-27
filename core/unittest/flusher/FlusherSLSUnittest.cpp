@@ -104,7 +104,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("", flusher->mEndpoint);
 #endif
     APSARA_TEST_EQUAL("", flusher->mAliuid);
-    APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
+    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
                       flusher->mBatcher.GetEventFlushStrategy().GetMaxCnt());
@@ -154,7 +154,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
     APSARA_TEST_EQUAL("", flusher->mAliuid);
 #endif
-    APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::METRIC, flusher->mTelemetryType);
+    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_METRICS, flusher->mTelemetryType);
     APSARA_TEST_EQUAL(1U, flusher->mShardHashKeys.size());
     SenderQueueManager::GetInstance()->Clear();
 
@@ -185,7 +185,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("", flusher->mEndpoint);
 #endif
     APSARA_TEST_EQUAL("", flusher->mAliuid);
-    APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
+    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
     SenderQueueManager::GetInstance()->Clear();
 
@@ -249,7 +249,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1", "1", "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
+    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     SenderQueueManager::GetInstance()->Clear();
 
     configStr = R"(
@@ -267,7 +267,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1", "1", "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(FlusherSLS::TelemetryType::LOG, flusher->mTelemetryType);
+    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     SenderQueueManager::GetInstance()->Clear();
 
     // ShardHashKeys

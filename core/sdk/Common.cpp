@@ -70,6 +70,7 @@ namespace sdk {
     const char* const LOGE_INVALID_SEQUENCE_ID = "InvalidSequenceId";
 
     const char* const LOGSTORES = "/logstores";
+    const char* const METRICSTORES = "/prometheus";
     const char* const SHARDS = "/shards";
     const char* const INDEX = "/index";
     const char* const CONFIGS = "/configs";

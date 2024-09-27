@@ -27,4 +27,5 @@ message LogtailBufferMeta
     optional int32 rawsize = 6;
     optional string shardhashkey = 7;
     optional SlsCompressType compresstype = 8;
+    optional SlsTelemetryType telemetrytype = 9;
 }

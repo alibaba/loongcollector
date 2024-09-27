@@ -14,6 +14,8 @@
 
 #include "plugin/flusher/sls/FlusherSLS.h"
 
+#include "sls_logs.pb.h"
+
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -56,6 +58,7 @@ DEFINE_FLAG_INT32(discard_send_fail_interval, "discard data when send fail after
 DEFINE_FLAG_INT32(profile_data_send_retrytimes, "how many times should retry if profile data send fail", 5);
 DEFINE_FLAG_INT32(unknow_error_try_max, "discard data when try times > this value", 5);
 DEFINE_FLAG_BOOL(global_network_success, "global network success flag, default false", false);
+DEFINE_FLAG_BOOL(enable_metricstore_channel, "only works for metrics data for enhance metrics query performance", true);
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
@@ -360,6 +363,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 
     // TelemetryType
     string telemetryType;
+
     if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
@@ -371,7 +375,8 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
     } else if (telemetryType == "metrics") {
-        mTelemetryType = TelemetryType::METRIC;
+        mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
+                                                               : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
     } else if (!telemetryType.empty() && telemetryType != "logs") {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
@@ -559,20 +564,29 @@ unique_ptr<HttpSinkRequest> FlusherSLS::BuildRequest(SenderQueueItem* item) cons
     }
 
     if (data->mType == RawDataType::EVENT_GROUP) {
-        if (data->mShardHashKey.empty()) {
-            return sendClient->CreatePostLogStoreLogsRequest(
+        if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+            return sendClient->CreatePostMetricStoreLogsRequest(
                 mProject, data->mLogstore, ConvertCompressType(GetCompressType()), data->mData, data->mRawSize, item);
         } else {
-            auto& exactlyOnceCpt = data->mExactlyOnceCheckpoint;
-            int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
-            return sendClient->CreatePostLogStoreLogsRequest(mProject,
-                                                             data->mLogstore,
-                                                             ConvertCompressType(GetCompressType()),
-                                                             data->mData,
-                                                             data->mRawSize,
-                                                             item,
-                                                             data->mShardHashKey,
-                                                             hashKeySeqID);
+            if (data->mShardHashKey.empty()) {
+                return sendClient->CreatePostLogStoreLogsRequest(mProject,
+                                                                 data->mLogstore,
+                                                                 ConvertCompressType(GetCompressType()),
+                                                                 data->mData,
+                                                                 data->mRawSize,
+                                                                 item);
+            } else {
+                auto& exactlyOnceCpt = data->mExactlyOnceCheckpoint;
+                int64_t hashKeySeqID = exactlyOnceCpt ? exactlyOnceCpt->data.sequence_id() : sdk::kInvalidHashKeySeqID;
+                return sendClient->CreatePostLogStoreLogsRequest(mProject,
+                                                                 data->mLogstore,
+                                                                 ConvertCompressType(GetCompressType()),
+                                                                 data->mData,
+                                                                 data->mRawSize,
+                                                                 item,
+                                                                 data->mShardHashKey,
+                                                                 hashKeySeqID);
+            }
         }
     } else {
         if (data->mShardHashKey.empty())
@@ -726,8 +740,8 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 //  the possibility of hash key conflict is very low, so data is
                 //  dropped here.
                 cpt->Commit();
-                failDetail << ", drop exactly once log group and commit checkpoint" << " checkpointKey:" << cpt->key
-                           << " checkpoint:" << cpt->data.DebugString();
+                failDetail << ", drop exactly once log group and commit checkpoint"
+                           << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
                 suggestion << "no suggestion";
                 LogtailAlarm::GetInstance()->SendAlarm(
                     EXACTLY_ONCE_ALARM,

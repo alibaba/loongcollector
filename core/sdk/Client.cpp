@@ -14,6 +14,7 @@
 
 #include "Client.h"
 
+#include "Common.h"
 #include "CurlImp.h"
 #include "Exception.h"
 #include "Result.h"
@@ -219,7 +220,8 @@ namespace sdk {
                                                       sls_logs::SlsCompressType compressType,
                                                       const std::string& compressedLogGroup,
                                                       uint32_t rawSize,
-                                                      const std::string& hashKey) {
+                                                      const std::string& hashKey,
+                                                      bool isTimeSeries) {
         map<string, string> httpHeader;
         httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
         if (!mKeyProvider.empty()) {
@@ -227,7 +229,11 @@ namespace sdk {
         }
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(rawSize);
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
-        return SynPostLogStoreLogs(project, logstore, compressedLogGroup, httpHeader, hashKey);
+        if (isTimeSeries) {
+            return SynPostMetricStoreLogs(project, logstore, compressedLogGroup, httpHeader);
+        } else {
+            return SynPostLogStoreLogs(project, logstore, compressedLogGroup, httpHeader, hashKey);
+        }
     }
 
     PostLogStoreLogsResponse Client::PostLogStoreLogPackageList(const std::string& project,
@@ -253,7 +259,8 @@ namespace sdk {
                                                                       uint32_t rawSize,
                                                                       SenderQueueItem* item,
                                                                       const std::string& hashKey,
-                                                                      int64_t hashKeySeqID) {
+                                                                      int64_t hashKeySeqID,
+                                                                      bool isTimeSeries) {
         map<string, string> httpHeader;
         httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
         if (!mKeyProvider.empty()) {
@@ -261,9 +268,15 @@ namespace sdk {
         }
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(rawSize);
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
-        return CreateAsynPostLogStoreLogsRequest(
-            project, logstore, compressedLogGroup, httpHeader, hashKey, hashKeySeqID, item);
+        if (isTimeSeries) {
+            return CreateAsynPostMetricStoreLogsRequest(
+                project, logstore, compressedLogGroup, httpHeader,item);
+        } else {
+            return CreateAsynPostLogStoreLogsRequest(
+                project, logstore, compressedLogGroup, httpHeader, hashKey, hashKeySeqID, item);
+        }
     }
+
 
     unique_ptr<HttpSinkRequest> Client::CreatePostLogStoreLogPackageListRequest(const std::string& project,
                                                                                 const std::string& logstore,
@@ -314,6 +327,22 @@ namespace sdk {
         }
     }
 
+    std::unique_ptr<HttpSinkRequest>
+    Client::CreateAsynPostMetricStoreLogsRequest(const std::string& project,
+                                                 const std::string& logstore,
+                                                 const std::string& body,
+                                                 std::map<std::string, std::string>& httpHeader,
+                                                 SenderQueueItem* item) {
+        string operation = METRICSTORES;
+        operation.append("/").append(project).append("/").append(logstore).append("/api/v1/write");
+        httpHeader[CONTENT_MD5] = CalcMD5(body);
+        map<string, string> parameterList;
+        string host = GetSlsHost();
+        SetCommonHeader(httpHeader, (int32_t)(body.length()), "");
+        string signature = GetUrlSignature(HTTP_POST, operation, httpHeader, parameterList, body, GetAccessKey());
+        httpHeader[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + GetAccessKeyId() + ':' + signature;
+        return make_unique<HttpSinkRequest>(HTTP_POST, mUsingHTTPS, host, mPort, operation, "", httpHeader, body, item);
+    }
     unique_ptr<HttpSinkRequest>
     Client::CreateAsynPostLogStoreLogsRequest(const std::string& project,
                                               const std::string& logstore,
@@ -388,6 +417,24 @@ namespace sdk {
         HttpMessage httpResponse;
         SendRequest(project, HTTP_POST, operation, body, parameterList, httpHeader, httpResponse, realIpPtr);
 
+        PostLogStoreLogsResponse ret;
+        ret.bodyBytes = (int32_t)body.size();
+        ret.statusCode = httpResponse.statusCode;
+        ret.requestId = httpResponse.header[X_LOG_REQUEST_ID];
+        return ret;
+    }
+
+    PostLogStoreLogsResponse Client::SynPostMetricStoreLogs(const std::string& project,
+                                                            const std::string& logstore,
+                                                            const std::string& body,
+                                                            std::map<std::string, std::string>& httpHeader,
+                                                            std::string* realIpPtr) {
+        string operation = METRICSTORES;
+        operation.append("/").append(project).append("/").append(logstore).append("/api/v1/write");
+        httpHeader[CONTENT_MD5] = CalcMD5(body);
+        map<string, string> parameterList;
+        HttpMessage httpResponse;
+        SendRequest(project, HTTP_POST, operation, body, parameterList, httpHeader, httpResponse, realIpPtr);
         PostLogStoreLogsResponse ret;
         ret.bodyBytes = (int32_t)body.size();
         ret.statusCode = httpResponse.statusCode;

@@ -100,7 +100,18 @@ namespace sdk {
                                                   sls_logs::SlsCompressType compressType,
                                                   const std::string& compressedLogGroup,
                                                   uint32_t rawSize,
-                                                  const std::string& hashKey = "");
+                                                  const std::string& hashKey = "",
+                                                  bool isTimeSeries = false);
+
+        PostLogStoreLogsResponse PostMetricStoreLogs(const std::string& project,
+                                                     const std::string& logstore,
+                                                     sls_logs::SlsCompressType compressType,
+                                                     const std::string& compressedLogGroup,
+                                                     uint32_t rawSize) {
+            return PostLogStoreLogs(project, logstore, compressType, compressedLogGroup, rawSize, "", true);
+        }
+
+
         /** Sync Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
          * @param project The project name
          * @param logstore The logstore name
@@ -127,7 +138,27 @@ namespace sdk {
                                                                        uint32_t rawSize,
                                                                        SenderQueueItem* item,
                                                                        const std::string& hashKey = "",
-                                                                       int64_t hashKeySeqID = kInvalidHashKeySeqID);
+                                                                       int64_t hashKeySeqID = kInvalidHashKeySeqID,
+                                                                       bool isTimeSeries = false);
+        /** Async Put metrics data to SLS metricstore. Unsuccessful opertaion will cause an LOGException.
+         * @param project The project name
+         * @param logstore The logstore name
+         * @param compressedLogGroup data of logGroup, LZ4 comressed
+         * @param rawSize before compress
+         * @param compressType compression type
+         * @return request_id.
+         */
+        std::unique_ptr<HttpSinkRequest> CreatePostMetricStoreLogsRequest(const std::string& project,
+                                                                          const std::string& logstore,
+                                                                          sls_logs::SlsCompressType compressType,
+                                                                          const std::string& compressedLogGroup,
+                                                                          uint32_t rawSize,
+                                                                          SenderQueueItem* item) {
+            return CreatePostLogStoreLogsRequest(
+                project, logstore, compressType, compressedLogGroup, rawSize, item, "", kInvalidHashKeySeqID, true);
+        }
+
+
         /** Async Put data to LOG service. Unsuccessful opertaion will cause an LOGException.
          * @param project The project name
          * @param logstore The logstore name
@@ -171,6 +202,13 @@ namespace sdk {
                                           int64_t hashKeySeqID,
                                           SenderQueueItem* item);
 
+        std::unique_ptr<HttpSinkRequest>
+        CreateAsynPostMetricStoreLogsRequest(const std::string& project,
+                                             const std::string& logstore,
+                                             const std::string& body,
+                                             std::map<std::string, std::string>& httpHeader,
+                                             SenderQueueItem* item);
+
         // PingSLSServer sends a trivial data packet to SLS for some inner purposes.
         PostLogStoreLogsResponse
         PingSLSServer(const std::string& project, const std::string& logstore, std::string* realIpPtr = NULL);
@@ -181,6 +219,12 @@ namespace sdk {
                                                      std::map<std::string, std::string>& httpHeader,
                                                      const std::string& hashKey,
                                                      std::string* realIpPtr = NULL);
+
+        PostLogStoreLogsResponse SynPostMetricStoreLogs(const std::string& project,
+                                                        const std::string& logstore,
+                                                        const std::string& body,
+                                                        std::map<std::string, std::string>& httpHeader,
+                                                        std::string* realIpPtr = NULL);
 
         void SetCommonHeader(std::map<std::string, std::string>& httpHeader,
                              int32_t contentLength,
