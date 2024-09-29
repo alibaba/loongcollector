@@ -30,30 +30,30 @@ type MetricWrapperV1 struct {
 	Input    pipeline.MetricInputV1
 }
 
-func (p *MetricWrapperV1) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
-	p.InitMetricRecord(pluginMeta)
+func (wrapper *MetricWrapperV1) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
+	wrapper.InitMetricRecord(pluginMeta)
 
-	interval, err := p.Input.Init(p.Config.Context)
+	interval, err := wrapper.Input.Init(wrapper.Config.Context)
 	if err != nil {
 		return err
 	}
 	if interval == 0 {
 		interval = inputInterval
 	}
-	p.Interval = time.Duration(interval) * time.Millisecond
+	wrapper.Interval = time.Duration(interval) * time.Millisecond
 	return nil
 }
 
-func (p *MetricWrapperV1) Run(control *pipeline.AsyncControl) {
-	logger.Info(p.Config.Context.GetRuntimeContext(), "start run metric ", p.Input.Description())
-	defer panicRecover(p.Input.Description())
+func (wrapper *MetricWrapperV1) Run(control *pipeline.AsyncControl) {
+	logger.Info(wrapper.Config.Context.GetRuntimeContext(), "start run metric ", wrapper.Input.Description())
+	defer panicRecover(wrapper.Input.Description())
 	for {
-		exitFlag := util.RandomSleep(p.Interval, 0.1, control.CancelToken())
+		exitFlag := util.RandomSleep(wrapper.Interval, 0.1, control.CancelToken())
 		startTime := time.Now()
-		err := p.Input.Collect(p)
-		p.LatencyMetric.Observe(float64(time.Since(startTime)))
+		err := wrapper.Input.Collect(wrapper)
+		wrapper.LatencyMetric.Observe(float64(time.Since(startTime)))
 		if err != nil {
-			logger.Error(p.Config.Context.GetRuntimeContext(), "INPUT_COLLECT_ALARM", "error", err)
+			logger.Error(wrapper.Config.Context.GetRuntimeContext(), "INPUT_COLLECT_ALARM", "error", err)
 		}
 		if exitFlag {
 			return
@@ -61,35 +61,36 @@ func (p *MetricWrapperV1) Run(control *pipeline.AsyncControl) {
 	}
 }
 
-func (p *MetricWrapperV1) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
-	p.AddDataWithContext(tags, fields, nil, t...)
+func (wrapper *MetricWrapperV1) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
+	wrapper.AddDataWithContext(tags, fields, nil, t...)
 }
 
-func (p *MetricWrapperV1) AddDataArray(tags map[string]string,
+func (wrapper *MetricWrapperV1) AddDataArray(tags map[string]string,
 	columns []string,
 	values []string,
 	t ...time.Time) {
-	p.AddDataArrayWithContext(tags, columns, values, nil, t...)
+	wrapper.AddDataArrayWithContext(tags, columns, values, nil, t...)
 }
 
-func (p *MetricWrapperV1) AddRawLog(log *protocol.Log) {
-	p.AddRawLogWithContext(log, nil)
+func (wrapper *MetricWrapperV1) AddRawLog(log *protocol.Log) {
+	wrapper.AddRawLogWithContext(log, nil)
 }
 
-func (p *MetricWrapperV1) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
+func (wrapper *MetricWrapperV1) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
 	var logTime time.Time
 	if len(t) == 0 {
 		logTime = time.Now()
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, p.Tags, tags, fields)
-	p.inputRecordsTotal.Add(1)
-	p.inputRecordsSizeBytes.Add(int64(slsLog.Size()))
-	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
+	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, wrapper.Tags, tags, fields)
+	wrapper.outEventsTotal.Add(1)
+	wrapper.outEventGroupsTotal.Add(1)
+	wrapper.outSizeBytes.Add(int64(slsLog.Size()))
+	wrapper.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *MetricWrapperV1) AddDataArrayWithContext(tags map[string]string,
+func (wrapper *MetricWrapperV1) AddDataArrayWithContext(tags map[string]string,
 	columns []string,
 	values []string,
 	ctx map[string]interface{},
@@ -100,14 +101,16 @@ func (p *MetricWrapperV1) AddDataArrayWithContext(tags map[string]string,
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, p.Tags, tags, columns, values)
-	p.inputRecordsTotal.Add(1)
-	p.inputRecordsSizeBytes.Add(int64(slsLog.Size()))
-	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
+	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, wrapper.Tags, tags, columns, values)
+	wrapper.outEventsTotal.Add(1)
+	wrapper.outEventGroupsTotal.Add(1)
+	wrapper.outSizeBytes.Add(int64(slsLog.Size()))
+	wrapper.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *MetricWrapperV1) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	p.inputRecordsTotal.Add(1)
-	p.inputRecordsSizeBytes.Add(int64(log.Size()))
-	p.LogsChan <- &pipeline.LogWithContext{Log: log, Context: ctx}
+func (wrapper *MetricWrapperV1) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
+	wrapper.outEventsTotal.Add(1)
+	wrapper.outEventGroupsTotal.Add(1)
+	wrapper.outSizeBytes.Add(int64(log.Size()))
+	wrapper.LogsChan <- &pipeline.LogWithContext{Log: log, Context: ctx}
 }

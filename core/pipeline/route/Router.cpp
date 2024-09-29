@@ -15,7 +15,7 @@
 #include "pipeline/route/Router.h"
 
 #include "common/ParamExtractor.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/plugin/interface/Flusher.h"
 
@@ -36,16 +36,16 @@ bool Router::Init(std::vector<pair<size_t, const Json::Value*>> configs, const P
     }
 
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
-                                                         {{METRIC_LABEL_PROJECT, ctx.GetProjectName()},
-                                                          {METRIC_LABEL_CONFIG_NAME, ctx.GetConfigName()},
-                                                          {METRIC_LABEL_KEY_COMPONENT_NAME, "router"}});
-    mInEventsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_CNT);
-    mInGroupDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENT_GROUP_SIZE_BYTES);
+                                                         {{METRIC_LABEL_KEY_PROJECT, ctx.GetProjectName()},
+                                                          {METRIC_LABEL_KEY_PIPELINE_NAME, ctx.GetConfigName()},
+                                                          {METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_ROUTER}});
+    mInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_TOTAL);
+    mInGroupDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
     return true;
 }
 
 vector<size_t> Router::Route(const PipelineEventGroup& g) const {
-    mInEventsCnt->Add(g.GetEvents().size());
+    mInEventsTotal->Add(g.GetEvents().size());
     mInGroupDataSizeBytes->Add(g.DataSize());
 
     vector<size_t> res(mAlwaysMatchedFlusherIdx);

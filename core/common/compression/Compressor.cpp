@@ -16,7 +16,7 @@
 
 #include <chrono>
 
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 using namespace std;
 
@@ -25,18 +25,18 @@ namespace logtail {
 void Compressor::SetMetricRecordRef(MetricLabels&& labels, DynamicMetricLabels&& dynamicLabels) {
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
         mMetricsRecordRef, std::move(labels), std::move(dynamicLabels));
-    mInItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_ITEMS_CNT);
-    mInItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_ITEM_SIZE_BYTES);
-    mOutItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_OUT_ITEMS_CNT);
-    mOutItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_OUT_ITEM_SIZE_BYTES);
-    mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_TOTAL_DELAY_MS);
-    mDiscardedItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_ITEMS_CNT);
+    mInItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_ITEMS_TOTAL);
+    mInItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
+    mOutItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_OUT_ITEMS_TOTAL);
+    mOutItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_OUT_SIZE_BYTES);
+    mTotalProcessMs = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_TOTAL_PROCESS_TIME_MS);
+    mDiscardedItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_ITEMS_TOTAL);
     mDiscardedItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_ITEMS_SIZE_BYTES);
 }
 
 bool Compressor::DoCompress(const string& input, string& output, string& errorMsg) {
     if (mMetricsRecordRef != nullptr) {
-        mInItemsCnt->Add(1);
+        mInItemsTotal->Add(1);
         mInItemSizeBytes->Add(input.size());
     }
 
@@ -44,12 +44,12 @@ bool Compressor::DoCompress(const string& input, string& output, string& errorMs
     auto res = Compress(input, output, errorMsg);
 
     if (mMetricsRecordRef != nullptr) {
-        mTotalDelayMs->Add(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - before).count());
+        mTotalProcessMs->Add(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - before).count());
         if (res) {
-            mOutItemsCnt->Add(1);
+            mOutItemsTotal->Add(1);
             mOutItemSizeBytes->Add(output.size());
         } else {
-            mDiscardedItemsCnt->Add(1);
+            mDiscardedItemsTotal->Add(1);
             mDiscardedItemSizeBytes->Add(input.size());
         }
     }

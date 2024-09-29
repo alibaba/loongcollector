@@ -77,7 +77,7 @@ func (p *pluginv2Runner) Init(inputQueueSize int, flushQueueSize int) error {
 
 func (p *pluginv2Runner) AddDefaultAggregatorIfEmpty() error {
 	if len(p.AggregatorPlugins) == 0 {
-		pluginMeta := p.LogstoreConfig.genPluginMeta("aggregator_default", true, false)
+		pluginMeta := p.LogstoreConfig.genPluginMeta("aggregator_default")
 		logger.Debug(p.LogstoreConfig.Context.GetRuntimeContext(), "add default aggregator")
 		if err := loadAggregator(pluginMeta, p.LogstoreConfig, nil); err != nil {
 			return err

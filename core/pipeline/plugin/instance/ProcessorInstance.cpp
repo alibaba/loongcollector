@@ -20,7 +20,7 @@
 
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 using namespace std;
 
@@ -28,33 +28,37 @@ namespace logtail {
 
 bool ProcessorInstance::Init(const Json::Value& config, PipelineContext& context) {
     mPlugin->SetContext(context);
-    mPlugin->SetMetricsRecordRef(Name(), PluginID(), NodeID(), ChildNodeID());
+    mPlugin->SetMetricsRecordRef(Name(), PluginID());
     if (!mPlugin->Init(config)) {
         return false;
     }
 
     // should init plugin first， then could GetMetricsRecordRef from plugin
-    mProcInRecordsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_IN_RECORDS_TOTAL);
-    mProcOutRecordsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_OUT_RECORDS_TOTAL);
-    mProcTimeMS = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PROC_TIME_MS);
+    mInEventsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
+    mOutEventsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+    mInSizeBytes = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_SIZE_BYTES);
+    mOutSizeBytes = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SIZE_BYTES);
+    mTotalProcessTimeMs = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_TOTAL_PROCESS_TIME_MS);
 
     return true;
 }
 
-void ProcessorInstance::Process(vector<PipelineEventGroup>& logGroupList) {
-    if (logGroupList.empty()) {
+void ProcessorInstance::Process(vector<PipelineEventGroup>& eventGroupList) {
+    if (eventGroupList.empty()) {
         return;
     } 
-    for (const auto& logGroup : logGroupList) {
-        mProcInRecordsTotal->Add(logGroup.GetEvents().size());
+    for (const auto& eventGroup : eventGroupList) {
+        mInEventsTotal->Add(eventGroup.GetEvents().size());
+        mInSizeBytes->Add(eventGroup.DataSize());
     }
 
     auto before = chrono::system_clock::now();
-    mPlugin->Process(logGroupList);
-    mProcTimeMS->Add(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - before).count());
+    mPlugin->Process(eventGroupList);
+    mTotalProcessTimeMs->Add(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - before).count());
 
-    for (const auto& logGroup : logGroupList) {
-        mProcOutRecordsTotal->Add(logGroup.GetEvents().size());
+    for (const auto& eventGroup : eventGroupList) {
+        mOutEventsTotal->Add(eventGroup.GetEvents().size());
+        mOutSizeBytes->Add(eventGroup.DataSize());
     }    
 }
 

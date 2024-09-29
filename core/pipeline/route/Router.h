@@ -39,7 +39,7 @@ private:
     std::vector<size_t> mAlwaysMatchedFlusherIdx;
 
     mutable MetricsRecordRef mMetricsRecordRef;
-    CounterPtr mInEventsCnt;
+    CounterPtr mInEventsTotal;
     CounterPtr mInGroupDataSizeBytes;
 
 #ifdef APSARA_UNIT_TEST_MAIN

@@ -141,9 +141,6 @@ private:
 
     std::shared_ptr<LogFilterRule> mFilterRule;
 
-    CounterPtr mProcFilterErrorTotal;
-    CounterPtr mProcFilterRecordsTotal;
-
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorFilterNativeUnittest;
 #endif

@@ -18,7 +18,7 @@
 #include "common/Constants.h"
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "sdk/Common.h"
 
@@ -136,7 +136,10 @@ bool ProcessorDesensitizeNative::Init(const Json::Value& config) {
                               mContext->GetRegion());
     }
 
-    mProcDesensitizeRecodesTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DESENSITIZE_RECORDS_TOTAL);
+    mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
+    mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
+    mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
+    mOutSuccessfulEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL);
 
     return true;
 }
@@ -156,16 +159,21 @@ void ProcessorDesensitizeNative::Process(PipelineEventGroup& logGroup) {
 
 void ProcessorDesensitizeNative::ProcessEvent(PipelineEventPtr& e) {
     if (!IsSupportedEvent(e)) {
+        mOutFailedEventsTotal->Add(1);
         return;
     }
 
     auto& sourceEvent = e.Cast<LogEvent>();
+    bool hasKey = false;
+    bool processed = false;
 
     // Traverse all fields and desensitize sensitive fields.
     for (auto& item : sourceEvent) {
         // Only perform desensitization processing on specified fields.
         if (item.first != mSourceKey) {
             continue;
+        } else {
+            hasKey = true;
         }
         // Only perform desensitization processing on non-empty fields.
         if (item.second.empty()) {
@@ -173,9 +181,18 @@ void ProcessorDesensitizeNative::ProcessEvent(PipelineEventPtr& e) {
         }
         std::string value = item.second.to_string();
         CastOneSensitiveWord(&value);
-        mProcDesensitizeRecodesTotal->Add(1);
         StringBuffer valueBuffer = sourceEvent.GetSourceBuffer()->CopyString(value);
         sourceEvent.SetContentNoCopy(item.first, StringView(valueBuffer.data, valueBuffer.size));
+        processed = true;
+    }
+    if (processed) {
+        mOutSuccessfulEventsTotal->Add(1);
+    } else {
+        if (hasKey) {
+            mOutKeyNotFoundEventsTotal->Add(1);
+        } else {
+            mOutFailedEventsTotal->Add(1);
+        }
     }
 }
 

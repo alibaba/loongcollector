@@ -40,27 +40,21 @@ protected:
 };
 
 void PluginRegistryUnittest::TestCreateInput() const {
-    unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, {"0", "0", "1"});
+    unique_ptr<InputInstance> input = PluginRegistry::GetInstance()->CreateInput(InputMock::sName, {"0"});
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, input);
     APSARA_TEST_EQUAL_FATAL("0", input->PluginID());
-    APSARA_TEST_EQUAL_FATAL("0", input->NodeID());
-    APSARA_TEST_EQUAL_FATAL("1", input->ChildNodeID());
 }
 
 void PluginRegistryUnittest::TestCreateProcessor() const {
-    unique_ptr<ProcessorInstance> processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMock::sName, {"0", "0", "1"});
+    unique_ptr<ProcessorInstance> processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorMock::sName, {"0"});
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, processor);
     APSARA_TEST_EQUAL_FATAL("0", processor->PluginID());
-    APSARA_TEST_EQUAL_FATAL("0", processor->NodeID());
-    APSARA_TEST_EQUAL_FATAL("1", processor->ChildNodeID());
 }
 
 void PluginRegistryUnittest::TestCreateFlusher() const {
-    unique_ptr<FlusherInstance> flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, {"0", "0", "1"});
+    unique_ptr<FlusherInstance> flusher = PluginRegistry::GetInstance()->CreateFlusher(FlusherMock::sName, {"0"});
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, flusher);
     APSARA_TEST_EQUAL_FATAL("0", flusher->PluginID());
-    APSARA_TEST_EQUAL_FATAL("0", flusher->NodeID());
-    APSARA_TEST_EQUAL_FATAL("1", flusher->ChildNodeID());
 }
 
 void PluginRegistryUnittest::TestValidPlugin() const {

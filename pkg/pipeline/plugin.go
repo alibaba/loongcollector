@@ -31,8 +31,6 @@ type PluginContext struct {
 
 type PluginMeta struct {
 	PluginID         string
-	NodeID           string
-	ChildNodeID      string
 	PluginType       string
 	PluginTypeWithID string
 }

@@ -55,11 +55,12 @@ private:
 
     int* mParseTimeFailures = nullptr;
     int* mHistoryFailures = nullptr;
-    CounterPtr mProcParseInSizeBytes;
-    CounterPtr mProcParseOutSizeBytes;
-    CounterPtr mProcDiscardRecordsTotal;
-    CounterPtr mProcParseErrorTotal;
-    CounterPtr mProcHistoryFailureTotal;
+
+    CounterPtr mDiscardedEventsTotal;
+    CounterPtr mOutFailedEventsTotal;
+    CounterPtr mOutKeyNotFoundEventsTotal;
+    CounterPtr mOutSuccessfulEventsTotal;
+    CounterPtr mHistoryFailureTotal;
     
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseTimestampNativeUnittest;

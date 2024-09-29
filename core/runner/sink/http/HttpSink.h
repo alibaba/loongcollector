@@ -57,11 +57,11 @@ private:
     std::atomic_bool mIsFlush = false;
 
     mutable MetricsRecordRef mMetricsRecordRef;
-    CounterPtr mInItemsCnt;
-    CounterPtr mOutSuccessfulItemsCnt;
-    CounterPtr mOutFailedItemsCnt;
+    CounterPtr mInItemsTotal;
+    CounterPtr mOutSuccessfulItemsTotal;
+    CounterPtr mOutFailedItemsTotal;
     // CounterPtr mTotalDelayMs; // TODO: should record distribution instead of average
-    IntGaugePtr mSendingItemsCnt;
+    IntGaugePtr mSendingItemsTotal;
     IntGaugePtr mSendConcurrency;
     IntGaugePtr mLastRunTime;
 

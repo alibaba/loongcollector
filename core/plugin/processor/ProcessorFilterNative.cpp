@@ -21,7 +21,7 @@
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
 
@@ -181,9 +181,6 @@ bool ProcessorFilterNative::Init(const Json::Value& config) {
                               mContext->GetRegion());
     }
 
-    mProcFilterErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_FILTER_ERROR_TOTAL);
-    mProcFilterRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_FILTER_RECORDS_TOTAL);
-
     return true;
 }
 
@@ -201,8 +198,6 @@ void ProcessorFilterNative::Process(PipelineEventGroup& logGroup) {
                 events[wIdx] = std::move(events[rIdx]);
             }
             ++wIdx;
-        } else {
-            mProcFilterRecordsTotal->Add(1);
         }
     }
     events.resize(wIdx);
@@ -265,7 +260,6 @@ bool ProcessorFilterNative::FilterExpressionRoot(LogEvent& sourceEvent, const Ba
     try {
         return node->Match(sourceEvent, GetContext());
     } catch (...) {
-        mProcFilterErrorTotal->Add(1);
         LOG_ERROR(GetContext().GetLogger(), ("filter error ", ""));
         return false;
     }
@@ -284,7 +278,6 @@ bool ProcessorFilterNative::FilterFilterRule(LogEvent& sourceEvent, const LogFil
     try {
         return IsMatched(sourceEvent, *filterRule);
     } catch (...) {
-        mProcFilterErrorTotal->Add(1);
         LOG_ERROR(GetContext().GetLogger(), ("filter error ", ""));
         return false;
     }

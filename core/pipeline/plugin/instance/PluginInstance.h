@@ -23,19 +23,15 @@ namespace logtail {
 class PluginInstance {
 public:
     struct PluginMeta {
-        PluginMeta(std::string pluginID, std::string nodeID, std::string childNodeID)
-            : mPluginID(pluginID), mNodeID(nodeID), mChildNodeID(childNodeID) {}
+        PluginMeta(std::string pluginID)
+            : mPluginID(pluginID) {}
         std::string mPluginID;
-        std::string mNodeID;
-        std::string mChildNodeID;
     };
     PluginInstance(const PluginMeta& pluginMeta) : mMeta(pluginMeta) {}
     virtual ~PluginInstance() = default;
 
     const PluginMeta& Meta() const { return mMeta; }
     const std::string PluginID() const { return mMeta.mPluginID; }
-    const std::string NodeID() const { return mMeta.mNodeID; }
-    const std::string ChildNodeID() const { return mMeta.mChildNodeID; }
 
     virtual const std::string& Name() const = 0;
 

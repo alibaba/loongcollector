@@ -57,7 +57,7 @@ APSARA_UNIT_TEST_CASE(SplUnittest, TestTag, 6);
 //APSARA_UNIT_TEST_CASE(SplUnittest, TestMultiParse, 7);
 
 PluginInstance::PluginMeta getPluginMeta(){
-    PluginInstance::PluginMeta pluginMeta{"testgetPluginID", "testNodeID", "testNodeChildID"};
+    PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
 

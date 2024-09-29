@@ -18,7 +18,7 @@
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "logger/Logger.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SenderQueueItem.h"
@@ -36,12 +36,12 @@ bool HttpSink::Init() {
     }
 
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
-                                                         {{METRIC_LABEL_KEY_RUNNER_NAME, "http sink"}});
-    mInItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_ITEMS_CNT);
+                                                         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK}});
+    mInItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_ITEMS_TOTAL);
     mLastRunTime = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
-    mOutSuccessfulItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HTTP_SINK_OUT_SUCCESSFUL_ITEMS_CNT);
-    mOutFailedItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HTTP_SINK_OUT_FAILED_ITEMS_CNT);
-    mSendingItemsCnt = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_HTTP_SINK_SENDING_ITEMS_CNT);
+    mOutSuccessfulItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HTTP_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL);
+    mOutFailedItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HTTP_SINK_OUT_FAILED_ITEMS_TOTAL);
+    mSendingItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_HTTP_SINK_SENDING_ITEMS_TOTAL);
     mSendConcurrency = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_HTTP_SINK_SEND_CONCURRENCY);
 
     // TODO: should be dynamic
@@ -68,7 +68,7 @@ void HttpSink::Run() {
             chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count());
         unique_ptr<HttpSinkRequest> request;
         if (mQueue.WaitAndPop(request, 500)) {
-            mInItemsCnt->Add(1);
+            mInItemsTotal->Add(1);
             LOG_DEBUG(
                 sLogger,
                 ("got item from flusher runner, item address", request->mItem)(
@@ -77,7 +77,7 @@ void HttpSink::Run() {
             if (!AddRequestToClient(std::move(request))) {
                 continue;
             }
-            mSendingItemsCnt->Add(1);
+            mSendingItemsTotal->Add(1);
         } else if (mIsFlush && mQueue.Empty()) {
             break;
         } else {
@@ -109,7 +109,7 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
     if (curl == nullptr) {
         request->mItem->mStatus = SendingStatus::IDLE;
         FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
-        mOutFailedItemsCnt->Add(1);
+        mOutFailedItemsTotal->Add(1);
         LOG_ERROR(sLogger,
                   ("failed to send request", "failed to init curl handler")(
                       "action", "put sender queue item back to sender queue")("item address", request->mItem)(
@@ -126,7 +126,7 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
         request->mItem->mStatus = SendingStatus::IDLE;
         FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
         curl_easy_cleanup(curl);
-        mOutFailedItemsCnt->Add(1);
+        mOutFailedItemsTotal->Add(1);
         LOG_ERROR(sLogger,
                   ("failed to send request",
                    "failed to add the easy curl handle to multi_handle")("errMsg", curl_multi_strerror(res))(
@@ -156,7 +156,7 @@ void HttpSink::DoRun() {
 
         unique_ptr<HttpSinkRequest> request;
         if (mQueue.TryPop(request)) {
-            mInItemsCnt->Add(1);
+            mInItemsTotal->Add(1);
             LOG_DEBUG(
                 sLogger,
                 ("got item from flusher runner, item address", request->mItem)(
@@ -164,7 +164,7 @@ void HttpSink::DoRun() {
                     "wait time", ToString(time(nullptr) - request->mEnqueTime))("try cnt", ToString(request->mTryCnt)));
             if (AddRequestToClient(std::move(request))) {
                 ++runningHandlers;
-                mSendingItemsCnt->Add(1);
+                mSendingItemsTotal->Add(1);
             }
         }
 
@@ -230,8 +230,8 @@ void HttpSink::HandleCompletedRequests() {
                     request->mResponse.mStatusCode = (int32_t)statusCode;
                     static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
                     FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
-                    mOutSuccessfulItemsCnt->Add(1);
-                    mSendingItemsCnt->Sub(1);
+                    mOutSuccessfulItemsTotal->Add(1);
+                    mSendingItemsTotal->Sub(1);
                     break;
                 }
                 default:
@@ -255,8 +255,8 @@ void HttpSink::HandleCompletedRequests() {
                             ->OnSendDone(request->mResponse, request->mItem);
                         FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
                     }
-                    mOutFailedItemsCnt->Add(1);
-                    mSendingItemsCnt->Sub(1);
+                    mOutFailedItemsTotal->Add(1);
+                    mSendingItemsTotal->Sub(1);
                     break;
             }
             curl_multi_remove_handle(mClient, handler);

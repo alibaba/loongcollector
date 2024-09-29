@@ -316,13 +316,13 @@ bool Pipeline::Init(PipelineConfig&& config) {
     }
 
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-        mMetricsRecordRef, {{METRIC_LABEL_PROJECT, mContext.GetProjectName()}, {METRIC_LABEL_CONFIG_NAME, mName}});
+        mMetricsRecordRef,
+        {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()}, {METRIC_LABEL_KEY_PIPELINE_NAME, mName}});
     mStartTime = mMetricsRecordRef.CreateIntGauge(METRIC_PIPELINE_START_TIME);
-    mProcessorsInEventsCnt = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_CNT);
-    mProcessorsInGroupsCnt = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_CNT);
-    mProcessorsInGroupDataSizeBytes
-        = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUP_SIZE_BYTES);
-    mProcessorsTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_TOTAL_DELAY_MS);
+    mProcessorsInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL);
+    mProcessorsInGroupsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL);
+    mProcessorsInSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_SIZE_BYTES);
+    mProcessorsTotalProcessTimeMs = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS);
 
     return true;
 }
@@ -355,10 +355,10 @@ void Pipeline::Start() {
 
 void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputIndex) {
     for (const auto& logGroup : logGroupList) {
-        mProcessorsInEventsCnt->Add(logGroup.GetEvents().size());
-        mProcessorsInGroupDataSizeBytes->Add(logGroup.DataSize());
+        mProcessorsInEventsTotal->Add(logGroup.GetEvents().size());
+        mProcessorsInSizeBytes->Add(logGroup.DataSize());
     }
-    mProcessorsInGroupsCnt->Add(logGroupList.size());
+    mProcessorsInGroupsTotal->Add(logGroupList.size());
 
     auto before = chrono::system_clock::now();
     for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
@@ -367,7 +367,7 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
     for (auto& p : mProcessorLine) {
         p->Process(logGroupList);
     }
-    mProcessorsTotalDelayMs->Add(
+    mProcessorsTotalProcessTimeMs->Add(
         chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - before).count());
 }
 
@@ -525,14 +525,8 @@ std::string Pipeline::GetNowPluginID() {
 
 PluginInstance::PluginMeta Pipeline::GenNextPluginMeta(bool lastOne) {
     mPluginID.fetch_add(1);
-    int32_t childNodeID = mPluginID.load();
-    if (lastOne) {
-        childNodeID = -1;
-    } else {
-        childNodeID += 1;
-    }
     return PluginInstance::PluginMeta(
-        std::to_string(mPluginID.load()), std::to_string(mPluginID.load()), std::to_string(childNodeID));
+        std::to_string(mPluginID.load()));
 }
 
 } // namespace logtail

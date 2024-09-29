@@ -25,7 +25,7 @@ namespace logtail {
 CircularProcessQueue::CircularProcessQueue(size_t cap, int64_t key, uint32_t priority, const PipelineContext& ctx)
     : QueueInterface<std::unique_ptr<ProcessQueueItem>>(key, cap, ctx), ProcessQueueInterface(key, cap, priority, ctx) {
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_QUEUE_TYPE, "circular"}});
-    mDiscardedEventsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_DISCARDED_EVENTS_CNT);
+    mDiscardedEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_DISCARDED_EVENTS_TOTAL);
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
@@ -36,9 +36,9 @@ bool CircularProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
         auto size = mQueue.front()->mEventGroup.DataSize();
         mEventCnt -= cnt;
         mQueue.pop_front();
-        mQueueSize->Set(Size());
+        mQueueSizeTotal->Set(Size());
         mQueueDataSizeByte->Sub(size);
-        mDiscardedEventsCnt->Add(cnt);
+        mDiscardedEventsTotal->Add(cnt);
     }
     if (mEventCnt + newCnt > mCapacity) {
         return false;
@@ -48,9 +48,9 @@ bool CircularProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     mQueue.push_back(std::move(item));
     mEventCnt += newCnt;
 
-    mInItemsCnt->Add(1);
+    mInItemsTotal->Add(1);
     mInItemDataSizeBytes->Add(size);
-    mQueueSize->Set(Size());
+    mQueueSizeTotal->Set(Size());
     mQueueDataSizeByte->Add(size);
     return true;
 }
@@ -63,11 +63,11 @@ bool CircularProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     mQueue.pop_front();
     mEventCnt -= item->mEventGroup.GetEvents().size();
 
-    mOutItemsCnt->Add(1);
+    mOutItemsTotal->Add(1);
     mTotalDelayMs->Add(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - item->mEnqueTime)
             .count());
-    mQueueSize->Set(Size());
+    mQueueSizeTotal->Set(Size());
     mQueueDataSizeByte->Sub(item->mEventGroup.DataSize());
     return true;
 }

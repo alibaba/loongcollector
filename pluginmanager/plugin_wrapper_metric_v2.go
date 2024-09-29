@@ -25,20 +25,20 @@ type MetricWrapperV2 struct {
 	Input pipeline.MetricInputV2
 }
 
-func (p *MetricWrapperV2) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
-	p.InitMetricRecord(pluginMeta)
+func (wrapper *MetricWrapperV2) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
+	wrapper.InitMetricRecord(pluginMeta)
 
-	interval, err := p.Input.Init(p.Config.Context)
+	interval, err := wrapper.Input.Init(wrapper.Config.Context)
 	if err != nil {
 		return err
 	}
 	if interval == 0 {
 		interval = inputInterval
 	}
-	p.Interval = time.Duration(interval) * time.Millisecond
+	wrapper.Interval = time.Duration(interval) * time.Millisecond
 	return nil
 }
 
-func (p *MetricWrapperV2) Read(pipelineContext pipeline.PipelineContext) error {
-	return p.Input.Read(pipelineContext)
+func (wrapper *MetricWrapperV2) Read(pipelineContext pipeline.PipelineContext) error {
+	return wrapper.Input.Read(pipelineContext)
 }

@@ -28,7 +28,7 @@
 #include "file_server/event/Event.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 using namespace std;
 

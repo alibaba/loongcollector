@@ -37,24 +37,17 @@ func (wrapper *FlusherWrapperV2) IsReady(projectName string, logstoreName string
 }
 
 func (wrapper *FlusherWrapperV2) Export(pipelineGroupEvents []*models.PipelineGroupEvents, pipelineContext pipeline.PipelineContext) error {
-	var total, size int64
+	startTime := time.Now()
 	for _, groups := range pipelineGroupEvents {
-		total += int64(len(groups.Events))
+		wrapper.inEventsTotal.Add(int64(len(groups.Events)))
+		wrapper.inEventGroupsTotal.Add(1)
 		for _, event := range groups.Events {
-			size += event.GetSize()
+			wrapper.inSizeBytes.Add(event.GetSize())
 		}
 	}
-	wrapper.flusherInRecordsTotal.Add(total)
-	wrapper.flusherInRecordsSizeBytes.Add(size)
-	startTime := time.Now()
+
 	err := wrapper.Flusher.Export(pipelineGroupEvents, pipelineContext)
-	if err == nil {
-		wrapper.flusherSuccessRecordsTotal.Add(total)
-		wrapper.flusherSuccessTimeMs.Observe(float64(time.Since(startTime)))
-	} else {
-		wrapper.flusherErrorTotal.Add(1)
-		wrapper.flusherDiscardRecordsTotal.Add(total)
-		wrapper.flusherErrorTimeMs.Observe(float64(time.Since(startTime)))
-	}
+
+	wrapper.totalDelayTimeMs.Add(time.Since(startTime).Milliseconds())
 	return err
 }

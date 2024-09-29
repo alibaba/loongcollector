@@ -37,30 +37,30 @@ type AggregatorWrapperV1 struct {
 	Aggregator    pipeline.AggregatorV1
 }
 
-func (p *AggregatorWrapperV1) Init(pluginMeta *pipeline.PluginMeta) error {
-	p.InitMetricRecord(pluginMeta)
+func (wrapper *AggregatorWrapperV1) Init(pluginMeta *pipeline.PluginMeta) error {
+	wrapper.InitMetricRecord(pluginMeta)
 
-	interval, err := p.Aggregator.Init(p.Config.Context, p)
+	interval, err := wrapper.Aggregator.Init(wrapper.Config.Context, wrapper)
 	if err != nil {
-		logger.Error(p.Config.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", p.Aggregator.Description(), "error", err)
+		logger.Error(wrapper.Config.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", wrapper.Aggregator.Description(), "error", err)
 		return err
 	}
 	if interval == 0 {
-		interval = p.Config.GlobalConfig.AggregatIntervalMs
+		interval = wrapper.Config.GlobalConfig.AggregatIntervalMs
 	}
-	p.Interval = time.Millisecond * time.Duration(interval)
+	wrapper.Interval = time.Millisecond * time.Duration(interval)
 	return nil
 }
 
 // Add inserts @loggroup to LogGroupsChan if @loggroup is not empty.
 // It is called by associated Aggregator.
 // It returns errAggAdd when queue is full.
-func (p *AggregatorWrapperV1) Add(loggroup *protocol.LogGroup) error {
+func (wrapper *AggregatorWrapperV1) Add(loggroup *protocol.LogGroup) error {
 	if len(loggroup.Logs) == 0 {
 		return nil
 	}
 	select {
-	case p.LogGroupsChan <- loggroup:
+	case wrapper.LogGroupsChan <- loggroup:
 		return nil
 	default:
 		return errAggAdd
@@ -71,13 +71,13 @@ func (p *AggregatorWrapperV1) Add(loggroup *protocol.LogGroup) error {
 // It works like Add but adds a timeout policy when log group queue is full.
 // It returns errAggAdd when queue is full and timeout.
 // NOTE: no body calls it now.
-func (p *AggregatorWrapperV1) AddWithWait(loggroup *protocol.LogGroup, duration time.Duration) error {
+func (wrapper *AggregatorWrapperV1) AddWithWait(loggroup *protocol.LogGroup, duration time.Duration) error {
 	if len(loggroup.Logs) == 0 {
 		return nil
 	}
 	timer := time.NewTimer(duration)
 	select {
-	case p.LogGroupsChan <- loggroup:
+	case wrapper.LogGroupsChan <- loggroup:
 		return nil
 	case <-timer.C:
 		return errAggAdd
@@ -86,16 +86,19 @@ func (p *AggregatorWrapperV1) AddWithWait(loggroup *protocol.LogGroup, duration 
 
 // Run calls periodically Aggregator.Flush to get log groups from associated aggregator and
 // pass them to LogstoreConfig through LogGroupsChan.
-func (p *AggregatorWrapperV1) Run(control *pipeline.AsyncControl) {
-	defer panicRecover(p.Aggregator.Description())
+func (wrapper *AggregatorWrapperV1) Run(control *pipeline.AsyncControl) {
+	defer panicRecover(wrapper.Aggregator.Description())
 	for {
-		exitFlag := util.RandomSleep(p.Interval, 0.1, control.CancelToken())
-		logGroups := p.Aggregator.Flush()
+		exitFlag := util.RandomSleep(wrapper.Interval, 0.1, control.CancelToken())
+		logGroups := wrapper.Aggregator.Flush()
 		for _, logGroup := range logGroups {
 			if len(logGroup.Logs) == 0 {
 				continue
 			}
-			p.LogGroupsChan <- logGroup
+			wrapper.outEventsTotal.Add(int64(len(logGroup.GetLogs())))
+			wrapper.outEventGroupsTotal.Add(1)
+			wrapper.outSizeBytes.Add(int64(logGroup.Size()))
+			wrapper.LogGroupsChan <- logGroup
 		}
 		if exitFlag {
 			return

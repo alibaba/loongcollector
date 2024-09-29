@@ -21,7 +21,7 @@
 #include "common/ParamExtractor.h"
 #include "common/TimeUtil.h"
 #include "models/LogEvent.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
@@ -78,11 +78,11 @@ bool ProcessorParseApsaraNative::Init(const Json::Value& config) {
     mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
     mHistoryFailures = &(GetContext().GetProcessProfile().historyFailures);
 
-    mProcParseInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_IN_SIZE_BYTES);
-    mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
-    mProcDiscardRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DISCARD_RECORDS_TOTAL);
-    mProcParseErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_ERROR_TOTAL);
-    mProcHistoryFailureTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_HISTORY_FAILURE_TOTAL);
+    mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
+    mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
+    mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
+    mOutSuccessfulEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL);
+    mHistoryFailureTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_HISTORY_FAILURE_TOTAL);
 
     return true;
 }
@@ -122,18 +122,20 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
                                               LogtailTime& cachedLogTime,
                                               StringView& timeStrCache) {
     if (!IsSupportedEvent(e)) {
+        mOutFailedEventsTotal->Add(1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
+        mOutKeyNotFoundEventsTotal->Add(1);
         return true;
     }
     bool sourceKeyOverwritten = false;
     StringView buffer = sourceEvent.GetContent(mSourceKey);
     if (buffer.size() == 0) {
+        mOutFailedEventsTotal->Add(1);
         return true;
     }
-    mProcParseInSizeBytes->Add(buffer.size());
     int64_t logTime_in_micro = 0;
     time_t logTime = ApsaraEasyReadLogTimeParser(buffer, timeStrCache, cachedLogTime, logTime_in_micro);
     if (logTime <= 0) // this case will handle empty apsara log line
@@ -156,7 +158,7 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
                                           GetContext().GetProjectName(),
                                           GetContext().GetLogstoreName(),
                                           GetContext().GetRegion());
-        mProcParseErrorTotal->Add(1);
+        mOutFailedEventsTotal->Add(1);
         ++(*mParseFailures);
         sourceEvent.DelContent(mSourceKey);
         if (mCommonParserOptions.ShouldAddSourceContent(false)) {
@@ -166,7 +168,7 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
             AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, buffer, sourceEvent, false);
         }
         if (mCommonParserOptions.ShouldEraseEvent(false, sourceEvent)) {
-            mProcDiscardRecordsTotal->Add(1);
+            mDiscardedEventsTotal->Add(1);
             return false;
         }
         return true;
@@ -194,8 +196,8 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
                                               GetContext().GetRegion());
         }
         ++(*mHistoryFailures);
-        mProcHistoryFailureTotal->Add(1);
-        mProcDiscardRecordsTotal->Add(1);
+        mHistoryFailureTotal->Add(1);
+        mDiscardedEventsTotal->Add(1);
         return false;
     }
 
@@ -237,6 +239,7 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
     if (mCommonParserOptions.ShouldAddSourceContent(true)) {
         AddLog(mCommonParserOptions.mRenamedSourceKey, buffer, sourceEvent, false);
     }
+    mOutSuccessfulEventsTotal->Add(1);
     return true;
 }
 
@@ -471,7 +474,6 @@ void ProcessorParseApsaraNative::AddLog(const StringView& key,
     }
     targetEvent.AppendContentNoCopy(key, value);
     *mLogGroupSize += key.size() + value.size() + 5;
-    mProcParseOutSizeBytes->Add(key.size() + value.size());
 }
 
 bool ProcessorParseApsaraNative::IsSupportedEvent(const PipelineEventPtr& e) const {

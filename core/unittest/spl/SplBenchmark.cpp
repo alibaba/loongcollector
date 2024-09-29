@@ -30,7 +30,7 @@
 using namespace logtail;
 
 PluginInstance::PluginMeta getPluginMeta(){
-    PluginInstance::PluginMeta pluginMeta{"testgetPluginID", "testNodeID", "testNodeChildID"};
+    PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
 

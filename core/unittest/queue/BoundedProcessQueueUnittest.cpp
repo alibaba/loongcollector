@@ -119,9 +119,9 @@ void BoundedProcessQueueUnittest::TestPop() {
 
 void BoundedProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(4U, mQueue->mMetricsRecordRef->GetLabels()->size());
-    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_PROJECT, ""));
-    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_CONFIG_NAME, "test_config"));
-    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, "process_queue"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, ""));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_PROCESS_QUEUE));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_QUEUE_TYPE, "bounded"));
 
     auto item = GenerateItem();
@@ -130,15 +130,15 @@ void BoundedProcessQueueUnittest::TestMetric() {
     auto dataSize = item->mEventGroup.DataSize();
     mQueue->Push(std::move(item));
 
-    APSARA_TEST_EQUAL(1U, mQueue->mInItemsCnt->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mInItemsTotal->GetValue());
     APSARA_TEST_EQUAL(dataSize, mQueue->mInItemDataSizeBytes->GetValue());
-    APSARA_TEST_EQUAL(1U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mQueueSizeTotal->GetValue());
     APSARA_TEST_EQUAL(dataSize, mQueue->mQueueDataSizeByte->GetValue());
     APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
 
     mQueue->Pop(item);
-    APSARA_TEST_EQUAL(1U, mQueue->mOutItemsCnt->GetValue());
-    APSARA_TEST_EQUAL(0U, mQueue->mQueueSize->GetValue());
+    APSARA_TEST_EQUAL(1U, mQueue->mOutItemsTotal->GetValue());
+    APSARA_TEST_EQUAL(0U, mQueue->mQueueSizeTotal->GetValue());
     APSARA_TEST_EQUAL(0U, mQueue->mQueueDataSizeByte->GetValue());
     APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
 }

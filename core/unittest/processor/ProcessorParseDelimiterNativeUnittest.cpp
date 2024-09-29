@@ -66,7 +66,7 @@ UNIT_TEST_CASE(ProcessorParseDelimiterNativeUnittest, TestExtend);
 UNIT_TEST_CASE(ProcessorParseDelimiterNativeUnittest, TestEmpty);
 
 PluginInstance::PluginMeta getPluginMeta(){
-    PluginInstance::PluginMeta pluginMeta{"testgetPluginID", "testNodeID", "testNodeChildID"};
+    PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
 
@@ -253,7 +253,7 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
             processor.Process(eventGroup);
 
@@ -375,7 +375,7 @@ void ProcessorParseDelimiterNativeUnittest::TestAllowingShortenedFields() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -525,7 +525,7 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -651,7 +651,7 @@ void ProcessorParseDelimiterNativeUnittest::TestExtend() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -775,7 +775,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -896,7 +896,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -1022,7 +1022,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLines() {
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
             processor.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -1153,7 +1153,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             // run function ProcessorMergeMultilineLogNative
             ProcessorMergeMultilineLogNative processorMergeMultilineLogNative;
             processorMergeMultilineLogNative.SetContext(mContext);
-            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1", "1", "1");
+            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
             processorMergeMultilineLogNative.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -1281,7 +1281,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             // run function ProcessorMergeMultilineLogNative
             ProcessorMergeMultilineLogNative processorMergeMultilineLogNative;
             processorMergeMultilineLogNative.SetContext(mContext);
-            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1", "1", "1");
+            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
             processorMergeMultilineLogNative.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -1414,7 +1414,7 @@ void ProcessorParseDelimiterNativeUnittest::TestMultipleLinesWithProcessorMergeM
             // run function ProcessorMergeMultilineLogNative
             ProcessorMergeMultilineLogNative processorMergeMultilineLogNative;
             processorMergeMultilineLogNative.SetContext(mContext);
-            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1", "1", "1");
+            processorMergeMultilineLogNative.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processorMergeMultilineLogNative.Init(config));
             processorMergeMultilineLogNative.Process(eventGroup);
             // run function ProcessorParseDelimiterNative
@@ -1714,7 +1714,7 @@ HTTP/2.0' '200' '154' 'go-sdk'"
             // run function ProcessorSplitMultilineLogStringNative
             ProcessorSplitMultilineLogStringNative processor;
             processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+            processor.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
             APSARA_TEST_TRUE_FATAL(processor.Init(config));
             processor.Process(eventGroup);
 
@@ -2335,16 +2335,10 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventKeepUnmatch() {
     // check observablity
     int count = 5;
     APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcInRecordsTotal->GetValue());
-    std::string expectValue = "value1";
-    APSARA_TEST_EQUAL_FATAL(uint64_t(expectValue.length() * count), processor.mProcParseInSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcOutRecordsTotal->GetValue());
-    expectValue = "rawLogvalue1";
-    APSARA_TEST_EQUAL_FATAL(uint64_t(expectValue.length() * count), processor.mProcParseOutSizeBytes->GetValue());
-
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcDiscardRecordsTotal->GetValue());
-
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mOutEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseDelimiterNativeUnittest::TestProcessEventDiscardUnmatch() {
@@ -2429,14 +2423,13 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventDiscardUnmatch() {
     // check observablity
     int count = 5;
     APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcInRecordsTotal->GetValue());
-    std::string expectValue = "value1";
-    APSARA_TEST_EQUAL_FATAL((expectValue.length()) * count, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
     // discard unmatch, so output is 0
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mProcOutRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcParseOutSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mOutEventsTotal->GetValue());
+    // event group size is not 0
+    APSARA_TEST_NOT_EQUAL_FATAL(uint64_t(0), processorInstance.mOutSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseDelimiterNativeUnittest::TestEmpty() {

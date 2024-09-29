@@ -34,7 +34,7 @@
 #include "file_server/polling/PollingModify.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 // Control the check frequency to call ClearUnavailableFileAndDir.
 DEFINE_FLAG_INT32(check_not_exist_file_dir_round, "clear not exist file dir cache, round", 20);

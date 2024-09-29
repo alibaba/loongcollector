@@ -18,7 +18,7 @@
 
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
@@ -178,10 +178,10 @@ bool ProcessorParseDelimiterNative::Init(const Json::Value& config) {
     mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
     mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
 
-    mProcParseInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_IN_SIZE_BYTES);
-    mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
-    mProcDiscardRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DISCARD_RECORDS_TOTAL);
-    mProcParseErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_ERROR_TOTAL);
+    mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
+    mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
+    mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
+    mOutSuccessfulEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL);
 
     return true;
 }
@@ -208,17 +208,21 @@ void ProcessorParseDelimiterNative::Process(PipelineEventGroup& logGroup) {
 
 bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, PipelineEventPtr& e) {
     if (!IsSupportedEvent(e)) {
+        mOutFailedEventsTotal->Add(1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
+        mOutKeyNotFoundEventsTotal->Add(1);
         return true;
     }
     StringView buffer = sourceEvent.GetContent(mSourceKey);
-    mProcParseInSizeBytes->Add(buffer.size());
+
     int32_t endIdx = buffer.size();
-    if (endIdx == 0)
+    if (endIdx == 0) {
+        mOutFailedEventsTotal->Add(1);
         return true;
+    }
 
     for (int32_t i = endIdx - 1; i >= 0; --i) {
         if (buffer.data()[i] == ' ' || '\r' == buffer.data()[i])
@@ -233,8 +237,11 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
         else
             break;
     }
-    if (begIdx >= endIdx)
+    if (begIdx >= endIdx) {
+        mOutFailedEventsTotal->Add(1);
         return true;
+    }
+        
     size_t reserveSize
         = mOverflowedFieldsTreatment == OverflowedFieldsTreatment::EXTEND ? (mKeys.size() + 10) : (mKeys.size() + 1);
     std::vector<StringView> columnValues;
@@ -290,7 +297,6 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
                                                   GetContext().GetProjectName(),
                                                   GetContext().GetLogstoreName(),
                                                   GetContext().GetRegion());
-                mProcParseErrorTotal->Add(1);
                 ++(*mParseFailures);
                 parseSuccess = false;
             }
@@ -301,7 +307,6 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
                                                    GetContext().GetProjectName(),
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
-            mProcParseErrorTotal->Add(1);
             ++(*mParseFailures);
             parseSuccess = false;
         }
@@ -314,7 +319,6 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
         LOG_WARNING(sLogger,
                     ("parse delimiter log fail", "no column keys defined")("project", GetContext().GetProjectName())(
                         "logstore", GetContext().GetLogstoreName())("file", logPath));
-        mProcParseErrorTotal->Add(1);
         ++(*mParseFailures);
         parseSuccess = false;
     }
@@ -339,7 +343,11 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
                        sourceEvent);
             }
         }
+        mOutSuccessfulEventsTotal->Add(1);
+    } else {
+        mOutFailedEventsTotal->Add(1);
     }
+
     if (!parseSuccess || !mSourceKeyOverwritten) {
         sourceEvent.DelContent(mSourceKey);
     }
@@ -350,7 +358,7 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
         AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, buffer, sourceEvent, false);
     }
     if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent)) {
-        mProcDiscardRecordsTotal->Add(1);
+        mDiscardedEventsTotal->Add(1);
         return false;
     }
     return true;
@@ -410,7 +418,6 @@ void ProcessorParseDelimiterNative::AddLog(const StringView& key,
     }
     targetEvent.SetContentNoCopy(key, value);
     *mLogGroupSize += key.size() + value.size() + 5;
-    mProcParseOutSizeBytes->Add(key.size() + value.size());
 }
 
 bool ProcessorParseDelimiterNative::IsSupportedEvent(const PipelineEventPtr& e) const {

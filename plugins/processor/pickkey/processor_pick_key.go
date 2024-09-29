@@ -15,8 +15,6 @@
 package pickkey
 
 import (
-	"fmt"
-
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -34,17 +32,15 @@ type ProcessorPickKey struct {
 	includeLen int
 	excludeLen int
 
-	filterMetric    pipeline.CounterMetric
-	processedMetric pipeline.CounterMetric
-	context         pipeline.Context
+	filterMetric pipeline.CounterMetric
+	context      pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorPickKey) Init(context pipeline.Context) error {
 	p.context = context
 	metricsRecord := p.context.GetMetricRecord()
-	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, "pick_key_lost")
-	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginType))
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginDiscardedEventsTotal)
 
 	if len(p.Include) > 0 {
 		p.includeMap = make(map[string]struct{})
@@ -109,7 +105,6 @@ func (p *ProcessorPickKey) ProcessLogs(logArray []*protocol.Log) []*protocol.Log
 			}
 			nextIdx++
 		}
-		p.processedMetric.Add(1)
 	}
 	logArray = logArray[:nextIdx]
 	return logArray

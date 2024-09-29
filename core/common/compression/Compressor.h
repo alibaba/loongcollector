@@ -40,13 +40,13 @@ public:
 
 protected:
     mutable MetricsRecordRef mMetricsRecordRef;
-    CounterPtr mInItemsCnt;
+    CounterPtr mInItemsTotal;
     CounterPtr mInItemSizeBytes;
-    CounterPtr mOutItemsCnt;
+    CounterPtr mOutItemsTotal;
     CounterPtr mOutItemSizeBytes;
-    CounterPtr mDiscardedItemsCnt;
+    CounterPtr mDiscardedItemsTotal;
     CounterPtr mDiscardedItemSizeBytes;
-    CounterPtr mTotalDelayMs;
+    CounterPtr mTotalProcessMs;
 
 private:
     virtual bool Compress(const std::string& input, std::string& output, std::string& errorMsg) = 0;

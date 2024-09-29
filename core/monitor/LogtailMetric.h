@@ -160,7 +160,9 @@ public:
         static ReadMetrics* ptr = new ReadMetrics();
         return ptr;
     }
-    void ReadAsLogGroup(std::map<std::string, sls_logs::LogGroup*>& logGroupMap) const;
+    void ReadAsLogGroup(const std::string& regionFieldName,
+                        const std::string& defaultRegion,
+                        std::map<std::string, sls_logs::LogGroup*>& logGroupMap) const;
     void ReadAsFileBuffer(std::string& metricsContent) const;
     void UpdateMetrics();
 

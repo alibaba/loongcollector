@@ -35,7 +35,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         Json::Value tmp;
         PipelineContext ctx;
         flusher->SetContext(ctx);
-        flusher->SetMetricsRecordRef("name", "pluginId", "nodeId", "childNodeId");
+        flusher->SetMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());
@@ -54,7 +54,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         Json::Value tmp;
         PipelineContext ctx;
         flusher->SetContext(ctx);
-        flusher->SetMetricsRecordRef("name", "pluginId", "nodeId", "childNodeId");
+        flusher->SetMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());

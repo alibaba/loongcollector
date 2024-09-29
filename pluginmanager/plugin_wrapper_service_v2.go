@@ -22,13 +22,13 @@ type ServiceWrapperV2 struct {
 	Input pipeline.ServiceInputV2
 }
 
-func (p *ServiceWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
-	p.InitMetricRecord(pluginMeta)
+func (wrapper *ServiceWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
+	wrapper.InitMetricRecord(pluginMeta)
 
-	_, err := p.Input.Init(p.Config.Context)
+	_, err := wrapper.Input.Init(wrapper.Config.Context)
 	return err
 }
 
-func (p *ServiceWrapperV2) StartService(pipelineContext pipeline.PipelineContext) error {
-	return p.Input.StartService(pipelineContext)
+func (wrapper *ServiceWrapperV2) StartService(pipelineContext pipeline.PipelineContext) error {
+	return wrapper.Input.StartService(pipelineContext)
 }

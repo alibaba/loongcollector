@@ -29,64 +29,65 @@ type ServiceWrapperV1 struct {
 	Input    pipeline.ServiceInputV1
 }
 
-func (p *ServiceWrapperV1) Init(pluginMeta *pipeline.PluginMeta) error {
-	p.InitMetricRecord(pluginMeta)
+func (wrapper *ServiceWrapperV1) Init(pluginMeta *pipeline.PluginMeta) error {
+	wrapper.InitMetricRecord(pluginMeta)
 
-	_, err := p.Input.Init(p.Config.Context)
+	_, err := wrapper.Input.Init(wrapper.Config.Context)
 	return err
 }
 
-func (p *ServiceWrapperV1) Run(cc *pipeline.AsyncControl) {
-	logger.Info(p.Config.Context.GetRuntimeContext(), "start run service", p.Input)
+func (wrapper *ServiceWrapperV1) Run(cc *pipeline.AsyncControl) {
+	logger.Info(wrapper.Config.Context.GetRuntimeContext(), "start run service", wrapper.Input)
 
 	go func() {
-		defer panicRecover(p.Input.Description())
-		err := p.Input.Start(p)
+		defer panicRecover(wrapper.Input.Description())
+		err := wrapper.Input.Start(wrapper)
 		if err != nil {
-			logger.Error(p.Config.Context.GetRuntimeContext(), "PLUGIN_ALARM", "start service error, err", err)
+			logger.Error(wrapper.Config.Context.GetRuntimeContext(), "PLUGIN_ALARM", "start service error, err", err)
 		}
-		logger.Info(p.Config.Context.GetRuntimeContext(), "service done", p.Input.Description())
+		logger.Info(wrapper.Config.Context.GetRuntimeContext(), "service done", wrapper.Input.Description())
 	}()
 
 }
 
-func (p *ServiceWrapperV1) Stop() error {
-	err := p.Input.Stop()
+func (wrapper *ServiceWrapperV1) Stop() error {
+	err := wrapper.Input.Stop()
 	if err != nil {
-		logger.Error(p.Config.Context.GetRuntimeContext(), "PLUGIN_ALARM", "stop service error, err", err)
+		logger.Error(wrapper.Config.Context.GetRuntimeContext(), "PLUGIN_ALARM", "stop service error, err", err)
 	}
 	return err
 }
 
-func (p *ServiceWrapperV1) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
-	p.AddDataWithContext(tags, fields, nil, t...)
+func (wrapper *ServiceWrapperV1) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
+	wrapper.AddDataWithContext(tags, fields, nil, t...)
 }
 
-func (p *ServiceWrapperV1) AddDataArray(tags map[string]string,
+func (wrapper *ServiceWrapperV1) AddDataArray(tags map[string]string,
 	columns []string,
 	values []string,
 	t ...time.Time) {
-	p.AddDataArrayWithContext(tags, columns, values, nil, t...)
+	wrapper.AddDataArrayWithContext(tags, columns, values, nil, t...)
 }
 
-func (p *ServiceWrapperV1) AddRawLog(log *protocol.Log) {
-	p.AddRawLogWithContext(log, nil)
+func (wrapper *ServiceWrapperV1) AddRawLog(log *protocol.Log) {
+	wrapper.AddRawLogWithContext(log, nil)
 }
 
-func (p *ServiceWrapperV1) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
+func (wrapper *ServiceWrapperV1) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
 	var logTime time.Time
 	if len(t) == 0 {
 		logTime = time.Now()
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, p.Tags, tags, fields)
-	p.inputRecordsTotal.Add(1)
-	p.inputRecordsSizeBytes.Add(int64(slsLog.Size()))
-	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
+	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, wrapper.Tags, tags, fields)
+	wrapper.outEventsTotal.Add(1)
+	wrapper.outEventGroupsTotal.Add(1)
+	wrapper.outSizeBytes.Add(int64(slsLog.Size()))
+	wrapper.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *ServiceWrapperV1) AddDataArrayWithContext(tags map[string]string,
+func (wrapper *ServiceWrapperV1) AddDataArrayWithContext(tags map[string]string,
 	columns []string,
 	values []string,
 	ctx map[string]interface{},
@@ -97,14 +98,16 @@ func (p *ServiceWrapperV1) AddDataArrayWithContext(tags map[string]string,
 	} else {
 		logTime = t[0]
 	}
-	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, p.Tags, tags, columns, values)
-	p.inputRecordsTotal.Add(1)
-	p.inputRecordsSizeBytes.Add(int64(slsLog.Size()))
-	p.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
+	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, wrapper.Tags, tags, columns, values)
+	wrapper.outEventsTotal.Add(1)
+	wrapper.outEventGroupsTotal.Add(1)
+	wrapper.outSizeBytes.Add(int64(slsLog.Size()))
+	wrapper.LogsChan <- &pipeline.LogWithContext{Log: slsLog, Context: ctx}
 }
 
-func (p *ServiceWrapperV1) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	p.inputRecordsTotal.Add(1)
-	p.inputRecordsSizeBytes.Add(int64(log.Size()))
-	p.LogsChan <- &pipeline.LogWithContext{Log: log, Context: ctx}
+func (wrapper *ServiceWrapperV1) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
+	wrapper.outEventsTotal.Add(1)
+	wrapper.outEventGroupsTotal.Add(1)
+	wrapper.outSizeBytes.Add(int64(log.Size()))
+	wrapper.LogsChan <- &pipeline.LogWithContext{Log: log, Context: ctx}
 }

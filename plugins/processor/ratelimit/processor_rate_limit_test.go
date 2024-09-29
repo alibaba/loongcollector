@@ -70,7 +70,6 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(2))
-		c.Assert(int64(processor.processedMetric.Collect().Value), check.Equals, int64(8))
 	}
 }
 
@@ -95,7 +94,6 @@ func (s *processorTestSuite) TestField(c *check.C) {
 		c.Assert(len(outLogs), check.Equals, 5)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(1))
-		c.Assert(int64(processor.processedMetric.Collect().Value), check.Equals, int64(6))
 	}
 	{
 		// case: multiple fields
@@ -124,7 +122,6 @@ func (s *processorTestSuite) TestField(c *check.C) {
 		c.Assert(len(outLogs), check.Equals, 9)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(3))
-		c.Assert(int64(processor.processedMetric.Collect().Value), check.Equals, int64(12))
 	}
 }
 
@@ -150,7 +147,6 @@ func (s *processorTestSuite) TestGC(c *check.C) {
 		c.Assert(len(outLogs), check.Equals, 6)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(10004))
-		c.Assert(int64(processor.processedMetric.Collect().Value), check.Equals, int64(10010))
 	}
 	{
 		// case: gc in multiple process
@@ -176,6 +172,5 @@ func (s *processorTestSuite) TestGC(c *check.C) {
 		c.Assert(len(outLogs), check.Equals, 0)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(10004))
-		c.Assert(int64(processor.processedMetric.Collect().Value), check.Equals, int64(10010))
 	}
 }

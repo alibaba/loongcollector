@@ -106,8 +106,8 @@ func (m *Mysql) Init(context pipeline.Context) (int, error) {
 	}
 
 	metricsRecord := m.context.GetMetricRecord()
-	m.collectLatency = helper.NewLatencyMetricAndRegister(metricsRecord, "mysql_collect_avg_cost")
-	m.collectTotal = helper.NewCounterMetricAndRegister(metricsRecord, "mysql_collect_total")
+	m.collectLatency = helper.NewLatencyMetricAndRegister(metricsRecord, helper.MetricPluginCollectAvgCostTimeMs)
+	m.collectTotal = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginCollectTotal)
 
 	if m.CheckPoint {
 		m.checkpointMetric = helper.NewStringMetricAndRegister(metricsRecord, "mysql_checkpoint")

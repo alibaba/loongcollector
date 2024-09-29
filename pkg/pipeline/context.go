@@ -77,27 +77,6 @@ func (m *MetricsRecord) ExportMetricRecords() map[string]string {
 	return record
 }
 
-func GetCommonLabels(context Context, pluginMeta *PluginMeta) []LabelPair {
-	labels := make([]LabelPair, 0)
-	labels = append(labels, LabelPair{Key: "project", Value: context.GetProject()})
-	labels = append(labels, LabelPair{Key: "logstore", Value: context.GetLogstore()})
-	labels = append(labels, LabelPair{Key: "config_name", Value: context.GetConfigName()})
-
-	if len(pluginMeta.PluginID) > 0 {
-		labels = append(labels, LabelPair{Key: "plugin_id", Value: pluginMeta.PluginID})
-	}
-	if len(pluginMeta.NodeID) > 0 {
-		labels = append(labels, LabelPair{Key: "node_id", Value: pluginMeta.NodeID})
-	}
-	if len(pluginMeta.ChildNodeID) > 0 {
-		labels = append(labels, LabelPair{Key: "child_node_id", Value: pluginMeta.ChildNodeID})
-	}
-	if len(pluginMeta.PluginType) > 0 {
-		labels = append(labels, LabelPair{Key: "plugin_name", Value: pluginMeta.PluginType})
-	}
-	return labels
-}
-
 // Context for plugin
 type Context interface {
 	InitContext(project, logstore, configName string)

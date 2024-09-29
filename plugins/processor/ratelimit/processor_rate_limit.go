@@ -27,10 +27,9 @@ type ProcessorRateLimit struct {
 	Fields []string `comment:"Optional. Fields of value to be limited, for each unique result from combining these field values."`
 	Limit  string   `comment:"Optional. Limit rate in the format of (number)/(time unit). Supported time unit: 's' (per second), 'm' (per minute), and 'h' (per hour)."`
 
-	Algorithm       algorithm
-	limitMetric     pipeline.CounterMetric
-	processedMetric pipeline.CounterMetric
-	context         pipeline.Context
+	Algorithm   algorithm
+	limitMetric pipeline.CounterMetric
+	context     pipeline.Context
 }
 
 const pluginType = "processor_rate_limit"
@@ -46,8 +45,7 @@ func (p *ProcessorRateLimit) Init(context pipeline.Context) error {
 	p.Algorithm = newTokenBucket(limit)
 
 	metricsRecord := p.context.GetMetricRecord()
-	p.limitMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_limited", pluginType))
-	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginType))
+	p.limitMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginDiscardedEventsTotal)
 	return nil
 }
 
@@ -69,7 +67,6 @@ func (p *ProcessorRateLimit) ProcessLogs(logArray []*protocol.Log) []*protocol.L
 		} else {
 			p.limitMetric.Add(1)
 		}
-		p.processedMetric.Add(1)
 	}
 	logArray = logArray[:nextIdx]
 	return logArray

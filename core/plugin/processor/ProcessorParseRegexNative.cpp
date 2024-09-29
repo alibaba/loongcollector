@@ -18,7 +18,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
 
@@ -96,11 +96,10 @@ bool ProcessorParseRegexNative::Init(const Json::Value& config) {
     mRegexMatchFailures = &(GetContext().GetProcessProfile().regexMatchFailures);
     mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
 
-    mProcParseInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_IN_SIZE_BYTES);
-    mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
-    mProcDiscardRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DISCARD_RECORDS_TOTAL);
-    mProcParseErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_ERROR_TOTAL);
-    mProcKeyCountNotMatchErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_KEY_COUNT_NOT_MATCH_ERROR_TOTAL);
+    mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
+    mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
+    mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
+    mOutSuccessfulEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL);
 
     return true;
 }
@@ -131,10 +130,12 @@ bool ProcessorParseRegexNative::IsSupportedEvent(const PipelineEventPtr& e) cons
 
 bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath, PipelineEventPtr& e) {
     if (!IsSupportedEvent(e)) {
+        mOutFailedEventsTotal->Add(1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
+        mOutKeyNotFoundEventsTotal->Add(1);
         return true;
     }
     auto rawContent = sourceEvent.GetContent(mSourceKey);
@@ -156,16 +157,16 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath, Pipeline
         AddLog(mCommonParserOptions.legacyUnmatchedRawLogKey, rawContent, sourceEvent, false);
     }
     if (mCommonParserOptions.ShouldEraseEvent(parseSuccess, sourceEvent)) {
-        mProcDiscardRecordsTotal->Add(1);
+        mDiscardedEventsTotal->Add(1);
         return false;
     }
+    mOutSuccessfulEventsTotal->Add(1);
     return true;
 }
 
 bool ProcessorParseRegexNative::WholeLineModeParser(LogEvent& sourceEvent, const std::string& key) {
     StringView buffer = sourceEvent.GetContent(mSourceKey);
     AddLog(StringView(key), buffer, sourceEvent);
-    mProcParseInSizeBytes->Add(buffer.size());
     return true;
 }
 
@@ -178,7 +179,6 @@ void ProcessorParseRegexNative::AddLog(const StringView& key,
     }
     targetEvent.SetContentNoCopy(key, value);
     *mLogGroupSize += key.size() + value.size() + 5;
-    mProcParseOutSizeBytes->Add(key.size() + value.size());
 }
 
 bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
@@ -189,7 +189,6 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
     std::string exception;
     StringView buffer = sourceEvent.GetContent(mSourceKey);
     bool parseSuccess = true;
-    mProcParseInSizeBytes->Add(buffer.size());
     if (!BoostRegexMatch(buffer.data(), buffer.size(), reg, exception, what, boost::match_default)) {
         if (!exception.empty()) {
             if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
@@ -221,7 +220,7 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
         }
         ++(*mRegexMatchFailures);
         ++(*mParseFailures);
-        mProcParseErrorTotal->Add(1);
+        mOutFailedEventsTotal->Add(1);
         parseSuccess = false;
     } else if (what.size() <= keys.size()) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
@@ -240,7 +239,6 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
         }
         ++(*mRegexMatchFailures);
         ++(*mParseFailures);
-        mProcKeyCountNotMatchErrorTotal->Add(1);
         parseSuccess = false;
     }
     if (!parseSuccess) {

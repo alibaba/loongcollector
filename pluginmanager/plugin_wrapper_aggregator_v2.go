@@ -17,6 +17,7 @@ package pluginmanager
 import (
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -31,42 +32,49 @@ import (
 type AggregatorWrapperV2 struct {
 	AggregatorWrapper
 	Aggregator pipeline.AggregatorV2
+
+	totalDelayTimeMs pipeline.CounterMetric
 }
 
-func (p *AggregatorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
-	p.InitMetricRecord(pluginMeta)
+func (wrapper *AggregatorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
+	wrapper.InitMetricRecord(pluginMeta)
+	wrapper.totalDelayTimeMs = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginTotalDelayMs)
 
-	interval, err := p.Aggregator.Init(p.Config.Context, p)
+	interval, err := wrapper.Aggregator.Init(wrapper.Config.Context, wrapper)
 	if err != nil {
-		logger.Error(p.Config.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", p.Aggregator.Description(), "error", err)
+		logger.Error(wrapper.Config.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", wrapper.Aggregator.Description(), "error", err)
 		return err
 	}
 	if interval == 0 {
-		interval = p.Config.GlobalConfig.AggregatIntervalMs
+		interval = wrapper.Config.GlobalConfig.AggregatIntervalMs
 	}
-	p.Interval = time.Millisecond * time.Duration(interval)
+	wrapper.Interval = time.Millisecond * time.Duration(interval)
 	return nil
 }
 
-func (p *AggregatorWrapperV2) Record(events *models.PipelineGroupEvents, context pipeline.PipelineContext) error {
-	p.aggrInRecordsTotal.Add(int64(len(events.Events)))
+func (wrapper *AggregatorWrapperV2) Record(events *models.PipelineGroupEvents, context pipeline.PipelineContext) error {
 	startTime := time.Now()
-	err := p.Aggregator.Record(events, context)
+
+	err := wrapper.Aggregator.Record(events, context)
 	if err == nil {
-		p.aggrOutRecordsTotal.Add(int64(len(events.Events)))
-		p.aggrTimeMS.Add(time.Since(startTime).Milliseconds())
+		wrapper.outEventsTotal.Add(int64(len(events.Events)))
+		wrapper.outEventGroupsTotal.Add(1)
+		for _, event := range events.Events {
+			wrapper.outSizeBytes.Add(event.GetSize())
+		}
 	}
+	wrapper.totalDelayTimeMs.Add(time.Since(startTime).Milliseconds())
 	return err
 }
 
-func (p *AggregatorWrapperV2) GetResult(context pipeline.PipelineContext) error {
-	return p.Aggregator.GetResult(context)
+func (wrapper *AggregatorWrapperV2) GetResult(context pipeline.PipelineContext) error {
+	return wrapper.Aggregator.GetResult(context)
 }
 
-func (p *AggregatorWrapperV2) Add(loggroup *protocol.LogGroup) error {
+func (wrapper *AggregatorWrapperV2) Add(loggroup *protocol.LogGroup) error {
 	return nil
 }
 
-func (p *AggregatorWrapperV2) AddWithWait(loggroup *protocol.LogGroup, duration time.Duration) error {
+func (wrapper *AggregatorWrapperV2) AddWithWait(loggroup *protocol.LogGroup, duration time.Duration) error {
 	return nil
 }

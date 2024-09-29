@@ -94,7 +94,7 @@ public:
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
-        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mNodeID, *mContext);
+        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
         return true;
     }
     bool Send(PipelineEventGroup&& g) override { return mIsValid; }
@@ -117,7 +117,7 @@ public:
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
-        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mNodeID, *mContext);
+        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
         return true;
     }
     bool Send(PipelineEventGroup&& g) override { return mIsValid; }

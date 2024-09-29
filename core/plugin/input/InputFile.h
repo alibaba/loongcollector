@@ -48,7 +48,7 @@ public:
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;
     PluginMetricManagerPtr mPluginMetricManager;
-    IntGaugePtr mInputFileMonitorTotal;
+    IntGaugePtr mMonitorFileTotal;
     // others
     uint32_t mMaxCheckpointDirSearchDepth = 0;
     uint32_t mExactlyOnceConcurrency = 0;

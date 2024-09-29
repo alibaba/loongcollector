@@ -113,8 +113,8 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL(QueueKeyManager::GetInstance()->GetKey("test_config-flusher_sls-test_project#test_logstore"),
                       pipeline->GetContext().GetLogstoreKey());
     APSARA_TEST_EQUAL(2U, pipeline->mMetricsRecordRef->GetLabels()->size());
-    APSARA_TEST_TRUE(pipeline->mMetricsRecordRef.HasLabel(METRIC_LABEL_CONFIG_NAME, configName));
-    APSARA_TEST_TRUE(pipeline->mMetricsRecordRef.HasLabel(METRIC_LABEL_PROJECT, "test_project"));
+    APSARA_TEST_TRUE(pipeline->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, configName));
+    APSARA_TEST_TRUE(pipeline->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, "test_project"));
 
     // without sls flusher
     configStr = R"(
@@ -2688,11 +2688,14 @@ void PipelineUnittest::TestProcess() const {
     pipeline.mProcessorLine.emplace_back(std::move(processor));
 
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, {});
-    pipeline.mProcessorsInEventsCnt = pipeline.mMetricsRecordRef.CreateCounter("pipeline_processors_in_events_total");
-    pipeline.mProcessorsInGroupsCnt = pipeline.mMetricsRecordRef.CreateCounter("pipeline_processors_in_event_groups_total");
-    pipeline.mProcessorsInGroupDataSizeBytes
-        = pipeline.mMetricsRecordRef.CreateCounter("processors_in_event_group_size_bytes");
-    pipeline.mProcessorsTotalDelayMs = pipeline.mMetricsRecordRef.CreateCounter("processors_total_delay_ms");
+    pipeline.mProcessorsInEventsTotal
+        = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL);
+    pipeline.mProcessorsInGroupsTotal
+        = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL);
+    pipeline.mProcessorsInSizeBytes
+        = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_SIZE_BYTES);
+    pipeline.mProcessorsTotalProcessTimeMs
+        = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS);
 
     vector<PipelineEventGroup> groups;
     groups.emplace_back(make_shared<SourceBuffer>());
@@ -2702,9 +2705,9 @@ void PipelineUnittest::TestProcess() const {
     APSARA_TEST_EQUAL(
         1U, static_cast<const ProcessorInnerMock*>(pipeline.mInputs[0]->GetInnerProcessors()[0]->mPlugin.get())->mCnt);
     APSARA_TEST_EQUAL(1U, static_cast<const ProcessorMock*>(pipeline.mProcessorLine[0]->mPlugin.get())->mCnt);
-    APSARA_TEST_EQUAL(1U, pipeline.mProcessorsInEventsCnt->GetValue());
-    APSARA_TEST_EQUAL(1U, pipeline.mProcessorsInGroupsCnt->GetValue());
-    APSARA_TEST_EQUAL(size, pipeline.mProcessorsInGroupDataSizeBytes->GetValue());
+    APSARA_TEST_EQUAL(1U, pipeline.mProcessorsInEventsTotal->GetValue());
+    APSARA_TEST_EQUAL(1U, pipeline.mProcessorsInGroupsTotal->GetValue());
+    APSARA_TEST_EQUAL(size, pipeline.mProcessorsInSizeBytes->GetValue());
 }
 
 void PipelineUnittest::TestSend() const {

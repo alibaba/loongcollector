@@ -19,7 +19,7 @@
 #include "app_config/AppConfig.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
@@ -90,11 +90,11 @@ bool ProcessorParseTimestampNative::Init(const Json::Value& config) {
     mParseTimeFailures = &(GetContext().GetProcessProfile().parseTimeFailures);
     mHistoryFailures = &(GetContext().GetProcessProfile().historyFailures);
 
-    mProcParseInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_IN_SIZE_BYTES);
-    mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
-    mProcDiscardRecordsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_DISCARD_RECORDS_TOTAL);
-    mProcParseErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_ERROR_TOTAL);
-    mProcHistoryFailureTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_HISTORY_FAILURE_TOTAL);
+    mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
+    mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
+    mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
+    mOutSuccessfulEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL);
+    mHistoryFailureTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_HISTORY_FAILURE_TOTAL);
 
     return true;
 }
@@ -130,17 +130,19 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
                                                  LogtailTime& logTime,
                                                  StringView& timeStrCache) {
     if (!IsSupportedEvent(e)) {
+        mOutFailedEventsTotal->Add(1);
         return true;
     }
     LogEvent& sourceEvent = e.Cast<LogEvent>();
     if (!sourceEvent.HasContent(mSourceKey)) {
+        mOutKeyNotFoundEventsTotal->Add(1);
         return true;
     }
     const StringView& timeStr = sourceEvent.GetContent(mSourceKey);
-    mProcParseInSizeBytes->Add(timeStr.size());
     uint64_t preciseTimestamp = 0;
     bool parseSuccess = ParseLogTime(timeStr, logPath, logTime, preciseTimestamp, timeStrCache);
     if (!parseSuccess) {
+        mOutFailedEventsTotal->Add(1);
         return true;
     }
     if (logTime.tv_sec <= 0
@@ -163,8 +165,8 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
                                                    GetContext().GetRegion());
         }
         ++(*mHistoryFailures);
-        mProcHistoryFailureTotal->Add(1);
-        mProcDiscardRecordsTotal->Add(1);
+        mHistoryFailureTotal->Add(1);
+        mDiscardedEventsTotal->Add(1);
         return false;
     }
     sourceEvent.SetTimestamp(logTime.tv_sec, logTime.tv_nsec);
@@ -173,7 +175,7 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
     //     sb.size = std::min(20, snprintf(sb.data, sb.capacity, "%lu", preciseTimestamp));
     //     sourceEvent.SetContentNoCopy(mLegacyPreciseTimestampConfig.key, StringView(sb.data, sb.size));
     // }
-    mProcParseOutSizeBytes->Add(sizeof(logTime.tv_sec) + sizeof(logTime.tv_nsec));
+    mOutSuccessfulEventsTotal->Add(1);
     return true;
 }
 
@@ -219,8 +221,6 @@ bool ProcessorParseTimestampNative::ParseLogTime(const StringView& curTimeStr, /
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
         }
-
-        mProcParseErrorTotal->Add(1);
         ++(*mParseTimeFailures);
         return false;
     }

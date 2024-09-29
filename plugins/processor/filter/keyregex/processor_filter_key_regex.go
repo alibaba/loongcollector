@@ -15,7 +15,6 @@
 package keyregex
 
 import (
-	"fmt"
 	"regexp"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -30,11 +29,10 @@ type ProcessorKeyFilter struct {
 	Include []string
 	Exclude []string
 
-	includeRegex    []*regexp.Regexp
-	excludeRegex    []*regexp.Regexp
-	filterMetric    pipeline.CounterMetric
-	processedMetric pipeline.CounterMetric
-	context         pipeline.Context
+	includeRegex []*regexp.Regexp
+	excludeRegex []*regexp.Regexp
+	filterMetric pipeline.CounterMetric
+	context      pipeline.Context
 }
 
 // Init called for init some system resources, like socket, mutex...
@@ -64,8 +62,7 @@ func (p *ProcessorKeyFilter) Init(context pipeline.Context) error {
 	}
 
 	metricsRecord := p.context.GetMetricRecord()
-	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_filtered", pluginType))
-	p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginType))
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginDiscardedEventsTotal)
 	return nil
 }
 
@@ -111,7 +108,6 @@ func (p *ProcessorKeyFilter) ProcessLogs(logArray []*protocol.Log) []*protocol.L
 		} else {
 			p.filterMetric.Add(1)
 		}
-		p.processedMetric.Add(1)
 	}
 	logArray = logArray[:nextIdx]
 	return logArray

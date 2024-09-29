@@ -38,7 +38,7 @@ func (p *ProcessorDropLastKey) Init(context pipeline.Context) error {
 	p.context = context
 
 	metricsRecord := p.context.GetMetricRecord()
-	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, "drop_key_count")
+	p.filterMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginDiscardedEventsTotal)
 
 	if len(p.DropKey) == 0 {
 		return fmt.Errorf("Invalid config, DropKey is empty")

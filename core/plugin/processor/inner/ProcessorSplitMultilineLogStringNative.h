@@ -66,9 +66,9 @@ private:
 
     int* mSplitLines = nullptr;
 
-    CounterPtr mProcMatchedEventsCnt;
-    CounterPtr mProcMatchedLinesCnt;
-    CounterPtr mProcUnmatchedLinesCnt;
+    CounterPtr mMatchedEventsTotal;
+    CounterPtr mMatchedLinesTotal;
+    CounterPtr mUnmatchedLinesTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorSplitMultilineLogStringNativeUnittest;

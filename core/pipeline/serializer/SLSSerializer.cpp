@@ -43,19 +43,19 @@ bool Serializer<vector<CompressedLogGroup>>::DoSerialize(vector<CompressedLogGro
     for (auto& item : p) {
         inputSize += item.mData.size();
     }
-    mInItemsCnt->Add(1);
+    mInItemsTotal->Add(1);
     mInItemSizeBytes->Add(inputSize);
 
     auto before = std::chrono::system_clock::now();
     auto res = Serialize(std::move(p), output, errorMsg);
-    mTotalDelayMs->Add(
+    mTotalProcessMs->Add(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - before).count());
 
     if (res) {
-        mOutItemsCnt->Add(1);
+        mOutItemsTotal->Add(1);
         mOutItemSizeBytes->Add(output.size());
     } else {
-        mDiscardedItemsCnt->Add(1);
+        mDiscardedItemsTotal->Add(1);
         mDiscardedItemSizeBytes->Add(inputSize);
     }
     return res;

@@ -20,7 +20,6 @@ package sls
 import (
 	"fmt"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logtail"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -32,15 +31,12 @@ type SlsFlusher struct { // nolint:revive
 	EnableShardHash bool
 	KeepShardHash   bool
 
-	context    pipeline.Context
-	lenCounter pipeline.CounterMetric
+	context pipeline.Context
 }
 
 // Init ...
 func (p *SlsFlusher) Init(context pipeline.Context) error {
 	p.context = context
-	metricsRecord := context.GetMetricRecord()
-	p.lenCounter = helper.NewCounterMetricAndRegister(metricsRecord, "flush_sls_size")
 	return nil
 }
 
@@ -82,8 +78,6 @@ func (p *SlsFlusher) Flush(projectName string, logstoreName string, configName s
 		if err != nil {
 			return fmt.Errorf("loggroup marshal err %v", err)
 		}
-		bufLen := len(buf)
-		p.lenCounter.Add(int64(bufLen))
 
 		var rst int
 		if !p.EnableShardHash {

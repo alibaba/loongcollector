@@ -14,25 +14,25 @@
 
 #include "pipeline/plugin/instance/FlusherInstance.h"
 
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
 bool FlusherInstance::Init(const Json::Value& config, PipelineContext& context, Json::Value& optionalGoPipeline) {
     mPlugin->SetContext(context);
-    mPlugin->SetNodeID(NodeID());
-    mPlugin->SetMetricsRecordRef(Name(), PluginID(), NodeID(), ChildNodeID());
+    mPlugin->SetPluginID(PluginID());
+    mPlugin->SetMetricsRecordRef(Name(), PluginID());
     if (!mPlugin->Init(config, optionalGoPipeline)) {
         return false;
     }
 
-    mInEventsCnt = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_EVENTS_CNT);
-    mInGroupDataSizeBytes = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_EVENT_GROUP_SIZE_BYTES);
+    mInEventsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
+    mInSizeBytes = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_SIZE_BYTES);
     return true;
 }
 
 bool FlusherInstance::Send(PipelineEventGroup&& g) {
-    mInEventsCnt->Add(g.GetEvents().size());
-    mInGroupDataSizeBytes->Add(g.DataSize());
+    mInEventsTotal->Add(g.GetEvents().size());
+    mInSizeBytes->Add(g.DataSize());
     return mPlugin->Send(std::move(g));
 }
 

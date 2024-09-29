@@ -104,8 +104,8 @@ func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
 
 	metricsRecord := m.Context.GetMetricRecord()
 
-	m.collectLatency = helper.NewLatencyMetricAndRegister(metricsRecord, fmt.Sprintf("%s_collect_avg_cost", m.Driver))
-	m.collectTotal = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%s_collect_total", m.Driver))
+	m.collectLatency = helper.NewLatencyMetricAndRegister(metricsRecord, helper.MetricPluginCollectAvgCostTimeMs)
+	m.collectTotal = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginCollectTotal)
 	if m.CheckPoint {
 		m.checkpointMetric = helper.NewStringMetricAndRegister(metricsRecord, fmt.Sprintf("%s_checkpoint", m.Driver))
 	}

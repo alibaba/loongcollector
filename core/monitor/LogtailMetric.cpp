@@ -25,6 +25,9 @@ using namespace sls_logs;
 
 namespace logtail {
 
+const std::string LABEL_PREFIX = "label.";
+const std::string VALUE_PREFIX = "value.";
+
 MetricsRecord::MetricsRecord(MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels)
     : mLabels(labels), mDynamicLabels(dynamicLabels), mDeleted(false) {
 }
@@ -325,7 +328,9 @@ ReadMetrics::~ReadMetrics() {
     Clear();
 }
 
-void ReadMetrics::ReadAsLogGroup(std::map<std::string, sls_logs::LogGroup*>& logGroupMap) const {
+void ReadMetrics::ReadAsLogGroup(const std::string& regionFieldName,
+                                 const std::string& defaultRegion,
+                                 std::map<std::string, sls_logs::LogGroup*>& logGroupMap) const {
     ReadLock lock(mReadWriteLock);
     MetricsRecord* tmp = mHead;
     while (tmp) {
@@ -333,7 +338,7 @@ void ReadMetrics::ReadAsLogGroup(std::map<std::string, sls_logs::LogGroup*>& log
 
         for (auto item = tmp->GetLabels()->begin(); item != tmp->GetLabels()->end(); ++item) {
             std::pair<std::string, std::string> pair = *item;
-            if (METRIC_FIELD_REGION == pair.first) {
+            if (regionFieldName == pair.first) {
                 std::map<std::string, sls_logs::LogGroup*>::iterator iter;
                 std::string region = pair.second;
                 iter = logGroupMap.find(region);
@@ -349,14 +354,14 @@ void ReadMetrics::ReadAsLogGroup(std::map<std::string, sls_logs::LogGroup*>& log
         }
         if (!logPtr) {
             std::map<std::string, sls_logs::LogGroup*>::iterator iter;
-            iter = logGroupMap.find(METRIC_REGION_DEFAULT);
+            iter = logGroupMap.find(defaultRegion);
             if (iter != logGroupMap.end()) {
                 sls_logs::LogGroup* logGroup = iter->second;
                 logPtr = logGroup->add_logs();
             } else {
                 sls_logs::LogGroup* logGroup = new sls_logs::LogGroup();
                 logPtr = logGroup->add_logs();
-                logGroupMap.insert(std::pair<std::string, sls_logs::LogGroup*>(METRIC_REGION_DEFAULT, logGroup));
+                logGroupMap.insert(std::pair<std::string, sls_logs::LogGroup*>(defaultRegion, logGroup));
             }
         }
         auto now = GetCurrentLogtailTime();

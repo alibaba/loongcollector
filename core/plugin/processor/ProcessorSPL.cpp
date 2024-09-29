@@ -28,7 +28,7 @@
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "spl/PipelineEventGroupInput.h"
 #include "spl/PipelineEventGroupOutput.h"
 #include "spl/SplConstants.h"

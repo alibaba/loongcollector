@@ -64,7 +64,7 @@ UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraEasyReadLogTimePars
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraLogLineParser);
 
 PluginInstance::PluginMeta getPluginMeta(){
-    PluginInstance::PluginMeta pluginMeta{"testgetPluginID", "testNodeID", "testNodeChildID"};
+    PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
 
@@ -574,7 +574,7 @@ void ProcessorParseApsaraNativeUnittest::TestMultipleLines() {
         // run function ProcessorSplitMultilineLogStringNative
         ProcessorSplitMultilineLogStringNative processorSplitMultilineLogStringNative;
         processorSplitMultilineLogStringNative.SetContext(mContext);
-        processorSplitMultilineLogStringNative.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1", "1", "1");
+        processorSplitMultilineLogStringNative.SetMetricsRecordRef(ProcessorSplitMultilineLogStringNative::sName, "1");
         APSARA_TEST_TRUE_FATAL(processorSplitMultilineLogStringNative.Init(config));
         processorSplitMultilineLogStringNative.Process(eventGroup);
 
@@ -786,11 +786,11 @@ void ProcessorParseApsaraNativeUnittest::TestProcessWholeLinePart() {
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
     APSARA_TEST_EQUAL_FATAL(1, processor.GetContext().GetProcessProfile().parseFailures);
-    APSARA_TEST_EQUAL_FATAL(uint64_t(3), processorInstance.mProcInRecordsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(3), processorInstance.mInEventsTotal->GetValue());
     // only timestamp failed, so output is 2
-    APSARA_TEST_EQUAL_FATAL(uint64_t(2), processorInstance.mProcOutRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(2), processorInstance.mOutEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseApsaraNativeUnittest::TestProcessKeyOverwritten() {
@@ -1081,16 +1081,10 @@ void ProcessorParseApsaraNativeUnittest::TestProcessEventKeepUnmatch() {
     // check observablity
     int count = 5;
     APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcInRecordsTotal->GetValue());
-    std::string expectValue = "value1";
-    APSARA_TEST_EQUAL_FATAL((expectValue.length()) * count, processor.mProcParseInSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcOutRecordsTotal->GetValue());
-    expectValue = "rawLogvalue1";
-    APSARA_TEST_EQUAL_FATAL((expectValue.length()) * count, processor.mProcParseOutSizeBytes->GetValue());
-
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcDiscardRecordsTotal->GetValue());
-
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mOutEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseApsaraNativeUnittest::TestProcessEventDiscardUnmatch() {
@@ -1164,14 +1158,13 @@ void ProcessorParseApsaraNativeUnittest::TestProcessEventDiscardUnmatch() {
     // check observablity
     int count = 5;
     APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mProcInRecordsTotal->GetValue());
-    std::string expectValue = "value1";
-    APSARA_TEST_EQUAL_FATAL((expectValue.length()) * count, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
     // discard unmatch, so output is 0
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mProcOutRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcParseOutSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mOutEventsTotal->GetValue());
+    // event group size is not 0
+    APSARA_TEST_NOT_EQUAL_FATAL(uint64_t(0), processorInstance.mOutSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(count), processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseApsaraNativeUnittest::TestProcessEventMicrosecondUnmatch() {
@@ -1283,10 +1276,10 @@ void ProcessorParseApsaraNativeUnittest::TestProcessEventMicrosecondUnmatch() {
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
     APSARA_TEST_EQUAL_FATAL(1, processor.GetContext().GetProcessProfile().parseFailures);
-    APSARA_TEST_EQUAL_FATAL(uint64_t(4), processorInstance.mProcInRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(4), processorInstance.mProcOutRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(4), processorInstance.mInEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(4), processorInstance.mOutEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(uint64_t(1), processor.mOutFailedEventsTotal->GetValue());
 }
 
 } // namespace logtail

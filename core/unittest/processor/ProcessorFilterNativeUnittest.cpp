@@ -42,7 +42,7 @@ UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestBaseFilter)
 UNIT_TEST_CASE(ProcessorFilterNativeUnittest, TestFilterNoneUtf8)
 
 PluginInstance::PluginMeta getPluginMeta(){
-    PluginInstance::PluginMeta pluginMeta{"testgetPluginID", "testNodeID", "testNodeChildID"};
+    PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
 
@@ -66,7 +66,7 @@ void ProcessorFilterNativeUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1", "1", "1");
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_TRUE(processor->Init(configJson));
     APSARA_TEST_EQUAL(1, processor->mFilterRule->FilterKeys.size());
     APSARA_TEST_EQUAL(1, processor->mFilterRule->FilterRegs.size());
@@ -93,7 +93,7 @@ void ProcessorFilterNativeUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1", "1", "1");
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_FALSE(processor->Init(configJson));
 
     configStr = R"(
@@ -112,7 +112,7 @@ void ProcessorFilterNativeUnittest::OnFailedInit() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     processor.reset(new ProcessorFilterNative());
     processor->SetContext(mContext);
-    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1", "1", "1");
+    processor->SetMetricsRecordRef(ProcessorFilterNative::sName, "1");
     APSARA_TEST_FALSE(processor->Init(configJson));
 }
 
@@ -449,7 +449,7 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
         })";
         APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
 
-        APSARA_TEST_EQUAL_FATAL(2, processor.mProcFilterRecordsTotal->GetValue());
+        APSARA_TEST_EQUAL_FATAL(2, processorInstance.mInEventsTotal->GetValue() -  processorInstance.mOutEventsTotal->GetValue());
     }
     {
         const char* jsonStr = "{\n"

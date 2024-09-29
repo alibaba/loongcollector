@@ -53,7 +53,7 @@ UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestProcessEventPreciseTim
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestCheckTime);
 
 PluginInstance::PluginMeta getPluginMeta(){
-    PluginInstance::PluginMeta pluginMeta{"testgetPluginID", "testNodeID", "testNodeChildID"};
+    PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
 
@@ -398,14 +398,11 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
     APSARA_TEST_EQUAL_FATAL(CompactJson(expectJsonSs.str()), CompactJson(outJson));
     // check observablity
     APSARA_TEST_EQUAL_FATAL(0, processor.GetContext().GetProcessProfile().historyFailures);
-    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mProcInRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(strlen(timebuff) * 2, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mInEventsTotal->GetValue());
     // discard history, so output is 0
-    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mProcOutRecordsTotal->GetValue());
-    // size of one timestamp and one nanosecond equals to 8 byte, respectively
-    APSARA_TEST_EQUAL_FATAL(8UL * 4, processor.mProcParseOutSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(0UL, processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(0UL, processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mOutEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(0UL, processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(0UL, processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseTimestampNativeUnittest::TestProcessNoYearFormat() {
@@ -490,14 +487,11 @@ void ProcessorParseTimestampNativeUnittest::TestProcessNoYearFormat() {
     APSARA_TEST_EQUAL_FATAL(CompactJson(expectJsonSs.str()), CompactJson(outJson));
     // check observablity
     APSARA_TEST_EQUAL_FATAL(0, processor.GetContext().GetProcessProfile().historyFailures);
-    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mProcInRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(strlen(timebuff) * 2, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mInEventsTotal->GetValue());
     // discard history, so output is 0
-    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mProcOutRecordsTotal->GetValue());
-    // size of one timestamp and one nanosecond equals to 8 byte, respectively
-    APSARA_TEST_EQUAL_FATAL(8UL * 4, processor.mProcParseOutSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(0UL, processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(0UL, processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mOutEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(0UL, processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(0UL, processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
@@ -555,14 +549,11 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
     APSARA_TEST_STREQ_FATAL(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
     APSARA_TEST_EQUAL_FATAL(0, processor.GetContext().GetProcessProfile().historyFailures);
-    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mProcInRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(strlen(timebuff) * 2, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mInEventsTotal->GetValue());
     // discard history, so output is 0
-    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mProcOutRecordsTotal->GetValue());
-    // size of one timestamp and one nanosecond equals to 8 byte, respectively
-    APSARA_TEST_EQUAL_FATAL(0UL, processor.mProcParseOutSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(0UL, processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(2UL, processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mOutEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(0UL, processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
@@ -614,13 +605,13 @@ void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
     // check observablity
     std::string outJson = eventGroupList[0].ToJsonString();
     APSARA_TEST_EQUAL_FATAL(2, processor.GetContext().GetProcessProfile().historyFailures);
-    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mProcInRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(strlen(timebuff) * 2, processor.mProcParseInSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mInEventsTotal->GetValue());
     // discard history, so output is 0
-    APSARA_TEST_EQUAL_FATAL(0UL, processorInstance.mProcOutRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(0UL, processor.mProcParseOutSizeBytes->GetValue());
-    APSARA_TEST_EQUAL_FATAL(2UL, processor.mProcDiscardRecordsTotal->GetValue());
-    APSARA_TEST_EQUAL_FATAL(0UL, processor.mProcParseErrorTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(0UL, processorInstance.mOutEventsTotal->GetValue());
+    // event group size is not 0
+    APSARA_TEST_NOT_EQUAL_FATAL(0UL, processorInstance.mOutSizeBytes->GetValue());
+    APSARA_TEST_EQUAL_FATAL(2UL, processor.mDiscardedEventsTotal->GetValue());
+    APSARA_TEST_EQUAL_FATAL(0UL, processor.mOutFailedEventsTotal->GetValue());
 }
 
 void ProcessorParseTimestampNativeUnittest::TestProcessEventPreciseTimestampLegacy() {

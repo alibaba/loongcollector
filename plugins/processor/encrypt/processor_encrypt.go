@@ -27,7 +27,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -66,9 +65,6 @@ type ProcessorEncrypt struct {
 	blockSize int
 	key       []byte
 	iv        []byte
-
-	encryptedCountMetric pipeline.CounterMetric
-	encryptedBytesMetric pipeline.CounterMetric
 }
 
 func (p *ProcessorEncrypt) Init(context pipeline.Context) error {
@@ -86,10 +82,6 @@ func (p *ProcessorEncrypt) Init(context pipeline.Context) error {
 	if err := p.parseIV(); err != nil {
 		return err
 	}
-
-	metricsRecord := p.context.GetMetricRecord()
-	p.encryptedCountMetric = helper.NewCounterMetricAndRegister(metricsRecord, "encrypted_count")
-	p.encryptedBytesMetric = helper.NewCounterMetricAndRegister(metricsRecord, "encrypted_bytes")
 	return nil
 }
 
@@ -115,8 +107,6 @@ func (p *ProcessorEncrypt) processLog(log *protocol.Log) {
 			continue
 		}
 
-		p.encryptedCountMetric.Add(1)
-		p.encryptedBytesMetric.Add(int64(len(cont.Value)))
 		ciphertext, err := p.encrypt(cont.Value)
 		if err == nil {
 			cont.Value = hex.EncodeToString(ciphertext)

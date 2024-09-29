@@ -17,6 +17,8 @@ import (
 	goruntimemetrics "runtime/metrics"
 	"strconv"
 	"strings"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
 )
 
 const (
@@ -83,12 +85,10 @@ func GetAgentStat() []map[string]string {
 	metric := map[string]string{}
 	// key is the metric key in runtime/metrics, value is agent's metric key
 	metricNames := map[string]string{
-		// cpu
-		// "": "agent_go_cpu_percent",
 		// mem. All memory mapped by the Go runtime into the current process as read-write. Note that this does not include memory mapped by code called via cgo or via the syscall package. Sum of all metrics in /memory/classes.
-		"/memory/classes/total:bytes": "agent_go_memory_used_mb",
+		"/memory/classes/total:bytes": helper.MetricAgentMemoryGo,
 		// go routines cnt. Count of live goroutines.
-		"/sched/goroutines:goroutines": "agent_go_routines_total",
+		"/sched/goroutines:goroutines": helper.MetricAgentGoRoutinesTotal,
 	}
 
 	// metrics to read from runtime/metrics

@@ -37,13 +37,13 @@ protected:
 
 void FlusherInstanceUnittest::TestName() const {
     unique_ptr<FlusherInstance> flusher
-        = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0", "0", "1"));
+        = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0"));
     APSARA_TEST_EQUAL(FlusherMock::sName, flusher->Name());
 }
 
 void FlusherInstanceUnittest::TestInit() const {
     unique_ptr<FlusherInstance> flusher
-        = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0", "0", "1"));
+        = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0"));
     Json::Value config, opt;
     PipelineContext context;
     APSARA_TEST_TRUE(flusher->Init(config, context, opt));
@@ -52,20 +52,20 @@ void FlusherInstanceUnittest::TestInit() const {
 
 void FlusherInstanceUnittest::TestStart() const {
     unique_ptr<FlusherInstance> flusher
-        = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0", "0", "1"));
+        = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0"));
     APSARA_TEST_TRUE(flusher->Start());
 }
 
 void FlusherInstanceUnittest::TestStop() const {
     unique_ptr<FlusherInstance> flusher
-        = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0", "0", "1"));
+        = make_unique<FlusherInstance>(new FlusherMock(), PluginInstance::PluginMeta("0"));
     APSARA_TEST_TRUE(flusher->Stop(true));
 }
 
 void FlusherInstanceUnittest::TestGetQueueKey() const {
     FlusherMock* mock = new FlusherMock();
     mock->GenerateQueueKey("target");
-    unique_ptr<FlusherInstance> flusher = make_unique<FlusherInstance>(mock, PluginInstance::PluginMeta("0", "0", "1"));
+    unique_ptr<FlusherInstance> flusher = make_unique<FlusherInstance>(mock, PluginInstance::PluginMeta("0"));
     APSARA_TEST_EQUAL(QueueKeyManager::GetInstance()->GetKey("-flusher_mock-target"), flusher->GetQueueKey());
 }
 

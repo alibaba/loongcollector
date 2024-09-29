@@ -26,7 +26,7 @@
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 
 namespace logtail {
@@ -115,11 +115,9 @@ bool ProcessorParseContainerLogNative::Init(const Json::Value& config) {
                               mContext->GetRegion());
     }
 
-    mProcParseInSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_IN_SIZE_BYTES);
-    mProcParseOutSizeBytes = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_OUT_SIZE_BYTES);
-    mProcParseErrorTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_ERROR_TOTAL);
-    mProcParseStdoutTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_STDOUT_TOTAL);
-    mProcParseStderrTotal = GetMetricsRecordRef().CreateCounter(METRIC_PROC_PARSE_STDERR_TOTAL);
+    mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
+    mParseStdoutTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_PARSE_STDOUT_TOTAL);
+    mParseStderrTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_PARSE_STDERR_TOTAL);
 
     return true;
 }
@@ -152,7 +150,6 @@ bool ProcessorParseContainerLogNative::ProcessEvent(StringView containerType,
     if (!sourceEvent.HasContent(mSourceKey)) {
         return true;
     }
-    mProcParseInSizeBytes->Add(mSourceKey.size() + sourceEvent.GetContent(mSourceKey).size());
 
     std::string errorMsg;
     bool shouldKeepEvent = true;
@@ -162,7 +159,7 @@ bool ProcessorParseContainerLogNative::ProcessEvent(StringView containerType,
         shouldKeepEvent = ParseDockerJsonLogLine(sourceEvent, errorMsg);
     }
     if (!errorMsg.empty()) {
-        mProcParseErrorTotal->Add(1);
+        mOutFailedEventsTotal->Add(1);
     }
 
     if (!mIgnoreParseWarning && !errorMsg.empty() && LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
@@ -219,12 +216,12 @@ bool ProcessorParseContainerLogNative::ParseContainerdTextLogLine(LogEvent& sour
     }
 
     if (sourceValue == "stdout") {
-        mProcParseStdoutTotal->Add(1);
+        mParseStdoutTotal->Add(1);
         if (mIgnoringStdout) {
             return false;
         }
     } else {
-        mProcParseStderrTotal->Add(1);
+        mParseStderrTotal->Add(1);
         if (mIgnoringStderr) {
             return false;
         }
@@ -492,12 +489,12 @@ bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEv
     }
 
     if (sourceValue == "stdout") {
-        mProcParseStdoutTotal->Add(1);
+        mParseStdoutTotal->Add(1);
         if (mIgnoringStdout) {
             return false;
         }
     } else {
-        mProcParseStderrTotal->Add(1);
+        mParseStderrTotal->Add(1);
         if (mIgnoringStderr) {
             return false;
         }
@@ -513,18 +510,15 @@ bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEv
 
     // time
     sourceEvent.SetContent(containerTimeKey, timeValue);
-    mProcParseOutSizeBytes->Add(containerTimeKey.size() + timeValue.size());
 
     // source
     sourceEvent.SetContent(containerSourceKey, sourceValue);
-    mProcParseOutSizeBytes->Add(containerSourceKey.size() + sourceValue.size());
 
     // content
     if (!content.empty() && content.back() == '\n') {
         content = StringView(content.data(), content.size() - 1);
     }
     sourceEvent.SetContentNoCopy(containerLogKey, content);
-    mProcParseOutSizeBytes->Add(containerLogKey.size() + content.size());
 
     return true;
 }
@@ -532,15 +526,11 @@ bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEv
 void ProcessorParseContainerLogNative::ResetContainerdTextLog(
     StringView time, StringView source, StringView content, bool isPartialLog, LogEvent& sourceEvent) {
     sourceEvent.SetContentNoCopy(containerTimeKey, time);
-    mProcParseOutSizeBytes->Add(containerTimeKey.size() + time.size());
     sourceEvent.SetContentNoCopy(containerSourceKey, source);
-    mProcParseOutSizeBytes->Add(containerSourceKey.size() + source.size());
     if (isPartialLog) {
         sourceEvent.SetContentNoCopy(ProcessorMergeMultilineLogNative::PartLogFlag, StringView());
-        mProcParseOutSizeBytes->Add(ProcessorMergeMultilineLogNative::PartLogFlag.size());
     }
     sourceEvent.SetContentNoCopy(containerLogKey, content);
-    mProcParseOutSizeBytes->Add(containerLogKey.size() + content.size());
 }
 
 bool ProcessorParseContainerLogNative::IsSupportedEvent(const PipelineEventPtr& e) const {

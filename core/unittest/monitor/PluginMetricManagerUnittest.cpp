@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "monitor/MetricConstants.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "monitor/PluginMetricManager.h"
 #include "unittest/Unittest.h"
 
@@ -22,12 +22,12 @@ class PluginMetricManagerUnittest : public ::testing::Test {
 public:
     void SetUp() {
         MetricLabelsPtr defaultLabels = std::make_shared<MetricLabels>();
-        defaultLabels->emplace_back(METRIC_LABEL_PROJECT, "default_project");
-        defaultLabels->emplace_back(METRIC_LABEL_LOGSTORE, "default_logstore");
-        defaultLabels->emplace_back(METRIC_LABEL_REGION, "default_region");
-        defaultLabels->emplace_back(METRIC_LABEL_CONFIG_NAME, "default_config");
-        defaultLabels->emplace_back(METRIC_LABEL_PLUGIN_NAME, "default_plugin");
-        defaultLabels->emplace_back(METRIC_LABEL_PLUGIN_ID, "default_id");
+        defaultLabels->emplace_back(METRIC_LABEL_KEY_PROJECT, "default_project");
+        defaultLabels->emplace_back(METRIC_LABEL_KEY_LOGSTORE, "default_logstore");
+        defaultLabels->emplace_back(METRIC_LABEL_KEY_REGION, "default_region");
+        defaultLabels->emplace_back(METRIC_LABEL_KEY_PIPELINE_NAME, "default_config");
+        defaultLabels->emplace_back(METRIC_LABEL_KEY_PLUGIN_TYPE, "default_plugin");
+        defaultLabels->emplace_back(METRIC_LABEL_KEY_PLUGIN_ID, "default_id");
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(*defaultLabels));
         std::unordered_map<std::string, MetricType> metricKeys;
         metricKeys.emplace("default_counter", MetricType::METRIC_TYPE_COUNTER);

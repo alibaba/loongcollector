@@ -87,10 +87,10 @@ private:
 
     mutable MetricsRecordRef mMetricsRecordRef;
     IntGaugePtr mStartTime;
-    CounterPtr mProcessorsInEventsCnt;
-    CounterPtr mProcessorsInGroupsCnt;
-    CounterPtr mProcessorsInGroupDataSizeBytes;
-    CounterPtr mProcessorsTotalDelayMs;
+    CounterPtr mProcessorsInEventsTotal;
+    CounterPtr mProcessorsInGroupsTotal;
+    CounterPtr mProcessorsInSizeBytes;
+    CounterPtr mProcessorsTotalProcessTimeMs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
         friend class PipelineMock;

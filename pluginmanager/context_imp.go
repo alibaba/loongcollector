@@ -59,7 +59,7 @@ func (p *ContextImp) GetExtension(name string, cfg any) (pipeline.Extension, err
 	}
 
 	// create if not found
-	pluginMeta := p.logstoreC.genPluginMeta(name, false, false)
+	pluginMeta := p.logstoreC.genPluginMeta(name)
 	err := loadExtension(pluginMeta, p.logstoreC, cfg)
 	if err != nil {
 		return nil, err

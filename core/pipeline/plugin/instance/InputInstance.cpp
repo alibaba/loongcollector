@@ -20,7 +20,7 @@ bool InputInstance::Init(const Json::Value& config,
                          size_t inputIdx,
                          Json::Value& optionalGoPipeline) {
     mPlugin->SetContext(context);
-    mPlugin->SetMetricsRecordRef(Name(), PluginID(), NodeID(), ChildNodeID());
+    mPlugin->SetMetricsRecordRef(Name(), PluginID());
     mPlugin->SetInputIndex(inputIdx);
     if (!mPlugin->Init(config, optionalGoPipeline)) {
         return false;

@@ -450,7 +450,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 
     // CompressType
     if (BOOL_FLAG(sls_client_send_compress)) {
-        mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, mNodeID, CompressType::LZ4);
+        mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, mPluginID, CompressType::LZ4);
     }
 
     mGroupSerializer = make_unique<SLSEventGroupSerializer>(this);
@@ -475,7 +475,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         GenerateQueueKey(mProject + "#" + mLogstore);
         SenderQueueManager::GetInstance()->CreateQueue(
             mQueueKey,
-            mNodeID,
+            mPluginID,
             *mContext,
             vector<shared_ptr<ConcurrencyLimiter>>{GetRegionConcurrencyLimiter(mRegion),
                                                    GetProjectConcurrencyLimiter(mProject)},

@@ -47,10 +47,10 @@ private:
     int* mParseFailures = nullptr;
     int* mLogGroupSize = nullptr;
 
-    CounterPtr mProcParseInSizeBytes;
-    CounterPtr mProcParseOutSizeBytes;
-    CounterPtr mProcDiscardRecordsTotal;
-    CounterPtr mProcParseErrorTotal;
+    CounterPtr mDiscardedEventsTotal;
+    CounterPtr mOutFailedEventsTotal;
+    CounterPtr mOutKeyNotFoundEventsTotal;
+    CounterPtr mOutSuccessfulEventsTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseJsonNativeUnittest;
