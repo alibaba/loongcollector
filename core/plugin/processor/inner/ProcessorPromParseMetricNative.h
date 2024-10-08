@@ -6,6 +6,7 @@
 #include "models/PipelineEventPtr.h"
 #include "pipeline/plugin/interface/Processor.h"
 #include "prometheus/labels/TextParser.h"
+#include "prometheus/schedulers/ScrapeConfig.h"
 
 namespace logtail {
 class ProcessorPromParseMetricNative : public Processor {
@@ -20,8 +21,8 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr&) const override;
 
 private:
-    bool ProcessEvent(PipelineEventPtr&, EventsContainer&, PipelineEventGroup&, uint64_t timestamp, uint32_t nanoSec);
-    TextParser mParser;
+    bool ProcessEvent(PipelineEventPtr&, EventsContainer&, PipelineEventGroup&, TextParser& parser);
+    std::unique_ptr<ScrapeConfig> mScrapeConfigPtr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputPrometheusUnittest;

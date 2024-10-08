@@ -40,26 +40,13 @@ enum class Action {
 };
 
 const std::string& ActionToString(Action action);
-Action StringToAction(std::string action);
-
-class LabelName {
-public:
-    LabelName();
-    LabelName(std::string);
-
-    bool Validate();
-
-    std::string mLabelName;
-
-private:
-};
+Action StringToAction(const std::string& action);
 
 class RelabelConfig {
 public:
     RelabelConfig();
-    RelabelConfig(const Json::Value&);
-
-    bool Validate();
+    bool Init(const Json::Value&);
+    bool Process(Labels&) const;
 
     // A list of labels from which values are taken and concatenated
     // with the configured separator in order.
@@ -81,12 +68,23 @@ public:
 private:
 };
 
+class RelabelConfigList {
+public:
+    bool Init(const Json::Value& relabelConfigs);
+    bool Process(MetricEvent&) const;
+    bool Process(Labels&) const;
 
-namespace prometheus {
-    bool Process(const Labels& lbls, const std::vector<RelabelConfig>& cfgs, Labels& ret);
-    bool ProcessBuilder(LabelsBuilder& lb, const std::vector<RelabelConfig>& cfgs);
-    bool Relabel(const RelabelConfig& cfg, LabelsBuilder& lb);
-} // namespace prometheus
+    [[nodiscard]] bool Empty() const;
+
+private:
+    std::vector<RelabelConfig> mRelabelConfigs;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class RelabelConfigListTest;
+    friend class InputPrometheusUnittest;
+    friend class ScrapeConfigUnittest;
+#endif
+};
 
 
 } // namespace logtail

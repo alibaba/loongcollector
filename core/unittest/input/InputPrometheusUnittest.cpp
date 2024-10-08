@@ -14,18 +14,17 @@
 
 #include <json/json.h>
 
-#include <cstdint>
 #include <memory>
 #include <string>
 
 #include "PluginRegistry.h"
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
-#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
-#include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
-#include "plugin/input/InputPrometheus.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
+#include "plugin/input/InputPrometheus.h"
+#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
+#include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 #include "prometheus/PrometheusInputRunner.h"
 #include "prometheus/labels/Relabel.h"
 #include "unittest/Unittest.h"
@@ -96,9 +95,9 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("/metrics", input->mTargetSubscirber->mScrapeConfigPtr->mMetricsPath);
     APSARA_TEST_EQUAL(15LL, input->mTargetSubscirber->mScrapeConfigPtr->mScrapeIntervalSeconds);
     APSARA_TEST_EQUAL(15LL, input->mTargetSubscirber->mScrapeConfigPtr->mScrapeTimeoutSeconds);
-    APSARA_TEST_EQUAL(-1, input->mTargetSubscirber->mScrapeConfigPtr->mMaxScrapeSizeBytes);
-    APSARA_TEST_EQUAL(-1, input->mTargetSubscirber->mScrapeConfigPtr->mSampleLimit);
-    APSARA_TEST_EQUAL(-1, input->mTargetSubscirber->mScrapeConfigPtr->mSeriesLimit);
+    APSARA_TEST_EQUAL(0ULL, input->mTargetSubscirber->mScrapeConfigPtr->mMaxScrapeSizeBytes);
+    APSARA_TEST_EQUAL(0ULL, input->mTargetSubscirber->mScrapeConfigPtr->mSampleLimit);
+    APSARA_TEST_EQUAL(0ULL, input->mTargetSubscirber->mScrapeConfigPtr->mSeriesLimit);
 
     // all useful config
     configStr = R"(
@@ -131,9 +130,9 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("/metrics", input->mTargetSubscirber->mScrapeConfigPtr->mMetricsPath);
     APSARA_TEST_EQUAL(15, input->mTargetSubscirber->mScrapeConfigPtr->mScrapeIntervalSeconds);
     APSARA_TEST_EQUAL(15, input->mTargetSubscirber->mScrapeConfigPtr->mScrapeTimeoutSeconds);
-    APSARA_TEST_EQUAL(10 * 1024 * 1024, input->mTargetSubscirber->mScrapeConfigPtr->mMaxScrapeSizeBytes);
-    APSARA_TEST_EQUAL(1000000, input->mTargetSubscirber->mScrapeConfigPtr->mSampleLimit);
-    APSARA_TEST_EQUAL(1000000, input->mTargetSubscirber->mScrapeConfigPtr->mSeriesLimit);
+    APSARA_TEST_EQUAL(10 * 1024 * 1024ULL, input->mTargetSubscirber->mScrapeConfigPtr->mMaxScrapeSizeBytes);
+    APSARA_TEST_EQUAL(1000000ULL, input->mTargetSubscirber->mScrapeConfigPtr->mSampleLimit);
+    APSARA_TEST_EQUAL(1000000ULL, input->mTargetSubscirber->mScrapeConfigPtr->mSeriesLimit);
     PrometheusInputRunner::GetInstance()->Stop();
 }
 
@@ -211,12 +210,14 @@ void InputPrometheusUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
 
     APSARA_TEST_TRUE(input->Start());
-    APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
-                     != PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
+    APSARA_TEST_TRUE(
+        PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
+        != PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
 
     APSARA_TEST_TRUE(input->Stop(true));
-    APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
-                     == PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
+    APSARA_TEST_TRUE(
+        PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
+        == PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
 
     PrometheusInputRunner::GetInstance()->Stop();
 }
@@ -258,7 +259,7 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
         APSARA_TEST_EQUAL(ProcessorPromRelabelMetricNative::sName, input->mInnerProcessors[1]->Name());
         APSARA_TEST_EQUAL(0U,
                           dynamic_cast<ProcessorPromRelabelMetricNative*>(input->mInnerProcessors[1]->mPlugin.get())
-                              ->mRelabelConfigs.size());
+                              ->mScrapeConfigPtr->mMetricRelabelConfigs.mRelabelConfigs.size());
     }
     {
         // with metric relabel config
@@ -366,18 +367,18 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
         APSARA_TEST_EQUAL(ProcessorPromRelabelMetricNative::sName, input->mInnerProcessors[1]->mPlugin->Name());
         APSARA_TEST_EQUAL(3U,
                           dynamic_cast<ProcessorPromRelabelMetricNative*>(input->mInnerProcessors[1]->mPlugin.get())
-                              ->mRelabelConfigs.size());
+                              ->mScrapeConfigPtr->mMetricRelabelConfigs.mRelabelConfigs.size());
         APSARA_TEST_EQUAL(Action::KEEP,
                           dynamic_cast<ProcessorPromRelabelMetricNative*>(input->mInnerProcessors[1]->mPlugin.get())
-                              ->mRelabelConfigs[0]
+                              ->mScrapeConfigPtr->mMetricRelabelConfigs.mRelabelConfigs[0]
                               .mAction);
         APSARA_TEST_EQUAL(Action::KEEP,
                           dynamic_cast<ProcessorPromRelabelMetricNative*>(input->mInnerProcessors[1]->mPlugin.get())
-                              ->mRelabelConfigs[1]
+                              ->mScrapeConfigPtr->mMetricRelabelConfigs.mRelabelConfigs[1]
                               .mAction);
         APSARA_TEST_EQUAL(Action::REPLACE,
                           dynamic_cast<ProcessorPromRelabelMetricNative*>(input->mInnerProcessors[1]->mPlugin.get())
-                              ->mRelabelConfigs[2]
+                              ->mScrapeConfigPtr->mMetricRelabelConfigs.mRelabelConfigs[2]
                               .mAction);
     }
     PrometheusInputRunner::GetInstance()->Stop();

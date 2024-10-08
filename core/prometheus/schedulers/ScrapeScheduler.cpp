@@ -27,11 +27,11 @@
 #include "common/timer/HttpRequestTimerEvent.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
-#include "prometheus/Constants.h"
-#include "prometheus/async/PromHttpRequest.h"
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKey.h"
+#include "prometheus/Constants.h"
+#include "prometheus/async/PromHttpRequest.h"
 
 using namespace std;
 
@@ -46,13 +46,13 @@ ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
     : mScrapeConfigPtr(std::move(scrapeConfigPtr)),
       mHost(std::move(host)),
       mPort(port),
-      mLabels(std::move(labels)),
+      mTargetLabels(std::move(labels)),
       mQueueKey(queueKey),
       mInputIndex(inputIndex) {
     string tmpTargetURL = mScrapeConfigPtr->mScheme + "://" + mHost + ":" + ToString(mPort)
         + mScrapeConfigPtr->mMetricsPath
         + (mScrapeConfigPtr->mQueryString.empty() ? "" : "?" + mScrapeConfigPtr->mQueryString);
-    mHash = mScrapeConfigPtr->mJobName + tmpTargetURL + ToString(mLabels.Hash());
+    mHash = mScrapeConfigPtr->mJobName + tmpTargetURL + ToString(mTargetLabels.Hash());
     mInstance = mHost + ":" + ToString(mPort);
     mInterval = mScrapeConfigPtr->mScrapeIntervalSeconds;
 
@@ -76,6 +76,7 @@ void ScrapeScheduler::OnMetricResult(const HttpResponse& response, uint64_t time
     auto eventGroup = BuildPipelineEventGroup(response.mBody);
 
     SetAutoMetricMeta(eventGroup);
+    SetTargetLabels(eventGroup);
     PushEventGroup(std::move(eventGroup));
 }
 
@@ -83,8 +84,11 @@ void ScrapeScheduler::SetAutoMetricMeta(PipelineEventGroup& eGroup) {
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC, ToString(mScrapeTimestampMilliSec));
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION, ToString(mScrapeDurationSeconds));
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE, ToString(mScrapeResponseSizeBytes));
-    eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_INSTANCE, mInstance);
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE, ToString(mUpState));
+}
+
+void ScrapeScheduler::SetTargetLabels(PipelineEventGroup& eGroup) {
+    mTargetLabels.Range([&eGroup](const std::string& key, const std::string& value) { eGroup.SetTag(key, value); });
 }
 
 PipelineEventGroup ScrapeScheduler::BuildPipelineEventGroup(const std::string& content) {

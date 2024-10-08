@@ -15,7 +15,11 @@ namespace logtail {
 const string ProcessorPromParseMetricNative::sName = "processor_prom_parse_metric_native";
 
 // only for inner processor
-bool ProcessorPromParseMetricNative::Init(const Json::Value&) {
+bool ProcessorPromParseMetricNative::Init(const Json::Value& config) {
+    mScrapeConfigPtr = std::make_unique<ScrapeConfig>();
+    if (!mScrapeConfigPtr->InitStaticConfig(config)) {
+        return false;
+    }
     return true;
 }
 
@@ -27,9 +31,11 @@ void ProcessorPromParseMetricNative::Process(PipelineEventGroup& eGroup) {
     auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());
     auto timestamp = timestampMilliSec / 1000;
     auto nanoSec = timestampMilliSec % 1000 * 1000000;
+    TextParser parser(mScrapeConfigPtr->mHonorTimestamps);
+    parser.SetDefaultTimestamp(timestamp, nanoSec);
 
     for (auto& e : events) {
-        ProcessEvent(e, newEvents, eGroup, timestamp, nanoSec);
+        ProcessEvent(e, newEvents, eGroup, parser);
     }
     events.swap(newEvents);
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED, ToString(events.size()));
@@ -39,14 +45,17 @@ bool ProcessorPromParseMetricNative::IsSupportedEvent(const PipelineEventPtr& e)
     return e.Is<LogEvent>();
 }
 
-bool ProcessorPromParseMetricNative::ProcessEvent(
-    PipelineEventPtr& e, EventsContainer& newEvents, PipelineEventGroup& eGroup, uint64_t timestamp, uint32_t nanoSec) {
+bool ProcessorPromParseMetricNative::ProcessEvent(PipelineEventPtr& e,
+                                                  EventsContainer& newEvents,
+                                                  PipelineEventGroup& eGroup,
+                                                  TextParser& parser) {
     if (!IsSupportedEvent(e)) {
         return false;
     }
     auto& sourceEvent = e.Cast<LogEvent>();
     std::unique_ptr<MetricEvent> metricEvent = eGroup.CreateMetricEvent();
-    if (mParser.ParseLine(sourceEvent.GetContent(prometheus::PROMETHEUS), timestamp, nanoSec, *metricEvent)) {
+    if (parser.ParseLine(sourceEvent.GetContent(prometheus::PROMETHEUS), *metricEvent)) {
+        metricEvent->SetTag(string(prometheus::NAME), metricEvent->GetName());
         newEvents.emplace_back(std::move(metricEvent));
     }
     return true;

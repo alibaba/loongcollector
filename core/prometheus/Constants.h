@@ -22,6 +22,7 @@ const char* const REPLACEMENT = "replacement";
 const char* const ACTION = "action";
 const char* const MODULUS = "modulus";
 const char* const NAME = "__name__";
+const std::string EXPORTED_PREFIX = "exported_";
 
 // prometheus env
 const char* const OPERATOR_HOST = "OPERATOR_HOST";
@@ -71,6 +72,8 @@ const char* const USERNAME_FILE = "username_file";
 const char* const PASSWORD = "password";
 const char* const PASSWORD_FILE = "password_file";
 const char* const BASIC_PREFIX = "Basic ";
+const char* const HONOR_LABELS = "honor_labels";
+const char* const HONOR_TIMESTAMPS = "honor_timestamps";
 
 // scrape protocols, from https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config
 // text/plain, application/openmetrics-text will be used
@@ -100,6 +103,7 @@ const char* const SCRAPE_SAMPLES_POST_METRIC_RELABELING = "scrape_samples_post_m
 const char* const SCRAPE_SAMPLES_SCRAPED = "scrape_samples_scraped";
 const char* const SCRAPE_TIMEOUT_SECONDS = "scrape_timeout_seconds";
 const char* const UP = "up";
+const char* const LC_SCRAPER = "lc_scraper";
 
 const char* const SCRAPE_TIMESTAMP_MILLISEC = "scrape_timestamp_millisec";
 

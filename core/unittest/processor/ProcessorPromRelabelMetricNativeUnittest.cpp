@@ -32,6 +32,7 @@ public:
     void TestInit();
     void TestProcess();
     void TestAddAutoMetrics();
+    void TestHonorLabels();
 
     PipelineContext mContext;
 };
@@ -203,7 +204,8 @@ test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION, ToString(1.5));
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE, ToString(2325));
     eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE, ToString(true));
-    eventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_INSTANCE, string("localhost:8080"));
+    eventGroup.SetTag(string("instance"), "localhost:8080");
+    eventGroup.SetTag(string("job"), "test_job");
     processor.AddAutoMetrics(eventGroup);
 
     APSARA_TEST_EQUAL((size_t)15, eventGroup.GetEvents().size());
@@ -218,9 +220,64 @@ test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
     APSARA_TEST_EQUAL("test_job", eventGroup.GetEvents().at(14).Cast<MetricEvent>().GetTag("job"));
 }
 
+void ProcessorPromRelabelMetricNativeUnittest::TestHonorLabels() {
+    // make config
+    Json::Value config;
+
+    ProcessorPromRelabelMetricNative processor;
+    processor.SetContext(mContext);
+
+    string configStr;
+    string errorMsg;
+    configStr = configStr + R"JSON(
+        {
+            "job_name": "test_job",
+            "scrape_timeout": "15s",
+            "honor_labels": true
+        }
+    )JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+
+    // init
+    APSARA_TEST_TRUE(processor.Init(config));
+
+    // make events
+    auto parser = TextParser();
+    string rawData = R"""(
+# begin
+test_metric1{k1="v1", k2="v2"} 1.0
+  test_metric2{k1="v1", k2="v2"} 2.0 1234567890
+test_metric3{k1="v1",k2="v2"} 9.9410452992e+10
+  test_metric4{k1="v1",k2="v2"} 9.9410452992e+10 1715829785083
+  test_metric5{k1="v1", k2="v2" } 9.9410452992e+10 1715829785083
+test_metric6{k1="v1",k2="v2",} 9.9410452992e+10 1715829785083
+test_metric7{k1="v1",k3="2", } 9.9410452992e+10 1715829785083  
+test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
+# end
+    )""";
+    auto eventGroup = parser.Parse(rawData, 0, 0);
+
+    // set global labels
+    eventGroup.SetTag(string("k3"), string("v3"));
+    APSARA_TEST_EQUAL((size_t)8, eventGroup.GetEvents().size());
+    auto targetTags = eventGroup.GetTags();
+    // honor_labels is true
+    processor.ProcessEvent(eventGroup.MutableEvents()[0], targetTags);
+    APSARA_TEST_EQUAL("v3", eventGroup.GetEvents().at(0).Cast<MetricEvent>().GetTag(string("k3")));
+    processor.ProcessEvent(eventGroup.MutableEvents()[6], targetTags);
+    APSARA_TEST_EQUAL("2", eventGroup.GetEvents().at(6).Cast<MetricEvent>().GetTag(string("k3")).to_string());
+
+    // honor_labels is false
+    processor.mScrapeConfigPtr->mHonorLabels = false;
+    processor.ProcessEvent(eventGroup.MutableEvents()[7], targetTags);
+    APSARA_TEST_FALSE(eventGroup.GetEvents().at(7).Cast<MetricEvent>().HasTag(string("k3")));
+    APSARA_TEST_EQUAL("v2", eventGroup.GetEvents().at(7).Cast<MetricEvent>().GetTag(string("exported_k3")).to_string());
+}
+
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestInit)
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestProcess)
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestAddAutoMetrics)
+UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestHonorLabels)
 
 
 } // namespace logtail

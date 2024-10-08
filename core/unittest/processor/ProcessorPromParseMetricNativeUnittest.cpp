@@ -48,6 +48,7 @@ void ProcessorParsePrometheusMetricUnittest::TestInit() {
     string errorMsg;
     configStr = R"JSON(
         {
+            "job_name": "test_job"
         }
     )JSON";
 
@@ -66,6 +67,7 @@ void ProcessorParsePrometheusMetricUnittest::TestProcess() {
     string errorMsg;
     configStr = configStr + R"(
         {
+            "job_name": "test_job"
         }
     )";
 

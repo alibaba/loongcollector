@@ -37,6 +37,8 @@ public:
 
     void TestParseFaliure();
     void TestParseSuccess();
+
+    void TestHonorTimestamps();
 };
 
 void TextParserUnittest::TestParseMultipleLines() const {
@@ -325,6 +327,38 @@ cassandra_token_ownership_ratio 78.9)";
 
 UNIT_TEST_CASE(TextParserUnittest, TestParseSuccess)
 
+void TextParserUnittest::TestHonorTimestamps() {
+    // false
+    TextParser parser(false);
+    // has timestamp
+    std::string rawData = "abc 123 456";
+    PipelineEventGroup res = parser.Parse(rawData, 789, 111);
+    APSARA_TEST_EQUAL(res.GetEvents().back().Cast<MetricEvent>().GetTimestamp(), 789);
+    APSARA_TEST_TRUE(IsDoubleEqual(res.GetEvents().back().Cast<MetricEvent>().GetTimestampNanosecond().value(), 111));
+
+    // no timestamp
+    rawData = "abc 123";
+    res = parser.Parse(rawData, 789, 111);
+    APSARA_TEST_EQUAL(res.GetEvents().back().Cast<MetricEvent>().GetTimestamp(), 789);
+    APSARA_TEST_TRUE(IsDoubleEqual(res.GetEvents().back().Cast<MetricEvent>().GetTimestampNanosecond().value(), 111));
+
+
+    // true
+    parser.mHonorTimestamps = true;
+    // has timestamp
+    rawData = "abc 123 456";
+    res = parser.Parse(rawData, 789, 111);
+    APSARA_TEST_EQUAL(res.GetEvents().back().Cast<MetricEvent>().GetTimestamp(), 456);
+    APSARA_TEST_TRUE(IsDoubleEqual(res.GetEvents().back().Cast<MetricEvent>().GetTimestampNanosecond().value(), 0));
+
+    // no timestamp
+    rawData = "abc 123";
+    res = parser.Parse(rawData, 789, 111);
+    APSARA_TEST_EQUAL(res.GetEvents().back().Cast<MetricEvent>().GetTimestamp(), 789);
+    APSARA_TEST_TRUE(IsDoubleEqual(res.GetEvents().back().Cast<MetricEvent>().GetTimestampNanosecond().value(), 111));
+}
+
+UNIT_TEST_CASE(TextParserUnittest, TestHonorTimestamps)
 
 } // namespace logtail
 

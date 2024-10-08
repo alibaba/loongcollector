@@ -88,8 +88,11 @@ void PrometheusInputRunner::Init() {
     }
     LOG_INFO(sLogger, ("PrometheusInputRunner", "Start"));
     mIsStarted = true;
+
+#ifndef APSARA_UNIT_TEST_MAIN
     mTimer->Init();
     AsynCurlRunner::GetInstance()->Init();
+#endif
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "register"));
     // only register when operator exist
@@ -147,10 +150,12 @@ void PrometheusInputRunner::Stop() {
 
     mIsStarted = false;
     mIsThreadRunning.store(false);
-    mTimer->Stop();
 
+#ifndef APSARA_UNIT_TEST_MAIN
+    mTimer->Stop();
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
+#endif
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
     CancelAllTargetSubscriber();

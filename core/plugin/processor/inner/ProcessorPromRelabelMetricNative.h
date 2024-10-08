@@ -21,7 +21,7 @@
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "pipeline/plugin/interface/Processor.h"
-#include "prometheus/labels/Relabel.h"
+#include "prometheus/schedulers/ScrapeConfig.h"
 
 namespace logtail {
 class ProcessorPromRelabelMetricNative : public Processor {
@@ -36,7 +36,7 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    bool ProcessEvent(PipelineEventPtr& e, StringView instance);
+    bool ProcessEvent(PipelineEventPtr& e, const GroupTags& targetTags);
 
     void AddAutoMetrics(PipelineEventGroup& metricGroup);
     void AddMetric(PipelineEventGroup& metricGroup,
@@ -44,15 +44,10 @@ private:
                    double value,
                    time_t timestamp,
                    uint32_t nanoSec,
-                   StringView instance);
+                   const GroupTags& targetTags);
 
-    std::vector<RelabelConfig> mRelabelConfigs;
-
-    // from config
-    std::string mJobName;
-    int64_t mScrapeTimeoutSeconds;
-    int64_t mSampleLimit;
-    int64_t mSeriesLimit;
+    std::unique_ptr<ScrapeConfig> mScrapeConfigPtr;
+    std::string mLoongCollectorScraper;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorPromRelabelMetricNativeUnittest;

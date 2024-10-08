@@ -22,6 +22,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/regex.hpp>
 #include <string>
+#include <vector>
 
 #include "common/ParamExtractor.h"
 #include "common/StringTools.h"
@@ -33,55 +34,54 @@ using namespace std;
 #define ENUM_TO_STRING_CASE(EnumValue) \
     { Action::EnumValue, ToLowerCaseString(#EnumValue) }
 
-#define STRING_TO_ENUM__CASE(EnumValue) \
+#define STRING_TO_ENUM_CASE(EnumValue) \
     { ToLowerCaseString(#EnumValue), Action::EnumValue }
 
 namespace logtail {
 
-Action StringToAction(string action) {
-    static std::map<string, Action> actionStrings{STRING_TO_ENUM__CASE(REPLACE),
-                                                  STRING_TO_ENUM__CASE(KEEP),
-                                                  STRING_TO_ENUM__CASE(DROP),
-                                                  STRING_TO_ENUM__CASE(KEEPEQUAL),
-                                                  STRING_TO_ENUM__CASE(DROPEQUAL),
-                                                  STRING_TO_ENUM__CASE(HASHMOD),
-                                                  STRING_TO_ENUM__CASE(LABELMAP),
-                                                  STRING_TO_ENUM__CASE(LABELDROP),
-                                                  STRING_TO_ENUM__CASE(LABELKEEP),
-                                                  STRING_TO_ENUM__CASE(LOWERCASE),
-                                                  STRING_TO_ENUM__CASE(UPPERCASE)};
+Action StringToAction(const string& action) {
+    static std::map<string, Action> sActionStrings{STRING_TO_ENUM_CASE(REPLACE),
+                                                   STRING_TO_ENUM_CASE(KEEP),
+                                                   STRING_TO_ENUM_CASE(DROP),
+                                                   STRING_TO_ENUM_CASE(KEEPEQUAL),
+                                                   STRING_TO_ENUM_CASE(DROPEQUAL),
+                                                   STRING_TO_ENUM_CASE(HASHMOD),
+                                                   STRING_TO_ENUM_CASE(LABELMAP),
+                                                   STRING_TO_ENUM_CASE(LABELDROP),
+                                                   STRING_TO_ENUM_CASE(LABELKEEP),
+                                                   STRING_TO_ENUM_CASE(LOWERCASE),
+                                                   STRING_TO_ENUM_CASE(UPPERCASE)};
 
-    auto it = actionStrings.find(action);
-    if (it != actionStrings.end()) {
+    auto it = sActionStrings.find(action);
+    if (it != sActionStrings.end()) {
         return it->second;
     }
     return Action::UNDEFINED;
 }
 
 const std::string& ActionToString(Action action) {
-    static std::map<Action, std::string> actionStrings{ENUM_TO_STRING_CASE(REPLACE),
-                                                       ENUM_TO_STRING_CASE(KEEP),
-                                                       ENUM_TO_STRING_CASE(DROP),
-                                                       ENUM_TO_STRING_CASE(KEEPEQUAL),
-                                                       ENUM_TO_STRING_CASE(DROPEQUAL),
-                                                       ENUM_TO_STRING_CASE(HASHMOD),
-                                                       ENUM_TO_STRING_CASE(LABELMAP),
-                                                       ENUM_TO_STRING_CASE(LABELDROP),
-                                                       ENUM_TO_STRING_CASE(LABELKEEP),
-                                                       ENUM_TO_STRING_CASE(LOWERCASE),
-                                                       ENUM_TO_STRING_CASE(UPPERCASE)};
-    static string undefined = prometheus::UNDEFINED;
-    auto it = actionStrings.find(action);
-    if (it != actionStrings.end()) {
+    static std::map<Action, std::string> sActionStrings{ENUM_TO_STRING_CASE(REPLACE),
+                                                        ENUM_TO_STRING_CASE(KEEP),
+                                                        ENUM_TO_STRING_CASE(DROP),
+                                                        ENUM_TO_STRING_CASE(KEEPEQUAL),
+                                                        ENUM_TO_STRING_CASE(DROPEQUAL),
+                                                        ENUM_TO_STRING_CASE(HASHMOD),
+                                                        ENUM_TO_STRING_CASE(LABELMAP),
+                                                        ENUM_TO_STRING_CASE(LABELDROP),
+                                                        ENUM_TO_STRING_CASE(LABELKEEP),
+                                                        ENUM_TO_STRING_CASE(LOWERCASE),
+                                                        ENUM_TO_STRING_CASE(UPPERCASE)};
+    static string sUndefined = prometheus::UNDEFINED;
+    auto it = sActionStrings.find(action);
+    if (it != sActionStrings.end()) {
         return it->second;
     }
-    return undefined;
+    return sUndefined;
 }
-
-RelabelConfig::RelabelConfig() {
+RelabelConfig::RelabelConfig() : mSeparator(";"), mReplacement("$1"), mAction(Action::REPLACE) {
+    mRegex = boost::regex("().*");
 }
-
-RelabelConfig::RelabelConfig(const Json::Value& config) {
+bool RelabelConfig::Init(const Json::Value& config) {
     string errorMsg;
 
     if (config.isMember(prometheus::SOURCE_LABELS) && config[prometheus::SOURCE_LABELS].isArray()) {
@@ -113,90 +113,63 @@ RelabelConfig::RelabelConfig(const Json::Value& config) {
     if (config.isMember(prometheus::MODULUS) && config[prometheus::MODULUS].isUInt64()) {
         mModulus = config[prometheus::MODULUS].asUInt64();
     }
-}
-
-bool RelabelConfig::Validate() {
     return true;
 }
 
-bool prometheus::Process(const Labels& lbls, const std::vector<RelabelConfig>& cfgs, Labels& ret) {
-    auto lb = LabelsBuilder();
-    lb.Reset(lbls);
-    if (!ProcessBuilder(lb, cfgs)) {
-        ret = Labels();
-        return false;
-    }
-    ret = lb.GetLabels();
-    return true;
-}
-
-bool prometheus::ProcessBuilder(LabelsBuilder& lb, const std::vector<RelabelConfig>& cfgs) {
-    for (const RelabelConfig& cfg : cfgs) {
-        bool keep = Relabel(cfg, lb);
-        if (!keep) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool prometheus::Relabel(const RelabelConfig& cfg, LabelsBuilder& lb) {
+bool RelabelConfig::Process(Labels& l) const {
     vector<string> values;
-    for (auto item : cfg.mSourceLabels) {
-        values.push_back(lb.Get(item));
+    values.reserve(mSourceLabels.size());
+    for (const auto& item : mSourceLabels) {
+        values.push_back(l.Get(item));
     }
-    string val = boost::algorithm::join(values, cfg.mSeparator);
+    string val = boost::algorithm::join(values, mSeparator);
 
-    switch (cfg.mAction) {
+    switch (mAction) {
         case Action::DROP: {
-            if (boost::regex_match(val, cfg.mRegex)) {
+            if (boost::regex_match(val, mRegex)) {
                 return false;
             }
             break;
         }
         case Action::KEEP: {
-            if (!boost::regex_match(val, cfg.mRegex)) {
+            if (!boost::regex_match(val, mRegex)) {
                 return false;
             }
             break;
         }
         case Action::DROPEQUAL: {
-            if (lb.Get(cfg.mTargetLabel) == val) {
+            if (l.Get(mTargetLabel) == val) {
                 return false;
             }
             break;
         }
         case Action::KEEPEQUAL: {
-            if (lb.Get(cfg.mTargetLabel) != val) {
+            if (l.Get(mTargetLabel) != val) {
                 return false;
             }
             break;
         }
         case Action::REPLACE: {
-            bool indexes = boost::regex_search(val, cfg.mRegex);
+            bool indexes = boost::regex_search(val, mRegex);
             // If there is no match no replacement must take place.
             if (!indexes) {
                 break;
             }
-            LabelName target
-                = LabelName(boost::regex_replace(val, cfg.mRegex, cfg.mTargetLabel, boost::format_first_only));
-            if (!target.Validate()) {
-                break;
-            }
-            string res = boost::regex_replace(val, cfg.mRegex, cfg.mReplacement, boost::format_first_only);
+            string target = string(boost::regex_replace(val, mRegex, mTargetLabel, boost::format_first_only));
+            string res = boost::regex_replace(val, mRegex, mReplacement, boost::format_first_only);
             if (res.size() == 0) {
-                lb.DeleteLabel(target.mLabelName);
+                l.Del(target);
                 break;
             }
-            lb.Set(target.mLabelName, string(res));
+            l.Set(target, string(res));
             break;
         }
         case Action::LOWERCASE: {
-            lb.Set(cfg.mTargetLabel, boost::to_lower_copy(val));
+            l.Set(mTargetLabel, boost::to_lower_copy(val));
             break;
         }
         case Action::UPPERCASE: {
-            lb.Set(cfg.mTargetLabel, boost::to_upper_copy(val));
+            l.Set(mTargetLabel, boost::to_upper_copy(val));
             break;
         }
         case Action::HASHMOD: {
@@ -207,49 +180,84 @@ bool prometheus::Relabel(const RelabelConfig& cfg, LabelsBuilder& lb) {
             for (int i = 8; i < MD5_DIGEST_LENGTH; ++i) {
                 hashVal = (hashVal << 8) | digest[i];
             }
-            uint64_t mod = hashVal % cfg.mModulus;
-            lb.Set(cfg.mTargetLabel, to_string(mod));
+            uint64_t mod = hashVal % mModulus;
+            l.Set(mTargetLabel, to_string(mod));
             break;
         }
         case Action::LABELMAP: {
-            lb.Range([&cfg, &lb](Label label) {
-                if (boost::regex_match(label.name, cfg.mRegex)) {
-                    string res = boost::regex_replace(
-                        label.name, cfg.mRegex, cfg.mReplacement, boost::match_default | boost::format_all);
-                    lb.Set(res, label.value);
+            l.Range([&](const string& key, const string& value) {
+                if (boost::regex_match(key, mRegex)) {
+                    string res
+                        = boost::regex_replace(key, mRegex, mReplacement, boost::match_default | boost::format_all);
+                    l.Set(res, value);
                 }
             });
             break;
         }
         case Action::LABELDROP: {
-            lb.Range([&cfg, &lb](Label label) {
-                if (boost::regex_match(label.name, cfg.mRegex)) {
-                    lb.DeleteLabel(label.name);
+            vector<string> toDel;
+            l.Range([&](const string& key, const string& value) {
+                if (boost::regex_match(key, mRegex)) {
+                    toDel.push_back(key);
                 }
             });
+            for (const auto& item : toDel) {
+                l.Del(item);
+            }
             break;
         }
         case Action::LABELKEEP: {
-            lb.Range([&cfg, &lb](Label label) {
-                if (!boost::regex_match(label.name, cfg.mRegex)) {
-                    lb.DeleteLabel(label.name);
+            vector<string> toDel;
+            l.Range([&](const string& key, const string& value) {
+                if (!boost::regex_match(key, mRegex)) {
+                    toDel.push_back(key);
                 }
             });
+            for (const auto& item : toDel) {
+                l.Del(item);
+            }
             break;
         }
         default:
             // error
-            LOG_ERROR(sLogger, ("relabel: unknown relabel action type", ActionToString(cfg.mAction)));
+            LOG_ERROR(sLogger, ("relabel: unknown relabel action type", ActionToString(mAction)));
             break;
     }
     return true;
 }
-LabelName::LabelName() {
-}
-LabelName::LabelName(std::string labelName) : mLabelName(labelName) {
-}
 
-bool LabelName::Validate() {
+bool RelabelConfigList::Init(const Json::Value& relabelConfigs) {
+    if (!relabelConfigs.isArray()) {
+        return false;
+    }
+    for (const auto& relabelConfig : relabelConfigs) {
+        RelabelConfig rc;
+        if (rc.Init(relabelConfig)) {
+            mRelabelConfigs.push_back(rc);
+        } else {
+            return false;
+        }
+    }
     return true;
 }
+
+bool RelabelConfigList::Process(Labels& l) const {
+    for (const auto& cfg : mRelabelConfigs) {
+        if (!cfg.Process(l)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool RelabelConfigList::Process(MetricEvent& event) const {
+    Labels labels;
+    labels.Reset(&event);
+    return Process(labels);
+}
+
+bool RelabelConfigList::Empty() const {
+    return mRelabelConfigs.empty();
+}
+
 } // namespace logtail

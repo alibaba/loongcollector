@@ -27,7 +27,7 @@ namespace logtail {
 class LabelsUnittest : public testing::Test {
 public:
     void TestGet();
-    void TestPush();
+    void TestSet();
     void TestRange();
     void TestHash();
     void TestRemoveMetaLabels();
@@ -47,9 +47,9 @@ public:
 
 void LabelsUnittest::TestRemoveMetaLabels() {
     Labels labels;
-    labels.Push(Label{"host", "172.17.0.3:9100"});
-    labels.Push(Label{"__meta_port", "172.17.0.3"});
-    labels.Push(Label{"port", "9100"});
+    labels.Set("host", "172.17.0.3:9100");
+    labels.Set("__meta_port", "172.17.0.3");
+    labels.Set("port", "9100");
     APSARA_TEST_EQUAL(3UL, labels.Size());
 
     labels.RemoveMetaLabels();
@@ -60,9 +60,9 @@ void LabelsUnittest::TestRemoveMetaLabels() {
 void LabelsUnittest::TestHash() {
     Labels labels;
 
-    labels.Push(Label{"host", "172.17.0.3:9100"});
-    labels.Push(Label{"ip", "172.17.0.3"});
-    labels.Push(Label{"port", "9100"});
+    labels.Set("host", "172.17.0.3:9100");
+    labels.Set("ip", "172.17.0.3");
+    labels.Set("port", "9100");
     uint64_t hash = labels.Hash();
 
     uint64_t expect = prometheus::OFFSET64;
@@ -79,7 +79,7 @@ void LabelsUnittest::TestHash() {
 
 void LabelsUnittest::TestGet() {
     Labels labels;
-    labels.Push(Label{"host", "172.17.0.3:9100"});
+    labels.Set("host", "172.17.0.3:9100");
     APSARA_TEST_EQUAL(1UL, labels.Size());
 
     APSARA_TEST_EQUAL("", labels.Get("hosts"));
@@ -87,10 +87,10 @@ void LabelsUnittest::TestGet() {
     APSARA_TEST_EQUAL("172.17.0.3:9100", labels.Get("host"));
 }
 
-void LabelsUnittest::TestPush() {
+void LabelsUnittest::TestSet() {
     Labels labels;
 
-    labels.Push(Label{"host", "172.17.0.3:9100"});
+    labels.Set("host", "172.17.0.3:9100");
 
     APSARA_TEST_EQUAL("172.17.0.3:9100", labels.Get("host"));
 }
@@ -102,108 +102,25 @@ void LabelsUnittest::TestRange() {
     testMap["ip"] = "172.17.0.3";
     testMap["port"] = "9100";
 
-    labels.Push(Label{"host", "172.17.0.3:9100"});
-    labels.Push(Label{"ip", "172.17.0.3"});
-    labels.Push(Label{"port", "9100"});
+    labels.Set("host", "172.17.0.3:9100");
+    labels.Set("ip", "172.17.0.3");
+    labels.Set("port", "9100");
 
     map<string, string> resMap;
-    labels.Range([&resMap](Label l) { resMap[l.name] = l.value; });
+    labels.Range([&resMap](const string& k, const string& v) { resMap[k] = v; });
 
     APSARA_TEST_EQUAL(testMap, resMap);
 }
 
 
-void LabelsBuilderUnittest::TestReset() {
-    LabelsBuilder lb;
-    Labels labels;
-    labels.Push(Label{"host", ""});
-    lb.Reset(labels);
-    APSARA_TEST_EQUAL("", lb.mBase.Get("host"));
-    APSARA_TEST_EQUAL(1UL, lb.mDeleteLabelNameList.count("host"));
-}
 
-void LabelsBuilderUnittest::TestDeleteLabel() {
-    LabelsBuilder lb;
-    Labels labels;
-
-    vector<string> nameList{"host"};
-    lb.DeleteLabel(nameList);
-
-    labels.Push(Label{"host", "172.17.0.3:9100"});
-    lb.Reset(labels);
-    APSARA_TEST_EQUAL("", lb.GetLabels().Get("host"));
-}
-
-void LabelsBuilderUnittest::TestSet() {
-    LabelsBuilder lb;
-    Labels labels;
-    labels.Push(Label{"host", "172.17.0.3:9100"});
-    lb.Reset(labels);
-    APSARA_TEST_EQUAL("172.17.0.3:9100", lb.Get("host"));
-
-    lb.mAddLabelList.emplace("host", "127.0.0.1");
-
-    lb.Set("host", "172.17.0.3:9300");
-    APSARA_TEST_EQUAL("172.17.0.3:9300", lb.Get("host"));
-
-    lb.Set("host", "");
-    APSARA_TEST_EQUAL("", lb.Get("host"));
-}
-
-void LabelsBuilderUnittest::TestGet() {
-    LabelsBuilder lb;
-    Labels labels;
-    labels.Push(Label{"host", "172.17.0.3:9100"});
-    lb.Reset(labels);
-    APSARA_TEST_EQUAL("172.17.0.3:9100", lb.Get("host"));
-}
-
-void LabelsBuilderUnittest::TestLabels() {
-    LabelsBuilder lb;
-    Labels labels;
-    labels.Push(Label{"host", "172.17.0.3:9100"});
-    lb.Reset(labels);
-
-    vector<string> nameList{"host"};
-    lb.DeleteLabel(nameList);
-
-
-    APSARA_TEST_EQUAL("", lb.GetLabels().Get("host"));
-}
-
-void LabelsBuilderUnittest::TestRange() {
-    LabelsBuilder lb;
-    Labels labels;
-    labels.Push(Label{"host", "172.17.0.3:9100"});
-    labels.Push(Label{"ip", "172.17.0.3"});
-    labels.Push(Label{"port", "9100"});
-    lb.Reset(labels);
-
-    vector<string> nameList{"host"};
-    lb.DeleteLabel(nameList);
-
-    map<string, string> resMap;
-    lb.Range([&resMap](Label l) { resMap[l.name] = l.value; });
-
-    map<string, string> expectMap;
-    expectMap["ip"] = "172.17.0.3";
-    expectMap["port"] = "9100";
-
-    APSARA_TEST_EQUAL(expectMap, resMap);
-}
 
 UNIT_TEST_CASE(LabelsUnittest, TestGet)
-UNIT_TEST_CASE(LabelsUnittest, TestPush)
+UNIT_TEST_CASE(LabelsUnittest, TestSet)
 UNIT_TEST_CASE(LabelsUnittest, TestRange)
 UNIT_TEST_CASE(LabelsUnittest, TestHash)
 UNIT_TEST_CASE(LabelsUnittest, TestRemoveMetaLabels)
 
-UNIT_TEST_CASE(LabelsBuilderUnittest, TestReset)
-UNIT_TEST_CASE(LabelsBuilderUnittest, TestDeleteLabel)
-UNIT_TEST_CASE(LabelsBuilderUnittest, TestSet)
-UNIT_TEST_CASE(LabelsBuilderUnittest, TestGet)
-UNIT_TEST_CASE(LabelsBuilderUnittest, TestLabels)
-UNIT_TEST_CASE(LabelsBuilderUnittest, TestRange)
 
 } // namespace logtail
 

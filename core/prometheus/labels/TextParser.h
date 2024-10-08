@@ -28,11 +28,14 @@ enum class TextState { Start, Done, Error };
 class TextParser {
 public:
     TextParser() = default;
+    explicit TextParser(bool honorTimestamps);
 
-    PipelineEventGroup Parse(const std::string& content, uint64_t defaultTimestamp, uint32_t defaultNanoTs);
+    void SetDefaultTimestamp(uint64_t defaultTimestamp, uint32_t defaultNanoSec);
+
+    PipelineEventGroup Parse(const std::string& content, uint64_t defaultTimestamp, uint32_t defaultNanoSec);
     PipelineEventGroup BuildLogGroup(const std::string& content);
 
-    bool ParseLine(StringView line, uint64_t defaultTimestamp, uint32_t defaultNanoTs, MetricEvent& metricEvent);
+    bool ParseLine(StringView line, MetricEvent& metricEvent);
 
 private:
     void HandleError(const std::string& errMsg);
@@ -57,10 +60,12 @@ private:
     StringView mLabelName;
     std::string mEscapedLabelValue;
     double mSampleValue{0.0};
-    time_t mTimestamp{0};
-    uint32_t mNanoTimestamp{0};
     std::size_t mTokenLength{0};
     std::string mDoubleStr;
+
+    bool mHonorTimestamps{true};
+    time_t mDefaultTimestamp{0};
+    uint32_t mDefaultNanoTimestamp{0};
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TextParserUnittest;

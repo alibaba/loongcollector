@@ -33,13 +33,69 @@ std::string SecondToDuration(uint64_t duration) {
 }
 
 uint64_t DurationToSecond(const std::string& duration) {
+    // check duration format <duration>s or <duration>m
+    if (duration.size() <= 1 || !IsNumber(duration.substr(0, duration.size() - 1))) {
+        return 0;
+    }
     if (EndWith(duration, "s")) {
         return stoll(duration.substr(0, duration.find('s')));
     }
     if (EndWith(duration, "m")) {
         return stoll(duration.substr(0, duration.find('m'))) * 60;
     }
-    return 60;
+    return 0;
+}
+
+// <size>: a size in bytes, e.g. 512MB. A unit is required. Supported units: B, KB, MB, GB, TB, PB, EB.
+uint64_t SizeToByte(const std::string& size) {
+    auto inputSize = size;
+    uint64_t res = 0;
+    if (size.empty()) {
+        res = 0;
+    } else if (EndWith(inputSize, "KiB") || EndWith(inputSize, "K") || EndWith(inputSize, "KB")) {
+        if (!IsNumber(inputSize.substr(0, inputSize.find('K')))) {
+            return 0;
+        }
+        inputSize = inputSize.substr(0, inputSize.find('K'));
+        res = stoll(inputSize) * 1024;
+    } else if (EndWith(inputSize, "MiB") || EndWith(inputSize, "M") || EndWith(inputSize, "MB")) {
+        if (!IsNumber(inputSize.substr(0, inputSize.find('M')))) {
+            return 0;
+        }
+        inputSize = inputSize.substr(0, inputSize.find('M'));
+        res = stoll(inputSize) * 1024 * 1024;
+    } else if (EndWith(inputSize, "GiB") || EndWith(inputSize, "G") || EndWith(inputSize, "GB")) {
+        if (!IsNumber(inputSize.substr(0, inputSize.find('G')))) {
+            return 0;
+        }
+        inputSize = inputSize.substr(0, inputSize.find('G'));
+        res = stoll(inputSize) * 1024 * 1024 * 1024;
+    } else if (EndWith(inputSize, "TiB") || EndWith(inputSize, "T") || EndWith(inputSize, "TB")) {
+        if (!IsNumber(inputSize.substr(0, inputSize.find('T')))) {
+            return 0;
+        }
+        inputSize = inputSize.substr(0, inputSize.find('T'));
+        res = stoll(inputSize) * 1024 * 1024 * 1024 * 1024;
+    } else if (EndWith(inputSize, "PiB") || EndWith(inputSize, "P") || EndWith(inputSize, "PB")) {
+        if (!IsNumber(inputSize.substr(0, inputSize.find('P')))) {
+            return 0;
+        }
+        inputSize = inputSize.substr(0, inputSize.find('P'));
+        res = stoll(inputSize) * 1024 * 1024 * 1024 * 1024 * 1024;
+    } else if (EndWith(inputSize, "EiB") || EndWith(inputSize, "E") || EndWith(inputSize, "EB")) {
+        if (!IsNumber(inputSize.substr(0, inputSize.find('E')))) {
+            return 0;
+        }
+        inputSize = inputSize.substr(0, inputSize.find('E'));
+        res = stoll(inputSize) * 1024 * 1024 * 1024 * 1024 * 1024 * 1024;
+    } else if (EndWith(inputSize, "B")) {
+        if (!IsNumber(inputSize.substr(0, inputSize.find('B')))) {
+            return 0;
+        }
+        inputSize = inputSize.substr(0, inputSize.find('B'));
+        res = stoll(inputSize);
+    }
+    return res;
 }
 
 bool IsValidMetric(const StringView& line) {
@@ -66,6 +122,10 @@ void SplitStringView(const std::string& s, char delimiter, std::vector<StringVie
     if (start < s.size()) {
         result.emplace_back(s.data() + start, s.size() - start);
     }
+}
+
+bool IsNumber(const std::string& str) {
+    return !str.empty() && str.find_first_not_of("0123456789") == std::string::npos;
 }
 
 uint64_t GetRandSleepMilliSec(const std::string& key, uint64_t intervalSeconds, uint64_t currentMilliSeconds) {

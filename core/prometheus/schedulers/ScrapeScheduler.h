@@ -56,6 +56,7 @@ public:
 private:
     void PushEventGroup(PipelineEventGroup&&);
     void SetAutoMetricMeta(PipelineEventGroup& eGroup);
+    void SetTargetLabels(PipelineEventGroup& eGroup);
 
     PipelineEventGroup BuildPipelineEventGroup(const std::string& content);
 
@@ -67,7 +68,7 @@ private:
     std::string mHost;
     int32_t mPort;
     std::string mInstance;
-    Labels mLabels;
+    Labels mTargetLabels;
 
     std::unique_ptr<TextParser> mParser;
 

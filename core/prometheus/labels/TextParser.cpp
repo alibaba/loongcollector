@@ -40,7 +40,16 @@ bool IsValidNumberChar(char c) {
     return sValidChars.count(c);
 };
 
-PipelineEventGroup TextParser::Parse(const string& content, uint64_t defaultTimestamp, uint32_t defaultNanoTs) {
+TextParser::TextParser(bool honorTimestamps) : mHonorTimestamps(honorTimestamps) {
+}
+
+void TextParser::SetDefaultTimestamp(uint64_t defaultTimestamp, uint32_t defaultNanoSec) {
+    mDefaultTimestamp = defaultTimestamp;
+    mDefaultNanoTimestamp = defaultNanoSec;
+}
+
+PipelineEventGroup TextParser::Parse(const string& content, uint64_t defaultTimestamp, uint32_t defaultNanoSec) {
+    SetDefaultTimestamp(defaultTimestamp, defaultNanoSec);
     auto eGroup = PipelineEventGroup(make_shared<SourceBuffer>());
     vector<StringView> lines;
     // pre-reserve vector size by 1024 which is experience value per line
@@ -51,7 +60,7 @@ PipelineEventGroup TextParser::Parse(const string& content, uint64_t defaultTime
             continue;
         }
         auto metricEvent = eGroup.CreateMetricEvent();
-        if (ParseLine(line, defaultTimestamp, defaultNanoTs, *metricEvent)) {
+        if (ParseLine(line, *metricEvent)) {
             eGroup.MutableEvents().emplace_back(std::move(metricEvent));
         }
     }
@@ -77,19 +86,12 @@ PipelineEventGroup TextParser::BuildLogGroup(const string& content) {
     return eGroup;
 }
 
-bool TextParser::ParseLine(StringView line,
-                           uint64_t defaultTimestamp,
-                           uint32_t defaultNanoTs,
-                           MetricEvent& metricEvent) {
+bool TextParser::ParseLine(StringView line, MetricEvent& metricEvent) {
     mLine = line;
     mPos = 0;
     mState = TextState::Start;
     mLabelName.clear();
     mTokenLength = 0;
-    if (defaultTimestamp > 0) {
-        mTimestamp = defaultTimestamp;
-        mNanoTimestamp = defaultNanoTs;
-    }
 
     HandleStart(metricEvent);
 
@@ -282,8 +284,8 @@ void TextParser::HandleSampleValue(MetricEvent& metricEvent) {
     metricEvent.SetValue<UntypedSingleValue>(mSampleValue);
     mTokenLength = 0;
     SkipLeadingWhitespace();
-    if (mPos == mLine.size() || mLine[mPos] == '#') {
-        metricEvent.SetTimestamp(mTimestamp, mNanoTimestamp);
+    if (mPos == mLine.size() || mLine[mPos] == '#' || !mHonorTimestamps) {
+        metricEvent.SetTimestamp(mDefaultTimestamp, mDefaultNanoTimestamp);
         mState = TextState::Done;
     } else {
         HandleTimestamp(metricEvent);
@@ -329,7 +331,11 @@ void TextParser::HandleTimestamp(MetricEvent& metricEvent) {
     }
     time_t timestamp = (int64_t)milliTimestamp / 1000;
     auto ns = ((int64_t)milliTimestamp % 1000) * 1000000;
-    metricEvent.SetTimestamp(timestamp, ns);
+    if (mHonorTimestamps) {
+        metricEvent.SetTimestamp(timestamp, ns);
+    } else {
+        metricEvent.SetTimestamp(mDefaultTimestamp, mDefaultNanoTimestamp);
+    }
 
     mTokenLength = 0;
 

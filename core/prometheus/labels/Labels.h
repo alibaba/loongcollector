@@ -20,73 +20,43 @@
 #include <functional>
 #include <map>
 #include <string>
-#include <unordered_set>
-#include <utility>
-#include <vector>
 
 #include "models/MetricEvent.h"
 
 namespace logtail {
 
-// Label is a key/value pair of strings.
-struct Label {
-    std::string name;
-    std::string value;
-    Label(std::string name, std::string value) : name(std::move(name)), value(std::move(value)) {}
-};
 
 using LabelMap = std::map<std::string, std::string>;
 /// @brief Labels is a sorted set of labels. Order has to be guaranteed upon instantiation
 class Labels {
 public:
     Labels() = default;
-    size_t Size() const;
+    Labels(const Labels&);
+    Labels& operator=(const Labels&);
+
+    Labels(Labels&&) noexcept;
+    Labels& operator=(Labels&&) noexcept;
+
+    [[nodiscard]] size_t Size() const;
     uint64_t Hash();
     void RemoveMetaLabels();
 
     std::string Get(const std::string&);
+    void Set(const std::string&, const std::string&);
+    void Del(const std::string&);
+
     void Reset(MetricEvent*);
-    void Push(const Label&);
 
-    void Range(const std::function<void(Label)>&);
-
-    LabelMap::const_iterator Begin() const;
-    LabelMap::const_iterator End() const;
+    void Range(const std::function<void(const std::string&, const std::string&)>&);
 
 private:
+
     LabelMap mLabels;
 
     MetricEvent* mMetricEventPtr = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class LabelsUnittest;
-#endif
-};
-
-class LabelsBuilder {
-public:
-    LabelsBuilder();
-    void DeleteLabel(const std::vector<std::string>&);
-    void DeleteLabel(std::string);
-
-    std::string Get(const std::string&);
-    void Set(const std::string&, const std::string&);
-
-    void Reset(Labels);
-    void Reset(MetricEvent*);
-
-    Labels GetLabels();
-
-    void Range(const std::function<void(Label)>& closure);
-
-private:
-    Labels mBase;
-
-    std::unordered_set<std::string> mDeleteLabelNameList;
-    std::unordered_map<std::string, std::string> mAddLabelList;
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class LabelsBuilderUnittest;
 #endif
 };
 
