@@ -43,9 +43,9 @@ bool ScrapeConfig::Init(const Json::Value& scrapeConfig) {
 
     if (scrapeConfig.isMember(prometheus::ENABLE_COMPRESSION)
         && scrapeConfig[prometheus::ENABLE_COMPRESSION].isBool()) {
-        InitEnableCompression(scrapeConfig[prometheus::ENABLE_COMPRESSION].asBool());
+        // InitEnableCompression(scrapeConfig[prometheus::ENABLE_COMPRESSION].asBool());
     } else {
-        InitEnableCompression(true);
+        // InitEnableCompression(true);
     }
 
     // basic auth, authorization, oauth2
