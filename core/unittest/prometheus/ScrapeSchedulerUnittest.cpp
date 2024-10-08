@@ -31,14 +31,6 @@ using namespace std;
 
 namespace logtail {
 
-class MockTimer : public Timer {
-public:
-    void Init() {}
-    void PushEvent(std::unique_ptr<TimerEvent>&& e) { mQueue.push_back(std::move(e)); }
-    void Stop() {}
-    std::vector<std::unique_ptr<TimerEvent>> mQueue;
-};
-
 class ScrapeSchedulerUnittest : public testing::Test {
 public:
     void TestInitscrapeScheduler();
@@ -47,6 +39,7 @@ public:
     void TestReceiveMessage();
 
     void TestScheduler();
+    void TestQueueIsFull();
 
 protected:
     void SetUp() override {
@@ -166,7 +159,7 @@ void ScrapeSchedulerUnittest::TestScheduler() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
-    auto timer = make_shared<MockTimer>();
+    auto timer = make_shared<Timer>();
     event.SetTimer(timer);
     event.ScheduleNext();
 
@@ -178,9 +171,34 @@ void ScrapeSchedulerUnittest::TestScheduler() {
     APSARA_TEST_TRUE(event.mFuture->mState == PromFutureState::Done);
 }
 
+void ScrapeSchedulerUnittest::TestQueueIsFull() {
+    Labels labels;
+    labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    auto timer = make_shared<Timer>();
+    event.SetTimer(timer);
+    auto now = std::chrono::steady_clock::now();
+    event.SetFirstExecTime(now);
+    event.ScheduleNext();
+
+    APSARA_TEST_TRUE(timer->mQueue.size() == 1);
+
+    const auto& e = timer->mQueue.top();
+    APSARA_TEST_EQUAL(now, e->GetExecTime());
+    APSARA_TEST_FALSE(e->IsValid());
+    timer->mQueue.pop();
+    // queue is full, so it should schedule next after 1 second
+    APSARA_TEST_EQUAL(1UL, timer->mQueue.size());
+    const auto& next = timer->mQueue.top();
+    APSARA_TEST_EQUAL(now + std::chrono::seconds(1), next->GetExecTime());
+}
+
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestInitscrapeScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestSplitByLines)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestScheduler)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestQueueIsFull)
+
 
 } // namespace logtail
 

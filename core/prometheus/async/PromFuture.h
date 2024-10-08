@@ -1,18 +1,21 @@
 #pragma once
 
+#include <functional>
+
 #include "common/Lock.h"
-#include "common/http/HttpResponse.h"
 
 namespace logtail {
 
 enum class PromFutureState { New, Processing, Done };
 
+template <typename... Args>
 class PromFuture {
 public:
+    using CallbackSignature = std::function<bool(Args...)>;
     // Process should support oneshot and streaming mode.
-    void Process(const HttpResponse&, uint64_t timestampMilliSec);
+    bool Process(Args...);
 
-    void AddDoneCallback(std::function<void(const HttpResponse&, uint64_t timestampMilliSec)>&& callback);
+    void AddDoneCallback(CallbackSignature&&);
 
     void Cancel();
 
@@ -20,7 +23,7 @@ protected:
     PromFutureState mState = {PromFutureState::New};
     ReadWriteLock mStateRWLock;
 
-    std::vector<std::function<void(const HttpResponse&, uint64_t timestampMilliSec)>> mDoneCallbacks;
+    std::vector<CallbackSignature> mDoneCallbacks;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ScrapeSchedulerUnittest;

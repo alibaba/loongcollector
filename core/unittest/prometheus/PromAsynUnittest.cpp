@@ -13,7 +13,7 @@ public:
 };
 
 void PromAsynUnittest::TestExecTime() {
-    auto future = std::make_shared<PromFuture>();
+    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
     auto now = std::chrono::system_clock::now();
     bool exec = false;
     future->AddDoneCallback([&exec, now](const HttpResponse&, uint64_t timestampMilliSec) {
@@ -21,6 +21,7 @@ void PromAsynUnittest::TestExecTime() {
                           std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
 
         APSARA_TEST_TRUE(exec);
+        return true;
     });
     auto request = std::make_shared<PromHttpRequest>(
         "http", false, "127.0.0.1", 8080, "/", "", map<string, string>(), "", 10, 3, future);

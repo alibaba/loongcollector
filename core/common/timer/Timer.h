@@ -52,6 +52,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TimerUnittest;
+    friend class ScrapeSchedulerUnittest;
 #endif
 };
 

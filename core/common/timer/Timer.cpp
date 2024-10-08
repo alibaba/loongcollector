@@ -66,12 +66,15 @@ void Timer::Run() {
                     mCV.wait_for(threadLock, timeout);
                     break;
                 } else {
+                    auto e = std::move(const_cast<unique_ptr<TimerEvent>&>(mQueue.top()));
+                    mQueue.pop();
+                    queueLock.unlock();
                     if (!e->IsValid()) {
                         LOG_INFO(sLogger, ("invalid timer event", "task is cancelled"));
                     } else {
                         e->Execute();
                     }
-                    mQueue.pop();
+                    queueLock.lock();
                 }
             }
         }

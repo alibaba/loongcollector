@@ -31,6 +31,7 @@
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKey.h"
 #include "prometheus/Constants.h"
+#include "prometheus/async/PromFuture.h"
 #include "prometheus/async/PromHttpRequest.h"
 
 using namespace std;
@@ -99,8 +100,14 @@ void ScrapeScheduler::PushEventGroup(PipelineEventGroup&& eGroup) {
     auto item = make_unique<ProcessQueueItem>(std::move(eGroup), mInputIndex);
 #ifdef APSARA_UNIT_TEST_MAIN
     mItem.push_back(std::move(item));
+    return;
 #endif
-    ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+    while (true) {
+        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item)) == 0) {
+            break;
+        }
+        usleep(10 * 1000);
+    }
 }
 
 string ScrapeScheduler::GetId() const {
@@ -108,21 +115,34 @@ string ScrapeScheduler::GetId() const {
 }
 
 void ScrapeScheduler::ScheduleNext() {
-    auto future = std::make_shared<PromFuture>();
+    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
+    auto isContextValidFuture = std::make_shared<PromFuture<>>();
     future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampMilliSec) {
         this->OnMetricResult(response, timestampMilliSec);
         this->ExecDone();
         this->ScheduleNext();
+        return true;
+    });
+    isContextValidFuture->AddDoneCallback([this]() -> bool {
+        if (ProcessQueueManager::GetInstance()->IsValidToPush(mQueueKey)) {
+            return true;
+        } else {
+            this->DelayExecTime(1);
+            this->ScheduleNext();
+            return false;
+        }
     });
 
     if (IsCancelled()) {
         mFuture->Cancel();
+        mIsContextValidFuture->Cancel();
         return;
     }
 
     {
         WriteLock lock(mLock);
         mFuture = future;
+        mIsContextValidFuture = isContextValidFuture;
     }
 
     auto event = BuildScrapeTimerEvent(GetNextExecTime());
@@ -130,9 +150,10 @@ void ScrapeScheduler::ScheduleNext() {
 }
 
 void ScrapeScheduler::ScrapeOnce(std::chrono::steady_clock::time_point execTime) {
-    auto future = std::make_shared<PromFuture>();
+    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
     future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampMilliSec) {
         this->OnMetricResult(response, timestampMilliSec);
+        return true;
     });
     mFuture = future;
     auto event = BuildScrapeTimerEvent(execTime);
@@ -153,14 +174,18 @@ std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::
                                                      mScrapeConfigPtr->mScrapeTimeoutSeconds,
                                                      mScrapeConfigPtr->mScrapeIntervalSeconds
                                                          / mScrapeConfigPtr->mScrapeTimeoutSeconds,
-                                                     this->mFuture);
+                                                     this->mFuture,
+                                                     this->mIsContextValidFuture);
     auto timerEvent = std::make_unique<HttpRequestTimerEvent>(execTime, std::move(request));
     return timerEvent;
 }
 
 void ScrapeScheduler::Cancel() {
-    if (mFuture) {
+    if (mFuture != nullptr) {
         mFuture->Cancel();
+    }
+    if (mIsContextValidFuture != nullptr) {
+        mIsContextValidFuture->Cancel();
     }
     {
         WriteLock lock(mLock);

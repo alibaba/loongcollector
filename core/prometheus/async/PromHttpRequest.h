@@ -20,7 +20,8 @@ public:
                     const std::string& body,
                     uint32_t timeout,
                     uint32_t maxTryCnt,
-                    std::shared_ptr<PromFuture> future);
+                    std::shared_ptr<PromFuture<const HttpResponse&, uint64_t>> future,
+                    std::shared_ptr<PromFuture<>> isContextValidFuture = nullptr);
     PromHttpRequest(const PromHttpRequest&) = default;
     ~PromHttpRequest() override = default;
 
@@ -30,7 +31,8 @@ public:
 private:
     void SetNextExecTime(std::chrono::steady_clock::time_point execTime);
 
-    std::shared_ptr<PromFuture> mFuture;
+    std::shared_ptr<PromFuture<const HttpResponse&, uint64_t>> mFuture;
+    std::shared_ptr<PromFuture<>> mIsContextValidFuture;
 };
 
 } // namespace logtail

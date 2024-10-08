@@ -18,17 +18,24 @@ PromHttpRequest::PromHttpRequest(const std::string& method,
                                  const std::string& body,
                                  uint32_t timeout,
                                  uint32_t maxTryCnt,
-                                 std::shared_ptr<PromFuture> future)
+                                 std::shared_ptr<PromFuture<const HttpResponse&, uint64_t>> future,
+                                 std::shared_ptr<PromFuture<>> isContextValidFuture)
     : AsynHttpRequest(method, httpsFlag, host, port, url, query, header, body, timeout, maxTryCnt),
-      mFuture(std::move(future)) {
+      mFuture(std::move(future)),
+      mIsContextValidFuture(std::move(isContextValidFuture)) {
 }
 
 void PromHttpRequest::OnSendDone(const HttpResponse& response) {
-    mFuture->Process(response,
-                     std::chrono::duration_cast<std::chrono::milliseconds>(mLastSendTime.time_since_epoch()).count());
+    if (mFuture != nullptr) {
+        mFuture->Process(
+            response, std::chrono::duration_cast<std::chrono::milliseconds>(mLastSendTime.time_since_epoch()).count());
+    }
 }
 
 [[nodiscard]] bool PromHttpRequest::IsContextValid() const {
+    if (mIsContextValidFuture != nullptr) {
+        return mIsContextValidFuture->Process();
+    }
     return true;
 }
 
