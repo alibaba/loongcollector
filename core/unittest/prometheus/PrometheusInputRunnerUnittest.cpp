@@ -15,10 +15,9 @@
  */
 
 #include <json/json.h>
+#include <json/value.h>
 
-#include "Common.h"
-#include "JsonUtil.h"
-#include "json/value.h"
+#include "common/JsonUtil.h"
 #include "prometheus/PrometheusInputRunner.h"
 #include "unittest/Unittest.h"
 
@@ -31,6 +30,7 @@ public:
     void OnSuccessfulStartAndStop();
     void TestHasRegisteredPlugins();
     void TestMulitStartAndStop();
+    void TestGetAllProjects();
 
 protected:
     void SetUp() override {
@@ -63,13 +63,15 @@ void PrometheusInputRunnerUnittest::OnSuccessfulStartAndStop() {
     std::unique_ptr<TargetSubscriberScheduler> scrapeJobPtr = make_unique<TargetSubscriberScheduler>();
     APSARA_TEST_TRUE(scrapeJobPtr->Init(config));
 
+    auto defaultLabels = MetricLabels();
+    string defaultProject = "default_project";
     // update scrapeJob
-    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr));
+    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr), defaultLabels, defaultProject);
 
     PrometheusInputRunner::GetInstance()->Init();
     APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("test_job")
                      != PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
-
+    APSARA_TEST_EQUAL(PrometheusInputRunner::GetInstance()->mJobNameToProjectNameMap["test_job"], defaultProject);
 
     // remove
     PrometheusInputRunner::GetInstance()->RemoveScrapeInput("test_job");
@@ -104,7 +106,9 @@ void PrometheusInputRunnerUnittest::TestHasRegisteredPlugins() {
 
     std::unique_ptr<TargetSubscriberScheduler> scrapeJobPtr = make_unique<TargetSubscriberScheduler>();
     APSARA_TEST_TRUE(scrapeJobPtr->Init(config));
-    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr));
+    auto defaultLabels = MetricLabels();
+    string defaultProject = "default_project";
+    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr), defaultLabels, defaultProject);
     APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->HasRegisteredPlugins());
     PrometheusInputRunner::GetInstance()->Stop();
 }
@@ -137,9 +141,56 @@ void PrometheusInputRunnerUnittest::TestMulitStartAndStop() {
     }
 }
 
+void PrometheusInputRunnerUnittest::TestGetAllProjects() {
+    // build scrape job and target
+    string errorMsg;
+    string configStr;
+    Json::Value config;
+
+    // test_job1
+    configStr = R"JSON(
+    {
+        "job_name": "test_job1",
+        "scheme": "http",
+        "metrics_path": "/metrics",
+        "scrape_interval": "30s",
+        "scrape_timeout": "30s"
+    }
+    )JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+
+    std::unique_ptr<TargetSubscriberScheduler> scrapeJobPtr1 = make_unique<TargetSubscriberScheduler>();
+    APSARA_TEST_TRUE(scrapeJobPtr1->Init(config));
+    auto defaultLabels = MetricLabels();
+    string defaultProject = "default_project";
+    // update scrapeJob
+    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr1), defaultLabels, defaultProject);
+
+    // test_job2
+    configStr = R"JSON(
+    {
+        "job_name": "test_job2",
+        "scheme": "http",
+        "metrics_path": "/metrics",
+        "scrape_interval": "30s",
+        "scrape_timeout": "30s"
+    }
+    )JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    std::unique_ptr<TargetSubscriberScheduler> scrapeJobPtr2 = make_unique<TargetSubscriberScheduler>();
+    APSARA_TEST_TRUE(scrapeJobPtr2->Init(config));
+    defaultProject = "default_project2";
+    // update scrapeJob
+    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr2), defaultLabels, defaultProject);
+
+    // Runner use map to store scrape job, so the order is test_job1, test_job2
+    APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->GetAllProjects() == "default_project default_project2");
+}
+
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, OnSuccessfulStartAndStop)
-// UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHasRegisteredPlugins)
-// UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestMulitStartAndStop)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHasRegisteredPlugins)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestMulitStartAndStop)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestGetAllProjects)
 
 } // namespace logtail
 

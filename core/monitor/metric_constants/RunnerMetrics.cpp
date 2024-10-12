@@ -26,6 +26,7 @@ const string METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER = "file_server";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER = "flusher_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK = "http_sink";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR = "processor_runner";
+const string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS = "prometheus_runner";
 
 // metric keys
 const string METRIC_RUNNER_IN_EVENTS_TOTAL = "runner_in_events_total";
@@ -35,6 +36,9 @@ const string METRIC_RUNNER_IN_ITEMS_TOTAL = "runner_in_items_total";
 const string METRIC_RUNNER_LAST_RUN_TIME = "runner_last_run_time";
 const string METRIC_RUNNER_OUT_ITEMS_TOTAL = "runner_out_items_total";
 const string METRIC_RUNNER_TOTAL_DELAY_MS = "runner_total_delay_ms";
+const string METRIC_RUNNER_CLIENT_REGISTER_STATE = "runner_client_register_state";
+const string METRIC_RUNNER_CLIENT_REGISTER_RETRY_TOTAL = "runner_client_register_retry_total";
+const string METRIC_RUNNER_JOB_NUM = "runner_job_num";
 
 /**********************************************************
  *   http sink

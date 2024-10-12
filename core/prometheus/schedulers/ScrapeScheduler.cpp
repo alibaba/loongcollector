@@ -21,7 +21,6 @@
 #include <string>
 #include <utility>
 
-#include "Common.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/timer/HttpRequestTimerEvent.h"
@@ -33,6 +32,7 @@
 #include "prometheus/Constants.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/async/PromHttpRequest.h"
+#include "sdk/Common.h"
 
 using namespace std;
 
@@ -61,6 +61,11 @@ ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
 }
 
 void ScrapeScheduler::OnMetricResult(const HttpResponse& response, uint64_t timestampMilliSec) {
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL, response.mStatusCode);
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_SIZE_BYTES, response.mStatusCode, response.mBody.size());
+    mSelfMonitor->AddCounter(
+        METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, response.mStatusCode, GetCurrentTimeInMilliSeconds() - timestampMilliSec);
+
     mScrapeTimestampMilliSec = timestampMilliSec;
     mScrapeDurationSeconds = 1.0 * (GetCurrentTimeInMilliSeconds() - timestampMilliSec) / 1000;
     mScrapeResponseSizeBytes = response.mBody.size();
@@ -79,6 +84,7 @@ void ScrapeScheduler::OnMetricResult(const HttpResponse& response, uint64_t time
     SetAutoMetricMeta(eventGroup);
     SetTargetLabels(eventGroup);
     PushEventGroup(std::move(eventGroup));
+    mPluginTotalDelayMs->Add(GetCurrentTimeInMilliSeconds() - timestampMilliSec);
 }
 
 void ScrapeScheduler::SetAutoMetricMeta(PipelineEventGroup& eGroup) {
@@ -128,6 +134,7 @@ void ScrapeScheduler::ScheduleNext() {
             return true;
         } else {
             this->DelayExecTime(1);
+            this->mPromDelayTotal->Add(1);
             this->ScheduleNext();
             return false;
         }
@@ -196,4 +203,23 @@ void ScrapeScheduler::Cancel() {
 void ScrapeScheduler::SetTimer(std::shared_ptr<Timer> timer) {
     mTimer = std::move(timer);
 }
+
+void ScrapeScheduler::InitSelfMonitor(const MetricLabels& defaultLabels) {
+    mSelfMonitor = std::make_shared<PromSelfMonitorUnsafe>();
+    MetricLabels labels = defaultLabels;
+    labels.emplace_back(METRIC_LABEL_KEY_INSTANCE, mInstance);
+
+    static const std::unordered_map<std::string, MetricType> sScrapeMetricKeys = {
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, MetricType::METRIC_TYPE_COUNTER},
+    };
+
+    mSelfMonitor->InitMetricManager(sScrapeMetricKeys, labels);
+
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(labels));
+    mPromDelayTotal = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_PROM_SCRAPE_DELAY_TOTAL);
+    mPluginTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_TOTAL_DELAY_MS);
+}
+
 } // namespace logtail

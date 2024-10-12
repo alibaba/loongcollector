@@ -24,11 +24,6 @@ const char* const MODULUS = "modulus";
 const char* const NAME = "__name__";
 const std::string EXPORTED_PREFIX = "exported_";
 
-// prometheus env
-const char* const OPERATOR_HOST = "OPERATOR_HOST";
-const char* const OPERATOR_PORT = "OPERATOR_PORT";
-const char* const POD_NAME = "POD_NAME";
-
 // prometheus api
 const char* const PROMETHEUS_PREFIX = "prometheus_";
 const char* const REGISTER_COLLECTOR_PATH = "/register_collector";

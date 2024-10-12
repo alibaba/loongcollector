@@ -27,6 +27,7 @@
 #include "common/timer/HttpRequestTimerEvent.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 #include "prometheus/async/PromFuture.h"
@@ -56,7 +57,10 @@ bool TargetSubscriberScheduler::operator<(const TargetSubscriberScheduler& other
     return mJobName < other.mJobName;
 }
 
-void TargetSubscriberScheduler::OnSubscription(const HttpResponse& response, uint64_t) {
+void TargetSubscriberScheduler::OnSubscription(const HttpResponse& response, uint64_t timestampMilliSec) {
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, response.mStatusCode);
+    mSelfMonitor->AddCounter(
+        METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS, response.mStatusCode, GetCurrentTimeInMilliSeconds() - timestampMilliSec);
     if (response.mStatusCode == 304) {
         // not modified
         return;
@@ -75,6 +79,8 @@ void TargetSubscriberScheduler::OnSubscription(const HttpResponse& response, uin
     std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>> newScrapeSchedulerSet
         = BuildScrapeSchedulerSet(targetGroup);
     UpdateScrapeScheduler(newScrapeSchedulerSet);
+    mPromSubscriberTargets->Set(mScrapeSchedulerMap.size());
+    mTotalDelayMs->Add(GetCurrentTimeInMilliSeconds() - timestampMilliSec);
 }
 
 void TargetSubscriberScheduler::UpdateScrapeScheduler(
@@ -222,6 +228,7 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
             scrapeScheduler->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, GetCurrentTimeInMilliSeconds());
         auto firstExecTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
         scrapeScheduler->SetFirstExecTime(firstExecTime);
+        scrapeScheduler->InitSelfMonitor(mDefaultLabels);
 
         scrapeSchedulerMap[scrapeScheduler->GetId()] = scrapeScheduler;
     }
@@ -312,5 +319,24 @@ void TargetSubscriberScheduler::CancelAllScrapeScheduler() {
     }
 }
 
+void TargetSubscriberScheduler::InitSelfMonitor(const MetricLabels& defaultLabels) {
+    mDefaultLabels = defaultLabels;
+    mDefaultLabels.emplace_back(METRIC_LABEL_KEY_JOB, mJobName);
+    mDefaultLabels.emplace_back(METRIC_LABEL_KEY_POD_NAME, mPodName);
+    mDefaultLabels.emplace_back(METRIC_LABEL_KEY_SERVICE_HOST, mServiceHost);
+    mDefaultLabels.emplace_back(METRIC_LABEL_KEY_SERVICE_PORT, ToString(mServicePort));
+
+    static const std::unordered_map<std::string, MetricType> sSubscriberMetricKeys = {
+        {METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS, MetricType::METRIC_TYPE_COUNTER},
+    };
+
+    mSelfMonitor = std::make_shared<PromSelfMonitorUnsafe>();
+    mSelfMonitor->InitMetricManager(sSubscriberMetricKeys, mDefaultLabels);
+
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(mDefaultLabels));
+    mPromSubscriberTargets = mMetricsRecordRef.CreateIntGauge(METRIC_PLUGIN_PROM_SUBSCRIBE_TARGETS);
+    mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_TOTAL_DELAY_MS);
+}
 
 } // namespace logtail

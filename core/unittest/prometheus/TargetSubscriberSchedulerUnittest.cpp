@@ -37,9 +37,6 @@ public:
 
 protected:
     void SetUp() override {
-        setenv("POD_NAME", "prometheus-test", 1);
-        setenv("OPERATOR_HOST", "127.0.0.1", 1);
-        setenv("OPERATOR_PORT", "12345", 1);
         {
             mConfigString = R"JSON(
 {
@@ -132,11 +129,7 @@ protected:
     ])JSON";
         }
     }
-    void TearDown() override {
-        unsetenv("POD_NAME");
-        unsetenv("OPERATOR_HOST");
-        unsetenv("OPERATOR_PORT");
-    }
+    void TearDown() override {}
 
 private:
     HttpResponse mHttpResponse;
@@ -155,7 +148,9 @@ void TargetSubscriberSchedulerUnittest::OnInitScrapeJobEvent() {
 
 void TargetSubscriberSchedulerUnittest::TestProcess() {
     std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
+    auto metricLabels = MetricLabels();
     APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
+    targetSubscriber->InitSelfMonitor(metricLabels);
 
     // if status code is not 200
     mHttpResponse.mStatusCode = 404;

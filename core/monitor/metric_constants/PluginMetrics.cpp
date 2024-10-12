@@ -45,6 +45,22 @@ const string METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES = "plugin_source_read_offset
 const string METRIC_PLUGIN_SOURCE_SIZE_BYTES = "plugin_source_size_bytes";
 
 /**********************************************************
+ *   input_prometheus
+ **********************************************************/
+const std::string METRIC_LABEL_KEY_JOB = "job";
+const std::string METRIC_LABEL_KEY_POD_NAME = "pod_name";
+const std::string METRIC_LABEL_KEY_SERVICE_HOST = "service_host";
+const std::string METRIC_LABEL_KEY_SERVICE_PORT = "service_port";
+const std::string METRIC_LABEL_KEY_STATUS = "status";
+const std::string METRIC_LABEL_KEY_INSTANCE = "instance";
+
+const std::string METRIC_PLUGIN_PROM_SUBSCRIBE_TARGETS = "plugin_prom_subscribe_targets";
+const std::string METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL = "plugin_prom_subscribe_total";
+const std::string METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS = "plugin_prom_subscribe_time_ms";
+const std::string METRIC_PLUGIN_PROM_SCRAPE_TIME_MS = "plugin_prom_scrape_time_ms";
+const std::string METRIC_PLUGIN_PROM_SCRAPE_DELAY_TOTAL = "plugin_prom_scrape_delay_total";
+
+/**********************************************************
  *   all processor （所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）
  **********************************************************/
 const string METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL = "plugin_discarded_events_total";

@@ -15,8 +15,10 @@
 cmake_minimum_required(VERSION 3.22)
 project(prometheus_unittest)
 
+add_executable(prom_self_monitor_unittest PromSelfMonitorUnittest.cpp)
+target_link_libraries(prom_self_monitor_unittest ${UT_BASE_TARGET})
+
 add_executable(labels_unittest LabelsUnittest.cpp)
-target_link_libraries(labels_unittest ${UT_BASE_TARGET})
 target_link_libraries(labels_unittest ${UT_BASE_TARGET})
 
 add_executable(relabel_unittest RelabelUnittest.cpp)
@@ -48,6 +50,7 @@ target_link_libraries(prom_asyn_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 
+gtest_discover_tests(prom_self_monitor_unittest)
 gtest_discover_tests(labels_unittest)
 gtest_discover_tests(relabel_unittest)
 gtest_discover_tests(scrape_scheduler_unittest)

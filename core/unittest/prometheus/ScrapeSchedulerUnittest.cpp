@@ -94,6 +94,8 @@ void ScrapeSchedulerUnittest::TestProcess() {
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    auto defaultLabels = MetricLabels();
+    event.InitSelfMonitor(defaultLabels);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
     // if status code is not 200, no data will be processed
     // but will continue running, sending self-monitoring metrics
@@ -175,6 +177,8 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    auto defaultLabels = MetricLabels();
+    event.InitSelfMonitor(defaultLabels);
     auto timer = make_shared<Timer>();
     event.SetTimer(timer);
     auto now = std::chrono::steady_clock::now();

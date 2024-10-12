@@ -42,10 +42,6 @@ public:
 
 protected:
     static void SetUpTestCase() {
-        setenv("POD_NAME", "prometheus-test", 1);
-        setenv("OPERATOR_HOST", "127.0.0.1", 1);
-        setenv("OPERATOR_PORT", "12345", 1);
-
         AppConfig::GetInstance()->mPurageContainerMode = true;
         PluginRegistry::GetInstance()->LoadPlugins();
     }
@@ -55,9 +51,6 @@ protected:
         ctx.SetPipeline(p);
     }
     static void TearDownTestCase() {
-        unsetenv("POD_NAME");
-        unsetenv("OPERATOR_HOST");
-        unsetenv("OPERATOR_PORT");
         PluginRegistry::GetInstance()->UnloadPlugins();
     }
 

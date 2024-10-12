@@ -22,6 +22,8 @@
 
 #include "common/Lock.h"
 #include "common/timer/Timer.h"
+#include "monitor/LogtailMetric.h"
+#include "monitor/LoongCollectorMetricTypes.h"
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 #include "runner/InputRunner.h"
 #include "sdk/Common.h"
@@ -42,7 +44,9 @@ public:
     }
 
     // input plugin update
-    void UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber);
+    void UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber,
+                           const MetricLabels& defaultLabels,
+                           const std::string& projectName);
     void RemoveScrapeInput(const std::string& jobName);
 
     // target discover and scrape
@@ -56,6 +60,8 @@ private:
 
     void CancelAllTargetSubscriber();
     void SubscribeOnce();
+
+    std::string GetAllProjects();
 
     bool mIsStarted = false;
     std::mutex mStartMutex;
@@ -75,6 +81,14 @@ private:
     std::map<std::string, std::shared_ptr<TargetSubscriberScheduler>> mTargetSubscriberSchedulerMap;
 
     std::atomic<uint64_t> mUnRegisterMs;
+
+    // self monitor
+    ReadWriteLock mProjectRWLock;
+    std::map<std::string, std::string> mJobNameToProjectNameMap;
+    MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mPromRegisterRetryTotal;
+    IntGaugePtr mPromRegisterState;
+    IntGaugePtr mPromJobNum;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PrometheusInputRunnerUnittest;

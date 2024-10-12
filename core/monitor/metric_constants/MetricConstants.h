@@ -90,6 +90,22 @@ extern const std::string METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES;
 extern const std::string METRIC_PLUGIN_SOURCE_SIZE_BYTES;
 
 /**********************************************************
+ *   input_prometheus
+ **********************************************************/
+extern const std::string METRIC_LABEL_KEY_JOB;
+extern const std::string METRIC_LABEL_KEY_POD_NAME;
+extern const std::string METRIC_LABEL_KEY_SERVICE_HOST;
+extern const std::string METRIC_LABEL_KEY_SERVICE_PORT;
+extern const std::string METRIC_LABEL_KEY_STATUS;
+extern const std::string METRIC_LABEL_KEY_INSTANCE;
+
+extern const std::string METRIC_PLUGIN_PROM_SUBSCRIBE_TARGETS;
+extern const std::string METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL;
+extern const std::string METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS;
+extern const std::string METRIC_PLUGIN_PROM_SCRAPE_TIME_MS;
+extern const std::string METRIC_PLUGIN_PROM_SCRAPE_DELAY_TOTAL;
+
+/**********************************************************
  *   all processor （所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）
  **********************************************************/
 extern const std::string METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL;
@@ -182,6 +198,7 @@ extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR;
+extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS;
 
 // metric keys
 extern const std::string METRIC_RUNNER_IN_EVENTS_TOTAL;
@@ -191,6 +208,9 @@ extern const std::string METRIC_RUNNER_IN_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_LAST_RUN_TIME;
 extern const std::string METRIC_RUNNER_OUT_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_TOTAL_DELAY_MS;
+extern const std::string METRIC_RUNNER_CLIENT_REGISTER_STATE;
+extern const std::string METRIC_RUNNER_CLIENT_REGISTER_RETRY_TOTAL;
+extern const std::string METRIC_RUNNER_JOB_NUM;
 
 /**********************************************************
  *   http sink
