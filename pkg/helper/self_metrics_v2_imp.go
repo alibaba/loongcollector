@@ -47,6 +47,8 @@ func newMetric(metricType pipeline.SelfMetricType, metricSet pipeline.MetricSet,
 		return newCumulativeCounter(metricSet, labelValues)
 	case pipeline.AverageType:
 		return newAverage(metricSet, labelValues)
+	case pipeline.MaxType:
+		return newMax(metricSet, labelValues)
 	case pipeline.CounterType:
 		return newDeltaCounter(metricSet, labelValues)
 	case pipeline.GaugeType:
@@ -230,6 +232,42 @@ func (a *averageImp) Serialize(log *protocol.Log) {
 func (a *averageImp) Export() map[string]string {
 	metricValue := a.Collect()
 	return a.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
+}
+
+// maxImp is a metric to compute the max value of a series of values in the last window.
+// if there is no value added in the last window, zero will be returned.
+type maxImp struct {
+	sync.RWMutex
+	value float64
+	Series
+}
+
+func newMax(ms pipeline.MetricSet, labelValues []string) pipeline.GaugeMetric {
+	m := &maxImp{
+		Series: newSeries(ms, labelValues),
+	}
+	return m
+}
+
+func (m *maxImp) Set(f float64) {
+	m.Lock()
+	defer m.Unlock()
+	if f > m.value {
+		m.value = f
+	}
+}
+
+func (m *maxImp) Collect() pipeline.MetricValue[float64] {
+	m.RLock()
+	defer m.RUnlock()
+	metric := pipeline.MetricValue[float64]{Name: m.Name(), Value: m.value}
+	m.value = 0
+	return metric
+}
+
+func (m *maxImp) Export() map[string]string {
+	metricValue := m.Collect()
+	return m.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
 // latencyImp is a metric to compute the average latency of a series of values in the last window.

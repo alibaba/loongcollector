@@ -21,6 +21,7 @@ const (
 	CounterType                          // counter in the last window.
 	CumulativeCounterType                // cumulative counter.
 	AverageType                          // average value in the last window.
+	MaxType                              // max value in the last window.
 	LatencyType                          // average latency in the last window.
 	StringType                           // string value.
 	GaugeType                            // gauge value in the last window.

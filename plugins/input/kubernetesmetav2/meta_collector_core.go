@@ -44,9 +44,9 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 				containerLog.Contents = models.NewLogContents()
 				containerLog.Timestamp = log.Timestamp
 
-				containerLog.Contents.Add(entityDomainFieldName, m.serviceK8sMeta.Domain)
-				containerLog.Contents.Add(entityTypeFieldName, m.genEntityTypeKey("container"))
-				containerLog.Contents.Add(entityIDFieldName, m.genKey(obj.Namespace, obj.Name+container.Name))
+				containerLog.Contents.Add(entityDomainFieldName, m.serviceK8sMeta.domain)
+				containerLog.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(containerTypeName))
+				containerLog.Contents.Add(entityIDFieldName, m.genKey(containerTypeName, obj.Namespace, obj.Name+container.Name))
 				containerLog.Contents.Add(entityMethodFieldName, method)
 
 				containerLog.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(data.FirstObservedTime, 10))
@@ -264,7 +264,7 @@ func (m *metaCollector) processPodNodeLink(data *k8smeta.ObjectWrapper, method s
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
 		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, obj.Node.Kind, "", obj.Node.Name, method, data.FirstObservedTime, data.LastObservedTime)
-		log.Contents.Add(entityLinkRelationTypeFieldName, "related_to")
+		log.Contents.Add(entityLinkRelationTypeFieldName, "runs")
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}
 	}
@@ -323,7 +323,7 @@ func (m *metaCollector) processPodContainerLink(data *k8smeta.ObjectWrapper, met
 	if obj, ok := data.Raw.(*k8smeta.PodContainer); ok {
 		log := &models.Log{}
 		log.Contents = models.NewLogContents()
-		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, "container", obj.Pod.Namespace, obj.Container.Name, method, data.FirstObservedTime, data.LastObservedTime)
+		m.processEntityLinkCommonPart(log.Contents, obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, "container", obj.Pod.Namespace, obj.Pod.Name+obj.Container.Name, method, data.FirstObservedTime, data.LastObservedTime)
 		log.Contents.Add(entityLinkRelationTypeFieldName, "contains")
 		log.Timestamp = uint64(time.Now().Unix())
 		return []models.PipelineEvent{log}

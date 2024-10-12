@@ -39,6 +39,7 @@ func SetMetricVectorCacheFactory(factory func(pipeline.MetricSet) MetricVectorCa
 type (
 	CumulativeCounterMetricVector = pipeline.MetricVector[pipeline.CounterMetric]
 	AverageMetricVector           = pipeline.MetricVector[pipeline.CounterMetric]
+	MaxMetricVector               = pipeline.MetricVector[pipeline.GaugeMetric]
 	CounterMetricVector           = pipeline.MetricVector[pipeline.CounterMetric]
 	GaugeMetricVector             = pipeline.MetricVector[pipeline.GaugeMetric]
 	LatencyMetricVector           = pipeline.MetricVector[pipeline.LatencyMetric]
@@ -63,6 +64,12 @@ func NewCounterMetricVector(metricName string, constLabels map[string]string, la
 // Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
 func NewAverageMetricVector(metricName string, constLabels map[string]string, labelNames []string) AverageMetricVector {
 	return NewMetricVector[pipeline.CounterMetric](metricName, pipeline.AverageType, constLabels, labelNames)
+}
+
+// NewMaxMetricVector creates a new MaxMetricVector.
+// Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
+func NewMaxMetricVector(metricName string, constLabels map[string]string, labelNames []string) MaxMetricVector {
+	return NewMetricVector[pipeline.GaugeMetric](metricName, pipeline.MaxType, constLabels, labelNames)
 }
 
 // NewGaugeMetricVector creates a new GaugeMetricVector.
@@ -172,6 +179,13 @@ func NewCounterMetricAndRegister(c *pipeline.MetricsRecord, n string, lables ...
 // NewAverageMetricAndRegister creates a new AverageMetric and register it's metricVector to the MetricsRecord.
 func NewAverageMetricAndRegister(c *pipeline.MetricsRecord, n string, lables ...*protocol.Log_Content) pipeline.CounterMetric {
 	mv := NewAverageMetricVector(n, convertLabels(lables), nil)
+	c.RegisterMetricCollector(mv.(pipeline.MetricCollector))
+	return mv.WithLabels()
+}
+
+// NewMaxMetricAndRegister creates a new MaxMetric and register it's metricVector to the MetricsRecord.
+func NewMaxMetricAndRegister(c *pipeline.MetricsRecord, n string, lables ...*protocol.Log_Content) pipeline.GaugeMetric {
+	mv := NewMaxMetricVector(n, convertLabels(lables), nil)
 	c.RegisterMetricCollector(mv.(pipeline.MetricCollector))
 	return mv.WithLabels()
 }

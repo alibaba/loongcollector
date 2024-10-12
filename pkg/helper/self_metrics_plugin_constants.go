@@ -14,20 +14,6 @@
 
 package helper
 
-import (
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-)
-
-//////////////////////////////////////////////////////////////////////////
-// agent
-//////////////////////////////////////////////////////////////////////////
-
-// metric keys
-const (
-	MetricAgentMemoryGo        = "agent_go_memory_used_mb"
-	MetricAgentGoRoutinesTotal = "agent_go_routines_total"
-)
-
 //////////////////////////////////////////////////////////////////////////
 // plugin
 //////////////////////////////////////////////////////////////////////////
@@ -88,6 +74,14 @@ const (
 )
 
 /**********************************************************
+*   service_k8s_meta
+**********************************************************/
+const (
+	MetricCollectEntityTotal = "plugin_collect_entity_total"
+	MetricCollectLinkTotal   = "plugin_collect_link_total"
+)
+
+/**********************************************************
 *   all processor（所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）
 **********************************************************/
 const (
@@ -105,18 +99,3 @@ const (
 const (
 	PluginPairsPerLogTotal = "plugin_pairs_per_log_total"
 )
-
-func GetCommonLabels(context pipeline.Context, pluginMeta *pipeline.PluginMeta) []pipeline.LabelPair {
-	labels := make([]pipeline.LabelPair, 0)
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyProject, Value: context.GetProject()})
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyLogstore, Value: context.GetLogstore()})
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPipelineName, Value: context.GetConfigName()})
-
-	if len(pluginMeta.PluginID) > 0 {
-		labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPluginID, Value: pluginMeta.PluginID})
-	}
-	if len(pluginMeta.PluginType) > 0 {
-		labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPluginType, Value: pluginMeta.PluginType})
-	}
-	return labels
-}

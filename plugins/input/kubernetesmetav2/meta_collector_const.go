@@ -14,9 +14,10 @@ const (
 	entityLastObservedTimeFieldName  = "__last_observed_time__"
 	entityKeepAliveSecondsFieldName  = "__keep_alive_seconds__"
 
-	entityCategoryFieldName   = "__category__"
-	defaultEntityCategory     = "entity"
-	defaultEntityLinkCategory = "entity_link"
+	entityCategoryFieldName      = "__category__"
+	entityCategorySelfMetricName = "category"
+	defaultEntityCategory        = "entity"
+	defaultEntityLinkCategory    = "entity_link"
 
 	entityLinkSrcDomainFieldName      = "__src_domain__"
 	entityLinkSrcEntityTypeFieldName  = "__src_entity_type__"
@@ -27,7 +28,14 @@ const (
 	entityLinkRelationTypeFieldName   = "__relation_type__"
 )
 
-var DomainEntityTypePrefix = map[string]string{
-	"acs":   "acs.ack.cluster.",
-	"infra": "infra.k8s.cluster.",
-}
+const (
+	acsDomain   = "acs"
+	infraDomain = "infra"
+
+	ackCluster = "ack"
+	oneCluster = "one"
+	asiCluster = "asi"
+
+	clusterTypeName   = "cluster"
+	containerTypeName = "container"
+)

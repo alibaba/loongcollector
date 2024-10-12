@@ -23,9 +23,9 @@ type metadataHandler struct {
 	metaManager *MetaManager
 }
 
-func newMetadataHandler() *metadataHandler {
+func newMetadataHandler(metaManager *MetaManager) *metadataHandler {
 	metadataHandler := &metadataHandler{
-		metaManager: GetMetaManagerInstance(),
+		metaManager: metaManager,
 	}
 	return metadataHandler
 }
@@ -46,17 +46,10 @@ func (m *metadataHandler) K8sServerRun(stopCh <-chan struct{}) error {
 	mux := http.NewServeMux()
 
 	// TODO: add port in ip endpoint
-	mux.HandleFunc("/metadata/ip", m.handlePodMetaByUniqueID)
-	mux.HandleFunc("/metadata/containerid", m.handlePodMetaByUniqueID)
-	mux.HandleFunc("/metadata/host", m.handlePodMetaByHostIP)
+	mux.HandleFunc("/metadata/ip", m.handler(m.handlePodMetaByUniqueID))
+	mux.HandleFunc("/metadata/containerid", m.handler(m.handlePodMetaByUniqueID))
+	mux.HandleFunc("/metadata/host", m.handler(m.handlePodMetaByHostIP))
 	server.Handler = mux
-	for {
-		if m.metaManager.IsReady() {
-			break
-		}
-		time.Sleep(1 * time.Second)
-		logger.Warning(context.Background(), "K8S_META_SERVER_WAIT", "waiting for k8s meta manager to be ready")
-	}
 	logger.Info(context.Background(), "k8s meta server", "started", "port", port)
 	go func() {
 		defer panicRecover()
@@ -64,6 +57,21 @@ func (m *metadataHandler) K8sServerRun(stopCh <-chan struct{}) error {
 	}()
 	<-stopCh
 	return nil
+}
+
+func (m *metadataHandler) handler(handleFunc func(w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !m.metaManager.IsReady() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		startTime := time.Now()
+		m.metaManager.httpRequestCount.Add(1)
+		handleFunc(w, r)
+		latency := time.Since(startTime).Milliseconds()
+		m.metaManager.httpAvgDelayMs.Add(latency)
+		m.metaManager.httpMaxDelayMs.Set(float64(latency))
+	}
 }
 
 func (m *metadataHandler) handlePodMetaByUniqueID(w http.ResponseWriter, r *http.Request) {

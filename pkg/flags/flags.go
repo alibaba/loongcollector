@@ -117,6 +117,7 @@ var (
 	DeployMode           = flag.String("DEPLOY_MODE", DeployDaemonset, "alibaba log deploy mode, daemonset or statefulset or singleton")
 	EnableKubernetesMeta = flag.Bool("ENABLE_KUBERNETES_META", false, "enable kubernetes meta")
 	ClusterID            = flag.String("GLOBAL_CLUSTER_ID", "", "cluster id")
+	ClusterType          = flag.String("GLOBAL_CLUSTER_TYPE", "", "cluster type, supporting ack, one, asi and k8s")
 )
 
 func init() {
@@ -144,6 +145,7 @@ func init() {
 	_ = util.InitFromEnvString("DEPLOY_MODE", DeployMode, *DeployMode)
 	_ = util.InitFromEnvBool("ENABLE_KUBERNETES_META", EnableKubernetesMeta, *EnableKubernetesMeta)
 	_ = util.InitFromEnvString("GLOBAL_CLUSTER_ID", ClusterID, *ClusterID)
+	_ = util.InitFromEnvString("GLOBAL_CLUSTER_TYPE", ClusterType, *ClusterType)
 
 	if len(*DefaultRegion) == 0 {
 		*DefaultRegion = util.GuessRegionByEndpoint(*LogServiceEndpoint, "cn-hangzhou")
