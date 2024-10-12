@@ -23,12 +23,12 @@ namespace logtail {
 
 void ConfigProvider::Init(const string& dir) {
     // default path: /etc/ilogtail/config/${dir}
-    mPipelineSourceDir.assign(AppConfig::GetInstance()->GetLogtailSysConfDir());
-    mPipelineSourceDir /= "config";
+    mPipelineSourceDir.assign(AppConfig::GetInstance()->GetLoongcollectorConfDir());
+    mPipelineSourceDir /= "pipeline_config";
     mPipelineSourceDir /= dir;
 
-    mInstanceSourceDir.assign(AppConfig::GetInstance()->GetLogtailSysConfDir());
-    mInstanceSourceDir /= "instanceconfig";
+    mInstanceSourceDir.assign(AppConfig::GetInstance()->GetLoongcollectorConfDir());
+    mInstanceSourceDir /= "instance_config";
     mInstanceSourceDir /= dir;
 
     error_code ec;

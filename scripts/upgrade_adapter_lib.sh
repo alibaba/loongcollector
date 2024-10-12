@@ -35,5 +35,5 @@ SOURCEDIR="core/build/plugin"
 [[ $# -eq 2 ]] && SOURCEDIR="$1" || :
 
 if [ $OS_FLAG = 1 ]; then
-  cp ${ROOTDIR}/core/build/go_pipeline/libPluginAdapter.so ${ROOTDIR}/pkg/logtail/libPluginAdapter.so
+  cp ${ROOTDIR}/core/build/go_pipeline/libGoPluginAdapter.so ${ROOTDIR}/pkg/logtail/libGoPluginAdapter.so
 fi

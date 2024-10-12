@@ -230,15 +230,6 @@ func CutString(val string, maxLen int) string {
 	return val[0:maxLen]
 }
 
-func GetCurrentBinaryPath() string {
-	ex, err := os.Executable()
-	if err != nil {
-		return "./"
-	}
-	exPath := filepath.Dir(ex)
-	return exPath + "/"
-}
-
 func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {

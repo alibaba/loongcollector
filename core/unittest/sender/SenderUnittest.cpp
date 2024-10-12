@@ -863,7 +863,7 @@ public:
 
         auto const sysConfDir = gRootDir + PATH_SEPARATOR + ".ilogtail" + PATH_SEPARATOR;
         bfs::create_directories(sysConfDir);
-        AppConfig::GetInstance()->SetLogtailSysConfDir(sysConfDir);
+        AppConfig::GetInstance()->SetLoongcollectorConfDir(sysConfDir);
         sCptM = CheckpointManagerV2::GetInstance();
         sQueueM = ExactlyOnceQueueManager::GetInstance();
         sEventDispatcher = EventDispatcher::GetInstance();
@@ -917,7 +917,7 @@ public:
             PTScopedLock lock(gBufferLogGroupsLock);
             gBufferLogGroups.clear();
         }
-        bfs::remove("ilogtail_config.json");
+        bfs::remove("loongcollector_config.json");
         {
             fsutil::Dir dir(gRootDir);
             dir.Open();
@@ -931,7 +931,7 @@ public:
         }
         sCptM->close();
         bfs::remove_all(gRootDir);
-        bfs::create_directories(AppConfig::GetInstance()->GetLogtailSysConfDir());
+        bfs::create_directories(AppConfig::GetInstance()->GetLoongcollectorConfDir());
         sCptM->open();
         if (gEnableExactlyOnce) {
             clearGlobalResource();

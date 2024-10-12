@@ -72,7 +72,7 @@ jobs:
 
       - name: Copy Lib
         if: matrix.runner == 'ubuntu'
-        run: sudo cp ./pkg/logtail/libPluginAdapter.so /usr/lib/
+        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
 
       - name: Check License Header
         if: matrix.runner == 'ubuntu'

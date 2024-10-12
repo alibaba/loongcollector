@@ -14,11 +14,11 @@
 
 # Name/Version information.
 if (NOT DEFINED LOGTAIL_VERSION)
-    set(LOGTAIL_VERSION "2.0.0")
+    set(LOGTAIL_VERSION "0.0.1")
 endif ()
 message(STATUS "Version: ${LOGTAIL_VERSION}")
 
-set(LOGTAIL_TARGET "ilogtail")
+set(LOGTAIL_TARGET "loongcollector")
 
 # Extract Git commit information for tracing.
 # For a better solution see https://jonathanhamberg.com/post/cmake-embedding-git-hash/ but this is simple and easy.

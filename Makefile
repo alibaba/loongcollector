@@ -13,10 +13,10 @@
 # limitations under the License.
 
 .DEFAULT_GOAL := all
-VERSION ?= 2.0.0
+VERSION ?= 0.0.1
 DOCKER_PUSH ?= false
-DOCKER_REPOSITORY ?= aliyun/ilogtail
-BUILD_REPOSITORY ?= aliyun/ilogtail_build
+DOCKER_REPOSITORY ?= aliyun/loongcollector
+BUILD_REPOSITORY ?= aliyun/loongcollector_build
 GENERATED_HOME ?= generated_files
 PLUGINS_CONFIG_FILE ?= plugins.yml,external_plugins.yml
 GO_MOD_FILE ?= go.mod
@@ -68,9 +68,9 @@ GO_BUILD_FLAGS = -v
 LICENSE_COVERAGE_FILE=license_coverage.txt
 OUT_DIR = output
 DIST_DIR = dist
-PACKAGE_DIR = ilogtail-$(VERSION)
+PACKAGE_DIR = loongcollector-$(VERSION)
 EXTERNAL_DIR = external
-DIST_FILE = $(DIST_DIR)/ilogtail-$(VERSION).linux-$(ARCH).tar.gz
+DIST_FILE = $(DIST_DIR)/loongcollector-$(VERSION).linux-$(ARCH).tar.gz
 
 .PHONY: tools
 tools:
@@ -137,8 +137,8 @@ upgrade_adapter_lib:
 .PHONY: plugin_main
 plugin_main: clean
 	./scripts/plugin_build.sh mod default $(OUT_DIR) $(VERSION) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE)
-	cp pkg/logtail/libPluginAdapter.so $(OUT_DIR)/libPluginAdapter.so
-	cp pkg/logtail/PluginAdapter.dll $(OUT_DIR)/PluginAdapter.dll
+	cp pkg/logtail/libGoPluginAdapter.so $(OUT_DIR)/libGoPluginAdapter.so
+	cp pkg/logtail/GoPluginAdapter.dll $(OUT_DIR)/GoPluginAdapter.dll
 
 .PHONY: plugin_local
 plugin_local:
@@ -190,8 +190,8 @@ unittest_e2e_engine: clean gocdocker
 
 .PHONY: unittest_plugin
 unittest_plugin: clean import_plugins
-	cp pkg/logtail/libPluginAdapter.so ./plugin_main
-	cp pkg/logtail/PluginAdapter.dll ./plugin_main
+	cp pkg/logtail/libGoPluginAdapter.so ./plugin_main
+	cp pkg/logtail/GoPluginAdapter.dll ./plugin_main
 	mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig|(input\/prometheus)|(input\/syslog)"| grep -Ev "plugin_main|pluginmanager") -coverprofile .testCoverage.txt
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
@@ -203,9 +203,9 @@ unittest_core:
 
 .PHONY: unittest_pluginmanager
 unittest_pluginmanager: clean import_plugins
-	cp pkg/logtail/libPluginAdapter.so ./plugin_main
-	cp pkg/logtail/PluginAdapter.dll ./plugin_main
-	cp pkg/logtail/libPluginAdapter.so ./pluginmanager
+	cp pkg/logtail/libGoPluginAdapter.so ./plugin_main
+	cp pkg/logtail/GoPluginAdapter.dll ./plugin_main
+	cp pkg/logtail/libGoPluginAdapter.so ./pluginmanager
 	mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig"| grep -E "plugin_main|pluginmanager") -coverprofile .coretestCoverage.txt
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
@@ -221,7 +221,7 @@ dist: all
 	./scripts/dist.sh "$(OUT_DIR)" "$(DIST_DIR)" "$(PACKAGE_DIR)"
 
 $(DIST_FILE):
-	@echo 'ilogtail-$(VERSION) dist does not exist! Please download or run `make dist` first!'
+	@echo 'loongcollector-$(VERSION) dist does not exist! Please download or run `make dist` first!'
 	@false
 
 .PHONY: docker

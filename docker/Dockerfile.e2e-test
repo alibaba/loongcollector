@@ -1,12 +1,12 @@
 FROM golang:1.19
 
 RUN go env -w GOPROXY="https://goproxy.cn,direct"
-RUN mkdir -p /tmp/ilogtail
+RUN mkdir -p /tmp/loongcollector
 
 WORKDIR /root
-COPY . ./ilogtail
+COPY . ./loongcollector
 
-WORKDIR /root/ilogtail/test
+WORKDIR /root/loongcollector/test
 RUN go mod download
 
 CMD ["sh", "-c", "while true; do sleep 3600; done"]

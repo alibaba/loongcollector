@@ -43,8 +43,8 @@ private:
     static const filesystem::path instanceConfigDir;
 };
 
-const filesystem::path ConfigWatcherUnittest::configDir = "./config";
-const filesystem::path ConfigWatcherUnittest::instanceConfigDir = "./instanceconfig";
+const filesystem::path ConfigWatcherUnittest::configDir = "./pipeline_config";
+const filesystem::path ConfigWatcherUnittest::instanceConfigDir = "./instance_config";
 
 void ConfigWatcherUnittest::InvalidConfigDirFound() const {
     {
@@ -60,10 +60,10 @@ void ConfigWatcherUnittest::InvalidConfigDirFound() const {
         InstanceConfigDiff diff = ConfigWatcher::GetInstance()->CheckInstanceConfigDiff();
         APSARA_TEST_TRUE(diff.IsEmpty());
 
-        { ofstream fout("instanceconfig"); }
+        { ofstream fout("instance_config"); }
         diff = ConfigWatcher::GetInstance()->CheckInstanceConfigDiff();
         APSARA_TEST_TRUE(diff.IsEmpty());
-        filesystem::remove("instanceconfig");
+        filesystem::remove("instance_config");
     }
 }
 
@@ -140,7 +140,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         ConfigWatcher::GetInstance()->AddInstanceSource("dir1");
         ConfigWatcher::GetInstance()->AddInstanceSource("dir2");
 
-        filesystem::create_directories("instanceconfig");
+        filesystem::create_directories("instance_config");
         filesystem::create_directories("dir1");
         filesystem::create_directories("dir2");
 
@@ -162,7 +162,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
 
         filesystem::remove_all("dir1");
         filesystem::remove_all("dir2");
-        filesystem::remove_all("instanceconfig");
+        filesystem::remove_all("instance_config");
         PluginRegistry::GetInstance()->UnloadPlugins();
     }
 }

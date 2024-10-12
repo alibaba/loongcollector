@@ -32,9 +32,9 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/protoparser/common"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var libLoggerOnce sync.Once
@@ -85,7 +85,7 @@ func (p *ServiceStaticPrometheus) Init(context pipeline.Context) (int, error) {
 	case p.Yaml != "":
 		detail = []byte(p.Yaml)
 		if p.AuthorizationPath == "" {
-			p.AuthorizationPath = util.GetCurrentBinaryPath()
+			p.AuthorizationPath = config.LoongcollectorGlobalConfig.LoongcollectorConfDir
 		}
 	case p.ConfigFilePath != "":
 		f, err := os.Open(p.ConfigFilePath)

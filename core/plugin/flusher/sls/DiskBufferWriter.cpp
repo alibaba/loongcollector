@@ -46,7 +46,6 @@ using namespace std;
 
 namespace logtail {
 
-const string DiskBufferWriter::BUFFER_FILE_NAME_PREFIX = "logtail_buffer_file_";
 const int32_t DiskBufferWriter::BUFFER_META_BASE_SIZE = 65536;
 
 void DiskBufferWriter::Init() {
@@ -207,7 +206,7 @@ void DiskBufferWriter::BufferSenderThread() {
 void DiskBufferWriter::SetBufferFilePath(const std::string& bufferfilepath) {
     lock_guard<mutex> lock(mBufferFileLock);
     if (bufferfilepath == "") {
-        mBufferFilePath = GetProcessExecutionDir();
+        mBufferFilePath = GetAgentDataDir();
     } else
         mBufferFilePath = bufferfilepath;
 
@@ -234,7 +233,7 @@ std::string DiskBufferWriter::GetBufferFileName() {
 bool DiskBufferWriter::LoadFileToSend(time_t timeLine, std::vector<std::string>& filesToSend) {
     string bufferFilePath = GetBufferFilePath();
     if (!CheckExistance(bufferFilePath)) {
-        if (GetProcessExecutionDir().find(bufferFilePath) != 0) {
+        if (GetAgentDataDir().find(bufferFilePath) != 0) {
             LOG_WARNING(sLogger,
                         ("buffer file path not exist", bufferFilePath)("logtail will not recreate external path",
                                                                        "local secondary does not work"));
@@ -262,9 +261,9 @@ bool DiskBufferWriter::LoadFileToSend(time_t timeLine, std::vector<std::string>&
     fsutil::Entry ent;
     while ((ent = dir.ReadNext())) {
         string filename = ent.Name();
-        if (filename.find(BUFFER_FILE_NAME_PREFIX) == 0) {
+        if (filename.find(GetSendBufferFileNamePrefix()) == 0) {
             try {
-                int32_t filetime = StringTo<int32_t>(filename.substr(BUFFER_FILE_NAME_PREFIX.size()));
+                int32_t filetime = StringTo<int32_t>(filename.substr(GetSendBufferFileNamePrefix().size()));
                 if (filetime < timeLine)
                     filesToSend.push_back(filename);
             } catch (...) {
@@ -543,7 +542,7 @@ bool DiskBufferWriter::CreateNewFile() {
         }
     }
     mBufferDivideTime = currentTime;
-    SetBufferFileName(GetBufferFilePath() + BUFFER_FILE_NAME_PREFIX + ToString(currentTime));
+    SetBufferFileName(GetBufferFilePath() + GetSendBufferFileNamePrefix() + ToString(currentTime));
     return true;
 }
 

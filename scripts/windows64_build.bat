@@ -48,7 +48,7 @@ REM Clean up
 IF exist %OUTPUT_DIR% ( rd /s /q %OUTPUT_DIR% )
 mkdir %OUTPUT_DIR%
 
-REM Build C++ core(ilogtail.exe, PluginAdapter.dll)
+REM Build C++ core(ilogtail.exe, GoPluginAdapter.dll)
 echo begin to compile core
 cd %ILOGTAIL_PLUGIN_SRC_PATH%\core
 IF exist build ( rd /s /q build )
@@ -76,13 +76,13 @@ del /f/s/q %ILOGTAIL_PLUGIN_SRC_PATH%\plugins\all\all_linux.go
 go run -mod=mod %ILOGTAIL_PLUGIN_SRC_UNIX_PATH%/tools/builder -root-dir=%ILOGTAIL_PLUGIN_SRC_UNIX_PATH% -config="plugins.yml,external_plugins.yml" -modfile="go.mod"
 echo generating plugins finished successfully
 
-REM Build plugins (PluginBase.dll, PluginBase.h)
+REM Build plugins (GoPluginBase.dll, GoPluginBase.h)
 echo Begin to build plugins...
 IF exist %OUTPUT_DIR% ( rd /s /q %OUTPUT_DIR% )
 mkdir %OUTPUT_DIR%
-xcopy /Y %ILOGTAIL_CORE_BUILD_PATH%\plugin\Release\PluginAdapter.dll %ILOGTAIL_PLUGIN_SRC_PATH%\pkg\logtail
+xcopy /Y %ILOGTAIL_CORE_BUILD_PATH%\plugin\Release\GoPluginAdapter.dll %ILOGTAIL_PLUGIN_SRC_PATH%\pkg\logtail
 set LDFLAGS="-X "github.com/alibaba/ilogtail/pluginmanager.BaseVersion=%ILOGTAIL_VERSION%""
-go build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o %OUTPUT_UNIX_DIR%/PluginBase.dll %ILOGTAIL_PLUGIN_SRC_UNIX_PATH%/plugin_main
+go build -mod=mod -buildmode=c-shared -ldflags=%LDFLAGS% -o %OUTPUT_UNIX_DIR%/GoPluginBase.dll %ILOGTAIL_PLUGIN_SRC_UNIX_PATH%/plugin_main
 if not %ERRORLEVEL% == 0 (
     echo Build iLogtail plugin source failed.
     goto quit
@@ -91,7 +91,7 @@ echo Build plugins success
 
 REM Copy artifacts
 xcopy /Y %ILOGTAIL_CORE_BUILD_PATH%\Release\ilogtail.exe %OUTPUT_DIR%
-xcopy /Y %ILOGTAIL_CORE_BUILD_PATH%\plugin\Release\PluginAdapter.dll %OUTPUT_DIR%
+xcopy /Y %ILOGTAIL_CORE_BUILD_PATH%\plugin\Release\GoPluginAdapter.dll %OUTPUT_DIR%
 echo { >  %OUTPUT_DIR%\ilogtail_config.json & echo } >> %OUTPUT_DIR%\ilogtail_config.json
 mkdir %OUTPUT_DIR%\config\local
 cd %OUTPUT_DIR%

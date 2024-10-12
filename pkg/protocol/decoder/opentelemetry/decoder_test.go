@@ -208,7 +208,7 @@ func TestDecoder_Decode_MetricsUntyped(t *testing.T) {
 }
 
 func TestDecoder_Decode_MetricsAll(t *testing.T) {
-	config.LogtailGlobalConfig.EnableSlsMetricsFormat = true
+	config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat = true
 	type args struct {
 		md func() pmetric.Metrics
 	}

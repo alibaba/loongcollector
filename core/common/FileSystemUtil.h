@@ -113,9 +113,6 @@ FILE* FileAppendOpen(const char* filePath, const char* mode = "a");
 // Logtail will ignore files with special suffix.
 bool IsValidSuffix(const std::string& filename);
 
-// Return true if filePath is existing and empty, otherwise false.
-bool IsEmptyConfigJSONFile(const std::string& filePath);
-
 std::string GetFdPath(int fd);
 
 #ifdef _MSC_VER

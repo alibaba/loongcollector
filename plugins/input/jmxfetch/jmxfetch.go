@@ -95,7 +95,7 @@ func (m *Jmx) Init(context pipeline.Context) (int, error) {
 	m.context = context
 	m.key = m.context.GetProject() + m.context.GetLogstore() + m.context.GetConfigName()
 	helper.ReplaceInvalidChars(&m.key)
-	m.jvmHome = path.Join(config.LogtailGlobalConfig.LogtailSysConfDir, "jvm")
+	m.jvmHome = path.Join(config.LoongcollectorGlobalConfig.LoongcollectorThirdPartyDir, "jvm")
 	for _, f := range m.Filters {
 		m.filters = append(m.filters, NewFilterInner(f))
 	}

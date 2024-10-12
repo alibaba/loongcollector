@@ -75,7 +75,7 @@ func TestOtlpGRPC_Logs_V1(t *testing.T) {
 }
 
 func TestOtlpGRPC_Metrics_V1(t *testing.T) {
-	config.LogtailGlobalConfig.EnableSlsMetricsFormat = true
+	config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat = true
 	endpointGrpc := test.GetAvailableLocalAddress(t)
 	input, err := newInput(true, false, endpointGrpc, "")
 	assert.NoError(t, err)

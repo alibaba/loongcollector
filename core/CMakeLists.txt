@@ -13,7 +13,7 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.22)
-project(logtail)
+project(loongcollector)
 
 include(CMakeDependentOption)
 

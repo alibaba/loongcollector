@@ -15,18 +15,21 @@
 #include "AppConfig.h"
 
 #include <algorithm>
+#include <boost/filesystem.hpp>
+#include <iostream>
 
+#include "RuntimeUtil.h"
 #include "common/EnvUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
 #include "file_server/ConfigManager.h"
+#include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
-#include "file_server/reader/LogFileReader.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -98,8 +101,6 @@ DEFINE_FLAG_INT32(data_server_port, "", 80);
 // DEFINE_FLAG_STRING(alipay_zone, "", "ALIPAY_ZONE");
 // DEFINE_FLAG_STRING(alipay_zone_env_name, "", "");
 
-DECLARE_FLAG_STRING(check_point_filename);
-
 DECLARE_FLAG_INT32(polling_max_stat_count);
 DECLARE_FLAG_INT32(polling_max_stat_count_per_dir);
 DECLARE_FLAG_INT32(polling_max_stat_count_per_config);
@@ -157,7 +158,308 @@ DEFINE_FLAG_STRING(loong_collector_operator_service, "loong collector operator s
 DEFINE_FLAG_INT32(loong_collector_operator_service_port, "loong collector operator service port", 8888);
 DEFINE_FLAG_STRING(_pod_name_, "agent pod name", "");
 
+DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
+DEFINE_FLAG_STRING(crash_stack_file_name, "crash stack back trace file name", "backtrace.dat");
+DEFINE_FLAG_STRING(local_event_data_file_name, "local event data file name", "local_event.json");
+DEFINE_FLAG_STRING(inotify_watcher_dirs_dump_filename, "", "inotify_watcher_dirs");
+DEFINE_FLAG_STRING(logtail_snapshot_dir, "snapshot dir on local disk", "snapshot");
+DEFINE_FLAG_STRING(logtail_profile_snapshot, "reader profile on local disk", "logtail_profile_snapshot");
+DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
+
+#if defined(__linux__)
+DEFINE_FLAG_STRING(adhoc_check_point_file_dir, "", "/tmp/logtail_adhoc_checkpoint");
+#elif defined(_MSC_VER)
+DEFINE_FLAG_STRING(adhoc_check_point_file_dir, "", "C:\\LogtailData\\logtail_adhoc_checkpoint");
+#endif
+
+#if defined(__linux__)
+DEFINE_FLAG_STRING(check_point_filename, "", "/tmp/logtail_check_point");
+#elif defined(_MSC_VER)
+DEFINE_FLAG_STRING(check_point_filename, "", "C:\\LogtailData\\logtail_check_point");
+#endif
+
 namespace logtail {
+
+void CreateAgentDir () {
+#if defined(__RUN_LOGTAIL__)
+    return;
+#endif
+    std::string processExecutionDir = GetProcessExecutionDir();
+    Json::Value emptyJson;
+#define PROCESSDIRFLAG(flag_name) \
+    try { \
+        const char* value = getenv(#flag_name); \
+        if (value != NULL) { \
+            STRING_FLAG(flag_name) = StringTo<string>(value); \
+        } \
+    } catch (const exception& e) { \
+        std::cout << "load config from env error, env_name:" << #flag_name << "\terror:" << e.what() << std::endl; \
+    } \
+    if (STRING_FLAG(flag_name).empty()) { \
+        STRING_FLAG(flag_name) = processExecutionDir + PATH_SEPARATOR; \
+    } else { \
+        STRING_FLAG(flag_name) = AbsolutePath(STRING_FLAG(flag_name), processExecutionDir); \
+    } \
+    if (!CheckExistance(STRING_FLAG(flag_name))) { \
+        if (Mkdirs(STRING_FLAG(flag_name))) { \
+            std::cout << STRING_FLAG(flag_name) + " dir is not existing, create done" << std::endl; \
+        } else { \
+            std::cout << STRING_FLAG(flag_name) + " dir is not existing, create failed" << std::endl; \
+            exit(0); \
+        } \
+    }
+
+    PROCESSDIRFLAG(loongcollector_conf_dir);
+    PROCESSDIRFLAG(loongcollector_log_dir);
+    PROCESSDIRFLAG(loongcollector_data_dir);
+    PROCESSDIRFLAG(loongcollector_run_dir);
+    PROCESSDIRFLAG(loongcollector_third_party_dir);
+}
+
+std::string GetAgentThirdPartyDir() {
+    static std::string dir;
+    if (!dir.empty()) {
+        return dir;
+    }
+#if defined(__RUN_LOGTAIL__)
+    dir = AppConfig::GetInstance()->GetLoongcollectorConfDir();
+#else
+    dir = STRING_FLAG(loongcollector_third_party_dir) + PATH_SEPARATOR;
+#endif
+    return dir;
+}
+
+std::string GetAgentLogDir() {
+    static std::string dir;
+    if (!dir.empty()) {
+        return dir;
+    }
+#if defined(__RUN_LOGTAIL__) || defined(APSARA_UNIT_TEST_MAIN)
+    dir = GetProcessExecutionDir();
+#else
+    dir = STRING_FLAG(loongcollector_log_dir) + PATH_SEPARATOR;
+#endif
+    return dir;
+}
+
+std::string GetAgentDataDir() {
+    static std::string dir;
+    if (!dir.empty()) {
+        return dir;
+    }
+#if defined(__RUN_LOGTAIL__) || defined(APSARA_UNIT_TEST_MAIN)
+    dir = GetProcessExecutionDir();
+#else
+    dir = STRING_FLAG(loongcollector_data_dir) + PATH_SEPARATOR;
+#endif
+    return dir;
+}
+
+std::string GetAgentConfDir() {
+    static std::string dir;
+    if (!dir.empty()) {
+        return dir;
+    }
+#if defined(__RUN_LOGTAIL__) || defined(APSARA_UNIT_TEST_MAIN)
+    dir = GetProcessExecutionDir();
+#else
+    dir = STRING_FLAG(loongcollector_conf_dir) + PATH_SEPARATOR;
+#endif
+    return dir;
+}
+
+std::string GetAgentRunDir() {
+    static std::string dir;
+    if (!dir.empty()) {
+        return dir;
+    }
+#if defined(__RUN_LOGTAIL__) || defined(APSARA_UNIT_TEST_MAIN)
+    dir = GetProcessExecutionDir();
+#else
+    dir = STRING_FLAG(loongcollector_run_dir) + PATH_SEPARATOR;
+#endif
+    return dir;
+}
+
+std::string GetAgentDockerPathConfig() {
+    static std::string file_path;
+    if (!file_path.empty()) {
+        return file_path;
+    }
+#if defined(__RUN_LOGTAIL__)
+    file_path = GetAgentDataDir() + STRING_FLAG(ilogtail_docker_file_path_config);
+#else
+    file_path = GetAgentDataDir() + "docker_path_config.json";
+#endif
+    return file_path;
+}
+
+std::string GetAgentConfDir(const ParseConfResult& res, const Json::Value& confJson) {
+    std::string newConfDir;
+#if defined(__RUN_LOGTAIL__)
+    if (res == CONFIG_OK) {
+        // Should be loaded here because other parameters depend on it.
+        LoadStringParameter(newConfDir, confJson, "logtail_sys_conf_dir", "ALIYUN_LOGTAIL_SYS_CONF_DIR");
+    }
+    if (newConfDir.empty()) {
+        newConfDir = STRING_FLAG(logtail_sys_conf_dir);
+    }
+#else
+    newConfDir = GetAgentConfDir();
+#endif
+    return newConfDir;
+}
+
+std::string GetAgentConfigFile() {
+#if defined(__RUN_LOGTAIL__)
+    // load ilogtail_config.json
+    char* configEnv = getenv(STRING_FLAG(ilogtail_config_env_name).c_str());
+    if (configEnv == NULL || strlen(configEnv) == 0) {
+        return STRING_FLAG(ilogtail_config);
+    } else {
+        return configEnv;
+    }
+#else
+    return LOONGCOLLECTOR_CONFIG;
+#endif
+}
+
+std::string GetAgentAppInfoFile() {
+    static std::string file;
+    if (!file.empty()) {
+        return file;
+    }
+#if defined(__RUN_LOGTAIL__)
+    file = GetAgentRunDir() + STRING_FLAG(app_info_file);
+#else
+    file = GetAgentRunDir() + "app_info.json";
+#endif
+    return file;
+}
+
+string GetAdhocCheckpointDirPath() {
+#if defined(__RUN_LOGTAIL__)
+    return STRING_FLAG(adhoc_check_point_file_dir);
+#else
+    return GetAgentDataDir() + "adhoc_checkpoint";
+#endif
+}
+
+string GetCheckPointFileName() {
+#if defined(__RUN_LOGTAIL__)
+    return STRING_FLAG(check_point_filename);
+#else
+    return GetAgentDataDir() + "file_check_point";
+#endif
+}
+
+string GetCrashStackFileName() {
+#if defined(__RUN_LOGTAIL__)
+    return GetProcessExecutionDir() + STRING_FLAG(crash_stack_file_name);
+#else
+    return GetAgentDataDir() + "backtrace.dat";
+#endif
+}
+
+string GetLocalEventDataFileName() {
+#if defined(__RUN_LOGTAIL__)
+    return STRING_FLAG(local_event_data_file_name);
+#else
+    return AppConfig::GetInstance()->GetLoongcollectorConfDir() + "local_event.json";
+#endif
+}
+
+string GetInotifyWatcherDirsDumpFileName() {
+#if defined(__RUN_LOGTAIL__)
+    return GetProcessExecutionDir() + STRING_FLAG(inotify_watcher_dirs_dump_filename);
+#else
+    return GetAgentRunDir() + "inotify_watcher_dirs";
+#endif
+}
+
+string GetAgentLoggersPrefix() {
+#if defined(__RUN_LOGTAIL__)
+    return "/apsara/sls/ilogtail";
+#else
+    return "/apsara/loongcollector";
+#endif
+}
+
+string GetAgentLogName() {
+#if defined(__RUN_LOGTAIL__)
+    return "ilogtail.LOG";
+#else
+    return "loongcollector.LOG";
+#endif
+}
+
+string GetAgentSnapshotDir() {
+#if defined(__RUN_LOGTAIL__)
+    return GetProcessExecutionDir() + STRING_FLAG(logtail_snapshot_dir);
+#else
+    return GetAgentLogDir() + "snapshot";
+#endif
+}
+
+string GetAgentProfileLogName() {
+#if defined(__RUN_LOGTAIL__)
+    return "ilogtail_profile.LOG";
+#else
+    return "loongcollector_profile.LOG";
+#endif
+}
+
+string GetAgentStatusLogName() {
+#if defined(__RUN_LOGTAIL__)
+    return "ilogtail_status.LOG";
+#else
+    return "loongcollector_status.LOG";
+#endif
+}
+
+string GetProfileSnapshotDumpFileName() {
+#if defined(__RUN_LOGTAIL__)
+    return GetProcessExecutionDir() + STRING_FLAG(logtail_profile_snapshot);
+#else
+    return GetAgentLogDir() + "loongcollector_profile_snapshot";
+#endif
+}
+
+
+string GetObserverEbpfHostPath() {
+#if defined(__RUN_LOGTAIL__)
+        return STRING_FLAG(sls_observer_ebpf_host_path);
+#else
+        return GetAgentDataDir();
+#endif
+}
+
+string GetSendBufferFileNamePrefix(){
+#if defined(__RUN_LOGTAIL__)
+        return "logtail_buffer_file_";
+#else
+        return "send_buffer_file_";
+#endif
+}
+
+string GetLegacyUserLocalConfigFilePath() {
+#if defined(__RUN_LOGTAIL__)
+    return AppConfig::GetInstance()->GetProcessExecutionDir();
+#else
+    return AppConfig::GetInstance()->GetLoongcollectorConfDir();
+#endif
+}
+
+string GetExactlyOnceCheckpoint() {
+#if defined(__RUN_LOGTAIL__)
+    auto fp = boost::filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir());
+    return (fp / "checkpoint_v2").string();
+#else
+    auto fp = boost::filesystem::path(GetAgentDataDir());
+    return (fp / "exactly_once_checkpoint").string();
+#endif
+}
+
 AppConfig::AppConfig() {
     LOG_INFO(sLogger, ("AppConfig AppConfig", "success"));
     mSendRandomSleep = BOOL_FLAG(enable_send_tps_smoothing);
@@ -203,7 +505,7 @@ void AppConfig::LoadIncludeConfig(Json::Value& confJson) {
     // to config.d, be compatible with old default value.
     string dirPath = STRING_FLAG(default_include_config_path);
     if (!dirPath.empty() && dirPath[0] != '/') {
-        dirPath = mLogtailSysConfDir + dirPath + PATH_SEPARATOR;
+        dirPath = mLoongcollectorConfDir + dirPath + PATH_SEPARATOR;
     }
     if (confJson.isMember("include_config_path") && confJson["include_config_path"].isString()) {
         dirPath = confJson["include_config_path"].asString();
@@ -248,14 +550,14 @@ void AppConfig::LoadIncludeConfig(Json::Value& confJson) {
 }
 
 void AppConfig::LoadAppConfig(const std::string& ilogtailConfigFile) {
-    std::string processExecutionDir = GetProcessExecutionDir();
-    mDockerFilePathConfig = processExecutionDir + STRING_FLAG(ilogtail_docker_file_path_config);
+    mDockerFilePathConfig = GetAgentDockerPathConfig();
 
     Json::Value confJson(Json::objectValue);
-    std::string newSysConfDir;
+    std::string newConfDir;
 
+    ParseConfResult res = CONFIG_NOT_EXIST;
     if (!ilogtailConfigFile.empty()) {
-        ParseConfResult res = ParseConfig(ilogtailConfigFile, confJson);
+        res = ParseConfig(ilogtailConfigFile, confJson);
 
 #ifdef __ENTERPRISE__
         if (res == CONFIG_NOT_EXIST) {
@@ -270,8 +572,6 @@ void AppConfig::LoadAppConfig(const std::string& ilogtailConfigFile) {
 #endif
 
         if (res == CONFIG_OK) {
-            // Should be loaded here because other parameters depend on it.
-            LoadStringParameter(newSysConfDir, confJson, "logtail_sys_conf_dir", "ALIYUN_LOGTAIL_SYS_CONF_DIR");
         } else {
             confJson.clear();
             if (res == CONFIG_NOT_EXIST) {
@@ -284,10 +584,8 @@ void AppConfig::LoadAppConfig(const std::string& ilogtailConfigFile) {
         }
     }
 
-    if (newSysConfDir.empty()) {
-        newSysConfDir = STRING_FLAG(logtail_sys_conf_dir);
-    }
-    SetLogtailSysConfDir(AbsolutePath(newSysConfDir, mProcessExecutionDir));
+    newConfDir = GetAgentConfDir(res, confJson);
+    SetLoongcollectorConfDir(AbsolutePath(newConfDir, mProcessExecutionDir));
 
     LoadIncludeConfig(confJson);
     string configJsonString = confJson.toStyledString();
@@ -557,7 +855,7 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
     else if (confJson.isMember("check_point_file_path") && confJson["check_point_file_path"].isString())
         mCheckPointFilePath = confJson["check_point_file_path"].asString();
     else
-        mCheckPointFilePath = STRING_FLAG(check_point_filename);
+        mCheckPointFilePath = GetCheckPointFileName();
     LoadStringParameter(mCheckPointFilePath,
                         confJson,
                         NULL, // Only load from env.
@@ -956,6 +1254,11 @@ void AppConfig::InitEnvMapping(const std::string& envStr, std::map<std::string, 
     }
 }
 void AppConfig::SetConfigFlag(const std::string& flagName, const std::string& value) {
+    static set<string> sIgnoreFlagSet
+        = {"loongcollector_conf_dir", "loongcollector_log_dir", "loongcollector_data_dir", "loongcollector_run_dir"};
+    if (sIgnoreFlagSet.find(flagName) != sIgnoreFlagSet.end()) {
+        return;
+    }
     GFLAGS_NAMESPACE::CommandLineFlagInfo info;
     bool rst = GetCommandLineFlagInfo(flagName.c_str(), &info);
     if (rst) {
@@ -1164,14 +1467,14 @@ bool AppConfig::IsInInotifyBlackList(const std::string& path) const {
 // TODO: Use Boost instead.
 // boost::filesystem::directory_iterator end;
 // try { boost::filesystem::directory_iterator(path); } catch (...) { // failed } // OK
-void AppConfig::SetLogtailSysConfDir(const std::string& dirPath) {
-    mLogtailSysConfDir = dirPath;
+void AppConfig::SetLoongcollectorConfDir(const std::string& dirPath) {
+    mLoongcollectorConfDir = dirPath;
     if (dirPath.back() != '/' || dirPath.back() != '\\') {
-        mLogtailSysConfDir += PATH_SEPARATOR;
+        mLoongcollectorConfDir += PATH_SEPARATOR;
     }
 
-    if (!CheckExistance(mLogtailSysConfDir)) {
-        if (Mkdir(mLogtailSysConfDir)) {
+    if (!CheckExistance(mLoongcollectorConfDir)) {
+        if (Mkdir(mLoongcollectorConfDir)) {
             LOG_INFO(sLogger, ("sys conf dir is not existing, create", "done"));
         } else {
             LOG_WARNING(sLogger, ("sys conf dir is not existing, create", "failed"));
@@ -1184,15 +1487,15 @@ void AppConfig::SetLogtailSysConfDir(const std::string& dirPath) {
         int savedErrno = errno;
         LOG_WARNING(sLogger, ("open sys conf dir error", dirPath)("error", strerror(errno)));
         if (savedErrno == EACCES || savedErrno == ENOTDIR || savedErrno == ENOENT) {
-            mLogtailSysConfDir = GetProcessExecutionDir();
+            mLoongcollectorConfDir = GetAgentConfDir();
         }
     } else {
         closedir(dir);
     }
 #elif defined(_MSC_VER)
-    DWORD ret = GetFileAttributes(mLogtailSysConfDir.c_str());
+    DWORD ret = GetFileAttributes(mLoongcollectorConfDir.c_str());
     if (INVALID_FILE_ATTRIBUTES == ret) {
-        mLogtailSysConfDir = GetProcessExecutionDir();
+        mLoongcollectorConfDir = GetAgentConfDir();
     }
 #endif
 
@@ -1211,7 +1514,7 @@ void AppConfig::SetLogtailSysConfDir(const std::string& dirPath) {
     //     = AbsolutePath(STRING_FLAG(ilogtail_local_yaml_config_dir), mLogtailSysConfDir) + PATH_SEPARATOR;
     // mUserRemoteYamlConfigDirPath
     //     = AbsolutePath(STRING_FLAG(ilogtail_remote_yaml_config_dir), mLogtailSysConfDir) + PATH_SEPARATOR;
-    LOG_INFO(sLogger, ("set logtail sys conf dir", mLogtailSysConfDir));
+    LOG_INFO(sLogger, ("set loongcollector conf dir", mLoongcollectorConfDir));
 }
 
 bool AppConfig::IsHostPathMatchBlacklist(const string& dirPath) const {

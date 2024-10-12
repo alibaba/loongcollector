@@ -56,7 +56,7 @@ func TestMetricLabels_Append(t *testing.T) {
 	require.Equal(t, `Time:1691646109 Contents:<Key:"__name__" Value:"name" > Contents:<Key:"__time_nano__" Value:"1691646109945000000" > Contents:<Key:"__labels__" Value:"" > Contents:<Key:"__value__" Value:"1" > Time_ns:945000000 `, log.String())
 
 	var ml2 MetricLabels
-	config.LogtailGlobalConfig.EnableSlsMetricsFormat = true
+	config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat = true
 	ml2.Append("key@", "val|")
 
 	log = NewMetricLog("name@", 1691646109945, 1, &ml2)

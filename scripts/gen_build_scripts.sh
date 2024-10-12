@@ -24,8 +24,8 @@ set -o pipefail
 # e2e: Build plugin dynamic lib with GOC and build the CPP part.
 CATEGORY=$1
 GENERATED_HOME=$2
-VERSION=${3:-2.0.0}
-REPOSITORY=${4:-aliyun/ilogtail}
+VERSION=${3:-0.0.1}
+REPOSITORY=${4:-aliyun/loongcollector}
 OUT_DIR=${5:-output}
 EXPORT_GO_ENVS=${6:-${DOCKER_BUILD_EXPORT_GO_ENVS:-true}}
 COPY_GIT_CONFIGS=${7:-${DOCKER_BUILD_COPY_GIT_CONFIGS:-true}}
@@ -82,7 +82,7 @@ EOF
 
   chmod 755 $BUILD_SCRIPT_FILE
   if [ $CATEGORY = "plugin" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s PluginAdapter && cd ../../.. && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s GoPluginAdapter && cd ../../.. && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "core" ]; then
     echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL=${BUILD_LOGTAIL} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DWITHSPL=${WITHSPL} .. && make -sj${MAKE_JOBS}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "all" ]; then
@@ -99,26 +99,26 @@ function generateCopyScript() {
   echo "id=\$(docker create ${REPOSITORY}:${VERSION})" >>$COPY_SCRIPT_FILE
 
   if [ $CATEGORY = "plugin" ]; then
-    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/'${OUT_DIR}'/libPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/'${OUT_DIR}'/libGoPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
   elif [ $CATEGORY = "core" ]; then
     if [ $BUILD_LOGTAIL = "ON" ]; then
-      echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/ilogtail $BINDIR' >>$COPY_SCRIPT_FILE
-      echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/go_pipeline/libPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
+      echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/loongcollector $BINDIR' >>$COPY_SCRIPT_FILE
+      echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/go_pipeline/libGoPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
     fi
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE
     fi
   else
-    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/'${OUT_DIR}'/libPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
-    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/ilogtail $BINDIR' >>$COPY_SCRIPT_FILE
-    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/go_pipeline/libPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/'${OUT_DIR}'/libGoPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/loongcollector $BINDIR' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/go_pipeline/libGoPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE
     fi
   fi
-  echo 'echo -e "{\n}" > $BINDIR/ilogtail_config.json' >>$COPY_SCRIPT_FILE
+  echo 'echo -e "{\n}" > $BINDIR/loongcollector_config.json' >>$COPY_SCRIPT_FILE
   echo 'mkdir -p $BINDIR/config/local' >>$COPY_SCRIPT_FILE
   echo 'docker rm -v "$id"' >>$COPY_SCRIPT_FILE
 }

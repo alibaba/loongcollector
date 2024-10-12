@@ -82,6 +82,7 @@ bool PCAPWrapper::Init(std::function<int(StringPiece)> processor) {
         LOG_INFO(sLogger, ("load pcap dynamic library", "begin"));
         mPCAPLib = new DynamicLibLoader;
         std::string loadErr;
+        // pcap lib load
         if (!mPCAPLib->LoadDynLib("pcap", loadErr, GetProcessExecutionDir())) {
             if (!mPCAPLib->LoadDynLib("pcap", loadErr)) {
                 LOG_ERROR(sLogger, ("load pcap dynamic library", "failed")("error", loadErr));

@@ -21,7 +21,7 @@ SendPbV2Fun gAdapterSendPbV2Fun = NULL;
 PluginCtlCmdFun gPluginCtlCmdFun = NULL;
 
 void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun, PluginCtlCmdFun cmdFun) {
-    fprintf(stderr, "[PluginAdapter] register fun %p %p %p\n", checkFun, sendFun, cmdFun);
+    fprintf(stderr, "[GoPluginAdapter] register fun %p %p %p\n", checkFun, sendFun, cmdFun);
     gAdapterIsValidToSendFun = checkFun;
     gAdapterSendPbFun = sendFun;
     gPluginCtlCmdFun = cmdFun;

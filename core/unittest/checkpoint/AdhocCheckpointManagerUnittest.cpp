@@ -32,7 +32,7 @@ public:
         kTestRootDir = (bfs::path(GetProcessExecutionDir()) / "AdhocCheckpointManagerUnittest").string();
         bfs::remove_all(kTestRootDir);
         bfs::create_directories(kTestRootDir);
-        AppConfig::GetInstance()->SetLogtailSysConfDir(kTestRootDir);
+        AppConfig::GetInstance()->SetLoongcollectorConfDir(kTestRootDir);
         mAdhocCheckpointManager = AdhocCheckpointManager::GetInstance();
     }
 

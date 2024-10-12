@@ -174,7 +174,7 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 			"DefaultLogGroupQueueSize": 4,
 			"Tags" : {
 				"base_version" : "0.1.0",
-				"logtail_version" : "0.16.19"
+				"loongcollector_version" : "0.16.19"
 			}
 		},
 		"inputs" : [

@@ -631,7 +631,7 @@ func (dc *DockerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPref
 
 func getDockerCenterInstance() *DockerCenter {
 	onceDocker.Do(func() {
-		logger.Init()
+		logger.InitLogger()
 		// load EnvTags first
 		LoadEnvTags()
 		dockerCenterInstance = &DockerCenter{}

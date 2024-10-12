@@ -110,21 +110,22 @@ func LoadGlobalConfig(jsonStr string) int {
 	// Only the first call will return non-zero.
 	retcode := 0
 	loadOnce.Do(func() {
-		logger.Info(context.Background(), "load global config", jsonStr)
 		if len(jsonStr) >= 2 { // For invalid JSON, use default value and return 0
-			if err := json.Unmarshal([]byte(jsonStr), &config.LogtailGlobalConfig); err != nil {
-				logger.Error(context.Background(), "LOAD_PLUGIN_ALARM", "load global config error", err)
+			if err := json.Unmarshal([]byte(jsonStr), &config.LoongcollectorGlobalConfig); err != nil {
+				fmt.Println("load global config error", "GlobalConfig", jsonStr, "err", err)
 				retcode = 1
 			}
-			config.UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", config.BaseVersion, runtime.GOOS, config.LogtailGlobalConfig.HostIP)
+			logger.InitLogger()
+			logger.Info(context.Background(), "load global config", jsonStr)
+			config.UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", config.BaseVersion, runtime.GOOS, config.LoongcollectorGlobalConfig.HostIP)
 		}
 	})
 	if retcode == 0 {
 		// Update when both of them are not empty.
 		logger.Debugf(context.Background(), "host IP: %v, hostname: %v",
-			config.LogtailGlobalConfig.HostIP, config.LogtailGlobalConfig.Hostname)
-		if len(config.LogtailGlobalConfig.Hostname) > 0 && len(config.LogtailGlobalConfig.HostIP) > 0 {
-			util.SetNetworkIdentification(config.LogtailGlobalConfig.HostIP, config.LogtailGlobalConfig.Hostname)
+			config.LoongcollectorGlobalConfig.HostIP, config.LoongcollectorGlobalConfig.Hostname)
+		if len(config.LoongcollectorGlobalConfig.Hostname) > 0 && len(config.LoongcollectorGlobalConfig.HostIP) > 0 {
+			util.SetNetworkIdentification(config.LoongcollectorGlobalConfig.HostIP, config.LoongcollectorGlobalConfig.Hostname)
 		}
 	}
 	return retcode
@@ -233,7 +234,7 @@ func CtlCmd(configName string, cmdID int, cmdDetail string) {
 
 //export GetContainerMeta
 func GetContainerMeta(containerID string) *C.struct_containerMeta {
-	logger.Init()
+	logger.InitLogger()
 	meta := helper.GetContainerMeta(containerID)
 	if meta == nil {
 		logger.Debug(context.Background(), "get meta", "")
@@ -323,11 +324,10 @@ func initPluginBase(cfgStr string) int {
 	// Only the first call will return non-zero.
 	rst := 0
 	initOnce.Do(func() {
-		logger.Init()
+		LoadGlobalConfig(cfgStr)
 		InitHTTPServer()
 		setGCPercentForSlowStart()
 		logger.Info(context.Background(), "init plugin base, version", config.BaseVersion)
-		LoadGlobalConfig(cfgStr)
 		if *flags.DeployMode == flags.DeploySingleton && *flags.EnableKubernetesMeta {
 			instance := k8smeta.GetMetaManagerInstance()
 			err := instance.Init("")

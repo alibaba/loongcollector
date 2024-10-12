@@ -65,4 +65,6 @@ const std::string EXPIRE_DAY = "expire_day";
 const std::string DEFAULT_CONTENT_KEY = "content";
 const std::string DEFAULT_REG = "(.*)";
 
+const std::string LOONGCOLLECTOR_CONFIG = "loongcollector_config.json";
+
 } // namespace logtail

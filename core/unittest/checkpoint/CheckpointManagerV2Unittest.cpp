@@ -39,7 +39,7 @@ public:
             bfs::remove_all(kTestRootDir);
         }
         bfs::create_directories(kTestRootDir);
-        AppConfig::GetInstance()->SetLogtailSysConfDir(kTestRootDir);
+        AppConfig::GetInstance()->SetLoongcollectorConfDir(kTestRootDir);
         INT32_FLAG(logtail_checkpoint_check_gc_interval_sec) = 1;
     }
 

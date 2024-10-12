@@ -21,9 +21,9 @@ set -ue
 set -o pipefail
 
 caller_dir="$PWD"
-ilogtail_dir=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
-bin_file="$ilogtail_dir/ilogtail"
-pid_file="$ilogtail_dir/ilogtail.pid"
+loongcollector_dir=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
+bin_file="$loongcollector_dir/loongcollector"
+pid_file="$loongcollector_dir/run/loongcollector.pid"
 kill_timeout=10
 port=${HTTP_PROBE_PORT:-7953}
 port_initial_delay_sec=${PORT_INITIAL_DELAY_SEC:-3}
@@ -48,29 +48,29 @@ gen_config() {
     :
 }
 
-start_ilogtail() {
+start_loongcollector() {
     check_liveness_by_pid && {
-        local ilogtail_pid=$(load_pid)
-        echo "ilogtail already started. pid: $ilogtail_pid"
+        local loongcollector_pid=$(load_pid)
+        echo "loongcollector already started. pid: $loongcollector_pid"
     } || {
         ($bin_file $@) &
-        local ilogtail_pid=$!
-        save_pid $ilogtail_pid
-        echo "ilogtail started. pid: $ilogtail_pid"
+        local loongcollector_pid=$!
+        save_pid $loongcollector_pid
+        echo "loongcollector started. pid: $loongcollector_pid"
     }
 }
 
 check_liveness_by_pid() {
     # check if process exists
-    local ilogtail_pid=$(load_pid)
-    [[ ! -z $ilogtail_pid && -d /proc/$ilogtail_pid ]] || {
+    local loongcollector_pid=$(load_pid)
+    [[ ! -z $loongcollector_pid && -d /proc/$loongcollector_pid ]] || {
         return 1
     }
-    pid_status=`head /proc/$ilogtail_pid/status | grep "State:*"`
+    pid_status=`head /proc/$loongcollector_pid/status | grep "State:*"`
     # check if process is zombie
     [[ "$pid_status" =~ .*"zombie"*. ]] && \
         return 2 || :
-    # ilogtail is healthy
+    # loongcollector is healthy
     return 0
 }
 
@@ -87,7 +87,7 @@ block_on_check_liveness_by_pid() {
     while [[ $exit_flag -eq 0 ]]
     do
         check_liveness_by_pid || {
-            echo "ilogtail exited unexpectedly"
+            echo "loongcollector exited unexpectedly"
             exit 1
         }
         sleep $liveness_check_interval
@@ -99,27 +99,27 @@ block_on_check_liveness_by_port() {
     while [[ $exit_flag -eq 0 ]]
     do
         check_liveness_by_port || {
-            echo "ilogtail plugin exited unexpectedly"
+            echo "loongcollector plugin exited unexpectedly"
             exit 1
         }
         sleep $liveness_check_interval
     done
 }
 
-stop_ilogtail() {
-    # just return if ilogtail has not started
-    local ilogtail_pid=$(load_pid)
-    [[ ! -z $ilogtail_pid ]] || {
-        echo "ilogtail not started"
+stop_loongcollector() {
+    # just return if loongcollector has not started
+    local loongcollector_pid=$(load_pid)
+    [[ ! -z $loongcollector_pid ]] || {
+        echo "loongcollector not started"
         return
     }
 
     local delaySec=${1:-0}
-    echo 'delay stop ilogtail, sleep' $delaySec
+    echo 'delay stop loongcollector, sleep' $delaySec
     sleep $delaySec
-    echo "stop ilogtail"
+    echo "stop loongcollector"
     # try to kill with SIGTERM, and wait for process to exit
-    kill $ilogtail_pid
+    kill $loongcollector_pid
     local exit_time=0
     local exit_result="force killed"
     while [[ $exit_time -lt $kill_timeout ]]
@@ -131,8 +131,8 @@ stop_ilogtail() {
         sleep 1
     done
     # force kill with SIGKILL if timed out
-    [[ $exit_time -ge $kill_timeout ]] && kill -9 $ilogtail_pid || :
-    echo "stop ilogtail done, result: ${exit_result}"
+    [[ $exit_time -ge $kill_timeout ]] && kill -9 $loongcollector_pid || :
+    echo "stop loongcollector done, result: ${exit_result}"
     remove_pid
 }
 
@@ -165,14 +165,14 @@ trap 'exit_handler' SIGINT
 
 case "$command" in
     start)
-    start_ilogtail $args
+    start_loongcollector $args
     ;;
     stop)
-    stop_ilogtail $args
+    stop_loongcollector $args
     ;;
     restart)
-    stop_ilogtail $args
-    start_ilogtail $args
+    stop_loongcollector $args
+    start_loongcollector $args
     ;;
     status)
     check_liveness_by_pid && exit 0 || exit $?
@@ -181,9 +181,9 @@ case "$command" in
     check_liveness_by_port && exit 0 || exit $?
     ;;
     start_and_block)
-    start_ilogtail $args
+    start_loongcollector $args
     block_on_check_liveness_by_pid
-    stop_ilogtail $args
+    stop_loongcollector $args
     ;;
     -h)
     usage

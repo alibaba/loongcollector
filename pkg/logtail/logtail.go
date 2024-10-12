@@ -19,8 +19,8 @@ package logtail
 
 /*
 #cgo CFLAGS: -I./
-#cgo !windows LDFLAGS: -L./ -lPluginAdapter -Wl,-rpath,/usr/lib64:
-#cgo windows LDFLAGS: -L./ -lPluginAdapter -static-libgcc
+#cgo !windows LDFLAGS: -L./ -lGoPluginAdapter -Wl,-rpath,/usr/lib64:
+#cgo windows LDFLAGS: -L./ -lGoPluginAdapter -static-libgcc
 #include "LogtailPluginAdapter.h"
 */
 import "C"

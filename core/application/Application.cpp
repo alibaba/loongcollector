@@ -63,8 +63,6 @@
 #endif
 
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
-DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
-DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
 DEFINE_FLAG_INT32(file_tags_update_interval, "second", 1);
 DEFINE_FLAG_INT32(config_scan_interval, "seconds", 10);
 DEFINE_FLAG_INT32(profiling_check_interval, "seconds", 60);
@@ -120,13 +118,7 @@ void Application::Init() {
         AppConfig::GetInstance()->SetWorkingDir(GetProcessExecutionDir());
     }
 
-    // load ilogtail_config.json
-    char* configEnv = getenv(STRING_FLAG(ilogtail_config_env_name).c_str());
-    if (configEnv == NULL || strlen(configEnv) == 0) {
-        AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
-    } else {
-        AppConfig::GetInstance()->LoadAppConfig(configEnv);
-    }
+    AppConfig::GetInstance()->LoadAppConfig(GetAgentConfigFile());
 
     // Initialize basic information: IP, hostname, etc.
     LogFileProfiler::GetInstance();
@@ -176,9 +168,9 @@ void Application::Init() {
     appInfoJson["UUID"] = Json::Value(Application::GetInstance()->GetUUID());
     appInfoJson["instance_id"] = Json::Value(Application::GetInstance()->GetInstanceId());
 #ifdef __ENTERPRISE__
-    appInfoJson["logtail_version"] = Json::Value(ILOGTAIL_VERSION);
+    appInfoJson["loongcollector_version"] = Json::Value(ILOGTAIL_VERSION);
 #else
-    appInfoJson["logtail_version"] = Json::Value(string(ILOGTAIL_VERSION) + " Community Edition");
+    appInfoJson["loongcollector_version"] = Json::Value(string(ILOGTAIL_VERSION) + " Community Edition");
     appInfoJson["git_hash"] = Json::Value(ILOGTAIL_GIT_HASH);
     appInfoJson["build_date"] = Json::Value(ILOGTAIL_BUILD_DATE);
 #endif
@@ -194,7 +186,7 @@ void Application::Init() {
     appInfoJson["os"] = Json::Value(LogFileProfiler::mOsDetail);
     appInfoJson["update_time"] = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
     string appInfo = appInfoJson.toStyledString();
-    OverwriteFile(GetProcessExecutionDir() + STRING_FLAG(app_info_file), appInfo);
+    OverwriteFile(GetAgentAppInfoFile(), appInfo);
     LOG_INFO(sLogger, ("app info", appInfo));
 }
 
@@ -212,12 +204,12 @@ void Application::Start() { // GCOVR_EXCL_START
     {
         // add local config dir
         filesystem::path localConfigPath
-            = filesystem::path(AppConfig::GetInstance()->GetLogtailSysConfDir()) / "config" / "local";
+            = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / "pipeline_config" / "local";
         error_code ec;
         filesystem::create_directories(localConfigPath, ec);
         if (ec) {
             LOG_WARNING(sLogger,
-                        ("failed to create dir for local pipelineconfig",
+                        ("failed to create dir for local pipeline_config",
                          "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
         }
         ConfigWatcher::GetInstance()->AddPipelineSource(localConfigPath.string());
@@ -225,12 +217,12 @@ void Application::Start() { // GCOVR_EXCL_START
     {
         // add local config dir
         filesystem::path localConfigPath
-            = filesystem::path(AppConfig::GetInstance()->GetLogtailSysConfDir()) / "instanceconfig" / "local";
+            = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / "instance_config" / "local";
         error_code ec;
         filesystem::create_directories(localConfigPath, ec);
         if (ec) {
             LOG_WARNING(sLogger,
-                        ("failed to create dir for local instanceconfig",
+                        ("failed to create dir for local instance_config",
                          "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
         }
         ConfigWatcher::GetInstance()->AddInstanceSource(localConfigPath.string());

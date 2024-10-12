@@ -165,6 +165,7 @@ void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {
         return;
     }
     string error;
+    // 动态插件加载
     auto pluginDir = AppConfig::GetInstance()->GetProcessExecutionDir() + "/plugins";
     for (auto& pluginType : plugins) {
         DynamicLibLoader loader;

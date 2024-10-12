@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NAME=libPluginBase.so
+NAME=libGoPluginBase.so
 goc version
 if [ $? != 0 ]; then
   echo "==========================================================================================================="

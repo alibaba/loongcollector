@@ -29,7 +29,7 @@ public:
         kTestRootDir = (bfs::path(GetProcessExecutionDir()) / "CheckpointManagerUnittest").string();
         bfs::remove_all(kTestRootDir);
         bfs::create_directories(kTestRootDir);
-        AppConfig::GetInstance()->SetLogtailSysConfDir(kTestRootDir);
+        AppConfig::GetInstance()->SetLoongcollectorConfDir(kTestRootDir);
     }
 
     static void TearDownTestCase() { bfs::remove_all(kTestRootDir); }

@@ -13,16 +13,16 @@
 # limitations under the License.
 
 FROM --platform=$TARGETPLATFORM debian:bookworm as build
-ARG VERSION=2.0.0
+ARG VERSION=0.0.1
 ARG TARGETPLATFORM
 ARG UID=65532
 WORKDIR /usr/local
-COPY dist/ilogtail-${VERSION}.linux-*.tar.gz .
-RUN tar -xzf ilogtail-${VERSION}.linux-${TARGETPLATFORM##*/}.tar.gz
-RUN mv /usr/local/ilogtail-${VERSION} /usr/local/ilogtail && \
-    mkdir /usr/local/ilogtail/checkpoint && \
-    cp example_config/start_with_docker/ilogtail_config.json /usr/local/ilogtail/ && \
-    chmod 755 /usr/local/ilogtail/ilogtail
+COPY dist/loongcollector-${VERSION}.linux-*.tar.gz .
+RUN tar -xzf loongcollector-${VERSION}.linux-${TARGETPLATFORM##*/}.tar.gz
+RUN mv /usr/local/loongcollector-${VERSION} /usr/local/loongcollector && \
+    mkdir -p /usr/local/loongcollector/data/checkpoint && \
+    cp example_config/start_with_docker/loongcollector_config.json /usr/local/loongcollector/ && \
+    chmod 755 /usr/local/loongcollector/loongcollector
 
 FROM gcr.lank8s.cn/distroless/cc-debian12:latest
 LABEL org.opencontainers.image.authors="yyuuttaaoo@gmail.com, jiangdeyan@gmail.com"
@@ -30,14 +30,18 @@ LABEL org.opencontainers.image.authors="yyuuttaaoo@gmail.com, jiangdeyan@gmail.c
 COPY --from=build /usr/lib/x86_64-linux-gnu/libuuid.so.1.3.0 /lib/x86_64-linux-gnu/libuuid.so.1
 
 ARG HOST_OS=Linux
-ARG VERSION=2.0.0
+ARG VERSION=0.0.1
 ARG TARGETPLATFORM
 
-COPY --from=build --chown=$UID:$UID /usr/local/ilogtail /usr/local/ilogtail
+COPY --from=build --chown=$UID:$UID /usr/local/loongcollector /usr/local/loongcollector
 
-WORKDIR /usr/local/ilogtail
+WORKDIR /usr/local/loongcollector
+RUN mkdir -p /usr/local/loongcollector/conf
+RUN mkdir -p /usr/local/loongcollector/log
+RUN mkdir -p /usr/local/loongcollector/data
+RUN mkdir -p /usr/local/loongcollector/run
 
 ENV HTTP_PROBE_PORT=7953 \
     ALIYUN_LOGTAIL_USER_DEFINED_ID=default \
-    docker_file_cache_path=checkpoint/docker_path_config.json
-CMD ["/usr/local/ilogtail/ilogtail"]
+    docker_file_cache_path=data/checkpoint/docker_path_config.json
+CMD ["/usr/local/loongcollector/loongcollector"]

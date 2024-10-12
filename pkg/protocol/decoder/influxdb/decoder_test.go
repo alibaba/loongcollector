@@ -141,7 +141,7 @@ func TestFieldsExtend(t *testing.T) {
 
 	for _, testCase := range cases {
 		decoder := &Decoder{FieldsExtend: testCase.enableFieldsExtend}
-		config.LogtailGlobalConfig.EnableSlsMetricsFormat = testCase.enableSlsMetricsFormat
+		config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat = testCase.enableSlsMetricsFormat
 		logs, err := decoder.Decode([]byte(txtWithDotNames), &http.Request{}, nil)
 		if testCase.wantErr {
 			assert.NotNil(t, err)

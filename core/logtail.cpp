@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
+#include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/ErrorUtil.h"
 #include "common/Flags.h"
@@ -73,10 +74,6 @@ void enable_core(void) {
 
 static void overwrite_community_edition_flags() {
     // support run in installation dir on default
-    STRING_FLAG(logtail_sys_conf_dir) = ".";
-    STRING_FLAG(check_point_filename) = "checkpoint/logtail_check_point";
-    STRING_FLAG(default_buffer_file_path) = "checkpoint";
-    STRING_FLAG(ilogtail_docker_file_path_config) = "checkpoint/docker_path_config.json";
     STRING_FLAG(metrics_report_method) = "";
     INT32_FLAG(data_server_port) = 443;
     BOOL_FLAG(enable_env_ref_in_config) = true;
@@ -86,6 +83,8 @@ static void overwrite_community_edition_flags() {
 
 // Main routine of worker process.
 void do_worker_process() {
+    CreateAgentDir();
+
     Logger::Instance().InitGlobalLoggers();
 
     struct sigaction sigtermSig;

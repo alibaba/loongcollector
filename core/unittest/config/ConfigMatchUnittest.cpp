@@ -90,7 +90,7 @@ public:
         gDispatchThreadId = nullptr;
         ConfigManager::GetInstance()->CleanEnviroments();
         bfs::remove("user_log_config.json");
-        bfs::remove("ilogtail_config.json");
+        bfs::remove("loongcollector_config.json");
         bfs::remove_all(gRootDir);
     }
 
@@ -569,7 +569,7 @@ private:
 
     void TestBlacklistControlCommon(const std::string& pathRoot, const std::string& logPath = "") {
         GenerateUserLogConfigForTestingBlacklistControl(pathRoot);
-        std::ofstream out("ilogtail_config.json");
+        std::ofstream out("loongcollector_config.json");
         out << std::string("{") << std::string("\"config_server_address\" : \"file\",")
             << std::string("\"data_server_address\" : \"file\",") << std::string("\"domain\" : \"\"")
             << std::string("}");

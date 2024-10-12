@@ -13,11 +13,11 @@
 # limitations under the License.
 
 FROM --platform=$TARGETPLATFORM centos:centos7.9.2009 as build
-ARG VERSION=2.0.0
+ARG VERSION=0.0.1
 ARG TARGETPLATFORM
 WORKDIR /usr/local
-COPY dist/ilogtail-${VERSION}.linux-*.tar.gz .
-RUN tar -xzf ilogtail-${VERSION}.linux-${TARGETPLATFORM##*/}.tar.gz
+COPY dist/loongcollector-${VERSION}.linux-*.tar.gz .
+RUN tar -xzf loongcollector-${VERSION}.linux-${TARGETPLATFORM##*/}.tar.gz
 
 
 FROM centos:centos7.9.2009
@@ -30,19 +30,24 @@ RUN curl -L -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/
 RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 
 ARG HOST_OS=Linux
-ARG VERSION=2.0.0
+ARG VERSION=0.0.1
 ARG TARGETPLATFORM
 
-COPY --from=build /usr/local/ilogtail-${VERSION} /usr/local/ilogtail
-RUN chown -R $(whoami) /usr/local/ilogtail/ && \
-    chmod 755 /usr/local/ilogtail/ilogtail && \
-    mkdir /usr/local/ilogtail/checkpoint
+COPY --from=build /usr/local/loongcollector-${VERSION} /usr/local/loongcollector
+RUN chown -R $(whoami) /usr/local/loongcollector/ && \
+    chmod 755 /usr/local/loongcollector/loongcollector && \
+    mkdir -p /usr/local/loongcollector/data/checkpoint
 
-WORKDIR /usr/local/ilogtail
-COPY example_config/start_with_docker/ilogtail_config.json /usr/local/ilogtail/
-COPY scripts/ilogtail_control.sh /usr/local/ilogtail/
+WORKDIR /usr/local/loongcollector
+RUN mkdir -p /usr/local/loongcollector/conf
+RUN mkdir -p /usr/local/loongcollector/log
+RUN mkdir -p /usr/local/loongcollector/data
+RUN mkdir -p /usr/local/loongcollector/run
+
+COPY example_config/start_with_docker/loongcollector_config.json /usr/local/loongcollector/
+COPY scripts/loongcollector_control.sh /usr/local/loongcollector/
 
 ENV HTTP_PROBE_PORT=7953 \
     ALIYUN_LOGTAIL_USER_DEFINED_ID=default \
     docker_file_cache_path=checkpoint/docker_path_config.json
-CMD ["/usr/local/ilogtail/ilogtail_control.sh", "start_and_block"]
+CMD ["/usr/local/loongcollector/loongcollector_control.sh", "start_and_block"]

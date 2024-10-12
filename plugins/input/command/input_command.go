@@ -70,7 +70,7 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 	}
 
 	// mkdir
-	in.storageDir = path.Join(config.LogtailGlobalConfig.LogtailSysConfDir, "/scripts")
+	in.storageDir = path.Join(config.LoongcollectorGlobalConfig.LoongcollectorConfDir, "/scripts")
 	err := mkdir(in.storageDir)
 	if err != nil {
 		err = fmt.Errorf("init storageInstance error : %s", err)

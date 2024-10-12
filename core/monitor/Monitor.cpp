@@ -485,12 +485,12 @@ void LogtailMonitor::DumpToLocal(const sls_logs::LogGroup& logGroup) {
     }
     dumpStr += "####status     end####\n";
 
-    static auto gMonitorLogger = Logger::Instance().GetLogger("/apsara/sls/ilogtail/status");
+    static auto gMonitorLogger = Logger::Instance().GetLogger(GetAgentLoggersPrefix() + "/status");
     LOG_INFO(gMonitorLogger, ("\n", dumpStr));
 }
 
 bool LogtailMonitor::DumpMonitorInfo(time_t monitorTime) {
-    string path = GetProcessExecutionDir() + "logtail_monitor_info";
+    string path = GetAgentLogDir() + "loongcollector_monitor_info";
     ofstream outfile(path.c_str(), ofstream::app);
     if (!outfile)
         return false;
@@ -591,9 +591,9 @@ bool LogtailMonitor::CalCpuCores() {
 // Use mCpuArrayForScale and mOsCpuArrayForScale to calculate if ilogtail can scale up
 // to use more CPU or scale down.
 void LogtailMonitor::CheckScaledCpuUsageUpLimit() {
-    // flag(cpu_usage_up_limit) or cpu_usage_limit in ilogtail_config.json.
+    // flag(cpu_usage_up_limit) or cpu_usage_limit in loongcollector_config.json.
     float cpuUsageUpLimit = AppConfig::GetInstance()->GetCpuUsageUpLimit();
-    // flag(machine_cpu_usage_threshold) or same name in ilogtail_config.json.
+    // flag(machine_cpu_usage_threshold) or same name in loongcollector_config.json.
     float machineCpuUsageThreshold = AppConfig::GetInstance()->GetMachineCpuUsageThreshold();
     // mScaledCpuUsageUpLimit is greater or equal than cpuUsageUpLimit.
     // It will be increased when Monitor finds the global CPU usage is low, which means

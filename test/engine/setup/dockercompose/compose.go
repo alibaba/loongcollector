@@ -56,13 +56,13 @@ services:
       interval: 1s
       retries: 10
   ilogtailC:
-    image: aliyun/ilogtail:2.0.0
+    image: aliyun/loongcollector:0.0.1
     hostname: ilogtail
     privileged: true
     pid: host
     volumes:
-      - %s:/ilogtail/default_flusher.json
-      - %s:/ilogtail/config/local
+      - %s:/loongcollector/conf/default_flusher.json
+      - %s:/loongcollector/conf/pipeline_config/local
       - /:/logtail_host
       - /var/run/docker.sock:/var/run/docker.sock
       - /sys/:/sys/
@@ -77,7 +77,7 @@ services:
       - ALICLOUD_LOG_PLUGIN_ENV_CONFIG=false
       - ALIYUN_LOGTAIL_USER_DEFINED_ID=1111
     healthcheck:
-      test: "cat ilogtail.LOG"
+      test: "cat /loongcollector/log/loongcollector.LOG"
       interval: 15s
       timeout: 5s
 `
@@ -138,7 +138,10 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	c.cli = cli
 
 	list, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", fmt.Sprintf("%s-ilogtailC", projectName))),
+		Filters: filters.NewArgs(
+			filters.Arg("name", fmt.Sprintf("%s_ilogtailC*", projectName)),
+			filters.Arg("name", fmt.Sprintf("%s-ilogtailC*", projectName)),
+		),
 	})
 	if len(list) != 1 {
 		logger.Errorf(context.Background(), "LOGTAIL_COMPOSE_ALARM", "logtail container size is not equal 1, got %d count", len(list))
@@ -222,13 +225,13 @@ func (c *ComposeBooter) CopyCoreLogs() {
 	if c.logtailID != "" {
 		_ = os.Remove(config.LogDir)
 		_ = os.Mkdir(config.LogDir, 0750)
-		cmd := exec.Command("docker", "cp", c.logtailID+":/ilogtail/ilogtail.LOG", config.LogDir)
+		cmd := exec.Command("docker", "cp", c.logtailID+":/loongcollector/log/loongcollector.LOG", config.LogDir)
 		output, err := cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {
 			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "main", "err", err)
 		}
-		cmd = exec.Command("docker", "cp", c.logtailID+":/ilogtail/logtail_plugin.LOG", config.LogDir)
+		cmd = exec.Command("docker", "cp", c.logtailID+":/loongcollector/log/go_plugin.LOG", config.LogDir)
 		output, err = cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {

@@ -81,7 +81,7 @@
 // app config
 DEFINE_FLAG_STRING(ilogtail_config,
                    "set dataserver & configserver address; (optional)set cpu,mem,bufflerfile,buffermap and etc.",
-                   "ilogtail_config.json");
+                   "loongcollector_config.json");
 DEFINE_FLAG_BOOL(enable_full_drain_mode, "", false);
 DEFINE_FLAG_INT32(cpu_limit_num, "cpu violate limit num before shutdown", 10);
 DEFINE_FLAG_INT32(mem_limit_num, "memory violate limit num before shutdown", 10);
@@ -123,3 +123,10 @@ DEFINE_FLAG_STRING(default_container_host_path, "", "C:\\logtail_host");
 #else
 DEFINE_FLAG_STRING(default_container_host_path, "", "/logtail_host");
 #endif
+
+// dir
+DEFINE_FLAG_STRING(loongcollector_conf_dir, "loongcollector config dir", "conf");
+DEFINE_FLAG_STRING(loongcollector_log_dir, "loongcollector log dir", "log");
+DEFINE_FLAG_STRING(loongcollector_data_dir, "loongcollector data dir", "data");
+DEFINE_FLAG_STRING(loongcollector_run_dir, "loongcollector run dir", "run");
+DEFINE_FLAG_STRING(loongcollector_third_party_dir, "loongcollector third party dir", "thirdparty");

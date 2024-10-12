@@ -290,7 +290,7 @@ func NewMetricLogStringVal(name string, t int64, value string, labels *MetricLab
 }
 
 func formatLabelKey(key string) string {
-	if !config.LogtailGlobalConfig.EnableSlsMetricsFormat {
+	if !config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat {
 		return key
 	}
 	var newKey []byte
@@ -315,7 +315,7 @@ func formatLabelKey(key string) string {
 }
 
 func formatLabelValue(value string) string {
-	if !config.LogtailGlobalConfig.EnableSlsMetricsFormat {
+	if !config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat {
 		return value
 	}
 	var newValue []byte
@@ -337,7 +337,7 @@ func formatLabelValue(value string) string {
 }
 
 func formatNewMetricName(name string) string {
-	if !config.LogtailGlobalConfig.EnableSlsMetricsFormat {
+	if !config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat {
 		return name
 	}
 	var newName []byte

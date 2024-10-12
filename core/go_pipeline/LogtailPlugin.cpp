@@ -62,7 +62,10 @@ LogtailPlugin::LogtailPlugin() {
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
 
-    mPluginCfg["LogtailSysConfDir"] = AppConfig::GetInstance()->GetLogtailSysConfDir();
+    mPluginCfg["LoongcollectorConfDir"] = AppConfig::GetInstance()->GetLoongcollectorConfDir();
+    mPluginCfg["LoongcollectorLogDir"] = GetAgentLogDir();
+    mPluginCfg["LoongcollectorDataDir"] = GetAgentDataDir();
+    mPluginCfg["LoongcollectorThirdPartyDir"] = GetAgentThirdPartyDir();
     mPluginCfg["HostIP"] = LogFileProfiler::mIpAddr;
     mPluginCfg["Hostname"] = LogFileProfiler::mHostname;
     mPluginCfg["EnableContainerdUpperDirDetect"] = BOOL_FLAG(enable_containerd_upper_dir_detect);
@@ -307,7 +310,8 @@ bool LogtailPlugin::LoadPluginBase() {
     if (mPluginAdapterPtr == NULL) {
         DynamicLibLoader loader;
         std::string error;
-        if (!loader.LoadDynLib("PluginAdapter", error, AppConfig::GetInstance()->GetWorkingDir())) {
+        // load plugin adapter
+        if (!loader.LoadDynLib("GoPluginAdapter", error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open adapter lib error, Message", error));
             return mPluginValid;
         }
@@ -324,7 +328,7 @@ bool LogtailPlugin::LoadPluginBase() {
         }
         LOG_INFO(sLogger, ("valid plugin adapter version, version", version));
 
-        // Be compatible with old libPluginAdapter.so, V2 -> V1.
+        // Be compatible with old libGoPluginAdapter.so, V2 -> V1.
         auto registerV2Fun = (RegisterLogtailCallBackV2)loader.LoadMethod("RegisterLogtailCallBackV2", error);
         if (error.empty()) {
             registerV2Fun(LogtailPlugin::IsValidToSend,
@@ -351,7 +355,8 @@ bool LogtailPlugin::LoadPluginBase() {
     if (mPluginBasePtr == NULL) {
         DynamicLibLoader loader;
         std::string error;
-        if (!loader.LoadDynLib("PluginBase", error, AppConfig::GetInstance()->GetWorkingDir())) {
+        // load plugin base
+        if (!loader.LoadDynLib("GoPluginBase", error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open plugin base dl error, Message", error));
             return mPluginValid;
         }

@@ -47,7 +47,6 @@ public:
     bool PushToDiskBuffer(SenderQueueItem* item, uint32_t retryTimes);
 
 private:
-    static const std::string BUFFER_FILE_NAME_PREFIX;
     static const int32_t BUFFER_META_BASE_SIZE;
 
     struct EncryptionStateMeta {

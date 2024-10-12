@@ -40,12 +40,12 @@ sed -i "s/VERSION=\${1:-.*}/VERSION=\${1:-$version}/g" scripts/*.sh
 sed -i "s/VERSION=\${2:-.*}/VERSION=\${2:-$version}/g" scripts/*.sh
 sed -i "s/VERSION=\${3:-.*}/VERSION=\${3:-$version}/g" scripts/*.sh
 sed -i "s/VERSION=\${4:-.*}/VERSION=\${4:-$version}/g" scripts/*.sh
-sed -i "s/DIST_DIR=\${2:-ilogtail-.*}/DIST_DIR=\${2:-ilogtail-$version}/g" scripts/dist.sh
+sed -i "s/DIST_DIR=\${2:-loongcollector-.*}/DIST_DIR=\${2:-loongcollector-$version}/g" scripts/dist.sh
 sed -i "s/^set ILOGTAIL_VERSION=.*/set ILOGTAIL_VERSION=$version/g" scripts/*.bat
-sed -i "s/image: aliyun\\/ilogtail:.*/image: aliyun\\/ilogtail:$version/g" test/engine/boot/compose.go
+sed -i "s/image: aliyun\\/loongcollector:.*/image: aliyun\\/loongcollector:$version/g" test/engine/boot/compose.go
 
 # Docs
-sed -i "s/aliyun\\/ilogtail:[^\` ]*/aliyun\\/ilogtail:$version/g" \
+sed -i "s/aliyun\\/loongcollector:[^\` ]*/aliyun\\/loongcollector:$version/g" \
     README.md \
     docs/en/guides/How-to-do-manual-test.md \
     docs/en/guides/How-to-build-with-docker.md

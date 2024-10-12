@@ -63,6 +63,7 @@ void SourceManager::Init() {
   mHostIp = GetHostIp();
   mHostName = GetHostName();
   mHostPathPrefix = STRING_FLAG(default_container_host_path);
+  // load ebpf lib
   mBinaryPath = GetProcessExecutionDir();
   mFullLibName = "lib" + m_lib_name_ + ".so";
   for (auto& x : mRunning) {

@@ -140,7 +140,7 @@ func (s *logstoreConfigTestSuite) TestLoadConfig() {
 		s.Equal(len(config.PluginRunner.(*pluginv1Runner).AggregatorPlugins), 1)
 		s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
 		// global config
-		s.Equal(config.GlobalConfig, &global_config.LogtailGlobalConfig)
+		s.Equal(config.GlobalConfig, &global_config.LoongcollectorGlobalConfig)
 
 		// check plugin inner info
 		reg, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
@@ -256,7 +256,7 @@ func (s *logstoreConfigTestSuite) TestLoadConfigWithExtension() {
 	s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
 	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ExtensionPlugins), 1)
 	// global config
-	s.Equal(config.GlobalConfig, &global_config.LogtailGlobalConfig)
+	s.Equal(config.GlobalConfig, &global_config.LoongcollectorGlobalConfig)
 
 	// check plugin inner info
 	_, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
@@ -343,7 +343,7 @@ func (s *logstoreConfigTestSuite) TestGetExtension() {
 	s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
 	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ExtensionPlugins), 1)
 	// global config
-	s.Equal(config.GlobalConfig, &global_config.LogtailGlobalConfig)
+	s.Equal(config.GlobalConfig, &global_config.LoongcollectorGlobalConfig)
 
 	// check plugin inner info
 	_, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
@@ -442,7 +442,7 @@ func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
 	l.PluginRunner = &pluginv1Runner{
 		LogsChan: make(chan *pipeline.LogWithContext, 10),
 	}
-	l.GlobalConfig = &config.LogtailGlobalConfig
+	l.GlobalConfig = &config.LoongcollectorGlobalConfig
 	l.GlobalConfig.UsingOldContentTag = true
 	{
 		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))

@@ -51,7 +51,7 @@ void HistoryFileImporter::Run() {
 }
 
 void HistoryFileImporter::LoadCheckPoint() {
-    std::string historyDataPath = GetProcessExecutionDir() + "history_file_checkpoint";
+    std::string historyDataPath = GetAgentDataDir() + "history_file_checkpoint";
     FILE* readPtr = fopen(historyDataPath.c_str(), "r");
     if (readPtr != NULL) {
         fclose(readPtr);

@@ -348,17 +348,6 @@ bool IsValidSuffix(const std::string& filename) {
     return true;
 }
 
-bool IsEmptyConfigJSONFile(const std::string& filePath) {
-    auto fullFilePath = IsRelativePath(filePath) ? GetProcessExecutionDir() + filePath : filePath;
-    std::ifstream in;
-    in.open(fullFilePath.c_str());
-    if (!in) {
-        return false;
-    }
-    in.seekg(0, std::ios::end);
-    return 0 == in.tellg();
-}
-
 namespace fsutil {
 
     Dir::Dir(const std::string& dirPath) : mDirPath(dirPath) {

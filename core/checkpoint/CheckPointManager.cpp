@@ -31,11 +31,8 @@
 #include "monitor/LogtailAlarm.h"
 
 using namespace std;
-#if defined(__linux__)
-DEFINE_FLAG_STRING(check_point_filename, "", "/tmp/logtail_check_point");
-#elif defined(_MSC_VER)
-DEFINE_FLAG_STRING(check_point_filename, "", "C:\\LogtailData\\logtail_check_point");
-#endif
+DECLARE_FLAG_STRING(check_point_filename);
+
 DEFINE_FLAG_INT32(file_check_point_time_out, "seconds", 300);
 DEFINE_FLAG_INT32(mem_check_point_time_out, "seconds", 7200);
 DEFINE_FLAG_INT32(check_point_check_interval, "default 15 min", 14 * 60);
@@ -127,8 +124,8 @@ void CheckPointManager::LoadCheckPoint() {
     ParseConfResult cptRes = ParseConfig(AppConfig::GetInstance()->GetCheckPointFilePath(), root);
     // if new checkpoint file not exist, check old checkpoint file.
     if (cptRes == CONFIG_NOT_EXIST
-        && AppConfig::GetInstance()->GetCheckPointFilePath() != STRING_FLAG(check_point_filename)) {
-        cptRes = ParseConfig(STRING_FLAG(check_point_filename), root);
+        && AppConfig::GetInstance()->GetCheckPointFilePath() != GetCheckPointFileName()) {
+        cptRes = ParseConfig(GetCheckPointFileName(), root);
     }
     if (cptRes != CONFIG_OK) {
         if (cptRes == CONFIG_NOT_EXIST)

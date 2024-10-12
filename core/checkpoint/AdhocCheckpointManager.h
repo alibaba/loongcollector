@@ -47,7 +47,6 @@ public:
     UpdateAdhocFileCheckpoint(const std::string& jobName, AdhocFileKey* fileKey, AdhocFileCheckpointPtr fileCheckpoint);
     void DeleteAdhocJobCheckpoint(const std::string& jobName);
 
-    std::string GetAdhocCheckpointDirPath();
     std::string GetJobCheckpointPath(const std::string& jobName);
 };
 

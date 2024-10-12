@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "app_config/AppConfig.h"
 #include "logger/Logger.h"
 #include "EBPFWrapper.h"
 #include "RuntimeUtil.h"
@@ -224,6 +225,7 @@ static std::string GetValidBTFPath(const int64_t& kernelVersion, const std::stri
     if (configedBTFPath != nullptr) {
         return {configedBTFPath};
     }
+    // ebpf lib load
     std::string execDir = GetProcessExecutionDir();
     fsutil::Dir dir(execDir);
     if (!dir.Open()) {
@@ -284,6 +286,7 @@ bool EBPFWrapper::loadEbpfLib(int64_t kernelVersion, std::string& soPath) {
         return true;
     }
     LOG_INFO(sLogger, ("load ebpf dynamic library", "begin"));
+    // load ebpf lib
     std::string dlPrefix = GetProcessExecutionDir();
     soPath = dlPrefix + "libebpf.so";
     if (kernelVersion < INT64_FLAG(sls_observer_ebpf_min_kernel_version)) {
@@ -292,12 +295,12 @@ bool EBPFWrapper::loadEbpfLib(int64_t kernelVersion, std::string& soPath) {
         // overlay fs. detail: https://lore.kernel.org/lkml/20180228004014.445-1-hmclauchlan@fb.com/
         if (fsutil::PathStat::stat(STRING_FLAG(default_container_host_path).c_str(), buf)) {
             std::string cmd
-                = std::string("\\cp ").append(soPath).append(" ").append(STRING_FLAG(sls_observer_ebpf_host_path));
+                = std::string("\\cp ").append(soPath).append(" ").append(GetObserverEbpfHostPath());
             LOG_INFO(sLogger, ("invoke cp cmd:", cmd));
-            system(std::string("mkdir ").append(STRING_FLAG(sls_observer_ebpf_host_path)).c_str());
+            system(std::string("mkdir ").append(GetObserverEbpfHostPath()).c_str());
             system(cmd.c_str());
-            dlPrefix = STRING_FLAG(sls_observer_ebpf_host_path);
-            soPath = STRING_FLAG(sls_observer_ebpf_host_path) + "libebpf.so";
+            dlPrefix = GetObserverEbpfHostPath();
+            soPath = GetObserverEbpfHostPath() + "libebpf.so";
         }
     }
     LOG_INFO(sLogger, ("load ebpf, libebpf path", soPath));

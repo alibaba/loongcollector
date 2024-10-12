@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "app_config/AppConfig.h"
 #include "RuntimeUtil.h"
 #if defined(__linux__)
 #include <unistd.h>
@@ -71,11 +72,21 @@ std::string GetBinaryName(void) {
 #endif
 }
 
-// only ilogtail_config.json will be rebuild from memory
+// only loongcollector_config.json will be rebuild from memory
 bool RebuildExecutionDir(const std::string& ilogtailConfigJson,
                          std::string& errorMessage,
                          const std::string& executionDir) {
-    std::string path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
+    std::string path = GetAgentDataDir();
+    if (CheckExistance(path))
+        return true;
+    if (!Mkdirs(path)) {
+        std::stringstream ss;
+        ss << "create data dir failed, errno is " << errno;
+        errorMessage = ss.str();
+        return false;
+    }
+    #if defined(__RUN_LOGTAIL__) 
+    path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
     if (CheckExistance(path))
         return true;
     if (!Mkdir(path)) {
@@ -98,6 +109,7 @@ bool RebuildExecutionDir(const std::string& ilogtailConfigJson,
 
     fwrite(ilogtailConfigJson.c_str(), 1, ilogtailConfigJson.size(), pFile);
     fclose(pFile);
+    #endif
     return true;
 }
 

@@ -210,7 +210,7 @@ public:
     void TearDown() {
         AppConfig::GetInstance()->ReadFlagsFromMap(flagMap);
         bfs::remove_all(mRootDir);
-        bfs::remove(mRootDir + PS + "ilogtail_config.json");
+        bfs::remove(mRootDir + PS + "loongcollector_config.json");
         bfs::remove(STRING_FLAG(check_point_filename));
     }
 
@@ -289,7 +289,7 @@ void ConfigUpdatorUnittest::SetUpTestCase() {
     INT32_FLAG(dirfile_check_interval_ms) = 1000;
 #endif
     Sender::Instance()->MockAsyncSend = MockAsyncSend;
-    bfs::remove("ilogtail_config.json");
+    bfs::remove("loongcollector_config.json");
     mRootDir = GetProcessExecutionDir();
     if (PATH_SEPARATOR[0] == mRootDir.at(mRootDir.size() - 1))
         mRootDir.resize(mRootDir.size() - 1);
@@ -827,7 +827,7 @@ void ConfigUpdatorUnittest::CaseCleanup() {
     ConfigManager::GetInstance()->CleanEnviroments();
     Sender::Instance()->RemoveSender();
     bfs::remove_all(mRootDir);
-    bfs::remove("ilogtail_config.json");
+    bfs::remove("loongcollector_config.json");
 
     gDispatchThreadId->join();
     gDispatchThreadId = nullptr;

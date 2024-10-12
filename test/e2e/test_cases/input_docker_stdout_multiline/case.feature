@@ -26,6 +26,6 @@ Feature: input docker stdout multiline
     content: "^today\nhello$"
     _source_: "^stdout$"
     _image_name_: ".*_container:latest$"
-    _container_name_: ".*-container-1$"
+    _container_name_: ".*[-_]container[-_]1$"
     _container_ip_: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
     """

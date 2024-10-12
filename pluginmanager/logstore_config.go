@@ -424,11 +424,11 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		}
 	}
 
-	logstoreC.GlobalConfig = &config.LogtailGlobalConfig
+	logstoreC.GlobalConfig = &config.LoongcollectorGlobalConfig
 	// If plugins config has "global" field, then override the logstoreC.GlobalConfig
 	if pluginConfigInterface, flag := plugins["global"]; flag {
 		pluginConfig := &config.GlobalConfig{}
-		*pluginConfig = config.LogtailGlobalConfig
+		*pluginConfig = config.LoongcollectorGlobalConfig
 		if flag {
 			configJSONStr, err := json.Marshal(pluginConfigInterface) //nolint:govet
 			if err != nil {

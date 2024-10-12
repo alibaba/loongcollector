@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "app_config/AppConfig.h"
 #include "AdhocCheckpointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
@@ -23,14 +24,6 @@
 #include "common/HashUtil.h"
 
 DEFINE_FLAG_INT32(adhoc_checkpoint_dump_thread_wait_interval, "microseconds", 5 * 1000);
-
-// TODO: Change to AppConfig::GetInstance()->GetLogtailSysConfDir()
-// /etc/ilogtail + /checkpoint/logtail_adhoc_checkpoint/${jobName}
-#if defined(__linux__)
-DEFINE_FLAG_STRING(adhoc_check_point_file_dir, "", "/tmp/logtail_adhoc_checkpoint");
-#elif defined(_MSC_VER)
-DEFINE_FLAG_STRING(adhoc_check_point_file_dir, "", "C:\\LogtailData\\logtail_adhoc_checkpoint");
-#endif
 
 namespace logtail {
 
@@ -180,10 +173,6 @@ std::string AdhocCheckpointManager::GetJobCheckpointPath(const std::string& jobN
     path += "\\" + jobName;
 #endif
     return path;
-}
-
-std::string AdhocCheckpointManager::GetAdhocCheckpointDirPath() {
-    return STRING_FLAG(adhoc_check_point_file_dir);
 }
 
 } // namespace logtail

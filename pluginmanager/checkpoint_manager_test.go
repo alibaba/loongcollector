@@ -16,11 +16,19 @@ package pluginmanager
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/config"
 )
 
+func MkdirDataDir() {
+	os.MkdirAll(config.LoongcollectorGlobalConfig.LoongcollectorDataDir, 0750)
+}
+
 func Test_checkPointManager_SaveGetCheckpoint(t *testing.T) {
+	MkdirDataDir()
 	CheckPointManager.Init()
 	tests := []string{"xx", "xx", "213##13143", "~/.."}
 	for _, tt := range tests {
@@ -39,6 +47,7 @@ func Test_checkPointManager_SaveGetCheckpoint(t *testing.T) {
 }
 
 func Test_checkPointManager_HoldOn(t *testing.T) {
+	MkdirDataDir()
 	CheckPointManager.Init()
 	t.Run("hold on resume", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(10))
@@ -61,6 +70,7 @@ func Test_checkPointManager_HoldOn(t *testing.T) {
 }
 
 func Test_checkPointManager_run(t *testing.T) {
+	MkdirDataDir()
 	CheckPointManager.Init()
 	t.Run("hold on resume", func(t *testing.T) {
 		CheckPointManager.SaveCheckpoint("1", "xx", []byte("xxxxx"))
@@ -98,6 +108,7 @@ func Test_checkPointManager_run(t *testing.T) {
 }
 
 func Test_checkPointManager_keyMatch(t *testing.T) {
+	MkdirDataDir()
 	CheckPointManager.Init()
 	t.Run("key match", func(t *testing.T) {
 		LogtailConfigLock.Lock()

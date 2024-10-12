@@ -31,9 +31,9 @@ import (
 
 func LogtailPluginLog(ctx context.Context, expectCount int, expectStr string) (context.Context, error) {
 	dockercompose.CopyCoreLogs()
-	logtailPluginLog := config.LogDir + "/logtail_plugin.LOG"
+	logtailPluginLog := config.LogDir + "/go_plugin.LOG"
 	count, err := lineCounter(logtailPluginLog)
-	logger.Infof(context.Background(), "find %d lines of the logtail plugin log", count)
+	logger.Infof(context.Background(), "find %d lines of the logtail plugin log, file: %s", count, logtailPluginLog)
 	if err != nil {
 		return ctx, fmt.Errorf("read log file %s failed: %v", logtailPluginLog, err)
 	}

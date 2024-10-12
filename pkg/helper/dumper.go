@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper/async"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type DumpDataReq struct {
@@ -58,10 +58,11 @@ type Dumper struct {
 }
 
 func (d *Dumper) Init() {
-	_ = os.MkdirAll(path.Join(util.GetCurrentBinaryPath(), "dump"), 0750)
+	// 只有 service_http_server 插件会使用这个模块
+	_ = os.MkdirAll(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorDebugDir, "dump"), 0750)
 	d.input = make(chan *DumpData, 10)
 	d.stop = make(chan struct{})
-	files, err := GetFileListByPrefix(path.Join(util.GetCurrentBinaryPath(), "dump"), d.prefix, true, 0)
+	files, err := GetFileListByPrefix(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorDebugDir, "dump"), d.prefix, true, 0)
 	if err != nil {
 		logger.Warning(context.Background(), "LIST_HISTORY_DUMP_ALARM", "err", err)
 	} else {
@@ -97,7 +98,7 @@ func (d *Dumper) doDumpFile() {
 		}
 	}
 	cutFile := func() (f *os.File, err error) {
-		nFile := path.Join(path.Join(util.GetCurrentBinaryPath(), "dump"), fileName+"_"+time.Now().Format("2006-01-02_15"))
+		nFile := path.Join(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorDebugDir, "dump"), fileName+"_"+time.Now().Format("2006-01-02_15"))
 		if len(d.dumpDataKeepFiles) == 0 || d.dumpDataKeepFiles[len(d.dumpDataKeepFiles)-1] != nFile {
 			d.dumpDataKeepFiles = append(d.dumpDataKeepFiles, nFile)
 		}

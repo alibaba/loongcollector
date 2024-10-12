@@ -32,7 +32,7 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
-const iLogtailLocalConfigDir = "/etc/ilogtail/config/local"
+const iLogtailLocalConfigDir = "/usr/local/loongcollector/conf/local"
 const lotailpluginHTTPAddress = "ilogtailC:18689"
 const E2EProjectName = "e2e-test-project"
 const E2ELogstoreName = "e2e-test-logstore"

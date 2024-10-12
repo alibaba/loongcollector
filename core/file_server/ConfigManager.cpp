@@ -101,6 +101,7 @@ DEFINE_FLAG_INT32(docker_config_update_interval, "interval between docker config
 
 namespace logtail {
 
+// 
 ParseConfResult ParseConfig(const std::string& configName, Json::Value& jsonRoot) {
     // Get full path, if it is a relative path, prepend process execution dir.
     std::string fullPath = configName;

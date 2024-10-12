@@ -174,7 +174,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 	}
 
 	var containerdClient *containerd.Client
-	if config.LogtailGlobalConfig.EnableContainerdUpperDirDetect {
+	if config.LoongcollectorGlobalConfig.EnableContainerdUpperDirDetect {
 		containerdClient, err = containerd.New(containerdUnixSocket, containerd.WithDefaultNamespace("k8s.io"))
 		if err == nil {
 			_, err = containerdClient.Version(context.Background())

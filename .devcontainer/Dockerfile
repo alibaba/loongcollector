@@ -29,7 +29,7 @@ RUN wget http://mirrors.ustc.edu.cn/gnu/libc/glibc-2.18.tar.gz && \
     rm -fr glibc-2.18*
 
 # install python3.8
-RUN cd /opt && curl -O https://cdn.npmmirror.com/binaries/python/3.8.12/Python-3.8.12.tgz && \
+RUN cd /opt && curl -O https://mirrors.aliyun.com/python-release/source/Python-3.8.12.tgz && \
     tar -zxvf Python-3.8.12.tgz && cd Python-3.8.12 && \
     mkdir /usr/local/python3 && \
     ./configure --prefix=/usr/local/python3 && \
@@ -37,7 +37,7 @@ RUN cd /opt && curl -O https://cdn.npmmirror.com/binaries/python/3.8.12/Python-3
     cp /usr/local/python3/bin/python3.8 /usr/bin/python3
 # install gcovr
 RUN python3 -m pip install --upgrade pip
-RUN cp /usr/local/python3/bin/pip3 /usr/bin/pip3 && pip3 install gcovr==7.0
+RUN cp /usr/local/python3/bin/pip3 /usr/bin/pip3 && pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && pip3 install gcovr==7.0
 RUN cp /usr/local/python3/bin/gcovr /usr/bin/gcovr
 
 # Create the user
