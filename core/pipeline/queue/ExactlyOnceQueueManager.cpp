@@ -16,11 +16,11 @@
 
 #include "common/Flags.h"
 #include "common/TimeUtil.h"
-#include "plugin/input/InputFeedbackInterfaceRegistry.h"
-#include "plugin/input/InputFile.h"
 #include "logger/Logger.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
+#include "plugin/input/InputFeedbackInterfaceRegistry.h"
+#include "plugin/input/InputFile.h"
 
 DEFINE_FLAG_INT32(logtail_queue_gc_threshold_sec, "2min", 2 * 60);
 DEFINE_FLAG_INT64(logtail_queue_max_used_time_per_round_in_msec, "500ms", 500);
@@ -154,7 +154,10 @@ void ExactlyOnceQueueManager::DisablePopProcessQueue(const string& configName, b
         if (iter.second->GetConfigName() == configName) {
             iter.second->DisablePop();
             if (!isPipelineRemoving) {
-                iter.second->SetPipelineForItems(configName);
+                const auto& p = PipelineManager::GetInstance()->FindConfigByName(configName);
+                if (p) {
+                    iter.second->SetPipelineForItems(p);
+                }
             }
         }
     }
@@ -274,6 +277,14 @@ uint32_t ExactlyOnceQueueManager::GetInvalidProcessQueueCnt() const {
 uint32_t ExactlyOnceQueueManager::GetProcessQueueCnt() const {
     lock_guard<mutex> lock(mProcessQueueMux);
     return mProcessQueues.size();
+}
+
+void ExactlyOnceQueueManager::SetPipelineForSenderItems(QueueKey key, const std::shared_ptr<Pipeline>& p) {
+    lock_guard<mutex> lock(mSenderQueueMux);
+    auto iter = mSenderQueues.find(key);
+    if (iter != mSenderQueues.end()) {
+        iter->second.SetPipelineForItems(p);
+    }
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

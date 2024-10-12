@@ -20,10 +20,10 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
-#include "plugin/flusher/sls/FlusherSLS.h"
-#include "plugin/flusher/sls/SendResult.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/flusher/sls/SendResult.h"
 #include "sdk/Exception.h"
 #include "sls_control/SLSControl.h"
 

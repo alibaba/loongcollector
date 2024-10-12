@@ -12,56 +12,59 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
-#include <json/json.h>
-#include "file_server/EventDispatcher.h"
-#include "file_server/ConfigManager.h"
-#include "app_config/AppConfig.h"
-#include "file_server/reader/LogFileReader.h"
-#include "file_server/event_handler/EventHandler.h"
-#include "monitor/Monitor.h"
-#include "file_server/event/Event.h"
-#include "sender/Sender.h"
 #include <assert.h>
+#include <json/json.h>
+
+#include "app_config/AppConfig.h"
+#include "file_server/ConfigManager.h"
+#include "file_server/EventDispatcher.h"
+#include "file_server/event/Event.h"
+#include "file_server/event_handler/EventHandler.h"
+#include "file_server/reader/LogFileReader.h"
+#include "monitor/Monitor.h"
+#include "sender/Sender.h"
+#include "unittest/Unittest.h"
 #if defined(__linux__)
 #include <unistd.h>
 #endif
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <string.h>
-#include <stdio.h>
-#include <string>
-#include <errno.h>
-#include <typeinfo>
-#include <iostream>
-#include <fstream>
+
 #include <boost/regex.hpp>
-#include "protobuf/sls/metric.pb.h"
-#include "protobuf/sls/sls_logs.pb.h"
-#include "monitor/LogtailAlarm.h"
-#include "monitor/LogIntegrity.h"
-#include "file_server/event_handler/LogInput.h"
+#include <fstream>
+#include <iostream>
+#include <queue>
+#include <set>
+#include <string>
+#include <typeinfo>
+#include <vector>
+
+#include "checkpoint/CheckpointManagerV2.h"
+#include "common/Constants.h"
 #include "common/FileEncryption.h"
-#include "runner/LogProcess.h"
-#include "common/WaitObject.h"
+#include "common/FileSystemUtil.h"
 #include "common/Lock.h"
+#include "common/LogFileCollectOffsetIndicator.h"
 #include "common/MemoryBarrier.h"
 #include "common/StringTools.h"
 #include "common/Thread.h"
-#include "common/Constants.h"
-#include "common/FileSystemUtil.h"
-#include "checkpoint/CheckpointManagerV2.h"
+#include "common/WaitObject.h"
+#include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
+#include "monitor/LogIntegrity.h"
+#include "monitor/LogtailAlarm.h"
+#include "protobuf/sls/metric.pb.h"
+#include "protobuf/sls/sls_logs.pb.h"
+#include "runner/ProcessorRunner.h"
 #include "sdk/Client.h"
 #include "sdk/Common.h"
 #include "sdk/Exception.h"
-#include "common/LogFileCollectOffsetIndicator.h"
-#include <set>
-#include <vector>
-#include <queue>
 
 using namespace std;
 using namespace sls_logs;
@@ -456,7 +459,7 @@ static decltype(ExactlyOnceQueueManager::GetInstance()) sQueueM = nullptr;
 static decltype(EventDispatcher::GetInstance()) sEventDispatcher = nullptr;
 
 class SenderUnittest : public ::testing::Test {
-    static decltype(LogProcess::GetInstance()->GetQueue().mLogstoreQueueMap)* sProcessQueueMap;
+    static decltype(ProcessorRunner::GetInstance()->GetQueue().mLogstoreQueueMap)* sProcessQueueMap;
     static decltype(Sender::Instance()->GetQueue().mLogstoreSenderQueueMap)* sSenderQueueMap;
     void clearGlobalResource() {
         sCptM->rebuild();
@@ -864,7 +867,7 @@ public:
         sCptM = CheckpointManagerV2::GetInstance();
         sQueueM = ExactlyOnceQueueManager::GetInstance();
         sEventDispatcher = EventDispatcher::GetInstance();
-        sProcessQueueMap = &(LogProcess::GetInstance()->GetQueue().mLogstoreQueueMap);
+        sProcessQueueMap = &(ProcessorRunner::GetInstance()->GetQueue().mLogstoreQueueMap);
         sSenderQueueMap = &(Sender::Instance()->GetQueue().mLogstoreSenderQueueMap);
 
         new Thread(&SenderUnittest::MockAsyncSendThread);
@@ -1018,7 +1021,7 @@ public:
         LogInput::GetInstance()->CleanEnviroments();
         sleep(1);
         EventDispatcher::GetInstance()->CleanEnviroments();
-        LogProcess::GetInstance()->CleanEnviroments();
+        ProcessorRunner::GetInstance()->CleanEnviroments();
         Sender::Instance()->RemoveSender();
         if (gRealIpSendThread) {
             Sender::Instance()->mStopRealIpThread = true;
@@ -1937,7 +1940,7 @@ public:
             sleep(1);
             Sender* pSender = Sender::Instance();
             Aggregator* pAgg = Aggregator::GetInstance();
-            if (LogProcess::GetInstance()->mLogFeedbackQueue.IsEmpty() && pAgg->IsMergeMapEmpty()
+            if (ProcessorRunner::GetInstance()->mLogFeedbackQueue.IsEmpty() && pAgg->IsMergeMapEmpty()
                 && pSender->IsBatchMapEmpty() && pSender->GetSendingCount() == 0 && pSender->IsSecondaryBufferEmpty()) {
                 break;
             }
@@ -2000,7 +2003,7 @@ public:
             sleep(1);
             Sender* pSender = Sender::Instance();
             Aggregator* pAgg = Aggregator::GetInstance();
-            if (LogProcess::GetInstance()->mLogFeedbackQueue.IsEmpty() && pAgg->IsMergeMapEmpty()
+            if (ProcessorRunner::GetInstance()->mLogFeedbackQueue.IsEmpty() && pAgg->IsMergeMapEmpty()
                 && pSender->IsBatchMapEmpty() && pSender->GetSendingCount() == 0 && pSender->IsSecondaryBufferEmpty()) {
                 break;
             }

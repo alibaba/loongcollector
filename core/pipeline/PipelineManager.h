@@ -23,6 +23,7 @@
 #include "common/Lock.h"
 #include "config/ConfigDiff.h"
 #include "pipeline/Pipeline.h"
+#include "runner/InputRunner.h"
 
 namespace logtail {
 
@@ -48,7 +49,7 @@ public:
     void StopAllPipelines();
 
 private:
-    PipelineManager() = default;
+    PipelineManager();
     ~PipelineManager() = default;
 
     virtual std::shared_ptr<Pipeline> BuildPipeline(PipelineConfig&& config); // virtual for ut
@@ -57,15 +58,14 @@ private:
     void DecreasePluginUsageCnt(
         const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& statistics);
     void FlushAllBatch();
-    // 过渡使用
-    void CheckIfInputUpdated(const Json::Value& config,
-                             bool& isInputObserverChanged,
-                             bool& isInputFileChanged,
-                             bool& isInputContainerStdioChanged);
+    // TODO: 长期过渡使用
+    bool CheckIfFileServerUpdated(const Json::Value& config);
 
     std::unordered_map<std::string, std::shared_ptr<Pipeline>> mPipelineNameEntityMap;
     mutable SpinLock mPluginCntMapLock;
     std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mPluginCntMap;
+
+    std::vector<InputRunner*> mInputRunners;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineManagerMock;
@@ -75,6 +75,7 @@ private:
     friend class BoundedProcessQueueUnittest;
     friend class CircularProcessQueueUnittest;
     friend class CommonConfigProviderUnittest;
+    friend class FlusherUnittest;
 #endif
 };
 

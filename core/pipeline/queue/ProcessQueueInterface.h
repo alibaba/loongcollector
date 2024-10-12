@@ -45,7 +45,7 @@ public:
     void DisablePop() { mValidToPop = false; }
     void EnablePop() { mValidToPop = true; }
 
-    virtual void SetPipelineForItems(const std::string& name) const = 0;
+    virtual void SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const = 0;
 
     void Reset() { mDownStreamQueues.clear(); }
 

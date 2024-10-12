@@ -35,7 +35,7 @@ bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
     mInItemDataSizeBytes->Add(size);
 
     if (Full()) {
-        mExtraBuffer.push(std::move(item));
+        mExtraBuffer.push_back(std::move(item));
 
         mExtraBufferSize->Set(mExtraBuffer.size());
         mExtraBufferDataSizeBytes->Add(size);
@@ -91,7 +91,7 @@ bool SenderQueue::Remove(SenderQueueItem* item) {
     if (!mExtraBuffer.empty()) {
         auto newSize = mExtraBuffer.front()->mData.size();
         Push(std::move(mExtraBuffer.front()));
-        mExtraBuffer.pop();
+        mExtraBuffer.pop_front();
 
         mExtraBufferSize->Set(mExtraBuffer.size());
         mExtraBufferDataSizeBytes->Sub(newSize);
@@ -138,6 +138,26 @@ void SenderQueue::GetAllAvailableItems(vector<SenderQueueItem*>& items, bool wit
                     mRateLimiter->PostPop(item->mRawSize);
                 }
             }
+        }
+    }
+}
+
+void SenderQueue::SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const {
+    if (Empty()) {
+        return;
+    }
+    for (auto index = mRead; index < mWrite; ++index) {
+        auto realIndex = index % mCapacity;
+        if (!mQueue[realIndex]) {
+            continue;
+        }
+        if (!mQueue[realIndex]->mPipeline) {
+            mQueue[realIndex]->mPipeline = p;
+        }
+    }
+    for (auto& item : mExtraBuffer) {
+        if (!item->mPipeline) {
+            item->mPipeline = p;
         }
     }
 }

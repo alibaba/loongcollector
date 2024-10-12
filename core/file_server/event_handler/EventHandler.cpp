@@ -18,20 +18,20 @@
 #include <string>
 #include <vector>
 
-#include "file_server/event_handler/LogInput.h"
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
-#include "file_server/EventDispatcher.h"
-#include "file_server/event/BlockEventManager.h"
 #include "file_server/ConfigManager.h"
+#include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
+#include "file_server/event/BlockEventManager.h"
+#include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
-#include "runner/LogProcess.h"
 #include "pipeline/queue/ProcessQueueManager.h"
+#include "runner/ProcessorRunner.h"
 
 using namespace std;
 using namespace sls_logs;
@@ -1090,7 +1090,7 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
                                                               time(NULL));
         PipelineEventGroup group = LogFileReader::GenerateEventGroup(reader, logBuffer);
 
-        while (!LogProcess::GetInstance()->PushBuffer(reader->GetQueueKey(), 0, std::move(group))) // 10ms
+        while (!ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), 0, std::move(group))) // 10ms
         {
             ++pushRetry;
             if (pushRetry % 10 == 0)

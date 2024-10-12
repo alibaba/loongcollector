@@ -119,9 +119,9 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		if execError.Error == nil {
 			break
 		}
+		logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
+			"stdout", execError.Error.Error())
 		if i == 2 {
-			logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
-				"stdout", execError.Error.Error())
 			return execError.Error
 		}
 		execError = testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()

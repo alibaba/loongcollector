@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/alibaba/ilogtail/pkg/config"
@@ -31,7 +30,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
 )
 
@@ -93,7 +91,7 @@ type LogstoreConfig struct {
 	ConfigName           string
 	ConfigNameWithSuffix string
 	LogstoreKey          int64
-	FlushOutFlag         bool
+	FlushOutFlag         atomic.Bool
 	// Each LogstoreConfig can have its independent GlobalConfig if the "global" field
 	//   is offered in configuration, see build-in StatisticsConfig and AlarmConfig.
 	GlobalConfig *config.GlobalConfig
@@ -103,15 +101,7 @@ type LogstoreConfig struct {
 	Statistics   LogstoreStatistics
 	PluginRunner PluginRunner
 	// private fields
-	alreadyStarted   bool // if this flag is true, do not start it when config Resume
 	configDetailHash string
-	// processShutdown  chan struct{}
-	// flushShutdown    chan struct{}
-	pauseChan  chan struct{}
-	resumeChan chan struct{}
-	// processWaitSema  sync.WaitGroup
-	// flushWaitSema    sync.WaitGroup
-	pauseOrResumeWg sync.WaitGroup
 
 	K8sLabelSet              map[string]struct{}
 	ContainerLabelSet        map[string]struct{}
@@ -141,11 +131,8 @@ func (p *LogstoreStatistics) Init(context pipeline.Context) {
 //  4. Start inputs (including metrics and services), just like aggregator, each input
 //     has its own goroutine.
 func (lc *LogstoreConfig) Start() {
-	lc.FlushOutFlag = false
+	lc.FlushOutFlag.Store(false)
 	logger.Info(lc.Context.GetRuntimeContext(), "config start", "begin")
-
-	lc.pauseChan = make(chan struct{}, 1)
-	lc.resumeChan = make(chan struct{}, 1)
 
 	lc.PluginRunner.Run()
 
@@ -153,46 +140,23 @@ func (lc *LogstoreConfig) Start() {
 }
 
 // Stop stops plugin instances and corresponding goroutines of config.
-// @exitFlag passed from Logtail, indicates that if Logtail will quit after this.
+// @removedFlag passed from C++, indicates that if config will be removed after this.
 // Procedures:
 // 1. SetUrgent to all flushers to indicate them current state.
 // 2. Stop all input plugins, stop generating logs.
 // 3. Stop processor goroutine, pass all existing logs to aggregator.
 // 4. Stop all aggregator plugins, make all logs to LogGroups.
 // 5. Set stopping flag, stop flusher goroutine.
-// 6. If Logtail is exiting and there are remaining data, try to flush once.
+// 6. If config will be removed and there are remaining data, try to flush once.
 // 7. Stop flusher plugins.
-func (lc *LogstoreConfig) Stop(exitFlag bool) error {
-	logger.Info(lc.Context.GetRuntimeContext(), "config stop", "begin", "exit", exitFlag)
-	if err := lc.PluginRunner.Stop(exitFlag); err != nil {
+func (lc *LogstoreConfig) Stop(removedFlag bool) error {
+	logger.Info(lc.Context.GetRuntimeContext(), "config stop", "begin", "removing", removedFlag)
+	if err := lc.PluginRunner.Stop(removedFlag); err != nil {
 		return err
 	}
 	logger.Info(lc.Context.GetRuntimeContext(), "Plugin Runner stop", "done")
-	close(lc.pauseChan)
-	close(lc.resumeChan)
 	logger.Info(lc.Context.GetRuntimeContext(), "config stop", "success")
 	return nil
-}
-
-func (lc *LogstoreConfig) pause() {
-	lc.pauseOrResumeWg.Add(1)
-	lc.pauseChan <- struct{}{}
-	lc.pauseOrResumeWg.Wait()
-}
-
-func (lc *LogstoreConfig) waitForResume() {
-	lc.pauseOrResumeWg.Done()
-	select {
-	case <-lc.resumeChan:
-		lc.pauseOrResumeWg.Done()
-	case <-GetFlushCancelToken(lc.PluginRunner):
-	}
-}
-
-func (lc *LogstoreConfig) resume() {
-	lc.pauseOrResumeWg.Add(1)
-	lc.resumeChan <- struct{}{}
-	lc.pauseOrResumeWg.Wait()
 }
 
 const (
@@ -204,14 +168,6 @@ var (
 	tagDelimiter = []byte("^^^")
 	tagSeparator = []byte("~=~")
 )
-
-func (lc *LogstoreConfig) ProcessRawLog(rawLog []byte, packID string, topic string) int {
-	log := &protocol.Log{}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: rawStringKey, Value: string(rawLog)})
-	logger.Debug(context.Background(), "Process raw log ", packID, topic, len(rawLog))
-	lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
-	return 0
-}
 
 // extractTags extracts tags from rawTags and append them into log.
 // Rule: k1~=~v1^^^k2~=~v2
@@ -371,8 +327,6 @@ func hasDockerStdoutInput(plugins map[string]interface{}) bool {
 	return false
 }
 
-var enableAlwaysOnlineForStdout = true
-
 func createLogstoreConfig(project string, logstore string, configName string, logstoreKey int64, jsonStr string) (*LogstoreConfig, error) {
 	var err error
 	contextImp := &ContextImp{}
@@ -388,21 +342,6 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	}
 	contextImp.logstoreC = logstoreC
 
-	// Check if the config has been disabled (keep disabled if config detail is unchanged).
-	DisabledLogtailConfigLock.Lock()
-	if disabledConfig, hasDisabled := DisabledLogtailConfig[configName]; hasDisabled {
-		if disabledConfig.configDetailHash == logstoreC.configDetailHash {
-			DisabledLogtailConfigLock.Unlock()
-			return nil, fmt.Errorf("failed to create config because timeout "+
-				"stop has happened on it: %v", configName)
-		}
-		delete(DisabledLogtailConfig, configName)
-		DisabledLogtailConfigLock.Unlock()
-		logger.Info(contextImp.GetRuntimeContext(), "retry timeout config because config detail has changed")
-	} else {
-		DisabledLogtailConfigLock.Unlock()
-	}
-
 	var plugins = make(map[string]interface{})
 	if err = json.Unmarshal([]byte(jsonStr), &plugins); err != nil {
 		return nil, err
@@ -413,26 +352,6 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		return nil, err
 	}
 
-	// check AlwaysOnlineManager
-	if oldConfig, ok := GetAlwaysOnlineManager().GetCachedConfig(configName); ok {
-		logger.Info(contextImp.GetRuntimeContext(), "find alwaysOnline config", oldConfig.ConfigName, "config compare", oldConfig.configDetailHash == logstoreC.configDetailHash,
-			"new config hash", logstoreC.configDetailHash, "old config hash", oldConfig.configDetailHash)
-		if oldConfig.configDetailHash == logstoreC.configDetailHash {
-			logstoreC = oldConfig
-			logstoreC.alreadyStarted = true
-			logger.Info(contextImp.GetRuntimeContext(), "config is same after reload, use it again", GetFlushStoreLen(logstoreC.PluginRunner))
-			return logstoreC, nil
-		}
-		oldConfig.resume()
-		_ = oldConfig.Stop(false)
-		logstoreC.PluginRunner.Merge(oldConfig.PluginRunner)
-		logger.Info(contextImp.GetRuntimeContext(), "config is changed after reload", "stop and create a new one")
-	} else if lastConfig, hasLastConfig := LastLogtailConfig[configName]; hasLastConfig {
-		// Move unsent LogGroups from last config to new config.
-		logstoreC.PluginRunner.Merge(lastConfig.PluginRunner)
-	}
-
-	enableAlwaysOnline := enableAlwaysOnlineForStdout && hasDockerStdoutInput(plugins)
 	logstoreC.ContainerLabelSet = make(map[string]struct{})
 	logstoreC.EnvSet = make(map[string]struct{})
 	logstoreC.K8sLabelSet = make(map[string]struct{})
@@ -507,7 +426,7 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 
 	logstoreC.GlobalConfig = &config.LogtailGlobalConfig
 	// If plugins config has "global" field, then override the logstoreC.GlobalConfig
-	if pluginConfigInterface, flag := plugins["global"]; flag || enableAlwaysOnline {
+	if pluginConfigInterface, flag := plugins["global"]; flag {
 		pluginConfig := &config.GlobalConfig{}
 		*pluginConfig = config.LogtailGlobalConfig
 		if flag {
@@ -519,9 +438,6 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			if err != nil {
 				return nil, err
 			}
-		}
-		if enableAlwaysOnline {
-			pluginConfig.AlwaysOnline = true
 		}
 		logstoreC.GlobalConfig = pluginConfig
 		logger.Debug(contextImp.GetRuntimeContext(), "load plugin config", *logstoreC.GlobalConfig)
@@ -724,7 +640,9 @@ func initPluginRunner(lc *LogstoreConfig) (PluginRunner, error) {
 func LoadLogstoreConfig(project string, logstore string, configName string, logstoreKey int64, jsonStr string) error {
 	if len(jsonStr) == 0 {
 		logger.Info(context.Background(), "delete config", configName, "logstore", logstore)
+		LogtailConfigLock.Lock()
 		delete(LogtailConfig, configName)
+		LogtailConfigLock.Unlock()
 		return nil
 	}
 	logger.Info(context.Background(), "load config", configName, "logstore", logstore)
@@ -732,8 +650,26 @@ func LoadLogstoreConfig(project string, logstore string, configName string, logs
 	if err != nil {
 		return err
 	}
-	LogtailConfig[configName] = logstoreC
+	if logstoreC.PluginRunner.IsWithInputPlugin() {
+		ToStartPipelineConfigWithInput = logstoreC
+	} else {
+		ToStartPipelineConfigWithoutInput = logstoreC
+	}
 	return nil
+}
+
+func UnloadPartiallyLoadedConfig(configName string) error {
+	logger.Info(context.Background(), "unload config", configName)
+	if ToStartPipelineConfigWithInput.ConfigNameWithSuffix == configName {
+		ToStartPipelineConfigWithInput = nil
+		return nil
+	}
+	if ToStartPipelineConfigWithoutInput.ConfigNameWithSuffix == configName {
+		ToStartPipelineConfigWithoutInput = nil
+		return nil
+	}
+	logger.Error(context.Background(), "unload config", "config not found", configName)
+	return fmt.Errorf("config not found")
 }
 
 func loadBuiltinConfig(name string, project string, logstore string,
@@ -928,6 +864,7 @@ func (lc *LogstoreConfig) genPluginID() string {
 }
 
 func init() {
+	LogtailConfigLock.Lock()
 	LogtailConfig = make(map[string]*LogstoreConfig)
-	_ = util.InitFromEnvBool("ALIYUN_LOGTAIL_ENABLE_ALWAYS_ONLINE_FOR_STDOUT", &enableAlwaysOnlineForStdout, true)
+	LogtailConfigLock.Unlock()
 }

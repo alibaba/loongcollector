@@ -22,9 +22,8 @@
 #include "prometheus/PrometheusInputRunner.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "ebpf/eBPFServer.h"
-#include "observer/ObserverManager.h"
 #endif
-#include "runner/LogProcess.h"
+#include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 #include "app_config/AppConfig.h"
 #include "shennong/ShennongManager.h"
@@ -37,24 +36,28 @@ using namespace std;
 
 namespace logtail {
 
+PipelineManager::PipelineManager()
+    : mInputRunners({
+          PrometheusInputRunner::GetInstance(),
+#if defined(__linux__) && !defined(__ANDROID__)
+          ebpf::eBPFServer::GetInstance(),
+#endif
+      }) {
+}
+
 void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
 #ifndef APSARA_UNIT_TEST_MAIN
     // 过渡使用
-    static bool isFileServerStarted = false, isInputObserverStarted = false;
-    bool isInputObserverChanged = false, isInputFileChanged = false, isInputContainerStdioChanged = false;
+    static bool isFileServerStarted = false;
+    bool isFileServerInputChanged = false;
     for (const auto& name : diff.mRemoved) {
-        CheckIfInputUpdated(mPipelineNameEntityMap[name]->GetConfig()["inputs"][0],
-                            isInputObserverChanged,
-                            isInputFileChanged,
-                            isInputContainerStdioChanged);
+        isFileServerInputChanged = CheckIfFileServerUpdated(mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]);
     }
     for (const auto& config : diff.mModified) {
-        CheckIfInputUpdated(
-            *config.mInputs[0], isInputObserverChanged, isInputFileChanged, isInputContainerStdioChanged);
+        isFileServerInputChanged = CheckIfFileServerUpdated(*config.mInputs[0]);
     }
     for (const auto& config : diff.mAdded) {
-        CheckIfInputUpdated(
-            *config.mInputs[0], isInputObserverChanged, isInputFileChanged, isInputContainerStdioChanged);
+        isFileServerInputChanged = CheckIfFileServerUpdated(*config.mInputs[0]);
     }
 
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
@@ -62,16 +65,9 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         ShennongManager::GetInstance()->Pause();
     }
 #endif
-#if defined(__linux__) && !defined(__ANDROID__)
-    if (isInputObserverStarted && isInputObserverChanged) {
-        ObserverManager::GetInstance()->HoldOn(false);
-    }
-#endif
-    if (isFileServerStarted && (isInputFileChanged || isInputContainerStdioChanged)) {
+    if (isFileServerStarted && isFileServerInputChanged) {
         FileServer::GetInstance()->Pause();
     }
-    LogProcess::GetInstance()->HoldOn();
-    LogtailPlugin::GetInstance()->HoldOn(false);
 #endif
 
     for (const auto& name : diff.mRemoved) {
@@ -83,7 +79,7 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(name, ConfigFeedbackStatus::DELETED);
     }
     for (auto& config : diff.mModified) {
-        auto p = BuildPipeline(std::move(config));
+        auto p = BuildPipeline(std::move(config)); // auto reuse old pipeline's process queue and sender queue
         if (!p) {
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for existing config",
@@ -94,22 +90,21 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
                 config.mProject,
                 config.mLogstore,
                 config.mRegion);
-            diff.mUnchanged.push_back(config.mName);
             ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName,
                                                                                ConfigFeedbackStatus::FAILED);
             continue;
         }
-        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
         LOG_INFO(sLogger,
                  ("pipeline building for existing config succeeded",
                   "stop the old pipeline and start the new one")("config", config.mName));
-
         auto iter = mPipelineNameEntityMap.find(config.mName);
         iter->second->Stop(false);
         DecreasePluginUsageCnt(iter->second->GetPluginStatistics());
+
         mPipelineNameEntityMap[config.mName] = p;
         IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();
+        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
     }
     for (auto& config : diff.mAdded) {
         auto p = BuildPipeline(std::move(config));
@@ -128,24 +123,17 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         }
         LOG_INFO(sLogger,
                  ("pipeline building for new config succeeded", "begin to start pipeline")("config", config.mName));
-        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
         mPipelineNameEntityMap[config.mName] = p;
         IncreasePluginUsageCnt(p->GetPluginStatistics());
         p->Start();
+        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
     }
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    // 过渡使用，有变更的流水线的Go流水线加载在BuildPipeline中完成
-    for (auto& name : diff.mUnchanged) {
-        mPipelineNameEntityMap[name]->LoadGoPipelines();
-    }
     // 在Flusher改造完成前，先不执行如下步骤，不会造成太大影响
     // Sender::CleanUnusedAk();
 
-    // 过渡使用
-    LogtailPlugin::GetInstance()->Resume();
-    LogProcess::GetInstance()->Resume();
-    if (isInputFileChanged || isInputContainerStdioChanged) {
+    if (isFileServerInputChanged) {
         if (isFileServerStarted) {
             FileServer::GetInstance()->Resume();
         } else {
@@ -154,24 +142,18 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         }
     }
 
-#if defined(__linux__) && !defined(__ANDROID__)
-    if (isInputObserverChanged) {
-        if (isInputObserverStarted) {
-            ObserverManager::GetInstance()->Resume();
-        } else {
-            // input_observer_network always relies on PluginBase
-            LogtailPlugin::GetInstance()->LoadPluginBase();
-            ObserverManager::GetInstance()->Reload();
-            isInputObserverStarted = true;
-        }
-    }
-#endif
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Resume();
     }
 #endif
 #endif
+
+    for (auto& item : mInputRunners) {
+        if (!item->HasRegisteredPlugins()) {
+            item->Stop();
+        }
+    }
 }
 
 shared_ptr<Pipeline> PipelineManager::FindConfigByName(const string& configName) const {
@@ -203,27 +185,18 @@ string PipelineManager::GetPluginStatistics() const {
 
 void PipelineManager::StopAllPipelines() {
     LOG_INFO(sLogger, ("stop all pipelines", "starts"));
-    PrometheusInputRunner::GetInstance()->Stop();
-#if defined(__linux__) && !defined(__ANDROID__)
-    ObserverManager::GetInstance()->HoldOn(true);
-    ebpf::eBPFServer::GetInstance()->Stop();
-#endif
+    for (auto& item : mInputRunners) {
+        item->Stop();
+    }
     FileServer::GetInstance()->Stop();
 
-    bool logProcessFlushFlag = false;
-    for (int i = 0; !logProcessFlushFlag && i < 500; ++i) {
-        logProcessFlushFlag = LogProcess::GetInstance()->FlushOut(10);
-    }
-    if (!logProcessFlushFlag) {
-        LOG_WARNING(sLogger, ("flush process daemon queue", "failed"));
-    } else {
-        LOG_INFO(sLogger, ("flush process daemon queue", "succeeded"));
-    }
-    LogProcess::GetInstance()->HoldOn();
+    LogtailPlugin::GetInstance()->StopAllPipelines(true);
+
+    ProcessorRunner::GetInstance()->Stop();
 
     FlushAllBatch();
 
-    LogtailPlugin::GetInstance()->HoldOn(true);
+    LogtailPlugin::GetInstance()->StopAllPipelines(false);
 
     // TODO: make it common
     FlusherSLS::RecycleResourceIfNotUsed();
@@ -263,18 +236,9 @@ void PipelineManager::DecreasePluginUsageCnt(const unordered_map<string, unorder
     }
 }
 
-void PipelineManager::CheckIfInputUpdated(const Json::Value& config,
-                                          bool& isInputObserverChanged,
-                                          bool& isInputFileChanged,
-                                          bool& isInputContainerStdioChanged) {
+bool PipelineManager::CheckIfFileServerUpdated(const Json::Value& config) {
     string inputType = config["Type"].asString();
-    if (inputType == "input_observer_network") {
-        isInputObserverChanged = true;
-    } else if (inputType == "input_file") {
-        isInputFileChanged = true;
-    } else if (inputType == "input_container_stdio") {
-        isInputContainerStdioChanged = true;
-    }
+    return inputType == "input_file" || inputType == "input_container_stdio";
 }
 
 } // namespace logtail

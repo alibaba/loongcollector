@@ -1023,18 +1023,6 @@ bool FlusherSLS::SerializeAndPush(vector<BatchedEventsList>&& groupLists) {
 }
 
 bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes) {
-#ifndef APSARA_UNIT_TEST_MAIN
-    // TODO: temporarily set here, should be removed after independent config update refactor
-    if (item->mFlusher->HasContext()) {
-        item->mPipeline
-            = PipelineManager::GetInstance()->FindConfigByName(item->mFlusher->GetContext().GetConfigName());
-        if (!item->mPipeline) {
-            // should not happen
-            return false;
-        }
-    }
-#endif
-
     const string& str = QueueKeyManager::GetInstance()->GetName(key);
     for (size_t i = 0; i < retryTimes; ++i) {
         int rst = SenderQueueManager::GetInstance()->PushQueue(key, std::move(item));

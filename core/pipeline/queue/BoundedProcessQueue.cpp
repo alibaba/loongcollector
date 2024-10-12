@@ -54,6 +54,7 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     }
     item = std::move(mQueue.front());
     mQueue.pop_front();
+    item->AddPipelineInProcessCnt(GetConfigName());
     if (ChangeStateIfNeededAfterPop()) {
         GiveFeedback();
     }
@@ -67,8 +68,7 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     return true;
 }
 
-void BoundedProcessQueue::SetPipelineForItems(const std::string& name) const {
-    auto p = PipelineManager::GetInstance()->FindConfigByName(name);
+void BoundedProcessQueue::SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const {
     for (auto& item : mQueue) {
         if (!item->mPipeline) {
             item->mPipeline = p;

@@ -19,11 +19,11 @@ package pluginmanager
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	_ "github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 	"github.com/alibaba/ilogtail/plugins/flusher/checker"
 
 	"github.com/stretchr/testify/suite"
@@ -43,73 +43,82 @@ type configUpdateTestSuite struct {
 func (s *configUpdateTestSuite) BeforeTest(suiteName, testName string) {
 	logger.Infof(context.Background(), "========== %s %s test start ========================", suiteName, testName)
 	logger.Info(context.Background(), "load logstore config", updateConfigName)
-	s.NoError(LoadMockConfig(updateConfigName, updateConfigName, updateConfigName, GetTestConfig(updateConfigName)))
-	s.NoError(Resume())
+	s.NoError(LoadAndStartMockConfig(updateConfigName, updateConfigName, updateConfigName, GetTestConfig(updateConfigName)))
 	time.Sleep(time.Second * time.Duration(1))
 }
 
 func (s *configUpdateTestSuite) AfterTest(suiteName, testName string) {
 	logger.Infof(context.Background(), "========== %s %s test end ========================", suiteName, testName)
-	s.NoError(HoldOn(false))
+	s.NoError(StopAllPipelines(false))
+	s.NoError(StopAllPipelines(true))
+	LogtailConfigLock.Lock()
 	LogtailConfig = make(map[string]*LogstoreConfig)
-	DisabledLogtailConfig = make(map[string]*LogstoreConfig)
+	LogtailConfigLock.Unlock()
 }
 
 func (s *configUpdateTestSuite) TestConfigUpdate() {
 	// block config
+	LogtailConfigLock.RLock()
 	config := LogtailConfig[updateConfigName]
+	LogtailConfigLock.RUnlock()
 	s.NotNil(config, "%s logstrore config should exist", updateConfigName)
 	checkFlusher, ok := GetConfigFlushers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 	s.Equal(0, checkFlusher.GetLogCount(), "the block flusher checker doesn't have any logs")
 
 	// update same hang config
-	s.NoError(HoldOn(false))
+	s.NoError(Stop(updateConfigName, false))
 	s.Equal(0, checkFlusher.GetLogCount(), "the hold on block flusher checker doesn't have any logs")
-	err := LoadMockConfig(updateConfigName, updateConfigName, updateConfigName, GetTestConfig(updateConfigName))
-	s.True(strings.Contains(err.Error(), "failed to create config because timeout stop has happened on it"))
-	s.NoError(LoadMockConfig(noblockUpdateConfigName, noblockUpdateConfigName, noblockUpdateConfigName, GetTestConfig(noblockUpdateConfigName)))
-	s.NoError(Resume())
-	s.Nil(LogtailConfig[updateConfigName], "the stopping config only allow to load same config when stopped")
+	_ = LoadAndStartMockConfig(updateConfigName, updateConfigName, updateConfigName, GetTestConfig(updateConfigName))
+	// Since independently load config, reload block config will be allowed
+	s.NoError(LoadAndStartMockConfig(noblockUpdateConfigName, noblockUpdateConfigName, noblockUpdateConfigName, GetTestConfig(noblockUpdateConfigName)))
+	LogtailConfigLock.RLock()
+	s.NotNil(LogtailConfig[updateConfigName])
 	s.NotNil(LogtailConfig[noblockUpdateConfigName])
+	LogtailConfigLock.RUnlock()
 
 	// unblock old config
 	checkFlusher.Block = false
 	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(10000, checkFlusher.GetLogCount())
 	// this magic number(10000) must exceed number of logs can be hold in processor channel(LogsChan) + aggregator buffer(defaultLogGroup) + flusher channel(LogGroupsChan)
+	LogtailConfigLock.RLock()
 	s.Equal(20000, GetConfigFlushers(LogtailConfig[noblockUpdateConfigName].PluginRunner)[0].(*checker.FlusherChecker).GetLogCount())
+	LogtailConfigLock.RUnlock()
 }
 
 func (s *configUpdateTestSuite) TestConfigUpdateMany() {
+	LogtailConfigLock.RLock()
 	config := LogtailConfig[updateConfigName]
+	LogtailConfigLock.RUnlock()
 	s.NotNil(config, "%s logstrore config should exist", updateConfigName)
 	checkFlusher, ok := GetConfigFlushers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 
 	s.Equal(0, checkFlusher.GetLogCount(), "the hold on block flusher checker doesn't have any logs")
 	// load block config
-	for i := 0; i < 5; i++ {
-		s.NoError(HoldOn(false))
-		err := LoadMockConfig(updateConfigName, updateConfigName, updateConfigName, GetTestConfig(updateConfigName))
-		s.True(strings.Contains(err.Error(), "failed to create config because timeout stop has happened on it"))
-		s.NoError(Resume())
-		s.Nil(LogtailConfig[updateConfigName], "the stopping config only allow to load same config when stopped")
-	}
+	Stop(updateConfigName, false)
+	err := LoadAndStartMockConfig(updateConfigName, updateConfigName, updateConfigName, GetTestConfig(updateConfigName))
+	s.Nil(err)
+	s.NotNil(LogtailConfig[updateConfigName])
 	s.Equal(0, checkFlusher.GetLogCount(), "the hold on block flusher checker doesn't have any logs")
 	checkFlusher.Block = false
 	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(checkFlusher.GetLogCount(), 10000)
 
 	// load normal config
-	for i := 0; i < 5; i++ {
-		s.NoError(HoldOn(false))
-		s.NoError(LoadMockConfig(noblockUpdateConfigName, noblockUpdateConfigName, noblockUpdateConfigName, GetTestConfig(noblockUpdateConfigName)))
-		s.NoError(Resume())
+	for i := 0; i < 3; i++ {
+		s.NoError(StopAllPipelines(true))
+		s.NoError(StopAllPipelines(false))
+		s.NoError(LoadAndStartMockConfig(noblockUpdateConfigName, noblockUpdateConfigName, noblockUpdateConfigName, GetTestConfig(noblockUpdateConfigName)))
+		LogtailConfigLock.RLock()
 		s.NotNil(LogtailConfig[noblockUpdateConfigName])
+		LogtailConfigLock.RUnlock()
 		time.Sleep(time.Millisecond)
 	}
+	LogtailConfigLock.RLock()
 	checkFlusher, ok = GetConfigFlushers(LogtailConfig[noblockUpdateConfigName].PluginRunner)[0].(*checker.FlusherChecker)
+	LogtailConfigLock.RUnlock()
 	s.True(ok)
 	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(checkFlusher.GetLogCount(), 20000)
@@ -117,25 +126,26 @@ func (s *configUpdateTestSuite) TestConfigUpdateMany() {
 
 func (s *configUpdateTestSuite) TestConfigUpdateName() {
 	time.Sleep(time.Second * time.Duration(1))
+	LogtailConfigLock.RLock()
 	config := LogtailConfig[updateConfigName]
+	LogtailConfigLock.RUnlock()
 	s.NotNil(config)
 	checkFlusher, ok := GetConfigFlushers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	defer func() {
 		checkFlusher.Block = false
 		time.Sleep(time.Second * 5)
-		s.Equal(checkFlusher.GetLogCount(), 10000)
+		s.Equal(checkFlusher.GetLogCount(), 20000)
 	}()
 	s.True(ok)
 
-	s.NoError(HoldOn(false))
 	s.Equal(0, checkFlusher.GetLogCount(), "the hold on blocking flusher checker doesn't have any logs")
-	s.NoError(LoadMockConfig(updateConfigName+"_", updateConfigName+"_", updateConfigName+"_", GetTestConfig(updateConfigName)))
-	s.NoError(Resume())
-
+	s.NoError(LoadAndStartMockConfig(updateConfigName+"_", updateConfigName+"_", updateConfigName+"_", GetTestConfig(updateConfigName)))
 	{
-		s.Nil(LogtailConfig[updateConfigName])
+		LogtailConfigLock.RLock()
+		s.NotNil(LogtailConfig[updateConfigName])
 		s.NotNil(LogtailConfig[updateConfigName+"_"])
 		checkFlusher, ok := GetConfigFlushers(LogtailConfig[updateConfigName+"_"].PluginRunner)[0].(*checker.FlusherChecker)
+		LogtailConfigLock.RUnlock()
 		s.True(ok)
 		s.Equal(checkFlusher.GetLogCount(), 0)
 		checkFlusher.Block = false
@@ -144,31 +154,34 @@ func (s *configUpdateTestSuite) TestConfigUpdateName() {
 	}
 }
 
-func (s *configUpdateTestSuite) TestHoldOnExit() {
+func (s *configUpdateTestSuite) TestStopAllExit() {
+	LogtailConfigLock.RLock()
 	config := LogtailConfig[updateConfigName]
+	LogtailConfigLock.RUnlock()
 	s.NotNil(config)
 	checkFlusher, ok := GetConfigFlushers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 	checkFlusher.Block = false
 	time.Sleep(time.Second * time.Duration(5))
-	s.NoError(HoldOn(true))
+	s.NoError(StopAllPipelines(true))
+	s.NoError(StopAllPipelines(false))
 	s.Equal(20000, checkFlusher.GetLogCount())
-	s.NoError(Resume())
 }
 
-func (s *configUpdateTestSuite) TestHoldOnExitTimeout() {
+func (s *configUpdateTestSuite) TestStopAllExitTimeout() {
 	time.Sleep(time.Second * time.Duration(1))
+	LogtailConfigLock.RLock()
 	config := LogtailConfig[updateConfigName]
+	LogtailConfigLock.RUnlock()
 	s.NotNil(config)
 	checkFlusher, ok := GetConfigFlushers(config.PluginRunner)[0].(*checker.FlusherChecker)
 	s.True(ok)
 	s.Equal(0, checkFlusher.GetLogCount())
-	s.NoError(HoldOn(true))
+	s.NoError(StopAllPipelines(true))
+	s.NoError(StopAllPipelines(false))
 	time.Sleep(time.Second)
 	s.Equal(0, checkFlusher.GetLogCount())
 	checkFlusher.Block = false
 	time.Sleep(time.Second * time.Duration(5))
 	s.Equal(10000, checkFlusher.GetLogCount())
-	time.Sleep(time.Second * 10)
-	s.NoError(Resume())
 }

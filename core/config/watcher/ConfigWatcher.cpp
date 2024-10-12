@@ -19,8 +19,8 @@
 #include <unordered_set>
 
 #include "logger/Logger.h"
-#include "pipeline/PipelineManager.h"
 #include "pipeline/InstanceConfigManager.h"
+#include "pipeline/PipelineManager.h"
 
 using namespace std;
 
@@ -51,12 +51,15 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
             continue;
         }
         if (!filesystem::exists(s)) {
-            LOG_WARNING(sLogger, ("config dir path not existed", "skip current object")("dir path", dir.string())("configType", configType));
+            LOG_WARNING(sLogger,
+                        ("config dir path not existed", "skip current object")("dir path", dir.string())("configType",
+                                                                                                         configType));
             continue;
         }
         if (!filesystem::is_directory(s)) {
             LOG_WARNING(sLogger,
-                        ("config dir path is not a directory", "skip current object")("dir path", dir.string())("configType", configType));
+                        ("config dir path is not a directory",
+                         "skip current object")("dir path", dir.string())("configType", configType));
             continue;
         }
         for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
@@ -72,13 +75,15 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
             const string& configName = path.stem().string();
             const string& filepath = path.string();
             if (!filesystem::is_regular_file(entry.status(ec))) {
-                LOG_DEBUG(sLogger, ("config file is not a regular file", "skip current object")("filepath", filepath)("configType", configType));
+                LOG_DEBUG(sLogger,
+                          ("config file is not a regular file",
+                           "skip current object")("filepath", filepath)("configType", configType));
                 continue;
             }
             if (configSet.find(configName) != configSet.end()) {
-                LOG_WARNING(
-                    sLogger,
-                    ("more than 1 config with the same name is found", "skip current config")("filepath", filepath)("configType", configType));
+                LOG_WARNING(sLogger,
+                            ("more than 1 config with the same name is found",
+                             "skip current config")("filepath", filepath)("configType", configType));
                 continue;
             }
             configSet.insert(configName);
@@ -93,12 +98,16 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
                     continue;
                 }
                 if (!IsConfigEnabled(configName, *detail)) {
-                    LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", configName)("configType", configType));
+                    LOG_INFO(sLogger,
+                             ("new config found and disabled",
+                              "skip current object")("config", configName)("configType", configType));
                     continue;
                 }
                 ConfigType config(configName, std::move(detail));
                 if (!config.Parse()) {
-                    LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName)("configType", configType));
+                    LOG_ERROR(sLogger,
+                              ("new config found but invalid",
+                               "skip current object")("config", configName)("configType", configType));
                     LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                            "new config found but invalid: skip current object, config: "
                                                                + configName + ", configType: " + configType,
@@ -108,29 +117,27 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
                     continue;
                 }
                 diff.mAdded.push_back(std::move(config));
-                LOG_INFO(
-                    sLogger,
-                    ("new config found and passed topology check", "prepare to build config")("config", configName)("configType", configType));
+                LOG_INFO(sLogger,
+                         ("new config found and passed topology check",
+                          "prepare to build config")("config", configName)("configType", configType));
             } else if (iter->second.first != size || iter->second.second != mTime) {
                 // for config currently running, we leave it untouched if new config is invalid
                 fileInfoMap[filepath] = make_pair(size, mTime);
                 unique_ptr<Json::Value> detail = make_unique<Json::Value>();
                 if (!LoadConfigDetailFromFile(path, *detail)) {
-                    if (configManager->FindConfigByName(configName)) {
-                        diff.mUnchanged.push_back(configName);
-                    }
                     continue;
                 }
                 if (!IsConfigEnabled(configName, *detail)) {
                     if (configManager->FindConfigByName(configName)) {
                         diff.mRemoved.push_back(configName);
-                        LOG_INFO(sLogger,
-                                 ("existing valid config modified and disabled",
-                                  "prepare to stop current running config")("config", configName)("configType", configType));
+                        LOG_INFO(
+                            sLogger,
+                            ("existing valid config modified and disabled",
+                             "prepare to stop current running config")("config", configName)("configType", configType));
                     } else {
                         LOG_INFO(sLogger,
-                                 ("existing invalid config modified and disabled", "skip current object")("config",
-                                                                                                          configName)("configType", configType));
+                                 ("existing invalid config modified and disabled",
+                                  "skip current object")("config", configName)("configType", configType));
                     }
                     continue;
                 }
@@ -157,7 +164,6 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
                 } else if (*detail != p->GetConfig()) {
                     ConfigType config(configName, std::move(detail));
                     if (!config.Parse()) {
-                        diff.mUnchanged.push_back(configName);
                         LOG_ERROR(sLogger,
                                   ("existing valid config modified and becomes invalid",
                                    "keep current config running")("config", configName)("configType", configType));
@@ -175,15 +181,11 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
                              ("existing valid config modified and passed topology check",
                               "prepare to rebuild config")("config", configName)("configType", configType));
                 } else {
-                    diff.mUnchanged.push_back(configName);
                     LOG_DEBUG(sLogger,
-                              ("existing valid config file modified, but no change found", "skip current object")("configType", configType));
+                              ("existing valid config file modified, but no change found",
+                               "skip current object")("configType", configType));
                 }
             } else {
-                // 为了插件系统过渡使用
-                if (configManager->FindConfigByName(configName)) {
-                    diff.mUnchanged.push_back(configName);
-                }
                 LOG_DEBUG(sLogger, ("existing config file unchanged", "skip current object")("configType", configType));
             }
         }
@@ -192,7 +194,8 @@ ConfigDiffType ConfigWatcher::CheckConfigDiff(
         if (configSet.find(name) == configSet.end()) {
             diff.mRemoved.push_back(name);
             LOG_INFO(sLogger,
-                     ("existing valid config is removed", "prepare to stop current running config")("config", name)("configType", configType));
+                     ("existing valid config is removed",
+                      "prepare to stop current running config")("config", name)("configType", configType));
         }
     }
     for (const auto& item : fileInfoMap) {

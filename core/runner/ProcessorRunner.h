@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,36 +18,36 @@
 
 #include <atomic>
 #include <cstdint>
+#include <future>
+#include <vector>
 
 #include "common/Lock.h"
-#include "common/LogRunnable.h"
-#include "common/Thread.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
 #include "monitor/Monitor.h"
-#include "pipeline/queue/QueueKey.h"
+#include "queue/QueueKey.h"
 
 namespace logtail {
 
-class LogProcess : public LogRunnable {
+class ProcessorRunner {
 public:
-    static LogProcess* GetInstance() {
-        static LogProcess* ptr = new LogProcess();
-        return ptr;
+    ProcessorRunner(const ProcessorRunner&) = delete;
+    ProcessorRunner& operator=(const ProcessorRunner&) = delete;
+
+    static ProcessorRunner* GetInstance() {
+        static ProcessorRunner instance;
+        return &instance;
     }
 
-    void Start();
-    void HoldOn();
-    void Resume();
-    bool FlushOut(int32_t waitMs);
+    void Init();
+    void Stop();
 
-    void* ProcessLoop(int32_t threadNo);
-    // TODO: replace key with configName
-    bool PushBuffer(QueueKey key, size_t inputIndex, PipelineEventGroup&& group, uint32_t retryTimes = 1);
+    bool PushQueue(QueueKey key, size_t inputIndex, PipelineEventGroup&& group, uint32_t retryTimes = 1);
 
 private:
-    LogProcess();
-    ~LogProcess();
+    ProcessorRunner();
+    ~ProcessorRunner() = default;
+
+    void Run(uint32_t threadNo);
 
     bool Serialize(const PipelineEventGroup& group,
                    bool enableNanosecond,
@@ -55,11 +55,9 @@ private:
                    std::string& res,
                    std::string& errorMsg);
 
-    bool mInitialized = false;
-    ThreadPtr* mProcessThreads;
-    int32_t mThreadCount = 1;
-    std::atomic_bool* mThreadFlags;
-    ReadWriteLock mAccessProcessThreadRWL;
+    uint32_t mThreadCount = 1;
+    std::vector<std::future<void>> mThreadRes;
+    std::atomic_bool mIsFlush = false;
 
     thread_local static MetricsRecordRef sMetricsRecordRef;
     thread_local static CounterPtr sInGroupsCnt;

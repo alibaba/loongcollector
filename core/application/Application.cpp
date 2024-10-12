@@ -49,7 +49,7 @@
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "runner/FlusherRunner.h"
-#include "runner/LogProcess.h"
+#include "runner/ProcessorRunner.h"
 #include "runner/sink/http/HttpSink.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
@@ -276,7 +276,7 @@ void Application::Start() { // GCOVR_EXCL_START
         LogtailPlugin::GetInstance()->LoadPluginBase();
     }
 
-    LogProcess::GetInstance()->Start();
+    ProcessorRunner::GetInstance()->Init();
 
     time_t curTime = 0, lastProfilingCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
            lastCheckTagsTime = 0, lastQueueGCTime = 0;
@@ -383,6 +383,7 @@ void Application::Exit() {
     LogtailMonitor::GetInstance()->Stop();
     LoongCollectorMonitor::GetInstance()->Stop();
     LogtailAlarm::GetInstance()->Stop();
+    LogtailPlugin::GetInstance()->StopBuiltInModules();
     // from now on, alarm should not be used.
 
     FlusherRunner::GetInstance()->Stop();

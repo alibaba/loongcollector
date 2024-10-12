@@ -61,7 +61,7 @@ void BoundedSenderQueueInterface::GiveFeedback() const {
 }
 
 void BoundedSenderQueueInterface::Reset(size_t cap, size_t low, size_t high) {
-    queue<unique_ptr<SenderQueueItem>>().swap(mExtraBuffer);
+    deque<unique_ptr<SenderQueueItem>>().swap(mExtraBuffer);
     mRateLimiter.reset();
     mConcurrencyLimiters.clear();
     BoundedQueueInterface::Reset(low, high);

@@ -30,11 +30,14 @@ namespace logtail {
 // not thread-safe, should be protected explicitly by queue manager
 class ExactlyOnceSenderQueue : public BoundedSenderQueueInterface {
 public:
-    ExactlyOnceSenderQueue(const std::vector<RangeCheckpointPtr>& checkpoints, QueueKey key, const PipelineContext& ctx);
+    ExactlyOnceSenderQueue(const std::vector<RangeCheckpointPtr>& checkpoints,
+                           QueueKey key,
+                           const PipelineContext& ctx);
 
     bool Push(std::unique_ptr<SenderQueueItem>&& item) override;
     bool Remove(SenderQueueItem* item) override;
     void GetAllAvailableItems(std::vector<SenderQueueItem*>& items, bool withLimits = true) override;
+    void SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const override;
 
     void Reset(const std::vector<RangeCheckpointPtr>& checkpoints);
 

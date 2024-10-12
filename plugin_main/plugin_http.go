@@ -112,20 +112,19 @@ func HandleLoadConfig(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("parse body error"))
 		return
 	}
-	HoldOn(0)
 	for _, cfg := range loadConfigs {
-		LoadConfig(cfg.Project, cfg.Logstore, cfg.ConfigName, cfg.LogstoreKey, cfg.JSONStr)
+		Stop(cfg.ConfigName, 0)
+		LoadPipeline(cfg.Project, cfg.Logstore, cfg.ConfigName, cfg.LogstoreKey, cfg.JSONStr)
+		Start(cfg.ConfigName)
 	}
-	Resume()
 }
 
 // HandleHoldOn hold on the ilogtail process.
 func HandleHoldOn(w http.ResponseWriter, r *http.Request) {
 	controlLock.Lock()
 	defer controlLock.Unlock()
-	HoldOn(1)
-	// flush async logs when hold on with exit flag.
-	logger.Flush()
+	StopAllPipelines(1)
+	StopAllPipelines(0)
 	w.WriteHeader(http.StatusOK)
 }
 

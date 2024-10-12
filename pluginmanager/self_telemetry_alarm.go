@@ -37,12 +37,14 @@ func (r *InputAlarm) Description() string {
 
 func (r *InputAlarm) Collect(collector pipeline.Collector) error {
 	loggroup := &protocol.LogGroup{}
+	LogtailConfigLock.RLock()
 	for _, config := range LogtailConfig {
 		alarm := config.Context.GetRuntimeContext().Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
 		if alarm != nil {
 			alarm.SerializeToPb(loggroup)
 		}
 	}
+	LogtailConfigLock.RUnlock()
 	util.GlobalAlarm.SerializeToPb(loggroup)
 	if len(loggroup.Logs) > 0 && AlarmConfig != nil {
 		for _, log := range loggroup.Logs {

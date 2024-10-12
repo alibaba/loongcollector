@@ -47,6 +47,7 @@ public:
 
     void SetRateLimiter(uint32_t maxRate);
     void SetConcurrencyLimiters(std::vector<std::shared_ptr<ConcurrencyLimiter>>&& limiters);
+    virtual void SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     std::optional<RateLimiter>& GetRateLimiter() { return mRateLimiter; }
@@ -62,10 +63,14 @@ protected:
     std::optional<RateLimiter> mRateLimiter;
     std::vector<std::shared_ptr<ConcurrencyLimiter>> mConcurrencyLimiters;
 
-    std::queue<std::unique_ptr<SenderQueueItem>> mExtraBuffer;
+    std::deque<std::unique_ptr<SenderQueueItem>> mExtraBuffer;
 
     IntGaugePtr mExtraBufferSize;
     IntGaugePtr mExtraBufferDataSizeBytes;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class FlusherUnittest;
+#endif
 };
 
 } // namespace logtail

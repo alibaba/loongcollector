@@ -196,6 +196,16 @@ void SenderQueueManager::Trigger() {
     mCond.notify_one();
 }
 
+void SenderQueueManager::SetPipelineForItems(QueueKey key, const std::shared_ptr<Pipeline>& p) {
+    lock_guard<mutex> lock(mQueueMux);
+    auto iter = mQueues.find(key);
+    if (iter != mQueues.end()) {
+        iter->second.SetPipelineForItems(p);
+    } else {
+        ExactlyOnceQueueManager::GetInstance()->SetPipelineForSenderItems(key, p);
+    }
+}
+
 #ifdef APSARA_UNIT_TEST_MAIN
 void SenderQueueManager::Clear() {
     lock_guard<mutex> lock(mQueueMux);

@@ -165,21 +165,19 @@ func main() {
 		p := fmt.Sprintf("PluginProject_%d", i)
 		l := fmt.Sprintf("PluginLogstore_%d", i)
 		c := fmt.Sprintf("1.0#PluginProject_%d##Config%d", i, i)
-		if LoadConfig(p, l, c, 123, cfg) != 0 {
+		if LoadPipeline(p, l, c, 123, cfg) != 0 {
 			logger.Warningf(context.Background(), "START_PLUGIN_ALARM", "%s_%s_%s start fail, config is %s", p, l, c, cfg)
 			return
 		}
+		Start(c)
 	}
-
-	Resume()
 
 	// handle the first shutdown signal gracefully, and exit directly if FileIOFlag is true
 	if !*flags.FileIOFlag {
 		<-signals.SetupSignalHandler()
 	}
-	logger.Info(context.Background(), "########################## exit process begin ##########################")
-	HoldOn(1)
-	logger.Info(context.Background(), "########################## exit process done ##########################")
+	StopAllPipelines(1)
+	StopAllPipelines(0)
 }
 
 func generatePluginDoc() {

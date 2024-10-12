@@ -20,6 +20,7 @@
 #include <memory>
 
 #include "models/PipelineEventGroup.h"
+#include "pipeline/PipelineManager.h"
 
 namespace logtail {
 
@@ -32,6 +33,17 @@ struct ProcessQueueItem {
     std::chrono::system_clock::time_point mEnqueTime;
 
     ProcessQueueItem(PipelineEventGroup&& group, size_t index) : mEventGroup(std::move(group)), mInputIndex(index) {}
+
+    void AddPipelineInProcessCnt(const std::string& configName) {
+        if (mPipeline) {
+            mPipeline->AddInProcessCnt();
+        } else {
+            const auto& p = PipelineManager::GetInstance()->FindConfigByName(configName);
+            if (p) {
+                p->AddInProcessCnt();
+            }
+        }
+    }
 };
 
 } // namespace logtail

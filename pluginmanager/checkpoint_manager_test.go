@@ -46,8 +46,8 @@ func Test_checkPointManager_HoldOn(t *testing.T) {
 		shutdown := make(chan struct{}, 1)
 		go func() {
 			for i := 0; i < 100; i++ {
-				CheckPointManager.Resume()
-				CheckPointManager.HoldOn()
+				CheckPointManager.Start()
+				CheckPointManager.Stop()
 			}
 			shutdown <- struct{}{}
 		}()
@@ -66,6 +66,7 @@ func Test_checkPointManager_run(t *testing.T) {
 		CheckPointManager.SaveCheckpoint("1", "xx", []byte("xxxxx"))
 		CheckPointManager.SaveCheckpoint("2", "yy", []byte("yyyyyy"))
 		*CheckPointCleanInterval = 1
+		CheckPointManager.cleanThreshold = 3
 		if data, err := CheckPointManager.GetCheckpoint("1", "xx"); err != nil || string(data) != "xxxxx" {
 			t.Errorf("checkPointManager.GetCheckpoint() error, %v %v", err, string(data))
 		}
@@ -73,7 +74,15 @@ func Test_checkPointManager_run(t *testing.T) {
 		if data, err := CheckPointManager.GetCheckpoint("2", "yy"); err != nil || string(data) != "yyyyyy" {
 			t.Errorf("checkPointManager.GetCheckpoint() error, %v %v", err, string(data))
 		}
-		CheckPointManager.Resume()
+		CheckPointManager.Start()
+		time.Sleep(time.Second * time.Duration(1))
+		if data, err := CheckPointManager.GetCheckpoint("1", "xx"); err != nil || string(data) != "xxxxx" {
+			t.Errorf("checkPointManager.GetCheckpoint() error, %v %v", err, string(data))
+		}
+
+		if data, err := CheckPointManager.GetCheckpoint("2", "yy"); err != nil || string(data) != "yyyyyy" {
+			t.Errorf("checkPointManager.GetCheckpoint() error, %v %v", err, string(data))
+		}
 		time.Sleep(time.Second * time.Duration(5))
 		if data, err := CheckPointManager.GetCheckpoint("1", "xx"); err == nil {
 			t.Errorf("checkPointManager.GetCheckpoint() error, %v %v", err, string(data))
@@ -85,14 +94,16 @@ func Test_checkPointManager_run(t *testing.T) {
 	})
 
 	*CheckPointCleanInterval = 3600
-	CheckPointManager.HoldOn()
+	CheckPointManager.Stop()
 }
 
 func Test_checkPointManager_keyMatch(t *testing.T) {
 	CheckPointManager.Init()
 	t.Run("key match", func(t *testing.T) {
+		LogtailConfigLock.Lock()
 		LogtailConfig["test_1/1"] = nil
 		LogtailConfig["test_2/1"] = nil
+		LogtailConfigLock.Unlock()
 		if got := CheckPointManager.keyMatch([]byte("test_1")); got {
 			t.Errorf("checkPointManager.Test_checkPointManager_keyMatch()")
 		}
@@ -112,7 +123,9 @@ func Test_checkPointManager_keyMatch(t *testing.T) {
 		if got := CheckPointManager.keyMatch([]byte("texst_1^xxx")); got {
 			t.Errorf("checkPointManager.Test_checkPointManager_keyMatch()")
 		}
+		LogtailConfigLock.Lock()
 		delete(LogtailConfig, "test_1/1")
 		delete(LogtailConfig, "test_2/1")
+		LogtailConfigLock.Unlock()
 	})
 }

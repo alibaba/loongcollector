@@ -33,6 +33,9 @@ target_link_libraries(processor_instance_unittest ${UT_BASE_TARGET})
 add_executable(flusher_instance_unittest FlusherInstanceUnittest.cpp)
 target_link_libraries(flusher_instance_unittest ${UT_BASE_TARGET})
 
+add_executable(flusher_unittest FlusherUnittest.cpp)
+target_link_libraries(flusher_unittest ${UT_BASE_TARGET})
+
 add_executable(plugin_registry_unittest PluginRegistryUnittest.cpp)
 target_link_libraries(plugin_registry_unittest ${UT_BASE_TARGET})
 
@@ -42,5 +45,7 @@ gtest_discover_tests(static_processor_creator_unittest)
 gtest_discover_tests(static_flusher_creator_unittest)
 gtest_discover_tests(input_instance_unittest)
 gtest_discover_tests(processor_instance_unittest)
+gtest_discover_tests(flusher_instance_unittest)
+gtest_discover_tests(flusher_unittest)
 gtest_discover_tests(plugin_registry_unittest)
 

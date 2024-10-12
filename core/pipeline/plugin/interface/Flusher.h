@@ -50,6 +50,7 @@ protected:
     void GenerateQueueKey(const std::string& target);
     bool PushToQueue(std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
     void DealSenderQueueItemAfterSend(SenderQueueItem* item, bool keep);
+    void SetPipelineForItemsWhenStop();
 
     QueueKey mQueueKey;
     std::string mPluginID;
@@ -57,6 +58,7 @@ protected:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherInstanceUnittest;
     friend class FlusherRunnerUnittest;
+    friend class FlusherUnittest;
 #endif
 };
 

@@ -35,6 +35,7 @@ func (r *InputStatistics) Description() string {
 }
 
 func (r *InputStatistics) Collect(collector pipeline.Collector) error {
+	LogtailConfigLock.RLock()
 	for _, config := range LogtailConfig {
 		log := &protocol.Log{}
 		metricRecord := config.Context.GetLogstoreConfigMetricRecord()
@@ -62,6 +63,7 @@ func (r *InputStatistics) Collect(collector pipeline.Collector) error {
 			logger.Debug(r.context.GetRuntimeContext(), "statistics", *log)
 		}
 	}
+	LogtailConfigLock.RUnlock()
 	return nil
 }
 

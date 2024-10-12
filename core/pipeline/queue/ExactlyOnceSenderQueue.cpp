@@ -78,7 +78,7 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
         }
         if (!eo->IsComplete()) {
             item->mEnqueTime = chrono::system_clock::now();
-            mExtraBuffer.push(std::move(item));
+            mExtraBuffer.push_back(std::move(item));
             return true;
         }
     }
@@ -102,7 +102,7 @@ bool ExactlyOnceSenderQueue::Remove(SenderQueueItem* item) {
 
     if (!mExtraBuffer.empty()) {
         Push(std::move(mExtraBuffer.front()));
-        mExtraBuffer.pop();
+        mExtraBuffer.pop_front();
         return true;
     }
     if (ChangeStateIfNeededAfterPop()) {
@@ -151,6 +151,25 @@ void ExactlyOnceSenderQueue::Reset(const vector<RangeCheckpointPtr>& checkpoints
     mQueue.clear();
     mWrite = mSize = 0;
     mRangeCheckpoints = checkpoints;
+}
+
+void ExactlyOnceSenderQueue::SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const {
+    if (Empty()) {
+        return;
+    }
+    for (size_t index = 0; index < mCapacity; ++index) {
+        if (!mQueue[index]) {
+            continue;
+        }
+        if (!mQueue[index]->mPipeline) {
+            mQueue[index]->mPipeline = p;
+        }
+    }
+    for (auto& item : mExtraBuffer) {
+        if (!item->mPipeline) {
+            item->mPipeline = p;
+        }
+    }
 }
 
 } // namespace logtail

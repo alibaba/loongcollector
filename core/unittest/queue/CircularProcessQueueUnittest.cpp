@@ -194,7 +194,8 @@ void CircularProcessQueueUnittest::TestSetPipeline() {
 
     mQueue->Push(std::move(item1));
     mQueue->Push(std::move(item2));
-    mQueue->SetPipelineForItems("test_config");
+    auto p = PipelineManager::GetInstance()->FindConfigByName("test_config");
+    mQueue->SetPipelineForItems(p);
 
     APSARA_TEST_EQUAL(pipelineTmp, p1->mPipeline);
     APSARA_TEST_EQUAL(pipeline, p2->mPipeline);

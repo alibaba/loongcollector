@@ -142,6 +142,10 @@ func (p *pluginv2Runner) RunPlugins(category pluginCategory, control *pipeline.A
 	}
 }
 
+func (p *pluginv2Runner) IsWithInputPlugin() bool {
+	return len(p.MetricPlugins) > 0 || len(p.ServicePlugins) > 0
+}
+
 func (p *pluginv2Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input pipeline.MetricInputV2, inputInterval int) error {
 	var wrapper MetricWrapperV2
 	wrapper.Config = p.LogstoreConfig
@@ -324,19 +328,10 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 			if len(pipeChan) == 0 {
 				return
 			}
-		case <-p.LogstoreConfig.pauseChan:
-			p.LogstoreConfig.waitForResume()
 
 		case event := <-pipeChan:
 			if event == nil {
 				continue
-			}
-
-			// Check pause status if config is still alive, if paused, wait for resume.
-			select {
-			case <-p.LogstoreConfig.pauseChan:
-				p.LogstoreConfig.waitForResume()
-			default:
 			}
 
 			dataSize := len(pipeChan) + 1
@@ -382,7 +377,7 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 					}
 					break
 				}
-				if !p.LogstoreConfig.FlushOutFlag {
+				if !p.LogstoreConfig.FlushOutFlag.Load() {
 					time.Sleep(time.Duration(10) * time.Millisecond)
 					continue
 				}
@@ -412,7 +407,7 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	p.AggregateControl.WaitCancel()
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "aggregator plugins stop", "done")
 
-	p.LogstoreConfig.FlushOutFlag = true
+	p.LogstoreConfig.FlushOutFlag.Store(true)
 	p.FlushControl.WaitCancel()
 
 	if exit && p.FlushOutStore.Len() > 0 {

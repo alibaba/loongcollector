@@ -60,6 +60,7 @@ bool CircularProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
         return false;
     }
     item = std::move(mQueue.front());
+    item->AddPipelineInProcessCnt(GetConfigName());
     mQueue.pop_front();
     mEventCnt -= item->mEventGroup.GetEvents().size();
 
@@ -72,8 +73,7 @@ bool CircularProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     return true;
 }
 
-void CircularProcessQueue::SetPipelineForItems(const std::string& name) const {
-    auto p = PipelineManager::GetInstance()->FindConfigByName(name);
+void CircularProcessQueue::SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const {
     for (auto& item : mQueue) {
         if (!item->mPipeline) {
             item->mPipeline = p;

@@ -29,8 +29,21 @@ bool Flusher::Start() {
 }
 
 bool Flusher::Stop(bool isPipelineRemoving) {
+    // TODO: temporarily used here
+    SetPipelineForItemsWhenStop();
     SenderQueueManager::GetInstance()->DeleteQueue(mQueueKey);
     return true;
+}
+
+void Flusher::SetPipelineForItemsWhenStop() {
+    if (HasContext()) {
+        const auto& pipeline = PipelineManager::GetInstance()->FindConfigByName(mContext->GetConfigName());
+        if (!pipeline) {
+            LOG_ERROR(sLogger, ("failed to get pipeline context", "context not found")("action", "not set pipeline"));
+            return;
+        }
+        SenderQueueManager::GetInstance()->SetPipelineForItems(mQueueKey, pipeline);
+    }
 }
 
 void Flusher::GenerateQueueKey(const std::string& target) {
@@ -39,18 +52,6 @@ void Flusher::GenerateQueueKey(const std::string& target) {
 }
 
 bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes) {
-#ifndef APSARA_UNIT_TEST_MAIN
-    // TODO: temporarily set here, should be removed after independent config update refactor
-    if (item->mFlusher->HasContext()) {
-        item->mPipeline
-            = PipelineManager::GetInstance()->FindConfigByName(item->mFlusher->GetContext().GetConfigName());
-        if (!item->mPipeline) {
-            // should not happen
-            return false;
-        }
-    }
-#endif
-
     const string& str = QueueKeyManager::GetInstance()->GetName(item->mQueueKey);
     for (size_t i = 0; i < retryTimes; ++i) {
         int rst = SenderQueueManager::GetInstance()->PushQueue(item->mQueueKey, std::move(item));

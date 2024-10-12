@@ -49,24 +49,34 @@ func GetTestConfig(configName string) string {
 }
 
 func LoadDefaultConfig() *pluginmanager.LogstoreConfig {
-	return LoadMockConfig("project", "logstore", "configName", GetTestConfig("config"))
+	return LoadAndStartMockConfig("project", "logstore", "configName", GetTestConfig("config"))
 }
 
 // project, logstore, config, jsonStr
-func LoadMockConfig(project, logstore, configName, jsonStr string) *pluginmanager.LogstoreConfig {
+func LoadAndStartMockConfig(project, logstore, configName, jsonStr string) *pluginmanager.LogstoreConfig {
 	err := pluginmanager.LoadLogstoreConfig(project, logstore, configName, 666, jsonStr)
 	if err != nil {
 		panic(err)
 	}
-	return pluginmanager.LogtailConfig[configName]
+	if err := pluginmanager.Start(configName); err != nil {
+		panic(err)
+	}
+	object := pluginmanager.LogtailConfig[configName]
+	return object
 }
 
 func PluginStart() error {
-	return pluginmanager.Resume()
+	return pluginmanager.Start("")
 }
 
-func PluginStop(forceFlushFlag bool) error {
-	return pluginmanager.HoldOn(true)
+func PluginStop() error {
+	if err := pluginmanager.StopAllPipelines(true); err != nil {
+		return err
+	}
+	if err := pluginmanager.StopAllPipelines(false); err != nil {
+		return err
+	}
+	return nil
 }
 
 func CreateLogs(kvs ...string) *protocol.Log {

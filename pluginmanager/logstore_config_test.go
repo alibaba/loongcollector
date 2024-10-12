@@ -48,7 +48,9 @@ type logstoreConfigTestSuite struct {
 
 func (s *logstoreConfigTestSuite) BeforeTest(suiteName, testName string) {
 	logger.Infof(context.Background(), "========== %s %s test start ========================", suiteName, testName)
+	LogtailConfigLock.Lock()
 	LogtailConfig = make(map[string]*LogstoreConfig)
+	LogtailConfigLock.Unlock()
 }
 
 func (s *logstoreConfigTestSuite) AfterTest(suiteName, testName string) {
@@ -97,7 +99,7 @@ func (s *logstoreConfigTestSuite) TestPluginGlobalConfig() {
 			}
 		]
 	}`
-	s.NoError(LoadMockConfig("project", "logstore", "1", str), "load config fail")
+	s.NoError(LoadAndStartMockConfig("project", "logstore", "1", str), "load config fail")
 	s.Equal(len(LogtailConfig), 1)
 	s.Equal(LogtailConfig["1"].ConfigName, "1")
 	config := LogtailConfig["1"]
@@ -120,9 +122,9 @@ func (s *logstoreConfigTestSuite) TestPluginGlobalConfig() {
 }
 
 func (s *logstoreConfigTestSuite) TestLoadConfig() {
-	s.NoError(LoadMockConfig("project", "logstore", "1"))
-	s.NoError(LoadMockConfig("project", "logstore", "3"))
-	s.NoError(LoadMockConfig("project", "logstore", "2"))
+	s.NoError(LoadAndStartMockConfig("project", "logstore", "1"))
+	s.NoError(LoadAndStartMockConfig("project", "logstore", "3"))
+	s.NoError(LoadAndStartMockConfig("project", "logstore", "2"))
 	s.Equal(len(LogtailConfig), 3)
 	s.Equal(LogtailConfig["1"].ConfigName, "1")
 	s.Equal(LogtailConfig["2"].ConfigName, "2")
@@ -240,7 +242,7 @@ func (s *logstoreConfigTestSuite) TestLoadConfigWithExtension() {
 	}
 `
 
-	s.NoError(LoadMockConfig("project", "logstore", "test", jsonStr))
+	s.NoError(LoadAndStartMockConfig("project", "logstore", "test", jsonStr))
 	s.Equal(len(LogtailConfig), 1)
 	config := LogtailConfig["test"]
 	s.Equal(config.ProjectName, "project")
@@ -327,7 +329,7 @@ func (s *logstoreConfigTestSuite) TestGetExtension() {
 	}
 `
 
-	s.NoError(LoadMockConfig("project", "logstore", "test", jsonStr))
+	s.NoError(LoadAndStartMockConfig("project", "logstore", "test", jsonStr))
 	s.Equal(len(LogtailConfig), 1)
 	config := LogtailConfig["test"]
 	s.Equal(config.ProjectName, "project")

@@ -132,12 +132,12 @@ struct K8sContainerMeta {
 
 // Methods export by plugin.
 typedef GoInt (*LoadGlobalConfigFun)(GoString);
-typedef GoInt (*LoadConfigFun)(GoString p, GoString l, GoString c, GoInt64 k, GoString p2);
-typedef GoInt (*UnloadConfigFun)(GoString p, GoString l, GoString c);
-typedef GoInt (*ProcessRawLogFun)(GoString c, GoSlice l, GoString p, GoString t);
-typedef GoInt (*ProcessRawLogV2Fun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
-typedef void (*HoldOnFun)(GoInt);
-typedef void (*ResumeFun)();
+typedef GoInt (*LoadPipelineFun)(GoString p, GoString l, GoString c, GoInt64 k, GoString p2);
+typedef GoInt (*UnloadPipelineFun)(GoString c);
+typedef void (*StopAllPipelinesFun)(GoInt);
+typedef void (*StopFun)(GoString, GoInt);
+typedef void (*StopBuiltInModulesFun)();
+typedef void (*StartFun)(GoString);
 typedef GoInt (*InitPluginBaseFun)();
 typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
 typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
@@ -207,28 +207,19 @@ public:
     }
 
     bool LoadPluginBase();
-    // void LoadConfig();
     bool LoadPipeline(const std::string& pipelineName,
                       const std::string& pipeline,
                       const std::string& project = "",
                       const std::string& logstore = "",
                       const std::string& region = "",
                       logtail::QueueKey logstoreKey = 0);
-    void HoldOn(bool exitFlag);
-    void Resume();
+    bool UnloadPipeline(const std::string& pipelineName);
+    void StopAllPipelines(bool withInputFlag);
+    void Stop(const std::string& configName, bool removingFlag);
+    void StopBuiltInModules();
+    void Start(const std::string& configName);
 
     bool IsPluginOpened() { return mPluginValid; }
-
-    // void ProcessRawLog(const std::string& configName,
-    //                    logtail::StringView rawLog,
-    //                    const std::string& packId,
-    //                    const std::string& topic);
-
-    // void ProcessRawLogV2(const std::string& configName,
-    //                      logtail::StringView rawLog,
-    //                      const std::string& packId,
-    //                      const std::string& topic,
-    //                      const std::string& tags);
 
     void ProcessLog(const std::string& configName,
                     sls_logs::Log& log,
@@ -271,12 +262,12 @@ private:
     void* mPluginAdapterPtr;
 
     LoadGlobalConfigFun mLoadGlobalConfigFun;
-    LoadConfigFun mLoadConfigFun;
-    UnloadConfigFun mUnloadConfigFun;
-    HoldOnFun mHoldOnFun;
-    ResumeFun mResumeFun;
-    ProcessRawLogFun mProcessRawLogFun;
-    ProcessRawLogV2Fun mProcessRawLogV2Fun;
+    LoadPipelineFun mLoadPipelineFun;
+    UnloadPipelineFun mUnloadPipelineFun;
+    StopAllPipelinesFun mStopAllPipelinesFun;
+    StopFun mStopFun;
+    StopBuiltInModulesFun mStopBuiltInModulesFun;
+    StartFun mStartFun;
     volatile bool mPluginValid;
     logtail::FlusherSLS mPluginAlarmConfig;
     logtail::FlusherSLS mPluginProfileConfig;

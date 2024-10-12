@@ -59,4 +59,6 @@ type PluginRunner interface {
 	Merge(p PluginRunner)
 
 	Stop(exit bool) error
+
+	IsWithInputPlugin() bool
 }

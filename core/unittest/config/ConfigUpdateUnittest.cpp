@@ -207,7 +207,6 @@ void ConfigUpdateUnittest::OnStartUp() const {
     APSARA_TEST_EQUAL(2U, diff.mAdded.size());
     APSARA_TEST_TRUE(diff.mModified.empty());
     APSARA_TEST_TRUE(diff.mRemoved.empty());
-    APSARA_TEST_TRUE(diff.mUnchanged.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
@@ -223,7 +222,6 @@ void ConfigUpdateUnittest::OnConfigDelete() const {
     APSARA_TEST_TRUE(diff.mAdded.empty());
     APSARA_TEST_TRUE(diff.mModified.empty());
     APSARA_TEST_EQUAL(1U, diff.mRemoved.size());
-    APSARA_TEST_TRUE(diff.mUnchanged.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
     APSARA_TEST_TRUE(PipelineManagerMock::GetInstance()->GetAllConfigNames().empty());
@@ -254,7 +252,6 @@ void ConfigUpdateUnittest::OnConfigToInvalidDetail() const {
     APSARA_TEST_EQUAL(3U, diff.mAdded.size());
     APSARA_TEST_EQUAL(1U, diff.mModified.size());
     APSARA_TEST_TRUE(diff.mRemoved.empty());
-    APSARA_TEST_TRUE(diff.mUnchanged.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
@@ -273,7 +270,6 @@ void ConfigUpdateUnittest::OnConfigToEnabledValid() const {
     APSARA_TEST_EQUAL(3U, diff.mAdded.size());
     APSARA_TEST_EQUAL(1U, diff.mModified.size());
     APSARA_TEST_TRUE(diff.mRemoved.empty());
-    APSARA_TEST_TRUE(diff.mUnchanged.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
     APSARA_TEST_EQUAL(4U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
@@ -292,7 +288,6 @@ void ConfigUpdateUnittest::OnConfigToDisabledValid() const {
     APSARA_TEST_TRUE(diff.mAdded.empty());
     APSARA_TEST_TRUE(diff.mModified.empty());
     APSARA_TEST_EQUAL(1U, diff.mRemoved.size());
-    APSARA_TEST_TRUE(diff.mUnchanged.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
     APSARA_TEST_TRUE(PipelineManagerMock::GetInstance()->GetAllConfigNames().empty());
@@ -316,7 +311,6 @@ void ConfigUpdateUnittest::OnConfigUnchanged() const {
     APSARA_TEST_EQUAL(1U, diff.mAdded.size());
     APSARA_TEST_TRUE(diff.mModified.empty());
     APSARA_TEST_TRUE(diff.mRemoved.empty());
-    APSARA_TEST_EQUAL(1U, diff.mUnchanged.size());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
@@ -347,7 +341,6 @@ void ConfigUpdateUnittest::OnConfigAdded() const {
     APSARA_TEST_EQUAL(2U, diff.mAdded.size());
     APSARA_TEST_TRUE(diff.mModified.empty());
     APSARA_TEST_TRUE(diff.mRemoved.empty());
-    APSARA_TEST_EQUAL(1U, diff.mUnchanged.size());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
     APSARA_TEST_EQUAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());

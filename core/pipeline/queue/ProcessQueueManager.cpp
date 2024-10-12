@@ -237,7 +237,10 @@ void ProcessQueueManager::DisablePop(const string& configName, bool isPipelineRe
         if (iter != mQueues.end()) {
             (*iter->second.first)->DisablePop();
             if (!isPipelineRemoving) {
-                (*iter->second.first)->SetPipelineForItems(configName);
+                const auto& p = PipelineManager::GetInstance()->FindConfigByName(configName);
+                if (p) {
+                    (*iter->second.first)->SetPipelineForItems(p);
+                }
             }
         }
     } else {
