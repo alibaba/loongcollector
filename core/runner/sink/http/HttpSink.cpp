@@ -39,10 +39,10 @@ bool HttpSink::Init() {
                                                          {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK}});
     mInItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_ITEMS_TOTAL);
     mLastRunTime = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
-    mOutSuccessfulItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HTTP_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL);
-    mOutFailedItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HTTP_SINK_OUT_FAILED_ITEMS_TOTAL);
-    mSendingItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_HTTP_SINK_SENDING_ITEMS_TOTAL);
-    mSendConcurrency = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_HTTP_SINK_SEND_CONCURRENCY);
+    mOutSuccessfulItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL);
+    mOutFailedItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL);
+    mSendingItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_SINK_SENDING_ITEMS_TOTAL);
+    mSendConcurrency = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_SINK_SEND_CONCURRENCY);
 
     // TODO: should be dynamic
     mSendConcurrency->Set(AppConfig::GetInstance()->GetSendRequestConcurrency());
@@ -107,7 +107,7 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
                                    AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface());
     if (curl == nullptr) {
-        request->mItem->mStatus = SendingStatus::IDLE;
+        request->mItem->mStatus.Set(SendingStatus::IDLE);
         FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
         mOutFailedItemsTotal->Add(1);
         LOG_ERROR(sLogger,
@@ -123,7 +123,7 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
 
     auto res = curl_multi_add_handle(mClient, curl);
     if (res != CURLM_OK) {
-        request->mItem->mStatus = SendingStatus::IDLE;
+        request->mItem->mStatus.Set(SendingStatus::IDLE);
         FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
         curl_easy_cleanup(curl);
         mOutFailedItemsTotal->Add(1);

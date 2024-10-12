@@ -57,7 +57,7 @@ void FlusherUnittest::TestStop() const {
     }
 
     std::vector<SenderQueueItem*> items1;
-    q->GetAllAvailableItems(items1, false);
+    q->GetAvailableItems(items1, -1);
     for (auto item : items1) {
         APSARA_TEST_EQUAL(item->mPipeline, nullptr);
     }
@@ -69,7 +69,7 @@ void FlusherUnittest::TestStop() const {
     mock->Stop(false);
 
     std::vector<SenderQueueItem*> items2;
-    q->GetAllAvailableItems(items2, false);
+    q->GetAvailableItems(items2, -1);
     for (auto item : items2) {
         APSARA_TEST_EQUAL(item->mPipeline, pipeline);
     }

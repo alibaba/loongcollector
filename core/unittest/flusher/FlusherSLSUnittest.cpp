@@ -125,7 +125,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     auto que = SenderQueueManager::GetInstance()->GetQueue(flusher->GetQueueKey());
     APSARA_TEST_NOT_EQUAL(nullptr, que);
     APSARA_TEST_FALSE(que->GetRateLimiter().has_value());
-    APSARA_TEST_EQUAL(2U, que->GetConcurrencyLimiters().size());
+    APSARA_TEST_EQUAL(3U, que->GetConcurrencyLimiters().size());
 
     // valid optional param
     configStr = R"(
@@ -467,6 +467,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     Json::Value configJson, optionalGoPipeline;
     FlusherSLS flusher1;
     flusher1.SetContext(ctx1);
+    flusher1.SetMetricsRecordRef(FlusherSLS::sName, "1");
     string configStr, errorMsg;
 
     configStr = R"(
@@ -490,6 +491,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
         ctx2.SetConfigName("test_config_2");
         FlusherSLS flusher2;
         flusher2.SetContext(ctx2);
+        flusher2.SetMetricsRecordRef(FlusherSLS::sName, "1");
         configStr = R"(
             {
                 "Type": "flusher_sls",
@@ -523,6 +525,7 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
         ctx2.SetConfigName("test_config_1");
         FlusherSLS flusher2;
         flusher2.SetContext(ctx2);
+        flusher2.SetMetricsRecordRef(FlusherSLS::sName, "1");
         configStr = R"(
             {
                 "Type": "flusher_sls",
@@ -568,6 +571,7 @@ void FlusherSLSUnittest::TestSend() {
         ctx.SetConfigName("test_config");
         ctx.SetExactlyOnceFlag(true);
         flusher.SetContext(ctx);
+        flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
         flusher.Init(configJson, optionalGoPipeline);
 
         // create exactly once queue
@@ -605,7 +609,7 @@ void FlusherSLSUnittest::TestSend() {
 
             APSARA_TEST_TRUE(flusher.Send(std::move(group)));
             vector<SenderQueueItem*> res;
-            ExactlyOnceQueueManager::GetInstance()->GetAllAvailableSenderQueueItems(res);
+            ExactlyOnceQueueManager::GetInstance()->GetAvailableSenderQueueItems(res, 80);
             APSARA_TEST_EQUAL(1U, res.size());
             auto item = static_cast<SLSSenderQueueItem*>(res[0]);
             APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
@@ -659,7 +663,7 @@ void FlusherSLSUnittest::TestSend() {
 
             APSARA_TEST_TRUE(flusher.Send(std::move(group)));
             vector<SenderQueueItem*> res;
-            ExactlyOnceQueueManager::GetInstance()->GetAllAvailableSenderQueueItems(res);
+            ExactlyOnceQueueManager::GetInstance()->GetAvailableSenderQueueItems(res, 80);
             APSARA_TEST_EQUAL(1U, res.size());
             auto item = static_cast<SLSSenderQueueItem*>(res[0]);
             APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
@@ -714,13 +718,14 @@ void FlusherSLSUnittest::TestSend() {
         ParseJsonTable(configStr, configJson, errorMsg);
         FlusherSLS flusher;
         flusher.SetContext(ctx);
+        flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
         flusher.Init(configJson, optionalGoPipeline);
         {
             // empty group
             PipelineEventGroup group(make_shared<SourceBuffer>());
             APSARA_TEST_TRUE(flusher.Send(std::move(group)));
             vector<SenderQueueItem*> res;
-            SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+            SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
             APSARA_TEST_TRUE(res.empty());
         }
         {
@@ -739,7 +744,7 @@ void FlusherSLSUnittest::TestSend() {
 
             APSARA_TEST_TRUE(flusher.Send(std::move(group)));
             vector<SenderQueueItem*> res;
-            SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+            SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
             APSARA_TEST_EQUAL(1U, res.size());
             auto item = static_cast<SLSSenderQueueItem*>(res[0]);
             APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP, item->mType);
@@ -805,6 +810,7 @@ void FlusherSLSUnittest::TestSend() {
         ParseJsonTable(configStr, configJson, errorMsg);
         FlusherSLS flusher;
         flusher.SetContext(ctx);
+        flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
         flusher.Init(configJson, optionalGoPipeline);
 
         PipelineEventGroup group(make_shared<SourceBuffer>());
@@ -833,7 +839,7 @@ void FlusherSLSUnittest::TestSend() {
 
         APSARA_TEST_TRUE(flusher.Send(std::move(group)));
         vector<SenderQueueItem*> res;
-        SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+        SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
         APSARA_TEST_EQUAL(1U, res.size());
         auto item = static_cast<SLSSenderQueueItem*>(res[0]);
         APSARA_TEST_EQUAL(RawDataType::EVENT_GROUP_LIST, item->mType);
@@ -882,7 +888,7 @@ void FlusherSLSUnittest::TestSend() {
         SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
         flusher.FlushAll();
         res.clear();
-        SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+        SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
         for (auto& tmp : res) {
             SenderQueueManager::GetInstance()->RemoveItem(tmp->mQueueKey, tmp);
         }
@@ -906,6 +912,7 @@ void FlusherSLSUnittest::TestFlush() {
     ParseJsonTable(configStr, configJson, errorMsg);
     FlusherSLS flusher;
     flusher.SetContext(ctx);
+    flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
     flusher.Init(configJson, optionalGoPipeline);
 
     PipelineEventGroup group(make_shared<SourceBuffer>());
@@ -925,11 +932,11 @@ void FlusherSLSUnittest::TestFlush() {
 
     flusher.Flush(batchKey);
     vector<SenderQueueItem*> res;
-    SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+    SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
     APSARA_TEST_EQUAL(0U, res.size());
 
     flusher.Flush(0);
-    SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+    SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
     APSARA_TEST_EQUAL(1U, res.size());
 }
 
@@ -949,6 +956,7 @@ void FlusherSLSUnittest::TestFlushAll() {
     ParseJsonTable(configStr, configJson, errorMsg);
     FlusherSLS flusher;
     flusher.SetContext(ctx);
+    flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
     flusher.Init(configJson, optionalGoPipeline);
 
     PipelineEventGroup group(make_shared<SourceBuffer>());
@@ -967,7 +975,7 @@ void FlusherSLSUnittest::TestFlushAll() {
 
     flusher.FlushAll();
     vector<SenderQueueItem*> res;
-    SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+    SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
     APSARA_TEST_EQUAL(1U, res.size());
 }
 
@@ -1000,12 +1008,13 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         ParseJsonTable(configStr, configJson, errorMsg);
         FlusherSLS flusher;
         flusher.SetContext(ctx);
+        flusher.SetMetricsRecordRef(FlusherSLS::sName, "1");
         flusher.Init(configJson, optionalGoPipeline);
         {
             APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));
 
             vector<SenderQueueItem*> res;
-            SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+            SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
 
             APSARA_TEST_EQUAL(1U, res.size());
             auto item = static_cast<SLSSenderQueueItem*>(res[0]);
@@ -1027,7 +1036,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
             APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", ""));
 
             vector<SenderQueueItem*> res;
-            SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+            SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
 
             APSARA_TEST_EQUAL(1U, res.size());
             auto item = static_cast<SLSSenderQueueItem*>(res[0]);
@@ -1049,7 +1058,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         APSARA_TEST_NOT_EQUAL(nullptr, SenderQueueManager::GetInstance()->GetQueue(key));
 
         vector<SenderQueueItem*> res;
-        SenderQueueManager::GetInstance()->GetAllAvailableItems(res);
+        SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
 
         APSARA_TEST_EQUAL(1U, res.size());
         auto item = static_cast<SLSSenderQueueItem*>(res[0]);
@@ -1077,6 +1086,7 @@ UNIT_TEST_CASE(FlusherSLSUnittest, TestFlush)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlushAll)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestAddPackId)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnGoPipelineSend)
+
 
 } // namespace logtail
 

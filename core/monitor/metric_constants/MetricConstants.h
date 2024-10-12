@@ -113,6 +113,19 @@ extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL;
 
+
+/**********************************************************
+ *   all flusher （所有发送插件通用指标）
+ **********************************************************/
+extern const std::string METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_UNAUTH_ERROR_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_PARAMS_ERROR_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_OTHER_ERROR_TOTAL;
+
 /**********************************************************
  *   processor_parse_apsara_native
  *   processor_parse_timestamp_native
@@ -138,9 +151,19 @@ extern const std::string METRIC_PLUGIN_UNMATCHED_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_PARSE_STDERR_TOTAL;
 extern const std::string METRIC_PLUGIN_PARSE_STDOUT_TOTAL;
 
+
+/**********************************************************
+ *   flusher_sls
+ **********************************************************/
+extern const std::string METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_SLS_PROJECT_QUOTA_ERROR_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_SLS_SEQUENCE_ID_ERROR_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPRIRED_ERROR_TOTAL;
+
 //////////////////////////////////////////////////////////////////////////
 // component
 //////////////////////////////////////////////////////////////////////////
+
 
 // label keys
 extern const std::string METRIC_LABEL_KEY_COMPONENT_NAME;
@@ -186,6 +209,14 @@ extern const std::string METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE;
 extern const std::string METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE_BYTES;
 extern const std::string METRIC_COMPONENT_QUEUE_DISCARDED_EVENTS_TOTAL;
 
+extern const std::string METRIC_COMPONENT_FETCH_TIMES_TOTAL;
+extern const std::string METRIC_COMPONENT_FETCHED_ITEMS_TOTAL;
+extern const std::string METRIC_COMPONENT_FETCH_REJECTED_BY_REGION_LIMITER_TIMES_TOTAL;
+extern const std::string METRIC_COMPONENT_FETCH_REJECTED_BY_PROJECT_LIMITER_TIMES_TOTAL;
+extern const std::string METRIC_COMPONENT_FETCH_REJECTED_BY_LOGSTORE_LIMITER_TIMES_TOTAL;
+extern const std::string METRIC_COMPONENT_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL;
+
+
 //////////////////////////////////////////////////////////////////////////
 // runner
 //////////////////////////////////////////////////////////////////////////
@@ -208,17 +239,14 @@ extern const std::string METRIC_RUNNER_IN_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_LAST_RUN_TIME;
 extern const std::string METRIC_RUNNER_OUT_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_TOTAL_DELAY_MS;
+extern const std::string METRIC_RUNNER_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL;
+extern const std::string METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL;
+extern const std::string METRIC_RUNNER_SINK_SENDING_ITEMS_TOTAL;
+extern const std::string METRIC_RUNNER_SINK_SEND_CONCURRENCY;
 extern const std::string METRIC_RUNNER_CLIENT_REGISTER_STATE;
 extern const std::string METRIC_RUNNER_CLIENT_REGISTER_RETRY_TOTAL;
 extern const std::string METRIC_RUNNER_JOB_NUM;
 
-/**********************************************************
- *   http sink
- **********************************************************/
-extern const std::string METRIC_RUNNER_HTTP_SINK_OUT_SUCCESSFUL_ITEMS_TOTAL;
-extern const std::string METRIC_RUNNER_HTTP_SINK_OUT_FAILED_ITEMS_TOTAL;
-extern const std::string METRIC_RUNNER_HTTP_SINK_SENDING_ITEMS_TOTAL;
-extern const std::string METRIC_RUNNER_HTTP_SINK_SEND_CONCURRENCY;
 
 /**********************************************************
  *   flusher runner

@@ -24,7 +24,9 @@ SenderQueue::SenderQueue(
     size_t cap, size_t low, size_t high, QueueKey key, const string& flusherId, const PipelineContext& ctx)
     : QueueInterface(key, cap, ctx), BoundedSenderQueueInterface(cap, low, high, key, flusherId, ctx) {
     mQueue.resize(cap);
-    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
+    mFetchedTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_FETCH_TIMES_TOTAL);
+    mFetchedItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_FETCHED_ITEMS_TOTAL);    
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);    
 }
 
 bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
@@ -65,6 +67,7 @@ bool SenderQueue::Remove(SenderQueueItem* item) {
     if (item == nullptr) {
         return false;
     }
+    
     size_t size = 0;
     chrono::system_clock::time_point enQueuTime;
     auto index = mRead;
@@ -106,37 +109,56 @@ bool SenderQueue::Remove(SenderQueueItem* item) {
     return true;
 }
 
-void SenderQueue::GetAllAvailableItems(vector<SenderQueueItem*>& items, bool withLimits) {
+
+void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t limit) {
+    mFetchedTimesCnt->Add(1);
     if (Empty()) {
         return;
     }
+    if (limit < 0) {
+        for (auto index = mRead; index < mWrite; ++index) {
+            SenderQueueItem* item = mQueue[index % mCapacity].get();
+            if (item == nullptr) {
+                continue;
+            }
+            if (item->mStatus.Get() == SendingStatus::IDLE) {
+                item->mStatus.Set(SendingStatus::SENDING);
+                items.emplace_back(item);
+            }
+        }
+        return;
+    } 
+
     for (auto index = mRead; index < mWrite; ++index) {
         SenderQueueItem* item = mQueue[index % mCapacity].get();
         if (item == nullptr) {
             continue;
         }
-        if (withLimits) {
-            if (mRateLimiter && !mRateLimiter->IsValidToPop()) {
+        if (limit == 0) {
+            return;
+        }
+        if (mRateLimiter && !mRateLimiter->IsValidToPop()) {
+            mRejectedByRateLimiterCnt->Add(1);
+            return;
+        }
+        for (auto& limiter : mConcurrencyLimiters) {
+            if (!limiter.first->IsValidToPop()) {
+                limiter.second->Add(1);
                 return;
             }
+        }
+        if (item->mStatus.Get() == SendingStatus::IDLE) {
+            mFetchedItemsCnt->Add(1);
+            --limit;
+            item->mStatus.Set(SendingStatus::SENDING);
+            items.emplace_back(item);
             for (auto& limiter : mConcurrencyLimiters) {
-                if (!limiter->IsValidToPop()) {
-                    return;
+                if (limiter.first != nullptr) {
+                    limiter.first->PostPop();
                 }
             }
-        }
-        if (item->mStatus == SendingStatus::IDLE) {
-            item->mStatus = SendingStatus::SENDING;
-            items.emplace_back(item);
-            if (withLimits) {
-                for (auto& limiter : mConcurrencyLimiters) {
-                    if (limiter != nullptr) {
-                        limiter->PostPop();
-                    }
-                }
-                if (mRateLimiter) {
-                    mRateLimiter->PostPop(item->mRawSize);
-                }
+            if (mRateLimiter) {
+                mRateLimiter->PostPop(item->mRawSize);
             }
         }
     }

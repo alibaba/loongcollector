@@ -20,6 +20,7 @@
 #include <optional>
 #include <queue>
 #include <vector>
+#include <unordered_map>
 
 #include "common/FeedbackInterface.h"
 #include "pipeline/limiter/ConcurrencyLimiter.h"
@@ -43,15 +44,18 @@ public:
     bool Pop(std::unique_ptr<SenderQueueItem>& item) override { return false; }
 
     virtual bool Remove(SenderQueueItem* item) = 0;
-    virtual void GetAllAvailableItems(std::vector<SenderQueueItem*>& items, bool withLimits = true) = 0;
+    
+    virtual void GetAvailableItems(std::vector<SenderQueueItem*>& items, int32_t limit) = 0;
 
+    void DecreaseSendingCnt();
+    void OnSendingSuccess();
     void SetRateLimiter(uint32_t maxRate);
-    void SetConcurrencyLimiters(std::vector<std::shared_ptr<ConcurrencyLimiter>>&& limiters);
+    void SetConcurrencyLimiters(std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap);
     virtual void SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     std::optional<RateLimiter>& GetRateLimiter() { return mRateLimiter; }
-    std::vector<std::shared_ptr<ConcurrencyLimiter>>& GetConcurrencyLimiters() { return mConcurrencyLimiters; }
+    std::vector<std::pair<std::shared_ptr<ConcurrencyLimiter>, CounterPtr>>& GetConcurrencyLimiters() { return mConcurrencyLimiters; }
 #endif
 
 protected:
@@ -61,12 +65,13 @@ protected:
     void Reset(size_t cap, size_t low, size_t high);
 
     std::optional<RateLimiter> mRateLimiter;
-    std::vector<std::shared_ptr<ConcurrencyLimiter>> mConcurrencyLimiters;
+    std::vector<std::pair<std::shared_ptr<ConcurrencyLimiter>, CounterPtr>> mConcurrencyLimiters;
 
     std::deque<std::unique_ptr<SenderQueueItem>> mExtraBuffer;
 
     IntGaugePtr mExtraBufferSize;
     IntGaugePtr mExtraBufferDataSizeBytes;
+    CounterPtr mRejectedByRateLimiterCnt;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherUnittest;

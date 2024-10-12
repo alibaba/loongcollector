@@ -24,25 +24,25 @@ class SenderQueueUnittest : public testing::Test {
 public:
     void TestPush();
     void TestRemove();
-    void TestGetAllAvailableItems();
+    void TestGetAvailableItems();
     void TestMetric();
 
 protected:
     static void SetUpTestCase() {
-        sConcurrencyLimiter = make_shared<ConcurrencyLimiter>();
+        sConcurrencyLimiter = make_shared<ConcurrencyLimiter>(80);
         sCtx.SetConfigName("test_config");
     }
 
     void SetUp() override {
         mQueue.reset(new SenderQueue(sCap, sLowWatermark, sHighWatermark, sKey, sFlusherId, sCtx));
-        mQueue->SetConcurrencyLimiters(vector<shared_ptr<ConcurrencyLimiter>>{sConcurrencyLimiter});
+        mQueue->SetConcurrencyLimiters({{"region", sConcurrencyLimiter}});
         mQueue->mRateLimiter = RateLimiter(100);
         mQueue->SetFeedback(&sFeedback);
     }
 
     void TearDown() override {
         sFeedback.Clear();
-        sConcurrencyLimiter->Reset();
+        sConcurrencyLimiter = make_shared<ConcurrencyLimiter>(80);
     }
 
 private:
@@ -117,7 +117,7 @@ void SenderQueueUnittest::TestRemove() {
     APSARA_TEST_FALSE(mQueue->Remove(items[0]));
 }
 
-void SenderQueueUnittest::TestGetAllAvailableItems() {
+void SenderQueueUnittest::TestGetAvailableItems() {
     vector<SenderQueueItem*> items;
     for (size_t i = 0; i <= sCap; ++i) {
         auto item = GenerateItem();
@@ -127,46 +127,49 @@ void SenderQueueUnittest::TestGetAllAvailableItems() {
     {
         // no limits
         vector<SenderQueueItem*> items;
-        mQueue->GetAllAvailableItems(items, false);
+        mQueue->GetAvailableItems(items, -1);
         APSARA_TEST_EQUAL(2U, items.size());
         for (auto& item : items) {
-            item->mStatus = SendingStatus::IDLE;
+            item->mStatus.Set(SendingStatus::IDLE);
         }
     }
     {
         // with limits, limited by concurrency limiter
         mQueue->mRateLimiter->mMaxSendBytesPerSecond = 100;
-        sConcurrencyLimiter->SetLimit(1);
+        sConcurrencyLimiter->SetCurrentLimit(1);
+        sConcurrencyLimiter->SetInSendingCount(0);
         vector<SenderQueueItem*> items;
-        mQueue->GetAllAvailableItems(items);
+        mQueue->GetAvailableItems(items, 80);
         APSARA_TEST_EQUAL(1U, items.size());
         APSARA_TEST_EQUAL(sDataSize, mQueue->mRateLimiter->mLastSecondTotalBytes);
-        APSARA_TEST_EQUAL(0, sConcurrencyLimiter->GetLimit());
+        APSARA_TEST_EQUAL(1, sConcurrencyLimiter->GetInSendingCount());
         for (auto& item : items) {
-            item->mStatus = SendingStatus::IDLE;
+            item->mStatus.Set(SendingStatus::IDLE);
         }
         mQueue->mRateLimiter->mLastSecondTotalBytes = 0;
     }
     {
         // with limits, limited by rate limiter
         mQueue->mRateLimiter->mMaxSendBytesPerSecond = 5;
-        sConcurrencyLimiter->SetLimit(3);
+        sConcurrencyLimiter->SetCurrentLimit(3);
+        sConcurrencyLimiter->SetInSendingCount(0);
         vector<SenderQueueItem*> items;
-        mQueue->GetAllAvailableItems(items);
+        mQueue->GetAvailableItems(items, 80);
         APSARA_TEST_EQUAL(1U, items.size());
         APSARA_TEST_EQUAL(sDataSize, mQueue->mRateLimiter->mLastSecondTotalBytes);
-        APSARA_TEST_EQUAL(2, sConcurrencyLimiter->GetLimit());
+        APSARA_TEST_EQUAL(1, sConcurrencyLimiter->GetInSendingCount());
         mQueue->mRateLimiter->mLastSecondTotalBytes = 0;
     }
     {
         // with limits, does not work
         mQueue->mRateLimiter->mMaxSendBytesPerSecond = 100;
-        sConcurrencyLimiter->SetLimit(3);
+        sConcurrencyLimiter->SetCurrentLimit(3);
+        sConcurrencyLimiter->SetInSendingCount(0);
         vector<SenderQueueItem*> items;
-        mQueue->GetAllAvailableItems(items);
+        mQueue->GetAvailableItems(items, 80);
         APSARA_TEST_EQUAL(1U, items.size());
         APSARA_TEST_EQUAL(sDataSize, mQueue->mRateLimiter->mLastSecondTotalBytes);
-        APSARA_TEST_EQUAL(2, sConcurrencyLimiter->GetLimit());
+        APSARA_TEST_EQUAL(1, sConcurrencyLimiter->GetInSendingCount());
     }
 }
 
@@ -224,7 +227,7 @@ unique_ptr<SenderQueueItem> SenderQueueUnittest::GenerateItem() {
 
 UNIT_TEST_CASE(SenderQueueUnittest, TestPush)
 UNIT_TEST_CASE(SenderQueueUnittest, TestRemove)
-UNIT_TEST_CASE(SenderQueueUnittest, TestGetAllAvailableItems)
+UNIT_TEST_CASE(SenderQueueUnittest, TestGetAvailableItems)
 UNIT_TEST_CASE(SenderQueueUnittest, TestMetric)
 
 } // namespace logtail

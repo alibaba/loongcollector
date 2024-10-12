@@ -27,6 +27,7 @@ BoundedSenderQueueInterface::BoundedSenderQueueInterface(
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_SENDER_QUEUE}});
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID, flusherId}});
     mExtraBufferSize = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE);
+    mRejectedByRateLimiterCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL);
     mExtraBufferDataSizeBytes = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE_BYTES);
 }
 
@@ -44,14 +45,30 @@ void BoundedSenderQueueInterface::SetRateLimiter(uint32_t maxRate) {
     }
 }
 
-void BoundedSenderQueueInterface::SetConcurrencyLimiters(std::vector<std::shared_ptr<ConcurrencyLimiter>>&& limiters) {
+void BoundedSenderQueueInterface::SetConcurrencyLimiters(std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap) {
     mConcurrencyLimiters.clear();
-    for (auto& item : limiters) {
-        if (item == nullptr) {
+    for (const auto& item : concurrencyLimitersMap) {
+        if (item.second == nullptr) {
             // should not happen
             continue;
         }
-        mConcurrencyLimiters.emplace_back(item);
+        mConcurrencyLimiters.emplace_back(item.second, mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName(item.first)));
+    }
+}
+
+void BoundedSenderQueueInterface::OnSendingSuccess() {
+    for (auto& limiter : mConcurrencyLimiters) {
+        if (limiter.first != nullptr) {
+            limiter.first->OnSuccess();
+        }
+    }
+}
+
+void BoundedSenderQueueInterface::DecreaseSendingCnt() {
+    for (auto& limiter : mConcurrencyLimiters) {
+        if (limiter.first != nullptr) {
+            limiter.first->OnSendDone();
+        }
     }
 }
 

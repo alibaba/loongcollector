@@ -31,7 +31,7 @@ SenderQueueManager::SenderQueueManager() : mQueueParam(INT32_FLAG(sender_queue_c
 bool SenderQueueManager::CreateQueue(QueueKey key,
                                      const string& flusherId,
                                      const PipelineContext& ctx,
-                                     vector<shared_ptr<ConcurrencyLimiter>>&& concurrencyLimiters,
+                                     std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap,
                                      uint32_t maxRate) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
@@ -45,7 +45,7 @@ bool SenderQueueManager::CreateQueue(QueueKey key,
                             ctx);
         iter = mQueues.find(key);
     }
-    iter->second.SetConcurrencyLimiters(std::move(concurrencyLimiters));
+    iter->second.SetConcurrencyLimiters(std::move(concurrencyLimitersMap));
     iter->second.SetRateLimiter(maxRate);
     return true;
 }
@@ -106,14 +106,33 @@ int SenderQueueManager::PushQueue(QueueKey key, unique_ptr<SenderQueueItem>&& it
     return 0;
 }
 
-void SenderQueueManager::GetAllAvailableItems(vector<SenderQueueItem*>& items, bool withLimits) {
+void SenderQueueManager::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t itemsCntLimit) {
     {
         lock_guard<mutex> lock(mQueueMux);
-        for (auto iter = mQueues.begin(); iter != mQueues.end(); ++iter) {
-            iter->second.GetAllAvailableItems(items, withLimits);
+        if (mQueues.empty()) {
+            return;
+        }
+        if (itemsCntLimit == -1) {
+            for (auto iter = mQueues.begin(); iter != mQueues.end(); ++iter) {         
+                iter->second.GetAvailableItems(items, -1);
+            }
+        } else {
+            int cntLimitPerQueue = std::max((int)(mQueueParam.GetCapacity() * 0.3), (int)(itemsCntLimit/mQueues.size()));
+            // must check index before moving iterator
+            mSenderQueueBeginIndex = mSenderQueueBeginIndex % mQueues.size();
+            // here we set sender queue begin index, let the sender order be different each time
+            auto beginIter = mQueues.begin();
+            std::advance(beginIter, mSenderQueueBeginIndex++);
+
+            for (auto iter = beginIter; iter != mQueues.end(); ++iter) {
+                iter->second.GetAvailableItems(items, cntLimitPerQueue);
+            }
+            for (auto iter = mQueues.begin(); iter != beginIter; ++iter) {        
+                iter->second.GetAvailableItems(items, cntLimitPerQueue);
+            }
         }
     }
-    ExactlyOnceQueueManager::GetInstance()->GetAllAvailableSenderQueueItems(items, withLimits);
+    ExactlyOnceQueueManager::GetInstance()->GetAvailableSenderQueueItems(items, itemsCntLimit);
 }
 
 bool SenderQueueManager::RemoveItem(QueueKey key, SenderQueueItem* item) {
@@ -125,6 +144,14 @@ bool SenderQueueManager::RemoveItem(QueueKey key, SenderQueueItem* item) {
         }
     }
     return ExactlyOnceQueueManager::GetInstance()->RemoveSenderQueueItem(key, item);
+}
+
+void SenderQueueManager::DecreaseConcurrencyLimiterInSendingCnt(QueueKey key) {
+    lock_guard<mutex> lock(mQueueMux);
+    auto iter = mQueues.find(key);
+    if (iter != mQueues.end()) {
+        iter->second.DecreaseSendingCnt();
+    }
 }
 
 bool SenderQueueManager::IsAllQueueEmpty() const {

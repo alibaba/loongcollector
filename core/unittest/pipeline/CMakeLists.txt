@@ -27,8 +27,13 @@ target_link_libraries(pipeline_manager_unittest ${UT_BASE_TARGET})
 add_executable(instance_config_manager_unittest InstanceConfigManagerUnittest.cpp)
 target_link_libraries(instance_config_manager_unittest ${UT_BASE_TARGET})
 
+add_executable(concurrency_limiter_unittest ConcurrencyLimiterUnittest.cpp)
+target_link_libraries(concurrency_limiter_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(global_config_unittest)
 gtest_discover_tests(pipeline_unittest)
 gtest_discover_tests(pipeline_manager_unittest)
 gtest_discover_tests(instance_config_manager_unittest)
+gtest_discover_tests(concurrency_limiter_unittest)
+

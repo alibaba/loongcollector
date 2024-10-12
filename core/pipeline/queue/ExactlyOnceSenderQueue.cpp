@@ -46,8 +46,9 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
         if (f->mMaxSendRate > 0) {
             mRateLimiter = RateLimiter(f->mMaxSendRate);
         }
-        mConcurrencyLimiters.emplace_back(FlusherSLS::GetRegionConcurrencyLimiter(f->mRegion));
-        mConcurrencyLimiters.emplace_back(FlusherSLS::GetProjectConcurrencyLimiter(f->mProject));
+        mConcurrencyLimiters.emplace_back(FlusherSLS::GetRegionConcurrencyLimiter(f->mRegion), mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("region")));
+        mConcurrencyLimiters.emplace_back(FlusherSLS::GetProjectConcurrencyLimiter(f->mProject), mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("project")));
+        mConcurrencyLimiters.emplace_back(FlusherSLS::GetLogstoreConcurrencyLimiter(f->mProject, f->mLogstore), mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("logstore")));
         mIsInitialised = true;
     }
 
@@ -111,36 +112,53 @@ bool ExactlyOnceSenderQueue::Remove(SenderQueueItem* item) {
     return true;
 }
 
-void ExactlyOnceSenderQueue::GetAllAvailableItems(vector<SenderQueueItem*>& items, bool withLimits) {
+
+void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t limit) {
     if (Empty()) {
         return;
+    }
+    if (limit < 0) {
+        for (size_t index = 0; index < mCapacity; ++index) {
+            SenderQueueItem* item = mQueue[index].get();
+            if (item == nullptr) {
+                continue;
+            }
+            if (item->mStatus.Get() == SendingStatus::IDLE) {
+                item->mStatus.Set(SendingStatus::SENDING);
+                items.emplace_back(item);
+                
+            }
+        }
     }
     for (size_t index = 0; index < mCapacity; ++index) {
         SenderQueueItem* item = mQueue[index].get();
         if (item == nullptr) {
             continue;
         }
-        if (withLimits) {
-            if (mRateLimiter && !mRateLimiter->IsValidToPop()) {
+        if (limit == 0) {
+            return;
+        }
+        if (mRateLimiter && !mRateLimiter->IsValidToPop()) {
+            return;
+        }
+        for (auto& limiter : mConcurrencyLimiters) {
+            if (!limiter.first->IsValidToPop()) {
                 return;
             }
-            for (auto& limiter : mConcurrencyLimiters) {
-                if (!limiter->IsValidToPop()) {
-                    return;
-                }
-            }
         }
-        if (item->mStatus == SendingStatus::IDLE) {
-            item->mStatus = SendingStatus::SENDING;
+        if (item->mStatus.Get() == SendingStatus::IDLE) {
+            --limit;
+            item->mStatus.Set(SendingStatus::SENDING);
             items.emplace_back(item);
-            if (withLimits) {
-                for (auto& limiter : mConcurrencyLimiters) {
-                    limiter->PostPop();
-                }
-                if (mRateLimiter) {
-                    mRateLimiter->PostPop(item->mRawSize);
+            for (auto& limiter : mConcurrencyLimiters) {
+                if (limiter.first != nullptr) {
+                    limiter.first->PostPop();
                 }
             }
+            if (mRateLimiter) {
+                mRateLimiter->PostPop(item->mRawSize);
+            }
+            
         }
     }
 }

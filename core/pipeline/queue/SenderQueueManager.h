@@ -49,16 +49,17 @@ public:
     bool CreateQueue(QueueKey key,
                      const std::string& flusherId,
                      const PipelineContext& ctx,
-                     std::vector<std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimiters
-                     = std::vector<std::shared_ptr<ConcurrencyLimiter>>(),
+                     std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap
+                     = std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>(),
                      uint32_t maxRate = 0);
     SenderQueue* GetQueue(QueueKey key);
     bool DeleteQueue(QueueKey key);
     bool ReuseQueue(QueueKey key);
     // 0: success, 1: queue is full, 2: queue not found
     int PushQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item);
-    void GetAllAvailableItems(std::vector<SenderQueueItem*>& items, bool withLimits = true);
+    void GetAvailableItems(std::vector<SenderQueueItem*>& items, int32_t itemsCntLimit);
     bool RemoveItem(QueueKey key, SenderQueueItem* item);
+    void DecreaseConcurrencyLimiterInSendingCnt(QueueKey key);
     bool IsAllQueueEmpty() const;
     void ClearUnusedQueues();
     void NotifyPipelineStop(QueueKey key, const std::string& configName);
@@ -92,6 +93,7 @@ private:
     mutable std::mutex mStateMux;
     mutable std::condition_variable mCond;
     bool mValidToPop = false;
+    size_t mSenderQueueBeginIndex = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderQueueManagerUnittest;

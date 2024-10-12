@@ -36,7 +36,7 @@ public:
 
     bool Push(std::unique_ptr<SenderQueueItem>&& item) override;
     bool Remove(SenderQueueItem* item) override;
-    void GetAllAvailableItems(std::vector<SenderQueueItem*>& items, bool withLimits = true) override;
+    void GetAvailableItems(std::vector<SenderQueueItem*>& items, int32_t limit) override;
     void SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const override;
 
     void Reset(const std::vector<RangeCheckpointPtr>& checkpoints);

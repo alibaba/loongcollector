@@ -93,4 +93,25 @@ const string METRIC_PLUGIN_UNMATCHED_EVENTS_TOTAL = "plugin_unmatched_events_tot
 const string METRIC_PLUGIN_PARSE_STDERR_TOTAL = "plugin_parse_stderr_total";
 const string METRIC_PLUGIN_PARSE_STDOUT_TOTAL = "plugin_parse_stdout_total";
 
+
+/**********************************************************
+ *   all flusher （所有发送插件通用指标）
+ **********************************************************/
+const string METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL = "plugin_flusher_send_total";
+const string METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL = "plugin_flusher_send_done_total";
+const string METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL = "plugin_flusher_success_total";
+const string METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL = "plugin_flusher_network_error_total";
+const string METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL = "plugin_flusher_server_error_total";
+const string METRIC_PLUGIN_FLUSHER_UNAUTH_ERROR_TOTAL = "plugin_flusher_unauth_error_total";
+const string METRIC_PLUGIN_FLUSHER_PARAMS_ERROR_TOTAL = "plugin_flusher_params_error_total";
+const string METRIC_PLUGIN_FLUSHER_OTHER_ERROR_TOTAL = "plugin_flusher_other_error_total";
+
+/**********************************************************
+ *   flusher_sls
+ **********************************************************/
+const string METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL = "plugin_flusher_sls_shard_write_quota_error_total";
+const string METRIC_PLUGIN_FLUSHER_SLS_PROJECT_QUOTA_ERROR_TOTAL = "plugin_flusher_sls_project_quota_error_total";
+const string METRIC_PLUGIN_FLUSHER_SLS_SEQUENCE_ID_ERROR_TOTAL = "plugin_flusher_sls_sequence_id_error_total";
+const string METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPRIRED_ERROR_TOTAL = "plugin_flusher_sls_request_exprired_error_total";
+
 } // namespace logtail

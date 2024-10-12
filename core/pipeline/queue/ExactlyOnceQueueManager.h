@@ -64,7 +64,7 @@ public:
 
     // 0: success, 1: queue is full, 2: queue not found
     int PushSenderQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item);
-    void GetAllAvailableSenderQueueItems(std::vector<SenderQueueItem*>& item, bool withLimits = true);
+    void GetAvailableSenderQueueItems(std::vector<SenderQueueItem*>& item, int32_t itemsCntLimit);
     bool RemoveSenderQueueItem(QueueKey key, SenderQueueItem* item);
     bool IsAllSenderQueueEmpty() const;
     void SetPipelineForSenderItems(QueueKey key, const std::shared_ptr<Pipeline>& p);

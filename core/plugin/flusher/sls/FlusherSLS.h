@@ -38,6 +38,7 @@ namespace logtail {
 class FlusherSLS : public HttpFlusher {
 public:
 
+    static std::shared_ptr<ConcurrencyLimiter> GetLogstoreConcurrencyLimiter(const std::string& project, const std::string& logstore);
     static std::shared_ptr<ConcurrencyLimiter> GetProjectConcurrencyLimiter(const std::string& project);
     static std::shared_ptr<ConcurrencyLimiter> GetRegionConcurrencyLimiter(const std::string& region);
     static void ClearInvalidConcurrencyLimiters();
@@ -98,6 +99,7 @@ private:
     static std::mutex sMux;
     static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sProjectConcurrencyLimiterMap;
     static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sRegionConcurrencyLimiterMap;
+    static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sLogstoreConcurrencyLimiterMap;
 
     static std::mutex sDefaultRegionLock;
     static std::string sDefaultRegion;
@@ -124,6 +126,19 @@ private:
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;
     std::unique_ptr<Serializer<std::vector<CompressedLogGroup>>> mGroupListSerializer;
+
+    CounterPtr mSendCnt;
+    CounterPtr mSendDoneCnt;
+    CounterPtr mSuccessCnt;
+    CounterPtr mNetworkErrorCnt;
+    CounterPtr mServerErrorCnt;
+    CounterPtr mShardWriteQuotaErrorCnt;
+    CounterPtr mProjectQuotaErrorCnt;
+    CounterPtr mUnauthErrorCnt;
+    CounterPtr mParamsErrorCnt;
+    CounterPtr mSequenceIDErrorCnt;
+    CounterPtr mRequestExpiredErrorCnt;
+    CounterPtr mOtherErrorCnt;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherSLSUnittest;
