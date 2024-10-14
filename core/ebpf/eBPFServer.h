@@ -33,6 +33,22 @@
 namespace logtail {
 namespace ebpf {
 
+class EnvManager {
+public:
+    void InitEnvInfo();
+    bool IsSupportedEnv(nami::PluginType type);
+    bool AbleToLoadDyLib();
+private:
+    volatile bool mInited = false;
+
+    std::atomic_bool mArchSupport = false;
+    std::atomic_bool mBTFSupport = false;
+    std::atomic_bool m310Support = false;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class eBPFServerUnittest;
+#endif
+};
+
 class eBPFServer : public InputRunner {
 public:
     eBPFServer(const eBPFServer&) = delete;
@@ -48,6 +64,7 @@ public:
     void Stop() override;
 
     std::string CheckLoadedPipelineName(nami::PluginType type);
+
     void UpdatePipelineName(nami::PluginType type, const std::string& name);
 
     bool EnablePlugin(const std::string& pipeline_name, uint32_t plugin_index,
@@ -60,6 +77,8 @@ public:
     bool SuspendPlugin(const std::string& pipeline_name, nami::PluginType type);
 
     bool HasRegisteredPlugins() const override;
+
+    bool IsSupportedEnv(nami::PluginType type);
 
 private:
     bool StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
@@ -85,6 +104,8 @@ private:
 
     eBPFAdminConfig mAdminConfig;
     volatile bool mInited = false;
+
+    EnvManager mEnvMgr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;

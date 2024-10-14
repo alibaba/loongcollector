@@ -18,6 +18,7 @@
 #include "ebpf/include/SysAkApi.h"
 #include "common/MachineInfoUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "app_config/AppConfig.h"
 
 #include <string>
 #include <filesystem>
@@ -62,8 +63,15 @@ SourceManager::~SourceManager() {
 void SourceManager::Init() {
   mHostIp = GetHostIp();
   mHostName = GetHostName();
-  mHostPathPrefix = STRING_FLAG(default_container_host_path);
-  // load ebpf lib
+
+  // read host path prefix
+  if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+    mHostPathPrefix = STRING_FLAG(default_container_host_path);
+    LOG_DEBUG(sLogger, ("running in container mode, would set host path prefix to ", mHostPathPrefix));
+  } else {
+    LOG_DEBUG(sLogger, ("running in host mode", "would not set host path prefix ..."));
+  }
+  
   mBinaryPath = GetProcessExecutionDir();
   mFullLibName = "lib" + m_lib_name_ + ".so";
   for (auto& x : mRunning) {

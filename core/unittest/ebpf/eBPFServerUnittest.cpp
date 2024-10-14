@@ -46,6 +46,8 @@ public:
 
     void TestInitAndStop();
 
+    void TestEnvManager();
+
 protected:
     void SetUp() override {
         config_ = new eBPFAdminConfig;
@@ -790,6 +792,42 @@ void eBPFServerUnittest::TestInitAndStop() {
     EXPECT_EQ(false, ret);
 }
 
+void eBPFServerUnittest::TestEnvManager() {
+    eBPFServer::GetInstance()->mEnvMgr.InitEnvInfo();
+
+    EXPECT_TRUE(eBPFServer::GetInstance()->mEnvMgr.mArchSupport);
+    // EXPECT_TRUE(eBPFServer::GetInstance()->mEnvMgr.mArchSupport);
+    // EXPECT_TRUE(eBPFServer::GetInstance()->mEnvMgr.mVersion > 0);
+    // EXPECT_TRUE(eBPFServer::GetInstance()->mEnvMgr.mRelease.size());
+    // EXPECT_TRUE(eBPFServer::GetInstance()->mEnvMgr.mOsVersion.size());
+
+    eBPFServer::GetInstance()->mEnvMgr.m310Support = false;
+    eBPFServer::GetInstance()->mEnvMgr.mArchSupport = false;
+    eBPFServer::GetInstance()->mEnvMgr.mBTFSupport = true;
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_OBSERVE), false);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_SECURITY), false);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::PROCESS_SECURITY), false);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::FILE_SECURITY), false);
+
+    eBPFServer::GetInstance()->mEnvMgr.m310Support = false;
+    eBPFServer::GetInstance()->mEnvMgr.mArchSupport = true;
+    eBPFServer::GetInstance()->mEnvMgr.mBTFSupport = true;
+
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_OBSERVE), true);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_SECURITY), true);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::PROCESS_SECURITY), true);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::FILE_SECURITY), true);
+
+    eBPFServer::GetInstance()->mEnvMgr.m310Support = true;
+    eBPFServer::GetInstance()->mEnvMgr.mArchSupport = true;
+    eBPFServer::GetInstance()->mEnvMgr.mBTFSupport = false;
+
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_OBSERVE), true);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_SECURITY), false);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::PROCESS_SECURITY), false);
+    EXPECT_EQ(eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::FILE_SECURITY), false);
+}
+
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV1);
@@ -800,6 +838,7 @@ UNIT_TEST_CASE(eBPFServerUnittest, TestEnableProcessPlugin)
 UNIT_TEST_CASE(eBPFServerUnittest, TestEnableNetworkSecurePlugin)
 UNIT_TEST_CASE(eBPFServerUnittest, TestEnableFileSecurePlugin)
 UNIT_TEST_CASE(eBPFServerUnittest, TestInitAndStop)
+UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager)
 }
 }
 

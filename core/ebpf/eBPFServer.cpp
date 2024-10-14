@@ -24,14 +24,126 @@
 #include "logger/Logger.h"
 #include "ebpf/include/export.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/MachineInfoUtil.h"
+
+DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
+                  "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
+                  4019000000);
 
 namespace logtail {
 namespace ebpf {
+
+static const uint16_t KERNEL_VERSION_310 = 3010; // for centos7
+static const std::string KERNEL_NAME_CENTOS = "CentOS";
+static const uint16_t KERNEL_CENTOS_MIN_VERSION = 7006;
+
+bool EnvManager::IsSupportedEnv(nami::PluginType type) {
+    if (!mInited) {
+        LOG_ERROR(sLogger, ("env manager not inited ...", ""));
+        return false;
+    }
+    bool status = false;
+    switch (type)
+    {
+    case nami::PluginType::NETWORK_OBSERVE:
+        status = mArchSupport && (mBTFSupport || m310Support);
+        break;
+    case nami::PluginType::FILE_SECURITY:
+    case nami::PluginType::NETWORK_SECURITY:
+    case nami::PluginType::PROCESS_SECURITY: {
+        status = mArchSupport && mBTFSupport;
+        break;
+    }
+    default:
+        status = false;
+    }
+    if (!status) {
+        LOG_WARNING(sLogger, ("runtime env not supported, plugin type: ", int(type)) 
+            ("arch support is ", mArchSupport) ("btf support is ", mBTFSupport) ("310 support is ", m310Support));
+    }
+    return status;
+}
+
+bool EnvManager::AbleToLoadDyLib() {
+    return mArchSupport;
+}
+
+void EnvManager::InitEnvInfo() {
+    if (mInited) return;
+    mInited = true;
+
+#ifdef _MSC_VER
+    LOG_WARNING(sLogger, ("MS", "not supported"));
+    mArchSupport = false;
+    return;
+#elif defined(__aarch64__)
+    LOG_WARNING(sLogger, ("aarch64", "not supported"));
+    mArchSupport = false;
+    return;
+#elif defined(__arm__)
+    LOG_WARNING(sLogger, ("arm", "not supported"));
+    mArchSupport = false;
+    return;
+#elif defined(__i386__)
+    LOG_WARNING(sLogger, ("i386", "not supported"));
+    mArchSupport = false;
+    return;
+#endif
+    mArchSupport = true;
+    std::string release;
+    int64_t version;
+    GetKernelInfo(release, version);
+    LOG_INFO(sLogger, ("ebpf kernel release", release) ("kernel version", version));
+    if (release.empty()) {
+        LOG_WARNING(sLogger, ("cannot find kernel release", ""));
+        mBTFSupport = false;
+        return;
+    }
+    if (version >= INT64_FLAG(kernel_min_version_for_ebpf)) {
+        mBTFSupport = true;
+        return;
+    }
+    if (version / 1000000 != KERNEL_VERSION_310) {
+        LOG_WARNING(sLogger, 
+            ("unsupported kernel version, will not start eBPF plugin ... version", version));
+        m310Support = false;
+        return;
+    }
+
+    std::string os;
+    int64_t osVersion;
+    if (GetRedHatReleaseInfo(os, osVersion, STRING_FLAG(default_container_host_path))
+        || GetRedHatReleaseInfo(os, osVersion)) {
+        if(os == KERNEL_NAME_CENTOS && osVersion >= KERNEL_CENTOS_MIN_VERSION) {
+            m310Support = true;
+            return;
+        } else {
+            LOG_WARNING(sLogger, 
+                ("unsupported os for 310 kernel, will not start eBPF plugin ...", "") 
+                ("os", os)("version", osVersion));
+            m310Support = false;
+            return;
+        }
+    }
+    LOG_WARNING(sLogger, 
+        ("not redhat release, will not start eBPF plugin ...", ""));
+    m310Support = false;
+    return;
+}
+
+bool eBPFServer::IsSupportedEnv(nami::PluginType type) {
+    return mEnvMgr.IsSupportedEnv(type);
+}
 
 void eBPFServer::Init() {
     if (mInited) {
         return;
     }
+    mEnvMgr.InitEnvInfo();
+    if (!mEnvMgr.AbleToLoadDyLib()) {
+        return;
+    }
+    mInited = true;
     mSourceManager = std::make_unique<SourceManager>();
     mSourceManager->Init();
     // ebpf config
@@ -49,7 +161,6 @@ void eBPFServer::Init() {
     mNetworkSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
     mProcessSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
     mFileSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
-    mInited = true;
 }
 
 void eBPFServer::Stop() {
@@ -79,7 +190,8 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
 
     std::string prev_pipeline_name = CheckLoadedPipelineName(type);
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
-        LOG_WARNING(sLogger, ("pipeline already loaded, plugin type", int(type))("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
+        LOG_WARNING(sLogger, ("pipeline already loaded, plugin type", int(type))
+            ("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
         return false;
     }
 
@@ -107,14 +219,17 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
         nami::NetworkObserveConfig nconfig;
         nami::ObserverNetworkOption* opts = std::get<nami::ObserverNetworkOption*>(options);
         if (opts->mEnableMetric) {
+            nconfig.enable_metric_ = true;
             nconfig.measure_cb_ = [this](auto events, auto ts) { return mMeterCB->handle(std::move(events), ts); };
             mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableSpan) {
+            nconfig.enable_span_ = true;
             nconfig.span_cb_ = [this](auto events) { return mSpanCB->handle(std::move(events)); };
             mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableLog) {
+            nconfig.enable_event_ = true;
             nconfig.event_cb_ = [this](auto events) { return mEventCB->handle(std::move(events)); };
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
@@ -167,16 +282,20 @@ bool eBPFServer::EnablePlugin(const std::string& pipeline_name, uint32_t plugin_
                         nami::PluginType type, 
                         const PipelineContext* ctx, 
                         const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options) {
-    Init();
+    if (!IsSupportedEnv(type)) {
+        return false;
+    }
     return StartPluginInternal(pipeline_name, plugin_index, type, ctx, options);
 }
 
 bool eBPFServer::DisablePlugin(const std::string& pipeline_name, nami::PluginType type) {
+    if (!IsSupportedEnv(type)) {
+        return true;
+    }
     std::string prev_pipeline = CheckLoadedPipelineName(type);
     if (prev_pipeline == pipeline_name) {
         UpdatePipelineName(type, "");
-    }
-    else {
+    } else {
         LOG_WARNING(sLogger, ("prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
         return true;
     }
@@ -198,6 +317,9 @@ void eBPFServer::UpdatePipelineName(nami::PluginType type, const std::string& na
 }
 
 bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, nami::PluginType type) {
+    if (!IsSupportedEnv(type)) {
+        return false;
+    }
     // mark plugin status is update
     bool ret = mSourceManager->SuspendPlugin(type);
     if (ret) UpdateCBContext(type, nullptr, -1, -1);

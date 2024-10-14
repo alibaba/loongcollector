@@ -26,6 +26,10 @@ namespace logtail {
 const std::string InputNetworkObserver::sName = "input_network_observer";
 
 bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+    ebpf::eBPFServer::GetInstance()->Init();
+    if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_OBSERVE)) {
+        return false;
+    }
     std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
