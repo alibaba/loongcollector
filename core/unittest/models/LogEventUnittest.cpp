@@ -30,6 +30,7 @@ public:
     void TestMeta();
     void TestSize();
     void TestFromJsonToJson();
+    void TestLevel();
 
 protected:
     void SetUp() override {
@@ -202,6 +203,11 @@ void LogEventUnittest::TestFromJsonToJson() {
     APSARA_TEST_STREQ(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
 }
 
+void LogEventUnittest::TestLevel() {
+    mLogEvent->SetLevel("level");
+    APSARA_TEST_EQUAL("level", mLogEvent->GetLevel().to_string());
+}
+
 UNIT_TEST_CASE(LogEventUnittest, TestTimestampOp)
 UNIT_TEST_CASE(LogEventUnittest, TestSetContent)
 UNIT_TEST_CASE(LogEventUnittest, TestDelContent)
@@ -210,6 +216,7 @@ UNIT_TEST_CASE(LogEventUnittest, TestIterateContent)
 UNIT_TEST_CASE(LogEventUnittest, TestMeta)
 UNIT_TEST_CASE(LogEventUnittest, TestSize)
 UNIT_TEST_CASE(LogEventUnittest, TestFromJsonToJson)
+UNIT_TEST_CASE(LogEventUnittest, TestLevel)
 
 } // namespace logtail
 

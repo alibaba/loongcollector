@@ -108,6 +108,7 @@ function generateCopyScript() {
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE
+      echo 'rm -rf core/protobuf/models && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/models core/protobuf/models' >>$COPY_SCRIPT_FILE
     fi
   else
     echo 'docker cp "$id":'${PATH_IN_DOCKER}'/'${OUT_DIR}'/libGoPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
@@ -116,6 +117,7 @@ function generateCopyScript() {
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE
+      echo 'rm -rf core/protobuf/models && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/models core/protobuf/models' >>$COPY_SCRIPT_FILE
     fi
   fi
   echo 'echo -e "{\n}" > $BINDIR/loongcollector_config.json' >>$COPY_SCRIPT_FILE

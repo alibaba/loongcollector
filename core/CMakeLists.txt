@@ -117,7 +117,7 @@ set(SUB_DIRECTORIES_LIST
         config config/watcher
         pipeline pipeline/batch pipeline/limiter pipeline/plugin pipeline/plugin/creator pipeline/plugin/instance pipeline/plugin/interface pipeline/queue pipeline/route pipeline/serializer
         runner runner/sink/http
-        protobuf/sls
+        protobuf/sls protobuf/models
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         prometheus prometheus/labels prometheus/schedulers prometheus/async
         ebpf ebpf/observer ebpf/security ebpf/handler
