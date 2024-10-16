@@ -20,7 +20,7 @@ ARG VERSION=0.0.1
 USER root
 WORKDIR /loongcollector
 
-RUN mkdir -p /loongcollector/conf
+RUN mkdir -p /loongcollector/conf/instance_config/local
 RUN mkdir -p /loongcollector/log
 RUN mkdir -p /loongcollector/data
 RUN mkdir -p /loongcollector/run
@@ -35,7 +35,7 @@ RUN chown -R $(whoami) /loongcollector && \
     rm /tmp/download_ebpflib.sh
 
 COPY --from=build /src/output/libGoPluginBase.so /loongcollector/
-COPY --from=build /src/example_config/quick_start/loongcollector_config.json /loongcollector/
+COPY --from=build /src/example_config/quick_start/loongcollector_config.json /loongcollector/conf/instance_config/local/loongcollector_config.json
 COPY --from=build /src/core/build/go_pipeline/libGoPluginAdapter.so /loongcollector/
 
 ENV HOST_OS=$HOST_OS

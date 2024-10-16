@@ -16,16 +16,19 @@
 
 #include <algorithm>
 #include <boost/filesystem.hpp>
+#include <filesystem>
 #include <iostream>
+#include <utility>
 
 #include "RuntimeUtil.h"
 #include "common/EnvUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
-#include "common/RuntimeUtil.h"
+#include "config/watcher/InstanceConfigWatcher.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/reader/LogFileReader.h"
+#include "json/value.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
@@ -36,9 +39,9 @@
 
 using namespace std;
 
+DEFINE_FLAG_BOOL(logtail_mode, "logtail mode", false);
 DEFINE_FLAG_INT32(max_buffer_num, "max size", 40);
 DEFINE_FLAG_INT32(pub_max_buffer_num, "max size", 8);
-DEFINE_FLAG_INT32(default_max_send_byte_per_sec, "the max send speed per sec, realtime thread", 25 * 1024 * 1024);
 DEFINE_FLAG_INT32(pub_max_send_byte_per_sec, "the max send speed per sec, realtime thread", 20 * 1024 * 1024);
 DEFINE_FLAG_INT32(default_send_byte_per_sec, "the max send speed per sec, replay buffer thread", 2 * 1024 * 1024);
 DEFINE_FLAG_INT32(pub_send_byte_per_sec, "the max send speed per sec, replay buffer thread", 1 * 1024 * 1024);
@@ -48,8 +51,6 @@ DEFINE_FLAG_INT32(default_local_file_size, "default size of one buffer file", 20
 DEFINE_FLAG_INT32(pub_local_file_size, "default size of one buffer file", 20 * 1024 * 1024);
 DEFINE_FLAG_INT32(process_thread_count, "", 1);
 DEFINE_FLAG_INT32(send_request_concurrency, "max count keep in mem when async send", 10);
-DEFINE_FLAG_BOOL(enable_send_tps_smoothing, "avoid web server load burst", true);
-DEFINE_FLAG_BOOL(enable_flow_control, "if enable flow control", true);
 DEFINE_FLAG_STRING(default_buffer_file_path, "set current execution dir in default", "");
 DEFINE_FLAG_STRING(buffer_file_path, "set buffer dir", "");
 // DEFINE_FLAG_STRING(default_mapping_config_path, "", "mapping_config.json");
@@ -178,12 +179,26 @@ DEFINE_FLAG_STRING(check_point_filename, "", "/tmp/logtail_check_point");
 DEFINE_FLAG_STRING(check_point_filename, "", "C:\\LogtailData\\logtail_check_point");
 #endif
 
-namespace logtail {
+DEFINE_FLAG_STRING(sls_observer_ebpf_host_path,
+                   "the backup real host path for store libebpf.so",
+                   "/etc/ilogtail/ebpf/");
 
-void CreateAgentDir () {
-#if defined(__RUN_LOGTAIL__)
-    return;
-#endif
+namespace logtail {
+constexpr int32_t kDefaultMaxSendBytePerSec = 25 * 1024 * 1024; // the max send speed per sec, realtime thread
+
+std::string AppConfig::sLocalConfigDir = "local";
+void CreateAgentDir() {
+    try {
+        const char* value = getenv("logtail_mode");
+        if (value != NULL) {
+            STRING_FLAG(logtail_mode) = StringTo<bool>(value);
+        }
+    } catch (const exception& e) {
+        std::cout << "load config from env error, env_name:logtail_mode, error:" << e.what() << std::endl;
+    }
+    if (BOOL_FLAG(logtail_mode)) {
+        return;
+    }
     std::string processExecutionDir = GetProcessExecutionDir();
     Json::Value emptyJson;
 #define PROCESSDIRFLAG(flag_name) \
@@ -221,11 +236,11 @@ std::string GetAgentThirdPartyDir() {
     if (!dir.empty()) {
         return dir;
     }
-#if defined(__RUN_LOGTAIL__)
-    dir = AppConfig::GetInstance()->GetLoongcollectorConfDir();
-#else
-    dir = STRING_FLAG(loongcollector_third_party_dir) + PATH_SEPARATOR;
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        dir = AppConfig::GetInstance()->GetLoongcollectorConfDir();
+    } else {
+        dir = STRING_FLAG(loongcollector_third_party_dir) + PATH_SEPARATOR;
+    }
     return dir;
 }
 
@@ -234,10 +249,14 @@ std::string GetAgentLogDir() {
     if (!dir.empty()) {
         return dir;
     }
-#if defined(__RUN_LOGTAIL__) || defined(APSARA_UNIT_TEST_MAIN)
+#if defined(APSARA_UNIT_TEST_MAIN)
     dir = GetProcessExecutionDir();
 #else
-    dir = STRING_FLAG(loongcollector_log_dir) + PATH_SEPARATOR;
+    if (BOOL_FLAG(logtail_mode)) {
+        dir = GetProcessExecutionDir();
+    } else {
+        dir = STRING_FLAG(loongcollector_log_dir) + PATH_SEPARATOR;
+    }
 #endif
     return dir;
 }
@@ -247,10 +266,14 @@ std::string GetAgentDataDir() {
     if (!dir.empty()) {
         return dir;
     }
-#if defined(__RUN_LOGTAIL__) || defined(APSARA_UNIT_TEST_MAIN)
+#if defined(APSARA_UNIT_TEST_MAIN)
     dir = GetProcessExecutionDir();
 #else
-    dir = STRING_FLAG(loongcollector_data_dir) + PATH_SEPARATOR;
+    if (BOOL_FLAG(logtail_mode)) {
+        dir = GetProcessExecutionDir();
+    } else {
+        dir = STRING_FLAG(loongcollector_data_dir) + PATH_SEPARATOR;
+    }
 #endif
     return dir;
 }
@@ -260,10 +283,14 @@ std::string GetAgentConfDir() {
     if (!dir.empty()) {
         return dir;
     }
-#if defined(__RUN_LOGTAIL__) || defined(APSARA_UNIT_TEST_MAIN)
+#if defined(APSARA_UNIT_TEST_MAIN)
     dir = GetProcessExecutionDir();
 #else
-    dir = STRING_FLAG(loongcollector_conf_dir) + PATH_SEPARATOR;
+    if (BOOL_FLAG(logtail_mode)) {
+        dir = GetProcessExecutionDir();
+    } else {
+        dir = STRING_FLAG(loongcollector_conf_dir) + PATH_SEPARATOR;
+    }
 #endif
     return dir;
 }
@@ -273,10 +300,14 @@ std::string GetAgentRunDir() {
     if (!dir.empty()) {
         return dir;
     }
-#if defined(__RUN_LOGTAIL__) || defined(APSARA_UNIT_TEST_MAIN)
+#if defined(APSARA_UNIT_TEST_MAIN)
     dir = GetProcessExecutionDir();
 #else
-    dir = STRING_FLAG(loongcollector_run_dir) + PATH_SEPARATOR;
+    if (BOOL_FLAG(logtail_mode)) {
+        dir = GetProcessExecutionDir();
+    } else {
+        dir = STRING_FLAG(loongcollector_run_dir) + PATH_SEPARATOR;
+    }
 #endif
     return dir;
 }
@@ -286,42 +317,42 @@ std::string GetAgentDockerPathConfig() {
     if (!file_path.empty()) {
         return file_path;
     }
-#if defined(__RUN_LOGTAIL__)
-    file_path = GetAgentDataDir() + STRING_FLAG(ilogtail_docker_file_path_config);
-#else
-    file_path = GetAgentDataDir() + "docker_path_config.json";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        file_path = GetAgentDataDir() + STRING_FLAG(ilogtail_docker_file_path_config);
+    } else {
+        file_path = GetAgentDataDir() + "docker_path_config.json";
+    }
     return file_path;
 }
 
 std::string GetAgentConfDir(const ParseConfResult& res, const Json::Value& confJson) {
     std::string newConfDir;
-#if defined(__RUN_LOGTAIL__)
-    if (res == CONFIG_OK) {
-        // Should be loaded here because other parameters depend on it.
-        LoadStringParameter(newConfDir, confJson, "logtail_sys_conf_dir", "ALIYUN_LOGTAIL_SYS_CONF_DIR");
+    if (BOOL_FLAG(logtail_mode)) {
+        if (res == CONFIG_OK) {
+            // Should be loaded here because other parameters depend on it.
+            LoadStringParameter(newConfDir, confJson, "logtail_sys_conf_dir", "ALIYUN_LOGTAIL_SYS_CONF_DIR");
+        }
+        if (newConfDir.empty()) {
+            newConfDir = STRING_FLAG(logtail_sys_conf_dir);
+        }
+    } else {
+        newConfDir = GetAgentConfDir();
     }
-    if (newConfDir.empty()) {
-        newConfDir = STRING_FLAG(logtail_sys_conf_dir);
-    }
-#else
-    newConfDir = GetAgentConfDir();
-#endif
     return newConfDir;
 }
 
 std::string GetAgentConfigFile() {
-#if defined(__RUN_LOGTAIL__)
-    // load ilogtail_config.json
-    char* configEnv = getenv(STRING_FLAG(ilogtail_config_env_name).c_str());
-    if (configEnv == NULL || strlen(configEnv) == 0) {
-        return STRING_FLAG(ilogtail_config);
+    if (BOOL_FLAG(logtail_mode)) {
+        // load ilogtail_config.json
+        char* configEnv = getenv(STRING_FLAG(ilogtail_config_env_name).c_str());
+        if (configEnv == NULL || strlen(configEnv) == 0) {
+            return STRING_FLAG(ilogtail_config);
+        } else {
+            return configEnv;
+        }
     } else {
-        return configEnv;
+        return LOONGCOLLECTOR_CONFIG;
     }
-#else
-    return LOONGCOLLECTOR_CONFIG;
-#endif
 }
 
 std::string GetAgentAppInfoFile() {
@@ -329,141 +360,147 @@ std::string GetAgentAppInfoFile() {
     if (!file.empty()) {
         return file;
     }
-#if defined(__RUN_LOGTAIL__)
-    file = GetAgentRunDir() + STRING_FLAG(app_info_file);
-#else
-    file = GetAgentRunDir() + "app_info.json";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        file = GetAgentRunDir() + STRING_FLAG(app_info_file);
+    } else {
+        file = GetAgentRunDir() + "app_info.json";
+    }
     return file;
 }
 
 string GetAdhocCheckpointDirPath() {
-#if defined(__RUN_LOGTAIL__)
-    return STRING_FLAG(adhoc_check_point_file_dir);
-#else
-    return GetAgentDataDir() + "adhoc_checkpoint";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return STRING_FLAG(adhoc_check_point_file_dir);
+    } else {
+        return GetAgentDataDir() + "adhoc_checkpoint";
+    }
 }
 
 string GetCheckPointFileName() {
-#if defined(__RUN_LOGTAIL__)
-    return STRING_FLAG(check_point_filename);
-#else
-    return GetAgentDataDir() + "file_check_point";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return STRING_FLAG(check_point_filename);
+    } else {
+        return GetAgentDataDir() + "file_check_point";
+    }
 }
 
 string GetCrashStackFileName() {
-#if defined(__RUN_LOGTAIL__)
-    return GetProcessExecutionDir() + STRING_FLAG(crash_stack_file_name);
-#else
-    return GetAgentDataDir() + "backtrace.dat";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return GetProcessExecutionDir() + STRING_FLAG(crash_stack_file_name);
+    } else {
+        return GetAgentDataDir() + "backtrace.dat";
+    }
 }
 
 string GetLocalEventDataFileName() {
-#if defined(__RUN_LOGTAIL__)
-    return STRING_FLAG(local_event_data_file_name);
-#else
-    return AppConfig::GetInstance()->GetLoongcollectorConfDir() + "local_event.json";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return STRING_FLAG(local_event_data_file_name);
+    } else {
+        return AppConfig::GetInstance()->GetLoongcollectorConfDir() + "local_event.json";
+    }
 }
 
 string GetInotifyWatcherDirsDumpFileName() {
-#if defined(__RUN_LOGTAIL__)
-    return GetProcessExecutionDir() + STRING_FLAG(inotify_watcher_dirs_dump_filename);
-#else
-    return GetAgentRunDir() + "inotify_watcher_dirs";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return GetProcessExecutionDir() + STRING_FLAG(inotify_watcher_dirs_dump_filename);
+    } else {
+        return GetAgentRunDir() + "inotify_watcher_dirs";
+    }
 }
 
 string GetAgentLoggersPrefix() {
-#if defined(__RUN_LOGTAIL__)
-    return "/apsara/sls/ilogtail";
-#else
-    return "/apsara/loongcollector";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return "/apsara/sls/ilogtail";
+    } else {
+        return "/apsara/loongcollector";
+    }
 }
 
 string GetAgentLogName() {
-#if defined(__RUN_LOGTAIL__)
-    return "ilogtail.LOG";
-#else
-    return "loongcollector.LOG";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return "ilogtail.LOG";
+    } else {
+        return "loongcollector.LOG";
+    }
 }
 
 string GetAgentSnapshotDir() {
-#if defined(__RUN_LOGTAIL__)
-    return GetProcessExecutionDir() + STRING_FLAG(logtail_snapshot_dir);
-#else
-    return GetAgentLogDir() + "snapshot";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return GetProcessExecutionDir() + STRING_FLAG(logtail_snapshot_dir);
+    } else {
+        return GetAgentLogDir() + "snapshot";
+    }
 }
 
 string GetAgentProfileLogName() {
-#if defined(__RUN_LOGTAIL__)
-    return "ilogtail_profile.LOG";
-#else
-    return "loongcollector_profile.LOG";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return "ilogtail_profile.LOG";
+    } else {
+        return "loongcollector_profile.LOG";
+    }
 }
 
 string GetAgentStatusLogName() {
-#if defined(__RUN_LOGTAIL__)
-    return "ilogtail_status.LOG";
-#else
-    return "loongcollector_status.LOG";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return "ilogtail_status.LOG";
+    } else {
+        return "loongcollector_status.LOG";
+    }
 }
 
 string GetProfileSnapshotDumpFileName() {
-#if defined(__RUN_LOGTAIL__)
-    return GetProcessExecutionDir() + STRING_FLAG(logtail_profile_snapshot);
-#else
-    return GetAgentLogDir() + "loongcollector_profile_snapshot";
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return GetProcessExecutionDir() + STRING_FLAG(logtail_profile_snapshot);
+    } else {
+        return GetAgentLogDir() + "loongcollector_profile_snapshot";
+    }
 }
 
 
 string GetObserverEbpfHostPath() {
-#if defined(__RUN_LOGTAIL__)
+    if (BOOL_FLAG(logtail_mode)) {
         return STRING_FLAG(sls_observer_ebpf_host_path);
-#else
+    } else {
         return GetAgentDataDir();
-#endif
+    }
 }
 
-string GetSendBufferFileNamePrefix(){
-#if defined(__RUN_LOGTAIL__)
+string GetSendBufferFileNamePrefix() {
+    if (BOOL_FLAG(logtail_mode)) {
         return "logtail_buffer_file_";
-#else
+    } else {
         return "send_buffer_file_";
-#endif
+    }
 }
 
 string GetLegacyUserLocalConfigFilePath() {
-#if defined(__RUN_LOGTAIL__)
-    return AppConfig::GetInstance()->GetProcessExecutionDir();
-#else
-    return AppConfig::GetInstance()->GetLoongcollectorConfDir();
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        return AppConfig::GetInstance()->GetProcessExecutionDir();
+    } else {
+        return AppConfig::GetInstance()->GetLoongcollectorConfDir();
+    }
 }
 
 string GetExactlyOnceCheckpoint() {
-#if defined(__RUN_LOGTAIL__)
-    auto fp = boost::filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir());
-    return (fp / "checkpoint_v2").string();
-#else
-    auto fp = boost::filesystem::path(GetAgentDataDir());
-    return (fp / "exactly_once_checkpoint").string();
-#endif
+    if (BOOL_FLAG(logtail_mode)) {
+        auto fp = boost::filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir());
+        return (fp / "checkpoint_v2").string();
+    } else {
+        auto fp = boost::filesystem::path(GetAgentDataDir());
+        return (fp / "exactly_once_checkpoint").string();
+    }
+}
+
+string GetFileTagsDir() {
+    if (BOOL_FLAG(logtail_mode)) {
+        return STRING_FLAG(ALIYUN_LOG_FILE_TAGS);
+    } else {
+        return AbsolutePath(STRING_FLAG(ALIYUN_LOG_FILE_TAGS), AppConfig::GetInstance()->GetLoongcollectorConfDir());
+    }
 }
 
 AppConfig::AppConfig() {
     LOG_INFO(sLogger, ("AppConfig AppConfig", "success"));
-    mSendRandomSleep = BOOL_FLAG(enable_send_tps_smoothing);
-    mSendFlowControl = BOOL_FLAG(enable_flow_control);
     SetIlogtailConfigJson("");
     // mStreamLogAddress = "0.0.0.0";
     // mIsOldPubRegion = false;
@@ -500,6 +537,7 @@ void AppConfig::MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJ
     }
 }
 
+// 只有 logtail 模式才使用
 void AppConfig::LoadIncludeConfig(Json::Value& confJson) {
     // New default value of the flag is renamed from /etc/ilogtail/config.d/
     // to config.d, be compatible with old default value.
@@ -549,8 +587,46 @@ void AppConfig::LoadIncludeConfig(Json::Value& confJson) {
     }
 }
 
+void AppConfig::LoadLocalInstanceConfig() {
+    filesystem::path localConfigPath
+        = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / "instance_config" / "local";
+    error_code ec;
+    filesystem::create_directories(localConfigPath, ec);
+    if (ec) {
+        LOG_WARNING(sLogger,
+                    ("failed to create dir for local instanceconfig",
+                     "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
+    }
+    InstanceConfigWatcher::GetInstance()->AddSource(localConfigPath.string());
+    InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
+    if (!instanceConfigDiff.IsEmpty()) {
+        InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
+    }
+}
+
 void AppConfig::LoadAppConfig(const std::string& ilogtailConfigFile) {
     mDockerFilePathConfig = GetAgentDockerPathConfig();
+    if (BOOL_FLAG(logtail_mode)) {
+        loadAppConfigLogtailMode(ilogtailConfigFile);
+    } else {
+        std::string confDir  = GetAgentConfDir();
+        SetLoongcollectorConfDir(AbsolutePath(confDir, mProcessExecutionDir));
+    }
+    // 加载本地instanceconfig
+    LoadLocalInstanceConfig();
+
+    ParseJsonToFlags(mLocalInstanceConfig);
+    ParseEnvToFlags();
+
+    LoadResourceConf(mLocalInstanceConfig);
+    // load addr will init sender, sender param depend on LoadResourceConf
+    // LoadAddrConfig(mLocalInstanceConfig);
+    LoadOtherConf(mLocalInstanceConfig);
+
+    CheckAndResetProxyEnv();
+}
+
+void AppConfig::loadAppConfigLogtailMode(const std::string& ilogtailConfigFile) {
 
     Json::Value confJson(Json::objectValue);
     std::string newConfDir;
@@ -593,18 +669,15 @@ void AppConfig::LoadAppConfig(const std::string& ilogtailConfigFile) {
     LOG_INFO(sLogger, ("load logtail config file, path", ilogtailConfigFile));
     LOG_INFO(sLogger, ("load logtail config file, detail", configJsonString));
 
-    ParseJsonToFlags(confJson);
-    ParseEnvToFlags();
-
-    LoadResourceConf(confJson);
-    // load addr will init sender, sender param depend on LoadResourceConf
-    // LoadAddrConfig(confJson);
-    LoadOtherConf(confJson);
-
-    CheckAndResetProxyEnv();
-    mConfJson = confJson;
+    mLocalInstanceConfig = confJson;
 }
 
+/**
+ * @brief 从环境变量加载Tag
+ *
+ * 该函数从环境变量中加载预定义的Tag。
+ * Tag键从环境变量中获取，对应的值也从环境变量中读取。
+ */
 void AppConfig::LoadEnvTags() {
     char* envTagKeys = getenv(STRING_FLAG(default_env_tag_keys).c_str());
     if (envTagKeys == NULL) {
@@ -626,7 +699,15 @@ void AppConfig::LoadEnvTags() {
     }
 }
 
-// @return true if input configValue has been updated.
+/**
+ * @brief 从环境变量加载单个配置值
+ *
+ * @tparam T 配置值的类型
+ * @param envKey 环境变量的键
+ * @param configValue 配置值的引用，如果环境变量存在且有效，将被更新
+ * @param minValue 配置值的最小允许值
+ * @return 如果配置值被更新，返回true；否则返回false
+ */
 template <typename T>
 bool LoadSingleValueEnvConfig(const char* envKey, T& configValue, const T minValue) {
     try {
@@ -646,6 +727,13 @@ bool LoadSingleValueEnvConfig(const char* envKey, T& configValue, const T minVal
     return false;
 }
 
+/**
+ * @brief 从环境变量加载配置值（如果存在）
+ *
+ * @tparam T 配置值的类型
+ * @param envKey 环境变量的键
+ * @param cfgValue 配置值的引用，如果环境变量存在，将被更新
+ */
 template <typename T>
 void LoadEnvValueIfExisting(const char* envKey, T& cfgValue) {
     try {
@@ -668,6 +756,18 @@ void AppConfig::LoadEnvResourceLimit() {
     LoadSingleValueEnvConfig("send_request_concurrency", mSendRequestConcurrency, (int32_t)2);
 }
 
+/**
+ * @brief 检查是否处于纯容器模式
+ *
+ * 该函数检查系统是否运行在纯容器模式下。
+ *
+ * 主要步骤：
+ * 1. 在企业版中，检查是否设置了用户定义的ID环境变量
+ * 2. 检查默认容器主机路径是否存在
+ * 3. 根据检查结果设置mPurageContainerMode标志
+ *
+ * @note 该函数会更新mPurageContainerMode成员变量
+ */
 void AppConfig::CheckPurageContainerMode() {
 #ifdef __ENTERPRISE__
     if (getenv(STRING_FLAG(ilogtail_user_defined_id_env_name).c_str()) == NULL) {
@@ -698,7 +798,7 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
         mMaxBytePerSec = INT32_FLAG(pub_max_send_byte_per_sec);
 #endif
     else
-        mMaxBytePerSec = INT32_FLAG(default_max_send_byte_per_sec);
+        mMaxBytePerSec = kDefaultMaxSendBytePerSec;
 
     if (confJson.isMember("bytes_per_sec") && confJson["bytes_per_sec"].isInt())
         mBytePerSec = confJson["bytes_per_sec"].asInt();
@@ -1255,7 +1355,7 @@ void AppConfig::InitEnvMapping(const std::string& envStr, std::map<std::string, 
 }
 void AppConfig::SetConfigFlag(const std::string& flagName, const std::string& value) {
     static set<string> sIgnoreFlagSet
-        = {"loongcollector_conf_dir", "loongcollector_log_dir", "loongcollector_data_dir", "loongcollector_run_dir"};
+        = {"loongcollector_conf_dir", "loongcollector_log_dir", "loongcollector_data_dir", "loongcollector_run_dir", "logtail_mode"};
     if (sIgnoreFlagSet.find(flagName) != sIgnoreFlagSet.end()) {
         return;
     }
@@ -1302,10 +1402,43 @@ void AppConfig::ParseEnvToFlags() {
         }
     }
 #endif
-    for (auto iter = envMapping.begin(); iter != envMapping.end(); ++iter) {
-        const std::string& key = iter->first;
-        const std::string& value = iter->second;
+    for (const auto & iter : envMapping) {
+        const std::string& key = iter.first;
+        const std::string& value = iter.second;
         SetConfigFlag(key, value);
+        // 尝试解析为 double
+        char* end;
+        double doubleValue = strtod(value.c_str(), &end);
+        mEnvConfigKeyToConfigName[key] = "env";
+        if (*end == '\0') {
+            mEnvConfig[key] = doubleValue;
+            continue;
+        }
+
+        // 尝试解析为 int64_t
+        int64_t int64Value = strtoll(value.c_str(), &end, 10);
+        if (*end == '\0' && errno != ERANGE) {
+            mEnvConfig[key] = Json::Int64(int64Value);
+            continue;
+        }
+
+        // 尝试解析为 int32_t
+        auto int32Value = static_cast<int32_t>(strtol(value.c_str(), &end, 10));
+        if (*end == '\0' && errno != ERANGE && static_cast<int64_t>(int32Value) == int64Value) {
+            mEnvConfig[key] = int32Value;
+            continue;
+        }
+
+        // 检查是否为 bool
+        if (value == "true") {
+            mEnvConfig[key] = true;
+            continue;
+        }
+        if (value == "false") {
+            mEnvConfig[key] = false;
+            continue;
+        }
+        mEnvConfig[key] = value;
     }
 }
 
@@ -1328,6 +1461,23 @@ void AppConfig::ReadFlagsFromMap(const std::unordered_map<std::string, std::stri
     LOG_DEBUG(sLogger, ("ReadFlagsFromMap", flagMap.size()));
 }
 
+/**
+ * @brief 递归解析JSON配置到gflag
+ *
+ * 该函数递归地遍历JSON对象，将其键值对转换为gflag
+ *
+ * @param confJson 要解析的JSON对象
+ * @param prefix 当前键的前缀，用于构建完整的标志名
+ *
+ * 主要逻辑:
+ * 1. 遍历JSON对象的所有成员
+ * 2. 对于嵌套的对象，递归调用自身
+ * 3. 对于非对象值:
+ *    - 忽略特定的键（如data_server_list）
+ *    - 将可转换为字符串的值设置为标志
+ *    - 对特定键（如config_server_address_list）强制转换为字符串
+ *    - 记录无法转换的值
+ */
 void AppConfig::RecurseParseJsonToFlags(const Json::Value& confJson, std::string prefix) {
     const static unordered_set<string> sIgnoreKeySet = {"data_server_list"};
     const static unordered_set<string> sForceKeySet = {"config_server_address_list"};
@@ -1444,16 +1594,8 @@ void AppConfig::CheckAndAdjustParameters() {
                                                                            INT32_FLAG(max_reader_open_files)));
 
     LOG_INFO(sLogger,
-             ("send byte per second limit", mMaxBytePerSec)("batch send interval", INT32_FLAG(batch_send_interval))(
-                 "batch send size", INT32_FLAG(batch_send_metric_size)));
-    // when inflow exceed 30MB/s, FlowControl lose precision
-    if (mMaxBytePerSec >= 30 * 1024 * 1024) {
-        if (mSendFlowControl)
-            mSendFlowControl = false;
-        if (mSendRandomSleep)
-            mSendRandomSleep = false;
-        LOG_INFO(sLogger, ("send flow control", "disable")("send random sleep", "disable"));
-    }
+             ("batch send interval", INT32_FLAG(batch_send_interval))("batch send size",
+                                                                      INT32_FLAG(batch_send_metric_size)));
 }
 
 bool AppConfig::IsInInotifyBlackList(const std::string& path) const {
@@ -1532,7 +1674,7 @@ void AppConfig::UpdateFileTags() {
     }
     // read local config
     Json::Value localFileTagsJson;
-    const char* file_tags_dir = STRING_FLAG(ALIYUN_LOG_FILE_TAGS).c_str();
+    string file_tags_dir = GetFileTagsDir();
     ParseConfResult userLogRes = ParseConfig(file_tags_dir, localFileTagsJson);
     if (userLogRes != CONFIG_OK) {
         if (userLogRes == CONFIG_NOT_EXIST)
@@ -1560,6 +1702,148 @@ void AppConfig::UpdateFileTags() {
         }
     }
     return;
+}
+
+void AppConfig::MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJson, std::unordered_map<std::string, std::string>& keyToConfigName, const std::string& configName) {
+    for (const auto& subkey : subConfJson.getMemberNames()) {
+        mainConfJson[subkey] = subConfJson[subkey];
+        keyToConfigName[subkey] = configName;
+    }
+}
+
+void AppConfig::LoadInstanceConfig(const std::map<std::string, std::shared_ptr<InstanceConfig>>& instanceConfig) {
+    Json::Value remoteInstanceConfig;
+    Json::Value localInstanceConfig;
+    mLocalInstanceConfigKeyToConfigName.clear();
+    mRemoteInstanceConfigKeyToConfigName.clear();
+    for (const auto& config : instanceConfig) {
+        if (EndWith(config.second->mDirName, AppConfig::sLocalConfigDir)) {
+            MergeJson(localInstanceConfig, config.second->GetConfig(), mLocalInstanceConfigKeyToConfigName, config.second->mDirName+"/"+config.second->mConfigName);
+        } else {
+            MergeJson(remoteInstanceConfig, config.second->GetConfig(), mRemoteInstanceConfigKeyToConfigName, config.second->mDirName+"/"+config.second->mConfigName);
+        }
+    }
+    if (localInstanceConfig != mLocalInstanceConfig || mRemoteInstanceConfig != remoteInstanceConfig) {
+        LOG_INFO(sLogger,
+                 ("load all local instanceConfig", localInstanceConfig.toStyledString())(
+                     "load all remote instanceConfig", remoteInstanceConfig.toStyledString()));
+        std::set<std::function<bool()>*> callbackCall;
+        for (const auto& callback : mCallbacks) {
+            const std::string& key = callback.first;
+            bool configChanged = false;
+            // 检查本地配置是否发生变化
+            if (localInstanceConfig.isMember(key) != mLocalInstanceConfig.isMember(key)
+                || (localInstanceConfig.isMember(key) && localInstanceConfig[key] != mLocalInstanceConfig[key])) {
+                configChanged = true;
+            }
+            // 检查远程配置是否发生变化
+            if (!configChanged
+                && (remoteInstanceConfig.isMember(key) != mRemoteInstanceConfig.isMember(key)
+                    || (remoteInstanceConfig.isMember(key)
+                        && remoteInstanceConfig[key] != mRemoteInstanceConfig[key]))) {
+                configChanged = true;
+            }
+            if (configChanged) {
+                callbackCall.insert(callback.second);
+            }
+        }
+        mLocalInstanceConfig = std::move(localInstanceConfig);
+        mRemoteInstanceConfig = std::move(remoteInstanceConfig);
+        for (const auto& callback : callbackCall) {
+            (*callback)();
+        }
+    }
+}
+
+void AppConfig::RegisterCallback(const std::string& key, std::function<bool()>* callback) {
+    mCallbacks[key] = callback;
+}
+
+template<typename T>
+T AppConfig::MergeConfig(const T& defaultValue,
+                         const T& currentValue,
+                         const std::string& name,
+                         const std::function<bool(const std::string&, const T&)>& validateFn) {
+    const auto& localInstanceConfig = AppConfig::GetInstance()->GetLocalInstanceConfig();
+    const auto& envConfig = AppConfig::GetInstance()->GetEnvConfig();
+    const auto& remoteInstanceConfig = AppConfig::GetInstance()->GetRemoteInstanceConfig();
+
+    T res = defaultValue;
+    std::string configName = "default";
+
+    auto tryMerge = [&](const Json::Value& config, std::unordered_map<std::string, std::string>& keyToConfigName) {
+        if (config.isMember(name)) {
+            if constexpr (std::is_same_v<T, int32_t>) {
+                if (config[name].isInt() && validateFn(name, config[name].asInt())) {
+                    res = config[name].asInt();
+                    configName = keyToConfigName[name];
+                }
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                if (config[name].isInt64() && validateFn(name, config[name].asInt64())) {
+                    res = config[name].asInt64();
+                    configName = keyToConfigName[name];
+                }
+            } else if constexpr (std::is_same_v<T, bool>) {
+                if (config[name].isBool() && validateFn(name, config[name].asBool())) {
+                    res = config[name].asBool();
+                    configName = keyToConfigName[name];
+                }
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                if (config[name].isString() && validateFn(name, config[name].asString())) {
+                    res = config[name].asString();
+                    configName = keyToConfigName[name];
+                }
+            } else if constexpr (std::is_same_v<T, double>) {
+                if (config[name].isDouble() && validateFn(name, config[name].asDouble())) {
+                    res = config[name].asDouble();
+                    configName = keyToConfigName[name];
+                }
+            }
+        }
+    };
+
+    tryMerge(localInstanceConfig, mLocalInstanceConfigKeyToConfigName);
+    tryMerge(envConfig, mEnvConfigKeyToConfigName);
+    tryMerge(remoteInstanceConfig, mRemoteInstanceConfigKeyToConfigName);
+    LOG_INFO(
+        sLogger,
+        ("merge instance config", name)("key", name)("newValue", res)("lastValue", currentValue)("from", configName));
+    return res;
+}
+
+int32_t AppConfig::MergeInt32(int32_t defaultValue,
+                              int32_t currentValue,
+                              const std::string& name,
+                              const std::function<bool(const std::string&, const int32_t)>& validateFn) {
+    return MergeConfig<int32_t>(defaultValue, currentValue, name, validateFn);
+}
+
+int64_t AppConfig::MergeInt64(int64_t defaultValue,
+                              int64_t currentValue,
+                              const std::string& name,
+                              const std::function<bool(const std::string&, const int64_t)>& validateFn) {
+    return MergeConfig<int64_t>(defaultValue, currentValue, name, validateFn);
+}
+
+bool AppConfig::MergeBool(bool defaultValue,
+                          bool currentValue,
+                          const std::string& name,
+                          const std::function<bool(const std::string&, const bool)>& validateFn) {
+    return MergeConfig<bool>(defaultValue, currentValue, name, validateFn);
+}
+
+std::string AppConfig::MergeString(const std::string& defaultValue,
+                                   const std::string& currentValue,
+                                   const std::string& name,
+                                   const std::function<bool(const std::string&, const std::string&)>& validateFn) {
+    return MergeConfig<std::string>(defaultValue, currentValue, name, validateFn);
+}
+
+double AppConfig::MergeDouble(double defaultValue,
+                              double currentValue,
+                              const std::string& name,
+                              const std::function<bool(const std::string&, const double)>& validateFn) {
+    return MergeConfig<double>(defaultValue, currentValue, name, validateFn);
 }
 
 } // namespace logtail

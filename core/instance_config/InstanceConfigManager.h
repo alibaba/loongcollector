@@ -18,9 +18,7 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 
-#include "common/Lock.h"
 #include "config/ConfigDiff.h"
 #include "config/InstanceConfig.h"
 

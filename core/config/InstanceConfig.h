@@ -28,61 +28,14 @@
 namespace logtail {
 
 struct InstanceConfig {
-    std::string mName;
-    std::unique_ptr<Json::Value> mDetail;
+    std::string mConfigName;
+    std::string mDirName;
+    Json::Value mDetail;
 
-    // for alarm only
-    std::string mProject;
-    std::string mLogstore;
-    std::string mRegion;
+    InstanceConfig(const std::string& name, const Json::Value& detail, const std::string& dirName)
+        : mConfigName(name), mDirName(dirName), mDetail(detail) {}
 
-    InstanceConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail)
-        : mName(name), mDetail(std::move(detail)) {
-        mProject = "";
-        mLogstore = "";
-        mRegion = "";
-    }
-    InstanceConfig(const logtail::InstanceConfig& config) {
-        mName = config.mName;
-        mDetail = std::make_unique<Json::Value>(*config.mDetail);
-        mProject = "";
-        mLogstore = "";
-        mRegion = "";
-    }
-
-    InstanceConfig& operator=(InstanceConfig&& other) {
-        if (this != &other) {
-            mName = std::move(other.mName);
-            mDetail = std::move(other.mDetail);
-            mProject = "";
-            mLogstore = "";
-            mRegion = "";
-        }
-        return *this;
-    }
-
-    InstanceConfig& operator=(const InstanceConfig& other) {
-        if (this != &other) {
-            mName = other.mName;
-            mDetail = std::make_unique<Json::Value>(*other.mDetail);
-            mProject = "";
-            mLogstore = "";
-            mRegion = "";
-        }
-        return *this;
-    }
-
-    bool Parse() { return true; }
-
-    const Json::Value& GetConfig() const { return *mDetail; }
+    const Json::Value& GetConfig() const { return mDetail; }
 };
-
-inline bool operator==(const InstanceConfig& lhs, const InstanceConfig& rhs) {
-    return (lhs.mName == rhs.mName) && (*lhs.mDetail == *rhs.mDetail);
-}
-
-inline bool operator!=(const InstanceConfig& lhs, const InstanceConfig& rhs) {
-    return !(lhs == rhs);
-}
 
 } // namespace logtail

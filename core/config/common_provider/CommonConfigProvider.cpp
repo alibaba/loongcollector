@@ -91,7 +91,7 @@ void CommonConfigProvider::Init(const string& dir) {
             if (port < 1 || port > 65535) {
                 LOG_WARNING(sLogger, ("configserver_address", "illegal port")("port", port));
                 continue;
-            } 
+            }
             mConfigServerAddresses.push_back(ConfigServerAddress(host, port));
         }
 
@@ -130,6 +130,8 @@ void CommonConfigProvider::Stop() {
 
 void CommonConfigProvider::LoadConfigFile() {
     error_code ec;
+    lock_guard<mutex> pipelineInfomaplock(mPipelineInfoMapMux);
+    lock_guard<mutex> lockPipeline(mPipelineMux);
     for (auto const& entry : filesystem::directory_iterator(mPipelineSourceDir, ec)) {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
@@ -141,10 +143,12 @@ void CommonConfigProvider::LoadConfigFile() {
             }
             info.status = ConfigFeedbackStatus::APPLYING;
             info.detail = detail.toStyledString();
-            lock_guard<mutex> infomaplock(mPipelineInfoMapMux);
             mPipelineConfigInfoMap[info.name] = info;
+            ConfigFeedbackReceiver::GetInstance().RegisterPipelineConfig(info.name, this);
         }
     }
+    lock_guard<mutex> instanceInfomaplock(mInstanceInfoMapMux);
+    lock_guard<mutex> lockInstance(mInstanceMux);
     for (auto const& entry : filesystem::directory_iterator(mInstanceSourceDir, ec)) {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
@@ -156,8 +160,8 @@ void CommonConfigProvider::LoadConfigFile() {
             }
             info.status = ConfigFeedbackStatus::APPLYING;
             info.detail = detail.toStyledString();
-            lock_guard<mutex> infomaplock(mInstanceInfoMapMux);
             mInstanceConfigInfoMap[info.name] = info;
+            ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(info.name, this);
         }
     }
 }
@@ -482,15 +486,15 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
             } else {
                 if (!DumpConfigFile(config, sourceDir)) {
                     mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                      .version = config.version(),
-                                                                      .status = ConfigFeedbackStatus::FAILED,
-                                                                      .detail = config.detail()};
+                                                                       .version = config.version(),
+                                                                       .status = ConfigFeedbackStatus::FAILED,
+                                                                       .detail = config.detail()};
                     continue;
                 }
                 mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                  .version = config.version(),
-                                                                  .status = ConfigFeedbackStatus::APPLYING,
-                                                                  .detail = config.detail()};
+                                                                   .version = config.version(),
+                                                                   .status = ConfigFeedbackStatus::APPLYING,
+                                                                   .detail = config.detail()};
                 ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
             }
         }
@@ -514,7 +518,8 @@ bool CommonConfigProvider::FetchInstanceConfigFromServer(
     string reqBody;
     fetchConfigRequest.SerializeToString(&reqBody);
     string fetchConfigResponse;
-    if (SendHttpRequest(operation, reqBody, "FetchInstanceConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
+    if (SendHttpRequest(
+            operation, reqBody, "FetchInstanceConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
         configserver::proto::v2::FetchConfigResponse fetchConfigResponsePb;
         fetchConfigResponsePb.ParseFromString(fetchConfigResponse);
         res.Swap(fetchConfigResponsePb.mutable_config_details());
@@ -540,7 +545,8 @@ bool CommonConfigProvider::FetchPipelineConfigFromServer(
     string reqBody;
     fetchConfigRequest.SerializeToString(&reqBody);
     string fetchConfigResponse;
-    if (SendHttpRequest(operation, reqBody, "FetchPipelineConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
+    if (SendHttpRequest(
+            operation, reqBody, "FetchPipelineConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
         configserver::proto::v2::FetchConfigResponse fetchConfigResponsePb;
         fetchConfigResponsePb.ParseFromString(fetchConfigResponse);
         res.Swap(fetchConfigResponsePb.mutable_config_details());

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Flags.h"
 #include "app_config/AppConfig.h"
 #include "RuntimeUtil.h"
 #if defined(__linux__)
@@ -31,6 +32,7 @@
 #include "FileSystemUtil.h"
 
 DECLARE_FLAG_STRING(logtail_sys_conf_dir);
+DECLARE_FLAG_BOOL(logtail_mode);
 
 namespace logtail {
 
@@ -85,31 +87,31 @@ bool RebuildExecutionDir(const std::string& ilogtailConfigJson,
         errorMessage = ss.str();
         return false;
     }
-    #if defined(__RUN_LOGTAIL__) 
-    path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
-    if (CheckExistance(path))
-        return true;
-    if (!Mkdir(path)) {
-        std::stringstream ss;
-        ss << "create execution dir failed, errno is " << errno;
-        errorMessage = ss.str();
-        return false;
+    if (BOOL_FLAG(logtail_mode)) {
+        path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
+        if (CheckExistance(path))
+            return true;
+        if (!Mkdir(path)) {
+            std::stringstream ss;
+            ss << "create execution dir failed, errno is " << errno;
+            errorMessage = ss.str();
+            return false;
+        }
+
+        if (ilogtailConfigJson.empty())
+            return true;
+
+        FILE* pFile = fopen((path + STRING_FLAG(ilogtail_config)).c_str(), "w");
+        if (pFile == NULL) {
+            std::stringstream ss;
+            ss << "open " << STRING_FLAG(ilogtail_config) << " to write failed, errno is " << errno;
+            errorMessage = ss.str();
+            return false;
+        }
+
+        fwrite(ilogtailConfigJson.c_str(), 1, ilogtailConfigJson.size(), pFile);
+        fclose(pFile);
     }
-
-    if (ilogtailConfigJson.empty())
-        return true;
-
-    FILE* pFile = fopen((path + STRING_FLAG(ilogtail_config)).c_str(), "w");
-    if (pFile == NULL) {
-        std::stringstream ss;
-        ss << "open " << STRING_FLAG(ilogtail_config) << " to write failed, errno is " << errno;
-        errorMessage = ss.str();
-        return false;
-    }
-
-    fwrite(ilogtailConfigJson.c_str(), 1, ilogtailConfigJson.size(), pFile);
-    fclose(pFile);
-    #endif
     return true;
 }
 

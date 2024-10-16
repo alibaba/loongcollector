@@ -27,6 +27,7 @@ DECLARE_FLAG_INT32(ebpf_aggregation_config_agg_window_second);
 DECLARE_FLAG_STRING(ebpf_converage_config_strategy);
 DECLARE_FLAG_STRING(ebpf_sample_config_strategy);
 DECLARE_FLAG_DOUBLE(ebpf_sample_config_config_rate);
+DECLARE_FLAG_BOOL(logtail_mode);
 
 namespace logtail {
 
@@ -37,7 +38,14 @@ public:
 private:
     void writeLogtailConfigJSON(const Json::Value& v) {
         LOG_INFO(sLogger, ("writeLogtailConfigJSON", v.toStyledString()));
-        OverwriteFile(STRING_FLAG(ilogtail_config), v.toStyledString());
+        if (BOOL_FLAG(logtail_mode)) {
+            OverwriteFile(STRING_FLAG(ilogtail_config), v.toStyledString());
+        } else {
+            CreateAgentDir();
+            std::string conf  = GetAgentConfDir() + "/instance_config/local/loongcollector_config.json";
+            AppConfig::GetInstance()->LoadAppConfig(conf);
+            OverwriteFile(conf, v.toStyledString());
+        }
     }
 
     template <typename T>

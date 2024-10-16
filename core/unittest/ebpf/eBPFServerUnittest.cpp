@@ -16,6 +16,8 @@
 #include "common/JsonUtil.h"
 #include "ebpf/config.h"
 
+DECLARE_FLAG_BOOL(logtail_mode);
+
 namespace logtail {
 namespace ebpf {
 class eBPFServerUnittest : public testing::Test {
@@ -80,7 +82,14 @@ private:
     void GenerateBatchAppEvent(nami::NamiHandleBatchEventFunc cb);
     void writeLogtailConfigJSON(const Json::Value& v) {
         LOG_INFO(sLogger, ("writeLogtailConfigJSON", v.toStyledString()));
-        OverwriteFile(STRING_FLAG(ilogtail_config), v.toStyledString());
+        if (BOOL_FLAG(logtail_mode)) {
+            OverwriteFile(STRING_FLAG(ilogtail_config), v.toStyledString());
+        } else {
+            CreateAgentDir();
+            std::string conf  = GetAgentConfDir() + "/instance_config/local/loongcollector_config.json";
+            AppConfig::GetInstance()->LoadAppConfig(conf);
+            OverwriteFile(conf, v.toStyledString());
+        }
     }
     eBPFAdminConfig* config_;
     Pipeline p;

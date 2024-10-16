@@ -20,39 +20,41 @@
 #include <filesystem>
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "InstanceConfigManager.h"
 #include "config/ConfigDiff.h"
 
 namespace logtail {
 
-class PipelineManager;
+class InstanceConfigManager;
 
-class ConfigWatcher {
+class InstanceConfigWatcher {
 public:
-    ConfigWatcher(const ConfigWatcher&) = delete;
-    ConfigWatcher& operator=(const ConfigWatcher&) = delete;
+    InstanceConfigWatcher(const InstanceConfigWatcher&) = delete;
+    InstanceConfigWatcher& operator=(const InstanceConfigWatcher&) = delete;
 
-    static ConfigWatcher* GetInstance() {
-        static ConfigWatcher instance;
+    static InstanceConfigWatcher* GetInstance() {
+        static InstanceConfigWatcher instance;
         return &instance;
     }
 
-    PipelineConfigDiff CheckConfigDiff();
+    InstanceConfigDiff CheckConfigDiff();
     void AddSource(const std::string& dir, std::mutex* mux = nullptr);
     // for ut
-    void SetPipelineManager(const PipelineManager* pm) { mPipelineManager = pm; }
+    void SetInstanceConfigManager(const InstanceConfigManager* m) { mInstanceConfigManager = m; }
     void ClearEnvironment();
 
 private:
-    ConfigWatcher();
-    ~ConfigWatcher() = default;
+    InstanceConfigWatcher();
+    ~InstanceConfigWatcher() = default;
 
     std::vector<std::filesystem::path> mSourceDir;
     std::unordered_map<std::string, std::mutex*> mDirMutexMap;
     std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>> mFileInfoMap;
-    const PipelineManager* mPipelineManager = nullptr;
+    const InstanceConfigManager* mInstanceConfigManager = nullptr;
 };
 
 } // namespace logtail

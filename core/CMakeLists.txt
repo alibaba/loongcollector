@@ -115,6 +115,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/links.cmake)
 set(SUB_DIRECTORIES_LIST
         application app_config checkpoint container_manager logger go_pipeline monitor monitor/metric_constants profile_sender models
         config config/watcher
+        instance_config
         pipeline pipeline/batch pipeline/limiter pipeline/plugin pipeline/plugin/creator pipeline/plugin/instance pipeline/plugin/interface pipeline/queue pipeline/route pipeline/serializer
         runner runner/sink/http
         protobuf/sls

@@ -55,7 +55,6 @@ DECLARE_FLAG_INT32(mem_check_point_time_out);
 DECLARE_FLAG_INT32(file_check_point_time_out);
 DECLARE_FLAG_INT32(check_point_check_interval);
 DECLARE_FLAG_STRING(default_global_topic);
-DECLARE_FLAG_INT32(default_max_send_byte_per_sec);
 DECLARE_FLAG_INT32(default_send_byte_per_sec);
 DECLARE_FLAG_INT32(default_buffer_file_num);
 DECLARE_FLAG_INT32(default_local_file_size);
@@ -2157,7 +2156,7 @@ void ConfigUpdatorUnittest::TestLoadIlogtailConfig() {
     AppConfig::GetInstance()->LoadAppConfig(ilogtailConfig);
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->mCpuUsageUpLimit, DOUBLE_FLAG(cpu_usage_up_limit));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->mMemUsageUpLimit, INT64_FLAG(memory_usage_up_limit));
-    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMaxBytePerSec(), INT32_FLAG(default_max_send_byte_per_sec));
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMaxBytePerSec(), kDefaultMaxSendBytePerSec);
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetBytePerSec(), INT32_FLAG(default_send_byte_per_sec));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetNumOfBufferFile(), INT32_FLAG(default_buffer_file_num));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetLocalFileSize(), INT32_FLAG(default_local_file_size));

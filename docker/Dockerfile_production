@@ -39,12 +39,12 @@ RUN chown -R $(whoami) /usr/local/loongcollector/ && \
     mkdir -p /usr/local/loongcollector/data/checkpoint
 
 WORKDIR /usr/local/loongcollector
-RUN mkdir -p /usr/local/loongcollector/conf
+RUN mkdir -p /usr/local/loongcollector/conf/instance_config/local
 RUN mkdir -p /usr/local/loongcollector/log
 RUN mkdir -p /usr/local/loongcollector/data
 RUN mkdir -p /usr/local/loongcollector/run
 
-COPY example_config/start_with_docker/loongcollector_config.json /usr/local/loongcollector/
+COPY example_config/start_with_docker/loongcollector_config.json /usr/local/loongcollector/conf/instance_config/local/loongcollector_config.json
 COPY scripts/loongcollector_control.sh /usr/local/loongcollector/
 
 ENV HTTP_PROBE_PORT=7953 \

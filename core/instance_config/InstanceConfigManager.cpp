@@ -14,32 +14,33 @@
  * limitations under the License.
  */
 
-#include "pipeline/InstanceConfigManager.h"
+#include "instance_config/InstanceConfigManager.h"
 
+#include "app_config/AppConfig.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 
 using namespace std;
 
 namespace logtail {
 
-InstanceConfigManager::InstanceConfigManager() {
-}
+InstanceConfigManager::InstanceConfigManager() = default;
 
 void InstanceConfigManager::UpdateInstanceConfigs(InstanceConfigDiff& diff) {
     for (auto& config : diff.mAdded) {
-        std::shared_ptr<InstanceConfig> configTmp(new InstanceConfig(config.mName, std::move(config.mDetail)));
-        mInstanceConfigMap[config.mName] = configTmp;
-        ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
+        mInstanceConfigMap[config.mConfigName] = 
+            std::make_shared<InstanceConfig>(config.mConfigName, std::move(config.mDetail), config.mDirName);
+        ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(config.mConfigName, ConfigFeedbackStatus::APPLIED);
     }
     for (auto& config : diff.mModified) {
-        std::shared_ptr<InstanceConfig> configTmp(new InstanceConfig(config.mName, std::move(config.mDetail)));
-        mInstanceConfigMap[config.mName] = configTmp;
-        ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
+        mInstanceConfigMap[config.mConfigName] = 
+            std::make_shared<InstanceConfig>(config.mConfigName, std::move(config.mDetail), config.mDirName);
+        ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(config.mConfigName, ConfigFeedbackStatus::APPLIED);
     }
-    for (auto& configName : diff.mRemoved) {
+    for (const auto& configName : diff.mRemoved) {
         mInstanceConfigMap.erase(configName);
         ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(configName, ConfigFeedbackStatus::DELETED);
     }
+    AppConfig::GetInstance()->LoadInstanceConfig(mInstanceConfigMap);
 }
 
 std::shared_ptr<InstanceConfig> InstanceConfigManager::FindConfigByName(const string& configName) const {
@@ -52,6 +53,7 @@ std::shared_ptr<InstanceConfig> InstanceConfigManager::FindConfigByName(const st
 
 vector<string> InstanceConfigManager::GetAllConfigNames() const {
     vector<string> res;
+    res.reserve(mInstanceConfigMap.size());
     for (const auto& item : mInstanceConfigMap) {
         res.push_back(item.first);
     }

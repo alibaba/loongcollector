@@ -14,6 +14,7 @@
 
 #include "config/provider/ConfigProvider.h"
 
+#include "InstanceConfigWatcher.h"
 #include "app_config/AppConfig.h"
 #include "config/watcher/ConfigWatcher.h"
 
@@ -33,11 +34,11 @@ void ConfigProvider::Init(const string& dir) {
 
     error_code ec;
     filesystem::create_directories(mPipelineSourceDir, ec);
-    ConfigWatcher::GetInstance()->AddPipelineSource(mPipelineSourceDir, &mPipelineMux);
+    ConfigWatcher::GetInstance()->AddSource(mPipelineSourceDir, &mPipelineMux);
 
     ec.clear();
     filesystem::create_directories(mInstanceSourceDir, ec);
-    ConfigWatcher::GetInstance()->AddInstanceSource(mInstanceSourceDir, &mInstanceMux);
+    InstanceConfigWatcher::GetInstance()->AddSource(mInstanceSourceDir, &mInstanceMux);
 }
 
 } // namespace logtail

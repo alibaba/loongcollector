@@ -34,9 +34,6 @@ DEFINE_FLAG_INT64(
     sls_observer_ebpf_nobtf_kernel_version,
     "the minimum kernel version that supported eBPF normal running without self BTF file, 5.4.0.0 -> 5004000000",
     5004000000);
-DEFINE_FLAG_STRING(sls_observer_ebpf_host_path,
-                   "the backup real host path for store libebpf.so",
-                   "/etc/ilogtail/ebpf/");
 
 static const std::string kLowkernelCentosName = "CentOS";
 static const uint16_t kLowkernelCentosMinVersion = 7006;
