@@ -616,4 +616,3 @@ K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
     }
     return K8sContainerMeta();
 }
-

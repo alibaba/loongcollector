@@ -55,7 +55,7 @@ _deps
 # Custom
 /build/
 core/build/
-core/protobuf/*/*.pb.*
+core/protobuf/sls/*.pb.*
 core/common/Version.cpp
 !/Makefile
 # Enterprise

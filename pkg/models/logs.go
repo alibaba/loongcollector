@@ -27,7 +27,6 @@ type Log struct {
 	Timestamp         uint64
 	ObservedTimestamp uint64
 	Offset            uint64
-	RawSize           uint64
 	Contents          LogContents
 }
 
@@ -85,19 +84,6 @@ func (m *Log) GetOffset() uint64 {
 func (m *Log) SetOffset(offset uint64) {
 	if m != nil {
 		m.Offset = offset
-	}
-}
-
-func (m *Log) GetRawSize() uint64 {
-	if m != nil {
-		return m.RawSize
-	}
-	return 0
-}
-
-func (m *Log) SetRawSize(rawSize uint64) {
-	if m != nil {
-		m.RawSize = rawSize
 	}
 }
 
