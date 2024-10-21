@@ -66,7 +66,7 @@ PrometheusInputRunner::PrometheusInputRunner()
         mMetricsRecordRef, std::move(labels), std::move(dynamicLabels));
 
     mPromRegisterState = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_CLIENT_REGISTER_STATE);
-    mPromJobNum = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_JOB_NUM);
+    mPromJobNum = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_JOBS_TOTAL);
     mPromRegisterRetryTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_CLIENT_REGISTER_RETRY_TOTAL);
 }
 

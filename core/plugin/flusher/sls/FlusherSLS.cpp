@@ -47,7 +47,7 @@ using namespace std;
 
 DEFINE_FLAG_INT32(batch_send_interval, "batch sender interval (second)(default 3)", 3);
 DEFINE_FLAG_INT32(merge_log_count_limit, "log count in one logGroup at most", 4000);
-DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 256KB)", 256 * 1024);
+DEFINE_FLAG_INT32(batch_send_metric_size, "batch send metric size limit(bytes)(default 512KB)", 512 * 1024);
 DEFINE_FLAG_INT32(send_check_real_ip_interval, "seconds", 2);
 
 DEFINE_FLAG_INT32(unauthorized_send_retrytimes,
@@ -690,7 +690,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                    item)("request id", slsResponse.mRequestId)("config", configName)("region", mRegion)(
                       "project", mProject)("logstore", data->mLogstore)("response time", curTime - data->mLastSendTime)(
                       "total send time",
-                      ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mEnqueTime).count())
+                      ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mFirstEnqueTime).count())
                           + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentEndpoint)("is profile data",
                                                                                                 isProfileData));
         GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
@@ -861,7 +861,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 mOtherErrorCnt->Add(1);
             }
         }
-        if (chrono::duration_cast<chrono::seconds>(curSystemTime - item->mEnqueTime).count()
+        if (chrono::duration_cast<chrono::seconds>(curSystemTime - item->mFirstEnqueTime).count()
             > INT32_FLAG(discard_send_fail_interval)) {
             operation = OperationOnFail::DISCARD;
         }
@@ -876,7 +876,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         "errMsg", slsResponse.mErrorMsg)("config", configName)("region", mRegion)("project", mProject)( \
         "logstore", data->mLogstore)("try cnt", data->mTryCnt)("response time", curTime - data->mLastSendTime)( \
         "total send time", \
-        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mEnqueTime).count()) \
+        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mFirstEnqueTime).count()) \
             + "ms")("endpoint", data->mCurrentEndpoint)("is profile data", isProfileData)
 
         switch (operation) {

@@ -143,7 +143,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             + "\tsize limit: " + ToString(INT32_FLAG(max_send_log_group_size));
         return false;
     }
-    res = logGroup.SerializeAsString();
+    logGroup.SerializeToString(&res);
     return true;
 }
 

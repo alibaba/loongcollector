@@ -45,6 +45,8 @@ PipelineManager::PipelineManager()
       }) {
 }
 
+static shared_ptr<Pipeline> sEmptyPipeline;
+
 void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
 #ifndef APSARA_UNIT_TEST_MAIN
     // 过渡使用
@@ -156,12 +158,12 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
     }
 }
 
-shared_ptr<Pipeline> PipelineManager::FindConfigByName(const string& configName) const {
+const shared_ptr<Pipeline>& PipelineManager::FindConfigByName(const string& configName) const {
     auto it = mPipelineNameEntityMap.find(configName);
     if (it != mPipelineNameEntityMap.end()) {
         return it->second;
     }
-    return nullptr;
+    return sEmptyPipeline;
 }
 
 vector<string> PipelineManager::GetAllConfigNames() const {

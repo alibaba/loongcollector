@@ -46,9 +46,8 @@ private:
     size_t mRead = 0;
     size_t mSize = 0;
 
-    CounterPtr mFetchedTimesCnt;
+    CounterPtr mFetchTimesCnt;
     CounterPtr mFetchedItemsCnt;
-    
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderQueueUnittest;

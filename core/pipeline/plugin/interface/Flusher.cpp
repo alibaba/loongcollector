@@ -86,7 +86,7 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
 
 void Flusher::DealSenderQueueItemAfterSend(SenderQueueItem* item, bool keep) {
     if (keep) {
-        item->mStatus.Set(SendingStatus::IDLE);
+        item->mStatus = SendingStatus::IDLE;
         ++item->mTryCnt;
     } else {
         // TODO: because current profile has a dummy flusher, we have to use item->mQueueKey here

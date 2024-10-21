@@ -32,7 +32,7 @@ ExactlyOnceSenderQueue::ExactlyOnceSenderQueue(const std::vector<RangeCheckpoint
       BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key, "", ctx),
       mRangeCheckpoints(checkpoints) {
     mQueue.resize(checkpoints.size());
-    mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_FLAG, "true"}});
+    mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"}});
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
@@ -46,9 +46,15 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
         if (f->mMaxSendRate > 0) {
             mRateLimiter = RateLimiter(f->mMaxSendRate);
         }
-        mConcurrencyLimiters.emplace_back(FlusherSLS::GetRegionConcurrencyLimiter(f->mRegion), mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("region")));
-        mConcurrencyLimiters.emplace_back(FlusherSLS::GetProjectConcurrencyLimiter(f->mProject), mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("project")));
-        mConcurrencyLimiters.emplace_back(FlusherSLS::GetLogstoreConcurrencyLimiter(f->mProject, f->mLogstore), mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("logstore")));
+        mConcurrencyLimiters.emplace_back(
+            FlusherSLS::GetRegionConcurrencyLimiter(f->mRegion),
+            mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("region")));
+        mConcurrencyLimiters.emplace_back(
+            FlusherSLS::GetProjectConcurrencyLimiter(f->mProject),
+            mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("project")));
+        mConcurrencyLimiters.emplace_back(
+            FlusherSLS::GetLogstoreConcurrencyLimiter(f->mProject, f->mLogstore),
+            mMetricsRecordRef.CreateCounter(ConcurrencyLimiter::GetLimiterMetricName("logstore")));
         mIsInitialised = true;
     }
 
@@ -59,7 +65,7 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
             // should not happen
             return false;
         }
-        item->mEnqueTime = chrono::system_clock::now();
+        item->mFirstEnqueTime = chrono::system_clock::now();
         mQueue[eo->index] = std::move(item);
     } else {
         for (size_t idx = 0; idx < mCapacity; ++idx, ++mWrite) {
@@ -67,7 +73,7 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
             if (mQueue[index] != nullptr) {
                 continue;
             }
-            item->mEnqueTime = chrono::system_clock::now();
+            item->mFirstEnqueTime = chrono::system_clock::now();
             mQueue[index] = std::move(item);
             auto& newCpt = mRangeCheckpoints[index];
             newCpt->data.set_read_offset(eo->data.read_offset());
@@ -78,7 +84,7 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
             break;
         }
         if (!eo->IsComplete()) {
-            item->mEnqueTime = chrono::system_clock::now();
+            item->mFirstEnqueTime = chrono::system_clock::now();
             mExtraBuffer.push_back(std::move(item));
             return true;
         }
@@ -123,10 +129,9 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
             if (item == nullptr) {
                 continue;
             }
-            if (item->mStatus.Get() == SendingStatus::IDLE) {
-                item->mStatus.Set(SendingStatus::SENDING);
+            if (item->mStatus.load() == SendingStatus::IDLE) {
+                item->mStatus = SendingStatus::SENDING;
                 items.emplace_back(item);
-                
             }
         }
     }
@@ -146,9 +151,9 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
                 return;
             }
         }
-        if (item->mStatus.Get() == SendingStatus::IDLE) {
+        if (item->mStatus.load() == SendingStatus::IDLE) {
             --limit;
-            item->mStatus.Set(SendingStatus::SENDING);
+            item->mStatus = SendingStatus::SENDING;
             items.emplace_back(item);
             for (auto& limiter : mConcurrencyLimiters) {
                 if (limiter.first != nullptr) {
@@ -158,7 +163,6 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
             if (mRateLimiter) {
                 mRateLimiter->PostPop(item->mRawSize);
             }
-            
         }
     }
 }

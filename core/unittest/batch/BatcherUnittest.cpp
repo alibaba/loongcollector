@@ -581,7 +581,7 @@ void BatcherUnittest::TestMetric() {
         APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
         APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_BATCHER));
         APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID, "1"));
-        APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel("enable_group_batch", "false"));
+        APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_GROUP_BATCH_ENABLED, "false"));
         APSARA_TEST_EQUAL(3U, batch.mInEventsTotal->GetValue());
         APSARA_TEST_EQUAL(groupSize, batch.mInGroupDataSizeBytes->GetValue());
         APSARA_TEST_EQUAL(2U, batch.mOutEventsTotal->GetValue());
@@ -606,7 +606,7 @@ void BatcherUnittest::TestMetric() {
         vector<BatchedEventsList> res;
         batch.Add(std::move(g), res);
         batch.FlushQueue(0, res[0]);
-        APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel("enable_group_batch", "true"));
+        APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_GROUP_BATCH_ENABLED, "true"));
         APSARA_TEST_EQUAL(3U, batch.mInEventsTotal->GetValue());
         APSARA_TEST_EQUAL(groupSize, batch.mInGroupDataSizeBytes->GetValue());
         APSARA_TEST_EQUAL(2U, batch.mOutEventsTotal->GetValue());

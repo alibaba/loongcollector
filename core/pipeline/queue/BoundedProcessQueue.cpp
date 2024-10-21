@@ -26,7 +26,7 @@ BoundedProcessQueue::BoundedProcessQueue(
       BoundedQueueInterface(key, cap, low, high, ctx),
       ProcessQueueInterface(key, cap, priority, ctx) {
     if (ctx.IsExactlyOnceEnabled()) {
-        mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_FLAG, "true"}});
+        mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"}});
     }
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }

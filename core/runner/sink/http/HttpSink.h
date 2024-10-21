@@ -60,7 +60,8 @@ private:
     CounterPtr mInItemsTotal;
     CounterPtr mOutSuccessfulItemsTotal;
     CounterPtr mOutFailedItemsTotal;
-    // CounterPtr mTotalDelayMs; // TODO: should record distribution instead of average
+    CounterPtr mSuccessfulItemTotalResponseTimeMs;
+    CounterPtr mFailedItemTotalResponseTimeMs;
     IntGaugePtr mSendingItemsTotal;
     IntGaugePtr mSendConcurrency;
     IntGaugePtr mLastRunTime;

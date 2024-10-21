@@ -27,7 +27,7 @@ BoundedSenderQueueInterface::BoundedSenderQueueInterface(
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_SENDER_QUEUE}});
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID, flusherId}});
     mExtraBufferSize = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE);
-    mRejectedByRateLimiterCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL);
+    mFetchRejectedByRateLimiterTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL);
     mExtraBufferDataSizeBytes = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE_BYTES);
 }
 

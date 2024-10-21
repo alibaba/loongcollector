@@ -71,7 +71,7 @@ protected:
 
     IntGaugePtr mExtraBufferSize;
     IntGaugePtr mExtraBufferDataSizeBytes;
-    CounterPtr mRejectedByRateLimiterCnt;
+    CounterPtr mFetchRejectedByRateLimiterTimesCnt;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherUnittest;

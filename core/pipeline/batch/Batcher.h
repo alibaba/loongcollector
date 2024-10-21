@@ -105,9 +105,9 @@ public:
             {METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_BATCHER},
             {METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID, flusher->GetPluginID()}};
         if (enableGroupBatch) {
-            labels.emplace_back("enable_group_batch", "true");
+            labels.emplace_back(METRIC_LABEL_KEY_GROUP_BATCH_ENABLED, "true");
         } else {
-            labels.emplace_back("enable_group_batch", "false");
+            labels.emplace_back(METRIC_LABEL_KEY_GROUP_BATCH_ENABLED, "false");
         }
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(labels));
         mInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_TOTAL);

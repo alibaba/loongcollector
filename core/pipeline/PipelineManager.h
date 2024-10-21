@@ -38,7 +38,7 @@ public:
     }
 
     void UpdatePipelines(PipelineConfigDiff& diff);
-    std::shared_ptr<Pipeline> FindConfigByName(const std::string& configName) const;
+    const std::shared_ptr<Pipeline>& FindConfigByName(const std::string& configName) const;
     std::vector<std::string> GetAllConfigNames() const;
     std::string GetPluginStatistics() const;
     // for shennong only
