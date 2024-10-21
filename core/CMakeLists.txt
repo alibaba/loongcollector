@@ -116,7 +116,7 @@ set(SUB_DIRECTORIES_LIST
         application app_config checkpoint container_manager logger go_pipeline monitor monitor/metric_constants profile_sender models
         config config/watcher
         instance_config
-        pipeline pipeline/batch pipeline/limiter pipeline/plugin pipeline/plugin/creator pipeline/plugin/instance pipeline/plugin/interface pipeline/queue pipeline/route pipeline/serializer
+        metadata pipeline pipeline/batch pipeline/limiter pipeline/plugin pipeline/plugin/creator pipeline/plugin/instance pipeline/plugin/interface pipeline/queue pipeline/route pipeline/serializer
         runner runner/sink/http
         protobuf/sls
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
