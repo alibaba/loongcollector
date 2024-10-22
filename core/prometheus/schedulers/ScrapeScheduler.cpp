@@ -170,6 +170,10 @@ void ScrapeScheduler::ScrapeOnce(std::chrono::steady_clock::time_point execTime)
 }
 
 std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::steady_clock::time_point execTime) {
+    auto retry = mScrapeConfigPtr->mScrapeIntervalSeconds / mScrapeConfigPtr->mScrapeTimeoutSeconds;
+    if (retry > 0) {
+        retry -= 1;
+    }
     auto request = std::make_unique<PromHttpRequest>(sdk::HTTP_GET,
                                                      mScrapeConfigPtr->mScheme == prometheus::HTTPS,
                                                      mHost,
@@ -179,8 +183,7 @@ std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::
                                                      mScrapeConfigPtr->mRequestHeaders,
                                                      "",
                                                      mScrapeConfigPtr->mScrapeTimeoutSeconds,
-                                                     mScrapeConfigPtr->mScrapeIntervalSeconds
-                                                         / mScrapeConfigPtr->mScrapeTimeoutSeconds,
+                                                     retry,
                                                      this->mFuture,
                                                      this->mIsContextValidFuture);
     auto timerEvent = std::make_unique<HttpRequestTimerEvent>(execTime, std::move(request));

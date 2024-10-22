@@ -166,7 +166,6 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
         // Parse labels
         Labels labels;
         labels.Set(prometheus::JOB, mJobName);
-        labels.Set(prometheus::INSTANCE, targets[0]);
         labels.Set(prometheus::ADDRESS_LABEL_NAME, targets[0]);
         labels.Set(prometheus::SCHEME_LABEL_NAME, mScrapeConfigPtr->mScheme);
         labels.Set(prometheus::METRICS_PATH_LABEL_NAME, mScrapeConfigPtr->mMetricsPath);
@@ -207,6 +206,10 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
         }
 
         string address = resultLabel.Get(prometheus::ADDRESS_LABEL_NAME);
+        if (resultLabel.Get(prometheus::INSTANCE).empty()) {
+            resultLabel.Set(prometheus::INSTANCE, address);
+        }
+
         auto m = address.find(':');
         if (m == string::npos) {
             continue;
