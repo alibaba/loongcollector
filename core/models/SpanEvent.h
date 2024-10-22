@@ -58,6 +58,9 @@ public:
         void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
         void SetTagNoCopy(StringView key, StringView val);
         void DelTag(StringView key);
+        std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
+        std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+        size_t TagsSize() const { return mTags.mInner.size(); }
 
         std::shared_ptr<SourceBuffer>& GetSourceBuffer();
 
@@ -95,6 +98,9 @@ public:
         void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
         void SetTagNoCopy(StringView key, StringView val);
         void DelTag(StringView key);
+        std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
+        std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+        size_t TagsSize() const { return mTags.mInner.size(); }
 
         std::shared_ptr<SourceBuffer>& GetSourceBuffer();
 
@@ -153,6 +159,9 @@ public:
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
+    std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
+    std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+    size_t TagsSize() const { return mTags.mInner.size(); }
 
     const std::vector<InnerEvent>& GetEvents() const { return mEvents; }
     InnerEvent* AddEvent();
@@ -170,6 +179,9 @@ public:
     void SetScopeTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetScopeTagNoCopy(StringView key, StringView val);
     void DelScopeTag(StringView key);
+    std::map<StringView, StringView>::const_iterator ScopeTagsBegin() const { return mScopeTags.mInner.begin(); }
+    std::map<StringView, StringView>::const_iterator ScopeTagsEnd() const { return mScopeTags.mInner.end(); }
+    size_t ScopeTagsSize() const { return mScopeTags.mInner.size(); }
 
     size_t DataSize() const override;
 
