@@ -68,6 +68,7 @@ private:
 
     std::mutex mRegisterMutex;
     std::atomic<bool> mIsThreadRunning = true;
+    std::future<void> mThreadRes;
 
     std::unique_ptr<sdk::CurlClient> mClient;
 

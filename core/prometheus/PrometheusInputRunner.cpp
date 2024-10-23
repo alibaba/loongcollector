@@ -141,7 +141,7 @@ void PrometheusInputRunner::Init() {
     // only register when operator exist
     if (!mServiceHost.empty()) {
         mIsThreadRunning.store(true);
-        auto res = std::async(launch::async, [this]() {
+        mThreadRes = std::async(launch::async, [this]() {
             std::lock_guard<mutex> lock(mRegisterMutex);
             int retry = 0;
             while (mIsThreadRunning.load()) {
@@ -194,6 +194,9 @@ void PrometheusInputRunner::Stop() {
 
     mIsStarted = false;
     mIsThreadRunning.store(false);
+    if (mThreadRes.valid()) {
+        mThreadRes.wait_for(chrono::seconds(1));
+    }
 
 #ifndef APSARA_UNIT_TEST_MAIN
     mTimer->Stop();
