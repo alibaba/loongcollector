@@ -93,7 +93,7 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e, const G
             if (sourceEvent.HasTag(k)) {
                 auto key = prometheus::EXPORTED_PREFIX + k.to_string();
                 sourceEvent.SetTag(key, sourceEvent.GetTag(k).to_string());
-                sourceEvent.DelTag(k);
+                sourceEvent.SetTag(k, v);
             } else {
                 sourceEvent.SetTag(k, v);
             }
