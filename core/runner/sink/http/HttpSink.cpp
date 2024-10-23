@@ -154,7 +154,7 @@ void HttpSink::DoRun() {
             this_thread::sleep_for(chrono::milliseconds(100));
             continue;
         }
-        HandleCompletedRequests();
+        HandleCompletedRequests(runningHandlers);
 
         unique_ptr<HttpSinkRequest> request;
         if (mQueue.TryPop(request)) {
@@ -208,7 +208,7 @@ void HttpSink::DoRun() {
     }
 }
 
-void HttpSink::HandleCompletedRequests() {
+void HttpSink::HandleCompletedRequests(int& runningHandlers) {
     int msgsLeft = 0;
     CURLMsg* msg = curl_multi_info_read(mClient, &msgsLeft);
     while (msg) {
@@ -251,6 +251,7 @@ void HttpSink::HandleCompletedRequests() {
                             request->mPrivateData = nullptr;
                         }
                         AddRequestToClient(unique_ptr<HttpSinkRequest>(request));
+                        ++runningHandlers;
                         requestReused = true;
                     } else {
                         static_cast<HttpFlusher*>(request->mItem->mFlusher)

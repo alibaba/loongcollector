@@ -50,7 +50,7 @@ private:
     void Run();
     bool AddRequestToClient(std::unique_ptr<AsynHttpRequest>&& request);
     void DoRun();
-    void HandleCompletedRequests();
+    void HandleCompletedRequests(int& runningHandlers);
 
     CURLM* mClient = nullptr;
     SafeQueue<std::unique_ptr<AsynHttpRequest>> mQueue;

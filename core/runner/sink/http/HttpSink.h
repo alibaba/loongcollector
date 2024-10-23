@@ -49,7 +49,7 @@ private:
     void Run();
     bool AddRequestToClient(std::unique_ptr<HttpSinkRequest>&& request);
     void DoRun();
-    void HandleCompletedRequests();
+    void HandleCompletedRequests(int& runningHandlers);
 
     CURLM* mClient = nullptr;
 
