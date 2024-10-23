@@ -23,6 +23,9 @@ const string METRIC_LABEL_KEY_LOGSTORE = "logstore";
 const string METRIC_LABEL_KEY_PIPELINE_NAME = "pipeline_name";
 const string METRIC_LABEL_KEY_REGION = "region";
 
+// label values
+const string METRIC_LABEL_KEY_METRIC_CATEGORY_PIPELINE = "pipeline";
+
 // metric keys
 const string METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL = "pipeline_processors_in_events_total";
 const string METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL = "pipeline_processors_in_event_groups_total";

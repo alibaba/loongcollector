@@ -81,7 +81,6 @@ private:
     int32_t mLastUpdateMetricTime;
 
     IntGaugePtr mLastRunTime;
-    IntGaugePtr mAgentOpenFdTotal;
     IntGaugePtr mRegisterdHandlersTotal;
     IntGaugePtr mActiveReadersTotal;
     IntGaugePtr mEnableFileIncludedByMultiConfigs;

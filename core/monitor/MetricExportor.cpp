@@ -44,8 +44,6 @@ const std::string METRIC_EXPORT_TYPE_GO = "direct";
 const std::string METRIC_EXPORT_TYPE_CPP = "cpp_provided";
 
 MetricExportor::MetricExportor() : mSendInterval(60), mLastSendTime(time(NULL) - (rand() % (mSendInterval / 10)) * 10) {
-    mAgentMemGo = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_MEMORY_GO);
-    mAgentGoRoutines = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_GO_ROUTINES_TOTAL);
 }
 
 void MetricExportor::PushMetrics(bool forceSend) {
@@ -178,10 +176,10 @@ void MetricExportor::PushGoCppProvidedMetrics(std::vector<std::map<std::string, 
     for (auto metrics : metricsList) {
         for (auto metric : metrics) {
             if (metric.first == METRIC_AGENT_MEMORY_GO) {
-                mAgentMemGo->Set(std::stoi(metric.second));
+                LoongCollectorMonitor::GetInstance()->SetAgentGoMemory(std::stoi(metric.second));
             }
             if (metric.first == METRIC_AGENT_GO_ROUTINES_TOTAL) {
-                mAgentGoRoutines->Set(std::stoi(metric.second));
+                LoongCollectorMonitor::GetInstance()->SetAgentGoRoutinesTotal(std::stoi(metric.second));
             }
             LogtailMonitor::GetInstance()->UpdateMetric(metric.first, metric.second);
         }

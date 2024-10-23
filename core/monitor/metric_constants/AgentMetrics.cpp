@@ -19,15 +19,19 @@ using namespace std;
 namespace logtail {
 
 // label keys
+const string METRIC_LABEL_KEY_METRIC_CATEGORY = "metric_category";
 const string METRIC_LABEL_KEY_ALIUIDS = "aliuids";
 const string METRIC_LABEL_KEY_INSTANCE_ID = "instance_id";
-const string METRIC_LABEL_KEY_IP = "ip";
+const string METRIC_LABEL_KEY_START_TIME = "start_time";
 const string METRIC_LABEL_KEY_OS = "os";
 const string METRIC_LABEL_KEY_OS_DETAIL = "os_detail";
 const string METRIC_LABEL_KEY_PROJECT = "project";
 const string METRIC_LABEL_KEY_USER_DEFINED_ID = "user_defined_id";
 const string METRIC_LABEL_KEY_UUID = "uuid";
 const string METRIC_LABEL_KEY_VERSION = "version";
+
+// label values
+const string METRIC_LABEL_KEY_METRIC_CATEGORY_AGENT = "agent";
 
 // metric keys
 const string METRIC_AGENT_CPU = "agent_cpu_percent";

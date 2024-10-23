@@ -38,6 +38,12 @@ CounterPtr MetricsRecord::CreateCounter(const std::string& name) {
     return counterPtr;
 }
 
+TimeCounterPtr MetricsRecord::CreateTimeCounter(const std::string& name) {
+    TimeCounterPtr counterPtr = std::make_shared<TimeCounter>(name);
+    mTimeCounters.emplace_back(counterPtr);
+    return counterPtr;
+}
+
 IntGaugePtr MetricsRecord::CreateIntGauge(const std::string& name) {
     IntGaugePtr gaugePtr = std::make_shared<IntGauge>(name);
     mIntGauges.emplace_back(gaugePtr);
@@ -70,6 +76,10 @@ const std::vector<CounterPtr>& MetricsRecord::GetCounters() const {
     return mCounters;
 }
 
+const std::vector<TimeCounterPtr>& MetricsRecord::GetTimeCounters() const {
+    return mTimeCounters;
+}
+
 const std::vector<IntGaugePtr>& MetricsRecord::GetIntGauges() const {
     return mIntGauges;
 }
@@ -83,6 +93,10 @@ MetricsRecord* MetricsRecord::Collect() {
     for (auto& item : mCounters) {
         CounterPtr newPtr(item->Collect());
         metrics->mCounters.emplace_back(newPtr);
+    }
+    for (auto& item : mTimeCounters) {
+        TimeCounterPtr newPtr(item->Collect());
+        metrics->mTimeCounters.emplace_back(newPtr);
     }
     for (auto& item : mIntGauges) {
         IntGaugePtr newPtr(item->Collect());
@@ -125,6 +139,10 @@ CounterPtr MetricsRecordRef::CreateCounter(const std::string& name) {
     return mMetrics->CreateCounter(name);
 }
 
+TimeCounterPtr MetricsRecordRef::CreateTimeCounter(const std::string& name) {
+    return mMetrics->CreateTimeCounter(name);
+}
+
 IntGaugePtr MetricsRecordRef::CreateIntGauge(const std::string& name) {
     return mMetrics->CreateIntGauge(name);
 }
@@ -160,6 +178,8 @@ void ReentrantMetricsRecord::Init(MetricLabels& labels, std::unordered_map<std::
             case MetricType::METRIC_TYPE_COUNTER:
                 mCounters[metric.first] = mMetricsRecordRef.CreateCounter(metric.first);
                 break;
+            case MetricType::METRIC_TYPE_TIME_COUNTER:
+                mTimeCounters[metric.first] = mMetricsRecordRef.CreateTimeCounter(metric.first);
             case MetricType::METRIC_TYPE_INT_GAUGE:
                 mIntGauges[metric.first] = mMetricsRecordRef.CreateIntGauge(metric.first);
                 break;
@@ -183,6 +203,14 @@ const DynamicMetricLabelsPtr& ReentrantMetricsRecord::GetDynamicLabels() const {
 CounterPtr ReentrantMetricsRecord::GetCounter(const std::string& name) {
     auto it = mCounters.find(name);
     if (it != mCounters.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+TimeCounterPtr ReentrantMetricsRecord::GetTimeCounter(const std::string& name) {
+    auto it = mTimeCounters.find(name);
+    if (it != mTimeCounters.end()) {
         return it->second;
     }
     return nullptr;
@@ -386,6 +414,12 @@ void ReadMetrics::ReadAsLogGroup(const std::string& regionFieldName,
             contentPtr->set_key(VALUE_PREFIX + counter->GetName());
             contentPtr->set_value(ToString(counter->GetValue()));
         }
+        for (auto& item : tmp->GetTimeCounters()) {
+            TimeCounterPtr counter = item;
+            Log_Content* contentPtr = logPtr->add_contents();
+            contentPtr->set_key(VALUE_PREFIX + counter->GetName());
+            contentPtr->set_value(ToString(counter->GetValue()));
+        }
         for (auto& item : tmp->GetIntGauges()) {
             IntGaugePtr gauge = item;
             Log_Content* contentPtr = logPtr->add_contents();
@@ -427,12 +461,14 @@ void ReadMetrics::ReadAsFileBuffer(std::string& metricsContent) const {
             CounterPtr counter = item;
             metricsRecordValue[VALUE_PREFIX + counter->GetName()] = ToString(counter->GetValue());
         }
-
+        for (auto& item : tmp->GetTimeCounters()) {
+            TimeCounterPtr counter = item;
+            metricsRecordValue[VALUE_PREFIX + counter->GetName()] = ToString(counter->GetValue());
+        }
         for (auto& item : tmp->GetIntGauges()) {
             IntGaugePtr gauge = item;
             metricsRecordValue[VALUE_PREFIX + gauge->GetName()] = ToString(gauge->GetValue());
         }
-
         for (auto& item : tmp->GetDoubleGauges()) {
             DoubleGaugePtr gauge = item;
             metricsRecordValue[VALUE_PREFIX + gauge->GetName()] = ToString(gauge->GetValue());

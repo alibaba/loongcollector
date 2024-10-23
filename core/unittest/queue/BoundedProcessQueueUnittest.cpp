@@ -118,7 +118,7 @@ void BoundedProcessQueueUnittest::TestPop() {
 }
 
 void BoundedProcessQueueUnittest::TestMetric() {
-    APSARA_TEST_EQUAL(4U, mQueue->mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_EQUAL(5U, mQueue->mMetricsRecordRef->GetLabels()->size());
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, ""));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_PROCESS_QUEUE));

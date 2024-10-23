@@ -65,9 +65,7 @@ bool CircularProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     mEventCnt -= item->mEventGroup.GetEvents().size();
 
     mOutItemsTotal->Add(1);
-    mTotalDelayMs->Add(
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - item->mEnqueTime)
-            .count());
+    mTotalDelayMs->Add(std::chrono::system_clock::now() - item->mEnqueTime);
     mQueueSizeTotal->Set(Size());
     mQueueDataSizeByte->Sub(item->mEventGroup.DataSize());
     return true;

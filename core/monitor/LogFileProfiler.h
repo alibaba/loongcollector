@@ -88,7 +88,7 @@ public:
     static std::string mECSInstanceID;
     static std::string mECSUserID;
     static std::string mECSRegionID;
-
+    static std::string mStartTime;
 
 private:
     struct LogStoreStatistic {

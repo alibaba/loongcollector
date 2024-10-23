@@ -60,8 +60,7 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     }
 
     mOutItemsTotal->Add(1);
-    mTotalDelayMs->Add(
-        chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - item->mEnqueTime).count());
+    mTotalDelayMs->Add(chrono::system_clock::now() - item->mEnqueTime);
     mQueueSizeTotal->Set(Size());
     mQueueDataSizeByte->Sub(item->mEventGroup.DataSize());
     mValidToPushFlag->Set(IsValidToPush());

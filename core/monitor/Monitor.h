@@ -162,10 +162,8 @@ private:
     CpuStat mRealtimeCpuStat;
     // Use to calculate CPU limit, updated regularly (30s by default).
     CpuStat mCpuStat;
-    DoubleGaugePtr mAgentCpuGauge;
     // Memory usage statistics.
     MemStat mMemStat;
-    IntGaugePtr mAgentMemoryGauge;
 
     // Current scale up level, updated by CheckScaledCpuUsageUpLimit.
     float mScaledCpuUsageUpLimit;
@@ -194,17 +192,23 @@ public:
     void Init();
     void Stop();
 
-    CounterPtr GetCounter(std::string key);
-    IntGaugePtr GetIntGauge(std::string key);
-    DoubleGaugePtr GetDoubleGauge(std::string key);
+    void SetAgentCpu(double cpu) { mAgentCpu->Set(cpu); }
+    void SetAgentMemory(uint64_t mem) { mAgentMemory->Set(mem); }
+    void SetAgentGoMemory(uint64_t mem) { mAgentGoMemory->Set(mem); }
+    void SetAgentGoRoutinesTotal(uint64_t total) { mAgentGoRoutinesTotal->Set(total); }
+    void SetAgentOpenFdTotal(uint64_t total) { mAgentOpenFdTotal->Set(total); }
+    void SetAgentConfigTotal(uint64_t total) { mAgentConfigTotal->Set(total); }
 
 private:
     // MetricRecord
     MetricsRecordRef mMetricsRecordRef;
-    // metrics
-    std::unordered_map<std::string, CounterPtr> mCounters;
-    std::unordered_map<std::string, IntGaugePtr> mIntGauges;
-    std::unordered_map<std::string, DoubleGaugePtr> mDoubleGauges;
+
+    DoubleGaugePtr mAgentCpu;
+    IntGaugePtr mAgentMemory;
+    IntGaugePtr mAgentGoMemory;
+    IntGaugePtr mAgentGoRoutinesTotal;
+    IntGaugePtr mAgentOpenFdTotal;
+    IntGaugePtr mAgentConfigTotal;
 };
 
 } // namespace logtail

@@ -225,6 +225,10 @@ func GetMetaManagerMetrics() []map[string]string {
 	manager.registerLock.RUnlock()
 	manager.metricRecord.Labels = []pipeline.Label{
 		{
+			Key:   helper.MetricLabelKeyMetricCategory,
+			Value: helper.MetricLabelKeyMetricCategoryRunner,
+		},
+		{
 			Key:   "cluster_id",
 			Value: *flags.ClusterID,
 		},

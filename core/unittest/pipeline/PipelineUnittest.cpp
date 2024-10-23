@@ -124,7 +124,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL(QueueKeyManager::GetInstance()->GetKey("test_config-flusher_sls-test_project#test_logstore"),
                       pipeline->GetContext().GetLogstoreKey());
     APSARA_TEST_EQUAL(0U, pipeline->mInProcessCnt.load());
-    APSARA_TEST_EQUAL(2U, pipeline->mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_EQUAL(3U, pipeline->mMetricsRecordRef->GetLabels()->size());
     APSARA_TEST_TRUE(pipeline->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, configName));
     APSARA_TEST_TRUE(pipeline->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, "test_project"));
 
@@ -2710,7 +2710,7 @@ void PipelineUnittest::TestProcess() const {
     pipeline.mProcessorsInSizeBytes
         = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_SIZE_BYTES);
     pipeline.mProcessorsTotalProcessTimeMs
-        = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS);
+        = pipeline.mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS);
 
     vector<PipelineEventGroup> groups;
     groups.emplace_back(make_shared<SourceBuffer>());

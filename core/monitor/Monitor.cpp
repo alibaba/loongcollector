@@ -113,10 +113,6 @@ bool LogtailMonitor::Init() {
     mCpuArrayForScaleIdx = 0;
 #endif
 
-    // init metrics
-    mAgentCpuGauge = LoongCollectorMonitor::GetInstance()->GetDoubleGauge(METRIC_AGENT_CPU);
-    mAgentMemoryGauge = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_MEMORY);
-
     // Initialize monitor thread.
     mThreadRes = async(launch::async, &LogtailMonitor::Monitor, this);
     return true;
@@ -266,14 +262,14 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec);
     // CPU usage of Logtail process.
     AddLogContent(logPtr, "cpu", mCpuStat.mCpuUsage);
-    mAgentCpuGauge->Set(mCpuStat.mCpuUsage);
+    LoongCollectorMonitor::GetInstance()->SetAgentCpu(mCpuStat.mCpuUsage);
 #if defined(__linux__) // TODO: Remove this if auto scale is available on Windows.
     // CPU usage of system.
     AddLogContent(logPtr, "os_cpu", mOsCpuStatForScale.mOsCpuUsage);
 #endif
     // Memory usage of Logtail process.
     AddLogContent(logPtr, "mem", mMemStat.mRss);
-    mAgentMemoryGauge->Set(mMemStat.mRss);
+    LoongCollectorMonitor::GetInstance()->SetAgentMemory(mMemStat.mRss);
     // The version, uuid of Logtail.
     AddLogContent(logPtr, "version", ILOGTAIL_VERSION);
     AddLogContent(logPtr, "uuid", Application::GetInstance()->GetUUID());
@@ -703,8 +699,9 @@ LoongCollectorMonitor* LoongCollectorMonitor::GetInstance() {
 void LoongCollectorMonitor::Init() {
     // create metric record
     MetricLabels labels;
+    labels.emplace_back(METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_AGENT);
     labels.emplace_back(METRIC_LABEL_KEY_INSTANCE_ID, Application::GetInstance()->GetInstanceId());
-    labels.emplace_back(METRIC_LABEL_KEY_IP, LogFileProfiler::mIpAddr);
+    labels.emplace_back(METRIC_LABEL_KEY_START_TIME, LogFileProfiler::mStartTime);
     labels.emplace_back(METRIC_LABEL_KEY_OS, OS_NAME);
     labels.emplace_back(METRIC_LABEL_KEY_OS_DETAIL, LogFileProfiler::mOsDetail);
     labels.emplace_back(METRIC_LABEL_KEY_UUID, Application::GetInstance()->GetUUID());
@@ -721,47 +718,17 @@ void LoongCollectorMonitor::Init() {
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
         mMetricsRecordRef, std::move(labels), std::move(dynamicLabels));
     // init value
-    mDoubleGauges[METRIC_AGENT_CPU] = mMetricsRecordRef.CreateDoubleGauge(METRIC_AGENT_CPU);
-    mIntGauges[METRIC_AGENT_MEMORY] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_MEMORY);
-    mIntGauges[METRIC_AGENT_MEMORY_GO] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_MEMORY_GO);
-    mIntGauges[METRIC_AGENT_GO_ROUTINES_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_GO_ROUTINES_TOTAL);
-    mIntGauges[METRIC_AGENT_OPEN_FD_TOTAL] = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
-    // mIntGauges[METRIC_AGENT_INSTANCE_CONFIG_TOTAL] =
-    // mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_INSTANCE_CONFIG_TOTAL);
-    mIntGauges[METRIC_AGENT_PIPELINE_CONFIG_TOTAL]
-        = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
+    mAgentCpu = mMetricsRecordRef.CreateDoubleGauge(METRIC_AGENT_CPU);
+    mAgentMemory = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_MEMORY);
+    mAgentGoMemory = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_MEMORY_GO);
+    mAgentGoRoutinesTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_GO_ROUTINES_TOTAL);
+    mAgentOpenFdTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
+    mAgentConfigTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
     LOG_INFO(sLogger, ("LoongCollectorMonitor", "started"));
 }
 
 void LoongCollectorMonitor::Stop() {
     MetricExportor::GetInstance()->PushMetrics(true);
-}
-
-CounterPtr LoongCollectorMonitor::GetCounter(std::string key) {
-    auto it = mCounters.find(key);
-    if (it != mCounters.end()) {
-        return it->second;
-    }
-    LOG_WARNING(sLogger, ("get global counter failed, counter key", key));
-    return nullptr;
-}
-
-IntGaugePtr LoongCollectorMonitor::GetIntGauge(std::string key) {
-    auto it = mIntGauges.find(key);
-    if (it != mIntGauges.end()) {
-        return it->second;
-    }
-    LOG_WARNING(sLogger, ("get global gauge failed, gauge key", key));
-    return nullptr;
-}
-
-DoubleGaugePtr LoongCollectorMonitor::GetDoubleGauge(std::string key) {
-    auto it = mDoubleGauges.find(key);
-    if (it != mDoubleGauges.end()) {
-        return it->second;
-    }
-    LOG_WARNING(sLogger, ("get global gauge failed, gauge key", key));
-    return nullptr;
 }
 
 } // namespace logtail

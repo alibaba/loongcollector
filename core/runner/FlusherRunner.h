@@ -77,7 +77,7 @@ private:
     CounterPtr mInItemDataSizeBytes;
     CounterPtr mInItemRawDataSizeBytes;
     CounterPtr mOutItemsTotal;
-    CounterPtr mTotalDelayMs;
+    TimeCounterPtr mTotalDelayMs;
     IntGaugePtr mWaitingItemsTotal;
     IntGaugePtr mLastRunTime;
 

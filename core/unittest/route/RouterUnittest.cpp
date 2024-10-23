@@ -150,7 +150,7 @@ void RouterUnittest::TestMetric() {
     Router router;
     router.Init(configs, ctx);
 
-    APSARA_TEST_EQUAL(3U, router.mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_EQUAL(4U, router.mMetricsRecordRef->GetLabels()->size());
     APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, ""));
     APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
     APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_ROUTER));

@@ -69,7 +69,6 @@ static const int64_t NANO_CONVERTING = 1000000000;
 
 void PollingDirFile::Start() {
     ClearCache();
-    mAgentConfigTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
     mPollingDirCacheSize
         = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_POLLING_DIR_CACHE_SIZE);
     mPollingFileCacheSize
@@ -153,7 +152,7 @@ void PollingDirFile::Polling() {
 
             size_t configTotal = nameConfigMap.size();
             LogtailMonitor::GetInstance()->UpdateMetric("config_count", configTotal);
-            mAgentConfigTotal->Set(configTotal);
+            LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(configTotal);
             {
                 ScopedSpinLock lock(mCacheLock);
                 size_t pollingDirCacheSize = mDirCacheMap.size();

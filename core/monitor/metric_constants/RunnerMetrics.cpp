@@ -22,6 +22,7 @@ namespace logtail {
 const string METRIC_LABEL_KEY_RUNNER_NAME = "runner_name";
 
 // label values
+const string METRIC_LABEL_KEY_METRIC_CATEGORY_RUNNER = "runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER = "file_server";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER = "flusher_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK = "http_sink";

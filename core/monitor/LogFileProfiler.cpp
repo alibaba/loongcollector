@@ -45,6 +45,7 @@ int32_t LogFileProfiler::mSystemBootTime = -1;
 string LogFileProfiler::mECSInstanceID;
 string LogFileProfiler::mECSUserID;
 string LogFileProfiler::mECSRegionID;
+string LogFileProfiler::mStartTime;
 
 LogFileProfiler::LogFileProfiler() {
     srand(time(NULL));

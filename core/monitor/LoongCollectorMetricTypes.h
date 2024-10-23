@@ -17,6 +17,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -29,12 +30,13 @@ namespace logtail {
 
 enum class MetricType {
     METRIC_TYPE_COUNTER,
+    METRIC_TYPE_TIME_COUNTER,
     METRIC_TYPE_INT_GAUGE,
     METRIC_TYPE_DOUBLE_GAUGE,
 };
 
 class Counter {
-private:
+protected:
     std::string mName;
     std::atomic_uint64_t mVal;
 
@@ -44,6 +46,15 @@ public:
     const std::string& GetName() const { return mName; }
     void Add(uint64_t val) { mVal.fetch_add(val); }
     Counter* Collect() { return new Counter(mName, mVal.exchange(0)); }
+};
+
+// input: nanosecond, output: milisecond
+class TimeCounter : public Counter {
+public:
+    TimeCounter(const std::string& name, uint64_t val = 0) : Counter(name, val) {}
+    uint64_t GetValue() const { return mVal.load()/1000000; }
+    void Add(std::chrono::nanoseconds val) { mVal.fetch_add(val.count()); }
+    TimeCounter* Collect() { return new TimeCounter(mName, mVal.exchange(0)); }
 };
 
 template <typename T>
@@ -73,6 +84,7 @@ public:
 };
 
 using CounterPtr = std::shared_ptr<Counter>;
+using TimeCounterPtr = std::shared_ptr<TimeCounter>;
 using IntGaugePtr = std::shared_ptr<IntGauge>;
 using DoubleGaugePtr = std::shared_ptr<Gauge<double>>;
 

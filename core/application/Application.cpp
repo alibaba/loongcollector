@@ -192,7 +192,8 @@ void Application::Init() {
 }
 
 void Application::Start() { // GCOVR_EXCL_START
-    LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S"));
+    LogFileProfiler::mStartTime =  GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
+    LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", LogFileProfiler::mStartTime);
 
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
     InitWindowsSignalObject();

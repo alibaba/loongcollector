@@ -22,6 +22,9 @@ namespace logtail {
 const string METRIC_LABEL_KEY_PLUGIN_ID = "plugin_id";
 const string METRIC_LABEL_KEY_PLUGIN_TYPE = "plugin_type";
 
+// label values
+const string METRIC_LABEL_KEY_METRIC_CATEGORY_PLUGIN = "plugin";
+
 // metric keys
 const string METRIC_PLUGIN_IN_EVENTS_TOTAL = "plugin_in_events_total";
 const string METRIC_PLUGIN_IN_EVENT_GROUPS_TOTAL = "plugin_in_event_groups_total";

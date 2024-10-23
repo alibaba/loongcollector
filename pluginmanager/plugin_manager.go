@@ -46,28 +46,7 @@ var DisabledLogtailConfig = make(map[string]*LogstoreConfig)
 var LastUnsendBuffer = make(map[string]PluginRunner)
 
 // Two built-in logtail configs to report statistics and alarm (from system and other logtail configs).
-var StatisticsConfig *LogstoreConfig
 var AlarmConfig *LogstoreConfig
-
-var statisticsConfigJSON = `{
-    "global": {
-        "InputIntervalMs" :  60000,
-        "AggregatIntervalMs": 1000,
-        "FlushIntervalMs": 1000,
-        "DefaultLogQueueSize": 4,
-		"DefaultLogGroupQueueSize": 4,
-		"Tags" : {
-			"base_version" : "` + config.BaseVersion + `",
-			"loongcollector_version" : "` + config.BaseVersion + `"
-		}
-	},
-	"inputs" : [
-		{
-			"type" : "metric_statistics",
-			"detail" : null
-		}
-	]
-}`
 
 var alarmConfigJSON = `{
     "global": {
@@ -122,11 +101,6 @@ func Init() (err error) {
 	logger.Info(context.Background(), "init plugin, local env tags", helper.EnvTags)
 
 	if err = CheckPointManager.Init(); err != nil {
-		return
-	}
-	if StatisticsConfig, err = loadBuiltinConfig("statistics", "sls-admin", "logtail_plugin_profile",
-		"shennong_log_profile", statisticsConfigJSON); err != nil {
-		logger.Error(context.Background(), "LOAD_PLUGIN_ALARM", "load statistics config fail", err)
 		return
 	}
 	if AlarmConfig, err = loadBuiltinConfig("alarm", "sls-admin", "logtail_alarm",
@@ -208,16 +182,6 @@ func StopAllPipelines(withInput bool) error {
 
 // StopBuiltInModulesConfig stops built-in services (self monitor, alarm, container and checkpoint manager).
 func StopBuiltInModulesConfig() {
-	if StatisticsConfig != nil {
-		if *flags.ForceSelfCollect {
-			logger.Info(context.Background(), "force collect the static metrics")
-			control := pipeline.NewAsyncControl()
-			StatisticsConfig.PluginRunner.RunPlugins(pluginMetricInput, control)
-			control.WaitCancel()
-		}
-		_ = StatisticsConfig.Stop(true)
-		StatisticsConfig = nil
-	}
 	if AlarmConfig != nil {
 		if *flags.ForceSelfCollect {
 			logger.Info(context.Background(), "force collect the alarm metrics")

@@ -88,7 +88,7 @@ bool SenderQueue::Remove(SenderQueueItem* item) {
     --mSize;
 
     mOutItemsTotal->Add(1);
-    mTotalDelayMs->Add(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - enQueuTime).count());
+    mTotalDelayMs->Add(chrono::system_clock::now() - enQueuTime);
     mQueueDataSizeByte->Sub(size);
 
     if (!mExtraBuffer.empty()) {

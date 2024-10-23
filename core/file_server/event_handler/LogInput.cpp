@@ -88,7 +88,6 @@ void LogInput::Start() {
     mInteruptFlag = false;
 
     mLastRunTime = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
-    mAgentOpenFdTotal = LoongCollectorMonitor::GetInstance()->GetIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
     mRegisterdHandlersTotal = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_WATCHED_DIRS_TOTAL);
     mActiveReadersTotal = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ACTIVE_READERS_TOTAL);
     mEnableFileIncludedByMultiConfigs = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG);
@@ -349,7 +348,7 @@ void LogInput::UpdateCriticalMetric(int32_t curTime) {
                                                 1.0 * mEventProcessCount / (curTime - mLastUpdateMetricTime));
     int32_t openFdTotal = GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize();
     LogtailMonitor::GetInstance()->UpdateMetric("open_fd", openFdTotal);
-    mAgentOpenFdTotal->Set(openFdTotal);
+    LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(openFdTotal);
     size_t handlerCount = EventDispatcher::GetInstance()->GetHandlerCount();
     LogtailMonitor::GetInstance()->UpdateMetric("register_handler", handlerCount);
     mRegisterdHandlersTotal->Set(handlerCount);

@@ -43,12 +43,14 @@ namespace logtail {
 
 bool FlusherRunner::Init() {
     srand(time(nullptr));
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
-                                                         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER}});
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        mMetricsRecordRef,
+        {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER},
+         {METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_RUNNER}});
     mInItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_ITEMS_TOTAL);
     mInItemDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_SIZE_BYTES);
     mOutItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_OUT_ITEMS_TOTAL);
-    mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_TOTAL_DELAY_MS);
+    mTotalDelayMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_TOTAL_DELAY_MS);
     mLastRunTime = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
     mInItemRawDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_FLUSHER_IN_RAW_SIZE_BYTES);
     mWaitingItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_FLUSHER_WAITING_ITEMS_TOTAL);
@@ -154,8 +156,9 @@ void FlusherRunner::Run() {
         mLastRunTime->Set(chrono::duration_cast<chrono::seconds>(curTime.time_since_epoch()).count());
 
         vector<SenderQueueItem*> items;
-        int32_t limit = Application::GetInstance()->IsExiting() ? -1 : AppConfig::GetInstance()->GetSendRequestConcurrency();
-        SenderQueueManager::GetInstance()->GetAvailableItems(items,  limit);
+        int32_t limit
+            = Application::GetInstance()->IsExiting() ? -1 : AppConfig::GetInstance()->GetSendRequestConcurrency();
+        SenderQueueManager::GetInstance()->GetAvailableItems(items, limit);
         if (items.empty()) {
             SenderQueueManager::GetInstance()->Wait(1000);
         } else {
@@ -195,8 +198,7 @@ void FlusherRunner::Run() {
             Dispatch(*itr);
             mWaitingItemsTotal->Sub(1);
             mOutItemsTotal->Add(1);
-            mTotalDelayMs->Add(
-                chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - curTime).count());
+            mTotalDelayMs->Add(chrono::system_clock::now() - curTime);
         }
 
         // TODO: move the following logic to scheduler

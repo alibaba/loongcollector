@@ -53,6 +53,7 @@ PrometheusInputRunner::PrometheusInputRunner()
 
     // self monitor
     MetricLabels labels;
+    labels.emplace_back(METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_RUNNER);
     labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS);
     labels.emplace_back(METRIC_LABEL_KEY_INSTANCE_ID, Application::GetInstance()->GetInstanceId());
     labels.emplace_back(METRIC_LABEL_KEY_POD_NAME, mPodName);

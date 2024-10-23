@@ -14,10 +14,6 @@
 
 package helper
 
-import (
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-)
-
 //////////////////////////////////////////////////////////////////////////
 // agent
 //////////////////////////////////////////////////////////////////////////
@@ -27,18 +23,3 @@ const (
 	MetricAgentMemoryGo        = "agent_go_memory_used_mb"
 	MetricAgentGoRoutinesTotal = "agent_go_routines_total"
 )
-
-func GetCommonLabels(context pipeline.Context, pluginMeta *pipeline.PluginMeta) []pipeline.LabelPair {
-	labels := make([]pipeline.LabelPair, 0)
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyProject, Value: context.GetProject()})
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyLogstore, Value: context.GetLogstore()})
-	labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPipelineName, Value: context.GetConfigName()})
-
-	if len(pluginMeta.PluginID) > 0 {
-		labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPluginID, Value: pluginMeta.PluginID})
-	}
-	if len(pluginMeta.PluginType) > 0 {
-		labels = append(labels, pipeline.LabelPair{Key: MetricLabelKeyPluginType, Value: pluginMeta.PluginType})
-	}
-	return labels
-}

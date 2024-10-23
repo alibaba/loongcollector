@@ -136,7 +136,6 @@ private:
     // The sequence number of current round, uint64_t is used to avoid overflow.
     uint64_t mCurrentRound;
 
-    IntGaugePtr mAgentConfigTotal;
     IntGaugePtr mPollingDirCacheSize;
     IntGaugePtr mPollingFileCacheSize;
 

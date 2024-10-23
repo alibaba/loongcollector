@@ -44,7 +44,7 @@ private:
     CounterPtr mOutEventsTotal;
     CounterPtr mInSizeBytes;
     CounterPtr mOutSizeBytes;
-    CounterPtr mTotalProcessTimeMs;
+    TimeCounterPtr mTotalProcessTimeMs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorInstanceUnittest;
