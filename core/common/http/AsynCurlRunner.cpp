@@ -27,6 +27,7 @@ namespace logtail {
 
 bool AsynCurlRunner::Init() {
     mClient = curl_multi_init();
+    mIsFlush = false;
     if (mClient == nullptr) {
         LOG_ERROR(sLogger, ("failed to init async curl runner", "failed to init curl client"));
         return false;

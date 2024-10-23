@@ -21,6 +21,10 @@ using namespace std;
 namespace logtail {
 
 void Timer::Init() {
+    {
+        lock_guard<mutex> lock(mThreadRunningMux);
+        mIsThreadRunning = true;
+    }
     mThreadRes = async(launch::async, &Timer::Run, this);
 }
 
