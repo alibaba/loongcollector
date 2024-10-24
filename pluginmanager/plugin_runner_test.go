@@ -44,8 +44,36 @@ func (s *pluginRunnerTestSuite) AfterTest(suiteName, testName string) {
 	logger.Infof(context.Background(), "========== %s %s test end =======================", suiteName, testName)
 }
 
-func (s *pluginRunnerTestSuite) TestTimerRunner() {
+func (s *pluginRunnerTestSuite) TestTimerRunner_WithoutInitialDelay() {
 	runner := &timerRunner{state: s, interval: time.Millisecond * 600, context: s.Context}
+	cc := pipeline.NewAsyncControl()
+	ch := make(chan struct{}, 10)
+	cc.Run(func(cc *pipeline.AsyncControl) {
+		runner.Run(func(state interface{}) error {
+			ch <- struct{}{}
+			s.Equal(state, s)
+			return nil
+		}, cc)
+	})
+	cc.WaitCancel()
+	s.Equal(2, len(ch))
+
+	ch = make(chan struct{}, 10)
+	cc.Reset()
+	cc.Run(func(cc *pipeline.AsyncControl) {
+		runner.Run(func(state interface{}) error {
+			ch <- struct{}{}
+			s.Equal(state, s)
+			return nil
+		}, cc)
+	})
+	<-time.After(time.Millisecond * 1000)
+	cc.WaitCancel()
+	s.Equal(3, len(ch))
+}
+
+func (s *pluginRunnerTestSuite) TestTimerRunner_WithInitialDelay() {
+	runner := &timerRunner{state: s, initialMaxDelay: time.Second, interval: time.Millisecond * 600, context: s.Context}
 	cc := pipeline.NewAsyncControl()
 	ch := make(chan struct{}, 10)
 	cc.Run(func(cc *pipeline.AsyncControl) {
@@ -67,7 +95,7 @@ func (s *pluginRunnerTestSuite) TestTimerRunner() {
 			return nil
 		}, cc)
 	})
-	<-time.After(time.Millisecond * 1000)
+	<-time.After(time.Millisecond * 600)
 	cc.WaitCancel()
 	s.Equal(2, len(ch))
 }

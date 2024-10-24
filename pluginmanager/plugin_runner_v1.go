@@ -208,7 +208,18 @@ func (p *pluginv1Runner) runInput() {
 func (p *pluginv1Runner) runMetricInput(async *pipeline.AsyncControl) {
 	for _, metric := range p.MetricPlugins {
 		m := metric
-		async.Run(m.Run)
+		runner := &timerRunner{
+			initialMaxDelay: time.Duration(p.LogstoreConfig.GlobalConfig.InputMaxFirstCollectDelayMs) * time.Millisecond,
+			state:           m.Input,
+			interval:        m.Interval,
+			context:         m.Config.Context,
+			latencyMetric:   m.Config.Statistics.CollecLatencytMetric,
+		}
+		async.Run(func(ac *pipeline.AsyncControl) {
+			runner.Run(func(state interface{}) error {
+				return m.Input.Collect(m)
+			}, ac)
+		})
 	}
 }
 

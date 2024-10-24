@@ -10,6 +10,9 @@
 |----------------------------------|------------|----------|---------|---------------------------------|
 | enable                           | bool       | 否        | true    | 是否使用当前配置。                       |
 | global                           | object     | 否        | 空       | 全局配置。                           |
+| global.StructureType             | string     | 否        | v1      | 流水线版本为v1或v2。               |
+| global.InputIntervalMs           | int        | 否        | 1000    | MetricInput采集间隔，单位毫秒。               |
+| global.InputMaxFirstCollectDelayMs| int       | 否        | 10000   | MetricInput启动后, 第一次采集随机等待时长上限，如果采集间隔更小，则以采集间隔为准               |
 | global.EnableTimestampNanosecond | bool       | 否        | false   | 否启用纳秒级时间戳，提高时间精度。               |
 | inputs                           | \[object\] | 是        | /       | 输入插件列表。目前只允许使用1个输入插件。           |
 | processors                       | \[object\] | 否        | 空       | 处理插件列表。                         |

@@ -156,10 +156,11 @@ func (p *pluginv2Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input p
 	}
 	p.MetricPlugins = append(p.MetricPlugins, &wrapper)
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
-		state:         input,
-		interval:      wrapper.Interval,
-		context:       p.LogstoreConfig.Context,
-		latencyMetric: p.LogstoreConfig.Statistics.CollecLatencytMetric,
+		initialMaxDelay: time.Duration(p.LogstoreConfig.GlobalConfig.InputMaxFirstCollectDelayMs) * time.Millisecond,
+		interval:        wrapper.Interval,
+		state:           input,
+		context:         p.LogstoreConfig.Context,
+		latencyMetric:   p.LogstoreConfig.Statistics.CollecLatencytMetric,
 	})
 	return err
 }
@@ -192,10 +193,11 @@ func (p *pluginv2Runner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregat
 	}
 	p.AggregatorPlugins = append(p.AggregatorPlugins, &wrapper)
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
-		state:         aggregator,
-		interval:      wrapper.Interval,
-		context:       p.LogstoreConfig.Context,
-		latencyMetric: p.LogstoreConfig.Statistics.CollecLatencytMetric,
+		state:           aggregator,
+		initialMaxDelay: wrapper.Interval,
+		interval:        wrapper.Interval,
+		context:         p.LogstoreConfig.Context,
+		latencyMetric:   p.LogstoreConfig.Statistics.CollecLatencytMetric,
 	})
 	return nil
 }

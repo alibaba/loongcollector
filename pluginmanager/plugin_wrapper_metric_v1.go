@@ -16,10 +16,8 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 
 	"time"
 )
@@ -42,23 +40,6 @@ func (wrapper *MetricWrapperV1) Init(pluginMeta *pipeline.PluginMeta, inputInter
 	}
 	wrapper.Interval = time.Duration(interval) * time.Millisecond
 	return nil
-}
-
-func (wrapper *MetricWrapperV1) Run(control *pipeline.AsyncControl) {
-	logger.Info(wrapper.Config.Context.GetRuntimeContext(), "start run metric ", wrapper.Input.Description())
-	defer panicRecover(wrapper.Input.Description())
-	for {
-		exitFlag := util.RandomSleep(wrapper.Interval, 0.1, control.CancelToken())
-		startTime := time.Now()
-		err := wrapper.Input.Collect(wrapper)
-		wrapper.LatencyMetric.Observe(float64(time.Since(startTime)))
-		if err != nil {
-			logger.Error(wrapper.Config.Context.GetRuntimeContext(), "INPUT_COLLECT_ALARM", "error", err)
-		}
-		if exitFlag {
-			return
-		}
-	}
 }
 
 func (wrapper *MetricWrapperV1) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
