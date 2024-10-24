@@ -137,16 +137,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                 continue;
             }
 
-            // record profile, must be placed here since readbytes info exists only before processing
-            auto& processProfile = pipeline->GetContext().GetProcessProfile();
-            ProcessProfile profile = processProfile;
-            bool isLog = false;
-            if (!item->mEventGroup.GetEvents().empty() && item->mEventGroup.GetEvents()[0].Is<LogEvent>()) {
-                isLog = true;
-                profile.readBytes = item->mEventGroup.GetEvents()[0].Cast<LogEvent>().GetPosition().second
-                    + 1; // may not be accurate if input is not utf8
-            }
-            processProfile.Reset();
+            bool isLog = !item->mEventGroup.GetEvents().empty() && item->mEventGroup.GetEvents()[0].Is<LogEvent>();
 
             int32_t startTime = (int32_t)time(NULL);
             vector<PipelineEventGroup> eventGroupList;
@@ -193,34 +184,6 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                     }
                 }
             } else {
-                if (isLog) {
-                    string convertedPath = eventGroupList[0].GetMetadata(EventGroupMetaKey::LOG_FILE_PATH).to_string();
-                    string hostLogPath
-                        = eventGroupList[0].GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED).to_string();
-#if defined(_MSC_VER)
-                    if (BOOL_FLAG(enable_chinese_tag_path)) {
-                        convertedPath = EncodingConverter::GetInstance()->FromACPToUTF8(convertedPath);
-                        hostLogPath = EncodingConverter::GetInstance()->FromACPToUTF8(hostLogPath);
-                    }
-#endif
-                    LogFileProfiler::GetInstance()->AddProfilingData(
-                        pipeline->Name(),
-                        pipeline->GetContext().GetRegion(),
-                        pipeline->GetContext().GetProjectName(),
-                        pipeline->GetContext().GetLogstoreName(),
-                        convertedPath,
-                        hostLogPath,
-                        vector<sls_logs::LogTag>(), // warning: this cannot be recovered!
-                        profile.readBytes,
-                        profile.skipBytes,
-                        profile.splitLines,
-                        profile.parseFailures,
-                        profile.regexMatchFailures,
-                        profile.parseTimeFailures,
-                        profile.historyFailures,
-                        0,
-                        ""); // TODO: I don't think errorLine is useful
-                }
                 pipeline->Send(std::move(eventGroupList));
             }
             pipeline->SubInProcessCnt();
