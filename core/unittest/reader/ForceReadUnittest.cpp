@@ -348,8 +348,8 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
         LogFileReader::BUFFER_SIZE = 10;
-        BlockedEventManager::GetInstance()->mBlockEventMap.clear();
-        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mBlockEventMap.size(), 0U);
+        BlockedEventManager::GetInstance()->mEventMap.clear();
+        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mEventMap.size(), 0U);
 
         ModifyHandler* pHanlder = new ModifyHandler(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event
@@ -362,7 +362,7 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
                          reader.mDevInode.dev,
                          reader.mDevInode.inode);
         pHanlder->Handle(e1);
-        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mBlockEventMap.size(), 0U);
+        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mEventMap.size(), 0U);
     }
     {
         // read all -> add timeout event
@@ -373,8 +373,8 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
         LogFileReader::BUFFER_SIZE = 1024 * 512;
-        BlockedEventManager::GetInstance()->mBlockEventMap.clear();
-        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mBlockEventMap.size(), 0U);
+        BlockedEventManager::GetInstance()->mEventMap.clear();
+        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mEventMap.size(), 0U);
 
         ModifyHandler* pHanlder = new ModifyHandler(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event
@@ -387,7 +387,7 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
                          reader.mDevInode.dev,
                          reader.mDevInode.inode);
         pHanlder->Handle(e1);
-        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mBlockEventMap.size(), 1U);
+        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mEventMap.size(), 1U);
     }
 }
 

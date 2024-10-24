@@ -15,25 +15,30 @@
  */
 
 #pragma once
+
+#include <cstdint>
+#include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
-#include "file_server/event/Event.h"
 #include "common/FeedbackInterface.h"
-#include "common/Flags.h"
-#include "common/Lock.h"
+#include "file_server/event/Event.h"
 #include "pipeline/queue/QueueKey.h"
-
-DECLARE_FLAG_INT32(max_block_event_timeout);
 
 namespace logtail {
 
 class BlockedEventManager : public FeedbackInterface {
 public:
+    BlockedEventManager(const BlockedEventManager&) = delete;
+    BlockedEventManager& operator=(const BlockedEventManager&) = delete;
+
     static BlockedEventManager* GetInstance() {
-        static BlockedEventManager* s_Instance = new BlockedEventManager;
-        return s_Instance;
+        static BlockedEventManager instance;
+        return &instance;
     }
+
+    void Feedback(int64_t key) override;
 
     void UpdateBlockEvent(QueueKey logstoreKey,
                           const std::string& configName,
@@ -41,56 +46,34 @@ public:
                           const DevInode& devInode,
                           int32_t curTime);
     void GetTimeoutEvent(std::vector<Event*>& eventVec, int32_t curTime);
-    void Feedback(int64_t key) override;
+    void GetFeedbackEvent(std::vector<Event*>& eventVec);
 
-protected:
+private:
     struct BlockedEvent {
-        BlockedEvent() : mInvalidTime(time(NULL)) {}
-        void Update(QueueKey key, Event* pEvent, int32_t curTime) {
-            if (mEvent != NULL) {
-                // There are only two situations where event coverage is possible
-                // 1. the new event is not timeout event
-                // 2. old event is timeout event
-                if (!pEvent->IsReaderFlushTimeout() || mEvent->IsReaderFlushTimeout()) {
-                    delete mEvent;
-                } else {
-                    return;
-                }
-            }
-            mEvent = pEvent;
-            mQueueKey = key;
-            // will become traditional block event if processor queue is not ready
-            if (mEvent->IsReaderFlushTimeout()) {
-                mTimeout = curTime - mInvalidTime;
-            } else {
-                mTimeout = (curTime - mInvalidTime) * 2 + 1;
-                if (mTimeout > INT32_FLAG(max_block_event_timeout)) {
-                    mTimeout = INT32_FLAG(max_block_event_timeout);
-                }
-            }
-        }
-        void SetInvalidAgain(int32_t curTime) {
-            mTimeout *= 2;
-            if (mTimeout > INT32_FLAG(max_block_event_timeout)) {
-                mTimeout = INT32_FLAG(max_block_event_timeout);
-            }
-        }
-
         QueueKey mQueueKey = -1;
         Event* mEvent = nullptr;
         int32_t mInvalidTime;
         int32_t mTimeout = 1;
+
+        BlockedEvent();
+
+        void Update(QueueKey key, Event* pEvent, int32_t curTime);
+        void SetInvalidAgain();
     };
 
-    BlockedEventManager();
-    virtual ~BlockedEventManager();
+    BlockedEventManager() = default;
+    ~BlockedEventManager();
 
-    std::unordered_map<int64_t, BlockedEvent> mBlockEventMap;
-    SpinLock mLock;
+    // only used by LogInput thread
+    std::unordered_map<int64_t, BlockedEvent> mEventMap;
 
-private:
+    // race condition from Processor Runner threads and LogInput thread
+    std::mutex mFeedbackQueueMux;
+    std::vector<int64_t> mFeedbackQueue;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ForceReadUnittest;
+    friend class BlockedEventManagerUnittest;
 #endif
 };
 

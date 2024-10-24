@@ -133,6 +133,12 @@ void LogInput::TryReadEvents(bool forceRead) {
         PushEventQueue(inotifyEvents);
     }
 
+    vector<Event*> feedbackEvents;
+    BlockedEventManager::GetInstance()->GetFeedbackEvent(feedbackEvents);
+    if (feedbackEvents.size() > 0) {
+        PushEventQueue(feedbackEvents);
+    }
+
     vector<Event*> pollingEvents;
     PollingEventQueue::GetInstance()->PopAllEvents(pollingEvents);
     if (pollingEvents.size() > 0) {

@@ -12,23 +12,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "BlockEventManager.h"
+#include "file_server/event/BlockEventManager.h"
 
+#include "common/Flags.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
-#include "file_server/polling/PollingEventQueue.h"
-#include "pipeline/queue/ProcessQueueManager.h"
 #include "logger/Logger.h"
+#include "pipeline/queue/ProcessQueueManager.h"
 
 DEFINE_FLAG_INT32(max_block_event_timeout, "max block event timeout, seconds", 3);
 
+using namespace std;
+
 namespace logtail {
 
-void BlockedEventManager::UpdateBlockEvent(QueueKey logstoreKey,
-                                           const std::string& configName,
-                                           const Event& event,
-                                           const DevInode& devInode,
-                                           int32_t curTime) {
+BlockedEventManager::BlockedEvent::BlockedEvent() : mInvalidTime(time(NULL)) {
+}
+
+void BlockedEventManager::BlockedEvent::Update(QueueKey key, Event* pEvent, int32_t curTime) {
+    if (mEvent != NULL) {
+        // There are only two situations where event coverage is possible
+        // 1. the new event is not timeout event
+        // 2. old event is timeout event
+        if (!pEvent->IsReaderFlushTimeout() || mEvent->IsReaderFlushTimeout()) {
+            delete mEvent;
+        } else {
+            return;
+        }
+    }
+    mEvent = pEvent;
+    mQueueKey = key;
+    // will become traditional block event if processor queue is not ready
+    if (mEvent->IsReaderFlushTimeout()) {
+        mTimeout = curTime - mInvalidTime;
+    } else {
+        mTimeout = (curTime - mInvalidTime) * 2 + 1;
+        if (mTimeout > INT32_FLAG(max_block_event_timeout)) {
+            mTimeout = INT32_FLAG(max_block_event_timeout);
+        }
+    }
+}
+
+void BlockedEventManager::BlockedEvent::SetInvalidAgain() {
+    mTimeout *= 2;
+    if (mTimeout > INT32_FLAG(max_block_event_timeout)) {
+        mTimeout = INT32_FLAG(max_block_event_timeout);
+    }
+}
+
+BlockedEventManager::~BlockedEventManager() {
+    for (auto iter = mEventMap.begin(); iter != mEventMap.end(); ++iter) {
+        if (iter->second.mEvent != nullptr) {
+            delete iter->second.mEvent;
+        }
+    }
+}
+
+void BlockedEventManager::Feedback(int64_t key) {
+    lock_guard<mutex> lock(mFeedbackQueueMux);
+    mFeedbackQueue.emplace_back(key);
+}
+
+void BlockedEventManager::UpdateBlockEvent(
+    QueueKey logstoreKey, const string& configName, const Event& event, const DevInode& devInode, int32_t curTime) {
     // need to create a new event
     Event* pEvent = new Event(event);
     int64_t hashKey = pEvent->GetHashKey();
@@ -38,7 +84,7 @@ void BlockedEventManager::UpdateBlockEvent(QueueKey logstoreKey,
         pEvent->SetConfigName(configName);
         pEvent->SetDev(devInode.dev);
         pEvent->SetInode(devInode.inode);
-        std::string key;
+        string key;
         key.append(pEvent->GetSource())
             .append(">")
             .append(pEvent->GetObject())
@@ -53,65 +99,40 @@ void BlockedEventManager::UpdateBlockEvent(QueueKey logstoreKey,
     LOG_DEBUG(sLogger,
               ("Add block event ", pEvent->GetSource())(pEvent->GetObject(),
                                                         pEvent->GetInode())(pEvent->GetConfigName(), hashKey));
-    ScopedSpinLock lock(mLock);
-    mBlockEventMap[hashKey].Update(logstoreKey, pEvent, curTime);
+    mEventMap[hashKey].Update(logstoreKey, pEvent, curTime);
 }
 
-void BlockedEventManager::GetTimeoutEvent(std::vector<Event*>& eventVec, int32_t curTime) {
-    ScopedSpinLock lock(mLock);
-    for (std::unordered_map<int64_t, BlockedEvent>::iterator iter = mBlockEventMap.begin();
-         iter != mBlockEventMap.end();) {
-        BlockedEvent& blockedEvent = iter->second;
-        if (blockedEvent.mEvent != NULL && blockedEvent.mInvalidTime + blockedEvent.mTimeout <= curTime) {
-            if (ProcessQueueManager::GetInstance()->IsValidToPush(blockedEvent.mQueueKey)) {
-                eventVec.push_back(blockedEvent.mEvent);
-                // LOG_DEBUG(sLogger, ("Get timeout block event  ",
-                // blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(),
-                // blockedEvent.mEvent->GetConfigName()));
-                iter = mBlockEventMap.erase(iter);
+void BlockedEventManager::GetTimeoutEvent(vector<Event*>& res, int32_t curTime) {
+    for (auto iter = mEventMap.begin(); iter != mEventMap.end();) {
+        auto& e = iter->second;
+        if (e.mEvent != nullptr && e.mInvalidTime + e.mTimeout <= curTime) {
+            if (ProcessQueueManager::GetInstance()->IsValidToPush(e.mQueueKey)) {
+                res.push_back(e.mEvent);
+                iter = mEventMap.erase(iter);
                 continue;
             } else {
-                blockedEvent.SetInvalidAgain(curTime);
+                e.SetInvalidAgain();
             }
         }
         ++iter;
     }
 }
 
-void BlockedEventManager::Feedback(int64_t key) {
-    // LOG_DEBUG(sLogger, ("Get feedback block event  ", key));
-    std::vector<Event*> eventVec;
+void BlockedEventManager::GetFeedbackEvent(vector<Event*>& res) {
+    vector<int64_t> keys;
     {
-        ScopedSpinLock lock(mLock);
-        for (std::unordered_map<int64_t, BlockedEvent>::iterator iter = mBlockEventMap.begin();
-             iter != mBlockEventMap.end();) {
-            BlockedEvent& blockedEvent = iter->second;
-            if (blockedEvent.mEvent != NULL && blockedEvent.mQueueKey == key) {
-                eventVec.push_back(blockedEvent.mEvent);
-                // LOG_DEBUG(sLogger, ("Get feedback block event  ",
-                // blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(),
-                // blockedEvent.mEvent->GetConfigName()));
-                iter = mBlockEventMap.erase(iter);
+        lock_guard<mutex> lock(mFeedbackQueueMux);
+        keys.swap(mFeedbackQueue);
+    }
+    for (auto& key : keys) {
+        for (auto iter = mEventMap.begin(); iter != mEventMap.end();) {
+            auto& e = iter->second;
+            if (e.mEvent != nullptr && e.mQueueKey == key) {
+                res.push_back(e.mEvent);
+                iter = mEventMap.erase(iter);
             } else {
                 ++iter;
             }
-        }
-    }
-    if (eventVec.size() > 0) {
-        // use polling event queue, it is thread safe
-        PollingEventQueue::GetInstance()->PushEvent(eventVec);
-    }
-}
-
-BlockedEventManager::BlockedEventManager() {
-}
-
-BlockedEventManager::~BlockedEventManager() {
-    for (std::unordered_map<int64_t, BlockedEvent>::iterator iter = mBlockEventMap.begin();
-         iter != mBlockEventMap.end();
-         ++iter) {
-        if (iter->second.mEvent != NULL) {
-            delete iter->second.mEvent;
         }
     }
 }
