@@ -317,10 +317,6 @@ void ProcessorSplitMultilineLogStringNative::CreateNewEvent(const StringView& co
         StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
         targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
     }
-    // TODO: remove the following code after the flusher refactorization
-    if (logGroup.GetExactlyOnceCheckpoint() != nullptr) {
-        logGroup.GetExactlyOnceCheckpoint()->positions.emplace_back(offset, content.size());
-    }
     newEvents.emplace_back(std::move(targetEvent));
 }
 

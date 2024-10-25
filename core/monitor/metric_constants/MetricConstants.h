@@ -66,6 +66,10 @@ extern const std::string METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL;
 extern const std::string METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL;
 extern const std::string METRIC_PIPELINE_PROCESSORS_IN_SIZE_BYTES;
 extern const std::string METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS;
+extern const std::string METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL;
+extern const std::string METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL;
+extern const std::string METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES;
+extern const std::string METRIC_PIPELINE_FLUSHERS_TOTAL_PACKAGE_TIME_MS;
 extern const std::string METRIC_PIPELINE_START_TIME;
 
 //////////////////////////////////////////////////////////////////////////
@@ -125,6 +129,7 @@ extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL;
 /**********************************************************
  *   all flusher （所有发送插件通用指标）
  **********************************************************/
+extern const std::string METRIC_PLUGIN_FLUSHER_TOTAL_PACKAGE_TIME_MS;
 extern const std::string METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL;

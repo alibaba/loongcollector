@@ -109,6 +109,10 @@ private:
     CounterPtr mProcessorsInGroupsTotal;
     CounterPtr mProcessorsInSizeBytes;
     TimeCounterPtr mProcessorsTotalProcessTimeMs;
+    CounterPtr mFlushersInGroupsTotal;
+    CounterPtr mFlushersInEventsTotal;
+    CounterPtr mFlushersInSizeBytes;
+    TimeCounterPtr mFlushersTotalPackageTimeMs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineMock;

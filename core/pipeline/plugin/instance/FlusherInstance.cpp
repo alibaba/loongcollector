@@ -16,7 +16,10 @@
 
 #include "monitor/metric_constants/MetricConstants.h"
 
+using namespace std;
+
 namespace logtail {
+
 bool FlusherInstance::Init(const Json::Value& config, PipelineContext& context, Json::Value& optionalGoPipeline) {
     mPlugin->SetContext(context);
     mPlugin->SetPluginID(PluginID());
@@ -25,15 +28,22 @@ bool FlusherInstance::Init(const Json::Value& config, PipelineContext& context, 
         return false;
     }
 
+    mInGroupsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_EVENT_GROUPS_TOTAL);
     mInEventsTotal = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
     mInSizeBytes = mPlugin->GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_IN_SIZE_BYTES);
+    mTotalPackageTimeMs = mPlugin->GetMetricsRecordRef().CreateTimeCounter(METRIC_PLUGIN_FLUSHER_TOTAL_PACKAGE_TIME_MS);
     return true;
 }
 
 bool FlusherInstance::Send(PipelineEventGroup&& g) {
+    mInGroupsTotal->Add(1);
     mInEventsTotal->Add(g.GetEvents().size());
     mInSizeBytes->Add(g.DataSize());
-    return mPlugin->Send(std::move(g));
+
+    auto before = chrono::system_clock::now();
+    auto res = mPlugin->Send(std::move(g));
+    mTotalPackageTimeMs->Add(chrono::system_clock::now() - before);
+    return res;
 }
 
 } // namespace logtail

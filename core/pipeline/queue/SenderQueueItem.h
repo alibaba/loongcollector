@@ -43,7 +43,7 @@ struct SenderQueueItem {
 
     std::atomic<SendingStatus> mStatus;
     std::chrono::system_clock::time_point mFirstEnqueTime;
-    time_t mLastSendTime = 0;
+    std::chrono::system_clock::time_point mLastSendTime;
     uint32_t mTryCnt = 1;
 
     SenderQueueItem(std::string&& data,

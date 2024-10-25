@@ -45,7 +45,7 @@ namespace logtail {
 std::string CommonConfigProvider::configVersion = "version";
 
 void CommonConfigProvider::Init(const string& dir) {
-    sName = "CommonConfigProvider";
+    sName = "common config provider";
 
     ConfigProvider::Init(dir);
     LoadConfigFile();

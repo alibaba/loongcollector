@@ -71,10 +71,6 @@ public:
 
     void ClearTimeoutQueues();
 
-    // TODO: should be removed when self-telemetry is refactored
-    uint32_t GetInvalidProcessQueueCnt() const;
-    uint32_t GetProcessQueueCnt() const;
-
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
 #endif

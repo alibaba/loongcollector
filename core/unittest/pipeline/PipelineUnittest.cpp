@@ -2749,6 +2749,16 @@ void PipelineUnittest::TestSend() const {
         configs.emplace_back(0, nullptr);
         configs.emplace_back(1, nullptr);
         pipeline.mRouter.Init(configs, ctx);
+
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, {});
+        pipeline.mFlushersInGroupsTotal
+            = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL);
+        pipeline.mFlushersInEventsTotal
+            = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL);
+        pipeline.mFlushersInSizeBytes
+            = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES);
+        pipeline.mFlushersTotalPackageTimeMs
+            = pipeline.mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_FLUSHERS_TOTAL_PACKAGE_TIME_MS);
         {
             // all valid
             vector<PipelineEventGroup> group;
@@ -2803,6 +2813,16 @@ void PipelineUnittest::TestSend() const {
         }
         configs.emplace_back(configJson.size(), nullptr);
         pipeline.mRouter.Init(configs, ctx);
+
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, {});
+        pipeline.mFlushersInGroupsTotal
+            = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL);
+        pipeline.mFlushersInEventsTotal
+            = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL);
+        pipeline.mFlushersInSizeBytes
+            = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES);
+        pipeline.mFlushersTotalPackageTimeMs
+            = pipeline.mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_FLUSHERS_TOTAL_PACKAGE_TIME_MS);
 
         {
             vector<PipelineEventGroup> group;

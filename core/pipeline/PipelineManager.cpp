@@ -200,9 +200,6 @@ void PipelineManager::StopAllPipelines() {
 
     LogtailPlugin::GetInstance()->StopAllPipelines(false);
 
-    // TODO: make it common
-    FlusherSLS::RecycleResourceIfNotUsed();
-
     // Sender should be stopped after profiling threads are stopped.
     LOG_INFO(sLogger, ("stop all pipelines", "succeeded"));
 }

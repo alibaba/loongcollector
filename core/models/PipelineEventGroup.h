@@ -86,6 +86,8 @@ public:
     MetricEvent* AddMetricEvent();
     SpanEvent* AddSpanEvent();
     void SwapEvents(EventsContainer& other) { mEvents.swap(other); }
+    void ReserveEvents(size_t size) { mEvents.reserve(size); }
+
     std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
 
     void SetMetadata(EventGroupMetaKey key, StringView val);

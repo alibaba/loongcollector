@@ -22,16 +22,16 @@
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
+#include "logger/Logger.h"
+#include "monitor/LogtailAlarm.h"
+#include "pipeline/limiter/RateLimiter.h"
+#include "pipeline/queue/QueueKeyManager.h"
+#include "pipeline/queue/SLSSenderQueueItem.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
-#include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
 #include "provider/Provider.h"
-#include "pipeline/queue/QueueKeyManager.h"
-#include "pipeline/queue/SLSSenderQueueItem.h"
 #include "sdk/Exception.h"
-#include "pipeline/limiter/RateLimiter.h"
 #include "sls_control/SLSControl.h"
 
 DEFINE_FLAG_INT32(write_secondary_wait_timeout, "interval of dump seconary buffer from memory to file, seconds", 2);
@@ -68,7 +68,7 @@ void DiskBufferWriter::Stop() {
     }
     mStopCV.notify_one();
     {
-        future_status s = mBufferWriterThreadRes.wait_for(chrono::seconds(3));
+        future_status s = mBufferWriterThreadRes.wait_for(chrono::seconds(5));
         if (s == future_status::ready) {
             LOG_INFO(sLogger, ("disk buffer writer", "stopped successfully"));
         } else {
@@ -76,7 +76,8 @@ void DiskBufferWriter::Stop() {
         }
     }
     {
-        future_status s = mBufferSenderThreadRes.wait_for(chrono::seconds(1));
+        // timeout should be larger than network timeout, which is 15 for now
+        future_status s = mBufferSenderThreadRes.wait_for(chrono::seconds(20));
         if (s == future_status::ready) {
             LOG_INFO(sLogger, ("disk buffer sender", "stopped successfully"));
         } else {
@@ -158,6 +159,7 @@ void DiskBufferWriter::BufferSenderThread() {
             }
             continue;
         }
+        lock.unlock();
         // mIsSendingBuffer = true;
         int32_t fileToSendCount = int32_t(filesToSend.size());
         int32_t bufferFileNumValue = AppConfig::GetInstance()->GetNumOfBufferFile();
@@ -197,6 +199,7 @@ void DiskBufferWriter::BufferSenderThread() {
             }
         }
         // mIsSendingBuffer = false;
+        lock.lock();
         if (mStopCV.wait_for(lock, chrono::seconds(mCheckPeriod), [this]() { return !mIsSendBufferThreadRunning; })) {
             break;
         }
@@ -509,6 +512,12 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                       filename);
         if (!sendResult)
             writeBack = true;
+        {
+            lock_guard<mutex> lock(mBufferSenderThreadRunningMux);
+            if (!mIsSendBufferThreadRunning) {
+                return;
+            }
+        }
     }
     if (!writeBack) {
         remove(filename.c_str());

@@ -100,6 +100,7 @@ const string METRIC_PLUGIN_PARSE_STDOUT_TOTAL = "plugin_parse_stdout_total";
 /**********************************************************
  *   all flusher （所有发送插件通用指标）
  **********************************************************/
+const string METRIC_PLUGIN_FLUSHER_TOTAL_PACKAGE_TIME_MS = "plugin_flusher_total_package_time_ms";
 const string METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL = "plugin_flusher_send_total";
 const string METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL = "plugin_flusher_send_done_total";
 const string METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL = "plugin_flusher_success_total";

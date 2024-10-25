@@ -329,23 +329,6 @@ void ProcessQueueManager::ResetCurrentQueueIndex() {
     mCurrentQueueIndex.second = mPriorityQueue[0].begin();
 }
 
-uint32_t ProcessQueueManager::GetInvalidCnt() const {
-    uint32_t res = 0;
-    lock_guard<mutex> lock(mQueueMux);
-    for (const auto& q : mQueues) {
-        if (q.second.second == QueueType::BOUNDED
-            && static_cast<BoundedProcessQueue*>(q.second.first->get())->IsValidToPush()) {
-            ++res;
-        }
-    }
-    return res;
-}
-
-uint32_t ProcessQueueManager::GetCnt() const {
-    lock_guard<mutex> lock(mQueueMux);
-    return mQueues.size();
-}
-
 #ifdef APSARA_UNIT_TEST_MAIN
 void ProcessQueueManager::Clear() {
     lock_guard<mutex> lock(mQueueMux);

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "instance_config/InstanceConfigManager.h"
+#include "config/InstanceConfigManager.h"
 
 #include "app_config/AppConfig.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"

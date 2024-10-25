@@ -46,8 +46,10 @@ public:
 private:
     std::unique_ptr<Flusher> mPlugin;
 
+    CounterPtr mInGroupsTotal;
     CounterPtr mInEventsTotal;
     CounterPtr mInSizeBytes;
+    TimeCounterPtr mTotalPackageTimeMs;
 };
 
 } // namespace logtail

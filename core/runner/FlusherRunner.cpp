@@ -36,6 +36,7 @@ using namespace std;
 DEFINE_FLAG_INT32(check_send_client_timeout_interval, "", 600);
 DEFINE_FLAG_BOOL(enable_flow_control, "if enable flow control", true);
 DEFINE_FLAG_BOOL(enable_send_tps_smoothing, "avoid web server load burst", true);
+DEFINE_FLAG_INT32(flusher_runner_exit_timeout_secs, "", 60);
 
 static const int SEND_BLOCK_COST_TIME_ALARM_INTERVAL_SECOND = 3;
 
@@ -76,8 +77,8 @@ bool FlusherRunner::LoadModuleConfig(bool isInit) {
     if (isInit) {
         // Only handle parameters that do not allow hot loading
     }
-    auto maxBytePerSec = AppConfig::GetInstance()->MergeInt32(kDefaultMaxSendBytePerSec, 
-        AppConfig::GetInstance()->GetMaxBytePerSec(), "max_bytes_per_sec", ValidateFn);
+    auto maxBytePerSec = AppConfig::GetInstance()->MergeInt32(
+        kDefaultMaxSendBytePerSec, AppConfig::GetInstance()->GetMaxBytePerSec(), "max_bytes_per_sec", ValidateFn);
     AppConfig::GetInstance()->SetMaxBytePerSec(maxBytePerSec);
     UpdateSendFlowControl();
     return true;
@@ -103,7 +104,7 @@ void FlusherRunner::UpdateSendFlowControl() {
 void FlusherRunner::Stop() {
     mIsFlush = true;
     SenderQueueManager::GetInstance()->Trigger();
-    future_status s = mThreadRes.wait_for(chrono::seconds(10));
+    future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(flusher_runner_exit_timeout_secs)));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("flusher runner", "stopped successfully"));
     } else {
@@ -143,10 +144,13 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
     }
 
     auto req = static_cast<HttpFlusher*>(item->mFlusher)->BuildRequest(item);
-    item->mLastSendTime = time(nullptr);
-    req->mEnqueTime = item->mLastSendTime;
+    req->mEnqueTime = item->mLastSendTime = chrono::system_clock::now();
     HttpSink::GetInstance()->AddRequest(std::move(req));
     ++mHttpSendingCnt;
+    LOG_DEBUG(sLogger,
+              ("send item to http sink, item address", item)("config-flusher-dst",
+                                                             QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
+                  "sending cnt", ToString(mHttpSendingCnt.load())));
 }
 
 void FlusherRunner::Run() {
@@ -162,6 +166,7 @@ void FlusherRunner::Run() {
         if (items.empty()) {
             SenderQueueManager::GetInstance()->Wait(1000);
         } else {
+            LOG_DEBUG(sLogger, ("got items from sender queue, cnt", items.size()));
             for (auto itr = items.begin(); itr != items.end(); ++itr) {
                 mInItemDataSizeBytes->Add((*itr)->mData.size());
                 mInItemRawDataSizeBytes->Add((*itr)->mRawSize);

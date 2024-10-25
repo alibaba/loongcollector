@@ -327,6 +327,10 @@ bool Pipeline::Init(PipelineConfig&& config) {
     mProcessorsInSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_SIZE_BYTES);
     mProcessorsTotalProcessTimeMs
         = mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS);
+    mFlushersInGroupsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL);
+    mFlushersInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL);
+    mFlushersInSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES);
+    mFlushersTotalPackageTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_FLUSHERS_TOTAL_PACKAGE_TIME_MS);
 
     return true;
 }
@@ -375,6 +379,13 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
 }
 
 bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
+    for (const auto& group : groupList) {
+        mFlushersInEventsTotal->Add(group.GetEvents().size());
+        mFlushersInSizeBytes->Add(group.DataSize());
+    }
+    mFlushersInGroupsTotal->Add(groupList.size());
+
+    auto before = chrono::system_clock::now();
     bool allSucceeded = true;
     for (auto& group : groupList) {
         auto res = mRouter.Route(group);
@@ -388,6 +399,7 @@ bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
             allSucceeded = mFlushers[item.first]->Send(std::move(item.second)) && allSucceeded;
         }
     }
+    mFlushersTotalPackageTimeMs->Add(chrono::system_clock::now() - before);
     return allSucceeded;
 }
 

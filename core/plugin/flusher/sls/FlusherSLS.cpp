@@ -120,7 +120,8 @@ shared_ptr<ConcurrencyLimiter> GetConcurrencyLimiter() {
     return make_shared<ConcurrencyLimiter>(AppConfig::GetInstance()->GetSendRequestConcurrency());
 }
 
-shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const std::string& project, const std::string& logstore) {
+shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const std::string& project,
+                                                                         const std::string& logstore) {
     lock_guard<mutex> lock(sMux);
     std::string key = project + "-" + logstore;
 
@@ -509,11 +510,9 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
             mQueueKey,
             mPluginID,
             *mContext,
-            {
-                {"region", GetRegionConcurrencyLimiter(mRegion)},
-                {"project", GetProjectConcurrencyLimiter(mProject)},
-                {"logstore", GetLogstoreConcurrencyLimiter(mProject, mLogstore)}
-            },
+            {{"region", GetRegionConcurrencyLimiter(mRegion)},
+             {"project", GetProjectConcurrencyLimiter(mProject)},
+             {"logstore", GetLogstoreConcurrencyLimiter(mProject, mLogstore)}},
             mMaxSendRate);
     }
 
@@ -537,12 +536,14 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     mSuccessCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL);
     mNetworkErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL);
     mServerErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL);
-    mShardWriteQuotaErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL);
+    mShardWriteQuotaErrorCnt
+        = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL);
     mProjectQuotaErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SLS_PROJECT_QUOTA_ERROR_TOTAL);
     mUnauthErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_UNAUTH_ERROR_TOTAL);
     mParamsErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_PARAMS_ERROR_TOTAL);
     mSequenceIDErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SLS_SEQUENCE_ID_ERROR_TOTAL);
-    mRequestExpiredErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPRIRED_ERROR_TOTAL);
+    mRequestExpiredErrorCnt
+        = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPRIRED_ERROR_TOTAL);
     mOtherErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OTHER_ERROR_TOTAL);
 
     return true;
@@ -686,17 +687,20 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             cpt->Commit();
             cpt->IncreaseSequenceID();
         }
-        LOG_DEBUG(sLogger,
-                  ("send data to sls succeeded, item address",
-                   item)("request id", slsResponse.mRequestId)("config", configName)("region", mRegion)(
-                      "project", mProject)("logstore", data->mLogstore)("response time", curTime - data->mLastSendTime)(
-                      "total send time",
-                      ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mFirstEnqueTime).count())
-                          + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentEndpoint)("is profile data",
-                                                                                                isProfileData));
+        LOG_DEBUG(
+            sLogger,
+            ("send data to sls succeeded, item address", item)("request id", slsResponse.mRequestId)(
+                "config", configName)("region", mRegion)("project", mProject)("logstore", data->mLogstore)(
+                "response time",
+                ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mLastSendTime).count())
+                    + "ms")(
+                "total send time",
+                ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mFirstEnqueTime).count())
+                    + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentEndpoint)("is profile data",
+                                                                                          isProfileData));
         GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
         GetProjectConcurrencyLimiter(mProject)->OnSuccess();
-        GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();                                                                                       
+        GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();
         SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
         DealSenderQueueItemAfterSend(item, false);
         if (mSuccessCnt) {
@@ -871,14 +875,16 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         }
 
 #define LOG_PATTERN \
-    ("failed to send request", failDetail.str())("operation", GetOperationString(operation))( \
-        "suggestion", suggestion.str())("item address", item)("request id", slsResponse.mRequestId)( \
-        "status code", slsResponse.mStatusCode)("error code", slsResponse.mErrorCode)( \
-        "errMsg", slsResponse.mErrorMsg)("config", configName)("region", mRegion)("project", mProject)( \
-        "logstore", data->mLogstore)("try cnt", data->mTryCnt)("response time", curTime - data->mLastSendTime)( \
-        "total send time", \
-        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mFirstEnqueTime).count()) \
-            + "ms")("endpoint", data->mCurrentEndpoint)("is profile data", isProfileData)
+    ("failed to send request", failDetail.str())("operation", GetOperationString(operation))("suggestion", \
+                                                                                             suggestion.str())( \
+        "item address", item)("request id", slsResponse.mRequestId)("status code", slsResponse.mStatusCode)( \
+        "error code", slsResponse.mErrorCode)("errMsg", slsResponse.mErrorMsg)("config", configName)( \
+        "region", mRegion)("project", mProject)("logstore", data->mLogstore)("try cnt", data->mTryCnt)( \
+        "response time", \
+        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mLastSendTime).count()) \
+            + "ms")("total send time", \
+                    ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mFirstEnqueTime).count()) \
+                        + "ms")("endpoint", data->mCurrentEndpoint)("is profile data", isProfileData)
 
         switch (operation) {
             case OperationOnFail::RETRY_IMMEDIATELY:
@@ -941,7 +947,8 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
         key = QueueKeyManager::GetInstance()->GetKey(mProject + "-" + mLogstore);
         if (SenderQueueManager::GetInstance()->GetQueue(key) == nullptr) {
             PipelineContext ctx;
-            SenderQueueManager::GetInstance()->CreateQueue(key, "", ctx, std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>());
+            SenderQueueManager::GetInstance()->CreateQueue(
+                key, "", ctx, std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>());
         }
     }
     return Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(compressedData),

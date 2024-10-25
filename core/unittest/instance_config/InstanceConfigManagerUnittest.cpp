@@ -16,7 +16,7 @@
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "config/InstanceConfig.h"
-#include "instance_config/InstanceConfigManager.h"
+#include "config/InstanceConfigManager.h"
 #include "runner/FlusherRunner.h"
 #include "unittest/Unittest.h"
 

@@ -68,10 +68,6 @@ public:
     bool Wait(uint64_t ms);
     void Trigger();
 
-    // TODO: should be removed when self-telemetry is refactored
-    uint32_t GetInvalidCnt() const;
-    uint32_t GetCnt() const;
-
 private:
     ProcessQueueManager();
     ~ProcessQueueManager() = default;

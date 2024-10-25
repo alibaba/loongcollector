@@ -718,7 +718,6 @@ void LoongCollectorMonitor::Init() {
     mAgentGoRoutinesTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_GO_ROUTINES_TOTAL);
     mAgentOpenFdTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
     mAgentConfigTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
-    LOG_INFO(sLogger, ("LoongCollectorMonitor", "started"));
 }
 
 void LoongCollectorMonitor::Stop() {

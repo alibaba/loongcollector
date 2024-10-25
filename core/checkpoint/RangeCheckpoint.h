@@ -29,10 +29,8 @@ public:
     std::string key;
     QueueKey fbKey;
     RangeCheckpointPB data;
-    std::vector<std::pair<uint64_t, size_t>> positions;
 
     inline void Prepare() {
-        positions.clear();
         data.set_committed(false);
         save();
     }

@@ -23,6 +23,7 @@ namespace logtail {
 class PipelineEventGroupUnittest : public ::testing::Test {
 public:
     void TestSwapEvents();
+    void TestReserveEvents();
     void TestCopy();
     void TestSetMetadata();
     void TestDelMetadata();
@@ -47,6 +48,11 @@ void PipelineEventGroupUnittest::TestSwapEvents() {
     mEventGroup->SwapEvents(eventContainer);
     APSARA_TEST_EQUAL_FATAL(3U, eventContainer.size());
     APSARA_TEST_EQUAL_FATAL(0U, mEventGroup->GetEvents().size());
+}
+
+void PipelineEventGroupUnittest::TestReserveEvents() {
+    mEventGroup->ReserveEvents(10);
+    APSARA_TEST_EQUAL(10U, mEventGroup->GetEvents().capacity());
 }
 
 void PipelineEventGroupUnittest::TestCopy() {
@@ -136,6 +142,7 @@ void PipelineEventGroupUnittest::TestFromJsonToJson() {
 }
 
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSwapEvents)
+UNIT_TEST_CASE(PipelineEventGroupUnittest, TestReserveEvents)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestCopy)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestSetMetadata)
 UNIT_TEST_CASE(PipelineEventGroupUnittest, TestDelMetadata)

@@ -19,11 +19,11 @@
 #include "common/FileSystemUtil.h"
 #include "common/version.h"
 #include "config/ConfigDiff.h"
+#include "config/InstanceConfigManager.h"
 #include "config/common_provider/CommonConfigProvider.h"
 #include "config/watcher/ConfigWatcher.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "gmock/gmock.h"
-#include "instance_config/InstanceConfigManager.h"
 #include "pipeline/PipelineManager.h"
 #include "unittest/Unittest.h"
 
@@ -132,7 +132,7 @@ void CommonConfigProviderUnittest::TestInit() {
         MockCommonConfigProvider provider;
         provider.Init("common_v2");
         APSARA_TEST_EQUAL(provider.mSequenceNum, 0);
-        APSARA_TEST_EQUAL(provider.sName, "CommonConfigProvider");
+        APSARA_TEST_EQUAL(provider.sName, "common config provider");
         APSARA_TEST_EQUAL(provider.mConfigServerAvailable, true);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses.size(), 1);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses[0].host, "test.config.com");
@@ -170,7 +170,7 @@ void CommonConfigProviderUnittest::TestInit() {
         MockCommonConfigProvider provider;
         provider.Init("common_v2");
         APSARA_TEST_EQUAL(provider.mSequenceNum, 0);
-        APSARA_TEST_EQUAL(provider.sName, "CommonConfigProvider");
+        APSARA_TEST_EQUAL(provider.sName, "common config provider");
         APSARA_TEST_EQUAL(provider.mConfigServerAvailable, true);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses.size(), 2);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses[0].host, "test.config.com");
@@ -235,7 +235,7 @@ void CommonConfigProviderUnittest::TestInit() {
         MockCommonConfigProvider provider;
         provider.Init("common_v2");
         APSARA_TEST_EQUAL(provider.mSequenceNum, 0);
-        APSARA_TEST_EQUAL(provider.sName, "CommonConfigProvider");
+        APSARA_TEST_EQUAL(provider.sName, "common config provider");
         APSARA_TEST_EQUAL(provider.mConfigServerAvailable, false);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses.size(), 0);
         APSARA_TEST_EQUAL(provider.mConfigServerTags.size(), 0);
@@ -407,7 +407,7 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
 
 
         provider.Init("common_v2");
-        APSARA_TEST_EQUAL(provider.sName, "CommonConfigProvider");
+        APSARA_TEST_EQUAL(provider.sName, "common config provider");
         APSARA_TEST_EQUAL(provider.mConfigServerAvailable, true);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses.size(), 1);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses[0].host, "test.config.com");
@@ -625,7 +625,7 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
 
 
         provider.Init("common_v2");
-        APSARA_TEST_EQUAL(provider.sName, "CommonConfigProvider");
+        APSARA_TEST_EQUAL(provider.sName, "common config provider");
         APSARA_TEST_EQUAL(provider.mConfigServerAvailable, true);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses.size(), 1);
         APSARA_TEST_EQUAL(provider.mConfigServerAddresses[0].host, "test.config.com");

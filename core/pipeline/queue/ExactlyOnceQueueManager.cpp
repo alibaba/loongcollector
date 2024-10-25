@@ -263,22 +263,6 @@ void ExactlyOnceQueueManager::ClearTimeoutQueues() {
     }
 }
 
-uint32_t ExactlyOnceQueueManager::GetInvalidProcessQueueCnt() const {
-    uint32_t res = 0;
-    lock_guard<mutex> lock(mProcessQueueMux);
-    for (const auto& q : mProcessQueues) {
-        if (q.second->IsValidToPush()) {
-            ++res;
-        }
-    }
-    return res;
-}
-
-uint32_t ExactlyOnceQueueManager::GetProcessQueueCnt() const {
-    lock_guard<mutex> lock(mProcessQueueMux);
-    return mProcessQueues.size();
-}
-
 void ExactlyOnceQueueManager::SetPipelineForSenderItems(QueueKey key, const std::shared_ptr<Pipeline>& p) {
     lock_guard<mutex> lock(mSenderQueueMux);
     auto iter = mSenderQueues.find(key);
