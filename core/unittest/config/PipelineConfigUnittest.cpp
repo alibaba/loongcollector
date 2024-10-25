@@ -1744,26 +1744,6 @@ void PipelineConfigUnittest::HandleInvalidProcessors() const {
     config.reset(new PipelineConfig(configName, std::move(configJson)));
     APSARA_TEST_FALSE(config->Parse());
 
-    // native processor plugins coexist with input_observer_network
-    configStr = R"(
-        {
-            "inputs": [
-                {
-                    "Type": "input_observer_network"
-                }
-            ],
-            "processors": [
-                {
-                    "Type": "processor_parse_regex_native"
-                }
-            ]
-        }
-    )";
-    configJson.reset(new Json::Value());
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new PipelineConfig(configName, std::move(configJson)));
-    APSARA_TEST_FALSE(config->Parse());
-
     // native processor plugins coexist with processor_spl
     configStr = R"(
         {

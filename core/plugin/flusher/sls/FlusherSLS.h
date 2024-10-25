@@ -70,7 +70,7 @@ public:
 
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
 
-    // for use of Go pipeline, stream, observer and shennong
+    // for use of Go pipeline and shennong
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
     std::string mProject;

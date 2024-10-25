@@ -39,12 +39,6 @@ if(MSVC)
     if (ENABLE_ENTERPRISE)
         list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.h ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.cpp)
     endif()
-elseif(UNIX)
-    if (LINUX)
-        # needed by observer in common
-        file(GLOB PICOHTTPPARSER_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/protocol/picohttpparser/*.c ${CMAKE_SOURCE_DIR}/common/protocol/picohttpparser/*.h)
-        list(APPEND THIS_SOURCE_FILES_LIST ${PICOHTTPPARSER_SOURCE_FILES})
-    endif()
 endif()
 
 # Set source files to parent

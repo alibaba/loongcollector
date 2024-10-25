@@ -153,7 +153,7 @@ private:
     "valid": false,
     "inputs": [
         {
-            "Type": "input_observer_network"
+            "Type": "input_container_stdio"
         }
     ],
     "flushers": [
@@ -168,7 +168,7 @@ private:
     "valid": true,
     "inputs": [
         {
-            "Type": "input_observer_network"
+            "Type": "input_container_stdio"
         }
     ],
     "flushers": [
@@ -184,7 +184,7 @@ private:
     "enable": false,
     "inputs": [
         {
-            "Type": "input_observer_network"
+            "Type": "input_container_stdio"
         }
     ],
     "flushers": [

@@ -41,9 +41,6 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "runner/FlusherRunner.h"
-#if defined(__linux__) && !defined(__ANDROID__)
-#include "ObserverManager.h"
-#endif
 #include "application/Application.h"
 #include "sdk/Common.h"
 #ifdef __ENTERPRISE__
@@ -304,9 +301,6 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
 #endif
     UpdateMetric("config_prefer_real_ip", BOOL_FLAG(send_prefer_real_ip));
     UpdateMetric("plugin_enabled", LogtailPlugin::GetInstance()->IsPluginOpened());
-#if defined(__linux__) && !defined(__ANDROID__)
-    UpdateMetric("observer_enabled", ObserverManager::GetInstance()->Status());
-#endif
     const std::vector<sls_logs::LogTag>& envTags = AppConfig::GetInstance()->GetEnvTags();
     if (!envTags.empty()) {
         UpdateMetric("env_config_count", envTags.size());
