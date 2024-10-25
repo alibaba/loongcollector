@@ -42,10 +42,12 @@ class TagCondition {
 public:
     bool Init(const Json::Value& config, const PipelineContext& ctx);
     bool Check(const PipelineEventGroup& g) const;
+    void DiscardTagIfRequired(PipelineEventGroup& g) const;
 
 private:
     std::string mKey;
     std::string mValue;
+    bool mDiscardingTag = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TagConditionUnittest;
@@ -57,6 +59,7 @@ class Condition {
 public:
     bool Init(const Json::Value& config, const PipelineContext& ctx);
     bool Check(const PipelineEventGroup& g) const;
+    void GetResult(PipelineEventGroup& g) const;
 
 private:
     enum class Type { EVENT_TYPE, TAG };

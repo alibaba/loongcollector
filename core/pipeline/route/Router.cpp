@@ -35,24 +35,46 @@ bool Router::Init(std::vector<pair<size_t, const Json::Value*>> configs, const P
         }
     }
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
-                                                         {{METRIC_LABEL_KEY_PROJECT, ctx.GetProjectName()},
-                                                          {METRIC_LABEL_KEY_PIPELINE_NAME, ctx.GetConfigName()},
-                                                          {METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_ROUTER},
-                                                          {METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_COMPONENT}});
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        mMetricsRecordRef,
+        {{METRIC_LABEL_KEY_PROJECT, ctx.GetProjectName()},
+         {METRIC_LABEL_KEY_PIPELINE_NAME, ctx.GetConfigName()},
+         {METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_ROUTER},
+         {METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_COMPONENT}});
     mInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_TOTAL);
     mInGroupDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
     return true;
 }
 
-vector<size_t> Router::Route(const PipelineEventGroup& g) const {
+vector<pair<size_t, PipelineEventGroup>> Router::Route(PipelineEventGroup& g) const {
     mInEventsTotal->Add(g.GetEvents().size());
     mInGroupDataSizeBytes->Add(g.DataSize());
 
-    vector<size_t> res(mAlwaysMatchedFlusherIdx);
+    vector<size_t> dest;
     for (size_t i = 0; i < mConditions.size(); ++i) {
         if (mConditions[i].second.Check(g)) {
-            res.push_back(i);
+            dest.push_back(i);
+        }
+    }
+    auto resSz = dest.size() + mAlwaysMatchedFlusherIdx.size();
+
+    vector<pair<size_t, PipelineEventGroup>> res;
+    res.reserve(resSz);
+    for (size_t i = 0; i < mAlwaysMatchedFlusherIdx.size(); ++i, --resSz) {
+        if (resSz == 1) {
+            res.emplace_back(mAlwaysMatchedFlusherIdx[i], std::move(g));
+        } else {
+            res.emplace_back(mAlwaysMatchedFlusherIdx[i], g.Copy());
+        }
+    }
+    for (size_t i = 0; i < dest.size(); ++i, --resSz) {
+        if (resSz == 1) {
+            mConditions[dest[i]].second.GetResult(g);
+            res.emplace_back(dest[i], std::move(g));
+        } else {
+            auto copy = g.Copy();
+            mConditions[dest[i]].second.GetResult(copy);
+            res.emplace_back(dest[i], std::move(copy));
         }
     }
     return res;

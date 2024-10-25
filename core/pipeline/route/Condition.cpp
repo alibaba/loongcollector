@@ -86,11 +86,30 @@ bool TagCondition::Init(const Json::Value& config, const PipelineContext& ctx) {
                            ctx.GetRegion());
     }
 
+    // DiscardingTag
+    if (!GetOptionalBoolParam(config, "Match.DiscardingTag", mDiscardingTag, errorMsg)) {
+        PARAM_WARNING_DEFAULT(ctx.GetLogger(),
+                              ctx.GetAlarm(),
+                              errorMsg,
+                              false,
+                              noModule,
+                              ctx.GetConfigName(),
+                              ctx.GetProjectName(),
+                              ctx.GetLogstoreName(),
+                              ctx.GetRegion());
+    }
+
     return true;
 }
 
 bool TagCondition::Check(const PipelineEventGroup& g) const {
     return g.GetTag(mKey) == mValue;
+}
+
+void TagCondition::DiscardTagIfRequired(PipelineEventGroup& g) const {
+    if (mDiscardingTag) {
+        g.DelTag(mKey);
+    }
 }
 
 bool Condition::Init(const Json::Value& config, const PipelineContext& ctx) {
@@ -159,6 +178,16 @@ bool Condition::Check(const PipelineEventGroup& g) const {
             return get_if<TagCondition>(&mDetail)->Check(g);
         default:
             return false;
+    }
+}
+
+void Condition::GetResult(PipelineEventGroup& g) const {
+    switch (mType) {
+        case Type::TAG:
+            get_if<TagCondition>(&mDetail)->DiscardTagIfRequired(g);
+            break;
+        default:
+            break;
     }
 }
 

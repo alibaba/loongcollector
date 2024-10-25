@@ -377,20 +377,15 @@ void Pipeline::Process(vector<PipelineEventGroup>& logGroupList, size_t inputInd
 bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
     bool allSucceeded = true;
     for (auto& group : groupList) {
-        auto flusherIdx = mRouter.Route(group);
-        for (size_t i = 0; i < flusherIdx.size(); ++i) {
-            if (flusherIdx[i] >= mFlushers.size()) {
-                LOG_ERROR(
-                    sLogger,
-                    ("unexpected error", "invalid flusher index")("flusher index", flusherIdx[i])("config", mName));
+        auto res = mRouter.Route(group);
+        for (auto& item : res) {
+            if (item.first >= mFlushers.size()) {
+                LOG_ERROR(sLogger,
+                          ("unexpected error", "invalid flusher index")("flusher index", item.first)("config", mName));
                 allSucceeded = false;
                 continue;
             }
-            if (i + 1 != flusherIdx.size()) {
-                allSucceeded = mFlushers[flusherIdx[i]]->Send(group.Copy()) && allSucceeded;
-            } else {
-                allSucceeded = mFlushers[flusherIdx[i]]->Send(std::move(group)) && allSucceeded;
-            }
+            allSucceeded = mFlushers[item.first]->Send(std::move(item.second)) && allSucceeded;
         }
     }
     return allSucceeded;

@@ -100,6 +100,12 @@ void RouterUnittest::TestRoute() {
             {
                 "Type": "event_type",
                 "Value": "log"
+            },
+            {
+                "Type": "tag",
+                "Key": "level",
+                "Value": "INFO",
+                "DiscardingTag": true
             }
         ]
     )";
@@ -117,15 +123,28 @@ void RouterUnittest::TestRoute() {
         g.AddLogEvent();
         auto res = router.Route(g);
         APSARA_TEST_EQUAL(2U, res.size());
-        APSARA_TEST_EQUAL(1U, res[0]);
-        APSARA_TEST_EQUAL(0U, res[1]);
+        APSARA_TEST_EQUAL(2U, res[0].first);
+        APSARA_TEST_EQUAL(1U, res[0].second.GetEvents().size());
+        APSARA_TEST_EQUAL(0U, res[1].first);
+        APSARA_TEST_EQUAL(1U, res[0].second.GetEvents().size());
+    }
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        g.SetTag(string("level"), string("INFO"));
+        auto res = router.Route(g);
+        APSARA_TEST_EQUAL(2U, res.size());
+        APSARA_TEST_EQUAL(2U, res[0].first);
+        APSARA_TEST_TRUE(res[0].second.HasTag("level"));
+        APSARA_TEST_EQUAL(1U, res[1].first);
+        APSARA_TEST_FALSE(res[1].second.HasTag("level"));
     }
     {
         PipelineEventGroup g(make_shared<SourceBuffer>());
         g.AddMetricEvent();
         auto res = router.Route(g);
         APSARA_TEST_EQUAL(1U, res.size());
-        APSARA_TEST_EQUAL(1U, res[0]);
+        APSARA_TEST_EQUAL(2U, res[0].first);
+        APSARA_TEST_EQUAL(1U, res[0].second.GetEvents().size());
     }
 }
 
@@ -153,7 +172,8 @@ void RouterUnittest::TestMetric() {
     APSARA_TEST_EQUAL(4U, router.mMetricsRecordRef->GetLabels()->size());
     APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, ""));
     APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
-    APSARA_TEST_TRUE(router.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_ROUTER));
+    APSARA_TEST_TRUE(
+        router.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_ROUTER));
 
     PipelineEventGroup g(make_shared<SourceBuffer>());
     g.AddLogEvent();
