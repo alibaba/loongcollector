@@ -684,6 +684,10 @@ bool PipelineConfig::ReplaceEnvVar() {
 
 bool LoadConfigDetailFromFile(const filesystem::path& filepath, Json::Value& detail) {
     const string& ext = filepath.extension().string();
+    const string& configName = filepath.stem().string();
+    if (configName == "region_config") {
+        return false;
+    }
     if (ext != ".yaml" && ext != ".yml" && ext != ".json") {
         LOG_WARNING(sLogger, ("unsupported config file format", "skip current object")("filepath", filepath));
         return false;

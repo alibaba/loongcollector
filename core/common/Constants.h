@@ -66,6 +66,7 @@ extern const std::string EXPIRE_DAY;
 extern const std::string DEFAULT_CONTENT_KEY; //"content"
 extern const std::string DEFAULT_REG; //"(.*)"
 
+extern const std::string AGENT_NAME;
 extern const std::string LOONGCOLLECTOR_CONFIG;
 
 } // namespace logtail

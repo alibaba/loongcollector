@@ -40,6 +40,7 @@ message AgentAttributes {
     bytes version = 1;                 // Agent's version
     bytes ip = 2;                      // Agent's ip
     bytes hostname = 3;                // Agent's hostname
+    bytes hostid = 4;                  // Agent's hostid  https://opentelemetry.io/docs/specs/semconv/attributes-registry/host/
     map<string, bytes> extras = 100;   // Agent's other attributes
     // before 100 (inclusive) are reserved for future official fields
 }

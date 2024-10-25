@@ -86,16 +86,6 @@ Application::Application() : mStartTime(time(nullptr)) {
 }
 
 void Application::Init() {
-    // get last crash info
-    string backTraceStr = GetCrashBackTrace();
-    if (!backTraceStr.empty()) {
-        LOG_ERROR(sLogger, ("last logtail crash stack", backTraceStr));
-        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
-    }
-    if (BOOL_FLAG(ilogtail_disable_core)) {
-        InitCrashBackTrace();
-    }
-
     // change working dir to ./${ILOGTAIL_VERSION}/
     string processExecutionDir = GetProcessExecutionDir();
     AppConfig::GetInstance()->SetProcessExecutionDir(processExecutionDir);
@@ -123,7 +113,21 @@ void Application::Init() {
 
     // Initialize basic information: IP, hostname, etc.
     LogFileProfiler::GetInstance();
-
+#ifdef __ENTERPRISE__
+    EnterpriseConfigProvider::GetInstance()->LoadRegionConfig();
+    if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
+        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
+    }
+    // get last crash info
+    string backTraceStr = GetCrashBackTrace();
+    if (!backTraceStr.empty()) {
+        LOG_ERROR(sLogger, ("last logtail crash stack", backTraceStr));
+        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
+    }
+    if (BOOL_FLAG(ilogtail_disable_core)) {
+        InitCrashBackTrace();
+    }
+#endif
     // override process related params if designated by user explicitly
     const string& interface = AppConfig::GetInstance()->GetBindInterface();
     const string& configIP = AppConfig::GetInstance()->GetConfigIP();
@@ -192,7 +196,7 @@ void Application::Init() {
 }
 
 void Application::Start() { // GCOVR_EXCL_START
-    LogFileProfiler::mStartTime =  GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
+    LogFileProfiler::mStartTime = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
     LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", LogFileProfiler::mStartTime);
 
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
@@ -206,7 +210,7 @@ void Application::Start() { // GCOVR_EXCL_START
     {
         // add local config dir
         filesystem::path localConfigPath
-            = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / "pipeline_config" / "local";
+            = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / GetPipelineConfigDir() / "local";
         error_code ec;
         filesystem::create_directories(localConfigPath, ec);
         if (ec) {

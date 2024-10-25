@@ -45,8 +45,15 @@ using namespace std;
 
 namespace logtail {
 
-bool SLSClientManager::RegionEndpointsInfo::AddDefaultEndpoint(const std::string& endpoint) {
-    mDefaultEndpoint = endpoint;
+bool SLSClientManager::RegionEndpointsInfo::AddDefaultEndpoint(const std::string& endpoint,
+                                                               const EndpointSourceType& endpointType,
+                                                               bool& isDefault) {
+    if (mDefaultEndpoint.empty()
+        || (endpointType == EndpointSourceType::LOCAL && mDefaultEndpointType == EndpointSourceType::REMOTE)) {
+        mDefaultEndpoint = endpoint;
+        mDefaultEndpointType = endpointType;
+        isDefault = true;
+    }
     return AddEndpoint(endpoint, true, false);
 }
 
@@ -299,14 +306,19 @@ void SLSClientManager::CleanTimeoutClient() {
     }
 }
 
-void SLSClientManager::AddEndpointEntry(const string& region, const string& endpoint, bool isDefault, bool isProxy) {
+void SLSClientManager::AddEndpointEntry(const string& region,
+                                        const string& endpoint,
+                                        bool isProxy,
+                                        const EndpointSourceType& endpointType) {
     lock_guard<mutex> lock(mRegionEndpointEntryMapLock);
     RegionEndpointsInfo& info = mRegionEndpointEntryMap[region];
-    if (isDefault) {
-        if (info.AddDefaultEndpoint(endpoint)) {
+    if (!isProxy) {
+        bool isDefault = false;
+        if (info.AddDefaultEndpoint(endpoint, endpointType, isDefault)) {
             LOG_INFO(sLogger,
-                     ("add default data server endpoint, region",
-                      region)("endpoint", endpoint)("isProxy", "false")("#endpoint", info.mEndpointInfoMap.size()));
+                     ("add data server endpoint, region", region)("endpoint", endpoint)(
+                         "isDefault", isDefault ? "yes" : "no")("isProxy", "false")("#endpoint",
+                                                                                    info.mEndpointInfoMap.size()));
         }
     } else {
         if (info.AddEndpoint(endpoint, true, isProxy)) {

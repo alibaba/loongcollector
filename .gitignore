@@ -12,7 +12,7 @@
 .devcontainer/
 
 ### GoLand
-.idea
+**/.idea/**
 
 ### MacOS
 .DS_Store
@@ -55,6 +55,7 @@ _deps
 # Custom
 /build/
 core/build/
+core/protobuf/config_server/*/*.pb.*
 core/protobuf/*/*.pb.*
 core/common/Version.cpp
 !/Makefile

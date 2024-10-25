@@ -26,7 +26,7 @@
 
 #include "config/feedbacker/ConfigFeedbackable.h"
 #include "config/provider/ConfigProvider.h"
-#include "protobuf/config_server/v2/agent.pb.h"
+#include "protobuf/config_server/v2/agentV2.pb.h"
 
 namespace logtail {
 
@@ -74,7 +74,7 @@ protected:
                                configserver::proto::v2::HeartbeatResponse&);
 
     virtual bool FetchInstanceConfig(::configserver::proto::v2::HeartbeatResponse&,
-                                    ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
+                                     ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
 
     virtual bool FetchPipelineConfig(::configserver::proto::v2::HeartbeatResponse&,
                                      ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
@@ -83,12 +83,12 @@ protected:
     virtual void FillAttributes(::configserver::proto::v2::AgentAttributes& attributes);
     void UpdateRemotePipelineConfig(
         const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
-    void
-    UpdateRemoteInstanceConfig(const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
+    void UpdateRemoteInstanceConfig(
+        const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
 
     virtual bool
     FetchInstanceConfigFromServer(::configserver::proto::v2::HeartbeatResponse&,
-                                 ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
+                                  ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);
     virtual bool
     FetchPipelineConfigFromServer(::configserver::proto::v2::HeartbeatResponse&,
                                   ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>&);

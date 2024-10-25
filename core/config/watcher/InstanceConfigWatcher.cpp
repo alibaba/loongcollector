@@ -61,6 +61,9 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
 
             const filesystem::path& path = entry.path();
             const string& configName = path.stem().string();
+            if (configName == "region_config") {
+                continue;
+            }
             const string& filepath = path.string();
             if (!filesystem::is_regular_file(entry.status(ec))) {
                 LOG_DEBUG(sLogger, ("config file is not a regular file", "skip current object")("filepath", filepath));

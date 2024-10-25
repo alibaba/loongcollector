@@ -850,7 +850,7 @@ public:
         sLogger->set_level(spdlog::level::trace);
         printf("Test case setup.\n");
         srand(time(NULL));
-        Sender::Instance()->AddEndpointEntry(STRING_FLAG(default_region_name), STRING_FLAG(logtail_send_address), true);
+        Sender::Instance()->AddEndpointEntry(STRING_FLAG(default_region_name), STRING_FLAG(logtail_send_address), SLSClientManager::EndpointSourceType::LOCAL);
         STRING_FLAG(profile_project_name) = "sls-admin";
         INT32_FLAG(sls_host_update_interval) = 1;
         INT32_FLAG(logtail_alarm_interval) = 600;

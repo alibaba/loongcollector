@@ -55,7 +55,8 @@ std::string GetProfileSnapshotDumpFileName();
 std::string GetObserverEbpfHostPath();
 std::string GetSendBufferFileNamePrefix();
 std::string GetLegacyUserLocalConfigFilePath();
-std::string GetExactlyOnceCheckpoint(); 
+std::string GetExactlyOnceCheckpoint();
+std::string GetPipelineConfigDir();
 
 template <class T>
 class DoubleBuffer {
@@ -224,7 +225,10 @@ private:
      */
     void CheckAndAdjustParameters();
     void MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJson);
-    void MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJson, std::unordered_map<std::string, std::string>& keyToConfigName, const std::string& configName);
+    void MergeJson(Json::Value& mainConfJson,
+                   const Json::Value& subConfJson,
+                   std::unordered_map<std::string, std::string>& keyToConfigName,
+                   const std::string& configName);
     /**
      * @brief Load *.json from config.d dir
      *
