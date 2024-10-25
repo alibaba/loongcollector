@@ -16,7 +16,6 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/opencontainers/go-digest](https://pkg.go.dev/github.com/opencontainers/go-digest?tab=licenses)
 - [github.com/opencontainers/image-spec](https://pkg.go.dev/github.com/opencontainers/image-spec?tab=licenses)
 - [github.com/opencontainers/runc](https://pkg.go.dev/github.com/opencontainers/runc?tab=licenses)
-- [google.golang.org/genproto](https://pkg.go.dev/google.golang.org/genproto?tab=licenses)
 - [google.golang.org/grpc](https://pkg.go.dev/google.golang.org/grpc?tab=licenses)
 - [gopkg.in/ini.v1](https://pkg.go.dev/gopkg.in/ini.v1?tab=licenses)
 - [gopkg.in/yaml.v2](https://pkg.go.dev/gopkg.in/yaml.v2?tab=licenses)
@@ -45,10 +44,12 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [sigs.k8s.io/json](https://pkg.go.dev/sigs.k8s.io/json?tab=licenses)
 - [sigs.k8s.io/structured-merge-diff](https://pkg.go.dev/sigs.k8s.io/structured-merge-diff?tab=licenses)
 - [sigs.k8s.io/yaml](https://pkg.go.dev/sigs.k8s.io/yaml?tab=licenses)
+- [github.com/google/cadvisor](https://pkg.go.dev/github.com/google/cadvisor?tab=licenses)
 - [github.com/go-openapi/jsonpointer](https://pkg.go.dev/github.com/go-openapi/jsonpointer?tab=licenses)
 - [github.com/go-openapi/jsonreference](https://pkg.go.dev/github.com/go-openapi/jsonreference?tab=licenses)
 - [github.com/go-openapi/swag](github.com/go-openapi/swag)
 - [github.com/google/gnostic](https://pkg.go.dev/github.com/google/gnostic?tab=licenses)
+- [google.golang.org/genproto/googleapis/rpc](https://pkg.go.dev/google.golang.org/genproto/googleapis/rpc?tab=licenses)
 
 ## BSD licenses
 

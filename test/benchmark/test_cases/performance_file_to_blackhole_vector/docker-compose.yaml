@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  vector:
+    image: timberio/vector:0.39.0-debian
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml
+      - .:/home/vector-log

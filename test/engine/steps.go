@@ -10,6 +10,7 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/cleanup"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup"
+	"github.com/alibaba/ilogtail/test/engine/setup/monitor"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 	"github.com/alibaba/ilogtail/test/engine/trigger"
 	"github.com/alibaba/ilogtail/test/engine/verify"
@@ -26,6 +27,7 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.Given(`^remove http config \{(.*)\}`, control.RemoveHTTPConfig)
 	ctx.Given(`^subcribe data from \{(\S+)\} with config`, subscriber.InitSubscriber)
 	ctx.Given(`^mkdir \{(.*)\}`, setup.Mkdir)
+	ctx.Given(`^docker-compose boot type \{(\S+)\}$`, setup.SetDockerComposeBootType)
 
 	// When
 	ctx.When(`^generate \{(\d+)\} regex logs to file \{(.*)\}, with interval \{(\d+)\}ms$`, trigger.RegexSingle)
@@ -40,6 +42,9 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^query through \{(.*)\}`, control.SetQuery)
 	ctx.When(`^begin trigger`, trigger.BeginTrigger)
 	ctx.When(`^execute \{(\d+)\} commands to generate file security events on files \{(.*)\}$`, trigger.TrigerFileSecurityEvents)
+	ctx.When(`^generate random nginx logs to file, speed \{(\d+)\}MB/s, total \{(\d+)\}min, to file \{(.*)\}`, trigger.GenerateRandomNginxLogToFile)
+	ctx.When(`^start monitor \{(\S+)\}`, monitor.StartMonitor)
+	ctx.When(`^wait monitor until log processing finished$`, monitor.WaitMonitorUntilProcessingFinished)
 
 	// Then
 	ctx.Then(`^there is \{(\d+)\} logs$`, verify.LogCount)

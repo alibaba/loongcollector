@@ -12,12 +12,25 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup/controller"
+	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
 
 const dependencyHome = "test_cases"
 
 type DockerComposeEnv struct {
 	BootController *controller.BootController
+	BootType       dockercompose.BootType
+}
+
+func SetDockerComposeBootType(t dockercompose.BootType) error {
+	if dockerComposeEnv, ok := Env.(*DockerComposeEnv); ok {
+		if t != dockercompose.DockerComposeBootTypeE2E && t != dockercompose.DockerComposeBootTypeBenchmark {
+			return fmt.Errorf("invalid docker compose boot type, not e2e or benchmark")
+		}
+		dockerComposeEnv.BootType = t
+		return nil
+	}
+	return fmt.Errorf("env is not docker-compose")
 }
 
 func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.Context, error) {
@@ -28,7 +41,7 @@ func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.
 			return ctx, err
 		}
 		dockerComposeEnv.BootController = new(controller.BootController)
-		if err = dockerComposeEnv.BootController.Init(); err != nil {
+		if err = dockerComposeEnv.BootController.Init(dockerComposeEnv.BootType); err != nil {
 			return ctx, err
 		}
 
@@ -93,6 +106,7 @@ func NewDockerComposeEnv() *DockerComposeEnv {
 	reportDir := root + "/report/"
 	_ = os.Mkdir(reportDir, 0750)
 	config.ConfigDir = reportDir + "config"
+	env.BootType = dockercompose.DockerComposeBootTypeE2E
 	return env
 }
 

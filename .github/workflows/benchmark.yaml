@@ -1,0 +1,118 @@
+# Copyright 2021 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Benchmark
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - 'example_config/**'
+      - 'docker/**'
+      - 'k8s_template/**'
+      - 'changes/**'
+      - 'licenses/**'
+      - 'CHANGELOG.md'
+    types:
+      - closed
+
+jobs:
+  CI:
+    if: github.event.pull_request.merged == true
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        go-version: [ 1.19.10 ]
+        runner: [ ubuntu-latest ]
+      fail-fast: true
+    permissions:
+      contents: write
+    steps:
+      # Clean up space to prevent action from running out of disk space.
+      - name: clean
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+
+      - name: Check disk space
+        run: |
+          df -hT $PWD
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Update Docker-compose to v2
+        run: |
+          sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: System environment
+        run: |
+          uname -r
+          docker --version
+          go version
+
+      - name: Run benchmark
+        env:
+          BUILD_LOGTAIL_UT: OFF
+          WITHOUTGDB: ON
+        run: |
+          make benchmark
+          git stash
+
+      - name: Store benchmark result iLogtail
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: benchmark
+          tool: "customSmallerIsBetter"
+          output-file-path: "test/benchmark/report/ilogtail_statistic_all.json"
+          auto-push: false
+          summary-always: true
+      
+      - name: Store benchmark result other agents
+        run: |
+          git checkout gh-pages
+          mv test/benchmark/report/records_all.json dev/bench/records_all.js
+          sed -i '1s/^\[/window.BENCHMARK_RECORDS = [/' dev/bench/records_all.js
+          git add dev/bench/records_all.js
+          last_commit_message=$(git log -1 --pretty=%B)
+          git -c user.name=github-action-benchmark -c user.email=github@users.noreply.github.com commit --amend -m "$last_commit_message"
+      
+      # TODO: Push gh-pages branch by github-action-bot
+      # - name: Push benchmark result
+        # run: git push 'https://alibaba:${{ secrets.GITHUB_TOKEN }}@github.com/alibaba/ilogtail.git' gh-pages:gh-pages
+
+  result:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [ CI ]
+    steps:
+      - name: Build Result
+        run: echo "Just to make the GitHub merge button green"
