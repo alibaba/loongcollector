@@ -1,4 +1,4 @@
-# Alibaba iLogtail - Fast and Lightweight Observability Data Collector | [中文用户手册](https://ilogtail.gitbook.io/ilogtail-docs/)
+# Alibaba iLogtail - Fast and Lightweight Observability Data Collector | 中文用户手册（[GitBook](https://ilogtail.gitbook.io/ilogtail-docs/) | [可观测中文社区](https://open.observability.cn/project/ilogtail/about/)）
 
 <img src="https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail.svg?versionId=CAEQMxiBgIDEmq.m6BciIDkzNmE2OWU4NzIwZjQ1Y2ZiYmIxZjhiYjMyNmQxZTdi" alt="ilogtail logo" height="150px" align="right" />
 
