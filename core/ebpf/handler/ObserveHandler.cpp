@@ -245,7 +245,6 @@ void ArmsMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasur
                 GenerateRequestsErrorMetrics(eventGroup, measure, timestamp);
                 GenerateRequestsDurationSumMetrics(eventGroup, measure, timestamp);
                 GenerateRequestsStatusMetrics(eventGroup, measure, timestamp);
-                
             } else if (type == MeasureType::MEASURE_TYPE_NET) {
                 GenerateTcpDropTotalMetrics(eventGroup, measure, timestamp);
                 GenerateTcpRetransTotalMetrics(eventGroup, measure, timestamp);

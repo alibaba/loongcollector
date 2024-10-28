@@ -18,6 +18,7 @@
 #include "ebpf/eBPFServer.h"
 #include "ebpf/config.h"
 #include "logger/Logger.h"
+#include "monitor/PluginMetricManager.h"
 
 using namespace std;
 
@@ -36,11 +37,24 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
         LOG_WARNING(sLogger, ("pipeline already loaded", "NETWORK_OBSERVE")("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
         return false;
     }
+
+    static const std::unordered_map<std::string, MetricType> metricKeys = {
+        {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_EBPF_PROCESS_CACHE_ENTRIES_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
+        {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_CONNTRACKER_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
+        {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_AGGREGATE_KEY_NUM, MetricType::METRIC_TYPE_INT_GAUGE},
+        {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_WORKER_HANDLE_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+    };
+
+    mPluginMgr = std::make_shared<PluginMetricManager>(GetMetricsRecordRef().GetLabels(), metricKeys);
     return ebpf::InitObserverNetworkOption(config, mNetworkOption, mContext, sName);
 }
 
 bool InputNetworkObserver::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_OBSERVE, mContext, &mNetworkOption);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_OBSERVE, mContext, &mNetworkOption, mPluginMgr);
 }
 
 bool InputNetworkObserver::Stop(bool isPipelineRemoving) {

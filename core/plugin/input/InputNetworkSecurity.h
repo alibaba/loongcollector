@@ -20,6 +20,7 @@
 
 #include "ebpf/config.h"
 #include "pipeline/plugin/interface/Input.h"
+#include "monitor/PluginMetricManager.h"
 
 namespace logtail {
 
@@ -34,6 +35,7 @@ public:
     bool SupportAck() const override { return false; }
 
     ebpf::SecurityOptions mSecurityOptions;
+    std::shared_ptr<PluginMetricManager> mPluginMgr;
 };
 
 } // namespace logtail

@@ -28,6 +28,7 @@ const string METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER = "flusher_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK = "http_sink";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR = "processor_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS = "prometheus_runner";
+const string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER = "ebpf_server";
 
 // metric keys
 const string METRIC_RUNNER_IN_EVENTS_TOTAL = "runner_in_events_total";
@@ -67,5 +68,12 @@ const string METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG
 const string METRIC_RUNNER_FILE_POLLING_MODIFY_CACHE_SIZE = "runner_polling_modify_cache_size";
 const string METRIC_RUNNER_FILE_POLLING_DIR_CACHE_SIZE = "runner_polling_dir_cache_size";
 const string METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE = "runner_polling_file_cache_size";
+
+/**********************************************************
+ *   ebpf server
+ **********************************************************/
+const string METRIC_RUNNER_EBPF_START_PLUGIN_TOTAL = "runner_start_plugin_total";
+const string METRIC_RUNNER_EBPF_STOP_PLUGIN_TOTAL = "runner_stop_plugin_total";
+const string METRIC_RUNNER_EBPF_SUSPEND_PLUGIN_TOTAL = "runner_suspend_plugin_total";
 
 } // namespace logtail

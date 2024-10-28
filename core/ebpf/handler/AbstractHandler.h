@@ -17,6 +17,8 @@
 #include <mutex>
 
 #include "pipeline/PipelineContext.h"
+#include "monitor/LoongCollectorMetricTypes.h"
+#include "monitor/LogtailMetric.h"
 
 namespace logtail{
 namespace ebpf {
@@ -24,7 +26,8 @@ namespace ebpf {
 class AbstractHandler {
 public:
     AbstractHandler() {}
-    AbstractHandler(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t idx) : mCtx(ctx), mQueueKey(key), mPluginIdx(idx) {}
+    AbstractHandler(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t idx) 
+        : mCtx(ctx), mQueueKey(key), mPluginIdx(idx) {}
     void UpdateContext(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t index) { 
         mCtx = ctx;
         mQueueKey = key;

@@ -291,6 +291,37 @@ struct FileSecurityConfig {
     return options_ == other.options_;  
   }
 };
+
+// for self monitor
+class eBPFStatistics {
+public:
+  virtual ~eBPFStatistics() = default;
+  PluginType plugin_type_;
+  bool updated_ = false;
+  uint64_t loss_kernel_events_total_ = 0; // kernel events loss 
+  uint64_t recv_kernel_events_total_ = 0; // receive events from kernel
+  uint64_t push_events_total_ = 0; // push events to loongcollector
+  uint64_t push_metrics_total_ = 0; // push metrics to loongcollector
+  uint64_t push_spans_total_ = 0; // push spans to loongcollector
+  uint64_t process_cache_entities_num_ = 0; // process cache size
+  uint64_t miss_process_cache_total_ = 0; // cache miss 
+};
+
+class NetworkObserverStatistics : public eBPFStatistics {
+public:
+  uint64_t conntracker_num_ = 0;
+  uint64_t recv_conn_stat_events_total_ = 0;
+  uint64_t recv_ctrl_events_total_ = 0;
+  uint64_t recv_http_data_events_total_ = 0;
+  // for protocol ... 
+  uint64_t parse_http_records_success_total_ = 0;
+  uint64_t parse_http_records_failed_total_ = 0;
+  // for agg
+  uint64_t agg_map_entities_num_ = 0;
+};
+
+using NamiStatisticsHandler = std::function<void(std::vector<eBPFStatistics>&)>;
+
 struct eBPFConfig {
   PluginType plugin_type_;
   UpdataType type = UpdataType::SECURE_UPDATE_TYPE_ENABLE_PROBE;
@@ -300,6 +331,7 @@ struct eBPFConfig {
   std::string host_path_prefix_;
   // specific config
   std::variant<NetworkObserveConfig, ProcessConfig, NetworkSecurityConfig, FileSecurityConfig> config_;
+  NamiStatisticsHandler stats_handler_;
   bool operator==(const eBPFConfig& other) const {
     return plugin_type_ == other.plugin_type_ &&
            type == other.type &&
