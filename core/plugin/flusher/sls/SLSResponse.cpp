@@ -27,18 +27,18 @@ using namespace std;
 namespace logtail {
 
 bool SLSResponse::Parse(const HttpResponse& response) {
-    const auto iter = response.mHeader.find(sdk::X_LOG_REQUEST_ID);
-    if (iter != response.mHeader.end()) {
+    const auto iter = response.GetHeader().find(sdk::X_LOG_REQUEST_ID);
+    if (iter != response.GetHeader().end()) {
         mRequestId = iter->second;
     }
-    mStatusCode = response.mStatusCode;
+    mStatusCode = response.GetStatusCode();
 
     if (mStatusCode == 0) {
         mErrorCode = sdk::LOG_REQUEST_TIMEOUT;
         mErrorMsg = "Request timeout";
     } else if (mStatusCode != 200) {
         try {
-            sdk::ErrorCheck(response.mBody, mRequestId, response.mStatusCode);
+            sdk::ErrorCheck(*response.GetBody<string>(), mRequestId, response.GetStatusCode());
         } catch (sdk::LOGException& e) {
             mErrorCode = e.GetErrorCode();
             mErrorMsg = e.GetMessage_();
@@ -48,8 +48,8 @@ bool SLSResponse::Parse(const HttpResponse& response) {
 }
 
 bool IsSLSResponse(const HttpResponse& response) {
-    const auto iter = response.mHeader.find(sdk::X_LOG_REQUEST_ID);
-    if (iter == response.mHeader.end()) {
+    const auto iter = response.GetHeader().find(sdk::X_LOG_REQUEST_ID);
+    if (iter == response.GetHeader().end()) {
         return false;
     }
     return !iter->second.empty();
@@ -60,8 +60,8 @@ time_t GetServerTime(const HttpResponse& response) {
     // Priority: x-log-time -> Date
     string errMsg;
     try {
-        const auto iter = response.mHeader.find("x-log-time");
-        if (iter != response.mHeader.end()) {
+        const auto iter = response.GetHeader().find("x-log-time");
+        if (iter != response.GetHeader().end()) {
             return StringTo<time_t>(iter->second);
         }
     } catch (const exception& e) {
@@ -73,8 +73,8 @@ time_t GetServerTime(const HttpResponse& response) {
         LOG_ERROR(sLogger, METHOD_LOG_PATTERN("parse x-log-time error", errMsg));
     }
 
-    const auto iter = response.mHeader.find("Date");
-    if (iter == response.mHeader.end()) {
+    const auto iter = response.GetHeader().find("Date");
+    if (iter == response.GetHeader().end()) {
         LOG_WARNING(sLogger, METHOD_LOG_PATTERN("no Date in HTTP header", ""));
         return 0;
     }

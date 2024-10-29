@@ -21,12 +21,13 @@
 #include <map>
 #include <string>
 
+#include "common/Flags.h"
 #include "common/http/HttpResponse.h"
 
-namespace logtail {
+DECLARE_FLAG_INT32(default_http_request_timeout_secs);
+DECLARE_FLAG_INT32(default_http_request_max_try_cnt);
 
-static constexpr uint32_t sDefaultTimeoutSec = 15;
-static constexpr uint32_t sDefaultMaxTryCnt = 3;
+namespace logtail {
 
 struct HttpRequest {
     std::string mMethod;
@@ -40,8 +41,8 @@ struct HttpRequest {
     std::string mBody;
     std::string mHost;
     int32_t mPort;
-    uint32_t mTimeout = sDefaultTimeoutSec;
-    uint32_t mMaxTryCnt = sDefaultMaxTryCnt;
+    uint32_t mTimeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs));
+    uint32_t mMaxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt));
 
     uint32_t mTryCnt = 1;
     std::chrono::system_clock::time_point mLastSendTime;
@@ -54,8 +55,8 @@ struct HttpRequest {
                 const std::string& query,
                 const std::map<std::string, std::string>& header,
                 const std::string& body,
-                uint32_t timeout = sDefaultTimeoutSec,
-                uint32_t maxTryCnt = sDefaultMaxTryCnt)
+                uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)),
+                uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)))
         : mMethod(method),
           mHTTPSFlag(httpsFlag),
           mUrl(url),
@@ -82,12 +83,14 @@ struct AsynHttpRequest : public HttpRequest {
                     const std::string& query,
                     const std::map<std::string, std::string>& header,
                     const std::string& body,
-                    uint32_t timeout = sDefaultTimeoutSec,
-                    uint32_t maxTryCnt = sDefaultMaxTryCnt)
-        : HttpRequest(method, httpsFlag, host, port, url, query, header, body, timeout, maxTryCnt) {}
+                    HttpResponse&& response = HttpResponse(),
+                    uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)),
+                    uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)))
+        : HttpRequest(method, httpsFlag, host, port, url, query, header, body, timeout, maxTryCnt),
+          mResponse(std::move(response)) {}
 
     virtual bool IsContextValid() const = 0;
-    virtual void OnSendDone(const HttpResponse& response) = 0;
+    virtual void OnSendDone(HttpResponse& response) = 0;
 };
 
 

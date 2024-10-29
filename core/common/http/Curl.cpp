@@ -27,17 +27,6 @@ using namespace std;
 
 namespace logtail {
 
-static size_t data_write_callback(char* buffer, size_t size, size_t nmemb, string* write_buf) {
-    unsigned long sizes = size * nmemb;
-
-    if (buffer == NULL) {
-        return 0;
-    }
-
-    write_buf->append(buffer, sizes);
-    return sizes;
-}
-
 static size_t header_write_callback(char* buffer,
                                     size_t size,
                                     size_t nmemb,
@@ -123,9 +112,9 @@ CURL* CreateCurlHandler(const std::string& method,
         curl_easy_setopt(curl, CURLOPT_INTERFACE, intf.c_str());
     }
 
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &(response.mBody));
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, data_write_callback);
-    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &(response.mHeader));
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, response.mBody.get());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, response.mWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &(response.GetHeader()));
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_write_callback);
 
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
@@ -162,7 +151,7 @@ bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& respo
         if (res == CURLE_OK) {
             long http_code = 0;
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-            response.mStatusCode = (int32_t)http_code;
+            response.SetStatusCode(http_code);
             success = true;
             break;
         } else if (request->mTryCnt < request->mMaxTryCnt) {

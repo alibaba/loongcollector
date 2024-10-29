@@ -73,9 +73,9 @@ protected:
             std::cerr << "JSON parsing failed." << std::endl;
         }
 
-        mHttpResponse.mStatusCode = 200;
+        mHttpResponse.SetStatusCode(200);
         {
-            mHttpResponse.mBody = R"JSON([
+            *mHttpResponse.GetBody<string>() = R"JSON([
         {
             "targets": [
                 "192.168.22.7:8080"
@@ -153,12 +153,12 @@ void TargetSubscriberSchedulerUnittest::TestProcess() {
     targetSubscriber->InitSelfMonitor(metricLabels);
 
     // if status code is not 200
-    mHttpResponse.mStatusCode = 404;
+    mHttpResponse.SetStatusCode(404);
     targetSubscriber->OnSubscription(mHttpResponse, 0);
     APSARA_TEST_EQUAL(0UL, targetSubscriber->mScrapeSchedulerMap.size());
 
     // if status code is 200
-    mHttpResponse.mStatusCode = 200;
+    mHttpResponse.SetStatusCode(200);
     targetSubscriber->OnSubscription(mHttpResponse, 0);
     APSARA_TEST_EQUAL(2UL, targetSubscriber->mScrapeSchedulerMap.size());
 }
@@ -168,7 +168,7 @@ void TargetSubscriberSchedulerUnittest::TestParseTargetGroups() {
     APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
 
     std::vector<Labels> newScrapeSchedulerSet;
-    APSARA_TEST_TRUE(targetSubscriber->ParseScrapeSchedulerGroup(mHttpResponse.mBody, newScrapeSchedulerSet));
+    APSARA_TEST_TRUE(targetSubscriber->ParseScrapeSchedulerGroup(*mHttpResponse.GetBody<string>(), newScrapeSchedulerSet));
     APSARA_TEST_EQUAL(2UL, newScrapeSchedulerSet.size());
 }
 

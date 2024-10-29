@@ -36,7 +36,7 @@ struct HttpSinkRequest : public AsynHttpRequest {
         : AsynHttpRequest(method, httpsFlag, host, port, url, query, header, body), mItem(item) {}
 
     bool IsContextValid() const override { return true; }
-    void OnSendDone(const HttpResponse& response) override {}
+    void OnSendDone(HttpResponse& response) override {}
 };
 
 } // namespace logtail

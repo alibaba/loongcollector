@@ -32,7 +32,7 @@ void PromFuture<Args...>::Cancel() {
     mState = PromFutureState::Done;
 }
 
-template class PromFuture<const HttpResponse&, uint64_t>;
+template class PromFuture<HttpResponse&, uint64_t>;
 template class PromFuture<>;
 
 } // namespace logtail

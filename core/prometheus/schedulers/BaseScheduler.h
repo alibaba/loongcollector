@@ -33,7 +33,7 @@ protected:
 
     ReadWriteLock mLock;
     bool mValidState = true;
-    std::shared_ptr<PromFuture<const HttpResponse&, uint64_t>> mFuture;
+    std::shared_ptr<PromFuture<HttpResponse&, uint64_t>> mFuture;
     std::shared_ptr<PromFuture<>> mIsContextValidFuture;
 };
 } // namespace logtail

@@ -13,10 +13,10 @@ public:
 };
 
 void PromAsynUnittest::TestExecTime() {
-    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
+    auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
     auto now = std::chrono::system_clock::now();
     bool exec = false;
-    future->AddDoneCallback([&exec, now](const HttpResponse&, uint64_t timestampMilliSec) {
+    future->AddDoneCallback([&exec, now](HttpResponse&, uint64_t timestampMilliSec) {
         APSARA_TEST_EQUAL(timestampMilliSec,
                           std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
 

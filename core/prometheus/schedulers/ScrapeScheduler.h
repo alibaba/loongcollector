@@ -46,7 +46,7 @@ public:
     ScrapeScheduler(const ScrapeScheduler&) = default;
     ~ScrapeScheduler() override = default;
 
-    void OnMetricResult(const HttpResponse&, uint64_t timestampMilliSec);
+    void OnMetricResult(HttpResponse&, uint64_t timestampMilliSec);
     void SetTimer(std::shared_ptr<Timer> timer);
 
     std::string GetId() const;

@@ -57,21 +57,21 @@ bool TargetSubscriberScheduler::operator<(const TargetSubscriberScheduler& other
     return mJobName < other.mJobName;
 }
 
-void TargetSubscriberScheduler::OnSubscription(const HttpResponse& response, uint64_t timestampMilliSec) {
-    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, response.mStatusCode);
+void TargetSubscriberScheduler::OnSubscription(HttpResponse& response, uint64_t timestampMilliSec) {
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, response.GetStatusCode());
     mSelfMonitor->AddCounter(
-        METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS, response.mStatusCode, GetCurrentTimeInMilliSeconds() - timestampMilliSec);
-    if (response.mStatusCode == 304) {
+        METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS, response.GetStatusCode(), GetCurrentTimeInMilliSeconds() - timestampMilliSec);
+    if (response.GetStatusCode() == 304) {
         // not modified
         return;
     }
-    if (response.mStatusCode != 200) {
+    if (response.GetStatusCode() != 200) {
         return;
     }
-    if (response.mHeader.count(prometheus::ETAG)) {
-        mETag = response.mHeader.at(prometheus::ETAG);
+    if (response.GetHeader().count(prometheus::ETAG)) {
+        mETag = response.GetHeader().at(prometheus::ETAG);
     }
-    const string& content = response.mBody;
+    const string& content = *response.GetBody<string>();
     vector<Labels> targetGroup;
     if (!ParseScrapeSchedulerGroup(content, targetGroup)) {
         return;
@@ -247,8 +247,8 @@ string TargetSubscriberScheduler::GetId() const {
 }
 
 void TargetSubscriberScheduler::ScheduleNext() {
-    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
-    future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampMilliSec) {
+    auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
+    future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
         this->OnSubscription(response, timestampMilliSec);
         this->ExecDone();
         this->ScheduleNext();
@@ -278,8 +278,8 @@ void TargetSubscriberScheduler::Cancel() {
 }
 
 void TargetSubscriberScheduler::SubscribeOnce(std::chrono::steady_clock::time_point execTime) {
-    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
-    future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampNanoSec) {
+    auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
+    future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampNanoSec) {
         this->OnSubscription(response, timestampNanoSec);
         return true;
     });

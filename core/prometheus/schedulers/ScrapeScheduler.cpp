@@ -60,26 +60,27 @@ ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
     mParser = make_unique<TextParser>();
 }
 
-void ScrapeScheduler::OnMetricResult(const HttpResponse& response, uint64_t timestampMilliSec) {
-    mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL, response.mStatusCode);
-    mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_SIZE_BYTES, response.mStatusCode, response.mBody.size());
+void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t timestampMilliSec) {
+    auto& responseBody = *response.GetBody<string>();
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL, response.GetStatusCode());
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_SIZE_BYTES, response.GetStatusCode(), responseBody.size());
     mSelfMonitor->AddCounter(
-        METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, response.mStatusCode, GetCurrentTimeInMilliSeconds() - timestampMilliSec);
+        METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, response.GetStatusCode(), GetCurrentTimeInMilliSeconds() - timestampMilliSec);
 
     mScrapeTimestampMilliSec = timestampMilliSec;
     mScrapeDurationSeconds = 1.0 * (GetCurrentTimeInMilliSeconds() - timestampMilliSec) / 1000;
-    mScrapeResponseSizeBytes = response.mBody.size();
-    mUpState = response.mStatusCode == 200;
-    if (response.mStatusCode != 200) {
+    mScrapeResponseSizeBytes = responseBody.size();
+    mUpState = response.GetStatusCode() == 200;
+    if (response.GetStatusCode() != 200) {
         mScrapeResponseSizeBytes = 0;
         string headerStr;
         for (const auto& [k, v] : mScrapeConfigPtr->mRequestHeaders) {
             headerStr.append(k).append(":").append(v).append(";");
         }
         LOG_WARNING(sLogger,
-                    ("scrape failed, status code", response.mStatusCode)("target", mHash)("http header", headerStr));
+                    ("scrape failed, status code", response.GetStatusCode())("target", mHash)("http header", headerStr));
     }
-    auto eventGroup = BuildPipelineEventGroup(response.mBody);
+    auto eventGroup = BuildPipelineEventGroup(responseBody);
 
     SetAutoMetricMeta(eventGroup);
     SetTargetLabels(eventGroup);
@@ -121,9 +122,9 @@ string ScrapeScheduler::GetId() const {
 }
 
 void ScrapeScheduler::ScheduleNext() {
-    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
+    auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
     auto isContextValidFuture = std::make_shared<PromFuture<>>();
-    future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampMilliSec) {
+    future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
         this->OnMetricResult(response, timestampMilliSec);
         this->ExecDone();
         this->ScheduleNext();
@@ -157,8 +158,8 @@ void ScrapeScheduler::ScheduleNext() {
 }
 
 void ScrapeScheduler::ScrapeOnce(std::chrono::steady_clock::time_point execTime) {
-    auto future = std::make_shared<PromFuture<const HttpResponse&, uint64_t>>();
-    future->AddDoneCallback([this](const HttpResponse& response, uint64_t timestampMilliSec) {
+    auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
+    future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
         this->OnMetricResult(response, timestampMilliSec);
         return true;
     });

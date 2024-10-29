@@ -40,7 +40,7 @@ public:
     bool Init(const Json::Value& scrapeConfig);
     bool operator<(const TargetSubscriberScheduler& other) const;
 
-    void OnSubscription(const HttpResponse&, uint64_t);
+    void OnSubscription(HttpResponse&, uint64_t);
     void SetTimer(std::shared_ptr<Timer> timer);
     void SubscribeOnce(std::chrono::steady_clock::time_point execTime);
 

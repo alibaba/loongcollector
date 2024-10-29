@@ -32,7 +32,7 @@ struct AsynHttpRequestMock : public AsynHttpRequest {
         : AsynHttpRequest(method, httpsFlag, host, port, url, query, header, body) {}
 
     bool IsContextValid() const override { return true; };
-    void OnSendDone(const HttpResponse& response){};
+    void OnSendDone(HttpResponse& response){};
 };
 
 class HttpRequestTimerEventUnittest : public ::testing::Test {
