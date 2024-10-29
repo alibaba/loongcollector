@@ -20,7 +20,7 @@
 #include <string>
 
 #include "app_config/AppConfig.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"

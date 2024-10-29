@@ -22,7 +22,7 @@
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/UUIDUtil.h"

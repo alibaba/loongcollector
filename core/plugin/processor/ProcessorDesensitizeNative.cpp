@@ -15,7 +15,7 @@
  */
 #include "plugin/processor/ProcessorDesensitizeNative.h"
 
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"

@@ -46,7 +46,7 @@
 #include <vector>
 
 #include "checkpoint/CheckpointManagerV2.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/FileEncryption.h"
 #include "common/FileSystemUtil.h"
 #include "common/Lock.h"

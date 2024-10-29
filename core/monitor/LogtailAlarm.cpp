@@ -16,7 +16,7 @@
 
 #include "LogFileProfiler.h"
 #include "app_config/AppConfig.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/Thread.h"

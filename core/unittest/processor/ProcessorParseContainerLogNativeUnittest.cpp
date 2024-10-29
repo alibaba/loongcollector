@@ -21,7 +21,7 @@
 #include <vector>
 
 #include "boost/utility/string_view.hpp"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
 #include "models/LogEvent.h"

@@ -14,7 +14,7 @@
 
 #include <cstdlib>
 
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "config/PipelineConfig.h"
 #include "file_server/ConfigManager.h"
 #include "pipeline/Pipeline.h"

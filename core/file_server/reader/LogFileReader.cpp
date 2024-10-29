@@ -31,7 +31,7 @@
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 #include "checkpoint/CheckpointManagerV2.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/ErrorUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"

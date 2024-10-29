@@ -36,7 +36,7 @@
 #include "LogtailAlarm.h"
 #include "common/Flags.h"
 #include "common/Lock.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/FileSystemUtil.h"
 #include "logger/Logger.h"
 #include "sdk/Common.h"

@@ -36,7 +36,7 @@
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 #include "common/CompressTools.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/ErrorUtil.h"
 #include "common/ExceptionBase.h"
 #include "common/FileSystemUtil.h"

@@ -13,7 +13,7 @@
 // limitations under the License.
 #include <cstdlib>
 
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
 #include "models/LogEvent.h"

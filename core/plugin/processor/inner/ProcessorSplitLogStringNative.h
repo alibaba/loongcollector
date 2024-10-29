@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "pipeline/plugin/interface/Processor.h"
 
 namespace logtail {

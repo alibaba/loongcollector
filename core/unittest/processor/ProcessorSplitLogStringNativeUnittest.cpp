@@ -15,7 +15,7 @@
 #include <cstdlib>
 #include <sstream>
 
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"

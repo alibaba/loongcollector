@@ -20,7 +20,7 @@
 #include <string>
 
 #include "checkpoint/RangeCheckpoint.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/memory/SourceBuffer.h"
 #include "models/PipelineEventPtr.h"
 

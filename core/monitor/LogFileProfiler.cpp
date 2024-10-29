@@ -17,7 +17,7 @@
 #include <string>
 
 #include "app_config/AppConfig.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/ErrorUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"

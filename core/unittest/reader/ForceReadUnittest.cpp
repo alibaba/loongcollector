@@ -19,7 +19,7 @@
 #include <memory>
 #include <string>
 
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"

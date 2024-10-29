@@ -23,7 +23,7 @@
 #include <functional>
 
 #include "app_config/AppConfig.h"
-#include "common/Constants.h"
+#include "constants/Constants.h"
 #include "common/DevInode.h"
 #include "common/ExceptionBase.h"
 #include "common/LogtailCommonFlags.h"
