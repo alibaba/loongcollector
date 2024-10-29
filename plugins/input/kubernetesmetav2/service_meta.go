@@ -23,7 +23,6 @@ type ServiceK8sMeta struct {
 	DaemonSet             bool
 	StatefulSet           bool
 	Configmap             bool
-	Secret                bool
 	Job                   bool
 	CronJob               bool
 	Namespace             bool

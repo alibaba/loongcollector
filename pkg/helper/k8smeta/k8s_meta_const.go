@@ -19,7 +19,6 @@ const (
 	NODE                  = "node"
 	NAMESPACE             = "namespace"
 	CONFIGMAP             = "configmap"
-	SECRET                = "secret"
 	PERSISTENTVOLUME      = "persistentvolume"
 	PERSISTENTVOLUMECLAIM = "persistentvolumeclaim"
 	STORAGECLASS          = "storageclass"
@@ -37,7 +36,6 @@ const (
 	POD_JOB                  = "pod->job"
 	POD_PERSISENTVOLUMECLAIN = "pod->persistentvolumeclaim"
 	POD_CONFIGMAP            = "pod->configmap"
-	POD_SECRET               = "pod->secret"
 	POD_SERVICE              = "pod->service"
 	POD_CONTAINER            = "pod->container"
 	POD_PROCESS              = "pod->process"
@@ -56,7 +54,6 @@ var AllResources = []string{
 	NODE,
 	NAMESPACE,
 	CONFIGMAP,
-	SECRET,
 	PERSISTENTVOLUME,
 	PERSISTENTVOLUMECLAIM,
 	STORAGECLASS,
@@ -106,11 +103,6 @@ type PodPersistentVolumeClaim struct {
 type PodConfigMap struct {
 	Pod       *v1.Pod
 	ConfigMap *v1.ConfigMap
-}
-
-type PodSecret struct {
-	Pod    *v1.Pod
-	Secret *v1.Secret
 }
 
 type PodService struct {

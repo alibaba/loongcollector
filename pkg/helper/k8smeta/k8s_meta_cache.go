@@ -165,8 +165,6 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 		informer = factory.Core().V1().Namespaces().Informer()
 	case CONFIGMAP:
 		informer = factory.Core().V1().ConfigMaps().Informer()
-	case SECRET:
-		informer = factory.Core().V1().Secrets().Informer()
 	case PERSISTENTVOLUME:
 		informer = factory.Core().V1().PersistentVolumes().Informer()
 	case PERSISTENTVOLUMECLAIM:

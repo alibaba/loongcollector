@@ -322,28 +322,3 @@ func (in *InputKubernetesMeta) collectConfigmaps(lister interface{}, selector la
 	}
 	return
 }
-
-// collectSecrets list the kubernetes secrets by the label selector and collect the core metadata.
-func (in *InputKubernetesMeta) collectSecrets(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
-	if !in.Secret {
-		return
-	}
-	secrets, err := lister.(core.SecretLister).List(selector)
-	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
-		return
-	}
-	nodes = make([]*helper.MetaNode, 0, len(secrets))
-	for _, s := range secrets {
-		node := helper.NewMetaNode(string(s.UID), Secret).
-			WithAttributes(make(helper.Attributes, 8)).
-			WithLabels(s.Labels).
-			WithAttribute(KeyNamespace, s.Namespace)
-		if s.Immutable != nil {
-			node.WithAttribute(KeyImmutable, s.Immutable)
-		}
-		addCommonAttributes(&s.ObjectMeta, node)
-		nodes = append(nodes, node)
-	}
-	return
-}
