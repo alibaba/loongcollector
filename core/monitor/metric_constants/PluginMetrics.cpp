@@ -151,7 +151,8 @@ const string METRIC_PLUGIN_FLUSHER_OTHER_ERROR_TOTAL = "plugin_flusher_other_err
 /**********************************************************
  *   flusher_sls
  **********************************************************/
-const string METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL = "plugin_flusher_sls_shard_write_quota_error_total";
+const string METRIC_PLUGIN_FLUSHER_SLS_SHARD_WRITE_QUOTA_ERROR_TOTAL
+    = "plugin_flusher_sls_shard_write_quota_error_total";
 const string METRIC_PLUGIN_FLUSHER_SLS_PROJECT_QUOTA_ERROR_TOTAL = "plugin_flusher_sls_project_quota_error_total";
 const string METRIC_PLUGIN_FLUSHER_SLS_SEQUENCE_ID_ERROR_TOTAL = "plugin_flusher_sls_sequence_id_error_total";
 const string METRIC_PLUGIN_FLUSHER_SLS_REQUEST_EXPRIRED_ERROR_TOTAL = "plugin_flusher_sls_request_exprired_error_total";

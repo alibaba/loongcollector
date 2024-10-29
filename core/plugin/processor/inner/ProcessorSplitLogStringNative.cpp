@@ -133,7 +133,7 @@ void ProcessorSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
 
     size_t begin = 0;
     while (begin < sourceVal.size()) {
-        std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent();
+        std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent(true);
         StringView content = GetNextLine(sourceVal, begin);
         targetEvent->SetContentNoCopy(StringView(sourceKey.data, sourceKey.size), content);
         targetEvent->SetTimestamp(
@@ -148,7 +148,7 @@ void ProcessorSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
             StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
             targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
         }
-        newEvents.emplace_back(std::move(targetEvent));
+        newEvents.emplace_back(std::move(targetEvent), true, nullptr);
         begin += content.size() + 1;
     }
 }

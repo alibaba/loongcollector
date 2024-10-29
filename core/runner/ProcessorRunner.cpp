@@ -14,12 +14,11 @@
 
 #include "runner/ProcessorRunner.h"
 
-#include <shared_mutex>
-
 #include "app_config/AppConfig.h"
 #include "batch/TimeoutFlushManager.h"
 #include "common/Flags.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "models/EventPool.h"
 #include "monitor/LogFileProfiler.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/metric_constants/MetricConstants.h"
@@ -112,86 +111,72 @@ void ProcessorRunner::Run(uint32_t threadNo) {
             lastMergeTime = curTime;
         }
 
-        {
-            sLastRunTime->Set(curTime);
-            unique_ptr<ProcessQueueItem> item;
-            string configName;
-            if (!ProcessQueueManager::GetInstance()->PopItem(threadNo, item, configName)) {
-                if (mIsFlush && ProcessQueueManager::GetInstance()->IsAllQueueEmpty()) {
-                    break;
-                }
-                ProcessQueueManager::GetInstance()->Wait(100);
-                continue;
+        sLastRunTime->Set(curTime);
+        unique_ptr<ProcessQueueItem> item;
+        string configName;
+        if (!ProcessQueueManager::GetInstance()->PopItem(threadNo, item, configName)) {
+            if (mIsFlush && ProcessQueueManager::GetInstance()->IsAllQueueEmpty()) {
+                break;
             }
-
-            sInEventsCnt->Add(item->mEventGroup.GetEvents().size());
-            sInGroupsCnt->Add(1);
-            sInGroupDataSizeBytes->Add(item->mEventGroup.DataSize());
-
-            shared_ptr<Pipeline> pipeline = item->mPipeline;
-            if (!pipeline) {
-                pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
-            }
-            if (!pipeline) {
-                LOG_INFO(sLogger,
-                         ("pipeline not found during processing, perhaps due to config deletion",
-                          "discard data")("config", configName));
-                continue;
-            }
-
-            bool isLog = !item->mEventGroup.GetEvents().empty() && item->mEventGroup.GetEvents()[0].Is<LogEvent>();
-
-            int32_t startTime = (int32_t)time(NULL);
-            vector<PipelineEventGroup> eventGroupList;
-            eventGroupList.emplace_back(std::move(item->mEventGroup));
-            pipeline->Process(eventGroupList, item->mInputIndex);
-            int32_t elapsedTime = (int32_t)time(NULL) - startTime;
-            if (elapsedTime > 1) {
-                LOG_WARNING(pipeline->GetContext().GetLogger(),
-                            ("event processing took too long, elapsed time", ToString(elapsedTime) + "s")("config",
-                                                                                                          configName));
-                pipeline->GetContext().GetAlarm().SendAlarm(PROCESS_TOO_SLOW_ALARM,
-                                                            string("event processing took too long, elapsed time: ")
-                                                                + ToString(elapsedTime) + "s\tconfig: " + configName,
-                                                            pipeline->GetContext().GetProjectName(),
-                                                            pipeline->GetContext().GetLogstoreName(),
-                                                            pipeline->GetContext().GetRegion());
-            }
-
-            if (pipeline->IsFlushingThroughGoPipeline()) {
-                if (isLog) {
-                    for (auto& group : eventGroupList) {
-                        string res, errorMsg;
-                        if (!Serialize(group,
-                                       pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond,
-                                       pipeline->GetContext().GetLogstoreName(),
-                                       res,
-                                       errorMsg)) {
-                            LOG_WARNING(pipeline->GetContext().GetLogger(),
-                                        ("failed to serialize event group",
-                                         errorMsg)("action", "discard data")("config", configName));
-                            pipeline->GetContext().GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
-                                                                        "failed to serialize event group: " + errorMsg
-                                                                            + "\taction: discard data\tconfig: "
-                                                                            + configName,
-                                                                        pipeline->GetContext().GetProjectName(),
-                                                                        pipeline->GetContext().GetLogstoreName(),
-                                                                        pipeline->GetContext().GetRegion());
-                            continue;
-                        }
-                        LogtailPlugin::GetInstance()->ProcessLogGroup(
-                            pipeline->GetContext().GetConfigName(),
-                            res,
-                            group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
-                    }
-                }
-            } else {
-                pipeline->Send(std::move(eventGroupList));
-            }
-            pipeline->SubInProcessCnt();
+            ProcessQueueManager::GetInstance()->Wait(100);
+            continue;
         }
+
+        sInEventsCnt->Add(item->mEventGroup.GetEvents().size());
+        sInGroupsCnt->Add(1);
+        sInGroupDataSizeBytes->Add(item->mEventGroup.DataSize());
+
+        shared_ptr<Pipeline>& pipeline = item->mPipeline;
+        if (!pipeline) {
+            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
+        }
+        if (!pipeline) {
+            LOG_INFO(sLogger,
+                     ("pipeline not found during processing, perhaps due to config deletion",
+                      "discard data")("config", configName));
+            continue;
+        }
+
+        bool isLog = !item->mEventGroup.GetEvents().empty() && item->mEventGroup.GetEvents()[0].Is<LogEvent>();
+
+        vector<PipelineEventGroup> eventGroupList;
+        eventGroupList.emplace_back(std::move(item->mEventGroup));
+        pipeline->Process(eventGroupList, item->mInputIndex);
+
+        if (pipeline->IsFlushingThroughGoPipeline()) {
+            if (isLog) {
+                for (auto& group : eventGroupList) {
+                    string res, errorMsg;
+                    if (!Serialize(group,
+                                   pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond,
+                                   pipeline->GetContext().GetLogstoreName(),
+                                   res,
+                                   errorMsg)) {
+                        LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                    ("failed to serialize event group",
+                                     errorMsg)("action", "discard data")("config", configName));
+                        pipeline->GetContext().GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
+                                                                    "failed to serialize event group: " + errorMsg
+                                                                        + "\taction: discard data\tconfig: "
+                                                                        + configName,
+                                                                    pipeline->GetContext().GetProjectName(),
+                                                                    pipeline->GetContext().GetLogstoreName(),
+                                                                    pipeline->GetContext().GetRegion());
+                        continue;
+                    }
+                    LogtailPlugin::GetInstance()->ProcessLogGroup(
+                        pipeline->GetContext().GetConfigName(),
+                        res,
+                        group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
+                }
+            }
+        } else {
+            pipeline->Send(std::move(eventGroupList));
+        }
+        pipeline->SubInProcessCnt();
+
+        gThreadedEventPool.CheckGC();
     }
-    LOG_WARNING(sLogger, ("ProcessorRunnerThread", "Exit")("threadNo", threadNo));
 }
 
 bool ProcessorRunner::Serialize(

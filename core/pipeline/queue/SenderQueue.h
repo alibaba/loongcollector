@@ -40,13 +40,15 @@ public:
 
 private:
     size_t Size() const override { return mSize; }
+    void PushFromExtraBuffer(std::unique_ptr<SenderQueueItem>&& item) override;
 
     std::vector<std::unique_ptr<SenderQueueItem>> mQueue;
     size_t mWrite = 0;
     size_t mRead = 0;
     size_t mSize = 0;
 
-    CounterPtr mFetchTimesCnt;
+    CounterPtr mSuccessfulFetchTimesCnt;
+    CounterPtr mFetchAttemptsCnt;
     CounterPtr mFetchedItemsCnt;
 
 #ifdef APSARA_UNIT_TEST_MAIN

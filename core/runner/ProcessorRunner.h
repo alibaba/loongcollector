@@ -19,12 +19,12 @@
 #include <atomic>
 #include <cstdint>
 #include <future>
+#include <string>
 #include <vector>
 
-#include "common/Lock.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/Monitor.h"
-#include "queue/QueueKey.h"
+#include "monitor/LogtailMetric.h"
+#include "pipeline/queue/QueueKey.h"
 
 namespace logtail {
 

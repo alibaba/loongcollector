@@ -33,6 +33,7 @@ namespace logtail {
 // Besides, PipelineEventGroup is equivalent to ResourceSpan in otlp, with Resource Attributes stored in mTags
 class SpanEvent : public PipelineEvent {
     friend class PipelineEventGroup;
+    friend class EventPool;
 
 public:
     class SpanLink {
@@ -127,6 +128,7 @@ public:
     static const std::string OTLP_SCOPE_VERSION;
 
     std::unique_ptr<PipelineEvent> Copy() const override;
+    void Reset() override;
 
     StringView GetTraceId() const { return mTraceId; }
     void SetTraceId(const std::string& traceId);

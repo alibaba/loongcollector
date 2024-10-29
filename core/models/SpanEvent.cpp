@@ -191,6 +191,23 @@ unique_ptr<PipelineEvent> SpanEvent::Copy() const {
     return make_unique<SpanEvent>(*this);
 }
 
+void SpanEvent::Reset() {
+    PipelineEvent::Reset();
+    mTraceId = gEmptyStringView;
+    mSpanId = gEmptyStringView;
+    mTraceState = gEmptyStringView;
+    mParentSpanId = gEmptyStringView;
+    mName = gEmptyStringView;
+    mKind = Kind::Unspecified;
+    mStartTimeNs = 0;
+    mEndTimeNs = 0;
+    mTags.Clear();
+    mEvents.clear();
+    mLinks.clear();
+    mStatus = StatusCode::Unset;
+    mScopeTags.Clear();
+}
+
 void SpanEvent::SetTraceId(const string& traceId) {
     const StringBuffer& b = GetSourceBuffer()->CopyString(traceId);
     mTraceId = StringView(b.data, b.size);

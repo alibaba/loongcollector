@@ -61,7 +61,7 @@ PipelineEventGroup TextParser::Parse(const string& content, uint64_t defaultTime
         }
         auto metricEvent = eGroup.CreateMetricEvent();
         if (ParseLine(line, *metricEvent)) {
-            eGroup.MutableEvents().emplace_back(std::move(metricEvent));
+            eGroup.MutableEvents().emplace_back(std::move(metricEvent), false, nullptr);
         }
     }
 

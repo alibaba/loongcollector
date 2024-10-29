@@ -108,7 +108,7 @@ bool ExactlyOnceSenderQueue::Remove(SenderQueueItem* item) {
     --mSize;
 
     if (!mExtraBuffer.empty()) {
-        Push(std::move(mExtraBuffer.front()));
+        PushFromExtraBuffer(std::move(mExtraBuffer.front()));
         mExtraBuffer.pop_front();
         return true;
     }
@@ -117,7 +117,6 @@ bool ExactlyOnceSenderQueue::Remove(SenderQueueItem* item) {
     }
     return true;
 }
-
 
 void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t limit) {
     if (Empty()) {
@@ -192,6 +191,28 @@ void ExactlyOnceSenderQueue::SetPipelineForItems(const std::shared_ptr<Pipeline>
             item->mPipeline = p;
         }
     }
+}
+
+void ExactlyOnceSenderQueue::PushFromExtraBuffer(unique_ptr<SenderQueueItem>&& item) {
+    auto ptr = static_cast<SLSSenderQueueItem*>(item.get());
+    auto& eo = ptr->mExactlyOnceCheckpoint;
+
+    for (size_t idx = 0; idx < mCapacity; ++idx, ++mWrite) {
+        auto index = mWrite % mCapacity;
+        if (mQueue[index] != nullptr) {
+            continue;
+        }
+        mQueue[index] = std::move(item);
+        auto& newCpt = mRangeCheckpoints[index];
+        newCpt->data.set_read_offset(eo->data.read_offset());
+        newCpt->data.set_read_length(eo->data.read_length());
+        eo = newCpt;
+        ptr->mShardHashKey = eo->data.hash_key();
+        ++mWrite;
+        break;
+    }
+    eo->Prepare();
+    ++mSize;
 }
 
 } // namespace logtail

@@ -16,15 +16,38 @@
 
 #include "models/PipelineEventGroup.h"
 
+#ifdef APSARA_UNIT_TEST_MAIN
 #include <sstream>
+#endif
 
 #include "common/HashUtil.h"
 #include "logger/Logger.h"
+#include "models/EventPool.h"
+#ifdef APSARA_UNIT_TEST_MAIN
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
+#endif
 
 using namespace std;
 
 namespace logtail {
+
+template <class T>
+void DestroyEvents(vector<PipelineEventPtr>&& events) {
+    unordered_map<EventPool*, vector<T*>> eventsPoolMap;
+    for (auto& item : events) {
+        if (item && item.IsFromEventPool()) {
+            item->Reset();
+            eventsPoolMap[item.GetEventPool()].emplace_back(static_cast<T*>(item.Release()));
+        }
+    }
+    for (auto& item : eventsPoolMap) {
+        if (item.first) {
+            item.first->Release(std::move(item.second));
+        } else {
+            gThreadedEventPool.Release(std::move(item.second));
+        }
+    }
+}
 
 PipelineEventGroup::PipelineEventGroup(PipelineEventGroup&& rhs) noexcept
     : mMetadata(std::move(rhs.mMetadata)),
@@ -33,6 +56,25 @@ PipelineEventGroup::PipelineEventGroup(PipelineEventGroup&& rhs) noexcept
       mSourceBuffer(std::move(rhs.mSourceBuffer)) {
     for (auto& item : mEvents) {
         item->ResetPipelineEventGroup(this);
+    }
+}
+
+PipelineEventGroup::~PipelineEventGroup() {
+    if (mEvents.empty() || !mEvents[0]) {
+        return;
+    }
+    switch (mEvents[0]->GetType()) {
+        case PipelineEvent::Type::LOG:
+            DestroyEvents<LogEvent>(std::move(mEvents));
+            break;
+        case PipelineEvent::Type::METRIC:
+            DestroyEvents<MetricEvent>(std::move(mEvents));
+            break;
+        case PipelineEvent::Type::SPAN:
+            DestroyEvents<SpanEvent>(std::move(mEvents));
+            break;
+        default:
+            break;
     }
 }
 
@@ -61,36 +103,90 @@ PipelineEventGroup PipelineEventGroup::Copy() const {
     return res;
 }
 
-unique_ptr<LogEvent> PipelineEventGroup::CreateLogEvent() {
-    // cannot use make_unique here because the private constructor is friend only to PipelineEventGroup
-    return unique_ptr<LogEvent>(new LogEvent(this));
+unique_ptr<LogEvent> PipelineEventGroup::CreateLogEvent(bool fromPool, EventPool* pool) {
+    LogEvent* e = nullptr;
+    if (fromPool) {
+        if (pool) {
+            e = pool->AcquireLogEvent(this);
+        } else {
+            e = gThreadedEventPool.AcquireLogEvent(this);
+        }
+    } else {
+        e = new LogEvent(this);
+    }
+    return unique_ptr<LogEvent>(e);
 }
 
-unique_ptr<MetricEvent> PipelineEventGroup::CreateMetricEvent() {
-    // cannot use make_unique here because the private constructor is friend only to PipelineEventGroup
-    return unique_ptr<MetricEvent>(new MetricEvent(this));
+unique_ptr<MetricEvent> PipelineEventGroup::CreateMetricEvent(bool fromPool, EventPool* pool) {
+    MetricEvent* e = nullptr;
+    if (fromPool) {
+        if (pool) {
+            e = pool->AcquireMetricEvent(this);
+        } else {
+            e = gThreadedEventPool.AcquireMetricEvent(this);
+        }
+    } else {
+        e = new MetricEvent(this);
+    }
+    return unique_ptr<MetricEvent>(e);
 }
 
-unique_ptr<SpanEvent> PipelineEventGroup::CreateSpanEvent() {
-    // cannot use make_unique here because the private constructor is friend only to PipelineEventGroup
-    return unique_ptr<SpanEvent>(new SpanEvent(this));
+unique_ptr<SpanEvent> PipelineEventGroup::CreateSpanEvent(bool fromPool, EventPool* pool) {
+    SpanEvent* e = nullptr;
+    if (fromPool) {
+        if (pool) {
+            e = pool->AcquireSpanEvent(this);
+        } else {
+            e = gThreadedEventPool.AcquireSpanEvent(this);
+        }
+    } else {
+        e = new SpanEvent(this);
+    }
+    return unique_ptr<SpanEvent>(e);
 }
 
-LogEvent* PipelineEventGroup::AddLogEvent() {
-    LogEvent* e = new LogEvent(this);
-    mEvents.emplace_back(e);
+LogEvent* PipelineEventGroup::AddLogEvent(bool fromPool, EventPool* pool) {
+    LogEvent* e = nullptr;
+    if (fromPool) {
+        if (pool) {
+            e = pool->AcquireLogEvent(this);
+        } else {
+            e = gThreadedEventPool.AcquireLogEvent(this);
+        }
+    } else {
+        e = new LogEvent(this);
+    }
+    mEvents.emplace_back(e, fromPool, pool);
     return e;
 }
 
-MetricEvent* PipelineEventGroup::AddMetricEvent() {
-    MetricEvent* e = new MetricEvent(this);
-    mEvents.emplace_back(e);
+MetricEvent* PipelineEventGroup::AddMetricEvent(bool fromPool, EventPool* pool) {
+    MetricEvent* e = nullptr;
+    if (fromPool) {
+        if (pool) {
+            e = pool->AcquireMetricEvent(this);
+        } else {
+            e = gThreadedEventPool.AcquireMetricEvent(this);
+        }
+    } else {
+        e = new MetricEvent(this);
+    }
+    mEvents.emplace_back(e, fromPool, pool);
     return e;
 }
 
-SpanEvent* PipelineEventGroup::AddSpanEvent() {
-    SpanEvent* e = new SpanEvent(this);
-    mEvents.emplace_back(e);
+SpanEvent* PipelineEventGroup::AddSpanEvent(bool fromPool, EventPool* pool) {
+    SpanEvent* e = nullptr;
+    if (fromPool) {
+        if (pool) {
+            e = pool->AcquireSpanEvent(this);
+        } else {
+            e = gThreadedEventPool.AcquireSpanEvent(this);
+        }
+    } else {
+        e = new SpanEvent(this);
+    }
+    mEvents.emplace_back(e, fromPool, pool);
     return e;
 }
 

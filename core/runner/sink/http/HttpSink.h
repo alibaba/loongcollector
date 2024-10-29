@@ -60,8 +60,8 @@ private:
     CounterPtr mInItemsTotal;
     CounterPtr mOutSuccessfulItemsTotal;
     CounterPtr mOutFailedItemsTotal;
-    CounterPtr mSuccessfulItemTotalResponseTimeMs;
-    CounterPtr mFailedItemTotalResponseTimeMs;
+    TimeCounterPtr mSuccessfulItemTotalResponseTimeMs;
+    TimeCounterPtr mFailedItemTotalResponseTimeMs;
     IntGaugePtr mSendingItemsTotal;
     IntGaugePtr mSendConcurrency;
     IntGaugePtr mLastRunTime;

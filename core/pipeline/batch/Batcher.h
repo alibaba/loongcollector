@@ -119,12 +119,14 @@ public:
         mBufferedGroupsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_BATCHER_BUFFERED_GROUPS_TOTAL);
         mBufferedEventsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_BATCHER_BUFFERED_EVENTS_TOTAL);
         mBufferedDataSizeByte = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_BATCHER_BUFFERED_SIZE_BYTES);
+        mTotalAddTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_COMPONENT_BATCHER_TOTAL_ADD_TIME_MS);
 
         return true;
     }
 
     // when group level batch is disabled, there should be only 1 element in BatchedEventsList
     void Add(PipelineEventGroup&& g, std::vector<BatchedEventsList>& res) {
+        auto before = std::chrono::system_clock::now();
         std::lock_guard<std::mutex> lock(mMux);
         size_t key = g.GetTagsHash();
         EventBatchItem<T>& item = mEventQueueMap[key];
@@ -179,6 +181,7 @@ public:
                 item.Flush(res);
             }
         }
+        mTotalAddTimeMs->Add(std::chrono::system_clock::now() - before);
     }
 
     // key != 0: event level queue
@@ -299,6 +302,7 @@ private:
     IntGaugePtr mBufferedGroupsTotal;
     IntGaugePtr mBufferedEventsTotal;
     IntGaugePtr mBufferedDataSizeByte;
+    TimeCounterPtr mTotalAddTimeMs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class BatcherUnittest;

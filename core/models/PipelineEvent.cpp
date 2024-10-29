@@ -45,6 +45,12 @@ const string& PipelineEventTypeToString(PipelineEvent::Type t) {
 PipelineEvent::PipelineEvent(Type type, PipelineEventGroup* ptr) : mType(type), mPipelineEventGroupPtr(ptr) {
 }
 
+void PipelineEvent::Reset() {
+    mTimestamp = 0;
+    mTimestampNanosecond = nullopt;
+    mPipelineEventGroupPtr = nullptr;
+}
+
 shared_ptr<SourceBuffer>& PipelineEvent::GetSourceBuffer() {
     return mPipelineEventGroupPtr->GetSourceBuffer();
 }

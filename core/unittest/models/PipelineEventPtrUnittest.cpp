@@ -24,6 +24,7 @@ public:
     void TestIs();
     void TestGet();
     void TestCast();
+    void TestRelease();
     void TestCopy();
 
 protected:
@@ -38,9 +39,9 @@ private:
 };
 
 void PipelineEventPtrUnittest::TestIs() {
-    PipelineEventPtr logEventPtr(mEventGroup->CreateLogEvent());
-    PipelineEventPtr metricEventPtr(mEventGroup->CreateMetricEvent());
-    PipelineEventPtr spanEventPtr(mEventGroup->CreateSpanEvent());
+    PipelineEventPtr logEventPtr(mEventGroup->CreateLogEvent(), false, nullptr);
+    PipelineEventPtr metricEventPtr(mEventGroup->CreateMetricEvent(), false, nullptr);
+    PipelineEventPtr spanEventPtr(mEventGroup->CreateSpanEvent(), false, nullptr);
     APSARA_TEST_TRUE_FATAL(logEventPtr.Is<LogEvent>());
     APSARA_TEST_FALSE_FATAL(logEventPtr.Is<MetricEvent>());
     APSARA_TEST_FALSE_FATAL(logEventPtr.Is<SpanEvent>());
@@ -55,15 +56,22 @@ void PipelineEventPtrUnittest::TestIs() {
 void PipelineEventPtrUnittest::TestGet() {
     auto logUPtr = mEventGroup->CreateLogEvent();
     auto addr = logUPtr.get();
-    PipelineEventPtr logEventPtr(std::move(logUPtr));
+    PipelineEventPtr logEventPtr(std::move(logUPtr), false, nullptr);
     APSARA_TEST_EQUAL_FATAL(addr, logEventPtr.Get<LogEvent>());
 }
 
 void PipelineEventPtrUnittest::TestCast() {
     auto logUPtr = mEventGroup->CreateLogEvent();
     auto addr = logUPtr.get();
-    PipelineEventPtr logEventPtr(std::move(logUPtr));
+    PipelineEventPtr logEventPtr(std::move(logUPtr), false, nullptr);
     APSARA_TEST_EQUAL_FATAL(addr, &logEventPtr.Cast<LogEvent>());
+}
+
+void PipelineEventPtrUnittest::TestRelease() {
+    auto logUPtr = mEventGroup->CreateLogEvent();
+    auto addr = logUPtr.get();
+    PipelineEventPtr logEventPtr(std::move(logUPtr), false, nullptr);
+    APSARA_TEST_EQUAL_FATAL(addr, logEventPtr.Release());
 }
 
 void PipelineEventPtrUnittest::TestCopy() {
@@ -75,24 +83,31 @@ void PipelineEventPtrUnittest::TestCopy() {
         event->SetTimestamp(12345678901);
         auto res = event.Copy();
         APSARA_TEST_NOT_EQUAL(event.Get<LogEvent>(), res.Get<LogEvent>());
+        APSARA_TEST_FALSE(res.IsFromEventPool());
+        APSARA_TEST_EQUAL(nullptr, res.GetEventPool());
     }
     {
         auto& event = mEventGroup->MutableEvents()[1];
         event->SetTimestamp(12345678901);
         auto res = event.Copy();
         APSARA_TEST_NOT_EQUAL(event.Get<MetricEvent>(), res.Get<MetricEvent>());
+        APSARA_TEST_FALSE(res.IsFromEventPool());
+        APSARA_TEST_EQUAL(nullptr, res.GetEventPool());
     }
     {
         auto& event = mEventGroup->MutableEvents()[2];
         event->SetTimestamp(12345678901);
         auto res = event.Copy();
         APSARA_TEST_NOT_EQUAL(event.Get<SpanEvent>(), res.Get<SpanEvent>());
+        APSARA_TEST_FALSE(res.IsFromEventPool());
+        APSARA_TEST_EQUAL(nullptr, res.GetEventPool());
     }
 }
 
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestIs)
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestGet)
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestCast)
+UNIT_TEST_CASE(PipelineEventPtrUnittest, TestRelease)
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestCopy)
 
 } // namespace logtail

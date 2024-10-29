@@ -61,6 +61,7 @@ const string METRIC_COMPONENT_BATCHER_EVENT_BATCHES_TOTAL = "component_event_bat
 const string METRIC_COMPONENT_BATCHER_BUFFERED_GROUPS_TOTAL = "component_buffered_groups_total";
 const string METRIC_COMPONENT_BATCHER_BUFFERED_EVENTS_TOTAL = "component_buffered_events_total";
 const string METRIC_COMPONENT_BATCHER_BUFFERED_SIZE_BYTES = "component_buffered_size_bytes";
+const string METRIC_COMPONENT_BATCHER_TOTAL_ADD_TIME_MS = "component_total_add_time_ms";
 
 /**********************************************************
  *   queue
@@ -72,11 +73,16 @@ const string METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE = "component_extra_buffer_
 const string METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE_BYTES = "component_extra_buffer_size_bytes";
 const string METRIC_COMPONENT_QUEUE_DISCARDED_EVENTS_TOTAL = "component_discarded_events_total";
 
-const string METRIC_COMPONENT_QUEUE_FETCH_TIMES_TOTAL = "component_fetch_times_total";
-const string METRIC_COMPONENT_QUEUE_FETCHED_ITEMS_TOTAL = "componet_fetched_items_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_REGION_LIMITER_TIMES_TOTAL = "component_fetch_rejected_by_region_limiter_times_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_PROJECT_LIMITER_TIMES_TOTAL = "component_fetch_rejected_by_project_limiter_times_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_LOGSTORE_LIMITER_TIMES_TOTAL = "component_fetch_rejected_by_logstore_limiter_times_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL = "component_fetch_rejected_by_rate_limiter_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCHED_ITEMS_TOTAL = "component_fetched_items_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_ATTEMPTS_TOTAL = "component_fetch_attempts_total";
+const string METRIC_COMPONENT_QUEUE_SUCCESSFUL_FETCH_TIMES_TOTAL = "component_successful_fetch_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_REGION_LIMITER_TIMES_TOTAL
+    = "component_fetch_rejected_by_region_limiter_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_PROJECT_LIMITER_TIMES_TOTAL
+    = "component_fetch_rejected_by_project_limiter_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_LOGSTORE_LIMITER_TIMES_TOTAL
+    = "component_fetch_rejected_by_logstore_limiter_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL
+    = "component_fetch_rejected_by_rate_limiter_times_total";
 
 } // namespace logtail

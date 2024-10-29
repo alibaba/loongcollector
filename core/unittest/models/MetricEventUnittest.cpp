@@ -28,6 +28,7 @@ public:
     void TestValue();
     void TestTag();
     void TestSize();
+    void TestReset();
     void TestToJson();
     void TestFromJson();
     void TestTagsIterator();
@@ -125,6 +126,19 @@ void MetricEventUnittest::TestSize() {
     APSARA_TEST_EQUAL(basicSize, mMetricEvent->DataSize());
 }
 
+void MetricEventUnittest::TestReset() {
+    mMetricEvent->SetTimestamp(12345678901);
+    mMetricEvent->SetName("test");
+    mMetricEvent->SetValue(UntypedSingleValue{10.0});
+    mMetricEvent->SetTag(string("key1"), string("value1"));
+    mMetricEvent->Reset();
+    APSARA_TEST_EQUAL(0, mMetricEvent->GetTimestamp());
+    APSARA_TEST_FALSE(mMetricEvent->GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL("", mMetricEvent->GetName());
+    APSARA_TEST_TRUE(mMetricEvent->Is<monostate>());
+    APSARA_TEST_EQUAL(mMetricEvent->TagsEnd(), mMetricEvent->TagsBegin());
+}
+
 void MetricEventUnittest::TestToJson() {
     mMetricEvent->SetTimestamp(12345678901, 0);
     mMetricEvent->SetName("test");
@@ -205,6 +219,7 @@ UNIT_TEST_CASE(MetricEventUnittest, TestName)
 UNIT_TEST_CASE(MetricEventUnittest, TestValue)
 UNIT_TEST_CASE(MetricEventUnittest, TestTag)
 UNIT_TEST_CASE(MetricEventUnittest, TestSize)
+UNIT_TEST_CASE(MetricEventUnittest, TestReset)
 UNIT_TEST_CASE(MetricEventUnittest, TestToJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestFromJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestTagsIterator)

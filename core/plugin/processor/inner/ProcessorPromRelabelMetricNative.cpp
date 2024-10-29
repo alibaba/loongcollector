@@ -197,7 +197,7 @@ void ProcessorPromRelabelMetricNative::AddMetric(PipelineEventGroup& metricGroup
                                                  time_t timestamp,
                                                  uint32_t nanoSec,
                                                  const GroupTags& targetTags) {
-    auto* metricEvent = metricGroup.AddMetricEvent();
+    auto* metricEvent = metricGroup.AddMetricEvent(true);
     metricEvent->SetName(name);
     metricEvent->SetValue<UntypedSingleValue>(value);
     metricEvent->SetTimestamp(timestamp, nanoSec);

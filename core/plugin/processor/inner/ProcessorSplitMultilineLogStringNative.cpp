@@ -304,7 +304,7 @@ void ProcessorSplitMultilineLogStringNative::CreateNewEvent(const StringView& co
                                                             PipelineEventGroup& logGroup,
                                                             EventsContainer& newEvents) {
     StringView sourceVal = sourceEvent.GetContent(mSourceKey);
-    std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent();
+    std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent(true);
     targetEvent->SetContentNoCopy(StringView(sourceKey.data, sourceKey.size), content);
     targetEvent->SetTimestamp(
         sourceEvent.GetTimestamp(),
@@ -317,7 +317,7 @@ void ProcessorSplitMultilineLogStringNative::CreateNewEvent(const StringView& co
         StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
         targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
     }
-    newEvents.emplace_back(std::move(targetEvent));
+    newEvents.emplace_back(std::move(targetEvent), true, nullptr);
 }
 
 void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView& sourceVal,

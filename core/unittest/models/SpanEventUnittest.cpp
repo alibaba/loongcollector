@@ -30,6 +30,7 @@ public:
     void TestEvent();
     void TestScopeTag();
     void TestSize();
+    void TestReset();
     void TestToJson();
     void TestFromJson();
 
@@ -246,6 +247,44 @@ void SpanEventUnittest::TestSize() {
     }
 }
 
+void SpanEventUnittest::TestReset() {
+    mSpanEvent->SetTimestamp(12345678901);
+    mSpanEvent->SetTraceId("test_trace_id");
+    mSpanEvent->SetSpanId("test_span_id");
+    mSpanEvent->SetTraceState("normal");
+    mSpanEvent->SetParentSpanId("test_parent_span_id");
+    mSpanEvent->SetName("test_name");
+    mSpanEvent->SetKind(SpanEvent::Kind::Client);
+    mSpanEvent->SetStartTimeNs(1715826723000000000);
+    mSpanEvent->SetEndTimeNs(1715826725000000000);
+    mSpanEvent->SetTag(string("key1"), string("value1"));
+    SpanEvent::InnerEvent* e = mSpanEvent->AddEvent();
+    e->SetName("test_event");
+    e->SetTimestampNs(1715826724000000000);
+    SpanEvent::SpanLink* l = mSpanEvent->AddLink();
+    l->SetTraceId("other_trace_id");
+    l->SetSpanId("other_span_id");
+    mSpanEvent->SetStatus(SpanEvent::StatusCode::Ok);
+    mSpanEvent->SetScopeTag(string("key2"), string("value2"));
+    mSpanEvent->Reset();
+
+    APSARA_TEST_EQUAL(0, mSpanEvent->GetTimestamp());
+    APSARA_TEST_FALSE(mSpanEvent->GetTimestampNanosecond().has_value());
+    APSARA_TEST_TRUE(mSpanEvent->GetTraceId().empty());
+    APSARA_TEST_TRUE(mSpanEvent->GetSpanId().empty());
+    APSARA_TEST_TRUE(mSpanEvent->GetTraceState().empty());
+    APSARA_TEST_TRUE(mSpanEvent->GetParentSpanId().empty());
+    APSARA_TEST_TRUE(mSpanEvent->GetName().empty());
+    APSARA_TEST_EQUAL(SpanEvent::Kind::Unspecified, mSpanEvent->GetKind());
+    APSARA_TEST_EQUAL(0U, mSpanEvent->GetStartTimeNs());
+    APSARA_TEST_EQUAL(0U, mSpanEvent->GetEndTimeNs());
+    APSARA_TEST_TRUE(mSpanEvent->mTags.mInner.empty());
+    APSARA_TEST_TRUE(mSpanEvent->GetEvents().empty());
+    APSARA_TEST_TRUE(mSpanEvent->GetLinks().empty());
+    APSARA_TEST_EQUAL(SpanEvent::StatusCode::Unset, mSpanEvent->GetStatus());
+    APSARA_TEST_TRUE(mSpanEvent->mScopeTags.mInner.empty());
+}
+
 void SpanEventUnittest::TestToJson() {
     mSpanEvent->SetTimestamp(12345678901, 0);
     mSpanEvent->SetTraceId("test_trace_id");
@@ -366,6 +405,7 @@ UNIT_TEST_CASE(SpanEventUnittest, TestLink)
 UNIT_TEST_CASE(SpanEventUnittest, TestEvent)
 UNIT_TEST_CASE(SpanEventUnittest, TestScopeTag)
 UNIT_TEST_CASE(SpanEventUnittest, TestSize)
+UNIT_TEST_CASE(SpanEventUnittest, TestReset)
 UNIT_TEST_CASE(SpanEventUnittest, TestToJson)
 UNIT_TEST_CASE(SpanEventUnittest, TestFromJson)
 

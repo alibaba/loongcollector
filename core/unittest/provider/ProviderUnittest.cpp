@@ -26,7 +26,7 @@ public:
 };
 void ProviderUnittest::TestGetRemoteConfigProvider() {
     auto remoteConfigProviders = GetRemoteConfigProviders();
-    APSARA_TEST_GT(remoteConfigProviders.size(), 0);
+    APSARA_TEST_GT(remoteConfigProviders.size(), 0U);
 }
 
 void ProviderUnittest::TestGetProfileSender() {

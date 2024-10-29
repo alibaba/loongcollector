@@ -18,6 +18,9 @@ project(batch_unittest)
 add_executable(flush_strategy_unittest FlushStrategyUnittest.cpp)
 target_link_libraries(flush_strategy_unittest ${UT_BASE_TARGET})
 
+add_executable(batched_events_unittest BatchedEventsUnittest.cpp)
+target_link_libraries(batched_events_unittest ${UT_BASE_TARGET})
+
 add_executable(batch_status_unittest BatchStatusUnittest.cpp)
 target_link_libraries(batch_status_unittest ${UT_BASE_TARGET})
 
@@ -32,6 +35,7 @@ target_link_libraries(timeout_flush_manager_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(flush_strategy_unittest)
+gtest_discover_tests(batched_events_unittest)
 gtest_discover_tests(batch_status_unittest)
 gtest_discover_tests(batch_item_unittest)
 gtest_discover_tests(batcher_unittest)

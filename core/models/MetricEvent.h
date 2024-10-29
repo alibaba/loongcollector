@@ -28,9 +28,11 @@ namespace logtail {
 
 class MetricEvent : public PipelineEvent {
     friend class PipelineEventGroup;
+    friend class EventPool;
 
 public:
     std::unique_ptr<PipelineEvent> Copy() const override;
+    void Reset() override;
     
     StringView GetName() const { return mName; }
     void SetName(const std::string& name);

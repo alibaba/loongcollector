@@ -102,7 +102,7 @@ private:
 
 void SLSEventFlushStrategyUnittest::TestNeedFlush() {
     PipelineEventGroup eventGroup(make_shared<SourceBuffer>());
-    PipelineEventPtr event(eventGroup.CreateLogEvent());
+    PipelineEventPtr event(eventGroup.CreateLogEvent(), false, nullptr);
     event->SetTimestamp(1717398001);
 
     SLSEventBatchStatus status;

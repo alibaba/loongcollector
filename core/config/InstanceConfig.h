@@ -17,13 +17,8 @@
 #pragma once
 
 #include <json/json.h>
-#include <re2/re2.h>
 
-#include <cstdint>
-#include <filesystem>
-#include <memory>
 #include <string>
-#include <vector>
 
 namespace logtail {
 

@@ -27,6 +27,15 @@ unique_ptr<PipelineEvent> LogEvent::Copy() const {
     return make_unique<LogEvent>(*this);
 }
 
+void LogEvent::Reset() {
+    PipelineEvent::Reset();
+    mContents.clear();
+    mIndex.clear();
+    mAllocatedContentSize = 0;
+    mFileOffset = 0;
+    mRawSize = 0;
+}
+
 StringView LogEvent::GetContent(StringView key) const {
     auto it = mIndex.find(key);
     if (it != mIndex.end()) {

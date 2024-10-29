@@ -67,7 +67,7 @@ void PipelineEventGroupOutput::addRow(const std::vector<SplStringPiece>& row,
     lastTagStrHash = tagStrHash;
 
     PipelineEventGroup& current = mLogGroupList->back();
-    LogEvent* targetEvent = current.AddLogEvent();
+    LogEvent* targetEvent = current.AddLogEvent(true);
 
     targetEvent->SetTimestamp(time, timeNsPart);
 

@@ -41,6 +41,7 @@ public:
     virtual ~PipelineEvent() = default;
 
     virtual std::unique_ptr<PipelineEvent> Copy() const = 0;
+    virtual void Reset();
 
     Type GetType() const { return mType; }
     time_t GetTimestamp() const { return mTimestamp; }
@@ -64,6 +65,7 @@ public:
     virtual bool FromJson(const Json::Value&) = 0;
     std::string ToJsonString(bool enableEventMeta = false) const;
     bool FromJsonString(const std::string&);
+    PipelineEventGroup* GetPipelineEventGroupPtr() { return mPipelineEventGroupPtr; }
 #endif
 
 protected:

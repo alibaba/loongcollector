@@ -34,32 +34,18 @@ struct BatchedEvents {
     StringView mPackIdPrefix;
 
     BatchedEvents() = default;
+    ~BatchedEvents();
+    BatchedEvents(BatchedEvents&&) noexcept = default;
+    BatchedEvents& operator=(BatchedEvents&&) noexcept = default;
 
     // for flusher_sls only
     BatchedEvents(EventsContainer&& events,
                   SizedMap&& tags,
                   std::shared_ptr<SourceBuffer>&& sourceBuffer,
                   StringView packIdPrefix,
-                  RangeCheckpointPtr&& eoo)
-        : mEvents(std::move(events)),
-          mTags(std::move(tags)),
-          mExactlyOnceCheckpoint(std::move(eoo)),
-          mPackIdPrefix(packIdPrefix) {
-        mSourceBuffers.emplace_back(std::move(sourceBuffer));
-        mSizeBytes = sizeof(decltype(mEvents)) + mTags.DataSize();
-        for (const auto& item : mEvents) {
-            mSizeBytes += item->DataSize();
-        }
-    }
+                  RangeCheckpointPtr&& eoo);
 
-    void Clear() {
-        mEvents.clear();
-        mTags.Clear();
-        mSourceBuffers.clear();
-        mSizeBytes = 0;
-        mExactlyOnceCheckpoint.reset();
-        mPackIdPrefix = StringView();
-    }
+    void Clear();
 };
 
 using BatchedEventsList = std::vector<BatchedEvents>;

@@ -25,6 +25,7 @@
 #include "models/PipelineEventPtr.h"
 
 namespace logtail {
+class EventPool;
 
 // referrences
 // https://opentelemetry.io/docs/specs/otel/logs/data-model-appendix/#elastic-common-schema
@@ -71,20 +72,21 @@ using EventsContainer = std::vector<PipelineEventPtr>;
 class PipelineEventGroup {
 public:
     PipelineEventGroup(const std::shared_ptr<SourceBuffer>& sourceBuffer) : mSourceBuffer(sourceBuffer) {}
+    ~PipelineEventGroup();
     PipelineEventGroup(PipelineEventGroup&&) noexcept;
     PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept;
 
     PipelineEventGroup Copy() const;
 
-    std::unique_ptr<LogEvent> CreateLogEvent();
-    std::unique_ptr<MetricEvent> CreateMetricEvent();
-    std::unique_ptr<SpanEvent> CreateSpanEvent();
+    std::unique_ptr<LogEvent> CreateLogEvent(bool fromPool = false, EventPool* pool = nullptr);
+    std::unique_ptr<MetricEvent> CreateMetricEvent(bool fromPool = false, EventPool* pool = nullptr);
+    std::unique_ptr<SpanEvent> CreateSpanEvent(bool fromPool = false, EventPool* pool = nullptr);
 
     const EventsContainer& GetEvents() const { return mEvents; }
     EventsContainer& MutableEvents() { return mEvents; }
-    LogEvent* AddLogEvent();
-    MetricEvent* AddMetricEvent();
-    SpanEvent* AddSpanEvent();
+    LogEvent* AddLogEvent(bool fromPool = false, EventPool* pool = nullptr);
+    MetricEvent* AddMetricEvent(bool fromPool = false, EventPool* pool = nullptr);
+    SpanEvent* AddSpanEvent(bool fromPool = false, EventPool* pool = nullptr);
     void SwapEvents(EventsContainer& other) { mEvents.swap(other); }
     void ReserveEvents(size_t size) { mEvents.reserve(size); }
 

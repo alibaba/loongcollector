@@ -63,12 +63,14 @@ private:
 
 class LogEvent : public PipelineEvent {
     friend class PipelineEventGroup;
+    friend class EventPool;
 
 public:
     using ConstContentIterator = BaseContentIterator<ContentsContainer::const_iterator, const LogContent>;
     using ContentIterator = BaseContentIterator<ContentsContainer::iterator, LogContent>;
 
     std::unique_ptr<PipelineEvent> Copy() const override;
+    void Reset() override;
 
     StringView GetContent(StringView key) const;
     bool HasContent(StringView key) const;

@@ -27,6 +27,13 @@ unique_ptr<PipelineEvent> MetricEvent::Copy() const {
     return make_unique<MetricEvent>(*this);
 }
 
+void MetricEvent::Reset() {
+    PipelineEvent::Reset();
+    mName = gEmptyStringView;
+    mValue = MetricValue();
+    mTags.Clear();
+}
+
 void MetricEvent::SetName(const string& name) {
     const StringBuffer& b = GetSourceBuffer()->CopyString(name);
     mName = StringView(b.data, b.size);

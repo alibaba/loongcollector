@@ -73,6 +73,9 @@ protected:
     IntGaugePtr mExtraBufferDataSizeBytes;
     CounterPtr mFetchRejectedByRateLimiterTimesCnt;
 
+private:
+    virtual void PushFromExtraBuffer(std::unique_ptr<SenderQueueItem>&& item) = 0;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherUnittest;
 #endif
