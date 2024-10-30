@@ -41,6 +41,8 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^generate \{(\d+)\} delimiter logs to file \{(.*)\}, with interval \{(\d+)\}ms$`, trigger.DelimiterSingle)
 	ctx.When(`^query through \{(.*)\}`, control.SetQuery)
 	ctx.When(`^begin trigger`, trigger.BeginTrigger)
+	ctx.When(`^execute \{(\d+)\} commands to generate process security events`, trigger.TrigerProcessSecurityEvents)
+	ctx.When(`^execute \{(\d+)\} commands to generate network security events on url \{(.*)\}$`, trigger.TrigerNetworksSecurityEvents)
 	ctx.When(`^execute \{(\d+)\} commands to generate file security events on files \{(.*)\}$`, trigger.TrigerFileSecurityEvents)
 	ctx.When(`^generate random nginx logs to file, speed \{(\d+)\}MB/s, total \{(\d+)\}min, to file \{(.*)\}`, trigger.GenerateRandomNginxLogToFile)
 	ctx.When(`^start monitor \{(\S+)\}`, monitor.StartMonitor)
