@@ -71,6 +71,50 @@ func LogCount(ctx context.Context, expect int) (context.Context, error) {
 	return ctx, nil
 }
 
+func LogCountLess(ctx context.Context, expect int) (context.Context, error) {
+	var from int32
+	value := ctx.Value(config.StartTimeContextKey)
+	if value != nil {
+		from = value.(int32)
+	} else {
+		return ctx, fmt.Errorf("no start time")
+	}
+	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
+	defer cancel()
+	var groups []*protocol.LogGroup
+	var err error
+	var count int
+	err = retry.Do(
+		func() error {
+			count = 0
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
+			if err != nil {
+				return err
+			}
+			for _, group := range groups {
+				count += len(group.Logs)
+			}
+			if count != expect {
+				return fmt.Errorf("log count not match, expect %d, got %d, from %d", expect, count, from)
+			}
+			if expect == 0 {
+				return fmt.Errorf("log count is 0")
+			}
+			return nil
+		},
+		retry.Context(timeoutCtx),
+		retry.Delay(5*time.Second),
+		retry.DelayType(retry.FixedDelay),
+	)
+	if count > 0 && count < expect {
+		return ctx, nil
+	}
+	if err != nil {
+		return ctx, err
+	}
+	return ctx, nil
+}
+
 func MetricCheck(ctx context.Context, expect int, duration int64, checker func([]*protocol.LogGroup) error) (context.Context, error) {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()

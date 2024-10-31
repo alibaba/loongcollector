@@ -22,4 +22,5 @@ const (
 	ExposePortKey               ContextKey = "exposePort"
 	CurrentWorkingDeploymentKey ContextKey = "currentWorkingDeployment"
 	QueryKey                    ContextKey = "query"
+	AgentPIDKey                 ContextKey = "agentPID"
 )

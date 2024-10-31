@@ -14,8 +14,68 @@
 package generator
 
 import (
+	"crypto/rand"
+	"fmt"
+	"math/big"
 	"os"
+	"strconv"
+	"text/template"
+
+	"github.com/pkg/errors"
 )
+
+var Levels = []string{"ERROR", "INFO", "DEBUG", "WARNING"}
+
+type GenerateFileLogConfig struct {
+	GeneratedLogDir string
+	TotalLog        int
+	Interval        int
+	FileName        string
+	Custom          map[string]string
+}
+
+func getGenerateFileLogConfigFromEnv(customKeys ...string) (*GenerateFileLogConfig, error) {
+	gneratedLogDir := getEnvOrDefault("GENERATED_LOG_DIR", "/tmp/loongcollector")
+	totalLog, err := strconv.Atoi(getEnvOrDefault("TOTAL_LOG", "100"))
+	if err != nil {
+		return nil, errors.Wrap(err, "parse TOTAL_LOG failed")
+	}
+	interval, err := strconv.Atoi(getEnvOrDefault("INTERVAL", "1"))
+	if err != nil {
+		return nil, errors.Wrap(err, "parse INTERVAL failed")
+	}
+	fileName := getEnvOrDefault("FILENAME", "default.log")
+	custom := make(map[string]string)
+	for _, key := range customKeys {
+		custom[key] = getEnvOrDefault(key, "")
+	}
+	return &GenerateFileLogConfig{
+		GeneratedLogDir: gneratedLogDir,
+		TotalLog:        totalLog,
+		Interval:        interval,
+		FileName:        fileName,
+		Custom:          custom,
+	}, nil
+}
+
+func string2Template(strings []string) []*template.Template {
+	templates := make([]*template.Template, len(strings))
+	for i, str := range strings {
+		templates[i], _ = template.New(fmt.Sprintf("template_%d", i)).Parse(str)
+	}
+	return templates
+}
+
+func getRandomLogLevel() string {
+	randInt, _ := rand.Int(rand.Reader, big.NewInt(int64(len(Levels))))
+	return Levels[randInt.Int64()]
+}
+
+func getRandomMark() string {
+	marks := []string{"-", "F"}
+	randInt, _ := rand.Int(rand.Reader, big.NewInt(int64(len(marks))))
+	return marks[randInt.Int64()]
+}
 
 func getEnvOrDefault(env, fallback string) string {
 	if value, ok := os.LookupEnv(env); ok {

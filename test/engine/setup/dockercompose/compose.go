@@ -55,9 +55,9 @@ services:
       timeout: 5s
       interval: 1s
       retries: 10
-  ilogtailC:
+  loongcollectorC:
     image: aliyun/loongcollector:0.0.1
-    hostname: ilogtail
+    hostname: loongcollector
     privileged: true
     pid: host
     volumes:
@@ -139,8 +139,8 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 
 	list, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
 		Filters: filters.NewArgs(
-			filters.Arg("name", fmt.Sprintf("%s_ilogtailC*", projectName)),
-			filters.Arg("name", fmt.Sprintf("%s-ilogtailC*", projectName)),
+			filters.Arg("name", fmt.Sprintf("%s_loongcollectorC*", projectName)),
+			filters.Arg("name", fmt.Sprintf("%s-loongcollectorC*", projectName)),
 		),
 	})
 	if len(list) != 1 {
@@ -265,7 +265,7 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 	}
 	cfg := c.getLogtailpluginConfig()
 	services := cfg["services"].(map[string]interface{})
-	ilogtail := services["ilogtailC"].(map[string]interface{})
+	loongcollector := services["loongcollectorC"].(map[string]interface{})
 	// merge docker compose file.
 	if len(bytes) > 0 {
 		caseCfg := make(map[string]interface{})
@@ -273,14 +273,14 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 			return err
 		}
 		// depend on
-		ilogtailDependOn := map[string]interface{}{
+		loongcollectorDependOn := map[string]interface{}{
 			"goc": map[string]string{
 				"condition": "service_healthy",
 			},
 		}
 		if dependOnContainers, ok := ctx.Value(config.DependOnContainerKey).([]string); ok {
 			for _, container := range dependOnContainers {
-				ilogtailDependOn[container] = map[string]string{
+				loongcollectorDependOn[container] = map[string]string{
 					"condition": "service_healthy",
 				}
 			}
@@ -289,24 +289,24 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 		for k := range newServices {
 			services[k] = newServices[k]
 		}
-		ilogtail["depends_on"] = ilogtailDependOn
+		loongcollector["depends_on"] = loongcollectorDependOn
 	}
 	// volume
-	ilogtailMount := services["ilogtailC"].(map[string]interface{})["volumes"].([]interface{})
+	loongcollectorMount := services["loongcollectorC"].(map[string]interface{})["volumes"].([]interface{})
 	if volumes, ok := ctx.Value(config.MountVolumeKey).([]string); ok {
 		for _, volume := range volumes {
-			ilogtailMount = append(ilogtailMount, volume)
+			loongcollectorMount = append(loongcollectorMount, volume)
 		}
 	}
 	// ports
-	ilogtailPort := services["ilogtailC"].(map[string]interface{})["ports"].([]interface{})
+	loongcollectorPort := services["loongcollectorC"].(map[string]interface{})["ports"].([]interface{})
 	if ports, ok := ctx.Value(config.ExposePortKey).([]string); ok {
 		for _, port := range ports {
-			ilogtailPort = append(ilogtailPort, port)
+			loongcollectorPort = append(loongcollectorPort, port)
 		}
 	}
-	ilogtail["volumes"] = ilogtailMount
-	ilogtail["ports"] = ilogtailPort
+	loongcollector["volumes"] = loongcollectorMount
+	loongcollector["ports"] = loongcollectorPort
 	yml, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
@@ -314,7 +314,7 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 	return os.WriteFile(config.CaseHome+finalFileName, yml, 0600)
 }
 
-// getLogtailpluginConfig find the docker compose configuration of the ilogtail.
+// getLogtailpluginConfig find the docker compose configuration of the loongcollector.
 func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 	cfg := make(map[string]interface{})
 	f, _ := os.Create(config.CoverageFile)

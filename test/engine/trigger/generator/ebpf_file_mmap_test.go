@@ -27,7 +27,7 @@ func TestGenerateMmapCommand(t *testing.T) {
 		t.Fatalf("parse COMMAND_CNT failed: %v", err)
 		return
 	}
-	filename := getEnvOrDefault("FILE_NAME", "/tmp/ilogtail/ebpfFileSecurityHook3.log")
+	filename := getEnvOrDefault("FILE_NAME", "/tmp/loongcollector/ebpfFileSecurityHook3.log")
 	f, err := os.Create(filename)
 	if err != nil {
 		panic(err)

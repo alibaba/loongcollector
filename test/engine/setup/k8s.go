@@ -19,8 +19,11 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"sort"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -37,6 +40,7 @@ type K8sEnv struct {
 	k8sClient            *kubernetes.Clientset
 	deploymentController *controller.DeploymentController
 	daemonsetController  *controller.DaemonSetController
+	dynamicController    *controller.DynamicController
 }
 
 func NewDaemonSetEnv() *K8sEnv {
@@ -59,34 +63,40 @@ func (k *K8sEnv) GetType() string {
 	return k.deployType
 }
 
-func (k *K8sEnv) ExecOnLogtail(command string) error {
+func (k *K8sEnv) ExecOnLogtail(command string) (string, error) {
 	if k.k8sClient == nil {
-		return fmt.Errorf("k8s client init failed")
+		return "", fmt.Errorf("k8s client init failed")
 	}
 	var pods *corev1.PodList
 	var err error
 	if k.deployType == "daemonset" {
 		pods, err = k.daemonsetController.GetDaemonSetPods("logtail-ds", "kube-system")
 		if err != nil {
-			return err
+			return "", err
 		}
 	} else if k.deployType == "deployment" {
 		pods, err = k.deploymentController.GetRunningDeploymentPods("cluster-agent", "loong-collector")
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
+	results := make([]string, 0)
+	sort.Slice(pods.Items, func(i, j int) bool {
+		return pods.Items[i].Name < pods.Items[j].Name
+	})
 	for _, pod := range pods.Items {
-		if err := k.execInPod(k.config, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, []string{"bash", "-c", command}); err != nil {
-			return err
+		result, err := k.execInPod(k.config, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, []string{"bash", "-c", command})
+		if err != nil {
+			return "", err
 		}
+		results = append(results, result)
 	}
-	return nil
+	return strings.Join(results, "\n"), nil
 }
 
-func (k *K8sEnv) ExecOnSource(ctx context.Context, command string) error {
+func (k *K8sEnv) ExecOnSource(ctx context.Context, command string) (string, error) {
 	if k.k8sClient == nil {
-		return fmt.Errorf("k8s client init failed")
+		return "", fmt.Errorf("k8s client init failed")
 	}
 	deploymentName := "e2e-generator"
 	if ctx.Value(config.CurrentWorkingDeploymentKey) != nil {
@@ -94,18 +104,15 @@ func (k *K8sEnv) ExecOnSource(ctx context.Context, command string) error {
 	}
 	pods, err := k.deploymentController.GetRunningDeploymentPods(deploymentName, "default")
 	if err != nil {
-		return err
+		return "", err
 	}
 	randomIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(pods.Items))))
 	if err != nil {
-		return err
+		return "", err
 	}
 	pod := pods.Items[randomIndex.Int64()]
-	fmt.Println("exec on pod: ", pod.Name)
-	if err := k.execInPod(k.config, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, []string{"sh", "-c", command}); err != nil {
-		return err
-	}
-	return nil
+	fmt.Println("exec on pod: ", pod.Name, "command: ", command)
+	return k.execInPod(k.config, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, []string{"sh", "-c", command})
 }
 
 func (k *K8sEnv) AddFilter(filter controller.ContainerFilter) error {
@@ -114,6 +121,14 @@ func (k *K8sEnv) AddFilter(filter controller.ContainerFilter) error {
 
 func (k *K8sEnv) RemoveFilter(filter controller.ContainerFilter) error {
 	return k.deploymentController.RemoveFilter("e2e-generator", filter)
+}
+
+func (k *K8sEnv) Apply(filePath string) error {
+	return k.dynamicController.Apply(filePath)
+}
+
+func (k *K8sEnv) Delete(filePath string) error {
+	return k.dynamicController.Delete(filePath)
 }
 
 func SwitchCurrentWorkingDeployment(ctx context.Context, deploymentName string) (context.Context, error) {
@@ -139,9 +154,15 @@ func (k *K8sEnv) init() {
 	k.k8sClient = k8sClient
 	k.deploymentController = controller.NewDeploymentController(k.k8sClient)
 	k.daemonsetController = controller.NewDaemonSetController(k.k8sClient)
+
+	dynamicClient, err := dynamic.NewForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	k.dynamicController = controller.NewDynamicController(dynamicClient, k.k8sClient.Discovery())
 }
 
-func (k *K8sEnv) execInPod(config *rest.Config, namespace, podName, containerName string, command []string) error {
+func (k *K8sEnv) execInPod(config *rest.Config, namespace, podName, containerName string, command []string) (string, error) {
 	req := k.k8sClient.CoreV1().RESTClient().
 		Post().
 		Resource("pods").
@@ -158,7 +179,7 @@ func (k *K8sEnv) execInPod(config *rest.Config, namespace, podName, containerNam
 		}, scheme.ParameterCodec)
 	executor, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
-		return err
+		return "", err
 	}
 	var stdout, stderr bytes.Buffer
 	err = executor.Stream(remotecommand.StreamOptions{
@@ -167,7 +188,7 @@ func (k *K8sEnv) execInPod(config *rest.Config, namespace, podName, containerNam
 		Stderr: &stderr,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return stdout.String(), nil
 }

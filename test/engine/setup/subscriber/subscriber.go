@@ -36,7 +36,7 @@ var mu sync.Mutex
 // Creator creates a new subscriber instance according to the spec.
 type Creator func(spec map[string]interface{}) (Subscriber, error)
 
-// Subscriber receives the logs transfer by ilogtail.
+// Subscriber receives the logs transfer by loongcollector.
 type Subscriber interface {
 	doc.Doc
 	// Name of subscriber
@@ -45,7 +45,7 @@ type Subscriber interface {
 	Stop() error
 	// Get data
 	GetData(sql string, startTime int32) ([]*protocol.LogGroup, error)
-	// FlusherConfig returns the default flusher config for Ilogtail container to transfer the received or self telemetry data.
+	// FlusherConfig returns the default flusher config for loongcollector container to transfer the received or self telemetry data.
 	FlusherConfig() string
 }
 

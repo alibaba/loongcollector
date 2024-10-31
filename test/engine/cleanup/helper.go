@@ -48,7 +48,6 @@ func All() {
 	_, _ = AllGeneratedLog(ctx)
 	_, _ = GoTestCache(ctx)
 	_, _ = DeleteContainers(ctx)
-	// FIXME: if this test case has no subscriber and the previous one has subscriber, it will panic
 	if subscriber.TestSubscriber != nil {
 		_ = subscriber.TestSubscriber.Stop()
 	}

@@ -28,7 +28,7 @@ Feature: input mssql
         Password: MSsqlpa#1word
         StateMent: "select * from LogtailTestTable where id > ? ORDER BY id"
     """
-    Given iLogtail depends on containers {["setup"]}
+    Given loongcollector depends on containers {["setup"]}
     When start docker-compose {input_mssql}
     Then there is at least {4} logs
     Then the log fields match as below

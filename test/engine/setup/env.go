@@ -15,17 +15,19 @@ package setup
 
 import (
 	"context"
+
+	"github.com/alibaba/ilogtail/test/config"
 )
 
 var Env TestEnv
 
 type TestEnv interface {
 	GetType() string
-	ExecOnLogtail(command string) error
-	ExecOnSource(ctx context.Context, command string) error
+	ExecOnLogtail(command string) (string, error)
+	ExecOnSource(ctx context.Context, command string) (string, error)
 }
 
-func InitEnv(envType string) {
+func InitEnv(ctx context.Context, envType string) (context.Context, error) {
 	switch envType {
 	case "host":
 		Env = NewHostEnv()
@@ -36,9 +38,23 @@ func InitEnv(envType string) {
 	case "deployment":
 		Env = NewDeploymentEnv()
 	}
+	return SetAgentPID(ctx)
 }
 
 func Mkdir(ctx context.Context, dir string) (context.Context, error) {
 	command := "mkdir -p " + dir
-	return ctx, Env.ExecOnSource(ctx, command)
+	_, err := Env.ExecOnSource(ctx, command)
+	return ctx, err
+}
+
+func SetAgentPID(ctx context.Context) (context.Context, error) {
+	command := "ps -e | grep loongcollector | grep -v grep | awk '{print $1}'"
+	result, err := Env.ExecOnLogtail(command)
+	if err != nil {
+		if err.Error() == "not implemented" {
+			return ctx, nil
+		}
+		return ctx, err
+	}
+	return context.WithValue(ctx, config.AgentPIDKey, result), nil
 }

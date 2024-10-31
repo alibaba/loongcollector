@@ -30,7 +30,7 @@ Feature: flusher elasticsearch
             Username: elastic
             Password: BtpoRTeyjmC=ruTIUoNN
     """
-    Given iLogtail depends on containers {["elasticsearch"]}
+    Given loongcollector depends on containers {["elasticsearch"]}
     When start docker-compose {flusher_elasticsearch}
     Then there is at least {10} logs
     Then the log fields match kv

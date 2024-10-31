@@ -17,6 +17,6 @@ Feature: reader flush timeout
           - /root/test/simple.log
         FlushTimeoutSecs: 1
     """
-    Given iLogtail container mount {./a.log} to {/root/test/simple.log}
+    Given loongcollector container mount {./a.log} to {/root/test/simple.log}
     When start docker-compose {reader_flush_timeout}
     Then there is at least {5} logs

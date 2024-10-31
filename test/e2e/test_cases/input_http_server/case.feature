@@ -27,9 +27,9 @@ Feature: input http server
             FieldType: json
             ExpondJson: true
     """
-    Given iLogtail expose port {18089} to {18089}
+    Given loongcollector expose port {18089} to {18089}
     When start docker-compose {input_http_server}
-    When generate {10} http logs, with interval {10}ms, url: {http://ilogtailC:18089/?db=mydb}, method: {POST}, body:
+    When generate {10} http logs, with interval {10}ms, url: {http://loongcollectorC:18089/?db=mydb}, method: {POST}, body:
     """
     weather,city=hz value=32
     """

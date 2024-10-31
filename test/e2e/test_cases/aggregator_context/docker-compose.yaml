@@ -23,7 +23,7 @@ services:
     environment:
       - STDOUT_SWITCH=true
     depends_on:
-      - ilogtailC
+      - loongcollectorC
   container_2:
     build:
       context: .
@@ -37,4 +37,4 @@ services:
       timeout: 5s
       retries: 3
     depends_on:
-      - ilogtailC
+      - loongcollectorC

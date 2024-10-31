@@ -17,6 +17,6 @@ Feature: reader new line after timeout
           - /root/test/a.log
         FlushTimeoutSecs: 1
     """
-    Given iLogtail container mount {./a.log} to {/root/test/a.log}
+    Given loongcollector container mount {./a.log} to {/root/test/a.log}
     When start docker-compose {reader_new_line_after_timeout}
     Then there is at least {6} logs

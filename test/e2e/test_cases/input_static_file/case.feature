@@ -20,7 +20,7 @@ Feature: input static file
           - "/root/test/**/a*.log"
         MaxDirSearchDepth: 10
     """
-    Given iLogtail container mount {./a.log} to {/root/test/1/2/3/axxxx.log}
+    Given loongcollector container mount {./a.log} to {/root/test/1/2/3/axxxx.log}
     When start docker-compose {input_static_file}
     Then there is at least {1000} logs
     Then the log fields match kv

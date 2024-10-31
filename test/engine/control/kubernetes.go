@@ -57,3 +57,25 @@ func RemoveLabel(ctx context.Context, labelStr string) (context.Context, error) 
 	}
 	return ctx, nil
 }
+
+func ApplyYaml(ctx context.Context, yaml string) (context.Context, error) {
+	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
+		if err := k8sEnv.Apply(yaml); err != nil {
+			return ctx, err
+		}
+	} else {
+		return ctx, fmt.Errorf("try to apply yaml, but env is not k8s env")
+	}
+	return ctx, nil
+}
+
+func DeleteYaml(ctx context.Context, yaml string) (context.Context, error) {
+	if k8sEnv, ok := setup.Env.(*setup.K8sEnv); ok {
+		if err := k8sEnv.Delete(yaml); err != nil {
+			return ctx, err
+		}
+	} else {
+		return ctx, fmt.Errorf("try to delete yaml, but env is not k8s env")
+	}
+	return ctx, nil
+}

@@ -32,7 +32,6 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
-const iLogtailLocalConfigDir = "/usr/local/loongcollector/conf/local"
 const lotailpluginHTTPAddress = "ilogtailC:18689"
 const E2EProjectName = "e2e-test-project"
 const E2ELogstoreName = "e2e-test-logstore"
@@ -55,8 +54,8 @@ func AddLocalConfig(ctx context.Context, configName, c string) (context.Context,
 		}
 	} else {
 		command := fmt.Sprintf(`cd %s && cat << 'EOF' > %s.yaml
-%s`, iLogtailLocalConfigDir, configName, c)
-		if err := setup.Env.ExecOnLogtail(command); err != nil {
+%s`, config.TestConfig.LocalConfigDir, configName, c)
+		if _, err := setup.Env.ExecOnLogtail(command); err != nil {
 			return ctx, err
 		}
 		time.Sleep(5 * time.Second)
@@ -65,8 +64,8 @@ func AddLocalConfig(ctx context.Context, configName, c string) (context.Context,
 }
 
 func RemoveAllLocalConfig(ctx context.Context) (context.Context, error) {
-	command := fmt.Sprintf("cd %s && rm -rf *.yaml", iLogtailLocalConfigDir)
-	if err := setup.Env.ExecOnLogtail(command); err != nil {
+	command := fmt.Sprintf("cd %s && rm -rf *.yaml", config.TestConfig.LocalConfigDir)
+	if _, err := setup.Env.ExecOnLogtail(command); err != nil {
 		return ctx, err
 	}
 	return ctx, nil

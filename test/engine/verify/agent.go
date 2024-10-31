@@ -11,18 +11,35 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package cleanup
+package verify
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup"
 )
 
-func GoTestCache(ctx context.Context) (context.Context, error) {
-	command := "/usr/local/go/bin/go clean -testcache"
-	if _, err := setup.Env.ExecOnSource(ctx, command); err != nil {
+const (
+	queryPIDCommand = "ps -e | grep loongcollector | grep -v grep | awk '{print $1}'"
+)
+
+func AgentNotCrash(ctx context.Context) (context.Context, error) {
+	// verify agent crash
+	result, err := setup.Env.ExecOnLogtail(queryPIDCommand)
+	if err != nil {
+		if err.Error() == "not implemented" {
+			return ctx, nil
+		}
 		return ctx, err
+	}
+	agentPID := ctx.Value(config.AgentPIDKey)
+	if agentPID == nil {
+		return ctx, fmt.Errorf("agent PID not found in context")
+	}
+	if result != agentPID {
+		return ctx, fmt.Errorf("agent crash, expect PID: %s, but got: %s", agentPID, result)
 	}
 	return ctx, nil
 }

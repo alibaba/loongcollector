@@ -25,6 +25,7 @@ var TestConfig Config
 
 type Config struct {
 	// Log
+	LocalConfigDir  string `mapstructure:"local_config_dir" yaml:"local_config_dir"`
 	GeneratedLogDir string `mapstructure:"generated_log_dir" yaml:"generated_log_dir"`
 	WorkDir         string `mapstructure:"work_dir" yaml:"work_dir"`
 	// Host
@@ -65,9 +66,10 @@ func ParseConfig() {
 
 	TestConfig = Config{}
 	// Log
+	TestConfig.LocalConfigDir = os.Getenv("LOCAL_CONFIG_DIR")
 	TestConfig.GeneratedLogDir = os.Getenv("GENERATED_LOG_DIR")
 	if len(TestConfig.GeneratedLogDir) == 0 {
-		TestConfig.GeneratedLogDir = "/tmp/ilogtail"
+		TestConfig.GeneratedLogDir = "/tmp/loongcollector"
 	}
 	TestConfig.WorkDir = os.Getenv("WORK_DIR")
 

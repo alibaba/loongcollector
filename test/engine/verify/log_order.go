@@ -28,7 +28,7 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
-func Apsara(ctx context.Context) (context.Context, error) {
+func LogOrder(ctx context.Context) (context.Context, error) {
 	var from int32
 	value := ctx.Value(config.StartTimeContextKey)
 	if value != nil {
@@ -36,51 +36,15 @@ func Apsara(ctx context.Context) (context.Context, error) {
 	} else {
 		return ctx, fmt.Errorf("no start time")
 	}
-	fields := []string{"__FILE__", "__LEVEL__", "__LINE__", "__THREAD__", "file", "logNo", "mark", "microtime", "msg"}
+
+	// Get logs
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
-	var groups []*protocol.LogGroup
 	var err error
+	var groups []*protocol.LogGroup
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
-			if err != nil {
-				return err
-			}
-			for _, group := range groups {
-				for _, log := range group.Logs {
-					for _, field := range fields {
-						found := false
-						for _, content := range log.Contents {
-							if content.Key == field {
-								found = true
-								break
-							}
-						}
-						if !found {
-							return fmt.Errorf("field %s not found", field)
-						}
-					}
-					// validate time parse
-					var microtime int64
-					var recordTime int64
-					var nanoTime int64
-					for _, content := range log.Contents {
-						if content.Key == "microtime" {
-							microtime, _ = strconv.ParseInt(content.Value, 10, 64)
-						}
-						if content.Key == "__time__" {
-							recordTime, _ = strconv.ParseInt(content.Value, 10, 64)
-						}
-						if content.Key == "__time_ns_part__" {
-							nanoTime, _ = strconv.ParseInt(content.Value, 10, 64)
-						}
-					}
-					if microtime != recordTime*1000000+nanoTime/1000 {
-						return fmt.Errorf("time parse error, microtime: %d, recordtime: %d, nanotime: %d", microtime, recordTime, nanoTime)
-					}
-				}
-			}
 			return err
 		},
 		retry.Context(timeoutCtx),
@@ -90,5 +54,38 @@ func Apsara(ctx context.Context) (context.Context, error) {
 	if err != nil {
 		return ctx, err
 	}
+
+	// Check log order
+	currentLogNo := 0
+	for i := 0; i < len(groups); i++ {
+		for j := 0; j < len(groups[i].Logs); j++ {
+			if j == 0 {
+				currentLogNo, _ = getLogNoFromLog(groups[i].Logs[j])
+				continue
+			}
+			if groups[i].Logs[j].Time > groups[i].Logs[j-1].Time {
+				if nextLogNo, ok := getLogNoFromLog(groups[i].Logs[j]); ok {
+					if nextLogNo != currentLogNo+1 {
+						return ctx, fmt.Errorf("log order is not correct, current logNo: %d, next logNo: %d", currentLogNo, nextLogNo)
+					}
+					currentLogNo = nextLogNo
+				}
+				continue
+			}
+		}
+	}
 	return ctx, nil
+}
+
+func getLogNoFromLog(log *protocol.Log) (int, bool) {
+	for _, content := range log.Contents {
+		if content.Key == "logNo" {
+			logNo, err := strconv.Atoi(content.Value)
+			if err != nil {
+				return 0, false
+			}
+			return logNo, true
+		}
+	}
+	return 0, false
 }

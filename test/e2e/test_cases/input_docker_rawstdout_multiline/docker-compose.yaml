@@ -23,4 +23,4 @@ services:
     environment:
       - STDOUT_SWITCH=true
     depends_on:
-      - ilogtailC
+      - loongcollectorC

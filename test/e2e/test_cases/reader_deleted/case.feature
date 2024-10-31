@@ -17,6 +17,6 @@ Feature: reader deleted
           - /root/test/simple.log
         FlushTimeoutSecs: 3
     """
-    Given iLogtail container mount {./volume} to {/root/test}
+    Given loongcollector container mount {./volume} to {/root/test}
     When start docker-compose {reader_deleted}
     Then there is at least {1} logs

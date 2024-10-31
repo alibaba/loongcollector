@@ -36,7 +36,7 @@ Feature: flusher clickhouse
         BufferMinBytes: 10000000
         BufferMaxBytes: 100000000
     """
-    Given iLogtail depends on containers {["clickhouse"]}
+    Given loongcollector depends on containers {["clickhouse"]}
     When start docker-compose {flusher_clickhouse}
     Then there is at least {10} logs
     Then the log fields match kv

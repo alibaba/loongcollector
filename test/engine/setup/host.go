@@ -38,23 +38,23 @@ func (h *HostEnv) GetType() string {
 	return "host"
 }
 
-func (h *HostEnv) ExecOnLogtail(command string) error {
+func (h *HostEnv) ExecOnLogtail(command string) (string, error) {
 	return h.exec(command)
 }
 
-func (h *HostEnv) ExecOnSource(ctx context.Context, command string) error {
+func (h *HostEnv) ExecOnSource(ctx context.Context, command string) (string, error) {
 	return h.exec(command)
 }
 
-func (h *HostEnv) exec(command string) error {
+func (h *HostEnv) exec(command string) (string, error) {
 	if h.sshClient == nil {
-		return fmt.Errorf("ssh client init failed")
+		return "", fmt.Errorf("ssh client init failed")
 	}
 	result, err := h.sshClient.Run(command)
 	if err != nil {
-		return fmt.Errorf("%v, %v", string(result), err)
+		return "", fmt.Errorf("%v, %v", string(result), err)
 	}
-	return nil
+	return string(result), nil
 }
 
 func (h *HostEnv) initSSHClient() {
