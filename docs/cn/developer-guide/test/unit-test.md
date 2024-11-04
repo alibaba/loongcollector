@@ -19,7 +19,7 @@ cmake -DBUILD_LOGTAIL_UT=ON <其他编译参数> ..
 ```shell
 mkdir -p coverage-report
 # 生成详细的报告
-gcovr -r ./core --txt coverage-report/index.txt --html-details --html coverage-report/index.html -e ".*sdk.*" -e ".*observer.*" -e ".*protobuf.*" -e ".*unittest.*" -e ".*config_server.*" -e ".*fuse.*" -e ".*go_pipeline.*"
+gcovr -r ./core --txt coverage-report/index.txt --html-details --html coverage-report/index.html -e ".*\.pb\.cc" -e ".*\.pb\.h" -e ".*unittest.*" -e ".*config_server.*" -e ".*go_pipeline.*" -e ".*sdk.*"
 # 生成本次commit diff的报告
 python3 tools/coverage-diff/main.py coverage-report/index.txt
 ```

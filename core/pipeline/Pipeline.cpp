@@ -388,6 +388,10 @@ bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
     auto before = chrono::system_clock::now();
     bool allSucceeded = true;
     for (auto& group : groupList) {
+        if (group.GetEvents().empty()) {
+            LOG_DEBUG(sLogger, ("empty event group", "discard")("config", mName));
+            continue;
+        }
         auto res = mRouter.Route(group);
         for (auto& item : res) {
             if (item.first >= mFlushers.size()) {

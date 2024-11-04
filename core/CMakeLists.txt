@@ -162,7 +162,6 @@ endif()
 # remove several files in go_pipeline
 list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.cpp ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.h)
 
-
 # add provider
 add_subdirectory("${PROVIDER_PATH}" "${CMAKE_BINARY_DIR}/provider")
 

@@ -1,4 +1,4 @@
-# Copyright 2022 iLogtail Authors
+# Copyright 2024 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(log_pb_unittest)
 
-add_executable(log_pb_unittest PBUnittest.cpp)
-target_link_libraries(log_pb_unittest ${UT_BASE_TARGET})
+add_executable(log_group_serializer_unittest LogGroupSerializerUnittest.cpp)
+target_link_libraries(log_group_serializer_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
-gtest_discover_tests(log_pb_unittest)
+gtest_discover_tests(log_group_serializer_unittest)

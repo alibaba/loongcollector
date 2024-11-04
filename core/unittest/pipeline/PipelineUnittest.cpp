@@ -2763,6 +2763,7 @@ void PipelineUnittest::TestSend() const {
             // all valid
             vector<PipelineEventGroup> group;
             group.emplace_back(make_shared<SourceBuffer>());
+            group.back().AddLogEvent();
             APSARA_TEST_TRUE(pipeline.Send(std::move(group)));
         }
         {
@@ -2771,6 +2772,7 @@ void PipelineUnittest::TestSend() const {
                 = false;
             vector<PipelineEventGroup> group;
             group.emplace_back(make_shared<SourceBuffer>());
+            group.back().AddLogEvent();
             APSARA_TEST_FALSE(pipeline.Send(std::move(group)));
             const_cast<FlusherMock*>(static_cast<const FlusherMock*>(pipeline.mFlushers[0]->GetPlugin()))->mIsValid
                 = true;
