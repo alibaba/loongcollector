@@ -16,12 +16,12 @@
 
 #include "LogFileProfiler.h"
 #include "app_config/AppConfig.h"
-#include "constants/Constants.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/Thread.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
+#include "constants/Constants.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SenderQueueManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
@@ -35,6 +35,8 @@ using namespace logtail;
 using namespace sls_logs;
 
 namespace logtail {
+
+const string ALARM_SLS_LOGSTORE_NAME = "logtail_alarm";
 
 LogtailAlarm::LogtailAlarm() {
     mMessageType.resize(ALL_LOGTAIL_ALARM_NUM);
@@ -193,8 +195,19 @@ void LogtailAlarm::SendAllRegionAlarm() {
             }
             // check sender queue status, if invalid jump this region
 
-            QueueKey alarmPrjLogstoreKey = QueueKeyManager::GetInstance()->GetKey(
-                "-flusher_sls-" + GetProfileSender()->GetProfileProjectName(region) + "#logtail_alarm");
+            string project = GetProfileSender()->GetProfileProjectName(region);
+            QueueKey alarmPrjLogstoreKey
+                = QueueKeyManager::GetInstance()->GetKey("-flusher_sls-" + project + "#" + ALARM_SLS_LOGSTORE_NAME);
+            if (SenderQueueManager::GetInstance()->GetQueue(alarmPrjLogstoreKey) == nullptr) {
+                PipelineContext ctx;
+                SenderQueueManager::GetInstance()->CreateQueue(
+                    alarmPrjLogstoreKey,
+                    "self_monitor",
+                    ctx,
+                    {{"region", FlusherSLS::GetRegionConcurrencyLimiter(region)},
+                     {"project", FlusherSLS::GetProjectConcurrencyLimiter(project)},
+                     {"logstore", FlusherSLS::GetLogstoreConcurrencyLimiter(project, ALARM_SLS_LOGSTORE_NAME)}});
+            }
             if (!SenderQueueManager::GetInstance()->IsValidToPush(alarmPrjLogstoreKey)) {
                 // jump this region
                 ++sendRegionIndex;
@@ -205,7 +218,7 @@ void LogtailAlarm::SendAllRegionAlarm() {
             // LOG_DEBUG(sLogger, ("4Send Alarm", region)("region", sendRegionIndex)("alarm index",
             // mMessageType[sendAlarmTypeIndex]));
             logGroup.set_source(LogFileProfiler::mIpAddr);
-            logGroup.set_category("logtail_alarm");
+            logGroup.set_category(ALARM_SLS_LOGSTORE_NAME);
             auto now = GetCurrentLogtailTime();
             for (map<string, LogtailAlarmMessage*>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
                  ++mapIter) {
