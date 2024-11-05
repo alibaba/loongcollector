@@ -53,6 +53,7 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^execute \{(\d+)\} commands to generate process security events`, trigger.TrigerProcessSecurityEvents)
 	ctx.When(`^execute \{(\d+)\} commands to generate network security events on url \{(.*)\}$`, trigger.TrigerNetworksSecurityEvents)
 	ctx.When(`^execute \{(\d+)\} commands to generate file security events on files \{(.*)\}$`, trigger.TrigerFileSecurityEvents)
+	ctx.When(`^generate \{(\d+)\} HTTP requests, with interval \{(\d+)\}ms, url: \{(.*)\}`, trigger.TrigerHTTP)
 	// ------------------------------------------
 
 	// Then
