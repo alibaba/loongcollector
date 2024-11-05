@@ -31,12 +31,6 @@ DECLARE_FLAG_INT32(max_send_log_group_size);
 
 using namespace std;
 
-#if defined(_MSC_VER)
-// On Windows, if Chinese config base path is used, the log path will be converted to GBK,
-// so the __tag__.__path__ have to be converted back to UTF8 to avoid bad display.
-// Note: enable this will spend CPU to do transformation.
-DEFINE_FLAG_BOOL(enable_chinese_tag_path, "Enable Chinese __tag__.__path__", true);
-#endif
 DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
 DEFINE_FLAG_INT32(processor_runner_exit_timeout_secs, "", 60);
 

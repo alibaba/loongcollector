@@ -233,8 +233,8 @@ public:
     bool GetSymbolicLinkFlag() const { return mSymbolicLinkFlag; }
 
     /// @return e.g. `/home/admin/access.log`
-    const std::string& GetConvertedPath() const { return mDockerPath.empty() ? mHostLogPath : mDockerPath; }
-
+    const std::string& GetConvertedPath() const;
+    
     const std::string& GetHostLogPathFile() const { return mHostLogPathFile; }
 
     int64_t GetFileSize() const { return mLastFileSize; }

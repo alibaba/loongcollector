@@ -31,7 +31,6 @@
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 #include "checkpoint/CheckpointManagerV2.h"
-#include "constants/Constants.h"
 #include "common/ErrorUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
@@ -39,6 +38,7 @@
 #include "common/RandomUtil.h"
 #include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
+#include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
@@ -73,6 +73,12 @@ DEFINE_FLAG_INT32(max_fix_pos_bytes, "", 128 * 1024);
 DEFINE_FLAG_INT32(force_release_deleted_file_fd_timeout,
                   "force release fd if file is deleted after specified seconds, no matter read to end or not",
                   -1);
+#if defined(_MSC_VER)
+// On Windows, if Chinese config base path is used, the log path will be converted to GBK,
+// so the __tag__.__path__ have to be converted back to UTF8 to avoid bad display.
+// Note: enable this will spend CPU to do transformation.
+DEFINE_FLAG_BOOL(enable_chinese_tag_path, "Enable Chinese __tag__.__path__", true);
+#endif
 DECLARE_FLAG_INT32(reader_close_unused_file_time);
 DECLARE_FLAG_INT32(logtail_alarm_interval);
 
@@ -2478,6 +2484,19 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
     event->SetPosition(logBuffer->readOffset, logBuffer->readLength);
 
     return group;
+}
+
+const std::string& LogFileReader::GetConvertedPath() const {
+    const std::string& path = mDockerPath.empty() ? mHostLogPath : mDockerPath;
+#if defined(_MSC_VER)
+    if (BOOL_FLAG(enable_chinese_tag_path)) {
+        static std::string newPath = EncodingConverter::GetInstance()->FromACPToUTF8(path);
+        return newPath;
+    }
+    return path;
+#else
+    return path;
+#endif
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
