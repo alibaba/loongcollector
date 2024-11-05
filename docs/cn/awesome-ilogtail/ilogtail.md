@@ -12,6 +12,8 @@
 * 2024-04 [破浪前行：iLogtail十年老架构如何浴火重生](https://developer.aliyun.com/article/1484844)
 * 2024-04 [跟着iLogtail学习无锁化编程](https://developer.aliyun.com/article/1484342)
 * 2023-08 [跟着iLogtail学习设计模式](https://mp.weixin.qq.com/s/gfy9DfvcTuCiBiLJdZLTKQ)
+* 2024-10 [跟着iLogtail学习容器运行时与K8s下日志采集方案](https://mp.weixin.qq.com/s/UTWqcgc4QTRkDIAkqj-Uvw)
+* 2024-10 [跟着 iLogtail 学习高质量软件建设](https://mp.weixin.qq.com/s/c4siqtB1z9PDQ-N8bWRG5Q)
 * 2022-12 [性能与可靠的超强碰撞：第三方测评开源日志采集器](https://mp.weixin.qq.com/s/8mCVk3gvXPOijTlcRjUR_w)
 * 2022-12 [阿里十年技术沉淀｜深度解析百PB级数据总线技术](https://mp.weixin.qq.com/s/NKoTCM5o-Rs_83Wakk9yCw)
 
