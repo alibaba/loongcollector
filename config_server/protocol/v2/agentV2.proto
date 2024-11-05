@@ -25,6 +25,7 @@ message ConfigInfo {
     int64 version = 2;       // Required, Config's version number or hash code
     ConfigStatus status = 3; // Config's status
     string message = 4;      // Optional error message
+    map<string, bytes> extra = 5;   // Optional extra info
 }
 
 // Define the Command information carried in the request
@@ -33,6 +34,7 @@ message CommandInfo {
     string name = 2;         // Required, Command's unique identification
     ConfigStatus status = 3; // Command's status
     string message = 4;      // Optional error message
+    map<string, bytes> extra = 5;   // Optional extra info
 }
 
 // Define Agent's basic attributes
@@ -94,6 +96,7 @@ message ConfigDetail {
     string name = 1;        // Required, Config's unique identification
     int64 version = 2;      // Required, Config's version number or hash code
     bytes detail = 3;       // Required, Config's detail
+    map<string, bytes> extra = 4;   // Optional extra info
 }
 
 message CommandDetail {
@@ -101,6 +104,7 @@ message CommandDetail {
     string name = 2;                // Required, Command name
     bytes detail = 3;               // Required, Command's detail
     int64 expire_time = 4;          // After which the command can be safely removed from history
+    map<string, bytes> extra = 5;   // Optional extra info
 }
 
 enum ServerCapabilities {
