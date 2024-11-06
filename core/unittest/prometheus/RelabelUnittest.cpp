@@ -136,7 +136,8 @@ void RelabelConfigUnittest::TestReplace() {
     APSARA_TEST_TRUE(configList.Init(configJson));
 
     Labels result = labels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
 
     APSARA_TEST_EQUAL((size_t)3, result.Size());
     APSARA_TEST_EQUAL("172.17.0.3:9100", result.Get("__address__"));
@@ -166,7 +167,8 @@ void RelabelConfigUnittest::TestKeep() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = labels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
     APSARA_TEST_EQUAL((size_t)2, result.Size());
     APSARA_TEST_EQUAL("172.17.0.3", result.Get("__meta_kubernetes_pod_ip"));
 }
@@ -194,8 +196,8 @@ void RelabelConfigUnittest::TestDrop() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = labels;
-
-    APSARA_TEST_FALSE(configList.Process(result));
+    vector<string> toDelete;
+    APSARA_TEST_FALSE(configList.Process(result, toDelete));
 }
 
 void RelabelConfigUnittest::TestDropEqual() {
@@ -223,7 +225,8 @@ void RelabelConfigUnittest::TestDropEqual() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = dropEqualLabels;
-    APSARA_TEST_FALSE(configList.Process(result));
+    vector<string> toDelete;
+    APSARA_TEST_FALSE(configList.Process(result, toDelete));
 }
 
 void RelabelConfigUnittest::TestKeepEqual() {
@@ -251,7 +254,8 @@ void RelabelConfigUnittest::TestKeepEqual() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = keepEqualLabels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
     APSARA_TEST_EQUAL((size_t)3, result.Size());
     APSARA_TEST_EQUAL("172.17.0.3", result.Get("__meta_kubernetes_pod_ip"));
 }
@@ -281,7 +285,8 @@ void RelabelConfigUnittest::TestLowerCase() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = lowercaseLabels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
     APSARA_TEST_EQUAL((size_t)3, result.Size());
     APSARA_TEST_EQUAL("node-exporter", result.Get("__meta_kubernetes_pod_label_app"));
 }
@@ -311,7 +316,8 @@ void RelabelConfigUnittest::TestUpperCase() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = uppercaseLabels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
     APSARA_TEST_EQUAL((size_t)3, result.Size());
     APSARA_TEST_EQUAL("NODE-EXPORTER", result.Get("__meta_kubernetes_pod_label_app"));
 }
@@ -343,7 +349,8 @@ void RelabelConfigUnittest::TestHashMod() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = hashmodLabels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
     APSARA_TEST_EQUAL((size_t)4, result.Size());
     APSARA_TEST_TRUE(!result.Get("hash_val").empty());
 }
@@ -368,7 +375,8 @@ void RelabelConfigUnittest::TestLabelMap() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = labels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
     APSARA_TEST_EQUAL((size_t)3, result.Size());
     APSARA_TEST_EQUAL("node-exporter", result.Get("k8s_app"));
 }
@@ -395,7 +403,8 @@ void RelabelConfigUnittest::TestLabelDrop() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = labelDropLabels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
     APSARA_TEST_EQUAL((size_t)1, result.Size());
     APSARA_TEST_EQUAL("172.17.0.3", result.Get("pod_ip"));
 }
@@ -422,7 +431,8 @@ void RelabelConfigUnittest::TestLabelKeep() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = labelKeepLabels;
-    configList.Process(result);
+    vector<string> toDelete;
+    configList.Process(result, toDelete);
     APSARA_TEST_EQUAL((size_t)2, result.Size());
     APSARA_TEST_EQUAL("172.17.0.3", result.Get("__meta_kubernetes_pod_ip"));
     APSARA_TEST_EQUAL("node-exporter", result.Get("__meta_kubernetes_pod_label_app"));
@@ -467,15 +477,16 @@ void RelabelConfigUnittest::TestMultiRelabel() {
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
     auto result = labels;
-    APSARA_TEST_TRUE(configList.Process(result));
+    vector<string> toDelete;
+    APSARA_TEST_TRUE(configList.Process(result, toDelete));
     APSARA_TEST_EQUAL((size_t)3, result.Size());
     APSARA_TEST_EQUAL("172.17.0.3:9100", result.Get("__address__"));
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr2, configJson, errorMsg));
     configList = RelabelConfigList();
     APSARA_TEST_TRUE(configList.Init(configJson));
-    // result = labels;
-    configList.Process(result);
+    result = labels;
+    APSARA_TEST_TRUE(configList.Process(result, toDelete));
 }
 
 UNIT_TEST_CASE(ActionConverterUnittest, TestStringToAction)

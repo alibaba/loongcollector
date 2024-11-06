@@ -193,11 +193,8 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
     for (const auto& labels : targetGroups) {
         // Relabel Config
         Labels resultLabel = labels;
-        // bool keep = prometheus::Process(labels, mScrapeConfigPtr->mRelabelConfigs, resultLabel);
-        // if (!keep) {
-        //     continue;
-        // }
-        if (!mScrapeConfigPtr->mRelabelConfigs.Process(resultLabel)) {
+        vector<string> toDelete;
+        if (!mScrapeConfigPtr->mRelabelConfigs.Process(resultLabel, toDelete)) {
             continue;
         }
         resultLabel.RemoveMetaLabels();

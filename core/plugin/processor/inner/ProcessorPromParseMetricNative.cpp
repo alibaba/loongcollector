@@ -26,6 +26,7 @@ bool ProcessorPromParseMetricNative::Init(const Json::Value& config) {
 void ProcessorPromParseMetricNative::Process(PipelineEventGroup& eGroup) {
     EventsContainer& events = eGroup.MutableEvents();
     EventsContainer newEvents;
+    newEvents.reserve(events.size());
 
     StringView scrapeTimestampMilliSecStr = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
     auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());

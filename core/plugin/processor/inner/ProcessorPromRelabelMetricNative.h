@@ -36,7 +36,8 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    bool ProcessEvent(PipelineEventPtr& e, const GroupTags& targetTags);
+    bool ProcessEvent(PipelineEventPtr& e, const GroupTags& targetTags, const std::vector<StringView>& toDelete);
+    std::vector<StringView> GetToDeleteTargetLabels(const GroupTags& targetTags) const;
 
     void AddAutoMetrics(PipelineEventGroup& metricGroup);
     void AddMetric(PipelineEventGroup& metricGroup,

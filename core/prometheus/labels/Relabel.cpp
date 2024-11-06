@@ -31,11 +31,9 @@
 
 using namespace std;
 
-#define ENUM_TO_STRING_CASE(EnumValue) \
-    { Action::EnumValue, ToLowerCaseString(#EnumValue) }
+#define ENUM_TO_STRING_CASE(EnumValue) {Action::EnumValue, ToLowerCaseString(#EnumValue)}
 
-#define STRING_TO_ENUM_CASE(EnumValue) \
-    { ToLowerCaseString(#EnumValue), Action::EnumValue }
+#define STRING_TO_ENUM_CASE(EnumValue) {ToLowerCaseString(#EnumValue), Action::EnumValue}
 
 namespace logtail {
 
@@ -116,14 +114,14 @@ bool RelabelConfig::Init(const Json::Value& config) {
     return true;
 }
 
-bool RelabelConfig::Process(Labels& l) const {
+bool RelabelConfig::Process(Labels& l, vector<string>& toDelete) const {
     vector<string> values;
     values.reserve(mSourceLabels.size());
     for (const auto& item : mSourceLabels) {
         values.push_back(l.Get(item));
     }
     string val = boost::algorithm::join(values, mSeparator);
-
+    CollectLabelsToDelete(mTargetLabel, toDelete);
     switch (mAction) {
         case Action::DROP: {
             if (boost::regex_match(val, mRegex)) {
@@ -162,6 +160,7 @@ bool RelabelConfig::Process(Labels& l) const {
                 break;
             }
             l.Set(target, string(res));
+            CollectLabelsToDelete(target, toDelete);
             break;
         }
         case Action::LOWERCASE: {
@@ -190,6 +189,7 @@ bool RelabelConfig::Process(Labels& l) const {
                     string res
                         = boost::regex_replace(key, mRegex, mReplacement, boost::match_default | boost::format_all);
                     l.Set(res, value);
+                    CollectLabelsToDelete(res, toDelete);
                 }
             });
             break;
@@ -226,6 +226,12 @@ bool RelabelConfig::Process(Labels& l) const {
     return true;
 }
 
+void RelabelConfig::CollectLabelsToDelete(const string& labelName, vector<string>& toDelete) const {
+    if (StartWith(labelName, "__")) {
+        toDelete.push_back(labelName);
+    }
+}
+
 bool RelabelConfigList::Init(const Json::Value& relabelConfigs) {
     if (!relabelConfigs.isArray()) {
         return false;
@@ -241,19 +247,19 @@ bool RelabelConfigList::Init(const Json::Value& relabelConfigs) {
     return true;
 }
 
-bool RelabelConfigList::Process(Labels& l) const {
+bool RelabelConfigList::Process(Labels& l, vector<string>& toDelete) const {
     for (const auto& cfg : mRelabelConfigs) {
-        if (!cfg.Process(l)) {
+        if (!cfg.Process(l, toDelete)) {
             return false;
         }
     }
     return true;
 }
 
-bool RelabelConfigList::Process(MetricEvent& event) const {
+bool RelabelConfigList::Process(MetricEvent& event, vector<string>& toDelete) const {
     Labels labels;
     labels.Reset(&event);
-    return Process(labels);
+    return Process(labels, toDelete);
 }
 
 bool RelabelConfigList::Empty() const {
