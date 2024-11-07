@@ -88,9 +88,12 @@ void LogInput::Start() {
     mInteruptFlag = false;
 
     mLastRunTime = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
-    mRegisterdHandlersTotal = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_WATCHED_DIRS_TOTAL);
-    mActiveReadersTotal = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ACTIVE_READERS_TOTAL);
-    mEnableFileIncludedByMultiConfigs = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG);
+    mRegisterdHandlersTotal
+        = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_WATCHED_DIRS_TOTAL);
+    mActiveReadersTotal
+        = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_ACTIVE_READERS_TOTAL);
+    mEnableFileIncludedByMultiConfigs = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(
+        METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG);
 
     new Thread([this]() { ProcessLoop(); });
 }
@@ -118,19 +121,14 @@ void LogInput::TryReadEvents(bool forceRead) {
     if (mInteruptFlag)
         return;
 
-    if (!forceRead) {
-        int64_t curMicroSeconds = GetCurrentTimeInMicroSeconds();
-        if (curMicroSeconds - mLastReadEventMicroSeconds >= INT64_FLAG(read_fs_events_interval))
-            mLastReadEventMicroSeconds = curMicroSeconds;
-        else
-            return;
-    } else
-        mLastReadEventMicroSeconds = GetCurrentTimeInMicroSeconds();
-
-    vector<Event*> inotifyEvents;
-    EventDispatcher::GetInstance()->ReadInotifyEvents(inotifyEvents);
-    if (inotifyEvents.size() > 0) {
-        PushEventQueue(inotifyEvents);
+    int64_t curMicroSeconds = GetCurrentTimeInMicroSeconds();
+    if (forceRead || curMicroSeconds - mLastReadEventMicroSeconds >= INT64_FLAG(read_fs_events_interval)) {
+        vector<Event*> inotifyEvents;
+        EventDispatcher::GetInstance()->ReadInotifyEvents(inotifyEvents);
+        if (inotifyEvents.size() > 0) {
+            PushEventQueue(inotifyEvents);
+        }
+        mLastReadEventMicroSeconds = curMicroSeconds;
     }
 
     vector<Event*> feedbackEvents;
@@ -212,8 +210,7 @@ bool LogInput::ReadLocalEvents() {
     }
     // set discard old data flag, so that history data will not be dropped.
     BOOL_FLAG(ilogtail_discard_old_data) = false;
-    LOG_INFO(sLogger,
-             ("load local events", GetLocalEventDataFileName())("event count", localEventJson.size()));
+    LOG_INFO(sLogger, ("load local events", GetLocalEventDataFileName())("event count", localEventJson.size()));
     for (Json::ValueIterator iter = localEventJson.begin(); iter != localEventJson.end(); ++iter) {
         const Json::Value& eventItem = *iter;
         if (!eventItem.isObject()) {
@@ -395,8 +392,11 @@ void* LogInput::ProcessLoop() {
                 delete ev;
             else
                 ProcessEvent(dispatcher, ev);
-        } else
-            usleep(INT32_FLAG(log_input_thread_wait_interval));
+        } else {
+            unique_lock<mutex> lock(mFeedbackMux);
+            mFeedbackCV.wait_for(lock, chrono::microseconds(INT32_FLAG(log_input_thread_wait_interval)));
+        }
+
         if (mIdleFlag)
             continue;
 

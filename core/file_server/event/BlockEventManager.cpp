@@ -17,6 +17,7 @@
 #include "common/Flags.h"
 #include "common/HashUtil.h"
 #include "common/StringTools.h"
+#include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 
@@ -69,8 +70,11 @@ BlockedEventManager::~BlockedEventManager() {
 }
 
 void BlockedEventManager::Feedback(int64_t key) {
-    lock_guard<mutex> lock(mFeedbackQueueMux);
-    mFeedbackQueue.emplace_back(key);
+    {
+        lock_guard<mutex> lock(mFeedbackQueueMux);
+        mFeedbackQueue.emplace_back(key);
+    }
+    LogInput::GetInstance()->Trigger();
 }
 
 void BlockedEventManager::UpdateBlockEvent(
