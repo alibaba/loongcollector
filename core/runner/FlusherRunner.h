@@ -47,14 +47,13 @@ public:
 
     int32_t GetSendingBufferCount() { return mHttpSendingCnt.load(); }
 
-    bool LoadModuleConfig(bool isInit);
-
 private:
     FlusherRunner() = default;
     ~FlusherRunner() = default;
 
     void Run();
     void Dispatch(SenderQueueItem* item);
+    bool LoadModuleConfig(bool isInit);
     void UpdateSendFlowControl();
 
     std::function<bool()> mCallback;
@@ -69,8 +68,7 @@ private:
     int64_t mSendLastTime = 0;
     int32_t mSendLastByte = 0;
 
-    bool mSendRandomSleep;
-    bool mSendFlowControl;
+    bool mEnableRateLimiter = true;
 
     mutable MetricsRecordRef mMetricsRecordRef;
     CounterPtr mInItemsTotal;

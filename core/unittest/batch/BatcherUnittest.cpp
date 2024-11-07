@@ -28,6 +28,7 @@ public:
     void TestInitWithGroupBatch();
     void TestAddWithoutGroupBatch();
     void TestAddWithGroupBatch();
+    void TestAddWithOversizedGroup();
     void TestFlushEventQueueWithoutGroupBatch();
     void TestFlushEventQueueWithGroupBatch();
     void TestFlushGroupQueue();
@@ -59,16 +60,18 @@ unique_ptr<FlusherMock> BatcherUnittest::sFlusher;
 
 void BatcherUnittest::TestParamInit() {
     DefaultFlushStrategyOptions strategy;
-    strategy.mMaxCnt = 1;
-    strategy.mMaxSizeBytes = 100;
+    strategy.mMinCnt = 1;
+    strategy.mMaxSizeBytes = 300;
+    strategy.mMinSizeBytes = 100;
     strategy.mTimeoutSecs = 3;
     {
         // empty config
         Batcher<> batch;
         batch.Init(Json::Value(), sFlusher.get(), strategy);
-        APSARA_TEST_EQUAL(1U, batch.mEventFlushStrategy.GetMaxCnt());
-        APSARA_TEST_EQUAL(100U, batch.mEventFlushStrategy.GetMaxSizeBytes());
+        APSARA_TEST_EQUAL(1U, batch.mEventFlushStrategy.GetMinCnt());
+        APSARA_TEST_EQUAL(100U, batch.mEventFlushStrategy.GetMinSizeBytes());
         APSARA_TEST_EQUAL(3U, batch.mEventFlushStrategy.GetTimeoutSecs());
+        APSARA_TEST_EQUAL(300U, batch.mEventFlushStrategy.GetMaxSizeBytes());
     }
     {
         // invalid param
@@ -76,8 +79,8 @@ void BatcherUnittest::TestParamInit() {
         string configStr, errorMsg;
         configStr = R"(
             {
-                "MaxSizeBytes": "1000",
-                "MaxCnt": "10",
+                "MinSizeBytes": "1000",
+                "MinCnt": "10",
                 "TimeoutSecs": "5"
             }
         )";
@@ -85,9 +88,10 @@ void BatcherUnittest::TestParamInit() {
 
         Batcher<> batch;
         batch.Init(configJson, sFlusher.get(), strategy);
-        APSARA_TEST_EQUAL(1U, batch.mEventFlushStrategy.GetMaxCnt());
-        APSARA_TEST_EQUAL(100U, batch.mEventFlushStrategy.GetMaxSizeBytes());
+        APSARA_TEST_EQUAL(1U, batch.mEventFlushStrategy.GetMinCnt());
+        APSARA_TEST_EQUAL(100U, batch.mEventFlushStrategy.GetMinSizeBytes());
         APSARA_TEST_EQUAL(3U, batch.mEventFlushStrategy.GetTimeoutSecs());
+        APSARA_TEST_EQUAL(300U, batch.mEventFlushStrategy.GetMaxSizeBytes());
     }
 }
 
@@ -96,8 +100,8 @@ void BatcherUnittest::TestInitWithoutGroupBatch() {
     string configStr, errorMsg;
     configStr = R"(
         {
-            "MaxSizeBytes": 1000,
-            "MaxCnt": 10,
+            "MinSizeBytes": 1000,
+            "MinCnt": 10,
             "TimeoutSecs": 5
         }
     )";
@@ -105,9 +109,10 @@ void BatcherUnittest::TestInitWithoutGroupBatch() {
 
     Batcher<> batch;
     batch.Init(configJson, sFlusher.get(), DefaultFlushStrategyOptions());
-    APSARA_TEST_EQUAL(10U, batch.mEventFlushStrategy.GetMaxCnt());
-    APSARA_TEST_EQUAL(1000U, batch.mEventFlushStrategy.GetMaxSizeBytes());
+    APSARA_TEST_EQUAL(10U, batch.mEventFlushStrategy.GetMinCnt());
+    APSARA_TEST_EQUAL(1000U, batch.mEventFlushStrategy.GetMinSizeBytes());
     APSARA_TEST_EQUAL(5U, batch.mEventFlushStrategy.GetTimeoutSecs());
+    APSARA_TEST_EQUAL(numeric_limits<uint32_t>::max(), batch.mEventFlushStrategy.GetMaxSizeBytes());
     APSARA_TEST_EQUAL(sFlusher.get(), batch.mFlusher);
 }
 
@@ -116,8 +121,8 @@ void BatcherUnittest::TestInitWithGroupBatch() {
     string configStr, errorMsg;
     configStr = R"(
             {
-                "MaxSizeBytes": 1000,
-                "MaxCnt": 10,
+                "MinSizeBytes": 1000,
+                "MinCnt": 10,
                 "TimeoutSecs": 5
             }
         )";
@@ -125,11 +130,12 @@ void BatcherUnittest::TestInitWithGroupBatch() {
 
     Batcher<> batch;
     batch.Init(configJson, sFlusher.get(), DefaultFlushStrategyOptions(), true);
-    APSARA_TEST_EQUAL(10U, batch.mEventFlushStrategy.GetMaxCnt());
-    APSARA_TEST_EQUAL(1000U, batch.mEventFlushStrategy.GetMaxSizeBytes());
+    APSARA_TEST_EQUAL(10U, batch.mEventFlushStrategy.GetMinCnt());
+    APSARA_TEST_EQUAL(1000U, batch.mEventFlushStrategy.GetMinSizeBytes());
     APSARA_TEST_EQUAL(3U, batch.mEventFlushStrategy.GetTimeoutSecs());
+    APSARA_TEST_EQUAL(numeric_limits<uint32_t>::max(), batch.mEventFlushStrategy.GetMaxSizeBytes());
     APSARA_TEST_TRUE(batch.mGroupFlushStrategy);
-    APSARA_TEST_EQUAL(1000U, batch.mGroupFlushStrategy->GetMaxSizeBytes());
+    APSARA_TEST_EQUAL(1000U, batch.mGroupFlushStrategy->GetMinSizeBytes());
     APSARA_TEST_EQUAL(2U, batch.mGroupFlushStrategy->GetTimeoutSecs());
     APSARA_TEST_TRUE(batch.mGroupQueue);
     APSARA_TEST_EQUAL(sFlusher.get(), batch.mFlusher);
@@ -137,8 +143,8 @@ void BatcherUnittest::TestInitWithGroupBatch() {
 
 void BatcherUnittest::TestAddWithoutGroupBatch() {
     DefaultFlushStrategyOptions strategy;
-    strategy.mMaxCnt = 3;
-    strategy.mMaxSizeBytes = 1000;
+    strategy.mMinCnt = 3;
+    strategy.mMinSizeBytes = 1000;
     strategy.mTimeoutSecs = 3;
 
     Batcher<> batch;
@@ -186,7 +192,7 @@ void BatcherUnittest::TestAddWithoutGroupBatch() {
     // flush by time then by size
     res.clear();
     batch.mEventFlushStrategy.SetTimeoutSecs(0);
-    batch.mEventFlushStrategy.SetMaxSizeBytes(10);
+    batch.mEventFlushStrategy.SetMinSizeBytes(10);
     PipelineEventGroup group3 = CreateEventGroup(1);
     SourceBuffer* buffer3 = group3.GetSourceBuffer().get();
     RangeCheckpoint* eoo3 = group3.GetExactlyOnceCheckpoint().get();
@@ -218,8 +224,8 @@ void BatcherUnittest::TestAddWithoutGroupBatch() {
 
 void BatcherUnittest::TestAddWithGroupBatch() {
     DefaultFlushStrategyOptions strategy;
-    strategy.mMaxCnt = 3;
-    strategy.mMaxSizeBytes = 1000;
+    strategy.mMinCnt = 3;
+    strategy.mMinSizeBytes = 1000;
     strategy.mTimeoutSecs = 3;
 
     Batcher<> batch;
@@ -298,7 +304,7 @@ void BatcherUnittest::TestAddWithGroupBatch() {
     // flush by time to group batch, and then group flush by size
     res.clear();
     batch.mGroupFlushStrategy->SetTimeoutSecs(3);
-    batch.mGroupFlushStrategy->SetMaxSizeBytes(10);
+    batch.mGroupFlushStrategy->SetMinSizeBytes(10);
     PipelineEventGroup group5 = CreateEventGroup(1);
     SourceBuffer* buffer5 = group5.GetSourceBuffer().get();
     RangeCheckpoint* eoo5 = group5.GetExactlyOnceCheckpoint().get();
@@ -328,31 +334,63 @@ void BatcherUnittest::TestAddWithGroupBatch() {
 
     // flush by size
     res.clear();
-    batch.mEventFlushStrategy.SetMaxSizeBytes(10);
+    batch.mEventFlushStrategy.SetMinSizeBytes(159);
     batch.mEventFlushStrategy.SetTimeoutSecs(3);
     PipelineEventGroup group6 = CreateEventGroup(1);
     SourceBuffer* buffer6 = group6.GetSourceBuffer().get();
     batch.Add(std::move(group6), res);
+    PipelineEventGroup group7 = CreateEventGroup(2);
+    SourceBuffer* buffer7 = group7.GetSourceBuffer().get();
+    batch.Add(std::move(group7), res);
     APSARA_TEST_EQUAL(1U, batch.mEventQueueMap.size());
-    APSARA_TEST_EQUAL(0U, batch.mEventQueueMap[key].mBatch.mEvents.size());
+    APSARA_TEST_EQUAL(1U, batch.mEventQueueMap[key].mBatch.mEvents.size());
     APSARA_TEST_EQUAL(1U, res.size());
     APSARA_TEST_EQUAL(1U, res[0].size());
-    APSARA_TEST_EQUAL(2U, res[0][0].mEvents.size());
+    APSARA_TEST_EQUAL(3U, res[0][0].mEvents.size());
     APSARA_TEST_EQUAL(1U, res[0][0].mTags.mInner.size());
     APSARA_TEST_STREQ("val", res[0][0].mTags.mInner["key"].data());
-    APSARA_TEST_EQUAL(2U, res[0][0].mSourceBuffers.size());
+    APSARA_TEST_EQUAL(3U, res[0][0].mSourceBuffers.size());
     APSARA_TEST_EQUAL(buffer5, res[0][0].mSourceBuffers[0].get());
     APSARA_TEST_EQUAL(buffer6, res[0][0].mSourceBuffers[1].get());
+    APSARA_TEST_EQUAL(buffer7, res[0][0].mSourceBuffers[2].get());
     APSARA_TEST_EQUAL(eoo5, res[0][0].mExactlyOnceCheckpoint.get());
     APSARA_TEST_STREQ("pack_id", res[0][0].mPackIdPrefix.data());
     APSARA_TEST_GT(TimeoutFlushManager::GetInstance()->mTimeoutRecords["test_config"].at(make_pair(0, key)).mUpdateTime,
                    updateTime - 1);
 }
 
+void BatcherUnittest::TestAddWithOversizedGroup() {
+    DefaultFlushStrategyOptions strategy;
+    strategy.mMaxSizeBytes = 500;
+    strategy.mMinCnt = 3;
+    strategy.mMinSizeBytes = 200;
+    strategy.mTimeoutSecs = 3;
+
+    Batcher<> batch;
+    batch.Init(Json::Value(), sFlusher.get(), strategy);
+
+    vector<BatchedEventsList> res;
+    PipelineEventGroup group1 = CreateEventGroup(2);
+    size_t key = group1.GetTagsHash();
+    batch.Add(std::move(group1), res);
+
+    PipelineEventGroup group2 = CreateEventGroup(20);
+    batch.Add(std::move(group2), res);
+    APSARA_TEST_EQUAL(1U, batch.mEventQueueMap.size());
+    APSARA_TEST_EQUAL(0U, batch.mEventQueueMap[key].mBatch.mEvents.size());
+    APSARA_TEST_EQUAL(3U, res.size());
+    APSARA_TEST_EQUAL(1U, res[0].size());
+    APSARA_TEST_EQUAL(2U, res[0][0].mEvents.size());
+    APSARA_TEST_EQUAL(1U, res[1].size());
+    APSARA_TEST_EQUAL(13U, res[1][0].mEvents.size());
+    APSARA_TEST_EQUAL(1U, res[2].size());
+    APSARA_TEST_EQUAL(7U, res[2][0].mEvents.size());
+}
+
 void BatcherUnittest::TestFlushEventQueueWithoutGroupBatch() {
     DefaultFlushStrategyOptions strategy;
-    strategy.mMaxCnt = 3;
-    strategy.mMaxSizeBytes = 1000;
+    strategy.mMinCnt = 3;
+    strategy.mMinSizeBytes = 1000;
     strategy.mTimeoutSecs = 3;
 
     Batcher<> batch;
@@ -385,8 +423,8 @@ void BatcherUnittest::TestFlushEventQueueWithoutGroupBatch() {
 
 void BatcherUnittest::TestFlushEventQueueWithGroupBatch() {
     DefaultFlushStrategyOptions strategy;
-    strategy.mMaxCnt = 10;
-    strategy.mMaxSizeBytes = 1000;
+    strategy.mMinCnt = 10;
+    strategy.mMinSizeBytes = 1000;
     strategy.mTimeoutSecs = 3;
 
     Batcher<> batch;
@@ -415,7 +453,7 @@ void BatcherUnittest::TestFlushEventQueueWithGroupBatch() {
 
     // flush to group item, and group is flushed by time then by size
     batch.mGroupFlushStrategy->SetTimeoutSecs(0);
-    batch.mGroupFlushStrategy->SetMaxSizeBytes(10);
+    batch.mGroupFlushStrategy->SetMinSizeBytes(10);
     PipelineEventGroup group2 = CreateEventGroup(2);
     SourceBuffer* buffer2 = group2.GetSourceBuffer().get();
     RangeCheckpoint* eoo2 = group2.GetExactlyOnceCheckpoint().get();
@@ -441,8 +479,8 @@ void BatcherUnittest::TestFlushEventQueueWithGroupBatch() {
 
 void BatcherUnittest::TestFlushGroupQueue() {
     DefaultFlushStrategyOptions strategy;
-    strategy.mMaxCnt = 3;
-    strategy.mMaxSizeBytes = 1000;
+    strategy.mMinCnt = 3;
+    strategy.mMinSizeBytes = 1000;
     strategy.mTimeoutSecs = 3;
     {
         // no group item
@@ -481,8 +519,8 @@ void BatcherUnittest::TestFlushGroupQueue() {
 
 void BatcherUnittest::TestFlushAllWithoutGroupBatch() {
     DefaultFlushStrategyOptions strategy;
-    strategy.mMaxCnt = 3;
-    strategy.mMaxSizeBytes = 1000;
+    strategy.mMinCnt = 3;
+    strategy.mMinSizeBytes = 1000;
     strategy.mTimeoutSecs = 3;
 
     Batcher<> batch;
@@ -509,8 +547,8 @@ void BatcherUnittest::TestFlushAllWithoutGroupBatch() {
 
 void BatcherUnittest::TestFlushAllWithGroupBatch() {
     DefaultFlushStrategyOptions strategy;
-    strategy.mMaxCnt = 3;
-    strategy.mMaxSizeBytes = 1000;
+    strategy.mMinCnt = 3;
+    strategy.mMinSizeBytes = 1000;
     strategy.mTimeoutSecs = 3;
 
     Batcher<> batch;
@@ -537,7 +575,7 @@ void BatcherUnittest::TestFlushAllWithGroupBatch() {
 
     // flush all by time then by size
     batch.mGroupFlushStrategy->SetTimeoutSecs(0);
-    batch.mGroupFlushStrategy->SetMaxSizeBytes(10);
+    batch.mGroupFlushStrategy->SetMinSizeBytes(10);
     vector<BatchedEventsList> res;
     batch.FlushAll(res);
     APSARA_TEST_EQUAL(0U, batch.mEventQueueMap.size());
@@ -563,8 +601,8 @@ void BatcherUnittest::TestFlushAllWithGroupBatch() {
 void BatcherUnittest::TestMetric() {
     {
         DefaultFlushStrategyOptions strategy;
-        strategy.mMaxCnt = 2;
-        strategy.mMaxSizeBytes = 1000;
+        strategy.mMinCnt = 2;
+        strategy.mMinSizeBytes = 1000;
         strategy.mTimeoutSecs = 3;
 
         Batcher<> batch;
@@ -579,7 +617,8 @@ void BatcherUnittest::TestMetric() {
         APSARA_TEST_EQUAL(6U, batch.mMetricsRecordRef->GetLabels()->size());
         APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, ""));
         APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
-        APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_BATCHER));
+        APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME,
+                                                          METRIC_LABEL_VALUE_COMPONENT_NAME_BATCHER));
         APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID, "1"));
         APSARA_TEST_TRUE(batch.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_GROUP_BATCH_ENABLED, "false"));
         APSARA_TEST_EQUAL(3U, batch.mInEventsTotal->GetValue());
@@ -592,8 +631,8 @@ void BatcherUnittest::TestMetric() {
     }
     {
         DefaultFlushStrategyOptions strategy;
-        strategy.mMaxCnt = 2;
-        strategy.mMaxSizeBytes = 1000;
+        strategy.mMinCnt = 2;
+        strategy.mMinSizeBytes = 1000;
         strategy.mTimeoutSecs = 3;
 
         Batcher<> batch;
@@ -632,6 +671,7 @@ PipelineEventGroup BatcherUnittest::CreateEventGroup(size_t cnt) {
 UNIT_TEST_CASE(BatcherUnittest, TestParamInit)
 UNIT_TEST_CASE(BatcherUnittest, TestInitWithoutGroupBatch)
 UNIT_TEST_CASE(BatcherUnittest, TestInitWithGroupBatch)
+UNIT_TEST_CASE(BatcherUnittest, TestAddWithOversizedGroup)
 UNIT_TEST_CASE(BatcherUnittest, TestAddWithoutGroupBatch)
 UNIT_TEST_CASE(BatcherUnittest, TestAddWithGroupBatch)
 UNIT_TEST_CASE(BatcherUnittest, TestFlushEventQueueWithoutGroupBatch)

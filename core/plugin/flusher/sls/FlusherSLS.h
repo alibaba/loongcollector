@@ -81,7 +81,6 @@ public:
     sls_logs::SlsTelemetryType mTelemetryType = sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS;
     std::vector<std::string> mShardHashKeys;
     uint32_t mMaxSendRate = 0; // preserved only for exactly once
-    uint32_t mFlowControlExpireTime = 0;
 
     // TODO: temporarily public for profile
     std::unique_ptr<Compressor> mCompressor;

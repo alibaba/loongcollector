@@ -34,7 +34,7 @@ public:
 
     void Add(BatchedEvents&& g, int64_t totalEnqueTimeMs) {
         mEventsCnt += g.mEvents.size();
-        mTotalEnqueTimeMs += totalEnqueTimeMs;
+        // mTotalEnqueTimeMs += totalEnqueTimeMs;
         mGroups.emplace_back(std::move(g));
         mStatus.Update(mGroups.back());
     }
@@ -94,9 +94,9 @@ public:
     void Add(PipelineEventPtr&& e) {
         mBatch.mEvents.emplace_back(std::move(e));
         mStatus.Update(mBatch.mEvents.back());
-        mTotalEnqueTimeMs += std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
-                                 .time_since_epoch()
-                                 .count();
+        // mTotalEnqueTimeMs += std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
+        //                          .time_since_epoch()
+        //                          .count();
     }
 
     void Flush(GroupBatchItem& res) {

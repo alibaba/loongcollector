@@ -47,8 +47,8 @@ private:
     size_t mRead = 0;
     size_t mSize = 0;
 
-    CounterPtr mSuccessfulFetchTimesCnt;
-    CounterPtr mFetchAttemptsCnt;
+    CounterPtr mFetchTimesCnt;
+    CounterPtr mValidFetchTimesCnt;
     CounterPtr mFetchedItemsCnt;
 
 #ifdef APSARA_UNIT_TEST_MAIN

@@ -20,15 +20,17 @@
 
 #include <cstdint>
 #include <ctime>
+#include <limits>
 
-#include "pipeline/batch/BatchStatus.h"
 #include "models/PipelineEventPtr.h"
+#include "pipeline/batch/BatchStatus.h"
 
 namespace logtail {
 
 struct DefaultFlushStrategyOptions {
-    uint32_t mMaxSizeBytes = 0;
-    uint32_t mMaxCnt = 0;
+    uint32_t mMaxSizeBytes = std::numeric_limits<uint32_t>::max();
+    uint32_t mMinSizeBytes = 0;
+    uint32_t mMinCnt = 0;
     uint32_t mTimeoutSecs = 0;
 };
 
@@ -36,49 +38,53 @@ template <class T = EventBatchStatus>
 class EventFlushStrategy {
 public:
     void SetMaxSizeBytes(uint32_t size) { mMaxSizeBytes = size; }
-    void SetMaxCnt(uint32_t cnt) { mMaxCnt = cnt; }
+    void SetMinSizeBytes(uint32_t size) { mMinSizeBytes = size; }
+    void SetMinCnt(uint32_t cnt) { mMinCnt = cnt; }
     void SetTimeoutSecs(uint32_t secs) { mTimeoutSecs = secs; }
     uint32_t GetMaxSizeBytes() const { return mMaxSizeBytes; }
-    uint32_t GetMaxCnt() const { return mMaxCnt; }
+    uint32_t GetMinSizeBytes() const { return mMinSizeBytes; }
+    uint32_t GetMinCnt() const { return mMinCnt; }
     uint32_t GetTimeoutSecs() const { return mTimeoutSecs; }
 
     // should be called after event is added
-    bool NeedFlushBySize(const T& status) { return status.GetSize() >= mMaxSizeBytes; }
-    bool NeedFlushByCnt(const T& status) { return status.GetCnt() == mMaxCnt; }
+    bool NeedFlushBySize(const T& status) { return status.GetSize() >= mMinSizeBytes; }
+    bool NeedFlushByCnt(const T& status) { return status.GetCnt() == mMinCnt; }
     // should be called before event is added
     bool NeedFlushByTime(const T& status, const PipelineEventPtr& e) {
         return time(nullptr) - status.GetCreateTime() >= mTimeoutSecs;
     }
+    bool SizeReachingUpperLimit(const T& status) { return status.GetSize() >= mMaxSizeBytes; }
 
 private:
     uint32_t mMaxSizeBytes = 0;
-    uint32_t mMaxCnt = 0;
+    uint32_t mMinSizeBytes = 0;
+    uint32_t mMinCnt = 0;
     uint32_t mTimeoutSecs = 0;
 };
 
 class GroupFlushStrategy {
 public:
-    GroupFlushStrategy(uint32_t size, uint32_t timeout) : mMaxSizeBytes(size), mTimeoutSecs(timeout) {}
+    GroupFlushStrategy(uint32_t size, uint32_t timeout) : mMinSizeBytes(size), mTimeoutSecs(timeout) {}
 
-    void SetMaxSizeBytes(uint32_t size) { mMaxSizeBytes = size; }
+    void SetMinSizeBytes(uint32_t size) { mMinSizeBytes = size; }
     void SetTimeoutSecs(uint32_t secs) { mTimeoutSecs = secs; }
-    uint32_t GetMaxSizeBytes() const { return mMaxSizeBytes; }
+    uint32_t GetMinSizeBytes() const { return mMinSizeBytes; }
     uint32_t GetTimeoutSecs() const { return mTimeoutSecs; }
 
     // should be called after event is added
-    bool NeedFlushBySize(const GroupBatchStatus& status) { return status.GetSize() >= mMaxSizeBytes; }
+    bool NeedFlushBySize(const GroupBatchStatus& status) { return status.GetSize() >= mMinSizeBytes; }
     // should be called before event is added
     bool NeedFlushByTime(const GroupBatchStatus& status) {
         return time(nullptr) - status.GetCreateTime() >= mTimeoutSecs;
     }
 
 private:
-    uint32_t mMaxSizeBytes = 0;
+    uint32_t mMinSizeBytes = 0;
     uint32_t mTimeoutSecs = 0;
 };
 
 template <>
 bool EventFlushStrategy<SLSEventBatchStatus>::NeedFlushByTime(const SLSEventBatchStatus& status,
-                                                                     const PipelineEventPtr& e);
+                                                              const PipelineEventPtr& e);
 
 } // namespace logtail

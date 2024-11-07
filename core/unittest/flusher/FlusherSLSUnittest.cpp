@@ -107,15 +107,17 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
-                      flusher->mBatcher.GetEventFlushStrategy().GetMaxCnt());
-    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
+                      flusher->mBatcher.GetEventFlushStrategy().GetMinCnt());
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(max_send_log_group_size)),
                       flusher->mBatcher.GetEventFlushStrategy().GetMaxSizeBytes());
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
+                      flusher->mBatcher.GetEventFlushStrategy().GetMinSizeBytes());
     uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(batch_send_interval)) / 2;
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_interval)) - timeout,
                       flusher->mBatcher.GetEventFlushStrategy().GetTimeoutSecs());
     APSARA_TEST_TRUE(flusher->mBatcher.GetGroupFlushStrategy().has_value());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
-                      flusher->mBatcher.GetGroupFlushStrategy()->GetMaxSizeBytes());
+                      flusher->mBatcher.GetGroupFlushStrategy()->GetMinSizeBytes());
     APSARA_TEST_EQUAL(timeout, flusher->mBatcher.GetGroupFlushStrategy()->GetTimeoutSecs());
     APSARA_TEST_TRUE(flusher->mGroupSerializer);
     APSARA_TEST_TRUE(flusher->mGroupListSerializer);
@@ -645,7 +647,7 @@ void FlusherSLSUnittest::TestSend() {
         }
         {
             // non-replay group
-            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(1);
+            flusher.mBatcher.GetEventFlushStrategy().SetMinCnt(1);
             PipelineEventGroup group(make_shared<SourceBuffer>());
             group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
             group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
@@ -730,7 +732,7 @@ void FlusherSLSUnittest::TestSend() {
         }
         {
             // group
-            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(1);
+            flusher.mBatcher.GetEventFlushStrategy().SetMinCnt(1);
             PipelineEventGroup group(make_shared<SourceBuffer>());
             group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
             group.SetTag(LOG_RESERVED_KEY_HOSTNAME, "hostname");
@@ -778,19 +780,19 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_EQUAL("content_value", logGroup.logs(0).contents(0).value());
 
             SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
-            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(4000);
+            flusher.mBatcher.GetEventFlushStrategy().SetMinCnt(4000);
         }
         {
             // oversized group
             INT32_FLAG(max_send_log_group_size) = 1;
-            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(1);
+            flusher.mBatcher.GetEventFlushStrategy().SetMinCnt(1);
             PipelineEventGroup group(make_shared<SourceBuffer>());
             auto e = group.AddLogEvent();
             e->SetTimestamp(1234567890);
             e->SetContent(string("content_key"), string("content_value"));
             APSARA_TEST_FALSE(flusher.Send(std::move(group)));
             INT32_FLAG(max_send_log_group_size) = 10 * 1024 * 1024;
-            flusher.mBatcher.GetEventFlushStrategy().SetMaxCnt(4000);
+            flusher.mBatcher.GetEventFlushStrategy().SetMinCnt(4000);
         }
     }
     {
@@ -829,7 +831,7 @@ void FlusherSLSUnittest::TestSend() {
             e->SetTimestamp(1234567990);
             e->SetContent(string("content_key"), string("content_value"));
         }
-        flusher.mBatcher.GetGroupFlushStrategy()->SetMaxSizeBytes(group.DataSize());
+        flusher.mBatcher.GetGroupFlushStrategy()->SetMinSizeBytes(group.DataSize());
         // flush the above two events from group item by the following event
         {
             auto e = group.AddLogEvent();
@@ -892,7 +894,7 @@ void FlusherSLSUnittest::TestSend() {
         for (auto& tmp : res) {
             SenderQueueManager::GetInstance()->RemoveItem(tmp->mQueueKey, tmp);
         }
-        flusher.mBatcher.GetGroupFlushStrategy()->SetMaxSizeBytes(256 * 1024);
+        flusher.mBatcher.GetGroupFlushStrategy()->SetMinSizeBytes(256 * 1024);
     }
 }
 

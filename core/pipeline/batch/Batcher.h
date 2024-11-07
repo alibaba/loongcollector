@@ -47,12 +47,12 @@ public:
         std::string errorMsg;
         PipelineContext& ctx = flusher->GetContext();
 
-        uint32_t maxSizeBytes = strategy.mMaxSizeBytes;
-        if (!GetOptionalUIntParam(config, "MaxSizeBytes", maxSizeBytes, errorMsg)) {
+        uint32_t minSizeBytes = strategy.mMinSizeBytes;
+        if (!GetOptionalUIntParam(config, "MinSizeBytes", minSizeBytes, errorMsg)) {
             PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                                   ctx.GetAlarm(),
                                   errorMsg,
-                                  maxSizeBytes,
+                                  minSizeBytes,
                                   flusher->Name(),
                                   ctx.GetConfigName(),
                                   ctx.GetProjectName(),
@@ -60,12 +60,12 @@ public:
                                   ctx.GetRegion());
         }
 
-        uint32_t maxCnt = strategy.mMaxCnt;
-        if (!GetOptionalUIntParam(config, "MaxCnt", maxCnt, errorMsg)) {
+        uint32_t minCnt = strategy.mMinCnt;
+        if (!GetOptionalUIntParam(config, "MinCnt", minCnt, errorMsg)) {
             PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                                   ctx.GetAlarm(),
                                   errorMsg,
-                                  maxCnt,
+                                  minCnt,
                                   flusher->Name(),
                                   ctx.GetConfigName(),
                                   ctx.GetProjectName(),
@@ -88,14 +88,15 @@ public:
 
         if (enableGroupBatch) {
             uint32_t groupTimeout = timeoutSecs / 2;
-            mGroupFlushStrategy = GroupFlushStrategy(maxSizeBytes, groupTimeout);
+            mGroupFlushStrategy = GroupFlushStrategy(minSizeBytes, groupTimeout);
             mGroupQueue = GroupBatchItem();
             mEventFlushStrategy.SetTimeoutSecs(timeoutSecs - groupTimeout);
         } else {
             mEventFlushStrategy.SetTimeoutSecs(timeoutSecs);
         }
-        mEventFlushStrategy.SetMaxSizeBytes(maxSizeBytes);
-        mEventFlushStrategy.SetMaxCnt(maxCnt);
+        mEventFlushStrategy.SetMaxSizeBytes(strategy.mMaxSizeBytes);
+        mEventFlushStrategy.SetMinSizeBytes(minSizeBytes);
+        mEventFlushStrategy.SetMinCnt(minCnt);
 
         mFlusher = flusher;
 
@@ -114,7 +115,7 @@ public:
         mInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_TOTAL);
         mInGroupDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
         mOutEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_OUT_EVENTS_TOTAL);
-        mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_TOTAL_DELAY_MS);
+        // mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_TOTAL_DELAY_MS);
         mEventBatchItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_BATCHER_EVENT_BATCHES_TOTAL);
         mBufferedGroupsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_BATCHER_BUFFERED_GROUPS_TOTAL);
         mBufferedEventsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_BATCHER_BUFFERED_EVENTS_TOTAL);
@@ -134,51 +135,79 @@ public:
         mInGroupDataSizeBytes->Add(g.DataSize());
         mEventBatchItemsTotal->Set(mEventQueueMap.size());
 
-        size_t eventsSize = g.GetEvents().size();
-        for (size_t i = 0; i < eventsSize; ++i) {
-            PipelineEventPtr& e = g.MutableEvents()[i];
-            if (!item.IsEmpty() && mEventFlushStrategy.NeedFlushByTime(item.GetStatus(), e)) {
-                if (!mGroupQueue) {
-                    UpdateMetricsOnFlushingEventQueue(item);
-                    item.Flush(res);
-                } else {
-                    if (!mGroupQueue->IsEmpty() && mGroupFlushStrategy->NeedFlushByTime(mGroupQueue->GetStatus())) {
-                        UpdateMetricsOnFlushingGroupQueue();
-                        mGroupQueue->Flush(res);
-                    }
-                    if (mGroupQueue->IsEmpty()) {
-                        TimeoutFlushManager::GetInstance()->UpdateRecord(mFlusher->GetContext().GetConfigName(),
-                                                                         0,
-                                                                         0,
-                                                                         mGroupFlushStrategy->GetTimeoutSecs(),
-                                                                         mFlusher);
-                    }
-                    item.Flush(mGroupQueue.value());
-                    if (mGroupFlushStrategy->NeedFlushBySize(mGroupQueue->GetStatus())) {
-                        UpdateMetricsOnFlushingGroupQueue();
-                        mGroupQueue->Flush(res);
-                    }
-                }
-            }
-            if (item.IsEmpty()) {
-                item.Reset(g.GetSizedTags(),
-                           g.GetSourceBuffer(),
-                           g.GetExactlyOnceCheckpoint(),
-                           g.GetMetadata(EventGroupMetaKey::SOURCE_ID));
-                TimeoutFlushManager::GetInstance()->UpdateRecord(
-                    mFlusher->GetContext().GetConfigName(), 0, key, mEventFlushStrategy.GetTimeoutSecs(), mFlusher);
-                mBufferedGroupsTotal->Add(1);
-                mBufferedDataSizeByte->Add(item.DataSize());
-            } else if (i == 0) {
-                item.AddSourceBuffer(g.GetSourceBuffer());
-            }
-            mBufferedEventsTotal->Add(1);
-            mBufferedDataSizeByte->Add(e->DataSize());
-            item.Add(std::move(e));
-            if (mEventFlushStrategy.NeedFlushBySize(item.GetStatus())
-                || mEventFlushStrategy.NeedFlushByCnt(item.GetStatus())) {
+        if (g.DataSize() > mEventFlushStrategy.GetMinSizeBytes()) {
+            // for group size larger than min batch size, separate group only if size is larger than max batch size
+            if (!item.IsEmpty()) {
                 UpdateMetricsOnFlushingEventQueue(item);
                 item.Flush(res);
+            }
+            for (auto& e : g.MutableEvents()) {
+                // should consider time condition here because sls require this
+                if (!item.IsEmpty() && mEventFlushStrategy.NeedFlushByTime(item.GetStatus(), e)) {
+                    mOutEventsTotal->Add(item.EventSize());
+                    item.Flush(res);
+                }
+                if (item.IsEmpty()) {
+                    item.Reset(g.GetSizedTags(),
+                               g.GetSourceBuffer(),
+                               g.GetExactlyOnceCheckpoint(),
+                               g.GetMetadata(EventGroupMetaKey::SOURCE_ID));
+                }
+                item.Add(std::move(e));
+                if (mEventFlushStrategy.SizeReachingUpperLimit(item.GetStatus())) {
+                    mOutEventsTotal->Add(item.EventSize());
+                    item.Flush(res);
+                }
+            }
+            mOutEventsTotal->Add(item.EventSize());
+            item.Flush(res);
+        } else {
+            size_t eventsSize = g.GetEvents().size();
+            for (size_t i = 0; i < eventsSize; ++i) {
+                PipelineEventPtr& e = g.MutableEvents()[i];
+                if (!item.IsEmpty() && mEventFlushStrategy.NeedFlushByTime(item.GetStatus(), e)) {
+                    if (!mGroupQueue) {
+                        UpdateMetricsOnFlushingEventQueue(item);
+                        item.Flush(res);
+                    } else {
+                        if (!mGroupQueue->IsEmpty() && mGroupFlushStrategy->NeedFlushByTime(mGroupQueue->GetStatus())) {
+                            UpdateMetricsOnFlushingGroupQueue();
+                            mGroupQueue->Flush(res);
+                        }
+                        if (mGroupQueue->IsEmpty()) {
+                            TimeoutFlushManager::GetInstance()->UpdateRecord(mFlusher->GetContext().GetConfigName(),
+                                                                             0,
+                                                                             0,
+                                                                             mGroupFlushStrategy->GetTimeoutSecs(),
+                                                                             mFlusher);
+                        }
+                        item.Flush(mGroupQueue.value());
+                        if (mGroupFlushStrategy->NeedFlushBySize(mGroupQueue->GetStatus())) {
+                            UpdateMetricsOnFlushingGroupQueue();
+                            mGroupQueue->Flush(res);
+                        }
+                    }
+                }
+                if (item.IsEmpty()) {
+                    item.Reset(g.GetSizedTags(),
+                               g.GetSourceBuffer(),
+                               g.GetExactlyOnceCheckpoint(),
+                               g.GetMetadata(EventGroupMetaKey::SOURCE_ID));
+                    TimeoutFlushManager::GetInstance()->UpdateRecord(
+                        mFlusher->GetContext().GetConfigName(), 0, key, mEventFlushStrategy.GetTimeoutSecs(), mFlusher);
+                    mBufferedGroupsTotal->Add(1);
+                    mBufferedDataSizeByte->Add(item.DataSize());
+                } else if (i == 0) {
+                    item.AddSourceBuffer(g.GetSourceBuffer());
+                }
+                mBufferedEventsTotal->Add(1);
+                mBufferedDataSizeByte->Add(e->DataSize());
+                item.Add(std::move(e));
+                if (mEventFlushStrategy.NeedFlushBySize(item.GetStatus())
+                    || mEventFlushStrategy.NeedFlushByCnt(item.GetStatus())) {
+                    UpdateMetricsOnFlushingEventQueue(item);
+                    item.Flush(res);
+                }
             }
         }
         mTotalAddTimeMs->Add(std::chrono::system_clock::now() - before);
@@ -260,12 +289,12 @@ public:
 private:
     void UpdateMetricsOnFlushingEventQueue(const EventBatchItem<T>& item) {
         mOutEventsTotal->Add(item.EventSize());
-        mTotalDelayMs->Add(
-            item.EventSize()
-                * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
-                      .time_since_epoch()
-                      .count()
-            - item.TotalEnqueTimeMs());
+        // mTotalDelayMs->Add(
+        //     item.EventSize()
+        //         * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
+        //               .time_since_epoch()
+        //               .count()
+        //     - item.TotalEnqueTimeMs());
         mBufferedGroupsTotal->Sub(1);
         mBufferedEventsTotal->Sub(item.EventSize());
         mBufferedDataSizeByte->Sub(item.DataSize());
@@ -273,12 +302,12 @@ private:
 
     void UpdateMetricsOnFlushingGroupQueue() {
         mOutEventsTotal->Add(mGroupQueue->EventSize());
-        mTotalDelayMs->Add(
-            mGroupQueue->EventSize()
-                * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
-                      .time_since_epoch()
-                      .count()
-            - mGroupQueue->TotalEnqueTimeMs());
+        // mTotalDelayMs->Add(
+        //     mGroupQueue->EventSize()
+        //         * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())
+        //               .time_since_epoch()
+        //               .count()
+        //     - mGroupQueue->TotalEnqueTimeMs());
         mBufferedGroupsTotal->Sub(mGroupQueue->GroupSize());
         mBufferedEventsTotal->Sub(mGroupQueue->EventSize());
         mBufferedDataSizeByte->Sub(mGroupQueue->DataSize());
@@ -297,7 +326,7 @@ private:
     CounterPtr mInEventsTotal;
     CounterPtr mInGroupDataSizeBytes;
     CounterPtr mOutEventsTotal;
-    CounterPtr mTotalDelayMs;
+    // CounterPtr mTotalDelayMs;
     IntGaugePtr mEventBatchItemsTotal;
     IntGaugePtr mBufferedGroupsTotal;
     IntGaugePtr mBufferedEventsTotal;

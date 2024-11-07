@@ -31,19 +31,18 @@
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 
-using namespace std;
-
-DEFINE_FLAG_INT32(check_send_client_timeout_interval, "", 600);
-DEFINE_FLAG_BOOL(enable_flow_control, "if enable flow control", true);
-DEFINE_FLAG_BOOL(enable_send_tps_smoothing, "avoid web server load burst", true);
 DEFINE_FLAG_INT32(flusher_runner_exit_timeout_secs, "", 60);
+DEFINE_FLAG_INT32(check_send_client_timeout_interval, "", 600);
 
-static const int SEND_BLOCK_COST_TIME_ALARM_INTERVAL_SECOND = 3;
+using namespace std;
 
 namespace logtail {
 
 bool FlusherRunner::Init() {
-    srand(time(nullptr));
+    LoadModuleConfig(true);
+    mCallback = [this]() { return LoadModuleConfig(false); };
+    AppConfig::GetInstance()->RegisterCallback("max_bytes_per_sec", &mCallback);
+
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
         mMetricsRecordRef,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER},
@@ -58,9 +57,7 @@ bool FlusherRunner::Init() {
 
     mThreadRes = async(launch::async, &FlusherRunner::Run, this);
     mLastCheckSendClientTime = time(nullptr);
-    LoadModuleConfig(true);
-    mCallback = [this]() { return LoadModuleConfig(false); };
-    AppConfig::GetInstance()->RegisterCallback("max_bytes_per_sec", &mCallback);
+
     return true;
 }
 
@@ -87,18 +84,11 @@ bool FlusherRunner::LoadModuleConfig(bool isInit) {
 void FlusherRunner::UpdateSendFlowControl() {
     // when inflow exceed 30MB/s, FlowControl lose precision
     if (AppConfig::GetInstance()->GetMaxBytePerSec() >= 30 * 1024 * 1024) {
-        if (mSendFlowControl)
-            mSendFlowControl = false;
-        if (mSendRandomSleep)
-            mSendRandomSleep = false;
-    } else {
-        mSendRandomSleep = BOOL_FLAG(enable_send_tps_smoothing);
-        mSendFlowControl = BOOL_FLAG(enable_flow_control);
+        mEnableRateLimiter = false;
     }
     LOG_INFO(sLogger,
              ("send byte per second limit", AppConfig::GetInstance()->GetMaxBytePerSec())(
-                 "send flow control", mSendFlowControl ? "enable" : "disable")(
-                 "send random sleep", mSendRandomSleep ? "enable" : "disable"));
+                 "send flow control", mEnableRateLimiter ? "enable" : "disable"));
 }
 
 void FlusherRunner::Stop() {
@@ -118,29 +108,10 @@ void FlusherRunner::DecreaseHttpSendingCnt() {
 }
 
 void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
-    if (!BOOL_FLAG(enable_full_drain_mode) && item->mFlusher->Name() == "flusher_sls"
-        && Application::GetInstance()->IsExiting()) {
-        DiskBufferWriter::GetInstance()->PushToDiskBuffer(item, 3);
-        SenderQueueManager::GetInstance()->RemoveItem(item->mFlusher->GetQueueKey(), item);
-        return;
-    }
-
-    int32_t beforeSleepTime = time(NULL);
+    // TODO: use semaphore instead
     while (withLimit && !Application::GetInstance()->IsExiting()
            && GetSendingBufferCount() >= AppConfig::GetInstance()->GetSendRequestConcurrency()) {
-        usleep(10 * 1000);
-    }
-    int32_t afterSleepTime = time(NULL);
-    int32_t blockCostTime = afterSleepTime - beforeSleepTime;
-    if (blockCostTime > SEND_BLOCK_COST_TIME_ALARM_INTERVAL_SECOND) {
-        LOG_WARNING(sLogger,
-                    ("sending log group blocked too long because send concurrency reached limit. current "
-                     "concurrency used",
-                     GetSendingBufferCount())("max concurrency", AppConfig::GetInstance()->GetSendRequestConcurrency())(
-                        "blocked time", blockCostTime));
-        LogtailAlarm::GetInstance()->SendAlarm(SENDING_COSTS_TOO_MUCH_TIME_ALARM,
-                                               "sending log group blocked for too much time, cost "
-                                                   + ToString(blockCostTime));
+        this_thread::sleep_for(chrono::milliseconds(10));
     }
 
     auto req = static_cast<HttpFlusher*>(item->mFlusher)->BuildRequest(item);
@@ -173,30 +144,19 @@ void FlusherRunner::Run() {
             }
             mInItemsTotal->Add(items.size());
             mWaitingItemsTotal->Add(items.size());
-
-            // smoothing send tps, walk around webserver load burst
-            uint32_t bufferPackageCount = items.size();
-            if (!Application::GetInstance()->IsExiting() && mSendRandomSleep) {
-                int64_t sleepMicroseconds = 0;
-                if (bufferPackageCount < 20)
-                    sleepMicroseconds = (rand() % 30) * 10000; // 0ms ~ 300ms
-                else if (bufferPackageCount < 30)
-                    sleepMicroseconds = (rand() % 20) * 10000; // 0ms ~ 200ms
-                else if (bufferPackageCount < 40)
-                    sleepMicroseconds = (rand() % 10) * 10000; // 0ms ~ 100ms
-                if (sleepMicroseconds > 0)
-                    usleep(sleepMicroseconds);
-            }
         }
 
         for (auto itr = items.begin(); itr != items.end(); ++itr) {
-            auto waitTime = chrono::duration_cast<chrono::milliseconds>(curTime - (*itr)->mFirstEnqueTime);
-            LOG_DEBUG(sLogger,
-                      ("got item from sender queue, item address",
-                       *itr)("config-flusher-dst", QueueKeyManager::GetInstance()->GetName((*itr)->mQueueKey))(
-                          "wait time", ToString(waitTime.count()) + "ms")("try cnt", ToString((*itr)->mTryCnt)));
+            LOG_DEBUG(
+                sLogger,
+                ("got item from sender queue, item address",
+                 *itr)("config-flusher-dst", QueueKeyManager::GetInstance()->GetName((*itr)->mQueueKey))(
+                    "wait time",
+                    ToString(chrono::duration_cast<chrono::milliseconds>(curTime - (*itr)->mFirstEnqueTime).count())
+                        + "ms")("try cnt", ToString((*itr)->mTryCnt)));
 
-            if (!Application::GetInstance()->IsExiting() && mSendFlowControl) {
+            // TODO: use rate limiter instead
+            if (!Application::GetInstance()->IsExiting() && mEnableRateLimiter) {
                 RateLimiter::FlowControl((*itr)->mRawSize, mSendLastTime, mSendLastByte, true);
             }
 
@@ -222,7 +182,14 @@ void FlusherRunner::Run() {
 void FlusherRunner::Dispatch(SenderQueueItem* item) {
     switch (item->mFlusher->GetSinkType()) {
         case SinkType::HTTP:
-            PushToHttpSink(item);
+            // TODO: make it common for all http flushers
+            if (!BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()
+                && item->mFlusher->Name() == "flusher_sls") {
+                DiskBufferWriter::GetInstance()->PushToDiskBuffer(item, 3);
+                SenderQueueManager::GetInstance()->RemoveItem(item->mFlusher->GetQueueKey(), item);
+            } else {
+                PushToHttpSink(item);
+            }
             break;
         default:
             SenderQueueManager::GetInstance()->RemoveItem(item->mFlusher->GetQueueKey(), item);

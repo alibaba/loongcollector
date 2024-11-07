@@ -22,9 +22,6 @@
 
 using namespace std;
 
-DECLARE_FLAG_BOOL(enable_send_tps_smoothing);
-DECLARE_FLAG_BOOL(enable_flow_control);
-
 namespace logtail {
 
 class InstanceConfigManagerUnittest : public testing::Test {
@@ -151,8 +148,7 @@ void InstanceConfigManagerUnittest::TestUpdateInstanceConfigs() {
         APSARA_TEST_EQUAL(nullptr, InstanceConfigManager::GetInstance()->FindConfigByName("test3"));
     }
     APSARA_TEST_EQUAL(kDefaultMaxSendBytePerSec, AppConfig::GetInstance()->GetMaxBytePerSec());
-    APSARA_TEST_EQUAL(true, FlusherRunner::GetInstance()->mSendRandomSleep);
-    APSARA_TEST_EQUAL(true, FlusherRunner::GetInstance()->mSendFlowControl);
+    APSARA_TEST_EQUAL(true, FlusherRunner::GetInstance()->mEnableRateLimiter);
     // Modified
     status = 1;
     {
@@ -206,8 +202,7 @@ void InstanceConfigManagerUnittest::TestUpdateInstanceConfigs() {
         APSARA_TEST_EQUAL(nullptr, InstanceConfigManager::GetInstance()->FindConfigByName("test3"));
     }
     APSARA_TEST_EQUAL(31457280, AppConfig::GetInstance()->GetMaxBytePerSec());
-    APSARA_TEST_EQUAL(false, FlusherRunner::GetInstance()->mSendRandomSleep);
-    APSARA_TEST_EQUAL(false, FlusherRunner::GetInstance()->mSendFlowControl);
+    APSARA_TEST_EQUAL(false, FlusherRunner::GetInstance()->mEnableRateLimiter);
     // Removed
     status = 2;
     {

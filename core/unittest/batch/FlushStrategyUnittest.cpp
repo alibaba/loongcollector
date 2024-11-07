@@ -27,8 +27,9 @@ public:
 
 protected:
     void SetUp() override {
-        mStrategy.SetMaxCnt(2);
-        mStrategy.SetMaxSizeBytes(100);
+        mStrategy.SetMinCnt(2);
+        mStrategy.SetMaxSizeBytes(200);
+        mStrategy.SetMinSizeBytes(100);
         mStrategy.SetTimeoutSecs(3);
     }
 
@@ -45,6 +46,7 @@ void EventFlushStrategyUnittest::TestNeedFlush() {
     APSARA_TEST_TRUE(mStrategy.NeedFlushByCnt(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushBySize(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushByTime(status, PipelineEventPtr()));
+    APSARA_TEST_FALSE(mStrategy.SizeReachingUpperLimit(status));
 
     status.mCnt = 1;
     status.mSizeBytes = 100;
@@ -52,6 +54,7 @@ void EventFlushStrategyUnittest::TestNeedFlush() {
     APSARA_TEST_FALSE(mStrategy.NeedFlushByCnt(status));
     APSARA_TEST_TRUE(mStrategy.NeedFlushBySize(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushByTime(status, PipelineEventPtr()));
+    APSARA_TEST_FALSE(mStrategy.SizeReachingUpperLimit(status));
 
     status.mCnt = 1;
     status.mSizeBytes = 50;
@@ -59,6 +62,12 @@ void EventFlushStrategyUnittest::TestNeedFlush() {
     APSARA_TEST_FALSE(mStrategy.NeedFlushByCnt(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushBySize(status));
     APSARA_TEST_TRUE(mStrategy.NeedFlushByTime(status, PipelineEventPtr()));
+    APSARA_TEST_FALSE(mStrategy.SizeReachingUpperLimit(status));
+
+    status.mSizeBytes = 300;
+    status.mCreateTime = time(nullptr) - 1;
+    APSARA_TEST_FALSE(mStrategy.NeedFlushByTime(status, PipelineEventPtr()));
+    APSARA_TEST_TRUE(mStrategy.SizeReachingUpperLimit(status));
 }
 
 UNIT_TEST_CASE(EventFlushStrategyUnittest, TestNeedFlush)
@@ -91,8 +100,8 @@ public:
 
 protected:
     void SetUp() override {
-        mStrategy.SetMaxCnt(2);
-        mStrategy.SetMaxSizeBytes(100);
+        mStrategy.SetMinCnt(2);
+        mStrategy.SetMinSizeBytes(100);
         mStrategy.SetTimeoutSecs(3);
     }
 

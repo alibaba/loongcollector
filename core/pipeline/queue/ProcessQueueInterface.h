@@ -52,6 +52,9 @@ public:
 protected:
     bool IsValidToPop() const;
 
+    CounterPtr mFetchTimesCnt;
+    CounterPtr mValidFetchTimesCnt;
+
 private:
     bool IsDownStreamQueuesValidToPush() const;
 

@@ -34,10 +34,24 @@ namespace logtail {
 template <class T>
 void DestroyEvents(vector<PipelineEventPtr>&& events) {
     unordered_map<EventPool*, vector<T*>> eventsPoolMap;
+    // for most cases, all events have the same origin. So we cache the pool pointer and iterator for efficiency
+    EventPool* cachedPoolPtr = nullptr;
+    typename unordered_map<EventPool*, vector<T*>>::iterator cachedIt;
+    bool firstEvent = true;
     for (auto& item : events) {
         if (item && item.IsFromEventPool()) {
             item->Reset();
-            eventsPoolMap[item.GetEventPool()].emplace_back(static_cast<T*>(item.Release()));
+            if (firstEvent || item.GetEventPool() != cachedPoolPtr) {
+                cachedPoolPtr = item.GetEventPool();
+                cachedIt = eventsPoolMap.find(cachedPoolPtr);
+                if (cachedIt == eventsPoolMap.end()) {
+                    eventsPoolMap.emplace(cachedPoolPtr, vector<T*>());
+                    cachedIt = eventsPoolMap.find(cachedPoolPtr);
+                    cachedIt->second.reserve(events.size());
+                }
+                firstEvent = false;
+            }
+            cachedIt->second.emplace_back(static_cast<T*>(item.Release()));
         }
     }
     for (auto& item : eventsPoolMap) {

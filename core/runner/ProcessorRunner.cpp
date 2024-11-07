@@ -27,12 +27,12 @@
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 
+DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
+DEFINE_FLAG_INT32(processor_runner_exit_timeout_secs, "", 60);
+
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
 using namespace std;
-
-DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
-DEFINE_FLAG_INT32(processor_runner_exit_timeout_secs, "", 60);
 
 namespace logtail {
 
@@ -84,7 +84,7 @@ bool ProcessorRunner::PushQueue(QueueKey key, size_t inputIndex, PipelineEventGr
 }
 
 void ProcessorRunner::Run(uint32_t threadNo) {
-    LOG_INFO(sLogger, ("processor runner", "started")("threadNo", threadNo));
+    LOG_INFO(sLogger, ("processor runner", "started")("thread no", threadNo));
 
     // thread local metrics should be initialized in each thread
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
@@ -97,12 +97,12 @@ void ProcessorRunner::Run(uint32_t threadNo) {
     sInGroupDataSizeBytes = sMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_SIZE_BYTES);
     sLastRunTime = sMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
 
-    static int32_t lastMergeTime = 0;
+    static int32_t lastFlushBatchTime = 0;
     while (true) {
-        int32_t curTime = time(NULL);
-        if (threadNo == 0 && curTime - lastMergeTime >= INT32_FLAG(default_flush_merged_buffer_interval)) {
+        int32_t curTime = time(nullptr);
+        if (threadNo == 0 && curTime - lastFlushBatchTime >= INT32_FLAG(default_flush_merged_buffer_interval)) {
             TimeoutFlushManager::GetInstance()->FlushTimeoutBatch();
-            lastMergeTime = curTime;
+            lastFlushBatchTime = curTime;
         }
 
         sLastRunTime->Set(curTime);
@@ -138,6 +138,9 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         pipeline->Process(eventGroupList, item->mInputIndex);
 
         if (pipeline->IsFlushingThroughGoPipeline()) {
+            // TODO: 
+            // 1. allow all event types to be sent to Go pipelines
+            // 2. use event group protobuf instead
             if (isLog) {
                 for (auto& group : eventGroupList) {
                     string res, errorMsg;

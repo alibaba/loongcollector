@@ -24,8 +24,8 @@ SenderQueue::SenderQueue(
     size_t cap, size_t low, size_t high, QueueKey key, const string& flusherId, const PipelineContext& ctx)
     : QueueInterface(key, cap, ctx), BoundedSenderQueueInterface(cap, low, high, key, flusherId, ctx) {
     mQueue.resize(cap);
-    mFetchAttemptsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCH_ATTEMPTS_TOTAL);
-    mSuccessfulFetchTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_SUCCESSFUL_FETCH_TIMES_TOTAL);
+    mFetchTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCH_TIMES_TOTAL);
+    mValidFetchTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_VALID_FETCH_TIMES_TOTAL);
     mFetchedItemsCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCHED_ITEMS_TOTAL);
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
@@ -111,7 +111,7 @@ bool SenderQueue::Remove(SenderQueueItem* item) {
 }
 
 void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t limit) {
-    mFetchAttemptsCnt->Add(1);
+    mFetchTimesCnt->Add(1);
     if (Empty()) {
         return;
     }
@@ -173,7 +173,7 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
         }
     }
     if (hasAvailableItem) {
-        mSuccessfulFetchTimesCnt->Add(1);
+        mValidFetchTimesCnt->Add(1);
     }
 }
 

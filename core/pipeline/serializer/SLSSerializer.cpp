@@ -19,7 +19,7 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/LogGroupSerializer.h"
 
-DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
+DECLARE_FLAG_INT32(max_send_log_group_size);
 
 using namespace std;
 
