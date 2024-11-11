@@ -60,7 +60,7 @@ DEFINE_FLAG_INT32(unknow_error_try_max, "discard data when try times > this valu
 DEFINE_FLAG_BOOL(global_network_success, "global network success flag, default false", false);
 DEFINE_FLAG_BOOL(enable_metricstore_channel, "only works for metrics data for enhance metrics query performance", true);
 DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
-DEFINE_FLAG_INT32(sls_serialize_size_expansion_ratio, "", 1.15);
+DEFINE_FLAG_DOUBLE(sls_serialize_size_expansion_ratio, "", 1.2);
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
