@@ -29,6 +29,11 @@ flushers:
 type SLSSubscriber struct {
 	client        *sls.Client
 	TelemetryType string
+	Aliuid        string
+	Region        string
+	Endpoint      string
+	Project       string
+	Logstore      string
 }
 
 func (s *SLSSubscriber) Name() string {
@@ -65,11 +70,11 @@ func (s *SLSSubscriber) FlusherConfig() string {
 	tpl := template.Must(template.New("slsFlusherConfig").Parse(SLSFlusherConfigTemplate))
 	var builder strings.Builder
 	_ = tpl.Execute(&builder, map[string]interface{}{
-		"Aliuid":        config.TestConfig.Aliuid,
-		"Region":        config.TestConfig.Region,
-		"Endpoint":      config.TestConfig.Endpoint,
-		"Project":       config.TestConfig.Project,
-		"Logstore":      config.TestConfig.GetLogstore(s.TelemetryType),
+		"Aliuid":        s.Aliuid,
+		"Region":        s.Region,
+		"Endpoint":      s.Endpoint,
+		"Project":       s.Project,
+		"Logstore":      s.Logstore,
 		"TelemetryType": s.TelemetryType,
 	})
 	config := builder.String()
@@ -135,8 +140,33 @@ func init() {
 		}
 		fmt.Println("create sls subscriber with telemetry type", telemetryType)
 		l := &SLSSubscriber{
-			client:        createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, config.TestConfig.QueryEndpoint),
+			client:        createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, config.GetQueryEndpoint()),
 			TelemetryType: telemetryType,
+		}
+		if v, ok := spec["aliuid"]; ok {
+			l.Aliuid = v.(string)
+		} else {
+			l.Aliuid = config.TestConfig.Aliuid
+		}
+		if v, ok := spec["region"]; ok {
+			l.Region = v.(string)
+		} else {
+			l.Region = config.TestConfig.Region
+		}
+		if v, ok := spec["endpoint"]; ok {
+			l.Endpoint = v.(string)
+		} else {
+			l.Endpoint = config.TestConfig.Endpoint
+		}
+		if v, ok := spec["project"]; ok {
+			l.Project = v.(string)
+		} else {
+			l.Project = config.TestConfig.Project
+		}
+		if v, ok := spec["logstore"]; ok {
+			l.Logstore = v.(string)
+		} else {
+			l.Logstore = config.TestConfig.GetLogstore(telemetryType)
 		}
 		return l, nil
 	})

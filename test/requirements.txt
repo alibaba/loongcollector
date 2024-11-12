@@ -1,1 +1,1 @@
-Faker
+Faker==30.8.2

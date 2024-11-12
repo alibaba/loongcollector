@@ -10,6 +10,7 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/cleanup"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup"
+	"github.com/alibaba/ilogtail/test/engine/setup/chaos"
 	"github.com/alibaba/ilogtail/test/engine/setup/monitor"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 	"github.com/alibaba/ilogtail/test/engine/trigger"
@@ -31,6 +32,11 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.Given(`^subcribe data from \{(\S+)\} with config`, subscriber.InitSubscriber)
 	ctx.Given(`^mkdir \{(.*)\}`, setup.Mkdir)
 	ctx.Given(`^docker-compose boot type \{(\S+)\}$`, setup.SetDockerComposeBootType)
+
+	// chaos
+	ctx.Given(`^network delay package \{(\d+)\}ms for ip \{(.*)\}`, chaos.NetworkDelay)
+	ctx.Given(`^network lost package \{(\d+)\}% for ip \{(.*)\}`, chaos.NetworkLoss)
+	ctx.Given(`^clean all chaos$`, cleanup.DestoryAllChaos)
 	// ------------------------------------------
 
 	// When
@@ -42,6 +48,8 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^query through \{(.*)\}`, control.SetQuery)
 	ctx.When(`^apply yaml \{(.*)\} to k8s`, control.ApplyYaml)
 	ctx.When(`^delete yaml \{(.*)\} from k8s`, control.DeleteYaml)
+	ctx.When(`^restart agent`, control.RestartAgent)
+	ctx.When(`^force restart agent`, control.ForceRestartAgent)
 
 	// generate
 	ctx.When(`^begin trigger`, trigger.BeginTrigger)

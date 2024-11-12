@@ -23,4 +23,5 @@ const (
 	CurrentWorkingDeploymentKey ContextKey = "currentWorkingDeployment"
 	QueryKey                    ContextKey = "query"
 	AgentPIDKey                 ContextKey = "agentPID"
+	EndpointIPKey               ContextKey = "endpointIP"
 )

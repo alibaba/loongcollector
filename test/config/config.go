@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -46,7 +47,6 @@ type Config struct {
 	AccessKeySecret string        `mapstructure:"access_key_secret" yaml:"access_key_secret"`
 	Endpoint        string        `mapstructure:"endpoint" yaml:"endpoint"`
 	Aliuid          string        `mapstructure:"aliuid" yaml:"aliuid"`
-	QueryEndpoint   string        `mapstructure:"query_endpoint" yaml:"query_endpoint"`
 	Region          string        `mapstructure:"region" yaml:"region"`
 	RetryTimeout    time.Duration `mapstructure:"retry_timeout" yaml:"retry_timeout"`
 }
@@ -94,11 +94,18 @@ func ParseConfig() {
 	TestConfig.AccessKeySecret = os.Getenv("ACCESS_KEY_SECRET")
 	TestConfig.Endpoint = os.Getenv("ENDPOINT")
 	TestConfig.Aliuid = os.Getenv("ALIUID")
-	TestConfig.QueryEndpoint = os.Getenv("QUERY_ENDPOINT")
 	TestConfig.Region = os.Getenv("REGION")
 	timeout, err := strconv.ParseInt(os.Getenv("RETRY_TIMEOUT"), 10, 64)
 	if err != nil {
 		timeout = 60
 	}
 	TestConfig.RetryTimeout = time.Duration(timeout) * time.Second
+}
+
+func GetQueryEndpoint() string {
+	idx := strings.Index(TestConfig.Endpoint, "-intranet")
+	if idx == -1 {
+		return TestConfig.Endpoint
+	}
+	return TestConfig.Endpoint[:idx] + TestConfig.Endpoint[idx+9:]
 }

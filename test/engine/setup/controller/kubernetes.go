@@ -230,18 +230,18 @@ func (c *DynamicController) Apply(filePath string) error {
 	}
 
 	// Apply the object to the Kubernetes cluster
-	namespace := obj.GetNamespace()
-	if namespace == "" {
-		namespace = "default" // Use default namespace if not specified
-	}
-	resourceInterface := c.dynamicClient.Resource(mapping.Resource).Namespace(namespace)
-	if _, err := resourceInterface.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); err != nil {
+	resourceInterface := c.dynamicClient.Resource(mapping.Resource)
+	if oldObj, err := resourceInterface.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); err != nil {
+		if !meta.IsNoMatchError(err) {
+			return err
+		}
 		// Object does not exist, create it
 		if _, err := resourceInterface.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 	} else {
 		// Object exists, update it
+		obj.SetResourceVersion(oldObj.GetResourceVersion())
 		if _, err := resourceInterface.Update(context.TODO(), obj, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
@@ -257,11 +257,7 @@ func (c *DynamicController) Delete(filePath string) error {
 	}
 
 	// Delete the object from the Kubernetes cluster
-	namespace := obj.GetNamespace()
-	if namespace == "" {
-		namespace = "default" // Use default namespace if not specified
-	}
-	resourceInterface := c.dynamicClient.Resource(mapping.Resource).Namespace(namespace)
+	resourceInterface := c.dynamicClient.Resource(mapping.Resource)
 	if err := resourceInterface.Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}); err != nil {
 		return err
 	}

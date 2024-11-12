@@ -15,6 +15,7 @@ package cleanup
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -44,10 +45,20 @@ func All() {
 		return
 	}
 	ctx := context.TODO()
-	_, _ = control.RemoveAllLocalConfig(ctx)
-	_, _ = AllGeneratedLog(ctx)
-	_, _ = GoTestCache(ctx)
-	_, _ = DeleteContainers(ctx)
+	red := "\033[31m"
+	reset := "\033[0m"
+	if _, err := control.RemoveAllLocalConfig(ctx); err != nil {
+		fmt.Println(red + err.Error() + reset)
+	}
+	if _, err := AllGeneratedLog(ctx); err != nil {
+		fmt.Println(red + err.Error() + reset)
+	}
+	if _, err := DestoryAllChaos(ctx); err != nil {
+		fmt.Println(red + err.Error() + reset)
+	}
+	if _, err := DeleteContainers(ctx); err != nil {
+		fmt.Println(red + err.Error() + reset)
+	}
 	if subscriber.TestSubscriber != nil {
 		_ = subscriber.TestSubscriber.Stop()
 	}
