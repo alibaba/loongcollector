@@ -477,7 +477,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 
     DefaultFlushStrategyOptions strategy{
-        static_cast<uint32_t>(INT32_FLAG(max_send_log_group_size) / INT32_FLAG(sls_serialize_size_expansion_ratio)),
+        static_cast<uint32_t>(INT32_FLAG(max_send_log_group_size) / DOUBLE_FLAG(sls_serialize_size_expansion_ratio)),
         static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
         static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
         static_cast<uint32_t>(INT32_FLAG(batch_send_interval))};

@@ -39,6 +39,7 @@ DECLARE_FLAG_INT32(batch_send_interval);
 DECLARE_FLAG_INT32(merge_log_count_limit);
 DECLARE_FLAG_INT32(batch_send_metric_size);
 DECLARE_FLAG_INT32(max_send_log_group_size);
+DECLARE_FLAG_DOUBLE(sls_serialize_size_expansion_ratio);
 
 using namespace std;
 
@@ -108,7 +109,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
                       flusher->mBatcher.GetEventFlushStrategy().GetMinCnt());
-    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(max_send_log_group_size)),
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(max_send_log_group_size) / DOUBLE_FLAG(sls_serialize_size_expansion_ratio)),
                       flusher->mBatcher.GetEventFlushStrategy().GetMaxSizeBytes());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
                       flusher->mBatcher.GetEventFlushStrategy().GetMinSizeBytes());
