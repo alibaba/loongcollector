@@ -1,12 +1,11 @@
-FROM golang:1.19
+FROM python:3.8
 
-RUN go env -w GOPROXY="https://goproxy.cn,direct"
 RUN mkdir -p /tmp/loongcollector
 
 WORKDIR /root
 COPY . ./loongcollector
 
 WORKDIR /root/loongcollector/test
-RUN go mod download
+RUN pip3 install -r requirements.txt
 
 CMD ["sh", "-c", "while true; do sleep 3600; done"]

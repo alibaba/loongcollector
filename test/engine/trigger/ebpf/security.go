@@ -11,16 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package trigger
+package ebpf
 
 import (
 	"context"
-	"html/template"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup"
+	"github.com/alibaba/ilogtail/test/engine/trigger"
 )
 
 /*
@@ -28,7 +28,7 @@ import (
 input_process_security
 ********************
 */
-func TrigerProcessSecurityEvents(ctx context.Context, commandCnt int) (context.Context, error) {
+func ProcessSecurityEvents(ctx context.Context, commandCnt int) (context.Context, error) {
 	time.Sleep(5 * time.Second)
 	if err := execveCommands(ctx, commandCnt); err != nil {
 		return ctx, err
@@ -51,7 +51,7 @@ func execveCommands(ctx context.Context, commandCnt int) error {
 input_network_security
 ********************
 */
-func TrigerNetworksSecurityEvents(ctx context.Context, commandCnt int, url string) (context.Context, error) {
+func NetworksSecurityEvents(ctx context.Context, commandCnt int, url string) (context.Context, error) {
 	time.Sleep(5 * time.Second)
 	if err := curlURL(ctx, commandCnt, url); err != nil {
 		return ctx, err
@@ -74,9 +74,8 @@ func curlURL(ctx context.Context, commandCnt int, url string) error {
 input_file_security
 ********************
 */
-const triggerFileSecurityTemplate = "cd {{.WorkDir}} && COMMAND_CNT={{.CommandCnt}} FILE_NAME={{.FileName}} {{.Command}}"
 
-func TrigerFileSecurityEvents(ctx context.Context, commandCnt int, filenames string) (context.Context, error) {
+func FileSecurityEvents(ctx context.Context, commandCnt int, filenames string) (context.Context, error) {
 	time.Sleep(5 * time.Second)
 	if err := rwFile(ctx, commandCnt, filenames); err != nil {
 		return ctx, err
@@ -112,20 +111,10 @@ func rwFile(ctx context.Context, commandCnt int, filenames string) error {
 }
 
 func mmapFile(ctx context.Context, commandCnt int, filenames string) error {
-	mmapFileCommand := getRunTriggerCommand("TestGenerateMmapCommand")
 	files := strings.Split(filenames, ",")
 	for _, file := range files {
-		var triggerEBPFCommand strings.Builder
-		template := template.Must(template.New("trigger").Parse(triggerFileSecurityTemplate))
-		if err := template.Execute(&triggerEBPFCommand, map[string]interface{}{
-			"WorkDir":    config.TestConfig.WorkDir,
-			"CommandCnt": commandCnt,
-			"FileName":   file,
-			"Command":    mmapFileCommand,
-		}); err != nil {
-			return err
-		}
-		if _, err := setup.Env.ExecOnSource(ctx, triggerEBPFCommand.String()); err != nil {
+		mmapFileCommand := trigger.GetRunTriggerCommand("ebpf", "mmap", "commandCnt", strconv.FormatInt(int64(commandCnt), 10), "filename", file)
+		if _, err := setup.Env.ExecOnSource(ctx, mmapFileCommand); err != nil {
 			return err
 		}
 	}

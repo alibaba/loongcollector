@@ -15,6 +15,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -72,6 +73,10 @@ func ParseConfig() {
 		TestConfig.GeneratedLogDir = "/tmp/loongcollector"
 	}
 	TestConfig.WorkDir = os.Getenv("WORK_DIR")
+	if len(TestConfig.WorkDir) == 0 {
+		testFileDir, _ := os.Getwd()
+		TestConfig.WorkDir = filepath.Dir(testFileDir)
+	}
 
 	// SSH
 	TestConfig.SSHUsername = os.Getenv("SSH_USERNAME")

@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package trigger
+package ebpf
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/setup"
 )
 
-func TrigerHTTP(ctx context.Context, count int, interval int, url string) (context.Context, error) {
+func HTTP(ctx context.Context, count int, interval int, url string) (context.Context, error) {
 	logger.Debugf(context.Background(), "count:%d interval:%d url:%s", count, interval, url)
 	cmd := fmt.Sprintf("curl -vL %s", url)
 	time.Sleep(time.Second * 5)
