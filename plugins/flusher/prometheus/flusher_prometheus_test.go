@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -117,8 +118,10 @@ func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWit
 
 		httpmock.Activate()
 		defer httpmock.DeactivateAndReset()
+		var wg sync.WaitGroup
 
 		httpmock.RegisterResponder("POST", endpoint, func(req *http.Request) (*http.Response, error) {
+			defer wg.Done()
 			username, password, err := parseBasicAuth(req.Header.Get("Authorization"))
 			if err != nil {
 				return httpmock.NewStringResponse(http.StatusUnauthorized, "Invalid Authorization"), fmt.Errorf("invalid authentication: %w", err)
@@ -238,10 +241,12 @@ func TestPrometheusFlusher_ShouldWriteToRemoteStorageSuccess_GivenCorrectDataWit
 			}
 			expectedWriteRequest = sortPromLabelsInWriteRequest(expectedWriteRequest)
 			httpmock.ZeroCallCounters()
+			wg.Add(2)
 			err := flusher.Export(groupEventsSlice, nil)
 			So(err, ShouldBeNil)
 
 			time.Sleep(1 * time.Second) // guarantee that all http requests are handled
+			wg.Wait()
 
 			err = flusher.Stop()
 			So(err, ShouldBeNil)
