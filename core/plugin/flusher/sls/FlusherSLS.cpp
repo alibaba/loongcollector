@@ -379,7 +379,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                 SLSClientManager::GetInstance()->AddEndpointEntry(mRegion,
                                                                   StandardizeEndpoint(mEndpoint, mEndpoint),
                                                                   false,
-                                                                  SLSClientManager::EndpointSourceType::LOCAL);
+                                                                  SLSClientManager::EndpointSourceType::REMOTE);
             }
         }
 #ifdef __ENTERPRISE__

@@ -114,6 +114,7 @@ void Application::Init() {
     // Initialize basic information: IP, hostname, etc.
     LogFileProfiler::GetInstance();
 #ifdef __ENTERPRISE__
+    EnterpriseConfigProvider::GetInstance()->Init("enterprise");
     EnterpriseConfigProvider::GetInstance()->LoadRegionConfig();
     if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
         LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
@@ -222,7 +223,7 @@ void Application::Start() { // GCOVR_EXCL_START
     }
 
 #ifdef __ENTERPRISE__
-    EnterpriseConfigProvider::GetInstance()->Init("enterprise");
+    EnterpriseConfigProvider::GetInstance()->Start();
     LegacyConfigProvider::GetInstance()->Init("legacy");
 #else
     InitRemoteConfigProviders();
