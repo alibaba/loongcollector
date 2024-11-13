@@ -509,7 +509,7 @@ bool CommonConfigProvider::FetchInstanceConfigFromServer(
     fetchConfigRequest.set_request_id(requestID);
     fetchConfigRequest.set_instance_id(GetInstanceId());
     for (const auto& config : heartbeatResponse.instance_config_updates()) {
-        auto reqConfig = fetchConfigRequest.add_req_configs();
+        auto reqConfig = fetchConfigRequest.add_instance_configs();
         reqConfig->set_name(config.name());
         reqConfig->set_version(config.version());
     }
@@ -522,7 +522,7 @@ bool CommonConfigProvider::FetchInstanceConfigFromServer(
             operation, reqBody, "FetchInstanceConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
         configserver::proto::v2::FetchConfigResponse fetchConfigResponsePb;
         fetchConfigResponsePb.ParseFromString(fetchConfigResponse);
-        res.Swap(fetchConfigResponsePb.mutable_config_details());
+        res.Swap(fetchConfigResponsePb.mutable_instance_config_updates());
         return true;
     }
     return false;
@@ -536,7 +536,7 @@ bool CommonConfigProvider::FetchPipelineConfigFromServer(
     fetchConfigRequest.set_request_id(requestID);
     fetchConfigRequest.set_instance_id(GetInstanceId());
     for (const auto& config : heartbeatResponse.pipeline_config_updates()) {
-        auto reqConfig = fetchConfigRequest.add_req_configs();
+        auto reqConfig = fetchConfigRequest.add_pipeline_configs();
         reqConfig->set_name(config.name());
         reqConfig->set_version(config.version());
     }
@@ -549,7 +549,7 @@ bool CommonConfigProvider::FetchPipelineConfigFromServer(
             operation, reqBody, "FetchPipelineConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
         configserver::proto::v2::FetchConfigResponse fetchConfigResponsePb;
         fetchConfigResponsePb.ParseFromString(fetchConfigResponse);
-        res.Swap(fetchConfigResponsePb.mutable_config_details());
+        res.Swap(fetchConfigResponsePb.mutable_pipeline_config_updates());
         return true;
     }
     return false;

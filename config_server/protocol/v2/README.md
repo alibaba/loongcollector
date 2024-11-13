@@ -18,11 +18,11 @@
         bytes instance_id = 4;                      // Required, Agent's unique identification, consistent throughout the process lifecycle
         string agent_type = 5;                      // Required, Agent's type(ilogtail, ..)
         AgentAttributes attributes = 6;             // Agent's basic attributes
-        repeated AgentGroupTag tags =  7;           // Agent's tags
+        repeated AgentGroupTag tags = 7;            // Agent's tags
         string running_status = 8;                  // Human readable running status
         int64 startup_time = 9;                     // Required, Agent's startup time
         repeated ConfigInfo pipeline_configs = 10;  // Information about the current PIPELINE_CONFIG held by the Agent
-        repeated ConfigInfo instance_configs = 11;   // Information about the current AGENT_CONFIG held by the Agent
+        repeated ConfigInfo instance_configs = 11;  // Information about the current AGENT_CONFIG held by the Agent
         repeated CommandInfo custom_commands = 12;  // Information about command history
         uint64 flags = 13;                          // Predefined command flag
         bytes opaque = 14;                          // Opaque data for extension
@@ -52,7 +52,7 @@
         int64 version = 2;       // Required, Config's version number or hash code
         ConfigStatus status = 3; // Config's status
         string message = 4;      // Optional error message
-        map<string, bytes> extra = 5;   // Optional extra info
+        map<string, bytes> extra = 5; // Optional extra info
     }
 
     // Define the Command information carried in the request
@@ -104,7 +104,7 @@
         uint64 capabilities = 3;                            // Bitmask of flags defined by ServerCapabilities enum
 
         repeated ConfigDetail pipeline_config_updates = 4;  // Agent's pipeline config update status
-        repeated ConfigDetail instance_config_updates = 5;   // Agent's instance config update status
+        repeated ConfigDetail instance_config_updates = 5;  // Agent's instance config update status
         repeated CommandDetail custom_command_updates = 6;  // Agent's commands updates
         uint64 flags = 7;                                   // Predefined command flag
         bytes opaque = 8;                                   // Opaque data for extension
@@ -127,13 +127,13 @@
 
     enum ServerCapabilities {
         // The capabilities field is unspecified.
-        UnspecifiedServerCapability = 0;
+        UnspecifiedServerCapability        = 0;
         // The Server can remember agent attributes.
         RembersAttribute                   = 0x00000001;
         // The Server can remember pipeline config status.
         RembersPipelineConfigStatus        = 0x00000002;
         // The Server can remember instance config status.
-        RembersInstanceConfigStatus         = 0x00000004;
+        RembersInstanceConfigStatus        = 0x00000004;
         // The Server can remember custom command status.
         RembersCustomCommandStatus         = 0x00000008;
 
@@ -141,8 +141,8 @@
     }
 
     message ServerErrorResponse {
-        int32 error_code = 1;                               // None-zero value indicates error
-        string error_message = 2;                           // Error message
+        int32 error_code = 1;        // None-zero value indicates error
+        string error_message = 2;    // Error message
     }
 
     enum ResponseFlags {
@@ -155,9 +155,53 @@
         // optimization) but the Server detects that it does not have it (e.g. was
         // restarted and lost state).
         ReportFullState           = 0x00000001;
+        // FetchPipelineConfigDetail can be used by the Server to tell Agent to fetch config details by FetchConfig api,
+        // HB response ConfigDetail will not contains details.
         FetchPipelineConfigDetail = 0x00000002;
-        FetchInstanceConfigDetail  = 0x00000004;
+        // like FetchPipelineConfigDetail, but for instance config.
+        FetchInstanceConfigDetail = 0x00000004;
         // bits before 2^16 (inclusive) are reserved for future official fields
+    }
+
+### [Optional] FetchConfigRequest 消息
+
+额外的 config 拉取接口，不通过心跳返回 config 详情。
+
+    message FetchConfigRequest {
+        bytes request_id = 1; 
+        bytes instance_id = 2;                     // Agent's unique identification
+        repeated ConfigInfo pipeline_configs = 3;  // Information about the current PIPELINE_CONFIG held by the Agent
+        repeated ConfigInfo instance_configs = 4;  // Information about the current AGENT_CONFIG held by the Agent
+        repeated CommandInfo custom_commands = 5;  // Information about command history
+    }
+
+### [Optional] FetchConfigResponse 消息
+
+    message FetchConfigResponse {
+        bytes request_id = 1;                     
+        CommonResponse commonResponse = 2;
+        repeated ConfigDetail pipeline_config_updates = 3;  // Agent's pipeline config with details
+        repeated ConfigDetail instance_config_updates = 4;  // Agent's instance config with details
+        repeated CommandDetail custom_command_updates = 5;  // Agent's commands details
+    }
+
+### [Optional] ReportStatusRequest 消息
+
+额外的 config 应用状态上报接口，不依赖于等到下次心跳上报。适用于心跳和 config 状态服务拆分的实现。
+
+    message ReportStatusRequest {
+        bytes request_id = 1;
+        bytes instance_id = 2;                     // Agent's unique identification
+        repeated ConfigInfo pipeline_configs = 3;  // status about the current PIPELINE_CONFIG held by the Agent
+        repeated ConfigInfo instance_configs = 4;  // status about the current AGENT_CONFIG held by the Agent
+        repeated CommandInfo custom_commands = 5;  // status about command history
+    }
+
+### [Optional] ReportStatusResponse 消息
+
+    message ReportStatusResponse {
+        bytes request_id = 1;
+        CommonResponse commonResponse = 2;
     }
 
 ## 行为规范
@@ -174,7 +218,7 @@ Server：应当通过capbilitiies上报Server自身的能力，这样如果新�
 
 Client：Agent启动后第一次向Server汇报全量信息，request字段应填尽填。request\_id、sequence\_num、capabilities、instance\_id、agent\_type、startup\_time为必填字段。
 
-Server：Server根据上报的信息返回响应。pipeline\_config\_updates、instance\_config\_updates中包含agent需要同步的配置，updates中必然包含name和version，是否包含detail取决于server端实现。custom\_command_updates包含要求agent执行的命令command中必然包含type、name和expire\_time。
+Server：Server根据上报的信息返回响应。pipeline\_config\_updates、instance\_config\_updates中包含agent需要同步的配置，updates中必然包含name和version，是否包含detail取决于server端实现, 如果不包含则需要通过 FetchConfig 拉取。custom\_command_updates包含要求agent执行的命令command中必然包含type、name和expire\_time。
 
 Server是否保存Client信息取决于Server实现，如果服务端找不到或保存的sequence\_num + 1 ≠ 心跳的sequence\_num，那么就立刻返回并且flags中必须设置ReportFullStatus标识位。
 
@@ -198,45 +242,68 @@ Server：同注册
 
 ### 进程配置
 
-若Server的注册/心跳响应中有instance\_config\_updates.detail
+可选两种实现：
+1. 在心跳中完成进程配置的状态上报与同步。
 
-Client：直接从response中获得detail，应用成功后下次心跳需要上报完整状态。
+    Server的注册/心跳响应中有instance\_config\_updates.detail，client 直接从response中获得detail，应用成功后下次心跳需要上报完整状态。
+    
+2. 在心跳中完成进程配置的基础信息同步，通过额外的接口完成进程配置的拉取。
 
-若Server的响应不包含detail
+    Server的响应不包含detail, 只包含要更新的进程配置 name 和 version。client 比较本地的配置和 version 判断需要更新后，根据 instance_config_updates 的信息构造 FetchConfigRequest 后进行一次额外拉取。FetchConfigRequest 至少需要包括 name 和 version。
 
-Client：根据instance\_config\_updates的信息构造FetchInstanceConfigRequest
-
-Server：返回FetchInstanceConfigResponse
+    心跳 response flag 需要设置 FetchInstanceConfigDetail.
 
 Client获取到多个进程配置时，自动合并，若产生冲突默认行为是未定义。
 
 ### 采集配置
 
-若Server的注册/心跳响应中有pipeline\_config\_updates.detail
+可选两种实现：
+1. 在心跳中完成采集配置的状态上报与同步。
 
-Client：直接从response中获得detail，应用成功后下次心跳需要上报完整状态。
+    Server的注册/心跳响应中有pipeline\_config\_updates.detail, Client 直接从response中获得detail，应用成功后下次心跳需要上报完整状态。
 
-若Server的响应不包含detail
+2. 在心跳中完成采集配置的基础信息同步，通过额外的接口完成进程配置的拉取。
 
-Client：根据pipeline\_config\_updates的信息构造FetchPipelineConfigRequest
+    Server的响应不包含detail, 只包含要更新的采集配置 name 和 version。client 比较本地的配置和 version 判断需要更新后，根据 pipeline_config_updates 的信息构造 FetchConfigRequest 后进行一次额外拉取。FetchConfigRequest 至少需要包括 name 和 version。
 
-Server：返回FetchPipelineConfigResponse
+    心跳 response flag 需要设置 FetchPipelineConfigDetail.
 
-客户端支持以下2种实现
+客户端以下2种实现
 
-实现1：直接将Detail返回在心跳响应中（FetchConfigDetail flag is unset）
+实现1：直接将Detail返回在心跳响应中（FetchPipelineConfigDetail flag is unset）
 
 ![image](https://github.com/alibaba/ilogtail/assets/1827594/be645615-dd99-42dd-9deb-681e9a4069bb)
 
-实现2：仅返回配置名和版本，Detail使用单独请求获取（FetchConfigDetail flag is set）
+实现2：仅返回配置名和版本，Detail使用单独请求获取（FetchPipelineConfigDetail flag is set）
 
 ![image](https://github.com/alibaba/ilogtail/assets/1827594/c409c35c-2a81-4927-bfd2-7fb321ef1ca8)
 
 ### 配置状态上报
 
-Client：这个版本的配置状态上报中修改了version的定义，-1仍然表示删除，0作为保留值，其他值都是合法version，只要version不同Client都应该视为配置更新。此外参考OpAMP增加了配置应用状态上报的字段，能反应出下发的配置是否生效。
+不管是进程配置还是采集配置，下发的配置需要上报应用状态。
 
-Server：这些信息是Agent状态的一部分，可选保存。与通过Event上报可观测信息不同的是，作为状态信息没有时间属性，用户可通过接口可获取即刻状态，而不需要选择时间窗口合并事件。
+对于 Client：这个版本的配置状态上报中修改了version的定义，-1仍然表示删除，0作为保留值，其他值都是合法version，只要version不同Client都应该视为配置更新。此外参考OpAMP增加了配置应用状态上报的字段，能反应出下发的配置是否生效。
+
+对于 Server：这些信息是Agent状态的一部分，可选保存。与通过Event上报可观测信息不同的是，作为状态信息没有时间属性，用户可通过接口可获取即刻状态，而不需要选择时间窗口合并事件。
+
+同进程配置和采集配置，上报配置状态也有两种可选实现：
+1. 在心跳 request 中将配置最新状态带上。
+
+    在心跳中将进程配置和采集配置的最新版本和状态一起上报。另外按照心跳协议的定义，配置状态变更后，要求在心跳一定要上报配置最新状态，如果相较于上一次心跳配置状态无变化，则不要求。
+
+2. 通过 ReportStatus 接口上报。适合对状态更新实时性要求比较高，或对心跳服务、配置服务、状态服务拆分以减少故障半径的实现。
+
+    通过 ReportStatus 额外接口去上报，能够在一定程度上减少心跳服务的复杂度，有利于状态服务和心跳服务的拆分。ReportStatus 接口不用等到下一次心跳，在配置状态发生变化即可上报。
+
+### 心跳配置拉取/上报与额外接口拉取/上报选择
+配置状态上报的方式应该和配置拉取方式配套使用：
+1. 如果进程配置和采集配置都通过心跳下发，状态配置也仅应该通过心跳上报。
+2. 如果进程配置和采集配置都通过 FetchConfig 接口拉取，状态上报也应该通过 ReportStatus 上报。
+
+虽然其他的组合方式也能完成配置的下发和状态上报，但会导致服务拆分和服务职责不清晰的问题。如无特殊要求，建议通过心跳完成配置下发和上报。
+
+通过额外接口拉取配置和状态上报流程：
+![image](https://github.com/user-attachments/assets/07224fe6-9454-4fcb-9c56-2a46eee33f0b)
 
 ### 预定义命令
 

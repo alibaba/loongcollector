@@ -25,7 +25,7 @@ message ConfigInfo {
     int64 version = 2;       // Required, Config's version number or hash code
     ConfigStatus status = 3; // Config's status
     string message = 4;      // Optional error message
-    map<string, bytes> extra = 5;   // Optional extra info
+    map<string, bytes> extra = 5; // Optional extra info
 }
 
 // Define the Command information carried in the request
@@ -34,7 +34,7 @@ message CommandInfo {
     string name = 2;         // Required, Command's unique identification
     ConfigStatus status = 3; // Command's status
     string message = 4;      // Optional error message
-    map<string, bytes> extra = 5;   // Optional extra info
+    map<string, bytes> extra = 5; // Optional extra info
 }
 
 // Define Agent's basic attributes
@@ -49,11 +49,11 @@ message AgentAttributes {
 
 enum AgentCapabilities {
     // The capabilities field is unspecified.
-    UnspecifiedAgentCapability = 0;
+    UnspecifiedAgentCapability     = 0;
     // The Agent can accept pipeline configuration from the Server.
     AcceptsPipelineConfig          = 0x00000001;
     // The Agent can accept instance configuration from the Server.
-    AcceptsInstanceConfig           = 0x00000002;
+    AcceptsInstanceConfig          = 0x00000002;
     // The Agent can accept custom command from the Server.
     AcceptsCustomCommand           = 0x00000004;
 
@@ -80,7 +80,7 @@ message HeartbeatRequest {
     bytes instance_id = 4;                      // Required, Agent's unique identification, consistent throughout the process lifecycle
     string agent_type = 5;                      // Required, Agent's type(ilogtail, ..)
     AgentAttributes attributes = 6;             // Agent's basic attributes
-    repeated AgentGroupTag tags =  7;           // Agent's tags
+    repeated AgentGroupTag tags = 7;            // Agent's tags
     string running_status = 8;                  // Human readable running status
     int64 startup_time = 9;                     // Required, Agent's startup time
     repeated ConfigInfo pipeline_configs = 10;  // Information about the current PIPELINE_CONFIG held by the Agent
@@ -96,7 +96,7 @@ message ConfigDetail {
     string name = 1;        // Required, Config's unique identification
     int64 version = 2;      // Required, Config's version number or hash code
     bytes detail = 3;       // Required, Config's detail
-    map<string, bytes> extra = 4;   // Optional extra info
+    map<string, bytes> extra = 4; // Optional extra info
 }
 
 message CommandDetail {
@@ -109,13 +109,13 @@ message CommandDetail {
 
 enum ServerCapabilities {
     // The capabilities field is unspecified.
-    UnspecifiedServerCapability = 0;
+    UnspecifiedServerCapability        = 0;
     // The Server can remember agent attributes.
     RembersAttribute                   = 0x00000001;
     // The Server can remember pipeline config status.
     RembersPipelineConfigStatus        = 0x00000002;
     // The Server can remember instance config status.
-    RembersInstanceConfigStatus         = 0x00000004;
+    RembersInstanceConfigStatus        = 0x00000004;
     // The Server can remember custom command status.
     RembersCustomCommandStatus         = 0x00000008;
 
@@ -132,7 +132,10 @@ enum ResponseFlags {
     // optimization) but the Server detects that it does not have it (e.g. was
     // restarted and lost state).
     ReportFullState           = 0x00000001;
+    // FetchPipelineConfigDetail can be used by the Server to tell Agent to fetch config details by FetchConfig api,
+    // HB response ConfigDetail will not contains details.
     FetchPipelineConfigDetail = 0x00000002;
+    // like FetchPipelineConfigDetail, but for instance config.
     FetchInstanceConfigDetail = 0x00000004;
     // bits before 2^16 (inclusive) are reserved for future official fields
 }
@@ -150,20 +153,40 @@ message HeartbeatResponse {
     bytes opaque = 8;                                   // Opaque data for extension
 }
 
-// API: /Agent/FetchPipelineConfig/
-// API: /Agent/FetchInstanceConfig/
-// Agent request to ConfigServer, pulling details of the config
+// API: /Agent/FetchConfig
+// optional api for fetching configs details, but not by heartbeat response with config details, see README.
 message FetchConfigRequest {
     bytes request_id = 1; 
-    bytes instance_id = 2;                 // Agent's unique identification
-    repeated ConfigInfo req_configs = 3;   // Config's name and version/hash
+    bytes instance_id = 2;                     // Agent's unique identification
+    repeated ConfigInfo pipeline_configs = 3;  // Information about the current PIPELINE_CONFIG held by the Agent
+    repeated ConfigInfo instance_configs = 4;  // Information about the current AGENT_CONFIG held by the Agent
+    repeated CommandInfo custom_commands = 5;  // Information about command history
 }
 
-// ConfigServer response to Agent's request
+// ConfigServer response to Agent's config fetching request
 message FetchConfigResponse {
     bytes request_id = 1;                     
     CommonResponse commonResponse = 2;
-    repeated ConfigDetail config_details = 3;   // config detail
+    repeated ConfigDetail pipeline_config_updates = 3;  // Agent's pipeline config with details
+    repeated ConfigDetail instance_config_updates = 4;  // Agent's instance config with details
+    repeated CommandDetail custom_command_updates = 5;  // Agent's commands details
+}
+
+// API: /Agent/ReportStatus
+// optional api for report config status, but not wait util next heartbeat, see README.
+// if HB server and Status server are different service, this api may be help.
+message ReportStatusRequest {
+    bytes request_id = 1;
+    bytes instance_id = 2;                     // Agent's unique identification
+    repeated ConfigInfo pipeline_configs = 3;  // status about the current PIPELINE_CONFIG held by the Agent
+    repeated ConfigInfo instance_configs = 4;  // status about the current AGENT_CONFIG held by the Agent
+    repeated CommandInfo custom_commands = 5;  // status about command history
+}
+
+// ConfigServer response to Agent's report status request
+message ReportStatusResponse {
+    bytes request_id = 1;
+    CommonResponse commonResponse = 2;
 }
 
 message CommonResponse
