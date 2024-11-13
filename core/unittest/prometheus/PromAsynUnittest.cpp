@@ -24,7 +24,7 @@ void PromAsynUnittest::TestExecTime() {
         return true;
     });
     auto request = std::make_shared<PromHttpRequest>(
-        "http", false, "127.0.0.1", 8080, "/", "", map<string, string>(), "", 10, 3, future);
+        "http", false, "127.0.0.1", 8080, "/", "", map<string, string>(), "", HttpResponse(), 10, 3, future);
     auto asynRequest = std::dynamic_pointer_cast<AsynHttpRequest>(request);
     asynRequest->mLastSendTime = now;
     auto response = HttpResponse{};

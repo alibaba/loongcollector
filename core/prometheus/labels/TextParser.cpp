@@ -68,24 +68,6 @@ PipelineEventGroup TextParser::Parse(const string& content, uint64_t defaultTime
     return eGroup;
 }
 
-PipelineEventGroup TextParser::BuildLogGroup(const string& content) {
-    PipelineEventGroup eGroup(std::make_shared<SourceBuffer>());
-
-    vector<StringView> lines;
-    // pre-reserve vector size by 1024 which is experience value per line
-    lines.reserve(content.size() / 1024);
-    SplitStringView(content, '\n', lines);
-    for (const auto& line : lines) {
-        if (!IsValidMetric(line)) {
-            continue;
-        }
-        auto* logEvent = eGroup.AddLogEvent();
-        logEvent->SetContent(prometheus::PROMETHEUS, line);
-    }
-
-    return eGroup;
-}
-
 bool TextParser::ParseLine(StringView line, MetricEvent& metricEvent) {
     mLine = line;
     mPos = 0;

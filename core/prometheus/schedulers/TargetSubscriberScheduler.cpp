@@ -59,8 +59,9 @@ bool TargetSubscriberScheduler::operator<(const TargetSubscriberScheduler& other
 
 void TargetSubscriberScheduler::OnSubscription(HttpResponse& response, uint64_t timestampMilliSec) {
     mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, response.GetStatusCode());
-    mSelfMonitor->AddCounter(
-        METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS, response.GetStatusCode(), GetCurrentTimeInMilliSeconds() - timestampMilliSec);
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TIME_MS,
+                             response.GetStatusCode(),
+                             GetCurrentTimeInMilliSeconds() - timestampMilliSec);
     if (response.GetStatusCode() == 304) {
         // not modified
         return;
@@ -304,6 +305,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
                                                      "collector_id=" + mPodName,
                                                      httpHeader,
                                                      "",
+                                                     HttpResponse(),
                                                      prometheus::RefeshIntervalSeconds,
                                                      1,
                                                      this->mFuture);

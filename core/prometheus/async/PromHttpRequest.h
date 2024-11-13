@@ -19,6 +19,7 @@ public:
                     const std::string& query,
                     const std::map<std::string, std::string>& header,
                     const std::string& body,
+                    HttpResponse&& response,
                     uint32_t timeout,
                     uint32_t maxTryCnt,
                     std::shared_ptr<PromFuture<HttpResponse&, uint64_t>> future,
@@ -34,14 +35,6 @@ private:
 
     std::shared_ptr<PromFuture<HttpResponse&, uint64_t>> mFuture;
     std::shared_ptr<PromFuture<>> mIsContextValidFuture;
-};
-
-struct PromResponseBody {
-    PipelineEventGroup mEventGroup;
-    std::string mCache;
-    size_t mRawSize = 0;
-
-    PromResponseBody() : mEventGroup(std::make_shared<SourceBuffer>()) {};
 };
 
 } // namespace logtail
