@@ -16,6 +16,7 @@ package helper
 
 import (
 	"context"
+	"errors"
 	"hash/fnv"
 	"path"
 	"regexp"
@@ -1022,6 +1023,35 @@ func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) 
 	dc.refreshLastUpdateMapTime()
 }
 
+func (dc *DockerCenter) inspectOneContainer(containerID string) (types.ContainerJSON, error) {
+	var err error
+	var containerDetail types.ContainerJSON
+	for idx := 0; idx < 3; idx++ {
+		if containerDetail, err = dc.client.ContainerInspect(context.Background(), containerID); err == nil {
+			break
+		}
+		time.Sleep(time.Second * 5)
+	}
+	if err != nil {
+		dc.setLastError(err, "inspect container error "+containerID)
+		return types.ContainerJSON{}, err
+	}
+	if !ContainerProcessAlive(containerDetail.State.Pid) {
+		containerDetail.State.Status = ContainerStatusExited
+		finishedAt := containerDetail.State.FinishedAt
+		finishedAtTime, _ := time.Parse(time.RFC3339, finishedAt)
+		now := time.Now()
+		duration := now.Sub(finishedAtTime)
+		if duration >= ContainerInfoDeletedTimeout {
+			errMsg := "inspect time out container " + containerID
+			err = errors.New(errMsg)
+			dc.setLastError(err, errMsg)
+			return types.ContainerJSON{}, err
+		}
+	}
+	return containerDetail, nil
+}
+
 func (dc *DockerCenter) fetchAll() error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
@@ -1035,26 +1065,9 @@ func (dc *DockerCenter) fetchAll() error {
 
 	for _, container := range containers {
 		var containerDetail types.ContainerJSON
-		for idx := 0; idx < 3; idx++ {
-			if containerDetail, err = dc.client.ContainerInspect(context.Background(), container.ID); err == nil {
-				break
-			}
-			time.Sleep(time.Second * 5)
-		}
+		containerDetail, err = dc.inspectOneContainer(container.ID)
 		if err == nil {
-			if !ContainerProcessAlive(containerDetail.State.Pid) {
-				containerDetail.State.Status = ContainerStatusExited
-				finishedAt := containerDetail.State.FinishedAt
-				finishedAtTime, _ := time.Parse(time.RFC3339, finishedAt)
-				now := time.Now()
-				duration := now.Sub(finishedAtTime)
-				if duration >= ContainerInfoDeletedTimeout {
-					continue
-				}
-			}
 			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
-		} else {
-			dc.setLastError(err, "inspect container error "+container.ID)
 		}
 	}
 	dc.updateContainers(containerMap)
@@ -1065,13 +1078,9 @@ func (dc *DockerCenter) fetchAll() error {
 func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
-	containerDetail, err := dc.client.ContainerInspect(context.Background(), containerID)
+	containerDetail, err := dc.inspectOneContainer(containerID)
 	if err != nil {
-		dc.setLastError(err, "inspect container error "+containerID)
 		return err
-	}
-	if containerDetail.State.Status == ContainerStatusRunning && !ContainerProcessAlive(containerDetail.State.Pid) {
-		containerDetail.State.Status = ContainerStatusExited
 	}
 	// docker 场景下
 	// tryFindSandbox如果是false, 那么fetchOne的地方应该会调用两次，一次是sandbox的id，一次是业务容器的id
