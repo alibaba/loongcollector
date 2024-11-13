@@ -79,7 +79,7 @@ void FileServer::PauseInner() {
     LogInput::GetInstance()->HoldOn();
     auto holdOnCost = GetCurrentTimeInMilliSeconds() - holdOnStart;
     if (holdOnCost >= 60 * 1000) {
-        LogtailAlarm::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
                                                "Pausing file server took " + ToString(holdOnCost) + "ms");
     }
     LOG_INFO(sLogger, ("file server pause", "succeeded")("cost", ToString(holdOnCost) + "ms"));

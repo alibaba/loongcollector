@@ -26,7 +26,7 @@
 
 #include "common/StringTools.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 
 #define PARAM_ERROR_RETURN(logger, alarm, msg, module, config, project, logstore, region) \
     if (module.empty()) { \

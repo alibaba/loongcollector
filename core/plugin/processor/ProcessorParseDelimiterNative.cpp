@@ -301,7 +301,7 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
                 parseSuccess = false;
             }
         } else {
-            LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("parse delimiter log fail")
                                                        + ", logs:" + buffer.to_string(),
                                                    GetContext().GetProjectName(),
@@ -311,7 +311,7 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath, Pipe
             parseSuccess = false;
         }
     } else {
-        LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                "no column keys defined",
                                                GetContext().GetProjectName(),
                                                GetContext().GetLogstoreName(),

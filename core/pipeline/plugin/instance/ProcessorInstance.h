@@ -21,7 +21,7 @@
 #include <memory>
 
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/plugin/instance/PluginInstance.h"
 #include "pipeline/plugin/interface/Processor.h"

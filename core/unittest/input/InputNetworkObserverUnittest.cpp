@@ -152,7 +152,6 @@ void InputNetworkObserverUnittest::OnSuccessfulStart() {
     unique_ptr<InputNetworkObserver> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    uint32_t pluginIdx = 0;
 
     configStr = R"(
         {

@@ -63,7 +63,7 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 DISCARD_DATA_ALARM,
                 "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
             return false;
@@ -78,7 +78,7 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
     LOG_WARNING(
         sLogger,
         ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
-    LogtailAlarm::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarm(
         DISCARD_DATA_ALARM,
         "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
     return false;

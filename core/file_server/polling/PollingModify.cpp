@@ -27,7 +27,7 @@
 #include "file_server/FileServer.h"
 #include "file_server/event/Event.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
 using namespace std;
@@ -108,7 +108,7 @@ void PollingModify::MakeSpaceForNewFile() {
         return;
     }
 
-    LogtailAlarm::GetInstance()->SendAlarm(MODIFY_FILE_EXCEED_ALARM,
+    AlarmManager::GetInstance()->SendAlarm(MODIFY_FILE_EXCEED_ALARM,
                                            string("modify cache is up limit, delete old cache, modify file count:")
                                                + ToString(mModifyCacheMap.size())
                                                + "  delete count : " + ToString(removeCount));
@@ -156,7 +156,7 @@ void PollingModify::LoadFileNameInQueues() {
 
         if (mModifyCacheMap.size() >= (size_t)INT32_FLAG(modify_cache_max)) {
             LOG_ERROR(sLogger, ("total modify polling stat count is exceeded, drop event", newFileNameQueue.size()));
-            LogtailAlarm::GetInstance()->SendAlarm(MODIFY_FILE_EXCEED_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(MODIFY_FILE_EXCEED_ALARM,
                                                    string("total modify polling stat count is exceeded, drop event:")
                                                        + ToString(newFileNameQueue.size()));
             hasSpace = false;

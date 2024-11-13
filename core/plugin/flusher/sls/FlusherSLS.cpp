@@ -759,7 +759,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                     mProjectQuotaErrorCnt->Add(1);
                 }
             }
-            LogtailAlarm::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
                                                    "error_code: " + slsResponse.mErrorCode
                                                        + ", error_message: " + slsResponse.mErrorMsg
                                                        + ", request_id:" + slsResponse.mRequestId,
@@ -811,7 +811,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 if (!cpt) {
                     failDetail << ", unexpected result when exactly once checkpoint is not found";
                     suggestion << "report bug";
-                    LogtailAlarm::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarm(
                         EXACTLY_ONCE_ALARM,
                         "drop exactly once log group because of invalid sequence ID, request id:"
                             + slsResponse.mRequestId,
@@ -829,7 +829,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 failDetail << ", drop exactly once log group and commit checkpoint"
                            << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
                 suggestion << "no suggestion";
-                LogtailAlarm::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarm(
                     EXACTLY_ONCE_ALARM,
                     "drop exactly once log group because of invalid sequence ID, cpt:" + cpt->key
                         + ", data:" + cpt->data.DebugString() + "request id:" + slsResponse.mRequestId,
@@ -897,7 +897,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             default:
                 LOG_WARNING(sLogger, LOG_PATTERN);
                 if (!isProfileData) {
-                    LogtailAlarm::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarm(
                         SEND_DATA_FAIL_ALARM,
                         "failed to send request: " + failDetail.str() + "\toperation: " + GetOperationString(operation)
                             + "\trequestId: " + slsResponse.mRequestId
@@ -1131,7 +1131,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 DISCARD_DATA_ALARM,
                 "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
             return false;
@@ -1146,7 +1146,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
     LOG_WARNING(
         sLogger,
         ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
-    LogtailAlarm::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarm(
         DISCARD_DATA_ALARM,
         "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
     return false;

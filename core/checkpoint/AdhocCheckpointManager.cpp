@@ -19,7 +19,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "common/Thread.h"
 #include "common/HashUtil.h"
 
@@ -149,7 +149,7 @@ void AdhocCheckpointManager::LoadAdhocCheckpoint() {
         std::vector<std::string> jobList;
         if (!GetAllFiles(adhocCheckpointDir, "*", jobList)) {
             LOG_WARNING(sLogger, ("get all adhoc checkpoint files", "failed"));
-            LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "Load adhoc check point files failed");
+            AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "Load adhoc check point files failed");
             return;
         }
 
@@ -161,7 +161,7 @@ void AdhocCheckpointManager::LoadAdhocCheckpoint() {
         }
     } else if (!Mkdir(adhocCheckpointDir)) {
         LOG_WARNING(sLogger, ("Create adhoc checkpoint dir", "failed"));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "Create adhoc check point dir failed");
+        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_ALARM, "Create adhoc check point dir failed");
     }
 }
 

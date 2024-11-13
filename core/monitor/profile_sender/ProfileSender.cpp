@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "profile_sender/ProfileSender.h"
+#include "ProfileSender.h"
 
 #include <json/json.h>
 
@@ -23,7 +23,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "logger/Logger.h"
 #ifdef __ENTERPRISE__
-#include "profile_sender/EnterpriseProfileSender.h"
+#include "EnterpriseProfileSender.h"
 #endif
 #include "sdk/Exception.h"
 #include "sls_control/SLSControl.h"

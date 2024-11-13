@@ -17,9 +17,32 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "LogtailMetric.h"
+#include "MetricManager.h"
 
 namespace logtail {
+
+class ReentrantMetricsRecord {
+private:
+    MetricsRecordRef mMetricsRecordRef;
+    std::unordered_map<std::string, CounterPtr> mCounters;
+    std::unordered_map<std::string, TimeCounterPtr> mTimeCounters;
+    std::unordered_map<std::string, IntGaugePtr> mIntGauges;
+    std::unordered_map<std::string, DoubleGaugePtr> mDoubleGauges;
+
+public:
+    void Init(const std::string& category,
+              MetricLabels& labels,
+              DynamicMetricLabels& dynamicLabels,
+              std::unordered_map<std::string, MetricType>& metricKeys);
+    const MetricLabelsPtr& GetLabels() const;
+    const DynamicMetricLabelsPtr& GetDynamicLabels() const;
+    CounterPtr GetCounter(const std::string& name);
+    TimeCounterPtr GetTimeCounter(const std::string& name);
+    IntGaugePtr GetIntGauge(const std::string& name);
+    DoubleGaugePtr GetDoubleGauge(const std::string& name);
+};
+using ReentrantMetricsRecordRef = std::shared_ptr<ReentrantMetricsRecord>;
+
 
 class PluginMetricManager {
 public:

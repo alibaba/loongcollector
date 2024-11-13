@@ -162,13 +162,13 @@ bool ProcessorParseContainerLogNative::ProcessEvent(StringView containerType,
         mOutFailedEventsTotal->Add(1);
     }
 
-    if (!mIgnoreParseWarning && !errorMsg.empty() && LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+    if (!mIgnoreParseWarning && !errorMsg.empty() && AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
         LOG_WARNING(sLogger,
                     ("failed to parse log line, errorMsg", errorMsg)("container runtime", containerType)(
                         "processor", sName)("config", mContext->GetConfigName()));
         errorMsg = "failed to parse log line, error: " + errorMsg + "\tcontainer runtime: " + containerType.to_string()
             + "\tprocessor: " + sName + "\tconfig: " + mContext->GetConfigName();
-        LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                errorMsg,
                                                GetContext().GetProjectName(),
                                                GetContext().GetLogstoreName(),

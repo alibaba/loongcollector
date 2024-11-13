@@ -58,7 +58,7 @@
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
 #include "monitor/LogIntegrity.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "protobuf/sls/metric.pb.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "runner/ProcessorRunner.h"

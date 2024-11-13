@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/PipelineContext.h"
 

@@ -17,8 +17,8 @@
 #include <mutex>
 
 #include "pipeline/PipelineContext.h"
-#include "monitor/LoongCollectorMetricTypes.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricTypes.h"
+#include "monitor/MetricManager.h"
 
 namespace logtail{
 namespace ebpf {

@@ -117,13 +117,13 @@ void Application::Init() {
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
     EnterpriseConfigProvider::GetInstance()->LoadRegionConfig();
     if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
-        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
+        AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
     }
     // get last crash info
     string backTraceStr = GetCrashBackTrace();
     if (!backTraceStr.empty()) {
         LOG_ERROR(sLogger, ("last logtail crash stack", backTraceStr));
-        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
+        AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
     }
     if (BOOL_FLAG(ilogtail_disable_core)) {
         InitCrashBackTrace();
@@ -229,7 +229,7 @@ void Application::Start() { // GCOVR_EXCL_START
     InitRemoteConfigProviders();
 #endif
 
-    LogtailAlarm::GetInstance()->Init();
+    AlarmManager::GetInstance()->Init();
     LoongCollectorMonitor::GetInstance()->Init();
     LogtailMonitor::GetInstance()->Init();
 
@@ -368,7 +368,7 @@ void Application::Exit() {
 
     LogtailMonitor::GetInstance()->Stop();
     LoongCollectorMonitor::GetInstance()->Stop();
-    LogtailAlarm::GetInstance()->Stop();
+    AlarmManager::GetInstance()->Stop();
     LogtailPlugin::GetInstance()->StopBuiltInModules();
     // from now on, alarm should not be used.
 
@@ -391,9 +391,9 @@ void Application::CheckCriticalCondition(int32_t curTime) {
     // force to exit if config update thread is block more than 1 hour
     if (lastGetConfigTime > 0 && curTime - lastGetConfigTime > 3600) {
         LOG_ERROR(sLogger, ("last config get time is too old", lastGetConfigTime)("prepare force exit", ""));
-        LogtailAlarm::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarm(
             LOGTAIL_CRASH_ALARM, "last config get time is too old: " + ToString(lastGetConfigTime) + " force exit");
-        LogtailAlarm::GetInstance()->ForceToSend();
+        AlarmManager::GetInstance()->ForceToSend();
         sleep(10);
         _exit(1);
     }
@@ -402,9 +402,9 @@ void Application::CheckCriticalCondition(int32_t curTime) {
     // work around for no network when docker start
     if (BOOL_FLAG(send_prefer_real_ip) && !BOOL_FLAG(global_network_success) && curTime - mStartTime > 7200) {
         LOG_ERROR(sLogger, ("network is fail", "prepare force exit"));
-        LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
                                                "network is fail since " + ToString(mStartTime) + " force exit");
-        LogtailAlarm::GetInstance()->ForceToSend();
+        AlarmManager::GetInstance()->ForceToSend();
         sleep(10);
         _exit(1);
     }

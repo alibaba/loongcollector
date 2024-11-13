@@ -37,7 +37,7 @@
 #include "file_server/reader/GloablFileDescriptorManager.h"
 #include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
@@ -279,7 +279,7 @@ bool LogInput::ReadLocalEvents() {
             sLogger,
             ("process local event, dir", source)("file name", object)("config", configName)(
                 "project", readerConfig.second->GetProjectName())("logstore", readerConfig.second->GetLogstoreName()));
-        LogtailAlarm::GetInstance()->SendAlarm(LOAD_LOCAL_EVENT_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(LOAD_LOCAL_EVENT_ALARM,
                                                string("process local event, dir:") + source + ", file name:" + object
                                                    + ", config:" + configName
                                                    + ", file count:" + ToString(objList.size()),

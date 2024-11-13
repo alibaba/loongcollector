@@ -20,7 +20,7 @@
 #include "common/StringTools.h"
 #include "common/http/HttpRequest.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SenderQueueItem.h"

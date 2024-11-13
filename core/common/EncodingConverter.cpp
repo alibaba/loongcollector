@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "EncodingConverter.h"
-#include "LogtailAlarm.h"
+#include "AlarmManager.h"
 #include "logger/Logger.h"
 #if defined(__linux__)
 #include <iconv.h>
@@ -78,7 +78,7 @@ size_t EncodingConverter::ConvertGbk2Utf8(
         if (ret == (size_t)(-1)) {
             LOG_ERROR(sLogger, ("convert GBK to UTF8 fail, errno", strerror(errno)));
             iconv(mGbk2Utf8Cd, NULL, NULL, NULL, NULL); // Clear status.
-            LogtailAlarm::GetInstance()->SendAlarm(ENCODING_CONVERT_ALARM, "convert GBK to UTF8 fail");
+            AlarmManager::GetInstance()->SendAlarm(ENCODING_CONVERT_ALARM, "convert GBK to UTF8 fail");
             // use memcpy
             memcpy(originDes + destIndex, originSrc + beginIndex, endIndex - beginIndex + 1);
             destIndex += endIndex - beginIndex + 1;

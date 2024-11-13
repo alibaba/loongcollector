@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <future>
 
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/plugin/interface/Flusher.h"
 #include "pipeline/queue/SenderQueueItem.h"
 #include "runner/sink/SinkType.h"

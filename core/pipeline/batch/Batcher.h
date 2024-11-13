@@ -27,7 +27,7 @@
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/batch/BatchItem.h"

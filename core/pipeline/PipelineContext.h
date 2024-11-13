@@ -24,7 +24,7 @@
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/LogFileProfiler.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "pipeline/GlobalConfig.h"
 #include "pipeline/queue/QueueKey.h"
 
@@ -88,7 +88,7 @@ public:
     ProcessProfile& GetProcessProfile() const { return mProcessProfile; }
     // LogFileProfiler& GetProfiler() { return *mProfiler; }
     const Logger::logger& GetLogger() const { return mLogger; }
-    LogtailAlarm& GetAlarm() const { return *mAlarm; };
+    AlarmManager& GetAlarm() const { return *mAlarm; };
 
 private:
     static const std::string sEmptyString;
@@ -109,7 +109,7 @@ private:
     mutable ProcessProfile mProcessProfile;
     // LogFileProfiler* mProfiler = LogFileProfiler::GetInstance();
     Logger::logger mLogger = sLogger;
-    LogtailAlarm* mAlarm = LogtailAlarm::GetInstance();
+    AlarmManager* mAlarm = AlarmManager::GetInstance();
 };
 
 } // namespace logtail

@@ -359,7 +359,7 @@ void ProcessorMergeMultilineLogNative::HandleUnmatchLogs(
         return;
     }
     for (size_t i = begin; i <= end; i++) {
-        if (!mMultiline.mIgnoringUnmatchWarning && LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+        if (!mMultiline.mIgnoringUnmatchWarning && AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
             StringView sourceVal = logEvents[i].Cast<LogEvent>().GetContent(mSourceKey);
             LOG_WARNING(
                 GetContext().GetLogger(),

@@ -23,7 +23,7 @@
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/LoongCollectorMetricTypes.h"
+#include "monitor/MetricTypes.h"
 #include "pipeline/queue/QueueKey.h"
 #include "prometheus/Constants.h"
 #include "prometheus/PromSelfMonitor.h"

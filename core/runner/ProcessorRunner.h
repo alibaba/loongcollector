@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/queue/QueueKey.h"
 
 namespace logtail {

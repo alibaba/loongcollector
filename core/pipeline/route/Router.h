@@ -22,7 +22,7 @@
 #include <vector>
 
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/route/Condition.h"
 
 namespace logtail {

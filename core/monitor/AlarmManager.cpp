@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 
 #include "LogFileProfiler.h"
 #include "app_config/AppConfig.h"
@@ -38,7 +38,7 @@ namespace logtail {
 
 const string ALARM_SLS_LOGSTORE_NAME = "logtail_alarm";
 
-LogtailAlarm::LogtailAlarm() {
+AlarmManager::AlarmManager() {
     mMessageType.resize(ALL_LOGTAIL_ALARM_NUM);
     mMessageType[USER_CONFIG_ALARM] = "USER_CONFIG_ALARM";
     mMessageType[GLOBAL_CONFIG_ALARM] = "GLOBAL_CONFIG_ALARM";
@@ -106,11 +106,11 @@ LogtailAlarm::LogtailAlarm() {
     mMessageType[RELABEL_METRIC_FAIL_ALARM] = "RELABEL_METRIC_FAIL_ALARM";
 }
 
-void LogtailAlarm::Init() {
-    mThreadRes = async(launch::async, &LogtailAlarm::SendAlarmLoop, this);
+void AlarmManager::Init() {
+    mThreadRes = async(launch::async, &AlarmManager::SendAlarmLoop, this);
 }
 
-void LogtailAlarm::Stop() {
+void AlarmManager::Stop() {
     ForceToSend();
     {
         lock_guard<mutex> lock(mThreadRunningMux);
@@ -125,7 +125,7 @@ void LogtailAlarm::Stop() {
     }
 }
 
-bool LogtailAlarm::SendAlarmLoop() {
+bool AlarmManager::SendAlarmLoop() {
     LOG_INFO(sLogger, ("alarm gathering", "started"));
     {
         unique_lock<mutex> lock(mThreadRunningMux);
@@ -140,8 +140,8 @@ bool LogtailAlarm::SendAlarmLoop() {
     return true;
 }
 
-void LogtailAlarm::SendAllRegionAlarm() {
-    LogtailAlarmMessage* messagePtr = nullptr;
+void AlarmManager::SendAllRegionAlarm() {
+    AlarmMessage* messagePtr = nullptr;
     int32_t currentTime = time(nullptr);
     size_t sendRegionIndex = 0;
     size_t sendAlarmTypeIndex = 0;
@@ -161,7 +161,7 @@ void LogtailAlarm::SendAllRegionAlarm() {
             }
             region = allAlarmIter->first;
             // LOG_DEBUG(sLogger, ("1Send Alarm", region)("region", sendRegionIndex));
-            LogtailAlarmVector& alarmBufferVec = *(allAlarmIter->second.first);
+            AlarmVector& alarmBufferVec = *(allAlarmIter->second.first);
             std::vector<int32_t>& lastUpdateTimeVec = allAlarmIter->second.second;
             // check this region end
             if (sendAlarmTypeIndex >= alarmBufferVec.size()) {
@@ -186,7 +186,7 @@ void LogtailAlarm::SendAllRegionAlarm() {
 
             // LOG_DEBUG(sLogger, ("3Send Alarm", region)("region", sendRegionIndex)("alarm index",
             // mMessageType[sendAlarmTypeIndex]));
-            map<string, LogtailAlarmMessage*>& alarmMap = alarmBufferVec[sendAlarmTypeIndex];
+            map<string, AlarmMessage*>& alarmMap = alarmBufferVec[sendAlarmTypeIndex];
             if (alarmMap.size() == 0
                 || currentTime - lastUpdateTimeVec[sendAlarmTypeIndex] < INT32_FLAG(logtail_alarm_interval)) {
                 // go next alarm type
@@ -220,7 +220,7 @@ void LogtailAlarm::SendAllRegionAlarm() {
             logGroup.set_source(LogFileProfiler::mIpAddr);
             logGroup.set_category(ALARM_SLS_LOGSTORE_NAME);
             auto now = GetCurrentLogtailTime();
-            for (map<string, LogtailAlarmMessage*>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
+            for (map<string, AlarmMessage*>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
                  ++mapIter) {
                 messagePtr = mapIter->second;
 
@@ -280,12 +280,12 @@ void LogtailAlarm::SendAllRegionAlarm() {
     } while (true);
 }
 
-LogtailAlarm::LogtailAlarmVector* LogtailAlarm::MakesureLogtailAlarmMapVecUnlocked(const string& region) {
+AlarmManager::AlarmVector* AlarmManager::MakesureLogtailAlarmMapVecUnlocked(const string& region) {
     // @todo
     // string region;
     auto iter = mAllAlarmMap.find(region);
     if (iter == mAllAlarmMap.end()) {
-        auto pMapVec = std::make_shared<LogtailAlarmVector>();
+        auto pMapVec = std::make_shared<AlarmVector>();
         // need resize to init this obj
         pMapVec->resize(ALL_LOGTAIL_ALARM_NUM);
 
@@ -300,7 +300,7 @@ LogtailAlarm::LogtailAlarmVector* LogtailAlarm::MakesureLogtailAlarmMapVecUnlock
     return iter->second.first.get();
 }
 
-void LogtailAlarm::SendAlarm(const LogtailAlarmType alarmType,
+void AlarmManager::SendAlarm(const AlarmType alarmType,
                              const std::string& message,
                              const std::string& projectName,
                              const std::string& category,
@@ -317,20 +317,20 @@ void LogtailAlarm::SendAlarm(const LogtailAlarmType alarmType,
     // mMessageType[alarmType])("msg", message));
     std::lock_guard<std::mutex> lock(mAlarmBufferMutex);
     string key = projectName + "_" + category;
-    LogtailAlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
+    AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        LogtailAlarmMessage* messagePtr
-            = new LogtailAlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
-        alarmBufferVec[alarmType].insert(pair<string, LogtailAlarmMessage*>(key, messagePtr));
+        AlarmMessage* messagePtr
+            = new AlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
+        alarmBufferVec[alarmType].insert(pair<string, AlarmMessage*>(key, messagePtr));
     } else
         alarmBufferVec[alarmType][key]->IncCount();
 }
 
-void LogtailAlarm::ForceToSend() {
+void AlarmManager::ForceToSend() {
     INT32_FLAG(logtail_alarm_interval) = 0;
 }
 
-bool LogtailAlarm::IsLowLevelAlarmValid() {
+bool AlarmManager::IsLowLevelAlarmValid() {
     int32_t curTime = time(NULL);
     if (curTime == mLastLowLevelTime) {
         if (++mLastLowLevelCount > INT32_FLAG(logtail_low_level_alarm_speed)) {

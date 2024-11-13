@@ -124,12 +124,12 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
     rapidjson::Document doc;
     doc.Parse(buffer.data(), buffer.size());
     if (doc.HasParseError()) {
-        if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+        if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
             LOG_WARNING(sLogger,
                         ("parse json log fail, log", buffer)("rapidjson offset", doc.GetErrorOffset())(
                             "rapidjson error", doc.GetParseError())("project", GetContext().GetProjectName())(
                             "logstore", GetContext().GetLogstoreName())("file", logPath));
-            LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("parse json fail:") + buffer.to_string(),
                                                    GetContext().GetProjectName(),
                                                    GetContext().GetLogstoreName(),
@@ -139,11 +139,11 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
         mOutFailedEventsTotal->Add(1);
         parseSuccess = false;
     } else if (!doc.IsObject()) {
-        if (LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+        if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
             LOG_WARNING(sLogger,
                         ("invalid json object, log", buffer)("project", GetContext().GetProjectName())(
                             "logstore", GetContext().GetLogstoreName())("file", logPath));
-            LogtailAlarm::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
                                                    std::string("invalid json object:") + buffer.to_string(),
                                                    GetContext().GetProjectName(),
                                                    GetContext().GetLogstoreName(),

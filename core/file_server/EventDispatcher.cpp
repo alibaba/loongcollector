@@ -46,7 +46,7 @@
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingModify.h"
 #include "monitor/LogFileProfiler.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/MetricExportor.h"
 #include "protobuf/sls/metric.pb.h"
 #include "protobuf/sls/sls_logs.pb.h"
@@ -102,7 +102,7 @@ EventDispatcher::EventDispatcher() : mWatchNum(0), mInotifyWatchNum(0) {
     mEventListener = EventListener::GetInstance();
     if (!AppConfig::GetInstance()->NoInotify()) {
         if (!mEventListener->Init()) {
-            LogtailAlarm::GetInstance()->SendAlarm(EPOLL_ERROR_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(EPOLL_ERROR_ALARM,
                                                    string("faild to init inotify fd, errno:") + ToString(GetErrno()));
             LOG_ERROR(sLogger, ("faild to init inotify fd, errno:", errno));
         }
@@ -161,7 +161,7 @@ bool EventDispatcher::RegisterEventHandler(const char* path,
     if (!fsutil::PathStat::stat(path, statBuf)) {
         if (errno != EEXIST) {
             LOG_WARNING(sLogger, ("call stat() on path fail", path)("errno", errno));
-            LogtailAlarm::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
                                                    "call stat() on path fail" + string(path)
                                                        + ", errno: " + ToString(errno) + ", will not be monitored",
                                                    config.second->GetProjectName(),
@@ -215,7 +215,7 @@ bool EventDispatcher::RegisterEventHandler(const char* path,
     if (mWatchNum >= INT32_FLAG(max_watch_dir_count)) {
         LOG_WARNING(sLogger,
                     ("fail to monitor dir, max_watch_dir_count", INT32_FLAG(max_watch_dir_count))("dir", path));
-        LogtailAlarm::GetInstance()->SendAlarm(DIR_EXCEED_LIMIT_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(DIR_EXCEED_LIMIT_ALARM,
                                                string("dir: ") + path
                                                    + " will not monitored, dir count should less than "
                                                    + ToString(INT32_FLAG(max_watch_dir_count)),
@@ -230,7 +230,7 @@ bool EventDispatcher::RegisterEventHandler(const char* path,
         LOG_INFO(sLogger,
                  ("failed to add inotify watcher for dir", path)("max allowd inotify watchers",
                                                                  INT32_FLAG(default_max_inotify_watch_num)));
-        LogtailAlarm::GetInstance()->SendAlarm(INOTIFY_DIR_NUM_LIMIT_ALARM,
+        AlarmManager::GetInstance()->SendAlarm(INOTIFY_DIR_NUM_LIMIT_ALARM,
                                                string("failed to register inotify watcher for dir") + path);
     } else {
         // need check mEventListener valid
@@ -245,21 +245,21 @@ bool EventDispatcher::RegisterEventHandler(const char* path,
                     LOG_ERROR(sLogger,
                               ("failed to register dir", path)("errno", errno)("error", str)("force exit",
                                                                                              "wait 10 seconds."));
-                    LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
+                    AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
                                                            string("Failed to register dir:  ") + path + ", errno: "
                                                                + ToString(errno) + ", error: " + str + ", force exit");
-                    LogtailAlarm::GetInstance()->ForceToSend();
+                    AlarmManager::GetInstance()->ForceToSend();
                     sleep(10);
                     _exit(1);
                 }
 #endif
                 if (config.first->IsTimeout(path))
-                    LogtailAlarm::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
+                    AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
                                                            string("Failed to register dir: ") + path + ", reason: "
                                                                + str + ", project: " + config.second->GetProjectName()
                                                                + ", logstore: " + config.second->GetLogstoreName());
                 else
-                    LogtailAlarm::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
+                    AlarmManager::GetInstance()->SendAlarm(REGISTER_INOTIFY_FAIL_ALARM,
                                                            string("Failed to register dir: ") + path
                                                                + ", reason: " + str + ", no timeout");
             } else {
@@ -551,7 +551,7 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
             ("delete checkpoint", "cannot find the file because of full find cache")("config", checkpoint->mConfigName)(
                 "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
                 "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
-        LogtailAlarm::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarm(
             CHECKPOINT_ALARM,
             string("cannot find the file because of full find cache, delete the checkpoint, log reader queue name: ")
                 + filePath + ", real file path: " + realFilePath);
@@ -921,7 +921,7 @@ void EventDispatcher::PropagateTimeout(const char* path) {
     MapType<string, int>::Type::iterator pathpos = mPathWdMap.find(tmp);
     if (pathpos == mPathWdMap.end()) {
         // walkarond of bug#5760293, should find the scenarios
-        LogtailAlarm::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarm(
             INVALID_MEMORY_ACCESS_ALARM, "PropagateTimeout access invalid key of mPathWdMap, path : " + string(tmp));
         LOG_ERROR(sLogger, ("PropagateTimeout access invalid key of mPathWdMap, path", string(tmp)));
         free(tmp);

@@ -103,7 +103,7 @@ bool PipelineConfig::Parse() {
 
     string key, errorMsg;
     const Json::Value* itr = nullptr;
-    LogtailAlarm& alarm = *LogtailAlarm::GetInstance();
+    AlarmManager& alarm = *AlarmManager::GetInstance();
     // to send alarm and init MetricsRecord, project, logstore and region should be extracted first.
     key = "flushers";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());

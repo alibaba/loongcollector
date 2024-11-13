@@ -500,7 +500,7 @@ bool Pipeline::LoadGoPipelines() const {
             LOG_ERROR(mContext.GetLogger(),
                       ("failed to init pipeline", "Go pipeline is invalid, see go_plugin.LOG for detail")(
                           "Go pipeline num", "2")("Go pipeline content", content)("config", mName));
-            LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
                                                    mContext.GetProjectName(),
                                                    mContext.GetLogstoreName(),
@@ -519,7 +519,7 @@ bool Pipeline::LoadGoPipelines() const {
             LOG_ERROR(mContext.GetLogger(),
                       ("failed to init pipeline", "Go pipeline is invalid, see go_plugin.LOG for detail")(
                           "Go pipeline num", "1")("Go pipeline content", content)("config", mName));
-            LogtailAlarm::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
                                                    mContext.GetProjectName(),
                                                    mContext.GetLogstoreName(),
@@ -550,7 +550,7 @@ void Pipeline::WaitAllItemsInProcessFinished() {
         uint64_t duration = GetCurrentTimeInMilliSeconds() - startTime;
         if (!alarmOnce && duration > 10000) { // 10s
             LOG_ERROR(sLogger, ("pipeline stop", "too slow")("config", mName)("cost", duration));
-            LogtailAlarm::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
                                                    string("pipeline stop too slow, config: ") + mName
                                                        + "; cost:" + std::to_string(duration),
                                                    mContext.GetProjectName(),

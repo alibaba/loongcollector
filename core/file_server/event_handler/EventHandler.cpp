@@ -29,7 +29,7 @@
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "runner/ProcessorRunner.h"
 
@@ -82,7 +82,7 @@ void NormalEventHandler::Handle(const Event& event) {
                 mCreateHandlerPtr->Handle(event);
             } else if (!buf.IsRegFile()) {
                 LOG_INFO(sLogger, ("path is not file or directory, ignore it", fullPath)("stat mode", buf.GetMode()));
-                LogtailAlarm::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
+                AlarmManager::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
                                                        string("found unexpected type mode: ") + ToString(buf.GetMode())
                                                            + ", file path: " + fullPath);
                 return;
@@ -231,7 +231,7 @@ void CreateModifyHandler::Handle(const Event& event) {
             isDir = true;
         else if (!buf.IsRegFile()) {
             LOG_INFO(sLogger, ("path is not file or directory, ignore it", path)("stat mode", buf.GetMode()));
-            LogtailAlarm::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
                                                    std::string("found unexpected type mode: ") + ToString(buf.GetMode())
                                                        + ", file path: " + path);
             return;
@@ -336,7 +336,7 @@ void ModifyHandler::MakeSpaceForNewReader() {
                  "total log reader count exceeds upper limit")("reader count after clean", mDevInodeReaderMap.size()));
     // randomly choose one project to send alarm
     LogFileReaderPtr oneReader = mDevInodeReaderMap.begin()->second;
-    LogtailAlarm::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarm(
         FILE_READER_EXCEED_ALARM,
         string("total log reader count exceeds upper limit, delete some of the old readers, reader count after clean:")
             + ToString(mDevInodeReaderMap.size()),
@@ -386,7 +386,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
                     "logstore", readerConfig.second->GetLogstoreName())("config", readerConfig.second->GetConfigName())(
                     "log reader queue name", PathJoin(path, name))("max queue length",
                                                                    readerConfig.first->mRotatorQueueSize));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 DROP_LOG_ALARM,
                 string("log reader queue length excceeds upper limit, stop creating new reader, config: ")
                     + readerConfig.second->GetConfigName() + ", log reader queue name: " + PathJoin(path, name)
@@ -708,7 +708,7 @@ void ModifyHandler::Handle(const Event& event) {
                              ToString(reader->GetDevInode().inode),
                              reader->GetLastFilePos())("DevInode map size", mDevInodeReaderMap.size()));
                 recreateReaderFlag = true;
-                LogtailAlarm::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarm(
                     INNER_PROFILE_ALARM,
                     string("file dev inode changed, create new reader. new path:") + reader->GetHostLogPath()
                         + " ,project:" + reader->GetProject() + " ,logstore:" + reader->GetLogstore());
@@ -761,7 +761,7 @@ void ModifyHandler::Handle(const Event& event) {
                                 ("logprocess queue is full, put modify event to event queue again",
                                  reader->GetHostLogPath())(reader->GetProject(), reader->GetLogstore()));
 
-                    LogtailAlarm::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarm(
                         PROCESS_QUEUE_BUSY_ALARM,
                         string("logprocess queue is full, put modify event to event queue again, file:")
                             + reader->GetHostLogPath(),

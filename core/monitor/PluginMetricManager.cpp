@@ -17,6 +17,72 @@
 
 namespace logtail {
 
+// ReentrantMetricsRecord相关操作可以无锁，因为mCounters、mGauges只在初始化时会添加内容，后续只允许Get操作
+void ReentrantMetricsRecord::Init(const std::string& category,
+                                  MetricLabels& labels,
+                                  DynamicMetricLabels& dynamicLabels,
+                                  std::unordered_map<std::string, MetricType>& metricKeys) {
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        mMetricsRecordRef, category, std::move(labels), std::move(dynamicLabels));
+    for (auto metric : metricKeys) {
+        switch (metric.second) {
+            case MetricType::METRIC_TYPE_COUNTER:
+                mCounters[metric.first] = mMetricsRecordRef.CreateCounter(metric.first);
+                break;
+            case MetricType::METRIC_TYPE_TIME_COUNTER:
+                mTimeCounters[metric.first] = mMetricsRecordRef.CreateTimeCounter(metric.first);
+            case MetricType::METRIC_TYPE_INT_GAUGE:
+                mIntGauges[metric.first] = mMetricsRecordRef.CreateIntGauge(metric.first);
+                break;
+            case MetricType::METRIC_TYPE_DOUBLE_GAUGE:
+                mDoubleGauges[metric.first] = mMetricsRecordRef.CreateDoubleGauge(metric.first);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+const MetricLabelsPtr& ReentrantMetricsRecord::GetLabels() const {
+    return mMetricsRecordRef->GetLabels();
+}
+
+const DynamicMetricLabelsPtr& ReentrantMetricsRecord::GetDynamicLabels() const {
+    return mMetricsRecordRef->GetDynamicLabels();
+}
+
+CounterPtr ReentrantMetricsRecord::GetCounter(const std::string& name) {
+    auto it = mCounters.find(name);
+    if (it != mCounters.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+TimeCounterPtr ReentrantMetricsRecord::GetTimeCounter(const std::string& name) {
+    auto it = mTimeCounters.find(name);
+    if (it != mTimeCounters.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+IntGaugePtr ReentrantMetricsRecord::GetIntGauge(const std::string& name) {
+    auto it = mIntGauges.find(name);
+    if (it != mIntGauges.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+DoubleGaugePtr ReentrantMetricsRecord::GetDoubleGauge(const std::string& name) {
+    auto it = mDoubleGauges.find(name);
+    if (it != mDoubleGauges.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecordRef(MetricLabels labels, DynamicMetricLabels dynamicLabels) {
     std::lock_guard<std::mutex> lock(mutex);
 

@@ -21,7 +21,7 @@
 #include <mutex>
 #include <string>
 
-#include "LogtailMetric.h"
+#include "MetricManager.h"
 #include "MetricConstants.h"
 #include "MetricStore.h"
 

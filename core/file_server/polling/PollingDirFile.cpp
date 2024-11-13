@@ -33,7 +33,7 @@
 #include "file_server/polling/PollingEventQueue.h"
 #include "file_server/polling/PollingModify.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
 // Control the check frequency to call ClearUnavailableFileAndDir.
@@ -118,7 +118,7 @@ void PollingDirFile::CheckConfigPollingStatCount(const int32_t lastStatCount,
     LOG_WARNING(sLogger,
                 (msgBase, diffCount)(config.first->GetBasePath(), mStatCount)(config.second->GetProjectName(),
                                                                               config.second->GetLogstoreName()));
-    LogtailAlarm::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
+    AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
                                            msgBase + ", current count: " + ToString(diffCount) + " total count:"
                                                + ToString(mStatCount) + " path: " + config.first->GetBasePath(),
                                            config.second->GetProjectName(),
@@ -382,7 +382,7 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             LOG_DEBUG(sLogger, ("Open dir error, ENOENT, dir", dirPath.c_str()));
             return false;
         } else {
-            LogtailAlarm::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
                                                    pConfig.second->GetProjectName(),
@@ -405,7 +405,7 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             LOG_WARNING(sLogger,
                         ("total dir's polling stat count is exceeded", nowStatCount)(dirPath, mStatCount)(
                             pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 STAT_LIMIT_ALARM,
                 string("total dir's polling stat count is exceeded, now count:") + ToString(nowStatCount)
                     + " total count:" + ToString(mStatCount) + " path: " + dirPath + " project:"
@@ -417,7 +417,7 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             LOG_WARNING(sLogger,
                         ("this dir's polling stat count is exceeded", nowStatCount)(dirPath, mStatCount)(
                             pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 STAT_LIMIT_ALARM,
                 string("this dir's polling stat count is exceeded, now count:") + ToString(nowStatCount)
                     + " total count:" + ToString(mStatCount) + " path: " + dirPath
@@ -547,7 +547,7 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             LOG_DEBUG(sLogger, ("Open dir fail, ENOENT, dir", dirPath.c_str()));
             return false;
         } else {
-            LogtailAlarm::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMINSSION_ALARM,
                                                    string("Failed to open dir : ") + dirPath
                                                        + ";\terrno : " + ToString(err),
                                                    pConfig.second->GetProjectName(),
@@ -566,7 +566,7 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             LOG_WARNING(sLogger,
                         ("too many sub directoried for path",
                          dirPath)("dirCount", dirCount)("basePath", pConfig.first->GetBasePath()));
-            LogtailAlarm::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
+            AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
                                                    string("too many sub directoried for path:" + dirPath
                                                           + " dirCount: " + ToString(dirCount) + " basePath"
                                                           + pConfig.first->GetBasePath()),
@@ -583,7 +583,7 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             LOG_WARNING(sLogger,
                         ("total dir's polling stat count is exceeded",
                          "")(dirPath, mStatCount)(pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
-            LogtailAlarm::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarm(
                 STAT_LIMIT_ALARM,
                 string("total dir's polling stat count is exceeded, total count:" + ToString(mStatCount)
                        + " path: " + dirPath + " project:" + pConfig.second->GetProjectName()

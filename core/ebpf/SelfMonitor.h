@@ -21,7 +21,7 @@
 #include "ebpf/include/export.h"
 #include "monitor/PluginMetricManager.h"
 #include "common/Lock.h"
-#include "monitor/LoongCollectorMetricTypes.h"
+#include "monitor/MetricTypes.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {

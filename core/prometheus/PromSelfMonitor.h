@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "monitor/PluginMetricManager.h"
 
 namespace logtail {

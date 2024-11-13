@@ -19,7 +19,7 @@
 #include "common/ScopeInvoker.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 
@@ -45,7 +45,7 @@ namespace detail {
         std::string msg;
         msg.append("op:").append(op).append(", key:").append(key).append(", status:").append(s.ToString());
         LOG_ERROR(sLogger, (title, msg));
-        LogtailAlarm::GetInstance()->SendAlarm(CHECKPOINT_V2_ALARM, title + ", " + msg);
+        AlarmManager::GetInstance()->SendAlarm(CHECKPOINT_V2_ALARM, title + ", " + msg);
     }
 
     // Range key is represented by data pointer and size to avoid copy.

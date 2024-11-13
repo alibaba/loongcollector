@@ -341,7 +341,7 @@ void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView&
             fisrtLogSize = content.size();
         }
     }
-    if (!mMultiline.mIgnoringUnmatchWarning && LogtailAlarm::GetInstance()->IsLowLevelAlarmValid()) {
+    if (!mMultiline.mIgnoringUnmatchWarning && AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
         LOG_WARNING(mContext->GetLogger(),
                     ("unmatched log string", "please check regex")(
                         "action", UnmatchedContentTreatmentToString(mMultiline.mUnmatchedContentTreatment))(

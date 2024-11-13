@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "monitor/LoongCollectorMetricTypes.h"
+#include "monitor/MetricTypes.h"
 #include "monitor/metric_constants/MetricConstants.h"
 using namespace std;
 

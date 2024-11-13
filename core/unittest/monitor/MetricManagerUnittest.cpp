@@ -18,7 +18,7 @@
 #include <list>
 #include <atomic>
 #include <thread>
-#include "LogtailMetric.h"
+#include "MetricManager.h"
 #include "MetricExportor.h"
 #include "MetricConstants.h"
 
@@ -28,7 +28,7 @@ namespace logtail {
 static std::atomic_bool running(true);
 
 
-class ILogtailMetricUnittest : public ::testing::Test {
+class MetricManagerUnittest : public ::testing::Test {
 public:
     void SetUp() {}
 
@@ -42,12 +42,12 @@ public:
     void TestCreateAndDeleteMetric();
 };
 
-APSARA_UNIT_TEST_CASE(ILogtailMetricUnittest, TestCreateMetricAutoDelete, 0);
-APSARA_UNIT_TEST_CASE(ILogtailMetricUnittest, TestCreateMetricAutoDeleteMultiThread, 1);
-APSARA_UNIT_TEST_CASE(ILogtailMetricUnittest, TestCreateAndDeleteMetric, 2);
+APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateMetricAutoDelete, 0);
+APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateMetricAutoDeleteMultiThread, 1);
+APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateAndDeleteMetric, 2);
 
 
-void ILogtailMetricUnittest::TestCreateMetricAutoDelete() {
+void MetricManagerUnittest::TestCreateMetricAutoDelete() {
     std::vector<std::pair<std::string, std::string>> labels;
     labels.emplace_back(std::make_pair<std::string, std::string>("project", "project1"));
     labels.emplace_back(std::make_pair<std::string, std::string>("logstore", "logstore1"));
@@ -150,7 +150,7 @@ void createMetrics(int count) {
     }
 }
 
-void ILogtailMetricUnittest::TestCreateMetricAutoDeleteMultiThread() {
+void MetricManagerUnittest::TestCreateMetricAutoDeleteMultiThread() {
     std::thread t1(createMetrics, 1);
     std::thread t2(createMetrics, 2);
     std::thread t3(createMetrics, 3);
@@ -199,7 +199,7 @@ void ILogtailMetricUnittest::TestCreateMetricAutoDeleteMultiThread() {
 }
 
 
-void ILogtailMetricUnittest::TestCreateAndDeleteMetric() {
+void MetricManagerUnittest::TestCreateAndDeleteMetric() {
     std::thread t1(createMetrics, 1);
     std::thread t2(createMetrics, 2);
 

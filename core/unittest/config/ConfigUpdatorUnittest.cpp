@@ -33,7 +33,7 @@
 #include "file_server/event_handler/LogInput.h"
 #include "Sender.h"
 #include "sls_logs.pb.h"
-#include "LogtailAlarm.h"
+#include "AlarmManager.h"
 #include "common/Flags.h"
 #include "common/Lock.h"
 #include "constants/Constants.h"

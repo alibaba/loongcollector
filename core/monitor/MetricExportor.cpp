@@ -17,7 +17,7 @@
 #include <filesystem>
 
 #include "LogFileProfiler.h"
-#include "LogtailMetric.h"
+#include "MetricManager.h"
 #include "MetricConstants.h"
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"

@@ -31,7 +31,7 @@
 #include "json/value.h"
 #include "logger/Logger.h"
 #include "monitor/LogFileProfiler.h"
-#include "monitor/LogtailAlarm.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
@@ -660,10 +660,10 @@ void AppConfig::loadAppConfigLogtailMode(const std::string& ilogtailConfigFile) 
             confJson.clear();
             if (res == CONFIG_NOT_EXIST) {
                 LOG_ERROR(sLogger, ("can not find start config", ilogtailConfigFile));
-                LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CONFIG_ALARM, "can not find start config");
+                AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CONFIG_ALARM, "can not find start config");
             } else if (res == CONFIG_INVALID_FORMAT) {
                 LOG_ERROR(sLogger, ("start config is not valid json", ilogtailConfigFile));
-                LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CONFIG_ALARM, "start config is not valid json");
+                AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CONFIG_ALARM, "start config is not valid json");
             }
         }
     }

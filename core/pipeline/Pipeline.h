@@ -25,7 +25,7 @@
 
 #include "config/PipelineConfig.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/plugin/instance/FlusherInstance.h"
 #include "pipeline/plugin/instance/InputInstance.h"

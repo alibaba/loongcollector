@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/queue/QueueKey.h"

@@ -25,7 +25,7 @@
 
 #include "runner/sink/Sink.h"
 #include "runner/sink/http/HttpSinkRequest.h"
-#include "monitor/LogtailMetric.h"
+#include "monitor/MetricManager.h"
 
 namespace logtail {
 
