@@ -152,8 +152,8 @@ void eBPFServer::Init() {
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, [this]() -> std::string { return this->GetAllProjects(); });
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mRef,
-                                            {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER},
-                                            {METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_RUNNER}}, 
+                                            MetricCategory::METRIC_CATEGORY_RUNNER,
+                                            {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER}}, 
                                             std::move(dynamicLabels));
 
     mStartPluginTotal = mRef.CreateCounter(METRIC_RUNNER_EBPF_START_PLUGIN_TOTAL);
@@ -202,7 +202,7 @@ void eBPFServer::Stop() {
 bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
                         nami::PluginType type, 
                         const logtail::PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, std::shared_ptr<PluginMetricManager> mgr) {
+                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, PluginMetricManagerPtr mgr) {
 
     std::string prev_pipeline_name = CheckLoadedPipelineName(type);
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
@@ -314,7 +314,7 @@ bool eBPFServer::HasRegisteredPlugins() const {
 bool eBPFServer::EnablePlugin(const std::string& pipeline_name, uint32_t plugin_index,
                         nami::PluginType type, 
                         const PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, std::shared_ptr<PluginMetricManager> mgr) {
+                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, PluginMetricManagerPtr mgr) {
     if (!IsSupportedEnv(type)) {
         return false;
     }

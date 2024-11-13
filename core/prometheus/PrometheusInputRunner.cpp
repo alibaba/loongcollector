@@ -53,7 +53,6 @@ PrometheusInputRunner::PrometheusInputRunner()
 
     // self monitor
     MetricLabels labels;
-    labels.emplace_back(METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_RUNNER);
     labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS);
     labels.emplace_back(METRIC_LABEL_KEY_INSTANCE_ID, Application::GetInstance()->GetInstanceId());
     labels.emplace_back(METRIC_LABEL_KEY_POD_NAME, mPodName);
@@ -64,7 +63,7 @@ PrometheusInputRunner::PrometheusInputRunner()
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, [this]() -> std::string { return this->GetAllProjects(); });
 
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-        mMetricsRecordRef, std::move(labels), std::move(dynamicLabels));
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels), std::move(dynamicLabels));
 
     mPromRegisterState = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_CLIENT_REGISTER_STATE);
     mPromJobNum = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_JOBS_TOTAL);

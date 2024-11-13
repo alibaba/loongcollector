@@ -19,7 +19,6 @@ using namespace std;
 namespace logtail {
 
 // label keys
-const string METRIC_LABEL_KEY_METRIC_CATEGORY = "metric_category";
 const string METRIC_LABEL_KEY_ALIUIDS = "aliuids";
 const string METRIC_LABEL_KEY_INSTANCE_ID = "instance_id";
 const string METRIC_LABEL_KEY_START_TIME = "start_time";
@@ -30,16 +29,13 @@ const string METRIC_LABEL_KEY_USER_DEFINED_ID = "user_defined_id";
 const string METRIC_LABEL_KEY_UUID = "uuid";
 const string METRIC_LABEL_KEY_VERSION = "version";
 
-// label values
-const string METRIC_LABEL_KEY_METRIC_CATEGORY_AGENT = "agent";
-
 // metric keys
-const string METRIC_AGENT_CPU = "agent_cpu_percent";
-const string METRIC_AGENT_GO_ROUTINES_TOTAL = "agent_go_routines_total";
-const string METRIC_AGENT_INSTANCE_CONFIG_TOTAL = "agent_instance_config_total"; // Not Implemented
-const string METRIC_AGENT_MEMORY = "agent_memory_used_mb";
-const string METRIC_AGENT_MEMORY_GO = "agent_go_memory_used_mb";
-const string METRIC_AGENT_OPEN_FD_TOTAL = "agent_open_fd_total";
-const string METRIC_AGENT_PIPELINE_CONFIG_TOTAL = "agent_pipeline_config_total";
+const string METRIC_AGENT_CPU = "cpu";
+const string METRIC_AGENT_GO_ROUTINES_TOTAL = "go_routines_total";
+const string METRIC_AGENT_INSTANCE_CONFIG_TOTAL = "instance_config_total"; // Not Implemented
+const string METRIC_AGENT_MEMORY = "memory_used_mb";
+const string METRIC_AGENT_MEMORY_GO = "go_memory_used_mb";
+const string METRIC_AGENT_OPEN_FD_TOTAL = "open_fd_total";
+const string METRIC_AGENT_PIPELINE_CONFIG_TOTAL = "pipeline_config_total";
 
 } // namespace logtail

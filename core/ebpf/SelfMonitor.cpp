@@ -179,7 +179,7 @@ void NetworkObserverSelfMonitor::HandleStatistic(nami::eBPFStatistics& stats) {
 
 eBPFSelfMonitorMgr::eBPFSelfMonitorMgr() : mSelfMonitors({}), mInited({}) {}
 
-void eBPFSelfMonitorMgr::Init(const nami::PluginType type, std::shared_ptr<PluginMetricManager> mgr, const std::string& name, const std::string& logstore) {
+void eBPFSelfMonitorMgr::Init(const nami::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const std::string& logstore) {
     if (mInited[int(type)]) return;
 
     WriteLock lk(mLock);

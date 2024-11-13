@@ -20,6 +20,6 @@ package helper
 
 // metric keys
 const (
-	MetricAgentMemoryGo        = "agent_go_memory_used_mb"
-	MetricAgentGoRoutinesTotal = "agent_go_routines_total"
+	MetricAgentMemoryGo        = "go_memory_used_mb"
+	MetricAgentGoRoutinesTotal = "go_routines_total"
 )

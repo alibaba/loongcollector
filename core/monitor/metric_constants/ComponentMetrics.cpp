@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "MetricCommonConstants.h"
 #include "MetricConstants.h"
 
 using namespace std;
@@ -34,7 +35,6 @@ const string METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED = "exactly_once_enabled";
 const string METRIC_LABEL_KEY_GROUP_BATCH_ENABLED = "group_batch_enabled";
 
 // label values
-const string METRIC_LABEL_KEY_METRIC_CATEGORY_COMPONENT = "component";
 const string METRIC_LABEL_VALUE_COMPONENT_NAME_BATCHER = "batcher";
 const string METRIC_LABEL_VALUE_COMPONENT_NAME_COMPRESSOR = "compressor";
 const string METRIC_LABEL_VALUE_COMPONENT_NAME_PROCESS_QUEUE = "process_queue";
@@ -43,46 +43,42 @@ const string METRIC_LABEL_VALUE_COMPONENT_NAME_SENDER_QUEUE = "sender_queue";
 const string METRIC_LABEL_VALUE_COMPONENT_NAME_SERIALIZER = "serializer";
 
 // metric keys
-const string METRIC_COMPONENT_IN_EVENTS_TOTAL = "component_in_events_total";
-const string METRIC_COMPONENT_IN_SIZE_BYTES = "component_in_size_bytes";
-const string METRIC_COMPONENT_IN_ITEMS_TOTAL = "component_in_items_total";
-const string METRIC_COMPONENT_OUT_EVENTS_TOTAL = "component_out_events_total";
-const string METRIC_COMPONENT_OUT_ITEMS_TOTAL = "component_out_items_total";
-const string METRIC_COMPONENT_OUT_SIZE_BYTES = "component_out_size_bytes";
-const string METRIC_COMPONENT_TOTAL_DELAY_MS = "component_total_delay_ms";
-const string METRIC_COMPONENT_TOTAL_PROCESS_TIME_MS = "component_total_process_time_ms";
-const string METRIC_COMPONENT_DISCARDED_ITEMS_TOTAL = "component_discarded_items_total";
-const string METRIC_COMPONENT_DISCARDED_ITEMS_SIZE_BYTES = "component_discarded_item_size_bytes";
+const string& METRIC_COMPONENT_IN_EVENTS_TOTAL = METRIC_IN_EVENTS_TOTAL;
+const string& METRIC_COMPONENT_IN_SIZE_BYTES = METRIC_IN_SIZE_BYTES;
+const string& METRIC_COMPONENT_IN_ITEMS_TOTAL = METRIC_IN_ITEMS_TOTAL;
+const string& METRIC_COMPONENT_OUT_EVENTS_TOTAL = METRIC_OUT_EVENTS_TOTAL;
+const string& METRIC_COMPONENT_OUT_ITEMS_TOTAL = METRIC_OUT_ITEMS_TOTAL;
+const string& METRIC_COMPONENT_OUT_SIZE_BYTES = METRIC_OUT_SIZE_BYTES;
+const string& METRIC_COMPONENT_TOTAL_DELAY_MS = METRIC_TOTAL_DELAY_MS;
+const string& METRIC_COMPONENT_TOTAL_PROCESS_TIME_MS = METRIC_TOTAL_PROCESS_TIME_MS;
+const string& METRIC_COMPONENT_DISCARDED_ITEMS_TOTAL = METRIC_DISCARDED_ITEMS_TOTAL;
+const string& METRIC_COMPONENT_DISCARDED_SIZE_BYTES = METRIC_DISCARDED_SIZE_BYTES;
 
 /**********************************************************
  *   batcher
  **********************************************************/
-const string METRIC_COMPONENT_BATCHER_EVENT_BATCHES_TOTAL = "component_event_batches_total";
-const string METRIC_COMPONENT_BATCHER_BUFFERED_GROUPS_TOTAL = "component_buffered_groups_total";
-const string METRIC_COMPONENT_BATCHER_BUFFERED_EVENTS_TOTAL = "component_buffered_events_total";
-const string METRIC_COMPONENT_BATCHER_BUFFERED_SIZE_BYTES = "component_buffered_size_bytes";
-const string METRIC_COMPONENT_BATCHER_TOTAL_ADD_TIME_MS = "component_total_add_time_ms";
+const string METRIC_COMPONENT_BATCHER_EVENT_BATCHES_TOTAL = "event_batches_total";
+const string METRIC_COMPONENT_BATCHER_BUFFERED_GROUPS_TOTAL = "buffered_groups_total";
+const string METRIC_COMPONENT_BATCHER_BUFFERED_EVENTS_TOTAL = "buffered_events_total";
+const string METRIC_COMPONENT_BATCHER_BUFFERED_SIZE_BYTES = "buffered_size_bytes";
+const string METRIC_COMPONENT_BATCHER_TOTAL_ADD_TIME_MS = "total_add_time_ms";
 
 /**********************************************************
  *   queue
  **********************************************************/
-const string METRIC_COMPONENT_QUEUE_SIZE = "component_queue_size";
-const string METRIC_COMPONENT_QUEUE_SIZE_BYTES = "component_queue_size_bytes";
-const string METRIC_COMPONENT_QUEUE_VALID_TO_PUSH_FLAG = "component_valid_to_push_status";
-const string METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE = "component_extra_buffer_size";
-const string METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE_BYTES = "component_extra_buffer_size_bytes";
-const string METRIC_COMPONENT_QUEUE_DISCARDED_EVENTS_TOTAL = "component_discarded_events_total";
+const string METRIC_COMPONENT_QUEUE_SIZE = "queue_size";
+const string METRIC_COMPONENT_QUEUE_SIZE_BYTES = "queue_size_bytes";
+const string METRIC_COMPONENT_QUEUE_VALID_TO_PUSH_FLAG = "valid_to_push_status";
+const string METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE = "extra_buffer_size";
+const string METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE_BYTES = "extra_buffer_size_bytes";
+const string& METRIC_COMPONENT_QUEUE_DISCARDED_EVENTS_TOTAL = METRIC_DISCARDED_EVENTS_TOTAL;
 
-const string METRIC_COMPONENT_QUEUE_FETCHED_ITEMS_TOTAL = "component_fetched_items_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_TIMES_TOTAL = "component_fetch_times_total";
-const string METRIC_COMPONENT_QUEUE_VALID_FETCH_TIMES_TOTAL = "component_valid_fetch_times_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_REGION_LIMITER_TIMES_TOTAL
-    = "component_fetch_rejected_by_region_limiter_times_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_PROJECT_LIMITER_TIMES_TOTAL
-    = "component_fetch_rejected_by_project_limiter_times_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_LOGSTORE_LIMITER_TIMES_TOTAL
-    = "component_fetch_rejected_by_logstore_limiter_times_total";
-const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL
-    = "component_fetch_rejected_by_rate_limiter_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCHED_ITEMS_TOTAL = "fetched_items_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_TIMES_TOTAL = "fetch_times_total";
+const string METRIC_COMPONENT_QUEUE_VALID_FETCH_TIMES_TOTAL = "valid_fetch_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_REGION_LIMITER_TIMES_TOTAL = "region_reject_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_PROJECT_LIMITER_TIMES_TOTAL = "project_reject_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_LOGSTORE_LIMITER_TIMES_TOTAL = "logstore_reject_times_total";
+const string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL = "rate_reject_times_total";
 
 } // namespace logtail

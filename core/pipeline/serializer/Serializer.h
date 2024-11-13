@@ -49,10 +49,10 @@ public:
     Serializer(Flusher* f) : mFlusher(f) {
         WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
             mMetricsRecordRef,
+            MetricCategory::METRIC_CATEGORY_COMPONENT,
             {{METRIC_LABEL_KEY_PROJECT, f->GetContext().GetProjectName()},
              {METRIC_LABEL_KEY_PIPELINE_NAME, f->GetContext().GetConfigName()},
              {METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_SERIALIZER},
-             {METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_COMPONENT},
              {METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID, f->GetPluginID()}});
         mInItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_ITEMS_TOTAL);
         mInItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
@@ -60,7 +60,7 @@ public:
         mOutItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_OUT_SIZE_BYTES);
         mTotalProcessMs = mMetricsRecordRef.CreateTimeCounter(METRIC_COMPONENT_TOTAL_PROCESS_TIME_MS);
         mDiscardedItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_ITEMS_TOTAL);
-        mDiscardedItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_ITEMS_SIZE_BYTES);
+        mDiscardedItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_SIZE_BYTES);
     }
     virtual ~Serializer() = default;
 

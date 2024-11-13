@@ -72,7 +72,7 @@ public:
     bool EnablePlugin(const std::string& pipeline_name, uint32_t plugin_index,
                         nami::PluginType type, 
                         const logtail::PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, std::shared_ptr<PluginMetricManager> mgr);
+                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, PluginMetricManagerPtr mgr);
 
     bool DisablePlugin(const std::string& pipeline_name, nami::PluginType type);
 
@@ -88,7 +88,7 @@ private:
     bool StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
                         nami::PluginType type, 
                         const logtail::PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, std::shared_ptr<PluginMetricManager> mgr);
+                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, PluginMetricManagerPtr mgr);
     eBPFServer() = default;
     ~eBPFServer() = default;
 

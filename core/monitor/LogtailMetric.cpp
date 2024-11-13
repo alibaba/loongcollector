@@ -25,11 +25,19 @@ using namespace sls_logs;
 
 namespace logtail {
 
-const std::string LABEL_PREFIX = "label.";
-const std::string VALUE_PREFIX = "value.";
+const std::string METRIC_KEY_LABEL = "label";
+const std::string METRIC_KEY_VALUE = "value";
+const std::string METRIC_KEY_CATEGORY = "category";
+const std::string MetricCategory::METRIC_CATEGORY_UNKNOWN = "unknown";
+const std::string MetricCategory::METRIC_CATEGORY_AGENT = "agent";
+const std::string MetricCategory::METRIC_CATEGORY_RUNNER = "runner";
+const std::string MetricCategory::METRIC_CATEGORY_PIPELINE = "pipeline";
+const std::string MetricCategory::METRIC_CATEGORY_COMPONENT = "component";
+const std::string MetricCategory::METRIC_CATEGORY_PLUGIN = "plugin";
+const std::string MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE = "plugin_source";
 
-MetricsRecord::MetricsRecord(MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels)
-    : mLabels(labels), mDynamicLabels(dynamicLabels), mDeleted(false) {
+MetricsRecord::MetricsRecord(const std::string& category, MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels)
+    : mCategory(category), mLabels(labels), mDynamicLabels(dynamicLabels), mDeleted(false) {
 }
 
 CounterPtr MetricsRecord::CreateCounter(const std::string& name) {
@@ -64,6 +72,10 @@ bool MetricsRecord::IsDeleted() const {
     return mDeleted;
 }
 
+const std::string& MetricsRecord::GetCategory() const {
+    return mCategory;
+}
+
 const MetricLabelsPtr& MetricsRecord::GetLabels() const {
     return mLabels;
 }
@@ -89,7 +101,7 @@ const std::vector<DoubleGaugePtr>& MetricsRecord::GetDoubleGauges() const {
 }
 
 MetricsRecord* MetricsRecord::Collect() {
-    MetricsRecord* metrics = new MetricsRecord(mLabels, mDynamicLabels);
+    MetricsRecord* metrics = new MetricsRecord(mCategory, mLabels, mDynamicLabels);
     for (auto& item : mCounters) {
         CounterPtr newPtr(item->Collect());
         metrics->mCounters.emplace_back(newPtr);
@@ -125,6 +137,10 @@ MetricsRecordRef::~MetricsRecordRef() {
 
 void MetricsRecordRef::SetMetricsRecord(MetricsRecord* metricRecord) {
     mMetrics = metricRecord;
+}
+
+const std::string& MetricsRecordRef::GetCategory() const {
+    return mMetrics->GetCategory();
 }
 
 const MetricLabelsPtr& MetricsRecordRef::GetLabels() const {
@@ -171,8 +187,12 @@ bool MetricsRecordRef::HasLabel(const std::string& key, const std::string& value
 #endif
 
 // ReentrantMetricsRecord相关操作可以无锁，因为mCounters、mGauges只在初始化时会添加内容，后续只允许Get操作
-void ReentrantMetricsRecord::Init(MetricLabels& labels, std::unordered_map<std::string, MetricType>& metricKeys) {
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(labels));
+void ReentrantMetricsRecord::Init(const std::string& category,
+                                  MetricLabels& labels,
+                                  DynamicMetricLabels& dynamicLabels,
+                                  std::unordered_map<std::string, MetricType>& metricKeys) {
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        mMetricsRecordRef, category, std::move(labels), std::move(dynamicLabels));
     for (auto metric : metricKeys) {
         switch (metric.second) {
             case MetricType::METRIC_TYPE_COUNTER:
@@ -237,17 +257,19 @@ WriteMetrics::~WriteMetrics() {
 }
 
 void WriteMetrics::PrepareMetricsRecordRef(MetricsRecordRef& ref,
+                                           const std::string& category,
                                            MetricLabels&& labels,
                                            DynamicMetricLabels&& dynamicLabels) {
-    CreateMetricsRecordRef(ref, std::move(labels), std::move(dynamicLabels));
+    CreateMetricsRecordRef(ref, category, std::move(labels), std::move(dynamicLabels));
     CommitMetricsRecordRef(ref);
 }
 
 void WriteMetrics::CreateMetricsRecordRef(MetricsRecordRef& ref,
+                                          const std::string& category,
                                           MetricLabels&& labels,
                                           DynamicMetricLabels&& dynamicLabels) {
-    MetricsRecord* cur = new MetricsRecord(std::make_shared<MetricLabels>(labels),
-                                           std::make_shared<DynamicMetricLabels>(dynamicLabels));
+    MetricsRecord* cur = new MetricsRecord(
+        category, std::make_shared<MetricLabels>(labels), std::make_shared<DynamicMetricLabels>(dynamicLabels));
     ref.SetMetricsRecord(cur);
 }
 
@@ -395,42 +417,53 @@ void ReadMetrics::ReadAsLogGroup(const std::string& regionFieldName,
         auto now = GetCurrentLogtailTime();
         SetLogTime(logPtr,
                    AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec);
-        for (auto item = tmp->GetLabels()->begin(); item != tmp->GetLabels()->end(); ++item) {
-            std::pair<std::string, std::string> pair = *item;
+        { // category
             Log_Content* contentPtr = logPtr->add_contents();
-            contentPtr->set_key(LABEL_PREFIX + pair.first);
-            contentPtr->set_value(pair.second);
+            contentPtr->set_key(METRIC_KEY_CATEGORY);
+            contentPtr->set_value(tmp->GetCategory());
         }
-        for (auto item = tmp->GetDynamicLabels()->begin(); item != tmp->GetDynamicLabels()->end(); ++item) {
-            std::pair<std::string, std::function<std::string()>> pair = *item;
+        { // label
+            Json::Value metricsRecordLabel;
+            for (auto item = tmp->GetLabels()->begin(); item != tmp->GetLabels()->end(); ++item) {
+                std::pair<std::string, std::string> pair = *item;
+                metricsRecordLabel[pair.first] = pair.second;
+            }
+            for (auto item = tmp->GetDynamicLabels()->begin(); item != tmp->GetDynamicLabels()->end(); ++item) {
+                std::pair<std::string, std::function<std::string()>> pair = *item;
+                metricsRecordLabel[pair.first] = pair.second();
+            }
+            Json::StreamWriterBuilder writer;
+            writer["indentation"] = "";
+            std::string jsonString = Json::writeString(writer, metricsRecordLabel);
             Log_Content* contentPtr = logPtr->add_contents();
-            contentPtr->set_key(LABEL_PREFIX + pair.first);
-            contentPtr->set_value(pair.second());
+            contentPtr->set_key(METRIC_KEY_LABEL);
+            contentPtr->set_value(jsonString);
         }
-
-        for (auto& item : tmp->GetCounters()) {
-            CounterPtr counter = item;
-            Log_Content* contentPtr = logPtr->add_contents();
-            contentPtr->set_key(VALUE_PREFIX + counter->GetName());
-            contentPtr->set_value(ToString(counter->GetValue()));
-        }
-        for (auto& item : tmp->GetTimeCounters()) {
-            TimeCounterPtr counter = item;
-            Log_Content* contentPtr = logPtr->add_contents();
-            contentPtr->set_key(VALUE_PREFIX + counter->GetName());
-            contentPtr->set_value(ToString(counter->GetValue()));
-        }
-        for (auto& item : tmp->GetIntGauges()) {
-            IntGaugePtr gauge = item;
-            Log_Content* contentPtr = logPtr->add_contents();
-            contentPtr->set_key(VALUE_PREFIX + gauge->GetName());
-            contentPtr->set_value(ToString(gauge->GetValue()));
-        }
-        for (auto& item : tmp->GetDoubleGauges()) {
-            DoubleGaugePtr gauge = item;
-            Log_Content* contentPtr = logPtr->add_contents();
-            contentPtr->set_key(VALUE_PREFIX + gauge->GetName());
-            contentPtr->set_value(ToString(gauge->GetValue()));
+        { // value
+            for (auto& item : tmp->GetCounters()) {
+                CounterPtr counter = item;
+                Log_Content* contentPtr = logPtr->add_contents();
+                contentPtr->set_key(counter->GetName());
+                contentPtr->set_value(ToString(counter->GetValue()));
+            }
+            for (auto& item : tmp->GetTimeCounters()) {
+                TimeCounterPtr counter = item;
+                Log_Content* contentPtr = logPtr->add_contents();
+                contentPtr->set_key(counter->GetName());
+                contentPtr->set_value(ToString(counter->GetValue()));
+            }
+            for (auto& item : tmp->GetIntGauges()) {
+                IntGaugePtr gauge = item;
+                Log_Content* contentPtr = logPtr->add_contents();
+                contentPtr->set_key(gauge->GetName());
+                contentPtr->set_value(ToString(gauge->GetValue()));
+            }
+            for (auto& item : tmp->GetDoubleGauges()) {
+                DoubleGaugePtr gauge = item;
+                Log_Content* contentPtr = logPtr->add_contents();
+                contentPtr->set_key(gauge->GetName());
+                contentPtr->set_value(ToString(gauge->GetValue()));
+            }
         }
         tmp = tmp->GetNext();
     }
@@ -443,40 +476,43 @@ void ReadMetrics::ReadAsFileBuffer(std::string& metricsContent) const {
 
     MetricsRecord* tmp = mHead;
     while (tmp) {
-        Json::Value metricsRecordValue;
+        Json::Value metricsRecordJson, metricsRecordLabel;
         auto now = GetCurrentLogtailTime();
-        metricsRecordValue["time"]
+        metricsRecordJson["time"]
             = AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec;
+
+        metricsRecordJson[METRIC_KEY_CATEGORY] = tmp->GetCategory();
 
         for (auto item = tmp->GetLabels()->begin(); item != tmp->GetLabels()->end(); ++item) {
             std::pair<std::string, std::string> pair = *item;
-            metricsRecordValue[LABEL_PREFIX + pair.first] = pair.second;
+            metricsRecordLabel[pair.first] = pair.second;
         }
         for (auto item = tmp->GetDynamicLabels()->begin(); item != tmp->GetDynamicLabels()->end(); ++item) {
             std::pair<std::string, std::function<std::string()>> pair = *item;
-            metricsRecordValue[LABEL_PREFIX + pair.first] = pair.second();
+            metricsRecordLabel[pair.first] = pair.second();
         }
+        metricsRecordJson[METRIC_KEY_LABEL] = metricsRecordLabel;
 
         for (auto& item : tmp->GetCounters()) {
             CounterPtr counter = item;
-            metricsRecordValue[VALUE_PREFIX + counter->GetName()] = ToString(counter->GetValue());
+            metricsRecordJson[counter->GetName()] = ToString(counter->GetValue());
         }
         for (auto& item : tmp->GetTimeCounters()) {
             TimeCounterPtr counter = item;
-            metricsRecordValue[VALUE_PREFIX + counter->GetName()] = ToString(counter->GetValue());
+            metricsRecordJson[counter->GetName()] = ToString(counter->GetValue());
         }
         for (auto& item : tmp->GetIntGauges()) {
             IntGaugePtr gauge = item;
-            metricsRecordValue[VALUE_PREFIX + gauge->GetName()] = ToString(gauge->GetValue());
+            metricsRecordJson[gauge->GetName()] = ToString(gauge->GetValue());
         }
         for (auto& item : tmp->GetDoubleGauges()) {
             DoubleGaugePtr gauge = item;
-            metricsRecordValue[VALUE_PREFIX + gauge->GetName()] = ToString(gauge->GetValue());
+            metricsRecordJson[gauge->GetName()] = ToString(gauge->GetValue());
         }
 
         Json::StreamWriterBuilder writer;
         writer["indentation"] = "";
-        std::string jsonString = Json::writeString(writer, metricsRecordValue);
+        std::string jsonString = Json::writeString(writer, metricsRecordJson);
         oss << jsonString << '\n';
 
         tmp = tmp->GetNext();

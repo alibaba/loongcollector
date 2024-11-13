@@ -49,7 +49,7 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
         {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
-    mPluginMgr = std::make_shared<PluginMetricManager>(GetMetricsRecordRef().GetLabels(), metricKeys);
+    mPluginMgr = std::make_shared<PluginMetricManager>(GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     return ebpf::InitObserverNetworkOption(config, mNetworkOption, mContext, sName);
 }
 

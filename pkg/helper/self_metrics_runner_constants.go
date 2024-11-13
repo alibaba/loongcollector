@@ -18,21 +18,38 @@ package helper
 // runner
 //////////////////////////////////////////////////////////////////////////
 
+// lebel keys
+const (
+	MetricLabelKeyRunnerName = "runner_name"
+)
+
 // label values
 const (
-	MetricLabelKeyMetricCategoryRunner = "runner"
+	MetricLabelValueMetricCategoryRunner = "runner"
 )
 
 /**********************************************************
 *   k8s meta
 **********************************************************/
+
+// label keys
 const (
-	MetricRunnerK8sMetaAddEventTotal    = "runner_k8s_meta_add_event_total"
-	MetricRunnerK8sMetaUpdateEventTotal = "runner_k8s_meta_update_event_total"
-	MetricRunnerK8sMetaDeleteEventTotal = "runner_k8s_meta_delete_event_total"
-	MetricRunnerK8sMetaCacheSize        = "runner_k8s_meta_cache_size"
-	MetricRunnerK8sMetaQueueSize        = "runner_k8s_meta_queue_size"
-	MetricRunnerK8sMetaHTTPRequestTotal = "runner_k8s_meta_http_request_total"
-	MetricRunnerK8sMetaHTTPAvgDelayMs   = "runner_k8s_meta_avg_delay_ms"
-	MetricRunnerK8sMetaHTTPMaxDelayMs   = "runner_k8s_meta_max_delay_ms"
+	MetricLabelKeyClusterID = "cluster_id"
+)
+
+// label values
+const (
+	MetricLabelValueRunnerNameK8sMeta = "k8s_meta"
+)
+
+// metric keys
+const (
+	MetricRunnerK8sMetaAddEventTotal    = "add_event_total"
+	MetricRunnerK8sMetaUpdateEventTotal = "update_event_total"
+	MetricRunnerK8sMetaDeleteEventTotal = "delete_event_total"
+	MetricRunnerK8sMetaCacheSize        = "cache_size"
+	MetricRunnerK8sMetaQueueSize        = "queue_size"
+	MetricRunnerK8sMetaHTTPRequestTotal = "http_request_total"
+	MetricRunnerK8sMetaHTTPAvgDelayMs   = "avg_delay_ms"
+	MetricRunnerK8sMetaHTTPMaxDelayMs   = "max_delay_ms"
 )

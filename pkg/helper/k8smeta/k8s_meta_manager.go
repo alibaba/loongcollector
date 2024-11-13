@@ -226,18 +226,18 @@ func GetMetaManagerMetrics() []map[string]string {
 	manager.metricRecord.Labels = []pipeline.Label{
 		{
 			Key:   helper.MetricLabelKeyMetricCategory,
-			Value: helper.MetricLabelKeyMetricCategoryRunner,
+			Value: helper.MetricLabelValueMetricCategoryRunner,
 		},
 		{
-			Key:   "cluster_id",
+			Key:   helper.MetricLabelKeyClusterID,
 			Value: *flags.ClusterID,
 		},
 		{
-			Key:   "runner_name",
-			Value: "k8s_meta_manager",
+			Key:   helper.MetricLabelKeyRunnerName,
+			Value: helper.MetricLabelValueRunnerNameK8sMeta,
 		},
 		{
-			Key:   "project",
+			Key:   helper.MetricLabelKeyProject,
 			Value: strings.Join(projectName, " "),
 		},
 	}

@@ -693,7 +693,6 @@ LoongCollectorMonitor* LoongCollectorMonitor::GetInstance() {
 void LoongCollectorMonitor::Init() {
     // create metric record
     MetricLabels labels;
-    labels.emplace_back(METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_AGENT);
     labels.emplace_back(METRIC_LABEL_KEY_INSTANCE_ID, Application::GetInstance()->GetInstanceId());
     labels.emplace_back(METRIC_LABEL_KEY_START_TIME, LogFileProfiler::mStartTime);
     labels.emplace_back(METRIC_LABEL_KEY_OS, OS_NAME);
@@ -710,7 +709,7 @@ void LoongCollectorMonitor::Init() {
     });
 #endif
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-        mMetricsRecordRef, std::move(labels), std::move(dynamicLabels));
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_AGENT, std::move(labels), std::move(dynamicLabels));
     // init value
     mAgentCpu = mMetricsRecordRef.CreateDoubleGauge(METRIC_AGENT_CPU);
     mAgentMemory = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_MEMORY);

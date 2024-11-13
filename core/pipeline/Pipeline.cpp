@@ -318,9 +318,8 @@ bool Pipeline::Init(PipelineConfig&& config) {
 
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
         mMetricsRecordRef,
-        {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()},
-         {METRIC_LABEL_KEY_PIPELINE_NAME, mName},
-         {METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_PIPELINE}});
+        MetricCategory::METRIC_CATEGORY_PIPELINE,
+        {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()}, {METRIC_LABEL_KEY_PIPELINE_NAME, mName}});
     mStartTime = mMetricsRecordRef.CreateIntGauge(METRIC_PIPELINE_START_TIME);
     mProcessorsInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL);
     mProcessorsInGroupsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL);

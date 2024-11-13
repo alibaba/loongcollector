@@ -17,7 +17,7 @@
 
 namespace logtail {
 
-ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecordRef(MetricLabels labels) {
+ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecordRef(MetricLabels labels, DynamicMetricLabels dynamicLabels) {
     std::lock_guard<std::mutex> lock(mutex);
 
     std::string key = GenerateKey(labels);
@@ -31,7 +31,7 @@ ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecord
     newLabels.insert(newLabels.end(), labels.begin(), labels.end());
 
     ReentrantMetricsRecordRef ptr = std::make_shared<ReentrantMetricsRecord>();
-    ptr->Init(newLabels, mMetricKeys);
+    ptr->Init(mDefaultCategory, newLabels, dynamicLabels, mMetricKeys);
 
     mReentrantMetricsRecordRefsMap.emplace(key, ptr);
     if (mSizeGauge != nullptr) {

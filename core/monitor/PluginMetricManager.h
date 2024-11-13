@@ -23,10 +23,15 @@ namespace logtail {
 
 class PluginMetricManager {
 public:
-    PluginMetricManager(const MetricLabelsPtr defaultLabels, std::unordered_map<std::string, MetricType> metricKeys)
-        : mDefaultLabels(defaultLabels->begin(), defaultLabels->end()), mMetricKeys(metricKeys) {}
+    PluginMetricManager(const MetricLabelsPtr defaultLabels,
+                        std::unordered_map<std::string, MetricType> metricKeys,
+                        std::string category = MetricCategory::METRIC_CATEGORY_UNKNOWN)
+        : mDefaultLabels(defaultLabels->begin(), defaultLabels->end()),
+          mMetricKeys(metricKeys),
+          mDefaultCategory(category) {}
 
-    ReentrantMetricsRecordRef GetOrCreateReentrantMetricsRecordRef(MetricLabels labels);
+    ReentrantMetricsRecordRef GetOrCreateReentrantMetricsRecordRef(MetricLabels labels,
+                                                                   DynamicMetricLabels dynamicLabels = {});
     void ReleaseReentrantMetricsRecordRef(MetricLabels labels);
 
     void RegisterSizeGauge(IntGaugePtr ptr) { mSizeGauge = ptr; }
@@ -36,6 +41,7 @@ private:
 
     MetricLabels mDefaultLabels;
     std::unordered_map<std::string, MetricType> mMetricKeys;
+    std::string mDefaultCategory;
     std::unordered_map<std::string, ReentrantMetricsRecordRef> mReentrantMetricsRecordRefsMap;
     mutable std::mutex mutex;
 

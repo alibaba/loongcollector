@@ -34,8 +34,8 @@ namespace logtail {
 FileServer::FileServer() {
     WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
         mMetricsRecordRef,
-        {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER},
-         {METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_RUNNER}});
+        MetricCategory::METRIC_CATEGORY_RUNNER,
+        {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER}});
 }
 
 // 启动文件服务，包括加载配置、处理检查点、注册事件等

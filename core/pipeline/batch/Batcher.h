@@ -104,14 +104,14 @@ public:
             {METRIC_LABEL_KEY_PROJECT, ctx.GetProjectName()},
             {METRIC_LABEL_KEY_PIPELINE_NAME, ctx.GetConfigName()},
             {METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_BATCHER},
-            {METRIC_LABEL_KEY_METRIC_CATEGORY, METRIC_LABEL_KEY_METRIC_CATEGORY_COMPONENT},
             {METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID, flusher->GetPluginID()}};
         if (enableGroupBatch) {
             labels.emplace_back(METRIC_LABEL_KEY_GROUP_BATCH_ENABLED, "true");
         } else {
             labels.emplace_back(METRIC_LABEL_KEY_GROUP_BATCH_ENABLED, "false");
         }
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, std::move(labels));
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_COMPONENT, std::move(labels));
         mInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_TOTAL);
         mInGroupDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
         mOutEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_OUT_EVENTS_TOTAL);

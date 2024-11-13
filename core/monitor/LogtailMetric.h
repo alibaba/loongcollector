@@ -28,22 +28,39 @@
 
 namespace logtail {
 
+extern const std::string METRIC_KEY_LABEL;
+extern const std::string METRIC_KEY_VALUE;
+extern const std::string METRIC_KEY_CATEGORY;
+class MetricCategory {
+public:
+    static const std::string METRIC_CATEGORY_UNKNOWN;
+    static const std::string METRIC_CATEGORY_AGENT;
+    static const std::string METRIC_CATEGORY_RUNNER;
+    static const std::string METRIC_CATEGORY_PIPELINE;
+    static const std::string METRIC_CATEGORY_COMPONENT;
+    static const std::string METRIC_CATEGORY_PLUGIN;
+    static const std::string METRIC_CATEGORY_PLUGIN_SOURCE;
+};
+
 class MetricsRecord {
 private:
+    std::string mCategory;
     MetricLabelsPtr mLabels;
     DynamicMetricLabelsPtr mDynamicLabels;
-    std::atomic_bool mDeleted;
     std::vector<CounterPtr> mCounters;
     std::vector<TimeCounterPtr> mTimeCounters;
     std::vector<IntGaugePtr> mIntGauges;
     std::vector<DoubleGaugePtr> mDoubleGauges;
+
+    std::atomic_bool mDeleted;
     MetricsRecord* mNext = nullptr;
 
 public:
-    MetricsRecord(MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels = nullptr);
+    MetricsRecord(const std::string& category, MetricLabelsPtr labels, DynamicMetricLabelsPtr dynamicLabels = nullptr);
     MetricsRecord() = default;
     void MarkDeleted();
     bool IsDeleted() const;
+    const std::string& GetCategory() const;
     const MetricLabelsPtr& GetLabels() const;
     const DynamicMetricLabelsPtr& GetDynamicLabels() const;
     const std::vector<CounterPtr>& GetCounters() const;
@@ -75,6 +92,7 @@ public:
     MetricsRecordRef(MetricsRecordRef&&) = delete;
     MetricsRecordRef& operator=(MetricsRecordRef&&) = delete;
     void SetMetricsRecord(MetricsRecord* metricRecord);
+    const std::string& GetCategory() const;
     const MetricLabelsPtr& GetLabels() const;
     const DynamicMetricLabelsPtr& GetDynamicLabels() const;
     CounterPtr CreateCounter(const std::string& name);
@@ -114,7 +132,10 @@ private:
     std::unordered_map<std::string, DoubleGaugePtr> mDoubleGauges;
 
 public:
-    void Init(MetricLabels& labels, std::unordered_map<std::string, MetricType>& metricKeys);
+    void Init(const std::string& category,
+              MetricLabels& labels,
+              DynamicMetricLabels& dynamicLabels,
+              std::unordered_map<std::string, MetricType>& metricKeys);
     const MetricLabelsPtr& GetLabels() const;
     const DynamicMetricLabelsPtr& GetDynamicLabels() const;
     CounterPtr GetCounter(const std::string& name);
@@ -140,9 +161,14 @@ public:
         return ptr;
     }
 
-    void
-    PrepareMetricsRecordRef(MetricsRecordRef& ref, MetricLabels&& labels, DynamicMetricLabels&& dynamicLabels = {});
-    void CreateMetricsRecordRef(MetricsRecordRef& ref, MetricLabels&& labels, DynamicMetricLabels&& dynamicLabels = {});
+    void PrepareMetricsRecordRef(MetricsRecordRef& ref,
+                                 const std::string& category,
+                                 MetricLabels&& labels,
+                                 DynamicMetricLabels&& dynamicLabels = {});
+    void CreateMetricsRecordRef(MetricsRecordRef& ref,
+                                const std::string& category,
+                                MetricLabels&& labels,
+                                DynamicMetricLabels&& dynamicLabels = {});
     void CommitMetricsRecordRef(MetricsRecordRef& ref);
     MetricsRecord* DoSnapshot();
 

@@ -36,7 +36,7 @@ public:
     bool SupportAck() const override { return false; }
     
     ebpf::SecurityOptions mSecurityOptions;
-    std::shared_ptr<PluginMetricManager> mPluginMgr;
+    PluginMetricManagerPtr mPluginMgr;
 };
 
 } // namespace logtail

@@ -16,7 +16,6 @@
 
 #include <filesystem>
 
-#include "app_config/AppConfig.h"
 #include "LogFileProfiler.h"
 #include "LogtailMetric.h"
 #include "MetricConstants.h"
@@ -35,7 +34,6 @@ DECLARE_FLAG_STRING(metrics_report_method);
 
 namespace logtail {
 
-const string METRIC_REGION_FIELD_NAME = "region";
 const string METRIC_REGION_DEFAULT = "default";
 const string METRIC_SLS_LOGSTORE_NAME = "shennong_log_profile";
 const string METRIC_TOPIC_TYPE = "loong_collector_metric";
@@ -66,7 +64,7 @@ void MetricExportor::PushCppMetrics() {
 
     if ("sls" == STRING_FLAG(metrics_report_method)) {
         std::map<std::string, sls_logs::LogGroup*> logGroupMap;
-        ReadMetrics::GetInstance()->ReadAsLogGroup(METRIC_REGION_FIELD_NAME, METRIC_REGION_DEFAULT, logGroupMap);
+        ReadMetrics::GetInstance()->ReadAsLogGroup(METRIC_LABEL_KEY_REGION, METRIC_REGION_DEFAULT, logGroupMap);
         SendToSLS(logGroupMap);
     } else if ("file" == STRING_FLAG(metrics_report_method)) {
         std::string metricsContent;
@@ -175,10 +173,10 @@ void MetricExportor::PushGoCppProvidedMetrics(std::vector<std::map<std::string, 
 
     for (auto metrics : metricsList) {
         for (auto metric : metrics) {
-            if (metric.first == METRIC_AGENT_MEMORY_GO) {
+            if (metric.first == METRIC_KEY_VALUE + "." + METRIC_AGENT_MEMORY_GO) {
                 LoongCollectorMonitor::GetInstance()->SetAgentGoMemory(std::stoi(metric.second));
             }
-            if (metric.first == METRIC_AGENT_GO_ROUTINES_TOTAL) {
+            if (metric.first == METRIC_KEY_VALUE + "." + METRIC_AGENT_GO_ROUTINES_TOTAL) {
                 LoongCollectorMonitor::GetInstance()->SetAgentGoRoutinesTotal(std::stoi(metric.second));
             }
             LogtailMonitor::GetInstance()->UpdateMetric(metric.first, metric.second);
@@ -193,15 +191,15 @@ void MetricExportor::SerializeGoDirectMetricsListToLogGroupMap(
         std::string configName = "";
         std::string region = METRIC_REGION_DEFAULT;
         {
-            // get the config_name label
+            // get the pipeline_name label
             for (const auto& metric : metrics) {
-                if (metric.first == "label.config_name") {
+                if (metric.first == METRIC_KEY_LABEL + "." + METRIC_LABEL_KEY_PIPELINE_NAME) {
                     configName = metric.second;
                     break;
                 }
             }
             if (!configName.empty()) {
-                // get region info by config_name
+                // get region info by pipeline_name
                 shared_ptr<Pipeline> p = PipelineManager::GetInstance()->FindConfigByName(configName);
                 if (p) {
                     FlusherSLS* pConfig = NULL;
@@ -225,11 +223,32 @@ void MetricExportor::SerializeGoDirectMetricsListToLogGroupMap(
         auto now = GetCurrentLogtailTime();
         SetLogTime(logPtr,
                    AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec);
+
+        Json::Value metricsRecordLabel;
         for (const auto& metric : metrics) {
+            // category
+            if (metric.first.compare("label.metric_category") == 0) {
+                Log_Content* contentPtr = logPtr->add_contents();
+                contentPtr->set_key(METRIC_KEY_CATEGORY);
+                contentPtr->set_value(metric.second);
+                continue;
+            }
+            // label
+            if (metric.first.compare(0, METRIC_KEY_LABEL.length(), METRIC_KEY_LABEL)) {
+                metricsRecordLabel[metric.first.substr(METRIC_KEY_LABEL.length() + 1)] = metric.second;
+                continue;
+            }
+            // value
             Log_Content* contentPtr = logPtr->add_contents();
             contentPtr->set_key(metric.first);
             contentPtr->set_value(metric.second);
         }
+        Json::StreamWriterBuilder writer;
+        writer["indentation"] = "";
+        std::string jsonString = Json::writeString(writer, metricsRecordLabel);
+        Log_Content* contentPtr = logPtr->add_contents();
+        contentPtr->set_key(METRIC_KEY_LABEL);
+        contentPtr->set_value(jsonString);
     }
 }
 
@@ -238,16 +257,25 @@ void MetricExportor::SerializeGoDirectMetricsListToString(std::vector<std::map<s
     std::ostringstream oss;
 
     for (auto& metrics : metricsList) {
-        Json::Value metricsRecordValue;
+        Json::Value metricsRecordJson, metricsRecordLabel;
         auto now = GetCurrentLogtailTime();
-        metricsRecordValue["time"]
+        metricsRecordJson["time"]
             = AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec;
         for (const auto& metric : metrics) {
-            metricsRecordValue[metric.first] = metric.second;
+            if (metric.first.compare("label.metric_category") == 0) {
+                metricsRecordJson[METRIC_KEY_CATEGORY] = metric.second;
+                continue;
+            }
+            if (metric.first.compare(0, METRIC_KEY_LABEL.length(), METRIC_KEY_LABEL) == 0) {
+                metricsRecordLabel[metric.first.substr(METRIC_KEY_LABEL.length() + 1)] = metric.second;
+                continue;
+            }
+            metricsRecordJson[metric.first.substr(METRIC_KEY_VALUE.length() + 1)] = metric.second;
         }
+        metricsRecordJson[METRIC_KEY_LABEL] = metricsRecordLabel;
         Json::StreamWriterBuilder writer;
         writer["indentation"] = "";
-        std::string jsonString = Json::writeString(writer, metricsRecordValue);
+        std::string jsonString = Json::writeString(writer, metricsRecordJson);
         oss << jsonString << '\n';
     }
     metricsContent = oss.str();

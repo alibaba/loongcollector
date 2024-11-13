@@ -124,7 +124,7 @@ void PipelineUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL(QueueKeyManager::GetInstance()->GetKey("test_config-flusher_sls-test_project#test_logstore"),
                       pipeline->GetContext().GetLogstoreKey());
     APSARA_TEST_EQUAL(0, pipeline->mInProcessCnt.load());
-    APSARA_TEST_EQUAL(3U, pipeline->mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_EQUAL(2U, pipeline->mMetricsRecordRef->GetLabels()->size());
     APSARA_TEST_TRUE(pipeline->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, configName));
     APSARA_TEST_TRUE(pipeline->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, "test_project"));
 
@@ -2702,7 +2702,7 @@ void PipelineUnittest::TestProcess() const {
     processor->Init(Json::Value(), ctx);
     pipeline.mProcessorLine.emplace_back(std::move(processor));
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, {});
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
     pipeline.mProcessorsInEventsTotal
         = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL);
     pipeline.mProcessorsInGroupsTotal
@@ -2750,7 +2750,7 @@ void PipelineUnittest::TestSend() const {
         configs.emplace_back(1, nullptr);
         pipeline.mRouter.Init(configs, ctx);
 
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, {});
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
         pipeline.mFlushersInGroupsTotal
             = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL);
         pipeline.mFlushersInEventsTotal
@@ -2816,7 +2816,7 @@ void PipelineUnittest::TestSend() const {
         configs.emplace_back(configJson.size(), nullptr);
         pipeline.mRouter.Init(configs, ctx);
 
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, {});
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
         pipeline.mFlushersInGroupsTotal
             = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL);
         pipeline.mFlushersInEventsTotal
