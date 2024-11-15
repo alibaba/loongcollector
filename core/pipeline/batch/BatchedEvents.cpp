@@ -66,6 +66,9 @@ BatchedEvents::~BatchedEvents() {
         case PipelineEvent::Type::SPAN:
             DestroyEvents<SpanEvent>(std::move(mEvents));
             break;
+        case PipelineEvent::Type::RAW:
+            DestroyEvents<RawEvent>(std::move(mEvents));
+            break;
         default:
             break;
     }

@@ -42,15 +42,26 @@ void PipelineEventPtrUnittest::TestIs() {
     PipelineEventPtr logEventPtr(mEventGroup->CreateLogEvent(), false, nullptr);
     PipelineEventPtr metricEventPtr(mEventGroup->CreateMetricEvent(), false, nullptr);
     PipelineEventPtr spanEventPtr(mEventGroup->CreateSpanEvent(), false, nullptr);
+    PipelineEventPtr rawEventPtr(mEventGroup->CreateRawEvent(), false, nullptr);
     APSARA_TEST_TRUE_FATAL(logEventPtr.Is<LogEvent>());
     APSARA_TEST_FALSE_FATAL(logEventPtr.Is<MetricEvent>());
     APSARA_TEST_FALSE_FATAL(logEventPtr.Is<SpanEvent>());
+    APSARA_TEST_FALSE_FATAL(logEventPtr.Is<RawEvent>());
+
     APSARA_TEST_FALSE_FATAL(metricEventPtr.Is<LogEvent>());
     APSARA_TEST_TRUE_FATAL(metricEventPtr.Is<MetricEvent>());
     APSARA_TEST_FALSE_FATAL(metricEventPtr.Is<SpanEvent>());
+    APSARA_TEST_FALSE_FATAL(metricEventPtr.Is<RawEvent>());
+
     APSARA_TEST_FALSE_FATAL(spanEventPtr.Is<LogEvent>());
     APSARA_TEST_FALSE_FATAL(spanEventPtr.Is<MetricEvent>());
     APSARA_TEST_TRUE_FATAL(spanEventPtr.Is<SpanEvent>());
+    APSARA_TEST_FALSE_FATAL(spanEventPtr.Is<RawEvent>());
+
+    APSARA_TEST_FALSE_FATAL(rawEventPtr.Is<LogEvent>());
+    APSARA_TEST_FALSE_FATAL(rawEventPtr.Is<MetricEvent>());
+    APSARA_TEST_FALSE_FATAL(rawEventPtr.Is<SpanEvent>());
+    APSARA_TEST_TRUE_FATAL(rawEventPtr.Is<RawEvent>());
 }
 
 void PipelineEventPtrUnittest::TestGet() {
@@ -78,6 +89,7 @@ void PipelineEventPtrUnittest::TestCopy() {
     mEventGroup->AddLogEvent();
     mEventGroup->AddMetricEvent();
     mEventGroup->AddSpanEvent();
+    mEventGroup->AddRawEvent();
     {
         auto& event = mEventGroup->MutableEvents()[0];
         event->SetTimestamp(12345678901);
@@ -99,6 +111,14 @@ void PipelineEventPtrUnittest::TestCopy() {
         event->SetTimestamp(12345678901);
         auto res = event.Copy();
         APSARA_TEST_NOT_EQUAL(event.Get<SpanEvent>(), res.Get<SpanEvent>());
+        APSARA_TEST_FALSE(res.IsFromEventPool());
+        APSARA_TEST_EQUAL(nullptr, res.GetEventPool());
+    }
+    {
+        auto& event = mEventGroup->MutableEvents()[3];
+        event->SetTimestamp(12345678901);
+        auto res = event.Copy();
+        APSARA_TEST_NOT_EQUAL(event.Get<RawEvent>(), res.Get<RawEvent>());
         APSARA_TEST_FALSE(res.IsFromEventPool());
         APSARA_TEST_EQUAL(nullptr, res.GetEventPool());
     }

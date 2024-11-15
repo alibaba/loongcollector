@@ -227,6 +227,9 @@ bool InputFile::CreateInnerProcessors() {
                 ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
             detail["AppendingLogPositionMeta"] = Json::Value(mFileReader.mAppendingLogPositionMeta);
         }
+        detail["EnableRawContent"]
+            = Json::Value(!mContext->HasNativeProcessors() && !mContext->IsExactlyOnceEnabled()
+                          && !mContext->IsFlushingThroughGoPipeline() && !mFileReader.mAppendingLogPositionMeta);
         if (!processor->Init(detail, *mContext)) {
             // should not happen
             return false;

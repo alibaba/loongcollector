@@ -23,6 +23,7 @@
 #include "models/MetricEvent.h"
 #include "models/PipelineEvent.h"
 #include "models/SpanEvent.h"
+#include "models/RawEvent.h"
 
 namespace logtail {
 class EventPool;
@@ -46,6 +47,9 @@ public:
         }
         if (typeid(T) == typeid(SpanEvent)) {
             return mData->GetType() == PipelineEvent::Type::SPAN;
+        }
+        if (typeid(T) == typeid(RawEvent)) {
+            return mData->GetType() == PipelineEvent::Type::RAW;
         }
         return false;
     }

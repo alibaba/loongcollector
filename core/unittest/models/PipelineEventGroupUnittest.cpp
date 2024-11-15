@@ -59,25 +59,31 @@ void PipelineEventGroupUnittest::TestCreateEvent() {
         auto logEvent = mEventGroup->CreateLogEvent();
         auto metricEvent = mEventGroup->CreateMetricEvent();
         auto spanEvent = mEventGroup->CreateSpanEvent();
+        auto rawEvent = mEventGroup->CreateRawEvent();
         APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
     }
     {
         auto logEvent = mEventGroup->CreateLogEvent(true);
         auto metricEvent = mEventGroup->CreateMetricEvent(true);
         auto spanEvent = mEventGroup->CreateSpanEvent(true);
+        auto rawEvent = mEventGroup->CreateRawEvent(true);
         APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
     }
     {
         auto logEvent = mEventGroup->CreateLogEvent(true, &mPool);
         auto metricEvent = mEventGroup->CreateMetricEvent(true, &mPool);
         auto spanEvent = mEventGroup->CreateSpanEvent(true, &mPool);
+        auto rawEvent = mEventGroup->CreateRawEvent(true, &mPool);
         APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
     }
 }
 
@@ -86,25 +92,31 @@ void PipelineEventGroupUnittest::TestAddEvent() {
         auto logEvent = mEventGroup->AddLogEvent();
         auto metricEvent = mEventGroup->AddMetricEvent();
         auto spanEvent = mEventGroup->AddSpanEvent();
+        auto rawEvent = mEventGroup->AddRawEvent();
         APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
     }
     {
         auto logEvent = mEventGroup->AddLogEvent(true);
         auto metricEvent = mEventGroup->AddMetricEvent(true);
         auto spanEvent = mEventGroup->AddSpanEvent(true);
+        auto rawEvent = mEventGroup->AddRawEvent(true);
         APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
     }
     {
         auto logEvent = mEventGroup->AddLogEvent(true, &mPool);
         auto metricEvent = mEventGroup->AddMetricEvent(true, &mPool);
         auto spanEvent = mEventGroup->AddSpanEvent(true, &mPool);
+        auto rawEvent = mEventGroup->AddRawEvent(true, &mPool);
         APSARA_TEST_EQUAL(mEventGroup.get(), logEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), metricEvent->mPipelineEventGroupPtr);
         APSARA_TEST_EQUAL(mEventGroup.get(), spanEvent->mPipelineEventGroupPtr);
+        APSARA_TEST_EQUAL(mEventGroup.get(), rawEvent->mPipelineEventGroupPtr);
     }
 }
 
@@ -112,9 +124,10 @@ void PipelineEventGroupUnittest::TestSwapEvents() {
     mEventGroup->AddLogEvent();
     mEventGroup->AddMetricEvent();
     mEventGroup->AddSpanEvent();
+    mEventGroup->AddRawEvent();
     EventsContainer eventContainer;
     mEventGroup->SwapEvents(eventContainer);
-    APSARA_TEST_EQUAL_FATAL(3U, eventContainer.size());
+    APSARA_TEST_EQUAL_FATAL(4U, eventContainer.size());
     APSARA_TEST_EQUAL_FATAL(0U, mEventGroup->GetEvents().size());
 }
 
@@ -122,6 +135,7 @@ void PipelineEventGroupUnittest::TestDestructor() {
     LogEvent* log = nullptr;
     MetricEvent* metric = nullptr;
     SpanEvent* span = nullptr;
+    RawEvent* raw = nullptr;
     {
         PipelineEventGroup g(make_shared<SourceBuffer>());
         log = g.AddLogEvent(true);
@@ -148,6 +162,14 @@ void PipelineEventGroupUnittest::TestDestructor() {
     APSARA_TEST_EQUAL(0, span->GetTimestamp());
     {
         PipelineEventGroup g(make_shared<SourceBuffer>());
+        raw = g.AddRawEvent(true);
+        raw->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mRawEventPool.size());
+    APSARA_TEST_EQUAL(raw, gThreadedEventPool.mRawEventPool.back());
+    APSARA_TEST_EQUAL(0, raw->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
         log = g.AddLogEvent(true, &mPool);
         log->SetTimestamp(1234567890);
     }
@@ -170,6 +192,14 @@ void PipelineEventGroupUnittest::TestDestructor() {
     APSARA_TEST_EQUAL(1U, mPool.mSpanEventPoolBak.size());
     APSARA_TEST_EQUAL(span, mPool.mSpanEventPoolBak.back());
     APSARA_TEST_EQUAL(0, span->GetTimestamp());
+    {
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        raw = g.AddRawEvent(true, &mPool);
+        raw->SetTimestamp(1234567890);
+    }
+    APSARA_TEST_EQUAL(1U, mPool.mRawEventPoolBak.size());
+    APSARA_TEST_EQUAL(raw, mPool.mRawEventPoolBak.back());
+    APSARA_TEST_EQUAL(0, raw->GetTimestamp());
 }
 
 void PipelineEventGroupUnittest::TestReserveEvents() {

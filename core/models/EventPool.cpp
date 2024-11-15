@@ -67,6 +67,15 @@ SpanEvent* EventPool::AcquireSpanEvent(PipelineEventGroup* ptr) {
     return AcquireEventNoLock(ptr, mSpanEventPool, mMinUnusedSpanEventsCnt);
 }
 
+RawEvent* EventPool::AcquireRawEvent(PipelineEventGroup* ptr) {
+    if (mEnableLock) {
+        TransferPoolIfEmpty(mRawEventPool, mRawEventPoolBak);
+        lock_guard<mutex> lock(mPoolMux);
+        return AcquireEventNoLock(ptr, mRawEventPool, mMinUnusedRawEventsCnt);
+    }
+    return AcquireEventNoLock(ptr, mRawEventPool, mMinUnusedRawEventsCnt);
+}
+
 void EventPool::Release(vector<LogEvent*>&& obj) {
     if (mEnableLock) {
         lock_guard<mutex> lock(mPoolBakMux);
@@ -91,6 +100,15 @@ void EventPool::Release(vector<SpanEvent*>&& obj) {
         mSpanEventPoolBak.insert(mSpanEventPoolBak.end(), obj.begin(), obj.end());
     } else {
         mSpanEventPool.insert(mSpanEventPool.end(), obj.begin(), obj.end());
+    }
+}
+
+void EventPool::Release(vector<RawEvent*>&& obj) {
+    if (mEnableLock) {
+        lock_guard<mutex> lock(mPoolBakMux);
+        mRawEventPoolBak.insert(mRawEventPoolBak.end(), obj.begin(), obj.end());
+    } else {
+        mRawEventPool.insert(mRawEventPool.end(), obj.begin(), obj.end());
     }
 }
 
@@ -131,10 +149,12 @@ void EventPool::CheckGC() {
             DoGC(mLogEventPool, mLogEventPoolBak, mMinUnusedLogEventsCnt, &mPoolBakMux, "log");
             DoGC(mMetricEventPool, mMetricEventPoolBak, mMinUnusedMetricEventsCnt, &mPoolBakMux, "metric");
             DoGC(mSpanEventPool, mSpanEventPoolBak, mMinUnusedSpanEventsCnt, &mPoolBakMux, "span");
+            DoGC(mRawEventPool, mRawEventPoolBak, mMinUnusedRawEventsCnt, &mPoolBakMux, "raw");
         } else {
             DoGC(mLogEventPool, mLogEventPoolBak, mMinUnusedLogEventsCnt, nullptr, "log");
             DoGC(mMetricEventPool, mMetricEventPoolBak, mMinUnusedMetricEventsCnt, nullptr, "metric");
             DoGC(mSpanEventPool, mSpanEventPoolBak, mMinUnusedSpanEventsCnt, nullptr, "span");
+            DoGC(mRawEventPool, mRawEventPoolBak, mMinUnusedRawEventsCnt, nullptr, "raw");
         }
         mLastGCTime = time(nullptr);
     }
@@ -150,6 +170,9 @@ void EventPool::DestroyAllEventPool() {
     for (auto& item : mSpanEventPool) {
         delete item;
     }
+    for (auto& item : mRawEventPool) {
+        delete item;
+    }
 }
 
 void EventPool::DestroyAllEventPoolBak() {
@@ -162,6 +185,9 @@ void EventPool::DestroyAllEventPoolBak() {
     for (auto& item : mSpanEventPoolBak) {
         delete item;
     }
+    for (auto& item : mRawEventPoolBak) {
+        delete item;
+    }
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -172,9 +198,11 @@ void EventPool::Clear() {
         mLogEventPool.clear();
         mMetricEventPool.clear();
         mSpanEventPool.clear();
+        mRawEventPool.clear();
         mMinUnusedLogEventsCnt = numeric_limits<size_t>::max();
         mMinUnusedMetricEventsCnt = numeric_limits<size_t>::max();
         mMinUnusedSpanEventsCnt = numeric_limits<size_t>::max();
+        mMinUnusedRawEventsCnt = numeric_limits<size_t>::max();
     }
     {
         lock_guard<mutex> lock(mPoolBakMux);
@@ -182,6 +210,7 @@ void EventPool::Clear() {
         mLogEventPoolBak.clear();
         mMetricEventPoolBak.clear();
         mSpanEventPoolBak.clear();
+        mRawEventPoolBak.clear();
     }
     mLastGCTime = 0;
 }

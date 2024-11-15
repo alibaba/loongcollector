@@ -24,6 +24,7 @@
 
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
+#include "models/RawEvent.h"
 #include "models/SpanEvent.h"
 
 namespace logtail {
@@ -39,9 +40,11 @@ public:
     LogEvent* AcquireLogEvent(PipelineEventGroup* ptr);
     MetricEvent* AcquireMetricEvent(PipelineEventGroup* ptr);
     SpanEvent* AcquireSpanEvent(PipelineEventGroup* ptr);
+    RawEvent* AcquireRawEvent(PipelineEventGroup* ptr);
     void Release(std::vector<LogEvent*>&& obj);
     void Release(std::vector<MetricEvent*>&& obj);
     void Release(std::vector<SpanEvent*>&& obj);
+    void Release(std::vector<RawEvent*>&& obj);
     void CheckGC();
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -80,16 +83,19 @@ private:
     std::vector<LogEvent*> mLogEventPool;
     std::vector<MetricEvent*> mMetricEventPool;
     std::vector<SpanEvent*> mSpanEventPool;
+    std::vector<RawEvent*> mRawEventPool;
 
     // only meaningful when mEnableLock is true
     std::mutex mPoolBakMux;
     std::vector<LogEvent*> mLogEventPoolBak;
     std::vector<MetricEvent*> mMetricEventPoolBak;
     std::vector<SpanEvent*> mSpanEventPoolBak;
+    std::vector<RawEvent*> mRawEventPoolBak;
 
     size_t mMinUnusedLogEventsCnt = std::numeric_limits<size_t>::max();
     size_t mMinUnusedMetricEventsCnt = std::numeric_limits<size_t>::max();
     size_t mMinUnusedSpanEventsCnt = std::numeric_limits<size_t>::max();
+    size_t mMinUnusedRawEventsCnt = std::numeric_limits<size_t>::max();
 
     time_t mLastGCTime = 0;
 

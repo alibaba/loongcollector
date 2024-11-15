@@ -20,8 +20,8 @@
 #include <string>
 
 #include "app_config/AppConfig.h"
-#include "constants/Constants.h"
 #include "common/ParamExtractor.h"
+#include "constants/Constants.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
@@ -57,6 +57,19 @@ bool ProcessorSplitMultilineLogStringNative::Init(const Json::Value& config) {
                               mContext->GetAlarm(),
                               errorMsg,
                               mAppendingLogPositionMeta,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    // EnableRawContent
+    if (!GetOptionalBoolParam(config, "EnableRawContent", mEnableRawContent, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mEnableRawContent,
                               sName,
                               mContext->GetConfigName(),
                               mContext->GetProjectName(),
@@ -303,21 +316,28 @@ void ProcessorSplitMultilineLogStringNative::CreateNewEvent(const StringView& co
                                                             const LogEvent& sourceEvent,
                                                             PipelineEventGroup& logGroup,
                                                             EventsContainer& newEvents) {
-    StringView sourceVal = sourceEvent.GetContent(mSourceKey);
-    std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent(true);
-    targetEvent->SetContentNoCopy(StringView(sourceKey.data, sourceKey.size), content);
-    targetEvent->SetTimestamp(
-        sourceEvent.GetTimestamp(),
-        sourceEvent.GetTimestampNanosecond()); // it is easy to forget other fields, better solution?
-    auto const offset = sourceEvent.GetPosition().first + (content.data() - sourceVal.data());
-    auto const length
-        = isLastLog ? sourceEvent.GetPosition().second - (content.data() - sourceVal.data()) : content.size() + 1;
-    targetEvent->SetPosition(offset, length);
-    if (mAppendingLogPositionMeta) {
-        StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
-        targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
+    if (mEnableRawContent) {
+        std::unique_ptr<RawEvent> targetEvent = logGroup.CreateRawEvent(true);
+        targetEvent->SetContentNoCopy(content);
+        targetEvent->SetTimestamp(sourceEvent.GetTimestamp(), sourceEvent.GetTimestampNanosecond());
+        newEvents.emplace_back(std::move(targetEvent), true, nullptr);
+    } else {
+        StringView sourceVal = sourceEvent.GetContent(mSourceKey);
+        std::unique_ptr<LogEvent> targetEvent = logGroup.CreateLogEvent(true);
+        targetEvent->SetContentNoCopy(StringView(sourceKey.data, sourceKey.size), content);
+        targetEvent->SetTimestamp(
+            sourceEvent.GetTimestamp(),
+            sourceEvent.GetTimestampNanosecond()); // it is easy to forget other fields, better solution?
+        auto const offset = sourceEvent.GetPosition().first + (content.data() - sourceVal.data());
+        auto const length
+            = isLastLog ? sourceEvent.GetPosition().second - (content.data() - sourceVal.data()) : content.size() + 1;
+        targetEvent->SetPosition(offset, length);
+        if (mAppendingLogPositionMeta) {
+            StringBuffer offsetStr = logGroup.GetSourceBuffer()->CopyString(ToString(offset));
+            targetEvent->SetContentNoCopy(LOG_RESERVED_KEY_FILE_OFFSET, StringView(offsetStr.data, offsetStr.size));
+        }
+        newEvents.emplace_back(std::move(targetEvent), true, nullptr);
     }
-    newEvents.emplace_back(std::move(targetEvent), true, nullptr);
 }
 
 void ProcessorSplitMultilineLogStringNative::HandleUnmatchLogs(const StringView& sourceVal,

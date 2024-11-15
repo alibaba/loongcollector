@@ -109,6 +109,16 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             break;
         case PipelineEvent::Type::SPAN:
             break;
+        case PipelineEvent::Type::RAW:
+            for (size_t i = 0; i < group.mEvents.size(); ++i) {
+                const auto& e = group.mEvents[i].Cast<RawEvent>();
+                if (e.GetContent().empty()) {
+                    continue;
+                }
+                size_t contentSZ = GetLogContentSize(DEFAULT_CONTENT_KEY.size(), e.GetContent().size());
+                logGroupSZ += GetLogSize(contentSZ, enableNs && e.GetTimestampNanosecond(), logSZ[i]);
+            }
+            break;
         default:
             break;
     }
@@ -138,32 +148,43 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
     switch (eventType) {
         case PipelineEvent::Type::LOG:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
-                const auto& logEvent = group.mEvents[i].Cast<LogEvent>();
+                const auto& e = group.mEvents[i].Cast<LogEvent>();
                 serializer.StartToAddLog(logSZ[i]);
-                serializer.AddLogTime(logEvent.GetTimestamp());
-                for (const auto& kv : logEvent) {
+                serializer.AddLogTime(e.GetTimestamp());
+                for (const auto& kv : e) {
                     serializer.AddLogContent(kv.first, kv.second);
                 }
-                if (enableNs && logEvent.GetTimestampNanosecond()) {
-                    serializer.AddLogTimeNs(logEvent.GetTimestampNanosecond().value());
+                if (enableNs && e.GetTimestampNanosecond()) {
+                    serializer.AddLogTimeNs(e.GetTimestampNanosecond().value());
                 }
             }
             break;
         case PipelineEvent::Type::METRIC:
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
-                const auto& metricEvent = group.mEvents[i].Cast<MetricEvent>();
-                if (metricEvent.Is<std::monostate>()) {
+                const auto& e = group.mEvents[i].Cast<MetricEvent>();
+                if (e.Is<std::monostate>()) {
                     continue;
                 }
                 serializer.StartToAddLog(logSZ[i]);
-                serializer.AddLogTime(metricEvent.GetTimestamp());
-                serializer.AddLogContentMetricLabel(metricEvent, metricEventContentCache[i].second);
-                serializer.AddLogContentMetricTimeNano(metricEvent);
+                serializer.AddLogTime(e.GetTimestamp());
+                serializer.AddLogContentMetricLabel(e, metricEventContentCache[i].second);
+                serializer.AddLogContentMetricTimeNano(e);
                 serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].first);
-                serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, metricEvent.GetName());
+                serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, e.GetName());
             }
             break;
         case PipelineEvent::Type::SPAN:
+            break;
+        case PipelineEvent::Type::RAW:
+            for (size_t i = 0; i < group.mEvents.size(); ++i) {
+                const auto& e = group.mEvents[i].Cast<RawEvent>();
+                serializer.StartToAddLog(logSZ[i]);
+                serializer.AddLogTime(e.GetTimestamp());
+                serializer.AddLogContent(DEFAULT_CONTENT_KEY, e.GetContent());
+                if (enableNs && e.GetTimestampNanosecond()) {
+                    serializer.AddLogTimeNs(e.GetTimestampNanosecond().value());
+                }
+            }
             break;
         default:
             break;

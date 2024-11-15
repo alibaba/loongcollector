@@ -81,12 +81,14 @@ public:
     std::unique_ptr<LogEvent> CreateLogEvent(bool fromPool = false, EventPool* pool = nullptr);
     std::unique_ptr<MetricEvent> CreateMetricEvent(bool fromPool = false, EventPool* pool = nullptr);
     std::unique_ptr<SpanEvent> CreateSpanEvent(bool fromPool = false, EventPool* pool = nullptr);
+    std::unique_ptr<RawEvent> CreateRawEvent(bool fromPool = false, EventPool* pool = nullptr);
 
     const EventsContainer& GetEvents() const { return mEvents; }
     EventsContainer& MutableEvents() { return mEvents; }
     LogEvent* AddLogEvent(bool fromPool = false, EventPool* pool = nullptr);
     MetricEvent* AddMetricEvent(bool fromPool = false, EventPool* pool = nullptr);
     SpanEvent* AddSpanEvent(bool fromPool = false, EventPool* pool = nullptr);
+    RawEvent* AddRawEvent(bool fromPool = false, EventPool* pool = nullptr);
     void SwapEvents(EventsContainer& other) { mEvents.swap(other); }
     void ReserveEvents(size_t size) { mEvents.reserve(size); }
 

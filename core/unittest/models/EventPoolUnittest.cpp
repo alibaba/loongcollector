@@ -75,6 +75,19 @@ void EventPoolUnittest::TestNoLock() {
         APSARA_TEST_EQUAL(0U, pool.mMinUnusedSpanEventsCnt);
         APSARA_TEST_EQUAL(&g, e->GetPipelineEventGroupPtr());
     }
+    {
+        auto e = pool.AcquireRawEvent(mGroup.get());
+        pool.Release({e});
+        APSARA_TEST_EQUAL(1U, pool.mRawEventPool.size());
+        APSARA_TEST_EQUAL(e, pool.mRawEventPool[0]);
+        APSARA_TEST_EQUAL(mGroup.get(), e->GetPipelineEventGroupPtr());
+
+        PipelineEventGroup g(make_shared<SourceBuffer>());
+        e = pool.AcquireRawEvent(&g);
+        APSARA_TEST_EQUAL(0U, pool.mRawEventPool.size());
+        APSARA_TEST_EQUAL(0U, pool.mMinUnusedRawEventsCnt);
+        APSARA_TEST_EQUAL(&g, e->GetPipelineEventGroupPtr());
+    }
 }
 
 void EventPoolUnittest::TestLock() {
@@ -133,6 +146,24 @@ void EventPoolUnittest::TestLock() {
         pool.AcquireSpanEvent(mGroup.get());
         APSARA_TEST_EQUAL(0U, pool.mSpanEventPoolBak.size());
         APSARA_TEST_EQUAL(1U, pool.mSpanEventPool.size());
+    }
+    {
+        auto e = pool.AcquireRawEvent(mGroup.get());
+        auto e1 = pool.AcquireRawEvent(mGroup.get());
+        pool.Release({e});
+        APSARA_TEST_EQUAL(1U, pool.mRawEventPoolBak.size());
+        APSARA_TEST_EQUAL(e, pool.mRawEventPoolBak[0]);
+        APSARA_TEST_EQUAL(mGroup.get(), e->GetPipelineEventGroupPtr());
+
+        e = pool.AcquireRawEvent(mGroup.get());
+        APSARA_TEST_EQUAL(0U, pool.mRawEventPoolBak.size());
+        APSARA_TEST_EQUAL(0U, pool.mRawEventPool.size());
+        APSARA_TEST_EQUAL(mGroup.get(), e->GetPipelineEventGroupPtr());
+
+        pool.Release(vector<RawEvent*>{e, e1});
+        pool.AcquireRawEvent(mGroup.get());
+        APSARA_TEST_EQUAL(0U, pool.mRawEventPoolBak.size());
+        APSARA_TEST_EQUAL(1U, pool.mRawEventPool.size());
     }
 }
 
