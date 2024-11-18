@@ -36,7 +36,6 @@
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
 #include "common/CompressTools.h"
-#include "constants/Constants.h"
 #include "common/ErrorUtil.h"
 #include "common/ExceptionBase.h"
 #include "common/FileSystemUtil.h"
@@ -46,10 +45,10 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
+#include "constants/Constants.h"
 #include "file_server/EventDispatcher.h"
-#include "file_server/event_handler/EventHandler.h"
 #include "file_server/FileServer.h"
-#include "monitor/LogFileProfiler.h"
+#include "file_server/event_handler/EventHandler.h"
 #include "monitor/AlarmManager.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineManager.h"
@@ -101,7 +100,7 @@ DEFINE_FLAG_INT32(docker_config_update_interval, "interval between docker config
 
 namespace logtail {
 
-// 
+//
 ParseConfResult ParseConfig(const std::string& configName, Json::Value& jsonRoot) {
     // Get full path, if it is a relative path, prepend process execution dir.
     std::string fullPath = configName;
@@ -200,7 +199,7 @@ ConfigManager::ConfigManager() {
     // CorrectionLogtailSysConfDir(); // first create dir then rewrite system-uuid file in GetSystemUUID
     // use a thread to get uuid, work around for CalculateDmiUUID hang
     // mUUID = CalculateDmiUUID();
-    // mInstanceId = CalculateRandomUUID() + "_" + LogFileProfiler::mIpAddr + "_" + ToString(time(NULL));
+    // mInstanceId = CalculateRandomUUID() + "_" + LoongCollectorMonitor::mIpAddr + "_" + ToString(time(NULL));
     // ReloadMappingConfig();
 }
 

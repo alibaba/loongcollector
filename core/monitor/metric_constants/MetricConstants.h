@@ -26,6 +26,7 @@ namespace logtail {
 extern const std::string METRIC_LABEL_KEY_ALIUIDS;
 extern const std::string METRIC_LABEL_KEY_INSTANCE_ID;
 extern const std::string METRIC_LABEL_KEY_START_TIME;
+extern const std::string METRIC_LABEL_KEY_HOSTNAME;
 extern const std::string METRIC_LABEL_KEY_OS;
 extern const std::string METRIC_LABEL_KEY_OS_DETAIL;
 extern const std::string METRIC_LABEL_KEY_PROJECT;

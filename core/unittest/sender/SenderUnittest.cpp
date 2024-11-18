@@ -46,7 +46,6 @@
 #include <vector>
 
 #include "checkpoint/CheckpointManagerV2.h"
-#include "constants/Constants.h"
 #include "common/FileEncryption.h"
 #include "common/FileSystemUtil.h"
 #include "common/Lock.h"
@@ -55,10 +54,11 @@
 #include "common/StringTools.h"
 #include "common/Thread.h"
 #include "common/WaitObject.h"
+#include "constants/Constants.h"
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
-#include "monitor/LogIntegrity.h"
 #include "monitor/AlarmManager.h"
+#include "monitor/LogIntegrity.h"
 #include "protobuf/sls/metric.pb.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "runner/ProcessorRunner.h"
@@ -850,7 +850,9 @@ public:
         sLogger->set_level(spdlog::level::trace);
         printf("Test case setup.\n");
         srand(time(NULL));
-        Sender::Instance()->AddEndpointEntry(STRING_FLAG(default_region_name), STRING_FLAG(logtail_send_address), SLSClientManager::EndpointSourceType::LOCAL);
+        Sender::Instance()->AddEndpointEntry(STRING_FLAG(default_region_name),
+                                             STRING_FLAG(logtail_send_address),
+                                             SLSClientManager::EndpointSourceType::LOCAL);
         STRING_FLAG(profile_project_name) = "sls-admin";
         INT32_FLAG(sls_host_update_interval) = 1;
         INT32_FLAG(logtail_alarm_interval) = 600;
@@ -2244,59 +2246,6 @@ public:
         CaseCleanUp();
         AppConfig::GetInstance()->mMaxBufferNum = INT32_FLAG(max_buffer_num);
         LOG_INFO(sLogger, ("TestFlushOut() end", time(NULL)));
-    }
-
-    void TestDumpSnapshot() {
-        LOG_INFO(sLogger, ("TestDumpSnapshot() begin", time(NULL)));
-        CaseSetUp();
-        EnableNetWork();
-        LogFileProfiler::GetInstance()->mSendInterval = 3600;
-        LogFileProfiler::GetInstance()->SendProfileData(true); // Update mLastSendTime.
-
-        OneJob(10, gRootDir, "Job", true, time(NULL));
-        WaitForFileBeenRead();
-        sleep(5);
-        LogFileProfiler::GetInstance()->SendProfileData(true);
-        Json::Value root;
-        ParseConfig(STRING_FLAG(logtail_profile_snapshot), root);
-        LOG_INFO(sLogger, ("snapshot", root.toStyledString()));
-        APSARA_TEST_TRUE(root["version"].asString().size() > 1);
-        APSARA_TEST_EQUAL(root["ip"].asString(), LogFileProfiler::mIpAddr);
-        int32_t timeInterval = root["end_time"].asInt64() - root["begin_time"].asInt64();
-#if defined(__linux__)
-        APSARA_TEST_TRUE_DESC(timeInterval >= 5 && timeInterval <= 7, timeInterval);
-#elif defined(_MSC_VER)
-        EXPECT_TRUE(timeInterval >= 5 && timeInterval <= 20);
-#endif
-        APSARA_TEST_EQUAL(root["detail"].size(), 1);
-        Json::Value categoryDetail = root["detail"][0];
-        APSARA_TEST_EQUAL(categoryDetail["project"].asString(), "1000000_proj");
-        APSARA_TEST_EQUAL(categoryDetail["logstore"].asString(), "app_log");
-        APSARA_TEST_EQUAL(StringTo<int64_t>(categoryDetail["split_lines"].asString()), 10);
-        APSARA_TEST_EQUAL(StringTo<int64_t>(categoryDetail["parse_fail_lines"].asString()), 0);
-        APSARA_TEST_TRUE(StringTo<int64_t>(categoryDetail["read_bytes"].asString()) > 0);
-
-        OneJob(100, gRootDir, "Job", true, time(NULL));
-        WaitForFileBeenRead();
-        sleep(5);
-        LogFileProfiler::GetInstance()->SendProfileData(true);
-
-        ParseConfig(STRING_FLAG(logtail_profile_snapshot), root);
-        LOG_INFO(sLogger, ("snapshot", root.toStyledString()));
-        APSARA_TEST_TRUE(root["version"].asString().size() > 1);
-        APSARA_TEST_EQUAL(root["ip"].asString(), LogFileProfiler::mIpAddr);
-        timeInterval = root["end_time"].asInt64() - root["begin_time"].asInt64();
-        APSARA_TEST_TRUE_DESC(timeInterval >= 5 && timeInterval <= 20, timeInterval);
-        APSARA_TEST_EQUAL(root["detail"].size(), 1);
-        categoryDetail = root["detail"][0];
-        APSARA_TEST_EQUAL(categoryDetail["project"].asString(), "1000000_proj");
-        APSARA_TEST_EQUAL(categoryDetail["logstore"].asString(), "app_log");
-        APSARA_TEST_EQUAL(StringTo<int64_t>(categoryDetail["split_lines"].asString()), 100);
-        APSARA_TEST_EQUAL(StringTo<int64_t>(categoryDetail["parse_fail_lines"].asString()), 0);
-        APSARA_TEST_TRUE(StringTo<int64_t>(categoryDetail["read_bytes"].asString()) > 0);
-
-        CaseCleanUp();
-        LOG_INFO(sLogger, ("TestDumpSnapshot() end", time(NULL)));
     }
 
     void TestMergeByMinute() {

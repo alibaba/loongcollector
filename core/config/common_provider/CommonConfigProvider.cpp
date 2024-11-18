@@ -22,7 +22,6 @@
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
-#include "constants/Constants.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/UUIDUtil.h"
@@ -30,8 +29,9 @@
 #include "common/version.h"
 #include "config/PipelineConfig.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
+#include "constants/Constants.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
+#include "monitor/Monitor.h"
 #include "sdk/Common.h"
 #include "sdk/CurlImp.h"
 #include "sdk/Exception.h"
@@ -206,11 +206,11 @@ string CommonConfigProvider::GetInstanceId() {
 }
 
 void CommonConfigProvider::FillAttributes(configserver::proto::v2::AgentAttributes& attributes) {
-    attributes.set_hostname(LogFileProfiler::mHostname);
-    attributes.set_ip(LogFileProfiler::mIpAddr);
+    attributes.set_hostname(LoongCollectorMonitor::mHostname);
+    attributes.set_ip(LoongCollectorMonitor::mIpAddr);
     attributes.set_version(ILOGTAIL_VERSION);
     google::protobuf::Map<string, string>* extras = attributes.mutable_extras();
-    extras->insert({"osDetail", LogFileProfiler::mOsDetail});
+    extras->insert({"osDetail", LoongCollectorMonitor::mOsDetail});
 }
 
 void addConfigInfoToRequest(const std::pair<const string, logtail::ConfigInfo>& configInfo,

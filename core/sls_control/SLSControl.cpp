@@ -20,13 +20,12 @@
 #include <sys/utsname.h>
 #endif
 
-#include "curl/curl.h"
-
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/version.h"
+#include "curl/curl.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
+#include "monitor/Monitor.h"
 #ifdef __ENTERPRISE__
 #include "sls_control/EnterpriseSLSControl.h"
 #endif
@@ -78,8 +77,8 @@ void SLSControl::GenerateUserAgent() {
     if (-1 == uname(buf)) {
         LOG_WARNING(
             sLogger,
-            ("get os info part of user agent failed", errno)("use default os info", LogFileProfiler::mOsDetail));
-        os = LogFileProfiler::mOsDetail;
+            ("get os info part of user agent failed", errno)("use default os info", LoongCollectorMonitor::mOsDetail));
+        os = LoongCollectorMonitor::mOsDetail;
     } else {
         char* pch = strchr(buf->release, '-');
         if (pch) {
@@ -93,10 +92,10 @@ void SLSControl::GenerateUserAgent() {
     }
     delete buf;
 #elif defined(_MSC_VER)
-    os = LogFileProfiler::mOsDetail;
+    os = LoongCollectorMonitor::mOsDetail;
 #endif
 
-    mUserAgent = string("ilogtail/") + ILOGTAIL_VERSION + " (" + os + ") ip/" + LogFileProfiler::mIpAddr + " env/"
+    mUserAgent = string("ilogtail/") + ILOGTAIL_VERSION + " (" + os + ") ip/" + LoongCollectorMonitor::mIpAddr + " env/"
         + GetRunningEnvironment();
     if (!STRING_FLAG(custom_user_agent).empty()) {
         mUserAgent += " " + STRING_FLAG(custom_user_agent);

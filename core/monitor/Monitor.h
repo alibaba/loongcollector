@@ -21,8 +21,8 @@
 #include <mutex>
 #include <string>
 
-#include "MetricManager.h"
 #include "MetricConstants.h"
+#include "MetricManager.h"
 #include "MetricStore.h"
 
 #if defined(_MSC_VER)
@@ -199,7 +199,20 @@ public:
     void SetAgentOpenFdTotal(uint64_t total) { mAgentOpenFdTotal->Set(total); }
     void SetAgentConfigTotal(uint64_t total) { mAgentConfigTotal->Set(total); }
 
+    static std::string mHostname;
+    static std::string mIpAddr;
+    static std::string mOsDetail;
+    static std::string mUsername;
+    static int32_t mSystemBootTime;
+    static std::string mECSInstanceID;
+    static std::string mECSUserID;
+    static std::string mECSRegionID;
+    static std::string mStartTime;
+
 private:
+    LoongCollectorMonitor();
+    ~LoongCollectorMonitor();
+
     // MetricRecord
     MetricsRecordRef mMetricsRecordRef;
 

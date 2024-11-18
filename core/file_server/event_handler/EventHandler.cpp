@@ -1071,18 +1071,6 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
     int32_t pushRetry = 0;
     if (!logBuffer->rawBuffer.empty()) {
         reader->ReportMetrics(logBuffer->readLength);
-        LogFileProfiler::GetInstance()->AddProfilingReadBytes(reader->GetConfigName(),
-                                                              reader->GetRegion(),
-                                                              reader->GetProject(),
-                                                              reader->GetLogstore(),
-                                                              reader->GetConvertedPath(),
-                                                              reader->GetHostLogPath(),
-                                                              reader->GetExtraTags(),
-                                                              reader->GetDevInode().dev,
-                                                              reader->GetDevInode().inode,
-                                                              reader->GetFileSize(),
-                                                              reader->GetLastFilePos(),
-                                                              time(NULL));
         PipelineEventGroup group = LogFileReader::GenerateEventGroup(reader, logBuffer);
 
         while (!ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), 0, std::move(group))) // 10ms

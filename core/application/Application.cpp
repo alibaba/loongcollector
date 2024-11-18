@@ -40,7 +40,6 @@
 #include "file_server/event_handler/LogInput.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
 #include "monitor/MetricExportor.h"
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
@@ -112,7 +111,7 @@ void Application::Init() {
     AppConfig::GetInstance()->LoadAppConfig(GetAgentConfigFile());
 
     // Initialize basic information: IP, hostname, etc.
-    LogFileProfiler::GetInstance();
+    LoongCollectorMonitor::GetInstance();
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
     EnterpriseConfigProvider::GetInstance()->LoadRegionConfig();
@@ -133,25 +132,25 @@ void Application::Init() {
     const string& interface = AppConfig::GetInstance()->GetBindInterface();
     const string& configIP = AppConfig::GetInstance()->GetConfigIP();
     if (!configIP.empty()) {
-        LogFileProfiler::mIpAddr = configIP;
+        LoongCollectorMonitor::mIpAddr = configIP;
         LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_ip", GetHostIp());
     } else if (!interface.empty()) {
-        LogFileProfiler::mIpAddr = GetHostIp(interface);
-        if (LogFileProfiler::mIpAddr.empty()) {
+        LoongCollectorMonitor::mIpAddr = GetHostIp(interface);
+        if (LoongCollectorMonitor::mIpAddr.empty()) {
             LOG_WARNING(sLogger,
                         ("failed to get ip from interface", "try to get any available ip")("interface", interface));
         }
-    } else if (LogFileProfiler::mIpAddr.empty()) {
+    } else if (LoongCollectorMonitor::mIpAddr.empty()) {
         LOG_WARNING(sLogger, ("failed to get ip from hostname or eth0 or bond0", "try to get any available ip"));
     }
-    if (LogFileProfiler::mIpAddr.empty()) {
-        LogFileProfiler::mIpAddr = GetAnyAvailableIP();
-        LOG_INFO(sLogger, ("get available ip succeeded", LogFileProfiler::mIpAddr));
+    if (LoongCollectorMonitor::mIpAddr.empty()) {
+        LoongCollectorMonitor::mIpAddr = GetAnyAvailableIP();
+        LOG_INFO(sLogger, ("get available ip succeeded", LoongCollectorMonitor::mIpAddr));
     }
 
     const string& configHostName = AppConfig::GetInstance()->GetConfigHostName();
     if (!configHostName.empty()) {
-        LogFileProfiler::mHostname = configHostName;
+        LoongCollectorMonitor::mHostname = configHostName;
         LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_hostname", GetHostName());
     }
 
@@ -165,12 +164,12 @@ void Application::Init() {
 #endif
 
     int32_t systemBootTime = AppConfig::GetInstance()->GetSystemBootTime();
-    LogFileProfiler::mSystemBootTime = systemBootTime > 0 ? systemBootTime : GetSystemBootTime();
+    LoongCollectorMonitor::mSystemBootTime = systemBootTime > 0 ? systemBootTime : GetSystemBootTime();
 
     // generate app_info.json
     Json::Value appInfoJson;
-    appInfoJson["ip"] = Json::Value(LogFileProfiler::mIpAddr);
-    appInfoJson["hostname"] = Json::Value(LogFileProfiler::mHostname);
+    appInfoJson["ip"] = Json::Value(LoongCollectorMonitor::mIpAddr);
+    appInfoJson["hostname"] = Json::Value(LoongCollectorMonitor::mHostname);
     appInfoJson["UUID"] = Json::Value(Application::GetInstance()->GetUUID());
     appInfoJson["instance_id"] = Json::Value(Application::GetInstance()->GetInstanceId());
 #ifdef __ENTERPRISE__
@@ -189,7 +188,7 @@ void Application::Init() {
 #define ILOGTAIL_COMPILER VERSION_STR(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__)
 #endif
     appInfoJson["compiler"] = Json::Value(ILOGTAIL_COMPILER);
-    appInfoJson["os"] = Json::Value(LogFileProfiler::mOsDetail);
+    appInfoJson["os"] = Json::Value(LoongCollectorMonitor::mOsDetail);
     appInfoJson["update_time"] = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
     string appInfo = appInfoJson.toStyledString();
     OverwriteFile(GetAgentAppInfoFile(), appInfo);
@@ -197,8 +196,8 @@ void Application::Init() {
 }
 
 void Application::Start() { // GCOVR_EXCL_START
-    LogFileProfiler::mStartTime = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
-    LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", LogFileProfiler::mStartTime);
+    LoongCollectorMonitor::mStartTime = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
+    LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", LoongCollectorMonitor::mStartTime);
 
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
     InitWindowsSignalObject();
@@ -287,7 +286,6 @@ void Application::Start() { // GCOVR_EXCL_START
             lastConfigCheckTime = curTime;
         }
         if (curTime - lastProfilingCheckTime >= INT32_FLAG(profiling_check_interval)) {
-            LogFileProfiler::GetInstance()->SendProfileData();
             MetricExportor::GetInstance()->PushMetrics(false);
             lastProfilingCheckTime = curTime;
         }
@@ -330,7 +328,7 @@ void Application::Start() { // GCOVR_EXCL_START
 } // GCOVR_EXCL_STOP
 
 void Application::GenerateInstanceId() {
-    mInstanceId = CalculateRandomUUID() + "_" + LogFileProfiler::mIpAddr + "_" + ToString(mStartTime);
+    mInstanceId = CalculateRandomUUID() + "_" + LoongCollectorMonitor::mIpAddr + "_" + ToString(mStartTime);
 }
 
 bool Application::TryGetUUID() {

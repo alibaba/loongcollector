@@ -30,7 +30,6 @@
 #include "file_server/reader/LogFileReader.h"
 #include "json/value.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
 #ifdef __ENTERPRISE__
@@ -433,14 +432,6 @@ string GetAgentSnapshotDir() {
     }
 }
 
-string GetAgentProfileLogName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return "ilogtail_profile.LOG";
-    } else {
-        return "loongcollector_profile.LOG";
-    }
-}
-
 string GetAgentStatusLogName() {
     if (BOOL_FLAG(logtail_mode)) {
         return "ilogtail_status.LOG";
@@ -448,15 +439,6 @@ string GetAgentStatusLogName() {
         return "loongcollector_status.LOG";
     }
 }
-
-string GetProfileSnapshotDumpFileName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return GetProcessExecutionDir() + STRING_FLAG(logtail_profile_snapshot);
-    } else {
-        return GetAgentLogDir() + "loongcollector_profile_snapshot";
-    }
-}
-
 
 string GetObserverEbpfHostPath() {
     if (BOOL_FLAG(logtail_mode)) {
@@ -884,14 +866,10 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
                        "reader_close_unused_file_time",
                        "ALIYUN_LOGTAIL_READER_CLOSE_UNUSED_FILE_TIME");
 
-    if (confJson.isMember("log_profile_save_interval") && confJson["log_profile_save_interval"].isInt())
-        LogFileProfiler::GetInstance()->SetProfileInterval(confJson["log_profile_save_interval"].asInt());
-
     LOG_DEBUG(sLogger,
               ("logreader delete interval", INT32_FLAG(logreader_filedeleted_remove_interval))(
                   "check handler interval", INT32_FLAG(check_handler_timeout_interval))(
-                  "reader close interval", INT32_FLAG(reader_close_unused_file_time))(
-                  "profile interval", LogFileProfiler::GetInstance()->GetProfileInterval()));
+                  "reader close interval", INT32_FLAG(reader_close_unused_file_time)));
 
 
     if (confJson.isMember("cpu_usage_limit")) {

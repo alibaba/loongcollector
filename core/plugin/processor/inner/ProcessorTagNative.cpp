@@ -21,8 +21,9 @@
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/Flags.h"
-#include "protobuf/sls/sls_logs.pb.h"
+#include "monitor/Monitor.h"
 #include "pipeline/Pipeline.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -69,8 +70,8 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     }
 
     // process level
-    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LogFileProfiler::mHostname);
-    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LogFileProfiler::mIpAddr);
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LoongCollectorMonitor::mHostname);
+    logGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
     auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_MACHINE_UUID, StringView(sb.data, sb.size));
     static const vector<sls_logs::LogTag>& sEnvTags = AppConfig::GetInstance()->GetEnvTags();

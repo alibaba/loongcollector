@@ -26,7 +26,7 @@
 #include "common/StringTools.h"
 #include "common/version.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
+#include "monitor/Monitor.h"
 #include "sdk/Common.h"
 #include "sdk/CurlImp.h"
 #include "sdk/Exception.h"
@@ -112,7 +112,8 @@ void LegacyCommonConfigProvider::CheckUpdateThread() {
     }
 }
 
-LegacyCommonConfigProvider::ConfigServerAddress LegacyCommonConfigProvider::GetOneConfigServerAddress(bool changeConfigServer) {
+LegacyCommonConfigProvider::ConfigServerAddress
+LegacyCommonConfigProvider::GetOneConfigServerAddress(bool changeConfigServer) {
     if (0 == mConfigServerAddresses.size()) {
         return ConfigServerAddress("", -1); // No address available
     }
@@ -158,7 +159,7 @@ LegacyCommonConfigProvider::SendHeartbeat(const ConfigServerAddress& configServe
     heartBeatReq.set_agent_id(Application::GetInstance()->GetInstanceId());
     heartBeatReq.set_agent_type("iLogtail");
     attributes.set_version(ILOGTAIL_VERSION);
-    attributes.set_ip(LogFileProfiler::mIpAddr);
+    attributes.set_ip(LoongCollectorMonitor::mIpAddr);
     heartBeatReq.mutable_attributes()->MergeFrom(attributes);
     heartBeatReq.mutable_tags()->MergeFrom({GetConfigServerTags().begin(), GetConfigServerTags().end()});
     heartBeatReq.set_running_status("");
@@ -289,8 +290,9 @@ void LegacyCommonConfigProvider::UpdateRemoteConfig(
     if (ec) {
         StopUsingConfigServer();
         LOG_ERROR(sLogger,
-                  ("failed to create dir for legacy common configs", "stop receiving config from legacy common config server")(
-                      "dir", mPipelineSourceDir.string())("error code", ec.value())("error msg", ec.message()));
+                  ("failed to create dir for legacy common configs",
+                   "stop receiving config from legacy common config server")("dir", mPipelineSourceDir.string())(
+                      "error code", ec.value())("error msg", ec.message()));
         return;
     }
 

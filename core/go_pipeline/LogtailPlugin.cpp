@@ -26,8 +26,8 @@
 #include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
 #include "monitor/AlarmManager.h"
+#include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
 #include "pipeline/queue/SenderQueueManager.h"
 #include "provider/Provider.h"
@@ -66,8 +66,8 @@ LogtailPlugin::LogtailPlugin() {
     mPluginCfg["LoongcollectorLogDir"] = GetAgentLogDir();
     mPluginCfg["LoongcollectorDataDir"] = GetAgentDataDir();
     mPluginCfg["LoongcollectorThirdPartyDir"] = GetAgentThirdPartyDir();
-    mPluginCfg["HostIP"] = LogFileProfiler::mIpAddr;
-    mPluginCfg["Hostname"] = LogFileProfiler::mHostname;
+    mPluginCfg["HostIP"] = LoongCollectorMonitor::mIpAddr;
+    mPluginCfg["Hostname"] = LoongCollectorMonitor::mHostname;
     mPluginCfg["EnableContainerdUpperDirDetect"] = BOOL_FLAG(enable_containerd_upper_dir_detect);
     mPluginCfg["EnableSlsMetricsFormat"] = BOOL_FLAG(enable_sls_metrics_format);
 }
@@ -616,4 +616,3 @@ K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
     }
     return K8sContainerMeta();
 }
-

@@ -46,7 +46,6 @@
 #include "file_server/reader/GloablFileDescriptorManager.h"
 #include "file_server/reader/JsonLogFileReader.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
@@ -296,7 +295,7 @@ bool LogFileReader::ShouldForceReleaseDeletedFileFd() {
 }
 
 void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t eoConcurrency) {
-    mSourceId = LogFileProfiler::mIpAddr + "_" + mReaderConfig.second->GetConfigName() + "_" + mHostLogPath + "_"
+    mSourceId = LoongCollectorMonitor::mIpAddr + "_" + mReaderConfig.second->GetConfigName() + "_" + mHostLogPath + "_"
         + CalculateRandomUUID();
 
     if (!tailExisted) {

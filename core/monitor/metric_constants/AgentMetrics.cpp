@@ -22,6 +22,7 @@ namespace logtail {
 const string METRIC_LABEL_KEY_ALIUIDS = "aliuids";
 const string METRIC_LABEL_KEY_INSTANCE_ID = "instance_id";
 const string METRIC_LABEL_KEY_START_TIME = "start_time";
+const string METRIC_LABEL_KEY_HOSTNAME = "hostname";
 const string METRIC_LABEL_KEY_OS = "os";
 const string METRIC_LABEL_KEY_OS_DETAIL = "os_detail";
 const string METRIC_LABEL_KEY_PROJECT = "project";

@@ -21,7 +21,7 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
-#include "monitor/LogFileProfiler.h"
+#include "monitor/Monitor.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/SendResult.h"
 #include "sdk/Exception.h"
@@ -122,7 +122,7 @@ void SLSClientManager::Init() {
                                                   STRING_FLAG(default_access_key_id),
                                                   STRING_FLAG(default_access_key),
                                                   INT32_FLAG(sls_client_send_timeout),
-                                                  LogFileProfiler::mIpAddr,
+                                                  LoongCollectorMonitor::mIpAddr,
                                                   AppConfig::GetInstance()->GetBindInterface()));
         SLSControl::GetInstance()->SetSlsSendClientCommonParam(mProbeNetworkClient.get());
         mProbeNetworkThreadRes = async(launch::async, &SLSClientManager::ProbeNetworkThread, this);
@@ -132,7 +132,7 @@ void SLSClientManager::Init() {
                                                   STRING_FLAG(default_access_key_id),
                                                   STRING_FLAG(default_access_key),
                                                   INT32_FLAG(sls_client_send_timeout),
-                                                  LogFileProfiler::mIpAddr,
+                                                  LoongCollectorMonitor::mIpAddr,
                                                   AppConfig::GetInstance()->GetBindInterface()));
         SLSControl::GetInstance()->SetSlsSendClientCommonParam(mUpdateRealIpClient.get());
         mUpdateRealIpThreadRes = async(launch::async, &SLSClientManager::UpdateRealIpThread, this);
@@ -232,7 +232,7 @@ sdk::Client* SLSClientManager::GetClient(const string& region, const string& ali
                                                               "",
                                                               "",
                                                               INT32_FLAG(sls_client_send_timeout),
-                                                              LogFileProfiler::mIpAddr,
+                                                              LoongCollectorMonitor::mIpAddr,
                                                               AppConfig::GetInstance()->GetBindInterface());
     SLSControl::GetInstance()->SetSlsSendClientCommonParam(client.get());
     ResetClientPort(region, client.get());

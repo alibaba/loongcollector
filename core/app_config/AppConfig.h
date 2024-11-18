@@ -18,12 +18,12 @@
 
 #include <json/json.h>
 
+#include <functional>
 #include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <functional>
 
 #include "InstanceConfig.h"
 #include "protobuf/sls/sls_logs.pb.h"
@@ -49,9 +49,7 @@ std::string GetInotifyWatcherDirsDumpFileName();
 std::string GetAgentLoggersPrefix();
 std::string GetAgentLogName();
 std::string GetAgentSnapshotDir();
-std::string GetAgentProfileLogName();
 std::string GetAgentStatusLogName();
-std::string GetProfileSnapshotDumpFileName();
 std::string GetObserverEbpfHostPath();
 std::string GetSendBufferFileNamePrefix();
 std::string GetLegacyUserLocalConfigFilePath();
@@ -301,7 +299,7 @@ private:
 
 public:
     AppConfig();
-    ~AppConfig(){};
+    ~AppConfig() {};
 
     void LoadInstanceConfig(const std::map<std::string, std::shared_ptr<InstanceConfig>>&);
 

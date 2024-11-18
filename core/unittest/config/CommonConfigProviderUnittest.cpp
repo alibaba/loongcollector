@@ -24,6 +24,7 @@
 #include "config/watcher/ConfigWatcher.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "gmock/gmock.h"
+#include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
 #include "unittest/Unittest.h"
 
@@ -296,8 +297,8 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
                   APSARA_TEST_TRUE(heartbeatReq.capabilities() & configserver::proto::v2::AcceptsPipelineConfig);
                   APSARA_TEST_EQUAL(heartbeatReq.instance_id(), provider.GetInstanceId());
                   APSARA_TEST_EQUAL(heartbeatReq.agent_type(), "LoongCollector");
-                  APSARA_TEST_EQUAL(heartbeatReq.attributes().ip(), LogFileProfiler::mIpAddr);
-                  APSARA_TEST_EQUAL(heartbeatReq.attributes().hostname(), LogFileProfiler::mHostname);
+                  APSARA_TEST_EQUAL(heartbeatReq.attributes().ip(), LoongCollectorMonitor::mIpAddr);
+                  APSARA_TEST_EQUAL(heartbeatReq.attributes().hostname(), LoongCollectorMonitor::mHostname);
                   APSARA_TEST_EQUAL(heartbeatReq.attributes().version(), ILOGTAIL_VERSION);
                   auto it = heartbeatReq.tags().begin();
                   APSARA_TEST_EQUAL(it->name(), "key1");
@@ -511,8 +512,8 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
                   APSARA_TEST_TRUE(heartbeatReq.capabilities() & configserver::proto::v2::AcceptsPipelineConfig);
                   APSARA_TEST_EQUAL(heartbeatReq.instance_id(), provider.GetInstanceId());
                   APSARA_TEST_EQUAL(heartbeatReq.agent_type(), "LoongCollector");
-                  APSARA_TEST_EQUAL(heartbeatReq.attributes().ip(), LogFileProfiler::mIpAddr);
-                  APSARA_TEST_EQUAL(heartbeatReq.attributes().hostname(), LogFileProfiler::mHostname);
+                  APSARA_TEST_EQUAL(heartbeatReq.attributes().ip(), LoongCollectorMonitor::mIpAddr);
+                  APSARA_TEST_EQUAL(heartbeatReq.attributes().hostname(), LoongCollectorMonitor::mHostname);
                   APSARA_TEST_EQUAL(heartbeatReq.attributes().version(), ILOGTAIL_VERSION);
                   auto it = heartbeatReq.tags().begin();
                   APSARA_TEST_EQUAL(it->name(), "key1");

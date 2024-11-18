@@ -17,24 +17,25 @@
 #pragma once
 #include <sys/types.h>
 #if defined(__linux__)
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #endif
 #include <stddef.h>
 #include <time.h>
+
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <set>
-#include "monitor/LogFileProfiler.h"
-#include "file_server/polling/PollingModify.h"
-#include "file_server/polling/PollingDirFile.h"
-#include "file_server/event_listener/EventListener.h"
+
 #include "checkpoint/CheckPointManager.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/event_listener/EventListener.h"
+#include "file_server/polling/PollingDirFile.h"
+#include "file_server/polling/PollingModify.h"
 namespace logtail {
 
 class TimeoutHandler;
@@ -184,11 +185,11 @@ public:
     //  * @return true on success; false on failure
     //  */
     // bool Dispatch();
-// #if defined(_MSC_VER)
-//     virtual void InitWindowsSignalObject() {}
-//     virtual void SyncWindowsSignalObject() {}
-//     virtual void ReleaseWindowsSignalObject() {}
-// #endif
+    // #if defined(_MSC_VER)
+    //     virtual void InitWindowsSignalObject() {}
+    //     virtual void SyncWindowsSignalObject() {}
+    //     virtual void ReleaseWindowsSignalObject() {}
+    // #endif
     // #if defined(__linux__)
     //     virtual void InitShennong() = 0;
     //     virtual void CheckShennong() = 0;

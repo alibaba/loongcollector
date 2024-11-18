@@ -16,9 +16,8 @@
 
 #include <filesystem>
 
-#include "LogFileProfiler.h"
-#include "MetricManager.h"
 #include "MetricConstants.h"
+#include "MetricManager.h"
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
@@ -88,7 +87,7 @@ void MetricExportor::SendToSLS(std::map<std::string, sls_logs::LogGroup*>& logGr
     for (iter = logGroupMap.begin(); iter != logGroupMap.end(); iter++) {
         sls_logs::LogGroup* logGroup = iter->second;
         logGroup->set_category(METRIC_SLS_LOGSTORE_NAME);
-        logGroup->set_source(LogFileProfiler::mIpAddr);
+        logGroup->set_source(LoongCollectorMonitor::mIpAddr);
         logGroup->set_topic(METRIC_TOPIC_TYPE);
         if (METRIC_REGION_DEFAULT == iter->first) {
             GetProfileSender()->SendToProfileProject(GetProfileSender()->GetDefaultProfileRegion(), *logGroup);

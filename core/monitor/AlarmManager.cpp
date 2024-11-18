@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "monitor/AlarmManager.h"
+#include "AlarmManager.h"
 
-#include "LogFileProfiler.h"
+#include "Monitor.h"
 #include "app_config/AppConfig.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
@@ -217,7 +217,7 @@ void AlarmManager::SendAllRegionAlarm() {
 
             // LOG_DEBUG(sLogger, ("4Send Alarm", region)("region", sendRegionIndex)("alarm index",
             // mMessageType[sendAlarmTypeIndex]));
-            logGroup.set_source(LogFileProfiler::mIpAddr);
+            logGroup.set_source(LoongCollectorMonitor::mIpAddr);
             logGroup.set_category(ALARM_SLS_LOGSTORE_NAME);
             auto now = GetCurrentLogtailTime();
             for (map<string, AlarmMessage*>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
@@ -245,7 +245,7 @@ void AlarmManager::SendAllRegionAlarm() {
 
                 contentPtr = logPtr->add_contents();
                 contentPtr->set_key("ip");
-                contentPtr->set_value(LogFileProfiler::mIpAddr);
+                contentPtr->set_value(LoongCollectorMonitor::mIpAddr);
 
                 contentPtr = logPtr->add_contents();
                 contentPtr->set_key("os");
@@ -319,8 +319,7 @@ void AlarmManager::SendAlarm(const AlarmType alarmType,
     string key = projectName + "_" + category;
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        AlarmMessage* messagePtr
-            = new AlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
+        AlarmMessage* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
         alarmBufferVec[alarmType].insert(pair<string, AlarmMessage*>(key, messagePtr));
     } else
         alarmBufferVec[alarmType][key]->IncCount();

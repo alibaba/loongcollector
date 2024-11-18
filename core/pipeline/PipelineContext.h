@@ -23,7 +23,6 @@
 
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/LogFileProfiler.h"
 #include "monitor/AlarmManager.h"
 #include "pipeline/GlobalConfig.h"
 #include "pipeline/queue/QueueKey.h"
@@ -83,7 +82,7 @@ public:
     void SetIsFirstProcessorApsaraFlag(bool flag) { mIsFirstProcessorApsara = flag; }
     bool IsFirstProcessorJson() const { return mIsFirstProcessorJson; }
     void SetIsFirstProcessorJsonFlag(bool flag) { mIsFirstProcessorJson = flag; }
-    bool IsExactlyOnceEnabled() const {return mEnableExactlyOnce; }
+    bool IsExactlyOnceEnabled() const { return mEnableExactlyOnce; }
     void SetExactlyOnceFlag(bool flag) { mEnableExactlyOnce = flag; }
     bool HasNativeProcessors() const { return mHasNativeProcessors; }
     void SetHasNativeProcessorsFlag(bool flag) { mHasNativeProcessors = flag; }
@@ -91,7 +90,6 @@ public:
     void SetIsFlushingThroughGoPipelineFlag(bool flag) { mIsFlushingThroughGoPipeline = flag; }
 
     ProcessProfile& GetProcessProfile() const { return mProcessProfile; }
-    // LogFileProfiler& GetProfiler() { return *mProfiler; }
     const Logger::logger& GetLogger() const { return mLogger; }
     AlarmManager& GetAlarm() const { return *mAlarm; };
 
@@ -114,7 +112,6 @@ private:
     bool mIsFlushingThroughGoPipeline = false;
 
     mutable ProcessProfile mProcessProfile;
-    // LogFileProfiler* mProfiler = LogFileProfiler::GetInstance();
     Logger::logger mLogger = sLogger;
     AlarmManager* mAlarm = AlarmManager::GetInstance();
 };
