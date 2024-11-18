@@ -20,7 +20,7 @@
 #include "pipeline/queue/ExactlyOnceQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
 
-DEFINE_FLAG_INT32(bounded_process_queue_capacity, "", 15);
+DEFINE_FLAG_INT32(bounded_process_queue_capacity, "", 5);
 
 DECLARE_FLAG_INT32(process_thread_count);
 

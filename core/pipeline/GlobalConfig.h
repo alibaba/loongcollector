@@ -35,7 +35,7 @@ struct GlobalConfig {
 
     TopicType mTopicType = TopicType::NONE;
     std::string mTopicFormat;
-    uint32_t mProcessPriority = 0;
+    uint32_t mPriority = 1U;
     bool mEnableTimestampNanosecond = false;
     bool mUsingOldContentTag = false;
 };

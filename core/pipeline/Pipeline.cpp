@@ -288,15 +288,12 @@ bool Pipeline::Init(PipelineConfig&& config) {
                                    mContext.GetRegion());
             }
         }
-        uint32_t priority = mContext.GetGlobalConfig().mProcessPriority == 0
-            ? ProcessQueueManager::sMaxPriority
-            : mContext.GetGlobalConfig().mProcessPriority - 1;
         if (isInputSupportAck) {
             ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(
-                mContext.GetProcessQueueKey(), priority, mContext);
+                mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, mContext);
         } else {
             ProcessQueueManager::GetInstance()->CreateOrUpdateCircularQueue(
-                mContext.GetProcessQueueKey(), priority, 1024, mContext);
+                mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, 1024, mContext);
         }
 
 

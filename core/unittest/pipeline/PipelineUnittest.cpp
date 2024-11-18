@@ -2303,7 +2303,7 @@ void PipelineUnittest::TestProcessQueue() const {
     configStr = R"(
         {
             "global": {
-                "ProcessPriority": 1
+                "Priority": 0
             },
             "inputs": [
                 {
@@ -2382,14 +2382,14 @@ void PipelineUnittest::TestProcessQueue() const {
     // queue level
     APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
     APSARA_TEST_EQUAL(key, (*que)->GetKey());
-    APSARA_TEST_EQUAL(3U, (*que)->GetPriority());
+    APSARA_TEST_EQUAL(1U, (*que)->GetPriority());
     APSARA_TEST_EQUAL(1U, (*que)->mDownStreamQueues.size());
     // pipeline level
     APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());
     // manager level
     APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mQueues.size());
-    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[3].size());
-    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[3].begin()
+    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[1].size());
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[1].begin()
                      == ProcessQueueManager::GetInstance()->mQueues[key].first);
 
     // update pipeline with different type
@@ -2430,14 +2430,14 @@ void PipelineUnittest::TestProcessQueue() const {
     // queue level
     APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
     APSARA_TEST_EQUAL(key, (*que)->GetKey());
-    APSARA_TEST_EQUAL(3U, (*que)->GetPriority());
+    APSARA_TEST_EQUAL(1U, (*que)->GetPriority());
     APSARA_TEST_EQUAL(1U, (*que)->mDownStreamQueues.size());
     // pipeline level
     APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());
     // manager level
     APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mQueues.size());
-    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[3].size());
-    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[3].begin()
+    APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mPriorityQueue[1].size());
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->mPriorityQueue[1].begin()
                      == ProcessQueueManager::GetInstance()->mQueues[key].first);
 
     // delete pipeline

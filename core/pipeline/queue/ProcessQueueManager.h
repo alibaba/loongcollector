@@ -40,7 +40,7 @@ public:
 
     enum class QueueType { BOUNDED, CIRCULAR };
 
-    static constexpr uint32_t sMaxPriority = 3;
+    static constexpr uint32_t sMaxPriority = 2;
 
     ProcessQueueManager(const ProcessQueueManager&) = delete;
     ProcessQueueManager& operator=(const ProcessQueueManager&) = delete;

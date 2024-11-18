@@ -36,7 +36,7 @@
 using namespace std;
 using namespace sls_logs;
 
-DEFINE_FLAG_INT64(read_file_time_slice, "microseconds", 50 * 1000);
+DEFINE_FLAG_INT64(read_file_time_slice, "microseconds", 25 * 1000);
 DEFINE_FLAG_INT32(logreader_timeout_interval,
                   "reader hasn't updated for a long time will be removed, seconds",
                   86400 * 20000); // roughly equivalent to not releasing logReader when timed out
@@ -286,14 +286,9 @@ void CreateModifyHandler::HandleTimeOut() {
 // implementation for ModifyHandler
 ModifyHandler::ModifyHandler(const std::string& configName, const FileDiscoveryConfig& pConfig)
     : mConfigName(configName) {
-    if (pConfig.first && pConfig.second->GetGlobalConfig().mProcessPriority > 0
-        && pConfig.second->GetGlobalConfig().mProcessPriority <= ProcessQueueManager::sMaxPriority) {
-        mReadFileTimeSlice
-            = (1 << (ProcessQueueManager::sMaxPriority - pConfig.second->GetGlobalConfig().mProcessPriority + 1))
+    // default is 2 * INT64_FLAG(read_file_time_slice)
+    mReadFileTimeSlice = 1 << (ProcessQueueManager::sMaxPriority - pConfig.second->GetGlobalConfig().mPriority)
             * INT64_FLAG(read_file_time_slice);
-    } else {
-        mReadFileTimeSlice = INT64_FLAG(read_file_time_slice);
-    }
     mLastOverflowErrorTime = 0;
 }
 

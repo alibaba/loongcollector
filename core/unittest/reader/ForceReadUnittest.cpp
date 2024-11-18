@@ -75,9 +75,6 @@ protected:
         // new pipeline
         configStr = R"(
             {
-                "global": {
-                    "ProcessPriority": 1
-                },
                 "inputs": [
                     {
                         "Type": "input_file",
