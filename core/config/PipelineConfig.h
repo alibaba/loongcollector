@@ -17,7 +17,6 @@
 #pragma once
 
 #include <json/json.h>
-#include <re2/re2.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -83,12 +82,5 @@ inline bool operator==(const PipelineConfig& lhs, const PipelineConfig& rhs) {
 inline bool operator!=(const PipelineConfig& lhs, const PipelineConfig& rhs) {
     return !(lhs == rhs);
 }
-
-bool LoadConfigDetailFromFile(const std::filesystem::path& filepath, Json::Value& detail);
-bool ParseConfigDetail(const std::string& content,
-                       const std::string& extenstion,
-                       Json::Value& detail,
-                       std::string& errorMsg);
-bool IsConfigEnabled(const std::string& name, const Json::Value& detail);
 
 } // namespace logtail

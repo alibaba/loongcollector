@@ -17,16 +17,17 @@
 #include <memory>
 #include <unordered_set>
 
-#include "config/InstanceConfig.h"
+#include "common/FileSystemUtil.h"
+#include "config/ConfigUtil.h"
+#include "config/InstanceConfigManager.h"
 #include "logger/Logger.h"
 
 using namespace std;
 
 namespace logtail {
 
-bool ReadFile(const string& filepath, string& content);
-
-InstanceConfigWatcher::InstanceConfigWatcher() : mInstanceConfigManager(InstanceConfigManager::GetInstance()) {
+InstanceConfigWatcher::InstanceConfigWatcher()
+    : ConfigWatcher(), mInstanceConfigManager(InstanceConfigManager::GetInstance()) {
 }
 
 InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
@@ -165,18 +166,6 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
     }
 
     return diff;
-}
-
-void InstanceConfigWatcher::AddSource(const string& dir, mutex* mux) {
-    mSourceDir.emplace_back(dir);
-    if (mux != nullptr) {
-        mDirMutexMap[dir] = mux;
-    }
-}
-
-void InstanceConfigWatcher::ClearEnvironment() {
-    mSourceDir.clear();
-    mFileInfoMap.clear();
 }
 
 } // namespace logtail

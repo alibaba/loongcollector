@@ -17,11 +17,8 @@
 #include <string>
 
 #include "app_config/AppConfig.h"
-#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
-#include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
-#include "common/YamlUtil.h"
 #include "pipeline/plugin/PluginRegistry.h"
 
 DEFINE_FLAG_BOOL(enable_env_ref_in_config, "enable environment variable reference replacement in configuration", false);
@@ -665,63 +662,6 @@ bool PipelineConfig::ReplaceEnvVar() {
     bool res = false;
     ReplaceEnvVarRef(*mDetail, res);
     return res;
-}
-
-bool LoadConfigDetailFromFile(const filesystem::path& filepath, Json::Value& detail) {
-    const string& ext = filepath.extension().string();
-    const string& configName = filepath.stem().string();
-    if (configName == "region_config") {
-        return false;
-    }
-    if (ext != ".yaml" && ext != ".yml" && ext != ".json") {
-        LOG_WARNING(sLogger, ("unsupported config file format", "skip current object")("filepath", filepath));
-        return false;
-    }
-    string content;
-    if (!ReadFile(filepath.string(), content)) {
-        LOG_WARNING(sLogger, ("failed to open config file", "skip current object")("filepath", filepath));
-        return false;
-    }
-    if (content.empty()) {
-        LOG_WARNING(sLogger, ("empty config file", "skip current object")("filepath", filepath));
-        return false;
-    }
-    string errorMsg;
-    if (!ParseConfigDetail(content, ext, detail, errorMsg)) {
-        LOG_WARNING(sLogger,
-                    ("config file format error", "skip current object")("error msg", errorMsg)("filepath", filepath));
-        return false;
-    }
-    return true;
-}
-
-bool ParseConfigDetail(const string& content, const string& extension, Json::Value& detail, string& errorMsg) {
-    if (extension == ".json") {
-        return ParseJsonTable(content, detail, errorMsg);
-    } else if (extension == ".yaml" || extension == ".yml") {
-        YAML::Node yamlRoot;
-        if (!ParseYamlTable(content, yamlRoot, errorMsg)) {
-            return false;
-        }
-        detail = ConvertYamlToJson(yamlRoot);
-        return true;
-    }
-    return false;
-}
-
-bool IsConfigEnabled(const string& name, const Json::Value& detail) {
-    const char* key = "enable";
-    const Json::Value* itr = detail.find(key, key + strlen(key));
-    if (itr != nullptr) {
-        if (!itr->isBool()) {
-            LOG_WARNING(sLogger,
-                        ("problem encountered in config parsing",
-                         "param enable is not of type bool")("action", "ignore the config")("config", name));
-            return false;
-        }
-        return itr->asBool();
-    }
-    return true;
 }
 
 } // namespace logtail

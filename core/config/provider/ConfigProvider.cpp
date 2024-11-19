@@ -14,9 +14,9 @@
 
 #include "config/provider/ConfigProvider.h"
 
-#include "InstanceConfigWatcher.h"
 #include "app_config/AppConfig.h"
-#include "config/watcher/ConfigWatcher.h"
+#include "config/watcher/InstanceConfigWatcher.h"
+#include "config/watcher/PipelineConfigWatcher.h"
 
 using namespace std;
 
@@ -34,7 +34,7 @@ void ConfigProvider::Init(const string& dir) {
 
     error_code ec;
     filesystem::create_directories(mPipelineSourceDir, ec);
-    ConfigWatcher::GetInstance()->AddSource(mPipelineSourceDir, &mPipelineMux);
+    PipelineConfigWatcher::GetInstance()->AddSource(mPipelineSourceDir, &mPipelineMux);
 
     ec.clear();
     filesystem::create_directories(mInstanceSourceDir, ec);

@@ -54,6 +54,7 @@ macro(add_core_subdir)
     add_subdirectory(serializer)
     add_subdirectory(prometheus)
     add_subdirectory(route)
+    add_subdirectory(task_pipeline)
 endmacro()
 
 macro(add_spl_subdir)

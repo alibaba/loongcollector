@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,22 +16,14 @@
 
 #pragma once
 
-#include <cstdint>
-#include <filesystem>
-#include <map>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <vector>
-
-#include "InstanceConfigManager.h"
 #include "config/ConfigDiff.h"
+#include "config/watcher/ConfigWatcher.h"
 
 namespace logtail {
 
 class InstanceConfigManager;
 
-class InstanceConfigWatcher {
+class InstanceConfigWatcher : public ConfigWatcher {
 public:
     InstanceConfigWatcher(const InstanceConfigWatcher&) = delete;
     InstanceConfigWatcher& operator=(const InstanceConfigWatcher&) = delete;
@@ -42,18 +34,15 @@ public:
     }
 
     InstanceConfigDiff CheckConfigDiff();
-    void AddSource(const std::string& dir, std::mutex* mux = nullptr);
-    // for ut
+
+#ifdef APSARA_UNIT_TEST_MAIN
     void SetInstanceConfigManager(const InstanceConfigManager* m) { mInstanceConfigManager = m; }
-    void ClearEnvironment();
+#endif
 
 private:
     InstanceConfigWatcher();
     ~InstanceConfigWatcher() = default;
 
-    std::vector<std::filesystem::path> mSourceDir;
-    std::unordered_map<std::string, std::mutex*> mDirMutexMap;
-    std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>> mFileInfoMap;
     const InstanceConfigManager* mInstanceConfigManager = nullptr;
 };
 

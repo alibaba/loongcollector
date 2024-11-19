@@ -28,6 +28,8 @@
 #include "pipeline/plugin/interface/Input.h"
 #include "pipeline/plugin/interface/Processor.h"
 #include "pipeline/queue/SenderQueueManager.h"
+#include "task_pipeline/Task.h"
+#include "task_pipeline/TaskRegistry.h"
 
 namespace logtail {
 
@@ -138,12 +140,35 @@ public:
 
 const std::string FlusherHttpMock::sName = "flusher_http_mock";
 
+class TaskMock : public Task {
+public:
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
+    bool Init(const Json::Value& config) override {
+        if (config.isMember("Valid")) {
+            return config["Valid"].asBool();
+        }
+        return true;
+    }
+    void Start() override { mIsRunning = true; }
+    void Stop(bool isRemoving) { mIsRunning = false; }
+
+    bool mIsRunning = false;
+};
+
+const std::string TaskMock::sName = "task_mock";
+
 void LoadPluginMock() {
     PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock>());
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorInnerMock>());
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherHttpMock>());
+}
+
+void LoadTaskMock() {
+    TaskRegistry::GetInstance()->RegisterCreator(TaskMock::sName, []() { return std::make_unique<TaskMock>(); });
 }
 
 } // namespace logtail

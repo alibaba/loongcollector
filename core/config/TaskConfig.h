@@ -16,33 +16,31 @@
 
 #pragma once
 
-#include <filesystem>
-#include <map>
-#include <mutex>
+#include <json/json.h>
+
+#include <cstdint>
+#include <memory>
 #include <string>
-#include <utility>
-#include <vector>
 
 namespace logtail {
 
-class ConfigWatcher {
-public:
-    ConfigWatcher(const ConfigWatcher&) = delete;
-    ConfigWatcher& operator=(const ConfigWatcher&) = delete;
+struct TaskConfig {
+    std::string mName;
+    std::unique_ptr<Json::Value> mDetail;
+    uint32_t mCreateTime = 0;
 
-    void AddSource(const std::string& dir, std::mutex* mux = nullptr);
+    TaskConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail)
+        : mName(name), mDetail(std::move(detail)) {}
 
-#ifdef APSARA_UNIT_TEST_MAIN
-    void ClearEnvironment();
-#endif
-
-protected:
-    ConfigWatcher() = default;
-    virtual ~ConfigWatcher() = default;
-
-    std::vector<std::filesystem::path> mSourceDir;
-    std::map<std::string, std::mutex*> mDirMutexMap;
-    std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>> mFileInfoMap;
+    bool Parse();
 };
+
+inline bool operator==(const TaskConfig& lhs, const TaskConfig& rhs) {
+    return (lhs.mName == rhs.mName) && (*lhs.mDetail == *rhs.mDetail);
+}
+
+inline bool operator!=(const TaskConfig& lhs, const TaskConfig& rhs) {
+    return !(lhs == rhs);
+}
 
 } // namespace logtail

@@ -1,11 +1,11 @@
 /*
- * Copyright 2023 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,26 +16,27 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
+#include <json/json.h>
 
-#include "config/InstanceConfig.h"
-#include "config/PipelineConfig.h"
-#include "config/TaskConfig.h"
+#include <string>
+
+#include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
 
 namespace logtail {
 
-template <class T>
-struct ConfigDiff {
-    std::vector<T> mAdded;
-    std::vector<T> mModified;
-    std::vector<std::string> mRemoved;
+class Task {
+public:
+    virtual ~Task() {}
 
-    bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }
+    virtual const std::string& Name() const = 0;
+    virtual bool Init(const Json::Value& config) = 0;
+    virtual void Start() = 0;
+    virtual void Stop(bool isRemoving) = 0;
+
+protected:
+    Logger::logger mLogger = sLogger;
+    AlarmManager* mAlarm = AlarmManager::GetInstance();
 };
-
-using PipelineConfigDiff = ConfigDiff<PipelineConfig>;
-using TaskConfigDiff = ConfigDiff<TaskConfig>;
-using InstanceConfigDiff = ConfigDiff<InstanceConfig>;
 
 } // namespace logtail

@@ -16,33 +16,21 @@
 
 #pragma once
 
+#include <json/json.h>
+
 #include <filesystem>
-#include <map>
-#include <mutex>
 #include <string>
-#include <utility>
-#include <vector>
 
 namespace logtail {
 
-class ConfigWatcher {
-public:
-    ConfigWatcher(const ConfigWatcher&) = delete;
-    ConfigWatcher& operator=(const ConfigWatcher&) = delete;
+enum class ConfigType { Pipeline, Task };
 
-    void AddSource(const std::string& dir, std::mutex* mux = nullptr);
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    void ClearEnvironment();
-#endif
-
-protected:
-    ConfigWatcher() = default;
-    virtual ~ConfigWatcher() = default;
-
-    std::vector<std::filesystem::path> mSourceDir;
-    std::map<std::string, std::mutex*> mDirMutexMap;
-    std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>> mFileInfoMap;
-};
+bool LoadConfigDetailFromFile(const std::filesystem::path& filepath, Json::Value& detail);
+bool ParseConfigDetail(const std::string& content,
+                       const std::string& extenstion,
+                       Json::Value& detail,
+                       std::string& errorMsg);
+bool IsConfigEnabled(const std::string& name, const Json::Value& detail);
+ConfigType GetConfigType(const Json::Value& detail);
 
 } // namespace logtail

@@ -19,11 +19,13 @@
 #include <vector>
 
 #include "config/PipelineConfig.h"
-#include "config/watcher/ConfigWatcher.h"
+#include "config/watcher/PipelineConfigWatcher.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineManager.h"
 #include "pipeline/plugin/PluginRegistry.h"
+#include "task_pipeline/TaskPipelineManager.h"
 #include "unittest/Unittest.h"
+#include "unittest/plugin/PluginMock.h"
 
 using namespace std;
 
@@ -74,19 +76,24 @@ public:
 protected:
     static void SetUpTestCase() {
         PluginRegistry::GetInstance()->LoadPlugins();
-        ConfigWatcher::GetInstance()->SetPipelineManager(PipelineManagerMock::GetInstance());
+        LoadTaskMock();
+        PipelineConfigWatcher::GetInstance()->SetPipelineManager(PipelineManagerMock::GetInstance());
     }
 
-    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+    static void TearDownTestCase() {
+        PluginRegistry::GetInstance()->UnloadPlugins();
+        TaskRegistry::GetInstance()->UnloadPlugins();
+    }
 
     void SetUp() override {
         filesystem::create_directories(configDir);
-        ConfigWatcher::GetInstance()->AddSource(configDir.string());
+        PipelineConfigWatcher::GetInstance()->AddSource(configDir.string());
     }
 
     void TearDown() override {
         PipelineManagerMock::GetInstance()->ClearEnvironment();
-        ConfigWatcher::GetInstance()->ClearEnvironment();
+        TaskPipelineManager::GetInstance()->ClearEnvironment();
+        PipelineConfigWatcher::GetInstance()->ClearEnvironment();
         filesystem::remove_all(configDir);
     }
 
@@ -94,13 +101,17 @@ private:
     void PrepareInitialSettings() const;
     void GenerateInitialConfigs() const;
 
-    filesystem::path configDir = "./config";
-    vector<filesystem::path> configPaths = {configDir / "invalid_format.json",
-                                            configDir / "invalid_detail.json",
-                                            configDir / "enabled_valid.json",
-                                            configDir / "disabled_valid.json"};
-    const string invalidConfigWithInvalidFormat = R"({"inputs":{}})";
-    const string invalidConfigWithInvalidDetail = R"(
+    filesystem::path configDir = "./pipeline_config";
+    vector<filesystem::path> pipelineConfigPaths = {configDir / "pipeline_invalid_format.json",
+                                                    configDir / "pipeline_invalid_detail.json",
+                                                    configDir / "pipeline_enabled_valid.json",
+                                                    configDir / "pipeline_disabled_valid.json"};
+    vector<filesystem::path> taskConfigPaths = {configDir / "task_invalid_format.json",
+                                                configDir / "task_invalid_detail.json",
+                                                configDir / "task_enabled_valid.json",
+                                                configDir / "task_disabled_valid.json"};
+    const string invalidPipelineConfigWithInvalidFormat = R"({"inputs":{}})";
+    const string invalidPipelineConfigWithInvalidDetail = R"(
 {
     "valid": false,
     "inputs": [
@@ -115,7 +126,7 @@ private:
     ]
 }
     )";
-    const string enabledValidConfig = R"(
+    const string enabledValidPipelineConfig = R"(
 {
     "valid": true,
     "inputs": [
@@ -130,7 +141,7 @@ private:
     ]
 }
     )";
-    const string disabledValidConfig = R"(
+    const string disabledValidPipelineConfig = R"(
 {
     "valid": true,
     "enable": false,
@@ -147,8 +158,8 @@ private:
 }
     )";
 
-    const string newInvalidConfigWithInvalidFormat = R"({"flushers":{}})";
-    const string newInvalidConfigWithInvalidDetail = R"(
+    const string newInvalidPipelineConfigWithInvalidFormat = R"({"flushers":{}})";
+    const string newInvalidPipelineConfigWithInvalidDetail = R"(
 {
     "valid": false,
     "inputs": [
@@ -163,7 +174,7 @@ private:
     ]
 }
     )";
-    const string newEnabledValidConfig = R"(
+    const string newEnabledValidPipelineConfig = R"(
 {
     "valid": true,
     "inputs": [
@@ -178,7 +189,7 @@ private:
     ]
 }
     )";
-    const string newDisabledValidConfig = R"(
+    const string newDisabledValidPipelineConfig = R"(
 {
     "valid": true,
     "enable": false,
@@ -192,182 +203,386 @@ private:
             "Type": "flusher_sls"
         }
     ]
+}
+    )";
+
+    const string invalidTaskConfigWithInvalidFormat = R"({"task":[]})";
+    const string invalidTaskConfigWithInvalidDetail = R"(
+{
+    "task": {
+        "Type": "task_mock",
+        "Valid": false
+    }
+}
+    )";
+    const string enabledValidTaskConfig = R"(
+{
+    "task": {
+        "Type": "task_mock"
+    }
+}
+    )";
+    const string disabledValidTaskConfig = R"(
+{
+    "enable": false,
+    "task": {
+        "Type": "task_mock"
+    }
+}
+    )";
+
+    const string newInvalidTaskConfigWithInvalidFormat = R"({"task":""})";
+    const string newInvalidTaskConfigWithInvalidDetail = R"(
+{
+    "task": {
+        "Type": "task_mock",
+        "Valid": false,
+        "Other": true
+    }
+}
+    )";
+    const string newEnabledValidTaskConfig = R"(
+{
+    "task": {
+        "Type": "task_mock",
+        "Other": true
+    }
+}
+    )";
+    const string newDisabledValidTaskConfig = R"(
+{
+    "enable": false,
+    "task": {
+        "Type": "task_mock",
+        "Other": true
+    }
 }
     )";
 };
 
 void ConfigUpdateUnittest::OnStartUp() const {
-    PipelineConfigDiff diff;
-    diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_TRUE(diff.IsEmpty());
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_TRUE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.IsEmpty());
 
     GenerateInitialConfigs();
-    diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.IsEmpty());
-    APSARA_TEST_EQUAL(2U, diff.mAdded.size());
-    APSARA_TEST_TRUE(diff.mModified.empty());
-    APSARA_TEST_TRUE(diff.mRemoved.empty());
+    diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_EQUAL(2U, diff.first.mAdded.size());
+    APSARA_TEST_TRUE(diff.first.mModified.empty());
+    APSARA_TEST_TRUE(diff.first.mRemoved.empty());
+    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_EQUAL(2U, diff.second.mAdded.size());
+    APSARA_TEST_TRUE(diff.second.mModified.empty());
+    APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
-    PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
+    auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+    APSARA_TEST_NOT_EQUAL(nullptr, ptr);
+    APSARA_TEST_EQUAL(TaskMock::sName, ptr->GetPlugin()->Name());
+    APSARA_TEST_TRUE(static_cast<TaskMock*>(ptr->GetPlugin())->mIsRunning);
 }
 
 void ConfigUpdateUnittest::OnConfigDelete() const {
     PrepareInitialSettings();
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     filesystem::remove_all(configDir);
-    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.IsEmpty());
-    APSARA_TEST_TRUE(diff.mAdded.empty());
-    APSARA_TEST_TRUE(diff.mModified.empty());
-    APSARA_TEST_EQUAL(1U, diff.mRemoved.size());
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.mAdded.empty());
+    APSARA_TEST_TRUE(diff.first.mModified.empty());
+    APSARA_TEST_EQUAL(1U, diff.first.mRemoved.size());
+    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.mAdded.empty());
+    APSARA_TEST_TRUE(diff.second.mModified.empty());
+    APSARA_TEST_EQUAL(1U, diff.second.mRemoved.size());
 
-    PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
     APSARA_TEST_TRUE(PipelineManagerMock::GetInstance()->GetAllConfigNames().empty());
+    TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
+    APSARA_TEST_TRUE(TaskPipelineManager::GetInstance()->GetAllPipelineNames().empty());
 }
 
 void ConfigUpdateUnittest::OnConfigToInvalidFormat() const {
     PrepareInitialSettings();
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
-    for (const auto& path : configPaths) {
+    for (const auto& path : pipelineConfigPaths) {
         ofstream fout(path, ios::trunc);
-        fout << newInvalidConfigWithInvalidFormat;
+        fout << newInvalidPipelineConfigWithInvalidFormat;
     }
-    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_TRUE(diff.IsEmpty());
+    for (const auto& path : taskConfigPaths) {
+        ofstream fout(path, ios::trunc);
+        fout << newInvalidTaskConfigWithInvalidFormat;
+    }
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_TRUE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.IsEmpty());
 }
 
 void ConfigUpdateUnittest::OnConfigToInvalidDetail() const {
     PrepareInitialSettings();
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
-    for (const auto& path : configPaths) {
+    for (const auto& path : pipelineConfigPaths) {
         ofstream fout(path, ios::trunc);
-        fout << newInvalidConfigWithInvalidDetail;
+        fout << newInvalidPipelineConfigWithInvalidDetail;
     }
-    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.IsEmpty());
-    APSARA_TEST_EQUAL(3U, diff.mAdded.size());
-    APSARA_TEST_EQUAL(1U, diff.mModified.size());
-    APSARA_TEST_TRUE(diff.mRemoved.empty());
+    for (const auto& path : taskConfigPaths) {
+        ofstream fout(path, ios::trunc);
+        fout << newInvalidTaskConfigWithInvalidDetail;
+    }
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_EQUAL(3U, diff.first.mAdded.size());
+    APSARA_TEST_EQUAL(1U, diff.first.mModified.size());
+    APSARA_TEST_TRUE(diff.first.mRemoved.empty());
+    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_EQUAL(3U, diff.second.mAdded.size());
+    APSARA_TEST_EQUAL(1U, diff.second.mModified.size());
+    APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
-    PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+    TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
+    auto& newPtr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+    APSARA_TEST_EQUAL(ptr, newPtr);
+    APSARA_TEST_EQUAL(TaskMock::sName, newPtr->GetPlugin()->Name());
+    APSARA_TEST_TRUE(static_cast<TaskMock*>(newPtr->GetPlugin())->mIsRunning);
 }
 
 void ConfigUpdateUnittest::OnConfigToEnabledValid() const {
     PrepareInitialSettings();
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
-    for (const auto& path : configPaths) {
+    for (const auto& path : pipelineConfigPaths) {
         ofstream fout(path, ios::trunc);
-        fout << newEnabledValidConfig;
+        fout << newEnabledValidPipelineConfig;
     }
-    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.IsEmpty());
-    APSARA_TEST_EQUAL(3U, diff.mAdded.size());
-    APSARA_TEST_EQUAL(1U, diff.mModified.size());
-    APSARA_TEST_TRUE(diff.mRemoved.empty());
+    for (const auto& path : taskConfigPaths) {
+        ofstream fout(path, ios::trunc);
+        fout << newEnabledValidTaskConfig;
+    }
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_EQUAL(3U, diff.first.mAdded.size());
+    APSARA_TEST_EQUAL(1U, diff.first.mModified.size());
+    APSARA_TEST_TRUE(diff.first.mRemoved.empty());
+    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_EQUAL(3U, diff.second.mAdded.size());
+    APSARA_TEST_EQUAL(1U, diff.second.mModified.size());
+    APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
-    PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
     APSARA_TEST_EQUAL(4U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
+    APSARA_TEST_EQUAL(4U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
+    {
+        auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_invalid_format");
+        APSARA_TEST_NOT_EQUAL(nullptr, ptr);
+        APSARA_TEST_EQUAL(TaskMock::sName, ptr->GetPlugin()->Name());
+        APSARA_TEST_TRUE(static_cast<TaskMock*>(ptr->GetPlugin())->mIsRunning);
+    }
+    {
+        auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_invalid_detail");
+        APSARA_TEST_NOT_EQUAL(nullptr, ptr);
+        APSARA_TEST_EQUAL(TaskMock::sName, ptr->GetPlugin()->Name());
+        APSARA_TEST_TRUE(static_cast<TaskMock*>(ptr->GetPlugin())->mIsRunning);
+    }
+    {
+        auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+        APSARA_TEST_NOT_EQUAL(nullptr, ptr);
+        APSARA_TEST_EQUAL(TaskMock::sName, ptr->GetPlugin()->Name());
+        APSARA_TEST_TRUE(static_cast<TaskMock*>(ptr->GetPlugin())->mIsRunning);
+    }
+    {
+        auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_disabled_valid");
+        APSARA_TEST_NOT_EQUAL(nullptr, ptr);
+        APSARA_TEST_EQUAL(TaskMock::sName, ptr->GetPlugin()->Name());
+        APSARA_TEST_TRUE(static_cast<TaskMock*>(ptr->GetPlugin())->mIsRunning);
+    }
 }
 
 void ConfigUpdateUnittest::OnConfigToDisabledValid() const {
     PrepareInitialSettings();
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
-    for (const auto& path : configPaths) {
+    for (const auto& path : pipelineConfigPaths) {
         ofstream fout(path, ios::trunc);
-        fout << newDisabledValidConfig;
+        fout << newDisabledValidPipelineConfig;
     }
-    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.IsEmpty());
-    APSARA_TEST_TRUE(diff.mAdded.empty());
-    APSARA_TEST_TRUE(diff.mModified.empty());
-    APSARA_TEST_EQUAL(1U, diff.mRemoved.size());
+    for (const auto& path : taskConfigPaths) {
+        ofstream fout(path, ios::trunc);
+        fout << newDisabledValidTaskConfig;
+    }
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.mAdded.empty());
+    APSARA_TEST_TRUE(diff.first.mModified.empty());
+    APSARA_TEST_EQUAL(1U, diff.first.mRemoved.size());
 
-    PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
     APSARA_TEST_TRUE(PipelineManagerMock::GetInstance()->GetAllConfigNames().empty());
+    TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
+    APSARA_TEST_TRUE(TaskPipelineManager::GetInstance()->GetAllPipelineNames().empty());
 }
 
 void ConfigUpdateUnittest::OnConfigUnchanged() const {
     PrepareInitialSettings();
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
-    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_TRUE(diff.IsEmpty());
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_TRUE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.IsEmpty());
 
     GenerateInitialConfigs();
     // mandatorily overwrite modify time in case of no update when file content remains the same.
-    for (const auto& path : configPaths) {
+    for (const auto& path : pipelineConfigPaths) {
         filesystem::file_time_type fTime = filesystem::last_write_time(path);
         filesystem::last_write_time(path, fTime + 1s);
     }
-    diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.IsEmpty());
-    APSARA_TEST_EQUAL(1U, diff.mAdded.size());
-    APSARA_TEST_TRUE(diff.mModified.empty());
-    APSARA_TEST_TRUE(diff.mRemoved.empty());
+    for (const auto& path : taskConfigPaths) {
+        filesystem::file_time_type fTime = filesystem::last_write_time(path);
+        filesystem::last_write_time(path, fTime + 1s);
+    }
+    diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_EQUAL(1U, diff.first.mAdded.size());
+    APSARA_TEST_TRUE(diff.first.mModified.empty());
+    APSARA_TEST_TRUE(diff.first.mRemoved.empty());
+    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_EQUAL(1U, diff.second.mAdded.size());
+    APSARA_TEST_TRUE(diff.second.mModified.empty());
+    APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
-    PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+    TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
+    auto& newPtr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+    APSARA_TEST_EQUAL(ptr, newPtr);
+    APSARA_TEST_EQUAL(TaskMock::sName, newPtr->GetPlugin()->Name());
+    APSARA_TEST_TRUE(static_cast<TaskMock*>(newPtr->GetPlugin())->mIsRunning);
 }
 
 void ConfigUpdateUnittest::OnConfigAdded() const {
     PrepareInitialSettings();
     APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     {
-        ofstream fout(configDir / "add_invalid_format.json", ios::trunc);
-        fout << invalidConfigWithInvalidFormat;
+        ofstream fout(configDir / "add_pipeline_invalid_format.json", ios::trunc);
+        fout << invalidPipelineConfigWithInvalidFormat;
     }
     {
-        ofstream fout(configDir / "add_invalid_detail.json", ios::trunc);
-        fout << invalidConfigWithInvalidDetail;
+        ofstream fout(configDir / "add_pipeline_invalid_detail.json", ios::trunc);
+        fout << invalidPipelineConfigWithInvalidDetail;
     }
     {
-        ofstream fout(configDir / "add_enabled_valid.json", ios::trunc);
-        fout << enabledValidConfig;
+        ofstream fout(configDir / "add_pipeline_enabled_valid.json", ios::trunc);
+        fout << enabledValidPipelineConfig;
     }
     {
-        ofstream fout(configDir / "add_disabled_valid.json", ios::trunc);
-        fout << disabledValidConfig;
+        ofstream fout(configDir / "add_pipeline_disabled_valid.json", ios::trunc);
+        fout << disabledValidPipelineConfig;
     }
-    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.IsEmpty());
-    APSARA_TEST_EQUAL(2U, diff.mAdded.size());
-    APSARA_TEST_TRUE(diff.mModified.empty());
-    APSARA_TEST_TRUE(diff.mRemoved.empty());
+    {
+        ofstream fout(configDir / "add_task_invalid_format.json", ios::trunc);
+        fout << invalidTaskConfigWithInvalidFormat;
+    }
+    {
+        ofstream fout(configDir / "add_task_invalid_detail.json", ios::trunc);
+        fout << invalidTaskConfigWithInvalidDetail;
+    }
+    {
+        ofstream fout(configDir / "add_task_enabled_valid.json", ios::trunc);
+        fout << enabledValidTaskConfig;
+    }
+    {
+        ofstream fout(configDir / "add_task_disabled_valid.json", ios::trunc);
+        fout << disabledValidTaskConfig;
+    }
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_EQUAL(2U, diff.first.mAdded.size());
+    APSARA_TEST_TRUE(diff.first.mModified.empty());
+    APSARA_TEST_TRUE(diff.first.mRemoved.empty());
+    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_EQUAL(2U, diff.second.mAdded.size());
+    APSARA_TEST_TRUE(diff.second.mModified.empty());
+    APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
-    PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
     APSARA_TEST_EQUAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+    TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
+    APSARA_TEST_EQUAL(2U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
+    {
+        auto& newPtr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+        APSARA_TEST_EQUAL(ptr, newPtr);
+        APSARA_TEST_EQUAL(TaskMock::sName, newPtr->GetPlugin()->Name());
+        APSARA_TEST_TRUE(static_cast<TaskMock*>(newPtr->GetPlugin())->mIsRunning);
+    }
+    {
+        auto& newPtr = TaskPipelineManager::GetInstance()->FindPipelineByName("add_task_enabled_valid");
+        APSARA_TEST_NOT_EQUAL(nullptr, newPtr);
+        APSARA_TEST_EQUAL(TaskMock::sName, newPtr->GetPlugin()->Name());
+        APSARA_TEST_TRUE(static_cast<TaskMock*>(newPtr->GetPlugin())->mIsRunning);
+    }
 }
 
 void ConfigUpdateUnittest::PrepareInitialSettings() const {
     GenerateInitialConfigs();
-    PipelineConfigDiff diff = ConfigWatcher::GetInstance()->CheckConfigDiff();
-    PipelineManagerMock::GetInstance()->UpdatePipelines(diff);
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
+    TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
 }
 
 void ConfigUpdateUnittest::GenerateInitialConfigs() const {
     {
-        ofstream fout(configPaths[0], ios::trunc);
-        fout << invalidConfigWithInvalidFormat;
+        ofstream fout(pipelineConfigPaths[0], ios::trunc);
+        fout << invalidPipelineConfigWithInvalidFormat;
     }
     {
-        ofstream fout(configPaths[1], ios::trunc);
-        fout << invalidConfigWithInvalidDetail;
+        ofstream fout(pipelineConfigPaths[1], ios::trunc);
+        fout << invalidPipelineConfigWithInvalidDetail;
     }
     {
-        ofstream fout(configPaths[2], ios::trunc);
-        fout << enabledValidConfig;
+        ofstream fout(pipelineConfigPaths[2], ios::trunc);
+        fout << enabledValidPipelineConfig;
     }
     {
-        ofstream fout(configPaths[3], ios::trunc);
-        fout << disabledValidConfig;
+        ofstream fout(pipelineConfigPaths[3], ios::trunc);
+        fout << disabledValidPipelineConfig;
+    }
+    {
+        ofstream fout(taskConfigPaths[0], ios::trunc);
+        fout << invalidTaskConfigWithInvalidFormat;
+    }
+    {
+        ofstream fout(taskConfigPaths[1], ios::trunc);
+        fout << invalidTaskConfigWithInvalidDetail;
+    }
+    {
+        ofstream fout(taskConfigPaths[2], ios::trunc);
+        fout << enabledValidTaskConfig;
+    }
+    {
+        ofstream fout(taskConfigPaths[3], ios::trunc);
+        fout << disabledValidTaskConfig;
     }
 }
 
