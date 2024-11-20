@@ -98,7 +98,6 @@ const char* const SCRAPE_SAMPLES_POST_METRIC_RELABELING = "scrape_samples_post_m
 const char* const SCRAPE_SAMPLES_SCRAPED = "scrape_samples_scraped";
 const char* const SCRAPE_TIMEOUT_SECONDS = "scrape_timeout_seconds";
 const char* const UP = "up";
-const char* const LC_SCRAPER = "lc_scraper";
 
 const char* const SCRAPE_TIMESTAMP_MILLISEC = "scrape_timestamp_millisec";
 
