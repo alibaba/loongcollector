@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "go_pipeline/LogtailPlugin.h"
@@ -497,7 +498,7 @@ bool Pipeline::LoadGoPipelines() const {
                                                         mContext.GetRegion(),
                                                         mContext.GetLogstoreKey())) {
             LOG_ERROR(mContext.GetLogger(),
-                      ("failed to init pipeline", "Go pipeline is invalid, see go_plugin.LOG for detail")(
+                      ("failed to init pipeline", "Go pipeline is invalid, see " + GetPluginLogName() + " for detail")(
                           "Go pipeline num", "2")("Go pipeline content", content)("config", mName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,
@@ -516,7 +517,7 @@ bool Pipeline::LoadGoPipelines() const {
                                                         mContext.GetRegion(),
                                                         mContext.GetLogstoreKey())) {
             LOG_ERROR(mContext.GetLogger(),
-                      ("failed to init pipeline", "Go pipeline is invalid, see go_plugin.LOG for detail")(
+                      ("failed to init pipeline", "Go pipeline is invalid, see " + GetPluginLogName() + " for detail")(
                           "Go pipeline num", "1")("Go pipeline content", content)("config", mName));
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "Go pipeline is invalid, content: " + content + ", config: " + mName,

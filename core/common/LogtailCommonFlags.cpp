@@ -81,7 +81,7 @@
 // app config
 DEFINE_FLAG_STRING(ilogtail_config,
                    "set dataserver & configserver address; (optional)set cpu,mem,bufflerfile,buffermap and etc.",
-                   "loongcollector_config.json");
+                   "ilogtail_config.json");
 DEFINE_FLAG_BOOL(enable_full_drain_mode, "", false);
 DEFINE_FLAG_INT32(cpu_limit_num, "cpu violate limit num before shutdown", 10);
 DEFINE_FLAG_INT32(mem_limit_num, "memory violate limit num before shutdown", 10);

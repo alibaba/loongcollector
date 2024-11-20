@@ -38,6 +38,12 @@ type GlobalConfig struct {
 	LoongcollectorDebugDir string
 	// Directory to store loongcollector third party data.
 	LoongcollectorThirdPartyDir string
+	// Log name of loongcollector plugin.
+	LoongcollectorPluginLogName string
+	// Tag of loongcollector version.
+	LoongcollectorVersionTag string
+	// Checkpoint file name of loongcollector plugin.
+	LoongcollectorCheckPointFile string
 	// Network identification from loongcollector.
 	HostIP       string
 	Hostname     string
@@ -59,18 +65,21 @@ var UserAgent = fmt.Sprintf("ilogtail/%v (%v)", BaseVersion, runtime.GOOS) // se
 
 func newGlobalConfig() (cfg GlobalConfig) {
 	cfg = GlobalConfig{
-		InputMaxFirstCollectDelayMs: 10000, // 10s
-		InputIntervalMs:             1000,  // 1s
-		AggregatIntervalMs:          3000,
-		FlushIntervalMs:             3000,
-		DefaultLogQueueSize:         1000,
-		DefaultLogGroupQueueSize:    4,
-		LoongcollectorConfDir:       "./conf/",
-		LoongcollectorLogDir:        "./log/",
-		LoongcollectorDataDir:       "./data/",
-		LoongcollectorDebugDir:      "./debug/",
-		LoongcollectorThirdPartyDir: "./thirdparty/",
-		DelayStopSec:                300,
+		InputMaxFirstCollectDelayMs:  10000, // 10s
+		InputIntervalMs:              1000,  // 1s
+		AggregatIntervalMs:           3000,
+		FlushIntervalMs:              3000,
+		DefaultLogQueueSize:          1000,
+		DefaultLogGroupQueueSize:     4,
+		LoongcollectorConfDir:        "./conf/",
+		LoongcollectorLogDir:         "./log/",
+		LoongcollectorPluginLogName:  "go_plugin.LOG",
+		LoongcollectorVersionTag:     "loongcollector_version",
+		LoongcollectorCheckPointFile: "go_plugin_checkpoint",
+		LoongcollectorDataDir:        "./data/",
+		LoongcollectorDebugDir:       "./debug/",
+		LoongcollectorThirdPartyDir:  "./thirdparty/",
+		DelayStopSec:                 300,
 	}
 	return
 }

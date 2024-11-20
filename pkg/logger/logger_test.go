@@ -49,11 +49,11 @@ func init() {
 
 func clean() {
 	_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorConfDir, "plugin_logger.xml"))
-	_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogDir, "go_plugin.LOG"))
+	_ = os.Remove(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogDir, config.LoongcollectorGlobalConfig.LoongcollectorPluginLogName))
 }
 
 func readLog(index int) string {
-	bytes, _ := os.ReadFile(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogDir, "go_plugin.LOG"))
+	bytes, _ := os.ReadFile(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorLogDir, config.LoongcollectorGlobalConfig.LoongcollectorPluginLogName))
 	logs := strings.Split(string(bytes), "\n")
 	if index > len(logs)-1 {
 		return ""

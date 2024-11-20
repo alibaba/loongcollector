@@ -30,7 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-var CheckPointFile = flag.String("CheckPointFile", "go_plugin_checkpoint", "checkpoint file name, base dir(binary dir)")
+var CheckPointFile = flag.String("CheckPointFile", "", "checkpoint file name, base dir(binary dir)")
 var CheckPointCleanInterval = flag.Int("CheckPointCleanInterval", 600, "checkpoint clean interval, second")
 var MaxCleanItemPerInterval = flag.Int("MaxCleanItemPerInterval", 1000, "max clean items per interval")
 
@@ -89,7 +89,11 @@ func (p *checkPointManager) Init() error {
 	pathExist, err := util.PathExists(logtailDataDir)
 	var dbPath string
 	if err == nil && pathExist {
-		dbPath = filepath.Join(logtailDataDir, *CheckPointFile)
+		if *CheckPointFile != "" {
+			dbPath = filepath.Join(logtailDataDir, *CheckPointFile)
+		} else {
+			dbPath = filepath.Join(logtailDataDir, config.LoongcollectorGlobalConfig.LoongcollectorCheckPointFile)
+		}
 	} else {
 		// c++程序如果这个目录创建失败会直接exit，所以这里一般应该不会走进来
 		logger.Error(context.Background(), "CHECKPOINT_ALARM", "logtailDataDir not exist", logtailDataDir, "err", err)

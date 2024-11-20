@@ -57,7 +57,7 @@ var alarmConfigJSON = `{
 		"DefaultLogGroupQueueSize": 4,
 		"Tags" : {
 			"base_version" : "` + config.BaseVersion + `",
-			"loongcollector_version" : "` + config.BaseVersion + `"
+			"` + config.LoongcollectorGlobalConfig.LoongcollectorVersionTag + `" : "` + config.BaseVersion + `"
 		}
     },
 	"inputs" : [
@@ -77,7 +77,7 @@ var containerConfigJSON = `{
 		"DefaultLogGroupQueueSize": 4,
 		"Tags" : {
 			"base_version" : "` + config.BaseVersion + `",
-			"loongcollector_version" : "` + config.BaseVersion + `"
+			"` + config.LoongcollectorGlobalConfig.LoongcollectorVersionTag + `" : "` + config.BaseVersion + `"
 		}
     },
 	"inputs" : [

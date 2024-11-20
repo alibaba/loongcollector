@@ -42,7 +42,7 @@ const (
 	asyncPattern = `
 <seelog type="asynctimer" asyncinterval="500000" minlevel="%s" >
  <outputs formatid="common">
-	 <rollingfile type="size" filename="%sgo_plugin.LOG" maxsize="20000000" maxrolls="10"/>
+	 <rollingfile type="size" filename="%s%s" maxsize="20000000" maxrolls="10"/>
 	 %s
      %s
  </outputs>
@@ -54,7 +54,7 @@ const (
 	syncPattern = `
 <seelog type="sync" minlevel="%s" >
  <outputs formatid="common">
-	 <rollingfile type="size" filename="%sgo_plugin.LOG" maxsize="20000000" maxrolls="10"/>
+	 <rollingfile type="size" filename="%s%s" maxsize="20000000" maxrolls="10"/>
 	 %s
 	 %s
  </outputs>
@@ -325,7 +325,7 @@ func generateDefaultConfig() string {
 	if memoryReceiverFlag {
 		memoryReceiverFlagStr = "<custom name=\"memory\" />"
 	}
-	return fmt.Sprintf(template, levelFlag, config.LoongcollectorGlobalConfig.LoongcollectorLogDir, consoleStr, memoryReceiverFlagStr)
+	return fmt.Sprintf(template, levelFlag, config.LoongcollectorGlobalConfig.LoongcollectorLogDir, config.LoongcollectorGlobalConfig.LoongcollectorPluginLogName, consoleStr, memoryReceiverFlagStr)
 }
 
 // Close the logger and recover the stdout and stderr

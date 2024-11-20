@@ -32,8 +32,8 @@
 #include "common/version.h"
 #include "config/ConfigDiff.h"
 #include "config/InstanceConfigManager.h"
-#include "config/watcher/PipelineConfigWatcher.h"
 #include "config/watcher/InstanceConfigWatcher.h"
+#include "config/watcher/PipelineConfigWatcher.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
@@ -175,9 +175,10 @@ void Application::Init() {
     appInfoJson["UUID"] = Json::Value(Application::GetInstance()->GetUUID());
     appInfoJson["instance_id"] = Json::Value(Application::GetInstance()->GetInstanceId());
 #ifdef __ENTERPRISE__
-    appInfoJson["loongcollector_version"] = Json::Value(ILOGTAIL_VERSION);
+    appInfoJson["host_id"] = Json::Value(FetchHostId());
+    appInfoJson[GetVersionTag()] = Json::Value(ILOGTAIL_VERSION);
 #else
-    appInfoJson["loongcollector_version"] = Json::Value(string(ILOGTAIL_VERSION) + " Community Edition");
+    appInfoJson[GetVersionTag()] = Json::Value(string(ILOGTAIL_VERSION) + " Community Edition");
     appInfoJson["git_hash"] = Json::Value(ILOGTAIL_GIT_HASH);
     appInfoJson["build_date"] = Json::Value(ILOGTAIL_BUILD_DATE);
 #endif

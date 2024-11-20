@@ -30,6 +30,8 @@
   * [Docker镜像](installation/sources/docker-image.md)
   * [编译依赖](installation/sources/dependencies.md)
 * [镜像站](installation/mirrors.md)
+* [LoongCollector 的 目录结构说明](installation/loongcollector-dir.md)
+* [LoongCollector 的 Logtail 兼容模式使用指南](installation/logtail-mode.md)
 
 ## 概念 <a href="#concepts" id="concepts"></a>
 
