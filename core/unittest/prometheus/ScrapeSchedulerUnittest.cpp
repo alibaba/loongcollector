@@ -21,6 +21,7 @@
 #include "common/StringTools.h"
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
+#include "models/RawEvent.h"
 #include "prometheus/Constants.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/labels/Labels.h"
@@ -65,8 +66,11 @@ void ScrapeSchedulerUnittest::TestInitscrapeScheduler() {
 }
 
 void ScrapeSchedulerUnittest::TestProcess() {
+    EventPool eventPool{true};
     HttpResponse httpResponse = HttpResponse(
-        new PromMetricResponseBody(), [](void* ptr) { delete static_cast<PromMetricResponseBody*>(ptr); }, PromMetricWriteCallback);
+        new PromMetricResponseBody(&eventPool),
+        [](void* ptr) { delete static_cast<PromMetricResponseBody*>(ptr); },
+        PromMetricWriteCallback);
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
@@ -112,8 +116,11 @@ void ScrapeSchedulerUnittest::TestProcess() {
 }
 
 void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
+    EventPool eventPool{true};
     HttpResponse httpResponse = HttpResponse(
-        new PromMetricResponseBody(), [](void* ptr) { delete static_cast<PromMetricResponseBody*>(ptr); }, PromMetricWriteCallback);
+        new PromMetricResponseBody(&eventPool),
+        [](void* ptr) { delete static_cast<PromMetricResponseBody*>(ptr); },
+        PromMetricWriteCallback);
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
@@ -148,33 +155,27 @@ void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
     auto& res = httpResponse.GetBody<PromMetricResponseBody>()->mEventGroup;
     APSARA_TEST_EQUAL(7UL, res.GetEvents().size());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05",
-                      res.GetEvents()[0].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[0].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0.25\"} 3.9357e-05",
-                      res.GetEvents()[1].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[1].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0.5\"} 4.1114e-05",
-                      res.GetEvents()[2].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[2].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0.75\"} 4.3372e-05",
-                      res.GetEvents()[3].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[3].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"1\"} 0.000112326",
-                      res.GetEvents()[4].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_gc_duration_seconds_sum 0.034885631",
-                      res.GetEvents()[5].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_gc_duration_seconds_count 850",
-                      res.GetEvents()[6].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+                      res.GetEvents()[4].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_gc_duration_seconds_sum 0.034885631", res.GetEvents()[5].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_gc_duration_seconds_count 850", res.GetEvents()[6].Cast<RawEvent>().GetContent());
     // httpResponse.GetBody<MetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
     PromMetricWriteCallback(
         body2.data(), (size_t)1, (size_t)body2.length(), (void*)httpResponse.GetBody<PromMetricResponseBody>());
     httpResponse.GetBody<PromMetricResponseBody>()->FlushCache();
     APSARA_TEST_EQUAL(11UL, res.GetEvents().size());
 
-    APSARA_TEST_EQUAL("go_goroutines 7",
-                      res.GetEvents()[7].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_info{version=\"go1.22.3\"} 1",
-                      res.GetEvents()[8].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_memstats_alloc_bytes 6.742688e+06",
-                      res.GetEvents()[9].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
-    APSARA_TEST_EQUAL("go_memstats_alloc_bytes_total 1.5159292e+08",
-                      res.GetEvents()[10].Cast<LogEvent>().GetContent(prometheus::PROMETHEUS).to_string());
+    APSARA_TEST_EQUAL("go_goroutines 7", res.GetEvents()[7].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_info{version=\"go1.22.3\"} 1", res.GetEvents()[8].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_memstats_alloc_bytes 6.742688e+06", res.GetEvents()[9].Cast<RawEvent>().GetContent());
+    APSARA_TEST_EQUAL("go_memstats_alloc_bytes_total 1.5159292e+08", res.GetEvents()[10].Cast<RawEvent>().GetContent());
 }
 
 void ScrapeSchedulerUnittest::TestReceiveMessage() {
@@ -197,7 +198,8 @@ void ScrapeSchedulerUnittest::TestScheduler() {
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
     auto timer = make_shared<Timer>();
-    event.SetTimer(timer);
+    EventPool eventPool{true};
+    event.SetComponent(timer, &eventPool);
     event.ScheduleNext();
 
     APSARA_TEST_TRUE(timer->mQueue.size() == 1);
@@ -215,7 +217,8 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     auto timer = make_shared<Timer>();
-    event.SetTimer(timer);
+    EventPool eventPool{true};
+    event.SetComponent(timer, &eventPool);
     auto now = std::chrono::steady_clock::now();
     event.SetFirstExecTime(now);
     event.ScheduleNext();

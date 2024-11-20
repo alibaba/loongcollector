@@ -22,7 +22,6 @@
 
 #include "common/Lock.h"
 #include "common/timer/Timer.h"
-#include "monitor/MetricManager.h"
 #include "monitor/MetricTypes.h"
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 #include "runner/InputRunner.h"
@@ -42,6 +41,7 @@ public:
         static PrometheusInputRunner sInstance;
         return &sInstance;
     }
+    void CheckGC();
 
     // input plugin update
     void UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber,
@@ -70,13 +70,13 @@ private:
     std::atomic<bool> mIsThreadRunning = true;
     std::future<void> mThreadRes;
 
-    std::unique_ptr<sdk::CurlClient> mClient;
-
     std::string mServiceHost;
     int32_t mServicePort;
     std::string mPodName;
 
+    std::unique_ptr<sdk::CurlClient> mClient;
     std::shared_ptr<Timer> mTimer;
+    EventPool mEventPool;
 
     mutable ReadWriteLock mSubscriberMapRWLock;
     std::map<std::string, std::shared_ptr<TargetSubscriberScheduler>> mTargetSubscriberSchedulerMap;

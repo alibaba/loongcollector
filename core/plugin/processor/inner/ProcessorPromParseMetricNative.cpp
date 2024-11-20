@@ -3,10 +3,10 @@
 #include <json/json.h>
 
 #include "common/StringTools.h"
-#include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
+#include "models/RawEvent.h"
 #include "prometheus/Constants.h"
 
 using namespace std;
@@ -43,7 +43,7 @@ void ProcessorPromParseMetricNative::Process(PipelineEventGroup& eGroup) {
 }
 
 bool ProcessorPromParseMetricNative::IsSupportedEvent(const PipelineEventPtr& e) const {
-    return e.Is<LogEvent>();
+    return e.Is<RawEvent>();
 }
 
 bool ProcessorPromParseMetricNative::ProcessEvent(PipelineEventPtr& e,
@@ -53,9 +53,9 @@ bool ProcessorPromParseMetricNative::ProcessEvent(PipelineEventPtr& e,
     if (!IsSupportedEvent(e)) {
         return false;
     }
-    auto& sourceEvent = e.Cast<LogEvent>();
+    auto& sourceEvent = e.Cast<RawEvent>();
     std::unique_ptr<MetricEvent> metricEvent = eGroup.CreateMetricEvent(true);
-    if (parser.ParseLine(sourceEvent.GetContent(prometheus::PROMETHEUS), *metricEvent)) {
+    if (parser.ParseLine(sourceEvent.GetContent(), *metricEvent)) {
         metricEvent->SetTag(string(prometheus::NAME), metricEvent->GetName());
         newEvents.emplace_back(std::move(metricEvent), true, nullptr);
     }

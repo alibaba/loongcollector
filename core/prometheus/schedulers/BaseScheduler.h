@@ -4,6 +4,8 @@
 #include <memory>
 
 #include "common/http/HttpResponse.h"
+#include "common/timer/Timer.h"
+#include "models/EventPool.h"
 #include "prometheus/async/PromFuture.h"
 
 namespace logtail {
@@ -20,8 +22,9 @@ public:
 
     void SetFirstExecTime(std::chrono::steady_clock::time_point firstExecTime);
     void DelayExecTime(uint64_t delaySeconds);
-
     virtual void Cancel();
+
+    void SetComponent(std::shared_ptr<Timer> timer, EventPool* eventPool);
 
 protected:
     bool IsCancelled();
@@ -35,5 +38,8 @@ protected:
     bool mValidState = true;
     std::shared_ptr<PromFuture<HttpResponse&, uint64_t>> mFuture;
     std::shared_ptr<PromFuture<>> mIsContextValidFuture;
+
+    std::shared_ptr<Timer> mTimer;
+    EventPool* mEventPool = nullptr;
 };
 } // namespace logtail

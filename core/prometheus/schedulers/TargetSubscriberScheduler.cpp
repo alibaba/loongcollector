@@ -223,7 +223,7 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
         auto scrapeScheduler
             = std::make_shared<ScrapeScheduler>(mScrapeConfigPtr, host, port, resultLabel, mQueueKey, mInputIndex);
 
-        scrapeScheduler->SetTimer(mTimer);
+        scrapeScheduler->SetComponent(mTimer, mEventPool);
 
         auto randSleepMilliSec = GetRandSleepMilliSec(
             scrapeScheduler->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, GetCurrentTimeInMilliSeconds());
@@ -236,9 +236,6 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
     return scrapeSchedulerMap;
 }
 
-void TargetSubscriberScheduler::SetTimer(shared_ptr<Timer> timer) {
-    mTimer = std::move(timer);
-}
 
 string TargetSubscriberScheduler::GetId() const {
     return mJobName;

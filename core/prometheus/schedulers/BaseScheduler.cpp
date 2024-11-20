@@ -1,5 +1,10 @@
 #include "prometheus/schedulers/BaseScheduler.h"
 
+#include "common/timer/Timer.h"
+#include "models/EventPool.h"
+
+using namespace std;
+
 namespace logtail {
 void BaseScheduler::ExecDone() {
     mExecCount++;
@@ -27,5 +32,10 @@ void BaseScheduler::Cancel() {
 bool BaseScheduler::IsCancelled() {
     ReadLock lock(mLock);
     return !mValidState;
+}
+
+void BaseScheduler::SetComponent(shared_ptr<Timer> timer, EventPool* eventPool) {
+    mTimer = std::move(timer);
+    mEventPool = eventPool;
 }
 } // namespace logtail

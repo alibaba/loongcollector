@@ -24,13 +24,11 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/timer/HttpRequestTimerEvent.h"
-#include "common/timer/Timer.h"
 #include "logger/Logger.h"
 #include "pipeline/queue/ProcessQueueItem.h"
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKey.h"
 #include "prometheus/Constants.h"
-#include "prometheus/Utils.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/async/PromHttpRequest.h"
 #include "sdk/Common.h"
@@ -86,8 +84,6 @@ ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
     mHash = mScrapeConfigPtr->mJobName + tmpTargetURL + ToString(mTargetLabels.Hash());
     mInstance = mHost + ":" + ToString(mPort);
     mInterval = mScrapeConfigPtr->mScrapeIntervalSeconds;
-
-    mParser = make_unique<TextParser>();
 }
 
 void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t timestampMilliSec) {
@@ -214,7 +210,7 @@ std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::
                                             mScrapeConfigPtr->mRequestHeaders,
                                             "",
                                             HttpResponse(
-                                                new PromMetricResponseBody(),
+                                                new PromMetricResponseBody(mEventPool),
                                                 [](void* ptr) { delete static_cast<PromMetricResponseBody*>(ptr); },
                                                 PromMetricWriteCallback),
                                             mScrapeConfigPtr->mScrapeTimeoutSeconds,
@@ -236,10 +232,6 @@ void ScrapeScheduler::Cancel() {
         WriteLock lock(mLock);
         mValidState = false;
     }
-}
-
-void ScrapeScheduler::SetTimer(std::shared_ptr<Timer> timer) {
-    mTimer = std::move(timer);
 }
 
 void ScrapeScheduler::InitSelfMonitor(const MetricLabels& defaultLabels) {
