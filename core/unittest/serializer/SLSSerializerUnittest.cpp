@@ -41,6 +41,7 @@ private:
     BatchedEvents
     CreateBatchedMetricEvents(bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag);
     BatchedEvents CreateBatchedRawEvents(bool enableNanosecond, bool emptyContent);
+    BatchedEvents CreateBatchedSpanEvents();
 
     static unique_ptr<FlusherSLS> sFlusher;
 
@@ -215,6 +216,86 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
     }
     {
         // span
+        string res, errorMsg;
+        auto events = CreateBatchedSpanEvents();
+        APSARA_TEST_EQUAL(events.mEvents.size(), 1);
+        APSARA_TEST_TRUE(events.mEvents[0]->GetType() == PipelineEvent::Type::SPAN);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(events), res, errorMsg));
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        APSARA_TEST_EQUAL(13, logGroup.logs(0).contents_size());
+        // traceid
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "traceId");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), "trace-1-2-3-4-5");
+        // span id
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "spanId");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "span-1-2-3-4-5");
+        // parent span id
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "parentSpanId");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "parent-1-2-3-4-5");
+        // spanName
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "spanName");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "/oneagent/qianlu/local/1");
+        // kind
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).key(), "kind");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "client");
+        // code
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(5).key(), "statusCode");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(5).value(), "OK");
+        // traceState
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(6).key(), "traceState");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(6).value(), "test-state");
+        // attributes
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(7).key(), "attributes");
+        auto attrs = logGroup.logs(0).contents(7).value();
+        Json::Value jsonVal;
+        Json::CharReaderBuilder readerBuilder;
+        std::string errs;
+
+        std::istringstream s(attrs);
+        bool ret = Json::parseFromStream(readerBuilder, s, &jsonVal, &errs);
+        APSARA_TEST_TRUE(ret);
+        APSARA_TEST_EQUAL(jsonVal.size(), 10);
+        APSARA_TEST_EQUAL(jsonVal["rpcType"].asString(), "25");
+        APSARA_TEST_EQUAL(jsonVal["scope-tag-0"].asString(), "scope-value-0");
+        // APSARA_TEST_EQUAL(logGroup.logs(0).contents(7).value(), "");
+        // links
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(8).key(), "links");
+        
+        auto linksStr = logGroup.logs(0).contents(8).value();
+
+        std::istringstream ss(linksStr);
+        ret = Json::parseFromStream(readerBuilder, ss, &jsonVal, &errs);
+        APSARA_TEST_TRUE(ret);
+        APSARA_TEST_EQUAL(jsonVal.size(), 1);
+        for (auto& link : jsonVal) {
+            APSARA_TEST_EQUAL(link["spanId"].asString(), "inner-link-spanid");
+            APSARA_TEST_EQUAL(link["traceId"].asString(), "inner-link-traceid");
+            APSARA_TEST_EQUAL(link["traceState"].asString(), "inner-link-trace-state");
+        }
+        // events
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(9).key(), "events");
+        auto eventsStr = logGroup.logs(0).contents(9).value();
+        std::istringstream sss(eventsStr);
+        ret = Json::parseFromStream(readerBuilder, sss, &jsonVal, &errs);
+        APSARA_TEST_TRUE(ret);
+        APSARA_TEST_EQUAL(jsonVal.size(), 1);
+        for (auto& event : jsonVal) {
+            APSARA_TEST_EQUAL(event["name"].asString(), "inner-event");
+            APSARA_TEST_EQUAL(event["timestamp"].asString(), "1000");
+        }
+        // start
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(10).key(), "startTime");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(10).value(), "1000");
+
+        // end
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(11).key(), "endTime");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(11).value(), "2000");
+
+        // duration
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(12).key(), "duration");
+        APSARA_TEST_EQUAL(logGroup.logs(0).contents(12).value(), "1000");
     }
     {
         // raw
@@ -383,6 +464,59 @@ BatchedEvents SLSSerializerUnittest::CreateBatchedRawEvents(bool enableNanosecon
     } else {
         e->SetTimestamp(1234567890);
     }
+    BatchedEvents batch(std::move(group.MutableEvents()),
+                        std::move(group.GetSizedTags()),
+                        std::move(group.GetSourceBuffer()),
+                        group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                        std::move(group.GetExactlyOnceCheckpoint()));
+    return batch;
+}
+
+BatchedEvents SLSSerializerUnittest::CreateBatchedSpanEvents() {
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
+    group.SetTag(LOG_RESERVED_KEY_SOURCE, "source");
+    group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "aaa");
+    group.SetTag(LOG_RESERVED_KEY_PACKAGE_ID, "bbb");   
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+    // auto nano = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count(); 
+    StringBuffer b = group.GetSourceBuffer()->CopyString(string("pack_id"));
+    group.SetMetadataNoCopy(EventGroupMetaKey::SOURCE_ID, StringView(b.data, b.size));
+    group.SetExactlyOnceCheckpoint(RangeCheckpointPtr(new RangeCheckpoint));
+    SpanEvent* spanEvent = group.AddSpanEvent();
+    spanEvent->SetScopeTag(std::string("scope-tag-0"), std::string("scope-value-0"));
+    spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+    spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
+    spanEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+    spanEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+    spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/1"));
+    spanEvent->SetTag(std::string("rpcType"), std::string("25"));
+    spanEvent->SetTag(std::string("callType"), std::string("http-client"));
+    spanEvent->SetTag(std::string("statusCode"), std::string("200"));
+    spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+    auto innerEvent = spanEvent->AddEvent();
+    innerEvent->SetTag(std::string("innner-event-key-0"), std::string("inner-event-value-0"));
+    innerEvent->SetTag(std::string("innner-event-key-1"), std::string("inner-event-value-1"));
+    innerEvent->SetName("inner-event");
+    innerEvent->SetTimestampNs(1000);
+    auto innerLink = spanEvent->AddLink();
+    innerLink->SetTag(std::string("innner-link-key-0"), std::string("inner-link-value-0"));
+    innerLink->SetTag(std::string("innner-link-key-1"), std::string("inner-link-value-1"));
+    innerLink->SetTraceId("inner-link-traceid");
+    innerLink->SetSpanId("inner-link-spanid");
+    innerLink->SetTraceState("inner-link-trace-state");
+    spanEvent->SetName("/oneagent/qianlu/local/1");
+    spanEvent->SetKind(SpanEvent::Kind::Client);
+    spanEvent->SetStatus(SpanEvent::StatusCode::Ok);
+    spanEvent->SetSpanId("span-1-2-3-4-5");
+    spanEvent->SetTraceId("trace-1-2-3-4-5");
+    spanEvent->SetParentSpanId("parent-1-2-3-4-5");
+    spanEvent->SetTraceState("test-state");
+    spanEvent->SetStartTimeNs(1000);
+    spanEvent->SetEndTimeNs(2000);
+    spanEvent->SetTimestamp(seconds);
     BatchedEvents batch(std::move(group.MutableEvents()),
                         std::move(group.GetSizedTags()),
                         std::move(group.GetSourceBuffer()),

@@ -44,4 +44,8 @@ namespace logtail {
     extern const std::string DEFAULT_METRIC_TAG_CONTAINER_IP;
     extern const std::string DEFAULT_METRIC_TAG_IMAGE_NAME;
 
+////////////////////////// TRACE ////////////////////////
+
+
+
 } // namespace logtail

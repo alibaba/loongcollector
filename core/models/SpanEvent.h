@@ -19,6 +19,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <json/json.h>
 
 #include "common/memory/SourceBuffer.h"
 #include "models/PipelineEvent.h"
@@ -67,8 +68,8 @@ public:
 
         size_t DataSize() const;
 
-#ifdef APSARA_UNIT_TEST_MAIN
         Json::Value ToJson() const;
+#ifdef APSARA_UNIT_TEST_MAIN
         void FromJson(const Json::Value& value);
 #endif
 
@@ -107,8 +108,8 @@ public:
 
         size_t DataSize() const;
 
-#ifdef APSARA_UNIT_TEST_MAIN
         Json::Value ToJson() const;
+#ifdef APSARA_UNIT_TEST_MAIN
         void FromJson(const Json::Value& value);
 #endif
 
@@ -213,5 +214,8 @@ private:
     friend class SpanEventUnittest;
 #endif
 };
+
+const std::string& GetStatusString(SpanEvent::StatusCode status);
+const std::string& GetKindString(SpanEvent::Kind kind);
 
 } // namespace logtail

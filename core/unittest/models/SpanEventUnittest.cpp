@@ -319,13 +319,13 @@ void SpanEventUnittest::TestToJson() {
         "kind": 3,
         "startTimeNs": 1715826723000000000,
         "endTimeNs": 1715826725000000000,
-        "tags": {
+        "attributes": {
             "key1": "value1"
         },
         "events": [
             {
                 "name": "test_event",
-                "timestampNs": 1715826724000000000
+                "timestamp": 1715826724000000000
             }
         ],
         "links": [
@@ -358,13 +358,13 @@ void SpanEventUnittest::TestFromJson() {
         "kind": 3,
         "startTimeNs": 1715826723000000000,
         "endTimeNs": 1715826725000000000,
-        "tags": {
+        "attributes": {
             "key1": "value1"
         },
         "events": [
             {
                 "name": "test_event",
-                "timestampNs": 1715826724000000000
+                "timestamp": 1715826724000000000
             }
         ],
         "links": [
@@ -513,8 +513,8 @@ void InnerEventUnittest::TestToJson() {
     Json::Value eventJson;
     string eventStr = R"({
         "name": "test",
-        "timestampNs": 1715826723000000000,
-        "tags": {
+        "timestamp": 1715826723000000000,
+        "attributes": {
             "key1": "value1"
         }
     })";
@@ -528,8 +528,8 @@ void InnerEventUnittest::TestFromJson() {
     Json::Value eventJson;
     string eventStr = R"({
         "name": "test",
-        "timestampNs": 1715826723000000000,
-        "tags": {
+        "timestamp": 1715826723000000000,
+        "attributes": {
             "key1": "value1"
         }
     })";
@@ -659,7 +659,7 @@ void SpanLinkUnittest::TestToJson() {
         "traceId": "test_trace_id",
         "spanId": "test_span_id",
         "traceState": "normal",
-        "tags": {
+        "attributes": {
             "key1": "value1"
         }
     })";
@@ -675,7 +675,7 @@ void SpanLinkUnittest::TestFromJson() {
         "traceId": "test_trace_id",
         "spanId": "test_span_id",
         "traceState": "normal",
-        "tags": {
+        "attributes": {
             "key1": "value1"
         }
     })";
