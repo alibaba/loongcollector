@@ -34,7 +34,7 @@ bool SLSResponse::Parse(const HttpResponse& response) {
     mStatusCode = response.GetStatusCode();
 
     if (mStatusCode == 0) {
-        mErrorCode = sdk::LOG_REQUEST_TIMEOUT;
+        mErrorCode = sdk::LOGE_REQUEST_TIMEOUT;
         mErrorMsg = "Request timeout";
     } else if (mStatusCode != 200) {
         try {
