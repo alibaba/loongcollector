@@ -21,8 +21,8 @@
 #include "config/ConfigDiff.h"
 #include "config/InstanceConfigManager.h"
 #include "config/common_provider/CommonConfigProvider.h"
-#include "config/watcher/PipelineConfigWatcher.h"
 #include "config/watcher/InstanceConfigWatcher.h"
+#include "config/watcher/PipelineConfigWatcher.h"
 #include "gmock/gmock.h"
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
@@ -80,7 +80,7 @@ public:
             MockCommonConfigProvider provider;
             provider.Init("common_v2");
             provider.Stop();
-            bfs::remove_all(provider.mPipelineSourceDir.string());
+            bfs::remove_all(provider.mContinuousPipelineConfigDir.string());
             bfs::remove_all(provider.mInstanceSourceDir.string());
         } else {
             CreateAgentDir();
@@ -91,7 +91,7 @@ public:
             MockCommonConfigProvider provider;
             provider.Init("common_v2");
             provider.Stop();
-            bfs::remove_all(provider.mPipelineSourceDir.string());
+            bfs::remove_all(provider.mContinuousPipelineConfigDir.string());
             bfs::remove_all(provider.mInstanceSourceDir.string());
         }
     }
@@ -101,7 +101,7 @@ public:
         MockCommonConfigProvider provider;
         provider.Init("common_v2");
         provider.Stop();
-        bfs::remove_all(provider.mPipelineSourceDir.string());
+        bfs::remove_all(provider.mContinuousPipelineConfigDir.string());
         bfs::remove_all(provider.mInstanceSourceDir.string());
     }
 
@@ -294,7 +294,8 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
                   APSARA_TEST_EQUAL(heartbeatReq.sequence_num(), sequence_num);
                   sequence_num++;
                   APSARA_TEST_TRUE(heartbeatReq.capabilities() & configserver::proto::v2::AcceptsInstanceConfig);
-                  APSARA_TEST_TRUE(heartbeatReq.capabilities() & configserver::proto::v2::AcceptsPipelineConfig);
+                  APSARA_TEST_TRUE(heartbeatReq.capabilities()
+                                   & configserver::proto::v2::AcceptsContinuousPipelineConfig);
                   APSARA_TEST_EQUAL(heartbeatReq.instance_id(), provider.GetInstanceId());
                   APSARA_TEST_EQUAL(heartbeatReq.agent_type(), "LoongCollector");
                   APSARA_TEST_EQUAL(heartbeatReq.attributes().ip(), LoongCollectorMonitor::mIpAddr);
@@ -314,7 +315,7 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
                   configserver::proto::v2::HeartbeatResponse heartbeatRespPb;
                   heartbeatRespPb.set_capabilities(configserver::proto::v2::ResponseFlags::ReportFullState);
                   {
-                      auto pipeline = heartbeatRespPb.mutable_pipeline_config_updates();
+                      auto pipeline = heartbeatRespPb.mutable_continuous_pipeline_config_updates();
                       auto configDetail = pipeline->Add();
                       configDetail->set_name("config1");
                       configDetail->set_version(1);
@@ -382,10 +383,9 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
                         )");
                   }
                   {
-                      auto commandconfig = heartbeatRespPb.mutable_custom_command_updates();
+                      auto commandconfig = heartbeatRespPb.mutable_onetime_pipeline_config_updates();
                       auto configDetail = commandconfig->Add();
                       configDetail->set_name("commandconfig1");
-                      configDetail->set_type("history");
                       configDetail->set_detail(R"(
                         {
                                 "enable": true,
@@ -427,9 +427,9 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
         configserver::proto::v2::HeartbeatResponse heartbeatResponse;
         provider.GetConfigUpdate();
 
-        APSARA_TEST_EQUAL(provider.mPipelineConfigInfoMap.size(), 2);
-        APSARA_TEST_EQUAL(provider.mPipelineConfigInfoMap["config1"].status, ConfigFeedbackStatus::APPLYING);
-        APSARA_TEST_EQUAL(provider.mPipelineConfigInfoMap["config2"].status, ConfigFeedbackStatus::FAILED);
+        APSARA_TEST_EQUAL(provider.mContinuousPipelineConfigInfoMap.size(), 2);
+        APSARA_TEST_EQUAL(provider.mContinuousPipelineConfigInfoMap["config1"].status, ConfigFeedbackStatus::APPLYING);
+        APSARA_TEST_EQUAL(provider.mContinuousPipelineConfigInfoMap["config2"].status, ConfigFeedbackStatus::FAILED);
 
         // 处理 pipelineconfig
         auto pipelineConfigDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
@@ -474,8 +474,8 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
     {
         MockCommonConfigProvider provider;
         provider.Init("common_v2");
-        APSARA_TEST_EQUAL(provider.mPipelineConfigInfoMap.size(), 1);
-        APSARA_TEST_EQUAL(provider.mPipelineConfigInfoMap["config1"].status, ConfigFeedbackStatus::APPLYING);
+        APSARA_TEST_EQUAL(provider.mContinuousPipelineConfigInfoMap.size(), 1);
+        APSARA_TEST_EQUAL(provider.mContinuousPipelineConfigInfoMap["config1"].status, ConfigFeedbackStatus::APPLYING);
         APSARA_TEST_EQUAL(provider.mInstanceConfigInfoMap.size(), 1);
         APSARA_TEST_EQUAL(provider.mInstanceConfigInfoMap["instanceconfig1"].status, ConfigFeedbackStatus::APPLYING);
         provider.Stop();
@@ -509,7 +509,8 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
                   APSARA_TEST_EQUAL(heartbeatReq.sequence_num(), sequence_num);
                   sequence_num++;
                   APSARA_TEST_TRUE(heartbeatReq.capabilities() & configserver::proto::v2::AcceptsInstanceConfig);
-                  APSARA_TEST_TRUE(heartbeatReq.capabilities() & configserver::proto::v2::AcceptsPipelineConfig);
+                  APSARA_TEST_TRUE(heartbeatReq.capabilities()
+                                   & configserver::proto::v2::AcceptsContinuousPipelineConfig);
                   APSARA_TEST_EQUAL(heartbeatReq.instance_id(), provider.GetInstanceId());
                   APSARA_TEST_EQUAL(heartbeatReq.agent_type(), "LoongCollector");
                   APSARA_TEST_EQUAL(heartbeatReq.attributes().ip(), LoongCollectorMonitor::mIpAddr);
@@ -530,7 +531,7 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
                   heartbeatRespPb.set_capabilities(configserver::proto::v2::ResponseFlags::ReportFullState);
                   // pipeline
                   {
-                      auto pipeline = heartbeatRespPb.mutable_pipeline_config_updates();
+                      auto pipeline = heartbeatRespPb.mutable_continuous_pipeline_config_updates();
                       auto configDetail = pipeline->Add();
                       configDetail->set_name("config1");
                       configDetail->set_version(-1);
@@ -600,10 +601,9 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
                   }
                   // commandconfig
                   {
-                      auto commandconfig = heartbeatRespPb.mutable_custom_command_updates();
+                      auto commandconfig = heartbeatRespPb.mutable_onetime_pipeline_config_updates();
                       auto configDetail = commandconfig->Add();
                       configDetail->set_name("commandconfig1");
-                      configDetail->set_type("history");
                       configDetail->set_detail(R"(
                         {
                                 "enable": true,
@@ -645,7 +645,7 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
         configserver::proto::v2::HeartbeatResponse heartbeatResponse;
         provider.GetConfigUpdate();
 
-        APSARA_TEST_TRUE(provider.mPipelineConfigInfoMap.empty());
+        APSARA_TEST_TRUE(provider.mContinuousPipelineConfigInfoMap.empty());
 
         // 处理pipelineConfigDiff
         auto pipelineConfigDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();

@@ -29,7 +29,8 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
         auto iter = mPipelineNameEntityMap.find(name);
         iter->second->Stop(true);
         mPipelineNameEntityMap.erase(iter);
-        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(name, ConfigFeedbackStatus::DELETED);
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
+                                                                                     ConfigFeedbackStatus::DELETED);
     }
     for (auto& config : diff.mModified) {
         auto p = BuildPipeline(std::move(config));
@@ -40,8 +41,8 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
             AlarmManager::GetInstance()->SendAlarm(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build task for existing config: keep current task running, config: " + config.mName);
-            ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName,
-                                                                               ConfigFeedbackStatus::FAILED);
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                         ConfigFeedbackStatus::FAILED);
             continue;
         }
         LOG_INFO(sLogger,
@@ -51,7 +52,8 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
         iter->second->Stop(false);
         mPipelineNameEntityMap[config.mName] = std::move(p);
         mPipelineNameEntityMap[config.mName]->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                     ConfigFeedbackStatus::APPLIED);
     }
     for (auto& config : diff.mAdded) {
         auto p = BuildPipeline(std::move(config));
@@ -61,14 +63,15 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
             AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
                                                    "failed to build task for new config: skip current object, config: "
                                                        + config.mName);
-            ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName,
-                                                                               ConfigFeedbackStatus::FAILED);
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                         ConfigFeedbackStatus::FAILED);
             continue;
         }
         LOG_INFO(sLogger, ("task building for new config succeeded", "begin to start task")("config", config.mName));
         mPipelineNameEntityMap[config.mName] = std::move(p);
         mPipelineNameEntityMap[config.mName]->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackPipelineConfigStatus(config.mName, ConfigFeedbackStatus::APPLIED);
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+                                                                                     ConfigFeedbackStatus::APPLIED);
     }
 }
 

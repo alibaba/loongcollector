@@ -38,13 +38,6 @@ struct ConfigInfo {
     std::string detail;
 };
 
-struct CommandInfo {
-    std::string type;
-    std::string name;
-    ConfigFeedbackStatus status;
-    std::string message;
-};
-
 class CommonConfigProvider : public ConfigProvider, ConfigFeedbackable {
 public:
     std::string sName;
@@ -61,10 +54,11 @@ public:
     void Init(const std::string& dir) override;
     void Stop() override;
 
-    void FeedbackPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
+    void FeedbackContinuousPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
     void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) override;
-    void
-    FeedbackCommandConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status) override;
+    void FeedbackOnetimePipelineConfigStatus(const std::string& type,
+                                             const std::string& name,
+                                             ConfigFeedbackStatus status) override;
     CommonConfigProvider() = default;
     ~CommonConfigProvider() = default;
 
@@ -105,12 +99,12 @@ protected:
     bool mConfigServerAvailable = false;
 
     mutable std::mutex mInstanceInfoMapMux;
-    mutable std::mutex mPipelineInfoMapMux;
-    mutable std::mutex mCommondInfoMapMux;
+    mutable std::mutex mContinuousPipelineInfoMapMux;
+    mutable std::mutex mOnetimePipelineInfoMapMux;
 
-    std::unordered_map<std::string, ConfigInfo> mPipelineConfigInfoMap;
+    std::unordered_map<std::string, ConfigInfo> mContinuousPipelineConfigInfoMap;
     std::unordered_map<std::string, ConfigInfo> mInstanceConfigInfoMap;
-    std::unordered_map<std::string, CommandInfo> mCommandInfoMap;
+    std::unordered_map<std::string, ConfigInfo> mOnetimePipelineConfigInfoMap;
 
 private:
     static std::string configVersion;

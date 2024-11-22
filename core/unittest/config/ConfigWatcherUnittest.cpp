@@ -16,8 +16,8 @@
 #include <fstream>
 
 #include "config/ConfigDiff.h"
-#include "config/watcher/PipelineConfigWatcher.h"
 #include "config/watcher/InstanceConfigWatcher.h"
+#include "config/watcher/PipelineConfigWatcher.h"
 #include "pipeline/plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
 
@@ -44,7 +44,7 @@ private:
     static const filesystem::path instanceConfigDir;
 };
 
-const filesystem::path ConfigWatcherUnittest::configDir = "./pipeline_config";
+const filesystem::path ConfigWatcherUnittest::configDir = "./continuous_pipeline_config";
 const filesystem::path ConfigWatcherUnittest::instanceConfigDir = "./instance_config";
 
 void ConfigWatcherUnittest::InvalidConfigDirFound() const {
@@ -53,11 +53,11 @@ void ConfigWatcherUnittest::InvalidConfigDirFound() const {
         APSARA_TEST_TRUE(diff.first.IsEmpty());
         APSARA_TEST_TRUE(diff.second.IsEmpty());
 
-        { ofstream fout("pipeline_config"); }
+        { ofstream fout("continuous_pipeline_config"); }
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.first.IsEmpty());
         APSARA_TEST_TRUE(diff.second.IsEmpty());
-        filesystem::remove_all("pipeline_config");
+        filesystem::remove_all("continuous_pipeline_config");
     }
     {
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();

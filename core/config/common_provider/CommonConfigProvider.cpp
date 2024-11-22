@@ -131,9 +131,9 @@ void CommonConfigProvider::Stop() {
 
 void CommonConfigProvider::LoadConfigFile() {
     error_code ec;
-    lock_guard<mutex> pipelineInfomaplock(mPipelineInfoMapMux);
-    lock_guard<mutex> lockPipeline(mPipelineMux);
-    for (auto const& entry : filesystem::directory_iterator(mPipelineSourceDir, ec)) {
+    lock_guard<mutex> pipelineInfomaplock(mContinuousPipelineInfoMapMux);
+    lock_guard<mutex> lockPipeline(mContinuousPipelineMux);
+    for (auto const& entry : filesystem::directory_iterator(mContinuousPipelineConfigDir, ec)) {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
             ConfigInfo info;
@@ -144,8 +144,8 @@ void CommonConfigProvider::LoadConfigFile() {
             }
             info.status = ConfigFeedbackStatus::APPLYING;
             info.detail = detail.toStyledString();
-            mPipelineConfigInfoMap[info.name] = info;
-            ConfigFeedbackReceiver::GetInstance().RegisterPipelineConfig(info.name, this);
+            mContinuousPipelineConfigInfoMap[info.name] = info;
+            ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(info.name, this);
         }
     }
     lock_guard<mutex> instanceInfomaplock(mInstanceInfoMapMux);
@@ -266,7 +266,7 @@ configserver::proto::v2::HeartbeatRequest CommonConfigProvider::PrepareHeartbeat
     heartbeatReq.set_request_id(requestID);
     heartbeatReq.set_sequence_num(mSequenceNum);
     heartbeatReq.set_capabilities(configserver::proto::v2::AcceptsInstanceConfig
-                                  | configserver::proto::v2::AcceptsPipelineConfig);
+                                  | configserver::proto::v2::AcceptsContinuousPipelineConfig);
     heartbeatReq.set_instance_id(GetInstanceId());
     heartbeatReq.set_agent_type("LoongCollector");
     FillAttributes(*heartbeatReq.mutable_attributes());
@@ -279,37 +279,18 @@ configserver::proto::v2::HeartbeatRequest CommonConfigProvider::PrepareHeartbeat
     heartbeatReq.set_running_status("running");
     heartbeatReq.set_startup_time(mStartTime);
 
-    lock_guard<mutex> pipelineinfomaplock(mPipelineInfoMapMux);
-    for (const auto& configInfo : mPipelineConfigInfoMap) {
-        addConfigInfoToRequest(configInfo, heartbeatReq.add_pipeline_configs());
+    lock_guard<mutex> pipelineinfomaplock(mContinuousPipelineInfoMapMux);
+    for (const auto& configInfo : mContinuousPipelineConfigInfoMap) {
+        addConfigInfoToRequest(configInfo, heartbeatReq.add_continuous_pipeline_configs());
     }
     lock_guard<mutex> instanceinfomaplock(mInstanceInfoMapMux);
     for (const auto& configInfo : mInstanceConfigInfoMap) {
         addConfigInfoToRequest(configInfo, heartbeatReq.add_instance_configs());
     }
 
-    for (auto& configInfo : mCommandInfoMap) {
-        configserver::proto::v2::CommandInfo* command = heartbeatReq.add_custom_commands();
-        command->set_type(configInfo.second.type);
-        command->set_name(configInfo.second.name);
-        command->set_message(configInfo.second.message);
-        switch (configInfo.second.status) {
-            case ConfigFeedbackStatus::UNSET:
-                command->set_status(configserver::proto::v2::ConfigStatus::UNSET);
-                break;
-            case ConfigFeedbackStatus::APPLYING:
-                command->set_status(configserver::proto::v2::ConfigStatus::APPLYING);
-                break;
-            case ConfigFeedbackStatus::APPLIED:
-                command->set_status(configserver::proto::v2::ConfigStatus::APPLIED);
-                break;
-            case ConfigFeedbackStatus::FAILED:
-                command->set_status(configserver::proto::v2::ConfigStatus::FAILED);
-                break;
-            case ConfigFeedbackStatus::DELETED:
-                break;
-        }
-        command->set_message(configInfo.second.message);
+    lock_guard<mutex> onetimeinfomaplock(mOnetimePipelineInfoMapMux);
+    for (const auto& configInfo : mOnetimePipelineConfigInfoMap) {
+        addConfigInfoToRequest(configInfo, heartbeatReq.add_onetime_pipeline_configs());
     }
     return heartbeatReq;
 }
@@ -370,10 +351,10 @@ bool CommonConfigProvider::SendHttpRequest(const string& operation,
 bool CommonConfigProvider::FetchPipelineConfig(
     configserver::proto::v2::HeartbeatResponse& heartbeatResponse,
     ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>& result) {
-    if (heartbeatResponse.flags() & ::configserver::proto::v2::FetchPipelineConfigDetail) {
+    if (heartbeatResponse.flags() & ::configserver::proto::v2::FetchContinuousPipelineConfigDetail) {
         return FetchPipelineConfigFromServer(heartbeatResponse, result);
     } else {
-        result.Swap(heartbeatResponse.mutable_pipeline_config_updates());
+        result.Swap(heartbeatResponse.mutable_continuous_pipeline_config_updates());
         return true;
     }
 }
@@ -381,7 +362,7 @@ bool CommonConfigProvider::FetchPipelineConfig(
 bool CommonConfigProvider::FetchInstanceConfig(
     configserver::proto::v2::HeartbeatResponse& heartbeatResponse,
     ::google::protobuf::RepeatedPtrField< ::configserver::proto::v2::ConfigDetail>& result) {
-    if (heartbeatResponse.flags() & ::configserver::proto::v2::FetchPipelineConfigDetail) {
+    if (heartbeatResponse.flags() & ::configserver::proto::v2::FetchContinuousPipelineConfigDetail) {
         return FetchInstanceConfigFromServer(heartbeatResponse, result);
     } else {
         result.Swap(heartbeatResponse.mutable_instance_config_updates());
@@ -422,7 +403,7 @@ bool CommonConfigProvider::DumpConfigFile(const configserver::proto::v2::ConfigD
 void CommonConfigProvider::UpdateRemotePipelineConfig(
     const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs) {
     error_code ec;
-    const std::filesystem::path& sourceDir = mPipelineSourceDir;
+    const std::filesystem::path& sourceDir = mContinuousPipelineConfigDir;
     filesystem::create_directories(sourceDir, ec);
     if (ec) {
         StopUsingConfigServer();
@@ -432,27 +413,27 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
         return;
     }
 
-    lock_guard<mutex> lock(mPipelineMux);
-    lock_guard<mutex> infomaplock(mPipelineInfoMapMux);
+    lock_guard<mutex> lock(mContinuousPipelineMux);
+    lock_guard<mutex> infomaplock(mContinuousPipelineInfoMapMux);
     for (const auto& config : configs) {
         filesystem::path filePath = sourceDir / (config.name() + ".json");
         if (config.version() == -1) {
-            mPipelineConfigInfoMap.erase(config.name());
+            mContinuousPipelineConfigInfoMap.erase(config.name());
             filesystem::remove(filePath, ec);
-            ConfigFeedbackReceiver::GetInstance().UnregisterPipelineConfig(config.name());
+            ConfigFeedbackReceiver::GetInstance().UnregisterContinuousPipelineConfig(config.name());
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
-                mPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                   .version = config.version(),
-                                                                   .status = ConfigFeedbackStatus::FAILED,
-                                                                   .detail = config.detail()};
+                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
+                                                                             .version = config.version(),
+                                                                             .status = ConfigFeedbackStatus::FAILED,
+                                                                             .detail = config.detail()};
                 continue;
             }
-            mPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                               .version = config.version(),
-                                                               .status = ConfigFeedbackStatus::APPLYING,
-                                                               .detail = config.detail()};
-            ConfigFeedbackReceiver::GetInstance().RegisterPipelineConfig(config.name(), this);
+            mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
+                                                                         .version = config.version(),
+                                                                         .status = ConfigFeedbackStatus::APPLYING,
+                                                                         .detail = config.detail()};
+            ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(config.name(), this);
         }
     }
 }
@@ -536,8 +517,8 @@ bool CommonConfigProvider::FetchPipelineConfigFromServer(
     string requestID = CalculateRandomUUID();
     fetchConfigRequest.set_request_id(requestID);
     fetchConfigRequest.set_instance_id(GetInstanceId());
-    for (const auto& config : heartbeatResponse.pipeline_config_updates()) {
-        auto reqConfig = fetchConfigRequest.add_pipeline_configs();
+    for (const auto& config : heartbeatResponse.continuous_pipeline_config_updates()) {
+        auto reqConfig = fetchConfigRequest.add_continuous_pipeline_configs();
         reqConfig->set_name(config.name());
         reqConfig->set_version(config.version());
     }
@@ -550,20 +531,22 @@ bool CommonConfigProvider::FetchPipelineConfigFromServer(
             operation, reqBody, "FetchPipelineConfig", fetchConfigRequest.request_id(), fetchConfigResponse)) {
         configserver::proto::v2::FetchConfigResponse fetchConfigResponsePb;
         fetchConfigResponsePb.ParseFromString(fetchConfigResponse);
-        res.Swap(fetchConfigResponsePb.mutable_pipeline_config_updates());
+        res.Swap(fetchConfigResponsePb.mutable_continuous_pipeline_config_updates());
         return true;
     }
     return false;
 }
 
-void CommonConfigProvider::FeedbackPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
-    lock_guard<mutex> infomaplock(mPipelineInfoMapMux);
-    auto info = mPipelineConfigInfoMap.find(name);
-    if (info != mPipelineConfigInfoMap.end()) {
+void CommonConfigProvider::FeedbackContinuousPipelineConfigStatus(const std::string& name,
+                                                                  ConfigFeedbackStatus status) {
+    lock_guard<mutex> infomaplock(mContinuousPipelineInfoMapMux);
+    auto info = mContinuousPipelineConfigInfoMap.find(name);
+    if (info != mContinuousPipelineConfigInfoMap.end()) {
         info->second.status = status;
     }
     LOG_DEBUG(sLogger,
-              ("CommonConfigProvider", "FeedbackPipelineConfigStatus")("name", name)("status", ToStringView(status)));
+              ("CommonConfigProvider", "FeedbackContinuousPipelineConfigStatus")("name", name)("status",
+                                                                                               ToStringView(status)));
 }
 void CommonConfigProvider::FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
     lock_guard<mutex> infomaplock(mInstanceInfoMapMux);
@@ -574,17 +557,17 @@ void CommonConfigProvider::FeedbackInstanceConfigStatus(const std::string& name,
     LOG_DEBUG(sLogger,
               ("CommonConfigProvider", "FeedbackInstanceConfigStatus")("name", name)("status", ToStringView(status)));
 }
-void CommonConfigProvider::FeedbackCommandConfigStatus(const std::string& type,
-                                                       const std::string& name,
-                                                       ConfigFeedbackStatus status) {
-    lock_guard<mutex> infomaplock(mCommondInfoMapMux);
-    auto info = mCommandInfoMap.find(GenerateCommandFeedBackKey(type, name));
-    if (info != mCommandInfoMap.end()) {
+void CommonConfigProvider::FeedbackOnetimePipelineConfigStatus(const std::string& type,
+                                                               const std::string& name,
+                                                               ConfigFeedbackStatus status) {
+    lock_guard<mutex> infomaplock(mOnetimePipelineInfoMapMux);
+    auto info = mOnetimePipelineConfigInfoMap.find(GenerateOnetimePipelineConfigFeedBackKey(type, name));
+    if (info != mOnetimePipelineConfigInfoMap.end()) {
         info->second.status = status;
     }
     LOG_DEBUG(sLogger,
               ("CommonConfigProvider",
-               "FeedbackCommandConfigStatus")("type", type)("name", name)("status", ToStringView(status)));
+               "FeedbackOnetimePipelineConfigStatus")("type", type)("name", name)("status", ToStringView(status)));
 }
 
 } // namespace logtail

@@ -18,7 +18,7 @@ services:
   ilogtailC:
     image: aliyun/loongcollector:0.0.1
     volumes:
-      - ./ilogtail.yaml:/loongcollector/conf/pipeline_config/local/ilogtail.yaml
+      - ./ilogtail.yaml:/loongcollector/conf/continuous_pipeline_config/local/ilogtail.yaml
       - .:/home/ilogtail
     healthcheck:
       test: "cat /loongcollector/log/loongcollector.LOG"

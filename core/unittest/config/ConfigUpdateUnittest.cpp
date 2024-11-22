@@ -101,7 +101,7 @@ private:
     void PrepareInitialSettings() const;
     void GenerateInitialConfigs() const;
 
-    filesystem::path configDir = "./pipeline_config";
+    filesystem::path configDir = "./continuous_pipeline_config";
     vector<filesystem::path> pipelineConfigPaths = {configDir / "pipeline_invalid_format.json",
                                                     configDir / "pipeline_invalid_detail.json",
                                                     configDir / "pipeline_enabled_valid.json",

@@ -23,27 +23,29 @@
 
 namespace logtail {
 
-std::string GenerateCommandFeedBackKey(const std::string& type, const std::string& name);
+std::string GenerateOnetimePipelineConfigFeedBackKey(const std::string& type, const std::string& name);
 
 class ConfigFeedbackReceiver {
 public:
     static ConfigFeedbackReceiver& GetInstance();
-    void RegisterPipelineConfig(const std::string& name, ConfigFeedbackable* feedbackable);
+    void RegisterContinuousPipelineConfig(const std::string& name, ConfigFeedbackable* feedbackable);
     void RegisterInstanceConfig(const std::string& name, ConfigFeedbackable* feedbackable);
-    void RegisterCommand(const std::string& type, const std::string& name, ConfigFeedbackable* feedbackable);
-    void UnregisterPipelineConfig(const std::string& name);
+    void
+    RegisterOnetimePipelineConfig(const std::string& type, const std::string& name, ConfigFeedbackable* feedbackable);
+    void UnregisterContinuousPipelineConfig(const std::string& name);
     void UnregisterInstanceConfig(const std::string& name);
-    void UnregisterCommand(const std::string& type, const std::string& name);
-    void FeedbackPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status);
+    void UnregisterOnetimePipelineConfig(const std::string& type, const std::string& name);
+    void FeedbackContinuousPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status);
     void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status);
-    void FeedbackCommandConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status);
+    void
+    FeedbackOnetimePipelineConfigStatus(const std::string& type, const std::string& name, ConfigFeedbackStatus status);
 
 private:
     ConfigFeedbackReceiver() {}
     std::mutex mMutex;
-    std::unordered_map<std::string, ConfigFeedbackable*> mPipelineConfigFeedbackableMap;
+    std::unordered_map<std::string, ConfigFeedbackable*> mContinuousPipelineConfigFeedbackableMap;
     std::unordered_map<std::string, ConfigFeedbackable*> mInstanceConfigFeedbackableMap;
-    std::unordered_map<std::string, ConfigFeedbackable*> mCommandFeedbackableMap;
+    std::unordered_map<std::string, ConfigFeedbackable*> mOnetimePipelineConfigFeedbackableMap;
 };
 
 } // namespace logtail

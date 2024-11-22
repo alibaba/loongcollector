@@ -62,7 +62,7 @@ services:
     pid: host
     volumes:
       - %s:/loongcollector/conf/default_flusher.json
-      - %s:/loongcollector/conf/pipeline_config/local
+      - %s:/loongcollector/conf/continuous_pipeline_config/local
       - /:/logtail_host
       - /var/run/docker.sock:/var/run/docker.sock
       - /sys/:/sys/

@@ -483,11 +483,11 @@ string GetFileTagsDir() {
     }
 }
 
-string GetPipelineConfigDir() {
+string GetContinuousPipelineConfigDir() {
     if (BOOL_FLAG(logtail_mode)) {
         return "config";
     } else {
-        return "pipeline_config";
+        return "continuous_pipeline_config";
     }
 }
 
