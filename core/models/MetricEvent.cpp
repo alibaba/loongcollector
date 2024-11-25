@@ -24,7 +24,11 @@ MetricEvent::MetricEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::METRIC, 
 }
 
 unique_ptr<PipelineEvent> MetricEvent::Copy() const {
-    return make_unique<MetricEvent>(*this);
+    unique_ptr<MetricEvent> newPtr = make_unique<MetricEvent>(*this);
+    if (newPtr->Is<UntypedMultiDoubleValues>()) {
+        newPtr->MutableValue<UntypedMultiDoubleValues>()->ResetPipelineEvent(newPtr.get());
+    }
+    return newPtr;
 }
 
 void MetricEvent::Reset() {
@@ -88,7 +92,21 @@ Json::Value MetricEvent::ToJson(bool enableEventMeta) const {
         root["timestampNanosecond"] = static_cast<int32_t>(GetTimestampNanosecond().value());
     }
     root["name"] = mName.to_string();
-    root["value"] = MetricValueToJson(mValue);
+    root["value"] = Json::Value();
+    visit(
+        [&](auto&& arg) {
+            using T = decay_t<decltype(arg)>;
+            if constexpr (is_same_v<T, UntypedSingleValue>) {
+                root["value"]["type"] = "untyped_single_value";
+                root["value"]["detail"] = get<UntypedSingleValue>(mValue).ToJson();
+            } else if constexpr (is_same_v<T, UntypedMultiDoubleValues>) {
+                root["value"]["type"] = "untyped_multi_double_values";
+                root["value"]["detail"] = get<UntypedMultiDoubleValues>(mValue).ToJson();
+            } else if constexpr (is_same_v<T, monostate>) {
+                root["value"]["type"] = "unknown";
+            }
+        },
+        mValue);
     if (!mTags.mInner.empty()) {
         Json::Value& tags = root["tags"];
         for (const auto& tag : mTags.mInner) {
@@ -106,7 +124,15 @@ bool MetricEvent::FromJson(const Json::Value& root) {
     }
     SetName(root["name"].asString());
     const Json::Value& value = root["value"];
-    SetValue(JsonToMetricValue(value["type"].asString(), value["detail"]));
+    if (value["type"].asString() == "untyped_single_value") {
+        UntypedSingleValue v;
+        v.FromJson(value["detail"]);
+        SetValue(v);
+    } else if (value["type"].asString() == "untyped_multi_double_values") {
+        UntypedMultiDoubleValues v(this);
+        v.FromJson(value["detail"]);
+        SetValue(v);
+    }
     if (root.isMember("tags")) {
         Json::Value tags = root["tags"];
         for (const auto& key : tags.getMemberNames()) {

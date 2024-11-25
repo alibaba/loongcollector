@@ -189,13 +189,13 @@ void FlusherRunner::Dispatch(SenderQueueItem* item) {
             if (!BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()
                 && item->mFlusher->Name() == "flusher_sls") {
                 DiskBufferWriter::GetInstance()->PushToDiskBuffer(item, 3);
-                SenderQueueManager::GetInstance()->RemoveItem(item->mFlusher->GetQueueKey(), item);
+                SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
             } else {
                 PushToHttpSink(item);
             }
             break;
         default:
-            SenderQueueManager::GetInstance()->RemoveItem(item->mFlusher->GetQueueKey(), item);
+            SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
             break;
     }
 }

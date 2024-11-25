@@ -49,6 +49,11 @@ public:
     }
 
     template <typename T>
+    constexpr std::add_pointer_t<T> MutableValue() noexcept {
+        return std::get_if<T>(&mValue);
+    }
+
+    template <typename T>
     void SetValue(const T& value) {
         mValue = value;
     }
@@ -56,6 +61,14 @@ public:
     template <typename T, typename... Args>
     void SetValue(Args&&... args) {
         mValue = T{std::forward<Args>(args)...};
+    }
+
+    void SetValue(const std::map<StringView, double>& multiDoubleValues) {
+        mValue = UntypedMultiDoubleValues{multiDoubleValues, this};
+    }
+
+    void SetValue(const UntypedMultiDoubleValues& multiDoubleValues) {
+        mValue = UntypedMultiDoubleValues{multiDoubleValues.mValues, this};
     }
 
     StringView GetTag(StringView key) const;

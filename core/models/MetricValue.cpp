@@ -20,6 +20,62 @@ using namespace std;
 
 namespace logtail {
 
+bool UntypedMultiDoubleValues::GetValue(StringView key, double& val) const {
+    if (mValues.find(key) != mValues.end()) {
+        val = mValues.at(key);
+        return true;
+    }
+    return false;
+}
+
+bool UntypedMultiDoubleValues::HasValue(StringView key) const {
+    return mValues.find(key) != mValues.end();
+}
+
+void UntypedMultiDoubleValues::SetValue(const std::string& key, double val) {
+    if (mMetricEventPtr) {
+        SetValueNoCopy(mMetricEventPtr->GetSourceBuffer()->CopyString(key), val);
+    }
+}
+
+void UntypedMultiDoubleValues::SetValue(StringView key, double val) {
+    if (mMetricEventPtr) {
+        SetValueNoCopy(mMetricEventPtr->GetSourceBuffer()->CopyString(key), val);
+    }
+}
+
+void UntypedMultiDoubleValues::SetValueNoCopy(const StringBuffer& key, double val) {
+    SetValueNoCopy(StringView(key.data, key.size), val);
+}
+
+void UntypedMultiDoubleValues::SetValueNoCopy(StringView key, double val) {
+    mValues[key] = val;
+}
+
+void UntypedMultiDoubleValues::DelValue(StringView key) {
+    mValues.erase(key);
+}
+
+std::map<StringView, double>::const_iterator UntypedMultiDoubleValues::ValusBegin() const {
+    return mValues.begin();
+}
+
+std::map<StringView, double>::const_iterator UntypedMultiDoubleValues::ValusEnd() const {
+    return mValues.end();
+}
+
+size_t UntypedMultiDoubleValues::ValusSize() const {
+    return mValues.size();
+}
+
+size_t UntypedMultiDoubleValues::DataSize() const {
+    size_t totalSize = sizeof(UntypedMultiDoubleValues);
+    for (const auto& pair : mValues) {
+        totalSize += pair.first.size() + sizeof(pair.second);
+    }
+    return totalSize;
+}
+
 size_t DataSize(const MetricValue& value) {
     return visit(
         [](auto&& arg) {
@@ -42,29 +98,20 @@ void UntypedSingleValue::FromJson(const Json::Value& value) {
     mValue = value.asFloat();
 }
 
-Json::Value MetricValueToJson(const MetricValue& value) {
+Json::Value UntypedMultiDoubleValues::ToJson() const {
     Json::Value res;
-    visit(
-        [&](auto&& arg) {
-            using T = decay_t<decltype(arg)>;
-            if constexpr (is_same_v<T, UntypedSingleValue>) {
-                res["type"] = "untyped_single_value";
-                res["detail"] = get<UntypedSingleValue>(value).ToJson();
-            } else if constexpr (is_same_v<T, monostate>) {
-                res["type"] = "unknown";
-            }
-        },
-        value);
+    for (auto metric : mValues) {
+        res[metric.first.to_string()] = metric.second;
+    }
     return res;
 }
 
-MetricValue JsonToMetricValue(const string& type, const Json::Value& detail) {
-    if (type == "untyped_single_value") {
-        UntypedSingleValue v;
-        v.FromJson(detail);
-        return v;
-    } else {
-        return MetricValue();
+void UntypedMultiDoubleValues::FromJson(const Json::Value& value) {
+    mValues.clear();
+    for (Json::Value::const_iterator itr = value.begin(); itr != value.end(); ++itr) {
+        if (itr->asDouble()) {
+            SetValue(itr.key().asString(), itr->asDouble());
+        }
     }
 }
 #endif

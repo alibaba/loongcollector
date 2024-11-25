@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <map>
 #include <variant>
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -23,6 +24,10 @@
 
 #include <string>
 #endif
+
+#include "common/memory/SourceBuffer.h"
+#include "models/PipelineEvent.h"
+#include "models/StringView.h"
 
 namespace logtail {
 
@@ -37,13 +42,37 @@ struct UntypedSingleValue {
 #endif
 };
 
-using MetricValue = std::variant<std::monostate, UntypedSingleValue>;
+struct UntypedMultiDoubleValues {
+    std::map<StringView, double> mValues;
+    PipelineEvent* mMetricEventPtr;
 
-size_t DataSize(const MetricValue& value);
+    UntypedMultiDoubleValues(PipelineEvent* ptr) : mMetricEventPtr(ptr) {}
+    UntypedMultiDoubleValues(std::map<StringView, double> values, PipelineEvent* ptr)
+        : mValues(values), mMetricEventPtr(ptr) {}
+
+    bool GetValue(StringView key, double& val) const;
+    bool HasValue(StringView key) const;
+    void SetValue(const std::string& key, double val);
+    void SetValue(StringView key, double val);
+    void SetValueNoCopy(const StringBuffer& key, double val);
+    void SetValueNoCopy(StringView key, double val);
+    void DelValue(StringView key);
+
+    std::map<StringView, double>::const_iterator ValusBegin() const;
+    std::map<StringView, double>::const_iterator ValusEnd() const;
+    size_t ValusSize() const;
+
+    size_t DataSize() const;
+    void ResetPipelineEvent(PipelineEvent* ptr) { mMetricEventPtr = ptr; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-Json::Value MetricValueToJson(const MetricValue& value);
-MetricValue JsonToMetricValue(const std::string& type, const Json::Value& detail);
+    Json::Value ToJson() const;
+    void FromJson(const Json::Value& value);
 #endif
+};
+
+using MetricValue = std::variant<std::monostate, UntypedSingleValue, UntypedMultiDoubleValues>;
+
+size_t DataSize(const MetricValue& value);
 
 } // namespace logtail
