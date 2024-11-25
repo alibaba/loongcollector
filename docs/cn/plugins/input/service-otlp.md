@@ -2,7 +2,7 @@
 
 ## 简介
 
-`service_otlp` `input`插件实现了`ServiceInputV1`和`ServiceInputV2`接口，可以接受`Opentelemetry log/metric/trace protocol`的http/gRPC请求，并且转换输出SLSProto或PipelineGroupEvents。目前尚不支持otlp trace转换到SLSProto。
+`service_otlp` `input`插件实现了`ServiceInputV1`和`ServiceInputV2`接口，可以接受`Opentelemetry log/metric/trace protocol`的http/gRPC请求，并且转换输出SLSProto或PipelineGroupEvents。
 
 ## 版本
 
