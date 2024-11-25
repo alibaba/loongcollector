@@ -46,6 +46,7 @@ private:
     friend class EventDispatcher;
     friend class EventDispatcherBase;
     friend class PollingUnittest;
+    friend class PollingPreservedDirDepthUnittest;
 
     void Clear();
     Event* FindEvent(const std::string& src, const std::string& obj, int32_t eventType = -1);

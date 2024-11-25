@@ -126,7 +126,7 @@ public:
     void AddCheckPoint(CheckPoint* checkPointPtr);
     void AddDirCheckPoint(const std::string& dirname);
     void DeleteCheckPoint(DevInode devInode, const std::string& configName);
-    void DeleteDirCheckPoint(const std::string& filename);
+    void DeleteDirCheckPoint(const std::string& dirname);
     void LoadCheckPoint();
     void LoadDirCheckPoint(const Json::Value& root);
     void LoadFileCheckPoint(const Json::Value& root);

@@ -104,6 +104,7 @@ AlarmManager::AlarmManager() {
     mMessageType[COMPRESS_FAIL_ALARM] = "COMPRESS_FAIL_ALARM";
     mMessageType[SERIALIZE_FAIL_ALARM] = "SERIALIZE_FAIL_ALARM";
     mMessageType[RELABEL_METRIC_FAIL_ALARM] = "RELABEL_METRIC_FAIL_ALARM";
+    mMessageType[REGISTER_HANDLERS_TOO_SLOW_ALARM] = "REGISTER_HANDLERS_TOO_SLOW_ALARM";
 }
 
 void AlarmManager::Init() {
@@ -117,6 +118,9 @@ void AlarmManager::Stop() {
         mIsThreadRunning = false;
     }
     mStopCV.notify_one();
+    if (!mThreadRes.valid()) {
+        return;
+    }
     future_status s = mThreadRes.wait_for(chrono::seconds(1));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("alarm gathering", "stopped successfully"));
@@ -141,7 +145,6 @@ bool AlarmManager::SendAlarmLoop() {
 }
 
 void AlarmManager::SendAllRegionAlarm() {
-    AlarmMessage* messagePtr = nullptr;
     int32_t currentTime = time(nullptr);
     size_t sendRegionIndex = 0;
     size_t sendAlarmTypeIndex = 0;
@@ -186,7 +189,7 @@ void AlarmManager::SendAllRegionAlarm() {
 
             // LOG_DEBUG(sLogger, ("3Send Alarm", region)("region", sendRegionIndex)("alarm index",
             // mMessageType[sendAlarmTypeIndex]));
-            map<string, AlarmMessage*>& alarmMap = alarmBufferVec[sendAlarmTypeIndex];
+            map<string, unique_ptr<AlarmMessage>>& alarmMap = alarmBufferVec[sendAlarmTypeIndex];
             if (alarmMap.size() == 0
                 || currentTime - lastUpdateTimeVec[sendAlarmTypeIndex] < INT32_FLAG(logtail_alarm_interval)) {
                 // go next alarm type
@@ -220,9 +223,10 @@ void AlarmManager::SendAllRegionAlarm() {
             logGroup.set_source(LoongCollectorMonitor::mIpAddr);
             logGroup.set_category(ALARM_SLS_LOGSTORE_NAME);
             auto now = GetCurrentLogtailTime();
-            for (map<string, AlarmMessage*>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
+            for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin();
+                 mapIter != alarmMap.end();
                  ++mapIter) {
-                messagePtr = mapIter->second;
+                auto& messagePtr = mapIter->second;
 
                 // LOG_DEBUG(sLogger, ("5Send Alarm", region)("region", sendRegionIndex)("alarm index",
                 // sendAlarmTypeIndex)("msg", messagePtr->mMessage));
@@ -266,7 +270,6 @@ void AlarmManager::SendAllRegionAlarm() {
                     contentPtr->set_key("category");
                     contentPtr->set_value(messagePtr->mCategory);
                 }
-                delete messagePtr;
             }
             lastUpdateTimeVec[sendAlarmTypeIndex] = currentTime;
             alarmMap.clear();
@@ -319,8 +322,8 @@ void AlarmManager::SendAlarm(const AlarmType alarmType,
     string key = projectName + "_" + category;
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        AlarmMessage* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
-        alarmBufferVec[alarmType].insert(pair<string, AlarmMessage*>(key, messagePtr));
+        auto* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, message, 1);
+        alarmBufferVec[alarmType].emplace(key, messagePtr);
     } else
         alarmBufferVec[alarmType][key]->IncCount();
 }

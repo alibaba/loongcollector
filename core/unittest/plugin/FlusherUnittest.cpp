@@ -39,12 +39,12 @@ void FlusherUnittest::TestStop() const {
     auto ctx = PipelineContext();
     ctx.SetConfigName("test_config");
 
-    FlusherMock* mock = new FlusherMock();
+    auto mock = make_unique<FlusherMock>();
     mock->SetContext(ctx);
     Json::Value tmp;
     mock->Init(Json::Value(), tmp);
 
-    auto q = SenderQueueManager::GetInstance()->GetQueue(mock->GetQueueKey());
+    auto* q = SenderQueueManager::GetInstance()->GetQueue(mock->GetQueueKey());
     // push items to queue
     for (size_t i = 0; i < q->mCapacity; ++i) {
         auto item = make_unique<SenderQueueItem>("content", 0, nullptr, mock->GetQueueKey());

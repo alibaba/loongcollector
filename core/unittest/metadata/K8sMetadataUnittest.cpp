@@ -170,7 +170,7 @@ public:
     })";
         eventGroup.FromJsonString(eventStr);
         eventGroup.AddMetricEvent();
-        LabelingK8sMetadata& processor = *(new LabelingK8sMetadata);
+        LabelingK8sMetadata processor;
         processor.AddLabelToLogGroup(eventGroup);
         EventsContainer& eventsEnd = eventGroup.MutableEvents();
         auto& metricEvent = eventsEnd[0].Cast<MetricEvent>();

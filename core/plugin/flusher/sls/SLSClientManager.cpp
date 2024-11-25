@@ -149,7 +149,7 @@ void SLSClientManager::Stop() {
         mIsUpdateRealIpThreadRunning = false;
     }
     mStopCV.notify_all();
-    if (mDataServerSwitchPolicy == EndpointSwitchPolicy::DESIGNATED_FIRST) {
+    if (mDataServerSwitchPolicy == EndpointSwitchPolicy::DESIGNATED_FIRST && mProbeNetworkThreadRes.valid()) {
         future_status s = mProbeNetworkThreadRes.wait_for(chrono::seconds(1));
         if (s == future_status::ready) {
             LOG_INFO(sLogger, ("sls endpoint probe", "stopped successfully"));
@@ -157,7 +157,7 @@ void SLSClientManager::Stop() {
             LOG_WARNING(sLogger, ("sls endpoint probe", "forced to stopped"));
         }
     }
-    if (BOOL_FLAG(send_prefer_real_ip)) {
+    if (BOOL_FLAG(send_prefer_real_ip) && mUpdateRealIpThreadRes.valid()) {
         future_status s = mUpdateRealIpThreadRes.wait_for(chrono::seconds(1));
         if (s == future_status::ready) {
             LOG_INFO(sLogger, ("sls real ip update", "stopped successfully"));

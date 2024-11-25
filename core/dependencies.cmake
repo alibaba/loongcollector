@@ -392,9 +392,12 @@ endmacro()
 
 # asan for debug
 macro(link_asan target_name)
-    if(CMAKE_BUILD_TYPE MATCHES Debug)
+    if (UNIX)
         target_compile_options(${target_name} PUBLIC -fsanitize=address)
         target_link_options(${target_name} PUBLIC -fsanitize=address -static-libasan)
+    elseif(MSVC)
+        target_compile_options(${target_name} PUBLIC /fsanitize=address)
+        target_link_options(${target_name} PUBLIC /fsanitize=address)
     endif()
 endmacro()
 

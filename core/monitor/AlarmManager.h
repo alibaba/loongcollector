@@ -95,7 +95,8 @@ enum AlarmType {
     COMPRESS_FAIL_ALARM = 65,
     SERIALIZE_FAIL_ALARM = 66,
     RELABEL_METRIC_FAIL_ALARM = 67,
-    ALL_LOGTAIL_ALARM_NUM = 68
+    REGISTER_HANDLERS_TOO_SLOW_ALARM = 68,
+    ALL_LOGTAIL_ALARM_NUM = 69
 };
 
 struct AlarmMessage {
@@ -106,10 +107,10 @@ struct AlarmMessage {
     int32_t mCount;
 
     AlarmMessage(const std::string& type,
-                        const std::string& projectName,
-                        const std::string& category,
-                        const std::string& message,
-                        const int32_t count)
+                 const std::string& projectName,
+                 const std::string& category,
+                 const std::string& message,
+                 const int32_t count)
         : mMessageType(type), mProjectName(projectName), mCategory(category), mMessage(message), mCount(count) {}
     void IncCount(int32_t inc = 1) { mCount += inc; }
 };
@@ -134,7 +135,7 @@ public:
     bool IsLowLevelAlarmValid();
 
 private:
-    typedef std::vector<std::map<std::string, AlarmMessage*> > AlarmVector;
+    using AlarmVector = std::vector<std::map<std::string, std::unique_ptr<AlarmMessage>>>;
 
     AlarmManager();
     ~AlarmManager() = default;
@@ -151,7 +152,7 @@ private:
 
 
     std::vector<std::string> mMessageType;
-    std::map<std::string, std::pair<std::shared_ptr<AlarmVector>, std::vector<int32_t> > > mAllAlarmMap;
+    std::map<std::string, std::pair<std::shared_ptr<AlarmVector>, std::vector<int32_t>>> mAllAlarmMap;
     PTMutex mAlarmBufferMutex;
 
     std::atomic_int mLastLowLevelTime{0};

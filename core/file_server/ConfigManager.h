@@ -510,7 +510,10 @@ private:
      * @param path is the current dir that being registered
      * @depth is the num of sub dir layers that should be registered
      */
-    bool RegisterHandlersWithinDepth(const std::string& path, const FileDiscoveryConfig& config, int depth);
+    bool RegisterHandlersWithinDepth(const std::string& path,
+                                     const FileDiscoveryConfig& config,
+                                     int preservedDirDepth,
+                                     int maxDepth);
     bool RegisterDescendants(const std::string& path, const FileDiscoveryConfig& config, int withinDepth);
     // bool CheckLogType(const std::string& logTypeStr, LogType& logType);
     // 废弃

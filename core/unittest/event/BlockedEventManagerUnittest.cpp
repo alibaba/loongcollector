@@ -40,6 +40,9 @@ void BlockedEventManagerUnittest::OnFeedback() const {
     APSARA_TEST_EQUAL("dir", res[0]->GetSource());
     APSARA_TEST_EQUAL("file", res[0]->GetObject());
     APSARA_TEST_EQUAL(1U, BlockedEventManager::GetInstance()->mEventMap.size());
+    for (auto* e : res) {
+        delete e;
+    }
 }
 
 UNIT_TEST_CASE(BlockedEventManagerUnittest, OnFeedback)

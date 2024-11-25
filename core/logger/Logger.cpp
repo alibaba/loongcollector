@@ -195,7 +195,7 @@ void Logger::LoadConfig(const std::string& filePath) {
     // Load config file, check if it is valid or not.
     do {
         std::ifstream in(filePath);
-        if (!in.good())
+        if (!in)
             break;
 
         in.seekg(0, std::ios::end);

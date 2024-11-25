@@ -245,59 +245,7 @@ void PollingModify::Polling() {
     LOG_INFO(sLogger, ("polling modify", "started"));
     mHoldOnFlag = false;
     while (mRuningFlag) {
-        {
-            PTScopedLock threadLock(mPollingThreadLock);
-            LoadFileNameInQueues();
-
-            vector<SplitedFilePath> deletedFileVec;
-            vector<Event*> pollingEventVec;
-            int32_t statCount = 0;
-            size_t pollingModifySizeTotal = mModifyCacheMap.size();
-            LogtailMonitor::GetInstance()->UpdateMetric("polling_modify_size", pollingModifySizeTotal);
-            mPollingModifySize->Set(pollingModifySizeTotal);
-            for (auto iter = mModifyCacheMap.begin(); iter != mModifyCacheMap.end(); ++iter) {
-                if (!mRuningFlag || mHoldOnFlag)
-                    break;
-
-                const SplitedFilePath& filePath = iter->first;
-                ModifyCheckCache& modifyCache = iter->second;
-                fsutil::PathStat logFileStat;
-                if (!fsutil::PathStat::stat(PathJoin(filePath.mFileDir, filePath.mFileName), logFileStat)) {
-                    if (errno == ENOENT) {
-                        LOG_DEBUG(sLogger, ("file deleted", PathJoin(filePath.mFileDir, filePath.mFileName)));
-                        if (UpdateDeletedFile(filePath, modifyCache, pollingEventVec)) {
-                            deletedFileVec.push_back(filePath);
-                        }
-                    } else {
-                        LOG_DEBUG(sLogger, ("get file info error", PathJoin(filePath.mFileDir, filePath.mFileName)));
-                    }
-                } else {
-                    int64_t sec, nsec;
-                    logFileStat.GetLastWriteTime(sec, nsec);
-                    timespec mtim{sec, nsec};
-                    auto devInode = logFileStat.GetDevInode();
-                    UpdateFile(filePath,
-                               modifyCache,
-                               devInode.dev,
-                               devInode.inode,
-                               logFileStat.GetFileSize(),
-                               mtim,
-                               pollingEventVec);
-                }
-
-                ++statCount;
-                if (statCount % INT32_FLAG(modify_stat_count) == 0) {
-                    usleep(1000 * INT32_FLAG(modify_stat_sleepMs));
-                }
-            }
-
-            if (pollingEventVec.size() > 0) {
-                PollingEventQueue::GetInstance()->PushEvent(pollingEventVec);
-            }
-            for (size_t i = 0; i < deletedFileVec.size(); ++i) {
-                mModifyCacheMap.erase(deletedFileVec[i]);
-            }
-        }
+        PollingIteration();
 
         // Sleep for a while, by default, 1s.
         for (int i = 0; i < 10 && mRuningFlag; ++i) {
@@ -305,6 +253,55 @@ void PollingModify::Polling() {
         }
     }
     LOG_INFO(sLogger, ("PollingModify::Polling", "stop"));
+}
+
+void PollingModify::PollingIteration() {
+    PTScopedLock threadLock(mPollingThreadLock);
+    LoadFileNameInQueues();
+
+    vector<SplitedFilePath> deletedFileVec;
+    vector<Event*> pollingEventVec;
+    int32_t statCount = 0;
+    size_t pollingModifySizeTotal = mModifyCacheMap.size();
+    LogtailMonitor::GetInstance()->UpdateMetric("polling_modify_size", pollingModifySizeTotal);
+    mPollingModifySize->Set(pollingModifySizeTotal);
+    for (auto iter = mModifyCacheMap.begin(); iter != mModifyCacheMap.end(); ++iter) {
+        if (!mRuningFlag || mHoldOnFlag)
+            break;
+
+        const SplitedFilePath& filePath = iter->first;
+        ModifyCheckCache& modifyCache = iter->second;
+        fsutil::PathStat logFileStat;
+        if (!fsutil::PathStat::stat(PathJoin(filePath.mFileDir, filePath.mFileName), logFileStat)) {
+            if (errno == ENOENT) {
+                LOG_DEBUG(sLogger, ("file deleted", PathJoin(filePath.mFileDir, filePath.mFileName)));
+                if (UpdateDeletedFile(filePath, modifyCache, pollingEventVec)) {
+                    deletedFileVec.push_back(filePath);
+                }
+            } else {
+                LOG_DEBUG(sLogger, ("get file info error", PathJoin(filePath.mFileDir, filePath.mFileName)));
+            }
+        } else {
+            int64_t sec, nsec;
+            logFileStat.GetLastWriteTime(sec, nsec);
+            timespec mtim{sec, nsec};
+            auto devInode = logFileStat.GetDevInode();
+            UpdateFile(
+                filePath, modifyCache, devInode.dev, devInode.inode, logFileStat.GetFileSize(), mtim, pollingEventVec);
+        }
+
+        ++statCount;
+        if (statCount % INT32_FLAG(modify_stat_count) == 0) {
+            usleep(1000 * INT32_FLAG(modify_stat_sleepMs));
+        }
+    }
+
+    if (pollingEventVec.size() > 0) {
+        PollingEventQueue::GetInstance()->PushEvent(pollingEventVec);
+    }
+    for (size_t i = 0; i < deletedFileVec.size(); ++i) {
+        mModifyCacheMap.erase(deletedFileVec[i]);
+    }
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

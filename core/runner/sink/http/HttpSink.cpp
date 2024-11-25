@@ -62,6 +62,9 @@ bool HttpSink::Init() {
 
 void HttpSink::Stop() {
     mIsFlush = true;
+    if (!mThreadRes.valid()) {
+        return;
+    }
     future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(http_sink_exit_timeout_secs)));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("http sink", "stopped successfully"));

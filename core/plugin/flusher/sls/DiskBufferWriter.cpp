@@ -67,7 +67,7 @@ void DiskBufferWriter::Stop() {
         mIsSendBufferThreadRunning = false;
     }
     mStopCV.notify_one();
-    {
+    if (mBufferWriterThreadRes.valid()) {
         future_status s = mBufferWriterThreadRes.wait_for(chrono::seconds(5));
         if (s == future_status::ready) {
             LOG_INFO(sLogger, ("disk buffer writer", "stopped successfully"));
@@ -75,7 +75,7 @@ void DiskBufferWriter::Stop() {
             LOG_WARNING(sLogger, ("disk buffer writer", "forced to stopped"));
         }
     }
-    {
+    if (mBufferSenderThreadRes.valid()) {
         // timeout should be larger than network timeout, which is 15 for now
         future_status s = mBufferSenderThreadRes.wait_for(chrono::seconds(20));
         if (s == future_status::ready) {

@@ -100,7 +100,7 @@ public:
      *
      * @return true on success; on error false is returned
      */
-    bool RegisterEventHandler(const char* path, const FileDiscoveryConfig&, EventHandler*& handler);
+    bool RegisterEventHandler(const std::string& path, const FileDiscoveryConfig&, EventHandler*& handler);
 
     /** Unregister handler for path; If no handler registered for path, do nothing but return.
      * After this call, no event watched on this path any more.
@@ -110,7 +110,7 @@ public:
      * @param path for whom event handler will be removed.
      */
     // TODO see whether report errors
-    void UnregisterEventHandler(const char* path);
+    void UnregisterEventHandler(const std::string& path);
 
     /** Close handlers for path; If no handler registered for path, do nothing but return.
      *
@@ -135,7 +135,7 @@ public:
      *
      * @return true if registered, false if not
      */
-    bool IsRegistered(const char* path);
+    bool IsRegistered(const std::string& path);
 
     /** Test whether a directory is registered.
      *
@@ -204,9 +204,10 @@ public:
     void CheckSymbolicLink();
 
     void DumpCheckPointPeriod(int32_t curTime);
+    void DumpCheckPoint();
 
     void StartTimeCount();
-    void PropagateTimeout(const char* path);
+    void PropagateTimeout(const std::string& path);
     void HandleTimeout();
 
     void ReadInotifyEvents(std::vector<Event*>& eventVec);
@@ -231,8 +232,8 @@ protected:
     /**
      * @return true on success; false if path isn't registered by RegisterEventHandler.
      */
-    bool AddTimeoutWatch(const char* path);
-    void AddExistedFileEvents(const char* path, int wd);
+    bool AddTimeoutWatch(const std::string& path);
+    void AddExistedFileEvents(const std::string& path, int wd);
 
     enum class ValidateCheckpointResult {
         kNormal,

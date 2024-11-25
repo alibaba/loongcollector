@@ -147,7 +147,7 @@ void ForceReadUnittest::TestTimeoutForceRead() {
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
 
-        ModifyHandler* pHanlder = new ModifyHandler(mConfigName, mConfig);
+        auto pHanlder = make_unique<ModifyHandler>(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event
 
         Event e1 = Event(reader.mHostLogPathDir,
@@ -188,7 +188,7 @@ void ForceReadUnittest::TestTimeoutForceRead() {
         std::string expectedPart1(expectedContent.get());
         expectedPart1.resize(expectedPart1.find("\n"));
         LogFileReader::BUFFER_SIZE = expectedPart1.size() + 1;
-        ModifyHandler* pHanlder = new ModifyHandler(mConfigName, mConfig);
+        auto pHanlder = make_unique<ModifyHandler>(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event
 
         Event e1 = Event(reader.mHostLogPathDir,
@@ -230,7 +230,7 @@ void ForceReadUnittest::TestTimeoutForceRead() {
         std::string expectedPart1(expectedContent.get());
         expectedPart1.resize(expectedPart1.find("\n"));
         LogFileReader::BUFFER_SIZE = expectedPart1.size() + 1;
-        ModifyHandler* pHanlder = new ModifyHandler(mConfigName, mConfig);
+        auto pHanlder = make_unique<ModifyHandler>(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event
 
         Event e1 = Event(reader.mHostLogPathDir,
@@ -302,7 +302,7 @@ void ForceReadUnittest::TestFileCloseForceRead() {
         reader.CheckFileSignatureAndOffset(true);
         LogFileReader::BUFFER_SIZE = 1024 * 512;
 
-        ModifyHandler* pHanlder = new ModifyHandler(mConfigName, mConfig);
+        auto pHanlder = make_unique<ModifyHandler>(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event
 
         Event e1 = Event(reader.mHostLogPathDir,
@@ -348,7 +348,7 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
         BlockedEventManager::GetInstance()->mEventMap.clear();
         APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mEventMap.size(), 0U);
 
-        ModifyHandler* pHanlder = new ModifyHandler(mConfigName, mConfig);
+        auto pHanlder = make_unique<ModifyHandler>(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event
 
         Event e1 = Event(reader.mHostLogPathDir,
@@ -373,7 +373,7 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
         BlockedEventManager::GetInstance()->mEventMap.clear();
         APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mEventMap.size(), 0U);
 
-        ModifyHandler* pHanlder = new ModifyHandler(mConfigName, mConfig);
+        auto pHanlder = make_unique<ModifyHandler>(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event
 
         Event e1 = Event(reader.mHostLogPathDir,

@@ -575,7 +575,7 @@ bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string&
 
 // XXX: assume path is a subdir under mBasePath
 bool FileDiscoveryOptions::IsTimeout(const string& path) const {
-    if (mPreservedDirDepth < 0 || mWildcardPaths.size() > 0)
+    if (mPreservedDirDepth < 0)
         return false;
 
     // we do not check if (path.find(mBasePath) == 0)

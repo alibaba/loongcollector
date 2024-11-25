@@ -335,8 +335,8 @@ bool Pipeline::Init(PipelineConfig&& config) {
 }
 
 void Pipeline::Start() {
-#ifndef APSARA_UNIT_TEST_MAIN
-    // TODO: 应该保证指定时间内返回，如果无法返回，将配置放入startDisabled里
+    // #ifndef APSARA_UNIT_TEST_MAIN
+    //  TODO: 应该保证指定时间内返回，如果无法返回，将配置放入startDisabled里
     for (const auto& flusher : mFlushers) {
         flusher->Start();
     }
@@ -356,7 +356,7 @@ void Pipeline::Start() {
     }
 
     mStartTime->Set(chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).count());
-#endif
+    // #endif
     LOG_INFO(sLogger, ("pipeline start", "succeeded")("config", mName));
 }
 
@@ -416,7 +416,6 @@ bool Pipeline::FlushBatch() {
 }
 
 void Pipeline::Stop(bool isRemoving) {
-#ifndef APSARA_UNIT_TEST_MAIN
     // TODO: 应该保证指定时间内返回，如果无法返回，将配置放入stopDisabled里
     for (const auto& input : mInputs) {
         input->Stop(isRemoving);
@@ -440,7 +439,6 @@ void Pipeline::Stop(bool isRemoving) {
     for (const auto& flusher : mFlushers) {
         flusher->Stop(isRemoving);
     }
-#endif
     LOG_INFO(sLogger, ("pipeline stop", "succeeded")("config", mName));
 }
 

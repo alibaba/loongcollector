@@ -41,7 +41,6 @@ bool logtail::EventListener::Init() {
 
 int logtail::EventListener::AddWatch(const char* dir) {
     return inotify_add_watch(mInotifyFd, dir, mWatchEventMask);
-    ;
 }
 
 bool logtail::EventListener::RemoveWatch(int wd) {

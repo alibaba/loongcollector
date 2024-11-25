@@ -94,6 +94,9 @@ void FlusherRunner::UpdateSendFlowControl() {
 void FlusherRunner::Stop() {
     mIsFlush = true;
     SenderQueueManager::GetInstance()->Trigger();
+    if (!mThreadRes.valid()) {
+        return;
+    }
     future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(flusher_runner_exit_timeout_secs)));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("flusher runner", "stopped successfully"));

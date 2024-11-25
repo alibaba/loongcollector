@@ -130,6 +130,9 @@ void LogtailMonitor::Stop() {
         mIsThreadRunning = false;
     }
     mStopCV.notify_one();
+    if (!mThreadRes.valid()) {
+        return;
+    }
     future_status s = mThreadRes.wait_for(chrono::seconds(1));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("profiling", "stopped successfully"));
@@ -357,7 +360,7 @@ bool LogtailMonitor::GetMemStat() {
 
     std::ifstream fin;
     fin.open(SELF_STATM_PATH);
-    if (!fin.good()) {
+    if (!fin) {
         LOG_ERROR(sLogger, ("open stat error", ""));
         return false;
     }
@@ -389,7 +392,7 @@ bool LogtailMonitor::GetCpuStat(CpuStat& cur) {
     std::ifstream fin;
     fin.open(SELF_STAT_PATH);
     uint64_t start = GetCurrentTimeInMilliSeconds();
-    if (!fin.good()) {
+    if (!fin) {
         LOG_ERROR(sLogger, ("open stat error", ""));
         return false;
     }
@@ -537,7 +540,7 @@ std::string LogtailMonitor::GetLoadAvg() {
     std::ifstream fin;
     std::string loadStr;
     fin.open(PROC_LOAD_PATH);
-    if (!fin.good()) {
+    if (!fin) {
         LOG_ERROR(sLogger, ("open load error", ""));
         return loadStr;
     }

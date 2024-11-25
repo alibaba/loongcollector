@@ -15,6 +15,9 @@
 cmake_minimum_required(VERSION 3.22)
 project(unittest_base)
 
+# Unittest should be able to visit private members
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+
 add_definitions(-DAPSARA_UNIT_TEST_MAIN)
 set(NO_TCMALLOC TRUE)
 add_definitions(-DLOGTAIL_NO_TC_MALLOC)

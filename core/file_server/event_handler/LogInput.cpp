@@ -48,6 +48,7 @@ using namespace std;
 
 DEFINE_FLAG_INT32(check_symbolic_link_interval, "seconds", 120);
 DEFINE_FLAG_INT32(check_base_dir_interval, "seconds", 60);
+DEFINE_FLAG_INT32(check_timeout_interval, "seconds", 600);
 DEFINE_FLAG_INT32(log_input_thread_wait_interval, "microseconds", 20 * 1000);
 DEFINE_FLAG_INT64(read_fs_events_interval, "microseconds", 20 * 1000);
 DEFINE_FLAG_INT32(check_handler_timeout_interval, "seconds", 180);
@@ -95,7 +96,7 @@ void LogInput::Start() {
     mEnableFileIncludedByMultiConfigs = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(
         METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG);
 
-    new Thread([this]() { ProcessLoop(); });
+    mThreadRes = async(launch::async, &LogInput::ProcessLoop, this);
 }
 
 void LogInput::Resume() {
@@ -106,15 +107,20 @@ void LogInput::Resume() {
 }
 
 void LogInput::HoldOn() {
-    LOG_INFO(sLogger, ("event handle daemon pause", "starts"));
-    if (BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()) {
+    if (Application::GetInstance()->IsExiting()) {
+        LOG_INFO(sLogger, ("input event handle daemon", "stop starts"));
         unique_lock<mutex> lock(mThreadRunningMux);
-        mStopCV.wait(lock, [this]() { return mInteruptFlag; });
+        if (!mThreadRes.valid()) {
+            return;
+        }
+        mThreadRes.wait(); // should we set a timeout here? what it network outrage for an hour?
+        LOG_INFO(sLogger, ("input event handle daemon", "stopped successfully"));
     } else {
+        LOG_INFO(sLogger, ("input event handle daemon pause", "starts"));
         mInteruptFlag = true;
         mAccessMainThreadRWL.lock();
+        LOG_INFO(sLogger, ("input event handle daemon pause", "succeeded"));
     }
-    LOG_INFO(sLogger, ("event handle daemon pause", "succeeded"));
 }
 
 void LogInput::TryReadEvents(bool forceRead) {
@@ -361,14 +367,14 @@ void LogInput::UpdateCriticalMetric(int32_t curTime) {
     mEventProcessCount = 0;
 }
 
-void* LogInput::ProcessLoop() {
+void LogInput::ProcessLoop() {
     LOG_INFO(sLogger, ("event handle daemon", "started"));
     EventDispatcher* dispatcher = EventDispatcher::GetInstance();
     dispatcher->StartTimeCount();
     int32_t prevTime = time(NULL);
     mLastReadEventTime = prevTime;
     int32_t curTime = prevTime;
-    srand(prevTime);
+    srand(0); // avoid random failures in unit tests
     int32_t lastCheckDir = prevTime - rand() % 60;
     int32_t lastCheckSymbolicLink = prevTime - rand() % 60;
     time_t lastCheckHandlerTimeOut = prevTime - rand() % 60;
@@ -428,7 +434,7 @@ void* LogInput::ProcessLoop() {
             lastCheckSymbolicLink = 0;
         }
 
-        if (curTime - prevTime >= INT32_FLAG(timeout_interval)) {
+        if (curTime - prevTime >= INT32_FLAG(check_timeout_interval)) {
             dispatcher->HandleTimeout();
             prevTime = curTime;
         }
@@ -462,19 +468,13 @@ void* LogInput::ProcessLoop() {
             lastClearConfigCache = curTime;
         }
 
-        if (BOOL_FLAG(enable_full_drain_mode) && Application::GetInstance()->IsExiting()
-            && EventDispatcher::GetInstance()->IsAllFileRead()) {
+        if (Application::GetInstance()->IsExiting()
+            && (!BOOL_FLAG(enable_full_drain_mode) || EventDispatcher::GetInstance()->IsAllFileRead())) {
             break;
         }
     }
 
     mInteruptFlag = true;
-    mStopCV.notify_one();
-
-    if (!BOOL_FLAG(enable_full_drain_mode)) {
-        LOG_WARNING(sLogger, ("LogInputThread", "Exit"));
-    }
-    return NULL;
 }
 
 void LogInput::PushEventQueue(std::vector<Event*>& eventVec) {

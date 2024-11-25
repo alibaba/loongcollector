@@ -80,9 +80,10 @@ void PipelineEventPtrUnittest::TestCast() {
 
 void PipelineEventPtrUnittest::TestRelease() {
     auto logUPtr = mEventGroup->CreateLogEvent();
-    auto addr = logUPtr.get();
+    auto* addr = logUPtr.get();
     PipelineEventPtr logEventPtr(std::move(logUPtr), false, nullptr);
     APSARA_TEST_EQUAL_FATAL(addr, logEventPtr.Release());
+    delete addr;
 }
 
 void PipelineEventPtrUnittest::TestCopy() {
