@@ -167,7 +167,7 @@ bool Pipeline::Init(PipelineConfig&& config) {
             = PluginRegistry::GetInstance()->CreateFlusher(pluginType, GenNextPluginMeta(false));
         if (flusher) {
             Json::Value optionalGoPipeline;
-            if (!flusher->Init(detail, mContext, optionalGoPipeline)) {
+            if (!flusher->Init(detail, mContext, i, optionalGoPipeline)) {
                 return false;
             }
             mFlushers.emplace_back(std::move(flusher));

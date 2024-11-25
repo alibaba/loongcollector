@@ -20,9 +20,10 @@ using namespace std;
 
 namespace logtail {
 
-bool FlusherInstance::Init(const Json::Value& config, PipelineContext& context, Json::Value& optionalGoPipeline) {
+bool FlusherInstance::Init(const Json::Value& config, PipelineContext& context, size_t flusherIdx, Json::Value& optionalGoPipeline) {
     mPlugin->SetContext(context);
     mPlugin->SetPluginID(PluginID());
+    mPlugin->SetFlusherIndex(flusherIdx);
     mPlugin->SetMetricsRecordRef(Name(), PluginID());
     if (!mPlugin->Init(config, optionalGoPipeline)) {
         return false;

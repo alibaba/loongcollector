@@ -176,7 +176,7 @@ public:
                         }
                         if (mGroupQueue->IsEmpty()) {
                             TimeoutFlushManager::GetInstance()->UpdateRecord(mFlusher->GetContext().GetConfigName(),
-                                                                             0,
+                                                                             mFlusher->GetFlusherIndex(),
                                                                              0,
                                                                              mGroupFlushStrategy->GetTimeoutSecs(),
                                                                              mFlusher);
@@ -193,8 +193,11 @@ public:
                                g.GetSourceBuffer(),
                                g.GetExactlyOnceCheckpoint(),
                                g.GetMetadata(EventGroupMetaKey::SOURCE_ID));
-                    TimeoutFlushManager::GetInstance()->UpdateRecord(
-                        mFlusher->GetContext().GetConfigName(), 0, key, mEventFlushStrategy.GetTimeoutSecs(), mFlusher);
+                    TimeoutFlushManager::GetInstance()->UpdateRecord(mFlusher->GetContext().GetConfigName(),
+                                                                     mFlusher->GetFlusherIndex(),
+                                                                     key,
+                                                                     mEventFlushStrategy.GetTimeoutSecs(),
+                                                                     mFlusher);
                     mBufferedGroupsTotal->Add(1);
                     mBufferedDataSizeByte->Add(item.DataSize());
                 } else if (i == 0) {
@@ -243,8 +246,11 @@ public:
             mGroupQueue->Flush(res);
         }
         if (mGroupQueue->IsEmpty()) {
-            TimeoutFlushManager::GetInstance()->UpdateRecord(
-                mFlusher->GetContext().GetConfigName(), 0, 0, mGroupFlushStrategy->GetTimeoutSecs(), mFlusher);
+            TimeoutFlushManager::GetInstance()->UpdateRecord(mFlusher->GetContext().GetConfigName(),
+                                                             mFlusher->GetFlusherIndex(),
+                                                             0,
+                                                             mGroupFlushStrategy->GetTimeoutSecs(),
+                                                             mFlusher);
         }
         iter->second.Flush(mGroupQueue.value());
         mEventQueueMap.erase(iter);

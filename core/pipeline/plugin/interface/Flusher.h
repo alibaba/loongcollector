@@ -44,6 +44,8 @@ public:
 
     QueueKey GetQueueKey() const { return mQueueKey; }
     void SetPluginID(const std::string& pluginID) { mPluginID = pluginID; }
+    size_t GetFlusherIndex() { return mIndex; }
+    void SetFlusherIndex(size_t idx) { mIndex = idx; }
     const std::string& GetPluginID() const { return mPluginID; }
 
 protected:
@@ -54,6 +56,7 @@ protected:
 
     QueueKey mQueueKey;
     std::string mPluginID;
+    size_t mIndex = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherInstanceUnittest;
