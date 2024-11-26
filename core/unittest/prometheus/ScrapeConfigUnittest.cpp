@@ -19,6 +19,7 @@ public:
     void TestAuthorization();
     void TestScrapeProtocols();
     void TestEnableCompression();
+    void TestTLS();
 
 private:
     void SetUp() override;
@@ -62,6 +63,13 @@ void ScrapeConfigUnittest::TestInit() {
                 "PrometheusProto",
                 "OpenMetricsText0.0.1"
             ],
+            "follow_redirects": false,
+            "tls_config": {
+                "ca_file": "ca_file",
+                "cert_file": "cert_file",
+                "key_file": "key_file",
+                "insecure_skip_verify": true
+            },
             "enable_compression": false,
             "scheme": "http",
             "honor_labels": true,
@@ -109,6 +117,16 @@ void ScrapeConfigUnittest::TestInit() {
                       "text/plain;version=0.0.4;q=0.4,application/"
                       "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.3,"
                       "application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1");
+
+    // follow redirects
+    APSARA_TEST_EQUAL(scrapeConfig.mFollowRedirects, false);
+
+    // tls
+    APSARA_TEST_EQUAL(scrapeConfig.mEnableTLS, true);
+    APSARA_TEST_EQUAL(scrapeConfig.mTLS.mCaFile, "ca_file");
+    APSARA_TEST_EQUAL(scrapeConfig.mTLS.mCertFile, "cert_file");
+    APSARA_TEST_EQUAL(scrapeConfig.mTLS.mKeyFile, "key_file");
+    APSARA_TEST_EQUAL(scrapeConfig.mTLS.mInsecureSkipVerify, true);
 
     // disable compression
     // APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Accept-Encoding"], "identity");
@@ -305,9 +323,7 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
-    APSARA_TEST_EQUAL(
-        "text/plain;version=0.0.4;q=0.2,*/*;q=0.1",
-        scrapeConfig.mRequestHeaders["Accept"]);
+    APSARA_TEST_EQUAL("text/plain;version=0.0.4;q=0.2,*/*;q=0.1", scrapeConfig.mRequestHeaders["Accept"]);
 
     // Capital error
     configStr = R"JSON({
@@ -414,12 +430,52 @@ void ScrapeConfigUnittest::TestEnableCompression() {
     // APSARA_TEST_EQUAL("gzip", scrapeConfig.mRequestHeaders["Accept-Encoding"]);
 }
 
+void ScrapeConfigUnittest::TestTLS() {
+    Json::Value config;
+    ScrapeConfig scrapeConfig;
+    string errorMsg;
+    string configStr;
+
+    // default
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http"
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL(false, scrapeConfig.mEnableTLS);
+
+    // enable
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "tls_config": {
+                "ca_file": "ca_file",
+                "insecure_skip_verify": false
+            }
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL(true, scrapeConfig.mEnableTLS);
+    APSARA_TEST_EQUAL("ca_file", scrapeConfig.mTLS.mCaFile);
+    APSARA_TEST_EQUAL("", scrapeConfig.mTLS.mCertFile);
+    APSARA_TEST_EQUAL("", scrapeConfig.mTLS.mKeyFile);
+    APSARA_TEST_EQUAL(false, scrapeConfig.mTLS.mInsecureSkipVerify);
+}
+
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestInit);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestAuth);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestBasicAuth);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestAuthorization);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestScrapeProtocols);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestEnableCompression);
+UNIT_TEST_CASE(ScrapeConfigUnittest, TestTLS);
 
 } // namespace logtail
 

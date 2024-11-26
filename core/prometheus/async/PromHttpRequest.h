@@ -23,7 +23,9 @@ public:
                     uint32_t timeout,
                     uint32_t maxTryCnt,
                     std::shared_ptr<PromFuture<HttpResponse&, uint64_t>> future,
-                    std::shared_ptr<PromFuture<>> isContextValidFuture = nullptr);
+                    std::shared_ptr<PromFuture<>> isContextValidFuture = nullptr,
+                    bool followRedirects = false,
+                    std::optional<CurlTLS> tls = std::nullopt);
     PromHttpRequest(const PromHttpRequest&) = default;
     ~PromHttpRequest() override = default;
 

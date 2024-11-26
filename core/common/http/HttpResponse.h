@@ -26,6 +26,8 @@ class curl_slist;
 
 namespace logtail {
 
+struct CurlTLS;
+
 bool caseInsensitiveComp(const char lhs, const char rhs);
 
 bool compareHeader(const std::string& lhs, const std::string& rhs);
@@ -45,7 +47,9 @@ class HttpResponse {
                                    curl_slist*& headers,
                                    uint32_t timeout,
                                    bool replaceHostWithIp,
-                                   const std::string& intf);
+                                   const std::string& intf,
+                                   bool followRedirects,
+                                   std::optional<CurlTLS> tls);
 
 public:
     HttpResponse()

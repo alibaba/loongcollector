@@ -22,10 +22,13 @@ ScrapeConfig::ScrapeConfig()
       mHonorLabels(false),
       mHonorTimestamps(true),
       mScheme("http"),
+      mFollowRedirects(true),
+      mEnableTLS(false),
       mMaxScrapeSizeBytes(0),
       mSampleLimit(0),
       mSeriesLimit(0) {
 }
+
 bool ScrapeConfig::Init(const Json::Value& scrapeConfig) {
     if (!InitStaticConfig(scrapeConfig)) {
         return false;
@@ -39,6 +42,17 @@ bool ScrapeConfig::Init(const Json::Value& scrapeConfig) {
     } else {
         Json::Value nullJson;
         InitScrapeProtocols(nullJson);
+    }
+
+    if (scrapeConfig.isMember(prometheus::FOLLOW_REDIRECTS) && scrapeConfig[prometheus::FOLLOW_REDIRECTS].isBool()) {
+        mFollowRedirects = scrapeConfig[prometheus::FOLLOW_REDIRECTS].asBool();
+    }
+
+    if (scrapeConfig.isMember(prometheus::TLS_CONFIG) && scrapeConfig[prometheus::TLS_CONFIG].isObject()) {
+        if (!InitTLSConfig(scrapeConfig[prometheus::TLS_CONFIG])) {
+            LOG_ERROR(sLogger, ("tls config error", ""));
+            return false;
+        }
     }
 
     if (scrapeConfig.isMember(prometheus::ENABLE_COMPRESSION)
@@ -336,6 +350,51 @@ void ScrapeConfig::InitEnableCompression(bool enableCompression) {
     } else {
         mRequestHeaders[prometheus::ACCEPT_ENCODING] = prometheus::IDENTITY;
     }
+}
+
+bool ScrapeConfig::InitTLSConfig(const Json::Value& tlsConfig) {
+    if (tlsConfig.isMember(prometheus::CA_FILE)) {
+        if (tlsConfig[prometheus::CA_FILE].isString()) {
+            mTLS.mCaFile = tlsConfig[prometheus::CA_FILE].asString();
+        } else {
+            LOG_ERROR(sLogger, ("tls config error", ""));
+            return false;
+        }
+    }
+    if (tlsConfig.isMember(prometheus::CERT_FILE)) {
+        if (tlsConfig[prometheus::CERT_FILE].isString()) {
+            mTLS.mCertFile = tlsConfig[prometheus::CERT_FILE].asString();
+        } else {
+            LOG_ERROR(sLogger, ("tls config error", ""));
+            return false;
+        }
+    }
+    if (tlsConfig.isMember(prometheus::KEY_FILE)) {
+        if (tlsConfig[prometheus::KEY_FILE].isString()) {
+            mTLS.mKeyFile = tlsConfig[prometheus::KEY_FILE].asString();
+        } else {
+            LOG_ERROR(sLogger, ("tls config error", ""));
+            return false;
+        }
+    }
+    if (tlsConfig.isMember(prometheus::SERVER_NAME)) {
+        if (tlsConfig[prometheus::SERVER_NAME].isString()) {
+            mRequestHeaders[prometheus::HOST] = tlsConfig[prometheus::SERVER_NAME].asString();
+        } else {
+            LOG_ERROR(sLogger, ("tls config error", ""));
+            return false;
+        }
+    }
+    if (tlsConfig.isMember(prometheus::INSECURE_SKIP_VERIFY)) {
+        if (tlsConfig[prometheus::INSECURE_SKIP_VERIFY].isBool()) {
+            mTLS.mInsecureSkipVerify = tlsConfig[prometheus::INSECURE_SKIP_VERIFY].asBool();
+        } else {
+            LOG_ERROR(sLogger, ("tls config error", ""));
+            return false;
+        }
+    }
+    mEnableTLS = true;
+    return true;
 }
 
 } // namespace logtail

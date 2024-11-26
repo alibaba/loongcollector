@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <utility>
 
 #include "common/http/HttpRequest.h"
 
@@ -20,7 +21,9 @@ PromHttpRequest::PromHttpRequest(const std::string& method,
                                  uint32_t timeout,
                                  uint32_t maxTryCnt,
                                  std::shared_ptr<PromFuture<HttpResponse&, uint64_t>> future,
-                                 std::shared_ptr<PromFuture<>> isContextValidFuture)
+                                 std::shared_ptr<PromFuture<>> isContextValidFuture,
+                                 bool followRedirects,
+                                 std::optional<CurlTLS> tls)
     : AsynHttpRequest(method,
                       httpsFlag,
                       host,
@@ -31,7 +34,9 @@ PromHttpRequest::PromHttpRequest(const std::string& method,
                       body,
                       std::move(response),
                       timeout,
-                      maxTryCnt),
+                      maxTryCnt,
+                      followRedirects,
+                      std::move(tls)),
       mFuture(std::move(future)),
       mIsContextValidFuture(std::move(isContextValidFuture)) {
 }

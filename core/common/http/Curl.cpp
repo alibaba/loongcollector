@@ -69,7 +69,9 @@ CURL* CreateCurlHandler(const std::string& method,
                         curl_slist*& headers,
                         uint32_t timeout,
                         bool replaceHostWithIp,
-                        const std::string& intf) {
+                        const std::string& intf,
+                        bool followRedirects,
+                        std::optional<CurlTLS> tls) {
     static DnsCache* dnsCache = DnsCache::GetInstance();
 
     CURL* curl = curl_easy_init();
@@ -102,9 +104,26 @@ CURL* CreateCurlHandler(const std::string& method,
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body.size());
     }
 
+    if (followRedirects) {
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    }
+
     if (httpsFlag) {
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    }
+
+    if (tls.has_value()) {
+        if (!tls->mCaFile.empty()) {
+            curl_easy_setopt(curl, CURLOPT_CAINFO, tls->mCaFile.c_str());
+        }
+        if (!tls->mCertFile.empty()) {
+            curl_easy_setopt(curl, CURLOPT_SSLCERT, tls->mCertFile.c_str());
+        }
+        if (!tls->mKeyFile.empty()) {
+            curl_easy_setopt(curl, CURLOPT_SSLKEY, tls->mKeyFile.c_str());
+        }
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, tls->mInsecureSkipVerify ? 0 : 1);
     }
 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
@@ -139,7 +158,9 @@ bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& respo
                                    headers,
                                    request->mTimeout,
                                    AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
-                                   AppConfig::GetInstance()->GetBindInterface());
+                                   AppConfig::GetInstance()->GetBindInterface(),
+                                   request->mFollowRedirects,
+                                   request->mTls);
     if (curl == NULL) {
         LOG_ERROR(sLogger,
                   ("failed to init curl handler", "failed to init curl client")("request address", request.get()));

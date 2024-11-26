@@ -69,6 +69,14 @@ const char* const PASSWORD_FILE = "password_file";
 const char* const BASIC_PREFIX = "Basic ";
 const char* const HONOR_LABELS = "honor_labels";
 const char* const HONOR_TIMESTAMPS = "honor_timestamps";
+const char* const FOLLOW_REDIRECTS = "follow_redirects";
+const char* const TLS_CONFIG = "tls_config";
+const char* const CA_FILE = "ca_file";
+const char* const CERT_FILE = "cert_file";
+const char* const KEY_FILE = "key_file";
+const char* const SERVER_NAME = "server_name";
+const char* const HOST = "Host";
+const char* const INSECURE_SKIP_VERIFY = "insecure_skip_verify";
 
 // scrape protocols, from https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config
 // text/plain, application/openmetrics-text will be used

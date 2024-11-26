@@ -20,8 +20,8 @@
 
 #include <cstdint>
 #include <map>
-#include <string>
 #include <memory>
+#include <string>
 
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
@@ -40,7 +40,9 @@ CURL* CreateCurlHandler(const std::string& method,
                         curl_slist*& headers,
                         uint32_t timeout,
                         bool replaceHostWithIp = true,
-                        const std::string& intf = "");
+                        const std::string& intf = "",
+                        bool followRedirects = false,
+                        std::optional<CurlTLS> tls = std::nullopt);
 
 bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& response);
 
