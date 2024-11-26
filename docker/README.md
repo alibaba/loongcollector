@@ -1,11 +1,5 @@
 # Dockerfile
 
-## Dockerfiles to build build image
-
-Dockerfile.centos7-cve-fix: base system
-Dockerfile.ilogtail-toolchain-linux: install toolchain
-Dockerfile.ilogtail-build-linux: add dependencies
-
 ## Dockerfiles to build iLogtail
 
 Dockerfile_build: build iLogtail

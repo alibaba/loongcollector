@@ -18,7 +18,6 @@ macro(processor_link target_name link_withspl)
     link_re2(${target_name})
     if (LINUX AND ${link_withspl})
         link_spl(${target_name})
-        target_link_libraries(${target_name} spl)
     endif ()
     link_ssl(${target_name}) # must after link_spl
     link_crypto(${target_name}) # must after link_spl

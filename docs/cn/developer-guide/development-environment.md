@@ -36,10 +36,10 @@ docker目录和scripts目录分别为辅助编译的镜像描述目录和脚本�
 
 ## 开发镜像
 
-iLogtail依赖了诸多第三方库（详见[编译依赖](./dependencies.md)），为了简化编译流程ilogtail提供了预编译依赖的镜像辅助编译。开发镜像的地址在`sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux`，可通过下面命令获取。
+loongcollector 依赖了诸多第三方库（详见[编译依赖](./dependencies.md)），为了简化编译流程ilogtail提供了预编译依赖的镜像辅助编译。开发镜像的地址在`sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux`，可通过下面命令获取。
 
 ```shell
-docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux
 ```
 
 开发镜像预先安装了gcc和go编译器，更新了git，为了代码风格统一安装了clang-format、go-tools，为了便于调试也安装了gdb、go-delve等工具。为方便国内开发者，预先设置了GOPROXY="[https://goproxy.cn,direct"](https://goproxy.cn,direct")。
@@ -63,7 +63,7 @@ bin  include  lib  lib64  share  ssl
 如果需要安装更多工具或编译依赖，可以在开发镜像上镜像叠加，制作自定义的开发镜像。
 
 ```dockerfile
-from sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux
+from sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux
 yum -y install ...
 go install ...
 ```
@@ -82,7 +82,7 @@ go install ...
 
 ```json
 {
-  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:2.0.3",
+  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.0.5",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -186,7 +186,7 @@ cp -a ./core/build/go_pipeline/libPluginAdapter.so ./output
 ```bash
 docker run --name ilogtail-build -d \
   -v `pwd`:/src -w /src \
-  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux:2.0.3 \
+  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.0.5 \
   bash -c "sleep infinity"
 ```
 
@@ -254,7 +254,7 @@ compilation terminated.
 请确保本地编译镜像为最新版本。可使用以下命令更新：
 
 ``` shell
-docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux
 ```
 
 若使用VS Code进行开发，请重新编译开发容器镜像。使用Shift + Command + P（Mac）或Ctrl + Shift + P（Win）打开命令面板，输入rebuild，选择`Dev-Containers: Rebuild Without Cache and Reopen in Container`。

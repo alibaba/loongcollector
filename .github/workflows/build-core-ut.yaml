@@ -75,6 +75,7 @@ jobs:
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
           MAKE_JOBS: 16
+          WITHSPL: ON
           # BUILD_TYPE: Debug # TODO: Uncomment when memory management is refined
         run: CURRENT_DIR=$(pwd) && sed -i "s|/src|$CURRENT_DIR|g" docker/Dockerfile_build && make core PATH_IN_DOCKER=$(pwd)
 

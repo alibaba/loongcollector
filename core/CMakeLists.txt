@@ -140,12 +140,6 @@ endif()
 
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories("/opt/logtail_spl/include")
-if (LINUX)
-    if (WITHSPL)
-        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/spl)
-    endif()
-endif()
 
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})
@@ -182,13 +176,6 @@ elseif(UNIX)
     endif()
 endif()
 set(SRC_FILES ${SRC_FILES} ${FRAMEWORK_SOURCE_FILES} ${PLUGIN_SOURCE_FILES_CORE})
-
-# Generate SPL library.
-if (LINUX)
-    if (WITHSPL)
-        add_subdirectory(spl)
-    endif()
-endif()
 
 # Logtail executable or shared library.
 if (BUILD_LOGTAIL)

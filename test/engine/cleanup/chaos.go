@@ -50,6 +50,9 @@ func DestoryAllChaos(ctx context.Context) (context.Context, error) {
 	case "daemonset", "deployment":
 		k8sEnv := setup.Env.(*setup.K8sEnv)
 		chaosDir := filepath.Join("test_cases", "chaos")
+		if _, err := os.Stat(chaosDir); os.IsNotExist(err) {
+			return ctx, nil
+		}
 		err := filepath.Walk(chaosDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err

@@ -125,7 +125,12 @@ func (d *DockerComposeEnv) Clean() error {
 }
 
 func (d *DockerComposeEnv) ExecOnLogtail(command string) (string, error) {
-	return "", fmt.Errorf("not implemented")
+	// exec on host of docker compose
+	fmt.Println(command)
+	cmd := exec.Command("sh", "-c", command)
+	output, err := cmd.CombinedOutput()
+	fmt.Println(string(output))
+	return string(output), err
 }
 
 func (d *DockerComposeEnv) ExecOnSource(ctx context.Context, command string) (string, error) {

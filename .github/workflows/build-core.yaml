@@ -73,6 +73,7 @@ jobs:
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
           MAKE_JOBS: 16
+          WITHSPL: ON
         run: make core
 
       - name: Check compatibility

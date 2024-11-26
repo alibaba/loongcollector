@@ -357,6 +357,7 @@ bool PipelineConfig::Parse() {
                                                mLogstore,
                                                mRegion);
                         }
+                        mHasNativeProcessor = true;
                     } else {
                         mHasNativeProcessor = true;
                     }

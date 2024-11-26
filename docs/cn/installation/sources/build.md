@@ -39,7 +39,7 @@ compilation terminated.
 请确保本地编译镜像为最新版本。可使用以下命令更新：
 
 ``` shell
-docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail-build-linux
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux
 ```
 
 ### 使用镜像编译完整iLogtail

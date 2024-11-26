@@ -17,11 +17,6 @@
 #include "plugin/processor/ProcessorSPL.h"
 
 #include <curl/curl.h>
-#ifdef FMT_HEADER_ONLY
-#undef FMT_HEADER_ONLY
-#endif
-#include <spl/logger/Logger.h>
-#include <spl/pipeline/SplPipeline.h>
 
 #include <iostream>
 
@@ -29,14 +24,9 @@
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
-#include "spl/PipelineEventGroupInput.h"
-#include "spl/PipelineEventGroupOutput.h"
-#include "spl/SplConstants.h"
 
 DEFINE_FLAG_INT32(logtail_spl_pipeline_quota, "", 16);
 DEFINE_FLAG_INT32(logtail_spl_query_max_size, "", 65536);
-
-using namespace apsara::sls::spl;
 
 namespace logtail {
 
@@ -56,54 +46,44 @@ bool ProcessorSPL::Init(const Json::Value& config) {
     }
     if (!GetOptionalUIntParam(config, "TimeoutMilliSeconds", mTimeoutMills, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           errorMsg,
-                           mTimeoutMills,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mTimeoutMills,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
     }
     if (!GetOptionalUIntParam(config, "MaxMemoryBytes", mMaxMemoryBytes, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mMaxMemoryBytes,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    mSPLPipelinePtr = std::make_shared<LoongCollectorSplPipeline>();
+    errorMsg.clear();
+    ResultCode success = mSPLPipelinePtr->InitLoongCollectorSPL(mSpl,
+                                                                INT32_FLAG(logtail_spl_pipeline_quota),
+                                                                INT32_FLAG(logtail_spl_query_max_size),
+                                                                errorMsg,
+                                                                mTimeoutMills,
+                                                                mMaxMemoryBytes);
+    if (success != ResultCode::OK) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
                            mContext->GetAlarm(),
-                           errorMsg,
-                           mMaxMemoryBytes,
+                           "failed to parse spl: " + mSpl + " error: " + errorMsg,
                            sName,
                            mContext->GetConfigName(),
                            mContext->GetProjectName(),
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
-    }
-
-    PipelineOptions splOptions;
-    // different parse mode support different spl operators
-    splOptions.parserMode = parser::ParserMode::LOGTAIL;
-    // spl pipeline的长度，多少管道
-    splOptions.pipelineQuota = INT32_FLAG(logtail_spl_pipeline_quota);
-    // spl pipeline语句的最大长度
-    splOptions.queryMaxSize = INT32_FLAG(logtail_spl_query_max_size);
-    // sampling for error
-    splOptions.errorSampling = true;
-
-    // this function is void and has no return
-    initSPL(&splOptions);
-
-    LoggerPtr logger;
-    logger = sLogger;
-    Error error;
-    mSPLPipelinePtr = std::make_shared<apsara::sls::spl::SplPipeline>(
-        mSpl, error, (u_int64_t)mTimeoutMills, (int64_t)mMaxMemoryBytes, logger);
-    if (error.code_ != StatusCode::OK) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           "failed to parse spl: " + mSpl + " error: " + error.msg_,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());                                       
     }
 
     mSplExcuteErrorCount = GetMetricsRecordRef().CreateCounter("proc_spl_excute_error_count");
@@ -124,10 +104,10 @@ bool ProcessorSPL::Init(const Json::Value& config) {
 
 
 void ProcessorSPL::Process(PipelineEventGroup& logGroup) {
-    LOG_ERROR(
-        sLogger,
-        ("ProcessorSPL error", "unexpected enter in ProcessorSPL::Process(PipelineEventGroup& logGroup)")("project", mContext->GetProjectName())("logstore", mContext->GetLogstoreName())(
-            "region", mContext->GetRegion())("configName", mContext->GetConfigName()));
+    LOG_ERROR(sLogger,
+              ("ProcessorSPL error", "unexpected enter in ProcessorSPL::Process(PipelineEventGroup& logGroup)")(
+                  "project", mContext->GetProjectName())("logstore", mContext->GetLogstoreName())(
+                  "region", mContext->GetRegion())("configName", mContext->GetConfigName()));
 }
 
 
@@ -139,55 +119,14 @@ void ProcessorSPL::Process(std::vector<PipelineEventGroup>& logGroupList) {
     PipelineEventGroup logGroup = std::move(logGroupList[0]);
     std::vector<PipelineEventGroup>().swap(logGroupList);
 
-    std::vector<std::string> colNames{FIELD_CONTENT};
-    // 根据spip->getInputSearches()，设置input数组
-    std::vector<Input*> inputs;
-    for (const auto& search : mSPLPipelinePtr->getInputSearches()) {
-        (void)search; //-Wunused-variable
-        PipelineEventGroupInput* input = new PipelineEventGroupInput(colNames, logGroup, *mContext);
-        if (!input) {
-            logGroupList.emplace_back(std::move(logGroup));
-            for (auto& input : inputs) {
-                delete input;
-            }
-            return;
-        }
-        inputs.push_back(input);
-    }
-    // 根据spip->getOutputLabels()，设置output数组
-    std::vector<Output*> outputs;
-    for (const auto& resultTaskLabel : mSPLPipelinePtr->getOutputLabels()) {
-        PipelineEventGroupOutput* output = new PipelineEventGroupOutput(logGroup, logGroupList, *mContext, resultTaskLabel); 
-        if (!output) {
-            logGroupList.emplace_back(std::move(logGroup));
-            for (auto& input : inputs) {
-                delete input;
-            }
-            for (auto& output : outputs) {
-                delete output;
-            }
-            return;
-        }
-        outputs.emplace_back(output);
-    }
-
-    // 开始调用pipeline.execute
-    // 传入inputs, outputs
-    // 输出pipelineStats, error
     PipelineStats pipelineStats;
-    auto errCode = mSPLPipelinePtr->execute(inputs, outputs, &errorMsg, &pipelineStats);
+    ResultCode result = mSPLPipelinePtr->Execute(std::move(logGroup), logGroupList, pipelineStats, mContext);
 
-    if (errCode != StatusCode::OK) {
-        LOG_ERROR(
-            sLogger,
-            ("execute error", errorMsg)("project", mContext->GetProjectName())("logstore", mContext->GetLogstoreName())(
-                "region", mContext->GetRegion())("configName", mContext->GetConfigName()));
+    if (result != ResultCode::OK) {
         mSplExcuteErrorCount->Add(1);
-        // 出现错误，把原数据放回来
-        logGroupList.emplace_back(std::move(logGroup));
-        if (errCode == StatusCode::TIMEOUT_ERROR) {
+        if (result == ResultCode::TIMEOUT_ERROR) {
             mSplExcuteTimeoutErrorCount->Add(1);
-        } else if (errCode == StatusCode::MEM_EXCEEDED) {
+        } else if (result == ResultCode::MEM_EXCEEDED) {
             mSplExcuteMemoryExceedErrorCount->Add(1);
         }
     } else {
@@ -200,12 +139,6 @@ void ProcessorSPL::Process(std::vector<PipelineEventGroup>& logGroupList) {
         mFailTaskCount->Add(pipelineStats.failTaskCount_);
     }
 
-    for (auto& input : inputs) {
-        delete input;
-    }
-    for (auto& output : outputs) {
-        delete output;
-    }
     return;
 }
 
