@@ -267,7 +267,7 @@ private:
 
 void ConfigUpdateUnittest::OnStartUp() const {
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_TRUE(diff.first.IsEmpty());
+    APSARA_TEST_EQUAL(1U, diff.first.mAdded.size());
     APSARA_TEST_TRUE(diff.second.IsEmpty());
 
     GenerateInitialConfigs();
