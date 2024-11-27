@@ -82,6 +82,7 @@ bool ProcessorRunner::PushQueue(QueueKey key, size_t inputIndex, PipelineEventGr
         }
         this_thread::sleep_for(chrono::milliseconds(10));
     }
+    group = std::move(item->mEventGroup);
     return false;
 }
 
