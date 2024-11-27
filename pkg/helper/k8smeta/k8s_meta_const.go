@@ -124,12 +124,17 @@ const (
 )
 
 type PodMetadata struct {
+	PodName      string            `json:"podName"`
+	StartTime    int64             `json:"startTime"`
 	Namespace    string            `json:"namespace"`
 	WorkloadName string            `json:"workloadName"`
 	WorkloadKind string            `json:"workloadKind"`
-	ServiceName  string            `json:"serviceName"`
 	Labels       map[string]string `json:"labels"`
 	Envs         map[string]string `json:"envs"`
 	Images       map[string]string `json:"images"`
-	IsDeleted    bool              `json:"-"`
+
+	ServiceName  string   `json:"serviceName,omitempty"`
+	ContainerIDs []string `json:"containerIDs,omitempty"`
+	PodIP        string   `json:"podIP,omitempty"`
+	IsDeleted    bool     `json:"-"`
 }

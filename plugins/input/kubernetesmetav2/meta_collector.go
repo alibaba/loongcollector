@@ -305,7 +305,11 @@ func (m *metaCollector) send(event models.PipelineEvent, entity bool) {
 	} else {
 		buffer = m.entityLinkBuffer
 	}
-	buffer <- event
+	select {
+	case buffer <- event:
+	case <-time.After(3 * time.Second):
+		logger.Error(context.Background(), "SEND_EVENT_TIMEOUT", "send event timeout, isEntity", entity)
+	}
 }
 
 func (m *metaCollector) sendInBackground() {

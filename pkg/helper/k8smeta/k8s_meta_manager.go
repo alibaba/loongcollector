@@ -28,6 +28,7 @@ type MetaCache interface {
 	GetSize() int
 	GetQueueSize() int
 	List() []*ObjectWrapper
+	Filter(filterFunc func(*ObjectWrapper) bool, limit int) []*ObjectWrapper
 	RegisterSendFunc(key string, sendFunc SendFunc, interval int)
 	UnRegisterSendFunc(key string)
 	init(*kubernetes.Clientset)
@@ -211,7 +212,6 @@ func GetMetaManagerMetrics() []map[string]string {
 	for _, cache := range manager.cacheMap {
 		queueSize += cache.GetQueueSize()
 		cacheSize += cache.GetSize()
-
 	}
 	manager.queueSizeGauge.Set(float64(queueSize))
 	manager.cacheResourceGauge.Set(float64(cacheSize))

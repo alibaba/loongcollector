@@ -69,8 +69,13 @@ func (m *k8sMetaCache) List() []*ObjectWrapper {
 	return m.metaStore.List()
 }
 
+func (m *k8sMetaCache) Filter(filterFunc func(*ObjectWrapper) bool, limit int) []*ObjectWrapper {
+	return m.metaStore.Filter(filterFunc, limit)
+}
+
 func (m *k8sMetaCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int) {
 	m.metaStore.RegisterSendFunc(key, sendFunc, interval)
+	logger.Debug(context.Background(), "register send func", m.resourceType)
 }
 
 func (m *k8sMetaCache) UnRegisterSendFunc(key string) {
@@ -186,6 +191,8 @@ func getIdxRules(resourceType string) []IdxFunc {
 		return []IdxFunc{generateNodeKey}
 	case POD:
 		return []IdxFunc{generateCommonKey, generatePodIPKey, generateContainerIDKey, generateHostIPKey}
+	case SERVICE:
+		return []IdxFunc{generateCommonKey, generateServiceIPKey}
 	default:
 		return []IdxFunc{generateCommonKey}
 	}
@@ -274,7 +281,7 @@ func generateContainerIDKey(obj interface{}) ([]string, error) {
 	}
 	result := make([]string, len(pod.Status.ContainerStatuses))
 	for i, containerStatus := range pod.Status.ContainerStatuses {
-		result[i] = containerStatus.ContainerID
+		result[i] = truncateContainerID(containerStatus.ContainerID)
 	}
 	return result, nil
 }
@@ -285,4 +292,26 @@ func generateHostIPKey(obj interface{}) ([]string, error) {
 		return []string{}, fmt.Errorf("object is not a pod")
 	}
 	return []string{pod.Status.HostIP}, nil
+}
+
+func generateServiceIPKey(obj interface{}) ([]string, error) {
+	svc, ok := obj.(*v1.Service)
+	if !ok {
+		return []string{}, fmt.Errorf("object is not a service")
+	}
+	results := make([]string, 0)
+	for _, ip := range svc.Spec.ClusterIPs {
+		if ip != "" {
+			results = append(results, ip)
+		}
+	}
+	for _, ip := range svc.Spec.ExternalIPs {
+		if ip != "" {
+			results = append(results, ip)
+		}
+	}
+	if svc.Spec.LoadBalancerIP != "" {
+		results = append(results, svc.Spec.LoadBalancerIP)
+	}
+	return results, nil
 }

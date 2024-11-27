@@ -14,8 +14,7 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type | String，无默认值（必填） | 插件类型，固定为`service_syslog`。 |
-| Domain | String，默认值为空（必填） | 实体域，ACK集群填写"acs", 普通集群填写"infra"。 |
+| Type | String，无默认值（必填） | 插件类型，固定为`service_kubernetes_meta`。 |
 | Interval | int, 30 | 采集间隔时间，单位为秒。 |
 | Pod | bool, false | 是否采集Pod元数据。 |
 | Node | bool, false | 是否采集Node元数据。 |
@@ -24,7 +23,6 @@
 | DaemonSet | bool, false | 是否采集DaemonSet元数据。 |
 | StatefulSet | bool, false | 是否采集StatefulSet元数据。 |
 | Configmap | bool, false | 是否采集ConfigMap元数据。 |
-| Secret | bool, false | 是否采集Secret元数据。 |
 | Job | bool, false | 是否采集Job元数据。 |
 | CronJob | bool, false | 是否采集CronJob元数据。 |
 | Namespace | bool, false | 是否采集Namespace元数据。 |

@@ -23,8 +23,9 @@ type DeferredDeletionMetaStore struct {
 	lock  sync.RWMutex
 
 	// timer
-	gracePeriod int64
-	sendFuncs   sync.Map
+	gracePeriod  int64
+	registerLock sync.RWMutex
+	sendFuncs    map[string]*SendFuncWithStopCh
 }
 
 type TimerEvent struct {
@@ -49,7 +50,7 @@ func NewDeferredDeletionMetaStore(eventCh chan *K8sMetaEvent, stopCh <-chan stru
 		Index: make(map[string][]string),
 
 		gracePeriod: gracePeriod,
-		sendFuncs:   sync.Map{},
+		sendFuncs:   make(map[string]*SendFuncWithStopCh),
 	}
 	return m
 }
@@ -65,7 +66,7 @@ func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrappe
 	for _, k := range key {
 		realKeys, ok := m.Index[k]
 		if !ok {
-			return nil
+			continue
 		}
 		for _, realKey := range realKeys {
 			result[k] = append(result[k], m.Items[realKey])
@@ -84,12 +85,33 @@ func (m *DeferredDeletionMetaStore) List() []*ObjectWrapper {
 	return result
 }
 
+func (m *DeferredDeletionMetaStore) Filter(filterFunc func(*ObjectWrapper) bool, limit int) []*ObjectWrapper {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	result := make([]*ObjectWrapper, 0)
+	for _, item := range m.Items {
+		if filterFunc != nil {
+			if filterFunc(item) {
+				result = append(result, item)
+			}
+		} else {
+			result = append(result, item)
+		}
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+	}
+	return result
+}
+
 func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, interval int) {
 	sendFuncWithStopCh := &SendFuncWithStopCh{
 		SendFunc: f,
 		StopCh:   make(chan struct{}),
 	}
-	m.sendFuncs.Store(key, sendFuncWithStopCh)
+	m.registerLock.Lock()
+	m.sendFuncs[key] = sendFuncWithStopCh
+	m.registerLock.Unlock()
 	go func() {
 		defer panicRecover()
 		event := &K8sMetaEvent{
@@ -123,9 +145,12 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 }
 
 func (m *DeferredDeletionMetaStore) UnRegisterSendFunc(key string) {
-	if stopCh, ok := m.sendFuncs.LoadAndDelete(key); ok {
-		close(stopCh.(*SendFuncWithStopCh).StopCh)
+	m.registerLock.Lock()
+	if stopCh, ok := m.sendFuncs[key]; ok {
+		close(stopCh.StopCh)
 	}
+	delete(m.sendFuncs, key)
+	m.registerLock.Unlock()
 }
 
 // realtime events (add, update, delete) and timer events are handled sequentially
@@ -149,10 +174,11 @@ func (m *DeferredDeletionMetaStore) handleEvent() {
 				logger.Error(context.Background(), "unknown event type", event.EventType)
 			}
 		case <-m.stopCh:
-			m.sendFuncs.Range(func(key, value interface{}) bool {
-				close(value.(*SendFuncWithStopCh).StopCh)
-				return true
-			})
+			m.registerLock.Lock()
+			for _, f := range m.sendFuncs {
+				close(f.StopCh)
+			}
+			m.registerLock.Unlock()
 			return
 		}
 	}
@@ -174,10 +200,11 @@ func (m *DeferredDeletionMetaStore) handleAddEvent(event *K8sMetaEvent) {
 		m.Index[idxKey] = append(m.Index[idxKey], key)
 	}
 	m.lock.Unlock()
-	m.sendFuncs.Range(func(key, value interface{}) bool {
-		value.(*SendFuncWithStopCh).SendFunc([]*K8sMetaEvent{event})
-		return true
-	})
+	m.registerLock.RLock()
+	for _, f := range m.sendFuncs {
+		f.SendFunc([]*K8sMetaEvent{event})
+	}
+	m.registerLock.RUnlock()
 }
 
 func (m *DeferredDeletionMetaStore) handleUpdateEvent(event *K8sMetaEvent) {
@@ -199,10 +226,11 @@ func (m *DeferredDeletionMetaStore) handleUpdateEvent(event *K8sMetaEvent) {
 		m.Index[idxKey] = append(m.Index[idxKey], key)
 	}
 	m.lock.Unlock()
-	m.sendFuncs.Range(func(key, value interface{}) bool {
-		value.(*SendFuncWithStopCh).SendFunc([]*K8sMetaEvent{event})
-		return true
-	})
+	m.registerLock.RLock()
+	for _, f := range m.sendFuncs {
+		f.SendFunc([]*K8sMetaEvent{event})
+	}
+	m.registerLock.RUnlock()
 }
 
 func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
@@ -217,10 +245,11 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 		event.Object.FirstObservedTime = obj.FirstObservedTime
 	}
 	m.lock.Unlock()
-	m.sendFuncs.Range(func(key, value interface{}) bool {
-		value.(*SendFuncWithStopCh).SendFunc([]*K8sMetaEvent{event})
-		return true
-	})
+	m.registerLock.RLock()
+	for _, f := range m.sendFuncs {
+		f.SendFunc([]*K8sMetaEvent{event})
+	}
+	m.registerLock.RUnlock()
 	go func() {
 		// wait and add a deferred delete event
 		time.Sleep(time.Duration(m.gracePeriod) * time.Second)
@@ -277,9 +306,11 @@ func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEven
 
 func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 	timerEvent := event.Object.Raw.(*TimerEvent)
-	if f, ok := m.sendFuncs.Load(timerEvent.ConfigName); ok {
-		sendFuncWithStopCh := f.(*SendFuncWithStopCh)
+	m.registerLock.RLock()
+	defer m.registerLock.RUnlock()
+	if f, ok := m.sendFuncs[timerEvent.ConfigName]; ok {
 		allItems := make([]*K8sMetaEvent, 0)
+		m.lock.RLock()
 		for _, obj := range m.Items {
 			if !obj.Deleted {
 				obj.LastObservedTime = time.Now().Unix()
@@ -289,9 +320,9 @@ func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 				})
 			}
 		}
-		sendFuncWithStopCh.SendFunc(allItems)
+		m.lock.RUnlock()
+		f.SendFunc(allItems)
 	}
-
 }
 
 func (m *DeferredDeletionMetaStore) getIdxKeys(obj *ObjectWrapper) []string {
