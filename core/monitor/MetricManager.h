@@ -24,9 +24,54 @@
 
 #include "MetricRecord.h"
 #include "common/Lock.h"
+#include "models/PipelineEventGroup.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
+
+extern const std::string METRIC_TOPIC_TYPE;
+
+struct SelfMonitorMetricRule {
+    bool mEnable;
+    size_t mInterval;
+};
+
+struct SelfMonitorMetricRules {
+    SelfMonitorMetricRule mAgentMetricsRule;
+    SelfMonitorMetricRule mRunnerMetricsRule;
+    SelfMonitorMetricRule mPipelineMetricsRule;
+    SelfMonitorMetricRule mPluginSourceMetricsRule;
+    SelfMonitorMetricRule mPluginMetricsRule;
+    SelfMonitorMetricRule mComponentMetricsRule;
+};
+
+using SelfMonitorMetricEventKey = int64_t;
+class SelfMonitorMetricEvent {
+public:
+    SelfMonitorMetricEvent();
+    SelfMonitorMetricEvent(MetricsRecord* metricRecord);
+    SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord);
+
+    void SetInterval(size_t interval);
+    void Merge(SelfMonitorMetricEvent& event);
+
+    bool ShouldSend();
+    bool ShouldDelete();
+    void ReadAsMetricEvent(MetricEvent* metricEventPtr);
+
+    SelfMonitorMetricEventKey mKey; // labels + category
+    std::string mCategory; // category
+private:
+    void CreateKey();
+
+    std::unordered_map<std::string, std::string> mLabels;
+    std::unordered_map<std::string, uint64_t> mCounters;
+    std::unordered_map<std::string, double> mGauges;
+    int32_t mSendInterval;
+    int32_t mLastSendInterval;
+    bool mUpdatedFlag;
+};
+using SelfMonitorMetricEventMap = std::unordered_map<SelfMonitorMetricEventKey, SelfMonitorMetricEvent>;
 
 class WriteMetrics {
 private:
@@ -66,8 +111,10 @@ private:
     ReadMetrics() = default;
     mutable ReadWriteLock mReadWriteLock;
     MetricsRecord* mHead = nullptr;
+    std::vector<std::map<std::string, std::string>> mGoMetrics;
     void Clear();
     MetricsRecord* GetHead();
+    void UpdateGoCppProvidedMetrics(std::vector<std::map<std::string, std::string>>& metricsList);
 
 public:
     ~ReadMetrics();
@@ -75,10 +122,7 @@ public:
         static ReadMetrics* ptr = new ReadMetrics();
         return ptr;
     }
-    void ReadAsLogGroup(const std::string& regionFieldName,
-                        const std::string& defaultRegion,
-                        std::map<std::string, sls_logs::LogGroup*>& logGroupMap) const;
-    void ReadAsFileBuffer(std::string& metricsContent) const;
+    void ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& metricEventList) const;
     void UpdateMetrics();
 
 #ifdef APSARA_UNIT_TEST_MAIN

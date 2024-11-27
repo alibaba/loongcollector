@@ -31,6 +31,7 @@ void ReentrantMetricsRecord::Init(const std::string& category,
                 break;
             case MetricType::METRIC_TYPE_TIME_COUNTER:
                 mTimeCounters[metric.first] = mMetricsRecordRef.CreateTimeCounter(metric.first);
+                break;
             case MetricType::METRIC_TYPE_INT_GAUGE:
                 mIntGauges[metric.first] = mMetricsRecordRef.CreateIntGauge(metric.first);
                 break;

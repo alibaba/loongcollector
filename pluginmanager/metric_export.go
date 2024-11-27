@@ -41,12 +41,15 @@ func GetMetrics(metricType string) []map[string]string {
 //
 //	[]map[string]string{
 //		{
-//			"label.plugin_name": "processor_test",
-//			"value.proc_in_records_total": "100",
+//			"labels": "{\"category\": \"plugin\",\"plugin_type\":\"flusher_stdout\"}",
+//			"counters": "{\"proc_in_records_total\": \"100\"}"
+//			"gauges": "{}"
 //		},
 //		{
-//			"label.plugin_name": "flusher_stdout",
-//			"value.flusher_in_records_total": "100",
+//			"labels": "{\"category\": \"runner\",\"runner_name\":\"k8s_meta\"}",
+//			"counters": "{\"proc_in_records_total\": \"100\"}",
+//			"gauges": "{\"cache_size\": \"100\"}"
+//		}
 //		},
 //	}
 func GetGoDirectMetrics() []map[string]string {
@@ -62,8 +65,8 @@ func GetGoDirectMetrics() []map[string]string {
 //
 //	[]map[string]string{
 //		{
-//			"agent_go_memory_used_mb": "100",
-//			"agent_go_routines_total": "20"
+//			"go_memory_used_mb": "100",
+//			"go_routines_total": "20"
 //		}
 //	}
 func GetGoCppProvidedMetrics() []map[string]string {

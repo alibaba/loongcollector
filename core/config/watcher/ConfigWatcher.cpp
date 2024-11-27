@@ -29,6 +29,7 @@ void ConfigWatcher::AddSource(const string& dir, mutex* mux) {
 void ConfigWatcher::ClearEnvironment() {
     mSourceDir.clear();
     mFileInfoMap.clear();
+    mInnerConfigMap.clear();
 }
 #endif
 

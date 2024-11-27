@@ -15,11 +15,11 @@
 #include "config/watcher/PipelineConfigWatcher.h"
 
 #include <memory>
-#include <unordered_set>
 
 #include "common/FileSystemUtil.h"
 #include "config/ConfigUtil.h"
 #include "logger/Logger.h"
+#include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
 #include "task_pipeline/TaskPipelineManager.h"
 
@@ -37,6 +37,138 @@ pair<PipelineConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff(
     PipelineConfigDiff pDiff;
     TaskConfigDiff tDiff;
     unordered_set<string> configSet;
+    // inner configs
+    InsertInnerPipelines(pDiff, tDiff, configSet);
+    // configs from file
+    InsertPipelines(pDiff, tDiff, configSet);
+
+    for (const auto& name : mPipelineManager->GetAllConfigNames()) {
+        if (configSet.find(name) == configSet.end()) {
+            pDiff.mRemoved.push_back(name);
+            LOG_INFO(sLogger,
+                     ("existing valid config is removed", "prepare to stop current running pipeline")("config", name));
+        }
+    }
+    for (const auto& name : mTaskPipelineManager->GetAllPipelineNames()) {
+        if (configSet.find(name) == configSet.end()) {
+            tDiff.mRemoved.push_back(name);
+            LOG_INFO(sLogger,
+                     ("existing valid config is removed", "prepare to stop current running task")("config", name));
+        }
+    }
+    for (auto it = mFileInfoMap.begin(); it != mFileInfoMap.end();) {
+        string configName = filesystem::path(it->first).stem().string();
+        if (configSet.find(configName) == configSet.end()) {
+            it = mFileInfoMap.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    if (!pDiff.IsEmpty()) {
+        LOG_INFO(sLogger,
+                 ("config files scan done", "got updates, begin to update pipelines")("added", pDiff.mAdded.size())(
+                     "modified", pDiff.mModified.size())("removed", pDiff.mRemoved.size()));
+    } else {
+        LOG_DEBUG(sLogger, ("config files scan done", "no pipeline update"));
+    }
+    if (!tDiff.IsEmpty()) {
+        LOG_INFO(sLogger,
+                 ("config files scan done", "got updates, begin to update tasks")("added", tDiff.mAdded.size())(
+                     "modified", tDiff.mModified.size())("removed", tDiff.mRemoved.size()));
+    } else {
+        LOG_DEBUG(sLogger, ("config files scan done", "no task update"));
+    }
+
+    return make_pair(std::move(pDiff), std::move(tDiff));
+}
+
+void PipelineConfigWatcher::InsertInnerPipelines(PipelineConfigDiff& pDiff,
+                                                 TaskConfigDiff& tDiff,
+                                                 unordered_set<string>& configSet) {
+    std::map<std::string, std::string> innerPipelines;
+    // self-monitor metric
+    innerPipelines[LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName()]
+        = LoongCollectorMonitor::GetInnerSelfMonitorMetricPipeline();
+
+    // process
+    for (const auto& pipeline : innerPipelines) {
+        if (configSet.find(pipeline.first) != configSet.end()) {
+            LOG_WARNING(sLogger,
+                        ("more than 1 config with the same name is found", "skip current config")("inner pipeline",
+                                                                                                  pipeline.first));
+            continue;
+        }
+        configSet.insert(pipeline.first);
+
+        string errorMsg;
+        auto iter = mInnerConfigMap.find(pipeline.first);
+        if (iter == mInnerConfigMap.end()) {
+            mInnerConfigMap[pipeline.first] = pipeline.second;
+            unique_ptr<Json::Value> detail = make_unique<Json::Value>();
+            if (!ParseConfigDetail(pipeline.second, ".json", *detail, errorMsg)) {
+                LOG_WARNING(sLogger,
+                            ("config format error", "skip current object")("error msg", errorMsg)("inner pipeline",
+                                                                                                  pipeline.first));
+                continue;
+            }
+            if (!IsConfigEnabled(pipeline.first, *detail)) {
+                LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", pipeline.first));
+                continue;
+            }
+            if (!CheckAddedConfig(pipeline.first, std::move(detail), pDiff, tDiff)) {
+                continue;
+            }
+        } else if (pipeline.second != iter->second) {
+            mInnerConfigMap[pipeline.first] = pipeline.second;
+            unique_ptr<Json::Value> detail = make_unique<Json::Value>();
+            if (!ParseConfigDetail(pipeline.second, ".json", *detail, errorMsg)) {
+                LOG_WARNING(sLogger,
+                            ("config format error", "skip current object")("error msg", errorMsg)("inner pipeline",
+                                                                                                  pipeline.first));
+                continue;
+            }
+            if (!IsConfigEnabled(pipeline.first, *detail)) {
+                switch (GetConfigType(*detail)) {
+                    case ConfigType::Pipeline:
+                        if (mPipelineManager->FindConfigByName(pipeline.first)) {
+                            pDiff.mRemoved.push_back(pipeline.first);
+                            LOG_INFO(sLogger,
+                                     ("existing valid config modified and disabled",
+                                      "prepare to stop current running pipeline")("config", pipeline.first));
+                        } else {
+                            LOG_INFO(sLogger,
+                                     ("existing invalid config modified and disabled",
+                                      "skip current object")("config", pipeline.first));
+                        }
+                        break;
+                    case ConfigType::Task:
+                        if (mTaskPipelineManager->FindPipelineByName(pipeline.first)) {
+                            tDiff.mRemoved.push_back(pipeline.first);
+                            LOG_INFO(sLogger,
+                                     ("existing valid config modified and disabled",
+                                      "prepare to stop current running task")("config", pipeline.first));
+                        } else {
+                            LOG_INFO(sLogger,
+                                     ("existing invalid config modified and disabled",
+                                      "skip current object")("config", pipeline.first));
+                        }
+                        break;
+                }
+                continue;
+            }
+            if (!CheckModifiedConfig(pipeline.first, std::move(detail), pDiff, tDiff)) {
+                continue;
+            }
+        } else {
+            LOG_DEBUG(sLogger, ("existing inner config unchanged", "skip current object"));
+        }
+    }
+}
+
+void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
+                                            TaskConfigDiff& tDiff,
+                                            std::unordered_set<std::string>& configSet) {
     for (const auto& dir : mSourceDir) {
         error_code ec;
         filesystem::file_status s = filesystem::status(dir, ec);
@@ -139,45 +271,6 @@ pair<PipelineConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff(
             }
         }
     }
-    for (const auto& name : mPipelineManager->GetAllConfigNames()) {
-        if (configSet.find(name) == configSet.end()) {
-            pDiff.mRemoved.push_back(name);
-            LOG_INFO(sLogger,
-                     ("existing valid config is removed", "prepare to stop current running pipeline")("config", name));
-        }
-    }
-    for (const auto& name : mTaskPipelineManager->GetAllPipelineNames()) {
-        if (configSet.find(name) == configSet.end()) {
-            tDiff.mRemoved.push_back(name);
-            LOG_INFO(sLogger,
-                     ("existing valid config is removed", "prepare to stop current running task")("config", name));
-        }
-    }
-    for (auto it = mFileInfoMap.begin(); it != mFileInfoMap.end();) {
-        string configName = filesystem::path(it->first).stem().string();
-        if (configSet.find(configName) == configSet.end()) {
-            it = mFileInfoMap.erase(it);
-        } else {
-            ++it;
-        }
-    }
-
-    if (!pDiff.IsEmpty()) {
-        LOG_INFO(sLogger,
-                 ("config files scan done", "got updates, begin to update pipelines")("added", pDiff.mAdded.size())(
-                     "modified", pDiff.mModified.size())("removed", pDiff.mRemoved.size()));
-    } else {
-        LOG_DEBUG(sLogger, ("config files scan done", "no pipeline update"));
-    }
-    if (!tDiff.IsEmpty()) {
-        LOG_INFO(sLogger,
-                 ("config files scan done", "got updates, begin to update tasks")("added", tDiff.mAdded.size())(
-                     "modified", tDiff.mModified.size())("removed", tDiff.mRemoved.size()));
-    } else {
-        LOG_DEBUG(sLogger, ("config files scan done", "no task update"));
-    }
-
-    return make_pair(std::move(pDiff), std::move(tDiff));
 }
 
 bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,

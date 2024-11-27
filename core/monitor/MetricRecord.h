@@ -19,9 +19,6 @@
 
 namespace logtail {
 
-extern const std::string METRIC_KEY_LABEL;
-extern const std::string METRIC_KEY_VALUE;
-extern const std::string METRIC_KEY_CATEGORY;
 class MetricCategory {
 public:
     static const std::string METRIC_CATEGORY_UNKNOWN;

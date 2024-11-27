@@ -16,6 +16,7 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/config"
@@ -30,8 +31,9 @@ type CommonContext struct {
 type LabelPair = Label
 
 const SelfMetricNameKey = "__name__"
-const MetricLabelPrefix = "label."
-const MetricValuePrefix = "value."
+const MetricLabelPrefix = "labels"
+const MetricCounterPrefix = "counters"
+const MetricGaugePrefix = "gauges"
 
 type MetricsRecord struct {
 	Context Context
@@ -42,9 +44,12 @@ type MetricsRecord struct {
 }
 
 func (m *MetricsRecord) insertLabels(record map[string]string) {
+	labels := map[string]string{}
 	for _, label := range m.Labels {
-		record[MetricLabelPrefix+label.Key] = label.Value
+		labels[label.Key] = label.Value
 	}
+	labelsStr, _ := json.Marshal(labels)
+	record[MetricLabelPrefix] = string(labelsStr)
 }
 
 func (m *MetricsRecord) RegisterMetricCollector(collector MetricCollector) {
@@ -63,16 +68,26 @@ func (m *MetricsRecord) ExportMetricRecords() map[string]string {
 	m.insertLabels(record)
 	for _, metricCollector := range m.MetricCollectors {
 		metrics := metricCollector.Collect()
-
+		counters := map[string]string{}
+		gauges := map[string]string{}
 		for _, metric := range metrics {
-			singleMetricRecord := metric.Export()
-			if len(singleMetricRecord) == 0 {
+			singleMetric := metric.Export()
+			if len(singleMetric) == 0 {
 				continue
 			}
-			valueName := singleMetricRecord[SelfMetricNameKey]
-			valueValue := singleMetricRecord[valueName]
-			record[MetricValuePrefix+valueName] = valueValue
+			valueName := singleMetric[SelfMetricNameKey]
+			valueValue := singleMetric[valueName]
+			if metric.Type() == CounterType {
+				counters[valueName] = valueValue
+			}
+			if metric.Type() == GaugeType {
+				gauges[valueName] = valueValue
+			}
 		}
+		countersStr, _ := json.Marshal(counters)
+		record[MetricCounterPrefix] = string(countersStr)
+		gaugesStr, _ := json.Marshal(gauges)
+		record[MetricGaugePrefix] = string(gaugesStr)
 	}
 	return record
 }

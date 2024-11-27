@@ -14,13 +14,15 @@
 
 #include "pipeline/serializer/SLSSerializer.h"
 
+#include <json/json.h>
+
+#include <array>
+
 #include "common/Flags.h"
-#include "constants/SpanConstants.h"
 #include "common/compression/CompressType.h"
+#include "constants/SpanConstants.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/LogGroupSerializer.h"
-#include <json/json.h>
-#include <array>
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
@@ -97,7 +99,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
     vector<array<string, 6>> spanEventContentCache(group.mEvents.size());
     size_t logGroupSZ = 0;
     switch (eventType) {
-        case PipelineEvent::Type::LOG:{
+        case PipelineEvent::Type::LOG: {
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<LogEvent>();
                 if (e.Empty()) {
@@ -111,7 +113,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             }
             break;
         }
-        case PipelineEvent::Type::METRIC:{
+        case PipelineEvent::Type::METRIC: {
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& e = group.mEvents[i].Cast<MetricEvent>();
                 if (e.Is<UntypedSingleValue>()) {
@@ -145,9 +147,10 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_PARENT_ID.size(), e.GetParentSpanId().size());
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_SPAN_NAME.size(), e.GetName().size());
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_SPAN_KIND.size(), GetKindString(e.GetKind()).size());
-                contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_STATUS_CODE.size(), GetStatusString(e.GetStatus()).size());
+                contentSZ
+                    += GetLogContentSize(DEFAULT_TRACE_TAG_STATUS_CODE.size(), GetStatusString(e.GetStatus()).size());
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_TRACE_STATE.size(), e.GetTraceState().size());
-                // 
+
                 // set tags and scope tags
                 Json::Value jsonVal;
                 for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
@@ -160,7 +163,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 std::string attrString = Json::writeString(writer, jsonVal);
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_ATTRIBUTES.size(), attrString.size());
                 spanEventContentCache[i][0] = std::move(attrString);
-
                 auto linkString = SerializeSpanLinksToString(e);
                 contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_LINKS.size(), linkString.size());
                 spanEventContentCache[i][1] = std::move(linkString);
@@ -265,7 +267,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 serializer.AddLogContent(DEFAULT_TRACE_TAG_TRACE_STATE, spanEvent.GetTraceState());
 
                 serializer.AddLogContent(DEFAULT_TRACE_TAG_ATTRIBUTES, spanEventContentCache[i][0]);
-                
+
                 serializer.AddLogContent(DEFAULT_TRACE_TAG_LINKS, spanEventContentCache[i][1]);
                 serializer.AddLogContent(DEFAULT_TRACE_TAG_EVENTS, spanEventContentCache[i][2]);
 
@@ -275,7 +277,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 serializer.AddLogContent(DEFAULT_TRACE_TAG_END_TIME_NANO, spanEventContentCache[i][4]);
                 // duration
                 serializer.AddLogContent(DEFAULT_TRACE_TAG_DURATION, spanEventContentCache[i][5]);
-                
             }
             break;
         case PipelineEvent::Type::RAW:

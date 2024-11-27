@@ -26,12 +26,14 @@
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
+#include "plugin/flusher/file/FlusherFile.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputPrometheus.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputInternalMetrics.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
@@ -49,9 +51,9 @@
 #include "plugin/processor/ProcessorParseJsonNative.h"
 #include "plugin/processor/ProcessorParseRegexNative.h"
 #include "plugin/processor/ProcessorParseTimestampNative.h"
-#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
+#include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
@@ -125,6 +127,7 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputFile>());
     RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
+    RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>());
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
     RegisterInputCreator(new StaticInputCreator<InputFileSecurity>());
@@ -156,6 +159,7 @@ void PluginRegistry::LoadStaticPlugins() {
 
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
 }
 
 void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {
@@ -220,7 +224,8 @@ void PluginRegistry::RegisterCreator(PluginCat cat, PluginCreator* creator) {
     mPluginDict.emplace(PluginKey(cat, creator->Name()), shared_ptr<PluginCreator>(creator));
 }
 
-unique_ptr<PluginInstance> PluginRegistry::Create(PluginCat cat, const string& name, const PluginInstance::PluginMeta& pluginMeta) {
+unique_ptr<PluginInstance>
+PluginRegistry::Create(PluginCat cat, const string& name, const PluginInstance::PluginMeta& pluginMeta) {
     unique_ptr<PluginInstance> ins;
     auto creatorEntry = mPluginDict.find(PluginKey(cat, name));
     if (creatorEntry != mPluginDict.end()) {

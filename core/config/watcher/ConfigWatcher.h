@@ -43,6 +43,7 @@ protected:
     std::vector<std::filesystem::path> mSourceDir;
     std::map<std::string, std::mutex*> mDirMutexMap;
     std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>> mFileInfoMap;
+    std::map<std::string, std::string> mInnerConfigMap;
 };
 
 } // namespace logtail

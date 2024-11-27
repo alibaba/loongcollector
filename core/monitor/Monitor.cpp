@@ -37,7 +37,7 @@
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
-#include "monitor/MetricExportor.h"
+#include "monitor/SelfMonitorServer.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "runner/FlusherRunner.h"
@@ -721,6 +721,9 @@ LoongCollectorMonitor::~LoongCollectorMonitor() {
 }
 
 void LoongCollectorMonitor::Init() {
+    LOG_INFO(sLogger, ("LoongCollector monitor", "started"));
+    SelfMonitorServer::GetInstance()->Init();
+
     // create metric record
     MetricLabels labels;
     labels.emplace_back(METRIC_LABEL_KEY_INSTANCE_ID, Application::GetInstance()->GetInstanceId());
@@ -751,7 +754,56 @@ void LoongCollectorMonitor::Init() {
 }
 
 void LoongCollectorMonitor::Stop() {
-    MetricExportor::GetInstance()->PushMetrics(true);
+    SelfMonitorServer::GetInstance()->Stop();
+    LOG_INFO(sLogger, ("LoongCollector monitor", "stopped successfully"));
+
+}
+
+const string LoongCollectorMonitor::GetInnerSelfMonitorMetricPipeline() {
+#ifdef __ENTERPRISE__
+    static string pipeline = "";
+#else
+    static string pipeline = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_internal_metrics",
+                    "Agent": {
+                        "Enable": false,
+                        "Interval": 1
+                    },
+                    "Runner": {
+                        "Enable": false,
+                        "Interval": 1
+                    },
+                    "Pipeline": {
+                        "Enable": true,
+                        "Interval": 1
+                    },
+                    "PluginSource": {
+                        "Enable": true,
+                        "Interval": 10
+                    },
+                    "Plugin": {
+                        "Enable": false,
+                        "Interval": 10
+                    },
+                    "Component": {
+                        "Enable": false,
+                        "Interval": 10
+                    }
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_file",
+                    "FilePath": "./log/self_metrics.log"
+                }
+            ]
+        }
+    )";
+#endif
+    return pipeline;
 }
 
 } // namespace logtail

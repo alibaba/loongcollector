@@ -18,9 +18,6 @@
 
 namespace logtail {
 
-const std::string METRIC_KEY_LABEL = "label";
-const std::string METRIC_KEY_VALUE = "value";
-const std::string METRIC_KEY_CATEGORY = "category";
 const std::string MetricCategory::METRIC_CATEGORY_UNKNOWN = "unknown";
 const std::string MetricCategory::METRIC_CATEGORY_AGENT = "agent";
 const std::string MetricCategory::METRIC_CATEGORY_RUNNER = "runner";

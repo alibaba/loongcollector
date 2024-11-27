@@ -71,6 +71,7 @@ type MetricVector[T Metric] interface {
 type Metric interface {
 	// Export as a map[string]string
 	Export() map[string]string
+	Type() SelfMetricType
 }
 
 // CounterMetric has three implementations:
