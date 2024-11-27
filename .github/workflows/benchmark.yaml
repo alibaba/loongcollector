@@ -111,9 +111,8 @@ jobs:
           last_commit_message=$(git log -1 --pretty=%B)
           git -c user.name=github-action-benchmark -c user.email=github@users.noreply.github.com commit --amend -m "$last_commit_message"
       
-      # TODO: Push gh-pages branch by github-action-bot
-      # - name: Push benchmark result
-        # run: git push 'https://alibaba:${{ secrets.GITHUB_TOKEN }}@github.com/alibaba/ilogtail.git' gh-pages:gh-pages
+      - name: Push benchmark result
+        run: git push 'https://alibaba:${{ secrets.GITHUB_TOKEN }}@github.com/alibaba/ilogtail.git' gh-pages:gh-pages
 
   result:
     if: github.event.pull_request.merged == true
