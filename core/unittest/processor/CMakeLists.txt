@@ -54,12 +54,6 @@ target_link_libraries(processor_merge_multiline_log_native_unittest ${UT_BASE_TA
 add_executable(processor_parse_container_log_native_unittest ProcessorParseContainerLogNativeUnittest.cpp)
 target_link_libraries(processor_parse_container_log_native_unittest ${UT_BASE_TARGET})
 
-add_executable(parse_container_log_benchmark ParseContainerLogBenchmark.cpp)
-target_link_libraries(parse_container_log_benchmark ${UT_BASE_TARGET})
-
-add_executable(boost_regex_benchmark BoostRegexBenchmark.cpp)
-target_link_libraries(boost_regex_benchmark ${UT_BASE_TARGET})
-
 add_executable(processor_prom_parse_metric_native_unittest ProcessorPromParseMetricNativeUnittest.cpp)
 target_link_libraries(processor_prom_parse_metric_native_unittest unittest_base)
 
@@ -78,3 +72,9 @@ gtest_discover_tests(processor_desensitize_native_unittest)
 gtest_discover_tests(processor_merge_multiline_log_native_unittest)
 gtest_discover_tests(processor_parse_container_log_native_unittest)
 gtest_discover_tests(processor_prom_parse_metric_native_unittest)
+
+add_executable(boost_regex_benchmark BoostRegexBenchmark.cpp)
+target_link_libraries(boost_regex_benchmark ${UT_BASE_TARGET})
+
+add_executable(parse_container_log_benchmark ParseContainerLogBenchmark.cpp)
+target_link_libraries(parse_container_log_benchmark ${UT_BASE_TARGET})
