@@ -1072,7 +1072,7 @@ func (dc *DockerCenter) fetchAll() error {
 	}
 	dc.updateContainers(containerMap)
 
-	return err
+	return nil
 }
 
 func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
