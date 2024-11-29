@@ -20,8 +20,8 @@
 #include <string>
 
 #include "checkpoint/RangeCheckpoint.h"
-#include "constants/Constants.h"
 #include "common/memory/SourceBuffer.h"
+#include "constants/Constants.h"
 #include "models/PipelineEventPtr.h"
 
 namespace logtail {
@@ -57,6 +57,8 @@ enum class EventGroupMetaKey {
     PROMETHEUS_SAMPLES_SCRAPED,
     PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC,
     PROMETHEUS_UP_STATE,
+
+    COLLECT_TIME,
 
     SOURCE_ID
 };
