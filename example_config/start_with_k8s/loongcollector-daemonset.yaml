@@ -1,4 +1,4 @@
-# Copyright 2022 iLogtail Authors
+# Copyright 2022 loongcollector Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,23 +15,23 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: ilogtail-ds
-  namespace: ilogtail
+  name: loongcollector-ds
+  namespace: loongcollector
   labels:
-    k8s-app: logtail-ds
+    k8s-app: loongcollector-ds
 spec:
   selector:
     matchLabels:
-      k8s-app: logtail-ds
+      k8s-app: loongcollector-ds
   template:
     metadata:
       labels:
-        k8s-app: logtail-ds
+        k8s-app: loongcollector-ds
     spec:
       tolerations:
         - operator: Exists # deploy on all nodes
       containers:
-        - name: logtail
+        - name: loongcollector
           env:
             - name: ALIYUN_LOG_ENV_TAGS # add log tags from env
               value: _node_name_|_node_ip_
@@ -45,24 +45,24 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: status.hostIP
-            - name: cpu_usage_limit # iLogtail's self monitor cpu limit
+            - name: cpu_usage_limit # loongcollector's self monitor cpu limit
               value: "1"
-            - name: mem_usage_limit # iLogtail's self monitor mem limit
+            - name: mem_usage_limit # loongcollector's self monitor mem limit
               value: "512"
             - name: default_access_key_id # accesskey id if you want to flush to SLS
               valueFrom:
                 secretKeyRef:
-                  name: ilogtail-secret
+                  name: loongcollector-secret
                   key: access_key_id
                   optional: true
             - name: default_access_key # accesskey secret if you want to flush to SLS
               valueFrom:
                 secretKeyRef:
-                  name: ilogtail-secret
+                  name: loongcollector-secret
                   key: access_key
                   optional: true
           image: >-
-            sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/ilogtail:latest
+            sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:latest
           imagePullPolicy: IfNotPresent
           resources:
             limits:
@@ -78,16 +78,16 @@ spec:
               mountPropagation: HostToContainer
               name: root
               readOnly: true
-            - mountPath: /usr/local/ilogtail/checkpoint # for checkpoint between container restart
+            - mountPath: /usr/local/loongcollector/data # for checkpoint between container restart
               name: checkpoint
-            - mountPath: /usr/local/ilogtail/config/local # mount config dir
+            - mountPath: /usr/local/loongcollector/conf/continuous_pipeline_config/local # mount config dir
               name: user-config
               readOnly: true
           lifecycle:
             preStop:
               exec:
                 command:
-                  - /usr/local/ilogtail/ilogtail_control.sh
+                  - /usr/local/loongcollector/loongcollector_control.sh
                   - stop
                   - "3"
           livenessProbe:
@@ -112,10 +112,10 @@ spec:
             type: Directory
           name: root
         - hostPath:
-            path: /etc/ilogtail-ilogtail-ds/checkpoint
+            path: /etc/loongcollector-loongcollector-ds/checkpoint
             type: DirectoryOrCreate
           name: checkpoint
         - configMap:
             defaultMode: 420
-            name: ilogtail-user-cm
+            name: loongcollector-user-cm
           name: user-config
