@@ -5,6 +5,7 @@
 #include <iomanip>
 
 #include "common/StringTools.h"
+#include "http/HttpResponse.h"
 #include "models/StringView.h"
 
 using namespace std;
@@ -148,4 +149,26 @@ uint64_t GetRandSleepMilliSec(const std::string& key, uint64_t intervalSeconds, 
     randSleep -= sleepOffset;
     return randSleep;
 }
+
+namespace prom {
+
+    std::string NetworkCodeToString(NetworkCode code) {
+        static map<uint64_t, string> sNetworkCodeMap = {{NetworkCode::Ok, "OK"},
+                                                        {NetworkCode::ConnectionFailed, "ERR_CONN_FAILED"},
+                                                        {NetworkCode::RemoteAccessDenied, "ERR_ACCESS_DENIED"},
+                                                        {NetworkCode::TIMEOUT, "ERR_TIMEOUT"},
+                                                        {NetworkCode::SSLConnectError, "ERR_SSL_CONN_ERR"},
+                                                        {NetworkCode::SSLCertError, "ERR_SSL_CERT_ERR"},
+                                                        {NetworkCode::SSLOtherProblem, "ERR_SSL_OTHER_PROBLEM"},
+                                                        {NetworkCode::SendDataFailed, "ERR_SEND_DATA_FAILED"},
+                                                        {NetworkCode::RecvDataFailed, "ERR_RECV_DATA_FAILED"},
+                                                        {NetworkCode::Other, "ERR_UNKNOWN"}};
+        static string sCurlOther = "ERR_UNKNOWN";
+        if (sNetworkCodeMap.count(code)) {
+            return sNetworkCodeMap[code];
+        }
+        return sCurlOther;
+    }
+
+} // namespace prom
 } // namespace logtail
