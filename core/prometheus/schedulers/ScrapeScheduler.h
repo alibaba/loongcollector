@@ -25,7 +25,6 @@
 #include "monitor/MetricTypes.h"
 #include "pipeline/queue/QueueKey.h"
 #include "prometheus/PromSelfMonitor.h"
-#include "prometheus/Utils.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -34,28 +33,6 @@
 
 namespace logtail {
 
-size_t PromMetricWriteCallback(char* buffer, size_t size, size_t nmemb, void* data);
-
-struct PromMetricResponseBody {
-    PipelineEventGroup mEventGroup;
-    std::string mCache;
-    size_t mRawSize = 0;
-    EventPool* mEventPool = nullptr;
-
-    explicit PromMetricResponseBody(EventPool* eventPool)
-        : mEventGroup(std::make_shared<SourceBuffer>()), mEventPool(eventPool) {};
-    void AddEvent(char* line, size_t len) {
-        if (IsValidMetric(StringView(line, len))) {
-            auto* e = mEventGroup.AddRawEvent(true, mEventPool);
-            auto sb = mEventGroup.GetSourceBuffer()->CopyString(line, len);
-            e->SetContentNoCopy(sb);
-        }
-    }
-    void FlushCache() {
-        AddEvent(mCache.data(), mCache.size());
-        mCache.clear();
-    }
-};
 
 class ScrapeScheduler : public BaseScheduler {
 public:
@@ -65,10 +42,19 @@ public:
                     Labels labels,
                     QueueKey queueKey,
                     size_t inputIndex);
-    ScrapeScheduler(const ScrapeScheduler&) = default;
+    ScrapeScheduler(const ScrapeScheduler&) = delete;
     ~ScrapeScheduler() override = default;
 
     void OnMetricResult(HttpResponse&, uint64_t timestampMilliSec);
+    static size_t PromMetricWriteCallback(char* buffer, size_t size, size_t nmemb, void* data);
+    void AddEvent(const char* line, size_t len);
+    void FlushCache();
+    size_t mRawSize = 0;
+    size_t mCurrStreamSize = 0;
+    std::string mCache;
+    PipelineEventGroup mEventGroup;
+    uint64_t mStreamIndex = 0;
+    std::string mCurrTimestampMilliSec;
 
     std::string GetId() const;
 
@@ -78,9 +64,9 @@ public:
     void InitSelfMonitor(const MetricLabels&);
 
 private:
-    void PushEventGroup(PipelineEventGroup&&);
-    void SetAutoMetricMeta(PipelineEventGroup& eGroup);
-    void SetTargetLabels(PipelineEventGroup& eGroup);
+    void PushEventGroup(PipelineEventGroup&&) const;
+    void SetAutoMetricMeta(PipelineEventGroup& eGroup) const;
+    void SetTargetLabels(PipelineEventGroup& eGroup) const;
 
     std::unique_ptr<TimerEvent> BuildScrapeTimerEvent(std::chrono::steady_clock::time_point execTime);
 
@@ -92,11 +78,13 @@ private:
     std::string mInstance;
     Labels mTargetLabels;
 
+    // pipeline
     QueueKey mQueueKey;
     size_t mInputIndex;
 
     // auto metrics
     uint64_t mScrapeTimestampMilliSec = 0;
+    uint64_t mScrapeSamplesScraped = 0;
     double mScrapeDurationSeconds = 0;
     uint64_t mScrapeResponseSizeBytes = 0;
     bool mUpState = true;

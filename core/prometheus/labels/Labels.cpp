@@ -96,7 +96,7 @@ void Labels::Del(const string& k) {
 }
 
 
-void Labels::Range(const std::function<void(const string& k, const string& v)>& f) {
+void Labels::Range(const std::function<void(const string& k, const string& v)>& f) const {
     if (mMetricEventPtr) {
         for (auto l = mMetricEventPtr->TagsBegin(); l != mMetricEventPtr->TagsEnd(); l++) {
             f(l->first.to_string(), l->second.to_string());
