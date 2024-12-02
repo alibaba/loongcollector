@@ -245,17 +245,17 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                     long statusCode = 0;
                     curl_easy_getinfo(handler, CURLINFO_RESPONSE_CODE, &statusCode);
                     request->mResponse.SetStatusCode(statusCode);
-                    static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
-                    FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
-                    mOutSuccessfulItemsTotal->Add(1);
-                    mSuccessfulItemTotalResponseTimeMs->Add(responseTime);
-                    mSendingItemsTotal->Sub(1);
                     LOG_DEBUG(
                         sLogger,
                         ("send http request succeeded, item address", request->mItem)(
                             "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
                             "response time", ToString(responseTimeMs) + "ms")("try cnt", ToString(request->mTryCnt))(
                             "sending cnt", ToString(FlusherRunner::GetInstance()->GetSendingBufferCount())));
+                    static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
+                    FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
+                    mOutSuccessfulItemsTotal->Add(1);
+                    mSuccessfulItemTotalResponseTimeMs->Add(responseTime);
+                    mSendingItemsTotal->Sub(1);
                     break;
                 }
                 default:
@@ -277,9 +277,6 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                         ++runningHandlers;
                         requestReused = true;
                     } else {
-                        static_cast<HttpFlusher*>(request->mItem->mFlusher)
-                            ->OnSendDone(request->mResponse, request->mItem);
-                        FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
                         LOG_DEBUG(sLogger,
                                   ("failed to send http request", "abort")("item address", request->mItem)(
                                       "config-flusher-dst",
@@ -287,6 +284,9 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                                       "response time", ToString(responseTimeMs) + "ms")("try cnt",
                                                                                         ToString(request->mTryCnt))(
                                       "sending cnt", ToString(FlusherRunner::GetInstance()->GetSendingBufferCount())));
+                        static_cast<HttpFlusher*>(request->mItem->mFlusher)
+                            ->OnSendDone(request->mResponse, request->mItem);
+                        FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
                     }
                     mOutFailedItemsTotal->Add(1);
                     mFailedItemTotalResponseTimeMs->Add(responseTime);

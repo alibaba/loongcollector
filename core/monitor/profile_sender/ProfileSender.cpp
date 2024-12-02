@@ -26,7 +26,8 @@
 #include "EnterpriseProfileSender.h"
 #endif
 #include "sdk/Exception.h"
-#include "sls_control/SLSControl.h"
+#include "plugin/flusher/sls/SLSClientManager.h"
+#include "app_config/AppConfig.h"
 // TODO: temporarily used
 #include "common/compression/CompressorFactory.h"
 
@@ -165,8 +166,8 @@ void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
     }
     logtailStatus["__logs__"][0] = status;
     string logBody = logtailStatus.toStyledString();
-    sdk::Client client(endpoint, "", "", INT32_FLAG(sls_client_send_timeout), "", "");
-    SLSControl::GetInstance()->SetSlsSendClientCommonParam(&client);
+    sdk::Client client("", endpoint, INT32_FLAG(sls_client_send_timeout));
+    client.SetPort(AppConfig::GetInstance()->GetDataServerPort());
     try {
         string res;
         if (!CompressLz4(logBody, res)) {
