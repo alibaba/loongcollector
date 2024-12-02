@@ -16,7 +16,6 @@ package helper
 
 import (
 	"context"
-	"errors"
 	"hash/fnv"
 	"path"
 	"regexp"
@@ -458,7 +457,7 @@ type DockerCenter struct {
 	// For the CRI scenario, the container list only contains the real containers and excludes the sandbox containers. But the
 	// sandbox meta would be saved to its bound container.
 	containerMap                   map[string]*DockerInfoDetail // all containers will in this map
-	client                         *docker.Client
+	client                         DockerCenterClientInterface
 	lastErrMu                      sync.Mutex
 	lastErr                        error
 	lock                           sync.RWMutex
@@ -469,6 +468,39 @@ type DockerCenter struct {
 	imageLock                      sync.RWMutex
 	imageCache                     map[string]string
 	initStaticContainerInfoSuccess bool
+}
+
+type DockerCenterClientInterface interface {
+	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
+	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
+	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	Events(ctx context.Context, options types.EventsOptions) (<-chan events.Message, <-chan error)
+
+	ContainerProcessAlive(pid int) bool
+}
+
+type DockerClientWrapper struct {
+	client *docker.Client
+}
+
+func (r *DockerClientWrapper) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
+	return r.client.ContainerList(ctx, options)
+}
+
+func (r *DockerClientWrapper) ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error) {
+	return r.client.ImageInspectWithRaw(ctx, imageID)
+}
+
+func (r *DockerClientWrapper) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+	return r.client.ContainerInspect(ctx, containerID)
+}
+
+func (r *DockerClientWrapper) Events(ctx context.Context, options types.EventsOptions) (<-chan events.Message, <-chan error) {
+	return r.client.Events(ctx, options)
+}
+
+func (r *DockerClientWrapper) ContainerProcessAlive(pid int) bool {
+	return ContainerProcessAlive(pid)
 }
 
 func getIPByHosts(hostFileName, hostname string) string {
@@ -1023,9 +1055,10 @@ func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) 
 	dc.refreshLastUpdateMapTime()
 }
 
-func (dc *DockerCenter) inspectOneContainer(containerID string) (types.ContainerJSON, error) {
+func (dc *DockerCenter) inspectOneContainer(containerID string) (types.ContainerJSON, error, bool) {
 	var err error
 	var containerDetail types.ContainerJSON
+	isAlive := true
 	for idx := 0; idx < 3; idx++ {
 		if containerDetail, err = dc.client.ContainerInspect(context.Background(), containerID); err == nil {
 			break
@@ -1034,22 +1067,13 @@ func (dc *DockerCenter) inspectOneContainer(containerID string) (types.Container
 	}
 	if err != nil {
 		dc.setLastError(err, "inspect container error "+containerID)
-		return types.ContainerJSON{}, err
+		return types.ContainerJSON{}, err, false
 	}
-	if !ContainerProcessAlive(containerDetail.State.Pid) {
+	if !dc.client.ContainerProcessAlive(containerDetail.State.Pid) {
 		containerDetail.State.Status = ContainerStatusExited
-		finishedAt := containerDetail.State.FinishedAt
-		finishedAtTime, _ := time.Parse(time.RFC3339, finishedAt)
-		now := time.Now()
-		duration := now.Sub(finishedAtTime)
-		if duration >= ContainerInfoDeletedTimeout {
-			errMsg := "inspect time out container " + containerID
-			err = errors.New(errMsg)
-			dc.setLastError(err, errMsg)
-			return types.ContainerJSON{}, err
-		}
+		isAlive = false
 	}
-	return containerDetail, nil
+	return containerDetail, nil, isAlive
 }
 
 func (dc *DockerCenter) fetchAll() error {
@@ -1065,21 +1089,21 @@ func (dc *DockerCenter) fetchAll() error {
 
 	for _, container := range containers {
 		var containerDetail types.ContainerJSON
-		containerDetail, err = dc.inspectOneContainer(container.ID)
-		if err == nil {
+		var isAlive bool
+		containerDetail, err, isAlive = dc.inspectOneContainer(container.ID)
+		if err == nil && isAlive {
 			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
 		}
 	}
 	dc.updateContainers(containerMap)
-
 	return nil
 }
 
 func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
-	containerDetail, err := dc.inspectOneContainer(containerID)
-	if err != nil {
+	containerDetail, err, isAlive := dc.inspectOneContainer(containerID)
+	if err != nil || !isAlive {
 		return err
 	}
 	// docker 场景下
@@ -1093,7 +1117,7 @@ func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error 
 			if err != nil {
 				dc.setLastError(err, "inspect sandbox container error "+id)
 			} else {
-				if containerDetail.State.Status == ContainerStatusRunning && !ContainerProcessAlive(containerDetail.State.Pid) {
+				if containerDetail.State.Status == ContainerStatusRunning && !dc.client.ContainerProcessAlive(containerDetail.State.Pid) {
 					containerDetail.State.Status = ContainerStatusExited
 				}
 				dc.updateContainer(id, dc.CreateInfoDetail(containerDetail, envConfigPrefix, false))
