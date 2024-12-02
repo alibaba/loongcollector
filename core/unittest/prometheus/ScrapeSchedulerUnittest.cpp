@@ -220,7 +220,8 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     EventPool eventPool{true};
     event.SetComponent(timer, &eventPool);
     auto now = std::chrono::steady_clock::now();
-    event.SetFirstExecTime(now);
+    auto nowScrape = std::chrono::system_clock::now();
+    event.SetFirstExecTime(now, nowScrape);
     event.ScheduleNext();
 
     APSARA_TEST_TRUE(timer->mQueue.size() == 1);
