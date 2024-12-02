@@ -160,17 +160,11 @@ void PollingDirFile::PollingIteration() {
     }
     sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
 
-    size_t configTotal = nameConfigMap.size();
-    LogtailMonitor::GetInstance()->UpdateMetric("config_count", configTotal);
-    LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(configTotal);
+    LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(nameConfigMap.size());
     {
         ScopedSpinLock lock(mCacheLock);
-        size_t pollingDirCacheSize = mDirCacheMap.size();
-        LogtailMonitor::GetInstance()->UpdateMetric("polling_dir_cache", pollingDirCacheSize);
-        mPollingDirCacheSize->Set(pollingDirCacheSize);
-        size_t pollingFileCacheSize = mFileCacheMap.size();
-        LogtailMonitor::GetInstance()->UpdateMetric("polling_file_cache", pollingFileCacheSize);
-        mPollingFileCacheSize->Set(pollingFileCacheSize);
+        mPollingDirCacheSize->Set(mDirCacheMap.size());
+        mPollingFileCacheSize->Set(mFileCacheMap.size());
     }
 
     // Iterate all normal configs, make sure stat count will not exceed limit.

@@ -133,7 +133,6 @@ void Application::Init() {
     const string& configIP = AppConfig::GetInstance()->GetConfigIP();
     if (!configIP.empty()) {
         LoongCollectorMonitor::mIpAddr = configIP;
-        LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_ip", GetHostIp());
     } else if (!interface.empty()) {
         LoongCollectorMonitor::mIpAddr = GetHostIp(interface);
         if (LoongCollectorMonitor::mIpAddr.empty()) {
@@ -151,7 +150,6 @@ void Application::Init() {
     const string& configHostName = AppConfig::GetInstance()->GetConfigHostName();
     if (!configHostName.empty()) {
         LoongCollectorMonitor::mHostname = configHostName;
-        LogtailMonitor::GetInstance()->UpdateConstMetric("logtail_hostname", GetHostName());
     }
 
     GenerateInstanceId();
@@ -198,7 +196,6 @@ void Application::Init() {
 
 void Application::Start() { // GCOVR_EXCL_START
     LoongCollectorMonitor::mStartTime = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
-    LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", LoongCollectorMonitor::mStartTime);
 
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
     InitWindowsSignalObject();

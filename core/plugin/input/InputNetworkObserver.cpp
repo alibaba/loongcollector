@@ -18,7 +18,7 @@
 #include "ebpf/eBPFServer.h"
 #include "ebpf/config.h"
 #include "logger/Logger.h"
-#include "monitor/PluginMetricManager.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 using namespace std;
 

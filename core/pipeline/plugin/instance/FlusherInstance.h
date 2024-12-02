@@ -21,7 +21,7 @@
 #include <memory>
 
 #include "models/PipelineEventGroup.h"
-#include "monitor/PluginMetricManager.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/plugin/instance/PluginInstance.h"
 #include "pipeline/plugin/interface/Flusher.h"

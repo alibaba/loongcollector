@@ -17,7 +17,7 @@
 #include <mutex>
 
 #include "pipeline/PipelineContext.h"
-#include "monitor/MetricTypes.h"
+#include "monitor/metric_models/MetricTypes.h"
 #include "monitor/MetricManager.h"
 
 namespace logtail{

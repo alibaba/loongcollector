@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "monitor/PluginMetricManager.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "unittest/Unittest.h"
 

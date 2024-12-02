@@ -349,21 +349,10 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
 }
 
 void LogInput::UpdateCriticalMetric(int32_t curTime) {
-    LogtailMonitor::GetInstance()->UpdateMetric("last_read_event_time",
-                                                GetTimeStamp(mLastReadEventTime, "%Y-%m-%d %H:%M:%S"));
     mLastRunTime->Set(mLastReadEventTime.load());
-
-    LogtailMonitor::GetInstance()->UpdateMetric("event_tps",
-                                                1.0 * mEventProcessCount / (curTime - mLastUpdateMetricTime));
-    int32_t openFdTotal = GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize();
-    LogtailMonitor::GetInstance()->UpdateMetric("open_fd", openFdTotal);
-    LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(openFdTotal);
-    size_t handlerCount = EventDispatcher::GetInstance()->GetHandlerCount();
-    LogtailMonitor::GetInstance()->UpdateMetric("register_handler", handlerCount);
-    mRegisterdHandlersTotal->Set(handlerCount);
-    LogtailMonitor::GetInstance()->UpdateMetric("reader_count", CheckPointManager::Instance()->GetReaderCount());
+    LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
+    mRegisterdHandlersTotal->Set(EventDispatcher::GetInstance()->GetHandlerCount());
     mActiveReadersTotal->Set(CheckPointManager::Instance()->GetReaderCount());
-    LogtailMonitor::GetInstance()->UpdateMetric("multi_config", AppConfig::GetInstance()->IsAcceptMultiConfig());
     mEventProcessCount = 0;
 }
 

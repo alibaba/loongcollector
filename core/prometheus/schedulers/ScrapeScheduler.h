@@ -22,7 +22,7 @@
 #include "BaseScheduler.h"
 #include "common/http/HttpResponse.h"
 #include "models/PipelineEventGroup.h"
-#include "monitor/MetricTypes.h"
+#include "monitor/metric_models/MetricTypes.h"
 #include "pipeline/queue/QueueKey.h"
 #include "prometheus/PromSelfMonitor.h"
 #include "prometheus/Utils.h"

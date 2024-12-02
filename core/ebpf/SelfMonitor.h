@@ -19,9 +19,9 @@
 #include <atomic>
 
 #include "ebpf/include/export.h"
-#include "monitor/PluginMetricManager.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "common/Lock.h"
-#include "monitor/MetricTypes.h"
+#include "monitor/metric_models/MetricTypes.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
