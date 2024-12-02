@@ -18,9 +18,11 @@
 
 #include "common/FileSystemUtil.h"
 #include "config/ConfigUtil.h"
+#include "config/internal_provider/InternalConfigProvider.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
+#include "provider/Provider.h"
 #include "task_pipeline/TaskPipelineManager.h"
 
 using namespace std;
@@ -86,78 +88,77 @@ pair<PipelineConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff(
 void PipelineConfigWatcher::InsertInnerPipelines(PipelineConfigDiff& pDiff,
                                                  TaskConfigDiff& tDiff,
                                                  unordered_set<string>& configSet) {
-    std::map<std::string, std::string> innerPipelines;
-    // self-monitor metric
-    innerPipelines[LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName()]
-        = LoongCollectorMonitor::GetInnerSelfMonitorMetricPipeline();
+    const std::map<std::string, std::string>& innerPipelines
+        = InternalConfigProvider::GetInstance()->GetAllInernalPipelineConfigs();
 
     // process
     for (const auto& pipeline : innerPipelines) {
-        if (configSet.find(pipeline.first) != configSet.end()) {
+        const string pipelineName = pipeline.first, pipleineDetail = pipeline.second;
+        if (configSet.find(pipelineName) != configSet.end()) {
             LOG_WARNING(sLogger,
                         ("more than 1 config with the same name is found", "skip current config")("inner pipeline",
-                                                                                                  pipeline.first));
+                                                                                                  pipelineName));
             continue;
         }
-        configSet.insert(pipeline.first);
+        configSet.insert(pipelineName);
 
         string errorMsg;
-        auto iter = mInnerConfigMap.find(pipeline.first);
+        auto iter = mInnerConfigMap.find(pipelineName);
         if (iter == mInnerConfigMap.end()) {
-            mInnerConfigMap[pipeline.first] = pipeline.second;
+            mInnerConfigMap[pipelineName] = pipleineDetail;
             unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-            if (!ParseConfigDetail(pipeline.second, ".json", *detail, errorMsg)) {
+            if (!ParseConfigDetail(pipleineDetail, ".json", *detail, errorMsg)) {
                 LOG_WARNING(sLogger,
                             ("config format error", "skip current object")("error msg", errorMsg)("inner pipeline",
-                                                                                                  pipeline.first));
+                                                                                                  pipelineName));
                 continue;
             }
-            if (!IsConfigEnabled(pipeline.first, *detail)) {
-                LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", pipeline.first));
+            if (!IsConfigEnabled(pipelineName, *detail)) {
+                LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", pipelineName));
                 continue;
             }
-            if (!CheckAddedConfig(pipeline.first, std::move(detail), pDiff, tDiff)) {
+            if (!CheckAddedConfig(pipelineName, std::move(detail), pDiff, tDiff)) {
                 continue;
             }
-        } else if (pipeline.second != iter->second) {
-            mInnerConfigMap[pipeline.first] = pipeline.second;
+        } else if (pipleineDetail != iter->second) {
+            mInnerConfigMap[pipelineName] = pipleineDetail;
             unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-            if (!ParseConfigDetail(pipeline.second, ".json", *detail, errorMsg)) {
+            if (!ParseConfigDetail(pipleineDetail, ".json", *detail, errorMsg)) {
                 LOG_WARNING(sLogger,
                             ("config format error", "skip current object")("error msg", errorMsg)("inner pipeline",
-                                                                                                  pipeline.first));
+                                                                                                  pipelineName));
                 continue;
             }
-            if (!IsConfigEnabled(pipeline.first, *detail)) {
+            if (!IsConfigEnabled(pipelineName, *detail)) {
                 switch (GetConfigType(*detail)) {
                     case ConfigType::Pipeline:
-                        if (mPipelineManager->FindConfigByName(pipeline.first)) {
-                            pDiff.mRemoved.push_back(pipeline.first);
+                        if (mPipelineManager->FindConfigByName(pipelineName)) {
+                            pDiff.mRemoved.push_back(pipelineName);
                             LOG_INFO(sLogger,
                                      ("existing valid config modified and disabled",
-                                      "prepare to stop current running pipeline")("config", pipeline.first));
+                                      "prepare to stop current running pipeline")("config", pipelineName));
                         } else {
                             LOG_INFO(sLogger,
                                      ("existing invalid config modified and disabled",
-                                      "skip current object")("config", pipeline.first));
+                                      "skip current object")("config", pipelineName));
                         }
                         break;
                     case ConfigType::Task:
-                        if (mTaskPipelineManager->FindPipelineByName(pipeline.first)) {
-                            tDiff.mRemoved.push_back(pipeline.first);
+                        if (mTaskPipelineManager->FindPipelineByName(pipelineName)) {
+                            tDiff.mRemoved.push_back(pipelineName);
                             LOG_INFO(sLogger,
                                      ("existing valid config modified and disabled",
-                                      "prepare to stop current running task")("config", pipeline.first));
+                                      "prepare to stop current running task")("config", pipelineName));
                         } else {
                             LOG_INFO(sLogger,
                                      ("existing invalid config modified and disabled",
-                                      "skip current object")("config", pipeline.first));
+                                      "skip current object")("config", pipelineName));
                         }
                         break;
                 }
                 continue;
             }
-            if (!CheckModifiedConfig(pipeline.first, std::move(detail), pDiff, tDiff)) {
+            if (!CheckModifiedConfig(pipelineName, std::move(detail), pDiff, tDiff)) {
                 continue;
             }
         } else {

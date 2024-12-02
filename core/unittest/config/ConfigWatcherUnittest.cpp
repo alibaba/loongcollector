@@ -16,6 +16,7 @@
 #include <fstream>
 
 #include "config/ConfigDiff.h"
+#include "config/internal_provider/InternalConfigProvider.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "pipeline/plugin/PluginRegistry.h"
@@ -50,7 +51,8 @@ const filesystem::path ConfigWatcherUnittest::instanceConfigDir = "./instance_co
 void ConfigWatcherUnittest::InvalidConfigDirFound() const {
     {
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL(1U, diff.first.mAdded.size());
+        auto innerPipelinesCnt = InternalConfigProvider::GetInstance()->GetAllInernalPipelineConfigs().size();
+        APSARA_TEST_EQUAL(innerPipelinesCnt, diff.first.mAdded.size());
         APSARA_TEST_TRUE(diff.second.IsEmpty());
 
         { ofstream fout("continuous_pipeline_config"); }
@@ -82,7 +84,8 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
             fout << "[}";
         }
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL(1U, diff.first.mAdded.size());
+        auto innerPipelinesCnt = InternalConfigProvider::GetInstance()->GetAllInernalPipelineConfigs().size();
+        APSARA_TEST_EQUAL(innerPipelinesCnt, diff.first.mAdded.size());
         APSARA_TEST_TRUE(diff.second.IsEmpty());
         filesystem::remove_all(configDir);
     }
@@ -131,8 +134,9 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         }
         { ofstream fout("dir2/config.json"); }
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+        auto innerPipelinesCnt = InternalConfigProvider::GetInstance()->GetAllInernalPipelineConfigs().size();
         APSARA_TEST_FALSE(diff.first.IsEmpty());
-        APSARA_TEST_EQUAL(2U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL(1U + innerPipelinesCnt, diff.first.mAdded.size());
 
         filesystem::remove_all("dir1");
         filesystem::remove_all("dir2");

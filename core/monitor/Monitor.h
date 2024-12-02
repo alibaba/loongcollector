@@ -192,11 +192,6 @@ public:
     void Init();
     void Stop();
 
-    static const std::string GetInnerSelfMonitorAlarmPipelineName() { return ""; }
-    static const std::string GetInnerSelfMonitorAlarmPipeline() { return ""; }
-    static const std::string GetInnerSelfMonitorMetricPipelineName() { return "inner-self-monitor-metric-pipeline"; }
-    static const std::string GetInnerSelfMonitorMetricPipeline();
-
     void SetAgentCpu(double cpu) { mAgentCpu->Set(cpu); }
     void SetAgentMemory(uint64_t mem) { mAgentMemory->Set(mem); }
     void SetAgentGoMemory(uint64_t mem) { mAgentGoMemory->Set(mem); }
