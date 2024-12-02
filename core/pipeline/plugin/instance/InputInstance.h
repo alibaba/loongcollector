@@ -28,14 +28,12 @@ namespace logtail {
 
 class InputInstance : public PluginInstance {
 public:
-    InputInstance(Input* plugin, const PluginInstance::PluginMeta& pluginMeta) : PluginInstance(pluginMeta), mPlugin(plugin) {}
+    InputInstance(Input* plugin, const PluginInstance::PluginMeta& pluginMeta)
+        : PluginInstance(pluginMeta), mPlugin(plugin) {}
 
     const std::string& Name() const override { return mPlugin->Name(); }
 
-    bool Init(const Json::Value& config,
-              PipelineContext& context,
-              size_t inputIdx,
-              Json::Value& optionalGoPipeline);
+    bool Init(const Json::Value& config, PipelineContext& context, size_t inputIdx, Json::Value& optionalGoPipeline);
     bool Start() { return mPlugin->Start(); }
     bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
     bool SupportAck() const { return mPlugin->SupportAck(); }

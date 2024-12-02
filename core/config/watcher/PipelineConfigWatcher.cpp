@@ -17,10 +17,12 @@
 #include <memory>
 
 #include "common/FileSystemUtil.h"
+#include "common/ParamExtractor.h"
 #include "config/ConfigUtil.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
+#include "pipeline/plugin/PluginRegistry.h"
 #include "task_pipeline/TaskPipelineManager.h"
 
 using namespace std;
@@ -79,7 +81,6 @@ pair<PipelineConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff(
     } else {
         LOG_DEBUG(sLogger, ("config files scan done", "no task update"));
     }
-
     return make_pair(std::move(pDiff), std::move(tDiff));
 }
 
@@ -169,6 +170,8 @@ void PipelineConfigWatcher::InsertInnerPipelines(PipelineConfigDiff& pDiff,
 void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
                                             TaskConfigDiff& tDiff,
                                             std::unordered_set<std::string>& configSet) {
+    std::unordered_map<std::string, std::pair<filesystem::path, unique_ptr<Json::Value>>> toBeDiffedConfigs;
+    std::unordered_map<std::string, ConfigPriority> singletonConfigs;
     for (const auto& dir : mSourceDir) {
         error_code ec;
         filesystem::file_status s = filesystem::status(dir, ec);
@@ -211,64 +214,66 @@ void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
             }
             configSet.insert(configName);
 
-            auto iter = mFileInfoMap.find(filepath);
-            uintmax_t size = filesystem::file_size(path, ec);
-            filesystem::file_time_type mTime = filesystem::last_write_time(path, ec);
-            if (iter == mFileInfoMap.end()) {
-                mFileInfoMap[filepath] = make_pair(size, mTime);
-                unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-                if (!LoadConfigDetailFromFile(path, *detail)) {
-                    continue;
-                }
-                if (!IsConfigEnabled(configName, *detail)) {
-                    LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", configName));
-                    continue;
-                }
-                if (!CheckAddedConfig(configName, std::move(detail), pDiff, tDiff)) {
-                    continue;
-                }
-            } else if (iter->second.first != size || iter->second.second != mTime) {
-                // for config currently running, we leave it untouched if new config is invalid
-                mFileInfoMap[filepath] = make_pair(size, mTime);
-                unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-                if (!LoadConfigDetailFromFile(path, *detail)) {
-                    continue;
-                }
-                if (!IsConfigEnabled(configName, *detail)) {
-                    switch (GetConfigType(*detail)) {
-                        case ConfigType::Pipeline:
-                            if (mPipelineManager->FindConfigByName(configName)) {
-                                pDiff.mRemoved.push_back(configName);
-                                LOG_INFO(sLogger,
-                                         ("existing valid config modified and disabled",
-                                          "prepare to stop current running pipeline")("config", configName));
-                            } else {
-                                LOG_INFO(sLogger,
-                                         ("existing invalid config modified and disabled",
-                                          "skip current object")("config", configName));
-                            }
-                            break;
-                        case ConfigType::Task:
-                            if (mTaskPipelineManager->FindPipelineByName(configName)) {
-                                tDiff.mRemoved.push_back(configName);
-                                LOG_INFO(sLogger,
-                                         ("existing valid config modified and disabled",
-                                          "prepare to stop current running task")("config", configName));
-                            } else {
-                                LOG_INFO(sLogger,
-                                         ("existing invalid config modified and disabled",
-                                          "skip current object")("config", configName));
-                            }
-                            break;
-                    }
-                    continue;
-                }
-                if (!CheckModifiedConfig(configName, std::move(detail), pDiff, tDiff)) {
-                    continue;
-                }
-            } else {
-                LOG_DEBUG(sLogger, ("existing config file unchanged", "skip current object"));
+            unique_ptr<Json::Value> detail = make_unique<Json::Value>();
+            if (!LoadConfigDetailFromFile(path, *detail)) {
+                continue;
             }
+            PreCheckConfig(configName, path, std::move(detail), toBeDiffedConfigs, singletonConfigs);
+        }
+    }
+
+    for (auto& config : toBeDiffedConfigs) {
+        error_code ec;
+        const filesystem::path& path = config.second.first;
+        const string& configName = path.stem().string();
+        const string& filepath = path.string();
+
+        auto iter = mFileInfoMap.find(filepath);
+        uintmax_t size = filesystem::file_size(path, ec);
+        filesystem::file_time_type mTime = filesystem::last_write_time(path, ec);
+        unique_ptr<Json::Value> detail = std::move(config.second.second);
+        if (iter == mFileInfoMap.end()) {
+            mFileInfoMap[filepath] = make_pair(size, mTime);
+            if (!CheckAddedConfig(configName, std::move(detail), pDiff, tDiff)) {
+                continue;
+            }
+        } else if (iter->second.first != size || iter->second.second != mTime) {
+            // for config currently running, we leave it untouched if new config is invalid
+            mFileInfoMap[filepath] = make_pair(size, mTime);
+            if (!IsConfigEnabled(configName, *detail)) {
+                switch (GetConfigType(*detail)) {
+                    case ConfigType::Pipeline:
+                        if (mPipelineManager->FindConfigByName(configName)) {
+                            pDiff.mRemoved.push_back(configName);
+                            LOG_INFO(sLogger,
+                                     ("existing valid config modified and disabled",
+                                      "prepare to stop current running pipeline")("config", configName));
+                        } else {
+                            LOG_INFO(sLogger,
+                                     ("existing invalid config modified and disabled",
+                                      "skip current object")("config", configName));
+                        }
+                        break;
+                    case ConfigType::Task:
+                        if (mTaskPipelineManager->FindPipelineByName(configName)) {
+                            tDiff.mRemoved.push_back(configName);
+                            LOG_INFO(sLogger,
+                                     ("existing valid config modified and disabled",
+                                      "prepare to stop current running task")("config", configName));
+                        } else {
+                            LOG_INFO(sLogger,
+                                     ("existing invalid config modified and disabled",
+                                      "skip current object")("config", configName));
+                        }
+                        break;
+                }
+                continue;
+            }
+            if (!CheckModifiedConfig(configName, std::move(detail), pDiff, tDiff)) {
+                continue;
+            }
+        } else {
+            LOG_DEBUG(sLogger, ("existing config file unchanged", "skip current object"));
         }
     }
 }
@@ -404,5 +409,51 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
     }
     return true;
 }
+
+bool PipelineConfigWatcher::PreCheckConfig(const string& configName,
+                                           const filesystem::path& path,
+                                           unique_ptr<Json::Value>&& configDetail,
+                                           std::unordered_map<std::string, ConfigWithPath>& toBeDiffedConfigs,
+                                           std::unordered_map<std::string, ConfigPriority>& singletonConfigs) {
+    // check enabled
+    if (!IsConfigEnabled(configName, *configDetail)) {
+        LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", configName));
+        return false;
+    }
+
+    // check singleton input, and only check this, others will be checked in Parse()
+    std::string errorMsg;
+    uint32_t createTime = 0;
+    if (!GetOptionalUIntParam(*configDetail, "createTime", createTime, errorMsg)) {
+        createTime = 0;
+    }
+
+    std::vector<std::string> inputTypes;
+    GetAllInputTypes(*configDetail, inputTypes);
+    for (const auto& inputType : inputTypes) {
+        if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(inputType)) {
+            auto it = singletonConfigs.find(inputType);
+            if (it != singletonConfigs.end()) {
+                if (it->second.first < createTime
+                    || (it->second.first == createTime && it->second.second < configName)) {
+                    LOG_WARNING(sLogger,
+                                ("global singleton plugin found, but another older config or smaller name config "
+                                 "already exists",
+                                 "skip current object")("config", configName));
+                    return false;
+                }
+                toBeDiffedConfigs.erase(it->second.second);
+            }
+        }
+    }
+    for (const auto& inputType : inputTypes) {
+        if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(inputType)) {
+            singletonConfigs[inputType] = make_pair(createTime, configName);
+        }
+    }
+    toBeDiffedConfigs[configName] = make_pair(path, std::move(configDetail));
+    return true;
+}
+
 
 } // namespace logtail

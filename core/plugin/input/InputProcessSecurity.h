@@ -19,8 +19,8 @@
 #include <string>
 
 #include "ebpf/config.h"
-#include "pipeline/plugin/interface/Input.h"
 #include "monitor/PluginMetricManager.h"
+#include "pipeline/plugin/interface/Input.h"
 
 namespace logtail {
 

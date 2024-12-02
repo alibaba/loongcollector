@@ -19,9 +19,9 @@
 #include <string>
 
 #include "ebpf/config.h"
-#include "pipeline/plugin/interface/Input.h"
 #include "ebpf/eBPFServer.h"
 #include "monitor/PluginMetricManager.h"
+#include "pipeline/plugin/interface/Input.h"
 
 namespace logtail {
 
@@ -34,7 +34,7 @@ public:
     bool Start() override;
     bool Stop(bool isPipelineRemoving) override;
     bool SupportAck() const override { return false; }
-    
+
     ebpf::SecurityOptions mSecurityOptions;
     PluginMetricManagerPtr mPluginMgr;
 };

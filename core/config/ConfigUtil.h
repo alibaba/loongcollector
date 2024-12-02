@@ -31,6 +31,7 @@ bool ParseConfigDetail(const std::string& content,
                        Json::Value& detail,
                        std::string& errorMsg);
 bool IsConfigEnabled(const std::string& name, const Json::Value& detail);
+void GetAllInputTypes(const Json::Value& detail, std::vector<std::string>& inputTypes);
 ConfigType GetConfigType(const Json::Value& detail);
 
 } // namespace logtail

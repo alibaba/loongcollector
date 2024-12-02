@@ -436,11 +436,13 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
         PipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
         APSARA_TEST_TRUE(!pipelineConfigDiff.first.IsEmpty());
         APSARA_TEST_EQUAL(2U, pipelineConfigDiff.first.mAdded.size());
-        APSARA_TEST_EQUAL(pipelineConfigDiff.first.mAdded[0].mName, LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName());
+        APSARA_TEST_EQUAL(pipelineConfigDiff.first.mAdded[0].mName,
+                          LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName());
         APSARA_TEST_EQUAL(pipelineConfigDiff.first.mAdded[1].mName, "config1");
         APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames().size(), 2);
         APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames()[0], "config1");
-        APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames()[1], LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName());
+        APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames()[1],
+                          LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName());
         // 再次处理 pipelineconfig
         pipelineConfigDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
@@ -448,7 +450,8 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
         APSARA_TEST_TRUE(pipelineConfigDiff.first.mAdded.empty());
         APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames().size(), 2);
         APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames()[0], "config1");
-        APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames()[1], LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName());
+        APSARA_TEST_EQUAL(PipelineManager::GetInstance()->GetAllConfigNames()[1],
+                          LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName());
 
 
         APSARA_TEST_EQUAL(provider.mInstanceConfigInfoMap.size(), 2);

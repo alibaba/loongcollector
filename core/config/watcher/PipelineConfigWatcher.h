@@ -16,12 +16,18 @@
 
 #pragma once
 
+#include <filesystem>
+#include <memory>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "config/ConfigDiff.h"
 #include "config/watcher/ConfigWatcher.h"
 
 namespace logtail {
+
+using ConfigWithPath = std::pair<std::filesystem::path, std::unique_ptr<Json::Value>>;
+using ConfigPriority = std::pair<uint32_t, std::string>;
 
 class PipelineManager;
 class TaskPipelineManager;
@@ -46,7 +52,8 @@ private:
     PipelineConfigWatcher();
     ~PipelineConfigWatcher() = default;
 
-    void InsertInnerPipelines(PipelineConfigDiff& pDiff, TaskConfigDiff& tDiff, std::unordered_set<std::string>& configSet);
+    void
+    InsertInnerPipelines(PipelineConfigDiff& pDiff, TaskConfigDiff& tDiff, std::unordered_set<std::string>& configSet);
     void InsertPipelines(PipelineConfigDiff& pDiff, TaskConfigDiff& tDiff, std::unordered_set<std::string>& configSet);
     bool CheckAddedConfig(const std::string& configName,
                           std::unique_ptr<Json::Value>&& configDetail,
@@ -56,9 +63,18 @@ private:
                              std::unique_ptr<Json::Value>&& configDetail,
                              PipelineConfigDiff& pDiff,
                              TaskConfigDiff& tDiff);
+    bool PreCheckConfig(const std::string& configName,
+                        const std::filesystem::path& path,
+                        std::unique_ptr<Json::Value>&& configDetail,
+                        std::unordered_map<std::string, ConfigWithPath>& toBeDiffedConfigs,
+                        std::unordered_map<std::string, ConfigPriority>& singletonConfigs);
 
     const PipelineManager* mPipelineManager = nullptr;
     const TaskPipelineManager* mTaskPipelineManager = nullptr;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class PipelineConfigWatcherUnittest;
+#endif
 };
 
 } // namespace logtail

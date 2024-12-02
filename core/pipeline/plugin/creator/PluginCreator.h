@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
 
 #include "pipeline/plugin/instance/PluginInstance.h"
 

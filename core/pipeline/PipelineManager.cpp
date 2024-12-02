@@ -29,8 +29,7 @@
 #include "shennong/ShennongManager.h"
 #endif
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
-#include "pipeline/queue/ProcessQueueManager.h"
-#include "pipeline/queue/QueueKeyManager.h"
+#include "plugin/PluginRegistry.h"
 
 using namespace std;
 
@@ -40,7 +39,7 @@ PipelineManager::PipelineManager()
     : mInputRunners({
           PrometheusInputRunner::GetInstance(),
 #if defined(__linux__) && !defined(__ANDROID__)
-              ebpf::eBPFServer::GetInstance(),
+          ebpf::eBPFServer::GetInstance(),
 #endif
       }) {
 }
