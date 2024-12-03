@@ -191,21 +191,24 @@ func SplitRegexFromMap(input map[string]string) (staticResult map[string]string,
 	return staticResult, regexResult, nil
 }
 
-func CreateDockerClient(opt ...docker.Opt) (client *docker.Client, err error) {
+func CreateDockerClient(opt ...docker.Opt) (*DockerClientWrapper, error) {
 	opt = append(opt, docker.FromEnv)
-	client, err = docker.NewClientWithOpts(opt...)
+	rawClient, err := docker.NewClientWithOpts(opt...)
 	if err != nil {
 		return nil, err
 	}
 	// add dockerClient connectivity tests
 	pingCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	ping, err := client.Ping(pingCtx)
+	ping, err := rawClient.Ping(pingCtx)
 	if err != nil {
 		return nil, err
 	}
-	client.NegotiateAPIVersionPing(ping)
-	return
+	rawClient.NegotiateAPIVersionPing(ping)
+
+	return &DockerClientWrapper{
+		client: rawClient,
+	}, nil
 }
 
 func RegisterDockerEventListener(c chan events.Message) {
