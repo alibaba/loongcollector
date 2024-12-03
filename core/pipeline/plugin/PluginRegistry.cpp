@@ -30,7 +30,9 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputPrometheus.h"
+#include "plugin/processor/inner/ProcessorHostMetaNative.h"
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputInternalMetrics.h"
@@ -134,6 +136,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>());
     RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>());
     RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>());
+    RegisterInputCreator(new StaticInputCreator<InputHostMeta>());
 #endif
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
@@ -151,6 +154,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorFilterNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorHostMetaNative>());
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
     if (BOOL_FLAG(enable_processor_spl)) {
         RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSPL>());

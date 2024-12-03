@@ -124,6 +124,7 @@ set(SUB_DIRECTORIES_LIST
         prometheus prometheus/labels prometheus/schedulers prometheus/async
         ebpf ebpf/observer ebpf/security ebpf/handler
         parser sls_control sdk
+        host_monitor host_monitor/collector
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)

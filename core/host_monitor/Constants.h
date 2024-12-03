@@ -16,23 +16,16 @@
 
 #pragma once
 
-#include <chrono>
+#include <filesystem>
 
 namespace logtail {
 
-class TimerEvent {
-public:
-    TimerEvent(std::chrono::steady_clock::time_point execTime) : mExecTime(execTime) {}
-    virtual ~TimerEvent() = default;
+#ifndef APSARA_UNIT_TEST_MAIN
+extern const std::filesystem::path PROCESS_DIR;
+#else
+extern std::filesystem::path PROCESS_DIR;
+#endif
 
-    virtual bool IsValid() const = 0;
-    virtual bool Execute() = 0;
-
-    std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
-    void SetExecTime(std::chrono::steady_clock::time_point nextExecTime) { mExecTime = nextExecTime; }
-
-private:
-    std::chrono::steady_clock::time_point mExecTime;
-};
+const extern std::filesystem::path PROCESS_STAT;
 
 } // namespace logtail

@@ -23,6 +23,9 @@ namespace logtail {
 void Timer::Init() {
     {
         lock_guard<mutex> lock(mThreadRunningMux);
+        if (mIsThreadRunning) {
+            return;
+        }
         mIsThreadRunning = true;
     }
     mThreadRes = async(launch::async, &Timer::Run, this);
@@ -31,6 +34,9 @@ void Timer::Init() {
 void Timer::Stop() {
     {
         lock_guard<mutex> lock(mThreadRunningMux);
+        if (!mIsThreadRunning) {
+            return;
+        }
         mIsThreadRunning = false;
     }
     mCV.notify_one();

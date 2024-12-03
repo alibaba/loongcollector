@@ -14,25 +14,22 @@
  * limitations under the License.
  */
 
-#pragma once
+#include "HostMonitorTimerEvent.h"
 
-#include <chrono>
+#include <utility>
+
+#include "HostMonitorInputRunner.h"
 
 namespace logtail {
 
-class TimerEvent {
-public:
-    TimerEvent(std::chrono::steady_clock::time_point execTime) : mExecTime(execTime) {}
-    virtual ~TimerEvent() = default;
+bool HostMonitorTimerEvent::IsValid() const {
+    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(mCollectConfig->mConfigName,
+                                                                     mCollectConfig->mCollectorName);
+}
 
-    virtual bool IsValid() const = 0;
-    virtual bool Execute() = 0;
-
-    std::chrono::steady_clock::time_point GetExecTime() const { return mExecTime; }
-    void SetExecTime(std::chrono::steady_clock::time_point nextExecTime) { mExecTime = nextExecTime; }
-
-private:
-    std::chrono::steady_clock::time_point mExecTime;
-};
+bool HostMonitorTimerEvent::Execute() {
+    HostMonitorInputRunner::GetInstance()->ScheduleOnce(std::move(mCollectConfig));
+    return true;
+}
 
 } // namespace logtail

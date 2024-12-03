@@ -16,6 +16,7 @@
 
 #include "pipeline/PipelineManager.h"
 
+#include "HostMonitorInputRunner.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
@@ -40,7 +41,8 @@ PipelineManager::PipelineManager()
     : mInputRunners({
           PrometheusInputRunner::GetInstance(),
 #if defined(__linux__) && !defined(__ANDROID__)
-              ebpf::eBPFServer::GetInstance(),
+          ebpf::eBPFServer::GetInstance(),
+          HostMonitorInputRunner::GetInstance(),
 #endif
       }) {
 }
@@ -197,6 +199,7 @@ void PipelineManager::StopAllPipelines() {
 
     LogtailPlugin::GetInstance()->StopAllPipelines(true);
 
+    Timer::GetInstance()->Stop();
     ProcessorRunner::GetInstance()->Stop();
 
     FlushAllBatch();

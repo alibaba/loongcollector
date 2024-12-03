@@ -141,6 +141,50 @@ bool ReadFileContent(const std::string& fileName, std::string& content, uint32_t
     return true;
 }
 
+int GetLines(std::istream& is,
+             bool enableEmptyLine,
+             const std::function<void(const std::string&)>& pushBack,
+             std::string* errorMessage) {
+    std::string line;
+    // 此处必须判断eof，具体原因参见:
+    // https://stackoverflow.com/questions/40561482/getline-throws-basic-iosclear-exception-after-reading-the-last-line
+    while (!is.eof() && std::getline(is, line)) {
+        if (enableEmptyLine || !line.empty()) {
+            pushBack(line);
+        }
+    }
+    return 0;
+}
+
+int GetLines(const std::filesystem::path& filename,
+             bool enableEmptyLine,
+             const std::function<void(const std::string&)>& pushBack,
+             std::string* errorMessage) {
+    int ret = 0;
+    std::ifstream fin;
+    try {
+        fin.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+        fin.open(filename.string(), std::ios_base::in);
+        fin.exceptions(std::ifstream::goodbit);
+        GetLines(fin, enableEmptyLine, pushBack, errorMessage);
+        fin.close();
+    } catch (const std::exception& fail) {
+        if (errorMessage != nullptr) {
+            LOG_ERROR(sLogger, ("open file fail", filename)("errno", strerror(errno)));
+            ret = -1;
+        }
+        fin.close();
+    }
+    return ret;
+}
+
+int GetFileLines(const std::filesystem::path& filename,
+                 std::vector<std::string>& res,
+                 bool enableEmptyLine,
+                 std::string* errorMessage) {
+    return GetLines(filename, enableEmptyLine, [&res](const std::string& s) { res.push_back(s); }, errorMessage);
+}
+
 bool OverwriteFile(const std::string& fileName, const std::string& content) {
     FILE* pFile = fopen(fileName.c_str(), "w");
     if (pFile == NULL) {

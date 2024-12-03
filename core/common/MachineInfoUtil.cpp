@@ -15,6 +15,11 @@
 #include "MachineInfoUtil.h"
 
 #include <string.h>
+
+#include <boost/filesystem.hpp>
+
+#include "AppConfig.h"
+#include "common/UUIDUtil.h"
 #if defined(__linux__)
 #include <arpa/inet.h>
 #include <ifaddrs.h>
@@ -40,8 +45,10 @@
 
 #include "FileSystemUtil.h"
 #include "StringTools.h"
+#include "common/FileSystemUtil.h"
 #include "logger/Logger.h"
 
+DEFINE_FLAG_STRING(agent_host_id, "", "");
 
 #if defined(_MSC_VER)
 typedef LONG NTSTATUS, *PNTSTATUS;
@@ -494,6 +501,92 @@ size_t FetchECSMetaCallback(char* buffer, size_t size, size_t nmemb, std::string
     size_t sizes = size * nmemb;
     res->append(buffer, sizes);
     return sizes;
+}
+
+std::string GetSerialNumberFromEcsAssist(const std::string& machineIdFile) {
+    std::string sn;
+    if (CheckExistance(machineIdFile)) {
+        if (!ReadFileContent(machineIdFile, sn)) {
+            return "";
+        }
+    }
+    return sn;
+}
+
+static std::string GetEcsAssistMachineIdFile() {
+#if defined(WIN32)
+    return "C:\\ProgramData\\aliyun\\assist\\hybrid\\machine-id";
+#else
+    return "/usr/local/share/aliyun-assist/hybrid/machine-id";
+#endif
+}
+
+std::string GetSerialNumberFromEcsAssist() {
+    return GetSerialNumberFromEcsAssist(GetEcsAssistMachineIdFile());
+}
+
+std::string RandomHostid() {
+    static std::string hostId = CalculateRandomUUID();
+    return hostId;
+}
+
+const std::string& GetLocalHostId() {
+    static std::string fileName = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "host_id";
+    static std::string hostId;
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    if (CheckExistance(fileName)) {
+        if (!ReadFileContent(fileName, hostId)) {
+            hostId = "";
+        }
+    }
+    if (hostId.empty()) {
+        hostId = RandomHostid();
+
+        LOG_INFO(sLogger, ("save hostId file to local file system, hostId", hostId));
+        int fd = open(fileName.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0755);
+        if (fd == -1) {
+            int savedErrno = errno;
+            if (savedErrno != EEXIST) {
+                LOG_ERROR(sLogger, ("save hostId file fail", fileName)("errno", strerror(savedErrno)));
+            }
+        } else {
+            // 文件成功创建,现在写入hostId
+            ssize_t written = write(fd, hostId.c_str(), hostId.length());
+            if (written == static_cast<ssize_t>(hostId.length())) {
+                LOG_INFO(sLogger, ("hostId saved successfully to", fileName));
+            } else {
+                int writeErrno = errno;
+                LOG_ERROR(sLogger, ("Failed to write hostId to file", fileName)("errno", strerror(writeErrno)));
+            }
+            close(fd);
+        }
+    }
+    return hostId;
+}
+
+std::string FetchHostId() {
+    static std::string hostId;
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    hostId = STRING_FLAG(agent_host_id);
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    ECSMeta meta = FetchECSMeta();
+    hostId = meta.instanceID;
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    hostId = GetSerialNumberFromEcsAssist();
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    hostId = GetLocalHostId();
+
+    return hostId;
 }
 
 ECSMeta FetchECSMeta() {

@@ -146,6 +146,12 @@ bool NormalizeTopicRegFormat(std::string& regStr);
 
 void RemoveFilePathTrailingSlash(std::string& path);
 
+bool IsInt(const char* sz);
+
+inline bool IsInt(const std::string& str) {
+    return IsInt(str.c_str());
+}
+
 #if defined(_MSC_VER)
 // TODO: Test it.
 #define FNM_PATHNAME 0

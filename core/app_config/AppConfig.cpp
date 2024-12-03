@@ -164,6 +164,7 @@ DEFINE_FLAG_STRING(loong_collector_operator_service, "loong collector operator s
 DEFINE_FLAG_INT32(loong_collector_operator_service_port, "loong collector operator service port", 8888);
 DEFINE_FLAG_INT32(loong_collector_k8s_meta_service_port, "loong collector operator service port", 9000);
 DEFINE_FLAG_STRING(_pod_name_, "agent pod name", "");
+DEFINE_FLAG_INT32(process_collect_silent_count, "number of process scanned between a sleep", 1000);
 
 DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
 DEFINE_FLAG_STRING(crash_stack_file_name, "crash stack back trace file name", "backtrace.dat");

@@ -58,6 +58,7 @@ macro(add_core_subdir)
     add_subdirectory(prometheus)
     add_subdirectory(route)
     add_subdirectory(task_pipeline)
+    add_subdirectory(host_monitor)
 endmacro()
 
 macro(add_spl_subdir)
