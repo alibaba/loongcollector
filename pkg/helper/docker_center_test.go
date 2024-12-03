@@ -17,6 +17,7 @@ package helper
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"sync"
 	"testing"
@@ -371,6 +372,11 @@ func (m *DockerClientMock) ContainerList(ctx context.Context, options types.Cont
 func (m *DockerClientMock) ContainerProcessAlive(pid int) bool {
 	args := m.Called(pid)
 	return args.Get(0).(bool)
+}
+
+func (m *DockerClientMock) ContainerLogs(ctx context.Context, container string, options types.ContainerLogsOptions) (io.ReadCloser, error) {
+	args := m.Called(ctx, container, options)
+	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
 func TestDockerCenterEvents(t *testing.T) {

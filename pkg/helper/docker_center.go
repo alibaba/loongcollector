@@ -17,6 +17,7 @@ package helper
 import (
 	"context"
 	"hash/fnv"
+	"io"
 	"path"
 	"regexp"
 	"runtime"
@@ -501,6 +502,10 @@ func (r *DockerClientWrapper) Events(ctx context.Context, options types.EventsOp
 
 func (r *DockerClientWrapper) ContainerProcessAlive(pid int) bool {
 	return ContainerProcessAlive(pid)
+}
+
+func (r *DockerClientWrapper) ContainerLogs(ctx context.Context, container string, options types.ContainerLogsOptions) (io.ReadCloser, error) {
+	return r.client.ContainerLogs(ctx, container, options)
 }
 
 func getIPByHosts(hostFileName, hostname string) string {
