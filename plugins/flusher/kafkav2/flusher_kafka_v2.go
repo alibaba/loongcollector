@@ -186,7 +186,7 @@ func NewFlusherKafka() *FlusherKafka {
 		BrokerTimeout:    10 * time.Second,
 		Compression:      "none",
 		CompressionLevel: 4,
-		Version:          "1.0.0",
+		Version:          "2.1.0",
 		MaxRetries:       3,
 		Headers:          nil,
 		Backoff: backoffConfig{
