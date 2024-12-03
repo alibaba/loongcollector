@@ -8,6 +8,8 @@
 #include "prometheus/labels/TextParser.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 
+DECLARE_FLAG_INT32(process_thread_count);
+
 namespace logtail {
 class ProcessorPromParseMetricNative : public Processor {
 public:
@@ -22,6 +24,9 @@ protected:
 
 private:
     bool ProcessEvent(PipelineEventPtr&, EventsContainer&, PipelineEventGroup&, TextParser& parser);
+    void
+    AddEvent(const char* data, size_t size, EventsContainer& events, PipelineEventGroup& eGroup, TextParser& parser);
+
     std::unique_ptr<ScrapeConfig> mScrapeConfigPtr;
 
 #ifdef APSARA_UNIT_TEST_MAIN

@@ -24,9 +24,14 @@ bool ProcessorPromParseMetricNative::Init(const Json::Value& config) {
 }
 
 void ProcessorPromParseMetricNative::Process(PipelineEventGroup& eGroup) {
+    if (!eGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_STREAM_ID)) {
+        LOG_WARNING(sLogger, ("unexpected event", "need prom stream id"));
+        return;
+    }
+
     EventsContainer& events = eGroup.MutableEvents();
-    EventsContainer newEvents;
-    newEvents.reserve(events.size());
+    auto rawEvents = std::move(events);
+    events.reserve(rawEvents.size());
 
     StringView scrapeTimestampMilliSecStr = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
     auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());
@@ -35,11 +40,9 @@ void ProcessorPromParseMetricNative::Process(PipelineEventGroup& eGroup) {
     TextParser parser(mScrapeConfigPtr->mHonorTimestamps);
     parser.SetDefaultTimestamp(timestamp, nanoSec);
 
-    for (auto& e : events) {
-        ProcessEvent(e, newEvents, eGroup, parser);
+    for (auto& rawEvent : rawEvents) {
+        ProcessEvent(rawEvent, events, eGroup, parser);
     }
-    events.swap(newEvents);
-    eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED, ToString(events.size()));
 }
 
 bool ProcessorPromParseMetricNative::IsSupportedEvent(const PipelineEventPtr& e) const {
@@ -47,19 +50,26 @@ bool ProcessorPromParseMetricNative::IsSupportedEvent(const PipelineEventPtr& e)
 }
 
 bool ProcessorPromParseMetricNative::ProcessEvent(PipelineEventPtr& e,
-                                                  EventsContainer& newEvents,
+                                                  EventsContainer& events,
                                                   PipelineEventGroup& eGroup,
                                                   TextParser& parser) {
-    if (!IsSupportedEvent(e)) {
+    if (!e.Is<RawEvent>()) {
+        LOG_WARNING(sLogger, ("unexpected event type", "need raw event"));
         return false;
     }
-    auto& sourceEvent = e.Cast<RawEvent>();
-    std::unique_ptr<MetricEvent> metricEvent = eGroup.CreateMetricEvent(true);
-    if (parser.ParseLine(sourceEvent.GetContent(), *metricEvent)) {
-        metricEvent->SetTag(string(prometheus::NAME), metricEvent->GetName());
-        newEvents.emplace_back(std::move(metricEvent), true, nullptr);
+    auto rawEvent = e.Cast<RawEvent>();
+    auto content = rawEvent.GetContent();
+    if (content.empty()) {
+        LOG_WARNING(sLogger, ("empty content", ""));
+        return false;
     }
-    return true;
+    auto metricEvent = eGroup.CreateMetricEvent(true);
+    if (parser.ParseLine(content, *metricEvent)) {
+        metricEvent->SetTagNoCopy(prometheus::NAME, metricEvent->GetName());
+        events.emplace_back(std::move(metricEvent), true, nullptr);
+        return true;
+    }
+    return false;
 }
 
 } // namespace logtail
