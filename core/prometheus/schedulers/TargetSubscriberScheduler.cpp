@@ -228,7 +228,8 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
         auto randSleepMilliSec = GetRandSleepMilliSec(
             scrapeScheduler->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, GetCurrentTimeInMilliSeconds());
         auto firstExecTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
-        scrapeScheduler->SetFirstExecTime(firstExecTime);
+        auto firstScrapeTIme = std::chrono::system_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
+        scrapeScheduler->SetFirstExecTime(firstExecTime, firstScrapeTIme);
         scrapeScheduler->InitSelfMonitor(mDefaultLabels);
 
         scrapeSchedulerMap[scrapeScheduler->GetId()] = scrapeScheduler;
@@ -333,7 +334,8 @@ void TargetSubscriberScheduler::InitSelfMonitor(const MetricLabels& defaultLabel
     mSelfMonitor = std::make_shared<PromSelfMonitorUnsafe>();
     mSelfMonitor->InitMetricManager(sSubscriberMetricKeys, mDefaultLabels);
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE, std::move(mDefaultLabels));
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE, std::move(mDefaultLabels));
     mPromSubscriberTargets = mMetricsRecordRef.CreateIntGauge(METRIC_PLUGIN_PROM_SUBSCRIBE_TARGETS);
     mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_TOTAL_DELAY_MS);
 }

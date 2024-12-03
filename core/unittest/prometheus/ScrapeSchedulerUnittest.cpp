@@ -32,7 +32,6 @@
 using namespace std;
 
 namespace logtail {
-
 class ScrapeSchedulerUnittest : public testing::Test {
 public:
     void TestInitscrapeScheduler();
@@ -42,6 +41,7 @@ public:
 
     void TestScheduler();
     void TestQueueIsFull();
+    void TestExactlyScrape();
 
 protected:
     void SetUp() override {
@@ -220,7 +220,8 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     EventPool eventPool{true};
     event.SetComponent(timer, &eventPool);
     auto now = std::chrono::steady_clock::now();
-    event.SetFirstExecTime(now);
+    auto nowScrape = std::chrono::system_clock::now();
+    event.SetFirstExecTime(now, nowScrape);
     event.ScheduleNext();
 
     APSARA_TEST_TRUE(timer->mQueue.size() == 1);
@@ -235,11 +236,41 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     APSARA_TEST_EQUAL(now + std::chrono::seconds(1), next->GetExecTime());
 }
 
+void ScrapeSchedulerUnittest::TestExactlyScrape() {
+    Labels labels;
+    labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    auto defaultLabels = MetricLabels();
+    event.InitSelfMonitor(defaultLabels);
+    auto timer = make_shared<Timer>();
+    EventPool eventPool{true};
+    event.SetComponent(timer, &eventPool);
+    auto execTime = std::chrono::steady_clock::now();
+    auto scrapeTime = std::chrono::system_clock::now();
+    event.SetFirstExecTime(execTime, scrapeTime);
+
+    auto firstScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    auto secondScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    event.DelayExecTime(1);
+    auto thirdScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    auto fourthScrapeTime = event.mLatestScrapeTime;
+    APSARA_TEST_EQUAL(firstScrapeTime, scrapeTime);
+    APSARA_TEST_EQUAL(secondScrapeTime - firstScrapeTime, std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds));
+    APSARA_TEST_EQUAL(thirdScrapeTime - firstScrapeTime,
+                      std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds * 2 + 1));
+    APSARA_TEST_EQUAL(fourthScrapeTime - firstScrapeTime,
+                      std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds * 3));
+}
+
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestInitscrapeScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestStreamMetricWriteCallback)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestQueueIsFull)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestExactlyScrape)
 
 
 } // namespace logtail
