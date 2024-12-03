@@ -46,7 +46,7 @@ private:
     PipelineConfigWatcher();
     ~PipelineConfigWatcher() = default;
 
-    void InsertInnerPipelines(PipelineConfigDiff& pDiff, TaskConfigDiff& tDiff, std::unordered_set<std::string>& configSet);
+    void InsertBuiltInPipelines(PipelineConfigDiff& pDiff, TaskConfigDiff& tDiff, std::unordered_set<std::string>& configSet);
     void InsertPipelines(PipelineConfigDiff& pDiff, TaskConfigDiff& tDiff, std::unordered_set<std::string>& configSet);
     bool CheckAddedConfig(const std::string& configName,
                           std::unique_ptr<Json::Value>&& configDetail,
