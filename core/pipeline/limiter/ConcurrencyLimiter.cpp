@@ -14,21 +14,24 @@
 
 #include "pipeline/limiter/ConcurrencyLimiter.h"
 
+#include "common/StringTools.h"
+#include "logger/Logger.h"
+
 using namespace std;
 
 namespace logtail {
 
 #ifdef APSARA_UNIT_TEST_MAIN
-uint32_t ConcurrencyLimiter::GetCurrentLimit() const { 
+uint32_t ConcurrencyLimiter::GetCurrentLimit() const {
     lock_guard<mutex> lock(mLimiterMux);
-    return mCurrenctConcurrency; 
+    return mCurrenctConcurrency;
 }
 
-uint32_t ConcurrencyLimiter::GetCurrentInterval() const { 
+uint32_t ConcurrencyLimiter::GetCurrentInterval() const {
     lock_guard<mutex> lock(mLimiterMux);
-    return mRetryIntervalSecs; 
+    return mRetryIntervalSecs;
 }
-void ConcurrencyLimiter::SetCurrentLimit(uint32_t limit) { 
+void ConcurrencyLimiter::SetCurrentLimit(uint32_t limit) {
     lock_guard<mutex> lock(mLimiterMux);
     mCurrenctConcurrency = limit;
 }
@@ -36,10 +39,10 @@ void ConcurrencyLimiter::SetCurrentLimit(uint32_t limit) {
 void ConcurrencyLimiter::SetInSendingCount(uint32_t count) {
     mInSendingCnt.store(count);
 }
-uint32_t ConcurrencyLimiter::GetInSendingCount() const { return mInSendingCnt.load(); }
-
+uint32_t ConcurrencyLimiter::GetInSendingCount() const {
+    return mInSendingCnt.load();
+}
 #endif
-
 
 bool ConcurrencyLimiter::IsValidToPop() {
     lock_guard<mutex> lock(mLimiterMux);
@@ -54,7 +57,7 @@ bool ConcurrencyLimiter::IsValidToPop() {
     }
     if (mCurrenctConcurrency > mInSendingCnt.load()) {
         return true;
-    } 
+    }
     return false;
 }
 
@@ -67,22 +70,38 @@ void ConcurrencyLimiter::OnSendDone() {
 }
 
 void ConcurrencyLimiter::OnSuccess() {
-    lock_guard<mutex> lock(mLimiterMux);    
+    lock_guard<mutex> lock(mLimiterMux);
     if (mCurrenctConcurrency <= 0) {
         mRetryIntervalSecs = mMinRetryIntervalSecs;
-    }    
+        LOG_INFO(sLogger, ("reset send retry interval, type", mDescription));
+    }
     if (mCurrenctConcurrency != mMaxConcurrency) {
         ++mCurrenctConcurrency;
+        if (mCurrenctConcurrency == mMaxConcurrency) {
+            LOG_INFO(sLogger,
+                     ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrenctConcurrency));
+        } else {
+            LOG_DEBUG(sLogger,
+                      ("increase send concurrency, type",
+                       mDescription)("from", mCurrenctConcurrency - 1)("to", mCurrenctConcurrency));
+        }
     }
 }
 
 void ConcurrencyLimiter::OnFail() {
     lock_guard<mutex> lock(mLimiterMux);
     if (mCurrenctConcurrency != 0) {
+        auto old = mCurrenctConcurrency;
         mCurrenctConcurrency = static_cast<uint32_t>(mCurrenctConcurrency * mConcurrencyDownRatio);
+        LOG_INFO(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
     } else {
         if (mRetryIntervalSecs != mMaxRetryIntervalSecs) {
-            mRetryIntervalSecs = min(mMaxRetryIntervalSecs, static_cast<uint32_t>(mRetryIntervalSecs * mRetryIntervalUpRatio));
+            auto old = mRetryIntervalSecs;
+            mRetryIntervalSecs
+                = min(mMaxRetryIntervalSecs, static_cast<uint32_t>(mRetryIntervalSecs * mRetryIntervalUpRatio));
+            LOG_INFO(sLogger,
+                     ("increase send retry interval, type",
+                      mDescription)("from", ToString(old) + "s")("to", ToString(mRetryIntervalSecs) + "s"));
         }
     }
 }

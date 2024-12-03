@@ -74,6 +74,10 @@ public:
         return mQueue.size();
     }
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    void Clear() { std::queue<T>().swap(mQueue); }
+#endif
+
 private:
     std::queue<T> mQueue;
     mutable std::mutex mMux;

@@ -17,7 +17,7 @@
 #include "sdk/Client.h"
 #include "sdk/Exception.h"
 #include "common/CompressTools.h"
-#include "sls_control/SLSControl.h"
+#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 
 DECLARE_FLAG_STRING(default_access_key_id);
 DECLARE_FLAG_STRING(default_access_key);
