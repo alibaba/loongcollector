@@ -388,6 +388,9 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	for _, service := range p.ServicePlugins {
 		_ = service.Stop()
 	}
+	// set flusher flag first in case of logschain/aggregator queue full and flusher isready is always false
+	p.LogstoreConfig.FlushOutFlag = true
+	
 	p.InputControl.WaitCancel()
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "metric plugins stop", "done", "service plugins stop", "done")
 
