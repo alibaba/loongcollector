@@ -229,21 +229,9 @@ void LogtailMonitor::Monitor() {
     SendStatusProfile(true);
 }
 
-template <typename T>
-static void AddLogContent(sls_logs::Log* log, const char* key, const T& val) {
-    auto content = log->add_contents();
-    content->set_key(key);
-    content->set_value(ToString(val));
-}
-
 bool LogtailMonitor::SendStatusProfile(bool suicide) {
     mStatusCount++;
-    string category;
-    if (suicide)
-        category = "logtail_suicide_profile";
-    else if (mStatusCount % 2 == 0)
-        category = "logtail_status_profile";
-    else
+    if (!suicide && mStatusCount % 2 != 0)
         return false;
 
     auto now = GetCurrentLogtailTime();
@@ -258,100 +246,12 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
         sleep(10);
         _exit(1);
     }
-
-    // the unique id of current instance
-    std::string id = sdk::Base64Enconde(LoongCollectorMonitor::mHostname + LoongCollectorMonitor::mIpAddr
-                                        + ILOGTAIL_VERSION + GetProcessExecutionDir());
-
-    // Collect status information to send.
-    LogGroup logGroup;
-    logGroup.set_category(category);
-    logGroup.set_source(LoongCollectorMonitor::mIpAddr);
-    Log* logPtr = logGroup.add_logs();
-    SetLogTime(logPtr, AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec);
     // CPU usage of Logtail process.
-    AddLogContent(logPtr, "cpu", mCpuStat.mCpuUsage);
     LoongCollectorMonitor::GetInstance()->SetAgentCpu(mCpuStat.mCpuUsage);
-#if defined(__linux__) // TODO: Remove this if auto scale is available on Windows.
-    // CPU usage of system.
-    AddLogContent(logPtr, "os_cpu", mOsCpuStatForScale.mOsCpuUsage);
-#endif
     // Memory usage of Logtail process.
-    AddLogContent(logPtr, "mem", mMemStat.mRss);
     LoongCollectorMonitor::GetInstance()->SetAgentMemory(mMemStat.mRss);
-    // The version, uuid of Logtail.
-    AddLogContent(logPtr, "version", ILOGTAIL_VERSION);
-    AddLogContent(logPtr, "uuid", Application::GetInstance()->GetUUID());
-#ifdef __ENTERPRISE__
-    AddLogContent(logPtr, "user_defined_id", EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet());
-    AddLogContent(logPtr, "aliuids", EnterpriseConfigProvider::GetInstance()->GetAliuidSet());
-#endif
-    AddLogContent(logPtr, "projects", FlusherSLS::GetAllProjects());
-    AddLogContent(logPtr, "instance_id", Application::GetInstance()->GetInstanceId());
-    AddLogContent(logPtr, "instance_key", id);
-    // Host informations.
-    AddLogContent(logPtr, "ip", LoongCollectorMonitor::mIpAddr);
-    AddLogContent(logPtr, "hostname", LoongCollectorMonitor::mHostname);
-    AddLogContent(logPtr, "os", OS_NAME);
-    AddLogContent(logPtr, "os_detail", LoongCollectorMonitor::mOsDetail);
-    AddLogContent(logPtr, "user", LoongCollectorMonitor::mUsername);
-#if defined(__linux__)
-    AddLogContent(logPtr, "load", GetLoadAvg());
-#endif
-    AddLogContent(logPtr, "plugin_stats", PipelineManager::GetInstance()->GetPluginStatistics());
-    // Metrics.
-    vector<string> allProfileRegion;
-    GetProfileSender()->GetAllProfileRegion(allProfileRegion);
-    UpdateMetric("region", allProfileRegion);
-#ifdef __ENTERPRISE__
-    UpdateMetric("config_update_count", EnterpriseConfigProvider::GetInstance()->GetConfigUpdateTotalCount());
-    UpdateMetric("config_update_item_count", EnterpriseConfigProvider::GetInstance()->GetConfigUpdateItemTotalCount());
-    UpdateMetric("config_update_last_time",
-                 GetTimeStamp(EnterpriseConfigProvider::GetInstance()->GetLastConfigUpdateTime(), "%Y-%m-%d %H:%M:%S"));
-    UpdateMetric("config_get_last_time",
-                 GetTimeStamp(EnterpriseConfigProvider::GetInstance()->GetLastConfigGetTime(), "%Y-%m-%d %H:%M:%S"));
-#endif
-    UpdateMetric("config_prefer_real_ip", BOOL_FLAG(send_prefer_real_ip));
-    UpdateMetric("plugin_enabled", LogtailPlugin::GetInstance()->IsPluginOpened());
-    const std::vector<sls_logs::LogTag>& envTags = AppConfig::GetInstance()->GetEnvTags();
-    if (!envTags.empty()) {
-        UpdateMetric("env_config_count", envTags.size());
-    }
-    int32_t usedSendingConcurrency = FlusherRunner::GetInstance()->GetSendingBufferCount();
-    UpdateMetric("used_sending_concurrency", usedSendingConcurrency);
 
-    AddLogContent(logPtr, "metric_json", MetricToString());
-    AddLogContent(logPtr, "status", CheckLogtailStatus());
-    AddLogContent(logPtr, "ecs_instance_id", LoongCollectorMonitor::mECSInstanceID);
-    AddLogContent(logPtr, "ecs_user_id", LoongCollectorMonitor::mECSUserID);
-    AddLogContent(logPtr, "ecs_regioon_id", LoongCollectorMonitor::mECSRegionID);
-    ClearMetric();
-
-    if (!mIsThreadRunning)
-        return false;
-
-    // Dump to local and send to enabled regions.
-    DumpToLocal(logGroup);
-    for (size_t i = 0; i < allProfileRegion.size(); ++i) {
-        if (BOOL_FLAG(check_profile_region) && !FlusherSLS::IsRegionContainingConfig(allProfileRegion[i])) {
-            LOG_DEBUG(sLogger, ("region does not contain config for this instance", allProfileRegion[i]));
-            continue;
-        }
-
-        // Check if the region is disabled.
-        if (!FlusherSLS::GetRegionStatus(allProfileRegion[i])) {
-            LOG_DEBUG(sLogger, ("disabled region, do not send status profile to region", allProfileRegion[i]));
-            continue;
-        }
-
-        if (i == allProfileRegion.size() - 1) {
-            GetProfileSender()->SendToProfileProject(allProfileRegion[i], logGroup);
-        } else {
-            LogGroup copyLogGroup = logGroup;
-            GetProfileSender()->SendToProfileProject(allProfileRegion[i], copyLogGroup);
-        }
-    }
-    return true;
+    return mIsThreadRunning;
 }
 
 bool LogtailMonitor::GetMemStat() {
@@ -471,24 +371,6 @@ bool LogtailMonitor::CheckSoftMemLimit() {
 
 bool LogtailMonitor::CheckHardMemLimit() {
     return mMemStat.mRss > 5 * AppConfig::GetInstance()->GetMemUsageUpLimit();
-}
-
-void LogtailMonitor::DumpToLocal(const sls_logs::LogGroup& logGroup) {
-    string dumpStr = "\n####logtail status####\n";
-    for (int32_t logIdx = 0; logIdx < logGroup.logs_size(); ++logIdx) {
-        Json::Value category;
-        const Log& log = logGroup.logs(logIdx);
-        for (int32_t conIdx = 0; conIdx < log.contents_size(); ++conIdx) {
-            const Log_Content& content = log.contents(conIdx);
-            const string& key = content.key();
-            const string& value = content.value();
-            dumpStr.append(key).append(":").append(value).append("\n");
-        }
-    }
-    dumpStr += "####status     end####\n";
-
-    static auto gMonitorLogger = Logger::Instance().GetLogger(GetAgentLoggersPrefix() + "/status");
-    LOG_INFO(gMonitorLogger, ("\n", dumpStr));
 }
 
 bool LogtailMonitor::DumpMonitorInfo(time_t monitorTime) {
@@ -756,7 +638,6 @@ void LoongCollectorMonitor::Init() {
 void LoongCollectorMonitor::Stop() {
     SelfMonitorServer::GetInstance()->Stop();
     LOG_INFO(sLogger, ("LoongCollector monitor", "stopped successfully"));
-
 }
 
 } // namespace logtail

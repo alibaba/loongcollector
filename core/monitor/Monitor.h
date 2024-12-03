@@ -21,9 +21,7 @@
 #include <mutex>
 #include <string>
 
-#include "MetricConstants.h"
 #include "MetricManager.h"
-#include "MetricStore.h"
 
 #if defined(_MSC_VER)
 #include <Windows.h>
@@ -78,7 +76,7 @@ struct OsCpuStat {
     }
 };
 
-class LogtailMonitor : public MetricStore {
+class LogtailMonitor {
 public:
     LogtailMonitor(const LogtailMonitor&) = delete;
     LogtailMonitor& operator=(const LogtailMonitor&) = delete;
@@ -123,9 +121,6 @@ private:
     //   Because sending is an asynchronous procedure, the caller should wait for
     //   several seconds after calling this method and before _exit(1).
     bool SendStatusProfile(bool suicide);
-
-    // DumpToLocal dumps the @logGroup to local status log.
-    void DumpToLocal(const sls_logs::LogGroup& logGroup);
 
     // DumpMonitorInfo dumps simple monitor information to local.
     bool DumpMonitorInfo(time_t monitorTime);
