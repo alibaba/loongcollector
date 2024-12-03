@@ -80,6 +80,22 @@ bool IsConfigEnabled(const string& name, const Json::Value& detail) {
     return true;
 }
 
+void GetAllInputTypes(const Json::Value& detail, std::vector<string>& inputTypes) {
+    const char* key = "inputs";
+    const Json::Value* inputs = detail.find(key, key + strlen(key));
+    if (inputs == nullptr || !inputs->isArray()) {
+        return;
+    }
+    for (const Json::Value& input : *inputs) {
+        const char* typeKey = "Type";
+        const Json::Value* type = input.find(typeKey, typeKey + strlen(typeKey));
+        if (type == nullptr || !type->isString()) {
+            continue;
+        }
+        inputTypes.push_back(type->asString());
+    }
+}
+
 ConfigType GetConfigType(const Json::Value& detail) {
     return detail.isMember("task") ? ConfigType::Task : ConfigType::Pipeline;
 }
