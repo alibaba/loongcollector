@@ -14,23 +14,23 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 ### 如何入手？
 
-如果您是初次贡献，可以先从 [good first issue](https://github.com/alibaba/ilogtail/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) 列表中认领一个相对小的任务来快速参与社区贡献。
+如果您是初次贡献，可以先从 [good first issue](https://github.com/alibaba/loongcollector/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) 列表中认领一个相对小的任务来快速参与社区贡献。
 
 认领方式: 您可以直接在相应 Issue 中回复参与意愿，然后参照下面的 GitHub 工作流指引解决 issue 并按照规范提交 PR，通过 review 后即可合入到 main 分支。
 
 ### GitHub 完整工作流
 
-我们使用 main 分支作为我们的开发分支，这代表它是不稳定的分支。稳定版本归档在 [Release](https://github.com/alibaba/ilogtail/releases) 中，每发布一个 Release 版本，都会打上对应版本 [Tag](https://github.com/alibaba/ilogtail/tags)。
+我们使用 main 分支作为我们的开发分支，这代表它是不稳定的分支。稳定版本归档在 [Release](https://github.com/alibaba/loongcollector/releases) 中，每发布一个 Release 版本，都会打上对应版本 [Tag](https://github.com/alibaba/loongcollector/tags)。
 
 #### 创建/认领 Issue
 
-我们使用 GitHub [Issues](https://github.com/alibaba/ilogtail/issues) 以及 [Pull Requests](https://github.com/alibaba/ilogtail/pulls) 来管理/追踪需求或者问题。如果您希望开发新的特性、功能完善，或者发现了代码的 BUG，或者文档的增加、完善，或者希望提建议等，都可以创建一个 Issue；也可以认领我们发布出来的一些 Issue。
+我们使用 GitHub [Issues](https://github.com/alibaba/loongcollector/issues) 以及 [Pull Requests](https://github.com/alibaba/loongcollector/pulls) 来管理/追踪需求或者问题。如果您希望开发新的特性、功能完善，或者发现了代码的 BUG，或者文档的增加、完善，或者希望提建议等，都可以创建一个 Issue；也可以认领我们发布出来的一些 Issue。
 
 新建的 Issue 请按照模板规范填写内容，以便我们更好地理解您需求。另外，也需要您打上对应[标签](#标签)，方便我们进行分类管理。
 
 #### 设计交流
 
-如果您的 PR 包含非常大的变更(比如模块的重构或者添加新的组件)，**请务必发起详细讨论，编写详细的文档来阐述其设计、解决的问题和用途，达成一致后再进行变更**。您可以在 Issue 或 [Discussions ideas](https://github.com/alibaba/ilogtail/discussions/categories/ideas) 中给出详细的设计。如果需要我们的支持可以扫描加入钉钉群，我们可以提供一对一的交流。
+如果您的 PR 包含非常大的变更(比如模块的重构或者添加新的组件)，**请务必发起详细讨论，编写详细的文档来阐述其设计、解决的问题和用途，达成一致后再进行变更**。您可以在 Issue 或 [Discussions ideas](https://github.com/alibaba/loongcollector/discussions/categories/ideas) 中给出详细的设计。如果需要我们的支持可以扫描加入钉钉群，我们可以提供一对一的交流。
 
 对于一些小的变更，也请在 Issue 中简单描述您的设计。
 
@@ -38,17 +38,17 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 设计定稿后，即可进行开发流程。下面是开源贡献者常用的工作流（workflow）：
 
-1. 将 [iLogtail](https://github.com/alibaba/ilogtail) 仓库 fork 到个人 GitHub 下。
+1. 将 [iLogtail](https://github.com/alibaba/loongcollector) 仓库 fork 到个人 GitHub 下。
 2. 基于个人 fork 分支进行开发、测试工作。详细流程：
     1. 保持个人 main 分支跟 iLogtail 主仓库 main 分支及时同步。
     2. 将 fork 后的个人仓库 clone 到本地。
     3. 创建新的开发分支，并进行开发。**请确保对应的变更都有 UnitTest 或 E2E 测试**。
     4. 在本地提交变更。**注意 commit log 保持简练、规范，提交的 email 需要和 GitHub 的 email 保持一致。**
     5. 将变更 push 到远程个人分支。
-3. 向 iLogtail main 分支创建一个 [pull request (PR)](https://github.com/alibaba/ilogtail/pulls)，在进行较大的变更的时候请确保 PR 有一个对应的 Issue，并进行关联。
+3. 向 iLogtail main 分支创建一个 [pull request (PR)](https://github.com/alibaba/loongcollector/pulls)，在进行较大的变更的时候请确保 PR 有一个对应的 Issue，并进行关联。
 
     1. 发起 PR 前请进行如下规范性检查：[代码/文档风格](../developer-guide/codestyle.md)、[编码规范](../developer-guide/code-check/check-codestyle.md)、[依赖包许可证](../developer-guide/code-check/check-dependency-license.md)、[文件许可证](../developer-guide/code-check/check-license.md)。
-    2. 为了更好的进行版本管理，对于一些独立的特性或者关键BUG修复，请提交[Changelog](https://github.com/alibaba/ilogtail/blob/main/CHANGELOG.md).
+    2. 为了更好的进行版本管理，对于一些独立的特性或者关键BUG修复，请提交[Changelog](https://github.com/alibaba/loongcollector/blob/main/CHANGELOG.md).
 
 注意一个 PR 尽量不要过于大，如果的确需要有大的变更，可以将其按功能拆分成多个单独的 PR。
 
@@ -68,7 +68,7 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 * [配置样例或K8s部署案例](#config)，对应 label: example config。
 * 文档（document），对应 label: documentation。
 * [案例类](#case)，对应 label: awesome ilogtail。
-* 回答、解决问题，对应 label: question。我们建议优先提到 [Discussions](https://github.com/alibaba/ilogtail/discussions) 中讨论。
+* 回答、解决问题，对应 label: question。我们建议优先提到 [Discussions](https://github.com/alibaba/loongcollector/discussions) 中讨论。
 
 以下为附加标签：
 
@@ -79,7 +79,7 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 所有的代码都需要经过 committer 进行 review。以下是我们推荐的一些原则：
 
-* 可读性：所有提交请遵循我们的[代码规范](../developer-guide/codestyle.md)、[文档规范](../developer-guide/plugin-doc-templete.md)。
+* 可读性：所有提交请遵循我们的[代码规范](../developer-guide/codestyle.md)、[文档规范](../developer-guide/plugin-development/plugin-docs/plugin-doc-templete.md)。
 * 优雅性：代码简练、复用度高，有着完善的设计。
 * 测试：重要的代码需要有完善的测试用例（单元测试、E2E 测试），对应的衡量标准是测试覆盖率。
 
@@ -87,9 +87,9 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 除了共享代码，您也可以为我们的配置样板库做出贡献。
 
-`example_config/data_pipelines`目录包含场景化的采集配置模版，重点突出processor / aggregator插件功能。如您对某些常见日志（如Apache、Spring Boot）的处理有一定心得，可以参考已有样例和[README](https://github.com/alibaba/ilogtail/tree/main/example_config#readme)进行提交。
+`example_config/data_pipelines`目录包含场景化的采集配置模版，重点突出processor / aggregator插件功能。如您对某些常见日志（如Apache、Spring Boot）的处理有一定心得，可以参考已有样例和[README](https://github.com/alibaba/loongcollector/tree/main/example_config#readme)进行提交。
 
-`k8s_templates`目录包含完整的K8s部署案例，从源到典型处理到输出，以input / flusher插件进行划分。如您对某些常见的日志处理场景（如将数据采集到Elastic Search、Clickhouse）的部署有一定心得，可以参考已有样例和[README](https://github.com/alibaba/ilogtail/tree/main/k8s_templates#readme)进行提交。
+`k8s_templates`目录包含完整的K8s部署案例，从源到典型处理到输出，以input / flusher插件进行划分。如您对某些常见的日志处理场景（如将数据采集到Elastic Search、Clickhouse）的部署有一定心得，可以参考已有样例和[README](https://github.com/alibaba/loongcollector/tree/main/k8s_templates#readme)进行提交。
 
 ### 案例分享 <a href="#case" id="case"></a>
 
@@ -97,11 +97,11 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 1. 在知乎写文章，例如[一文搞懂 SAE 日志采集架构](https://zhuanlan.zhihu.com/p/557591446)。
 2. 推荐自己的文章到“iLogtail社区”专栏。
-3. GitHub上修改[use-cases.md](https://github.com/alibaba/ilogtail/blob/main/docs/cn/awesome-ilogtail/use-cases.md)并发起PR，Label选awesome ilogtail。
+3. GitHub上修改[use-cases.md](https://github.com/alibaba/loongcollector/blob/main/docs/cn/awesome-ilogtail/use-cases.md)并发起PR，Label选awesome ilogtail。
 
 ### 参与社区讨论
 
-如果您在使用 iLogtail 中遇到任何问题，欢迎到 [Discussions](https://github.com/alibaba/ilogtail/discussions) 进行交流互动。也欢迎在这里帮助其他使用者解答一些使用中的问题。
+如果您在使用 iLogtail 中遇到任何问题，欢迎到 [Discussions](https://github.com/alibaba/loongcollector/discussions) 进行交流互动。也欢迎在这里帮助其他使用者解答一些使用中的问题。
 
 Discussion 分类：
 
@@ -112,4 +112,4 @@ Discussion 分类：
 
 ## 联系我们
 
-<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup.png" style="width: 50%; height: 50%" />
+<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup/chatgroup.png" style="width: 60%; height: 60%" />

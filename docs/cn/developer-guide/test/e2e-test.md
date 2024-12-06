@@ -84,4 +84,4 @@ TEST_CASE=input_canal go test -v -timeout 30m -run ^TestE2EOnDockerCompose$ gith
 
 ### 拓展
 
-如果目前engine中已有的测试行为无法满足您的需求，您可以参考以下[添加指南](./e2e-test-step.md)，自行拓展测试行为。
+如果目前engine中已有的测试行为无法满足您的需求，您可以参考以下[添加指南](e2e-test-step.md)，自行拓展测试行为。

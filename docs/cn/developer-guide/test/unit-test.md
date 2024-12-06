@@ -68,4 +68,4 @@ func TestInputSystem_CollectOpenFD(t *testing.T) {
 
 ### 测试插件行为
 
-如果需要日志的方式进行验证插件具体行为，可以参加[日志功能高级用法](../plugin-development/logger-api.md)
+如果需要日志的方式进行验证插件具体行为，可以参加[日志功能高级用法](../plugin-development/plugin-debug/logger-api.md)

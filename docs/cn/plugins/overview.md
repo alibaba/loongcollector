@@ -4,32 +4,32 @@
 
 | 名称                                                                            | 提供方                                                        | 简介                                                    |
 |-------------------------------------------------------------------------------|------------------------------------------------------------|-------------------------------------------------------|
-| [`input_file`](input/input-file.md)<br> 文本日志                                      | SLS官方 | 文本采集。                                                 |
-| [`input_container_stdio`](input/input-container-stdio.md)<br> 容器标准输出（原生插件）                                      | SLS官方 | 从容器标准输出/标准错误流中采集日志。                                                 |
-| [`input_observer_network`](input/metric-observer.md)<br>eBPF网络调用数据         | SLS官方                                                      | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。 |
-| [`input_command`](input/input-command.md)<br>脚本执行数据                           | 社区<br>[`didachuxing`](https://github.com/didachuxing)      | 采集脚本执行数据。                                             |
-| [`input_docker_stdout`](input/service-docker-stdout.md)<br>容器标准输出             | SLS官方                                                      | 从容器标准输出/标准错误流中采集日志。                                   |
-| [`metric_debug_file`](input/metric-debug-file.md)<br>文本日志（debug）              | SLS官方                                                      | 用于调试的读取文件内容的插件。                                       |
-| [`metric_input_example`](input/metric-input-example.md)<br>MetricInput示例插件    | SLS官方                                                      | MetricInput示例插件。                                      |
-| [`metric_meta_host`](input/metric-meta-host.md)<br>主机Meta数据                   | SLS官方                                                      | 主机Meta数据。                                             |
-| [`metric_mock`](input/metric-mock.md)<br>Mock数据-Metric                        | SLS官方                                                      | 生成metric模拟数据的插件。                                      |
-| [`metric_system_v2`](input/metric-system.md)<br>主机监控数据                        | SLS官方                                                      | 主机监控数据。                                               |
-| [`service_canal`](input/service-canal.md)<br>MySQL Binlog                     | SLS官方                                                      | 将MySQL Binlog输入到iLogtail。                             |
-| [`service_go_profile`](input/service-goprofile.md)<br>GO Profile              | SLS官方                                                      | 采集Golang pprof 性能数据。                                  |
-| [`service_gpu_metric`](input/service-gpu.md)<br>GPU数据                         | SLS官方                                                      | 支持收集英伟达GPU指标。                                         |
-| [`service_http_server`](input/service-http-server.md)<br>HTTP数据               | SLS官方                                                      | 接收来自unix socket、http/https、tcp的请求，并支持sls协议、otlp等多种协议。 |
-| [`service_input_example`](input/service-input-example.md)<br>ServiceInput示例插件 | SLS官方                                                      | ServiceInput示例插件。                                     |
-| [`service_journal`](input/service-journal.md)<br>Journal数据                    | SLS官方                                                      | 从原始的二进制文件中采集Linux系统的Journal（systemd）日志。               |
-| [`service_kafka`](input/service-kafka.md)<br>Kafka                            | SLS官方                                                      | 将Kafka数据输入到iLogtail。                                  |
-| [`service_mock`](input/service-mock.md)<br>Mock数据-Service                     | SLS官方                                                      | 生成service模拟数据的插件。                                     |
-| [`service_mssql`](input/service-mssql.md)<br>SqlServer查询数据                    | SLS官方                                                      | 将Sql Server数据输入到iLogtail。                             |
-| [`service_otlp`](input/service-otlp.md)<br>OTLP数据                             | 社区<br>[`Zhu Shunjia`](https://github.com/shunjiazhu)       | 通过http/grpc协议，接收OTLP数据。                               |
-| [`service_pgsql`](input/service-pgsql.md)<br>PostgreSQL查询数据                   | SLS官方                                                      | 将PostgresSQL数据输入到iLogtail。                            |
-| [`service_syslog`](input/service-syslog.md)<br>Syslog数据                       | SLS官方                                                      | 采集syslog数据。                                           |
-| [`input_file_security`](input/input-file-security.md)<br> 文件安全数据                                      | SLS官方 | 文件安全数据采集。                                                 |
-| [`input_network_observer`](input/input-network-observer.md)<br> 网络可观测数据                                      | SLS官方 | 网络可观测数据采集。                                                 |
-| [`input_network_security`](input/input-network-security.md)<br> 网络安全数据                                      | SLS官方 | 网络安全数据采集。                                                 |
-| [`input_process_security`](input/input-process-security.md)<br> 进程安全数据                                      | SLS官方 | 进程安全数据采集。                                                 |
+| [`input_file`](input/native/input-file.md)<br> 文本日志                                      | SLS官方 | 文本采集。                                                 |
+| [`input_container_stdio`](input/native/input-container-stdio.md)<br> 容器标准输出（原生插件）                                      | SLS官方 | 从容器标准输出/标准错误流中采集日志。                                                 |
+| [`input_observer_network`](input/native/metric-observer.md)<br>eBPF网络调用数据         | SLS官方                                                      | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。 |
+| [`input_command`](input/extended/input-command.md)<br>脚本执行数据                           | 社区<br>[`didachuxing`](https://github.com/didachuxing)      | 采集脚本执行数据。                                             |
+| [`input_docker_stdout`](input/extended/service-docker-stdout.md)<br>容器标准输出             | SLS官方                                                      | 从容器标准输出/标准错误流中采集日志。                                   |
+| [`metric_debug_file`](input/extended/metric-debug-file.md)<br>文本日志（debug）              | SLS官方                                                      | 用于调试的读取文件内容的插件。                                       |
+| [`metric_input_example`](input/extended/metric-input-example.md)<br>MetricInput示例插件    | SLS官方                                                      | MetricInput示例插件。                                      |
+| [`metric_meta_host`](input/extended/metric-meta-host.md)<br>主机Meta数据                   | SLS官方                                                      | 主机Meta数据。                                             |
+| [`metric_mock`](input/extended/metric-mock.md)<br>Mock数据-Metric                        | SLS官方                                                      | 生成metric模拟数据的插件。                                      |
+| [`metric_system_v2`](input/extended/metric-system.md)<br>主机监控数据                        | SLS官方                                                      | 主机监控数据。                                               |
+| [`service_canal`](input/extended/service-canal.md)<br>MySQL Binlog                     | SLS官方                                                      | 将MySQL Binlog输入到iLogtail。                             |
+| [`service_go_profile`](input/extended/service-goprofile.md)<br>GO Profile              | SLS官方                                                      | 采集Golang pprof 性能数据。                                  |
+| [`service_gpu_metric`](input/extended/service-gpu.md)<br>GPU数据                         | SLS官方                                                      | 支持收集英伟达GPU指标。                                         |
+| [`service_http_server`](input/extended/service-http-server.md)<br>HTTP数据               | SLS官方                                                      | 接收来自unix socket、http/https、tcp的请求，并支持sls协议、otlp等多种协议。 |
+| [`service_input_example`](input/extended/service-input-example.md)<br>ServiceInput示例插件 | SLS官方                                                      | ServiceInput示例插件。                                     |
+| [`service_journal`](input/extended/service-journal.md)<br>Journal数据                    | SLS官方                                                      | 从原始的二进制文件中采集Linux系统的Journal（systemd）日志。               |
+| [`service_kafka`](input/extended/service-kafka.md)<br>Kafka                            | SLS官方                                                      | 将Kafka数据输入到iLogtail。                                  |
+| [`service_mock`](input/extended/service-mock.md)<br>Mock数据-Service                     | SLS官方                                                      | 生成service模拟数据的插件。                                     |
+| [`service_mssql`](input/extended/service-mssql.md)<br>SqlServer查询数据                    | SLS官方                                                      | 将Sql Server数据输入到iLogtail。                             |
+| [`service_otlp`](input/extended/service-otlp.md)<br>OTLP数据                             | 社区<br>[`Zhu Shunjia`](https://github.com/shunjiazhu)       | 通过http/grpc协议，接收OTLP数据。                               |
+| [`service_pgsql`](input/extended/service-pgsql.md)<br>PostgreSQL查询数据                   | SLS官方                                                      | 将PostgresSQL数据输入到iLogtail。                            |
+| [`service_syslog`](input/extended/service-syslog.md)<br>Syslog数据                       | SLS官方                                                      | 采集syslog数据。                                           |
+| [`input_file_security`](input/native/input-file-security.md)<br> 文件安全数据                                      | SLS官方 | 文件安全数据采集。                                                 |
+| [`input_network_observer`](input/native/input-network-observer.md)<br> 网络可观测数据                                      | SLS官方 | 网络可观测数据采集。                                                 |
+| [`input_network_security`](input/native/input-network-security.md)<br> 网络安全数据                                      | SLS官方 | 网络安全数据采集。                                                 |
+| [`input_process_security`](input/native/input-process-security.md)<br> 进程安全数据                                      | SLS官方 | 进程安全数据采集。                                                 |
 
 ## 处理
 
@@ -79,16 +79,16 @@
 
 | 名称                                                                           | 提供方                                                 | 简介                                        |
 |------------------------------------------------------------------------------|-----------------------------------------------------|-------------------------------------------|
-| [`flusher_kafka`](flusher/flusher-kafka.md)<br>Kafka                         | 社区                                                  | 将采集到的数据输出到Kafka。推荐使用下面的flusher_kafka_v2   |
-| [`flusher_kafka_v2`](flusher/flusher-kafka_v2.md)<br>Kafka                   | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Kafka。                          |
-| [`flusher_sls`](flusher/flusher-sls.md)<br>SLS                               | SLS官方                                               | 将采集到的数据输出到SLS。                            |
-| [`flusher_stdout`](flusher/flusher-stdout.md)<br>标准输出/文件                     | SLS官方                                               | 将采集到的数据输出到标准输出或文件。                        |
-| [`flusher_otlp_log`](flusher/flusher-otlp.md)<br>OTLP日志                      | 社区<br>[`liuhaoyang`](https://github.com/liuhaoyang) | 将采集到的数据支持`Opentelemetry log protocol`的后端。 |
-| [`flusher_http`](flusher/flusher-http.md)<br>HTTP                            | 社区<br>[`snakorse`](https://github.com/snakorse)     | 将采集到的数据以http方式输出到指定的后端。                   |
-| [`flusher_pulsar`](flusher/flusher-pulsar.md)<br>Kafka                       | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Pulsar。                         |
-| [`flusher_clickhouse`](flusher/flusher-clickhouse.md)<br>ClickHouse          | 社区<br>[`kl7sn`](https://github.com/kl7sn)           | 将采集到的数据输出到ClickHouse。                     |
-| [`flusher_elasticsearch`](flusher/flusher-elasticsearch.md)<br>ElasticSearch | 社区<br>[`joeCarf`](https://github.com/joeCarf)       | 将采集到的数据输出到ElasticSearch。                  |
-| [`flusher_loki`](flusher/loki.md)<br>Loki                                    | 社区<br>[`abingcbc`](https://github.com/abingcbc)     | 将采集到的数据输出到Loki。                           |
+| [`flusher_kafka`](flusher/extended/flusher-kafka.md)<br>Kafka                         | 社区                                                  | 将采集到的数据输出到Kafka。推荐使用下面的flusher_kafka_v2   |
+| [`flusher_kafka_v2`](flusher/extended/flusher-kafka_v2.md)<br>Kafka                   | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Kafka。                          |
+| [`flusher_sls`](flusher/native/flusher-sls.md)<br>SLS                               | SLS官方                                               | 将采集到的数据输出到SLS。                            |
+| [`flusher_stdout`](flusher/extended/flusher-stdout.md)<br>标准输出/文件                     | SLS官方                                               | 将采集到的数据输出到标准输出或文件。                        |
+| [`flusher_otlp_log`](flusher/extended/flusher-otlp.md)<br>OTLP日志                      | 社区<br>[`liuhaoyang`](https://github.com/liuhaoyang) | 将采集到的数据支持`Opentelemetry log protocol`的后端。 |
+| [`flusher_http`](flusher/extended/flusher-http.md)<br>HTTP                            | 社区<br>[`snakorse`](https://github.com/snakorse)     | 将采集到的数据以http方式输出到指定的后端。                   |
+| [`flusher_pulsar`](flusher/extended/flusher-pulsar.md)<br>Kafka                       | 社区<br>[`shalousun`](https://github.com/shalousun)   | 将采集到的数据输出到Pulsar。                         |
+| [`flusher_clickhouse`](flusher/extended/flusher-clickhouse.md)<br>ClickHouse          | 社区<br>[`kl7sn`](https://github.com/kl7sn)           | 将采集到的数据输出到ClickHouse。                     |
+| [`flusher_elasticsearch`](flusher/extended/flusher-elasticsearch.md)<br>ElasticSearch | 社区<br>[`joeCarf`](https://github.com/joeCarf)       | 将采集到的数据输出到ElasticSearch。                  |
+| [`flusher_loki`](flusher/extended/loki.md)<br>Loki                                    | 社区<br>[`abingcbc`](https://github.com/abingcbc)     | 将采集到的数据输出到Loki。                           |
 
 ## 扩展
 

@@ -8,7 +8,7 @@
 
 ### iLogtail介绍
 
-iLogtail 为可观测场景而生，拥有轻量级、高性能、自动化配置等诸多生产级别特性，在阿里巴巴以及外部数万家阿里云客户内部广泛应用。你可以将它部署于物理机，虚拟机，Kubernetes等多种环境中来采集可观测数据，例如logs、traces和metrics。目前来自阿里云、石墨文档、同程旅行、小红书、字节跳动、哔哩哔哩、嘀嗒出行的多位同学在参与 iLogtail 社区的共建。iLogtail 代码库：<https://github.com/alibaba/ilogtail>
+iLogtail 为可观测场景而生，拥有轻量级、高性能、自动化配置等诸多生产级别特性，在阿里巴巴以及外部数万家阿里云客户内部广泛应用。你可以将它部署于物理机，虚拟机，Kubernetes等多种环境中来采集可观测数据，例如logs、traces和metrics。目前来自阿里云、石墨文档、同程旅行、小红书、字节跳动、哔哩哔哩、嘀嗒出行的多位同学在参与 iLogtail 社区的共建。iLogtail 代码库：<https://github.com/alibaba/loongcollector>
 
 ### ConfigServer介绍
 

@@ -2,11 +2,11 @@
 
 ## 更改管控协议
 
-1. 在[管控协议讨论版](https://github.com/alibaba/ilogtail/discussions/404)提出修改意见
-2. 意见通过后，修改[管控协议文件](https://github.com/alibaba/ilogtail/tree/main/config_server/protocol)
+1. 在[管控协议讨论版](https://github.com/alibaba/loongcollector/discussions/404)提出修改意见
+2. 意见通过后，修改[管控协议文件](https://github.com/alibaba/loongcollector/tree/main/config_server/protocol)
 3. 管控协议生成对应语言的版本，并进行代码适配
-    * ilogtail C++ 部分：[agent.proto](https://github.com/alibaba/ilogtail/tree/main/core/protobuf/config_server)
-    * ConfigServer Golang 部分：[agent.proto & user.proto](https://github.com/alibaba/ilogtail/tree/main/config_server/service/proto/v1)
+    * ilogtail C++ 部分：[agent.proto](https://github.com/alibaba/loongcollector/tree/main/core/protobuf/config_server)
+    * ConfigServer Golang 部分：[agent.proto & user.proto](https://github.com/alibaba/loongcollector/tree/main/config_server/service/proto/v1)
 
 ## 开发
 
@@ -33,7 +33,7 @@ go build -o ConfigServer
 可以通过如下方式查看测试覆盖率：
 
 ```bash
-go test -cover github.com/alibaba/ilogtail/config_server/service/test -coverpkg github.com/alibaba/ilogtail/config_server/service/... -coverprofile coverage.out -v
+go test -cover github.com/alibaba/loongcollector/config_server/service/test -coverpkg github.com/alibaba/loongcollector/config_server/service/... -coverprofile coverage.out -v
 go tool cover -func=coverage.out -o coverage.txt
 # Visualization results: go tool cover -html=coverage.out -o coverage.html
 cat coverage.txt

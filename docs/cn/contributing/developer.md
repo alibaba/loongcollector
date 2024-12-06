@@ -68,4 +68,4 @@ iLogtail 社区包含 Maintainer、Committer、Contributor、User 等角色，�
 
 ### Contributor
 
-<https://github.com/alibaba/ilogtail/graphs/contributors>
+<https://github.com/alibaba/loongcollector/graphs/contributors>

@@ -1,6 +1,6 @@
 # 开发环境
 
-虽然[源代码编译](docs/cn/installation/sources/build.md)已经提供了方便的iLogtail编译方法，但却不适合开发场景。因为开发过程中需要不断进行编译调试，重复全量编译的速度太慢，因此需要构建支持增量编译开发环境。
+虽然[源代码编译](../installation/sources/build.md)已经提供了方便的iLogtail编译方法，但却不适合开发场景。因为开发过程中需要不断进行编译调试，重复全量编译的速度太慢，因此需要构建支持增量编译开发环境。
 
 ## 进程结构
 
@@ -36,7 +36,7 @@ docker目录和scripts目录分别为辅助编译的镜像描述目录和脚本�
 
 ## 开发镜像
 
-loongcollector 依赖了诸多第三方库（详见[编译依赖](./dependencies.md)），为了简化编译流程ilogtail提供了预编译依赖的镜像辅助编译。开发镜像的地址在`sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux`，可通过下面命令获取。
+loongcollector 依赖了诸多第三方库（详见[编译依赖](../installation/sources/dependencies.md)），为了简化编译流程ilogtail提供了预编译依赖的镜像辅助编译。开发镜像的地址在`sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux`，可通过下面命令获取。
 
 ```shell
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux
@@ -97,7 +97,7 @@ go install ...
 
 ```
 
-其中，image指定了ilogtail的开发镜像地址，customizations.vscode.extensions指定了开发环境的插件。部分插件介绍如下，开发者也可以按照自己的习惯进行修改，[欢迎讨论](https://github.com/alibaba/ilogtail/discussions/299)。
+其中，image指定了ilogtail的开发镜像地址，customizations.vscode.extensions指定了开发环境的插件。部分插件介绍如下，开发者也可以按照自己的习惯进行修改，[欢迎讨论](https://github.com/alibaba/loongcollector/discussions/299)。
 
 | **插件名** | **用途** |
 | --- | --- |

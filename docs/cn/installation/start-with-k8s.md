@@ -8,9 +8,9 @@
 
 ## 采集Kubernetes容器日志
 
-1. 创建部署loongcollector的命名空间
+1. 创建部署 LoongCollector 的命名空间
 
-    将下面内容保存为loongcollector-ns.yaml
+    将下面内容保存为`loongcollector-ns.yaml`
 
     ```yaml {.line-numbers}
     apiVersion: v1
@@ -22,7 +22,7 @@
     您也可以直接从下面的地址下载示例配置。
 
     ```bash
-    wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/start_with_k8s/loongcollector-ns.yaml
+    wget https://raw.githubusercontent.com/alibaba/loongcollector/main/example_config/start_with_k8s/loongcollector-ns.yaml
     ```
 
     应用上述配置
@@ -31,15 +31,15 @@
     kubectl apply -f loongcollector-ns.yaml
     ```
 
-2. 创建配置loongcollector的ConfigMap和Secret
+2. 创建配置 LoongCollector 的 ConfigMap 和 Secret
 
-    将下面内容保存为loongcollector-user-configmap.yaml。该ConfigMap后续将作为配置目录挂载到loongcollector容器中，因此可包含多个采集配置。
+    将下面内容保存为`loongcollector-user-configmap.yaml`。该ConfigMap后续将作为配置目录挂载到LoongCollector 容器中，因此可包含多个采集配置。
 
-    ```yaml {.line-numbers}
+    ```yaml  
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: loongcollector-user-cm
+      name: loongcollector-user-configmap
       namespace: loongcollector
     data:
       nginx_stdout.yaml: |
@@ -71,7 +71,7 @@
             OnlyStdout: true
     ```
 
-    将下面内容保存为loongcollector-secret.yaml。该Secret为可选，当需要将日志写入SLS时会用到。
+    将下面内容保存为`loongcollector-secret.yaml`。该Secret为可选，当需要将日志写入SLS时会用到。
 
     ```yaml {.line-numbers}
     apiVersion: v1
@@ -88,8 +88,8 @@
     您也可以直接从下面的地址下载示例配置。
 
     ```bash
-    wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/start_with_k8s/loongcollector-user-configmap.yaml
-    wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/start_with_k8s/loongcollector-secret.yaml
+    wget https://raw.githubusercontent.com/alibaba/loongcollector/main/example_config/start_with_k8s/loongcollector-user-configmap.yaml
+    wget https://raw.githubusercontent.com/alibaba/loongcollector/main/example_config/start_with_k8s/loongcollector-secret.yaml
     ```
 
     应用上述配置
@@ -99,9 +99,9 @@
     kubectl apply -f loongcollector-secret.yaml
     ```
 
-3. 创建loongcollector DaemonSet
+3. 创建 LoongCollector DaemonSet
 
-    将下面内容保存为loongcollector-daemonset.yaml。
+    将下面内容保存为`loongcollector-daemonset.yaml`。
 
     ```yaml {.line-numbers}
     apiVersion: apps/v1
@@ -154,7 +154,7 @@
                       key: access_key
                       optional: true
               image: >-
-                sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:latest
+                sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:0.2.0
               imagePullPolicy: IfNotPresent
               resources:
                 limits:
@@ -192,14 +192,14 @@
               name: checkpoint
             - configMap:
                 defaultMode: 420
-                name: loongcollector-user-cm
+                name: loongcollector-user-configmap
               name: user-config
     ```
 
     您也可以直接从下面的地址下载示例配置。
 
     ```bash
-    wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/start_with_k8s/loongcollector-daemonset.yaml
+    wget https://raw.githubusercontent.com/alibaba/loongcollector/main/example_config/start_with_k8s/loongcollector-daemonset.yaml
     ```
 
     添加参数示例
@@ -221,9 +221,9 @@
     kubectl apply -f loongcollector-daemonset.yaml
     ```
 
-4. 部署用来测试的nginx
+4. 部署用来测试的 nginx
 
-    将下面内容保存为nginx-deployment.yaml。
+    将下面内容保存为`nginx-deployment.yaml`。
 
     ```yaml {.line-numbers}
     apiVersion: apps/v1
@@ -259,7 +259,7 @@
     您也可以直接从下面的地址下载示例配置。
 
     ```bash
-    wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/start_with_k8s/nginx-deployment.yaml
+    wget https://raw.githubusercontent.com/alibaba/loongcollector/main/example_config/start_with_k8s/nginx-deployment.yaml
     ```
 
     应用上述配置
@@ -283,13 +283,13 @@
     结果为
 
     ```json
-    2022-07-14 16:36:50 {"_time_":"2022-07-15T00:36:48.489153485+08:00","_source_":"stdout","_image_name_":"docker.io/library/nginx:latest","_container_name_":"nginx","_pod_name_":"nginx-76d49876c7-r892w","_namespace_":"default","_pod_uid_":"07f75a79-da69-40ac-ae2b-77a632929cc6","_container_ip_":"10.223.0.154","remote_addr":"::1","remote_user":"-","time_local":"14/Jul/2022:16:36:48","method":"GET","url":"/hello/loongcollector","protocol":"HTTP/1.1","status":"404","body_bytes_sent":"153","http_referer":"-","http_user_agent":"curl/7.74.0","http_x_forwarded_for":"-","__time__":"1657816609"}
+    2024-12-05 08:53:45 {"_time_":"2024-12-05T16:53:42.165362808+08:00","_source_":"stdout","_pod_name_":"nginx-b9cf9cc78-8tzpx","_namespace_":"default","_pod_uid_":"6deb87e1-02b3-4002-a556-32a3f668cd6f","_container_ip_":"192.168.0.65","_image_name_":"docker.io/library/nginx:latest","_container_name_":"nginx","remote_addr":"127.0.0.1","remote_user":"-","time_local":"05/Dec/2024:08:53:42","method":"GET","url":"/hello/loongcollector","protocol":"HTTP/1.1","status":"404","body_bytes_sent":"153","http_referer":"-","http_user_agent":"curl/7.88.1","http_x_forwarded_for":"-","__time__":"1733388822"}
     ```
 
 ## 采集模版
 
 了解采集配置结构：[采集配置](../configuration/collection-config.md)
 
-查看更多K8s采集日志模版（从容器中采集文件日等）：<https://github.com/alibaba/ilogtail/blob/main/k8s_templates>
+查看更多K8s采集日志模版（从容器中采集文件日等）：<https://github.com/alibaba/loongcollector/blob/main/k8s_templates>
 
-参考更多可组合的日志采集和处理配置样例：<https://github.com/alibaba/ilogtail/blob/main/example_config>
+参考更多可组合的日志采集和处理配置样例：<https://github.com/alibaba/loongcollector/blob/main/example_config>

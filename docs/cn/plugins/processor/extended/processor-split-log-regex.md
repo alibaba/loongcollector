@@ -9,7 +9,7 @@
 
 ## 版本
 
-[Stable](../stability-level.md)
+[Stable](../../stability-level.md)
 
 ## 配置参数
 

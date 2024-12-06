@@ -50,13 +50,13 @@
 
 | 输入插件 | 说明 |
 |---------|------|
-| [`input_file`](../input/input-file.md) | 文本日志输入插件 |
-| [`input_container_stdio`](../input/input-container-stdio.md) | 容器标准输出插件 |
-| [`input_observer_network`](../input/metric-observer.md) | eBPF网络观测插件 |
-| [`input_file_security`](../input/input-file-security.md) | 文件安全监控插件 |
-| [`input_network_observer`](../input/input-network-observer.md) | 网络观测插件 |
-| [`input_network_security`](../input/input-network-security.md) | 网络安全监控插件 |
-| [`input_process_security`](../input/input-process-security.md) | 进程安全监控插件 |
+| [`input_file`](../input/native/input-file.md) | 文本日志输入插件 |
+| [`input_container_stdio`](../input/native/input-container-stdio.md) | 容器标准输出插件 |
+| [`input_observer_network`](../input/native/metric-observer.md) | eBPF网络观测插件 |
+| [`input_file_security`](../input/native/input-file-security.md) | 文件安全监控插件 |
+| [`input_network_observer`](../input/native/input-network-observer.md) | 网络观测插件 |
+| [`input_network_security`](../input/native/input-network-security.md) | 网络安全监控插件 |
+| [`input_process_security`](../input/native/input-process-security.md) | 进程安全监控插件 |
 
 更多输入插件说明请参考[输入插件文档](../input/README.md)。
 

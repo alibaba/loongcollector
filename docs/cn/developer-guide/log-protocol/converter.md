@@ -63,7 +63,7 @@ func (c *Converter) ToByteStreamWithSelectedFieldsV2(groupEvents *models.Pipelin
 1. 在当前文件中引入`protocol`包：
 
     ```Go
-    import "github.com/alibaba/ilogtail/pkg/protocol"
+    import "github.com/alibaba/loongcollector/pkg/protocol"
     ```
 
 2. 使用选定的转换参数创建`Converter`对象实例：

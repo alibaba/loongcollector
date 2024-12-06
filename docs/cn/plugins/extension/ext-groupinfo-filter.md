@@ -2,7 +2,7 @@
 
 ## 简介
 
-`ext_groupinfo_filter` 扩展插件，实现了 [extensions.FlushInterceptor](https://github.com/alibaba/ilogtail/blob/main/pkg/pipeline/extensions/flush_interceptor.go) 接口，可以在 http_flusher 插件中引用，提供在向远端最终提交前筛选数据的能力。
+`ext_groupinfo_filter` 扩展插件，实现了 [extensions.FlushInterceptor](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/extensions/flush_interceptor.go) 接口，可以在 http_flusher 插件中引用，提供在向远端最终提交前筛选数据的能力。
 
 ## 版本
 
