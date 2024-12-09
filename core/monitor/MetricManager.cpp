@@ -28,9 +28,6 @@ using namespace std;
 
 namespace logtail {
 
-const string METRIC_KEY_CATEGORY = "category";
-const string METRIC_KEY_LABEL = "label";
-const string METRIC_TOPIC_TYPE = "loongcollector_metric";
 const string METRIC_EXPORT_TYPE_GO = "direct";
 const string METRIC_EXPORT_TYPE_CPP = "cpp_provided";
 

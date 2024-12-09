@@ -28,6 +28,9 @@
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseFlusherSLSMonitor.h"
+#endif
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputPrometheus.h"
@@ -160,6 +163,9 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
+#ifdef __ENTERPRISE__
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());
+#endif
 }
 
 void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {

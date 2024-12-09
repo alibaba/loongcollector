@@ -208,56 +208,56 @@ void FlusherSLS::SetDefaultRegion(const string& region) {
     sDefaultRegion = region;
 }
 
-mutex FlusherSLS::sProjectRefCntMapLock;
+mutex FlusherSLS::sProjectRegionMapLock;
 unordered_map<string, int32_t> FlusherSLS::sProjectRefCntMap;
-mutex FlusherSLS::sRegionRefCntMapLock;
 unordered_map<string, int32_t> FlusherSLS::sRegionRefCntMap;
+unordered_map<string, string> FlusherSLS::sProjectRegionMap;
 
 string FlusherSLS::GetAllProjects() {
     string result;
-    lock_guard<mutex> lock(sProjectRefCntMapLock);
+    lock_guard<mutex> lock(sProjectRegionMapLock);
     for (auto iter = sProjectRefCntMap.cbegin(); iter != sProjectRefCntMap.cend(); ++iter) {
         result.append(iter->first).append(" ");
     }
     return result;
 }
 
-void FlusherSLS::IncreaseProjectReferenceCnt(const string& project) {
-    lock_guard<mutex> lock(sProjectRefCntMapLock);
-    ++sProjectRefCntMap[project];
-}
-
-void FlusherSLS::DecreaseProjectReferenceCnt(const string& project) {
-    lock_guard<mutex> lock(sProjectRefCntMapLock);
-    auto iter = sProjectRefCntMap.find(project);
-    if (iter == sProjectRefCntMap.end()) {
-        // should not happen
-        return;
-    }
-    if (--iter->second == 0) {
-        sProjectRefCntMap.erase(iter);
-    }
-}
-
 bool FlusherSLS::IsRegionContainingConfig(const string& region) {
-    lock_guard<mutex> lock(sRegionRefCntMapLock);
+    lock_guard<mutex> lock(sProjectRegionMapLock);
     return sRegionRefCntMap.find(region) != sRegionRefCntMap.end();
 }
 
-void FlusherSLS::IncreaseRegionReferenceCnt(const string& region) {
-    lock_guard<mutex> lock(sRegionRefCntMapLock);
-    ++sRegionRefCntMap[region];
+std::string FlusherSLS::GetProjectRegion(const std::string& project) {
+    lock_guard<mutex> lock(sProjectRegionMapLock);
+    auto iter = sProjectRegionMap.find(project);
+    if (iter == sProjectRegionMap.end()) {
+        return "";
+    }
+    return iter->second;
 }
 
-void FlusherSLS::DecreaseRegionReferenceCnt(const string& region) {
-    lock_guard<mutex> lock(sRegionRefCntMapLock);
-    auto iter = sRegionRefCntMap.find(region);
-    if (iter == sRegionRefCntMap.end()) {
-        // should not happen
-        return;
+void FlusherSLS::IncreaseProjectRegionReferenceCnt(const string& project, const string& region) {
+    lock_guard<mutex> lock(sProjectRegionMapLock);
+    ++sProjectRefCntMap[project];
+    ++sRegionRefCntMap[region];
+    sProjectRegionMap[project] = region;
+}
+
+void FlusherSLS::DecreaseProjectRegionReferenceCnt(const string& project, const string& region) {
+    lock_guard<mutex> lock(sProjectRegionMapLock);
+    auto projectRefCnt = sProjectRefCntMap.find(project);
+    if (projectRefCnt != sProjectRefCntMap.end()) {
+        if (--projectRefCnt->second == 0) {
+            sProjectRefCntMap.erase(projectRefCnt);
+            sProjectRegionMap.erase(project);
+        }
     }
-    if (--iter->second == 0) {
-        sRegionRefCntMap.erase(iter);
+
+    auto regionRefCnt = sRegionRefCntMap.find(region);
+    if (regionRefCnt != sRegionRefCntMap.end()) {
+        if (--regionRefCnt->second == 0) {
+            sRegionRefCntMap.erase(regionRefCnt);
+        }
     }
 }
 
@@ -540,8 +540,7 @@ bool FlusherSLS::Start() {
     Flusher::Start();
     InitResource();
 
-    IncreaseProjectReferenceCnt(mProject);
-    IncreaseRegionReferenceCnt(mRegion);
+    IncreaseProjectRegionReferenceCnt(mProject, mRegion);
     SLSClientManager::GetInstance()->IncreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
     return true;
 }
@@ -549,11 +548,11 @@ bool FlusherSLS::Start() {
 bool FlusherSLS::Stop(bool isPipelineRemoving) {
     Flusher::Stop(isPipelineRemoving);
 
-    DecreaseProjectReferenceCnt(mProject);
-    DecreaseRegionReferenceCnt(mRegion);
+    DecreaseProjectRegionReferenceCnt(mProject, mRegion);
     SLSClientManager::GetInstance()->DecreaseAliuidReferenceCntForRegion(mRegion, mAliuid);
     return true;
 }
+
 
 bool FlusherSLS::Send(PipelineEventGroup&& g) {
     if (g.IsReplay()) {

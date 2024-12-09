@@ -30,8 +30,6 @@
 
 namespace logtail {
 
-extern const std::string METRIC_TOPIC_TYPE;
-
 class WriteMetrics {
 private:
     WriteMetrics() = default;

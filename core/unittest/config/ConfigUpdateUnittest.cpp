@@ -20,6 +20,9 @@
 
 #include "config/PipelineConfig.h"
 #include "config/common_provider/CommonConfigProvider.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineManager.h"
@@ -268,7 +271,11 @@ private:
 
 void ConfigUpdateUnittest::OnStartUp() const {
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_EQUAL(0U, diff.first.mAdded.size());
+    size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+    builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
+    APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
     APSARA_TEST_TRUE(diff.second.IsEmpty());
 
     GenerateInitialConfigs();
