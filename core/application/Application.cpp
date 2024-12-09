@@ -70,9 +70,8 @@ DEFINE_FLAG_INT32(tcmalloc_release_memory_interval, "force release memory held b
 DEFINE_FLAG_INT32(exit_flushout_duration, "exit process flushout duration", 20 * 1000);
 DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
-DEFINE_FLAG_BOOL(enable_cgroup, "", true);
+DEFINE_FLAG_BOOL(enable_cgroup, "", false);
 #endif
-
 
 DECLARE_FLAG_BOOL(send_prefer_real_ip);
 DECLARE_FLAG_BOOL(global_network_success);
