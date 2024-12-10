@@ -189,7 +189,7 @@ void eBPFServer::Stop() {
     for (int i = 0; i < int(nami::PluginType::MAX); i ++) {
         UpdatePipelineName(static_cast<nami::PluginType>(i), "", "");
     }
-    
+
     // UpdateContext must after than StopPlugin
     if (mEventCB) mEventCB->UpdateContext(nullptr, -1, -1);
     if (mMeterCB) mMeterCB->UpdateContext(nullptr, -1, -1);
@@ -199,11 +199,12 @@ void eBPFServer::Stop() {
     if (mFileSecureCB) mFileSecureCB->UpdateContext(nullptr, -1, -1);
 }
 
-bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
-                        nami::PluginType type, 
-                        const logtail::PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, PluginMetricManagerPtr mgr) {
-
+bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
+                                     uint32_t plugin_index,
+                                     nami::PluginType type,
+                                     const logtail::PipelineContext* ctx,
+                                     const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                                     PluginMetricManagerPtr mgr) {
     std::string prev_pipeline_name = CheckLoadedPipelineName(type);
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger, ("pipeline already loaded, plugin type", int(type))
@@ -217,23 +218,21 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
     mMonitorMgr->Init(type, mgr, pipeline_name, ctx->GetProjectName());
 
     // step1: convert options to export type
-    std::variant<nami::NetworkObserveConfig, nami::ProcessConfig, nami::NetworkSecurityConfig, nami::FileSecurityConfig> config;
     bool ret = false;
     auto eBPFConfig = std::make_unique<nami::eBPFConfig>();
     eBPFConfig->plugin_type_ = type;
-    eBPFConfig->stats_handler_ = [this](auto stats){ return mMonitorMgr->HandleStatistic(std::move(stats)); };
+    eBPFConfig->stats_handler_ = [this](auto&& stats) { return mMonitorMgr->HandleStatistic(std::move(stats)); };
     // call update function
     // step2: call init function
     switch(type) {
     case nami::PluginType::PROCESS_SECURITY: {
         nami::ProcessConfig pconfig;
-        pconfig.process_security_cb_ = [this](auto events) { return mProcessSecureCB->handle(std::move(events)); };
+        pconfig.process_security_cb_ = [this](auto&& events) { return mProcessSecureCB->handle(std::move(events)); };
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
         pconfig.options_ = opts->mOptionList;
-        config = std::move(pconfig);
         // UpdateContext must ahead of StartPlugin
         mProcessSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-        eBPFConfig->config_ = config;
+        eBPFConfig->config_ = std::move(pconfig);
         ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
         break;
     }
@@ -243,36 +242,34 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
         nami::ObserverNetworkOption* opts = std::get<nami::ObserverNetworkOption*>(options);
         if (opts->mEnableMetric) {
             nconfig.enable_metric_ = true;
-            nconfig.measure_cb_ = [this](auto events, auto ts) { return mMeterCB->handle(std::move(events), ts); };
+            nconfig.measure_cb_ = [this](auto&& events, auto ts) { return mMeterCB->handle(std::move(events), ts); };
             nconfig.enable_metric_ = true;
             mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableSpan) {
             nconfig.enable_span_ = true;
-            nconfig.span_cb_ = [this](auto events) { return mSpanCB->handle(std::move(events)); };
+            nconfig.span_cb_ = [this](auto&& events) { return mSpanCB->handle(std::move(events)); };
             nconfig.enable_span_ = true;
             mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableLog) {
             nconfig.enable_event_ = true;
-            nconfig.event_cb_ = [this](auto events) { return mEventCB->handle(std::move(events)); };
+            nconfig.event_cb_ = [this](auto&& events) { return mEventCB->handle(std::move(events)); };
             nconfig.enable_event_ = true;
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
 
-        config = std::move(nconfig);
-        eBPFConfig->config_ = config;
+        eBPFConfig->config_ = std::move(nconfig);
         ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
         break;
     }
 
     case nami::PluginType::NETWORK_SECURITY:{
         nami::NetworkSecurityConfig nconfig;
-        nconfig.network_security_cb_ = [this](auto events) { return mNetworkSecureCB->handle(std::move(events)); };
+        nconfig.network_security_cb_ = [this](auto&& events) { return mNetworkSecureCB->handle(std::move(events)); };
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
         nconfig.options_ = opts->mOptionList;
-        config = std::move(nconfig);
-        eBPFConfig->config_ = config;
+        eBPFConfig->config_ = std::move(nconfig);
         // UpdateContext must ahead of StartPlugin
         mNetworkSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
@@ -281,11 +278,10 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
 
     case nami::PluginType::FILE_SECURITY:{
         nami::FileSecurityConfig fconfig;
-        fconfig.file_security_cb_ = [this](auto events) { return mFileSecureCB->handle(std::move(events)); };
+        fconfig.file_security_cb_ = [this](auto&& events) { return mFileSecureCB->handle(std::move(events)); };
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
         fconfig.options_ = opts->mOptionList;
-        config = std::move(fconfig);
-        eBPFConfig->config_ = config;
+        eBPFConfig->config_ = std::move(fconfig);
         // UpdateContext must ahead of StartPlugin
         mFileSecureCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));

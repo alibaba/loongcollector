@@ -188,7 +188,7 @@ bool SourceManager::StartPlugin(nami::PluginType plugin_type, std::unique_ptr<na
     return false;
   }
   auto init_f = (init_func)f;
-  int res = init_f(conf.release());
+  int res = init_f(conf.get());
   if (!res) mRunning[int(plugin_type)] = true;
   return !res;
 }
@@ -199,6 +199,7 @@ bool SourceManager::UpdatePlugin(nami::PluginType plugin_type, std::unique_ptr<n
     return false;
   }
 
+  LOG_INFO(sLogger, ("begin to update plugin, type", int(plugin_type)));
   conf->type = UpdataType::SECURE_UPDATE_TYPE_CONFIG_CHAGE;
   FillCommonConf(conf);
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -212,20 +213,21 @@ bool SourceManager::UpdatePlugin(nami::PluginType plugin_type, std::unique_ptr<n
   }
 
   auto update_f = (update_func)f;
-  int res = update_f(conf.release());
-  if (!res) mRunning[int(plugin_type)] = true;
+  int res = update_f(conf.get());
   return !res;
 }
 
 bool SourceManager::StopAll() {
   if (!DynamicLibSuccess()) {
-    LOG_WARNING(sLogger, ("dynamic lib not load, just exit", "need check"));
-    return true;
+      LOG_WARNING(sLogger, ("dynamic lib not load, just exit", "need check"));
+      return true;
   }
 
   for (size_t i = 0; i < mRunning.size(); i ++) {
     auto& x = mRunning[i];
-    if (!x) continue;
+    if (!x) {
+        continue;
+    }
     // stop plugin
     StopPlugin(static_cast<nami::PluginType>(i));
   }
@@ -241,13 +243,13 @@ bool SourceManager::StopAll() {
 }
 
 bool SourceManager::SuspendPlugin(nami::PluginType plugin_type) {
-  if (!CheckPluginRunning(plugin_type)) {
-    LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type",  int(plugin_type)));
-    return false;
-  }
-  auto config = std::make_unique<nami::eBPFConfig>();
-  config->plugin_type_ = plugin_type;
-  config->type = UpdataType::SECURE_UPDATE_TYPE_SUSPEND_PROBE;
+    if (!CheckPluginRunning(plugin_type)) {
+        LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", int(plugin_type)));
+        return false;
+    }
+    auto config = std::make_unique<nami::eBPFConfig>();
+    config->plugin_type_ = plugin_type;
+    config->type = UpdataType::SECURE_UPDATE_TYPE_SUSPEND_PROBE;
 #ifdef APSARA_UNIT_TEST_MAIN
   mConfig = std::move(config);
   return true;
@@ -260,15 +262,15 @@ bool SourceManager::SuspendPlugin(nami::PluginType plugin_type) {
   }
 
   auto suspend_f = (suspend_func)f;
-  int res = suspend_f(config.release());
+  int res = suspend_f(config.get());
 
   return !res;
 }
 
 bool SourceManager::StopPlugin(nami::PluginType plugin_type) {
   if (!CheckPluginRunning(plugin_type)) {
-    LOG_WARNING(sLogger, ("plugin not started, do nothing. type",  int(plugin_type)));
-    return true;
+      LOG_WARNING(sLogger, ("plugin not started, do nothing. type", int(plugin_type)));
+      return true;
   }
 
   auto config = std::make_unique<nami::eBPFConfig>();
@@ -288,7 +290,7 @@ bool SourceManager::StopPlugin(nami::PluginType plugin_type) {
   }
 
   auto remove_f = (remove_func)f;
-  int res = remove_f(config.release());
+  int res = remove_f(config.get());
   if (!res) mRunning[int(plugin_type)] = false;
   return !res;
 }

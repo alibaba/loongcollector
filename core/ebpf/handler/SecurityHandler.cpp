@@ -49,7 +49,7 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
     event_group.SetTag(host_ip_key, mHostIp);
     event_group.SetTag(host_name_key, mHostName);
     for (auto& x : events) {
-        auto event = event_group.AddLogEvent();
+        auto* event = event_group.AddLogEvent();
         for (auto& tag : x->GetAllTags()) {
             event->SetContent(tag.first, tag.second);
         }
