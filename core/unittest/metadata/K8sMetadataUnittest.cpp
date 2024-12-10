@@ -34,9 +34,36 @@ protected:
     }
     
 public:
+
+    void TestFromInfoJson() {
+        // 创建Json测试数据
+        Json::Value testJson;
+        testJson["images"]["image1"] = "nginx:latest";
+        testJson["labels"]["app_id"] = "my_app_id";
+        testJson["namespace"] = "default";
+        testJson["workloadKind"] = "Deployment";
+        testJson["workloadName"] = "nginx-deployment";
+        testJson["serviceName"] = "nginx-service";
+
+        k8sContainerInfo info;
+        auto& k8sMetadata = K8sMetadata::GetInstance();
+
+        // 调用函数
+        bool result = k8sMetadata.FromInfoJson(testJson, info);
+
+        // 验证结果
+        EXPECT_TRUE(result);
+        EXPECT_EQ(info.images["image1"], "nginx:latest");
+        EXPECT_EQ(info.labels["app_id"], "my_app_id");
+        EXPECT_EQ(info.k8sNamespace, "default");
+        EXPECT_EQ(info.workloadKind, "Deployment");
+        EXPECT_EQ(info.workloadName, "nginx-deployment");
+        EXPECT_EQ(info.serviceName, "nginx-service");
+    }
+
     void TestGetByContainerIds() {
         LOG_INFO(sLogger, ("TestGetByContainerIds() begin", time(NULL)));
-                const std::string jsonData = R"({"containerd://286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144":{"namespace":"default","workloadName":"oneagent-demo-658648895b","workloadKind":"replicaset","serviceName":"","labels":{"app":"oneagent-demo","pod-template-hash":"658648895b"},"envs":{},"images":{"oneagent-demo":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/centos7-cve-fix:1.0.0"}}})";
+                const std::string jsonData = R"({"containerd://286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144":{"namespace":"default","workloadName":"oneagent-demo-658648895b","workloadKind":"replicaset","serviceName":"","labels":{"app":"oneagent-demo","pod-template-hash":"658648895b"},"envs":{},""images"":{"oneagent-demo":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/centos7-cve-fix:1.0.0"}}})";
 
         Json::Value root;
         Json::CharReaderBuilder readerBuilder;
@@ -75,7 +102,7 @@ public:
                     "COREDNS_NAMESPACE": "",
                     "COREDNS_POD_NAME": ""
                 },
-                "images": {
+                ""images"": {
                     "coredns": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/coredns:v1.9.3.10-7dfca203-aliyun"
                 }
             },
@@ -94,7 +121,7 @@ public:
                     "KUBE_NODE_NAME": "",
                     "SERVICE_TYPE": "provisioner"
                 },
-                "images": {
+                ""images"": {
                     "csi-provisioner": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-plugin:v1.30.3-921e63a-aliyun",
                     "external-csi-snapshotter": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-snapshotter:v4.0.0-a230d5b-aliyun",
                     "external-disk-attacher": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-attacher:v4.5.0-4a01fda6-aliyun",
@@ -119,7 +146,7 @@ public:
                 "envs": {
                     "NODE_NAME": ""
                 },
-                "images": {
+                ""images"": {
                     "kube-proxy-worker": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/kube-proxy:v1.30.1-aliyun.1"
                 }
             }
@@ -148,7 +175,7 @@ public:
 {
         "name": "test",
         "tags": {
-            "remote_ip": "172.16.20.108"
+            "remote.ip": "172.16.20.108"
         },
         "timestamp" : 12345678901,
         "timestampNanosecond" : 0,
@@ -174,7 +201,7 @@ public:
         processor.AddLabelToLogGroup(eventGroup);
         EventsContainer& eventsEnd = eventGroup.MutableEvents();
         auto& metricEvent = eventsEnd[0].Cast<MetricEvent>();
-        APSARA_TEST_EQUAL("kube-proxy-worker", metricEvent.GetTag("peerWorkloadName").to_string());
+        APSARA_TEST_EQUAL("kube-proxy-worker", metricEvent.GetTag("peer.workload.name").to_string());
         APSARA_TEST_TRUE_FATAL(k8sMetadata.GetInfoByIpFromCache("10.41.0.2") != nullptr);
     }
 
@@ -195,7 +222,7 @@ public:
                     "COREDNS_NAMESPACE": "",
                     "COREDNS_POD_NAME": ""
                 },
-                "images": {
+                ""images"": {
                     "coredns": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/coredns:v1.9.3.10-7dfca203-aliyun"
                 }
             },
@@ -214,7 +241,7 @@ public:
                     "KUBE_NODE_NAME": "",
                     "SERVICE_TYPE": "provisioner"
                 },
-                "images": {
+                ""images"": {
                     "csi-provisioner": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-plugin:v1.30.3-921e63a-aliyun",
                     "external-csi-snapshotter": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-snapshotter:v4.0.0-a230d5b-aliyun",
                     "external-disk-attacher": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-attacher:v4.5.0-4a01fda6-aliyun",
@@ -239,7 +266,7 @@ public:
                 "envs": {
                     "NODE_NAME": ""
                 },
-                "images": {
+                ""images"": {
                     "kube-proxy-worker": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/kube-proxy:v1.30.1-aliyun.1"
                 }
             }
@@ -274,7 +301,7 @@ public:
         mSpanEvent->SetStartTimeNs(1715826723000000000);
         mSpanEvent->SetEndTimeNs(1715826725000000000);
         mSpanEvent->SetTag(string("key1"), string("value1"));
-        mSpanEvent->SetTag(string("remote_ip"), string("172.16.20.108"));
+        mSpanEvent->SetTag(string("remote.ip"), string("172.16.20.108"));
         SpanEvent::InnerEvent* e = mSpanEvent->AddEvent();
         e->SetName("test_event");
         e->SetTimestampNs(1715826724000000000);
@@ -287,7 +314,9 @@ public:
         mSpanEvent->SetScopeTag(string("key2"), string("value2"));
         LabelingK8sMetadata& processor = *(new LabelingK8sMetadata);
         processor.AddLabels(*mSpanEvent, container_vec, remote_ip_vec);
-        APSARA_TEST_EQUAL("kube-proxy-worker", mSpanEvent->GetTag("peerWorkloadName").to_string());
+        APSARA_TEST_EQUAL("kube-system", mSpanEvent->GetTag("k8s.namespace.name").to_string());
+        APSARA_TEST_EQUAL("daemonset", mSpanEvent->GetTag("peer.workload.kind").to_string());
+        APSARA_TEST_EQUAL("kube-proxy-worker", mSpanEvent->GetTag("peer.workload.name").to_string());
         APSARA_TEST_TRUE_FATAL(k8sMetadata.GetInfoByIpFromCache("10.41.0.2") != nullptr);
     }
 
@@ -309,7 +338,7 @@ public:
                     "COREDNS_NAMESPACE": "",
                     "COREDNS_POD_NAME": ""
                 },
-                "images": {
+                ""images"": {
                     "coredns": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/coredns:v1.9.3.10-7dfca203-aliyun"
                 }
             },
@@ -328,7 +357,7 @@ public:
                     "KUBE_NODE_NAME": "",
                     "SERVICE_TYPE": "provisioner"
                 },
-                "images": {
+                ""images"": {
                     "csi-provisioner": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-plugin:v1.30.3-921e63a-aliyun",
                     "external-csi-snapshotter": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-snapshotter:v4.0.0-a230d5b-aliyun",
                     "external-disk-attacher": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/csi-attacher:v4.5.0-4a01fda6-aliyun",
@@ -353,7 +382,7 @@ public:
                 "envs": {
                     "NODE_NAME": ""
                 },
-                "images": {
+                ""images"": {
                     "kube-proxy-worker": "registry-cn-chengdu-vpc.ack.aliyuncs.com/acs/kube-proxy:v1.30.1-aliyun.1"
                 }
             }
@@ -383,7 +412,7 @@ public:
 {
         "name": "test",
         "tags": {
-            "remote_ip": "172.16.20.108"
+            "remote.ip": "172.16.20.108"
         },
         "timestamp" : 12345678901,
         "timestampNanosecond" : 0,
@@ -412,7 +441,7 @@ public:
         processor.AddLabels(events[0].Cast<MetricEvent>(), container_vec, remote_ip_vec);
         EventsContainer& eventsEnd = eventGroup.MutableEvents();
         auto& metricEvent = eventsEnd[0].Cast<MetricEvent>();
-        APSARA_TEST_EQUAL("kube-proxy-worker", metricEvent.GetTag("peerWorkloadName").to_string());
+        APSARA_TEST_EQUAL("kube-proxy-worker", metricEvent.GetTag("peer.workload.name").to_string());
         APSARA_TEST_TRUE_FATAL(k8sMetadata.GetInfoByIpFromCache("10.41.0.2") != nullptr);
     }
 };
@@ -421,6 +450,7 @@ APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestGetByContainerIds, 0);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestGetByLocalHost, 1);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToMetric, 2);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToSpan, 3);
+APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestFromInfoJson, 4);
 
 
 
