@@ -1,6 +1,6 @@
 # 代码风格
 
-iLogtail C++遵循基于[Google代码规范](https://google.github.io/styleguide/cppguide.html)的风格，详细格式约束见[.clang-format](https://github.com/alibaba/loongcollector/blob/main/.clang-format)。
+LoongCollector C++遵循基于[Google代码规范](https://google.github.io/styleguide/cppguide.html)的风格，详细格式约束见[.clang-format](https://github.com/alibaba/loongcollector/blob/main/.clang-format)。
 
 Go遵循[Effective Go](https://go.dev/doc/effective_go)风格。
 

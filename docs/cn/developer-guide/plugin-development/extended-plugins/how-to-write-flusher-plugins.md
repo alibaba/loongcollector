@@ -10,7 +10,7 @@ Flusher 插件与外部系统进行交互，将数据发送到外部，以下将
 - Flush 接口是插件系统向 flusher 插件实例提交数据的入口，用于将数据输出到外部系统。为了映射到日志服务的概念中，我们增加了三个 string 参数，它代表这个 flusher 实例所属的
   project/logstore/config。详细解释请参与[数据结构](../data-structure.md) 与 [基本结构](../../../principle/plugin-system.md) 。
 
-- SetUrgent： 标识iLogtail 即将退出，将系统状态传递给具体Flusher 插件，可以供Flusher 插件自动适应系统状态，比如加快输出速率等。(SetUrgent调用发生在其他类型插件的Stop之前，当前尚无有意义的实现)
+- SetUrgent： 标识 LoongCollector 即将退出，将系统状态传递给具体Flusher 插件，可以供Flusher 插件自动适应系统状态，比如加快输出速率等。(SetUrgent调用发生在其他类型插件的Stop之前，当前尚无有意义的实现)
 - Stop：停止Flusher 插件，比如断开与外部系统交互的链接
 
 ```go

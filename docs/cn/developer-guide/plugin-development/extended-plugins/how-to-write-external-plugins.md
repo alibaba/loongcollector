@@ -2,7 +2,7 @@
 
 ## 场景
 
-某些情况下，您可能想要开发自己的非公开插件，但又希望能够及时更新使用到社区iLogtail不断迭代的更新功能（而不是在社区版本上分叉），iLogtail 的外部插件开发机制可以满足您这样的需求。
+某些情况下，您可能想要开发自己的非公开插件，但又希望能够及时更新使用到社区 LoongCollector 不断迭代的更新功能（而不是在社区版本上分叉），LoongCollector 的外部插件开发机制可以满足您这样的需求。
 
 ## 步骤
 
@@ -153,9 +153,9 @@ import (
 
 ### 7. 编写插件引用配置文件
 
-**以下内容在 iLogtail 主仓库执行**。
+**以下内容在 LoongCollector 主仓库执行**。
 
-在 iLogtail 仓库根目录创建名为 `external_plugins.yml` 的配置文件，写入如下内容：
+在 LoongCollector 仓库根目录创建名为 `external_plugins.yml` 的配置文件，写入如下内容：
 
 ```yaml
 plugins:

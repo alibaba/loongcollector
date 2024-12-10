@@ -97,4 +97,5 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-c
 ## iLogtail 版本
 
 [iLogtail 发布记录(2.x版本)](release-notes-ilogtail-2x.md)
+
 [iLogtail 发布记录(1.x版本)](release-notes-ilogtail-1x.md)

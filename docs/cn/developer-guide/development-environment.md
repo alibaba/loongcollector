@@ -1,20 +1,20 @@
 # 开发环境
 
-虽然[源代码编译](../installation/sources/build.md)已经提供了方便的iLogtail编译方法，但却不适合开发场景。因为开发过程中需要不断进行编译调试，重复全量编译的速度太慢，因此需要构建支持增量编译开发环境。
+虽然[源代码编译](../installation/sources/build.md)已经提供了方便的 LoongCollector 编译方法，但却不适合开发场景。因为开发过程中需要不断进行编译调试，重复全量编译的速度太慢，因此需要构建支持增量编译开发环境。
 
 ## 进程结构
 
-iLogtail为了支持插件系统，引入了 libPluginAdaptor 和 libPluginBase（以下简称 adaptor 和 base）这两个动态库，它们与 iLogtail 之间的关系如下：<br />
-iLogtail 动态依赖于这两个动态库（即 binary 中不依赖），在初始化时，iLogtail 会尝试使用动态库接口（如 dlopen）动态加载它们，获取所需的符号。<br />
-Adaptor 充当一个中间层，iLogtail 和 base 均依赖它，iLogtail 向 adaptor 注册回调，adpator 将这些回调记录下来以接口的形式暴露给 base 使用。<br />
-Base 是插件系统的主体，它包含插件系统所必须的采集、处理、聚合以及输出（向 iLogtail 递交可以视为其中一种）等功能。<br />
-因此，完整的iLogtail包含ilogtail、libPluginAdaptor.so 和 libPluginBase.so 3个二进制文件。
+LoongCollector 为了支持插件系统，引入了 libPluginAdaptor 和 libPluginBase（以下简称 adaptor 和 base）这两个动态库，它们与 LoongCollector 之间的关系如下：<br />
+LoongCollector 动态依赖于这两个动态库（即 binary 中不依赖），在初始化时，LoongCollector 会尝试使用动态库接口（如 dlopen）动态加载它们，获取所需的符号。<br />
+Adaptor 充当一个中间层，LoongCollector 和 base 均依赖它，LoongCollector 向 adaptor 注册回调，adpator 将这些回调记录下来以接口的形式暴露给 base 使用。<br />
+Base 是插件系统的主体，它包含插件系统所必须的采集、处理、聚合以及输出（向 LoongCollector 递交可以视为其中一种）等功能。<br />
+因此，完整的 LoongCollector 包含loongcollector 、libPluginAdaptor.so 和 libPluginBase.so 3个二进制文件。
 
 ![image.png](https://sls-opensource.oss-us-west-1.aliyuncs.com/ilogtail/ilogtail-adapter-cgo.png)
 
 ## 目录结构 <a name="iKc61"></a>
 
-iLogtail的大致目录结构如下：
+LoongCollector 的大致目录结构如下：
 
 ```shell
 .
@@ -28,15 +28,17 @@ iLogtail的大致目录结构如下：
 └── Makefile              # 编译描述文件
 ```
 
-core目录包含了iLogtail C++核心代码，ilogtail.cpp是其主函数入口文件。C++项目使用CMake描述，CMakeLists.txt是总入口，各子目录中还有CMakeLists.txt描述子目录下的编译目标。
+core目录包含了 LoongCollector C++核心代码，ilogtail.cpp是其主函数入口文件。C++项目使用CMake描述，CMakeLists.txt是总入口，各子目录中还有CMakeLists.txt描述子目录下的编译目标。
 
-顶层目录.本身就是一个Go项目，该项目为iLogtail插件，go.mod为其描述文件。插件代码主体在plugins目录。
+顶层目录.本身就是一个Go项目，该项目为 LoongCollector 插件，go.mod为其描述文件。插件代码主体在plugins目录。
 
-docker目录和scripts目录分别为辅助编译的镜像描述目录和脚本目录。Makefile为整个iLogtail的编译描述文件，对编译命令进行了封装。
+docker目录和scripts目录分别为辅助编译的镜像描述目录和脚本目录。Makefile为整个 LoongCollector 的编译描述文件，对编译命令进行了封装。
 
 ## 开发镜像
 
-loongcollector 依赖了诸多第三方库（详见[编译依赖](../installation/sources/dependencies.md)），为了简化编译流程ilogtail提供了预编译依赖的镜像辅助编译。开发镜像的地址在`sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux`，可通过下面命令获取。
+LoongCollector 依赖了诸多第三方库（详见[编译依赖](../installation/sources/dependencies.md)
+
+LoongCollector 提供了预编译依赖的镜像辅助编译。开发镜像的地址在`sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux`，可通过下面命令获取。
 
 ```shell
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux
@@ -70,7 +72,7 @@ go install ...
 
 ## 使用VS Code构建开发环境
 
-[VS Code](https://code.visualstudio.com/)通过[Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)插件可以实现远程开发、在镜像中开发，甚至远程+镜像中开发，在镜像中开发的功能使得编译环境在不同部署间都能保持统一。由于VS Code免费而功能强大，因此我们选用VS Code来为iLogtail创建一致的、可移植的开发环境。
+[VS Code](https://code.visualstudio.com/)通过[Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)插件可以实现远程开发、在镜像中开发，甚至远程+镜像中开发，在镜像中开发的功能使得编译环境在不同部署间都能保持统一。由于VS Code免费而功能强大，因此我们选用VS Code来为 LoongCollector 创建一致的、可移植的开发环境。
 
 ### 1. 安装插件  <a name="zpMpx"></a>
 
@@ -78,7 +80,7 @@ go install ...
 
 ### 2. 创建镜像开发环境配置  <a name="S3QyX"></a>
 
-在iLogtail代码库的顶层目录创建`.devcontainer`目录，并在里面创建`devcontainer.json`文件，文件的内容如下：
+在 LoongCollector 代码库的顶层目录创建`.devcontainer`目录，并在里面创建`devcontainer.json`文件，文件的内容如下：
 
 ```json
 {
@@ -94,10 +96,9 @@ go install ...
     }
   }
 }
-
 ```
 
-其中，image指定了ilogtail的开发镜像地址，customizations.vscode.extensions指定了开发环境的插件。部分插件介绍如下，开发者也可以按照自己的习惯进行修改，[欢迎讨论](https://github.com/alibaba/loongcollector/discussions/299)。
+其中，image指定了 LoongCollector 的开发镜像地址，customizations.vscode.extensions指定了开发环境的插件。部分插件介绍如下，开发者也可以按照自己的习惯进行修改，[欢迎讨论](https://github.com/alibaba/loongcollector/discussions/299)。
 
 | **插件名** | **用途** |
 | --- | --- |
@@ -161,7 +162,7 @@ cmake -DBUILD_LOGTAIL_UT=ON ..
 可以将C++核心的构建结果拷贝到`./output`目录组装出完整的构建结果。
 
 ```bash
-cp -a ./core/build/ilogtail ./output
+cp -a ./core/build/loongcollector ./output
 cp -a ./core/build/go_pipeline/libPluginAdapter.so ./output
 ```
 
@@ -169,7 +170,7 @@ cp -a ./core/build/go_pipeline/libPluginAdapter.so ./output
 
 ```text
 ./output
-├── ilogtail (主程序）
+├── loongcollector (主程序）
 ├── libPluginAdapter.so（插件接口）
 ├── libPluginBase.h
 └── libPluginBase.so (插件lib）
@@ -184,7 +185,7 @@ cp -a ./core/build/go_pipeline/libPluginAdapter.so ./output
 ### 2. 创建编译容器，并挂载代码目录
 
 ```bash
-docker run --name ilogtail-build -d \
+docker run --name loongcollector-build -d \
   -v `pwd`:/src -w /src \
   sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.0.5 \
   bash -c "sleep infinity"
@@ -193,7 +194,7 @@ docker run --name ilogtail-build -d \
 ### 3. 进入容器
 
 ```bash
-docker exec -it ilogtail-build bash
+docker exec -it loongcollector-build bash
 ```
 
 ### 4. 在容器内编译
@@ -206,12 +207,12 @@ docker exec -it ilogtail-build bash
 
 ### 1. 修改官方镜像entrypoint
 
-基于官方镜像包进行调试，首先用bash覆盖官方镜像的entrypoint，避免杀死ilogtail后容器直接退出。
+基于官方镜像包进行调试，首先用bash覆盖官方镜像的entrypoint，避免杀死 LoongCollector 后容器直接退出。
 
 - docker：指定CMD
 
 ```bash
-docker run -it --name docker_ilogtail -v /:/logtail_host:ro -v /var/run:/var/run aliyun/ilogtail:<VERSION> bash
+docker run -it --name docker_loongcollector -v /:/logtail_host:ro -v /var/run:/var/run aliyun/loongcollector:<VERSION> bash
 ```
 
 - k8s：用command覆盖entrypoint
@@ -225,17 +226,17 @@ docker run -it --name docker_ilogtail -v /:/logtail_host:ro -v /var/run:/var/run
 
 ### 2. 将自己编的二进制文件、so，替换到容器里
 
-由于ilogtail容器挂载了主机目录，因此将需要替换掉文件放到主机目录上容器内就能访问。
+由于 LoongCollector 容器挂载了主机目录，因此将需要替换掉文件放到主机目录上容器内就能访问。
 
 ```bash
 # 将开发机上编译的so scp到container所在node上
 scp libPluginBase.so <user>@<node>:/home/<user>
 ```
 
-主机的根路径在ilogtail容器中位于/logtail_host，找到对应目录进行copy即可。
+主机的根路径在 LoongCollector 容器中位于/logtail_host，找到对应目录进行copy即可。
 
 ```bash
-cp /logtail_host/home/<user>/libPluginBase.so /usr/local/ilogtail
+cp /logtail_host/home/<user>/libPluginBase.so /usr/local/loongcollector
 ```
 
 ## 常见问题

@@ -1,28 +1,29 @@
 # 纯插件模式启动
 
-纯插件模式为iLogtail插件开发提供轻量级测试能力，以下我们将介绍如以纯插件模式启动iLogtail。
+纯插件模式为 LoongCollector 插件开发提供轻量级测试能力，以下我们将介绍如以纯插件模式启动 LoongCollector。
 
 ## 本地启动
 
-在根目录下执行 `make plugin_main` 命令，会得到 `output/ilogtail` 可执行文件，使用以下命令可以快速启动iLogtail 程序，并将日志使用控制台输出。
+在根目录下执行 `make plugin_main` 命令，会得到 `output/loongcollector` 可执行文件，使用以下命令可以快速启动 LoongCollector 程序，并将日志使用控制台输出。
 
 ```shell
 # 默认插件启动行为是使用metric_mock 插件mock 数据，并将数据进行日志模式打印。
- ./output/ilogtail --logger-console=true --logger-retain=false
+cd output
+./loongcollector --logger-console=true --logger-retain=false
 ```
 
 ## 配置
 
-iLogtail 目前提供以下4种模式进行配置设置：
+LoongCollector 目前提供以下4种模式进行配置设置：
 
 * 指定配置文件模式启动。
 * 文件至文件快速测试
-* iLogtail 暴露Http 端口，可以进行配置变更。
-* iLogtail-C程序通过程序API进行配置变更。
+* LoongCollector 暴露Http 端口，可以进行配置变更。
+* loongcollector-C程序通过程序API进行配置变更。
 
 ### 指定配置文件模式启动
 
-在使用独立模式编译得到 ilogtail 这个可执行程序后，你可以通过为其指定一个配置文件（不指定的话默认为当前目录下 plugin.json）来启动它。
+在使用独立模式编译得到 LoongCollector 这个可执行程序后，你可以通过为其指定一个配置文件（不指定的话默认为当前目录下 plugin.json）来启动它。
 
 ```json
 {
@@ -105,14 +106,14 @@ iLogtail 目前提供以下4种模式进行配置设置：
 }
 ```
 
-执行 `./output/ilogtail --plugin=plugin.quickstart.json`，在一段时间后，使用 ctrl+c 中断运行。通过查看目录，会发现生成了 quickstart\_1.stdout 和 quickstart\_2.stdout 两个文件，并且它们的内容一致。查看内容可以发现，其中的每条数据都包含 Index 和 Content 两个键，并且由于有两个输入插件，Content 会有所不同。
+执行 `./loongcollector --plugin=plugin.quickstart.json`，在一段时间后，使用 ctrl+c 中断运行。通过查看目录，会发现生成了 quickstart\_1.stdout 和 quickstart\_2.stdout 两个文件，并且它们的内容一致。查看内容可以发现，其中的每条数据都包含 Index 和 Content 两个键，并且由于有两个输入插件，Content 会有所不同。
 
 ### 文件至文件快速测试
 
 可以使用如下指令，从文件输入数据并输出到文件，快速进行配置测试
 
 ```shell
-./output/ilogtail --plugin=plugin.json --file-io=true
+./output/loongcollector --plugin=plugin.json --file-io=true
 ```
 
 在测试前，需要创建上文所说的json格式的配置文件。与上文不同的是，这里的配置文件不需要配置inputs和flushers（如果配置，inputs会失效，flushers会保留）。当file-io开关被打开时，会自动指定为文件输入，并输出到文件。默认的输入文件是input.log，默认的输出文件是output.log，也可以设置input-file和output-file参数来修改输入和输出文件。
@@ -148,7 +149,7 @@ stdin.log内容如下：
 执行如下命令：
 
 ```shell
-./output/ilogtail --plugin=plugin.file2filetest.json --file-io=true --input-file=stdin.log --output-file=stdout.log
+./loongcollector --plugin=plugin.file2filetest.json --file-io=true --input-file=stdin.log --output-file=stdout.log
 ```
 
 可以发现生成了一个stdout.log文件，内容如下：
@@ -159,14 +160,14 @@ stdin.log内容如下：
 
 ### HTTP API 配置变更
 
-当iLogtail 以独立模式运行时，可以使用HTTP API 进行配置文件变更。
+当 LoongCollector 以独立模式运行时，可以使用HTTP API 进行配置文件变更。
 
-* 端口： iLogtail 独立运行时，默认启动18689 端口进行监听配置输入。
+* 端口： LoongCollector 独立运行时，默认启动18689 端口进行监听配置输入。
 * 接口：/loadconfig
 
 接下来我们将使用HTTP 模式重新进行动态加载**指定配置文件模式启动**篇幅中的静态配置案例。
 
-1. 首先我们启动 iLogtail 程序： `./output/ilogtail`
+1. 首先我们启动 LoongCollector 程序： `./loongcollector`
 2. 使用以下命令进行配置重新加载。
 
     ```shell

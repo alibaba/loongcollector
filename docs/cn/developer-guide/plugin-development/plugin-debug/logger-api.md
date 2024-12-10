@@ -35,7 +35,7 @@ func (p *plugin) func1() {
 
 ## 打印采集配置元信息
 
-对于iLogtail，具有多租户的特点，可以支持多份采集配置同时工作，iLogtail 支持将采集配置的元信息打印到日志中，便于问题的排查与定位。
+对于 LoongCollector，具有多租户的特点，可以支持多份采集配置同时工作，LoongCollector 支持将采集配置的元信息打印到日志中，便于问题的排查与定位。
 
 ```go
 import (
@@ -139,20 +139,20 @@ func Test_plugin_func1(t *testing.T) {
 
 ## 启动时控制日志行为
 
-启动iLogtail 时，默认的日志行为是异步文件Info级别输出，如果需要动态调整，可以参考以下内容进行设置：
+启动 LoongCollector 时，默认的日志行为是异步文件Info级别输出，如果需要动态调整，可以参考以下内容进行设置：
 
 ### 调整日志级别
 
 启动时如果启动程序相对路径下没有 plugin_logger.xml 文件，则可以使用以下命令设置：
 
 ```shell
-./ilogtail --logger-level=debug
+./loongcollector --logger-level=debug
 ```
 
 如果存在 plugin_logger.xml 文件，可以修改文件，或使用以下命令强制重新生成日志配置文件：
 
 ```shell
-./ilogtail --logger-level=info --logger-retain=false
+./loongcollector --logger-level=info --logger-retain=false
 ```
 
 ### 是否开启控制台打印
@@ -160,11 +160,11 @@ func Test_plugin_func1(t *testing.T) {
 默认生成环境关闭控制台打印，如果本地调试环境想开启控制台日志，相对路径下没有 plugin_logger.xml 文件，则可以使用以下命令：
 
 ```shell
-./ilogtail --logger-console=true
+./loongcollector --logger-console=true
 ```
 
 如果存在 plugin_logger.xml 文件，可以修改文件，或使用以下命令强制重新生成日志配置文件：
 
 ```shell
-./ilogtail --logger-console=true --logger-retain=false
+./loongcollector --logger-console=true --logger-retain=false
 ```

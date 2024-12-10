@@ -39,7 +39,7 @@ LogGroup（日志组）是对多条日志的包装：
 - Logs：包含所有日志。
 - Category：日志服务Logstore，可以类比Kafka 独立集群， 数据存储的独立单元。
 - Topic: 日志服务Topic，一个Category（Logstore）可以划分为多个topic，不填写时Topic 为空字符串，可以类比Kafka 独立集群下的Topic概念。
-- Source/MachineUUID：iLogtail 所在节点的信息，前者为 IP，后者为 UUID。
+- Source/MachineUUID：LoongCollector 所在节点的信息，前者为 IP，后者为 UUID。
 - LogTags：所有日志共同的 tag，同样由 key/value 列表组成。
 
 ```protobuf

@@ -123,7 +123,11 @@ func initNormalLogger() {
 	for _, option := range defaultProductionOptions {
 		option()
 	}
-	setLogConf(path.Join(config.LoongcollectorGlobalConfig.LoongcollectorConfDir, "plugin_logger.xml"))
+	confDir := config.LoongcollectorGlobalConfig.LoongcollectorConfDir
+	if _, err := os.Stat(confDir); os.IsNotExist(err) {
+		_ = os.MkdirAll(confDir, os.ModePerm)
+	}
+	setLogConf(path.Join(confDir, "plugin_logger.xml"))
 }
 
 // initTestLogger extracted from Init method for unit test.

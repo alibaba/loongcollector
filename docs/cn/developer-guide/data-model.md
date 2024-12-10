@@ -1,6 +1,6 @@
 # 数据模型
 
-iLogtail 目前支持 `SLS Log Protocol` 和 `Pipeline Event` 两种数据模型，两种模型的描述和对比如下：  
+LoongCollector 目前支持 `SLS Log Protocol` 和 `Pipeline Event` 两种数据模型，两种模型的描述和对比如下：  
 |  | SLS Log Protocol | Pipeline Event |
 |  ----  | ----  |  ---- |
 | 描述 | SLS 日志的专用处理结构 | 可扩展的可观测性数据模型，支持Metrics、Trace、Logging、Bytes、Profile等 |
@@ -72,7 +72,7 @@ type MetricEvent struct {
 }
 ```
 
-主流的metrics数据有单值(eg. Prometheus)和多值(eg. influxdb)两种设计，iLogtail 中也需要支持两种不同的设计，基于此设计了 MetricValue 接口和MetricSingleValue 和 MetricMultiValue 两个不同的实现
+主流的metrics数据有单值(eg. Prometheus)和多值(eg. influxdb)两种设计，LoongCollector 中也需要支持两种不同的设计，基于此设计了 MetricValue 接口和MetricSingleValue 和 MetricMultiValue 两个不同的实现
 
 ```go
 type MetricValue interface {
