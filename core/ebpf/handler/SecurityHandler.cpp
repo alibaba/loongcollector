@@ -34,7 +34,7 @@ SecurityHandler::SecurityHandler(const logtail::PipelineContext* ctx, logtail::Q
     mHostIp = GetHostIp();
 }
 
-void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
+void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
     if (events.empty()) {
         return ;
     }
@@ -48,9 +48,9 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
     const static std::string host_name_key = "host.name";
     event_group.SetTag(host_ip_key, mHostIp);
     event_group.SetTag(host_name_key, mHostName);
-    for (auto& x : events) {
-        auto event = event_group.AddLogEvent();
-        for (auto& tag : x->GetAllTags()) {
+    for (const auto& x : events) {
+        auto* event = event_group.AddLogEvent();
+        for (const auto& tag : x->GetAllTags()) {
             event->SetContent(tag.first, tag.second);
         }
         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(x->GetTimestamp()));

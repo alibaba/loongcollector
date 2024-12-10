@@ -26,7 +26,7 @@ namespace ebpf {
 class SecurityHandler : public AbstractHandler {
 public:
     SecurityHandler(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t idx);
-    void handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events);
+    void handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>& events);
 private:
     // TODO 后续这两个 key 需要移到 group 的 metadata 里，在 processortagnative 中转成tag
     std::string mHostIp;

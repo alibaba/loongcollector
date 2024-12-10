@@ -4,12 +4,14 @@
 
 #pragma once
 
-#include <vector>
-#include <string>
-#include <memory>
 #include <functional>
+#include <iostream>
 #include <map>
+#include <memory>
+#include <string>
 #include <variant>
+#include <future>
+#include <vector>
 
 enum class SecureEventType {
   SECURE_EVENT_TYPE_SOCKET_SECURE,
@@ -48,14 +50,16 @@ private:
   std::vector<std::unique_ptr<AbstractSecurityEvent>> events;
 };
 
-using HandleSingleDataEventFn = std::function<void(std::unique_ptr<AbstractSecurityEvent>&& event)>;
-using HandleBatchDataEventFn = std::function<void(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events)>;
+using HandleSingleDataEventFn = std::function<void(std::unique_ptr<AbstractSecurityEvent>& event)>;
+using HandleBatchDataEventFn = std::function<void(std::vector<std::unique_ptr<AbstractSecurityEvent>>& events)>;
 
 enum class UpdataType {
   SECURE_UPDATE_TYPE_ENABLE_PROBE,
   SECURE_UPDATE_TYPE_CONFIG_CHAGE,
   SECURE_UPDATE_TYPE_SUSPEND_PROBE,
   SECURE_UPDATE_TYPE_DISABLE_PROBE,
+  OBSERVER_UPDATE_TYPE_CHANGE_WHITELIST,
+  OBSERVER_UPDATE_TYPE_UPDATE_PROBE,
   SECURE_UPDATE_TYPE_MAX,
 };
 
@@ -104,8 +108,9 @@ struct Measure {
 // process
 struct ApplicationBatchMeasure {
   std::string app_id_;
-  std::string region_id_;
+  std::string app_name_;
   std::string ip_;
+  std::string host_;
   std::vector<std::unique_ptr<Measure>> measures_;
 };
 
@@ -123,6 +128,9 @@ struct SingleSpan {
 
 struct ApplicationBatchSpan {
   std::string app_id_;
+  std::string app_name_;
+  std::string host_ip_;
+  std::string host_name_;
   std::vector<std::unique_ptr<SingleSpan>> single_spans_;
 };
 
@@ -176,13 +184,13 @@ enum class PluginType {
 };
 
 // observe metrics
-using NamiHandleBatchMeasureFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp)>;
+using NamiHandleBatchMeasureFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t timestamp)>;
 // observe spans
-using NamiHandleBatchSpanFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchSpan>>&&)>;
+using NamiHandleBatchSpanFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchSpan>>&)>;
 // observe events
-using NamiHandleBatchEventFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchEvent>>&&)>;
+using NamiHandleBatchEventFunc = std::function<void(std::vector<std::unique_ptr<ApplicationBatchEvent>>&)>;
 // observe security
-using NamiHandleBatchDataEventFn = std::function<void(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events)>;
+using NamiHandleBatchDataEventFn = std::function<void(std::vector<std::unique_ptr<AbstractSecurityEvent>>& events)>;
 
 struct ObserverNetworkOption {
     std::vector<std::string> mEnableProtocols;
@@ -192,6 +200,9 @@ struct ObserverNetworkOption {
     bool mEnableSpan = false;
     bool mEnableMetric = false;
     bool mEnableLog = true;
+    bool mEnableCidFilter = true;
+    std::vector<std::string> mEnableCids;
+    std::vector<std::string> mDisableCids;
     std::string mMeterHandlerType;
     std::string mSpanHandlerType;
 };
@@ -227,11 +238,51 @@ struct SecurityNetworkFilter {
 struct SecurityOption {
   std::vector<std::string> call_names_;
   std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> filter_;
+
+  SecurityOption() = default;
+
+  SecurityOption(const SecurityOption& other) = default;
+
+  SecurityOption(SecurityOption&& other) noexcept
+      : call_names_(std::move(other.call_names_)), filter_(std::move(other.filter_)) {}
+
+  SecurityOption& operator=(const SecurityOption& other) = default;
+
+  SecurityOption& operator=(SecurityOption&& other) noexcept {
+      call_names_ = other.call_names_;
+      filter_ = other.filter_;
+      return *this;
+  }
+
+  ~SecurityOption() {}
+
   bool operator==(const SecurityOption& other) const {
     return call_names_ == other.call_names_ &&
             filter_ == other.filter_;
   }
 };
+
+class PodMeta {
+public:
+  PodMeta(const std::string& app_id, const std::string& app_name, 
+    const std::string& ns, 
+    const std::string& workload_name, 
+    const std::string& workload_kind, 
+    const std::string& pod_name, const std::string& pod_ip, const std::string& service_name) 
+    : app_id_(app_id), app_name_(app_name), namespace_(ns), workload_name_(workload_name), workload_kind_(workload_kind), pod_name_(pod_name), pod_ip_(pod_ip), service_name_(service_name){}
+  std::string app_id_;
+  std::string app_name_;
+  std::string namespace_;
+  std::string workload_name_;
+  std::string workload_kind_;
+  std::string pod_name_;
+  std::string pod_ip_;
+  std::string service_name_;
+};
+
+using K8sMetadataCacheCallback = std::function<std::unique_ptr<PodMeta>(const std::string&)>;
+using K8sMetadataCallback = std::function<bool(std::vector<std::string>&, std::vector<std::unique_ptr<PodMeta>>&)>;
+using AsyncK8sMetadataCallback = std::function<std::future<bool>(std::vector<std::string>&, std::vector<std::unique_ptr<PodMeta>>&)>;
 
 struct NetworkObserveConfig {
   bool enable_libbpf_debug_ = false;
@@ -247,9 +298,19 @@ struct NetworkObserveConfig {
   bool enable_span_ = false;
   bool enable_metric_ = false;
   bool enable_event_ = false;
+  bool enable_cid_filter = false;
   NamiHandleBatchMeasureFunc measure_cb_ = nullptr;
   NamiHandleBatchSpanFunc span_cb_ = nullptr;
   NamiHandleBatchEventFunc event_cb_ = nullptr;
+  K8sMetadataCallback metadata_by_cid_cb_ = nullptr;
+  K8sMetadataCallback metadata_by_ip_cb_ = nullptr;
+  AsyncK8sMetadataCallback async_metadata_by_cid_cb_ = nullptr;
+  AsyncK8sMetadataCallback async_metadata_by_ip_cb_ = nullptr;
+  K8sMetadataCacheCallback metadata_by_cid_cache_ = nullptr;
+  K8sMetadataCacheCallback metadata_by_ip_cache_ = nullptr;
+  std::vector<std::string> enable_container_ids_;
+  std::vector<std::string> disable_container_ids_;
+
   bool operator==(const NetworkObserveConfig& other) const {
     return enable_libbpf_debug_ == other.enable_libbpf_debug_ &&
            enable_so_ == other.enable_so_ &&
@@ -342,4 +403,4 @@ struct eBPFConfig {
   }
 };
 
-};
+}; // namespace nami

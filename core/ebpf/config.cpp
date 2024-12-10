@@ -368,10 +368,10 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         }
         nami::SecurityOption thisSecurityOption;
         GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);
-        mOptionList.emplace_back(thisSecurityOption);
+        mOptionList.emplace_back(std::move(thisSecurityOption));
         return true;
     }
-    auto innerConfig = config["ProbeConfig"];
+    const auto& innerConfig = config["ProbeConfig"];
     nami::SecurityOption thisSecurityOption;
     // Genral Filter (Optional)
     std::variant<std::monostate, nami::SecurityFileFilter, nami::SecurityNetworkFilter> thisFilter;
@@ -402,8 +402,8 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                     mContext->GetRegion());
     }
     thisSecurityOption.filter_ = thisFilter;
-    GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);    
-    mOptionList.emplace_back(thisSecurityOption);
+    GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);
+    mOptionList.emplace_back(std::move(thisSecurityOption));
     mProbeType = probeType;
     return true;
 }
