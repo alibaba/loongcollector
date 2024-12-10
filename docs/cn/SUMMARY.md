@@ -147,7 +147,7 @@
   * [增加新的日志协议](developer-guide/log-protocol/How-to-add-new-protocol.md)
   * 协议
     * [sls协议](developer-guide/log-protocol/protocol-spec/sls.md)
-    * [单条协议](developer-guide/log-protocol/protocol-spec/single.md)
+    * [单条协议](developer-guide/log-protocol/protocol-spec/custom_single.md)
     * [raw协议](developer-guide/log-protocol/protocol-spec/raw.md)
 * 插件开发
   * [开源插件开发引导](developer-guide/plugin-development/plugin-development-guide.md)
