@@ -375,6 +375,8 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	for _, flusher := range p.FlusherPlugins {
 		flusher.SetUrgent(exit)
 	}
+	p.LogstoreConfig.FlushOutFlag.Store(true)
+
 	for _, serviceInput := range p.ServicePlugins {
 		_ = serviceInput.Stop()
 	}
@@ -387,7 +389,6 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	p.AggregateControl.WaitCancel()
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "aggregator plugins stop", "done")
 
-	p.LogstoreConfig.FlushOutFlag = true
 	p.FlushControl.WaitCancel()
 
 	if exit && p.FlushOutStore.Len() > 0 {
