@@ -285,13 +285,6 @@ bool EventDispatcher::RegisterEventHandler(const char* path,
     bool dirTimeOutFlag = config.first->IsTimeout(path);
 
     if (!mEventListener->IsValidID(wd)) {
-        if (dirTimeOutFlag) {
-            LOG_DEBUG(
-                sLogger,
-                ("Drop timeout path, source", path)("config, basepath", config.first->GetBasePath())(
-                    "preseveDepth", config.first->mPreservedDirDepth)("maxDepth", config.first->mMaxDirSearchDepth));
-            return false;
-        }
         wd = mNonInotifyWd;
         if (mNonInotifyWd == INT_MIN)
             mNonInotifyWd = -1;
@@ -893,7 +886,7 @@ void EventDispatcher::HandleTimeout() {
     time_t curTime = time(NULL);
     MapType<int, time_t>::Type::iterator itr = mWdUpdateTimeMap.begin();
     for (; itr != mWdUpdateTimeMap.end(); ++itr) {
-        if (curTime - (itr->second) >= INT32_FLAG(timeout_interval)) {
+        if (curTime - (itr->second) > INT32_FLAG(timeout_interval)) {
             // add to vector then batch process to avoid possible iterator change problem
             // mHandler may remove what itr points to, thus change the layout of the map container
             // what follows may not work

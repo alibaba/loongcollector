@@ -60,7 +60,7 @@ private:
     ~PollingModify();
 
     void Polling();
-
+    void PollingIteration();
     // MakeSpaceForNewFile tries to release some space from modify cache
     // for LoadFileNameInQueues to add new files.
     void MakeSpaceForNewFile();

@@ -62,13 +62,11 @@ void AggregatorUnittest::TestLogstoreMergeTypeAdd() {
     int64_t logGroupKey = 123;
     
     std::unique_ptr<FlusherSLS> flusher;
-    {
-        PipelineContext ctx;
-        ctx.SetConfigName("test_config");
-        flusher.reset(new FlusherSLS());
-        flusher->SetContext(ctx);
-        flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
-    }
+    PipelineContext ctx;
+    ctx.SetConfigName("test_config");
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
 
     FlusherSLS::Batch::MergeType mergeType = FlusherSLS::Batch::MergeType::LOGSTORE;
     std::string defaultRegion = "testRegion";
@@ -183,13 +181,11 @@ void AggregatorUnittest::TestLogstoreMergeTypeAddLargeGroup() {
     int64_t logGroupKey = 123;
     
     std::unique_ptr<FlusherSLS> flusher;
-    {
-        PipelineContext ctx;
-        ctx.SetConfigName("test_config");
-        flusher.reset(new FlusherSLS());
-        flusher->SetContext(ctx);
-        flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
-    }
+    PipelineContext ctx;
+    ctx.SetConfigName("test_config");
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
 
     FlusherSLS::Batch::MergeType mergeType = FlusherSLS::Batch::MergeType::LOGSTORE;
     std::string defaultRegion = "testRegion";
@@ -268,13 +264,11 @@ void AggregatorUnittest::TestTopicMergeTypeAdd() {
     INT32_FLAG(merge_log_count_limit) = 10;
     
     std::unique_ptr<FlusherSLS> flusher;
-    {
-        PipelineContext ctx;
-        ctx.SetConfigName("test_config");
-        flusher.reset(new FlusherSLS());
-        flusher->SetContext(ctx);
-        flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
-    }
+    PipelineContext ctx;
+    ctx.SetConfigName("test_config");
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
 
     FlusherSLS::Batch::MergeType mergeType = FlusherSLS::Batch::MergeType::TOPIC;
     std::string defaultRegion = "testRegion";

@@ -158,11 +158,13 @@ void CreateHandler::Handle(const Event& event) {
     if (!config.first)
         return;
     else if (event.IsDir())
-        ConfigManager::GetInstance()->RegisterHandlersRecursively(path, config, false);
+        ConfigManager::GetInstance()->RegisterHandlers(path, config);
     else {
         // symbolic link
-        if (EventDispatcher::GetInstance()->IsDirRegistered(path) == PATH_INODE_NOT_REGISTERED)
+        if (EventDispatcher::GetInstance()->IsDirRegistered(path) == PATH_INODE_NOT_REGISTERED) {
+            // TODO: why not use RegisterHandlers
             ConfigManager::GetInstance()->RegisterHandlersRecursively(path, config, true);
+        }
     }
 }
 
@@ -176,6 +178,7 @@ void TimeoutHandler::Handle(const Event& ev) {
     const string& dir = ev.GetSource();
     EventDispatcher::GetInstance()->UnregisterEventHandler(dir.c_str());
     ConfigManager::GetInstance()->RemoveHandler(dir);
+    CheckPointManager::Instance()->DeleteDirCheckPoint(dir);
 }
 
 

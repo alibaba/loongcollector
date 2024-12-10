@@ -74,10 +74,18 @@ bool CheckPointManager::GetCheckPoint(DevInode devInode, const std::string& conf
     return false;
 }
 
-void CheckPointManager::DeleteDirCheckPoint(const std::string& filename) {
-    std::unordered_map<std::string, DirCheckPointPtr>::iterator it = mDirNameMap.find(filename);
-    if (it != mDirNameMap.end())
+void CheckPointManager::DeleteDirCheckPoint(const std::string& dirname) {
+    std::unordered_map<std::string, DirCheckPointPtr>::iterator it = mDirNameMap.find(dirname);
+    if (it != mDirNameMap.end()) {
         mDirNameMap.erase(it);
+    }
+    auto parentpos = dirname.find_last_of(PATH_SEPARATOR);
+    if (parentpos != std::string::npos) {
+        auto parentDirCheckpoint = mDirNameMap.find(dirname.substr(0, parentpos));
+        if (parentDirCheckpoint != mDirNameMap.end()) {
+            parentDirCheckpoint->second->mSubDir.erase(dirname);
+        }
+    }
 }
 
 bool CheckPointManager::GetDirCheckPoint(const std::string& dirname, DirCheckPointPtr& dirCheckPointPtr) {

@@ -50,6 +50,7 @@ using namespace std;
 
 DEFINE_FLAG_INT32(check_symbolic_link_interval, "seconds", 120);
 DEFINE_FLAG_INT32(check_base_dir_interval, "seconds", 60);
+DEFINE_FLAG_INT32(check_timeout_interval, "seconds", 600);
 DEFINE_FLAG_INT32(log_input_thread_wait_interval, "microseconds", 20 * 1000);
 DEFINE_FLAG_INT64(read_fs_events_interval, "microseconds", 20 * 1000);
 DEFINE_FLAG_INT32(check_handler_timeout_interval, "seconds", 180);
@@ -357,7 +358,7 @@ void* LogInput::ProcessLoop() {
     int32_t prevTime = time(NULL);
     mLastReadEventTime = prevTime;
     int32_t curTime = prevTime;
-    srand(prevTime);
+    srand(0); // avoid random failures in unit tests
     int32_t lastCheckDir = prevTime - rand() % 60;
     int32_t lastCheckSymbolicLink = prevTime - rand() % 60;
     time_t lastCheckHandlerTimeOut = prevTime - rand() % 60;
@@ -415,7 +416,7 @@ void* LogInput::ProcessLoop() {
             lastCheckSymbolicLink = 0;
         }
 
-        if (curTime - prevTime >= INT32_FLAG(timeout_interval)) {
+        if (curTime - prevTime >= INT32_FLAG(check_timeout_interval)) {
             dispatcher->HandleTimeout();
             prevTime = curTime;
         }

@@ -14,26 +14,27 @@
 
 #include "PollingDirFile.h"
 #if defined(__linux__)
-#include <sys/file.h>
 #include <fnmatch.h>
+#include <sys/file.h>
 #elif defined(_MSC_VER)
 #include <Shlwapi.h>
 #endif
 #include <sys/stat.h>
+
+#include "PollingEventQueue.h"
+#include "PollingModify.h"
 #include "app_config/AppConfig.h"
-#include "common/Flags.h"
-#include "common/StringTools.h"
 #include "common/ErrorUtil.h"
 #include "common/FileSystemUtil.h"
+#include "common/Flags.h"
+#include "common/StringTools.h"
 #include "common/TimeUtil.h"
-#include "event/Event.h"
-#include "logger/Logger.h"
 #include "config_manager/ConfigManager.h"
+#include "event/Event.h"
+#include "file_server/FileServer.h"
+#include "logger/Logger.h"
 #include "monitor/LogtailAlarm.h"
 #include "monitor/Monitor.h"
-#include "PollingModify.h"
-#include "PollingEventQueue.h"
-#include "file_server/FileServer.h"
 
 // Control the check frequency to call ClearUnavailableFileAndDir.
 DEFINE_FLAG_INT32(check_not_exist_file_dir_round, "clear not exist file dir cache, round", 20);
@@ -125,120 +126,7 @@ void PollingDirFile::Polling() {
     LOG_INFO(sLogger, ("polling discovery", "started"));
     mHoldOnFlag = false;
     while (mRuningFlag) {
-        LOG_DEBUG(sLogger, ("start dir file polling, mCurrentRound", mCurrentRound));
-        {
-            PTScopedLock thradLock(mPollingThreadLock);
-            mStatCount = 0;
-            mNewFileVec.clear();
-            ++mCurrentRound;
-
-            // Get a copy of config list from ConfigManager.
-            // PollingDirFile has to be held on at first because raw pointers are used here.
-            vector<FileDiscoveryConfig> sortedConfigs;
-            vector<FileDiscoveryConfig> wildcardConfigs;
-            auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-            for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
-                if (itr->second.first->GetWildcardPaths().empty())
-                    sortedConfigs.push_back(itr->second);
-                else
-                    wildcardConfigs.push_back(itr->second);
-            }
-            sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
-
-            LogtailMonitor::GetInstance()->UpdateMetric("config_count", nameConfigMap.size());
-            {
-                ScopedSpinLock lock(mCacheLock);
-                LogtailMonitor::GetInstance()->UpdateMetric("polling_dir_cache", mDirCacheMap.size());
-                LogtailMonitor::GetInstance()->UpdateMetric("polling_file_cache", mFileCacheMap.size());
-            }
-
-            // Iterate all normal configs, make sure stat count will not exceed limit.
-            for (auto itr = sortedConfigs.begin();
-                 itr != sortedConfigs.end() && mStatCount <= INT32_FLAG(polling_max_stat_count);
-                 ++itr) {
-                if (!mRuningFlag || mHoldOnFlag)
-                    break;
-
-                const FileDiscoveryOptions* config = itr->first;
-                const PipelineContext* ctx = itr->second;
-                if (!config->IsContainerDiscoveryEnabled()) {
-                    fsutil::PathStat baseDirStat;
-                    if (!fsutil::PathStat::stat(config->GetBasePath(), baseDirStat)) {
-                        LOG_DEBUG(sLogger,
-                                  ("get base dir info error: ", config->GetBasePath())(ctx->GetProjectName(),
-                                                                                       ctx->GetLogstoreName()));
-                        continue;
-                    }
-
-                    int32_t lastConfigStatCount = mStatCount;
-                    if (!PollingNormalConfigPath(*itr, config->GetBasePath(), string(), baseDirStat, 0)) {
-                        LOG_DEBUG(sLogger,
-                                  ("logPath in config not exist", config->GetBasePath())(ctx->GetProjectName(),
-                                                                                         ctx->GetLogstoreName()));
-                    }
-                    CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
-                } else {
-                    for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                        const string& basePath = (*config->GetContainerInfo())[i].mContainerPath;
-                        fsutil::PathStat baseDirStat;
-                        if (!fsutil::PathStat::stat(basePath.c_str(), baseDirStat)) {
-                            LOG_DEBUG(sLogger,
-                                      ("get docker base dir info error: ", basePath)(ctx->GetProjectName(),
-                                                                                     ctx->GetLogstoreName()));
-                            continue;
-                        }
-                        int32_t lastConfigStatCount = mStatCount;
-                        if (!PollingNormalConfigPath(*itr, basePath, string(), baseDirStat, 0)) {
-                            LOG_DEBUG(sLogger,
-                                      ("docker logPath in config not exist", basePath)(ctx->GetProjectName(),
-                                                                                       ctx->GetLogstoreName()));
-                        }
-                        CheckConfigPollingStatCount(lastConfigStatCount, *itr, true);
-                    }
-                }
-            }
-
-            // Iterate all wildcard configs, make sure stat count will not exceed limit.
-            for (auto itr = wildcardConfigs.begin();
-                 itr != wildcardConfigs.end() && mStatCount <= INT32_FLAG(polling_max_stat_count);
-                 ++itr) {
-                if (!mRuningFlag || mHoldOnFlag)
-                    break;
-
-                const FileDiscoveryOptions* config = itr->first;
-                const PipelineContext* ctx = itr->second;
-                if (!config->IsContainerDiscoveryEnabled()) {
-                    int32_t lastConfigStatCount = mStatCount;
-                    if (!PollingWildcardConfigPath(*itr, config->GetWildcardPaths()[0], 0)) {
-                        LOG_DEBUG(sLogger,
-                                  ("can not find matched path in config, Wildcard begin logPath",
-                                   config->GetBasePath())(ctx->GetProjectName(), ctx->GetLogstoreName()));
-                    }
-                    CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
-                } else {
-                    for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                        const string& baseWildcardPath = (*config->GetContainerInfo())[i].mContainerPath;
-                        int32_t lastConfigStatCount = mStatCount;
-                        if (!PollingWildcardConfigPath(*itr, baseWildcardPath, 0)) {
-                            LOG_DEBUG(sLogger,
-                                      ("can not find matched path in config, "
-                                       "Wildcard begin logPath ",
-                                       baseWildcardPath)(ctx->GetProjectName(), ctx->GetLogstoreName()));
-                        }
-                        CheckConfigPollingStatCount(lastConfigStatCount, *itr, true);
-                    }
-                }
-            }
-
-            // Add collected new files to PollingModify.
-            PollingModify::GetInstance()->AddNewFile(mNewFileVec);
-
-            // Check cache, clear unavailable and overtime items.
-            if (mCurrentRound % INT32_FLAG(check_not_exist_file_dir_round) == 0) {
-                ClearUnavailableFileAndDir();
-            }
-            ClearTimeoutFileAndDir();
-        }
+        PollingIteration();
 
         // Sleep for a while, by default, 5s on Linux, 1s on Windows.
         for (int i = 0; i < 10 && mRuningFlag; ++i) {
@@ -248,12 +136,137 @@ void PollingDirFile::Polling() {
     LOG_DEBUG(sLogger, ("dir file polling thread done", ""));
 }
 
+void PollingDirFile::PollingIteration() {
+    LOG_DEBUG(sLogger, ("start dir file polling, mCurrentRound", mCurrentRound));
+    PTScopedLock thradLock(mPollingThreadLock);
+    mStatCount = 0;
+    mNewFileVec.clear();
+    ++mCurrentRound;
+
+    // Get a copy of config list from ConfigManager.
+    // PollingDirFile has to be held on at first because raw pointers are used here.
+    vector<FileDiscoveryConfig> sortedConfigs;
+    vector<FileDiscoveryConfig> wildcardConfigs;
+    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+    for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
+        if (itr->second.first->GetWildcardPaths().empty())
+            sortedConfigs.push_back(itr->second);
+        else
+            wildcardConfigs.push_back(itr->second);
+    }
+    sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
+
+    size_t configTotal = nameConfigMap.size();
+    LogtailMonitor::GetInstance()->UpdateMetric("config_count", configTotal);
+    {
+        ScopedSpinLock lock(mCacheLock);
+        size_t pollingDirCacheSize = mDirCacheMap.size();
+        LogtailMonitor::GetInstance()->UpdateMetric("polling_dir_cache", pollingDirCacheSize);
+        size_t pollingFileCacheSize = mFileCacheMap.size();
+        LogtailMonitor::GetInstance()->UpdateMetric("polling_file_cache", pollingFileCacheSize);
+    }
+    LogtailMonitor::GetInstance()->UpdateMetric("config_count", nameConfigMap.size());
+    {
+        ScopedSpinLock lock(mCacheLock);
+        LogtailMonitor::GetInstance()->UpdateMetric("polling_dir_cache", mDirCacheMap.size());
+        LogtailMonitor::GetInstance()->UpdateMetric("polling_file_cache", mFileCacheMap.size());
+    }
+
+    // Iterate all normal configs, make sure stat count will not exceed limit.
+    for (auto itr = sortedConfigs.begin();
+         itr != sortedConfigs.end() && mStatCount <= INT32_FLAG(polling_max_stat_count);
+         ++itr) {
+        if (!mRuningFlag || mHoldOnFlag)
+            break;
+
+        const FileDiscoveryOptions* config = itr->first;
+        const PipelineContext* ctx = itr->second;
+        if (!config->IsContainerDiscoveryEnabled()) {
+            fsutil::PathStat baseDirStat;
+            if (!fsutil::PathStat::stat(config->GetBasePath(), baseDirStat)) {
+                LOG_DEBUG(sLogger,
+                          ("get base dir info error: ", config->GetBasePath())(ctx->GetProjectName(),
+                                                                               ctx->GetLogstoreName()));
+                continue;
+            }
+
+            int32_t lastConfigStatCount = mStatCount;
+            if (!PollingNormalConfigPath(*itr, config->GetBasePath(), string(), baseDirStat, 0)) {
+                LOG_DEBUG(sLogger,
+                          ("logPath in config not exist", config->GetBasePath())(ctx->GetProjectName(),
+                                                                                 ctx->GetLogstoreName()));
+            }
+            CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
+        } else {
+            for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
+                const string& basePath = (*config->GetContainerInfo())[i].mContainerPath;
+                fsutil::PathStat baseDirStat;
+                if (!fsutil::PathStat::stat(basePath.c_str(), baseDirStat)) {
+                    LOG_DEBUG(
+                        sLogger,
+                        ("get docker base dir info error: ", basePath)(ctx->GetProjectName(), ctx->GetLogstoreName()));
+                    continue;
+                }
+                int32_t lastConfigStatCount = mStatCount;
+                if (!PollingNormalConfigPath(*itr, basePath, string(), baseDirStat, 0)) {
+                    LOG_DEBUG(sLogger,
+                              ("docker logPath in config not exist", basePath)(ctx->GetProjectName(),
+                                                                               ctx->GetLogstoreName()));
+                }
+                CheckConfigPollingStatCount(lastConfigStatCount, *itr, true);
+            }
+        }
+    }
+
+    // Iterate all wildcard configs, make sure stat count will not exceed limit.
+    for (auto itr = wildcardConfigs.begin();
+         itr != wildcardConfigs.end() && mStatCount <= INT32_FLAG(polling_max_stat_count);
+         ++itr) {
+        if (!mRuningFlag || mHoldOnFlag)
+            break;
+
+        const FileDiscoveryOptions* config = itr->first;
+        const PipelineContext* ctx = itr->second;
+        if (!config->IsContainerDiscoveryEnabled()) {
+            int32_t lastConfigStatCount = mStatCount;
+            if (!PollingWildcardConfigPath(*itr, config->GetWildcardPaths()[0], 0)) {
+                LOG_DEBUG(sLogger,
+                          ("can not find matched path in config, Wildcard begin logPath",
+                           config->GetBasePath())(ctx->GetProjectName(), ctx->GetLogstoreName()));
+            }
+            CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
+        } else {
+            for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
+                const string& baseWildcardPath = (*config->GetContainerInfo())[i].mContainerPath;
+                int32_t lastConfigStatCount = mStatCount;
+                if (!PollingWildcardConfigPath(*itr, baseWildcardPath, 0)) {
+                    LOG_DEBUG(sLogger,
+                              ("can not find matched path in config, "
+                               "Wildcard begin logPath ",
+                               baseWildcardPath)(ctx->GetProjectName(), ctx->GetLogstoreName()));
+                }
+                CheckConfigPollingStatCount(lastConfigStatCount, *itr, true);
+            }
+        }
+    }
+
+    // Add collected new files to PollingModify.
+    PollingModify::GetInstance()->AddNewFile(mNewFileVec);
+
+    // Check cache, clear unavailable and overtime items.
+    if (mCurrentRound % INT32_FLAG(check_not_exist_file_dir_round) == 0) {
+        ClearUnavailableFileAndDir();
+    }
+    ClearTimeoutFileAndDir();
+}
+
 // Last Modified Time (LMD) of directory changes when a file or a subdirectory is added,
 // removed or renamed. Howerver, modifying the content of a file within it will not update
 // LMD, and add/remove/rename file/directory in its subdirectory will also not upadte LMD.
 // NOTE: So, we can not find changes in subdirectories of the directory according to LMD.
 bool PollingDirFile::CheckAndUpdateDirMatchCache(const string& dirPath,
                                                  const fsutil::PathStat& statBuf,
+                                                 bool exceedPreservedDirDepth,
                                                  bool& newFlag) {
     int64_t sec, nsec;
     statBuf.GetLastWriteTime(sec, nsec);
@@ -266,6 +279,7 @@ bool PollingDirFile::CheckAndUpdateDirMatchCache(const string& dirPath,
     if (iter == mDirCacheMap.end()) {
         DirFileCache& dirCache = mDirCacheMap[dirPath];
         dirCache.SetConfigMatched(true);
+        dirCache.SetExceedPreservedDirDepth(exceedPreservedDirDepth);
         dirCache.SetCheckRound(mCurrentRound);
         dirCache.SetLastModifyTime(modifyTime);
         // Directories found at round 1 or too old are considered as old data.
@@ -290,7 +304,8 @@ bool PollingDirFile::CheckAndUpdateDirMatchCache(const string& dirPath,
 bool PollingDirFile::CheckAndUpdateFileMatchCache(const string& fileDir,
                                                   const string& fileName,
                                                   const fsutil::PathStat& statBuf,
-                                                  bool needFindBestMatch) {
+                                                  bool needFindBestMatch,
+                                                  bool exceedPreservedDirDepth) {
     int64_t sec, nsec;
     statBuf.GetLastWriteTime(sec, nsec);
     int64_t modifyTime = NANO_CONVERTING * sec + nsec;
@@ -306,6 +321,7 @@ bool PollingDirFile::CheckAndUpdateFileMatchCache(const string& fileDir,
 
         DirFileCache& fileCache = mFileCacheMap[filePath];
         fileCache.SetConfigMatched(matchFlag);
+        fileCache.SetExceedPreservedDirDepth(exceedPreservedDirDepth);
         fileCache.SetCheckRound(mCurrentRound);
         fileCache.SetLastModifyTime(modifyTime);
 
@@ -346,10 +362,20 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
                                              const string& obj,
                                              const fsutil::PathStat& statBuf,
                                              int depth) {
-    if (pConfig.first->mMaxDirSearchDepth >= 0 && depth > pConfig.first->mMaxDirSearchDepth)
+    if (pConfig.first->mMaxDirSearchDepth >= 0 && depth > pConfig.first->mMaxDirSearchDepth) {
         return false;
-    if (pConfig.first->mPreservedDirDepth >= 0 && depth > pConfig.first->mPreservedDirDepth)
-        return false;
+    }
+    bool exceedPreservedDirDepth = false;
+    if (pConfig.first->mPreservedDirDepth >= 0 && depth > pConfig.first->mPreservedDirDepth) {
+        exceedPreservedDirDepth = true;
+        int64_t sec = 0;
+        int64_t nsec = 0;
+        statBuf.GetLastWriteTime(sec, nsec);
+        auto curTime = time(nullptr);
+        if (curTime - sec > INT32_FLAG(timeout_interval)) {
+            return false;
+        }
+    }
 
     string dirPath = obj.empty() ? srcPath : PathJoin(srcPath, obj);
     if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(dirPath)) {
@@ -357,7 +383,7 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
         return false;
     }
     bool isNewDirectory = false;
-    if (!CheckAndUpdateDirMatchCache(dirPath, statBuf, isNewDirectory))
+    if (!CheckAndUpdateDirMatchCache(dirPath, statBuf, exceedPreservedDirDepth, isNewDirectory))
         return true;
     if (isNewDirectory) {
         PollingEventQueue::GetInstance()->PushEvent(new Event(srcPath, obj, EVENT_CREATE | EVENT_ISDIR, -1, 0));
@@ -460,7 +486,7 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
         if (buf.IsDir() && (!needCheckDirMatch || !pConfig.first->IsDirectoryInBlacklist(item))) {
             PollingNormalConfigPath(pConfig, dirPath, entName, buf, depth + 1);
         } else if (buf.IsRegFile()) {
-            if (CheckAndUpdateFileMatchCache(dirPath, entName, buf, needFindBestMatch)) {
+            if (CheckAndUpdateFileMatchCache(dirPath, entName, buf, needFindBestMatch, exceedPreservedDirDepth)) {
                 LOG_DEBUG(sLogger, ("add to modify event", entName)("round", mCurrentRound));
                 mNewFileVec.push_back(SplitedFilePath(dirPath, entName));
             }
@@ -621,12 +647,44 @@ void PollingDirFile::ClearTimeoutFileAndDir() {
     }
 
     // Collect deleted files, so that it can notify PollingModify later.
+    s_lastClearTime = curTime;
     std::vector<SplitedFilePath> deleteFileVec;
     {
         ScopedSpinLock lock(mCacheLock);
+        bool clearExceedPreservedDirDepth = false;
+        for (auto iter = mDirCacheMap.begin(); iter != mDirCacheMap.end();) {
+            if (iter->second.GetExceedPreservedDirDepth()
+                && (NANO_CONVERTING * curTime - iter->second.GetLastModifyTime())
+                    > NANO_CONVERTING * INT32_FLAG(timeout_interval)) {
+                iter = mDirCacheMap.erase(iter);
+                clearExceedPreservedDirDepth = true;
+            } else
+                ++iter;
+        }
+        if (clearExceedPreservedDirDepth) {
+            LOG_INFO(sLogger, ("After clear DirCache size", mDirCacheMap.size()));
+        }
+        clearExceedPreservedDirDepth = false;
+        for (auto iter = mFileCacheMap.begin(); iter != mFileCacheMap.end();) {
+            if (iter->second.GetExceedPreservedDirDepth()
+                && (NANO_CONVERTING * curTime - iter->second.GetLastModifyTime())
+                    > NANO_CONVERTING * INT32_FLAG(timeout_interval)) {
+                // If the file has been added to PollingModify, remove it here.
+                if (iter->second.HasMatchedConfig() && iter->second.HasEventFlag()) {
+                    deleteFileVec.push_back(SplitedFilePath(iter->first));
+                    LOG_INFO(sLogger, ("delete file cache", iter->first)("vec size", deleteFileVec.size()));
+                }
+                iter = mFileCacheMap.erase(iter);
+                clearExceedPreservedDirDepth = true;
+            } else
+                ++iter;
+        }
+        if (clearExceedPreservedDirDepth) {
+            LOG_INFO(sLogger, ("After clear FileCache size", mFileCacheMap.size()));
+        }
+
         if (mDirCacheMap.size() > (size_t)INT32_FLAG(polling_dir_upperlimit)) {
             LOG_INFO(sLogger, ("start clear dir cache", mDirCacheMap.size()));
-            s_lastClearTime = curTime;
             for (auto iter = mDirCacheMap.begin(); iter != mDirCacheMap.end();) {
                 if ((NANO_CONVERTING * curTime - iter->second.GetLastModifyTime())
                     > NANO_CONVERTING * INT32_FLAG(polling_dir_timeout)) {
@@ -634,12 +692,11 @@ void PollingDirFile::ClearTimeoutFileAndDir() {
                 } else
                     ++iter;
             }
-            LOG_INFO(sLogger, ("After clear", mDirCacheMap.size())("Cost time", time(NULL) - s_lastClearTime));
+            LOG_INFO(sLogger, ("After clear DirCache size", mDirCacheMap.size()));
         }
 
         if (mFileCacheMap.size() > (size_t)INT32_FLAG(polling_file_upperlimit)) {
             LOG_INFO(sLogger, ("start clear file cache", mFileCacheMap.size()));
-            s_lastClearTime = curTime;
             for (auto iter = mFileCacheMap.begin(); iter != mFileCacheMap.end();) {
                 if ((NANO_CONVERTING * curTime - iter->second.GetLastModifyTime())
                     > NANO_CONVERTING * INT32_FLAG(polling_file_timeout)) {
@@ -652,7 +709,7 @@ void PollingDirFile::ClearTimeoutFileAndDir() {
                 } else
                     ++iter;
             }
-            LOG_INFO(sLogger, ("After clear", mFileCacheMap.size())("Cost time", time(NULL) - s_lastClearTime));
+            LOG_INFO(sLogger, ("After clear FileCache size", mFileCacheMap.size()));
         }
     }
 

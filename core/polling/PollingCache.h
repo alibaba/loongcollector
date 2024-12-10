@@ -32,6 +32,10 @@ struct DirFileCache {
     void SetConfigMatched(bool configMatched) { mConfigMatched = configMatched; }
     bool HasMatchedConfig() const { return mConfigMatched; }
 
+
+    void SetExceedPreservedDirDepth(bool exceed) { mExceedPreservedDirDepth = exceed; }
+    bool GetExceedPreservedDirDepth() const { return mExceedPreservedDirDepth; }
+
     void SetCheckRound(uint64_t curRound) { mLastCheckRound = curRound; }
     uint64_t GetLastCheckRound() const { return mLastCheckRound; }
 
@@ -51,6 +55,7 @@ private:
     int32_t mLastEventTime = 0;
 
     bool mConfigMatched = false;
+    bool mExceedPreservedDirDepth = false;
     uint64_t mLastCheckRound = 0;
     // Last modified time on filesystem in nanoseconds.
     int64_t mLastModifyTime = 0;

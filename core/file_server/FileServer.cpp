@@ -34,7 +34,17 @@ namespace logtail {
 void FileServer::Start() {
     ConfigManager::GetInstance()->LoadDockerConfig();
     CheckPointManager::Instance()->LoadCheckPoint();
+    LOG_INFO(sLogger, ("watch dirs", "start"));
+    auto start = GetCurrentTimeInMilliSeconds();
     ConfigManager::GetInstance()->RegisterHandlers();
+    auto costMs = GetCurrentTimeInMilliSeconds() - start;
+    if (costMs >= 60 * 1000) {
+        LogtailAlarm::GetInstance()->SendAlarm(REGISTER_HANDLERS_TOO_SLOW_ALARM,
+                                               "Registering handlers took " + ToString(costMs) + " ms");
+        LOG_WARNING(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
+    } else {
+        LOG_INFO(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
+    }
     LOG_INFO(sLogger, ("watch dirs", "succeeded"));
     EventDispatcher::GetInstance()->AddExistedCheckPointFileEvents();
     // the dump time must be reset after dir registration, since it may take long on NFS.
