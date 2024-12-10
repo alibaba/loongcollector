@@ -25,18 +25,22 @@ StringView gEmptyStringView;
 
 const std::string& PipelineEventTypeToString(PipelineEvent::Type t) {
     switch (t) {
-        case PipelineEvent::Type::LOG:
+        case PipelineEvent::Type::LOG: {
             static std::string logname = "Log";
             return logname;
-        case PipelineEvent::Type::METRIC:
+        }
+        case PipelineEvent::Type::METRIC: {
             static std::string metricname = "Metric";
             return metricname;
-        case PipelineEvent::Type::SPAN:
+        }
+        case PipelineEvent::Type::SPAN: {
             static std::string spanname = "Span";
             return spanname;
-        default:
+        }
+        default: {
             static std::string voidname = "";
             return voidname;
+        }
     }
 }
 

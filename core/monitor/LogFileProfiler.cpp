@@ -26,6 +26,9 @@
 #include "sender/Sender.h"
 #include "config_manager/ConfigManager.h"
 #include "app_config/AppConfig.h"
+#if defined(_MSC_VER)
+#include "EncodingConverter.h"
+#endif
 
 DEFINE_FLAG_INT32(profile_data_send_interval, "interval of send LogFile/DomainSocket profile data, seconds", 600);
 DEFINE_FLAG_STRING(logtail_profile_snapshot, "reader profile on local disk", "logtail_profile_snapshot");
