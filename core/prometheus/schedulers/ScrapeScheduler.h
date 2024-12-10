@@ -96,6 +96,7 @@ private:
     size_t mInputIndex;
 
     // auto metrics
+    std::string mScrapeState;
     uint64_t mScrapeTimestampMilliSec = 0;
     double mScrapeDurationSeconds = 0;
     uint64_t mScrapeResponseSizeBytes = 0;

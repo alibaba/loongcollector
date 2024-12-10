@@ -5,6 +5,7 @@
 #include <iomanip>
 
 #include "common/StringTools.h"
+#include "http/HttpResponse.h"
 #include "models/StringView.h"
 
 using namespace std;
@@ -148,4 +149,37 @@ uint64_t GetRandSleepMilliSec(const std::string& key, uint64_t intervalSeconds, 
     randSleep -= sleepOffset;
     return randSleep;
 }
+
+namespace prom {
+
+    std::string NetworkCodeToState(NetworkCode code) {
+        static map<uint64_t, string> sNetworkCodeMap = {{NetworkCode::Ok, "OK"},
+                                                        {NetworkCode::ConnectionFailed, "ERR_CONN_FAILED"},
+                                                        {NetworkCode::RemoteAccessDenied, "ERR_ACCESS_DENIED"},
+                                                        {NetworkCode::Timeout, "ERR_TIMEOUT"},
+                                                        {NetworkCode::SSLConnectError, "ERR_SSL_CONN_ERR"},
+                                                        {NetworkCode::SSLCertError, "ERR_SSL_CERT_ERR"},
+                                                        {NetworkCode::SSLOtherProblem, "ERR_SSL_OTHER_PROBLEM"},
+                                                        {NetworkCode::SendDataFailed, "ERR_SEND_DATA_FAILED"},
+                                                        {NetworkCode::RecvDataFailed, "ERR_RECV_DATA_FAILED"},
+                                                        {NetworkCode::Other, "ERR_UNKNOWN"}};
+        static string sCurlOther = "ERR_UNKNOWN";
+        if (sNetworkCodeMap.count(code)) {
+            return sNetworkCodeMap[code];
+        }
+        return sCurlOther;
+    }
+
+    std::string HttpCodeToState(uint64_t code) {
+        if (code > 1000) {
+            return "ERR_HTTP_UNKNOWN";
+        }
+        if (code == 200) {
+            return "OK";
+        }
+        string statePrefix = "ERR_HTTP_";
+        return statePrefix + ToString(code);
+    }
+
+} // namespace prom
 } // namespace logtail
