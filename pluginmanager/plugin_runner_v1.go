@@ -110,6 +110,7 @@ func (p *pluginv1Runner) AddPlugin(pluginMeta *pipeline.PluginMeta, category plu
 		}
 	case pluginExtension:
 		if extension, ok := plugin.(pipeline.Extension); ok {
+			logger.Debug(p.LogstoreConfig.Context.GetRuntimeContext(), "add extension, key:", pluginMeta.PluginTypeWithID)
 			return p.addExtension(pluginMeta.PluginTypeWithID, extension)
 		}
 	default:
@@ -419,7 +420,8 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	}
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "flusher plugins stop", "done")
 
-	for _, extension := range p.ExtensionPlugins {
+	for pluginTypeWithID, extension := range p.ExtensionPlugins {
+		logger.Debug(p.LogstoreConfig.Context.GetRuntimeContext(), "stop extension:", pluginTypeWithID, "description", extension.Description())
 		err := extension.Stop()
 		if err != nil {
 			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), "STOP_EXTENSION_ALARM",
