@@ -23,14 +23,29 @@
 #include "pipeline/plugin/interface/Processor.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 
+DECLARE_FLAG_INT32(process_thread_count);
+
 namespace logtail {
+
+namespace prom {
+    struct AutoMetric {
+        double mScrapeDurationSeconds;
+        uint64_t mScrapeResponseSizeBytes;
+        uint64_t mScrapeSamplesLimit;
+        // uint64_t mPostRelabel;
+        uint64_t mScrapeSamplesScraped;
+        uint64_t mScrapeTimeoutSeconds;
+        bool mUp;
+    };
+} // namespace prom
+
 class ProcessorPromRelabelMetricNative : public Processor {
 public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config) override;
-    void Process(PipelineEventGroup& metricGroup) override;
+    void Process(PipelineEventGroup&) override;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
@@ -39,13 +54,14 @@ private:
     bool ProcessEvent(PipelineEventPtr& e, const GroupTags& targetTags, const std::vector<StringView>& toDelete);
     std::vector<StringView> GetToDeleteTargetLabels(const GroupTags& targetTags) const;
 
-    void AddAutoMetrics(PipelineEventGroup& metricGroup);
+    void AddAutoMetrics(PipelineEventGroup& eGroup, const prom::AutoMetric& autoMetric) const;
+    void UpdateAutoMetrics(const PipelineEventGroup& eGroup, prom::AutoMetric& autoMetric) const;
     void AddMetric(PipelineEventGroup& metricGroup,
                    const std::string& name,
                    double value,
                    time_t timestamp,
                    uint32_t nanoSec,
-                   const GroupTags& targetTags);
+                   const GroupTags& targetTags) const;
 
     std::unique_ptr<ScrapeConfig> mScrapeConfigPtr;
     std::string mLoongCollectorScraper;
