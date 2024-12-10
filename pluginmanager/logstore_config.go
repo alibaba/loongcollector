@@ -108,6 +108,7 @@ type LogstoreConfig struct {
 	EnvSet                   map[string]struct{}
 	CollectingContainersMeta bool
 	pluginID                 int32
+	extensionIndex           int32
 }
 
 func (p *LogstoreStatistics) Init(context pipeline.Context) {
@@ -503,6 +504,8 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 							} else if _, isServiceInput := pipeline.ServiceInputs[pluginType]; isServiceInput {
 								// Load ServiceInput plugin defined in pipeline.ServiceInputs
 								err = loadService(logstoreC.genPluginMeta(pluginTypeWithIDStr), logstoreC, input["detail"])
+							} else {
+								err = fmt.Errorf("invalid input type: %s", pluginTypeWithIDStr)
 							}
 							if err != nil {
 								return nil, err
@@ -799,6 +802,7 @@ func (lc *LogstoreConfig) genPluginMeta(pluginTypeWithID string) *pipeline.Plugi
 		}
 		if ids := strings.IndexByte(pluginTypeWithID, '/'); ids != -1 {
 			if pluginID, err := strconv.ParseInt(pluginTypeWithID[ids+1:], 10, 32); err == nil {
+				atomic.StoreInt32(&lc.extensionIndex, 0)
 				atomic.StoreInt32(&lc.pluginID, int32(pluginID))
 			}
 			return &pipeline.PluginMeta{
@@ -808,6 +812,8 @@ func (lc *LogstoreConfig) genPluginMeta(pluginTypeWithID string) *pipeline.Plugi
 			}
 		}
 	}
+
+	// only for anonymous extensions.
 	pluginType := pluginTypeWithID
 	pluginID := lc.genPluginID()
 	pluginTypeWithID = fmt.Sprintf("%s/%s", pluginType, pluginID)
@@ -860,7 +866,7 @@ func GetPluginPriority(pluginTypeWithID string) int {
 }
 
 func (lc *LogstoreConfig) genPluginID() string {
-	return fmt.Sprintf("%v", atomic.AddInt32(&lc.pluginID, 1))
+	return fmt.Sprintf("%v_%v", atomic.LoadInt32(&lc.pluginID), atomic.AddInt32(&lc.extensionIndex, 1))
 }
 
 func init() {
