@@ -239,6 +239,378 @@ scp libPluginBase.so <user>@<node>:/home/<user>
 cp /logtail_host/home/<user>/libPluginBase.so /usr/local/loongcollector
 ```
 
+## 改善vscode开发体验
+
+### 1. 图形界面调试
+
+我相信在有可能的情况下，没人愿意使用gdb命令界面进行调试，繁琐，不友好，因此第一步需要解决的就是使用现代图形化的调试界面调试代码。
+
+1. 首先使用vscode打开ilogtail的项目目录；
+2. 安装`devcontainer`插件（如果没有的话）；
+3. 使用新的devcontainer配置文件：将项目目录下`.devcontainer`目录下的`devcontainer.json`里面的内容替换成`devcontainer.json.lldb`文件里面的内容。
+4. 在开发容器里打开项目：打开`Command Palette`，输入`Reopen in container` 回车，如下图：
+
+![1.png](https://s2.loli.net/2024/01/18/Y3WVivjBhnD1yfL.png)
+
+![image-20240115003845492.png](https://s2.loli.net/2024/01/18/BGM17Etcyo6puKn.png)
+
+5. `launch.json` 文件：进入`.vscode`目录下，修改`launch.json`文件输入内容如下：
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // 这个配置的目的主要用于第一次全量编译c++ core代码
+            "type": "lldb",
+            "request": "launch",
+            "name": "First run",
+            "program": "${workspaceFolder}/output/ilogtail",
+            "args": [
+                "--version"
+            ],
+            "preLaunchTask": "c++ first build",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            // 这个配置用于后续修改相关c++ core代码之后增量编译以及调试
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug c++",
+            "program": "${workspaceFolder}/output/ilogtail",
+            "args": [
+                // "--ilogtail_local_config_dir=${workspaceFolder}/config"
+            ],
+            "preLaunchTask": "c++ build",
+            "cwd": "${workspaceFolder}",
+            "preRunCommands": [
+                "pro hand -p true -n false -s false SIGURG"
+            ],
+            "env": {
+                "ALIYUN_LOGTAIL_USER_DEFINED_ID": "test",
+                "default_container_host_path": "/logtail_host"
+            }
+        },
+        {
+            // 这个配置用于单独调试go插件代码
+            "name": "Debug go",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "preLaunchTask": "go build",
+            "program": "${workspaceFolder}/plugin_main/",
+            "args": [
+                // "--file-io=true",
+                "--plugin=${workspaceFolder}/config/json-kafka.json",
+                "--input-file=${workspaceFolder}/config/input.log",
+                "--output-file=${workspaceFolder}/config/output.log"
+            ],
+            "env": {
+                "LD_LIBRARY_PATH": "${workspaceFolder}/output/"
+            }
+        },
+    ]
+}
+
+```
+
+6. `tasks.json`文件：同样在`.vscode`目录下，新建文件`tasks.json`，文件内容如下：
+
+```
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "mkdir build",
+            "type": "shell",
+            "command": "mkdir",
+            "args": [
+                "-p",
+                "${workspaceFolder}/core/build"
+            ]
+        },
+        {
+            "label": "mkdir output",
+            "type": "shell",
+            "command": "mkdir",
+            "args": [
+                "-p",
+                "${workspaceFolder}/output"
+            ]
+        },
+        {
+            "label": "cmake",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-D",
+                "CMAKE_BUILD_TYPE=Debug",
+                "-D",
+                "CMAKE_EXPORT_COMPILE_COMMANDS=1",
+                "../"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/core/build"
+            }
+        },
+        {
+            "label": "make",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "-j",
+                "$(nproc)"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/core/build"
+            }
+        },
+        {
+            "label": "make plugin_local",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "plugin_local",
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "cp",
+            "type": "shell",
+            "command": "cp",
+            "args": [
+                "-a",
+                "./ilogtail",
+                "./go_pipeline/libPluginAdapter.so",
+                "${workspaceFolder}/output"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/core/build"
+            }
+        },
+        {
+            "label": "cp plugin_main",
+            "type": "shell",
+            "command": "cp",
+            "args": [
+                "-a",
+                "${workspaceFolder}/output/libPluginAdapter.so",
+                "${workspaceFolder}/core/go_pipeline/LogtailPluginAdapter.h",
+                "${workspaceFolder}/pkg/logtail/"
+            ]
+        },
+        {
+            "label": "c++ first build",
+            "type": "shell",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "make plugin_local",
+                "mkdir build",
+                "cmake",
+                "make",
+                "cp",
+                "cp plugin_main"
+            ],
+        },
+        {
+            "label": "c++ build",
+            "type": "shell",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "make",
+                "cp"
+            ],
+        },
+        {
+            "label": "go build",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "plugin_main"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        }
+    ]
+}
+```
+
+7. 打开vscode的调试那一栏，可以看到以下内容：
+
+![image-20240115000234066.png](https://s2.loli.net/2024/01/18/bKZNQadM2fTltH8.png)
+
+运行第一个选项`First run`：该选项主要进行第一次C++代码编译，并复制相关文件当指定目录；
+
+8. 运行第二个选项`Debug c++`：打开`logtail.cpp`文件并打上断点
+
+   ![image-20240115000951727.png](https://s2.loli.net/2024/01/18/SqoIDVCnf8OrTHv.png)
+
+接着运行`Debug c++`选项，可以看到程序将中断在断点处：
+
+![image-20240115001306196.png](https://s2.loli.net/2024/01/18/sV9lcoH7bEtiLJm.png)
+
+后续修改相关c++代码之后需要进行调试就只需要执行`Debug c++`选项就可以了。
+
+> launch.json和tasks.json文件的结合会使调试过程变得非常灵活，上面我提供的launch.json和tasks.json文件只是我自己开发的时候用的，各位可以自行进行修改以满足需求。
+>
+> 各位也可以通过为调试相关选项配置快捷键，配合`launch.json和tasks.json`文件实现真正的一键调试，这将极大的改善开发体验。
+
+9. `Debug go`选项就是用来调试go插件系统的，比较简单，就不多说了，可以结合[纯插件模式启动](https://ilogtail.gitbook.io/ilogtail-docs/developer-guide/plugin-development/pure-plugin-start)这篇文档和`launch.json`文件中的`Debug go`配置以及`plugin_main.go`源码文件自行领悟；我提供两份配置文件方便做测试：
+
+```json
+{
+    "inputs": [
+        {
+            "detail": {
+                "FieldName": "content",
+                "InputFilePath": "/workspaces/ilogtail_src/config/input.log",
+                "LineLimit": 1000
+            },
+            "type": "metric_debug_file"
+        }
+    ],
+    "processors": [
+        {
+            "type": "processor_json",
+            "detail": {
+                "SourceKey": "content",
+                "KeepSource": false,
+                "ExpandDepth": 0,
+                "IgnoreFirstConnector": true,
+                "ExpandConnector": "_",
+                "NestJsonKey": "message"
+            }
+        },
+        {
+            "type": "processor_add_fields",
+            "detail": {
+                "Fields": {
+                    "config_file": "wo giao"
+                }
+            }
+        }
+    ],
+    "flushers": [
+        {
+            "type": "flusher_kafka_v2_compatible",
+            "detail": {
+                "Brokers": [
+                    "192.168.6.11:32245"
+                ],
+                "Topic": "test-topic"
+            }
+        }
+    ]
+}
+```
+
+```json
+{
+    "inputs": [
+        {
+            "detail": {
+                "FieldName": "content",
+                "InputFilePath": "/workspaces/ilogtail_src/config/input.log",
+                "LineLimit": 1000
+            },
+            "type": "metric_debug_file"
+        }
+    ],
+    "processors": [
+        {
+            "type": "processor_json",
+            "detail": {
+                "SourceKey": "content",
+                "KeepSource": false,
+                "ExpandDepth": 0,
+                "IgnoreFirstConnector": true,
+                "ExpandConnector": "",
+                "NestJsonKey": "message"
+            }
+        },
+        {
+            "type": "processor_add_fields",
+            "detail": {
+                "Fields": {
+                    "config_file": "wo giao"
+                }
+            }
+        }
+    ],
+    "flushers": [
+        {
+            "type": "flusher_otlp",
+            "detail": {
+                "Logs": {
+                    "Endpoint": "100.105.62.83:4317"
+                }
+            }
+        }
+    ]
+}
+```
+
+### 2. 代码跳转
+
+有了一键调试可以方便修改代码之后，下面就需要解决阅读代码的问题，毕竟为了看一个调用函数实现得靠全文搜索那效率也太低了。
+
+#### 2.1 安装clangd
+
+1. 当你第一次通过`Command Palette`执行`Reopen in container`完成之后，vscode应该会跳出以下提示：
+
+![image-20240115002642430.png](https://s2.loli.net/2024/01/18/BhZapEeMVYG9ygw.png)
+
+这时候点击`Install`安装`clangd`，该程序就是提供代码跳转的；
+
+如果出于某些原因你没有点的话可以通过呼出`Command Palette`执行`Rstart language server`，如果没有安装`clangd`那么它会再次跳出上面的提示框，接着就可以再次点击安装了：
+
+![image-20240115003845492.png](https://s2.loli.net/2024/01/18/BGM17Etcyo6puKn.png)
+
+又或者这样：
+
+![PixPin_2024-01-18_23-00-23.png](https://s2.loli.net/2024/01/18/irsLjwBogf6cauI.png)
+
+2. 点开vscode的设置页面，定位到`clangd`插件：
+
+![image-20240115003340641.png](https://s2.loli.net/2024/01/18/EH5AnYhKO3ZbQ9w.png)
+
+为`clangd` 添加以上截图中的运行参数：
+
+```json
+  "clangd.arguments": [
+    "--background-index",
+    "-j=32",
+    "--all-scopes-completion",
+    "--completion-style=detailed",
+    "--header-insertion=iwyu",
+    "--pch-storage=memory",
+    "--enable-config",
+    "--pretty",
+    "--clang-tidy",
+    "--header-insertion-decorators",
+    "--fallback-style=Webkit"
+  ],
+```
+
+> 其中的的`-j`选项后面的数字是你cpu的核心数，可以根据自己的实际情况进行修改。
+
+#### 2.2 编译指令信息文件
+
+当你执行完前面调试选项`First run`之后，会在`ilogtail项目目录/core/build`目录下生成一个名为`compile_commands.json`的文件，该文件包含了项目中每个文件的编译指令，例如编译器参数、定义的宏、包含的目录等，这些信息是从实际的构建过程中提取的；该文件也是clangd程序提供代码跳转能力的关键。
+
+当你有了`clangd`以及`compile_commands.json`文件之后就可以通过鼠标点击来自由的在各个函数及其实现之间跳转了，极大的提升阅读代码的体验。
+
+实际上此时你就应该可以通过鼠标随意点击任意函数进行代码跳转了，如果不行的话请呼出`Command Palette`执行`Rstart language server`来重启`clangd`程序。当第一次启动`clangd`的时候会读取`compile_commands.json`文件进行索引：
+
+![image-20240115005943930.png](https://s2.loli.net/2024/01/18/QbYCDSvVIAocap6.png)
+
+索引完成之后是下面这个状态：
+
+![image-20240115010037830.png](https://s2.loli.net/2024/01/18/4eFKldVtGRzscYM.png)
+
 ## 常见问题
 
 ### 1. 更新代码后编译错误
