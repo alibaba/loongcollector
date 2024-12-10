@@ -221,13 +221,13 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
     bool ret = false;
     auto eBPFConfig = std::make_unique<nami::eBPFConfig>();
     eBPFConfig->plugin_type_ = type;
-    eBPFConfig->stats_handler_ = [this](auto stats){ return mMonitorMgr->HandleStatistic(std::move(stats)); };
+    eBPFConfig->stats_handler_ = [this](auto stats){ return mMonitorMgr->HandleStatistic(stats); };
     // call update function
     // step2: call init function
     switch(type) {
     case nami::PluginType::PROCESS_SECURITY: {
         nami::ProcessConfig pconfig;
-        pconfig.process_security_cb_ = [this](auto events) { return mProcessSecureCB->handle(std::move(events)); };
+        pconfig.process_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) { return mProcessSecureCB->handle(events); };
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
         pconfig.options_ = opts->mOptionList;
         config = std::move(pconfig);
@@ -240,22 +240,23 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
 
     case nami::PluginType::NETWORK_OBSERVE:{
         nami::NetworkObserveConfig nconfig;
+        nconfig.enable_cid_filter = false;
         nami::ObserverNetworkOption* opts = std::get<nami::ObserverNetworkOption*>(options);
         if (opts->mEnableMetric) {
             nconfig.enable_metric_ = true;
-            nconfig.measure_cb_ = [this](auto events, auto ts) { return mMeterCB->handle(std::move(events), ts); };
+            nconfig.measure_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchMeasure>>&  events, auto ts) { return mMeterCB->handle(events, ts); };
             nconfig.enable_metric_ = true;
             mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableSpan) {
             nconfig.enable_span_ = true;
-            nconfig.span_cb_ = [this](auto events) { return mSpanCB->handle(std::move(events)); };
+            nconfig.span_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchSpan>>& events) { return mSpanCB->handle(events); };
             nconfig.enable_span_ = true;
             mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableLog) {
             nconfig.enable_event_ = true;
-            nconfig.event_cb_ = [this](auto events) { return mEventCB->handle(std::move(events)); };
+            nconfig.event_cb_ = [this](std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) { return mEventCB->handle(events); };
             nconfig.enable_event_ = true;
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
@@ -268,7 +269,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
 
     case nami::PluginType::NETWORK_SECURITY:{
         nami::NetworkSecurityConfig nconfig;
-        nconfig.network_security_cb_ = [this](auto events) { return mNetworkSecureCB->handle(std::move(events)); };
+        nconfig.network_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) { return mNetworkSecureCB->handle(events); };
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
         nconfig.options_ = opts->mOptionList;
         config = std::move(nconfig);
@@ -281,7 +282,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
 
     case nami::PluginType::FILE_SECURITY:{
         nami::FileSecurityConfig fconfig;
-        fconfig.file_security_cb_ = [this](auto events) { return mFileSecureCB->handle(std::move(events)); };
+        fconfig.file_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) { return mFileSecureCB->handle(events); };
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
         fconfig.options_ = opts->mOptionList;
         config = std::move(fconfig);

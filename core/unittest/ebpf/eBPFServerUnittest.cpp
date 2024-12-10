@@ -434,7 +434,7 @@ void eBPFServerUnittest::GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc c
             batch_app_measures.emplace_back(std::move(app_measure_ptr));
         }
     }
-    cb(std::move(batch_app_measures), 100000);
+    cb(batch_app_measures, 100000);
 }
 
 void eBPFServerUnittest::GenerateBatchAppEvent(nami::NamiHandleBatchEventFunc cb) {
@@ -452,7 +452,7 @@ void eBPFServerUnittest::GenerateBatchAppEvent(nami::NamiHandleBatchEventFunc cb
         batch_app_events.emplace_back(std::move(appEvent));
     }
 
-    if (cb) cb(std::move(batch_app_events));
+    if (cb) cb(batch_app_events);
 
     return;
 }
@@ -539,7 +539,7 @@ void eBPFServerUnittest::GenerateBatchSpan(nami::NamiHandleBatchSpanFunc cb) {
         batch_spans->single_spans_.emplace_back(std::move(single_span));
     }
     batch_app_spans.emplace_back(std::move(batch_spans));
-    cb(std::move(batch_app_spans));
+    cb(batch_app_spans);
 }
 
 void eBPFServerUnittest::GenerateBatchEvent(nami::NamiHandleBatchDataEventFn cb, SecureEventType type) {
@@ -555,7 +555,7 @@ void eBPFServerUnittest::GenerateBatchEvent(nami::NamiHandleBatchDataEventFn cb,
         auto event = std::make_unique<AbstractSecurityEvent> (std::move(tags), type, 1000);
         events.emplace_back(std::move(event));
     }
-    cb(std::move(events));
+    cb(events);
 }
 
 void eBPFServerUnittest::InitSecurityOpts() {

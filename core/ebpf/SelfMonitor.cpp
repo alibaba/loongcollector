@@ -232,7 +232,7 @@ void eBPFSelfMonitorMgr::Suspend(const nami::PluginType type) {
     mInited[int(type)] = false;
 }
 
-void eBPFSelfMonitorMgr::HandleStatistic(std::vector<nami::eBPFStatistics>&& stats) {
+void eBPFSelfMonitorMgr::HandleStatistic(std::vector<nami::eBPFStatistics>& stats) {
     for (auto& stat : stats) {
         if (!stat.updated_) {
             continue;

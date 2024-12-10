@@ -26,31 +26,31 @@ class MeterHandler : public AbstractHandler {
 public:
     MeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : AbstractHandler(ctx, key, idx) {}
 
-    virtual void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&&, uint64_t) = 0;
+    virtual void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&, uint64_t) = 0;
 };
 
 class OtelMeterHandler : public MeterHandler {
 public:
     OtelMeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : MeterHandler(ctx, key, idx) {}
-    void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp) override;
+    void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t timestamp) override;
 };
 
 class SpanHandler : public AbstractHandler {
 public:
     SpanHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : AbstractHandler(ctx, key, idx) {}
-    virtual void handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&&) = 0;
+    virtual void handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&) = 0;
 };
 
 class OtelSpanHandler : public SpanHandler {
 public:
     OtelSpanHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : SpanHandler(ctx, key, idx) {}
-    void handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&&) override;
+    void handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&) override;
 };
 
 class EventHandler : public AbstractHandler {
 public:
     EventHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : AbstractHandler(ctx, key, idx) {}
-    void handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&&);
+    void handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&);
 };
 
 #ifdef __ENTERPRISE__
@@ -58,13 +58,13 @@ public:
 class ArmsMeterHandler : public MeterHandler {
 public:
     ArmsMeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : MeterHandler(ctx, key, idx) {}
-    void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp) override;
+    void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t timestamp) override;
 };
 
 class ArmsSpanHandler : public SpanHandler {
 public:
     ArmsSpanHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : SpanHandler(ctx, key, idx) {}
-    void handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&&) override;
+    void handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&) override;
 };
 
 #endif

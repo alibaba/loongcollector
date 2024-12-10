@@ -33,7 +33,7 @@ namespace ebpf {
 #define ADD_STATUS_METRICS(METRIC_NAME, FIELD_NAME, VALUE) \
     {if (!inner->FIELD_NAME) return; \
     auto event = group.AddMetricEvent(); \
-    for (auto& tag : measure->tags_) { \
+    for (const auto& tag : measure->tags_) { \
         event->SetTag(tag.first, tag.second); \
     } \
     event->SetTag(std::string("status_code"), std::string(VALUE)); \
@@ -47,7 +47,7 @@ void FUNC_NAME(PipelineEventGroup& group, std::unique_ptr<Measure>& measure, uin
     auto inner = static_cast<INNER_TYPE*>(measure->inner_measure_.get()); \
     if (!inner->FIELD_NAME) return; \
     auto event = group.AddMetricEvent(); \
-    for (auto& tag : measure->tags_) { \
+    for (const auto& tag : measure->tags_) { \
         event->SetTag(tag.first, tag.second); \
     } \
     event->SetName(METRIC_NAME); \
@@ -55,17 +55,17 @@ void FUNC_NAME(PipelineEventGroup& group, std::unique_ptr<Measure>& measure, uin
     event->SetValue(UntypedSingleValue{(double)inner->FIELD_NAME}); \
 }
 
-void OtelMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp) {
+void OtelMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t timestamp) {
     if (measures.empty()) return;
 
-    for (auto& appBatchMeasures : measures) {
+    for (const auto& appBatchMeasures : measures) {
         PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
-        for (auto& measure : appBatchMeasures->measures_) {
+        for (const auto& measure : appBatchMeasures->measures_) {
             auto type = measure->type_;
             if (type == MeasureType::MEASURE_TYPE_APP) {
                 auto inner = static_cast<AppSingleMeasure*>(measure->inner_measure_.get());
                 auto event = eventGroup.AddMetricEvent();
-                for (auto& tag : measure->tags_) {
+                for (const auto& tag : measure->tags_) {
                     event->SetTag(tag.first, tag.second);
                 }
                 event->SetName("service_requests_total");
@@ -86,15 +86,15 @@ void OtelMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasur
     return;
 }
 
-void OtelSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&& spans) {
+void OtelSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>& spans) {
     if (spans.empty()) return;
 
-    for (auto& span : spans) {
+    for (const auto& span : spans) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
-        for (auto& x : span->single_spans_) {
+        for (const auto& x : span->single_spans_) {
             auto spanEvent = eventGroup.AddSpanEvent();
-            for (auto& tag : x->tags_) {
+            for (const auto& tag : x->tags_) {
                 spanEvent->SetTag(tag.first, tag.second);
             }
             spanEvent->SetName(x->span_name_);
@@ -118,24 +118,24 @@ void OtelSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&
     return;
 }
 
-void EventHandler::handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&& events) {
+void EventHandler::handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
     if (events.empty()) return;
 
-    for (auto& appEvents : events) {
+    for (const auto& appEvents : events) {
         if (!appEvents || appEvents->events_.empty()) continue;
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
-        for (auto& event : appEvents->events_) {
+        for (const auto& event : appEvents->events_) {
             if (!event || event->GetAllTags().empty()) continue;
             auto logEvent = eventGroup.AddLogEvent();
-            for (auto& tag : event->GetAllTags()) {
+            for (const auto& tag : event->GetAllTags()) {
                 logEvent->SetContent(tag.first, tag.second);
                 auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(event->GetTimestamp()));
                 logEvent->SetTimestamp(seconds.count(), event->GetTimestamp() - seconds.count() * 1e9);
             }
             mProcessTotalCnt ++;
         }
-        for (auto& tag : appEvents->tags_) {
+        for (const auto& tag : appEvents->tags_) {
             eventGroup.SetTag(tag.first, tag.second);
         }
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -195,16 +195,16 @@ GENERATE_METRICS(GenerateTcpRecvBytesTotalMetrics, MeasureType::MEASURE_TYPE_NET
 GENERATE_METRICS(GenerateTcpSendPktsTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_send_pkt_total, send_pkt_total_)
 GENERATE_METRICS(GenerateTcpSendBytesTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_send_byte_total, send_byte_total_)
 
-void ArmsSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&& spans) {
+void ArmsSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>& spans) {
     if (spans.empty()) return;
 
-    for (auto& span : spans) {
+    for (const auto& span : spans) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
         eventGroup.SetTag(app_id_key, span->app_id_);
-        for (auto& x : span->single_spans_) {
+        for (const auto& x : span->single_spans_) {
             auto spanEvent = eventGroup.AddSpanEvent();
-            for (auto& tag : x->tags_) {
+            for (const auto& tag : x->tags_) {
                 spanEvent->SetTag(tag.first, tag.second);
             }
             spanEvent->SetName(x->span_name_);
@@ -227,17 +227,17 @@ void ArmsSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&
     return;
 }
 
-void ArmsMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp) {
+void ArmsMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures, uint64_t timestamp) {
     if (measures.empty()) return;
 
-    for (auto& appBatchMeasures : measures) {
+    for (const auto& appBatchMeasures : measures) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();;
         PipelineEventGroup eventGroup(sourceBuffer);
         
         // source_ip
         eventGroup.SetTag(std::string(app_id_key), appBatchMeasures->app_id_);
         eventGroup.SetTag(std::string(ip_key), appBatchMeasures->ip_);
-        for (auto& measure : appBatchMeasures->measures_) {
+        for (const auto& measure : appBatchMeasures->measures_) {
             auto type = measure->type_;
             if (type == MeasureType::MEASURE_TYPE_APP) {
                 GenerateRequestsTotalMetrics(eventGroup, measure, timestamp);

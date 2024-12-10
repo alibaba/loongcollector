@@ -125,7 +125,7 @@ public:
     void Init(const nami::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const std::string& project);
     void Release(const nami::PluginType type);
     void Suspend(const nami::PluginType type);
-    void HandleStatistic(std::vector<nami::eBPFStatistics>&& stats);
+    void HandleStatistic(std::vector<nami::eBPFStatistics>& stats);
 private:
     // `mLock` is used to protect mSelfMonitors
     ReadWriteLock mLock;
