@@ -16,25 +16,109 @@
 
 #pragma once
 
-#include <condition_variable>
+// #include <curl/curl.h>
+
+// #include <atomic>
+#include <chrono>
+// #include <condition_variable>
 #include <cstdint>
-#include <future>
+// #include <ctime>
+// #include <future>
+#include <list>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
-#include <unordered_map>
+// #include <unordered_map>
+// #include <unordered_set>
 #include <vector>
 
-#include "sdk/Client.h"
+// #include "common/http/HttpRequest.h"
+// #include "common/http/HttpResponse.h"
+#include "pipeline/queue/SenderQueueItem.h"
+#include "plugin/flusher/sls/SLSResponse.h"
 
 namespace logtail {
 
+enum class EndpointMode { DEFAULT, ACCELERATE, CUSTOM };
+const std::string& EndpointModeToString(EndpointMode mode);
+
+struct CandidateEndpoints {
+    // currently only remote endpoints can be updated
+    EndpointMode mMode = EndpointMode::DEFAULT;
+    // when mMode = ACCELERATE, mLocalEndpoints should be empty
+    std::vector<std::string> mLocalEndpoints;
+    std::vector<std::string> mRemoteEndpoints;
+};
+
+class HostInfo {
+public:
+    HostInfo(const std::string& hostname) : mHostname(hostname) {}
+    HostInfo(const HostInfo& rhs) : mHostname(rhs.mHostname) { mLatency = rhs.GetLatency(); }
+
+    const std::string& GetHostname() const { return mHostname; }
+    std::chrono::milliseconds GetLatency() const;
+    void SetLatency(const std::chrono::milliseconds& latency);
+    void SetForbidden();
+    bool IsForbidden() const;
+
+private:
+    // normally in the form of <project>.<endpoint>, except for the real ip scene, which equals to endpoint
+    const std::string mHostname;
+
+    mutable std::mutex mLatencyMux;
+    std::chrono::milliseconds mLatency = std::chrono::milliseconds::max();
+};
+
+class CandidateHostsInfo {
+public:
+    CandidateHostsInfo(const std::string& project, const std::string& region, EndpointMode mode)
+        : mProject(project), mRegion(region), mMode(mode) {}
+
+    void UpdateHosts(const CandidateEndpoints& regionEndpoints);
+    bool UpdateHostInfo(const std::string& hostname, const std::chrono::milliseconds& latency);
+    void GetProbeHosts(std::vector<std::string>& hosts) const;
+    void GetAllHosts(std::vector<std::string>& hosts) const;
+    void SelectBestHost();
+    std::string GetCurrentHost() const;
+    std::string GetFirstHost() const;
+    const std::string& GetProject() const { return mProject; }
+    const std::string& GetRegion() const { return mRegion; }
+    EndpointMode GetMode() const { return mMode; }
+    bool IsInitialized() const { return mInitialized.load(); }
+    void SetInitialized() { mInitialized = true; }
+
+private:
+    bool HasValidHost() const;
+    void SetCurrentHost(const std::string& host);
+
+    // for real ip scene, mProject is empty
+    const std::string mProject;
+    const std::string mRegion;
+    const EndpointMode mMode;
+    std::atomic_bool mInitialized = false;
+
+    mutable std::mutex mCurrentHostMux;
+    std::string mCurrentHost;
+
+    // mMode = DEFAULT: each mCandidateHosts element has exactly one element
+    // mMode = ACCELERATE: mCandidateHosts.size() == 1 && mCandidateHosts[0].size() == 2
+    // mMode = CUSTOM: mCandidateHosts.size() == 1 && mCandidateHosts[0].size() == 1
+    mutable std::mutex mCandidateHostsMux;
+    std::vector<std::vector<HostInfo>> mCandidateHosts;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class CandidateHostsInfoUnittest;
+    friend class SLSClientManagerUnittest;
+    friend class EnterpriseSLSClientManagerUnittest;
+#endif
+};
+
 class SLSClientManager {
 public:
-    enum class EndpointSourceType { LOCAL, REMOTE };
-    enum class EndpointSwitchPolicy { DESIGNATED_FIRST, DESIGNATED_LOCKED };
     enum class AuthType { ANONYMOUS, AK };
+    // enum class RemoteEndpointUpdateAction { CREATE, OVERWRITE, APPEND };
 
     virtual ~SLSClientManager() = default;
     SLSClientManager(const SLSClientManager&) = delete;
@@ -42,131 +126,193 @@ public:
 
     static SLSClientManager* GetInstance();
 
-    void Init();
-    void Stop();
+    virtual void Init();
+    virtual void Stop() {};
 
-    EndpointSwitchPolicy GetServerSwitchPolicy() const { return mDataServerSwitchPolicy; }
     const std::string& GetUserAgent() const { return mUserAgent; }
 
-    void IncreaseAliuidReferenceCntForRegion(const std::string& region, const std::string& aliuid);
-    void DecreaseAliuidReferenceCntForRegion(const std::string& region, const std::string& aliuid);
-
-    sdk::Client* GetClient(const std::string& region, const std::string& aliuid, bool createIfNotFound = true);
-    bool ResetClientEndpoint(const std::string& aliuid, const std::string& region, time_t curTime);
-    void CleanTimeoutClient();
     virtual bool
     GetAccessKey(const std::string& aliuid, AuthType& type, std::string& accessKeyId, std::string& accessKeySecret);
     virtual void UpdateAccessKeyStatus(const std::string& aliuid, bool success) {}
 
-    void AddEndpointEntry(const std::string& region,
-                          const std::string& endpoint,
-                          bool isProxy,
-                          const EndpointSourceType& endpointType);
-    void UpdateEndpointStatus(const std::string& region,
-                              const std::string& endpoint,
-                              bool status,
-                              std::optional<uint32_t> latency = std::optional<uint32_t>());
+    // // currently not support hot relead
+    // void UpdateLocalRegionEndpointsAndHttpsInfo(const std::string& region, const std::vector<std::string>&
+    // endpoints); void UpdateRemoteRegionEndpoints(const std::string& region,
+    //                                  const std::vector<std::string>& endpoints,
+    //                                  RemoteEndpointUpdateAction action = RemoteEndpointUpdateAction::OVERWRITE);
 
-    void ForceUpdateRealIp(const std::string& region);
-    void UpdateSendClientRealIp(sdk::Client* client, const std::string& region);
+    // std::shared_ptr<CandidateHostsInfo>
+    // GetCandidateHostsInfo(const std::string& region, const std::string& project, EndpointMode mode);
+    // bool UpdateHostInfo(const std::string& project,
+    //                     EndpointMode mode,
+    //                     const std::string& host,
+    //                     const std::chrono::milliseconds& latency);
+    // // only for real ip
+    // bool UpdateHostInfo(const std::string& region, const std::string& host, const std::chrono::milliseconds&
+    // latency);
 
-    std::string GetRegionFromEndpoint(const std::string& endpoint); // for backward compatibility
-    bool HasNetworkAvailable(); // TODO: remove this function
+    // only for open source
+    std::shared_ptr<CandidateHostsInfo> GetCandidateHostsInfo(const std::string& project, const std::string& endpoint);
+
+    virtual bool UsingHttps(const std::string& region) const;
+
+    // void UpdateOutdatedRealIpRegions(const std::string& region);
+    // std::string GetRealIp(const std::string& region) const;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    virtual void Clear();
+#endif
 
 protected:
     SLSClientManager() = default;
 
     virtual std::string GetRunningEnvironment();
-    bool TryCurlEndpoint(const std::string& endpoint);
+    bool PingEndpoint(const std::string& host, const std::string& path);
 
     std::string mUserAgent;
 
 private:
-    enum class EndpointStatus { STATUS_OK_WITH_IP, STATUS_OK_WITH_ENDPOINT, STATUS_ERROR };
+    // struct ProbeNetworkHttpRequest : public AsynHttpRequest {
+    //     std::string mRegion;
+    //     std::string mProject;
+    //     EndpointMode mMode;
+    //     std::string mHost;
 
-    struct EndpointInfo {
-        bool mValid = true;
-        std::optional<uint32_t> mLatencyMs;
-        bool mProxy = false;
+    //     ProbeNetworkHttpRequest(const std::string& region,
+    //                             const std::string& project,
+    //                             EndpointMode mode,
+    //                             const std::string& host,
+    //                             bool httpsFlag);
 
-        EndpointInfo(bool valid, bool proxy) : mValid(valid), mProxy(proxy) {}
-
-        void UpdateInfo(bool valid, std::optional<uint32_t> latency) {
-            mValid = valid;
-            mLatencyMs = latency;
-        }
-    };
-
-    struct RegionEndpointsInfo {
-        std::unordered_map<std::string, EndpointInfo> mEndpointInfoMap;
-        std::string mDefaultEndpoint;
-        EndpointSourceType mDefaultEndpointType;
-
-        bool AddDefaultEndpoint(const std::string& endpoint, const EndpointSourceType& endpointType, bool& isDefault);
-        bool AddEndpoint(const std::string& endpoint, bool status, bool proxy = false);
-        void UpdateEndpointInfo(const std::string& endpoint,
-                                bool status,
-                                std::optional<uint32_t> latency,
-                                bool createFlag = true);
-        void RemoveEndpoint(const std::string& endpoint);
-        std::string GetAvailableEndpointWithTopPriority() const;
-    };
-
-    struct RealIpInfo {
-        std::string mRealIp;
-        time_t mLastUpdateTime = 0;
-        bool mForceFlushFlag = false;
-
-        void SetRealIp(const std::string& realIp) {
-            mRealIp = realIp;
-            mLastUpdateTime = time(NULL);
-            mForceFlushFlag = false;
-        }
-    };
+    //     bool IsContextValid() const override { return true; };
+    //     void OnSendDone(HttpResponse& response) override;
+    // };
 
     virtual void GenerateUserAgent();
-    void InitEndpointSwitchPolicy();
-    std::vector<std::string> GetRegionAliuids(const std::string& region);
 
-    void ResetClientPort(const std::string& region, sdk::Client* sendClient);
-    std::string GetAvailableEndpointWithTopPriority(const std::string& region) const;
+    // void UnInitializedHostProbeThread();
+    // void DoProbeUnInitializedHost();
+    // void HostProbeThread();
+    // void DoProbeHost();
+    // bool HasPartiallyInitializedCandidateHostsInfos() const;
+    // void ClearExpiredCandidateHostsInfos();
 
-    void ProbeNetworkThread();
-    bool TestEndpoint(const std::string& region, const std::string& endpoint);
+    // void UpdateRealIpThread();
+    // void DoUpdateRealIp();
+    // void SetRealIp(const std::string& region, const std::string& ip);
+    // bool HasOutdatedRealIpRegions() const;
 
-    void UpdateRealIpThread();
-    EndpointStatus UpdateRealIp(const std::string& region, const std::string& endpoint);
-    void SetRealIp(const std::string& region, const std::string& ip);
+    // mutable std::mutex mRegionCandidateEndpointsMapMux;
+    // std::map<std::string, CandidateEndpoints> mRegionCandidateEndpointsMap;
 
-    mutable std::mutex mRegionAliuidRefCntMapLock;
-    std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mRegionAliuidRefCntMap;
+    // mutable std::mutex mHttpsRegionsMux;
+    // std::unordered_set<std::string> mHttpsRegions;
 
-    mutable std::mutex mClientMapMux;
-    std::unordered_map<std::string, std::pair<std::unique_ptr<sdk::Client>, time_t>> mClientMap;
-    // int32_t mLastCheckSendClientTime;
+    mutable std::mutex mCandidateHostsInfosMapMux;
+    // only custom mode is supported, and one project supports multiple custom endpoints
+    std::map<std::string, std::list<std::weak_ptr<CandidateHostsInfo>>> mProjectCandidateHostsInfosMap;
 
-    mutable std::mutex mRegionEndpointEntryMapLock;
-    std::unordered_map<std::string, RegionEndpointsInfo> mRegionEndpointEntryMap;
-    EndpointSwitchPolicy mDataServerSwitchPolicy = EndpointSwitchPolicy::DESIGNATED_FIRST;
-    std::unique_ptr<sdk::Client> mProbeNetworkClient;
+    //     CURLM* mUnInitializedHostProbeClient = nullptr;
+    //     mutable std::mutex mUnInitializedCandidateHostsInfosMux;
+    //     std::vector<std::weak_ptr<CandidateHostsInfo>> mUnInitializedCandidateHostsInfos;
 
-    std::future<void> mProbeNetworkThreadRes;
-    mutable std::mutex mProbeNetworkThreadRunningMux;
-    bool mIsProbeNetworkThreadRunning = true;
+    //     std::future<void> mUnInitializedHostProbeThreadRes;
+    //     mutable std::mutex mUnInitializedHostProbeThreadRunningMux;
+    //     bool mIsUnInitializedHostProbeThreadRunning = true;
 
-    mutable std::mutex mRegionRealIpLock;
-    std::unordered_map<std::string, RealIpInfo*> mRegionRealIpMap;
-    std::unique_ptr<sdk::Client> mUpdateRealIpClient;
+    //     CURLM* mHostProbeClient = nullptr;
+    //     mutable std::mutex mPartiallyInitializedCandidateHostsInfosMux;
+    //     std::vector<std::weak_ptr<CandidateHostsInfo>> mPartiallyInitializedCandidateHostsInfos;
 
-    std::future<void> mUpdateRealIpThreadRes;
-    mutable std::mutex mUpdateRealIpThreadRunningMux;
-    bool mIsUpdateRealIpThreadRunning = true;
+    //     std::future<void> mHostProbeThreadRes;
+    //     mutable std::mutex mHostProbeThreadRunningMux;
+    //     bool mIsHostProbeThreadRunning = true;
+    // #ifdef APSARA_UNIT_TEST_MAIN
+    //     HttpResponse (*mDoProbeNetwork)(const std::unique_ptr<ProbeNetworkHttpRequest>& req) = nullptr;
+    // #endif
 
-    mutable std::condition_variable mStopCV;
+    //     mutable std::mutex mRegionRealIpMux;
+    //     std::map<std::string, std::string> mRegionRealIpMap;
+    //     mutable std::mutex mOutdatedRealIpRegionsMux;
+    //     std::vector<std::string> mOutdatedRealIpRegions;
+    //     mutable std::mutex mRegionRealIpCandidateHostsInfosMapMux;
+    //     std::map<std::string, CandidateHostsInfo> mRegionRealIpCandidateHostsInfosMap;
+    //     bool (*mGetEndpointRealIp)(const std::string& endpoint, std::string& ip) = nullptr;
+
+    //     std::future<void> mUpdateRealIpThreadRes;
+    //     mutable std::mutex mUpdateRealIpThreadRunningMux;
+    //     bool mIsUpdateRealIpThreadRunning = true;
+
+    //     mutable std::condition_variable mStopCV;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherSLSUnittest;
+    friend class SLSClientManagerUnittest;
+    // friend class ProbeNetworkMock;
+    // friend class GetRealIpMock;
 #endif
 };
+
+void PreparePostLogStoreLogsRequest(const std::string& accessKeyId,
+                                    const std::string& accessKeySecret,
+                                    SLSClientManager::AuthType type,
+                                    const std::string& host,
+                                    bool isHostIp,
+                                    const std::string& project,
+                                    const std::string& logstore,
+                                    const std::string& compressType,
+                                    RawDataType dataType,
+                                    const std::string& body,
+                                    size_t rawSize,
+                                    const std::string& shardHashKey,
+                                    std::optional<uint64_t> seqId,
+                                    std::string& path,
+                                    std::string& query,
+                                    std::map<std::string, std::string>& header);
+void PreparePostMetricStoreLogsRequest(const std::string& accessKeyId,
+                                       const std::string& accessKeySecret,
+                                       SLSClientManager::AuthType type,
+                                       const std::string& host,
+                                       bool isHostIp,
+                                       const std::string& project,
+                                       const std::string& logstore,
+                                       const std::string& compressType,
+                                       const std::string& body,
+                                       size_t rawSize,
+                                       std::string& path,
+                                       std::map<std::string, std::string>& header);
+SLSResponse PostLogStoreLogs(const std::string& accessKeyId,
+                             const std::string& accessKeySecret,
+                             SLSClientManager::AuthType type,
+                             const std::string& host,
+                             bool httpsFlag,
+                             const std::string& project,
+                             const std::string& logstore,
+                             const std::string& compressType,
+                             RawDataType dataType,
+                             const std::string& body,
+                             size_t rawSize,
+                             const std::string& shardHashKey);
+SLSResponse PostMetricStoreLogs(const std::string& accessKeyId,
+                                const std::string& accessKeySecret,
+                                SLSClientManager::AuthType type,
+                                const std::string& host,
+                                bool httpsFlag,
+                                const std::string& project,
+                                const std::string& logstore,
+                                const std::string& compressType,
+                                const std::string& body,
+                                size_t rawSize);
+SLSResponse PutWebTracking(const std::string& host,
+                           bool httpsFlag,
+                           const std::string& logstore,
+                           const std::string& compressType,
+                           const std::string& body,
+                           size_t rawSize);
+// bool GetEndpointRealIp(const std::string& endpoint, std::string& ip);
+
+// #ifdef APSARA_UNIT_TEST_MAIN
+// extern HttpResponse (*DoGetRealIp)(const std::unique_ptr<HttpRequest>& req);
+// #endif
 
 } // namespace logtail

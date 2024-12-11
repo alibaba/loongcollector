@@ -27,12 +27,8 @@
 #include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "runner/sink/http/HttpSink.h"
-// TODO: temporarily used here
-#include "plugin/flusher/sls/PackIdManager.h"
-#include "plugin/flusher/sls/SLSClientManager.h"
 
 DEFINE_FLAG_INT32(flusher_runner_exit_timeout_secs, "", 60);
-DEFINE_FLAG_INT32(check_send_client_timeout_interval, "", 600);
 
 DECLARE_FLAG_INT32(discard_send_fail_interval);
 
@@ -187,13 +183,6 @@ void FlusherRunner::Run() {
             mWaitingItemsTotal->Sub(1);
             mOutItemsTotal->Add(1);
             mTotalDelayMs->Add(chrono::system_clock::now() - curTime);
-        }
-
-        // TODO: move the following logic to scheduler
-        if ((time(NULL) - mLastCheckSendClientTime) > INT32_FLAG(check_send_client_timeout_interval)) {
-            SLSClientManager::GetInstance()->CleanTimeoutClient();
-            PackIdManager::GetInstance()->CleanTimeoutEntry();
-            mLastCheckSendClientTime = time(NULL);
         }
 
         if (mIsFlush && SenderQueueManager::GetInstance()->IsAllQueueEmpty()) {

@@ -73,9 +73,6 @@ DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
 DEFINE_FLAG_BOOL(enable_cgroup, "", false);
 #endif
 
-DECLARE_FLAG_BOOL(send_prefer_real_ip);
-DECLARE_FLAG_BOOL(global_network_success);
-
 using namespace std;
 
 namespace logtail {
@@ -393,16 +390,6 @@ void Application::CheckCriticalCondition(int32_t curTime) {
         _exit(1);
     }
 #endif
-    // if network is fail in 2 hours, force exit (for ant only)
-    // work around for no network when docker start
-    if (BOOL_FLAG(send_prefer_real_ip) && !BOOL_FLAG(global_network_success) && curTime - mStartTime > 7200) {
-        LOG_ERROR(sLogger, ("network is fail", "prepare force exit"));
-        AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM,
-                                               "network is fail since " + ToString(mStartTime) + " force exit");
-        AlarmManager::GetInstance()->ForceToSend();
-        sleep(10);
-        _exit(1);
-    }
 }
 
 bool Application::GetUUIDThread() {

@@ -34,10 +34,7 @@ DECLARE_FLAG_INT32(ilogtail_epoll_wait_events);
 DECLARE_FLAG_INT32(ilogtail_max_epoll_events);
 
 // sls sender
-DECLARE_FLAG_INT32(sls_client_send_timeout);
 DECLARE_FLAG_BOOL(sls_client_send_compress);
-DECLARE_FLAG_INT32(send_retrytimes);
-DECLARE_FLAG_DOUBLE(loggroup_bytes_inflation);
 DECLARE_FLAG_STRING(default_region_name);
 
 // profile

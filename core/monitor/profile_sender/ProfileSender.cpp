@@ -25,9 +25,8 @@
 #ifdef __ENTERPRISE__
 #include "EnterpriseProfileSender.h"
 #endif
-#include "sdk/Exception.h"
-#include "plugin/flusher/sls/SLSClientManager.h"
 #include "app_config/AppConfig.h"
+#include "plugin/flusher/sls/SLSClientManager.h"
 // TODO: temporarily used
 #include "common/compression/CompressorFactory.h"
 
@@ -148,7 +147,7 @@ void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
     string region = "cn-shanghai";
     string project = "ilogtail-community-edition";
     string logstore = "ilogtail-online";
-    string endpoint = region + ".log.aliyuncs.com";
+    string host = project + "." + region + ".log.aliyuncs.com";
 
     Json::Value logtailStatus;
     logtailStatus["__topic__"] = "logtail_status_profile";
@@ -166,26 +165,14 @@ void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
     }
     logtailStatus["__logs__"][0] = status;
     string logBody = logtailStatus.toStyledString();
-    sdk::Client client("", endpoint, INT32_FLAG(sls_client_send_timeout));
-    client.SetPort(AppConfig::GetInstance()->GetDataServerPort());
-    try {
-        string res;
-        if (!CompressLz4(logBody, res)) {
-            LOG_ERROR(sLogger, ("lz4 compress data", "fail"));
-            return;
-        }
 
-        sdk::PostLogStoreLogsResponse resp
-            = client.PostLogUsingWebTracking(project, logstore, sls_logs::SLS_CMP_LZ4, res, logBody.size());
-
-        LOG_DEBUG(sLogger,
-                  ("SendToProfileProject",
-                   "success")("logBody", logBody)("requestId", resp.requestId)("statusCode", resp.statusCode));
-    } catch (const sdk::LOGException& e) {
-        LOG_DEBUG(sLogger,
-                  ("SendToProfileProject", "fail")("logBody", logBody)("errCode", e.GetErrorCode())("errMsg",
-                                                                                                    e.GetMessage()));
+    string res;
+    if (!CompressLz4(logBody, res)) {
+        LOG_ERROR(sLogger, ("lz4 compress data", "fail"));
+        return;
     }
+
+    PutWebTracking(host, true, logstore, "lz4", res, logBody.size());
 }
 
 } // namespace logtail

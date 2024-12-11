@@ -14,31 +14,80 @@
 
 #include "plugin/flusher/sls/SLSResponse.h"
 
+#include <rapidjson/document.h>
+
+#include "app_config/AppConfig.h"
 #include "common/ErrorUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
-#include "sdk/Common.h"
-#include "sdk/Exception.h"
-#include "sdk/Result.h"
+#include "plugin/flusher/sls/SLSConstant.h"
+#include "Exception.h"
 
 using namespace std;
+using namespace logtail::sdk;
 
 namespace logtail {
 
+void ExtractJsonResult(const string& response, rapidjson::Document& document) {
+    document.Parse(response.c_str());
+    if (document.HasParseError()) {
+        throw JsonException("ParseException", "Fail to parse from json string");
+    }
+}
+
+void JsonMemberCheck(const rapidjson::Value& value, const char* name) {
+    if (!value.IsObject()) {
+        throw JsonException("InvalidObjectException", "response is not valid JSON object");
+    }
+    if (!value.HasMember(name)) {
+        throw JsonException("NoMemberException", string("Member ") + name + " does not exist");
+    }
+}
+
+void ExtractJsonResult(const rapidjson::Value& value, const char* name, string& dst) {
+    JsonMemberCheck(value, name);
+    if (value[name].IsString()) {
+        dst = value[name].GetString();
+    } else {
+        throw JsonException("ValueTypeException", string("Member ") + name + " is not string type");
+    }
+}
+
+void ErrorCheck(const string& response, const string& requestId, const int32_t httpCode) {
+    rapidjson::Document document;
+    try {
+        ExtractJsonResult(response, document);
+
+        string errorCode;
+        ExtractJsonResult(document, LOG_ERROR_CODE.c_str(), errorCode);
+
+        string errorMessage;
+        ExtractJsonResult(document, LOG_ERROR_MESSAGE.c_str(), errorMessage);
+
+        throw LOGException(errorCode, errorMessage, requestId, httpCode);
+    } catch (JsonException& e) {
+        if (httpCode >= 500) {
+            throw LOGException(LOGE_INTERNAL_SERVER_ERROR, response, requestId, httpCode);
+        } else {
+            throw LOGException(LOGE_BAD_RESPONSE, string("Unextractable error:") + response, requestId, httpCode);
+        }
+    }
+}
+
 bool SLSResponse::Parse(const HttpResponse& response) {
-    const auto iter = response.GetHeader().find(sdk::X_LOG_REQUEST_ID);
+    const auto iter = response.GetHeader().find(X_LOG_REQUEST_ID);
     if (iter != response.GetHeader().end()) {
         mRequestId = iter->second;
     }
     mStatusCode = response.GetStatusCode();
 
     if (mStatusCode == 0) {
-        mErrorCode = sdk::LOGE_REQUEST_TIMEOUT;
+        mErrorCode = LOGE_REQUEST_TIMEOUT;
         mErrorMsg = "Request timeout";
     } else if (mStatusCode != 200) {
         try {
-            sdk::ErrorCheck(*response.GetBody<string>(), mRequestId, response.GetStatusCode());
+            ErrorCheck(*response.GetBody<string>(), mRequestId, response.GetStatusCode());
         } catch (sdk::LOGException& e) {
             mErrorCode = e.GetErrorCode();
             mErrorMsg = e.GetMessage_();
@@ -47,8 +96,30 @@ bool SLSResponse::Parse(const HttpResponse& response) {
     return true;
 }
 
+SLSResponse ParseHttpResponse(const HttpResponse& response) {
+    SLSResponse slsResponse;
+    if (AppConfig::GetInstance()->IsResponseVerificationEnabled() && !IsSLSResponse(response)) {
+        slsResponse.mStatusCode = 0;
+        slsResponse.mErrorCode = LOGE_REQUEST_ERROR;
+        slsResponse.mErrorMsg = "invalid response body";
+    } else {
+        slsResponse.Parse(response);
+
+        if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
+            static uint32_t sCount = 0;
+            if (sCount++ % 10000 == 0 || slsResponse.mErrorCode == LOGE_REQUEST_TIME_EXPIRED) {
+                time_t serverTime = GetServerTime(response);
+                if (serverTime > 0) {
+                    UpdateTimeDelta(serverTime);
+                }
+            }
+        }
+    }
+    return slsResponse;
+}
+
 bool IsSLSResponse(const HttpResponse& response) {
-    const auto iter = response.GetHeader().find(sdk::X_LOG_REQUEST_ID);
+    const auto iter = response.GetHeader().find(X_LOG_REQUEST_ID);
     if (iter == response.GetHeader().end()) {
         return false;
     }

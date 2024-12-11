@@ -20,6 +20,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/DNSCache.h"
+#include "common/StringTools.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
 
@@ -57,21 +58,21 @@ static size_t header_write_callback(char* buffer,
     return sizes;
 }
 
-CURL* CreateCurlHandler(const std::string& method,
+CURL* CreateCurlHandler(const string& method,
                         bool httpsFlag,
-                        const std::string& host,
+                        const string& host,
                         int32_t port,
-                        const std::string& url,
-                        const std::string& queryString,
-                        const std::map<std::string, std::string>& header,
-                        const std::string& body,
+                        const string& url,
+                        const string& queryString,
+                        const map<string, string>& header,
+                        const string& body,
                         HttpResponse& response,
                         curl_slist*& headers,
                         uint32_t timeout,
                         bool replaceHostWithIp,
-                        const std::string& intf,
+                        const string& intf,
                         bool followRedirects,
-                        std::optional<CurlTLS> tls) {
+                        optional<CurlTLS> tls) {
     static DnsCache* dnsCache = DnsCache::GetInstance();
 
     CURL* curl = curl_easy_init();
@@ -80,7 +81,7 @@ CURL* CreateCurlHandler(const std::string& method,
     }
 
     string totalUrl = httpsFlag ? "https://" : "http://";
-    std::string hostIP;
+    string hostIP;
     if (replaceHostWithIp && dnsCache->GetIPFromDnsCache(host, hostIP)) {
         totalUrl.append(hostIP);
     } else {
@@ -144,7 +145,7 @@ CURL* CreateCurlHandler(const std::string& method,
     return curl;
 }
 
-bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+bool SendHttpRequest(unique_ptr<HttpRequest>&& request, HttpResponse& response) {
     curl_slist* headers = NULL;
     CURL* curl = CreateCurlHandler(request->mMethod,
                                    request->mHTTPSFlag,
@@ -189,6 +190,155 @@ bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& respo
     }
     curl_easy_cleanup(curl);
     return success;
+}
+
+bool AddRequestToMultiCurlHandler(CURLM* multiCurl, unique_ptr<AsynHttpRequest>&& request) {
+    curl_slist* headers = NULL;
+    CURL* curl = CreateCurlHandler(request->mMethod,
+                                   request->mHTTPSFlag,
+                                   request->mHost,
+                                   request->mPort,
+                                   request->mUrl,
+                                   request->mQueryString,
+                                   request->mHeader,
+                                   request->mBody,
+                                   request->mResponse,
+                                   headers,
+                                   request->mTimeout,
+                                   AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
+                                   AppConfig::GetInstance()->GetBindInterface(),
+                                   request->mFollowRedirects,
+                                   request->mTls);
+    if (curl == NULL) {
+        LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));
+        request->OnSendDone(request->mResponse);
+        return false;
+    }
+
+    request->mPrivateData = headers;
+    curl_easy_setopt(curl, CURLOPT_PRIVATE, request.get());
+    request->mLastSendTime = chrono::system_clock::now();
+    CURLMcode res = curl_multi_add_handle(multiCurl, curl);
+    if (res != CURLM_OK) {
+        LOG_ERROR(sLogger,
+                  ("failed to send request", "failed to add the easy curl handle to multi_handle")(
+                      "errMsg", curl_multi_strerror(res))("request address", request.get()));
+        request->OnSendDone(request->mResponse);
+        curl_easy_cleanup(curl);
+        return false;
+    }
+    // let callback destruct the request
+    request.release();
+    return true;
+}
+
+void HandleCompletedAsynRequests(CURLM* multiCurl, int& runningHandlers) {
+    int msgsLeft = 0;
+    CURLMsg* msg = curl_multi_info_read(multiCurl, &msgsLeft);
+    while (msg) {
+        if (msg->msg == CURLMSG_DONE) {
+            bool requestReused = false;
+            CURL* handler = msg->easy_handle;
+            AsynHttpRequest* request = nullptr;
+            curl_easy_getinfo(handler, CURLINFO_PRIVATE, &request);
+            auto responseTimeMs
+                = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - request->mLastSendTime);
+            switch (msg->data.result) {
+                case CURLE_OK: {
+                    long statusCode = 0;
+                    curl_easy_getinfo(handler, CURLINFO_RESPONSE_CODE, &statusCode);
+                    request->mResponse.SetStatusCode(statusCode);
+                    request->mResponse.SetResponseTime(responseTimeMs);
+                    request->OnSendDone(request->mResponse);
+                    LOG_DEBUG(sLogger,
+                              ("send http request succeeded, request address",
+                               request)("response time", ToString(responseTimeMs.count()) + "ms")(
+                                  "try cnt", ToString(request->mTryCnt)));
+                    break;
+                }
+                default:
+                    // considered as network error
+                    if (request->mTryCnt < request->mMaxTryCnt) {
+                        LOG_WARNING(sLogger,
+                                    ("failed to send http request", "retry immediately")("request address", request)(
+                                        "try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(msg->data.result)));
+                        // free first，becase mPrivateData will be reset in AddRequestToMultiCurlHandler
+                        if (request->mPrivateData) {
+                            curl_slist_free_all((curl_slist*)request->mPrivateData);
+                            request->mPrivateData = nullptr;
+                        }
+                        ++request->mTryCnt;
+                        AddRequestToMultiCurlHandler(multiCurl, unique_ptr<AsynHttpRequest>(request));
+                        ++runningHandlers;
+                        requestReused = true;
+                    } else {
+                        request->OnSendDone(request->mResponse);
+                        LOG_DEBUG(sLogger,
+                                  ("failed to send http request", "abort")("request address", request)(
+                                      "response time",
+                                      ToString(responseTimeMs.count()) + "ms")("try cnt", ToString(request->mTryCnt)));
+                    }
+                    break;
+            }
+
+            curl_multi_remove_handle(multiCurl, handler);
+            curl_easy_cleanup(handler);
+            if (!requestReused) {
+                if (request->mPrivateData) {
+                    curl_slist_free_all((curl_slist*)request->mPrivateData);
+                }
+                delete request;
+            }
+        }
+        msg = curl_multi_info_read(multiCurl, &msgsLeft);
+    }
+}
+
+void SendAsynRequests(CURLM* multiCurl) {
+    CURLMcode mc;
+    int runningHandlers = 0;
+    do {
+        if ((mc = curl_multi_perform(multiCurl, &runningHandlers)) != CURLM_OK) {
+            LOG_ERROR(
+                sLogger,
+                ("failed to call curl_multi_perform", "sleep 100ms and retry")("errMsg", curl_multi_strerror(mc)));
+            this_thread::sleep_for(chrono::milliseconds(100));
+            continue;
+        }
+        HandleCompletedAsynRequests(multiCurl, runningHandlers);
+
+        long curlTimeout = -1;
+        if ((mc = curl_multi_timeout(multiCurl, &curlTimeout)) != CURLM_OK) {
+            LOG_WARNING(
+                sLogger,
+                ("failed to call curl_multi_timeout", "use default timeout 1s")("errMsg", curl_multi_strerror(mc)));
+        }
+        struct timeval timeout {
+            1, 0
+        };
+        if (curlTimeout >= 0) {
+            timeout.tv_sec = curlTimeout / 1000;
+            timeout.tv_usec = (curlTimeout % 1000) * 1000;
+        }
+
+        int maxfd = -1;
+        fd_set fdread;
+        fd_set fdwrite;
+        fd_set fdexcep;
+        FD_ZERO(&fdread);
+        FD_ZERO(&fdwrite);
+        FD_ZERO(&fdexcep);
+        if ((mc = curl_multi_fdset(multiCurl, &fdread, &fdwrite, &fdexcep, &maxfd)) != CURLM_OK) {
+            LOG_ERROR(sLogger, ("failed to call curl_multi_fdset", "sleep 100ms")("errMsg", curl_multi_strerror(mc)));
+        }
+        if (maxfd == -1) {
+            // sleep min(timeout, 100ms) according to libcurl
+            int64_t sleepMs = (curlTimeout >= 0 && curlTimeout < 100) ? curlTimeout : 100;
+            this_thread::sleep_for(chrono::milliseconds(sleepMs));
+        } else {
+            select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
+        }
+    } while (runningHandlers);
 }
 
 } // namespace logtail

@@ -122,8 +122,6 @@ DECLARE_FLAG_INT32(reader_close_unused_file_time);
 DECLARE_FLAG_INT32(batch_send_interval);
 DECLARE_FLAG_INT32(batch_send_metric_size);
 
-DECLARE_FLAG_BOOL(send_prefer_real_ip);
-DECLARE_FLAG_INT32(send_switch_real_ip_interval);
 DECLARE_FLAG_INT32(truncate_pos_skip_bytes);
 DECLARE_FLAG_INT32(default_tail_limit_kb);
 
@@ -1002,25 +1000,10 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
     mCheckPointFilePath = AbsolutePath(mCheckPointFilePath, mProcessExecutionDir);
     LOG_INFO(sLogger, ("logtail checkpoint path", mCheckPointFilePath));
 
-    if (confJson.isMember("send_prefer_real_ip") && confJson["send_prefer_real_ip"].isBool()) {
-        BOOL_FLAG(send_prefer_real_ip) = confJson["send_prefer_real_ip"].asBool();
-    }
-
-    if (confJson.isMember("send_switch_real_ip_interval") && confJson["send_switch_real_ip_interval"].isInt()) {
-        INT32_FLAG(send_switch_real_ip_interval) = confJson["send_switch_real_ip_interval"].asInt();
-    }
-
     LoadInt32Parameter(INT32_FLAG(truncate_pos_skip_bytes),
                        confJson,
                        "truncate_pos_skip_bytes",
                        "ALIYUN_LOGTAIL_TRUNCATE_POS_SKIP_BYTES");
-
-    if (BOOL_FLAG(send_prefer_real_ip)) {
-        LOG_INFO(sLogger,
-                 ("change send policy, prefer use real ip, switch interval seconds",
-                  INT32_FLAG(send_switch_real_ip_interval))("truncate skip read offset",
-                                                            INT32_FLAG(truncate_pos_skip_bytes)));
-    }
 
     if (confJson.isMember("ignore_dir_inode_changed") && confJson["ignore_dir_inode_changed"].isBool()) {
         mIgnoreDirInodeChanged = confJson["ignore_dir_inode_changed"].asBool();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,6 @@
 
 namespace logtail {
 
-bool IsHttpsEndpoint(const std::string& endpoint);
-
-std::string ExtractEndpoint(const std::string& endpoint);
-
-std::string StandardizeHost(const std::string& endpoint, const std::string& defaultEndpoint);
-
-std::string GetHostFromEndpoint(const std::string& endpoint);
+std::string Base64Enconde(const std::string& message);
 
 } // namespace logtail

@@ -30,6 +30,9 @@
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#endif
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -101,16 +104,16 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
 #ifndef __ENTERPRISE__
     APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
-#else
-    APSARA_TEST_EQUAL("", flusher->mEndpoint);
+    APSARA_TEST_EQUAL("test_project.cn-hangzhou.log.aliyuncs.com", flusher->mCandidateHostsInfo->GetFirstHost());
 #endif
     APSARA_TEST_EQUAL("", flusher->mAliuid);
     APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(merge_log_count_limit)),
                       flusher->mBatcher.GetEventFlushStrategy().GetMinCnt());
-    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(max_send_log_group_size) / DOUBLE_FLAG(sls_serialize_size_expansion_ratio)),
-                      flusher->mBatcher.GetEventFlushStrategy().GetMaxSizeBytes());
+    APSARA_TEST_EQUAL(
+        static_cast<uint32_t>(INT32_FLAG(max_send_log_group_size) / DOUBLE_FLAG(sls_serialize_size_expansion_ratio)),
+        flusher->mBatcher.GetEventFlushStrategy().GetMaxSizeBytes());
     APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(batch_send_metric_size)),
                       flusher->mBatcher.GetEventFlushStrategy().GetMinSizeBytes());
     uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(batch_send_interval)) / 2;
@@ -146,6 +149,9 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+#ifndef __ENTERPRISE__
+    configJson["EndpointMode"] = "default";
+#endif
     flusher.reset(new FlusherSLS());
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
@@ -153,12 +159,14 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("cn-hangzhou", flusher->mRegion);
 #ifdef __ENTERPRISE__
     APSARA_TEST_EQUAL("123456789", flusher->mAliuid);
+    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mEndpointMode);
 #else
-    APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
     APSARA_TEST_EQUAL("", flusher->mAliuid);
 #endif
+    APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
     APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_METRICS, flusher->mTelemetryType);
     APSARA_TEST_EQUAL(1U, flusher->mShardHashKeys.size());
+    APSARA_TEST_EQUAL("__source__", flusher->mShardHashKeys[0]);
     SenderQueueManager::GetInstance()->Clear();
 
     // invalid optional param
@@ -175,6 +183,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
 #ifdef __ENTERPRISE__
+    configJson["EndpointMode"] = true;
     configJson["Endpoint"] = true;
 #else
     configJson["Endpoint"] = "cn-hangzhou.log.aliyuncs.com";
@@ -185,6 +194,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(STRING_FLAG(default_region_name), flusher->mRegion);
 #ifdef __ENTERPRISE__
+    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mEndpointMode);
     APSARA_TEST_EQUAL("", flusher->mEndpoint);
 #endif
     APSARA_TEST_EQUAL("", flusher->mAliuid);
@@ -214,6 +224,84 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     SenderQueueManager::GetInstance()->Clear();
 #endif
 
+#ifdef __ENTERPRISE__
+    // EndpointMode && Endpoint
+    SLSClientManager::GetInstance()->Clear();
+    // Endpoint ignored in acclerate mode
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "EndpointMode": "accelerate",
+            "Endpoint": "  cn-hangzhou.log.aliyuncs.com   "
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_EQUAL(EndpointMode::ACCELERATE, flusher->mEndpointMode);
+    APSARA_TEST_TRUE(EnterpriseSLSClientManager::GetInstance()
+                         ->mRegionCandidateEndpointsMap["cn-hangzhou"]
+                         .mRemoteEndpoints.empty());
+    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateHostsInfo->GetProject());
+    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateHostsInfo->GetRegion());
+    APSARA_TEST_EQUAL(EndpointMode::ACCELERATE, flusher->mCandidateHostsInfo->GetMode());
+    SenderQueueManager::GetInstance()->Clear();
+
+    // Endpoint should be added to region remote endpoints if not existed
+    configStr = R"(
+            {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "EndpointMode": "unknown",
+            "Endpoint": "  cn-hangzhou.log.aliyuncs.com   "
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mEndpointMode);
+    auto& endpoints
+        = EnterpriseSLSClientManager::GetInstance()->mRegionCandidateEndpointsMap["cn-hangzhou"].mRemoteEndpoints;
+    APSARA_TEST_EQUAL(1U, endpoints.size());
+    APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", endpoints[0]);
+    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateHostsInfo->GetProject());
+    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateHostsInfo->GetRegion());
+    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mCandidateHostsInfo->GetMode());
+    SenderQueueManager::GetInstance()->Clear();
+
+    // Endpoint should be ignored when region remote endpoints existed
+    configStr = R"(
+            {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "EndpointMode": "default",
+            "Endpoint": "  cn-hangzhou-intranet.log.aliyuncs.com   "
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    flusher.reset(new FlusherSLS());
+    flusher->SetContext(ctx);
+    flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mEndpointMode);
+    endpoints = EnterpriseSLSClientManager::GetInstance()->mRegionCandidateEndpointsMap["cn-hangzhou"].mRemoteEndpoints;
+    APSARA_TEST_EQUAL(1U, endpoints.size());
+    APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", endpoints[0]);
+    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateHostsInfo->GetProject());
+    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateHostsInfo->GetRegion());
+    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mCandidateHostsInfo->GetMode());
+    SenderQueueManager::GetInstance()->Clear();
+#endif
+
+#ifndef __ENTERPRISE__
     // Endpoint
     configStr = R"(
         {
@@ -229,12 +317,9 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL("cn-hangzhou.log.aliyuncs.com", flusher->mEndpoint);
-    auto iter = SLSClientManager::GetInstance()->mRegionEndpointEntryMap.find("cn-hangzhou");
-    APSARA_TEST_NOT_EQUAL(SLSClientManager::GetInstance()->mRegionEndpointEntryMap.end(), iter);
-    APSARA_TEST_NOT_EQUAL(iter->second.mEndpointInfoMap.end(),
-                          iter->second.mEndpointInfoMap.find("http://cn-hangzhou.log.aliyuncs.com"));
+    APSARA_TEST_EQUAL("test_project.cn-hangzhou.log.aliyuncs.com", flusher->mCandidateHostsInfo->GetFirstHost());
     SenderQueueManager::GetInstance()->Clear();
+#endif
 
     // TelemetryType
     configStr = R"(
@@ -244,7 +329,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "Logstore": "test_logstore",
             "Region": "cn-hangzhou",
             "Endpoint": "cn-hangzhou.log.aliyuncs.com",
-            "TelemetryType": "logs"
+            "TelemetryType": "metrics"
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -252,7 +337,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     flusher->SetContext(ctx);
     flusher->SetMetricsRecordRef(FlusherSLS::sName, "1");
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
-    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
+    APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_METRICS, flusher->mTelemetryType);
     SenderQueueManager::GetInstance()->Clear();
 
     configStr = R"(
@@ -486,8 +571,6 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(flusher1.Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(flusher1.Start());
     APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
-    APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
-    APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
 
     {
         PipelineContext ctx2;
@@ -510,14 +593,10 @@ void FlusherSLSUnittest::OnPipelineUpdate() {
 
         APSARA_TEST_TRUE(flusher1.Stop(false));
         APSARA_TEST_TRUE(FlusherSLS::sProjectRefCntMap.empty());
-        APSARA_TEST_FALSE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
-        APSARA_TEST_TRUE(SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").empty());
         APSARA_TEST_TRUE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher1.GetQueueKey()));
 
         APSARA_TEST_TRUE(flusher2.Start());
         APSARA_TEST_EQUAL(1U, FlusherSLS::sProjectRefCntMap.size());
-        APSARA_TEST_TRUE(FlusherSLS::IsRegionContainingConfig("cn-hangzhou"));
-        APSARA_TEST_EQUAL(1U, SLSClientManager::GetInstance()->GetRegionAliuids("cn-hangzhou").size());
         APSARA_TEST_TRUE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher1.GetQueueKey()));
         APSARA_TEST_FALSE(SenderQueueManager::GetInstance()->IsQueueMarkedDeleted(flusher2.GetQueueKey()));
         flusher2.Stop(true);
@@ -754,7 +833,7 @@ void FlusherSLSUnittest::TestSend() {
             APSARA_TEST_TRUE(item->mBufferOrNot);
             APSARA_TEST_EQUAL(&flusher, item->mFlusher);
             APSARA_TEST_EQUAL(flusher.mQueueKey, item->mQueueKey);
-            APSARA_TEST_EQUAL(sdk::CalcMD5("tag_value"), item->mShardHashKey);
+            APSARA_TEST_EQUAL(CalcMD5("tag_value"), item->mShardHashKey);
             APSARA_TEST_EQUAL(flusher.mLogstore, item->mLogstore);
 
             auto compressor
@@ -1089,7 +1168,6 @@ UNIT_TEST_CASE(FlusherSLSUnittest, TestFlush)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlushAll)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestAddPackId)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnGoPipelineSend)
-
 
 } // namespace logtail
 

@@ -239,17 +239,18 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
             HttpSinkRequest* request = nullptr;
             curl_easy_getinfo(handler, CURLINFO_PRIVATE, &request);
             auto responseTime = chrono::system_clock::now() - request->mLastSendTime;
-            auto responseTimeMs = chrono::duration_cast<chrono::milliseconds>(responseTime).count();
+            auto responseTimeMs = chrono::duration_cast<chrono::milliseconds>(responseTime);
             switch (msg->data.result) {
                 case CURLE_OK: {
                     long statusCode = 0;
                     curl_easy_getinfo(handler, CURLINFO_RESPONSE_CODE, &statusCode);
                     request->mResponse.SetStatusCode(statusCode);
+                    request->mResponse.SetResponseTime(responseTimeMs);
                     LOG_DEBUG(
                         sLogger,
                         ("send http request succeeded, item address", request->mItem)(
                             "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
-                            "response time", ToString(responseTimeMs) + "ms")("try cnt", ToString(request->mTryCnt))(
+                            "response time", ToString(responseTimeMs.count()) + "ms")("try cnt", ToString(request->mTryCnt))(
                             "sending cnt", ToString(FlusherRunner::GetInstance()->GetSendingBufferCount())));
                     static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
                     FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
@@ -281,7 +282,7 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                                   ("failed to send http request", "abort")("item address", request->mItem)(
                                       "config-flusher-dst",
                                       QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
-                                      "response time", ToString(responseTimeMs) + "ms")("try cnt",
+                                      "response time", ToString(responseTimeMs.count()) + "ms")("try cnt",
                                                                                         ToString(request->mTryCnt))(
                                       "sending cnt", ToString(FlusherRunner::GetInstance()->GetSendingBufferCount())));
                         static_cast<HttpFlusher*>(request->mItem->mFlusher)

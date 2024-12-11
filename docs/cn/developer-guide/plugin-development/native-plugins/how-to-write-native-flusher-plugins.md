@@ -24,7 +24,7 @@ public:
 class HttpFlusher : public Flusher {
 public:
     // 用于将待发送数据打包成http请求
-    virtual bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) const = 0;
+    virtual bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) = 0;
     // 用于发送完成后进行记录和处理
     virtual void OnSendDone(const HttpResponse& response, SenderQueueItem* item) = 0;
 };

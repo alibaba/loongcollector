@@ -10,7 +10,7 @@
 #include "logger/Logger.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
-#include "sdk/Common.h"
+#include "common/EncodingUtil.h"
 
 using namespace std;
 
@@ -223,7 +223,7 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
     }
 
     auto token = username + ":" + password;
-    auto token64 = sdk::Base64Enconde(token);
+    auto token64 = Base64Enconde(token);
     mRequestHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
     return true;
 }

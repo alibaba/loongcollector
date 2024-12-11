@@ -53,7 +53,6 @@
 #include "pipeline/queue/QueueKeyManager.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "rapidjson/document.h"
-#include "sdk/Common.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -89,6 +88,8 @@ namespace logtail {
         "file device", mDevInode.dev)("file inode", mDevInode.inode)("file signature", mLastFileSignatureHash)
 
 size_t LogFileReader::BUFFER_SIZE = 1024 * 512; // 512KB
+
+const int64_t kFirstHashKeySeqID = 1;
 
 LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                                   const string& hostLogPathFile,
@@ -439,7 +440,7 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
             auto partitionRange = detail::getPartitionRange(partIdx, mEOOption->concurrency, kPartitionCount);
             auto partitionID = partitionRange.first + rand() % (partitionRange.second - partitionRange.first + 1);
             rangeCpt->data.set_hash_key(GenerateHashKey(baseHashKey, partitionID, kPartitionCount));
-            rangeCpt->data.set_sequence_id(sdk::kFirstHashKeySeqID);
+            rangeCpt->data.set_sequence_id(kFirstHashKeySeqID);
             rangeCpt->data.set_committed(false);
         }
         LOG_DEBUG(sLogger,

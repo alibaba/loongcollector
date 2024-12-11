@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -75,12 +76,24 @@ public:
     }
 
     void SetStatusCode(int32_t code) { mStatusCode = code; }
+    void SetResponseTime(const std::chrono::milliseconds& time) { mResponseTime = time; }
+    std::chrono::milliseconds GetResponseTime() const { return mResponseTime; }
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    template <class T>
+    void SetBody(const T& body) {
+        *mBody = body;
+    }
+
+    void AddHeader(const std::string& key, const std::string& value) { mHeader[key] = value; }
+#endif
 
 private:
     int32_t mStatusCode = 0; // 0 means no response from server
     std::map<std::string, std::string, decltype(compareHeader)*> mHeader;
     std::unique_ptr<void, std::function<void(void*)>> mBody;
     size_t (*mWriteCallback)(char*, size_t, size_t, void*) = nullptr;
+    std::chrono::milliseconds mResponseTime = std::chrono::milliseconds::max();
 };
 
 } // namespace logtail

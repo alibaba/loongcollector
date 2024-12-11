@@ -102,13 +102,24 @@ struct AsynHttpRequest : public HttpRequest {
                     uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
                     bool followRedirects = false,
                     std::optional<CurlTLS> tls = std::nullopt)
-        : HttpRequest(
-              method, httpsFlag, host, port, url, query, header, body, timeout, maxTryCnt, followRedirects, std::move(tls)),
+        : HttpRequest(method,
+                      httpsFlag,
+                      host,
+                      port,
+                      url,
+                      query,
+                      header,
+                      body,
+                      timeout,
+                      maxTryCnt,
+                      followRedirects,
+                      std::move(tls)),
           mResponse(std::move(response)) {}
 
     virtual bool IsContextValid() const = 0;
     virtual void OnSendDone(HttpResponse& response) = 0;
 };
 
+std::string GetQueryString(const std::map<std::string, std::string>& parameters);
 
 } // namespace logtail

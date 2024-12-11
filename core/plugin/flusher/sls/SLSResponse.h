@@ -32,6 +32,7 @@ struct SLSResponse {
     bool Parse(const HttpResponse& response);
 };
 
+SLSResponse ParseHttpResponse(const HttpResponse& response);
 bool IsSLSResponse(const HttpResponse& response);
 time_t GetServerTime(const HttpResponse& response);
 
