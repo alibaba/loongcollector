@@ -191,6 +191,20 @@ bool PipelineConfig::Parse() {
                                mRegion);
         }
         const string pluginType = it->asString();
+        // when input is singleton, there should only one input to simpify config load transaction
+        if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(pluginType)) {
+            mSingletonInput = pluginType;
+            if (itr->size() > 1) {
+                PARAM_ERROR_RETURN(sLogger,
+                                   alarm,
+                                   "more than 1 input plugin is given when global singleton input plugin is used",
+                                   noModule,
+                                   mName,
+                                   mProject,
+                                   mLogstore,
+                                   mRegion);
+            }
+        }
         if (i == 0) {
             if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 mHasGoInput = true;
@@ -241,7 +255,7 @@ bool PipelineConfig::Parse() {
     if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,
-                           "more than 1 input_file or input_container_stdio plugin is given",
+                           "more than 1 input_file or input_container_stdio is given",
                            noModule,
                            mName,
                            mProject,

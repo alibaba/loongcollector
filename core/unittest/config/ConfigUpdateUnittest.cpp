@@ -29,47 +29,12 @@
 #include "pipeline/plugin/PluginRegistry.h"
 #include "task_pipeline/TaskPipelineManager.h"
 #include "unittest/Unittest.h"
+#include "unittest/config/PipelineManagerMock.h"
 #include "unittest/plugin/PluginMock.h"
 
 using namespace std;
 
 namespace logtail {
-
-class PipelineMock : public Pipeline {
-public:
-    bool Init(PipelineConfig&& config) {
-        mConfig = std::move(config.mDetail);
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-            mMetricsRecordRef,
-            MetricCategory::METRIC_CATEGORY_PIPELINE,
-            {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()}, {METRIC_LABEL_KEY_PIPELINE_NAME, mName}});
-        mStartTime = mMetricsRecordRef.CreateIntGauge(METRIC_PIPELINE_START_TIME);
-        return (*mConfig)["valid"].asBool();
-    }
-};
-
-class PipelineManagerMock : public PipelineManager {
-public:
-    static PipelineManagerMock* GetInstance() {
-        static PipelineManagerMock instance;
-        return &instance;
-    }
-
-    void ClearEnvironment() {
-        mPipelineNameEntityMap.clear();
-        mPluginCntMap.clear();
-    }
-
-private:
-    shared_ptr<Pipeline> BuildPipeline(PipelineConfig&& config) override {
-        // this should be synchronized with PipelineManager::BuildPipeline, except for the pointer type.
-        shared_ptr<PipelineMock> p = make_shared<PipelineMock>();
-        if (!p->Init(std::move(config))) {
-            return nullptr;
-        }
-        return p;
-    }
-};
 
 class ConfigUpdateUnittest : public testing::Test {
 public:
