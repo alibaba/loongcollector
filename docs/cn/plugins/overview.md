@@ -104,7 +104,7 @@
 | 名称 | 提供方 | 简介 |
 | --- | --- | --- |
 | `flusher_kafka`<br>[Kafka](flusher/extended/flusher-kafka.md) | 社区 | 将采集到的数据输出到Kafka。推荐使用下面的flusher_kafka_v2 |
-| `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka_v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | 将采集到的数据输出到Kafka。 |
+| `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka-v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | 将采集到的数据输出到Kafka。 |
 | `flusher_stdout`<br>[标准输出/文件](flusher/extended/flusher-stdout.md) | SLS官方 | 将采集到的数据输出到标准输出或文件。 |
 | `flusher_otlp_log`<br>[OTLP日志](flusher/extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | 将采集到的数据支持`Opentelemetry log protocol`的后端。 |
 | `flusher_http`<br>[HTTP](flusher/extended/flusher-http.md) | 社区<br>[snakorse](https://github.com/snakorse) | 将采集到的数据以http方式输出到指定的后端。 |

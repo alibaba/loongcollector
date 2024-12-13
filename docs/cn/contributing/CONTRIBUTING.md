@@ -1,12 +1,12 @@
 # 贡献指南
 
-欢迎来到 iLogtail 的社区！感谢您为iLogtail贡献代码、文档及案例！
+欢迎来到 LoongCollector 的社区！感谢您为 LoongCollector 贡献代码、文档及案例！
 
-iLogtail 自从开源以来，受到了很多社区同学的关注。社区的每一个 Issue、每一个 pull request (PR)，都是在为 iLogtail 的发展添砖加瓦。衷心地希望越来越多的社区同学能参与到 iLogtail 项目中来，跟我们一起把 iLogtail 做好。
+LoongCollector 自从开源以来，受到了很多社区同学的关注。社区的每一个 Issue、每一个 pull request (PR)，都是在为 LoongCollector 的发展添砖加瓦。衷心地希望越来越多的社区同学能参与到 LoongCollector 项目中来，跟我们一起把 LoongCollector 做好。
 
 ## 行为准则
 
-参与 iLogtail 社区贡献，请阅读并同意遵守[阿里巴巴开源行为准则](https://github.com/alibaba/community/blob/master/CODE_OF_CONDUCT_zh.md)，共同营造一个开放透明且友好的开源社区环境。
+参与 LoongCollector 社区贡献，请阅读并同意遵守[阿里巴巴开源行为准则](https://github.com/alibaba/community/blob/master/CODE_OF_CONDUCT_zh.md)，共同营造一个开放透明且友好的开源社区环境。
 
 ## 贡献流程
 
@@ -38,14 +38,14 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 设计定稿后，即可进行开发流程。下面是开源贡献者常用的工作流（workflow）：
 
-1. 将 [iLogtail](https://github.com/alibaba/loongcollector) 仓库 fork 到个人 GitHub 下。
+1. 将 [LoongCollector](https://github.com/alibaba/loongcollector) 仓库 fork 到个人 GitHub 下。
 2. 基于个人 fork 分支进行开发、测试工作。详细流程：
-    1. 保持个人 main 分支跟 iLogtail 主仓库 main 分支及时同步。
+    1. 保持个人 main 分支跟 LoongCollector 主仓库 main 分支及时同步。
     2. 将 fork 后的个人仓库 clone 到本地。
     3. 创建新的开发分支，并进行开发。**请确保对应的变更都有 UnitTest 或 E2E 测试**。
     4. 在本地提交变更。**注意 commit log 保持简练、规范，提交的 email 需要和 GitHub 的 email 保持一致。**
     5. 将变更 push 到远程个人分支。
-3. 向 iLogtail main 分支创建一个 [pull request (PR)](https://github.com/alibaba/loongcollector/pulls)，在进行较大的变更的时候请确保 PR 有一个对应的 Issue，并进行关联。
+3. 向 LoongCollector main 分支创建一个 [pull request (PR)](https://github.com/alibaba/loongcollector/pulls)，在进行较大的变更的时候请确保 PR 有一个对应的 Issue，并进行关联。
 
     1. 发起 PR 前请进行如下规范性检查：[代码/文档风格](../developer-guide/codestyle.md)、[编码规范](../developer-guide/code-check/check-codestyle.md)、[依赖包许可证](../developer-guide/code-check/check-dependency-license.md)、[文件许可证](../developer-guide/code-check/check-license.md)。
     2. 为了更好的进行版本管理，对于一些独立的特性或者关键BUG修复，请提交[Changelog](https://github.com/alibaba/loongcollector/blob/main/CHANGELOG.md).
@@ -93,22 +93,22 @@ iLogtail 自从开源以来，受到了很多社区同学的关注。社区的�
 
 ### 案例分享 <a href="#case" id="case"></a>
 
-我们也欢迎您分享任何关于 iLogtail 的使用案例。我们在知乎建立了专栏 [iLogtail社区](https://www.zhihu.com/column/c_1533139823409270785)，欢迎大家投稿，分享 iLogtail 的使用案例。
+我们也欢迎您分享任何关于 LoongCollector 的使用案例。我们在知乎建立了专栏 [iLogtail社区](https://www.zhihu.com/column/c_1533139823409270785)，欢迎大家投稿，分享 LoongCollector 的使用案例。
 
 1. 在知乎写文章，例如[一文搞懂 SAE 日志采集架构](https://zhuanlan.zhihu.com/p/557591446)。
 2. 推荐自己的文章到“iLogtail社区”专栏。
-3. GitHub上修改[use-cases.md](https://github.com/alibaba/loongcollector/blob/main/docs/cn/awesome-ilogtail/use-cases.md)并发起PR，Label选awesome ilogtail。
+3. GitHub上修改[use-cases.md](https://github.com/alibaba/loongcollector/blob/main/docs/cn/awesome-ilogtail/awesome-ilogtail-use-cases.md)并发起PR，Label选awesome ilogtail。
 
 ### 参与社区讨论
 
-如果您在使用 iLogtail 中遇到任何问题，欢迎到 [Discussions](https://github.com/alibaba/loongcollector/discussions) 进行交流互动。也欢迎在这里帮助其他使用者解答一些使用中的问题。
+如果您在使用 LoongCollector 中遇到任何问题，欢迎到 [Discussions](https://github.com/alibaba/loongcollector/discussions) 进行交流互动。也欢迎在这里帮助其他使用者解答一些使用中的问题。
 
 Discussion 分类：
 
-* Announcements：iLogtail官方公告。
-* Help：使用 iLogtail 中遇到问题，想在社区寻求帮助。
-* Ideas：关于 iLogtail 的一些想法，欢迎随时交流。
-* Show and tell：可以在这里展示任何跟 iLogtail 相关的工作，例如一些小工具等。
+* Announcements：LoongCollector 官方公告。
+* Help：使用 LoongCollector 中遇到问题，想在社区寻求帮助。
+* Ideas：关于 LoongCollector 的一些想法，欢迎随时交流。
+* Show and tell：可以在这里展示任何跟 LoongCollector 相关的工作，例如一些小工具等。
 
 ## 联系我们
 

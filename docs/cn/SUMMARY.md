@@ -38,7 +38,7 @@
 * [概览](plugins/overview.md)
 * [版本管理](plugins/stability-level.md)
 * 输入
-  * [什么是输入插件](plugins/input/README.md)
+  * [什么是输入插件](plugins/input/inputs.md)
   * 原生插件
     * [文本日志](plugins/input/native/input-file.md)
     * [容器标准输出](plugins/input/native/input-container-stdio.md)
@@ -69,7 +69,7 @@
     * [【Debug】Mock数据-Service](plugins/input/extended/service-mock.md)
     * [【Debug】文本日志](plugins/input/extended/metric-debug-file.md)
 * 处理
-  * [什么是处理插件](plugins/processor/README.md)
+  * [什么是处理插件](plugins/processor/processors.md)
   * SPL 处理
     * [SPL 处理](plugins/processor/spl/processor-spl-native.md)
   * 原生插件
@@ -102,13 +102,13 @@
     * [多行切分](plugins/processor/extended/processor-split-log-regex.md)
     * [字符串替换](plugins/processor/extended/processor-string-replace.md)
 * 聚合
-  * [什么是聚合插件](plugins/aggregator/README.md)
+  * [什么是聚合插件](plugins/aggregator/aggregators.md)
   * [基础聚合](plugins/aggregator/aggregator-base.md)
   * [按上下文分组](plugins/aggregator/aggregator-context.md)
   * [按Key分组](plugins/aggregator/aggregator-content-value-group.md)
   * [按GroupMetadata分组](plugins/aggregator/aggregator-metadata-group.md)
 * 输出
-  * [什么是输出插件](plugins/flusher/README.md)
+  * [什么是输出插件](plugins/flusher/flushers.md)
   * 原生插件
     * [SLS](plugins/flusher/native/flusher-sls.md)
     * [【Debug】Blackhole](plugins/flusher/native/flusher-blackhole.md)
@@ -117,7 +117,7 @@
     * [ClickHouse](plugins/flusher/extended/flusher-clickhouse.md)
     * [ElasticSearch](plugins/flusher/extended/flusher-elasticsearch.md)
     * [HTTP](plugins/flusher/extended/flusher-http.md)
-    * [kafkaV2](plugins/flusher/extended/flusher-kafka_v2.md)
+    * [kafkaV2](plugins/flusher/extended/flusher-kafka-v2.md)
     * [Kafka（Deprecated）](plugins/flusher/extended/flusher-kafka.md)
     * [OTLP日志](plugins/flusher/extended/flusher-otlp.md)
     * [Prometheus](plugins/flusher/extended/flusher-prometheus.md)
@@ -125,7 +125,7 @@
     * [标准输出/文件](plugins/flusher/extended/flusher-stdout.md)
     * [Loki](plugins/flusher/extended/loki.md)
 * 扩展
-  * [什么是扩展插件](plugins/extension/README.md)
+  * [什么是扩展插件](plugins/extension/extensions.md)
   * [BasicAuth鉴权](plugins/extension/ext-basicauth.md)
   * [协议解码/反序列化](plugins/extension/ext-default-decoder.md)
   * [协议编码/序列化](plugins/extension/ext-default-encoder.md)
@@ -142,12 +142,12 @@
 * [代码风格](developer-guide/codestyle.md)
 * [数据模型](developer-guide/data-model.md)
 * 日志协议
-  * [什么是日志协议](developer-guide/log-protocol/README.md)
+  * [什么是日志协议](developer-guide/log-protocol/log-protocol.md)
   * [协议转换](developer-guide/log-protocol/converter.md)
   * [增加新的日志协议](developer-guide/log-protocol/How-to-add-new-protocol.md)
   * 协议
     * [sls协议](developer-guide/log-protocol/protocol-spec/sls.md)
-    * [单条协议](developer-guide/log-protocol/protocol-spec/custom_single.md)
+    * [单条协议](developer-guide/log-protocol/protocol-spec/custom-single.md)
     * [raw协议](developer-guide/log-protocol/protocol-spec/raw.md)
 * 插件开发
   * [开源插件开发引导](developer-guide/plugin-development/plugin-development-guide.md)
@@ -193,22 +193,22 @@
 
 ## 管控工具 <a href="#config-server" id="config-server"></a>
 
-* [使用介绍](config-server/quick-start.md)
+* [使用介绍](config-server/usage-instructions.md)
 * [通信协议](config-server/communication-protocol.md)
-* [开发指南](config-server/developer-guide.md)
+* [开发指南](config-server/config-server-developer-guide.md)
 
 ## 社区活动 <a href="#events" id="event"></a>
 
 * 开源之夏 2024
-  * [开源之夏 2024 活动介绍](events/summer-ospp-2024/README.md)
+  * [开源之夏 2024 活动介绍](events/summer-ospp-2024/summer-ospp-2024.md)
   * 项目
-    * [iLogtail 社区项目介绍](events/summer-ospp-2024/projects/README.md)
-    * [iLogtail 数据吞吐性能优化](events/summer-ospp-2024/projects/ilogtail-io.md)
-    * [ConfigServer 能力升级 + 体验优化（全栈）](events/summer-ospp-2024/projects/config-server.md)
+    * [iLogtail 社区项目介绍](events/summer-ospp-2024/projects/summer-ospp-2024-projects.md)
+    * [iLogtail 数据吞吐性能优化](events/summer-ospp-2024/projects/summer-ospp-2024-projects-ilogtail-io.md)
+    * [ConfigServer 能力升级 + 体验优化（全栈）](events/summer-ospp-2024/projects/summer-ospp-2024-projects-config-server.md)
 
 ## Awesome iLogtail <a href="#awesome-ilogtail" id="awesome-ilogtail"></a>
 
-* [走近iLogtail社区版](awesome-ilogtail/ilogtail.md)
-* [iLogtail社区版使用入门](awesome-ilogtail/getting-started.md)
-* [iLogtail社区版开发者指南](awesome-ilogtail/developer-guide.md)
-* [iLogtail社区版使用案例](awesome-ilogtail/use-cases.md)
+* [走近iLogtail社区版](awesome-ilogtail/awesome-ilogtail.md)
+* [iLogtail社区版使用入门](awesome-ilogtail/awesome-ilogtail-getting-started.md)
+* [iLogtail社区版开发者指南](awesome-ilogtail/awesome-ilogtail-developer-guide.md)
+* [iLogtail社区版使用案例](awesome-ilogtail/awesome-ilogtail-use-cases.md)

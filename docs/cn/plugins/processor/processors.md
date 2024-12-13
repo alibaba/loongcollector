@@ -58,7 +58,7 @@
 | [`input_network_security`](../input/native/input-network-security.md) | 网络安全监控插件 |
 | [`input_process_security`](../input/native/input-process-security.md) | 进程安全监控插件 |
 
-更多输入插件说明请参考[输入插件文档](../input/README.md)。
+更多输入插件说明请参考[输入插件文档](../input/inputs.md)。
 
 ### 插件组合规则
 

@@ -84,4 +84,4 @@
 - 插件组合规则:
   - 原生Input插件: 可配合原生/扩展Processor插件使用，支持SPL插件
   - 扩展Input插件: 仅支持扩展Processor插件
-  - 详细说明请参考[处理插件文档](../processor/README.md)
+  - 详细说明请参考[处理插件文档](../processor/processors.md)

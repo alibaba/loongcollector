@@ -7,6 +7,6 @@ LoongCollector 的日志数据默认以sls自定义协议的形式与外部进�
 | 协议类型  | 协议名称                                                                                             | 支持的编码方式       |
 |-------|--------------------------------------------------------------------------------------------------|---------------|
 | 标准协议  | [sls协议](protocol-spec/sls.md)                                                                  | json、protobuf |
-| 自定义协议 | [单条协议](protocol-spec/custom_single.md)                                                         | json          |
+| 自定义协议 | [单条协议](protocol-spec/custom-single.md)                                                         | json          |
 | 标准协议  | [Influxdb协议](https://docs.influxdata.com/influxdb/v1.8/write_protocols/line_protocol_reference/) | custom        |
 | 字节流协议 | [raw协议](protocol-spec/raw.md)                                                                  | custom        |

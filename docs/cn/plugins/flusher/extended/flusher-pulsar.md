@@ -123,7 +123,7 @@ Topic: test_%{content.application}
 
 - `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
 - `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
-- `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。可以参考`flusher-kafka_v2`中的使用。
+- `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。可以参考`flusher-kafka-v2`中的使用。
 - 其它方式暂不支持
 
 ### TagFieldsRename

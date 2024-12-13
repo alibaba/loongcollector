@@ -38,7 +38,7 @@ LoongCollector 是一款集卓越性能、超强稳定性和灵活可编程性�
 3. 更灵活的编程管道
 
     * C++ 全面插件化（已发布）：同时提供了充足的组件可供插件自由组合，极大地方便社区新增高性能的输入和输出能力，C++原生插件开发指南详见[如何开发原生Input插件](../../developer-guide/plugin-development/native-plugins/how-to-write-native-input-plugins.md)和[如何开发原生Flusher插件](../../developer-guide/plugin-development/native-plugins/how-to-write-native-flusher-plugins.md)。
-    * C++ Input 可使用原生 Processor（已发布）：C++ Input插件能够与原生及扩展的Processor插件配合使用，并支持SPL插件。这意味着C++ Input插件不仅可以利用原生Processor提供的高性能来解析日志，还能通过丰富的扩展Processor功能进一步处理日志，具体详情请参阅文档[什么是处理插件](../../plugins/processor/README.md)和[什么是输入插件](../../plugins/input/README.md)。
+    * C++ Input 可使用原生 Processor（已发布）：C++ Input插件能够与原生及扩展的Processor插件配合使用，并支持SPL插件。这意味着C++ Input插件不仅可以利用原生Processor提供的高性能来解析日志，还能通过丰富的扩展Processor功能进一步处理日志，具体详情请参阅文档[什么是处理插件](../../plugins/processor/processors.md)和[什么是输入插件](../../plugins/input/inputs.md)。
     * Golang Input 可使用原生 Processor （开发中）：Go Input 支持多种灵活的数据源输入，而原生处理插件提供了高性能的数据处理。结合两者的优势，可以构建出既高效又能适应多种应用场景的数据处理流水线。详见 [Issue](https://github.com/alibaba/loongcollector/issues/1917)。
     * SPL 处理模式（已发布）：SPL 处理模式支持用户通过 SPL 语句实现对数据的处理。无需编写代码开发插件，极大地拓展了 LoongCollector 可应用的场景。详见文档 [SPL 处理](../../plugins/processor/spl/processor-spl-native.md)。
 
