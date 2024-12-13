@@ -40,6 +40,9 @@
 // TODO: temporarily used here
 #include "pipeline/PipelineManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#endif
 
 using namespace std;
 
@@ -895,6 +898,10 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         }
     }
     SLSClientManager::GetInstance()->UpdateAccessKeyStatus(mAliuid, !hasAuthError);
+#ifdef __ENTERPRISE__
+    static auto manager = static_cast<EnterpriseSLSClientManager*>(SLSClientManager::GetInstance());
+    manager->UpdateProjectAnonymousWriteStatus(mProject, !hasAuthError);
+#endif
 }
 
 bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
