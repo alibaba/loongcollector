@@ -48,6 +48,7 @@ void EventPoolUnittest::TestNoLock() {
         APSARA_TEST_EQUAL(0U, pool.mLogEventPool.size());
         APSARA_TEST_EQUAL(0U, pool.mMinUnusedLogEventsCnt);
         APSARA_TEST_EQUAL(&g, e->GetPipelineEventGroupPtr());
+        delete e;
     }
     {
         auto e = pool.AcquireMetricEvent(mGroup.get());
@@ -61,6 +62,7 @@ void EventPoolUnittest::TestNoLock() {
         APSARA_TEST_EQUAL(0U, pool.mMetricEventPool.size());
         APSARA_TEST_EQUAL(0U, pool.mMinUnusedMetricEventsCnt);
         APSARA_TEST_EQUAL(&g, e->GetPipelineEventGroupPtr());
+        delete e;
     }
     {
         auto e = pool.AcquireSpanEvent(mGroup.get());
@@ -74,6 +76,7 @@ void EventPoolUnittest::TestNoLock() {
         APSARA_TEST_EQUAL(0U, pool.mSpanEventPool.size());
         APSARA_TEST_EQUAL(0U, pool.mMinUnusedSpanEventsCnt);
         APSARA_TEST_EQUAL(&g, e->GetPipelineEventGroupPtr());
+        delete e;
     }
     {
         auto e = pool.AcquireRawEvent(mGroup.get());
@@ -87,7 +90,9 @@ void EventPoolUnittest::TestNoLock() {
         APSARA_TEST_EQUAL(0U, pool.mRawEventPool.size());
         APSARA_TEST_EQUAL(0U, pool.mMinUnusedRawEventsCnt);
         APSARA_TEST_EQUAL(&g, e->GetPipelineEventGroupPtr());
+        delete e;
     }
+    pool.Clear();
 }
 
 void EventPoolUnittest::TestLock() {
@@ -107,9 +112,11 @@ void EventPoolUnittest::TestLock() {
         APSARA_TEST_EQUAL(mGroup.get(), e->GetPipelineEventGroupPtr());
 
         pool.Release(vector<LogEvent*>{e, e1});
-        pool.AcquireLogEvent(mGroup.get());
+        auto e2 = pool.AcquireLogEvent(mGroup.get());
         APSARA_TEST_EQUAL(0U, pool.mLogEventPoolBak.size());
         APSARA_TEST_EQUAL(1U, pool.mLogEventPool.size());
+        delete e2;
+
     }
     {
         auto e = pool.AcquireMetricEvent(mGroup.get());
@@ -125,9 +132,10 @@ void EventPoolUnittest::TestLock() {
         APSARA_TEST_EQUAL(mGroup.get(), e->GetPipelineEventGroupPtr());
 
         pool.Release(vector<MetricEvent*>{e, e1});
-        pool.AcquireMetricEvent(mGroup.get());
+        auto e2 = pool.AcquireMetricEvent(mGroup.get());
         APSARA_TEST_EQUAL(0U, pool.mMetricEventPoolBak.size());
         APSARA_TEST_EQUAL(1U, pool.mMetricEventPool.size());
+        delete e2;
     }
     {
         auto e = pool.AcquireSpanEvent(mGroup.get());
@@ -143,9 +151,10 @@ void EventPoolUnittest::TestLock() {
         APSARA_TEST_EQUAL(mGroup.get(), e->GetPipelineEventGroupPtr());
 
         pool.Release(vector<SpanEvent*>{e, e1});
-        pool.AcquireSpanEvent(mGroup.get());
+        auto e2 = pool.AcquireSpanEvent(mGroup.get());
         APSARA_TEST_EQUAL(0U, pool.mSpanEventPoolBak.size());
         APSARA_TEST_EQUAL(1U, pool.mSpanEventPool.size());
+        delete e2;
     }
     {
         auto e = pool.AcquireRawEvent(mGroup.get());
@@ -161,10 +170,12 @@ void EventPoolUnittest::TestLock() {
         APSARA_TEST_EQUAL(mGroup.get(), e->GetPipelineEventGroupPtr());
 
         pool.Release(vector<RawEvent*>{e, e1});
-        pool.AcquireRawEvent(mGroup.get());
+        auto e2 = pool.AcquireRawEvent(mGroup.get());
         APSARA_TEST_EQUAL(0U, pool.mRawEventPoolBak.size());
         APSARA_TEST_EQUAL(1U, pool.mRawEventPool.size());
+        delete e2;
     }
+    pool.Clear();
 }
 
 void EventPoolUnittest::TestGC() {
