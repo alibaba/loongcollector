@@ -568,7 +568,12 @@ AppConfig::AppConfig() {
     mNoInotify = false;
     mSendDataPort = 80;
     mShennongSocket = true;
-    // mInotifyBlackList.insert("/tmp");
+#ifdef __CORP__
+    // for internal systems which read and write frequently on small files in /tmp，it may lead to increased resource
+    // consumption and system fluctuations which rely on inotify_add_watch and inotify_rm_watch for filesystem
+    // monitoring.
+    mInotifyBlackList.insert("/tmp");
+#endif
 
     mPurageContainerMode = false;
     mForceQuitReadTimeout = 7200;
