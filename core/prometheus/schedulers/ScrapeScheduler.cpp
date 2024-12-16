@@ -99,18 +99,25 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
     mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_SIZE_BYTES, response.GetStatusCode(), responseBody.mRawSize);
     mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, response.GetStatusCode(), scrapeDurationMilliSeconds);
 
+    const auto& networkStatus = response.GetNetworkStatus();
+    if (networkStatus.mCode != NetworkCode::Ok) {
+        // not 0 means curl error
+        mScrapeState = prom::NetworkCodeToState(networkStatus.mCode);
+    } else if (response.GetStatusCode() != 200) {
+        mScrapeState = prom::HttpCodeToState(response.GetStatusCode());
+    } else {
+        // 0 means success
+        mScrapeState = prom::NetworkCodeToState(NetworkCode::Ok);
+    }
+
     mScrapeDurationSeconds = scrapeDurationMilliSeconds * sRate;
     mScrapeResponseSizeBytes = responseBody.mRawSize;
     mUpState = response.GetStatusCode() == 200;
     if (response.GetStatusCode() != 200) {
         mScrapeResponseSizeBytes = 0;
-        string headerStr;
-        for (const auto& [k, v] : mScrapeConfigPtr->mRequestHeaders) {
-            headerStr.append(k).append(":").append(v).append(";");
-        }
-        LOG_WARNING(
-            sLogger,
-            ("scrape failed, status code", response.GetStatusCode())("target", mHash)("http header", headerStr));
+        LOG_WARNING(sLogger,
+                    ("scrape failed, status code",
+                     response.GetStatusCode())("target", mHash)("curl msg", response.GetNetworkStatus().mMessage));
     }
     auto& eventGroup = responseBody.mEventGroup;
 
@@ -121,6 +128,7 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
 }
 
 void ScrapeScheduler::SetAutoMetricMeta(PipelineEventGroup& eGroup) {
+    eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE, mScrapeState);
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC, ToString(mScrapeTimestampMilliSec));
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION, ToString(mScrapeDurationSeconds));
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE, ToString(mScrapeResponseSizeBytes));
@@ -244,11 +252,10 @@ void ScrapeScheduler::InitSelfMonitor(const MetricLabels& defaultLabels) {
     MetricLabels labels = defaultLabels;
     labels.emplace_back(METRIC_LABEL_KEY_INSTANCE, mInstance);
 
-    static const std::unordered_map<std::string, MetricType> sScrapeMetricKeys = {
-        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
-        {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
-        {METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, MetricType::METRIC_TYPE_COUNTER},
-    };
+    static const std::unordered_map<std::string, MetricType> sScrapeMetricKeys
+        = {{METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+           {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+           {METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, MetricType::METRIC_TYPE_COUNTER}};
 
     mSelfMonitor->InitMetricManager(sScrapeMetricKeys, labels);
 

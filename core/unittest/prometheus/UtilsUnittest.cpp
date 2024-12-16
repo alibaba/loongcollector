@@ -16,6 +16,8 @@ public:
     void TestDurationToSecond();
     void TestSecondToDuration();
     void TestSizeToByte();
+    void TestNetworkCodeToString();
+    void TestHttpCodeToState();
 };
 
 void PromUtilsUnittest::TestDurationToSecond() {
@@ -58,9 +60,23 @@ void PromUtilsUnittest::TestSizeToByte() {
     APSARA_TEST_EQUAL(0ULL, SizeToByte("1xxE"));
 }
 
+void PromUtilsUnittest::TestNetworkCodeToString() {
+    APSARA_TEST_EQUAL("OK", prom::NetworkCodeToState(NetworkCode::Ok));
+    APSARA_TEST_EQUAL("ERR_UNKNOWN", prom::NetworkCodeToState(NetworkCode::Other));
+    APSARA_TEST_EQUAL("ERR_UNKNOWN", prom::NetworkCodeToState((NetworkCode)123));
+}
+
+void PromUtilsUnittest::TestHttpCodeToState() {
+    APSARA_TEST_EQUAL("ERR_HTTP_UNKNOWN", prom::HttpCodeToState(1001));
+    APSARA_TEST_EQUAL("ERR_HTTP_300", prom::HttpCodeToState(300));
+    APSARA_TEST_EQUAL("OK", prom::HttpCodeToState(200));
+}
+
 UNIT_TEST_CASE(PromUtilsUnittest, TestDurationToSecond);
 UNIT_TEST_CASE(PromUtilsUnittest, TestSecondToDuration);
 UNIT_TEST_CASE(PromUtilsUnittest, TestSizeToByte);
+UNIT_TEST_CASE(PromUtilsUnittest, TestNetworkCodeToString);
+UNIT_TEST_CASE(PromUtilsUnittest, TestHttpCodeToState);
 
 } // namespace logtail
 
