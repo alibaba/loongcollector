@@ -53,11 +53,35 @@ namespace ebpf {
         } \
         res; \
     })
-    
-SourceManager::SourceManager() {
-}
+
+SourceManager::SourceManager() = default;
 
 SourceManager::~SourceManager() {
+    if (!DynamicLibSuccess()) {
+        return;
+    }
+
+  for (size_t i = 0; i < mRunning.size(); i++) {
+    auto& x = mRunning[i];
+    if (!x) {
+        continue;
+    }
+    // stop plugin
+    StopPlugin(static_cast<nami::PluginType>(i));
+  }
+
+#ifdef APSARA_UNIT_TEST_MAIN
+  return;
+#endif
+
+  // call deinit
+  void* f = mFuncs[(int)ebpf_func::EBPF_DEINIT];
+  if (!f) {
+      return;
+  }
+
+  auto deinit_f = (deinit_func)f;
+  deinit_f();
 }
 
 void SourceManager::Init() {
@@ -71,7 +95,7 @@ void SourceManager::Init() {
   } else {
     LOG_DEBUG(sLogger, ("running in host mode", "would not set host path prefix ..."));
   }
-  
+
   mBinaryPath = GetProcessExecutionDir();
   mFullLibName = "lib" + m_lib_name_ + ".so";
   for (auto& x : mRunning) {
@@ -81,8 +105,8 @@ void SourceManager::Init() {
 
 bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
   if (DynamicLibSuccess()) {
-    // already load
-    return true;
+      // already load
+      return true;
   }
 #ifdef APSARA_UNIT_TEST_MAIN
     return true;
@@ -120,8 +144,8 @@ bool SourceManager::LoadDynamicLib(const std::string& lib_name) {
   mOffsets[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR] = LOAD_UPROBE_OFFSET(mFuncs[(int)ebpf_func::EBPF_SOCKET_TRACE_UPDATE_CONN_ADDR]);
 
   // check function load success
-  for (auto& x : mFuncs) {
-    if (x == nullptr) return false;
+  if (std::any_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x == nullptr; })) {
+      return false;
   }
 
   // update meta
@@ -135,8 +159,8 @@ bool SourceManager::DynamicLibSuccess() {
     return true;
 #endif
   if (!mLib) return false;
-  for (auto x : mFuncs) {
-    if (x == nullptr) return false;
+  if (!std::all_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x != nullptr; })) {
+      return false;
   }
   return true;
 }
@@ -215,31 +239,6 @@ bool SourceManager::UpdatePlugin(nami::PluginType plugin_type, std::unique_ptr<n
   auto update_f = (update_func)f;
   int res = update_f(conf.get());
   return !res;
-}
-
-bool SourceManager::StopAll() {
-  if (!DynamicLibSuccess()) {
-      LOG_WARNING(sLogger, ("dynamic lib not load, just exit", "need check"));
-      return true;
-  }
-
-  for (size_t i = 0; i < mRunning.size(); i ++) {
-    auto& x = mRunning[i];
-    if (!x) {
-        continue;
-    }
-    // stop plugin
-    StopPlugin(static_cast<nami::PluginType>(i));
-  }
-
-#ifdef APSARA_UNIT_TEST_MAIN
-  return true;
-#endif
-
-  // call deinit
-  auto deinit_f = (deinit_func)mFuncs[(int)ebpf_func::EBPF_DEINIT];
-  deinit_f();
-  return true;
 }
 
 bool SourceManager::SuspendPlugin(nami::PluginType plugin_type) {

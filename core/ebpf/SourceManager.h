@@ -53,8 +53,6 @@ public:
 
     bool SuspendPlugin(nami::PluginType plugin_type);
 
-    bool StopAll();
-
     bool CheckPluginRunning(nami::PluginType plugin_type);
         
     SourceManager();

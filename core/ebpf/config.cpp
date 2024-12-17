@@ -379,13 +379,13 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         case SecurityProbeType::FILE: {
             nami::SecurityFileFilter thisFileFilter;
             InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
-            thisFilter.emplace<nami::SecurityFileFilter>(thisFileFilter);
+            thisFilter.emplace<nami::SecurityFileFilter>(std::move(thisFileFilter));
             break;
         }
         case SecurityProbeType::NETWORK: {
             nami::SecurityNetworkFilter thisNetworkFilter;
             InitSecurityNetworkFilter(innerConfig, thisNetworkFilter, mContext, sName);
-            thisFilter.emplace<nami::SecurityNetworkFilter>(thisNetworkFilter);
+            thisFilter.emplace<nami::SecurityNetworkFilter>(std::move(thisNetworkFilter));
             break;
         }
         case SecurityProbeType::PROCESS: {

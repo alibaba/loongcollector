@@ -697,10 +697,10 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         GetProjectConcurrencyLimiter(mProject)->OnSuccess();
         GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();
         SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
-        DealSenderQueueItemAfterSend(item, false);
         if (mSuccessCnt) {
             mSuccessCnt->Add(1);
         }
+        DealSenderQueueItemAfterSend(item, false);
     } else {
         OperationOnFail operation;
         SendResult sendResult = ConvertErrorCode(slsResponse.mErrorCode);
