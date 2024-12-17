@@ -18,6 +18,9 @@
 #include <string>
 
 #include "common/JsonUtil.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "plugin/PluginRegistry.h"
 #include "unittest/Unittest.h"
@@ -47,6 +50,9 @@ private:
         PipelineConfigWatcher::GetInstance()->AddSource(configDir1.string());
         filesystem::create_directories(configDir2);
         PipelineConfigWatcher::GetInstance()->AddSource(configDir2.string());
+#ifdef __ENTERPRISE__
+        builtinPipelineCnt = EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
     }
 
     void ClearConfig() {
@@ -56,6 +62,7 @@ private:
         filesystem::remove_all(configDir2);
     }
 
+    size_t builtinPipelineCnt = 0;
     filesystem::path configDir1 = "./continuous_pipeline_config1";
     filesystem::path configDir2 = "./continuous_pipeline_config2";
 
@@ -182,16 +189,16 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout << otherConfig;
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: added -> added, first < second
@@ -206,16 +213,16 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout << otherConfig;
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: added -> added, first > second -> first < second
@@ -234,7 +241,8 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -247,16 +255,16 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: added -> modified, first < second
@@ -269,7 +277,8 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -282,16 +291,16 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: added -> modified, first > second -> first < second
@@ -310,7 +319,8 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -318,13 +328,13 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         filesystem::remove(configDir2 / "test2.json");
         filesystem::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(1U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, allConfigNames.size());
         APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[0]);
         ClearConfig();
     }
@@ -338,7 +348,8 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << lessPriorityConfig;
@@ -346,13 +357,13 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         filesystem::remove(configDir2 / "test2.json");
         filesystem::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(1U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, allConfigNames.size());
         APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[0]);
         ClearConfig();
     }
@@ -372,22 +383,23 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: added -> unchanged, first < second
@@ -400,22 +412,23 @@ void PipelineConfigWatcherUnittest::TestLoadAddedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << lessPriorityConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: added -> unchanged, first > second -> first < second
@@ -434,7 +447,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -447,16 +461,16 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout << otherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> added, first < second
@@ -466,7 +480,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -479,16 +494,16 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout << otherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> added, first > second -> first < second
@@ -510,7 +525,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -523,16 +539,16 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> modified, first < second
@@ -548,7 +564,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -561,16 +578,16 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> modified, first > second -> first < second
@@ -586,7 +603,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -599,16 +617,16 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> modified, first < second -> first > second
@@ -624,7 +642,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -637,16 +656,16 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> removed, first > second
@@ -662,7 +681,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -671,14 +691,14 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         filesystem::remove(configDir2 / "test2.json");
         filesystem::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(1U, allConfigNames.size());
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[0]);
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt]);
         ClearConfig();
     }
     { // case: modified -> removed, first < second
@@ -694,7 +714,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -703,13 +724,13 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         filesystem::remove(configDir2 / "test2.json");
         filesystem::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(1U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, allConfigNames.size());
         APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[0]);
         ClearConfig();
     }
@@ -732,23 +753,24 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << modifiedGreaterPriorityConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> unchanged, first < second
@@ -764,7 +786,8 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
@@ -772,16 +795,16 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         filesystem::remove(configDir2 / "test2.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> unchanged, first > second -> first < second
@@ -797,23 +820,24 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << lessPriorityConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: modified -> unchanged, first < second -> first > second
@@ -829,23 +853,24 @@ void PipelineConfigWatcherUnittest::TestLoadModifiedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         fout.open(configDir1 / "test3.json", ios::trunc);
         fout << greaterPriorityConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test3", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test3", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
 }
@@ -857,8 +882,13 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout << greaterPriorityConfig;
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+        size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+        builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         filesystem::remove(configDir1 / "test1.json");
         fout.open(configDir2 / "test2.json", ios::trunc);
@@ -868,16 +898,16 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout << otherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: removed -> added, first < second
@@ -887,7 +917,8 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         filesystem::remove(configDir1 / "test1.json");
         fout.open(configDir2 / "test2.json", ios::trunc);
@@ -897,16 +928,16 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout << otherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: removed -> added, first > second -> first < second
@@ -928,7 +959,8 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         this_thread::sleep_for(chrono::milliseconds(1));
 
         filesystem::remove(configDir1 / "test1.json");
@@ -939,16 +971,16 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: removed -> modified, first < second
@@ -964,7 +996,8 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         this_thread::sleep_for(chrono::milliseconds(1));
 
         filesystem::remove(configDir1 / "test1.json");
@@ -975,16 +1008,16 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: removed -> modified, first > second -> first < second
@@ -1006,18 +1039,20 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         filesystem::remove(configDir1 / "test1.json");
         filesystem::remove(configDir2 / "test2.json");
         filesystem::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(0U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(0U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         ClearConfig();
     }
     { // case: removed -> removed, first < second
@@ -1033,18 +1068,20 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         filesystem::remove(configDir1 / "test1.json");
         filesystem::remove(configDir2 / "test2.json");
         filesystem::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(0U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(0U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         ClearConfig();
     }
     { // case: removed -> removed, first > second -> first < second
@@ -1066,20 +1103,21 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         filesystem::remove(configDir1 / "test1.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: removed -> unchanged, first < second
@@ -1095,20 +1133,21 @@ void PipelineConfigWatcherUnittest::TestLoadRemovedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         filesystem::remove(configDir1 / "test1.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: removed -> unchanged, first > second -> first < second
@@ -1126,8 +1165,13 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout << greaterPriorityConfig;
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+        size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+        builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << lessPriorityConfig;
@@ -1136,16 +1180,16 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout << otherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: unchanged -> added, first < second
@@ -1155,7 +1199,8 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -1164,16 +1209,16 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout << otherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: unchanged -> added, first > second -> first < second
@@ -1195,7 +1240,8 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << modifiedLessPriorityConfig;
@@ -1204,16 +1250,16 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: unchanged -> modified, first < second
@@ -1229,7 +1275,8 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << modifiedGreaterPriorityConfig;
@@ -1238,16 +1285,16 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: unchanged -> modified, first > second -> first < second
@@ -1263,7 +1310,8 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << greaterPriorityConfig;
@@ -1272,16 +1320,16 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: unchanged -> modified, first < second -> first > second
@@ -1297,7 +1345,8 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << modifiedLessPriorityConfig;
@@ -1306,16 +1355,16 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout << modifiedOtherConfig;
         fout.close();
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test3", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test3", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: unchanged -> removed, first > second
@@ -1331,19 +1380,20 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         filesystem::remove(configDir2 / "test2.json");
         filesystem::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(1U, allConfigNames.size());
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[0]);
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt]);
         ClearConfig();
     }
     { // case: unchanged -> removed, first < second
@@ -1359,18 +1409,19 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         filesystem::remove(configDir2 / "test2.json");
         filesystem::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(1, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(2, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(2U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(1U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, allConfigNames.size());
         APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[0]);
         ClearConfig();
     }
@@ -1393,19 +1444,20 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test1", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: unchanged -> unchanged, first < second
@@ -1421,19 +1473,20 @@ void PipelineConfigWatcherUnittest::TestLoadUnchangedSingletonConfig() {
         fout.close();
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-        APSARA_TEST_EQUAL_FATAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
+                                PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mAdded.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mModified.size());
-        APSARA_TEST_EQUAL_FATAL(0, diff.first.mRemoved.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
+        APSARA_TEST_EQUAL_FATAL(0U, diff.first.mRemoved.size());
 
         PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
         auto allConfigNames = PipelineManagerMock::GetInstance()->GetAllConfigNames();
-        APSARA_TEST_EQUAL_FATAL(2U, allConfigNames.size());
+        APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt, allConfigNames.size());
         sort(allConfigNames.begin(), allConfigNames.end());
-        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[0]);
-        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[1]);
+        APSARA_TEST_EQUAL_FATAL("test-other", allConfigNames[builtinPipelineCnt]);
+        APSARA_TEST_EQUAL_FATAL("test2", allConfigNames[builtinPipelineCnt + 1]);
         ClearConfig();
     }
     { // case: unchanged -> unchanged, first > second -> first < second
