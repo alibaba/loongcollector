@@ -37,9 +37,9 @@
 
 * [概览](plugins/overview.md)
 * [版本管理](plugins/stability-level.md)
-* 输入
+* 输入插件
   * [什么是输入插件](plugins/input/inputs.md)
-  * 原生插件
+  * 原生输入插件
     * [文本日志](plugins/input/native/input-file.md)
     * [容器标准输出](plugins/input/native/input-container-stdio.md)
     * [eBPF网络可观测数据](plugins/input/native/input-network-observer.md)
@@ -47,7 +47,7 @@
     * [eBPF网络安全数据](plugins/input/native/input-network-security.md)
     * [eBPF文件安全数据](plugins/input/native/input-file-security.md)
     * [eBPF网络调用数据](plugins/input/native/metric-observer.md)
-  * 扩展插件
+  * 扩展输入插件
     * [容器标准输出](plugins/input/extended/service-docker-stdout.md)
     * [脚本执行数据](plugins/input/extended/input-command.md)
     * [Kubernetes元信息采集](plugins/input/extended/service-kubernetesmeta-v2.md)
@@ -68,18 +68,18 @@
     * [【Debug】Mock数据-Metric](plugins/input/extended/metric-mock.md)
     * [【Debug】Mock数据-Service](plugins/input/extended/service-mock.md)
     * [【Debug】文本日志](plugins/input/extended/metric-debug-file.md)
-* 处理
+* 处理插件
   * [什么是处理插件](plugins/processor/processors.md)
-  * SPL 处理
+  * SPL处理插件
     * [SPL 处理](plugins/processor/spl/processor-spl-native.md)
-  * 原生插件
+  * 原生处理插件
     * [正则解析](plugins/processor/native/processor-parse-regex-native.md)
     * [分隔符解析](plugins/processor/native/processor-parse-delimiter-native.md)
     * [Json解析](plugins/processor/native/processor-parse-json-native.md)
     * [时间解析](plugins/processor/native/processor-parse-timestamp-native.md)
     * [过滤](plugins/processor/native/processor-filter-regex-native.md)
     * [脱敏](plugins/processor/native/processor-desensitize-native.md)
-  * 扩展插件
+  * 扩展处理插件
     * [添加字段](plugins/processor/extended/processor-add-fields.md)
     * [添加云资产信息](plugins/processor/extended/processor-cloudmeta.md)
     * [原始数据](plugins/processor/extended/processor-default.md)
@@ -101,30 +101,30 @@
     * [键值对](plugins/processor/extended/processor-split-key-value.md)
     * [多行切分](plugins/processor/extended/processor-split-log-regex.md)
     * [字符串替换](plugins/processor/extended/processor-string-replace.md)
-* 聚合
+* 聚合插件
   * [什么是聚合插件](plugins/aggregator/aggregators.md)
   * [基础聚合](plugins/aggregator/aggregator-base.md)
   * [按上下文分组](plugins/aggregator/aggregator-context.md)
   * [按Key分组](plugins/aggregator/aggregator-content-value-group.md)
   * [按GroupMetadata分组](plugins/aggregator/aggregator-metadata-group.md)
-* 输出
+* 输出插件
   * [什么是输出插件](plugins/flusher/flushers.md)
-  * 原生插件
+  * 原生输出插件
     * [SLS](plugins/flusher/native/flusher-sls.md)
     * [【Debug】Blackhole](plugins/flusher/native/flusher-blackhole.md)
     * [多Flusher路由](plugins/flusher/native/router.md)
-  * 扩展插件
+  * 扩展输出插件
     * [ClickHouse](plugins/flusher/extended/flusher-clickhouse.md)
     * [ElasticSearch](plugins/flusher/extended/flusher-elasticsearch.md)
     * [HTTP](plugins/flusher/extended/flusher-http.md)
-    * [kafkaV2](plugins/flusher/extended/flusher-kafka-v2.md)
+    * [KafkaV2](plugins/flusher/extended/flusher-kafka-v2.md)
     * [Kafka（Deprecated）](plugins/flusher/extended/flusher-kafka.md)
     * [OTLP日志](plugins/flusher/extended/flusher-otlp.md)
     * [Prometheus](plugins/flusher/extended/flusher-prometheus.md)
     * [Pulsar](plugins/flusher/extended/flusher-pulsar.md)
     * [标准输出/文件](plugins/flusher/extended/flusher-stdout.md)
     * [Loki](plugins/flusher/extended/loki.md)
-* 扩展
+* 扩展插件
   * [什么是扩展插件](plugins/extension/extensions.md)
   * [BasicAuth鉴权](plugins/extension/ext-basicauth.md)
   * [协议解码/反序列化](plugins/extension/ext-default-decoder.md)
