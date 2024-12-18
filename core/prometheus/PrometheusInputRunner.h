@@ -22,23 +22,24 @@
 
 #include "common/Lock.h"
 #include "common/timer/Timer.h"
+#include "component/GlobalConfig.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 #include "runner/InputRunner.h"
 #include "sdk/Common.h"
 #include "sdk/CurlImp.h"
 
-namespace logtail {
+namespace logtail::prom {
 
-class PrometheusInputRunner : public InputRunner {
+class PrometheusServer : public InputRunner {
 public:
-    PrometheusInputRunner(const PrometheusInputRunner&) = delete;
-    PrometheusInputRunner(PrometheusInputRunner&&) = delete;
-    PrometheusInputRunner& operator=(const PrometheusInputRunner&) = delete;
-    PrometheusInputRunner& operator=(PrometheusInputRunner&&) = delete;
-    ~PrometheusInputRunner() override = default;
-    static PrometheusInputRunner* GetInstance() {
-        static PrometheusInputRunner sInstance;
+    PrometheusServer(const PrometheusServer&) = delete;
+    PrometheusServer(PrometheusServer&&) = delete;
+    PrometheusServer& operator=(const PrometheusServer&) = delete;
+    PrometheusServer& operator=(PrometheusServer&&) = delete;
+    ~PrometheusServer() override = default;
+    static PrometheusServer* GetInstance() {
+        static PrometheusServer sInstance;
         return &sInstance;
     }
     void CheckGC();
@@ -48,6 +49,7 @@ public:
                            const MetricLabels& defaultLabels,
                            const std::string& projectName);
     void RemoveScrapeInput(const std::string& jobName);
+    std::shared_ptr<GlobalConfig> GetGlobalConfig() const { return mGlobalConfig; }
 
     // target discover and scrape
     void Init() override;
@@ -55,13 +57,14 @@ public:
     bool HasRegisteredPlugins() const override;
 
 private:
-    PrometheusInputRunner();
+    PrometheusServer();
     sdk::HttpMessage SendRegisterMessage(const std::string& url) const;
 
     void CancelAllTargetSubscriber();
     void SubscribeOnce();
 
     std::string GetAllProjects();
+    bool UpdateGlobalConfig();
 
     bool mIsStarted = false;
     std::mutex mStartMutex;
@@ -77,6 +80,8 @@ private:
     std::unique_ptr<sdk::CurlClient> mClient;
     std::shared_ptr<Timer> mTimer;
     EventPool mEventPool;
+    std::shared_ptr<GlobalConfig> mGlobalConfig;
+    std::function<bool()> mCallback;
 
     mutable ReadWriteLock mSubscriberMapRWLock;
     std::map<std::string, std::shared_ptr<TargetSubscriberScheduler>> mTargetSubscriberSchedulerMap;
@@ -98,4 +103,4 @@ private:
 #endif
 };
 
-} // namespace logtail
+} // namespace logtail::prom

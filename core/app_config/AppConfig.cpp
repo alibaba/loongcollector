@@ -1815,6 +1815,12 @@ void AppConfig::RegisterCallback(const std::string& key, std::function<bool()>* 
     mCallbacks[key] = callback;
 }
 
+void AppConfig::UnregisterCallback(const std::string& key) {
+    if (mCallbacks.find(key) == mCallbacks.end())
+        return;
+    mCallbacks.erase(key);
+}
+
 template <typename T>
 T AppConfig::MergeConfig(const T& defaultValue,
                          const T& currentValue,

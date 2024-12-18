@@ -25,6 +25,7 @@
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "prometheus/Constants.h"
+#include "prometheus/PrometheusInputRunner.h"
 
 using namespace std;
 
@@ -42,7 +43,7 @@ bool ProcessorPromRelabelMetricNative::Init(const Json::Value& config) {
         return false;
     }
 
-    mLoongCollectorScraper = STRING_FLAG(_pod_name_);
+    mGlobalConfig = prom::PrometheusServer::GetInstance()->GetGlobalConfig();
 
     return true;
 }

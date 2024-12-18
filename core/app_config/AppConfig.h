@@ -354,6 +354,8 @@ public:
 
     // 注册回调
     void RegisterCallback(const std::string& key, std::function<bool()>* callback);
+    // 注销回调
+    void UnregisterCallback(const std::string& key);
 
     // 合并配置
     std::string Merge(Json::Value& localConf,

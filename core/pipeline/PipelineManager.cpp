@@ -38,7 +38,7 @@ namespace logtail {
 
 PipelineManager::PipelineManager()
     : mInputRunners({
-          PrometheusInputRunner::GetInstance(),
+          prom::PrometheusServer::GetInstance(),
 #if defined(__linux__) && !defined(__ANDROID__)
               ebpf::eBPFServer::GetInstance(),
 #endif

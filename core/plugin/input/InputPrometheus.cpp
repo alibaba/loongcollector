@@ -27,6 +27,7 @@
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
+#include "plugin/processor/inner/ProcessorPromDropMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 #include "prometheus/Constants.h"
@@ -65,12 +66,13 @@ bool InputPrometheus::Init(const Json::Value& config, Json::Value&) {
 /// @brief register scrape job by PrometheusInputRunner
 bool InputPrometheus::Start() {
     LOG_INFO(sLogger, ("input config start", mJobName));
-    PrometheusInputRunner::GetInstance()->Init();
+    prom::PrometheusServer::GetInstance()->Init();
 
     mTargetSubscirber->mQueueKey = mContext->GetProcessQueueKey();
     auto defaultLabels = GetMetricsRecordRef()->GetLabels();
 
-    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(mTargetSubscirber), *defaultLabels, mContext->GetProjectName());
+    prom::PrometheusServer::GetInstance()->UpdateScrapeInput(
+        std::move(mTargetSubscirber), *defaultLabels, mContext->GetProjectName());
     return true;
 }
 
@@ -78,7 +80,7 @@ bool InputPrometheus::Start() {
 bool InputPrometheus::Stop(bool) {
     LOG_INFO(sLogger, ("input config stop", mJobName));
 
-    PrometheusInputRunner::GetInstance()->RemoveScrapeInput(mJobName);
+    prom::PrometheusServer::GetInstance()->RemoveScrapeInput(mJobName);
     return true;
 }
 
@@ -94,6 +96,14 @@ bool InputPrometheus::CreateInnerProcessors(const Json::Value& inputConfig) {
     }
     {
         processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorPromRelabelMetricNative::sName,
+                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
+        if (!processor->Init(inputConfig, *mContext)) {
+            return false;
+        }
+        mInnerProcessors.emplace_back(std::move(processor));
+    }
+    {
+        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorPromDropMetricNative::sName,
                                                                    mContext->GetPipeline().GenNextPluginMeta(false));
         if (!processor->Init(inputConfig, *mContext)) {
             return false;

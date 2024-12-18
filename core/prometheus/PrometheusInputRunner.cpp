@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 
+#include "AppConfig.h"
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
@@ -41,9 +42,9 @@ DECLARE_FLAG_STRING(loong_collector_operator_service);
 DECLARE_FLAG_INT32(loong_collector_operator_service_port);
 DECLARE_FLAG_STRING(_pod_name_);
 
-namespace logtail {
+namespace logtail::prom {
 
-PrometheusInputRunner::PrometheusInputRunner()
+PrometheusServer::PrometheusServer()
     : mServiceHost(STRING_FLAG(loong_collector_operator_service)),
       mServicePort(INT32_FLAG(loong_collector_operator_service_port)),
       mPodName(STRING_FLAG(_pod_name_)),
@@ -51,6 +52,7 @@ PrometheusInputRunner::PrometheusInputRunner()
       mUnRegisterMs(0) {
     mClient = std::make_unique<sdk::CurlClient>();
     mTimer = std::make_shared<Timer>();
+    mGlobalConfig = std::make_shared<GlobalConfig>();
 
     // self monitor
     MetricLabels labels;
@@ -72,9 +74,9 @@ PrometheusInputRunner::PrometheusInputRunner()
 }
 
 /// @brief receive scrape jobs from input plugins and update scrape jobs
-void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber,
-                                              const MetricLabels& defaultLabels,
-                                              const string& projectName) {
+void PrometheusServer::UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber,
+                                         const MetricLabels& defaultLabels,
+                                         const string& projectName) {
     RemoveScrapeInput(targetSubscriber->GetId());
 
     targetSubscriber->mServiceHost = mServiceHost;
@@ -111,7 +113,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     }
 }
 
-void PrometheusInputRunner::RemoveScrapeInput(const std::string& jobName) {
+void PrometheusServer::RemoveScrapeInput(const std::string& jobName) {
     {
         WriteLock lock(mSubscriberMapRWLock);
         if (mTargetSubscriberSchedulerMap.count(jobName)) {
@@ -128,8 +130,13 @@ void PrometheusInputRunner::RemoveScrapeInput(const std::string& jobName) {
     }
 }
 
+bool PrometheusServer::UpdateGlobalConfig() {
+    // @catdogpandas TODO: update global config
+    return true;
+}
+
 /// @brief targets discovery and start scrape work
-void PrometheusInputRunner::Init() {
+void PrometheusServer::Init() {
     std::lock_guard<mutex> lock(mStartMutex);
     if (mIsStarted) {
         return;
@@ -137,9 +144,11 @@ void PrometheusInputRunner::Init() {
     LOG_INFO(sLogger, ("PrometheusInputRunner", "Start"));
     mIsStarted = true;
 
+    mCallback = [this]() -> bool { return UpdateGlobalConfig(); };
 #ifndef APSARA_UNIT_TEST_MAIN
     mTimer->Init();
     AsynCurlRunner::GetInstance()->Init();
+    AppConfig::GetInstance()->RegisterCallback("prometheus", &mCallback);
 #endif
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "register"));
@@ -191,7 +200,7 @@ void PrometheusInputRunner::Init() {
 }
 
 /// @brief stop scrape work and clear all scrape jobs
-void PrometheusInputRunner::Stop() {
+void PrometheusServer::Stop() {
     std::lock_guard<mutex> lock(mStartMutex);
     if (!mIsStarted) {
         return;
@@ -207,6 +216,7 @@ void PrometheusInputRunner::Stop() {
     mTimer->Stop();
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
+    AppConfig::GetInstance()->UnregisterCallback("prometheus");
 #endif
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
@@ -237,12 +247,12 @@ void PrometheusInputRunner::Stop() {
     LOG_INFO(sLogger, ("PrometheusInputRunner", "Stop"));
 }
 
-bool PrometheusInputRunner::HasRegisteredPlugins() const {
+bool PrometheusServer::HasRegisteredPlugins() const {
     ReadLock lock(mSubscriberMapRWLock);
     return !mTargetSubscriberSchedulerMap.empty();
 }
 
-sdk::HttpMessage PrometheusInputRunner::SendRegisterMessage(const string& url) const {
+sdk::HttpMessage PrometheusServer::SendRegisterMessage(const string& url) const {
     map<string, string> httpHeader;
     httpHeader[sdk::X_LOG_REQUEST_ID] = prometheus::PROMETHEUS_PREFIX + mPodName;
     sdk::HttpMessage httpResponse;
@@ -270,21 +280,21 @@ sdk::HttpMessage PrometheusInputRunner::SendRegisterMessage(const string& url) c
 }
 
 
-void PrometheusInputRunner::CancelAllTargetSubscriber() {
+void PrometheusServer::CancelAllTargetSubscriber() {
     ReadLock lock(mSubscriberMapRWLock);
     for (auto& it : mTargetSubscriberSchedulerMap) {
         it.second->Cancel();
     }
 }
 
-void PrometheusInputRunner::SubscribeOnce() {
+void PrometheusServer::SubscribeOnce() {
     ReadLock lock(mSubscriberMapRWLock);
     for (auto& [k, v] : mTargetSubscriberSchedulerMap) {
         v->SubscribeOnce(std::chrono::steady_clock::now());
     }
 }
 
-string PrometheusInputRunner::GetAllProjects() {
+string PrometheusServer::GetAllProjects() {
     string result;
     set<string> existProjects;
     ReadLock lock(mProjectRWLock);
@@ -300,7 +310,7 @@ string PrometheusInputRunner::GetAllProjects() {
     return result;
 }
 
-void PrometheusInputRunner::CheckGC() {
+void PrometheusServer::CheckGC() {
     mEventPool.CheckGC();
 }
-}; // namespace logtail
+}; // namespace logtail::prom
