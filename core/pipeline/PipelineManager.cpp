@@ -40,7 +40,7 @@ PipelineManager::PipelineManager()
     : mInputRunners({
           PrometheusInputRunner::GetInstance(),
 #if defined(__linux__) && !defined(__ANDROID__)
-              ebpf::eBPFServer::GetInstance(),
+          ebpf::eBPFServer::GetInstance(),
 #endif
       }) {
 }
@@ -48,29 +48,20 @@ PipelineManager::PipelineManager()
 static shared_ptr<Pipeline> sEmptyPipeline;
 
 void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
-#ifndef APSARA_UNIT_TEST_MAIN
     // 过渡使用
     static bool isFileServerStarted = false;
-    bool isFileServerInputChanged = false;
-    for (const auto& name : diff.mRemoved) {
-        isFileServerInputChanged = CheckIfFileServerUpdated(mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]);
-    }
-    for (const auto& config : diff.mModified) {
-        isFileServerInputChanged = CheckIfFileServerUpdated(*config.mInputs[0]);
-    }
-    for (const auto& config : diff.mAdded) {
-        isFileServerInputChanged = CheckIfFileServerUpdated(*config.mInputs[0]);
-    }
+    bool isFileServerInputChanged = CheckIfFileServerUpdated(diff);
 
+#ifndef APSARA_UNIT_TEST_MAIN
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Pause();
     }
 #endif
+#endif
     if (isFileServerStarted && isFileServerInputChanged) {
         FileServer::GetInstance()->Pause();
     }
-#endif
 
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
@@ -134,7 +125,6 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
 
-#ifndef APSARA_UNIT_TEST_MAIN
     // 在Flusher改造完成前，先不执行如下步骤，不会造成太大影响
     // Sender::CleanUnusedAk();
 
@@ -147,6 +137,7 @@ void logtail::PipelineManager::UpdatePipelines(PipelineConfigDiff& diff) {
         }
     }
 
+#ifndef APSARA_UNIT_TEST_MAIN
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
     if (AppConfig::GetInstance()->ShennongSocketEnabled()) {
         ShennongManager::GetInstance()->Resume();
@@ -238,9 +229,26 @@ void PipelineManager::DecreasePluginUsageCnt(const unordered_map<string, unorder
     }
 }
 
-bool PipelineManager::CheckIfFileServerUpdated(const Json::Value& config) {
-    string inputType = config["Type"].asString();
-    return inputType == "input_file" || inputType == "input_container_stdio";
+bool PipelineManager::CheckIfFileServerUpdated(PipelineConfigDiff& diff) {
+    for (const auto& name : diff.mRemoved) {
+        string inputType = mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]["Type"].asString();
+        if (inputType == "input_file" || inputType == "input_container_stdio") {
+            return true;
+        }
+    }
+    for (const auto& config : diff.mModified) {
+        string inputType = (*config.mInputs[0])["Type"].asString();
+        if (inputType == "input_file" || inputType == "input_container_stdio") {
+            return true;
+        }
+    }
+    for (const auto& config : diff.mAdded) {
+        string inputType = (*config.mInputs[0])["Type"].asString();
+        if (inputType == "input_file" || inputType == "input_container_stdio") {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace logtail

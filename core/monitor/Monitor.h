@@ -191,8 +191,16 @@ public:
     void SetAgentMemory(uint64_t mem) { mAgentMemory->Set(mem); }
     void SetAgentGoMemory(uint64_t mem) { mAgentGoMemory->Set(mem); }
     void SetAgentGoRoutinesTotal(uint64_t total) { mAgentGoRoutinesTotal->Set(total); }
-    void SetAgentOpenFdTotal(uint64_t total) { mAgentOpenFdTotal->Set(total); }
-    void SetAgentConfigTotal(uint64_t total) { mAgentConfigTotal->Set(total); }
+    void SetAgentOpenFdTotal(uint64_t total) {
+#ifndef APSARA_UNIT_TEST_MAIN
+        mAgentOpenFdTotal->Set(total);
+#endif
+    }
+    void SetAgentConfigTotal(uint64_t total) {
+#ifndef APSARA_UNIT_TEST_MAIN
+        mAgentConfigTotal->Set(total);
+#endif
+    }
 
     static std::string mHostname;
     static std::string mIpAddr;

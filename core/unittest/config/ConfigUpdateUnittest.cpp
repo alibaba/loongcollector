@@ -24,6 +24,7 @@
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
 #include "config/watcher/PipelineConfigWatcher.h"
+#include "file_server/FileServer.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineManager.h"
 #include "pipeline/plugin/PluginRegistry.h"
@@ -57,6 +58,7 @@ protected:
     static void TearDownTestCase() {
         PluginRegistry::GetInstance()->UnloadPlugins();
         TaskRegistry::GetInstance()->UnloadPlugins();
+        FileServer::GetInstance()->Stop();
     }
 
     void SetUp() override {

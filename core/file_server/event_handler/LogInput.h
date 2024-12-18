@@ -103,6 +103,7 @@ private:
     friend class FuxiSceneUnittest;
     friend class ConfigMatchUnittest;
     friend class FuseFileUnittest;
+    friend class PipelineUpdateUnittest;
 
     void CleanEnviroments();
 #endif

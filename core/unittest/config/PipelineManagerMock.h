@@ -31,6 +31,9 @@ public:
         mContext.SetCreateTime(config.mCreateTime);
         return (*mConfig)["valid"].asBool();
     }
+
+    bool Start() { return true; }
+    void Stop(bool isRemoving) {}
 };
 
 class PipelineManagerMock : public PipelineManager {

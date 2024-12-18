@@ -26,6 +26,7 @@
 #endif
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
+#include "file_server/FileServer.h"
 #include "gmock/gmock.h"
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
@@ -71,6 +72,10 @@ public:
         AppConfig::GetInstance()->LoadAppConfig(ilogtailConfigPath);
         return true;
     }
+
+    static void SetUpTestCase() {}
+
+    static void TearDownTestCase() { FileServer::GetInstance()->Stop(); }
 
     // 在每个测试用例开始前的设置
     void SetUp() override {
