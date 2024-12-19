@@ -81,7 +81,7 @@ func NetworkDelay(ctx context.Context, time int, ip string) (context.Context, er
 	switch setup.Env.GetType() {
 	case "host":
 		command := "/opt/chaosblade/blade create network delay --time " + strconv.FormatInt(int64(time), 10) + " --exclude-port 22 --interface eth0 --destination-ip " + ip
-		_, err := setup.Env.ExecOnLogtail(command)
+		_, err := setup.Env.ExecOnLoongCollector(command)
 		if err != nil {
 			return ctx, err
 		}
@@ -115,7 +115,7 @@ func NetworkLoss(ctx context.Context, percentage int, ip string) (context.Contex
 	switch setup.Env.GetType() {
 	case "host":
 		command := "/opt/chaosblade/blade create network loss --percent " + strconv.FormatInt(int64(percentage), 10) + " --exclude-port 22 --interface eth0 --destination-ip " + ip
-		_, err := setup.Env.ExecOnLogtail(command)
+		_, err := setup.Env.ExecOnLoongCollector(command)
 		if err != nil {
 			return ctx, err
 		}

@@ -27,7 +27,7 @@ const (
 
 func AgentNotCrash(ctx context.Context) (context.Context, error) {
 	// verify agent crash
-	result, err := setup.Env.ExecOnLogtail(queryPIDCommand)
+	result, err := setup.Env.ExecOnLoongCollector(queryPIDCommand)
 	if err != nil {
 		if err.Error() == "not implemented" {
 			return ctx, nil

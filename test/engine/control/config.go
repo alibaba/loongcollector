@@ -55,7 +55,7 @@ func AddLocalConfig(ctx context.Context, configName, c string) (context.Context,
 	} else {
 		command := fmt.Sprintf(`cd %s && cat << 'EOF' > %s.yaml
 %s`, config.TestConfig.LocalConfigDir, configName, c)
-		if _, err := setup.Env.ExecOnLogtail(command); err != nil {
+		if _, err := setup.Env.ExecOnLoongCollector(command); err != nil {
 			return ctx, err
 		}
 		time.Sleep(5 * time.Second)
@@ -65,7 +65,7 @@ func AddLocalConfig(ctx context.Context, configName, c string) (context.Context,
 
 func RemoveAllLocalConfig(ctx context.Context) (context.Context, error) {
 	command := fmt.Sprintf("cd %s && rm -rf *.yaml", config.TestConfig.LocalConfigDir)
-	if _, err := setup.Env.ExecOnLogtail(command); err != nil {
+	if _, err := setup.Env.ExecOnLoongCollector(command); err != nil {
 		return ctx, err
 	}
 	return ctx, nil

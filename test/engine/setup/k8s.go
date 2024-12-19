@@ -63,19 +63,19 @@ func (k *K8sEnv) GetType() string {
 	return k.deployType
 }
 
-func (k *K8sEnv) ExecOnLogtail(command string) (string, error) {
+func (k *K8sEnv) ExecOnLoongCollector(command string) (string, error) {
 	if k.k8sClient == nil {
 		return "", fmt.Errorf("k8s client init failed")
 	}
 	var pods *corev1.PodList
 	var err error
 	if k.deployType == "daemonset" {
-		pods, err = k.daemonsetController.GetDaemonSetPods("logtail-ds", "kube-system")
+		pods, err = k.daemonsetController.GetDaemonSetPods("loongcollector-ds", "kube-system")
 		if err != nil {
 			return "", err
 		}
 	} else if k.deployType == "deployment" {
-		pods, err = k.deploymentController.GetRunningDeploymentPods("cluster-agent", "loong-collector")
+		pods, err = k.deploymentController.GetRunningDeploymentPods("loongcollector-cluster", "kube-system")
 		if err != nil {
 			return "", err
 		}

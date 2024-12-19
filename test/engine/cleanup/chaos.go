@@ -33,7 +33,7 @@ func DestoryAllChaos(ctx context.Context) (context.Context, error) {
 	switch setup.Env.GetType() {
 	case "host":
 		command := "/opt/chaosblade/blade status --type create --status Success"
-		response, err := setup.Env.ExecOnLogtail(command)
+		response, err := setup.Env.ExecOnLoongCollector(command)
 		if err != nil {
 			return ctx, err
 		}
@@ -43,7 +43,7 @@ func DestoryAllChaos(ctx context.Context) (context.Context, error) {
 		}
 		for _, result := range status.Result {
 			command = "/opt/chaosblade/blade destroy " + result["Uid"]
-			if _, err := setup.Env.ExecOnLogtail(command); err != nil {
+			if _, err := setup.Env.ExecOnLoongCollector(command); err != nil {
 				fmt.Println("Destroy chaos failed: ", err)
 			}
 		}

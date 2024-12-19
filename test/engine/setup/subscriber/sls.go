@@ -32,6 +32,7 @@ type SLSSubscriber struct {
 	Aliuid        string
 	Region        string
 	Endpoint      string
+	QueryEndpoint string
 	Project       string
 	Logstore      string
 }
@@ -112,7 +113,7 @@ func (s *SLSSubscriber) getLogFromSLS(sql string, from int32) (*sls.GetLogsRespo
 		From:  tea.Int32(from),
 		To:    tea.Int32(now),
 	}
-	resp, err := s.client.GetLogs(tea.String(config.TestConfig.Project), tea.String(config.TestConfig.GetLogstore(s.TelemetryType)), req)
+	resp, err := s.client.GetLogs(tea.String(s.Project), tea.String(s.Logstore), req)
 	if err != nil {
 		return nil, err
 	}
@@ -134,15 +135,7 @@ func createSLSClient(accessKeyID, accessKeySecret, endpoint string) *sls.Client 
 
 func init() {
 	RegisterCreator(slsName, func(spec map[string]interface{}) (Subscriber, error) {
-		telemetryType := "logs"
-		if v, ok := spec["telemetry_type"]; ok {
-			telemetryType = v.(string)
-		}
-		fmt.Println("create sls subscriber with telemetry type", telemetryType)
-		l := &SLSSubscriber{
-			client:        createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, config.GetQueryEndpoint()),
-			TelemetryType: telemetryType,
-		}
+		l := &SLSSubscriber{}
 		if v, ok := spec["aliuid"]; ok {
 			l.Aliuid = v.(string)
 		} else {
@@ -166,8 +159,19 @@ func init() {
 		if v, ok := spec["logstore"]; ok {
 			l.Logstore = v.(string)
 		} else {
-			l.Logstore = config.TestConfig.GetLogstore(telemetryType)
+			l.Logstore = config.TestConfig.Logstore
 		}
+		if v, ok := spec["query_endpoint"]; ok {
+			l.QueryEndpoint = v.(string)
+		} else {
+			l.QueryEndpoint = config.TestConfig.Endpoint
+		}
+		if v, ok := spec["telemetry_type"]; ok {
+			l.TelemetryType = v.(string)
+		} else {
+			l.TelemetryType = "logs"
+		}
+		l.client = createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, l.QueryEndpoint)
 		return l, nil
 	})
 	doc.Register("subscriber", slsName, new(SLSSubscriber))

@@ -38,7 +38,7 @@ func (h *HostEnv) GetType() string {
 	return "host"
 }
 
-func (h *HostEnv) ExecOnLogtail(command string) (string, error) {
+func (h *HostEnv) ExecOnLoongCollector(command string) (string, error) {
 	return h.exec(command)
 }
 
