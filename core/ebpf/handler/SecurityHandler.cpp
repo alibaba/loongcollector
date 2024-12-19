@@ -13,22 +13,22 @@
 // limitations under the License.
 
 #include "ebpf/handler/SecurityHandler.h"
-#include "logger/Logger.h"
-#include "pipeline/PipelineContext.h"
+
+#include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
 #include "ebpf/SourceManager.h"
-#include "models/SpanEvent.h"
-#include "models/PipelineEventGroup.h"
-#include "models/PipelineEvent.h"
 #include "logger/Logger.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "models/PipelineEvent.h"
+#include "models/PipelineEventGroup.h"
+#include "models/SpanEvent.h"
+#include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ProcessQueueItem.h"
-#include "common/MachineInfoUtil.h"
+#include "pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
 
-SecurityHandler::SecurityHandler(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t idx) 
+SecurityHandler::SecurityHandler(const logtail::PipelineContext* ctx, logtail::QueueKey key, uint32_t idx)
     : AbstractHandler(ctx, key, idx) {
     mHostName = GetHostName();
     mHostIp = GetHostIp();
@@ -36,10 +36,11 @@ SecurityHandler::SecurityHandler(const logtail::PipelineContext* ctx, logtail::Q
 
 void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
     if (events.empty()) {
-        return ;
+        return;
     }
 
-    std::shared_ptr<SourceBuffer> source_buffer = std::make_shared<SourceBuffer>();;
+    std::shared_ptr<SourceBuffer> source_buffer = std::make_shared<SourceBuffer>();
+    ;
     PipelineEventGroup event_group(source_buffer);
     // aggregate to pipeline event group
     // set host ips
@@ -56,17 +57,19 @@ void SecurityHandler::handle(std::vector<std::unique_ptr<AbstractSecurityEvent>>
         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(x->GetTimestamp()));
         event->SetTimestamp(seconds.count(), x->GetTimestamp());
     }
-    mProcessTotalCnt+= events.size();
+    mProcessTotalCnt += events.size();
 #ifdef APSARA_UNIT_TEST_MAIN
     return;
 #endif
-    std::unique_ptr<ProcessQueueItem> item = 
-            std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(event_group), mPluginIdx));
-    
+    std::unique_ptr<ProcessQueueItem> item
+        = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(event_group), mPluginIdx));
+
     if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-        LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("Push queue failed!", events.size()));
+        LOG_WARNING(
+            sLogger,
+            ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("Push queue failed!", events.size()));
     }
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

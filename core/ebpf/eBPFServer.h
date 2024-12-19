@@ -14,23 +14,23 @@
 
 #pragma once
 
-#include <variant>
+#include <array>
 #include <atomic>
 #include <map>
-#include <array>
 #include <memory>
 #include <mutex>
+#include <variant>
 
-#include "runner/InputRunner.h"
-#include "pipeline/PipelineContext.h"
+#include "ebpf/Config.h"
+#include "ebpf/SelfMonitor.h"
 #include "ebpf/SourceManager.h"
-#include "ebpf/config.h"
-#include "ebpf/include/export.h"
 #include "ebpf/handler/AbstractHandler.h"
 #include "ebpf/handler/ObserveHandler.h"
 #include "ebpf/handler/SecurityHandler.h"
+#include "ebpf/include/export.h"
 #include "monitor/metric_models/MetricTypes.h"
-#include "ebpf/SelfMonitor.h"
+#include "pipeline/PipelineContext.h"
+#include "runner/InputRunner.h"
 
 namespace logtail {
 namespace ebpf {
@@ -40,6 +40,7 @@ public:
     void InitEnvInfo();
     bool IsSupportedEnv(nami::PluginType type);
     bool AbleToLoadDyLib();
+
 private:
     volatile bool mInited = false;
 
@@ -69,10 +70,12 @@ public:
 
     void UpdatePipelineName(nami::PluginType type, const std::string& name, const std::string& project);
 
-    bool EnablePlugin(const std::string& pipeline_name, uint32_t plugin_index,
-                        nami::PluginType type, 
-                        const logtail::PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, PluginMetricManagerPtr mgr);
+    bool EnablePlugin(const std::string& pipeline_name,
+                      uint32_t plugin_index,
+                      nami::PluginType type,
+                      const logtail::PipelineContext* ctx,
+                      const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                      PluginMetricManagerPtr mgr);
 
     bool DisablePlugin(const std::string& pipeline_name, nami::PluginType type);
 
@@ -85,10 +88,12 @@ public:
     std::string GetAllProjects();
 
 private:
-    bool StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
-                        nami::PluginType type, 
-                        const logtail::PipelineContext* ctx, 
-                        const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, PluginMetricManagerPtr mgr);
+    bool StartPluginInternal(const std::string& pipeline_name,
+                             uint32_t plugin_index,
+                             nami::PluginType type,
+                             const logtail::PipelineContext* ctx,
+                             const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options,
+                             PluginMetricManagerPtr mgr);
     eBPFServer() = default;
     ~eBPFServer() = default;
 

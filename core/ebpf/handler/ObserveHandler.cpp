@@ -12,20 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <thread>
-#include <mutex>
-#include <iostream>
-
 #include "ebpf/handler/ObserveHandler.h"
-#include "pipeline/PipelineContext.h"
+
+#include <iostream>
+#include <mutex>
+#include <thread>
+
 #include "common/RuntimeUtil.h"
 #include "ebpf/SourceManager.h"
-#include "models/SpanEvent.h"
-#include "models/PipelineEventGroup.h"
-#include "models/PipelineEvent.h"
 #include "logger/Logger.h"
-#include "pipeline/queue/ProcessQueueManager.h"
+#include "models/PipelineEvent.h"
+#include "models/PipelineEventGroup.h"
+#include "models/SpanEvent.h"
+#include "pipeline/PipelineContext.h"
 #include "pipeline/queue/ProcessQueueItem.h"
+#include "pipeline/queue/ProcessQueueManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -63,27 +64,27 @@ namespace ebpf {
         event->SetValue(UntypedSingleValue{(double)inner->FIELD_NAME}); \
     }
 
-    void OtelMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures,
-                                  uint64_t timestamp) {
-        if (measures.empty()) {
-            return;
-        }
-        for (const auto& appBatchMeasures : measures) {
-            PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
-            for (const auto& measure : appBatchMeasures->measures_) {
-                auto type = measure->type_;
-                if (type == MeasureType::MEASURE_TYPE_APP) {
-                    auto* inner = static_cast<AppSingleMeasure*>(measure->inner_measure_.get());
-                    auto* event = eventGroup.AddMetricEvent();
-                    for (const auto& tag : measure->tags_) {
-                        event->SetTag(tag.first, tag.second);
-                    }
-                    event->SetName("service_requests_total");
-                    event->SetTimestamp(timestamp);
-                    event->SetValue(UntypedSingleValue{(double)inner->request_total_});
+void OtelMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchMeasure>>& measures,
+                              uint64_t timestamp) {
+    if (measures.empty()) {
+        return;
+    }
+    for (const auto& appBatchMeasures : measures) {
+        PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+        for (const auto& measure : appBatchMeasures->measures_) {
+            auto type = measure->type_;
+            if (type == MeasureType::MEASURE_TYPE_APP) {
+                auto* inner = static_cast<AppSingleMeasure*>(measure->inner_measure_.get());
+                auto* event = eventGroup.AddMetricEvent();
+                for (const auto& tag : measure->tags_) {
+                    event->SetTag(tag.first, tag.second);
                 }
-                mProcessTotalCnt++;
+                event->SetName("service_requests_total");
+                event->SetTimestamp(timestamp);
+                event->SetValue(UntypedSingleValue{(double)inner->request_total_});
             }
+            mProcessTotalCnt++;
+        }
 #ifdef APSARA_UNIT_TEST_MAIN
         continue;
 #endif
@@ -94,7 +95,7 @@ namespace ebpf {
                                                               mPluginIdx)("[Otel Metrics] push queue failed!", ""));
         }
     }
-    }
+}
 
 void OtelSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchSpan>>& spans) {
     if (spans.empty()) {
@@ -159,7 +160,9 @@ void EventHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchEven
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
         if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Event] push queue failed!", ""));
+            LOG_WARNING(
+                sLogger,
+                ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Event] push queue failed!", ""));
         }
     }
 }
@@ -180,10 +183,20 @@ static const std::string status_4xx_key = "2xx";
 static const std::string status_5xx_key = "2xx";
 
 // FOR APP METRICS
-GENERATE_METRICS(GenerateRequestsTotalMetrics, MeasureType::MEASURE_TYPE_APP, AppSingleMeasure, rpc_request_total_count, request_total_)
-GENERATE_METRICS(GenerateRequestsSlowMetrics, MeasureType::MEASURE_TYPE_APP, AppSingleMeasure, rpc_request_slow_count, slow_total_)
-GENERATE_METRICS(GenerateRequestsErrorMetrics, MeasureType::MEASURE_TYPE_APP, AppSingleMeasure, rpc_request_err_count, error_total_)
-GENERATE_METRICS(GenerateRequestsDurationSumMetrics, MeasureType::MEASURE_TYPE_APP, AppSingleMeasure, rpc_request_status_count, duration_ms_sum_)
+GENERATE_METRICS(GenerateRequestsTotalMetrics,
+                 MeasureType::MEASURE_TYPE_APP,
+                 AppSingleMeasure,
+                 rpc_request_total_count,
+                 request_total_)
+GENERATE_METRICS(
+    GenerateRequestsSlowMetrics, MeasureType::MEASURE_TYPE_APP, AppSingleMeasure, rpc_request_slow_count, slow_total_)
+GENERATE_METRICS(
+    GenerateRequestsErrorMetrics, MeasureType::MEASURE_TYPE_APP, AppSingleMeasure, rpc_request_err_count, error_total_)
+GENERATE_METRICS(GenerateRequestsDurationSumMetrics,
+                 MeasureType::MEASURE_TYPE_APP,
+                 AppSingleMeasure,
+                 rpc_request_status_count,
+                 duration_ms_sum_)
 
 void GenerateRequestsStatusMetrics(PipelineEventGroup& group, const std::unique_ptr<Measure>& measure, uint64_t ts) {
     if (measure->type_ != MeasureType::MEASURE_TYPE_APP) {
@@ -205,13 +218,38 @@ const static std::string npm_send_pkt_total = "arms_npm_sent_packets_total";
 const static std::string npm_send_byte_total = "arms_npm_sent_bytes_total";
 
 // FOR NET METRICS
-GENERATE_METRICS(GenerateTcpDropTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_tcp_drop_total, tcp_drop_total_)
-GENERATE_METRICS(GenerateTcpRetransTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_tcp_retrans_total, tcp_retran_total_)
-GENERATE_METRICS(GenerateTcpConnectionTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_tcp_count_total, tcp_connect_total_)
-GENERATE_METRICS(GenerateTcpRecvPktsTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_recv_pkt_total, recv_pkt_total_)
-GENERATE_METRICS(GenerateTcpRecvBytesTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_recv_byte_total, recv_byte_total_)
-GENERATE_METRICS(GenerateTcpSendPktsTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_send_pkt_total, send_pkt_total_)
-GENERATE_METRICS(GenerateTcpSendBytesTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_send_byte_total, send_byte_total_)
+GENERATE_METRICS(
+    GenerateTcpDropTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_tcp_drop_total, tcp_drop_total_)
+GENERATE_METRICS(GenerateTcpRetransTotalMetrics,
+                 MeasureType::MEASURE_TYPE_NET,
+                 NetSingleMeasure,
+                 npm_tcp_retrans_total,
+                 tcp_retran_total_)
+GENERATE_METRICS(GenerateTcpConnectionTotalMetrics,
+                 MeasureType::MEASURE_TYPE_NET,
+                 NetSingleMeasure,
+                 npm_tcp_count_total,
+                 tcp_connect_total_)
+GENERATE_METRICS(GenerateTcpRecvPktsTotalMetrics,
+                 MeasureType::MEASURE_TYPE_NET,
+                 NetSingleMeasure,
+                 npm_recv_pkt_total,
+                 recv_pkt_total_)
+GENERATE_METRICS(GenerateTcpRecvBytesTotalMetrics,
+                 MeasureType::MEASURE_TYPE_NET,
+                 NetSingleMeasure,
+                 npm_recv_byte_total,
+                 recv_byte_total_)
+GENERATE_METRICS(GenerateTcpSendPktsTotalMetrics,
+                 MeasureType::MEASURE_TYPE_NET,
+                 NetSingleMeasure,
+                 npm_send_pkt_total,
+                 send_pkt_total_)
+GENERATE_METRICS(GenerateTcpSendBytesTotalMetrics,
+                 MeasureType::MEASURE_TYPE_NET,
+                 NetSingleMeasure,
+                 npm_send_byte_total,
+                 send_byte_total_)
 
 void ArmsSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchSpan>>& spans) {
     if (spans.empty()) {
@@ -239,7 +277,9 @@ void ArmsSpanHandler::handle(const std::vector<std::unique_ptr<ApplicationBatchS
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
         if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Span] push queue failed!", ""));
+            LOG_WARNING(
+                sLogger,
+                ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Span] push queue failed!", ""));
         }
     }
 }
@@ -250,9 +290,10 @@ void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
         return;
     }
     for (const auto& appBatchMeasures : measures) {
-        std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();;
+        std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
+        ;
         PipelineEventGroup eventGroup(sourceBuffer);
-        
+
         // source_ip
         eventGroup.SetTag(std::string(app_id_key), appBatchMeasures->app_id_);
         eventGroup.SetTag(std::string(ip_key), appBatchMeasures->ip_);
@@ -275,18 +316,20 @@ void ArmsMeterHandler::handle(const std::vector<std::unique_ptr<ApplicationBatch
             }
             mProcessTotalCnt++;
         }
-        
+
 #ifdef APSARA_UNIT_TEST_MAIN
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
         if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Metrics] push queue failed!", ""));
+            LOG_WARNING(
+                sLogger,
+                ("configName", mCtx->GetConfigName())("pluginIdx", mPluginIdx)("[Metrics] push queue failed!", ""));
         }
     }
 }
 
 #endif
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

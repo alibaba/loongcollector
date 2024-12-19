@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "ebpf/Config.h"
+
 #include <string>
 #include <unordered_set>
 
-#include "logger/Logger.h"
-#include "ebpf/config.h"
-#include "common/ParamExtractor.h"
 #include "common/Flags.h"
+#include "common/ParamExtractor.h"
+#include "logger/Logger.h"
 
 DEFINE_FLAG_INT32(ebpf_receive_event_chan_cap, "ebpf receive kernel event queue size", 4096);
 DEFINE_FLAG_BOOL(ebpf_admin_config_debug_mode, "ebpf admin config debug mode", false);
@@ -46,9 +47,9 @@ static const std::unordered_map<SecurityProbeType, std::unordered_set<std::strin
        {SecurityProbeType::NETWORK, {"tcp_connect", "tcp_close", "tcp_sendmsg"}}};
 
 bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
-                               nami::ObserverNetworkOption& thisObserverNetworkOption,
-                               const PipelineContext* mContext,
-                               const std::string& sName) {
+                                    nami::ObserverNetworkOption& thisObserverNetworkOption,
+                                    const PipelineContext* mContext,
+                                    const std::string& sName) {
     std::string errorMsg;
     // EnableEvent (Optional)
     if (!GetOptionalBoolParam(probeConfig, "EnableLog", thisObserverNetworkOption.mEnableLog, errorMsg)) {
@@ -84,7 +85,8 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
     // MeterHandlerType (Optional)
-    if (!GetOptionalStringParam(probeConfig, "MeterHandlerType", thisObserverNetworkOption.mMeterHandlerType, errorMsg)) {
+    if (!GetOptionalStringParam(
+            probeConfig, "MeterHandlerType", thisObserverNetworkOption.mMeterHandlerType, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -158,7 +160,10 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
     return true;
 }
 
-bool ExtractProbeConfig(const Json::Value& config, const PipelineContext* mContext, const std::string& sName, Json::Value& probeConfig) {
+bool ExtractProbeConfig(const Json::Value& config,
+                        const PipelineContext* mContext,
+                        const std::string& sName,
+                        Json::Value& probeConfig) {
     std::string errorMsg;
     if (!IsValidMap(config, "ProbeConfig", errorMsg)) {
         PARAM_ERROR_RETURN(mContext->GetLogger(),
@@ -174,7 +179,7 @@ bool ExtractProbeConfig(const Json::Value& config, const PipelineContext* mConte
     return true;
 }
 
-bool InitObserverNetworkOption(const Json::Value& config, 
+bool InitObserverNetworkOption(const Json::Value& config,
                                nami::ObserverNetworkOption& thisObserverNetworkOption,
                                const PipelineContext* mContext,
                                const std::string& sName) {
@@ -393,13 +398,13 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         }
         default:
             PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                    mContext->GetAlarm(),
-                                    "Unknown security eBPF probe type",
-                                    sName,
-                                    mContext->GetConfigName(),
-                                    mContext->GetProjectName(),
-                                    mContext->GetLogstoreName(),
-                                    mContext->GetRegion());
+                                 mContext->GetAlarm(),
+                                 "Unknown security eBPF probe type",
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
     }
     thisSecurityOption.filter_ = thisFilter;
     GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.call_names_);
@@ -413,20 +418,27 @@ void eBPFAdminConfig::LoadEbpfConfig(const Json::Value& confJson) {
     // receive_event_chan_cap (Optional)
     mReceiveEventChanCap = INT32_FLAG(ebpf_receive_event_chan_cap);
     // admin_config (Optional)
-    mAdminConfig = AdminConfig{BOOL_FLAG(ebpf_admin_config_debug_mode), STRING_FLAG(ebpf_admin_config_log_level), BOOL_FLAG(ebpf_admin_config_push_all_span)};
+    mAdminConfig = AdminConfig{BOOL_FLAG(ebpf_admin_config_debug_mode),
+                               STRING_FLAG(ebpf_admin_config_log_level),
+                               BOOL_FLAG(ebpf_admin_config_push_all_span)};
     // aggregation_config (Optional)
     mAggregationConfig = AggregationConfig{INT32_FLAG(ebpf_aggregation_config_agg_window_second)};
     // converage_config (Optional)
     mConverageConfig = ConverageConfig{STRING_FLAG(ebpf_converage_config_strategy)};
     // sample_config (Optional)
-    mSampleConfig = SampleConfig{STRING_FLAG(ebpf_sample_config_strategy), {DOUBLE_FLAG(ebpf_sample_config_config_rate)}};
+    mSampleConfig
+        = SampleConfig{STRING_FLAG(ebpf_sample_config_strategy), {DOUBLE_FLAG(ebpf_sample_config_config_rate)}};
     // socket_probe_config (Optional)
-    mSocketProbeConfig = SocketProbeConfig{INT32_FLAG(ebpf_socket_probe_config_slow_request_threshold_ms), INT32_FLAG(ebpf_socket_probe_config_max_conn_trackers), INT32_FLAG(ebpf_socket_probe_config_max_band_width_mb_per_sec), INT32_FLAG(ebpf_socket_probe_config_max_raw_record_per_sec)};
+    mSocketProbeConfig = SocketProbeConfig{INT32_FLAG(ebpf_socket_probe_config_slow_request_threshold_ms),
+                                           INT32_FLAG(ebpf_socket_probe_config_max_conn_trackers),
+                                           INT32_FLAG(ebpf_socket_probe_config_max_band_width_mb_per_sec),
+                                           INT32_FLAG(ebpf_socket_probe_config_max_raw_record_per_sec)};
     // profile_probe_config (Optional)
-    mProfileProbeConfig = ProfileProbeConfig{INT32_FLAG(ebpf_profile_probe_config_profile_sample_rate), INT32_FLAG(ebpf_profile_probe_config_profile_upload_duration)};
+    mProfileProbeConfig = ProfileProbeConfig{INT32_FLAG(ebpf_profile_probe_config_profile_sample_rate),
+                                             INT32_FLAG(ebpf_profile_probe_config_profile_upload_duration)};
     // process_probe_config (Optional)
     mProcessProbeConfig = ProcessProbeConfig{BOOL_FLAG(ebpf_process_probe_config_enable_oom_detect)};
 }
 
-} // ebpf
-} // logtail
+} // namespace ebpf
+} // namespace logtail

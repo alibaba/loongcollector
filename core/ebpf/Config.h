@@ -14,13 +14,14 @@
 
 #pragma once
 
-#include <string>
 #include <json/json.h>
+
+#include <string>
 #include <variant>
 #include <vector>
 
-#include "pipeline/PipelineContext.h"
 #include "ebpf/include/export.h"
+#include "pipeline/PipelineContext.h"
 
 
 namespace logtail {
@@ -29,7 +30,7 @@ namespace ebpf {
 /////////////////////  /////////////////////
 
 enum class ObserverType { PROCESS, FILE, NETWORK };
-bool InitObserverNetworkOption(const Json::Value& config, 
+bool InitObserverNetworkOption(const Json::Value& config,
                                nami::ObserverNetworkOption& thisObserverNetworkOption,
                                const PipelineContext* mContext,
                                const std::string& sName);
@@ -129,8 +130,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
-
 };
 
-} // ebpf
-} // logtail
+} // namespace ebpf
+} // namespace logtail

@@ -15,46 +15,47 @@
 #pragma once
 
 #include <dlfcn.h>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <thread>
+
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <cstring>
-#include <atomic>
-#include <array>
+#include <iostream>
+#include <map>
+#include <string>
+#include <thread>
+#include <vector>
 
-#include "ebpf/include/export.h"
-#include "ebpf/include/SysAkApi.h"
 #include "common/DynamicLibHelper.h"
+#include "ebpf/include/SysAkApi.h"
+#include "ebpf/include/export.h"
 
 namespace logtail {
 namespace ebpf {
 
 enum class eBPFPluginType {
-  SOCKETTRACE = 0,
-  PROCESS = 1,
-  MAX = 2,
+    SOCKETTRACE = 0,
+    PROCESS = 1,
+    MAX = 2,
 };
 
 class SourceManager {
 public:
     const std::string m_lib_name_ = "network_observer";
-    
+
     SourceManager(const SourceManager&) = delete;
     SourceManager& operator=(const SourceManager&) = delete;
 
     void Init();
 
     bool StartPlugin(nami::PluginType plugin_type, std::unique_ptr<nami::eBPFConfig> conf);
-    
+
     bool StopPlugin(nami::PluginType plugin_type);
 
     bool SuspendPlugin(nami::PluginType plugin_type);
 
     bool CheckPluginRunning(nami::PluginType plugin_type);
-        
+
     SourceManager();
     ~SourceManager();
 
@@ -93,5 +94,5 @@ private:
 #endif
 };
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

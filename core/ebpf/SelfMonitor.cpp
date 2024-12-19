@@ -13,24 +13,28 @@
 // limitations under the License.
 
 #include "ebpf/SelfMonitor.h"
+
 #include "logger/Logger.h"
 
 namespace logtail {
 namespace ebpf {
 
 void BaseBPFMonitor::HandleStatistic(nami::eBPFStatistics& stats) {
-    if (!stats.updated_) return;
+    if (!stats.updated_)
+        return;
     UpdateMetricInner(stats);
 }
 
 void BaseBPFMonitor::InitMetric() {
-    if (mMetricInited) return;
+    if (mMetricInited)
+        return;
     mMetricInited = true;
     InitMetricInner();
 }
 
 void BaseBPFMonitor::ReleaseMetric() {
-    if (!mMetricInited) return;
+    if (!mMetricInited)
+        return;
     for (auto& item : mRefAndLabels) {
         auto labels = item.second;
         if (mPluginMetricMgr) {
@@ -44,9 +48,8 @@ void BaseBPFMonitor::ReleaseMetric() {
 void BaseBPFMonitor::InitMetricInner() {
     // init base metrics, only plugin relative
     // poll kernel events
-    MetricLabels pollKernelEventsLabels = {
-        {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_POLL_KERNEL}
-    };
+    MetricLabels pollKernelEventsLabels
+        = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_POLL_KERNEL}};
     auto ref = mPluginMetricMgr->GetOrCreateReentrantMetricsRecordRef(pollKernelEventsLabels);
     mRecvKernelEventsTotal = ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
     // loss kernel events
@@ -56,33 +59,31 @@ void BaseBPFMonitor::InitMetricInner() {
     mRefAndLabels.emplace_back(std::make_pair<>(ref, pollKernelEventsLabels));
 
     // push logs/spans/metrics
-    MetricLabels pushLogsLabels = {
-        {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_REPORT_TO_LC},
-        {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}
-    };
+    MetricLabels pushLogsLabels
+        = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_REPORT_TO_LC},
+           {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
     ref = mPluginMetricMgr->GetOrCreateReentrantMetricsRecordRef(pushLogsLabels);
     mPushEventsTotal = ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
     mRefAndLabels.emplace_back(std::make_pair<>(ref, pushLogsLabels));
 
-    MetricLabels pushMetricsLabels = {
-        {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_REPORT_TO_LC},
-        {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_METRIC}
-    };
+    MetricLabels pushMetricsLabels
+        = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_REPORT_TO_LC},
+           {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_METRIC}};
     ref = mPluginMetricMgr->GetOrCreateReentrantMetricsRecordRef(pushMetricsLabels);
     mPushMetricsTotal = ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
     mRefAndLabels.emplace_back(std::make_pair<>(ref, pushMetricsLabels));
 
-    MetricLabels pushSpansLabels = {
-        {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_REPORT_TO_LC},
-        {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_TRACE}
-    };
+    MetricLabels pushSpansLabels
+        = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_REPORT_TO_LC},
+           {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_TRACE}};
     ref = mPluginMetricMgr->GetOrCreateReentrantMetricsRecordRef(pushSpansLabels);
     mPushSpansTotal = ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
     mRefAndLabels.emplace_back(std::make_pair<>(ref, pushSpansLabels));
 }
 
 void BaseBPFMonitor::UpdateMetricInner(nami::eBPFStatistics& currStat) {
-    if (!currStat.updated_) return;
+    if (!currStat.updated_)
+        return;
     mProcessCacheEntitiesNum->Set(currStat.process_cache_entities_num_);
     mRecvKernelEventsTotal->Add(currStat.recv_kernel_events_total_);
     mLossKernelEventsTotal->Add(currStat.loss_kernel_events_total_);
@@ -94,12 +95,13 @@ void BaseBPFMonitor::UpdateMetricInner(nami::eBPFStatistics& currStat) {
 
 /////////////////////////// NetworkObserverSelfMonitor ///////////////////////////
 void NetworkObserverSelfMonitor::InitMetric() {
-    if (mMetricInited) return;
+    if (mMetricInited)
+        return;
     mMetricInited = true;
 
     InitMetricInner();
 
-    // use default labels ... 
+    // use default labels ...
     MetricLabels recvEventLabels = {
         {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
     };
@@ -109,24 +111,21 @@ void NetworkObserverSelfMonitor::InitMetric() {
     mAggMapEntitiesNum = ref->GetIntGauge(METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_AGGREGATE_KEY_NUM);
     mRefAndLabels.emplace_back(std::make_pair<>(ref, recvEventLabels));
 
-    // event type relative labels ... 
-    MetricLabels eventTypeLabels = {
-        {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
-        {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_CONN_STATS}
-    };
+    // event type relative labels ...
+    MetricLabels eventTypeLabels
+        = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
+           {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_CONN_STATS}};
     ref = mPluginMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
     mRecvConnStatsTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_WORKER_HANDLE_EVENTS_TOTAL);
     mRefAndLabels.emplace_back(std::make_pair<>(ref, eventTypeLabels));
 
-    eventTypeLabels = {
-        {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
-        {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_CTRL_EVENT}
-    };
+    eventTypeLabels = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
+                       {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_CTRL_EVENT}};
     ref = mPluginMetricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
     mRecvCtrlEventsTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_WORKER_HANDLE_EVENTS_TOTAL);
     mRefAndLabels.emplace_back(std::make_pair<>(ref, eventTypeLabels));
 
-    // 
+    //
     MetricLabels eventTypeAndProtocolLbales = {
         {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
         {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_DATA_EVENT},
@@ -137,29 +136,28 @@ void NetworkObserverSelfMonitor::InitMetric() {
     mRefAndLabels.emplace_back(std::make_pair<>(ref, eventTypeAndProtocolLbales));
 
     // protocol relative labels ...
-    MetricLabels httpSuccessLabels = {
-        {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
-        {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_DATA_EVENT},
-        {METRIC_LABEL_KEY_PARSER_PROTOCOL, METRIC_LABEL_VALUE_PARSER_PROTOCOL_HTTP},
-        {METRIC_LABEL_KEY_PARSE_STATUS, METRIC_LABEL_VALUE_PARSE_STATUS_SUCCESS}
-    };
+    MetricLabels httpSuccessLabels
+        = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
+           {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_DATA_EVENT},
+           {METRIC_LABEL_KEY_PARSER_PROTOCOL, METRIC_LABEL_VALUE_PARSER_PROTOCOL_HTTP},
+           {METRIC_LABEL_KEY_PARSE_STATUS, METRIC_LABEL_VALUE_PARSE_STATUS_SUCCESS}};
     ref = mPluginMetricMgr->GetOrCreateReentrantMetricsRecordRef(httpSuccessLabels);
     mParseHTTPEventsSuccessTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL);
     mRefAndLabels.emplace_back(std::make_pair<>(ref, httpSuccessLabels));
 
-    MetricLabels httpFailLabels = {
-        {METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
-        {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_DATA_EVENT},
-        {METRIC_LABEL_KEY_PARSER_PROTOCOL, METRIC_LABEL_VALUE_PARSER_PROTOCOL_HTTP},
-        {METRIC_LABEL_KEY_PARSE_STATUS, METRIC_LABEL_VALUE_PARSE_STATUS_FAILED}
-    };
+    MetricLabels httpFailLabels
+        = {{METRIC_LABEL_KEY_RECV_EVENT_STAGE, METRIC_LABEL_VALUE_RECV_EVENT_STAGE_AFTER_PERF_WORKER},
+           {METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_DATA_EVENT},
+           {METRIC_LABEL_KEY_PARSER_PROTOCOL, METRIC_LABEL_VALUE_PARSER_PROTOCOL_HTTP},
+           {METRIC_LABEL_KEY_PARSE_STATUS, METRIC_LABEL_VALUE_PARSE_STATUS_FAILED}};
     ref = mPluginMetricMgr->GetOrCreateReentrantMetricsRecordRef(httpFailLabels);
     mParseHTTPEventsFailTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL);
     mRefAndLabels.emplace_back(std::make_pair<>(ref, httpFailLabels));
 }
 
 void NetworkObserverSelfMonitor::HandleStatistic(nami::eBPFStatistics& stats) {
-    if (!stats.updated_) return;
+    if (!stats.updated_)
+        return;
     UpdateMetricInner(stats);
     // recv kernel events metric
     assert(stats.plugin_type_ == nami::PluginType::NETWORK_OBSERVE);
@@ -177,47 +175,53 @@ void NetworkObserverSelfMonitor::HandleStatistic(nami::eBPFStatistics& stats) {
     mAggMapEntitiesNum->Set(currNetworkStatsPtr->agg_map_entities_num_);
 }
 
-eBPFSelfMonitorMgr::eBPFSelfMonitorMgr() : mSelfMonitors({}), mInited({}) {}
+eBPFSelfMonitorMgr::eBPFSelfMonitorMgr() = default;
 
-void eBPFSelfMonitorMgr::Init(const nami::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const std::string& logstore) {
-    if (mInited[int(type)]) return;
+void eBPFSelfMonitorMgr::Init(const nami::PluginType type,
+                              PluginMetricManagerPtr mgr,
+                              const std::string& name,
+                              const std::string& logstore) {
+    if (mInited[int(type)])
+        return;
 
     WriteLock lk(mLock);
 
     // double check
-    if (mInited[int(type)]) return;
+    if (mInited[int(type)])
+        return;
 
-    switch (type)
-    {
-    case nami::PluginType::NETWORK_OBSERVE: {
-        mSelfMonitors[int(type)] = std::make_unique<NetworkObserverSelfMonitor>(name, mgr);
-        break;
-    }
-    case nami::PluginType::NETWORK_SECURITY: {
-        mSelfMonitors[int(type)] = std::make_unique<NetworkSecuritySelfMonitor>(name, mgr);
-        break;
-    }
-    case nami::PluginType::FILE_SECURITY: {
-        mSelfMonitors[int(type)] = std::make_unique<FileSecuritySelfMonitor>(name, mgr);
-        break;
-    }
-    case nami::PluginType::PROCESS_SECURITY: {
-        mSelfMonitors[int(type)] = std::make_unique<ProcessSecuritySelfMonitor>(name, mgr);
-        break;
-    }
-    default:
-        break;
+    switch (type) {
+        case nami::PluginType::NETWORK_OBSERVE: {
+            mSelfMonitors[int(type)] = std::make_unique<NetworkObserverSelfMonitor>(name, mgr);
+            break;
+        }
+        case nami::PluginType::NETWORK_SECURITY: {
+            mSelfMonitors[int(type)] = std::make_unique<NetworkSecuritySelfMonitor>(name, mgr);
+            break;
+        }
+        case nami::PluginType::FILE_SECURITY: {
+            mSelfMonitors[int(type)] = std::make_unique<FileSecuritySelfMonitor>(name, mgr);
+            break;
+        }
+        case nami::PluginType::PROCESS_SECURITY: {
+            mSelfMonitors[int(type)] = std::make_unique<ProcessSecuritySelfMonitor>(name, mgr);
+            break;
+        }
+        default:
+            break;
     }
     mSelfMonitors[int(type)]->InitMetric();
     mInited[int(type)] = true;
 }
 
 void eBPFSelfMonitorMgr::Release(const nami::PluginType type) {
-    if (!mInited[int(type)]) return;
+    if (!mInited[int(type)])
+        return;
 
     WriteLock lk(mLock);
     // double check
-    if (!mInited[int(type)]) return;
+    if (!mInited[int(type)])
+        return;
     if (mSelfMonitors[int(type)]) {
         mSelfMonitors[int(type)]->ReleaseMetric();
         mSelfMonitors[int(type)].reset();
@@ -247,5 +251,5 @@ void eBPFSelfMonitorMgr::HandleStatistic(std::vector<nami::eBPFStatistics>& stat
     }
 }
 
-}
-}
+} // namespace ebpf
+} // namespace logtail

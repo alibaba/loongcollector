@@ -1,24 +1,24 @@
 #include <json/json.h>
+
+#include <algorithm>
 #include <iostream>
 #include <random>
-#include <algorithm>
 
+#include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
-#include "unittest/Unittest.h"
+#include "common/JsonUtil.h"
+#include "ebpf/Config.h"
+#include "ebpf/SourceManager.h"
+#include "ebpf/eBPFServer.h"
 #include "ebpf/include/export.h"
+#include "logger/Logger.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineContext.h"
-#include "ebpf/eBPFServer.h"
-#include "ebpf/SourceManager.h"
-#include "logger/Logger.h"
-#include "ebpf/config.h"
-#include "app_config/AppConfig.h"
-#include "common/JsonUtil.h"
-#include "ebpf/config.h"
-#include "plugin/input/InputNetworkObserver.h"
-#include "plugin/input/InputProcessSecurity.h"
-#include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputNetworkObserver.h"
+#include "plugin/input/InputNetworkSecurity.h"
+#include "plugin/input/InputProcessSecurity.h"
+#include "unittest/Unittest.h"
 
 DECLARE_FLAG_BOOL(logtail_mode);
 
@@ -26,9 +26,7 @@ namespace logtail {
 namespace ebpf {
 class eBPFServerUnittest : public testing::Test {
 public:
-    eBPFServerUnittest() {
-        ebpf::eBPFServer::GetInstance()->Init();
-    }
+    eBPFServerUnittest() { ebpf::eBPFServer::GetInstance()->Init(); }
     void TestInit();
 
     void TestEnableNetworkPlugin();
@@ -74,6 +72,7 @@ protected:
         config_->mProcessProbeConfig.mEnableOOMDetect = false;
     }
     void TearDown() override { delete config_; }
+
 private:
     template <typename T>
     void setJSON(Json::Value& v, const std::string& key, const T& value) {
@@ -92,7 +91,7 @@ private:
             OverwriteFile(STRING_FLAG(ilogtail_config), v.toStyledString());
         } else {
             CreateAgentDir();
-            std::string conf  = GetAgentConfDir() + "/instance_config/local/loongcollector_config.json";
+            std::string conf = GetAgentConfDir() + "/instance_config/local/loongcollector_config.json";
             AppConfig::GetInstance()->LoadAppConfig(conf);
             OverwriteFile(conf, v.toStyledString());
         }
@@ -104,10 +103,10 @@ private:
 };
 
 static int generateRandomInt(int bound) {
-  std::random_device rd;
-  std::mt19937 generator(rd());
-  std::uniform_int_distribution<> dist(0, bound);
-  return dist(generator);
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_int_distribution<> dist(0, bound);
+    return dist(generator);
 }
 
 
@@ -276,28 +275,31 @@ void eBPFServerUnittest::TestEbpfParameters() {
 }
 
 void eBPFServerUnittest::GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc cb) {
-    const std::vector<std::string> app_ids = {"60d360af9bb426c8a9c5aad4b0b21c06", // apm-http-server
-                                            "16466f6d0782d6ae16d7ac1ccb673ca7" // apm-http-client
+    const std::vector<std::string> app_ids = {
+        "60d360af9bb426c8a9c5aad4b0b21c06", // apm-http-server
+        "16466f6d0782d6ae16d7ac1ccb673ca7" // apm-http-client
     };
     const std::vector<std::string> ips = {"172.16.0.207", "172.16.0.210", "172.16.0.209"};
-    const std::vector<std::string> server_app_ids = {"60d360af9bb426c8a9c5aad4b0b21c06", // apm-http-server
+    const std::vector<std::string> server_app_ids = {
+        "60d360af9bb426c8a9c5aad4b0b21c06", // apm-http-server
     };
-    const std::vector<std::string> client_app_ids = {"16466f6d0782d6ae16d7ac1ccb673ca7" // apm-http-client
+    const std::vector<std::string> client_app_ids = {
+        "16466f6d0782d6ae16d7ac1ccb673ca7" // apm-http-client
     };
     const std::vector<std::string> client_ips = {"172.16.0.207", "172.16.0.210"};
     const std::vector<std::string> server_ips = {"172.16.0.209"};
-        std::vector<std::unique_ptr<ApplicationBatchMeasure>> batch_app_measures;
+    std::vector<std::unique_ptr<ApplicationBatchMeasure>> batch_app_measures;
     auto now = std::chrono::system_clock::now();
     auto duration = now.time_since_epoch();
     auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
     // client side
-    for (size_t i = 0 ; i < client_app_ids.size(); i ++ ) { // 1
-        for (size_t j = 0; j < client_ips.size(); j ++) { // 2 * 6 = 12
+    for (size_t i = 0; i < client_app_ids.size(); i++) { // 1
+        for (size_t j = 0; j < client_ips.size(); j++) { // 2 * 6 = 12
             std::unique_ptr<ApplicationBatchMeasure> app_measure_ptr = std::make_unique<ApplicationBatchMeasure>();
             app_measure_ptr->app_id_ = client_app_ids[i];
             app_measure_ptr->ip_ = client_ips[j];
             // generate app metrics
-            for (size_t z = 0 ; z < 5; z ++ ) { // 5
+            for (size_t z = 0; z < 5; z++) { // 5
                 std::unique_ptr<Measure> measure_ptr = std::make_unique<Measure>();
                 measure_ptr->type_ = MEASURE_TYPE_APP;
                 measure_ptr->tags_ = {
@@ -309,11 +311,11 @@ void eBPFServerUnittest::GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc c
                     {"rpc", "/shoes/" + std::to_string(z)},
                     {"rpcType", "25"},
                     {"callType", "http_client"},
-        //              {"statusCode", "200"},
+                    //              {"statusCode", "200"},
                     {"version", "HTTP1.1"},
                     {"source", "ebpf"},
-                    {"endpoint","/shoes/" + std::to_string(z)},
-                    {"destId","apm-http-server"},
+                    {"endpoint", "/shoes/" + std::to_string(z)},
+                    {"destId", "apm-http-server"},
                 };
                 AppSingleMeasure* sm = new AppSingleMeasure;
                 sm->request_total_ = 40 + generateRandomInt(20);
@@ -362,45 +364,45 @@ void eBPFServerUnittest::GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc c
         }
     }
     // server side
-    for (size_t i = 0 ; i < server_app_ids.size(); i ++ ) { // 1
-        for (size_t j = 0; j < server_ips.size(); j ++) { // 1 * 7
+    for (size_t i = 0; i < server_app_ids.size(); i++) { // 1
+        for (size_t j = 0; j < server_ips.size(); j++) { // 1 * 7
             std::unique_ptr<ApplicationBatchMeasure> app_measure_ptr = std::make_unique<ApplicationBatchMeasure>();
             app_measure_ptr->app_id_ = server_app_ids[i];
             app_measure_ptr->ip_ = server_ips[j];
             // generate app metrics
-            for (size_t z = 0 ; z < 5; z ++ ) { // 5
-            std::unique_ptr<Measure> measure_ptr = std::make_unique<Measure>();
-            measure_ptr->type_ = MEASURE_TYPE_APP;
-            measure_ptr->tags_ = {
-                {"workloadName", "apm-http-server"},
-                {"workloadKind", "deployment"},
-                {"namespace", "default"},
-                {"source_ip", server_ips[j]},
-                {"host", server_ips[j]},
-                {"rpc", "/shoes/" + std::to_string(z)},
-                {"rpcType", "0"},
-                {"callType", "http"},
-                {"destId","/shoes/" + std::to_string(z)},
-                {"endpoint","apm-http-client"},
-    //              {"statusCode", "200"},
-                {"version", "HTTP1.1"},
-                {"source", "ebpf"},
-            };
-            AppSingleMeasure* sm = new AppSingleMeasure;
-            sm->request_total_ = 70 + generateRandomInt(20);
-            sm->error_total_ = 8;
-            sm->slow_total_ = 2;
-            sm->duration_ms_sum_ = 25000 + generateRandomInt(2000);
-            sm->status_2xx_count_ = sm->request_total_ - sm->error_total_;
-            sm->status_3xx_count_ = 0;
-            sm->status_4xx_count_ = 0;
-            sm->status_5xx_count_ = 8;
-            std::unique_ptr<AbstractSingleMeasure> sm_ptr(sm);
-            measure_ptr->inner_measure_ = std::move(sm_ptr);
-            app_measure_ptr->measures_.emplace_back(std::move(measure_ptr));
+            for (size_t z = 0; z < 5; z++) { // 5
+                std::unique_ptr<Measure> measure_ptr = std::make_unique<Measure>();
+                measure_ptr->type_ = MEASURE_TYPE_APP;
+                measure_ptr->tags_ = {
+                    {"workloadName", "apm-http-server"},
+                    {"workloadKind", "deployment"},
+                    {"namespace", "default"},
+                    {"source_ip", server_ips[j]},
+                    {"host", server_ips[j]},
+                    {"rpc", "/shoes/" + std::to_string(z)},
+                    {"rpcType", "0"},
+                    {"callType", "http"},
+                    {"destId", "/shoes/" + std::to_string(z)},
+                    {"endpoint", "apm-http-client"},
+                    //              {"statusCode", "200"},
+                    {"version", "HTTP1.1"},
+                    {"source", "ebpf"},
+                };
+                AppSingleMeasure* sm = new AppSingleMeasure;
+                sm->request_total_ = 70 + generateRandomInt(20);
+                sm->error_total_ = 8;
+                sm->slow_total_ = 2;
+                sm->duration_ms_sum_ = 25000 + generateRandomInt(2000);
+                sm->status_2xx_count_ = sm->request_total_ - sm->error_total_;
+                sm->status_3xx_count_ = 0;
+                sm->status_4xx_count_ = 0;
+                sm->status_5xx_count_ = 8;
+                std::unique_ptr<AbstractSingleMeasure> sm_ptr(sm);
+                measure_ptr->inner_measure_ = std::move(sm_ptr);
+                app_measure_ptr->measures_.emplace_back(std::move(measure_ptr));
             }
             // generate tcp metrics
-            for (size_t z = 0; z < client_ips.size(); z ++ ) { // 2
+            for (size_t z = 0; z < client_ips.size(); z++) { // 2
                 std::unique_ptr<Measure> measure_ptr = std::make_unique<Measure>();
                 measure_ptr->type_ = MEASURE_TYPE_NET;
                 measure_ptr->tags_ = {
@@ -439,20 +441,23 @@ void eBPFServerUnittest::GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc c
 
 void eBPFServerUnittest::GenerateBatchAppEvent(nami::NamiHandleBatchEventFunc cb) {
     std::vector<std::unique_ptr<ApplicationBatchEvent>> batch_app_events;
-    std::vector<std::string> apps = {"a6rx69e8me@582846f37273cf8", "a6rx69e8me@582846f37273cf9", "a6rx69e8me@582846f37273c10"};
-    
-    for (int i = 0 ; i < apps.size(); i ++) { // 3 apps
+    std::vector<std::string> apps
+        = {"a6rx69e8me@582846f37273cf8", "a6rx69e8me@582846f37273cf9", "a6rx69e8me@582846f37273c10"};
+
+    for (int i = 0; i < apps.size(); i++) { // 3 apps
         std::vector<std::pair<std::string, std::string>> appTags = {{"hh", "hh"}, {"e", "e"}, {"f", std::to_string(i)}};
-        std::unique_ptr<ApplicationBatchEvent> appEvent = std::make_unique<ApplicationBatchEvent>(apps[i], std::move(appTags));
-        for (int j = 0; j < 1000; j ++) {
-            std::vector<std::pair<std::string, std::string>> tags = {{"1", "1"}, {"2", "2"}, {"3",std::to_string(j)}};
+        std::unique_ptr<ApplicationBatchEvent> appEvent
+            = std::make_unique<ApplicationBatchEvent>(apps[i], std::move(appTags));
+        for (int j = 0; j < 1000; j++) {
+            std::vector<std::pair<std::string, std::string>> tags = {{"1", "1"}, {"2", "2"}, {"3", std::to_string(j)}};
             std::unique_ptr<SingleEvent> se = std::make_unique<SingleEvent>(std::move(tags), 0);
             appEvent->AppendEvent(std::move(se));
         }
         batch_app_events.emplace_back(std::move(appEvent));
     }
 
-    if (cb) cb(batch_app_events);
+    if (cb)
+        cb(batch_app_events);
 
     return;
 }
@@ -469,7 +474,7 @@ void eBPFServerUnittest::HandleStats(nami::NamiStatisticsHandler cb, int plus) {
     ebpfStat.push_spans_total_ = 12 + plus;
     ebpfStat.process_cache_entities_num_ = 400 + plus;
     ebpfStat.miss_process_cache_total_ = 20 + plus;
-    
+
     nami::eBPFStatistics networkSecurityStat = ebpfStat;
     networkSecurityStat.plugin_type_ = nami::PluginType::NETWORK_SECURITY;
     nami::eBPFStatistics processSecurityStat = ebpfStat;
@@ -501,14 +506,15 @@ void eBPFServerUnittest::HandleStats(nami::NamiStatisticsHandler cb, int plus) {
     stats.emplace_back(std::move(networkSecurityStat));
     stats.emplace_back(std::move(processSecurityStat));
     stats.emplace_back(std::move(fileSecurityStat));
-    if (cb) cb(stats);
+    if (cb)
+        cb(stats);
 }
 
 void eBPFServerUnittest::GenerateBatchSpan(nami::NamiHandleBatchSpanFunc cb) {
     std::vector<std::unique_ptr<ApplicationBatchSpan>> batch_app_spans;
     // agg for app level
     std::unique_ptr<ApplicationBatchSpan> batch_spans = std::make_unique<ApplicationBatchSpan>();
-    for (int i = 0 ; i < 5; i ++) { // 5
+    for (int i = 0; i < 5; i++) { // 5
         auto now = std::chrono::system_clock::now();
         auto duration = now.time_since_epoch();
         auto nano = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
@@ -544,7 +550,7 @@ void eBPFServerUnittest::GenerateBatchSpan(nami::NamiHandleBatchSpanFunc cb) {
 
 void eBPFServerUnittest::GenerateBatchEvent(nami::NamiHandleBatchDataEventFn cb, SecureEventType type) {
     std::vector<std::unique_ptr<AbstractSecurityEvent>> events;
-    for (int i = 0 ; i< 1000; i ++ ) {
+    for (int i = 0; i < 1000; i++) {
         std::vector<std::pair<std::string, std::string>> tags;
         tags.push_back({"hh", "hh"});
         tags.push_back({"ee", "hh"});
@@ -552,18 +558,16 @@ void eBPFServerUnittest::GenerateBatchEvent(nami::NamiHandleBatchDataEventFn cb,
         tags.push_back({"tt", "hh"});
         tags.push_back({"aa", "hh"});
 
-        auto event = std::make_unique<AbstractSecurityEvent> (std::move(tags), type, 1000);
+        auto event = std::make_unique<AbstractSecurityEvent>(std::move(tags), type, 1000);
         events.emplace_back(std::move(event));
     }
     cb(events);
 }
 
 void eBPFServerUnittest::InitSecurityOpts() {
-    
 }
 
 void eBPFServerUnittest::InitObserverOpts() {
-
 }
 
 void eBPFServerUnittest::TestInit() {
@@ -596,21 +600,18 @@ void eBPFServerUnittest::TestEnableNetworkPlugin() {
     std::string errorMsg;
     Json::Value configJson, optionalGoPipeline;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    
+
     nami::ObserverNetworkOption network_option;
     bool res = ebpf::InitObserverNetworkOption(configJson, network_option, &ctx, "test");
     EXPECT_TRUE(res);
     // observer_options.Init(ObserverType::NETWORK, configJson, &ctx, "test");
     std::shared_ptr<InputNetworkObserver> input(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");    
+    input->SetMetricsRecordRef("test", "1");
     auto initStatus = input->Init(configJson, optionalGoPipeline);
     EXPECT_TRUE(initStatus);
     res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "test", 1,
-        nami::PluginType::NETWORK_OBSERVE,
-        &ctx,
-        &network_option, input->mPluginMgr);
+        "test", 1, nami::PluginType::NETWORK_OBSERVE, &ctx, &network_option, input->mPluginMgr);
 
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mMonitorMgr->mInited[int(nami::PluginType::NETWORK_OBSERVE)], true);
     auto& mgr = ebpf::eBPFServer::GetInstance()->mMonitorMgr->mSelfMonitors[int(nami::PluginType::NETWORK_OBSERVE)];
@@ -650,10 +651,7 @@ void eBPFServerUnittest::TestEnableNetworkPlugin() {
     // do update
     input->SetMetricsRecordRef("test", "2");
     res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "test", 8,
-        nami::PluginType::NETWORK_OBSERVE,
-        &ctx,
-        &network_option, input->mPluginMgr);
+        "test", 8, nami::PluginType::NETWORK_OBSERVE, &ctx, &network_option, input->mPluginMgr);
     EXPECT_TRUE(res);
     conf = ebpf::eBPFServer::GetInstance()->mSourceManager->mConfig.get();
     EXPECT_EQ(conf->plugin_type_, nami::PluginType::NETWORK_OBSERVE);
@@ -676,7 +674,7 @@ void eBPFServerUnittest::TestEnableNetworkPlugin() {
 
     // do stop
     ebpf::eBPFServer::GetInstance()->DisablePlugin("test", nami::PluginType::NETWORK_OBSERVE);
-    EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mSpanCB->mQueueKey,-1);
+    EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mSpanCB->mQueueKey, -1);
     EXPECT_TRUE(!ebpf::eBPFServer::GetInstance()->mSourceManager->mRunning[int(nami::PluginType::NETWORK_OBSERVE)]);
 }
 
@@ -697,10 +695,7 @@ void eBPFServerUnittest::TestEnableProcessPlugin() {
     input->SetMetricsRecordRef("test", "1");
     input->Init(configJson, optionalGoPipeline);
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "test", 0,
-        nami::PluginType::PROCESS_SECURITY,
-        &ctx,
-        &security_options, input->mPluginMgr);
+        "test", 0, nami::PluginType::PROCESS_SECURITY, &ctx, &security_options, input->mPluginMgr);
     EXPECT_TRUE(res);
     auto conf = ebpf::eBPFServer::GetInstance()->mSourceManager->mConfig.get();
     EXPECT_EQ(conf->plugin_type_, nami::PluginType::PROCESS_SECURITY);
@@ -719,10 +714,7 @@ void eBPFServerUnittest::TestEnableProcessPlugin() {
 
     input->SetMetricsRecordRef("test", "2");
     res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "test", 0,
-        nami::PluginType::PROCESS_SECURITY,
-        &ctx,
-        &security_options, input->mPluginMgr);
+        "test", 0, nami::PluginType::PROCESS_SECURITY, &ctx, &security_options, input->mPluginMgr);
     EXPECT_TRUE(res);
     EXPECT_TRUE(ebpf::eBPFServer::GetInstance()->mStartPluginTotal->GetValue() > 0);
     conf = ebpf::eBPFServer::GetInstance()->mSourceManager->mConfig.get();
@@ -753,18 +745,16 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
     std::shared_ptr<InputNetworkSecurity> input(new InputNetworkSecurity());
     input->SetContext(ctx);
     input->SetMetricsRecordRef("test", "1");
-    
+
     std::string errorMsg;
-    Json::Value configJson, optionalGoPipeline;;
+    Json::Value configJson, optionalGoPipeline;
+    ;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     SecurityOptions security_options;
     security_options.Init(SecurityProbeType::NETWORK, configJson, &ctx, "input_network_security");
     input->Init(configJson, optionalGoPipeline);
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_network_security", 5,
-        nami::PluginType::NETWORK_SECURITY,
-        &ctx,
-        &security_options, input->mPluginMgr);
+        "input_network_security", 5, nami::PluginType::NETWORK_SECURITY, &ctx, &security_options, input->mPluginMgr);
     EXPECT_TRUE(res);
     auto conf = ebpf::eBPFServer::GetInstance()->mSourceManager->mConfig.get();
     EXPECT_EQ(conf->plugin_type_, nami::PluginType::NETWORK_SECURITY);
@@ -788,10 +778,7 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
     input->SetContext(ctx);
     input->SetMetricsRecordRef("test", "2");
     res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_network_security", 0,
-        nami::PluginType::NETWORK_SECURITY,
-        &ctx,
-        &security_options, input->mPluginMgr);
+        "input_network_security", 0, nami::PluginType::NETWORK_SECURITY, &ctx, &security_options, input->mPluginMgr);
     EXPECT_TRUE(res);
     conf = ebpf::eBPFServer::GetInstance()->mSourceManager->mConfig.get();
     EXPECT_EQ(conf->plugin_type_, nami::PluginType::NETWORK_SECURITY);
@@ -803,7 +790,6 @@ void eBPFServerUnittest::TestEnableNetworkSecurePlugin() {
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mNetworkSecureCB->mQueueKey, ctx.GetProcessQueueKey());
     EXPECT_EQ(ebpf::eBPFServer::GetInstance()->mNetworkSecureCB->mProcessTotalCnt, 1000);
 }
-
 
 
 void eBPFServerUnittest::TestEnableFileSecurePlugin() {
@@ -826,16 +812,14 @@ void eBPFServerUnittest::TestEnableFileSecurePlugin() {
     input->SetMetricsRecordRef("test", "1");
 
     std::string errorMsg;
-    Json::Value configJson, optionalGoPipeline;;
+    Json::Value configJson, optionalGoPipeline;
+    ;
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     SecurityOptions security_options;
     security_options.Init(SecurityProbeType::FILE, configJson, &ctx, "input_file_security");
     input->Init(configJson, optionalGoPipeline);
     bool res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_file_security", 0,
-        nami::PluginType::FILE_SECURITY,
-        &ctx,
-        &security_options, input->mPluginMgr);
+        "input_file_security", 0, nami::PluginType::FILE_SECURITY, &ctx, &security_options, input->mPluginMgr);
     EXPECT_EQ(std::get<nami::SecurityFileFilter>(security_options.mOptionList[0].filter_).mFilePathList.size(), 3);
     EXPECT_TRUE(res);
     auto conf = ebpf::eBPFServer::GetInstance()->mSourceManager->mConfig.get();
@@ -858,10 +842,7 @@ void eBPFServerUnittest::TestEnableFileSecurePlugin() {
 
     input->SetMetricsRecordRef("test", "2");
     res = ebpf::eBPFServer::GetInstance()->EnablePlugin(
-        "input_file_security", 0,
-        nami::PluginType::FILE_SECURITY,
-        &ctx,
-        &security_options, input->mPluginMgr);
+        "input_file_security", 0, nami::PluginType::FILE_SECURITY, &ctx, &security_options, input->mPluginMgr);
     EXPECT_TRUE(res);
     conf = ebpf::eBPFServer::GetInstance()->mSourceManager->mConfig.get();
     EXPECT_EQ(conf->plugin_type_, nami::PluginType::FILE_SECURITY);
@@ -934,7 +915,7 @@ UNIT_TEST_CASE(eBPFServerUnittest, TestEnableNetworkSecurePlugin)
 UNIT_TEST_CASE(eBPFServerUnittest, TestEnableFileSecurePlugin)
 UNIT_TEST_CASE(eBPFServerUnittest, TestInitAndStop)
 UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager)
-}
-}
+} // namespace ebpf
+} // namespace logtail
 
 UNIT_TEST_MAIN

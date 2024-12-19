@@ -51,7 +51,7 @@ DisableFormat: false
 IndentWrappedFunctionNames: false
 MacroBlockBegin: ''
 MacroBlockEnd: ''
-NamespaceIndentation: Inner
+NamespaceIndentation: None
 PenaltyBreakBeforeFirstCallParameter: 19
 PenaltyBreakComment: 300
 PenaltyBreakFirstLessLess: 120

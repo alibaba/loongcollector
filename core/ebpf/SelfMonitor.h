@@ -14,15 +14,15 @@
 
 #pragma once
 
-#include <vector>
 #include <array>
 #include <atomic>
+#include <vector>
 
-#include "ebpf/include/export.h"
-#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "common/Lock.h"
-#include "monitor/metric_models/MetricTypes.h"
+#include "ebpf/include/export.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include "monitor/metric_models/MetricTypes.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
 namespace ebpf {
@@ -33,9 +33,9 @@ public:
     virtual void InitMetric();
     virtual void ReleaseMetric();
     virtual ~BaseBPFMonitor() = default;
+
 protected:
-    BaseBPFMonitor(const std::string& name, PluginMetricManagerPtr mgr) 
-        : mPipelineName(name), mPluginMetricMgr(mgr) {}
+    BaseBPFMonitor(const std::string& name, PluginMetricManagerPtr mgr) : mPipelineName(name), mPluginMetricMgr(mgr) {}
 
     // attention: not thread safe!!
     void InitMetricInner();
@@ -65,15 +65,13 @@ protected:
 
 class NetworkObserverSelfMonitor : public BaseBPFMonitor {
 public:
-    NetworkObserverSelfMonitor(const std::string& name, PluginMetricManagerPtr mgr/**/) 
-        : BaseBPFMonitor(name, mgr) {}
+    NetworkObserverSelfMonitor(const std::string& name, PluginMetricManagerPtr mgr /**/) : BaseBPFMonitor(name, mgr) {}
 
     void InitMetric() override;
 
     void HandleStatistic(nami::eBPFStatistics& stats) override;
 
 private:
-
     // recv kernel events metric
     CounterPtr mRecvConnStatsTotal;
     CounterPtr mRecvCtrlEventsTotal;
@@ -95,47 +93,48 @@ private:
 
 class NetworkSecuritySelfMonitor : public BaseBPFMonitor {
 public:
-    NetworkSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) 
-        : BaseBPFMonitor(name, mgr) {}
+    NetworkSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
 
     void HandleStatistic(nami::eBPFStatistics& stats) override {
-        if (!stats.updated_) return;
+        if (!stats.updated_)
+            return;
         UpdateMetricInner(stats);
     }
 };
 
 class ProcessSecuritySelfMonitor : public BaseBPFMonitor {
 public:
-    ProcessSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) 
-        : BaseBPFMonitor(name, mgr) {}
+    ProcessSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
 };
 
 class FileSecuritySelfMonitor : public BaseBPFMonitor {
 public:
-    FileSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) 
-        : BaseBPFMonitor(name, mgr) {}
+    FileSecuritySelfMonitor(const std::string& name, PluginMetricManagerPtr mgr) : BaseBPFMonitor(name, mgr) {}
 };
 
 /**
- * eBPFSelfMonitorMgr is only used to manage the self-monitoring data in libnetwork_observer.so, updating the statistics through callbacks.
+ * eBPFSelfMonitorMgr is only used to manage the self-monitoring data in libnetwork_observer.so, updating the
+ * statistics through callbacks.
  */
 class eBPFSelfMonitorMgr {
 public:
     eBPFSelfMonitorMgr();
-    void Init(const nami::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const std::string& project);
+    void
+    Init(const nami::PluginType type, PluginMetricManagerPtr mgr, const std::string& name, const std::string& project);
     void Release(const nami::PluginType type);
     void Suspend(const nami::PluginType type);
     void HandleStatistic(std::vector<nami::eBPFStatistics>& stats);
+
 private:
     // `mLock` is used to protect mSelfMonitors
     ReadWriteLock mLock;
-    std::array<std::unique_ptr<BaseBPFMonitor>, int(nami::PluginType::MAX)> mSelfMonitors;
-    std::array<std::atomic_bool, int(nami::PluginType::MAX)> mInited;
-    
+    std::array<std::unique_ptr<BaseBPFMonitor>, int(nami::PluginType::MAX)> mSelfMonitors = {};
+    std::array<std::atomic_bool, int(nami::PluginType::MAX)> mInited = {};
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
 };
 
-} // ebpf
-} // logtail
+} // namespace ebpf
+} // namespace logtail

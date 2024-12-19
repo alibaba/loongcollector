@@ -69,5 +69,5 @@ public:
 
 #endif
 
-}
-}
+} // namespace ebpf
+} // namespace logtail
