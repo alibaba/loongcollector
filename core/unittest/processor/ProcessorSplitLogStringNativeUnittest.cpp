@@ -84,11 +84,12 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
     })";
     APSARA_TEST_TRUE_FATAL(eventGroup.FromJsonString(inJson.str()));
     // run function
-    ProcessorSplitLogStringNative processor;
-    processor.SetContext(mContext);
-
-    APSARA_TEST_TRUE_FATAL(processor.Init(config));
-    processor.Process(eventGroup);
+    ProcessorSplitLogStringNative& processor = *(new ProcessorSplitLogStringNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<logtail::PipelineEventGroup> logGroupList;
+    logGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(logGroupList);
     // judge result
     std::stringstream expectJson;
     expectJson << R"({
@@ -124,10 +125,10 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessJson() {
             }
         ]
     })";
-    std::string outJson = eventGroup.ToJsonString(true);
+    std::string outJson = logGroupList[0].ToJsonString(true);
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
     // check observability
-    APSARA_TEST_EQUAL_FATAL(2, processor.GetContext().GetProcessProfile().splitLines);
+    APSARA_TEST_EQUAL_FATAL(2, processorInstance.mOutEventsTotal->GetValue());
 }
 
 void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
@@ -166,10 +167,12 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
     })";
     eventGroup.FromJsonString(inJson);
     // run function
-    ProcessorSplitLogStringNative processor;
-    processor.SetContext(mContext);
-    APSARA_TEST_TRUE_FATAL(processor.Init(config));
-    processor.Process(eventGroup);
+    ProcessorSplitLogStringNative& processor = *(new ProcessorSplitLogStringNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<logtail::PipelineEventGroup> logGroupList;
+    logGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(logGroupList);
     // judge result
     std::string expectJson = R"({
         "events" :
@@ -220,10 +223,10 @@ void ProcessorSplitLogStringNativeUnittest::TestProcessCommon() {
             }
         ]
     })";
-    std::string outJson = eventGroup.ToJsonString(true);
+    std::string outJson = logGroupList[0].ToJsonString(true);
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observability
-    APSARA_TEST_EQUAL_FATAL(4, processor.GetContext().GetProcessProfile().splitLines);
+    APSARA_TEST_EQUAL_FATAL(4, processorInstance.mOutEventsTotal->GetValue());
 }
 
 void ProcessorSplitLogStringNativeUnittest::TestEnableRawContent() {

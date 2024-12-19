@@ -32,21 +32,6 @@ namespace logtail {
 class Pipeline;
 class FlusherSLS;
 
-// for compatiblity with shennong profile
-struct ProcessProfile {
-    int readBytes = 0;
-    int skipBytes = 0;
-    int feedLines = 0;
-    int splitLines = 0;
-    int parseFailures = 0;
-    int regexMatchFailures = 0;
-    int parseTimeFailures = 0;
-    int historyFailures = 0;
-    int logGroupSize = 0;
-
-    void Reset() { memset(this, 0, sizeof(ProcessProfile)); }
-};
-
 class PipelineContext {
 public:
     PipelineContext() {}
@@ -89,7 +74,6 @@ public:
     bool IsFlushingThroughGoPipeline() const { return mIsFlushingThroughGoPipeline; }
     void SetIsFlushingThroughGoPipelineFlag(bool flag) { mIsFlushingThroughGoPipeline = flag; }
 
-    ProcessProfile& GetProcessProfile() const { return mProcessProfile; }
     const Logger::logger& GetLogger() const { return mLogger; }
     AlarmManager& GetAlarm() const { return *mAlarm; };
 
@@ -111,7 +95,6 @@ private:
     bool mHasNativeProcessors = false;
     bool mIsFlushingThroughGoPipeline = false;
 
-    mutable ProcessProfile mProcessProfile;
     Logger::logger mLogger = sLogger;
     AlarmManager* mAlarm = AlarmManager::GetInstance();
 };

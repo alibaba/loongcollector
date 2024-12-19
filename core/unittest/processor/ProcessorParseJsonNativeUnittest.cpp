@@ -58,7 +58,7 @@ UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessJsonRaw);
 
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestMultipleLines);
 
-PluginInstance::PluginMeta getPluginMeta(){
+PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
@@ -257,8 +257,7 @@ void ProcessorParseJsonNativeUnittest::TestAddLog() {
     char value[] = "value";
     processor.AddLog(key, value, *logEvent);
     // check observability
-    APSARA_TEST_EQUAL_FATAL(int(strlen(key) + strlen(value) + 5),
-                            processor.GetContext().GetProcessProfile().logGroupSize);
+    // Todo: add metrics for check result
 }
 
 void ProcessorParseJsonNativeUnittest::TestProcessJsonEscapedNullByte() {
@@ -617,8 +616,6 @@ void ProcessorParseJsonNativeUnittest::TestProcessEventKeepUnmatch() {
     int count = 1;
 
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mOutEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
@@ -683,8 +680,6 @@ void ProcessorParseJsonNativeUnittest::TestProcessEventDiscardUnmatch() {
     int count = 1;
 
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
     // discard unmatch, so output is 0
     APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mOutEventsTotal->GetValue());

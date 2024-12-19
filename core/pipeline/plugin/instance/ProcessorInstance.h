@@ -55,6 +55,7 @@ private:
     friend class ProcessorParseDelimiterNativeUnittest;
     friend class ProcessorFilterNativeUnittest;
     friend class ProcessorDesensitizeNativeUnittest;
+    friend class ProcessorSplitLogStringNativeUnittest;
     friend class InputFileUnittest;
     friend class InputPrometheusUnittest;
     friend class PipelineUnittest;

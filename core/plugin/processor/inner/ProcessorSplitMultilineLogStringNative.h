@@ -65,8 +65,6 @@ private:
                            int* unmatchLines);
     StringView GetNextLine(StringView log, size_t begin);
 
-    int* mSplitLines = nullptr;
-
     CounterPtr mMatchedEventsTotal;
     CounterPtr mMatchedLinesTotal;
     CounterPtr mUnmatchedLinesTotal;

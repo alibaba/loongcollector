@@ -87,9 +87,6 @@ bool ProcessorParseTimestampNative::Init(const Json::Value& config) {
                               mContext->GetRegion());
     }
 
-    mParseTimeFailures = &(GetContext().GetProcessProfile().parseTimeFailures);
-    mHistoryFailures = &(GetContext().GetProcessProfile().historyFailures);
-
     mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
     mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
     mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
@@ -164,7 +161,6 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
         }
-        ++(*mHistoryFailures);
         mHistoryFailureTotal->Add(1);
         mDiscardedEventsTotal->Add(1);
         return false;
@@ -221,7 +217,6 @@ bool ProcessorParseTimestampNative::ParseLogTime(const StringView& curTimeStr, /
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
         }
-        ++(*mParseTimeFailures);
         return false;
     }
 

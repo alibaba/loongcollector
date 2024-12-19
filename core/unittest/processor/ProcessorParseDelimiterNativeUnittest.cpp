@@ -65,7 +65,7 @@ UNIT_TEST_CASE(ProcessorParseDelimiterNativeUnittest, TestAllowingShortenedField
 UNIT_TEST_CASE(ProcessorParseDelimiterNativeUnittest, TestExtend);
 UNIT_TEST_CASE(ProcessorParseDelimiterNativeUnittest, TestEmpty);
 
-PluginInstance::PluginMeta getPluginMeta(){
+PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
@@ -2199,8 +2199,7 @@ void ProcessorParseDelimiterNativeUnittest::TestAddLog() {
     char value[] = "value";
     processor.AddLog(key, value, *logEvent);
     // check observability
-    APSARA_TEST_EQUAL_FATAL(int(strlen(key) + strlen(value) + 5),
-                            processor.GetContext().GetProcessProfile().logGroupSize);
+    // Todo: add metrics for check result
 }
 
 void ProcessorParseDelimiterNativeUnittest::TestProcessEventKeepUnmatch() {
@@ -2334,7 +2333,6 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventKeepUnmatch() {
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
     int count = 5;
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mOutEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
@@ -2422,7 +2420,6 @@ void ProcessorParseDelimiterNativeUnittest::TestProcessEventDiscardUnmatch() {
     APSARA_TEST_STREQ_FATAL("null", CompactJson(outJson).c_str());
     // check observablity
     int count = 5;
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
     // discard unmatch, so output is 0
     APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mOutEventsTotal->GetValue());

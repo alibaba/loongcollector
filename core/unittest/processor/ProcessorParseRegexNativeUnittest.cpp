@@ -43,7 +43,7 @@ private:
     PipelineContext ctx;
 };
 
-PluginInstance::PluginMeta getPluginMeta(){
+PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
@@ -398,7 +398,7 @@ void ProcessorParseRegexNativeUnittest::TestAddLog() {
     char value[] = "value";
     processor.AddLog(key, value, *logEvent);
     // check observability
-    APSARA_TEST_EQUAL_FATAL(strlen(key) + strlen(value) + 5, processor.GetContext().GetProcessProfile().logGroupSize);
+    // Todo: add metrics for check result
 }
 
 void ProcessorParseRegexNativeUnittest::TestProcessEventKeepUnmatch() {
@@ -475,9 +475,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessEventKeepUnmatch() {
     int count = 5;
 
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().regexMatchFailures);
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-
     APSARA_TEST_EQUAL_FATAL(count, processorInstance.mInEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(count, processorInstance.mOutEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(0, processor.mDiscardedEventsTotal->GetValue());
@@ -559,8 +556,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessEventDiscardUnmatch() {
     int count = 5;
 
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().regexMatchFailures);
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
     APSARA_TEST_EQUAL_FATAL(count, processorInstance.mInEventsTotal->GetValue());
     // discard unmatch, so output is 0
     APSARA_TEST_EQUAL_FATAL(0, processorInstance.mOutEventsTotal->GetValue());
@@ -646,9 +641,6 @@ void ProcessorParseRegexNativeUnittest::TestProcessEventKeyCountUnmatch() {
 
     int count = 5;
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().regexMatchFailures);
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
-
     APSARA_TEST_EQUAL_FATAL(count, processorInstance.mInEventsTotal->GetValue());
     // discard unmatch, so output is 0
     APSARA_TEST_EQUAL_FATAL(0, processorInstance.mOutEventsTotal->GetValue());

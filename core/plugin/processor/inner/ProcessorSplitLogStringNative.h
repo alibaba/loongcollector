@@ -44,8 +44,6 @@ private:
     void ProcessEvent(PipelineEventGroup& logGroup, PipelineEventPtr&& e, EventsContainer& newEvents);
     StringView GetNextLine(StringView log, size_t begin);
 
-    int* mSplitLines = nullptr;
-
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorRegexStringNativeUnittest;
     friend class ProcessorParseDelimiterNativeUnittest;

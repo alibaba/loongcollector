@@ -47,9 +47,6 @@ bool ProcessorParseJsonNative::Init(const Json::Value& config) {
         return false;
     }
 
-    mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
-    mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
-
     mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
     mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
     mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
@@ -135,7 +132,6 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
         }
-        ++(*mParseFailures);
         mOutFailedEventsTotal->Add(1);
         parseSuccess = false;
     } else if (!doc.IsObject()) {
@@ -149,7 +145,6 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
                                                    GetContext().GetLogstoreName(),
                                                    GetContext().GetRegion());
         }
-        ++(*mParseFailures);
         mOutFailedEventsTotal->Add(1);
         parseSuccess = false;
     }
@@ -209,7 +204,6 @@ void ProcessorParseJsonNative::AddLog(const StringView& key,
         return;
     }
     targetEvent.SetContentNoCopy(key, value);
-    *mLogGroupSize += key.size() + value.size() + 5;
 }
 
 bool ProcessorParseJsonNative::IsSupportedEvent(const PipelineEventPtr& e) const {

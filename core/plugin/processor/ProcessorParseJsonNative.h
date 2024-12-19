@@ -44,9 +44,6 @@ private:
     bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
     static std::string RapidjsonValueToString(const rapidjson::Value& value);
 
-    int* mParseFailures = nullptr;
-    int* mLogGroupSize = nullptr;
-
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;
     CounterPtr mOutKeyNotFoundEventsTotal;

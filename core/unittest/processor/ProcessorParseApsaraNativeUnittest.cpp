@@ -19,8 +19,8 @@
 #include "models/LogEvent.h"
 #include "models/StringView.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
-#include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
+#include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "unittest/Unittest.h"
@@ -63,7 +63,7 @@ UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestProcessEventMicrosecondUn
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraEasyReadLogTimeParser);
 UNIT_TEST_CASE(ProcessorParseApsaraNativeUnittest, TestApsaraLogLineParser);
 
-PluginInstance::PluginMeta getPluginMeta(){
+PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
@@ -785,7 +785,6 @@ void ProcessorParseApsaraNativeUnittest::TestProcessWholeLinePart() {
     })";
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(1, processor.GetContext().GetProcessProfile().parseFailures);
     APSARA_TEST_EQUAL_FATAL(uint64_t(3), processorInstance.mInEventsTotal->GetValue());
     // only timestamp failed, so output is 2
     APSARA_TEST_EQUAL_FATAL(uint64_t(2), processorInstance.mOutEventsTotal->GetValue());
@@ -961,8 +960,7 @@ void ProcessorParseApsaraNativeUnittest::TestAddLog() {
     char value[] = "value";
     processor.AddLog(key, value, *logEvent);
     // check observability
-    APSARA_TEST_EQUAL_FATAL(int(strlen(key) + strlen(value) + 5),
-                            processor.GetContext().GetProcessProfile().logGroupSize);
+    // Todo: add metrics for check result
 }
 
 void ProcessorParseApsaraNativeUnittest::TestProcessEventKeepUnmatch() {
@@ -1080,7 +1078,6 @@ void ProcessorParseApsaraNativeUnittest::TestProcessEventKeepUnmatch() {
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
     int count = 5;
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mOutEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
@@ -1157,7 +1154,6 @@ void ProcessorParseApsaraNativeUnittest::TestProcessEventDiscardUnmatch() {
     APSARA_TEST_STREQ_FATAL("null", CompactJson(outJson).c_str());
     // check observablity
     int count = 5;
-    APSARA_TEST_EQUAL_FATAL(count, processor.GetContext().GetProcessProfile().parseFailures);
     APSARA_TEST_EQUAL_FATAL(uint64_t(count), processorInstance.mInEventsTotal->GetValue());
     // discard unmatch, so output is 0
     APSARA_TEST_EQUAL_FATAL(uint64_t(0), processorInstance.mOutEventsTotal->GetValue());
@@ -1275,7 +1271,6 @@ void ProcessorParseApsaraNativeUnittest::TestProcessEventMicrosecondUnmatch() {
     std::string outJson = eventGroupList[0].ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
     // check observablity
-    APSARA_TEST_EQUAL_FATAL(1, processor.GetContext().GetProcessProfile().parseFailures);
     APSARA_TEST_EQUAL_FATAL(uint64_t(4), processorInstance.mInEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(4), processorInstance.mOutEventsTotal->GetValue());
     APSARA_TEST_EQUAL_FATAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
