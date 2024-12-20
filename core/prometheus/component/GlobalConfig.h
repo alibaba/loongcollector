@@ -3,16 +3,26 @@
 #include <set>
 #include <string>
 
+#include "StringTools.h"
 #include "StringView.h"
 #include "common/Lock.h"
-#include "json/value.h"
 
 namespace logtail::prom {
 class GlobalConfig {
 public:
     GlobalConfig() = default;
 
-    void Update(const Json::Value&) {}
+    void UpdateDropMetrics(const std::string& dropMetrics) {
+        WriteLock lock(mDropMetricsLock);
+        auto metricNames = SplitString(dropMetrics, ",");
+        mDropMetrics.clear();
+        mDropMetricsSaved.clear();
+        for (auto& metricName : metricNames) {
+            mDropMetricsSaved.insert(metricName);
+            auto iter = mDropMetricsSaved.find(metricName);
+            mDropMetrics.insert(StringView(iter->data(), iter->size()));
+        }
+    }
 
     bool IsDropped(const std::string& metricName) { return IsDropped(StringView(metricName)); }
 
