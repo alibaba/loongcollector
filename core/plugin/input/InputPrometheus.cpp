@@ -45,12 +45,12 @@ bool InputPrometheus::Init(const Json::Value& config, Json::Value&) {
     string errorMsg;
 
     // config["ScrapeConfig"]
-    if (!config.isMember(prometheus::SCRAPE_CONFIG) || !config[prometheus::SCRAPE_CONFIG].isObject()) {
+    if (!config.isMember(prom::SCRAPE_CONFIG) || !config[prom::SCRAPE_CONFIG].isObject()) {
         errorMsg = "ScrapeConfig not found";
         LOG_ERROR(sLogger, ("init prometheus input failed", errorMsg));
         return false;
     }
-    const Json::Value& scrapeConfig = config[prometheus::SCRAPE_CONFIG];
+    const Json::Value& scrapeConfig = config[prom::SCRAPE_CONFIG];
 
     // build scrape job
     mTargetSubscirber = make_unique<TargetSubscriberScheduler>();

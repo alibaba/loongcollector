@@ -213,7 +213,7 @@ std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::
     }
     auto request = std::make_unique<PromHttpRequest>(
         sdk::HTTP_GET,
-        mScrapeConfigPtr->mScheme == prometheus::HTTPS,
+        mScrapeConfigPtr->mScheme == prom::HTTPS,
         mHost,
         mPort,
         mScrapeConfigPtr->mMetricsPath,

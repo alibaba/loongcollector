@@ -69,7 +69,7 @@ const std::string& ActionToString(Action action) {
                                                         ENUM_TO_STRING_CASE(LABELKEEP),
                                                         ENUM_TO_STRING_CASE(LOWERCASE),
                                                         ENUM_TO_STRING_CASE(UPPERCASE)};
-    static string sUndefined = prometheus::UNDEFINED;
+    static string sUndefined = prom::UNDEFINED;
     auto it = sActionStrings.find(action);
     if (it != sActionStrings.end()) {
         return it->second;
@@ -82,34 +82,34 @@ RelabelConfig::RelabelConfig() : mSeparator(";"), mReplacement("$1"), mAction(Ac
 bool RelabelConfig::Init(const Json::Value& config) {
     string errorMsg;
 
-    if (config.isMember(prometheus::SOURCE_LABELS) && config[prometheus::SOURCE_LABELS].isArray()) {
-        GetOptionalListParam<string>(config, prometheus::SOURCE_LABELS, mSourceLabels, errorMsg);
+    if (config.isMember(prom::SOURCE_LABELS) && config[prom::SOURCE_LABELS].isArray()) {
+        GetOptionalListParam<string>(config, prom::SOURCE_LABELS, mSourceLabels, errorMsg);
     }
 
-    if (config.isMember(prometheus::SEPARATOR) && config[prometheus::SEPARATOR].isString()) {
-        mSeparator = config[prometheus::SEPARATOR].asString();
+    if (config.isMember(prom::SEPARATOR) && config[prom::SEPARATOR].isString()) {
+        mSeparator = config[prom::SEPARATOR].asString();
     }
 
-    if (config.isMember(prometheus::TARGET_LABEL) && config[prometheus::TARGET_LABEL].isString()) {
-        mTargetLabel = config[prometheus::TARGET_LABEL].asString();
+    if (config.isMember(prom::TARGET_LABEL) && config[prom::TARGET_LABEL].isString()) {
+        mTargetLabel = config[prom::TARGET_LABEL].asString();
     }
 
-    if (config.isMember(prometheus::REGEX) && config[prometheus::REGEX].isString()) {
-        string re = config[prometheus::REGEX].asString();
+    if (config.isMember(prom::REGEX) && config[prom::REGEX].isString()) {
+        string re = config[prom::REGEX].asString();
         mRegex = boost::regex(re);
     }
 
-    if (config.isMember(prometheus::REPLACEMENT) && config[prometheus::REPLACEMENT].isString()) {
-        mReplacement = config[prometheus::REPLACEMENT].asString();
+    if (config.isMember(prom::REPLACEMENT) && config[prom::REPLACEMENT].isString()) {
+        mReplacement = config[prom::REPLACEMENT].asString();
     }
 
-    if (config.isMember(prometheus::ACTION) && config[prometheus::ACTION].isString()) {
-        string actionString = config[prometheus::ACTION].asString();
+    if (config.isMember(prom::ACTION) && config[prom::ACTION].isString()) {
+        string actionString = config[prom::ACTION].asString();
         mAction = StringToAction(actionString);
     }
 
-    if (config.isMember(prometheus::MODULUS) && config[prometheus::MODULUS].isUInt64()) {
-        mModulus = config[prometheus::MODULUS].asUInt64();
+    if (config.isMember(prom::MODULUS) && config[prom::MODULUS].isUInt64()) {
+        mModulus = config[prom::MODULUS].asUInt64();
     }
     return true;
 }

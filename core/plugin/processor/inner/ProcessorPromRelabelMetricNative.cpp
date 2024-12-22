@@ -97,7 +97,7 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e,
             if (!mScrapeConfigPtr->mHonorLabels) {
                 // metric event labels is secondary
                 // if confiliction, then rename it exported_<label_name>
-                auto key = prometheus::EXPORTED_PREFIX + k.to_string();
+                auto key = prom::EXPORTED_PREFIX + k.to_string();
                 auto b = sourceEvent.GetSourceBuffer()->CopyString(key);
                 sourceEvent.SetTagNoCopy(StringView(b.data, b.size), sourceEvent.GetTag(k));
                 sourceEvent.SetTagNoCopy(k, v);
@@ -113,7 +113,7 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e,
         return false;
     }
     // set metricEvent name
-    sourceEvent.SetNameNoCopy(sourceEvent.GetTag(prometheus::NAME));
+    sourceEvent.SetNameNoCopy(sourceEvent.GetTag(prom::NAME));
 
     for (const auto& k : toDelete) {
         sourceEvent.DelTag(k);
@@ -123,7 +123,7 @@ bool ProcessorPromRelabelMetricNative::ProcessEvent(PipelineEventPtr& e,
     }
 
     // set metricEvent name
-    sourceEvent.SetTagNoCopy(prometheus::NAME, sourceEvent.GetName());
+    sourceEvent.SetTagNoCopy(prom::NAME, sourceEvent.GetName());
 
     return true;
 }
@@ -158,15 +158,15 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& metric
     auto scrapeDurationSeconds
         = StringTo<double>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION).to_string());
 
-    AddMetric(metricGroup, prometheus::SCRAPE_DURATION_SECONDS, scrapeDurationSeconds, timestamp, nanoSec, targetTags);
+    AddMetric(metricGroup, prom::SCRAPE_DURATION_SECONDS, scrapeDurationSeconds, timestamp, nanoSec, targetTags);
 
     auto scrapeResponseSize
         = StringTo<uint64_t>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE).to_string());
-    AddMetric(metricGroup, prometheus::SCRAPE_RESPONSE_SIZE_BYTES, scrapeResponseSize, timestamp, nanoSec, targetTags);
+    AddMetric(metricGroup, prom::SCRAPE_RESPONSE_SIZE_BYTES, scrapeResponseSize, timestamp, nanoSec, targetTags);
 
     if (mScrapeConfigPtr->mSampleLimit > 0) {
         AddMetric(metricGroup,
-                  prometheus::SCRAPE_SAMPLES_LIMIT,
+                  prom::SCRAPE_SAMPLES_LIMIT,
                   mScrapeConfigPtr->mSampleLimit,
                   timestamp,
                   nanoSec,
@@ -174,7 +174,7 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& metric
     }
 
     AddMetric(metricGroup,
-              prometheus::SCRAPE_SAMPLES_POST_METRIC_RELABELING,
+              prom::SCRAPE_SAMPLES_POST_METRIC_RELABELING,
               samplesPostMetricRelabel,
               timestamp,
               nanoSec,
@@ -183,10 +183,10 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& metric
     auto samplesScraped
         = StringTo<uint64_t>(metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED).to_string());
 
-    AddMetric(metricGroup, prometheus::SCRAPE_SAMPLES_SCRAPED, samplesScraped, timestamp, nanoSec, targetTags);
+    AddMetric(metricGroup, prom::SCRAPE_SAMPLES_SCRAPED, samplesScraped, timestamp, nanoSec, targetTags);
 
     AddMetric(metricGroup,
-              prometheus::SCRAPE_TIMEOUT_SECONDS,
+              prom::SCRAPE_TIMEOUT_SECONDS,
               mScrapeConfigPtr->mScrapeTimeoutSeconds,
               timestamp,
               nanoSec,
@@ -197,12 +197,12 @@ void ProcessorPromRelabelMetricNative::AddAutoMetrics(PipelineEventGroup& metric
 
     if (metricGroup.HasMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE)) {
         auto scrapeState = metricGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE);
-        AddMetric(metricGroup, prometheus::SCRAPE_STATE, 1.0 * upState, timestamp, nanoSec, targetTags);
+        AddMetric(metricGroup, prom::SCRAPE_STATE, 1.0 * upState, timestamp, nanoSec, targetTags);
         auto& last = metricGroup.MutableEvents()[metricGroup.GetEvents().size() - 1];
         last.Cast<MetricEvent>().SetTag(METRIC_LABEL_KEY_STATUS, scrapeState);
     }
 
-    AddMetric(metricGroup, prometheus::UP, 1.0 * upState, timestamp, nanoSec, targetTags);
+    AddMetric(metricGroup, prom::UP, 1.0 * upState, timestamp, nanoSec, targetTags);
 }
 
 void ProcessorPromRelabelMetricNative::AddMetric(PipelineEventGroup& metricGroup,
@@ -215,7 +215,7 @@ void ProcessorPromRelabelMetricNative::AddMetric(PipelineEventGroup& metricGroup
     metricEvent->SetName(name);
     metricEvent->SetValue<UntypedSingleValue>(value);
     metricEvent->SetTimestamp(timestamp, nanoSec);
-    metricEvent->SetTag(prometheus::NAME, name);
+    metricEvent->SetTag(prom::NAME, name);
     for (const auto& [k, v] : targetTags) {
         metricEvent->SetTag(k, v);
     }
