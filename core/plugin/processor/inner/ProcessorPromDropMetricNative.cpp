@@ -19,6 +19,9 @@ bool ProcessorPromDropMetricNative::Init(const Json::Value&) {
 }
 
 void ProcessorPromDropMetricNative::Process(PipelineEventGroup& eGroup) {
+    if (!mGlobalConfig->HasDropMetrics()) {
+        return;
+    }
     EventsContainer& events = eGroup.MutableEvents();
     size_t wIdx = 0;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {

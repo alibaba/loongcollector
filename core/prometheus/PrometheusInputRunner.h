@@ -99,6 +99,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PrometheusInputRunnerUnittest;
     friend class InputPrometheusUnittest;
+    friend class ProcessorDropPrometheusMetricUnittest;
 
 #endif
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <set>
 #include <string>
 
@@ -18,10 +19,19 @@ public:
         mDropMetrics.clear();
         mDropMetricsSaved.clear();
         for (auto& metricName : metricNames) {
-            mDropMetricsSaved.insert(metricName);
-            auto iter = mDropMetricsSaved.find(metricName);
+            auto metric = TrimString(metricName);
+            if (metric.empty()) {
+                continue;
+            }
+            mDropMetricsSaved.insert(metric);
+            auto iter = mDropMetricsSaved.find(metric);
             mDropMetrics.insert(StringView(iter->data(), iter->size()));
         }
+    }
+
+    bool HasDropMetrics() {
+        ReadLock lock(mDropMetricsLock);
+        return !mDropMetrics.empty();
     }
 
     bool IsDropped(const std::string& metricName) { return IsDropped(StringView(metricName)); }

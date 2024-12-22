@@ -138,9 +138,7 @@ bool PrometheusServer::UpdateGlobalConfig() {
         return false;
     };
     auto dropMetrics = AppConfig::GetInstance()->MergeString("", "", prom::PROM_DROP_METRICS, validateFn);
-    if (!dropMetrics.empty()) {
-        mGlobalConfig->UpdateDropMetrics(dropMetrics);
-    }
+    mGlobalConfig->UpdateDropMetrics(dropMetrics);
     return true;
 }
 
@@ -157,8 +155,8 @@ void PrometheusServer::Init() {
 #ifndef APSARA_UNIT_TEST_MAIN
     mTimer->Init();
     AsynCurlRunner::GetInstance()->Init();
-    AppConfig::GetInstance()->RegisterCallback(prom::PROM_DROP_METRICS, &mCallback);
 #endif
+    AppConfig::GetInstance()->RegisterCallback(prom::PROM_DROP_METRICS, &mCallback);
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "register"));
     // only register when operator exist
@@ -225,7 +223,6 @@ void PrometheusServer::Stop() {
     mTimer->Stop();
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
-    AppConfig::GetInstance()->UnregisterCallback(prom::PROM_DROP_METRICS);
 #endif
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
