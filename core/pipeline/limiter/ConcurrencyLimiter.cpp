@@ -27,10 +27,6 @@ uint32_t ConcurrencyLimiter::GetCurrentLimit() const {
     return mCurrenctConcurrency;
 }
 
-uint32_t ConcurrencyLimiter::GetCurrentInterval() const {
-    lock_guard<mutex> lock(mLimiterMux);
-    return mRetryIntervalSecs;
-}
 void ConcurrencyLimiter::SetCurrentLimit(uint32_t limit) {
     lock_guard<mutex> lock(mLimiterMux);
     mCurrenctConcurrency = limit;
@@ -42,19 +38,15 @@ void ConcurrencyLimiter::SetInSendingCount(uint32_t count) {
 uint32_t ConcurrencyLimiter::GetInSendingCount() const {
     return mInSendingCnt.load();
 }
+
+uint32_t ConcurrencyLimiter::GetStatisticThreshold() const {
+    return mStatisticThreshold;
+}
+
 #endif
 
 bool ConcurrencyLimiter::IsValidToPop() {
     lock_guard<mutex> lock(mLimiterMux);
-    if (mCurrenctConcurrency == 0) {
-        auto curTime = std::chrono::system_clock::now();
-        if (chrono::duration_cast<chrono::seconds>(curTime - mLastCheckTime).count() > mRetryIntervalSecs) {
-            mLastCheckTime = curTime;
-            return true;
-        } else {
-            return false;
-        }
-    }
     if (mCurrenctConcurrency > mInSendingCnt.load()) {
         return true;
     }
@@ -69,14 +61,22 @@ void ConcurrencyLimiter::OnSendDone() {
     --mInSendingCnt;
 }
 
-void ConcurrencyLimiter::OnSuccess() {
+void ConcurrencyLimiter::OnSuccess(std::chrono::system_clock::time_point time) {
+    AdjustConcurrency(true, time);
+}
+
+void ConcurrencyLimiter::OnFail(std::chrono::system_clock::time_point time) {
+    AdjustConcurrency(false, time);
+}
+
+
+
+void ConcurrencyLimiter::Increase() {
     lock_guard<mutex> lock(mLimiterMux);
-    if (mCurrenctConcurrency <= 0) {
-        mRetryIntervalSecs = mMinRetryIntervalSecs;
-        LOG_INFO(sLogger, ("reset send retry interval, type", mDescription));
-    }
     if (mCurrenctConcurrency != mMaxConcurrency) {
         ++mCurrenctConcurrency;
+         LOG_INFO(sLogger,
+                     ("increase send concurrency", mDescription)("concurrency", mCurrenctConcurrency));
         if (mCurrenctConcurrency == mMaxConcurrency) {
             LOG_INFO(sLogger,
                      ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrenctConcurrency));
@@ -88,22 +88,58 @@ void ConcurrencyLimiter::OnSuccess() {
     }
 }
 
-void ConcurrencyLimiter::OnFail() {
+void ConcurrencyLimiter::Decrease(bool fastFallBack) {
     lock_guard<mutex> lock(mLimiterMux);
-    if (mCurrenctConcurrency != 0) {
-        auto old = mCurrenctConcurrency;
-        mCurrenctConcurrency = static_cast<uint32_t>(mCurrenctConcurrency * mConcurrencyDownRatio);
-        LOG_INFO(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
+    if (fastFallBack) {
+        if (mCurrenctConcurrency != mMinConcurrency) {
+            auto old = mCurrenctConcurrency;
+            mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * mConcurrencyDownFastRatio), mMinConcurrency);
+            LOG_INFO(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
+        } 
     } else {
-        if (mRetryIntervalSecs != mMaxRetryIntervalSecs) {
-            auto old = mRetryIntervalSecs;
-            mRetryIntervalSecs
-                = min(mMaxRetryIntervalSecs, static_cast<uint32_t>(mRetryIntervalSecs * mRetryIntervalUpRatio));
-            LOG_INFO(sLogger,
-                     ("increase send retry interval, type",
-                      mDescription)("from", ToString(old) + "s")("to", ToString(mRetryIntervalSecs) + "s"));
+        if (mCurrenctConcurrency != mMinConcurrency) {
+            mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * mConcurrencyDownSlowRatio), mMinConcurrency);
+            LOG_INFO(sLogger, ("decrease send concurrency, type", mDescription)("to", mCurrenctConcurrency));
+        } else {
+            if (mMinConcurrency == 0) {
+                mCurrenctConcurrency = 1;
+                LOG_INFO(sLogger, ("decrease send concurrency to min, type", mDescription)("to", mCurrenctConcurrency));
+            }
         }
     }
 }
+
+
+void ConcurrencyLimiter::AdjustConcurrency(bool success, std::chrono::system_clock::time_point time) {
+    lock_guard<mutex> lock(mStatisticsMux);
+    mStatisticsTotal ++;
+    if (!success) {
+        mStatisticsFailTotal ++;
+    }
+    if (mLastStatisticsTime == std::chrono::system_clock::time_point()) {
+        mLastStatisticsTime = time;
+    }
+
+    if (mStatisticsTotal == mStatisticThreshold || chrono::duration_cast<chrono::seconds>(time - mLastStatisticsTime).count() > mStatisticIntervalThresholdSeconds) {
+        uint32_t failPercentage =  mStatisticsFailTotal*100/mStatisticsTotal;
+        LOG_DEBUG(sLogger,("AdjustConcurrency", mDescription)("mStatisticsFailTotal", mStatisticsFailTotal)("mStatisticsTotal", mStatisticsTotal));
+        mStatisticsTotal = 0;
+        mStatisticsFailTotal = 0;
+        mLastStatisticsTime = time;
+        if (failPercentage == 0) {
+            // 成功
+            Increase();
+        } else if (failPercentage <= 10) {
+            // 不调整
+        } else if (failPercentage <= 40) {
+            // 慢回退
+            Decrease(false);
+        } else  {
+            // 快速回退
+            Decrease(true);
+        } 
+    }
+}
+
 
 } // namespace logtail

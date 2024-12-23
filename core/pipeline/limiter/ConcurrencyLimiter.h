@@ -30,25 +30,23 @@ class ConcurrencyLimiter {
 public:
     ConcurrencyLimiter(const std::string& description,
                        uint32_t maxConcurrency,
-                       uint32_t maxRetryIntervalSecs = 3600,
-                       uint32_t minRetryIntervalSecs = 30,
-                       double retryIntervalUpRatio = 1.5,
-                       double concurrencyDownRatio = 0.5)
+                       uint32_t minConcurrency = 0,
+                       double concurrencyDownFastRatio = 0.5,
+                       double concurrencyDownSlowRatio = 0.8)
         : mDescription(description),
           mMaxConcurrency(maxConcurrency),
+          mMinConcurrency(minConcurrency),
           mCurrenctConcurrency(maxConcurrency),
-          mMaxRetryIntervalSecs(maxRetryIntervalSecs),
-          mMinRetryIntervalSecs(minRetryIntervalSecs),
-          mRetryIntervalSecs(minRetryIntervalSecs),
-          mRetryIntervalUpRatio(retryIntervalUpRatio),
-          mConcurrencyDownRatio(concurrencyDownRatio) {}
+          mConcurrencyDownFastRatio(concurrencyDownFastRatio),
+          mConcurrencyDownSlowRatio(concurrencyDownSlowRatio) {}
 
     bool IsValidToPop();
     void PostPop();
     void OnSendDone();
 
-    void OnSuccess();
-    void OnFail();
+    void OnSuccess(std::chrono::system_clock::time_point time);
+    void OnFail(std::chrono::system_clock::time_point time);
+
 
     static std::string GetLimiterMetricName(const std::string& limiter) {
         if (limiter == "region") {
@@ -64,10 +62,10 @@ public:
 #ifdef APSARA_UNIT_TEST_MAIN
 
     uint32_t GetCurrentLimit() const;
-    uint32_t GetCurrentInterval() const;
     void SetCurrentLimit(uint32_t limit);
     void SetInSendingCount(uint32_t count);
     uint32_t GetInSendingCount() const;
+    uint32_t GetStatisticThreshold() const;
 
 #endif
 
@@ -77,19 +75,30 @@ private:
     std::atomic_uint32_t mInSendingCnt = 0U;
 
     uint32_t mMaxConcurrency = 0;
+    uint32_t mMinConcurrency = 0;
 
     mutable std::mutex mLimiterMux;
     uint32_t mCurrenctConcurrency = 0;
 
-    uint32_t mMaxRetryIntervalSecs = 0;
-    uint32_t mMinRetryIntervalSecs = 0;
-
-    uint32_t mRetryIntervalSecs = 0;
-
-    double mRetryIntervalUpRatio = 0.0;
-    double mConcurrencyDownRatio = 0.0;
+    double mConcurrencyDownFastRatio = 0.0;
+    double mConcurrencyDownSlowRatio = 0.0;
 
     std::chrono::system_clock::time_point mLastCheckTime;
+
+    mutable std::mutex mStatisticsMux;
+    std::chrono::system_clock::time_point mLastStatisticsTime;
+    uint32_t mStatisticsTotal = 0;
+    uint32_t mStatisticsFailTotal = 0;
+
+    // 统计10个数据，最多等3s
+    const uint32_t mStatisticThreshold = 10;
+    const uint32_t mStatisticIntervalThresholdSeconds = 3;
+
+
+    void Increase();
+    void Decrease(bool fastFallBack);
+    void AdjustConcurrency(bool success, std::chrono::system_clock::time_point time);
+
 };
 
 } // namespace logtail

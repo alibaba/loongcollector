@@ -56,13 +56,6 @@ void BoundedSenderQueueInterface::SetConcurrencyLimiters(std::unordered_map<std:
     }
 }
 
-void BoundedSenderQueueInterface::OnSendingSuccess() {
-    for (auto& limiter : mConcurrencyLimiters) {
-        if (limiter.first != nullptr) {
-            limiter.first->OnSuccess();
-        }
-    }
-}
 
 void BoundedSenderQueueInterface::DecreaseSendingCnt() {
     for (auto& limiter : mConcurrencyLimiters) {

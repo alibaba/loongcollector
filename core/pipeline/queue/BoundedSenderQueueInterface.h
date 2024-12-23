@@ -48,7 +48,6 @@ public:
     virtual void GetAvailableItems(std::vector<SenderQueueItem*>& items, int32_t limit) = 0;
 
     void DecreaseSendingCnt();
-    void OnSendingSuccess();
     void SetRateLimiter(uint32_t maxRate);
     void SetConcurrencyLimiters(std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap);
     virtual void SetPipelineForItems(const std::shared_ptr<Pipeline>& p) const = 0;
