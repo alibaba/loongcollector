@@ -836,7 +836,10 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             operation = OperationOnFail::DISCARD;
         }
 #ifdef __ENTERPRISE__
-        if (sendResult != SEND_NETWORK_ERROR && sendResult != SEND_SERVER_ERROR) {
+        bool hasNetworkError = (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR);
+        EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(mProject, mCandidateHostsInfo->GetMode(), data->mCurrentHost, !hasNetworkError);
+        mCandidateHostsInfo->SelectBestHost();
+        if (!hasNetworkError) {
             bool hasAuthError = sendResult == SEND_UNAUTHORIZED;
             EnterpriseSLSClientManager::GetInstance()->UpdateAccessKeyStatus(mAliuid, !hasAuthError);
             EnterpriseSLSClientManager::GetInstance()->UpdateProjectAnonymousWriteStatus(mProject, !hasAuthError);

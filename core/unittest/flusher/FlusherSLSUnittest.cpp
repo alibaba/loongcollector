@@ -716,7 +716,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(static_cast<uint32_t>(AppConfig::GetInstance()->GetSendRequestConcurrency()) / 2,
                           FlusherSLS::GetRegionConcurrencyLimiter(flusher.mRegion)->GetCurrentLimit());
     }
-    EnterpriseSLSClientManager::GetInstance()->UpdateHostInfo("test_project",
+    EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency("test_project",
                                                               EndpointMode::DEFAULT,
                                                               "test_project.test_region-b.log.aliyuncs.com",
                                                               chrono::milliseconds(100));
@@ -1043,7 +1043,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem));
         APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateHostsInfo.get());
 
-        EnterpriseSLSClientManager::GetInstance()->UpdateHostInfo("test_project",
+        EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency("test_project",
                                                                   EndpointMode::ACCELERATE,
                                                                   "test_project." + kAccelerationDataEndpoint,
                                                                   chrono::milliseconds(10));
@@ -1122,7 +1122,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem));
         APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateHostsInfo.get());
 
-        EnterpriseSLSClientManager::GetInstance()->UpdateHostInfo(
+        EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency(
             "test_project", EndpointMode::CUSTOM, "test_project.custom.endpoint", chrono::milliseconds(10));
         flusher.mCandidateHostsInfo->SelectBestHost();
         APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));

@@ -221,20 +221,20 @@ bool SendHttpRequest(unique_ptr<HttpRequest>&& request, HttpResponse& response) 
             response.SetResponseTime(chrono::milliseconds(responseTimeMs));
             success = true;
             LOG_DEBUG(sLogger,
-                      ("send http request succeeded, request address", request)("host", request->mHost)(
+                      ("send http request succeeded, host", request->mHost)(
                           "response time", ToString(responseTimeMs) + "ms")("try cnt", ToString(request->mTryCnt)));
             break;
         } else if (request->mTryCnt < request->mMaxTryCnt) {
             LOG_DEBUG(sLogger,
-                      ("failed to send http request", "retry immediately")("request address", request.get())(
-                          "host", request->mHost)("try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(res)));
+                      ("failed to send http request", "retry immediately")("host", request->mHost)(
+                          "try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(res)));
             ++request->mTryCnt;
         } else {
             auto errMsg = curl_easy_strerror(res);
             response.SetNetworkStatus(GetNetworkStatus(res), errMsg);
             LOG_DEBUG(sLogger,
-                      ("failed to send http request", "abort")("request address", request)("host", request->mHost)(
-                          "try cnt", ToString(request->mTryCnt))("errMsg", errMsg));
+                      ("failed to send http request",
+                       "abort")("host", request->mHost)("try cnt", ToString(request->mTryCnt))("errMsg", errMsg));
             break;
         }
     }
