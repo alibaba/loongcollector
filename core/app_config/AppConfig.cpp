@@ -1190,6 +1190,15 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
             mBindInterface.clear();
         LOG_INFO(sLogger, ("bind_interface", mBindInterface));
     }
+
+    // mSendRequestConcurrency was limited in [15, 80]
+    if (mSendRequestConcurrency < 15) {
+        mSendRequestConcurrency = 15;
+    } 
+    if (mSendRequestConcurrency > 80) {
+        mSendRequestConcurrency = 80;
+    }
+    mSendRequestGlobalConcurrency = mSendRequestConcurrency * 1.5;
 }
 
 bool AppConfig::CheckAndResetProxyEnv() {
