@@ -1816,8 +1816,9 @@ void AppConfig::RegisterCallback(const std::string& key, std::function<bool()>* 
 }
 
 void AppConfig::UnregisterCallback(const std::string& key) {
-    if (mCallbacks.find(key) == mCallbacks.end())
+    if (mCallbacks.find(key) == mCallbacks.end()) {
         return;
+    }
     mCallbacks.erase(key);
 }
 

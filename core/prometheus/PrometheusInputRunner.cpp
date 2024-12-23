@@ -225,6 +225,7 @@ void PrometheusServer::Stop() {
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
 #endif
+    AppConfig::GetInstance()->UnregisterCallback(prom::PROM_DROP_METRICS);
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
     CancelAllTargetSubscriber();
