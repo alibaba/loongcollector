@@ -211,17 +211,30 @@ bool SendHttpRequest(unique_ptr<HttpRequest>&& request, HttpResponse& response) 
     while (true) {
         CURLcode res = curl_easy_perform(curl);
         if (res == CURLE_OK) {
-            long http_code = 0;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-            response.SetStatusCode(http_code);
+            long statusCode = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
+            curl_off_t responseTime;
+            curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME_T, &responseTime);
+            auto responseTimeMs = responseTime / 1000;
+            response.SetNetworkStatus(NetworkCode::Ok, "");
+            response.SetStatusCode(statusCode);
+            response.SetResponseTime(chrono::milliseconds(responseTimeMs));
             success = true;
+            LOG_DEBUG(sLogger,
+                      ("send http request succeeded, request address", request)("host", request->mHost)(
+                          "response time", ToString(responseTimeMs) + "ms")("try cnt", ToString(request->mTryCnt)));
             break;
         } else if (request->mTryCnt < request->mMaxTryCnt) {
-            LOG_WARNING(sLogger,
-                        ("failed to send http request", "retry immediately")("request address", request.get())(
-                            "host", request->mHost)("try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(res)));
+            LOG_DEBUG(sLogger,
+                      ("failed to send http request", "retry immediately")("request address", request.get())(
+                          "host", request->mHost)("try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(res)));
             ++request->mTryCnt;
         } else {
+            auto errMsg = curl_easy_strerror(res);
+            response.SetNetworkStatus(GetNetworkStatus(res), errMsg);
+            LOG_DEBUG(sLogger,
+                      ("failed to send http request", "abort")("request address", request)("host", request->mHost)(
+                          "try cnt", ToString(request->mTryCnt))("errMsg", errMsg));
             break;
         }
     }
@@ -250,8 +263,8 @@ bool AddRequestToMultiCurlHandler(CURLM* multiCurl, unique_ptr<AsynHttpRequest>&
                                    request->mFollowRedirects,
                                    request->mTls);
     if (curl == NULL) {
-        LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));
         request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to init curl handler");
+        LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));
         request->OnSendDone(request->mResponse);
         return false;
     }
@@ -259,12 +272,13 @@ bool AddRequestToMultiCurlHandler(CURLM* multiCurl, unique_ptr<AsynHttpRequest>&
     request->mPrivateData = headers;
     curl_easy_setopt(curl, CURLOPT_PRIVATE, request.get());
     request->mLastSendTime = chrono::system_clock::now();
+
     CURLMcode res = curl_multi_add_handle(multiCurl, curl);
     if (res != CURLM_OK) {
+        request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to add the easy curl handle to multi_handle");
         LOG_ERROR(sLogger,
                   ("failed to send request", "failed to add the easy curl handle to multi_handle")(
                       "errMsg", curl_multi_strerror(res))("request address", request.get()));
-        request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to add the easy curl handle to multi_handle");
         request->OnSendDone(request->mResponse);
         curl_easy_cleanup(curl);
         return false;
@@ -283,29 +297,31 @@ void HandleCompletedAsynRequests(CURLM* multiCurl, int& runningHandlers) {
             CURL* handler = msg->easy_handle;
             AsynHttpRequest* request = nullptr;
             curl_easy_getinfo(handler, CURLINFO_PRIVATE, &request);
-            auto responseTimeMs
-                = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - request->mLastSendTime);
             switch (msg->data.result) {
                 case CURLE_OK: {
                     long statusCode = 0;
                     curl_easy_getinfo(handler, CURLINFO_RESPONSE_CODE, &statusCode);
+                    curl_off_t responseTime;
+                    curl_easy_getinfo(handler, CURLINFO_TOTAL_TIME_T, &responseTime);
+                    auto responseTimeMs = responseTime / 1000;
                     request->mResponse.SetNetworkStatus(NetworkCode::Ok, "");
                     request->mResponse.SetStatusCode(statusCode);
-                    request->mResponse.SetResponseTime(responseTimeMs);
+                    request->mResponse.SetResponseTime(chrono::milliseconds(responseTimeMs));
+                    LOG_DEBUG(
+                        sLogger,
+                        ("send http request succeeded, request address",
+                         request)("host", request->mHost)("response time", ToString(responseTimeMs) + "ms")(
+                            "try cnt", ToString(request->mTryCnt))("errMsg", curl_easy_strerror(msg->data.result)));
                     request->OnSendDone(request->mResponse);
-                    LOG_DEBUG(sLogger,
-                              ("send http request succeeded, request address", request)("host", request->mHost)(
-                                  "response time",
-                                  ToString(responseTimeMs.count()) + "ms")("try cnt", ToString(request->mTryCnt)));
                     break;
                 }
                 default:
                     // considered as network error
                     if (request->mTryCnt < request->mMaxTryCnt) {
                         LOG_DEBUG(sLogger,
-                                    ("failed to send http request",
-                                     "retry immediately")("request address", request)("host", request->mHost)(
-                                        "try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(msg->data.result)));
+                                  ("failed to send http request", "retry immediately")("request address",
+                                                                                       request)("host", request->mHost)(
+                                      "try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(msg->data.result)));
                         // free first，becase mPrivateData will be reset in AddRequestToMultiCurlHandler
                         if (request->mPrivateData) {
                             curl_slist_free_all((curl_slist*)request->mPrivateData);
@@ -318,11 +334,10 @@ void HandleCompletedAsynRequests(CURLM* multiCurl, int& runningHandlers) {
                     } else {
                         auto errMsg = curl_easy_strerror(msg->data.result);
                         request->mResponse.SetNetworkStatus(GetNetworkStatus(msg->data.result), errMsg);
-                        request->OnSendDone(request->mResponse);
                         LOG_DEBUG(sLogger,
                                   ("failed to send http request", "abort")("request address", request)(
-                                      "host", request->mHost)("response time", ToString(responseTimeMs.count()) + "ms")(
-                                      "try cnt", ToString(request->mTryCnt))("errMsg", errMsg));
+                                      "host", request->mHost)("try cnt", ToString(request->mTryCnt))("errMsg", errMsg));
+                        request->OnSendDone(request->mResponse);
                     }
                     break;
             }

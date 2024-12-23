@@ -122,6 +122,7 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
                                    AppConfig::GetInstance()->GetBindInterface());
     if (curl == nullptr) {
         request->mItem->mStatus = SendingStatus::IDLE;
+        request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to init curl handler");
         FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
         mOutFailedItemsTotal->Add(1);
         LOG_ERROR(sLogger,
@@ -134,11 +135,11 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
 
     request->mPrivateData = headers;
     curl_easy_setopt(curl, CURLOPT_PRIVATE, request.get());
-    request->mLastSendTime = chrono::system_clock::now();
 
     auto res = curl_multi_add_handle(mClient, curl);
     if (res != CURLM_OK) {
         request->mItem->mStatus = SendingStatus::IDLE;
+        request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to add the easy curl handle to multi_handle");
         FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
         curl_easy_cleanup(curl);
         mOutFailedItemsTotal->Add(1);
@@ -245,14 +246,16 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                 case CURLE_OK: {
                     long statusCode = 0;
                     curl_easy_getinfo(handler, CURLINFO_RESPONSE_CODE, &statusCode);
+                    request->mResponse.SetNetworkStatus(NetworkCode::Ok, "");
                     request->mResponse.SetStatusCode(statusCode);
                     request->mResponse.SetResponseTime(responseTimeMs);
-                    LOG_DEBUG(
-                        sLogger,
-                        ("send http request succeeded, item address", request->mItem)(
-                            "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
-                            "response time", ToString(responseTimeMs.count()) + "ms")("try cnt", ToString(request->mTryCnt))(
-                            "sending cnt", ToString(FlusherRunner::GetInstance()->GetSendingBufferCount())));
+                    LOG_DEBUG(sLogger,
+                              ("send http request succeeded, item address",
+                               request->mItem)("config-flusher-dst",
+                                               QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
+                                  "response time", ToString(responseTimeMs.count()) + "ms")("try cnt",
+                                                                                            ToString(request->mTryCnt))(
+                                  "sending cnt", ToString(FlusherRunner::GetInstance()->GetSendingBufferCount())));
                     static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
                     FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
                     mOutSuccessfulItemsTotal->Add(1);
@@ -279,12 +282,14 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                         ++runningHandlers;
                         requestReused = true;
                     } else {
+                        auto errMsg = curl_easy_strerror(msg->data.result);
+                        request->mResponse.SetNetworkStatus(GetNetworkStatus(msg->data.result), errMsg);
                         LOG_DEBUG(sLogger,
                                   ("failed to send http request", "abort")("item address", request->mItem)(
                                       "config-flusher-dst",
                                       QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
-                                      "response time", ToString(responseTimeMs.count()) + "ms")("try cnt",
-                                                                                        ToString(request->mTryCnt))(
+                                      "response time", ToString(responseTimeMs.count()) + "ms")(
+                                      "try cnt", ToString(request->mTryCnt))("errMsg", errMsg)(
                                       "sending cnt", ToString(FlusherRunner::GetInstance()->GetSendingBufferCount())));
                         static_cast<HttpFlusher*>(request->mItem->mFlusher)
                             ->OnSendDone(request->mResponse, request->mItem);
