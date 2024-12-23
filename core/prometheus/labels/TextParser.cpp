@@ -16,29 +16,21 @@
 
 #include "prometheus/labels/TextParser.h"
 
+#include <nmmintrin.h>
+
 #include <boost/algorithm/string.hpp>
-#include <charconv>
 #include <cmath>
 #include <string>
 
-#include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/StringView.h"
-#include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
 
 using namespace std;
 
-namespace logtail {
-
-bool IsValidNumberChar(char c) {
-    static const unordered_set<char> sValidChars
-        = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-', '+', 'e', 'E', 'I',
-           'N', 'F', 'T', 'Y', 'i', 'n', 'f', 't', 'y', 'X', 'x', 'N', 'n', 'A', 'a'};
-    return sValidChars.count(c);
-};
+namespace logtail::prom {
 
 TextParser::TextParser(bool honorTimestamps) : mHonorTimestamps(honorTimestamps) {
 }
@@ -69,13 +61,11 @@ PipelineEventGroup TextParser::Parse(const string& content, uint64_t defaultTime
 }
 
 bool TextParser::ParseLine(StringView line, MetricEvent& metricEvent) {
-    mLine = line;
-    mPos = 0;
     mState = TextState::Start;
     mLabelName.clear();
-    mTokenLength = 0;
+    mEscape = FindFirstLetter(line.data(), line.size(), '\\').has_value();
 
-    HandleStart(metricEvent);
+    HandleStart(metricEvent, line.data(), line.size());
 
     if (mState == TextState::Done) {
         return true;
@@ -84,228 +74,316 @@ bool TextParser::ParseLine(StringView line, MetricEvent& metricEvent) {
     return false;
 }
 
-// start to parse metric sample:test_metric{k1="v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
-void TextParser::HandleStart(MetricEvent& metricEvent) {
-    SkipLeadingWhitespace();
-    auto c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
-    if (std::isalpha(c) || c == '_' || c == ':') {
-        HandleMetricName(metricEvent);
-    } else {
-        HandleError("expected metric name");
+std::optional<size_t> TextParser::FindFirstLetter(const char* s, size_t len, char target) {
+    size_t res = 0;
+#if !defined(__EXCLUDE_SSE4_2__)
+    __m128i targetVec = _mm_set1_epi8(target);
+
+    while (res + 16 < len) {
+        __m128i chunk = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&s[res]));
+
+        __m128i cmp = _mm_cmpeq_epi8(chunk, targetVec);
+
+        int mask = _mm_movemask_epi8(cmp);
+
+        if (mask != 0) {
+            return res + __builtin_ffs(mask) - 1;
+        }
+
+        res += 16;
     }
+#endif
+
+    while (res < len) {
+        if (s[res] == target) {
+            return res;
+        }
+        res++;
+    }
+    return std::nullopt;
 }
 
-// parse:test_metric{k1="v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
-void TextParser::HandleMetricName(MetricEvent& metricEvent) {
-    char c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
-    while (std::isalpha(c) || c == '_' || c == ':' || std::isdigit(c)) {
-        ++mTokenLength;
-        ++mPos;
-        c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
+std::optional<size_t> TextParser::FindFirstWhiteSpace(const char* s, size_t len) {
+    size_t res = 0;
+
+#if !defined(__EXCLUDE_SSE4_2__)
+    static __m128i sTargetVec1 = _mm_set1_epi8(' ');
+    static __m128i sTargetVec2 = _mm_set1_epi8('\t');
+
+    while (res + 16 < len) {
+        __m128i chunk = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&s[res]));
+
+        __m128i cmp1 = _mm_cmpeq_epi8(chunk, sTargetVec1);
+        __m128i cmp2 = _mm_cmpeq_epi8(chunk, sTargetVec2);
+
+        int mask1 = _mm_movemask_epi8(cmp1);
+        int mask2 = _mm_movemask_epi8(cmp2);
+
+        if (mask1 != 0) {
+            return res + __builtin_ffs(mask1) - 1;
+        }
+        if (mask2 != 0) {
+            return res + __builtin_ffs(mask2) - 1;
+        }
+
+        res += 16;
     }
-    metricEvent.SetNameNoCopy(mLine.substr(mPos - mTokenLength, mTokenLength));
-    mTokenLength = 0;
-    SkipLeadingWhitespace();
-    if (mPos < mLine.size()) {
-        if (mLine[mPos] == '{') {
-            ++mPos;
-            SkipLeadingWhitespace();
-            HandleLabelName(metricEvent);
+#endif
+
+    while (res < len) {
+        if (s[res] == ' ' || s[res] == '\t') {
+            return res;
+        }
+        res++;
+    }
+    return std::nullopt;
+}
+
+std::optional<size_t> TextParser::FindWhiteSpaceAndExemplar(const char* s, size_t len) {
+    size_t res = 0;
+
+#if !defined(__EXCLUDE_SSE4_2__)
+    static __m128i sTargetVec1 = _mm_set1_epi8(' ');
+    static __m128i sTargetVec2 = _mm_set1_epi8('\t');
+    static __m128i sTargetVec3 = _mm_set1_epi8('#');
+
+    while (res + 16 < len) {
+        __m128i chunk = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&s[res]));
+
+        __m128i cmp1 = _mm_cmpeq_epi8(chunk, sTargetVec1);
+        __m128i cmp2 = _mm_cmpeq_epi8(chunk, sTargetVec2);
+        __m128i cmp3 = _mm_cmpeq_epi8(chunk, sTargetVec3);
+
+        int mask1 = _mm_movemask_epi8(cmp1);
+        int mask2 = _mm_movemask_epi8(cmp2);
+        int mask3 = _mm_movemask_epi8(cmp3);
+
+        if (mask1 != 0) {
+            return res + __builtin_ffs(mask1) - 1;
+        }
+        if (mask2 != 0) {
+            return res + __builtin_ffs(mask2) - 1;
+        }
+        if (mask3 != 0) {
+            return res + __builtin_ffs(mask3) - 1;
+        }
+
+        res += 16;
+    }
+#endif
+
+    while (res < len) {
+        if (s[res] == ' ' || s[res] == '\t' || s[res] == '#') {
+            return res;
+        }
+        res++;
+    }
+    return std::nullopt;
+}
+
+std::optional<size_t> TextParser::SkipTrailingWhitespace(const char* s, size_t pos) {
+    for (; pos > 0 && (s[pos] == ' ' || s[pos] == '\t'); --pos) {
+    }
+    if (pos == 0 && (s[pos] == ' ' || s[pos] == '\t')) {
+        return std::nullopt;
+    }
+    return pos;
+}
+
+inline size_t TextParser::SkipLeadingWhitespace(const char* s, size_t len, size_t pos) {
+    while (pos < len && (s[pos] == ' ' || s[pos] == '\t')) {
+        pos++;
+    }
+    return pos;
+}
+
+void TextParser::HandleError(const string& errMsg) {
+    LOG_WARNING(sLogger, ("text parser error parsing line", errMsg));
+    mState = TextState::Error;
+}
+
+void TextParser::HandleStart(MetricEvent& metricEvent, const char* s, const size_t len) {
+    auto pos = SkipLeadingWhitespace(s, len, 0);
+    HandleMetricName(metricEvent, s + pos, len - pos);
+}
+
+void TextParser::HandleMetricName(MetricEvent& metricEvent, const char* s, size_t len) {
+    auto pos = FindFirstLetter(s, len, '{');
+    if (pos.has_value()) {
+        auto endPos = SkipTrailingWhitespace(s, pos.value() - 1);
+        if (endPos.has_value()) {
+            metricEvent.SetNameNoCopy(StringView(s, endPos.value() + 1));
         } else {
-            HandleSampleValue(metricEvent);
-        }
-    } else {
-        HandleError("error end of metric name");
-    }
-}
-
-// parse:k1="v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
-void TextParser::HandleLabelName(MetricEvent& metricEvent) {
-    char c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
-    if (std::isalpha(c) || c == '_') {
-        while (std::isalpha(c) || c == '_' || std::isdigit(c)) {
-            ++mTokenLength;
-            ++mPos;
-            c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
-        }
-        mLabelName = mLine.substr(mPos - mTokenLength, mTokenLength);
-        mTokenLength = 0;
-        SkipLeadingWhitespace();
-        if (mPos == mLine.size() || mLine[mPos] != '=') {
-            HandleError("expected '=' after label name");
+            HandleError("error end of metric name");
             return;
         }
-        ++mPos;
-        SkipLeadingWhitespace();
-        HandleEqualSign(metricEvent);
-    } else if (c == '}') {
-        ++mPos;
-        SkipLeadingWhitespace();
-        HandleSampleValue(metricEvent);
+        auto nextPos = SkipLeadingWhitespace(s, len, pos.value() + 1);
+        HandleLabelName(metricEvent, s + nextPos, len - nextPos);
     } else {
-        HandleError("invalid character in label name");
-    }
-}
-
-// parse:"v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
-void TextParser::HandleEqualSign(MetricEvent& metricEvent) {
-    if (mPos < mLine.size() && mLine[mPos] == '"') {
-        ++mPos;
-        HandleLabelValue(metricEvent);
-    } else {
-        HandleError("expected '\"' after '='");
-    }
-}
-
-// parse:v1", k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
-void TextParser::HandleLabelValue(MetricEvent& metricEvent) {
-    // left quote has been consumed
-    // LableValue supports escape char
-    bool escaped = false;
-    auto lPos = mPos;
-    while (mPos < mLine.size() && mLine[mPos] != '"') {
-        if (mLine[mPos] != '\\') {
-            if (escaped) {
-                mEscapedLabelValue.push_back(mLine[mPos]);
-            }
-            ++mPos;
-            ++mTokenLength;
-        } else {
-            if (escaped == false) {
-                // first meet escape char
-                escaped = true;
-                mEscapedLabelValue = mLine.substr(lPos, mPos - lPos).to_string();
-            }
-            if (mPos + 1 < mLine.size()) {
-                // check next char, if it is valid escape char, we can consume two chars and push one escaped char
-                // if not, we neet to push the two chars
-                // valid escape char: \", \\, \n
-                switch (mLine[lPos + 1]) {
-                    case '\\':
-                    case '\"':
-                        mEscapedLabelValue.push_back(mLine[mPos + 1]);
-                        break;
-                    case 'n':
-                        mEscapedLabelValue.push_back('\n');
-                        break;
-                    default:
-                        mEscapedLabelValue.push_back('\\');
-                        mEscapedLabelValue.push_back(mLine[mPos + 1]);
-                        break;
-                }
-                mPos += 2;
-            } else {
-                mEscapedLabelValue.push_back(mLine[mPos + 1]);
-                ++mPos;
-            }
+        auto nextPos = FindFirstWhiteSpace(s, len);
+        if (nextPos.has_value()) {
+            metricEvent.SetNameNoCopy(StringView(s, nextPos.value()));
+            auto nextNextPos = SkipLeadingWhitespace(s, len, nextPos.value());
+            HandleSampleValue(metricEvent, s + nextNextPos, len - nextNextPos);
         }
     }
+}
 
-    if (mPos == mLine.size()) {
-        HandleError("unexpected end of input in label value");
-        return;
-    }
-
-    if (!escaped) {
-        metricEvent.SetTagNoCopy(mLabelName, mLine.substr(mPos - mTokenLength, mTokenLength));
+void TextParser::HandleLabelName(MetricEvent& metricEvent, const char* s, size_t len) {
+    auto pos = FindFirstLetter(s, len, '=');
+    if (pos.has_value()) {
+        auto endPos = SkipTrailingWhitespace(s, pos.value() - 1);
+        if (endPos.has_value()) {
+            if (FindFirstLetter(s, endPos.value(), '"').has_value()) {
+                HandleError("invalid character in label name");
+                return;
+            }
+            mLabelName = StringView(s, endPos.value() + 1);
+        } else {
+            HandleError("error end of metric name");
+            return;
+        }
+        auto nextPos = SkipLeadingWhitespace(s, len, pos.value() + 1);
+        HandleLabelValue(metricEvent, s + nextPos, len - nextPos);
     } else {
-        metricEvent.SetTag(mLabelName.to_string(), mEscapedLabelValue);
-        mEscapedLabelValue.clear();
-    }
-    mTokenLength = 0;
-    ++mPos;
-    SkipLeadingWhitespace();
-    if (mPos < mLine.size() && (mLine[mPos] == ',' || mLine[mPos] == '}')) {
-        HandleCommaOrCloseBrace(metricEvent);
-    } else {
-        HandleError("unexpected end of input in label value");
+        if (len > 0 && s[0] == '}') {
+            auto nextPos = SkipLeadingWhitespace(s, len, 1);
+            HandleSampleValue(metricEvent, s + nextPos, len - nextPos);
+        } else {
+            HandleError("invalid character in label name");
+        }
     }
 }
 
-// parse:, k2="v2" } 9.9410452992e+10 1715829785083 # exemplarsxxx
-// or parse:} 9.9410452992e+10 1715829785083 # exemplarsxxx
-void TextParser::HandleCommaOrCloseBrace(MetricEvent& metricEvent) {
-    char c = (mPos < mLine.size()) ? mLine[mPos] : '\0';
-    if (c == ',') {
-        ++mPos;
-        SkipLeadingWhitespace();
-        HandleLabelName(metricEvent);
-    } else if (c == '}') {
-        ++mPos;
-        SkipLeadingWhitespace();
-        HandleSampleValue(metricEvent);
+void TextParser::HandleLabelValue(MetricEvent& metricEvent, const char* s, size_t len) {
+    // left quote has been consumed
+    // LableValue supports escape char
+    if (len == 0 || s[0] != '"') {
+        HandleError("invalid character in label value");
+        return;
+    }
+    s = s + 1;
+    len--;
+    size_t nextPos = 0;
+    if (mEscape) {
+        // slow path
+        // escape char
+        string labelValue;
+        size_t pos = 0;
+        for (size_t i = 0; i < len; i++) {
+            if (s[i] == '\\') {
+                if (i + 1 < len) {
+                    switch (s[i + 1]) {
+                        case 'n':
+                            labelValue.push_back('\n');
+                            break;
+                        case '\\':
+                        case '\"':
+                            labelValue.push_back(s[i + 1]);
+                            break;
+                        default:
+                            labelValue.push_back('\\');
+                            labelValue.push_back(s[i + 1]);
+                            break;
+                    }
+                    i++;
+                } else {
+                    HandleError("invalid escape char");
+                    return;
+                }
+            } else if (s[i] == '"') {
+                pos = i;
+                break;
+            } else {
+                labelValue.push_back(s[i]);
+            }
+        }
+        auto sb = metricEvent.GetSourceBuffer()->CopyString(labelValue);
+        metricEvent.SetTag(mLabelName, StringView(sb.data, sb.size));
+        nextPos = SkipLeadingWhitespace(s, len, pos + 1);
     } else {
-        HandleError("expected ',' or '}' after label value");
+        const auto pos = FindFirstLetter(s, len, '"');
+        if (pos.has_value()) {
+            metricEvent.SetTagNoCopy(mLabelName, StringView(s, pos.value()));
+            nextPos = SkipLeadingWhitespace(s, len, pos.value() + 1);
+        } else {
+            HandleError("invalid character in label value");
+            return;
+        }
+    }
+    if (s[nextPos] == ',') {
+        nextPos++;
+        nextPos = SkipLeadingWhitespace(s, len, nextPos);
+        if (s[nextPos] == '}') {
+            nextPos++;
+            nextPos = SkipLeadingWhitespace(s, len, nextPos);
+            HandleSampleValue(metricEvent, s + nextPos, len - nextPos);
+            return;
+        }
+        HandleLabelName(metricEvent, s + nextPos, len - nextPos);
+    } else if (s[nextPos] == '}') {
+        nextPos++;
+        nextPos = SkipLeadingWhitespace(s, len, nextPos);
+        HandleSampleValue(metricEvent, s + nextPos, len - nextPos);
+    } else {
+        HandleError("invalid character in label value");
     }
 }
 
-// parse:9.9410452992e+10 1715829785083 # exemplarsxxx
-void TextParser::HandleSampleValue(MetricEvent& metricEvent) {
-    while (mPos < mLine.size() && IsValidNumberChar(mLine[mPos])) {
-        ++mPos;
-        ++mTokenLength;
+void TextParser::HandleSampleValue(MetricEvent& metricEvent, const char* s, size_t len) {
+    auto pos = FindWhiteSpaceAndExemplar(s, len);
+    size_t valueLen = 0;
+    if (pos.has_value()) {
+        valueLen = pos.value();
+    } else {
+        valueLen = len;
     }
-
-    if (mPos < mLine.size() && mLine[mPos] != ' ' && mLine[mPos] != '\t' && mLine[mPos] != '#') {
-        HandleError("unexpected end of input in sample value");
+    if (valueLen == 0) {
+        HandleError("invalid sample value");
         return;
     }
-
-    auto tmpSampleValue = mLine.substr(mPos - mTokenLength, mTokenLength);
-    mDoubleStr = tmpSampleValue.to_string();
-
+    auto tmpSampleValue = StringView(s, valueLen);
     try {
-        mSampleValue = std::stod(mDoubleStr);
+        auto sampleValue = stod(tmpSampleValue.to_string());
+        metricEvent.SetValue<UntypedSingleValue>(sampleValue);
     } catch (...) {
         HandleError("invalid sample value");
-        mTokenLength = 0;
         return;
     }
-    mDoubleStr.clear();
-
-    metricEvent.SetValue<UntypedSingleValue>(mSampleValue);
-    mTokenLength = 0;
-    SkipLeadingWhitespace();
-    if (mPos == mLine.size() || mLine[mPos] == '#' || !mHonorTimestamps) {
+    if ((pos.has_value() && s[pos.value()] == '#') || valueLen == len) {
         metricEvent.SetTimestamp(mDefaultTimestamp, mDefaultNanoTimestamp);
         mState = TextState::Done;
-    } else {
-        HandleTimestamp(metricEvent);
-    }
-}
-
-// parse:1715829785083 # exemplarsxxx
-// timestamp will be 1715829785.083 in OpenMetrics
-void TextParser::HandleTimestamp(MetricEvent& metricEvent) {
-    // '#' is for exemplars, and we don't need it
-    while (mPos < mLine.size() && IsValidNumberChar(mLine[mPos])) {
-        ++mPos;
-        ++mTokenLength;
-    }
-    if (mPos < mLine.size() && mLine[mPos] != ' ' && mLine[mPos] != '\t' && mLine[mPos] != '#') {
-        HandleError("unexpected end of input in sample timestamp");
         return;
     }
-
-    auto tmpTimestamp = mLine.substr(mPos - mTokenLength, mTokenLength);
-    if (tmpTimestamp.size() == 0) {
+    s = s + pos.value() + 1;
+    len -= pos.value() + 1;
+    auto nextPos = SkipLeadingWhitespace(s, len, 0);
+    HandleTimestamp(metricEvent, s + nextPos, len - nextPos);
+}
+void TextParser::HandleTimestamp(MetricEvent& metricEvent, const char* s, size_t len) {
+    // '#' is for exemplars, and we don't need it
+    auto pos = FindWhiteSpaceAndExemplar(s, len);
+    size_t valueLen = 0;
+    if (pos.has_value()) {
+        valueLen = pos.value();
+    } else {
+        valueLen = len;
+    }
+    if (valueLen == 0) {
         mState = TextState::Done;
         return;
     }
-    mDoubleStr = tmpTimestamp.to_string();
+    auto tmpTimestamp = StringView(s, valueLen);
     double milliTimestamp = 0;
     try {
-        milliTimestamp = stod(mDoubleStr);
+        milliTimestamp = stod(tmpTimestamp.to_string());
     } catch (...) {
         HandleError("invalid timestamp");
-        mTokenLength = 0;
         return;
     }
-    mDoubleStr.clear();
 
     if (milliTimestamp > 1ULL << 63) {
         HandleError("timestamp overflow");
-        mTokenLength = 0;
         return;
     }
     if (milliTimestamp < 1UL << 31) {
@@ -318,21 +396,7 @@ void TextParser::HandleTimestamp(MetricEvent& metricEvent) {
     } else {
         metricEvent.SetTimestamp(mDefaultTimestamp, mDefaultNanoTimestamp);
     }
-
-    mTokenLength = 0;
-
     mState = TextState::Done;
 }
 
-void TextParser::HandleError(const string& errMsg) {
-    LOG_WARNING(sLogger, ("text parser error parsing line", mLine.to_string() + errMsg));
-    mState = TextState::Error;
-}
-
-inline void TextParser::SkipLeadingWhitespace() {
-    while (mPos < mLine.length() && (mLine[mPos] == ' ' || mLine[mPos] == '\t')) {
-        mPos++;
-    }
-}
-
-} // namespace logtail
+} // namespace logtail::prom

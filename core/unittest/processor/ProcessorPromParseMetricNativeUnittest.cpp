@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-#include "LogEvent.h"
 #include "MetricEvent.h"
 #include "StringTools.h"
 #include "common/JsonUtil.h"
 #include "models/PipelineEventGroup.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
-#include "prometheus/Constants.h"
-#include "prometheus/labels/TextParser.h"
 #include "prometheus/schedulers/ScrapeScheduler.h"
 #include "unittest/Unittest.h"
 
@@ -76,7 +73,6 @@ void ProcessorParsePrometheusMetricUnittest::TestProcess() {
     APSARA_TEST_TRUE(processor.Init(config));
 
     // make events
-    auto parser = TextParser();
     auto splitByLines = [](const std::string& content) {
         PipelineEventGroup eGroup(std::make_shared<SourceBuffer>());
 

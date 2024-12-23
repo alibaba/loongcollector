@@ -56,7 +56,7 @@ else ()
 endif ()
 
 if (NOT WITHSPL)
-    add_definitions(-D__EXCLUDE_SPL__)
+    add_definitions(-D__EXCLUDE_SSE4_2__)
 endif()
 
 # Default C/CXX flags.

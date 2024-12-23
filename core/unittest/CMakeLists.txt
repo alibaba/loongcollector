@@ -90,7 +90,7 @@ if (UNIX)
         endif()
         # add core subdir
         set(UT_BASE_TARGET "unittest_base")
-        add_definitions(-D__EXCLUDE_SPL__)
+        add_definitions(-D__EXCLUDE_SSE4_2__)
         add_library(${UT_BASE_TARGET} SHARED ${SOURCE_FILES_CORE})
         target_compile_options(${UT_BASE_TARGET} PRIVATE -Werror)
         add_core_subdir()

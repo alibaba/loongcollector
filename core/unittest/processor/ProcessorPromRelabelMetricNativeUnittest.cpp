@@ -24,7 +24,7 @@
 
 using namespace std;
 
-namespace logtail {
+namespace logtail::prom {
 class ProcessorPromRelabelMetricNativeUnittest : public testing::Test {
 public:
     void SetUp() override { mContext.SetConfigName("project##config_0"); }
@@ -286,6 +286,6 @@ UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestAddAutoMetrics)
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestHonorLabels)
 
 
-} // namespace logtail
+} // namespace logtail::prom
 
 UNIT_TEST_MAIN

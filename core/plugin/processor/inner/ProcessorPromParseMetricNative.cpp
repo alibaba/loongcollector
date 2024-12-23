@@ -32,7 +32,7 @@ void ProcessorPromParseMetricNative::Process(PipelineEventGroup& eGroup) {
     auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());
     auto timestamp = timestampMilliSec / 1000;
     auto nanoSec = timestampMilliSec % 1000 * 1000000;
-    TextParser parser(mScrapeConfigPtr->mHonorTimestamps);
+    prom::TextParser parser(mScrapeConfigPtr->mHonorTimestamps);
     parser.SetDefaultTimestamp(timestamp, nanoSec);
 
     for (auto& e : events) {
@@ -49,7 +49,7 @@ bool ProcessorPromParseMetricNative::IsSupportedEvent(const PipelineEventPtr& e)
 bool ProcessorPromParseMetricNative::ProcessEvent(PipelineEventPtr& e,
                                                   EventsContainer& newEvents,
                                                   PipelineEventGroup& eGroup,
-                                                  TextParser& parser) {
+                                                  prom::TextParser& parser) {
     if (!IsSupportedEvent(e)) {
         return false;
     }

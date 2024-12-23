@@ -23,7 +23,7 @@
 
 using namespace std;
 
-namespace logtail {
+namespace logtail::prom {
 
 bool IsDoubleEqual(double a, double b) {
     return fabs(a - b) < 0.000001;
@@ -388,6 +388,6 @@ void TextParserUnittest::TestParseUnicodeLabelValue() {
 
 UNIT_TEST_CASE(TextParserUnittest, TestParseUnicodeLabelValue)
 
-} // namespace logtail
+} // namespace logtail::prom
 
 UNIT_TEST_MAIN
