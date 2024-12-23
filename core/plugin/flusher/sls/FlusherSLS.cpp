@@ -835,16 +835,6 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         if (isProfileData && data->mTryCnt >= static_cast<uint32_t>(INT32_FLAG(profile_data_send_retrytimes))) {
             operation = OperationOnFail::DISCARD;
         }
-#ifdef __ENTERPRISE__
-        bool hasNetworkError = (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR);
-        EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(mProject, mCandidateHostsInfo->GetMode(), data->mCurrentHost, !hasNetworkError);
-        mCandidateHostsInfo->SelectBestHost();
-        if (!hasNetworkError) {
-            bool hasAuthError = sendResult == SEND_UNAUTHORIZED;
-            EnterpriseSLSClientManager::GetInstance()->UpdateAccessKeyStatus(mAliuid, !hasAuthError);
-            EnterpriseSLSClientManager::GetInstance()->UpdateProjectAnonymousWriteStatus(mProject, !hasAuthError);
-        }
-#endif
 
 #define LOG_PATTERN \
     ("failed to send request", failDetail.str())("operation", GetOperationString(operation))("suggestion", \
@@ -892,6 +882,18 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 break;
         }
     }
+#ifdef __ENTERPRISE__
+    bool hasNetworkError = (sendResult == SEND_NETWORK_ERROR || sendResult == SEND_SERVER_ERROR);
+    EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(
+        mProject, mCandidateHostsInfo->GetMode(), data->mCurrentHost, !hasNetworkError);
+    mCandidateHostsInfo->SelectBestHost();
+    
+    if (!hasNetworkError) {
+        bool hasAuthError = sendResult == SEND_UNAUTHORIZED;
+        EnterpriseSLSClientManager::GetInstance()->UpdateAccessKeyStatus(mAliuid, !hasAuthError);
+        EnterpriseSLSClientManager::GetInstance()->UpdateProjectAnonymousWriteStatus(mProject, !hasAuthError);
+    }
+#endif
 }
 
 bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
