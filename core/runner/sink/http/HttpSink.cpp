@@ -266,12 +266,11 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                 default:
                     // considered as network error
                     if (request->mTryCnt <= request->mMaxTryCnt) {
-                        LOG_WARNING(
-                            sLogger,
-                            ("failed to send http request", "retry immediately")("item address", request->mItem)(
-                                "config-flusher-dst",
-                                QueueKeyManager::GetInstance()->GetName(request->mItem->mFlusher->GetQueueKey()))(
-                                "try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(msg->data.result)));
+                        LOG_DEBUG(sLogger,
+                                  ("failed to send http request", "retry immediately")("item address", request->mItem)(
+                                      "config-flusher-dst",
+                                      QueueKeyManager::GetInstance()->GetName(request->mItem->mFlusher->GetQueueKey()))(
+                                      "try cnt", request->mTryCnt)("errMsg", curl_easy_strerror(msg->data.result)));
                         // free first，becase mPrivateData will be reset in AddRequestToClient
                         if (request->mPrivateData) {
                             curl_slist_free_all((curl_slist*)request->mPrivateData);
