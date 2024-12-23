@@ -318,7 +318,7 @@ void Application::Start() { // GCOVR_EXCL_START
 
         // destruct event handlers here so that it will not block file reading task
         ConfigManager::GetInstance()->DeleteHandlers();
-        PrometheusInputRunner::GetInstance()->CheckGC();
+        prom::PrometheusServer::GetInstance()->CheckGC();
 
         this_thread::sleep_for(chrono::seconds(1));
     }

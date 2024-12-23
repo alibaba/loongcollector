@@ -34,9 +34,9 @@ bool ScrapeConfig::Init(const Json::Value& scrapeConfig) {
         return false;
     }
 
-    if (scrapeConfig.isMember(prometheus::SCRAPE_PROTOCOLS) && scrapeConfig[prometheus::SCRAPE_PROTOCOLS].isArray()) {
-        if (!InitScrapeProtocols(scrapeConfig[prometheus::SCRAPE_PROTOCOLS])) {
-            LOG_ERROR(sLogger, ("scrape protocol config error", scrapeConfig[prometheus::SCRAPE_PROTOCOLS]));
+    if (scrapeConfig.isMember(prom::SCRAPE_PROTOCOLS) && scrapeConfig[prom::SCRAPE_PROTOCOLS].isArray()) {
+        if (!InitScrapeProtocols(scrapeConfig[prom::SCRAPE_PROTOCOLS])) {
+            LOG_ERROR(sLogger, ("scrape protocol config error", scrapeConfig[prom::SCRAPE_PROTOCOLS]));
             return false;
         }
     } else {
@@ -44,45 +44,45 @@ bool ScrapeConfig::Init(const Json::Value& scrapeConfig) {
         InitScrapeProtocols(nullJson);
     }
 
-    if (scrapeConfig.isMember(prometheus::FOLLOW_REDIRECTS) && scrapeConfig[prometheus::FOLLOW_REDIRECTS].isBool()) {
-        mFollowRedirects = scrapeConfig[prometheus::FOLLOW_REDIRECTS].asBool();
+    if (scrapeConfig.isMember(prom::FOLLOW_REDIRECTS) && scrapeConfig[prom::FOLLOW_REDIRECTS].isBool()) {
+        mFollowRedirects = scrapeConfig[prom::FOLLOW_REDIRECTS].asBool();
     }
 
-    if (scrapeConfig.isMember(prometheus::TLS_CONFIG) && scrapeConfig[prometheus::TLS_CONFIG].isObject()) {
-        if (!InitTLSConfig(scrapeConfig[prometheus::TLS_CONFIG])) {
+    if (scrapeConfig.isMember(prom::TLS_CONFIG) && scrapeConfig[prom::TLS_CONFIG].isObject()) {
+        if (!InitTLSConfig(scrapeConfig[prom::TLS_CONFIG])) {
             LOG_ERROR(sLogger, ("tls config error", ""));
             return false;
         }
     }
 
-    if (scrapeConfig.isMember(prometheus::ENABLE_COMPRESSION)
-        && scrapeConfig[prometheus::ENABLE_COMPRESSION].isBool()) {
-        // InitEnableCompression(scrapeConfig[prometheus::ENABLE_COMPRESSION].asBool());
+    if (scrapeConfig.isMember(prom::ENABLE_COMPRESSION)
+        && scrapeConfig[prom::ENABLE_COMPRESSION].isBool()) {
+        // InitEnableCompression(scrapeConfig[prom::ENABLE_COMPRESSION].asBool());
     } else {
         // InitEnableCompression(true);
     }
 
     // basic auth, authorization, oauth2
     // basic auth, authorization, oauth2 cannot be used at the same time
-    if ((int)scrapeConfig.isMember(prometheus::BASIC_AUTH) + scrapeConfig.isMember(prometheus::AUTHORIZATION) > 1) {
+    if ((int)scrapeConfig.isMember(prom::BASIC_AUTH) + scrapeConfig.isMember(prom::AUTHORIZATION) > 1) {
         LOG_ERROR(sLogger, ("basic auth and authorization cannot be used at the same time", ""));
         return false;
     }
-    if (scrapeConfig.isMember(prometheus::BASIC_AUTH) && scrapeConfig[prometheus::BASIC_AUTH].isObject()) {
-        if (!InitBasicAuth(scrapeConfig[prometheus::BASIC_AUTH])) {
+    if (scrapeConfig.isMember(prom::BASIC_AUTH) && scrapeConfig[prom::BASIC_AUTH].isObject()) {
+        if (!InitBasicAuth(scrapeConfig[prom::BASIC_AUTH])) {
             LOG_ERROR(sLogger, ("basic auth config error", ""));
             return false;
         }
     }
-    if (scrapeConfig.isMember(prometheus::AUTHORIZATION) && scrapeConfig[prometheus::AUTHORIZATION].isObject()) {
-        if (!InitAuthorization(scrapeConfig[prometheus::AUTHORIZATION])) {
+    if (scrapeConfig.isMember(prom::AUTHORIZATION) && scrapeConfig[prom::AUTHORIZATION].isObject()) {
+        if (!InitAuthorization(scrapeConfig[prom::AUTHORIZATION])) {
             LOG_ERROR(sLogger, ("authorization config error", ""));
             return false;
         }
     }
 
-    if (scrapeConfig.isMember(prometheus::PARAMS) && scrapeConfig[prometheus::PARAMS].isObject()) {
-        const Json::Value& params = scrapeConfig[prometheus::PARAMS];
+    if (scrapeConfig.isMember(prom::PARAMS) && scrapeConfig[prom::PARAMS].isObject()) {
+        const Json::Value& params = scrapeConfig[prom::PARAMS];
         for (const auto& key : params.getMemberNames()) {
             const Json::Value& values = params[key];
             if (values.isArray()) {
@@ -111,8 +111,8 @@ bool ScrapeConfig::Init(const Json::Value& scrapeConfig) {
 }
 
 bool ScrapeConfig::InitStaticConfig(const Json::Value& scrapeConfig) {
-    if (scrapeConfig.isMember(prometheus::JOB_NAME) && scrapeConfig[prometheus::JOB_NAME].isString()) {
-        mJobName = scrapeConfig[prometheus::JOB_NAME].asString();
+    if (scrapeConfig.isMember(prom::JOB_NAME) && scrapeConfig[prom::JOB_NAME].isString()) {
+        mJobName = scrapeConfig[prom::JOB_NAME].asString();
         if (mJobName.empty()) {
             LOG_ERROR(sLogger, ("job name is empty", ""));
             return false;
@@ -121,41 +121,41 @@ bool ScrapeConfig::InitStaticConfig(const Json::Value& scrapeConfig) {
         return false;
     }
 
-    if (scrapeConfig.isMember(prometheus::SCRAPE_INTERVAL) && scrapeConfig[prometheus::SCRAPE_INTERVAL].isString()) {
-        string tmpScrapeIntervalString = scrapeConfig[prometheus::SCRAPE_INTERVAL].asString();
+    if (scrapeConfig.isMember(prom::SCRAPE_INTERVAL) && scrapeConfig[prom::SCRAPE_INTERVAL].isString()) {
+        string tmpScrapeIntervalString = scrapeConfig[prom::SCRAPE_INTERVAL].asString();
         mScrapeIntervalSeconds = DurationToSecond(tmpScrapeIntervalString);
         if (mScrapeIntervalSeconds == 0) {
             LOG_ERROR(sLogger, ("scrape interval is invalid", tmpScrapeIntervalString));
             return false;
         }
     }
-    if (scrapeConfig.isMember(prometheus::SCRAPE_TIMEOUT) && scrapeConfig[prometheus::SCRAPE_TIMEOUT].isString()) {
-        string tmpScrapeTimeoutString = scrapeConfig[prometheus::SCRAPE_TIMEOUT].asString();
+    if (scrapeConfig.isMember(prom::SCRAPE_TIMEOUT) && scrapeConfig[prom::SCRAPE_TIMEOUT].isString()) {
+        string tmpScrapeTimeoutString = scrapeConfig[prom::SCRAPE_TIMEOUT].asString();
         mScrapeTimeoutSeconds = DurationToSecond(tmpScrapeTimeoutString);
         if (mScrapeTimeoutSeconds == 0) {
             LOG_ERROR(sLogger, ("scrape timeout is invalid", tmpScrapeTimeoutString));
             return false;
         }
     }
-    if (scrapeConfig.isMember(prometheus::METRICS_PATH) && scrapeConfig[prometheus::METRICS_PATH].isString()) {
-        mMetricsPath = scrapeConfig[prometheus::METRICS_PATH].asString();
+    if (scrapeConfig.isMember(prom::METRICS_PATH) && scrapeConfig[prom::METRICS_PATH].isString()) {
+        mMetricsPath = scrapeConfig[prom::METRICS_PATH].asString();
     }
 
-    if (scrapeConfig.isMember(prometheus::HONOR_LABELS) && scrapeConfig[prometheus::HONOR_LABELS].isBool()) {
-        mHonorLabels = scrapeConfig[prometheus::HONOR_LABELS].asBool();
+    if (scrapeConfig.isMember(prom::HONOR_LABELS) && scrapeConfig[prom::HONOR_LABELS].isBool()) {
+        mHonorLabels = scrapeConfig[prom::HONOR_LABELS].asBool();
     }
 
-    if (scrapeConfig.isMember(prometheus::HONOR_TIMESTAMPS) && scrapeConfig[prometheus::HONOR_TIMESTAMPS].isBool()) {
-        mHonorTimestamps = scrapeConfig[prometheus::HONOR_TIMESTAMPS].asBool();
+    if (scrapeConfig.isMember(prom::HONOR_TIMESTAMPS) && scrapeConfig[prom::HONOR_TIMESTAMPS].isBool()) {
+        mHonorTimestamps = scrapeConfig[prom::HONOR_TIMESTAMPS].asBool();
     }
 
-    if (scrapeConfig.isMember(prometheus::SCHEME) && scrapeConfig[prometheus::SCHEME].isString()) {
-        mScheme = scrapeConfig[prometheus::SCHEME].asString();
+    if (scrapeConfig.isMember(prom::SCHEME) && scrapeConfig[prom::SCHEME].isString()) {
+        mScheme = scrapeConfig[prom::SCHEME].asString();
     }
 
     // <size>: a size in bytes, e.g. 512MB. A unit is required. Supported units: B, KB, MB, GB, TB, PB, EB.
-    if (scrapeConfig.isMember(prometheus::MAX_SCRAPE_SIZE) && scrapeConfig[prometheus::MAX_SCRAPE_SIZE].isString()) {
-        string tmpMaxScrapeSize = scrapeConfig[prometheus::MAX_SCRAPE_SIZE].asString();
+    if (scrapeConfig.isMember(prom::MAX_SCRAPE_SIZE) && scrapeConfig[prom::MAX_SCRAPE_SIZE].isString()) {
+        string tmpMaxScrapeSize = scrapeConfig[prom::MAX_SCRAPE_SIZE].asString();
         mMaxScrapeSizeBytes = SizeToByte(tmpMaxScrapeSize);
         if (mMaxScrapeSizeBytes == 0) {
             LOG_ERROR(sLogger, ("max scrape size is invalid", tmpMaxScrapeSize));
@@ -163,22 +163,22 @@ bool ScrapeConfig::InitStaticConfig(const Json::Value& scrapeConfig) {
         }
     }
 
-    if (scrapeConfig.isMember(prometheus::SAMPLE_LIMIT) && scrapeConfig[prometheus::SAMPLE_LIMIT].isInt64()) {
-        mSampleLimit = scrapeConfig[prometheus::SAMPLE_LIMIT].asUInt64();
+    if (scrapeConfig.isMember(prom::SAMPLE_LIMIT) && scrapeConfig[prom::SAMPLE_LIMIT].isInt64()) {
+        mSampleLimit = scrapeConfig[prom::SAMPLE_LIMIT].asUInt64();
     }
-    if (scrapeConfig.isMember(prometheus::SERIES_LIMIT) && scrapeConfig[prometheus::SERIES_LIMIT].isInt64()) {
-        mSeriesLimit = scrapeConfig[prometheus::SERIES_LIMIT].asUInt64();
+    if (scrapeConfig.isMember(prom::SERIES_LIMIT) && scrapeConfig[prom::SERIES_LIMIT].isInt64()) {
+        mSeriesLimit = scrapeConfig[prom::SERIES_LIMIT].asUInt64();
     }
 
-    if (scrapeConfig.isMember(prometheus::RELABEL_CONFIGS)) {
-        if (!mRelabelConfigs.Init(scrapeConfig[prometheus::RELABEL_CONFIGS])) {
+    if (scrapeConfig.isMember(prom::RELABEL_CONFIGS)) {
+        if (!mRelabelConfigs.Init(scrapeConfig[prom::RELABEL_CONFIGS])) {
             LOG_ERROR(sLogger, ("relabel config error", ""));
             return false;
         }
     }
 
-    if (scrapeConfig.isMember(prometheus::METRIC_RELABEL_CONFIGS)) {
-        if (!mMetricRelabelConfigs.Init(scrapeConfig[prometheus::METRIC_RELABEL_CONFIGS])) {
+    if (scrapeConfig.isMember(prom::METRIC_RELABEL_CONFIGS)) {
+        if (!mMetricRelabelConfigs.Init(scrapeConfig[prom::METRIC_RELABEL_CONFIGS])) {
             LOG_ERROR(sLogger, ("metric relabel config error", ""));
             return false;
         }
@@ -191,17 +191,17 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
     string usernameFile;
     string password;
     string passwordFile;
-    if (basicAuth.isMember(prometheus::USERNAME) && basicAuth[prometheus::USERNAME].isString()) {
-        username = basicAuth[prometheus::USERNAME].asString();
+    if (basicAuth.isMember(prom::USERNAME) && basicAuth[prom::USERNAME].isString()) {
+        username = basicAuth[prom::USERNAME].asString();
     }
-    if (basicAuth.isMember(prometheus::USERNAME_FILE) && basicAuth[prometheus::USERNAME_FILE].isString()) {
-        usernameFile = basicAuth[prometheus::USERNAME_FILE].asString();
+    if (basicAuth.isMember(prom::USERNAME_FILE) && basicAuth[prom::USERNAME_FILE].isString()) {
+        usernameFile = basicAuth[prom::USERNAME_FILE].asString();
     }
-    if (basicAuth.isMember(prometheus::PASSWORD) && basicAuth[prometheus::PASSWORD].isString()) {
-        password = basicAuth[prometheus::PASSWORD].asString();
+    if (basicAuth.isMember(prom::PASSWORD) && basicAuth[prom::PASSWORD].isString()) {
+        password = basicAuth[prom::PASSWORD].asString();
     }
-    if (basicAuth.isMember(prometheus::PASSWORD_FILE) && basicAuth[prometheus::PASSWORD_FILE].isString()) {
-        passwordFile = basicAuth[prometheus::PASSWORD_FILE].asString();
+    if (basicAuth.isMember(prom::PASSWORD_FILE) && basicAuth[prom::PASSWORD_FILE].isString()) {
+        passwordFile = basicAuth[prom::PASSWORD_FILE].asString();
     }
 
     if ((username.empty() && usernameFile.empty()) || (password.empty() && passwordFile.empty())) {
@@ -224,7 +224,7 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
 
     auto token = username + ":" + password;
     auto token64 = sdk::Base64Enconde(token);
-    mRequestHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
+    mRequestHeaders[prom::A_UTHORIZATION] = prom::BASIC_PREFIX + token64;
     return true;
 }
 
@@ -233,20 +233,20 @@ bool ScrapeConfig::InitAuthorization(const Json::Value& authorization) {
     string credentials;
     string credentialsFile;
 
-    if (authorization.isMember(prometheus::TYPE) && authorization[prometheus::TYPE].isString()) {
-        type = authorization[prometheus::TYPE].asString();
+    if (authorization.isMember(prom::TYPE) && authorization[prom::TYPE].isString()) {
+        type = authorization[prom::TYPE].asString();
     }
     // if not set, use default type Bearer
     if (type.empty()) {
-        type = prometheus::AUTHORIZATION_DEFAULT_TYEP;
+        type = prom::AUTHORIZATION_DEFAULT_TYEP;
     }
 
-    if (authorization.isMember(prometheus::CREDENTIALS) && authorization[prometheus::CREDENTIALS].isString()) {
-        credentials = authorization[prometheus::CREDENTIALS].asString();
+    if (authorization.isMember(prom::CREDENTIALS) && authorization[prom::CREDENTIALS].isString()) {
+        credentials = authorization[prom::CREDENTIALS].asString();
     }
-    if (authorization.isMember(prometheus::CREDENTIALS_FILE)
-        && authorization[prometheus::CREDENTIALS_FILE].isString()) {
-        credentialsFile = authorization[prometheus::CREDENTIALS_FILE].asString();
+    if (authorization.isMember(prom::CREDENTIALS_FILE)
+        && authorization[prom::CREDENTIALS_FILE].isString()) {
+        credentialsFile = authorization[prom::CREDENTIALS_FILE].asString();
     }
     if (!credentials.empty() && !credentialsFile.empty()) {
         LOG_ERROR(sLogger, ("authorization config error", ""));
@@ -258,23 +258,23 @@ bool ScrapeConfig::InitAuthorization(const Json::Value& authorization) {
         return false;
     }
 
-    mRequestHeaders[prometheus::A_UTHORIZATION] = type + " " + credentials;
+    mRequestHeaders[prom::A_UTHORIZATION] = type + " " + credentials;
     return true;
 }
 
 bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
     static auto sScrapeProtocolsHeaders = std::map<string, string>{
-        {prometheus::PrometheusProto,
+        {prom::PrometheusProto,
          "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited"},
-        {prometheus::PrometheusText0_0_4, "text/plain;version=0.0.4"},
-        {prometheus::OpenMetricsText0_0_1, "application/openmetrics-text;version=0.0.1"},
-        {prometheus::OpenMetricsText1_0_0, "application/openmetrics-text;version=1.0.0"},
+        {prom::PrometheusText0_0_4, "text/plain;version=0.0.4"},
+        {prom::OpenMetricsText0_0_1, "application/openmetrics-text;version=0.0.1"},
+        {prom::OpenMetricsText1_0_0, "application/openmetrics-text;version=1.0.0"},
     };
     static auto sDefaultScrapeProtocols = vector<string>{
-        prometheus::PrometheusText0_0_4,
-        prometheus::PrometheusProto,
-        prometheus::OpenMetricsText0_0_1,
-        prometheus::OpenMetricsText1_0_0,
+        prom::PrometheusText0_0_4,
+        prom::PrometheusProto,
+        prom::OpenMetricsText0_0_1,
+        prom::OpenMetricsText1_0_0,
     };
 
     auto join = [](const vector<string>& strs, const string& sep) {
@@ -340,54 +340,54 @@ bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
         tmpScrapeProtocol = val;
     }
     tmpScrapeProtocols.push_back("*/*;q=0." + ToString(weight));
-    mRequestHeaders[prometheus::ACCEPT] = join(tmpScrapeProtocols, ",");
+    mRequestHeaders[prom::ACCEPT] = join(tmpScrapeProtocols, ",");
     return true;
 }
 
 void ScrapeConfig::InitEnableCompression(bool enableCompression) {
     if (enableCompression) {
-        mRequestHeaders[prometheus::ACCEPT_ENCODING] = prometheus::GZIP;
+        mRequestHeaders[prom::ACCEPT_ENCODING] = prom::GZIP;
     } else {
-        mRequestHeaders[prometheus::ACCEPT_ENCODING] = prometheus::IDENTITY;
+        mRequestHeaders[prom::ACCEPT_ENCODING] = prom::IDENTITY;
     }
 }
 
 bool ScrapeConfig::InitTLSConfig(const Json::Value& tlsConfig) {
-    if (tlsConfig.isMember(prometheus::CA_FILE)) {
-        if (tlsConfig[prometheus::CA_FILE].isString()) {
-            mTLS.mCaFile = tlsConfig[prometheus::CA_FILE].asString();
+    if (tlsConfig.isMember(prom::CA_FILE)) {
+        if (tlsConfig[prom::CA_FILE].isString()) {
+            mTLS.mCaFile = tlsConfig[prom::CA_FILE].asString();
         } else {
             LOG_ERROR(sLogger, ("tls config error", ""));
             return false;
         }
     }
-    if (tlsConfig.isMember(prometheus::CERT_FILE)) {
-        if (tlsConfig[prometheus::CERT_FILE].isString()) {
-            mTLS.mCertFile = tlsConfig[prometheus::CERT_FILE].asString();
+    if (tlsConfig.isMember(prom::CERT_FILE)) {
+        if (tlsConfig[prom::CERT_FILE].isString()) {
+            mTLS.mCertFile = tlsConfig[prom::CERT_FILE].asString();
         } else {
             LOG_ERROR(sLogger, ("tls config error", ""));
             return false;
         }
     }
-    if (tlsConfig.isMember(prometheus::KEY_FILE)) {
-        if (tlsConfig[prometheus::KEY_FILE].isString()) {
-            mTLS.mKeyFile = tlsConfig[prometheus::KEY_FILE].asString();
+    if (tlsConfig.isMember(prom::KEY_FILE)) {
+        if (tlsConfig[prom::KEY_FILE].isString()) {
+            mTLS.mKeyFile = tlsConfig[prom::KEY_FILE].asString();
         } else {
             LOG_ERROR(sLogger, ("tls config error", ""));
             return false;
         }
     }
-    if (tlsConfig.isMember(prometheus::SERVER_NAME)) {
-        if (tlsConfig[prometheus::SERVER_NAME].isString()) {
-            mRequestHeaders[prometheus::HOST] = tlsConfig[prometheus::SERVER_NAME].asString();
+    if (tlsConfig.isMember(prom::SERVER_NAME)) {
+        if (tlsConfig[prom::SERVER_NAME].isString()) {
+            mRequestHeaders[prom::HOST] = tlsConfig[prom::SERVER_NAME].asString();
         } else {
             LOG_ERROR(sLogger, ("tls config error", ""));
             return false;
         }
     }
-    if (tlsConfig.isMember(prometheus::INSECURE_SKIP_VERIFY)) {
-        if (tlsConfig[prometheus::INSECURE_SKIP_VERIFY].isBool()) {
-            mTLS.mInsecureSkipVerify = tlsConfig[prometheus::INSECURE_SKIP_VERIFY].asBool();
+    if (tlsConfig.isMember(prom::INSECURE_SKIP_VERIFY)) {
+        if (tlsConfig[prom::INSECURE_SKIP_VERIFY].isBool()) {
+            mTLS.mInsecureSkipVerify = tlsConfig[prom::INSECURE_SKIP_VERIFY].asBool();
         } else {
             LOG_ERROR(sLogger, ("tls config error", ""));
             return false;

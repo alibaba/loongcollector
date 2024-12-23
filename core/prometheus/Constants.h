@@ -3,7 +3,10 @@
 #include <cstdint>
 #include <string>
 
-namespace logtail::prometheus {
+namespace logtail::prom {
+
+// app config
+const std::string PROM_DROP_METRICS = "prom_drop_metrics_list";
 
 // magic number for labels hash, from https://github.com/prometheus/common/blob/main/model/fnv.go#L19
 const uint64_t PRIME64 = 1099511628211;

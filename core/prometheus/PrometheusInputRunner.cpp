@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 
+#include "AppConfig.h"
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
@@ -41,9 +42,9 @@ DECLARE_FLAG_STRING(loong_collector_operator_service);
 DECLARE_FLAG_INT32(loong_collector_operator_service_port);
 DECLARE_FLAG_STRING(_pod_name_);
 
-namespace logtail {
+namespace logtail::prom {
 
-PrometheusInputRunner::PrometheusInputRunner()
+PrometheusServer::PrometheusServer()
     : mServiceHost(STRING_FLAG(loong_collector_operator_service)),
       mServicePort(INT32_FLAG(loong_collector_operator_service_port)),
       mPodName(STRING_FLAG(_pod_name_)),
@@ -51,6 +52,7 @@ PrometheusInputRunner::PrometheusInputRunner()
       mUnRegisterMs(0) {
     mClient = std::make_unique<sdk::CurlClient>();
     mTimer = std::make_shared<Timer>();
+    mGlobalConfig = std::make_shared<GlobalConfig>();
 
     // self monitor
     MetricLabels labels;
@@ -72,9 +74,9 @@ PrometheusInputRunner::PrometheusInputRunner()
 }
 
 /// @brief receive scrape jobs from input plugins and update scrape jobs
-void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber,
-                                              const MetricLabels& defaultLabels,
-                                              const string& projectName) {
+void PrometheusServer::UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber,
+                                         const MetricLabels& defaultLabels,
+                                         const string& projectName) {
     RemoveScrapeInput(targetSubscriber->GetId());
 
     targetSubscriber->mServiceHost = mServiceHost;
@@ -88,7 +90,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     auto currSystemTime = chrono::system_clock::now();
     auto randSleepMilliSec
         = GetRandSleepMilliSec(targetSubscriber->GetId(),
-                               prometheus::RefeshIntervalSeconds,
+                               prom::RefeshIntervalSeconds,
                                chrono::duration_cast<chrono::milliseconds>(currSystemTime.time_since_epoch()).count());
     auto firstExecTime = chrono::steady_clock::now() + chrono::milliseconds(randSleepMilliSec);
     auto firstSubscribeTime = currSystemTime + chrono::milliseconds(randSleepMilliSec);
@@ -111,7 +113,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     }
 }
 
-void PrometheusInputRunner::RemoveScrapeInput(const std::string& jobName) {
+void PrometheusServer::RemoveScrapeInput(const std::string& jobName) {
     {
         WriteLock lock(mSubscriberMapRWLock);
         if (mTargetSubscriberSchedulerMap.count(jobName)) {
@@ -128,8 +130,20 @@ void PrometheusInputRunner::RemoveScrapeInput(const std::string& jobName) {
     }
 }
 
+bool PrometheusServer::UpdateGlobalConfig() {
+    auto validateFn = [](const std::string& key, const std::string& _) -> bool {
+        if (key == prom::PROM_DROP_METRICS) {
+            return true;
+        }
+        return false;
+    };
+    auto dropMetrics = AppConfig::GetInstance()->MergeString("", "", prom::PROM_DROP_METRICS, validateFn);
+    mGlobalConfig->UpdateDropMetrics(dropMetrics);
+    return true;
+}
+
 /// @brief targets discovery and start scrape work
-void PrometheusInputRunner::Init() {
+void PrometheusServer::Init() {
     std::lock_guard<mutex> lock(mStartMutex);
     if (mIsStarted) {
         return;
@@ -137,10 +151,13 @@ void PrometheusInputRunner::Init() {
     LOG_INFO(sLogger, ("PrometheusInputRunner", "Start"));
     mIsStarted = true;
 
+    UpdateGlobalConfig();
+    mCallback = [this]() -> bool { return UpdateGlobalConfig(); };
 #ifndef APSARA_UNIT_TEST_MAIN
     mTimer->Init();
     AsynCurlRunner::GetInstance()->Init();
 #endif
+    AppConfig::GetInstance()->RegisterCallback(prom::PROM_DROP_METRICS, &mCallback);
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "register"));
     // only register when operator exist
@@ -151,7 +168,7 @@ void PrometheusInputRunner::Init() {
             int retry = 0;
             while (mIsThreadRunning.load()) {
                 ++retry;
-                sdk::HttpMessage httpResponse = SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH);
+                sdk::HttpMessage httpResponse = SendRegisterMessage(prom::REGISTER_COLLECTOR_PATH);
                 if (httpResponse.statusCode != 200) {
                     mPromRegisterRetryTotal->Add(1);
                     if (retry % 10 == 0) {
@@ -167,9 +184,9 @@ void PrometheusInputRunner::Init() {
                         if (!ParseJsonTable(responseStr, responseJson, errMsg)) {
                             LOG_ERROR(sLogger, ("register failed, parse response failed", responseStr));
                         }
-                        if (responseJson.isMember(prometheus::UNREGISTER_MS)
-                            && responseJson[prometheus::UNREGISTER_MS].isString()) {
-                            auto tmpStr = responseJson[prometheus::UNREGISTER_MS].asString();
+                        if (responseJson.isMember(prom::UNREGISTER_MS)
+                            && responseJson[prom::UNREGISTER_MS].isString()) {
+                            auto tmpStr = responseJson[prom::UNREGISTER_MS].asString();
                             if (tmpStr.empty()) {
                                 mUnRegisterMs = 0;
                             } else {
@@ -191,7 +208,7 @@ void PrometheusInputRunner::Init() {
 }
 
 /// @brief stop scrape work and clear all scrape jobs
-void PrometheusInputRunner::Stop() {
+void PrometheusServer::Stop() {
     std::lock_guard<mutex> lock(mStartMutex);
     if (!mIsStarted) {
         return;
@@ -208,6 +225,7 @@ void PrometheusInputRunner::Stop() {
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
 #endif
+    AppConfig::GetInstance()->UnregisterCallback(prom::PROM_DROP_METRICS);
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
     CancelAllTargetSubscriber();
@@ -222,7 +240,7 @@ void PrometheusInputRunner::Stop() {
         auto res = std::async(launch::async, [this]() {
             std::lock_guard<mutex> lock(mRegisterMutex);
             for (int retry = 0; retry < 3; ++retry) {
-                sdk::HttpMessage httpResponse = SendRegisterMessage(prometheus::UNREGISTER_COLLECTOR_PATH);
+                sdk::HttpMessage httpResponse = SendRegisterMessage(prom::UNREGISTER_COLLECTOR_PATH);
                 if (httpResponse.statusCode != 200) {
                     LOG_ERROR(sLogger, ("unregister failed, statusCode", httpResponse.statusCode));
                 } else {
@@ -237,16 +255,16 @@ void PrometheusInputRunner::Stop() {
     LOG_INFO(sLogger, ("PrometheusInputRunner", "Stop"));
 }
 
-bool PrometheusInputRunner::HasRegisteredPlugins() const {
+bool PrometheusServer::HasRegisteredPlugins() const {
     ReadLock lock(mSubscriberMapRWLock);
     return !mTargetSubscriberSchedulerMap.empty();
 }
 
-sdk::HttpMessage PrometheusInputRunner::SendRegisterMessage(const string& url) const {
+sdk::HttpMessage PrometheusServer::SendRegisterMessage(const string& url) const {
     map<string, string> httpHeader;
-    httpHeader[sdk::X_LOG_REQUEST_ID] = prometheus::PROMETHEUS_PREFIX + mPodName;
+    httpHeader[sdk::X_LOG_REQUEST_ID] = prom::PROMETHEUS_PREFIX + mPodName;
     sdk::HttpMessage httpResponse;
-    httpResponse.header[sdk::X_LOG_REQUEST_ID] = prometheus::PROMETHEUS_PREFIX + mPodName;
+    httpResponse.header[sdk::X_LOG_REQUEST_ID] = prom::PROMETHEUS_PREFIX + mPodName;
 #ifdef APSARA_UNIT_TEST_MAIN
     httpResponse.statusCode = 200;
     return httpResponse;
@@ -270,21 +288,21 @@ sdk::HttpMessage PrometheusInputRunner::SendRegisterMessage(const string& url) c
 }
 
 
-void PrometheusInputRunner::CancelAllTargetSubscriber() {
+void PrometheusServer::CancelAllTargetSubscriber() {
     ReadLock lock(mSubscriberMapRWLock);
     for (auto& it : mTargetSubscriberSchedulerMap) {
         it.second->Cancel();
     }
 }
 
-void PrometheusInputRunner::SubscribeOnce() {
+void PrometheusServer::SubscribeOnce() {
     ReadLock lock(mSubscriberMapRWLock);
     for (auto& [k, v] : mTargetSubscriberSchedulerMap) {
         v->SubscribeOnce(std::chrono::steady_clock::now());
     }
 }
 
-string PrometheusInputRunner::GetAllProjects() {
+string PrometheusServer::GetAllProjects() {
     string result;
     set<string> existProjects;
     ReadLock lock(mProjectRWLock);
@@ -300,7 +318,7 @@ string PrometheusInputRunner::GetAllProjects() {
     return result;
 }
 
-void PrometheusInputRunner::CheckGC() {
+void PrometheusServer::CheckGC() {
     mEventPool.CheckGC();
 }
-}; // namespace logtail
+}; // namespace logtail::prom

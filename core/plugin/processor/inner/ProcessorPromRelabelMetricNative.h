@@ -21,6 +21,7 @@
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "pipeline/plugin/interface/Processor.h"
+#include "prometheus/component/GlobalConfig.h"
 #include "prometheus/schedulers/ScrapeConfig.h"
 
 namespace logtail {
@@ -48,7 +49,7 @@ private:
                    const GroupTags& targetTags);
 
     std::unique_ptr<ScrapeConfig> mScrapeConfigPtr;
-    std::string mLoongCollectorScraper;
+    std::shared_ptr<prom::GlobalConfig> mGlobalConfig;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorPromRelabelMetricNativeUnittest;

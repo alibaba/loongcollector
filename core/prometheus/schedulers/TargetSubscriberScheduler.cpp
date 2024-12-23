@@ -48,7 +48,7 @@ bool TargetSubscriberScheduler::Init(const Json::Value& scrapeConfig) {
         return false;
     }
     mJobName = mScrapeConfigPtr->mJobName;
-    mInterval = prometheus::RefeshIntervalSeconds;
+    mInterval = prom::RefeshIntervalSeconds;
 
     return true;
 }
@@ -69,8 +69,8 @@ void TargetSubscriberScheduler::OnSubscription(HttpResponse& response, uint64_t 
     if (response.GetStatusCode() != 200) {
         return;
     }
-    if (response.GetHeader().count(prometheus::ETAG)) {
-        mETag = response.GetHeader().at(prometheus::ETAG);
+    if (response.GetHeader().count(prom::ETAG)) {
+        mETag = response.GetHeader().at(prom::ETAG);
     }
     const string& content = *response.GetBody<string>();
     vector<Labels> targetGroup;
@@ -149,8 +149,8 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
 
         // Parse targets
         vector<string> targets;
-        if (element.isMember(prometheus::TARGETS) && element[prometheus::TARGETS].isArray()) {
-            for (const auto& target : element[prometheus::TARGETS]) {
+        if (element.isMember(prom::TARGETS) && element[prom::TARGETS].isArray()) {
+            for (const auto& target : element[prom::TARGETS]) {
                 if (target.isString()) {
                     targets.push_back(target.asString());
                 } else {
@@ -166,21 +166,21 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
         }
         // Parse labels
         Labels labels;
-        labels.Set(prometheus::JOB, mJobName);
-        labels.Set(prometheus::ADDRESS_LABEL_NAME, targets[0]);
-        labels.Set(prometheus::SCHEME_LABEL_NAME, mScrapeConfigPtr->mScheme);
-        labels.Set(prometheus::METRICS_PATH_LABEL_NAME, mScrapeConfigPtr->mMetricsPath);
-        labels.Set(prometheus::SCRAPE_INTERVAL_LABEL_NAME, SecondToDuration(mScrapeConfigPtr->mScrapeIntervalSeconds));
-        labels.Set(prometheus::SCRAPE_TIMEOUT_LABEL_NAME, SecondToDuration(mScrapeConfigPtr->mScrapeTimeoutSeconds));
+        labels.Set(prom::JOB, mJobName);
+        labels.Set(prom::ADDRESS_LABEL_NAME, targets[0]);
+        labels.Set(prom::SCHEME_LABEL_NAME, mScrapeConfigPtr->mScheme);
+        labels.Set(prom::METRICS_PATH_LABEL_NAME, mScrapeConfigPtr->mMetricsPath);
+        labels.Set(prom::SCRAPE_INTERVAL_LABEL_NAME, SecondToDuration(mScrapeConfigPtr->mScrapeIntervalSeconds));
+        labels.Set(prom::SCRAPE_TIMEOUT_LABEL_NAME, SecondToDuration(mScrapeConfigPtr->mScrapeTimeoutSeconds));
         for (const auto& pair : mScrapeConfigPtr->mParams) {
             if (!pair.second.empty()) {
-                labels.Set(prometheus::PARAM_LABEL_NAME + pair.first, pair.second[0]);
+                labels.Set(prom::PARAM_LABEL_NAME + pair.first, pair.second[0]);
             }
         }
 
-        if (element.isMember(prometheus::LABELS) && element[prometheus::LABELS].isObject()) {
-            for (const string& labelKey : element[prometheus::LABELS].getMemberNames()) {
-                labels.Set(labelKey, element[prometheus::LABELS][labelKey].asString());
+        if (element.isMember(prom::LABELS) && element[prom::LABELS].isObject()) {
+            for (const string& labelKey : element[prom::LABELS].getMemberNames()) {
+                labels.Set(labelKey, element[prom::LABELS][labelKey].asString());
             }
         }
         scrapeSchedulerGroup.push_back(labels);
@@ -203,9 +203,9 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
             continue;
         }
 
-        string address = resultLabel.Get(prometheus::ADDRESS_LABEL_NAME);
-        if (resultLabel.Get(prometheus::INSTANCE).empty()) {
-            resultLabel.Set(prometheus::INSTANCE, address);
+        string address = resultLabel.Get(prom::ADDRESS_LABEL_NAME);
+        if (resultLabel.Get(prom::INSTANCE).empty()) {
+            resultLabel.Set(prom::INSTANCE, address);
         }
 
         auto m = address.find(':');
@@ -289,11 +289,11 @@ void TargetSubscriberScheduler::SubscribeOnce(std::chrono::steady_clock::time_po
 std::unique_ptr<TimerEvent>
 TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::time_point execTime) {
     map<string, string> httpHeader;
-    httpHeader[prometheus::ACCEPT] = prometheus::APPLICATION_JSON;
-    httpHeader[prometheus::X_PROMETHEUS_REFRESH_INTERVAL_SECONDS] = ToString(prometheus::RefeshIntervalSeconds);
-    httpHeader[prometheus::USER_AGENT] = prometheus::PROMETHEUS_PREFIX + mPodName;
+    httpHeader[prom::ACCEPT] = prom::APPLICATION_JSON;
+    httpHeader[prom::X_PROMETHEUS_REFRESH_INTERVAL_SECONDS] = ToString(prom::RefeshIntervalSeconds);
+    httpHeader[prom::USER_AGENT] = prom::PROMETHEUS_PREFIX + mPodName;
     if (!mETag.empty()) {
-        httpHeader[prometheus::IF_NONE_MATCH] = mETag;
+        httpHeader[prom::IF_NONE_MATCH] = mETag;
     }
     auto request = std::make_unique<PromHttpRequest>(sdk::HTTP_GET,
                                                      false,
@@ -304,7 +304,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
                                                      httpHeader,
                                                      "",
                                                      HttpResponse(),
-                                                     prometheus::RefeshIntervalSeconds,
+                                                     prom::RefeshIntervalSeconds,
                                                      1,
                                                      this->mFuture);
     auto timerEvent = std::make_unique<HttpRequestTimerEvent>(execTime, std::move(request));

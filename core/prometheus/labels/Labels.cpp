@@ -72,7 +72,7 @@ std::string Labels::Get(const string& name) {
 
 void Labels::Reset(MetricEvent* metricEvent) {
     mMetricEventPtr = metricEvent;
-    Set(prometheus::NAME, metricEvent->GetName().to_string());
+    Set(prom::NAME, metricEvent->GetName().to_string());
 }
 
 void Labels::Set(const string& k, const string& v) {
@@ -110,11 +110,11 @@ void Labels::Range(const std::function<void(const string& k, const string& v)>& 
 
 uint64_t Labels::Hash() {
     string hash;
-    uint64_t sum = prometheus::OFFSET64;
+    uint64_t sum = prom::OFFSET64;
     Range([&hash](const string& k, const string& v) { hash += k + "\xff" + v + "\xff"; });
     for (auto i : hash) {
         sum ^= (uint64_t)i;
-        sum *= prometheus::PRIME64;
+        sum *= prom::PRIME64;
     }
     return sum;
 }
@@ -122,7 +122,7 @@ uint64_t Labels::Hash() {
 void Labels::RemoveMetaLabels() {
     // for mLabels only
     for (auto it = mLabels.begin(); it != mLabels.end();) {
-        if (it->first.find(prometheus::META) == 0) {
+        if (it->first.find(prom::META) == 0) {
             it = mLabels.erase(it);
         } else {
             ++it;

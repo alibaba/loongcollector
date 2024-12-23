@@ -28,6 +28,7 @@
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/processor/inner/ProcessorPromDropMetricNative.h"
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseFlusherSLSMonitor.h"
 #endif
@@ -154,6 +155,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorFilterNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromDropMetricNative>());
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
     if (BOOL_FLAG(enable_processor_spl)) {
         RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSPL>());
