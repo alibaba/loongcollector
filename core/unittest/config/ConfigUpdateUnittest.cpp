@@ -244,6 +244,7 @@ void ConfigUpdateUnittest::OnStartUp() const {
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
     APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
     APSARA_TEST_TRUE(diff.second.IsEmpty());
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
 
     GenerateInitialConfigs();
     diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
