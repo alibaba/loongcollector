@@ -21,12 +21,11 @@
 #include <string>
 
 #include "common/Lock.h"
+#include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
 #include "monitor/metric_models/MetricTypes.h"
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 #include "runner/InputRunner.h"
-#include "sdk/Common.h"
-#include "sdk/CurlImp.h"
 
 namespace logtail {
 
@@ -56,7 +55,7 @@ public:
 
 private:
     PrometheusInputRunner();
-    sdk::HttpMessage SendRegisterMessage(const std::string& url) const;
+    HttpResponse SendRegisterMessage(const std::string& url) const;
 
     void CancelAllTargetSubscriber();
     void SubscribeOnce();
@@ -74,7 +73,6 @@ private:
     int32_t mServicePort;
     std::string mPodName;
 
-    std::unique_ptr<sdk::CurlClient> mClient;
     std::shared_ptr<Timer> mTimer;
     EventPool mEventPool;
 

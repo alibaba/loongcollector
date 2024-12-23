@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,17 @@
 
 namespace logtail {
 
-bool IsHttpsEndpoint(const std::string& endpoint);
+extern const std::string HTTP_POST;
+extern const std::string HTTP_GET;
 
-std::string ExtractEndpoint(const std::string& endpoint);
+extern const std::string HOST;
+extern const std::string DATE;
+extern const std::string USER_AGENT;
+extern const std::string CONTENT_LENGTH;
+extern const std::string CONTENT_TYPE;
+extern const std::string AUTHORIZATION;
+extern const std::string SIGNATURE;
 
-std::string StandardizeHost(const std::string& endpoint, const std::string& defaultEndpoint);
-
-std::string GetHostFromEndpoint(const std::string& endpoint);
+extern const std::string TYPE_LOG_PROTOBUF;
 
 } // namespace logtail

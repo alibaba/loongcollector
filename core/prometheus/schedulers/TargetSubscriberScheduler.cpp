@@ -20,10 +20,10 @@
 #include <memory>
 #include <string>
 
-#include "Common.h"
-#include "TimeUtil.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "common/http/Constant.h"
 #include "common/timer/HttpRequestTimerEvent.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
@@ -295,7 +295,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
     if (!mETag.empty()) {
         httpHeader[prometheus::IF_NONE_MATCH] = mETag;
     }
-    auto request = std::make_unique<PromHttpRequest>(sdk::HTTP_GET,
+    auto request = std::make_unique<PromHttpRequest>(HTTP_GET,
                                                      false,
                                                      mServiceHost,
                                                      mServicePort,

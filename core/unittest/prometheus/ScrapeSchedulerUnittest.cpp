@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-
 #include <memory>
 #include <string>
 
 #include "common/StringTools.h"
+#include "common/http/Curl.h"
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
 #include "models/RawEvent.h"
@@ -81,14 +81,14 @@ void ScrapeSchedulerUnittest::TestProcess() {
     // if status code is not 200, no data will be processed
     // but will continue running, sending self-monitoring metrics
     httpResponse.SetStatusCode(503);
-    httpResponse.SetNetworkStatus(CURLE_OK);
+    httpResponse.SetNetworkStatus(NetworkCode::Ok, "");
     event.OnMetricResult(httpResponse, 0);
     APSARA_TEST_EQUAL(1UL, event.mItem.size());
     event.mItem.clear();
 
     httpResponse.GetBody<PromMetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
     httpResponse.SetStatusCode(503);
-    httpResponse.SetNetworkStatus(CURLE_COULDNT_CONNECT);
+    httpResponse.SetNetworkStatus(GetNetworkStatus(CURLE_COULDNT_CONNECT), "");
     event.OnMetricResult(httpResponse, 0);
     APSARA_TEST_EQUAL(event.mScrapeState, "ERR_CONN_FAILED");
     APSARA_TEST_EQUAL(1UL, event.mItem.size());
@@ -96,7 +96,7 @@ void ScrapeSchedulerUnittest::TestProcess() {
 
     httpResponse.GetBody<PromMetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
     httpResponse.SetStatusCode(200);
-    httpResponse.SetNetworkStatus(CURLE_OK);
+    httpResponse.SetNetworkStatus(NetworkCode::Ok, "");
     string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
                    "# TYPE go_gc_duration_seconds summary\n"
                    "go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05\n"

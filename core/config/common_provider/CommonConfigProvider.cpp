@@ -26,6 +26,8 @@
 #include "common/StringTools.h"
 #include "common/UUIDUtil.h"
 #include "common/YamlUtil.h"
+#include "common/http/Constant.h"
+#include "common/http/Curl.h"
 #include "common/version.h"
 #include "config/ConfigUtil.h"
 #include "config/PipelineConfig.h"
@@ -33,9 +35,6 @@
 #include "constants/Constants.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
-#include "sdk/Common.h"
-#include "sdk/CurlImp.h"
-#include "sdk/Exception.h"
 
 using namespace std;
 
@@ -43,7 +42,9 @@ DEFINE_FLAG_INT32(heartbeat_interval, "second", 10);
 
 namespace logtail {
 
-std::string CommonConfigProvider::configVersion = "version";
+const string AGENT = "/Agent";
+
+string CommonConfigProvider::configVersion = "version";
 
 void CommonConfigProvider::Init(const string& dir) {
     sName = "common config provider";
@@ -300,7 +301,7 @@ configserver::proto::v2::HeartbeatRequest CommonConfigProvider::PrepareHeartbeat
 
 bool CommonConfigProvider::SendHeartbeat(const configserver::proto::v2::HeartbeatRequest& heartbeatReq,
                                          configserver::proto::v2::HeartbeatResponse& heartbeatResponse) {
-    string operation = sdk::CONFIGSERVERAGENT;
+    string operation = AGENT;
     operation.append("/").append("Heartbeat");
     string reqBody;
     heartbeatReq.SerializeToString(&reqBody);
@@ -323,31 +324,25 @@ bool CommonConfigProvider::SendHttpRequest(const string& operation,
     // LCOV_EXCL_START
     ConfigServerAddress configServerAddress = GetOneConfigServerAddress(false);
     map<string, string> httpHeader;
-    httpHeader[sdk::CONTENT_TYPE] = sdk::TYPE_LOG_PROTOBUF;
-    sdk::HttpMessage httpResponse;
-    httpResponse.header[sdk::X_LOG_REQUEST_ID] = requestId;
-    sdk::CurlClient client;
+    httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
 
-    try {
-        client.Send(sdk::HTTP_POST,
-                    configServerAddress.host,
-                    configServerAddress.port,
-                    operation,
-                    "",
-                    httpHeader,
-                    reqBody,
-                    INT32_FLAG(sls_client_send_timeout),
-                    httpResponse,
-                    "",
-                    false);
-        resp.swap(httpResponse.content);
-        return true;
-    } catch (const sdk::LOGException& e) {
+    HttpResponse httpResponse;
+    if (!logtail::SendHttpRequest(make_unique<HttpRequest>(HTTP_POST,
+                                                           false,
+                                                           configServerAddress.host,
+                                                           configServerAddress.port,
+                                                           operation,
+                                                           "",
+                                                           httpHeader,
+                                                           reqBody),
+                                  httpResponse)) {
         LOG_WARNING(sLogger,
-                    (configType, "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())("errMsg", e.GetMessage())(
-                        "host", configServerAddress.host)("port", configServerAddress.port));
+                    (configType, "fail")("reqBody",
+                                         reqBody)("host", configServerAddress.host)("port", configServerAddress.port));
         return false;
     }
+    resp = *httpResponse.GetBody<string>();
+    return true;
     // LCOV_EXCL_STOP
 }
 
@@ -498,7 +493,7 @@ bool CommonConfigProvider::FetchInstanceConfigFromServer(
         reqConfig->set_name(config.name());
         reqConfig->set_version(config.version());
     }
-    string operation = sdk::CONFIGSERVERAGENT;
+    string operation = AGENT;
     operation.append("/FetchInstanceConfig");
     string reqBody;
     fetchConfigRequest.SerializeToString(&reqBody);
@@ -525,7 +520,7 @@ bool CommonConfigProvider::FetchPipelineConfigFromServer(
         reqConfig->set_name(config.name());
         reqConfig->set_version(config.version());
     }
-    string operation = sdk::CONFIGSERVERAGENT;
+    string operation = AGENT;
     operation.append("/FetchPipelineConfig");
     string reqBody;
     fetchConfigRequest.SerializeToString(&reqBody);

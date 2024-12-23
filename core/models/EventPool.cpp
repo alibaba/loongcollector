@@ -19,7 +19,7 @@
 #include "common/Flags.h"
 #include "logger/Logger.h"
 
-DEFINE_FLAG_INT32(event_pool_gc_interval_secs, "", 60);
+DEFINE_FLAG_INT32(event_pool_gc_interval_sec, "", 60);
 
 using namespace std;
 
@@ -143,7 +143,7 @@ void DoGC(vector<T*>& pool, vector<T*>& poolBak, size_t& minUnusedCnt, mutex* mu
 }
 
 void EventPool::CheckGC() {
-    if (time(nullptr) - mLastGCTime > INT32_FLAG(event_pool_gc_interval_secs)) {
+    if (time(nullptr) - mLastGCTime > INT32_FLAG(event_pool_gc_interval_sec)) {
         if (mEnableLock) {
             lock_guard<mutex> lock(mPoolMux);
             DoGC(mLogEventPool, mLogEventPoolBak, mMinUnusedLogEventsCnt, &mPoolBakMux, "log");

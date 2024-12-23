@@ -23,6 +23,7 @@
 
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "common/http/Constant.h"
 #include "common/timer/HttpRequestTimerEvent.h"
 #include "logger/Logger.h"
 #include "pipeline/queue/ProcessQueueItem.h"
@@ -31,7 +32,6 @@
 #include "prometheus/Constants.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/async/PromHttpRequest.h"
-#include "sdk/Common.h"
 
 using namespace std;
 
@@ -212,7 +212,7 @@ std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::
         retry -= 1;
     }
     auto request = std::make_unique<PromHttpRequest>(
-        sdk::HTTP_GET,
+        HTTP_GET,
         mScrapeConfigPtr->mScheme == prometheus::HTTPS,
         mHost,
         mPort,

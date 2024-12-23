@@ -28,10 +28,14 @@
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#endif
 #include "plugin/flusher/sls/SLSClientManager.h"
+#include "plugin/flusher/sls/SLSConstant.h"
+#include "plugin/flusher/sls/SendResult.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
-#include "sdk/Exception.h"
 
 DEFINE_FLAG_INT32(write_secondary_wait_timeout, "interval of dump seconary buffer from memory to file, seconds", 2);
 DEFINE_FLAG_INT32(buffer_file_alive_interval, "the max alive time of a bufferfile, 5 minutes", 300);
@@ -41,12 +45,55 @@ DEFINE_FLAG_INT32(secondary_buffer_count_limit, "data ready for write buffer fil
 DEFINE_FLAG_INT32(send_retry_sleep_interval, "sleep microseconds when sync send fail, 50ms", 50000);
 DEFINE_FLAG_INT32(buffer_check_period, "check logtail local storage buffer period", 60);
 DEFINE_FLAG_INT32(unauthorized_wait_interval, "", 1);
+DEFINE_FLAG_INT32(send_retrytimes, "how many times should retry if PostLogStoreLogs operation fail", 3);
 
 DECLARE_FLAG_INT32(discard_send_fail_interval);
 
 using namespace std;
-
 namespace logtail {
+
+#ifdef __ENTERPRISE__
+static EndpointMode GetEndpointMode(sls_logs::EndpointMode mode) {
+    switch (mode) {
+        case sls_logs::EndpointMode::DEFAULT:
+            return EndpointMode::DEFAULT;
+        case sls_logs::EndpointMode::ACCELERATE:
+            return EndpointMode::ACCELERATE;
+        case sls_logs::EndpointMode::CUSTOM:
+            return EndpointMode::CUSTOM;
+    }
+    return EndpointMode::DEFAULT;
+}
+
+static sls_logs::EndpointMode GetEndpointMode(EndpointMode mode) {
+    switch (mode) {
+        case EndpointMode::DEFAULT:
+            return sls_logs::EndpointMode::DEFAULT;
+        case EndpointMode::ACCELERATE:
+            return sls_logs::EndpointMode::ACCELERATE;
+        case EndpointMode::CUSTOM:
+            return sls_logs::EndpointMode::CUSTOM;
+    }
+    return sls_logs::EndpointMode::DEFAULT;
+}
+#endif
+
+static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compressType) {
+    switch (compressType) {
+        case sls_logs::SLS_CMP_NONE: {
+            static string none = "";
+            return none;
+        }
+        case sls_logs::SLS_CMP_ZSTD: {
+            static string zstd = "zstd";
+            return zstd;
+        }
+        default: {
+            static string lz4 = "lz4";
+            return lz4;
+        }
+    }
+}
 
 const int32_t DiskBufferWriter::BUFFER_META_BASE_SIZE = 65536;
 
@@ -146,13 +193,6 @@ void DiskBufferWriter::BufferSenderThread() {
     LOG_INFO(sLogger, ("disk buffer sender", "started"));
     unique_lock<mutex> lock(mBufferSenderThreadRunningMux);
     while (mIsSendBufferThreadRunning) {
-        if (!SLSClientManager::GetInstance()->HasNetworkAvailable()) {
-            if (mStopCV.wait_for(
-                    lock, chrono::seconds(mCheckPeriod), [this]() { return !mIsSendBufferThreadRunning; })) {
-                break;
-            }
-            continue;
-        }
         vector<string> filesToSend;
         if (!LoadFileToSend(mBufferDivideTime, filesToSend)) {
             if (mStopCV.wait_for(
@@ -200,6 +240,9 @@ void DiskBufferWriter::BufferSenderThread() {
                                                        "check header of buffer file failed, delete file: " + fileName);
             }
         }
+#ifdef __ENTERPRISE__
+        mCandidateHostsInfos.clear();
+#endif
         // mIsSendingBuffer = false;
         lock.lock();
         if (mStopCV.wait_for(lock, chrono::seconds(mCheckPeriod), [this]() { return !mIsSendBufferThreadRunning; })) {
@@ -386,7 +429,7 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
         }
     } else {
         bufferMeta.set_project(encodedInfo);
-        bufferMeta.set_endpoint(FlusherSLS::GetDefaultRegion()); // new mode
+        bufferMeta.set_region(FlusherSLS::GetDefaultRegion()); // new mode
         bufferMeta.set_aliuid("");
     }
     if (!bufferMeta.has_compresstype()) {
@@ -394,6 +437,14 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
     }
     if (!bufferMeta.has_telemetrytype()) {
         bufferMeta.set_telemetrytype(sls_logs::SLS_TELEMETRY_TYPE_LOGS);
+    }
+#ifdef __ENTERPRISE__
+    if (!bufferMeta.has_endpointmode()) {
+        bufferMeta.set_endpointmode(sls_logs::EndpointMode::DEFAULT);
+    }
+#endif
+    if (!bufferMeta.has_endpoint()) {
+        bufferMeta.set_endpoint("");
     }
 
     buffer = new char[meta.mEncryptionSize + 1];
@@ -480,20 +531,72 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                     }
                 }
                 if (!sendResult) {
-                    string errorCode;
-                    SendResult res = SendBufferFileData(bufferMeta, logData, errorCode);
-                    if (res == SEND_OK)
-                        sendResult = true;
-                    else if (res == SEND_DISCARD_ERROR || res == SEND_PARAMETER_INVALID) {
-                        AlarmManager::GetInstance()->SendAlarm(SEND_DATA_FAIL_ALARM,
-                                                               string("send buffer file fail, rawsize:")
-                                                                   + ToString(bufferMeta.rawsize())
-                                                                   + "errorCode: " + errorCode,
-                                                               bufferMeta.project(),
-                                                               bufferMeta.logstore(),
-                                                               "");
-                        sendResult = true;
-                        discardCount++;
+                    time_t beginTime = time(nullptr);
+                    while (true) {
+                        string host;
+                        auto response = SendBufferFileData(bufferMeta, logData, host);
+                        SendResult sendRes = SEND_OK;
+                        if (response.mStatusCode != 200) {
+                            sendRes = ConvertErrorCode(response.mErrorCode);
+                        }
+                        switch (sendRes) {
+                            case SEND_OK:
+                                sendResult = true;
+                                break;
+                            case SEND_NETWORK_ERROR:
+                            case SEND_SERVER_ERROR:
+                                if (response.mErrorMsg != "can not get available host") {
+                                    LOG_WARNING(
+                                        sLogger,
+                                        ("send data to SLS fail", "retry later")("request id", response.mRequestId)(
+                                            "error_code", response.mErrorCode)("error_message", response.mErrorMsg)(
+                                            "endpoint", host)("projectName", bufferMeta.project())(
+                                            "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
+                                }
+                                usleep(INT32_FLAG(send_retry_sleep_interval));
+                                break;
+                            case SEND_QUOTA_EXCEED:
+                                AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
+                                                                       "error_code: " + response.mErrorCode
+                                                                           + ", error_message: " + response.mErrorMsg,
+                                                                       bufferMeta.project(),
+                                                                       bufferMeta.logstore(),
+                                                                       "");
+                                // no region
+                                if (!GetProfileSender()->IsProfileData("", bufferMeta.project(), bufferMeta.logstore()))
+                                    LOG_WARNING(
+                                        sLogger,
+                                        ("send data to SLS fail", "retry later")("request id", response.mRequestId)(
+                                            "error_code", response.mErrorCode)("error_message", response.mErrorMsg)(
+                                            "endpoint", host)("projectName", bufferMeta.project())(
+                                            "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
+                                usleep(INT32_FLAG(quota_exceed_wait_interval));
+                                break;
+                            case SEND_UNAUTHORIZED:
+                                usleep(INT32_FLAG(unauthorized_wait_interval));
+                                break;
+                            default:
+                                sendResult = true;
+                                discardCount++;
+                                break;
+                        }
+#ifdef __ENTERPRISE__
+                        if (sendRes != SEND_NETWORK_ERROR && sendRes != SEND_SERVER_ERROR) {
+                            bool hasAuthError
+                                = sendRes == SEND_UNAUTHORIZED && response.mErrorMsg != "can not get valid access key";
+                            EnterpriseSLSClientManager::GetInstance()->UpdateAccessKeyStatus(bufferMeta.aliuid(),
+                                                                                             !hasAuthError);
+                            EnterpriseSLSClientManager::GetInstance()->UpdateProjectAnonymousWriteStatus(
+                                bufferMeta.project(), !hasAuthError);
+                        }
+#endif
+                        if (time(nullptr) - beginTime >= INT32_FLAG(discard_send_fail_interval)) {
+                            sendResult = true;
+                            discardCount++;
+                        }
+                        if (sendResult) {
+                            break;
+                        }
                     }
                 }
             }
@@ -656,7 +759,7 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
 
     sls_logs::LogtailBufferMeta bufferMeta;
     bufferMeta.set_project(flusher->mProject);
-    bufferMeta.set_endpoint(flusher->mRegion);
+    bufferMeta.set_region(flusher->mRegion);
     bufferMeta.set_aliuid(flusher->mAliuid);
     bufferMeta.set_logstore(data->mLogstore);
     bufferMeta.set_datatype(int32_t(data->mType));
@@ -664,6 +767,10 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     bufferMeta.set_shardhashkey(data->mShardHashKey);
     bufferMeta.set_compresstype(ConvertCompressType(flusher->GetCompressType()));
     bufferMeta.set_telemetrytype(flusher->mTelemetryType);
+#ifdef __ENTERPRISE__
+    bufferMeta.set_endpointmode(GetEndpointMode(flusher->mEndpointMode));
+#endif
+    bufferMeta.set_endpoint(flusher->mEndpoint);
     string encodedInfo;
     bufferMeta.SerializeToString(&encodedInfo);
 
@@ -702,137 +809,84 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     return true;
 }
 
-SendResult DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta,
-                                                const std::string& logData,
-                                                std::string& errorCode) {
+SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta,
+                                                 const std::string& logData,
+                                                 std::string& host) {
     RateLimiter::FlowControl(bufferMeta.rawsize(), mSendLastTime, mSendLastByte, false);
-    string region = bufferMeta.endpoint();
-    if (region.find("http://") == 0) // old buffer file which record the endpoint
-        region = SLSClientManager::GetInstance()->GetRegionFromEndpoint(region);
-
-    sdk::Client* sendClient = SLSClientManager::GetInstance()->GetClient(region, bufferMeta.aliuid());
-    SendResult sendRes;
-    const string& endpoint = sendClient->GetRawSlsHost();
-    if (endpoint.empty())
-        sendRes = SEND_NETWORK_ERROR;
-    else {
-        sendRes = SendToNetSync(sendClient, region, endpoint, bufferMeta, logData, errorCode);
+    string region = bufferMeta.region();
+#ifdef __ENTERPRISE__
+    // old buffer file which record the endpoint
+    if (region.find("http://") == 0) {
+        region = EnterpriseSLSClientManager::GetInstance()->GetRegionFromEndpoint(region);
     }
-    return sendRes;
-}
+#endif
 
-SendResult DiskBufferWriter::SendToNetSync(sdk::Client* sendClient,
-                                           const std::string& region,
-                                           const std::string& endpoint,
-                                           const sls_logs::LogtailBufferMeta& bufferMeta,
-                                           const std::string& logData,
-                                           std::string& errorCode) {
-    int32_t retryTimes = 0;
-    time_t beginTime = time(NULL);
-    while (true) {
-        ++retryTimes;
-        try {
-            if (bufferMeta.datatype() == int(RawDataType::EVENT_GROUP)) {
-                if (bufferMeta.has_telemetrytype()
-                    && bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
-                    sendClient->PostMetricStoreLogs(bufferMeta.project(),
-                                                    bufferMeta.logstore(),
-                                                    bufferMeta.compresstype(),
-                                                    logData,
-                                                    bufferMeta.rawsize());
-                } else if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
-                    sendClient->PostLogStoreLogs(bufferMeta.project(),
-                                                 bufferMeta.logstore(),
-                                                 bufferMeta.compresstype(),
-                                                 logData,
-                                                 bufferMeta.rawsize(),
-                                                 bufferMeta.shardhashkey());
-                else
-                    sendClient->PostLogStoreLogs(bufferMeta.project(),
-                                                 bufferMeta.logstore(),
-                                                 bufferMeta.compresstype(),
-                                                 logData,
-                                                 bufferMeta.rawsize());
-            } else {
-                if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
-                    sendClient->PostLogStoreLogPackageList(bufferMeta.project(),
-                                                           bufferMeta.logstore(),
-                                                           bufferMeta.compresstype(),
-                                                           logData,
-                                                           bufferMeta.shardhashkey());
-                else
-                    sendClient->PostLogStoreLogPackageList(
-                        bufferMeta.project(), bufferMeta.logstore(), bufferMeta.compresstype(), logData);
-            }
-            return SEND_OK;
-        } catch (sdk::LOGException& ex) {
-            errorCode = ex.GetErrorCode();
-            SendResult sendRes = ConvertErrorCode(errorCode);
-            bool hasAuthError = false;
-            switch (sendRes) {
-                case SEND_NETWORK_ERROR:
-                case SEND_SERVER_ERROR:
-                    SLSClientManager::GetInstance()->UpdateEndpointStatus(region, endpoint, false);
-                    SLSClientManager::GetInstance()->ResetClientEndpoint(bufferMeta.aliuid(), region, time(NULL));
-                    LOG_WARNING(sLogger,
-                                ("send data to SLS fail", "retry later")("error_code", errorCode)(
-                                    "error_message", ex.GetMessage())("endpoint", sendClient->GetRawSlsHost())(
-                                    "projectName", bufferMeta.project())("logstore", bufferMeta.logstore())(
-                                    "RetryTimes", retryTimes)("rawsize", bufferMeta.rawsize()));
-                    usleep(INT32_FLAG(send_retry_sleep_interval));
-                    break;
-                case SEND_QUOTA_EXCEED:
-                    AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
-                                                           "error_code: " + errorCode
-                                                               + ", error_message: " + ex.GetMessage(),
-                                                           bufferMeta.project(),
-                                                           bufferMeta.logstore(),
-                                                           "");
-                    // no region
-                    if (!GetProfileSender()->IsProfileData("", bufferMeta.project(), bufferMeta.logstore()))
-                        LOG_WARNING(sLogger,
-                                    ("send data to SLS fail, error_code", errorCode)("error_message", ex.GetMessage())(
-                                        "endpoint", sendClient->GetRawSlsHost())("projectName", bufferMeta.project())(
-                                        "logstore", bufferMeta.logstore())("RetryTimes", retryTimes)(
-                                        "rawsize", bufferMeta.rawsize()));
-                    usleep(INT32_FLAG(quota_exceed_wait_interval));
-                    break;
-                case SEND_UNAUTHORIZED:
-                    hasAuthError = true;
-                    usleep(INT32_FLAG(unauthorized_wait_interval));
-                    break;
-                default:
-                    break;
-            }
-            SLSClientManager::GetInstance()->UpdateAccessKeyStatus(bufferMeta.aliuid(), !hasAuthError);
-            if (time(nullptr) - beginTime >= INT32_FLAG(discard_send_fail_interval)) {
-                sendRes = SEND_DISCARD_ERROR;
-            }
-            if (sendRes != SEND_NETWORK_ERROR && sendRes != SEND_SERVER_ERROR && sendRes != SEND_QUOTA_EXCEED
-                && sendRes != SEND_UNAUTHORIZED) {
-                return sendRes;
-            }
-            {
-                lock_guard<mutex> lock(mBufferSenderThreadRunningMux);
-                if (!mIsSendBufferThreadRunning) {
-                    return sendRes;
-                }
-            }
-        } catch (...) {
-            if (retryTimes >= INT32_FLAG(send_retrytimes)) {
-                LOG_ERROR(sLogger,
-                          ("send data fail", "unknown excepiton")("endpoint", sendClient->GetRawSlsHost())(
-                              "projectName", bufferMeta.project())("logstore", bufferMeta.logstore())(
-                              "rawsize", bufferMeta.rawsize()));
-                return SEND_DISCARD_ERROR;
-            } else {
-                LOG_DEBUG(sLogger,
-                          ("send data fail", "unknown excepiton, retry later")("endpoint", sendClient->GetRawSlsHost())(
-                              "projectName", bufferMeta.project())("logstore", bufferMeta.logstore())(
-                              "rawsize", bufferMeta.rawsize()));
-                usleep(INT32_FLAG(send_retry_sleep_interval));
-            }
+    SLSClientManager::AuthType type;
+    string accessKeyId, accessKeySecret;
+    if (!SLSClientManager::GetInstance()->GetAccessKey(bufferMeta.aliuid(), type, accessKeyId, accessKeySecret)) {
+#ifdef __ENTERPRISE__
+        if (!EnterpriseSLSClientManager::GetInstance()->GetAccessKeyIfProjectSupportsAnonymousWrite(
+                bufferMeta.project(), type, accessKeyId, accessKeySecret)) {
+            SLSResponse response;
+            response.mErrorCode = LOGE_UNAUTHORIZED;
+            response.mErrorMsg = "can not get valid access key";
+            return response;
         }
+#endif
+    }
+
+#ifdef __ENTERPRISE__
+    if (bufferMeta.endpointmode() == sls_logs::EndpointMode::DEFAULT) {
+        EnterpriseSLSClientManager::GetInstance()->UpdateRemoteRegionEndpoints(
+            region, {bufferMeta.endpoint()}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::CREATE);
+    }
+    auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(
+        region, bufferMeta.project(), GetEndpointMode(bufferMeta.endpointmode()));
+    mCandidateHostsInfos.insert(info);
+
+    host = info->GetCurrentHost();
+    if (host.empty()) {
+        SLSResponse response;
+        response.mErrorCode = LOGE_REQUEST_ERROR;
+        response.mErrorMsg = "can not get available host";
+        return response;
+    }
+#else
+    host = bufferMeta.project() + "." + bufferMeta.endpoint();
+#endif
+
+    bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(region);
+
+    RawDataType dataType;
+    if (bufferMeta.datatype() == 0) {
+        dataType = RawDataType::EVENT_GROUP_LIST;
+    } else {
+        dataType = RawDataType::EVENT_GROUP;
+    }
+    if (bufferMeta.has_telemetrytype() && bufferMeta.telemetrytype() == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+        return PostMetricStoreLogs(accessKeyId,
+                                   accessKeySecret,
+                                   type,
+                                   host,
+                                   httpsFlag,
+                                   bufferMeta.project(),
+                                   bufferMeta.logstore(),
+                                   GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                   logData,
+                                   bufferMeta.rawsize());
+    } else {
+        return PostLogStoreLogs(accessKeyId,
+                                accessKeySecret,
+                                type,
+                                host,
+                                httpsFlag,
+                                bufferMeta.project(),
+                                bufferMeta.logstore(),
+                                GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                dataType,
+                                logData,
+                                bufferMeta.rawsize(),
+                                bufferMeta.has_shardhashkey() ? bufferMeta.shardhashkey() : "");
     }
 }
 

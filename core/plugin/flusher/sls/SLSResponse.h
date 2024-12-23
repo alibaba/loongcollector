@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
 #include <string>
 
 #include "common/http/HttpResponse.h"
@@ -32,6 +33,7 @@ struct SLSResponse {
     bool Parse(const HttpResponse& response);
 };
 
+SLSResponse ParseHttpResponse(const HttpResponse& response);
 bool IsSLSResponse(const HttpResponse& response);
 time_t GetServerTime(const HttpResponse& response);
 

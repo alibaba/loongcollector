@@ -17,10 +17,17 @@ package sls_logs;
 
 import "sls_logs.proto";
 
+enum EndpointMode
+{
+    DEFAULT = 0;
+    ACCELERATE = 1;
+    CUSTOM = 2;
+}
+
 message LogtailBufferMeta 
 {
     required string project = 1;
-    required string endpoint = 2;
+    required string region = 2;
     required string aliuid = 3;
     optional string logstore = 4;
     optional int32 datatype = 5;
@@ -28,4 +35,6 @@ message LogtailBufferMeta
     optional string shardhashkey = 7;
     optional SlsCompressType compresstype = 8;
     optional SlsTelemetryType telemetrytype = 9;
+    optional EndpointMode endpointmode = 10;
+    optional string endpoint = 11;
 }

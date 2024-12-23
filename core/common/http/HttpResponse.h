@@ -16,8 +16,7 @@
 
 #pragma once
 
-#include <curl/curl.h>
-
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -82,6 +81,8 @@ public:
         : mHeader(compareHeader), mBody(body, bodyDeleter), mWriteCallback(callback) {}
 
     int32_t GetStatusCode() const { return mStatusCode; }
+    void SetStatusCode(int32_t code) { mStatusCode = code; }
+
     const std::map<std::string, std::string, decltype(compareHeader)*>& GetHeader() const { return mHeader; }
 
     template <class T>
@@ -94,67 +95,31 @@ public:
         return static_cast<T*>(mBody.get());
     }
 
-    void SetStatusCode(int32_t code) { mStatusCode = code; }
-
-    void SetNetworkStatus(CURLcode code) {
-        mNetworkStatus.mMessage = curl_easy_strerror(code);
-        // please refer to https://curl.se/libcurl/c/libcurl-errors.html
-        switch (code) {
-            case CURLE_OK:
-                mNetworkStatus.mCode = NetworkCode::Ok;
-                break;
-            case CURLE_COULDNT_CONNECT:
-                mNetworkStatus.mCode = NetworkCode::ConnectionFailed;
-                break;
-            case CURLE_LOGIN_DENIED:
-            case CURLE_REMOTE_ACCESS_DENIED:
-                mNetworkStatus.mCode = NetworkCode::RemoteAccessDenied;
-                break;
-            case CURLE_OPERATION_TIMEDOUT:
-                mNetworkStatus.mCode = NetworkCode::Timeout;
-                break;
-            case CURLE_SSL_CONNECT_ERROR:
-                mNetworkStatus.mCode = NetworkCode::SSLConnectError;
-                break;
-            case CURLE_SSL_CERTPROBLEM:
-            case CURLE_SSL_CACERT:
-                mNetworkStatus.mCode = NetworkCode::SSLCertError;
-                break;
-            case CURLE_SEND_ERROR:
-            case CURLE_SEND_FAIL_REWIND:
-                mNetworkStatus.mCode = NetworkCode::SendDataFailed;
-                break;
-            case CURLE_RECV_ERROR:
-                mNetworkStatus.mCode = NetworkCode::RecvDataFailed;
-                break;
-            case CURLE_SSL_PINNEDPUBKEYNOTMATCH:
-            case CURLE_SSL_INVALIDCERTSTATUS:
-            case CURLE_SSL_CACERT_BADFILE:
-            case CURLE_SSL_CIPHER:
-            case CURLE_SSL_ENGINE_NOTFOUND:
-            case CURLE_SSL_ENGINE_SETFAILED:
-            case CURLE_USE_SSL_FAILED:
-            case CURLE_SSL_ENGINE_INITFAILED:
-            case CURLE_SSL_CRL_BADFILE:
-            case CURLE_SSL_ISSUER_ERROR:
-            case CURLE_SSL_SHUTDOWN_FAILED:
-                mNetworkStatus.mCode = NetworkCode::SSLOtherProblem;
-                break;
-            case CURLE_FAILED_INIT:
-            default:
-                mNetworkStatus.mCode = NetworkCode::Other;
-                break;
-        }
-    }
+    void SetResponseTime(const std::chrono::milliseconds& time) { mResponseTime = time; }
+    std::chrono::milliseconds GetResponseTime() const { return mResponseTime; }
 
     const NetworkStatus& GetNetworkStatus() { return mNetworkStatus; }
+    void SetNetworkStatus(NetworkCode code, const std::string& msg) {
+        mNetworkStatus.mCode = code;
+        mNetworkStatus.mMessage = msg;
+    }
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    template <class T>
+    void SetBody(const T& body) {
+        *mBody = body;
+    }
+
+    void AddHeader(const std::string& key, const std::string& value) { mHeader[key] = value; }
+#endif
 
 private:
     int32_t mStatusCode = 0; // 0 means no response from server
-    NetworkStatus mNetworkStatus; // 0 means no error
+    NetworkStatus mNetworkStatus;
     std::map<std::string, std::string, decltype(compareHeader)*> mHeader;
     std::unique_ptr<void, std::function<void(void*)>> mBody;
     size_t (*mWriteCallback)(char*, size_t, size_t, void*) = nullptr;
+    std::chrono::milliseconds mResponseTime = std::chrono::milliseconds::max();
 };
 
 } // namespace logtail

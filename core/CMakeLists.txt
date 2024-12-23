@@ -129,7 +129,7 @@ set(SUB_DIRECTORIES_LIST
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         prometheus prometheus/labels prometheus/schedulers prometheus/async
         ebpf ebpf/observer ebpf/security ebpf/handler
-        parser sls_control sdk
+        parser
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
