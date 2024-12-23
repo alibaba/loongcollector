@@ -27,7 +27,7 @@
 #include "queue/QueueKeyManager.h"
 
 DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
-DEFINE_FLAG_INT32(processor_runner_exit_timeout_secs, "", 60);
+DEFINE_FLAG_INT32(processor_runner_exit_timeout_sec, "", 60);
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
@@ -59,7 +59,7 @@ void ProcessorRunner::Stop() {
             continue;
         }
         future_status s
-            = mThreadRes[threadNo].wait_for(chrono::seconds(INT32_FLAG(processor_runner_exit_timeout_secs)));
+            = mThreadRes[threadNo].wait_for(chrono::seconds(INT32_FLAG(processor_runner_exit_timeout_sec)));
         if (s == future_status::ready) {
             LOG_INFO(sLogger, ("processor runner", "stopped successfully")("threadNo", threadNo));
         } else {

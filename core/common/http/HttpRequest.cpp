@@ -14,7 +14,7 @@
 
 #include "common/http/HttpRequest.h"
 
-DEFINE_FLAG_INT32(default_http_request_timeout_secs, "", 15);
+DEFINE_FLAG_INT32(default_http_request_timeout_sec, "", 15);
 DEFINE_FLAG_INT32(default_http_request_max_try_cnt, "", 3);
 
 using namespace std;

@@ -25,7 +25,7 @@
 #include "pipeline/queue/SenderQueueItem.h"
 #include "runner/FlusherRunner.h"
 
-DEFINE_FLAG_INT32(http_sink_exit_timeout_secs, "", 5);
+DEFINE_FLAG_INT32(http_sink_exit_timeout_sec, "", 5);
 
 using namespace std;
 
@@ -65,7 +65,7 @@ void HttpSink::Stop() {
     if (!mThreadRes.valid()) {
         return;
     }
-    future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(http_sink_exit_timeout_secs)));
+    future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(http_sink_exit_timeout_sec)));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("http sink", "stopped successfully"));
     } else {

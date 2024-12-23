@@ -770,7 +770,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #else
         APSARA_TEST_EQUAL(443, req->mPort);
 #endif
-        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)), req->mTimeout);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
@@ -833,7 +833,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #else
         APSARA_TEST_EQUAL(443, req->mPort);
 #endif
-        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)), req->mTimeout);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
@@ -896,7 +896,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #else
         APSARA_TEST_EQUAL(443, req->mPort);
 #endif
-        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)), req->mTimeout);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
@@ -965,7 +965,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #else
         APSARA_TEST_EQUAL(443, req->mPort);
 #endif
-        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)), req->mTimeout);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
@@ -1023,7 +1023,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
 #else
         APSARA_TEST_EQUAL(443, req->mPort);
 #endif
-        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)), req->mTimeout);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
@@ -1079,7 +1079,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(body, req->mBody);
         APSARA_TEST_EQUAL("192.168.0.1", req->mHost);
         APSARA_TEST_EQUAL(80, req->mPort);
-        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)), req->mTimeout);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
@@ -1106,7 +1106,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(body, req->mBody);
         APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, req->mHost);
         APSARA_TEST_EQUAL(80, req->mPort);
-        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)), req->mTimeout);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)), req->mTimeout);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);

@@ -28,7 +28,7 @@
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "runner/sink/http/HttpSink.h"
 
-DEFINE_FLAG_INT32(flusher_runner_exit_timeout_secs, "", 60);
+DEFINE_FLAG_INT32(flusher_runner_exit_timeout_sec, "", 60);
 
 DECLARE_FLAG_INT32(discard_send_fail_interval);
 
@@ -95,7 +95,7 @@ void FlusherRunner::Stop() {
     if (!mThreadRes.valid()) {
         return;
     }
-    future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(flusher_runner_exit_timeout_secs)));
+    future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(flusher_runner_exit_timeout_sec)));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("flusher runner", "stopped successfully"));
     } else {

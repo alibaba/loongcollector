@@ -25,7 +25,7 @@
 #include "common/Flags.h"
 #include "common/http/HttpResponse.h"
 
-DECLARE_FLAG_INT32(default_http_request_timeout_secs);
+DECLARE_FLAG_INT32(default_http_request_timeout_sec);
 DECLARE_FLAG_INT32(default_http_request_max_try_cnt);
 
 namespace logtail {
@@ -49,7 +49,7 @@ struct HttpRequest {
     std::string mBody;
     std::string mHost;
     int32_t mPort;
-    uint32_t mTimeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs));
+    uint32_t mTimeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec));
     uint32_t mMaxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt));
     bool mFollowRedirects = false;
     std::optional<CurlTLS> mTls = std::nullopt;
@@ -65,7 +65,7 @@ struct HttpRequest {
                 const std::string& query,
                 const std::map<std::string, std::string>& header,
                 const std::string& body,
-                uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)),
+                uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)),
                 uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
                 bool followRedirects = false,
                 std::optional<CurlTLS> tls = std::nullopt)
@@ -98,7 +98,7 @@ struct AsynHttpRequest : public HttpRequest {
                     const std::map<std::string, std::string>& header,
                     const std::string& body,
                     HttpResponse&& response = HttpResponse(),
-                    uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)),
+                    uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)),
                     uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
                     bool followRedirects = false,
                     std::optional<CurlTLS> tls = std::nullopt)
