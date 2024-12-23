@@ -151,6 +151,7 @@ void PrometheusServer::Init() {
     LOG_INFO(sLogger, ("PrometheusInputRunner", "Start"));
     mIsStarted = true;
 
+    UpdateGlobalConfig();
     mCallback = [this]() -> bool { return UpdateGlobalConfig(); };
 #ifndef APSARA_UNIT_TEST_MAIN
     mTimer->Init();
