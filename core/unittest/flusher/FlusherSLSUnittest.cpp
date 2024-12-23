@@ -688,12 +688,13 @@ void FlusherSLSUnittest::TestBuildRequest() {
     SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
     unique_ptr<HttpSinkRequest> req;
     bool keepItem = false;
+    string errMsg;
 #ifdef __ENTERPRISE__
     {
         // empty ak, first try
-        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         // empty ak, second try
-        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(nullptr, req);
         APSARA_TEST_TRUE(keepItem);
     }
@@ -701,7 +702,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         "1234567890", SLSClientManager::AuthType::ANONYMOUS, "test_ak", "test_sk");
     {
         // no available host, uninitialized
-        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(nullptr, req);
         APSARA_TEST_TRUE(keepItem);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(AppConfig::GetInstance()->GetSendRequestConcurrency()),
@@ -710,7 +711,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
     {
         // no available host, initialized
         flusher.mCandidateHostsInfo->SetInitialized();
-        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(nullptr, req);
         APSARA_TEST_TRUE(keepItem);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(AppConfig::GetInstance()->GetSendRequestConcurrency()) / 2,
@@ -726,7 +727,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
     {
         // normal
         SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
 #ifdef __ENTERPRISE__
         APSARA_TEST_FALSE(req->mHTTPSFlag);
@@ -788,7 +789,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
                                 flusher.GetQueueKey(),
                                 flusher.mLogstore,
                                 RawDataType::EVENT_GROUP_LIST);
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
 #ifdef __ENTERPRISE__
         APSARA_TEST_FALSE(req->mHTTPSFlag);
@@ -851,7 +852,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
                                 flusher.mLogstore,
                                 RawDataType::EVENT_GROUP,
                                 "hash_key");
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
 #ifdef __ENTERPRISE__
         APSARA_TEST_FALSE(req->mHTTPSFlag);
@@ -920,7 +921,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
                                 RawDataType::EVENT_GROUP,
                                 "hash_key_0",
                                 std::move(cpt));
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
 #ifdef __ENTERPRISE__
         APSARA_TEST_FALSE(req->mHTTPSFlag);
@@ -979,7 +980,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
     flusher.mTelemetryType = sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_METRICS;
     {
         SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
 #ifdef __ENTERPRISE__
         APSARA_TEST_FALSE(req->mHTTPSFlag);
@@ -1040,7 +1041,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         EnterpriseSLSClientManager::GetInstance()->CopyLocalRegionEndpointsAndHttpsInfoIfNotExisted("test_region",
                                                                                                     "test_region-b");
         auto old = flusher.mCandidateHostsInfo.get();
-        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateHostsInfo.get());
 
         EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency("test_project",
@@ -1048,7 +1049,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
                                                                   "test_project." + kAccelerationDataEndpoint,
                                                                   chrono::milliseconds(10));
         flusher.mCandidateHostsInfo->SelectBestHost();
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, req->mHost);
     }
     // real ip
@@ -1057,7 +1058,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         // ip not empty
         EnterpriseSLSClientManager::GetInstance()->SetRealIp("test_region-b", "192.168.0.1");
         SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(HTTP_POST, req->mMethod);
         APSARA_TEST_FALSE(req->mHTTPSFlag);
         APSARA_TEST_EQUAL("/logstores/test_logstore/shards/lb", req->mUrl);
@@ -1089,7 +1090,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         // ip empty
         EnterpriseSLSClientManager::GetInstance()->SetRealIp("test_region-b", "");
         SLSSenderQueueItem item("hello, world!", rawSize, &flusher, flusher.GetQueueKey(), flusher.mLogstore);
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, req->mHeader[HOST]);
         APSARA_TEST_EQUAL(SLSClientManager::GetInstance()->GetUserAgent(), req->mHeader[USER_AGENT]);
         APSARA_TEST_FALSE(req->mHeader[DATE].empty());
@@ -1119,13 +1120,13 @@ void FlusherSLSUnittest::TestBuildRequest() {
         endpoints.mLocalEndpoints = {"custom.endpoint"};
 
         auto old = flusher.mCandidateHostsInfo.get();
-        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateHostsInfo.get());
 
         EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency(
             "test_project", EndpointMode::CUSTOM, "test_project.custom.endpoint", chrono::milliseconds(10));
         flusher.mCandidateHostsInfo->SelectBestHost();
-        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem));
+        APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL("test_project.custom.endpoint", req->mHost);
     }
     BOOL_FLAG(send_prefer_real_ip) = false;

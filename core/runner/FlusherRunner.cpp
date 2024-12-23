@@ -117,7 +117,8 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
 
     unique_ptr<HttpSinkRequest> req;
     bool keepItem = false;
-    if (!static_cast<HttpFlusher*>(item->mFlusher)->BuildRequest(item, req, &keepItem)) {
+    string errMsg;
+    if (!static_cast<HttpFlusher*>(item->mFlusher)->BuildRequest(item, req, &keepItem, &errMsg)) {
         if (keepItem
             && chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - item->mFirstEnqueTime).count()
                 < INT32_FLAG(discard_send_fail_interval)) {

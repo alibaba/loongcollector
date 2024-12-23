@@ -585,7 +585,7 @@ bool FlusherSLS::FlushAll() {
     return SerializeAndPush(std::move(res));
 }
 
-bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>& req, bool* keepItem) {
+bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>& req, bool* keepItem, string* errMsg) {
     if (mSendCnt) {
         mSendCnt->Add(1);
     }
@@ -597,6 +597,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         if (!EnterpriseSLSClientManager::GetInstance()->GetAccessKeyIfProjectSupportsAnonymousWrite(
                 mProject, type, accessKeyId, accessKeySecret)) {
             *keepItem = true;
+            *errMsg = "failed to get access key";
             return false;
         }
 #endif
@@ -641,6 +642,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         if (mCandidateHostsInfo->IsInitialized()) {
             GetRegionConcurrencyLimiter(mRegion)->OnFail();
         }
+        *errMsg = "failed to get available host";
         *keepItem = true;
         return false;
     }
