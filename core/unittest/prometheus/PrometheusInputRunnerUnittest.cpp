@@ -34,9 +34,9 @@ public:
 
 protected:
     void SetUp() override {
-        PrometheusInputRunner::GetInstance()->mServiceHost = "127.0.0.1";
-        PrometheusInputRunner::GetInstance()->mServicePort = 8080;
-        PrometheusInputRunner::GetInstance()->mPodName = "test_pod";
+        prom::PrometheusServer::GetInstance()->mServiceHost = "127.0.0.1";
+        prom::PrometheusServer::GetInstance()->mServicePort = 8080;
+        prom::PrometheusServer::GetInstance()->mPodName = "test_pod";
     }
 
     void TearDown() override {}
@@ -66,30 +66,30 @@ void PrometheusInputRunnerUnittest::OnSuccessfulStartAndStop() {
     auto defaultLabels = MetricLabels();
     string defaultProject = "default_project";
     // update scrapeJob
-    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr), defaultLabels, defaultProject);
+    prom::PrometheusServer::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr), defaultLabels, defaultProject);
 
-    PrometheusInputRunner::GetInstance()->Init();
-    APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("test_job")
-                     != PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
-    APSARA_TEST_EQUAL(PrometheusInputRunner::GetInstance()->mJobNameToProjectNameMap["test_job"], defaultProject);
+    prom::PrometheusServer::GetInstance()->Init();
+    APSARA_TEST_TRUE(prom::PrometheusServer::GetInstance()->mTargetSubscriberSchedulerMap.find("test_job")
+                     != prom::PrometheusServer::GetInstance()->mTargetSubscriberSchedulerMap.end());
+    APSARA_TEST_EQUAL(prom::PrometheusServer::GetInstance()->mJobNameToProjectNameMap["test_job"], defaultProject);
 
     // remove
-    PrometheusInputRunner::GetInstance()->RemoveScrapeInput("test_job");
+    prom::PrometheusServer::GetInstance()->RemoveScrapeInput("test_job");
 
-    APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("test_job")
-                     == PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
+    APSARA_TEST_TRUE(prom::PrometheusServer::GetInstance()->mTargetSubscriberSchedulerMap.find("test_job")
+                     == prom::PrometheusServer::GetInstance()->mTargetSubscriberSchedulerMap.end());
     // stop
-    PrometheusInputRunner::GetInstance()->Stop();
+    prom::PrometheusServer::GetInstance()->Stop();
 }
 
 void PrometheusInputRunnerUnittest::TestHasRegisteredPlugins() {
-    PrometheusInputRunner::GetInstance()->Init();
+    prom::PrometheusServer::GetInstance()->Init();
 
     // not in use
-    APSARA_TEST_FALSE(PrometheusInputRunner::GetInstance()->HasRegisteredPlugins());
+    APSARA_TEST_FALSE(prom::PrometheusServer::GetInstance()->HasRegisteredPlugins());
 
     // in use
-    PrometheusInputRunner::GetInstance()->Init();
+    prom::PrometheusServer::GetInstance()->Init();
     string errorMsg;
     string configStr;
     Json::Value config;
@@ -108,36 +108,36 @@ void PrometheusInputRunnerUnittest::TestHasRegisteredPlugins() {
     APSARA_TEST_TRUE(scrapeJobPtr->Init(config));
     auto defaultLabels = MetricLabels();
     string defaultProject = "default_project";
-    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr), defaultLabels, defaultProject);
-    APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->HasRegisteredPlugins());
-    PrometheusInputRunner::GetInstance()->Stop();
+    prom::PrometheusServer::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr), defaultLabels, defaultProject);
+    APSARA_TEST_TRUE(prom::PrometheusServer::GetInstance()->HasRegisteredPlugins());
+    prom::PrometheusServer::GetInstance()->Stop();
 }
 
 void PrometheusInputRunnerUnittest::TestMulitStartAndStop() {
-    PrometheusInputRunner::GetInstance()->Init();
+    prom::PrometheusServer::GetInstance()->Init();
     {
-        std::lock_guard<mutex> lock(PrometheusInputRunner::GetInstance()->mStartMutex);
-        APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mIsStarted);
+        std::lock_guard<mutex> lock(prom::PrometheusServer::GetInstance()->mStartMutex);
+        APSARA_TEST_TRUE(prom::PrometheusServer::GetInstance()->mIsStarted);
     }
-    PrometheusInputRunner::GetInstance()->Init();
+    prom::PrometheusServer::GetInstance()->Init();
     {
-        std::lock_guard<mutex> lock(PrometheusInputRunner::GetInstance()->mStartMutex);
-        APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mIsStarted);
+        std::lock_guard<mutex> lock(prom::PrometheusServer::GetInstance()->mStartMutex);
+        APSARA_TEST_TRUE(prom::PrometheusServer::GetInstance()->mIsStarted);
     }
-    PrometheusInputRunner::GetInstance()->Stop();
+    prom::PrometheusServer::GetInstance()->Stop();
     {
-        std::lock_guard<mutex> lock(PrometheusInputRunner::GetInstance()->mStartMutex);
-        APSARA_TEST_FALSE(PrometheusInputRunner::GetInstance()->mIsStarted);
+        std::lock_guard<mutex> lock(prom::PrometheusServer::GetInstance()->mStartMutex);
+        APSARA_TEST_FALSE(prom::PrometheusServer::GetInstance()->mIsStarted);
     }
-    PrometheusInputRunner::GetInstance()->Init();
+    prom::PrometheusServer::GetInstance()->Init();
     {
-        std::lock_guard<mutex> lock(PrometheusInputRunner::GetInstance()->mStartMutex);
-        APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->mIsStarted);
+        std::lock_guard<mutex> lock(prom::PrometheusServer::GetInstance()->mStartMutex);
+        APSARA_TEST_TRUE(prom::PrometheusServer::GetInstance()->mIsStarted);
     }
-    PrometheusInputRunner::GetInstance()->Stop();
+    prom::PrometheusServer::GetInstance()->Stop();
     {
-        std::lock_guard<mutex> lock(PrometheusInputRunner::GetInstance()->mStartMutex);
-        APSARA_TEST_FALSE(PrometheusInputRunner::GetInstance()->mIsStarted);
+        std::lock_guard<mutex> lock(prom::PrometheusServer::GetInstance()->mStartMutex);
+        APSARA_TEST_FALSE(prom::PrometheusServer::GetInstance()->mIsStarted);
     }
 }
 
@@ -164,7 +164,7 @@ void PrometheusInputRunnerUnittest::TestGetAllProjects() {
     auto defaultLabels = MetricLabels();
     string defaultProject = "default_project";
     // update scrapeJob
-    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr1), defaultLabels, defaultProject);
+    prom::PrometheusServer::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr1), defaultLabels, defaultProject);
 
     // test_job2
     configStr = R"JSON(
@@ -181,10 +181,10 @@ void PrometheusInputRunnerUnittest::TestGetAllProjects() {
     APSARA_TEST_TRUE(scrapeJobPtr2->Init(config));
     defaultProject = "default_project2";
     // update scrapeJob
-    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr2), defaultLabels, defaultProject);
+    prom::PrometheusServer::GetInstance()->UpdateScrapeInput(std::move(scrapeJobPtr2), defaultLabels, defaultProject);
 
     // Runner use map to store scrape job, so the order is test_job1, test_job2
-    APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->GetAllProjects() == "default_project default_project2");
+    APSARA_TEST_TRUE(prom::PrometheusServer::GetInstance()->GetAllProjects() == "default_project default_project2");
 }
 
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, OnSuccessfulStartAndStop)

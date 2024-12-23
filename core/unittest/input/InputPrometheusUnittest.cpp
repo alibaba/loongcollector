@@ -126,7 +126,7 @@ void InputPrometheusUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(10 * 1024 * 1024ULL, input->mTargetSubscirber->mScrapeConfigPtr->mMaxScrapeSizeBytes);
     APSARA_TEST_EQUAL(1000000ULL, input->mTargetSubscirber->mScrapeConfigPtr->mSampleLimit);
     APSARA_TEST_EQUAL(1000000ULL, input->mTargetSubscirber->mScrapeConfigPtr->mSeriesLimit);
-    PrometheusInputRunner::GetInstance()->Stop();
+    prom::PrometheusServer::GetInstance()->Stop();
 }
 
 void InputPrometheusUnittest::OnFailedInit() {
@@ -170,7 +170,7 @@ void InputPrometheusUnittest::OnFailedInit() {
     input->SetContext(ctx);
     input->SetMetricsRecordRef(InputPrometheus::sName, "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
-    PrometheusInputRunner::GetInstance()->Stop();
+    prom::PrometheusServer::GetInstance()->Stop();
 }
 
 void InputPrometheusUnittest::OnPipelineUpdate() {
@@ -204,15 +204,15 @@ void InputPrometheusUnittest::OnPipelineUpdate() {
 
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_TRUE(
-        PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
-        != PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
+        prom::PrometheusServer::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
+        != prom::PrometheusServer::GetInstance()->mTargetSubscriberSchedulerMap.end());
 
     APSARA_TEST_TRUE(input->Stop(true));
     APSARA_TEST_TRUE(
-        PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
-        == PrometheusInputRunner::GetInstance()->mTargetSubscriberSchedulerMap.end());
+        prom::PrometheusServer::GetInstance()->mTargetSubscriberSchedulerMap.find("_arms-prom/node-exporter/0")
+        == prom::PrometheusServer::GetInstance()->mTargetSubscriberSchedulerMap.end());
 
-    PrometheusInputRunner::GetInstance()->Stop();
+    prom::PrometheusServer::GetInstance()->Stop();
 }
 
 void InputPrometheusUnittest::TestCreateInnerProcessor() {
@@ -374,7 +374,7 @@ void InputPrometheusUnittest::TestCreateInnerProcessor() {
                               ->mScrapeConfigPtr->mMetricRelabelConfigs.mRelabelConfigs[2]
                               .mAction);
     }
-    PrometheusInputRunner::GetInstance()->Stop();
+    prom::PrometheusServer::GetInstance()->Stop();
 }
 
 UNIT_TEST_CASE(InputPrometheusUnittest, OnSuccessfulInit)
