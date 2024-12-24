@@ -43,11 +43,11 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
             cotainerNotTag.push_back(rIdx);
         }
     }
-    auto& k8sMetadata = K8sMetadata::GetInstance();
-    if (containerVec.empty() || (!k8sMetadata.GetByContainerIdsFromServer(containerVec))) {
+    K8sMetadata* k8sMetadata = K8sMetadata::GetInstance();
+    if (containerVec.empty() || (!k8sMetadata->GetByContainerIdsFromServer(containerVec))) {
         return;
     }
-    if (remoteIpVec.empty() || (!k8sMetadata.GetByIpsFromServer(remoteIpVec))) {
+    if (remoteIpVec.empty() || (!k8sMetadata->GetByIpsFromServer(remoteIpVec))) {
         return;
     }
     for (size_t i = 0; i < cotainerNotTag.size(); ++i) {
@@ -74,12 +74,12 @@ template <typename Event>
 bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containerVec, std::vector<std::string>& remoteIpVec) {
     bool res = true;
     
-    auto& k8sMetadata = K8sMetadata::GetInstance();
+    K8sMetadata* k8sMetadata = K8sMetadata::GetInstance();
     StringView containerIdViewKey(containerIdKey);
     StringView containerIdView = e.HasTag(containerIdViewKey) ? e.GetTag(containerIdViewKey) : StringView{};
     if (!containerIdView.empty()) {
         std::string containerId(containerIdView);
-        std::shared_ptr<k8sContainerInfo> containerInfo = k8sMetadata.GetInfoByContainerIdFromCache(containerId);
+        std::shared_ptr<k8sContainerInfo> containerInfo = k8sMetadata->GetInfoByContainerIdFromCache(containerId);
         if (containerInfo == nullptr) {
             containerVec.push_back(containerId);
             res = false;
@@ -95,7 +95,7 @@ bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containe
     StringView remoteIpView = e.HasTag(ipView) ? e.GetTag(ipView) : StringView{};
     if (!remoteIpView.empty()) {
         std::string remoteIp(remoteIpView);
-        std::shared_ptr<k8sContainerInfo> ipInfo = k8sMetadata.GetInfoByIpFromCache(remoteIp);
+        std::shared_ptr<k8sContainerInfo> ipInfo = k8sMetadata->GetInfoByIpFromCache(remoteIp);
         if (ipInfo == nullptr) {
             remoteIpVec.push_back(remoteIp);
             res = false;

@@ -93,6 +93,11 @@ bool K8sMetadata::FromContainerJson(const Json::Value& json, std::shared_ptr<Con
     return true;
 }
 
+void K8sMetadata::ClearCache() {
+    containerCache.clear();
+    ipCache.clear();
+}
+
 bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
                                         const std::string& output,
                                         containerInfoType infoType) {
