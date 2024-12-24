@@ -29,6 +29,9 @@
 #endif
 
 DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
+#ifdef __ENTERPRISE__
+DECLARE_FLAG_BOOL(enable_host_id);
+#endif
 
 using namespace std;
 
@@ -70,6 +73,12 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     }
 
     // process level
+#ifdef __ENTERPRISE__
+    if (BOOL_FLAG(enable_host_id)) {
+        static std::string hostid = FetchHostId();
+        logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTID, hostid);
+    }
+#endif
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_HOSTNAME, LoongCollectorMonitor::mHostname);
     logGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
     auto sb = logGroup.GetSourceBuffer()->CopyString(Application::GetInstance()->GetUUID());

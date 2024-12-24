@@ -23,6 +23,7 @@ namespace logtail {
 extern const std::string OS_NAME;
 
 // Resevered key in log.
+extern const std::string LOG_RESERVED_KEY_HOSTID;
 extern const std::string LOG_RESERVED_KEY_SOURCE;
 extern const std::string LOG_RESERVED_KEY_TOPIC;
 extern const std::string LOG_RESERVED_KEY_USER_DEFINED_ID;

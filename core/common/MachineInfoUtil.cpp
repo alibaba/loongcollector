@@ -15,6 +15,11 @@
 #include "MachineInfoUtil.h"
 
 #include <string.h>
+
+#include <boost/filesystem.hpp>
+
+#include "AppConfig.h"
+#include "common/UUIDUtil.h"
 #if defined(__linux__)
 #include <arpa/inet.h>
 #include <ifaddrs.h>
@@ -40,8 +45,10 @@
 
 #include "FileSystemUtil.h"
 #include "StringTools.h"
+#include "common/FileSystemUtil.h"
 #include "logger/Logger.h"
 
+DEFINE_FLAG_STRING(agent_host_id, "", "");
 
 #if defined(_MSC_VER)
 typedef LONG NTSTATUS, *PNTSTATUS;
@@ -496,8 +503,105 @@ size_t FetchECSMetaCallback(char* buffer, size_t size, size_t nmemb, std::string
     return sizes;
 }
 
+// 从云助手获取序列号
+std::string GetSerialNumberFromEcsAssist(const std::string& machineIdFile) {
+    std::string sn;
+    if (CheckExistance(machineIdFile)) {
+        if (!ReadFileContent(machineIdFile, sn)) {
+            return "";
+        }
+    }
+    return sn;
+}
+
+static std::string GetEcsAssistMachineIdFile() {
+#if defined(WIN32)
+    return "C:\\ProgramData\\aliyun\\assist\\hybrid\\machine-id";
+#else
+    return "/usr/local/share/aliyun-assist/hybrid/machine-id";
+#endif
+}
+
+std::string GetSerialNumberFromEcsAssist() {
+    return GetSerialNumberFromEcsAssist(GetEcsAssistMachineIdFile());
+}
+
+std::string RandomHostid() {
+    static std::string hostId = CalculateRandomUUID();
+    return hostId;
+}
+
+const std::string& GetLocalHostId() {
+    static std::string fileName = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "host_id";
+    static std::string hostId;
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    if (CheckExistance(fileName)) {
+        if (!ReadFileContent(fileName, hostId)) {
+            hostId = "";
+        }
+    }
+    if (hostId.empty()) {
+        hostId = RandomHostid();
+
+        LOG_INFO(sLogger, ("save hostId file to local file system, hostId", hostId));
+        int fd = open(fileName.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0755);
+        if (fd == -1) {
+            int savedErrno = errno;
+            if (savedErrno != EEXIST) {
+                LOG_ERROR(sLogger, ("save hostId file fail", fileName)("errno", strerror(savedErrno)));
+            }
+        } else {
+            // 文件成功创建,现在写入hostId
+            ssize_t written = write(fd, hostId.c_str(), hostId.length());
+            if (written == static_cast<ssize_t>(hostId.length())) {
+                LOG_INFO(sLogger, ("hostId saved successfully to", fileName));
+            } else {
+                int writeErrno = errno;
+                LOG_ERROR(sLogger, ("Failed to write hostId to file", fileName)("errno", strerror(writeErrno)));
+            }
+            close(fd);
+        }
+    }
+    return hostId;
+}
+
+std::string FetchHostId() {
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
+    static std::string hostId;
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    hostId = STRING_FLAG(agent_host_id);
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    ECSMeta meta = FetchECSMeta();
+    hostId = meta.instanceID;
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    hostId = GetSerialNumberFromEcsAssist();
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    hostId = GetLocalHostId();
+
+    return hostId;
+}
+
 ECSMeta FetchECSMeta() {
-    CURL* curl;
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
+    static ECSMeta metaObj;
+    static bool initialized = false;
+    if (initialized) {
+        return metaObj;
+    }
+    initialized = true;
+    CURL* curl = nullptr;
     for (size_t retryTimes = 1; retryTimes <= 5; retryTimes++) {
         curl = curl_easy_init();
         if (curl) {
@@ -505,49 +609,89 @@ ECSMeta FetchECSMeta() {
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    ECSMeta metaObj;
-    metaObj.instanceID = "";
-    metaObj.userID = "";
-    metaObj.regionID = "";
-    if (curl) {
+    if (!curl) {
+        LOG_WARNING(sLogger,
+                    ("curl handler cannot be initialized during user environment identification",
+                     "ecs meta may be mislabeled"));
+        return metaObj;
+    }
+    for (size_t retryTimes = 1; retryTimes <= 3; retryTimes++) {
+        // Get token first
+        std::string token;
+        auto* tokenHeaders = curl_slist_append(nullptr, "X-aliyun-ecs-metadata-token-ttl-seconds:3600");
+        if (!tokenHeaders) {
+            curl_easy_cleanup(curl);
+            return metaObj;
+        }
+        curl_easy_setopt(curl, CURLOPT_URL, "http://100.100.100.200/latest/api/token");
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, tokenHeaders);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
+
+        CURLcode res = curl_easy_perform(curl);
+        curl_slist_free_all(tokenHeaders);
+
+        if (res != CURLE_OK) {
+            LOG_WARNING(sLogger, ("fetch ecs token fail", curl_easy_strerror(res)));
+            continue;
+        }
+
+        // Get metadata with token
         std::string meta;
+        auto* metaHeaders = curl_slist_append(nullptr, ("X-aliyun-ecs-metadata-token: " + token).c_str());
+        if (!metaHeaders) {
+            continue;
+        }
+
+        curl_easy_reset(curl);
         curl_easy_setopt(curl, CURLOPT_URL, "http://100.100.100.200/latest/dynamic/instance-identity/document");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, metaHeaders);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &meta);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
-        CURLcode res = curl_easy_perform(curl);
+
+        res = curl_easy_perform(curl);
+        curl_slist_free_all(metaHeaders);
+
         if (res != CURLE_OK) {
-            LOG_DEBUG(sLogger, ("fetch ecs meta fail", curl_easy_strerror(res)));
-        } else {
-            rapidjson::Document doc;
-            doc.Parse(meta.c_str());
-            if (doc.HasParseError() || !doc.IsObject()) {
-                LOG_DEBUG(sLogger, ("fetch ecs meta fail", meta));
-            } else {
-                rapidjson::Value::ConstMemberIterator instanceItr = doc.FindMember("instance-id");
-                if (instanceItr != doc.MemberEnd() && (instanceItr->value.IsString())) {
-                    metaObj.instanceID = instanceItr->value.GetString();
-                }
-
-                rapidjson::Value::ConstMemberIterator userItr = doc.FindMember("owner-account-id");
-                if (userItr != doc.MemberEnd() && userItr->value.IsString()) {
-                    metaObj.userID = userItr->value.GetString();
-                }
-
-                rapidjson::Value::ConstMemberIterator regionItr = doc.FindMember("region-id");
-                if (regionItr != doc.MemberEnd() && regionItr->value.IsString()) {
-                    metaObj.regionID = regionItr->value.GetString();
-                }
-            }
+            LOG_WARNING(sLogger, ("fetch ecs meta fail", curl_easy_strerror(res)));
+            continue;
         }
+
+        rapidjson::Document doc;
+        doc.Parse(meta.c_str());
+        if (doc.HasParseError() || !doc.IsObject()) {
+            LOG_WARNING(sLogger, ("fetch ecs meta fail", meta));
+            continue;
+        }
+
+        if (const auto instanceItr = doc.FindMember("instance-id");
+            instanceItr != doc.MemberEnd() && instanceItr->value.IsString()) {
+            metaObj.instanceID = instanceItr->value.GetString();
+        }
+
+        if (const auto userItr = doc.FindMember("owner-account-id");
+            userItr != doc.MemberEnd() && userItr->value.IsString()) {
+            metaObj.userID = userItr->value.GetString();
+        }
+
+        if (const auto regionItr = doc.FindMember("region-id");
+            regionItr != doc.MemberEnd() && regionItr->value.IsString()) {
+            metaObj.regionID = regionItr->value.GetString();
+        }
+
         curl_easy_cleanup(curl);
         return metaObj;
     }
-    LOG_WARNING(
-        sLogger,
-        ("curl handler cannot be initialized during user environment identification", "ecs meta may be mislabeled"));
+
+    curl_easy_cleanup(curl);
+    LOG_WARNING(sLogger, ("failed to fetch ecs metadata after retries", "ecs meta may be mislabeled"));
     return metaObj;
 }
 

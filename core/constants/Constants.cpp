@@ -22,6 +22,7 @@ const std::string OS_NAME = "Linux";
 const std::string OS_NAME = "Windows";
 #endif
 
+const std::string LOG_RESERVED_KEY_HOSTID = "__hostid__";
 const std::string LOG_RESERVED_KEY_SOURCE = "__source__";
 const std::string LOG_RESERVED_KEY_TOPIC = "__topic__";
 const std::string LOG_RESERVED_KEY_USER_DEFINED_ID = "__user_defined_id__";
