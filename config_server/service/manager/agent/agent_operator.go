@@ -34,6 +34,7 @@ func (a *AgentManager) HeartBeat(req *proto.HeartBeatRequest, res *proto.HeartBe
 	agent.RunningStatus = req.RunningStatus
 	agent.StartupTime = req.StartupTime
 	agent.Interval = req.Interval
+	agent.Timestamp = time.Now().UTC()
 
 	a.AgentMessageList.Push(optHeartbeat, agent)
 
