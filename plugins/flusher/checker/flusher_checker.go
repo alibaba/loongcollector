@@ -29,7 +29,6 @@ type FlusherChecker struct {
 	context  pipeline.Context
 	LogGroup protocol.LogGroup
 	Lock     sync.RWMutex
-	Block    bool
 }
 
 func (p *FlusherChecker) Init(context pipeline.Context) error {
@@ -140,7 +139,7 @@ func (p *FlusherChecker) Flush(projectName string, logstoreName string, configNa
 
 // IsReady is ready to flush
 func (p *FlusherChecker) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
-	return !p.Block
+	return true
 }
 
 // Stop ...

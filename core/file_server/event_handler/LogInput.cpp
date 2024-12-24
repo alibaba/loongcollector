@@ -350,7 +350,8 @@ void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
 
 void LogInput::UpdateCriticalMetric(int32_t curTime) {
     mLastRunTime->Set(mLastReadEventTime.load());
-    LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
+    LoongCollectorMonitor::GetInstance()->SetAgentOpenFdTotal(
+        GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
     mRegisterdHandlersTotal->Set(EventDispatcher::GetInstance()->GetHandlerCount());
     mActiveReadersTotal->Set(CheckPointManager::Instance()->GetReaderCount());
     mEventProcessCount = 0;
@@ -529,6 +530,7 @@ Event* LogInput::PopEventQueue() {
 #ifdef APSARA_UNIT_TEST_MAIN
 void LogInput::CleanEnviroments() {
     mIdleFlag = true;
+    mInteruptFlag = true;
     usleep(100 * 1000);
     while (true) {
         Event* ev = PopEventQueue();

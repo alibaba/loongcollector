@@ -75,7 +75,7 @@ public:
     HttpResponse()
         : mHeader(compareHeader),
           mBody(new std::string(), [](void* p) { delete static_cast<std::string*>(p); }),
-          mWriteCallback(DefaultWriteCallback) {};
+          mWriteCallback(DefaultWriteCallback){};
     HttpResponse(void* body,
                  const std::function<void(void*)>& bodyDeleter,
                  size_t (*callback)(char*, size_t, size_t, void*))
@@ -155,6 +155,10 @@ private:
     std::map<std::string, std::string, decltype(compareHeader)*> mHeader;
     std::unique_ptr<void, std::function<void(void*)>> mBody;
     size_t (*mWriteCallback)(char*, size_t, size_t, void*) = nullptr;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class HttpSinkMock;
+#endif
 };
 
 } // namespace logtail

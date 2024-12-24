@@ -27,7 +27,9 @@
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/plugin/interface/Input.h"
 #include "pipeline/plugin/interface/Processor.h"
+#include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 #include "task_pipeline/Task.h"
 #include "task_pipeline/TaskRegistry.h"
 
@@ -65,13 +67,32 @@ public:
         return true;
     }
     bool Start() override { return true; }
-    bool Stop(bool isPipelineRemoving) override { return true; }
+    bool Stop(bool isPipelineRemoving) override {
+        while (mBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            LOG_DEBUG(sLogger, ("input mock", "block"));
+        }
+        return true;
+    }
     bool SupportAck() const override { return mSupportAck; }
 
+    void Block() { mBlockFlag = true; }
+    void Unblock() { mBlockFlag = false; }
+
     bool mSupportAck = true;
+
+private:
+    std::atomic_bool mBlockFlag = false;
 };
 
 const std::string InputMock::sName = "input_mock";
+
+class InputMock2 : public InputMock {
+public:
+    static const std::string sName;
+};
+
+const std::string InputMock2::sName = "input_mock2";
 
 class ProcessorMock : public Processor {
 public:
@@ -79,15 +100,34 @@ public:
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config) override { return true; }
-    void Process(PipelineEventGroup& logGroup) override { ++mCnt; };
+    void Process(PipelineEventGroup& logGroup) override {
+        while (mBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            LOG_INFO(sLogger, ("processor mock", "block")("cnt", mCnt));
+        }
+        ++mCnt;
+        LOG_DEBUG(sLogger, ("processor mock", "process")("cnt", mCnt));
+    };
+
+    void Block() { mBlockFlag.store(true); }
+    void Unblock() { mBlockFlag.store(false); }
 
     uint32_t mCnt = 0;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; };
+
+    std::atomic_bool mBlockFlag = false;
 };
 
 const std::string ProcessorMock::sName = "processor_mock";
+
+class ProcessorMock2 : public ProcessorMock {
+public:
+    static const std::string sName;
+};
+
+const std::string ProcessorMock2::sName = "processor_mock2";
 
 class FlusherMock : public Flusher {
 public:
@@ -149,6 +189,29 @@ public:
 
 const std::string FlusherHttpMock::sName = "flusher_http_mock";
 
+class FlusherSLSMock : public FlusherSLS {
+public:
+    static const std::string sName;
+
+    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) const override {
+        auto data = static_cast<SLSSenderQueueItem*>(item);
+        std::map<std::string, std::string> header;
+        req = std::make_unique<HttpSinkRequest>(
+            "POST", false, "test-host", 80, "/test-operation", "", header, data->mData, item);
+        LOG_WARNING(sLogger, ("build mock request", data->mData));
+        return true;
+    }
+};
+
+const std::string FlusherSLSMock::sName = "flusher_sls_mock";
+
+class FlusherSLSMock2 : public FlusherSLSMock {
+public:
+    static const std::string sName;
+};
+
+const std::string FlusherSLSMock2::sName = "flusher_sls_mock2";
+
 class TaskMock : public Task {
 public:
     static const std::string sName;
@@ -174,6 +237,10 @@ void LoadPluginMock() {
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherHttpMock>());
+    PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock>());
+    PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock2>());
+    PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock2>());
+    PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock2>());
 }
 
 void LoadTaskMock() {

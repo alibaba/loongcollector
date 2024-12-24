@@ -32,6 +32,9 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
+#ifdef APSARA_UNIT_TEST_MAIN
+#include "unittest/pipeline/LogtailPluginMock.h"
+#endif
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
 
@@ -338,18 +341,29 @@ bool Pipeline::Init(PipelineConfig&& config) {
 void Pipeline::Start() {
     // #ifndef APSARA_UNIT_TEST_MAIN
     //  TODO: 应该保证指定时间内返回，如果无法返回，将配置放入startDisabled里
+    LOG_WARNING(sLogger, ("debug", "8"));
     for (const auto& flusher : mFlushers) {
         flusher->Start();
     }
 
+    LOG_WARNING(sLogger, ("debug", "9"));
     if (!mGoPipelineWithoutInput.isNull()) {
+#ifndef APSARA_UNIT_TEST_MAIN
         LogtailPlugin::GetInstance()->Start(GetConfigNameOfGoPipelineWithoutInput());
+#else
+        LogtailPluginMock::GetInstance()->Start(GetConfigNameOfGoPipelineWithoutInput());
+#endif
     }
 
+    LOG_WARNING(sLogger, ("debug", "10"));
     ProcessQueueManager::GetInstance()->EnablePop(mName);
 
     if (!mGoPipelineWithInput.isNull()) {
+#ifndef APSARA_UNIT_TEST_MAIN
         LogtailPlugin::GetInstance()->Start(GetConfigNameOfGoPipelineWithInput());
+#else
+        LogtailPluginMock::GetInstance()->Start(GetConfigNameOfGoPipelineWithInput());
+#endif
     }
 
     for (const auto& input : mInputs) {
@@ -395,8 +409,9 @@ bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
         auto res = mRouter.Route(group);
         for (auto& item : res) {
             if (item.first >= mFlushers.size()) {
-                LOG_ERROR(sLogger,
-                          ("unexpected error", "invalid flusher index")("flusher index", item.first)("config", mName));
+                LOG_WARNING(sLogger,
+                            ("pipeline send", "discard data")("config", mName)(
+                                "reason", "invalid flusher index or config update flusher from C++ to Go"));
                 allSucceeded = false;
                 continue;
             }
@@ -424,7 +439,11 @@ void Pipeline::Stop(bool isRemoving) {
 
     if (!mGoPipelineWithInput.isNull()) {
         // Go pipeline `Stop` will stop and delete
+#ifndef APSARA_UNIT_TEST_MAIN
         LogtailPlugin::GetInstance()->Stop(GetConfigNameOfGoPipelineWithInput(), isRemoving);
+#else
+        LogtailPluginMock::GetInstance()->Stop(GetConfigNameOfGoPipelineWithInput(), isRemoving);
+#endif
     }
 
     ProcessQueueManager::GetInstance()->DisablePop(mName, isRemoving);
@@ -434,7 +453,11 @@ void Pipeline::Stop(bool isRemoving) {
 
     if (!mGoPipelineWithoutInput.isNull()) {
         // Go pipeline `Stop` will stop and delete
+#ifndef APSARA_UNIT_TEST_MAIN
         LogtailPlugin::GetInstance()->Stop(GetConfigNameOfGoPipelineWithoutInput(), isRemoving);
+#else
+        LogtailPluginMock::GetInstance()->Stop(GetConfigNameOfGoPipelineWithoutInput(), isRemoving);
+#endif
     }
 
     for (const auto& flusher : mFlushers) {
@@ -488,6 +511,7 @@ void Pipeline::CopyNativeGlobalParamToGoPipeline(Json::Value& pipeline) {
 }
 
 bool Pipeline::LoadGoPipelines() const {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (!mGoPipelineWithoutInput.isNull()) {
         string content = mGoPipelineWithoutInput.toStyledString();
         if (!LogtailPlugin::GetInstance()->LoadPipeline(GetConfigNameOfGoPipelineWithoutInput(),
@@ -529,6 +553,7 @@ bool Pipeline::LoadGoPipelines() const {
             return false;
         }
     }
+#endif
     return true;
 }
 

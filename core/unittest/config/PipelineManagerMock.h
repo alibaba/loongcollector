@@ -31,9 +31,6 @@ public:
         mContext.SetCreateTime(config.mCreateTime);
         return (*mConfig)["valid"].asBool();
     }
-
-    bool Start() { return true; }
-    void Stop(bool isRemoving) {}
 };
 
 class PipelineManagerMock : public PipelineManager {
@@ -44,6 +41,9 @@ public:
     }
 
     void ClearEnvironment() {
+        for (auto& it : mPipelineNameEntityMap) {
+            it.second->Stop(true);
+        }
         mPipelineNameEntityMap.clear();
         mPluginCntMap.clear();
     }

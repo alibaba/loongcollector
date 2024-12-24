@@ -12,39 +12,97 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>
-#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
-#include "file_server/FileServer.h"
+#include "file_server/EventDispatcher.h"
 #include "file_server/event_handler/LogInput.h"
 #include "pipeline/plugin/PluginRegistry.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+#include "pipeline/queue/QueueKeyManager.h"
+#include "pipeline/queue/SLSSenderQueueItem.h"
+#include "pipeline/queue/SenderQueueManager.h"
+#include "runner/FlusherRunner.h"
+#include "runner/ProcessorRunner.h"
 #include "unittest/Unittest.h"
 #include "unittest/config/PipelineManagerMock.h"
+#include "unittest/pipeline/HttpSinkMock.h"
+#include "unittest/pipeline/LogtailPluginMock.h"
+#include "unittest/plugin/PluginMock.h"
 
 using namespace std;
 
 namespace logtail {
 
+
 class PipelineUpdateUnittest : public testing::Test {
 public:
-    void TestFileServerStart() const;
+    void TestFileServerStart();
+    void TestPipelineParamUpdateCase1() const;
+    void TestPipelineParamUpdateCase2() const;
+    void TestPipelineParamUpdateCase3() const;
+    void TestPipelineParamUpdateCase4() const;
+    void TestPipelineTypeUpdateCase1() const;
+    void TestPipelineTypeUpdateCase2() const;
+    void TestPipelineTypeUpdateCase3() const;
+    void TestPipelineTypeUpdateCase4() const;
+    void TestPipelineTopoUpdateCase1() const;
+    void TestPipelineTopoUpdateCase2() const;
+    void TestPipelineTopoUpdateCase3() const;
+    void TestPipelineTopoUpdateCase4() const;
+    void TestPipelineTopoUpdateCase5() const;
+    void TestPipelineTopoUpdateCase6() const;
+    void TestPipelineTopoUpdateCase7() const;
+    void TestPipelineTopoUpdateCase8() const;
+    void TestPipelineTopoUpdateCase9() const;
+    void TestPipelineTopoUpdateCase10() const;
+    void TestPipelineTopoUpdateCase11() const;
+    void TestPipelineTopoUpdateCase12() const;
+    void TestPipelineInputBlock() const;
+    void TestPipelineGoInputBlockCase1() const;
+    void TestPipelineGoInputBlockCase2() const;
+    void TestPipelineIsolationCase1() const;
+    void TestPipelineIsolationCase2() const;
 
 protected:
-    static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
+    static void SetUpTestCase() {
+        PluginRegistry::GetInstance()->LoadPlugins();
+        LoadPluginMock();
 
-    static void TearDownTestCase() {
-        PluginRegistry::GetInstance()->UnloadPlugins();
-        FileServer::GetInstance()->Stop();
+        FlusherRunner::GetInstance()->mEnableRateLimiter = false;
+#ifdef __ENTERPRISE__
+        builtinPipelineCnt = EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
+        SenderQueueManager::GetInstance()->mDefaultQueueParam.mCapacity = 1; // test extra buffer
     }
 
-    void SetUp() override {}
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
-    void TearDown() override {}
+    void SetUp() override {
+        LogInput::GetInstance()->CleanEnviroments();
+        ProcessorRunner::GetInstance()->Init();
+        isFileServerStart = false; // file server stop is not reentrant, so we stop it only when start it
+    }
+
+    void TearDown() override {
+        LogInput::GetInstance()->CleanEnviroments();
+        EventDispatcher::GetInstance()->CleanEnviroments();
+        for (auto& pipeline : PipelineManager::GetInstance()->GetAllPipelines()) {
+            pipeline.second->Stop(true);
+        }
+        PipelineManager::GetInstance()->mPipelineNameEntityMap.clear();
+        if (isFileServerStart) {
+            FileServer::GetInstance()->Stop();
+        }
+        ProcessorRunner::GetInstance()->Stop();
+        FlusherRunner::GetInstance()->Stop();
+        HttpSinkMock::GetInstance()->ClearRequests();
+        HttpSinkMock::GetInstance()->Stop();
+        LOG_WARNING(sLogger, ("tear down", "all"));
+    }
 
 private:
     Json::Value GeneratePipelineConfigJson(const string& inputConfig,
@@ -66,43 +124,191 @@ private:
                        errorMsg);
         return json;
     }
+
+    void AddDataToProcessQueue(const string& configName, const string& data) const {
+        auto key = QueueKeyManager::GetInstance()->GetKey(configName);
+        PipelineEventGroup g(std::make_shared<SourceBuffer>());
+        auto event = g.AddLogEvent();
+        event->SetContent("content", data);
+        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(g), 0);
+        {
+            auto manager = ProcessQueueManager::GetInstance();
+            manager->CreateOrUpdateBoundedQueue(key, 0, PipelineContext{});
+            lock_guard<mutex> lock(manager->mQueueMux);
+            auto iter = manager->mQueues.find(key);
+            APSARA_TEST_NOT_EQUAL(iter, manager->mQueues.end());
+            APSARA_TEST_TRUE_FATAL((*iter->second.first)->Push(std::move(item)));
+        }
+    };
+
+    void AddDataToProcessor(const string& configName, const string& data) const {
+        auto key = QueueKeyManager::GetInstance()->GetKey(configName);
+        PipelineEventGroup g(std::make_shared<SourceBuffer>());
+        auto event = g.AddLogEvent();
+        event->SetContent("content", data);
+        ProcessorRunner::GetInstance()->PushQueue(key, 0, std::move(g));
+    }
+
+    void AddDataToSenderQueue(const string& configName, string&& data, Flusher* flusher) const {
+        auto key = flusher->mQueueKey;
+        auto cpt = make_shared<RangeCheckpoint>();
+        LOG_WARNING(sLogger, ("sender queue key", key));
+        std::unique_ptr<SLSSenderQueueItem> item = std::make_unique<SLSSenderQueueItem>(
+            std::move(data), data.size(), flusher, key, "", RawDataType::EVENT_GROUP, "", std::move(cpt), false);
+        {
+            auto manager = SenderQueueManager::GetInstance();
+            manager->CreateQueue(key, "", PipelineContext{});
+            lock_guard<mutex> lock(manager->mQueueMux);
+            auto iter = manager->mQueues.find(key);
+            APSARA_TEST_NOT_EQUAL(iter, manager->mQueues.end());
+            LOG_WARNING(sLogger, ("add data to sender queue", item->mData));
+            APSARA_TEST_TRUE_FATAL(iter->second.Push(std::move(item)));
+        }
+    }
+
+    void VerifyData(size_t expectedDataCount) const {
+        for (size_t retry = 0; retry < 8; ++retry) {
+            this_thread::sleep_for(chrono::milliseconds(1000));
+            auto requests = HttpSinkMock::GetInstance()->GetRequests();
+            size_t i = 1;
+            size_t j = 0;
+            while ((i < expectedDataCount + 1) && j < requests.size()) {
+                LOG_WARNING(sLogger, ("requests", requests[j]));
+                if (requests[j].find("test-data-" + to_string(i)) != string::npos) {
+                    ++i;
+                    continue;
+                }
+                ++j;
+            }
+            if (i == expectedDataCount + 1) {
+                APSARA_TEST_EQUAL_FATAL(requests.size() - 1, j);
+                APSARA_TEST_EQUAL_FATAL(expectedDataCount + 1, i);
+                return;
+            }
+        }
+    }
+
+    string nativeInputFileConfig = R"(
+        {
+            "Type": "input_file",
+            "FilePaths": [
+                "/tmp/not_found.log"
+            ]
+        })";
     string nativeInputConfig = R"(
         {
-            "Type": "input_file"
+            "Type": "input_mock",
+            "FilePaths": [
+                "/tmp/not_found.log"
+            ]
+        })";
+    string nativeInputConfig2 = R"(
+        {
+            "Type": "input_mock",
+            "FilePaths": [
+                "/tmp/*.log"
+            ]
+        })";
+    string nativeInputConfig3 = R"(
+        {
+            "Type": "input_mock2",
+            "FilePaths": [
+                "/tmp/not_found.log"
+            ]
         })";
     string nativeProcessorConfig = R"(
         {
-            "Type": "processor_parse_regex_native"
+            "Type": "processor_mock"
+        })";
+    string nativeProcessorConfig2 = R"(
+        {
+            "Type": "processor_mock",
+            "Regex": ".*"
+        })";
+    string nativeProcessorConfig3 = R"(
+        {
+            "Type": "processor_mock2"
         })";
     string nativeFlusherConfig = R"(
         {
-            "Type": "flusher_sls"
+            "Type": "flusher_sls_mock",
+            "Project": "test_project",
+            "Logstore": "test_logstore_1",
+            "Region": "test_region",
+            "Endpoint": "test_endpoint"
+        })";
+    string nativeFlusherConfig2 = R"(
+        {
+            "Type": "flusher_sls_mock",
+            "Project": "test_project",
+            "Logstore": "test_logstore_2",
+            "Region": "test_region",
+            "Endpoint": "test_endpoint"
+        })";
+    string nativeFlusherConfig3 = R"(
+        {
+            "Type": "flusher_sls_mock2",
+            "Project": "test_project",
+            "Logstore": "test_logstore_1",
+            "Region": "test_region",
+            "Endpoint": "test_endpoint"
         })";
     string goInputConfig = R"(
         {
-            "Type": "input_docker_stdout"
+            "Type": "service_docker_stdout_v2"
+        })";
+    string goInputConfig2 = R"(
+        {
+            "Type": "service_docker_stdout_v2",
+            "Stdout": true
+        })";
+    string goInputConfig3 = R"(
+        {
+            "Type": "service_docker_stdout_v3"
         })";
     string goProcessorConfig = R"(
         {
             "Type": "processor_regex"
         })";
+    string goProcessorConfig2 = R"(
+        {
+            "Type": "processor_regex",
+            "Regex": ".*"
+        })";
+    string goProcessorConfig3 = R"(
+        {
+            "Type": "processor_regex2"
+        })";
     string goFlusherConfig = R"(
         {
             "Type": "flusher_stdout"
         })";
+    string goFlusherConfig2 = R"(
+        {
+            "Type": "flusher_stdout",
+            "Stdout": true
+        })";
+    string goFlusherConfig3 = R"(
+        {
+            "Type": "flusher_stdout2"
+        })";
+
+    size_t builtinPipelineCnt = 0;
+    bool isFileServerStart = false;
 };
 
-void PipelineUpdateUnittest::TestFileServerStart() const {
+void PipelineUpdateUnittest::TestFileServerStart() {
+    isFileServerStart = true;
     Json::Value nativePipelineConfigJson
-        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+        = GeneratePipelineConfigJson(nativeInputFileConfig, nativeProcessorConfig, nativeFlusherConfig);
     Json::Value goPipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
     auto pipelineManager = PipelineManagerMock::GetInstance();
     PipelineConfigDiff diff;
     PipelineConfig nativePipelineConfigObj
-        = PipelineConfig("test1", make_unique<Json::Value>(nativePipelineConfigJson));
+        = PipelineConfig("test-file-1", make_unique<Json::Value>(nativePipelineConfigJson));
     nativePipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(nativePipelineConfigObj));
-    PipelineConfig goPipelineConfigObj = PipelineConfig("test2", make_unique<Json::Value>(goPipelineConfigJson));
+    PipelineConfig goPipelineConfigObj = PipelineConfig("test-file-2", make_unique<Json::Value>(goPipelineConfigJson));
     goPipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(goPipelineConfigObj));
 
@@ -111,7 +317,1137 @@ void PipelineUpdateUnittest::TestFileServerStart() const {
     APSARA_TEST_EQUAL_FATAL(false, LogInput::GetInstance()->mInteruptFlag);
 }
 
+void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
+    // C++ -> C++ -> C++
+    const std::string configName = "test1";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    auto processor
+        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->GetProcessors()[0].get()->GetPlugin()));
+    processor->Block();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        processor->Unblock();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineParamUpdateCase2() const {
+    // Go -> Go -> Go
+    const std::string configName = "test2";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig2, goProcessorConfig2, goFlusherConfig2);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+}
+
+void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
+    // Go -> Go -> C++
+    const std::string configName = "test3";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig2, goProcessorConfig2, nativeFlusherConfig2);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(3);
+}
+
+void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
+    // C++ -> Go -> C++
+    const std::string configName = "test4";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    LogtailPluginMock::GetInstance()->BlockProcess();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig2, goProcessorConfig2, nativeFlusherConfig2);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        LogtailPluginMock::GetInstance()->UnblockProcess();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
+    // C++ -> C++ -> C++
+    const std::string configName = "test1";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    auto processor
+        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->GetProcessors()[0].get()->GetPlugin()));
+    processor->Block();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        processor->Unblock();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineTypeUpdateCase2() const {
+    // Go -> Go -> Go
+    const std::string configName = "test2";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+}
+
+void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
+    // Go -> Go -> C++
+    const std::string configName = "test3";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(3);
+}
+
+void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
+    // C++ -> Go -> C++
+    const std::string configName = "test4";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    LogtailPluginMock::GetInstance()->BlockProcess();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        LogtailPluginMock::GetInstance()->UnblockProcess();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase1() const {
+    // C++ -> C++ -> C++ => Go -> Go -> Go
+    const std::string configName = "test1";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    auto processor
+        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->GetProcessors()[0].get()->GetPlugin()));
+    processor->Block();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        processor->Unblock();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(4);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
+    // C++ -> C++ -> C++ => Go -> Go -> C++
+    const std::string configName = "test2";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    auto processor
+        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->GetProcessors()[0].get()->GetPlugin()));
+    processor->Block();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        processor->Unblock();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase3() const {
+    // C++ -> C++ -> C++ => C++ -> Go -> C++
+    const std::string configName = "test3";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    auto processor
+        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->GetProcessors()[0].get()->GetPlugin()));
+    processor->Block();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        processor->Unblock();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase4() const {
+    // Go -> Go -> Go => C++ -> C++ -> C++
+    const std::string configName = "test4";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(false, LogtailPluginMock::GetInstance()->IsStarted());
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase5() const {
+    // Go -> Go -> Go => Go -> Go -> C++
+    const std::string configName = "test5";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase6() const {
+    // Go -> Go -> Go => C++ -> Go -> C++
+    const std::string configName = "test6";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase7() const {
+    // Go -> Go -> C++ => C++ -> C++ -> C++
+    const std::string configName = "test7";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(false, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(3);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase8() const {
+    // Go -> Go -> C++ => Go -> Go -> Go
+    const std::string configName = "test8";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(3);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase9() const {
+    // Go -> Go -> C++ => C++ -> Go -> C++
+    const std::string configName = "test9";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(3);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase10() const {
+    // C++ -> Go -> C++ => C++ -> C++ -> C++
+    const std::string configName = "test10";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    LogtailPluginMock::GetInstance()->BlockProcess();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        LogtailPluginMock::GetInstance()->UnblockProcess();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(false, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase11() const {
+    // C++ -> Go -> C++ => Go -> Go -> Go
+    const std::string configName = "test11";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    LogtailPluginMock::GetInstance()->BlockProcess();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        LogtailPluginMock::GetInstance()->UnblockProcess();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(4);
+}
+
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
+    // C++ -> Go -> C++ => Go -> Go -> C++
+    const std::string configName = "test12";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    LogtailPluginMock::GetInstance()->BlockProcess();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        LogtailPluginMock::GetInstance()->UnblockProcess();
+    });
+    pipelineManager->UpdatePipelines(diffUpdate);
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineInputBlock() const {
+    // C++ -> C++ -> C++
+    const std::string configName = "test1";
+    // load old pipeline
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto input = static_cast<InputMock*>(const_cast<Input*>(pipeline->GetInputs()[0].get()->GetPlugin()));
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    auto processor
+        = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->GetProcessors()[0].get()->GetPlugin()));
+    input->Block();
+    processor->Block();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    AddDataToProcessor(configName, "test-data-4");
+
+    AddDataToProcessQueue(configName, "test-data-5");
+    AddDataToProcessQueue(configName, "test-data-6");
+    AddDataToProcessQueue(configName, "test-data-7");
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result1 = async(launch::async, [&]() {
+        this_thread::sleep_for(chrono::milliseconds(2000));
+        processor->Unblock();
+    });
+    auto result2 = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
+    this_thread::sleep_for(chrono::milliseconds(2000));
+    APSARA_TEST_NOT_EQUAL_FATAL(future_status::ready, result2.wait_for(chrono::milliseconds(0)));
+    input->Unblock();
+    result1.get();
+    result2.get();
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(7);
+}
+
+void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
+    // Go -> Go -> C++ => Go -> Go -> C++
+    const std::string configName = "test1";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    LogtailPluginMock::GetInstance()->BlockStop();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
+    this_thread::sleep_for(chrono::milliseconds(2000));
+    APSARA_TEST_NOT_EQUAL_FATAL(future_status::ready, result.wait_for(chrono::milliseconds(0)));
+    LogtailPluginMock::GetInstance()->UnblockStop();
+    result.get();
+
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(3);
+}
+
+void PipelineUpdateUnittest::TestPipelineGoInputBlockCase2() const {
+    // Go -> Go -> C++ => C++ -> Go -> C++
+    const std::string configName = "test1";
+    // load old pipeline
+    Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = PipelineManager::GetInstance();
+    PipelineConfigDiff diff;
+    PipelineConfig pipelineConfigObj = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // Add data without trigger
+    auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+    auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+    LogtailPluginMock::GetInstance()->BlockStop();
+    AddDataToSenderQueue(configName, "test-data-1", flusher);
+    AddDataToSenderQueue(configName, "test-data-2", flusher);
+    AddDataToSenderQueue(configName, "test-data-3", flusher);
+
+    // load new pipeline
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(nativeInputConfig3, nativeFlusherConfig3, nativeFlusherConfig3);
+    PipelineConfigDiff diffUpdate;
+    PipelineConfig pipelineConfigObjUpdate
+        = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
+    this_thread::sleep_for(chrono::milliseconds(2000));
+    APSARA_TEST_NOT_EQUAL_FATAL(future_status::ready, result.wait_for(chrono::milliseconds(0)));
+    LogtailPluginMock::GetInstance()->UnblockStop();
+    result.get();
+
+    APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(false, LogtailPluginMock::GetInstance()->IsStarted());
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    VerifyData(3);
+}
+
+void PipelineUpdateUnittest::TestPipelineIsolationCase1() const {
+    PipelineConfigDiff diff;
+    auto pipelineManager = PipelineManager::GetInstance();
+    // C++ -> C++ -> C++
+    Json::Value pipelineConfigJson1
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    PipelineConfig pipelineConfigObj1 = PipelineConfig("test1", make_unique<Json::Value>(pipelineConfigJson1));
+    pipelineConfigObj1.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj1));
+    // Go -> Go -> Go
+    Json::Value pipelineConfigJson2 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
+    PipelineConfig pipelineConfigObj2 = PipelineConfig("test2", make_unique<Json::Value>(pipelineConfigJson2));
+    pipelineConfigObj2.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj2));
+    // Go -> Go -> C++
+    Json::Value pipelineConfigJson3 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    PipelineConfig pipelineConfigObj3 = PipelineConfig("test3", make_unique<Json::Value>(pipelineConfigJson3));
+    pipelineConfigObj3.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj3));
+    // C++ -> Go -> C++
+    Json::Value pipelineConfigJson4
+        = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
+    PipelineConfig pipelineConfigObj4 = PipelineConfig("test4", make_unique<Json::Value>(pipelineConfigJson4));
+    pipelineConfigObj4.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj4));
+
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(4U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    PipelineConfigDiff diffUpdate;
+    diffUpdate.mRemoved.push_back("test1");
+    auto pipeline = pipelineManager->GetAllPipelines().at("test1");
+    auto input = static_cast<InputMock*>(const_cast<Input*>(pipeline->GetInputs()[0].get()->GetPlugin()));
+    input->Block();
+
+    HttpSinkMock::GetInstance()->Init();
+    FlusherRunner::GetInstance()->Init();
+    auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
+    { // add data to Go -> Go -> C++
+        std::string configName = "test3";
+        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+        auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+        AddDataToSenderQueue(configName, "test-data-1", flusher);
+        AddDataToSenderQueue(configName, "test-data-2", flusher);
+        AddDataToSenderQueue(configName, "test-data-3", flusher);
+        VerifyData(3);
+    }
+    HttpSinkMock::GetInstance()->ClearRequests();
+    { // add data to C++ -> Go -> C++
+        std::string configName = "test4";
+        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+        AddDataToProcessQueue(configName, "test-data-1");
+        AddDataToProcessQueue(configName, "test-data-2");
+        AddDataToProcessQueue(configName, "test-data-3");
+        VerifyData(3);
+    }
+
+    input->Unblock();
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(3U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+}
+
+void PipelineUpdateUnittest::TestPipelineIsolationCase2() const {
+    PipelineConfigDiff diff;
+    auto pipelineManager = PipelineManager::GetInstance();
+    // C++ -> C++ -> C++
+    Json::Value pipelineConfigJson1
+        = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
+    PipelineConfig pipelineConfigObj1 = PipelineConfig("test1", make_unique<Json::Value>(pipelineConfigJson1));
+    pipelineConfigObj1.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj1));
+    // Go -> Go -> Go
+    Json::Value pipelineConfigJson2 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
+    PipelineConfig pipelineConfigObj2 = PipelineConfig("test2", make_unique<Json::Value>(pipelineConfigJson2));
+    pipelineConfigObj2.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj2));
+    // Go -> Go -> C++
+    Json::Value pipelineConfigJson3 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
+    PipelineConfig pipelineConfigObj3 = PipelineConfig("test3", make_unique<Json::Value>(pipelineConfigJson3));
+    pipelineConfigObj3.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj3));
+    // C++ -> Go -> C++
+    Json::Value pipelineConfigJson4
+        = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
+    PipelineConfig pipelineConfigObj4 = PipelineConfig("test4", make_unique<Json::Value>(pipelineConfigJson4));
+    pipelineConfigObj4.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj4));
+
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(4U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+
+    PipelineConfigDiff diffUpdate;
+    diffUpdate.mRemoved.push_back("test4");
+    auto pipeline = pipelineManager->GetAllPipelines().at("test4");
+    auto input = static_cast<InputMock*>(const_cast<Input*>(pipeline->GetInputs()[0].get()->GetPlugin()));
+    input->Block();
+
+    auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
+    { // add data to C++ -> Go -> C++
+        std::string configName = "test1";
+        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+        AddDataToProcessQueue(configName, "test-data-1");
+        AddDataToProcessQueue(configName, "test-data-2");
+        AddDataToProcessQueue(configName, "test-data-3");
+        VerifyData(3);
+    }
+    HttpSinkMock::GetInstance()->ClearRequests();
+    { // add data to Go -> Go -> C++
+        std::string configName = "test3";
+        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName);
+        auto flusher = const_cast<Flusher*>(pipeline->GetFlushers()[0].get()->GetPlugin());
+        AddDataToSenderQueue(configName, "test-data-1", flusher);
+        AddDataToSenderQueue(configName, "test-data-2", flusher);
+        AddDataToSenderQueue(configName, "test-data-3", flusher);
+        VerifyData(3);
+    }
+
+    input->Unblock();
+    result.get();
+    APSARA_TEST_EQUAL_FATAL(3U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
+}
+
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestFileServerStart)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineParamUpdateCase1)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineParamUpdateCase2)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineParamUpdateCase3)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineParamUpdateCase4)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTypeUpdateCase1)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTypeUpdateCase2)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTypeUpdateCase3)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTypeUpdateCase4)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase1)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase2)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase3)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase4)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase5)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase6)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase7)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase8)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase9)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase10)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase11)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase12)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineInputBlock)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineGoInputBlockCase1)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineGoInputBlockCase2)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineIsolationCase1)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineIsolationCase2)
 
 } // namespace logtail
 

@@ -22,9 +22,9 @@
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/PipelineManager.h"
-#include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
+#include "unittest/pipeline/LogtailPluginMock.h"
 
 DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
 DEFINE_FLAG_INT32(processor_runner_exit_timeout_secs, "", 60);
@@ -49,6 +49,7 @@ void ProcessorRunner::Init() {
     for (uint32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
         mThreadRes[threadNo] = async(launch::async, &ProcessorRunner::Run, this, threadNo);
     }
+    mIsFlush = false;
 }
 
 void ProcessorRunner::Stop() {
@@ -141,8 +142,11 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         eventGroupList.emplace_back(std::move(item->mEventGroup));
         pipeline->Process(eventGroupList, item->mInputIndex);
         // if the pipeline is updated, the pointer will be released, so we need to update it to the new pipeline
+        shared_ptr<Pipeline> oldPipeline;
         if (hasOldPipeline) {
-            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
+            pipeline->SubInProcessCnt(); // old pipeline
+            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
+            pipeline->AddInProcessCnt();
             if (!pipeline) {
                 LOG_INFO(sLogger,
                          ("pipeline not found during processing, perhaps due to config deletion",
@@ -175,11 +179,19 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                                                                     pipeline->GetContext().GetRegion());
                         continue;
                     }
+#ifndef APSARA_UNIT_TEST_MAIN
                     LogtailPlugin::GetInstance()->ProcessLogGroup(
                         pipeline->GetContext().GetConfigName(),
                         res,
                         group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
                 }
+#else
+                    LogtailPluginMock::GetInstance()->ProcessLogGroup(
+                        pipeline->GetContext().GetConfigName(),
+                        res,
+                        group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
+                }
+#endif
             }
         } else {
             pipeline->Send(std::move(eventGroupList));

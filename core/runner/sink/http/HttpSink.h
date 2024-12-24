@@ -23,9 +23,9 @@
 #include <future>
 #include <mutex>
 
+#include "monitor/MetricManager.h"
 #include "runner/sink/Sink.h"
 #include "runner/sink/http/HttpSinkRequest.h"
-#include "monitor/MetricManager.h"
 
 namespace logtail {
 
@@ -68,6 +68,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherRunnerUnittest;
+    friend class HttpSinkMock;
 #endif
 };
 
