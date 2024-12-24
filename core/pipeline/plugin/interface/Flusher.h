@@ -62,6 +62,7 @@ protected:
     friend class FlusherInstanceUnittest;
     friend class FlusherRunnerUnittest;
     friend class FlusherUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

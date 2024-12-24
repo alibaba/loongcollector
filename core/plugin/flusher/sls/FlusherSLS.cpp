@@ -486,7 +486,9 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 
     // CompressType
     if (BOOL_FLAG(sls_client_send_compress)) {
+#ifndef APSARA_UNIT_TEST_MAIN
         mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, mPluginID, CompressType::LZ4);
+#endif
     }
 
     mGroupSerializer = make_unique<SLSEventGroupSerializer>(this);
@@ -672,7 +674,11 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
     string configName = HasContext() ? GetContext().GetConfigName() : "";
+#ifndef APSARA_UNIT_TEST_MAIN
     bool isProfileData = GetProfileSender()->IsProfileData(mRegion, mProject, data->mLogstore);
+#else
+    bool isProfileData = false;
+#endif
     int32_t curTime = time(NULL);
     auto curSystemTime = chrono::system_clock::now();
     bool hasAuthError = false;

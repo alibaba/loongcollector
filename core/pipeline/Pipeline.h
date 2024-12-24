@@ -62,6 +62,7 @@ public:
     PipelineContext& GetContext() const { return mContext; }
     const Json::Value& GetConfig() const { return *mConfig; }
     const std::optional<std::string>& GetSingletonInput() const { return mSingletonInput; }
+    const std::vector<std::unique_ptr<ProcessorInstance>>& GetProcessors() const { return mProcessorLine; }
     const std::vector<std::unique_ptr<FlusherInstance>>& GetFlushers() const { return mFlushers; }
     bool IsFlushingThroughGoPipeline() const { return !mGoPipelineWithoutInput.isNull(); }
     const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& GetPluginStatistics() const {

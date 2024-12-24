@@ -250,6 +250,11 @@ bool PipelineConfig::Parse() {
         if (pluginType == "input_file" || pluginType == "input_container_stdio") {
             hasFileInput = true;
         }
+#ifdef APSARA_UNIT_TEST_MAIN
+        if (pluginType.find("mock") != string::npos) {
+            hasFileInput = true;
+        }
+#endif
     }
     // TODO: remove these special restrictions
     if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
@@ -530,7 +535,9 @@ bool PipelineConfig::Parse() {
             }
             mRouter.emplace_back(i, itr);
         } else {
-            mRouter.emplace_back(i, nullptr);
+            if (!IsFlushingThroughGoPipelineExisted()) {
+                mRouter.emplace_back(i, nullptr);
+            }
         }
     }
 
