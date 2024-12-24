@@ -17,15 +17,9 @@
 
 #include "models/LogEvent.h"
 #include "plugin/interface/Processor.h"
+#include "K8sMetadata.h"
 
 namespace logtail {
-
-    const static std::string containerIdKey = "container.id";
-    const static std::string pidKey = "pid";
-    const static std::string remoteIpKey = "remote_ip";
-    const static std::string peerWorkloadNameKey = "peerWorkloadName";
-    const static std::string peerWorkloadKindKey = "peerWorkloadKind";
-    const static std::string peerNamespaceKey = "peerNamespace";
 
     class LabelingK8sMetadata {
     public:
