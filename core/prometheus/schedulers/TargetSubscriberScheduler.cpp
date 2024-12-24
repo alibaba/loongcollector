@@ -121,7 +121,7 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
                             < mUnRegisterMs)) {
                         // scrape once just now
                         LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
-                        v->ScrapeOnce(std::chrono::steady_clock::now());
+                        v->SetScrapeOnceTime(chrono::steady_clock::now(), chrono::system_clock::now());
                     }
                     v->ScheduleNext();
                 }

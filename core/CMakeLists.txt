@@ -127,7 +127,7 @@ set(SUB_DIRECTORIES_LIST
         runner runner/sink/http
         protobuf/sls protobuf/models
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
-        prometheus prometheus/labels prometheus/schedulers prometheus/async
+        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         ebpf ebpf/observer ebpf/security ebpf/handler
         parser sls_control sdk
         )
