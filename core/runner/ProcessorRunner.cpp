@@ -145,13 +145,13 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         if (hasOldPipeline) {
             pipeline->SubInProcessCnt(); // old pipeline
             pipeline = PipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
-            pipeline->AddInProcessCnt();
             if (!pipeline) {
                 LOG_INFO(sLogger,
                          ("pipeline not found during processing, perhaps due to config deletion",
                           "discard data")("config", configName));
                 continue;
             }
+            pipeline->AddInProcessCnt();
         }
 
         if (pipeline->IsFlushingThroughGoPipeline()) {
