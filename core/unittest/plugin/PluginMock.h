@@ -110,10 +110,9 @@ public:
     void Process(PipelineEventGroup& logGroup) override {
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            LOG_INFO(sLogger, ("processor mock", "block")("cnt", mCnt));
+            LOG_DEBUG(sLogger, ("processor mock", "block")("cnt", mCnt));
         }
         ++mCnt;
-        LOG_DEBUG(sLogger, ("processor mock", "process")("cnt", mCnt));
     };
 
     void Block() { mBlockFlag.store(true); }
@@ -205,7 +204,6 @@ public:
         std::map<std::string, std::string> header;
         req = std::make_unique<HttpSinkRequest>(
             "POST", false, "test-host", 80, "/test-operation", "", header, data->mData, item);
-        LOG_DEBUG(sLogger, ("build mock request", data->mData));
         return true;
     }
 };

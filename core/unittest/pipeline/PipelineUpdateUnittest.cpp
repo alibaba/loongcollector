@@ -102,7 +102,6 @@ protected:
         FlusherRunner::GetInstance()->Stop();
         HttpSinkMock::GetInstance()->ClearRequests();
         HttpSinkMock::GetInstance()->Stop();
-        LOG_WARNING(sLogger, ("tear down", "all"));
     }
 
 private:
@@ -153,7 +152,6 @@ private:
     void AddDataToSenderQueue(const string& configName, string&& data, Flusher* flusher) const {
         auto key = flusher->mQueueKey;
         auto cpt = make_shared<RangeCheckpoint>();
-        LOG_WARNING(sLogger, ("sender queue key", key));
         std::unique_ptr<SLSSenderQueueItem> item = std::make_unique<SLSSenderQueueItem>(
             std::move(data), data.size(), flusher, key, "", RawDataType::EVENT_GROUP, "", std::move(cpt), false);
         {
@@ -162,7 +160,6 @@ private:
             lock_guard<mutex> lock(manager->mQueueMux);
             auto iter = manager->mQueues.find(key);
             APSARA_TEST_NOT_EQUAL(iter, manager->mQueues.end());
-            LOG_WARNING(sLogger, ("add data to sender queue", item->mData));
             APSARA_TEST_TRUE_FATAL(iter->second.Push(std::move(item)));
         }
     }
@@ -173,7 +170,6 @@ private:
             size_t i = 1;
             size_t j = 0;
             while ((i < expectedDataCount + 1) && j < requests.size()) {
-                LOG_WARNING(sLogger, ("requests", requests[j]));
                 if (requests[j].find("test-data-" + to_string(i)) != string::npos) {
                     ++i;
                     continue;

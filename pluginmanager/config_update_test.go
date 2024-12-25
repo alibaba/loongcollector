@@ -193,8 +193,10 @@ func (s *configUpdateTestSuite) TestConfigUpdateName() {
 		s.NotNil(LogtailConfig[updateConfigName])
 		s.NotNil(LogtailConfig[updateConfigName+"_"])
 		checkFlusher, ok := GetConfigFlushers(LogtailConfig[updateConfigName+"_"].PluginRunner)[0].(*checker.FlusherChecker)
-		LogtailConfigLock.RUnlock()
 		s.True(ok)
+		mockInput, ok := GetConfigInputs(LogtailConfig[updateConfigName+"_"].PluginRunner)[0].(*mockd.ServiceMock)
+		s.True(ok)
+		LogtailConfigLock.RUnlock()
 		s.Equal(checkFlusher.GetLogCount(), 0)
 		mockInput.Block = false
 		time.Sleep(time.Second * 5)

@@ -202,9 +202,6 @@ void FlusherRunner::Run() {
             PackIdManager::GetInstance()->CleanTimeoutEntry();
             mLastCheckSendClientTime = time(NULL);
         }
-        LOG_WARNING(sLogger,
-                    ("flusher runner", "exit")("is_flush", mIsFlush)(
-                        "all queue empty", SenderQueueManager::GetInstance()->IsAllQueueEmpty()));
         if (mIsFlush && SenderQueueManager::GetInstance()->IsAllQueueEmpty()) {
             break;
         }
