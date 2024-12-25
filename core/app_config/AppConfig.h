@@ -436,9 +436,9 @@ public:
     int32_t GetLocalFileSize() const { return mLocalFileSize; }
 
     const std::string& GetBufferFilePath() const { return mBufferFilePath; }
-
+    // 单地域并发度
     int32_t GetSendRequestConcurrency() const { return mSendRequestConcurrency; }
-
+    // 全局并发度
     int32_t GetSendRequestGlobalConcurrency() const { return mSendRequestGlobalConcurrency; }
 
     int32_t GetProcessThreadCount() const { return mProcessThreadCount; }

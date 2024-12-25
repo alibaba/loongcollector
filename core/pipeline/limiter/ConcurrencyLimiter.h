@@ -30,22 +30,22 @@ class ConcurrencyLimiter {
 public:
     ConcurrencyLimiter(const std::string& description,
                        uint32_t maxConcurrency,
-                       uint32_t minConcurrency = 0,
-                       double concurrencyDownFastRatio = 0.5,
-                       double concurrencyDownSlowRatio = 0.8)
+                       uint32_t minConcurrency = 1,
+                       double concurrencyFastFallBackRatio = 0.5,
+                       double concurrencySlowFallBackRatio = 0.8)
         : mDescription(description),
           mMaxConcurrency(maxConcurrency),
           mMinConcurrency(minConcurrency),
           mCurrenctConcurrency(maxConcurrency),
-          mConcurrencyDownFastRatio(concurrencyDownFastRatio),
-          mConcurrencyDownSlowRatio(concurrencyDownSlowRatio) {}
+          mConcurrencyFastFallBackRatio(concurrencyFastFallBackRatio),
+          mConcurrencySlowFallBackRatio(concurrencySlowFallBackRatio) {}
 
     bool IsValidToPop();
     void PostPop();
     void OnSendDone();
 
-    void OnSuccess(std::chrono::system_clock::time_point time);
-    void OnFail(std::chrono::system_clock::time_point time);
+    void OnSuccess(std::chrono::system_clock::time_point currentTime);
+    void OnFail(std::chrono::system_clock::time_point currentTime);
 
 
     static std::string GetLimiterMetricName(const std::string& limiter) {
@@ -80,8 +80,8 @@ private:
     mutable std::mutex mLimiterMux;
     uint32_t mCurrenctConcurrency = 0;
 
-    double mConcurrencyDownFastRatio = 0.0;
-    double mConcurrencyDownSlowRatio = 0.0;
+    double mConcurrencyFastFallBackRatio = 0.0;
+    double mConcurrencySlowFallBackRatio = 0.0;
 
     std::chrono::system_clock::time_point mLastCheckTime;
 
@@ -93,11 +93,14 @@ private:
     // 统计10个数据，最多等3s
     const uint32_t mStatisticThreshold = 10;
     const uint32_t mStatisticIntervalThresholdSeconds = 3;
+    
+    const uint32_t mNoFallBackFailPercentage = 10;
+    const uint32_t mSlowFallBackFailPercentage = 40;
 
 
     void Increase();
-    void Decrease(bool fastFallBack);
-    void AdjustConcurrency(bool success, std::chrono::system_clock::time_point time);
+    void Decrease(double fallBackRatio);
+    void AdjustConcurrency(bool success, std::chrono::system_clock::time_point currentTime);
 
 };
 

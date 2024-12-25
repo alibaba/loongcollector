@@ -61,12 +61,12 @@ void ConcurrencyLimiter::OnSendDone() {
     --mInSendingCnt;
 }
 
-void ConcurrencyLimiter::OnSuccess(std::chrono::system_clock::time_point time) {
-    AdjustConcurrency(true, time);
+void ConcurrencyLimiter::OnSuccess(std::chrono::system_clock::time_point currentTime) {
+    AdjustConcurrency(true, currentTime);
 }
 
-void ConcurrencyLimiter::OnFail(std::chrono::system_clock::time_point time) {
-    AdjustConcurrency(false, time);
+void ConcurrencyLimiter::OnFail(std::chrono::system_clock::time_point currentTime) {
+    AdjustConcurrency(false, currentTime);
 }
 
 
@@ -88,55 +88,54 @@ void ConcurrencyLimiter::Increase() {
     }
 }
 
-void ConcurrencyLimiter::Decrease(bool fastFallBack) {
+void ConcurrencyLimiter::Decrease(double fallBackRatio) {
     lock_guard<mutex> lock(mLimiterMux);
-    if (fastFallBack) {
-        if (mCurrenctConcurrency != mMinConcurrency) {
-            auto old = mCurrenctConcurrency;
-            mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * mConcurrencyDownFastRatio), mMinConcurrency);
-            LOG_INFO(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
-        } 
+    if (mCurrenctConcurrency != mMinConcurrency) {
+        auto old = mCurrenctConcurrency;
+        mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * fallBackRatio), mMinConcurrency);
+        LOG_INFO(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
     } else {
-        if (mCurrenctConcurrency != mMinConcurrency) {
-            mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * mConcurrencyDownSlowRatio), mMinConcurrency);
-            LOG_INFO(sLogger, ("decrease send concurrency, type", mDescription)("to", mCurrenctConcurrency));
-        } else {
-            if (mMinConcurrency == 0) {
-                mCurrenctConcurrency = 1;
-                LOG_INFO(sLogger, ("decrease send concurrency to min, type", mDescription)("to", mCurrenctConcurrency));
-            }
+        if (mMinConcurrency == 0) {
+            mCurrenctConcurrency = 1;
+            LOG_INFO(sLogger, ("decrease send concurrency to min, type", mDescription)("to", mCurrenctConcurrency));
         }
     }
 }
 
 
-void ConcurrencyLimiter::AdjustConcurrency(bool success, std::chrono::system_clock::time_point time) {
-    lock_guard<mutex> lock(mStatisticsMux);
-    mStatisticsTotal ++;
-    if (!success) {
-        mStatisticsFailTotal ++;
+void ConcurrencyLimiter::AdjustConcurrency(bool success, std::chrono::system_clock::time_point currentTime) {
+    uint32_t failPercentage = 0;
+    bool finishStatistics = false;
+    {   
+        lock_guard<mutex> lock(mStatisticsMux);
+        mStatisticsTotal ++;
+        if (!success) {
+            mStatisticsFailTotal ++;
+        }
+        if (mLastStatisticsTime == std::chrono::system_clock::time_point()) {
+            mLastStatisticsTime = currentTime;
+        }
+        if (mStatisticsTotal == mStatisticThreshold || chrono::duration_cast<chrono::seconds>(currentTime - mLastStatisticsTime).count() > mStatisticIntervalThresholdSeconds) {
+            failPercentage =  mStatisticsFailTotal*100/mStatisticsTotal;
+            LOG_DEBUG(sLogger,("AdjustConcurrency", mDescription)("mStatisticsFailTotal", mStatisticsFailTotal)("mStatisticsTotal", mStatisticsTotal));
+            mStatisticsTotal = 0;
+            mStatisticsFailTotal = 0;
+            mLastStatisticsTime = currentTime;
+            finishStatistics = true;
+        } 
     }
-    if (mLastStatisticsTime == std::chrono::system_clock::time_point()) {
-        mLastStatisticsTime = time;
-    }
-
-    if (mStatisticsTotal == mStatisticThreshold || chrono::duration_cast<chrono::seconds>(time - mLastStatisticsTime).count() > mStatisticIntervalThresholdSeconds) {
-        uint32_t failPercentage =  mStatisticsFailTotal*100/mStatisticsTotal;
-        LOG_DEBUG(sLogger,("AdjustConcurrency", mDescription)("mStatisticsFailTotal", mStatisticsFailTotal)("mStatisticsTotal", mStatisticsTotal));
-        mStatisticsTotal = 0;
-        mStatisticsFailTotal = 0;
-        mLastStatisticsTime = time;
+    if (finishStatistics) {
         if (failPercentage == 0) {
             // 成功
             Increase();
-        } else if (failPercentage <= 10) {
+        } else if (failPercentage <= mNoFallBackFailPercentage) {
             // 不调整
-        } else if (failPercentage <= 40) {
+        } else if (failPercentage <= mSlowFallBackFailPercentage) {
             // 慢回退
-            Decrease(false);
+            Decrease(mConcurrencySlowFallBackRatio);
         } else  {
             // 快速回退
-            Decrease(true);
+            Decrease(mConcurrencyFastFallBackRatio);
         } 
     }
 }
