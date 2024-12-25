@@ -73,10 +73,8 @@ void ConcurrencyLimiter::Increase() {
     lock_guard<mutex> lock(mLimiterMux);
     if (mCurrenctConcurrency != mMaxConcurrency) {
         ++mCurrenctConcurrency;
-         LOG_INFO(sLogger,
-                     ("increase send concurrency", mDescription)("concurrency", mCurrenctConcurrency));
         if (mCurrenctConcurrency == mMaxConcurrency) {
-            LOG_INFO(sLogger,
+            LOG_DEBUG(sLogger,
                      ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrenctConcurrency));
         } else {
             LOG_DEBUG(sLogger,
@@ -91,7 +89,7 @@ void ConcurrencyLimiter::Decrease(double fallBackRatio) {
     if (mCurrenctConcurrency != mMinConcurrency) {
         auto old = mCurrenctConcurrency;
         mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * fallBackRatio), mMinConcurrency);
-        LOG_INFO(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
+        LOG_DEBUG(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
     } else {
         if (mMinConcurrency == 0) {
             mCurrenctConcurrency = 1;
