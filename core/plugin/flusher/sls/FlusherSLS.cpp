@@ -486,9 +486,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
 
     // CompressType
     if (BOOL_FLAG(sls_client_send_compress)) {
-#ifndef APSARA_UNIT_TEST_MAIN
         mCompressor = CompressorFactory::GetInstance()->Create(config, *mContext, sName, mPluginID, CompressType::LZ4);
-#endif
     }
 
     mGroupSerializer = make_unique<SLSEventGroupSerializer>(this);
@@ -816,8 +814,8 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 //  the possibility of hash key conflict is very low, so data is
                 //  dropped here.
                 cpt->Commit();
-                failDetail << ", drop exactly once log group and commit checkpoint"
-                           << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
+                failDetail << ", drop exactly once log group and commit checkpoint" << " checkpointKey:" << cpt->key
+                           << " checkpoint:" << cpt->data.DebugString();
                 suggestion << "no suggestion";
                 AlarmManager::GetInstance()->SendAlarm(
                     EXACTLY_ONCE_ALARM,

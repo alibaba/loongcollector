@@ -31,6 +31,9 @@
 #include "pipeline/PipelineManager.h"
 #include "pipeline/queue/SenderQueueManager.h"
 #include "provider/Provider.h"
+#ifdef APSARA_UNIT_TEST_MAIN
+#include "unittest/pipeline/LogtailPluginMock.h"
+#endif
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", false);
 DEFINE_FLAG_BOOL(enable_containerd_upper_dir_detect,
@@ -145,6 +148,7 @@ void LogtailPlugin::StopAllPipelines(bool withInputFlag) {
 }
 
 void LogtailPlugin::Stop(const std::string& configName, bool removedFlag) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (mPluginValid && mStopFun != NULL) {
         LOG_INFO(sLogger, ("Go pipelines stop", "starts")("config", configName));
         auto stopStart = GetCurrentTimeInMilliSeconds();
@@ -159,6 +163,9 @@ void LogtailPlugin::Stop(const std::string& configName, bool removedFlag) {
                 HOLD_ON_TOO_SLOW_ALARM, "Stopping Go pipeline " + configName + " took " + ToString(stopCost) + "ms");
         }
     }
+#else
+    LogtailPluginMock::GetInstance()->Stop(configName, removedFlag);
+#endif
 }
 
 void LogtailPlugin::StopBuiltInModules() {
@@ -170,6 +177,7 @@ void LogtailPlugin::StopBuiltInModules() {
 }
 
 void LogtailPlugin::Start(const std::string& configName) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (mPluginValid && mStartFun != NULL) {
         LOG_INFO(sLogger, ("Go pipelines start", "starts")("config name", configName));
         GoString goConfigName;
@@ -178,6 +186,9 @@ void LogtailPlugin::Start(const std::string& configName) {
         mStartFun(goConfigName);
         LOG_INFO(sLogger, ("Go pipelines start", "succeeded")("config name", configName));
     }
+#else
+    LogtailPluginMock::GetInstance()->Start(configName);
+#endif
 }
 
 int LogtailPlugin::IsValidToSend(long long logstoreKey) {

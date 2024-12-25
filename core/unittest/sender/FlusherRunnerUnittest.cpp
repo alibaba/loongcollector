@@ -17,6 +17,7 @@
 #include "runner/FlusherRunner.h"
 #include "runner/sink/http/HttpSink.h"
 #include "unittest/Unittest.h"
+#include "unittest/pipeline/HttpSinkMock.h"
 #include "unittest/plugin/PluginMock.h"
 
 DECLARE_FLAG_INT32(discard_send_fail_interval);
@@ -29,6 +30,8 @@ class FlusherRunnerUnittest : public ::testing::Test {
 public:
     void TestDispatch();
     void TestPushToHttpSink();
+
+    static void SetUpTestCase() { HttpSinkMock::GetInstance()->SetUseRealHttpSink(true); }
 
 protected:
     void TearDown() override {

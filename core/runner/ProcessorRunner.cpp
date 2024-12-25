@@ -24,7 +24,6 @@
 #include "pipeline/PipelineManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
-#include "unittest/pipeline/LogtailPluginMock.h"
 
 DEFINE_FLAG_INT32(default_flush_merged_buffer_interval, "default flush merged buffer, seconds", 1);
 DEFINE_FLAG_INT32(processor_runner_exit_timeout_secs, "", 60);
@@ -179,19 +178,11 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                                                                     pipeline->GetContext().GetRegion());
                         continue;
                     }
-#ifndef APSARA_UNIT_TEST_MAIN
                     LogtailPlugin::GetInstance()->ProcessLogGroup(
                         pipeline->GetContext().GetConfigName(),
                         res,
                         group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
                 }
-#else
-                    LogtailPluginMock::GetInstance()->ProcessLogGroup(
-                        pipeline->GetContext().GetConfigName(),
-                        res,
-                        group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
-                }
-#endif
             }
         } else {
             pipeline->Send(std::move(eventGroupList));

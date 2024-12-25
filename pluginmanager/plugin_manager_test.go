@@ -117,7 +117,6 @@ func LoadAndStartMockConfig(args ...string) error {
 			{
 				"type": "service_mock",
 				"detail": {
-					"Block": true,
 					"LogsPerSecond": 100,
 					"Fields": {
 						"content": "Active connections: 1\nserver accepts handled requests\n 6079 6079 11596\n Reading: 0 Writing: 1 Waiting: 0"

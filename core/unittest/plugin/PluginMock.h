@@ -87,12 +87,19 @@ private:
 
 const std::string InputMock::sName = "input_mock";
 
-class InputMock2 : public InputMock {
+class InputFileMock : public InputMock {
 public:
     static const std::string sName;
 };
 
-const std::string InputMock2::sName = "input_mock2";
+const std::string InputFileMock::sName = "input_file_mock";
+
+class InputFileMock2 : public InputMock {
+public:
+    static const std::string sName;
+};
+
+const std::string InputFileMock2::sName = "input_file_mock2";
 
 class ProcessorMock : public Processor {
 public:
@@ -198,7 +205,7 @@ public:
         std::map<std::string, std::string> header;
         req = std::make_unique<HttpSinkRequest>(
             "POST", false, "test-host", 80, "/test-operation", "", header, data->mData, item);
-        LOG_WARNING(sLogger, ("build mock request", data->mData));
+        LOG_DEBUG(sLogger, ("build mock request", data->mData));
         return true;
     }
 };
@@ -238,7 +245,8 @@ void LoadPluginMock() {
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherHttpMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock>());
-    PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock2>());
+    PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputFileMock>());
+    PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputFileMock2>());
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock2>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock2>());
 }

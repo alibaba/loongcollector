@@ -77,6 +77,7 @@ protected:
         builtinPipelineCnt = EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
 #endif
         SenderQueueManager::GetInstance()->mDefaultQueueParam.mCapacity = 1; // test extra buffer
+        FLAGS_sls_client_send_compress = false;
     }
 
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
@@ -168,7 +169,6 @@ private:
 
     void VerifyData(size_t expectedDataCount) const {
         for (size_t retry = 0; retry < 8; ++retry) {
-            this_thread::sleep_for(chrono::milliseconds(1000));
             auto requests = HttpSinkMock::GetInstance()->GetRequests();
             size_t i = 1;
             size_t j = 0;
@@ -185,6 +185,7 @@ private:
                 APSARA_TEST_EQUAL_FATAL(expectedDataCount + 1, i);
                 return;
             }
+            this_thread::sleep_for(chrono::milliseconds(1000));
         }
     }
 
@@ -197,21 +198,21 @@ private:
         })";
     string nativeInputConfig = R"(
         {
-            "Type": "input_mock",
+            "Type": "input_file_mock",
             "FilePaths": [
                 "/tmp/not_found.log"
             ]
         })";
     string nativeInputConfig2 = R"(
         {
-            "Type": "input_mock",
+            "Type": "input_file_mock",
             "FilePaths": [
                 "/tmp/*.log"
             ]
         })";
     string nativeInputConfig3 = R"(
         {
-            "Type": "input_mock2",
+            "Type": "input_file_mock2",
             "FilePaths": [
                 "/tmp/not_found.log"
             ]
@@ -356,7 +357,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         processor->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -471,7 +472,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         LogtailPluginMock::GetInstance()->UnblockProcess();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -523,7 +524,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         processor->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -638,7 +639,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         LogtailPluginMock::GetInstance()->UnblockProcess();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -690,7 +691,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase1() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         processor->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -742,7 +743,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         processor->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -794,7 +795,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase3() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         processor->Unblock();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1040,7 +1041,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase10() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         LogtailPluginMock::GetInstance()->UnblockProcess();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1091,7 +1092,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase11() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         LogtailPluginMock::GetInstance()->UnblockProcess();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1142,7 +1143,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         LogtailPluginMock::GetInstance()->UnblockProcess();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1196,11 +1197,11 @@ void PipelineUpdateUnittest::TestPipelineInputBlock() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result1 = async(launch::async, [&]() {
-        this_thread::sleep_for(chrono::milliseconds(2000));
+        this_thread::sleep_for(chrono::milliseconds(1000));
         processor->Unblock();
     });
     auto result2 = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
-    this_thread::sleep_for(chrono::milliseconds(2000));
+    this_thread::sleep_for(chrono::milliseconds(1000));
     APSARA_TEST_NOT_EQUAL_FATAL(future_status::ready, result2.wait_for(chrono::milliseconds(0)));
     input->Unblock();
     result1.get();
@@ -1243,7 +1244,7 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
-    this_thread::sleep_for(chrono::milliseconds(2000));
+    this_thread::sleep_for(chrono::milliseconds(1000));
     APSARA_TEST_NOT_EQUAL_FATAL(future_status::ready, result.wait_for(chrono::milliseconds(0)));
     LogtailPluginMock::GetInstance()->UnblockStop();
     result.get();
@@ -1287,7 +1288,7 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase2() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
-    this_thread::sleep_for(chrono::milliseconds(2000));
+    this_thread::sleep_for(chrono::milliseconds(1000));
     APSARA_TEST_NOT_EQUAL_FATAL(future_status::ready, result.wait_for(chrono::milliseconds(0)));
     LogtailPluginMock::GetInstance()->UnblockStop();
     result.get();

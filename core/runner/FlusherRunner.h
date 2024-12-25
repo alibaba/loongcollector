@@ -24,6 +24,7 @@
 #include "pipeline/plugin/interface/Flusher.h"
 #include "pipeline/queue/SenderQueueItem.h"
 #include "runner/sink/SinkType.h"
+#include "runner/sink/http/HttpSink.h"
 
 namespace logtail {
 
@@ -83,6 +84,7 @@ private:
     friend class PluginRegistryUnittest;
     friend class FlusherRunnerUnittest;
     friend class InstanceConfigManagerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

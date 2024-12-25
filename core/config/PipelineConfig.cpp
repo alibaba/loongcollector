@@ -251,7 +251,7 @@ bool PipelineConfig::Parse() {
             hasFileInput = true;
         }
 #ifdef APSARA_UNIT_TEST_MAIN
-        if (pluginType.find("mock") != string::npos) {
+        if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos) {
             hasFileInput = true;
         }
 #endif

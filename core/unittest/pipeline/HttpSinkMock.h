@@ -34,7 +34,12 @@ public:
         return &instance;
     }
 
+    bool Init() override { return true; }
+
     bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request) {
+        if (useRealHttpSink) {
+            return HttpSink::GetInstance()->AddRequest(std::move(request));
+        }
         {
             std::lock_guard<std::mutex> lock(mMutex);
             mRequests.push_back(request->mBody);
@@ -58,9 +63,13 @@ public:
         mRequests.clear();
     }
 
+    void SetUseRealHttpSink(bool useReal) { useRealHttpSink = useReal; }
+
 private:
     HttpSinkMock() = default;
     ~HttpSinkMock() = default;
+
+    bool useRealHttpSink = false;
 
     std::atomic_bool mIsFlush = false;
     mutable std::mutex mMutex;
