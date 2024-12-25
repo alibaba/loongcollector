@@ -45,19 +45,17 @@ The core advantages of **LoongCollector**:
 
 ## Quick Start
 
-For the complexity of C++ dependencies, the compilation of LoongCollector requires you have docker installed. If you aim to build LoongCollector from sources, you can go ahead and start with the following commands.
-
-1. Start with local
+For the complexity of C++ dependencies, the compilation of LoongCollector requires you have docker and golang installed. If you aim to build LoongCollector from sources, you can go ahead and start with the following commands.
 
 ```bash
 make
 cp -r example_config/quick_start/* output
 cd output
 ./loongcollector
-# Now, LoongCollector is collecting data from output/simple.log and outputing the result to stdout
+# Now, LoongCollector is collecting data from output/simple.log,
+# and outputing the result to stdout
 ```
 
- HEAD
 
 ## Documentation
 
