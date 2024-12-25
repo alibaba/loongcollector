@@ -1192,14 +1192,14 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
         LOG_INFO(sLogger, ("bind_interface", mBindInterface));
     }
 
-    // mSendRequestConcurrency was limited in [15, 80]
-    if (mSendRequestConcurrency < 15) {
-        mSendRequestConcurrency = 15;
+    // mSendRequestConcurrency was limited 
+    if (mSendRequestConcurrency < mMinSendRequestConcurrency) {
+        mSendRequestConcurrency = mMinSendRequestConcurrency;
     } 
-    if (mSendRequestConcurrency > 80) {
-        mSendRequestConcurrency = 80;
+    if (mSendRequestConcurrency > mMaxSendRequestConcurrency) {
+        mSendRequestConcurrency = mMaxSendRequestConcurrency;
     }
-    mSendRequestGlobalConcurrency = mSendRequestConcurrency * 1.5;
+    mSendRequestGlobalConcurrency = mSendRequestConcurrency * (1 + mGlobalConcurrencyFreePercentageForOneRegion);
 }
 
 bool AppConfig::CheckAndResetProxyEnv() {

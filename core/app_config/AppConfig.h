@@ -209,6 +209,11 @@ private:
 
     std::string mBindInterface;
 
+    // 全局并发度对单地域占比保留的余量
+    const double mGlobalConcurrencyFreePercentageForOneRegion = 0.5;
+    const int32_t mMinSendRequestConcurrency = 15;
+    const int32_t mMaxSendRequestConcurrency = 80;
+
     // /**
     //  * @brief Load ConfigServer, DataServer and network interface
     //  *
@@ -440,6 +445,8 @@ public:
     int32_t GetSendRequestConcurrency() const { return mSendRequestConcurrency; }
     // 全局并发度
     int32_t GetSendRequestGlobalConcurrency() const { return mSendRequestGlobalConcurrency; }
+
+    double GetGlobalConcurrencyFreePercentageForOneRegion() const { return mGlobalConcurrencyFreePercentageForOneRegion; }
 
     int32_t GetProcessThreadCount() const { return mProcessThreadCount; }
 

@@ -155,12 +155,12 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetRegionConcurrencyLimiter(const str
     lock_guard<mutex> lock(sMux);
     auto iter = sRegionConcurrencyLimiterMap.find(region);
     if (iter == sRegionConcurrencyLimiterMap.end()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*0.5);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         sRegionConcurrencyLimiterMap.try_emplace(region, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*0.5);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         iter->second = limiter;
         return limiter;
     }

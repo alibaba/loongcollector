@@ -69,8 +69,6 @@ void ConcurrencyLimiter::OnFail(std::chrono::system_clock::time_point currentTim
     AdjustConcurrency(false, currentTime);
 }
 
-
-
 void ConcurrencyLimiter::Increase() {
     lock_guard<mutex> lock(mLimiterMux);
     if (mCurrenctConcurrency != mMaxConcurrency) {
