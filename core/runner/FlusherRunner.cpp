@@ -29,7 +29,9 @@
 // TODO: temporarily used here
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
+#ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/HttpSinkMock.h"
+#endif
 
 DEFINE_FLAG_INT32(flusher_runner_exit_timeout_secs, "", 60);
 DEFINE_FLAG_INT32(check_send_client_timeout_interval, "", 600);
