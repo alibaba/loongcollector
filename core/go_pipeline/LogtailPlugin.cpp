@@ -89,6 +89,7 @@ bool LogtailPlugin::LoadPipeline(const std::string& pipelineName,
                                  const std::string& logstore,
                                  const std::string& region,
                                  logtail::QueueKey logstoreKey) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (!mPluginValid) {
         LoadPluginBase();
     }
@@ -113,9 +114,14 @@ bool LogtailPlugin::LoadPipeline(const std::string& pipelineName,
     }
 
     return false;
+#else
+    return LogtailPluginMock::GetInstance()->LoadPipeline(
+        pipelineName, pipeline, project, logstore, region, logstoreKey);
+#endif
 }
 
 bool LogtailPlugin::UnloadPipeline(const std::string& pipelineName) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (!mPluginValid) {
         LOG_ERROR(sLogger, ("UnloadPipeline", "plugin not valid"));
         return false;
@@ -131,9 +137,13 @@ bool LogtailPlugin::UnloadPipeline(const std::string& pipelineName) {
     }
 
     return false;
+#else
+    return LogtailPluginMock::GetInstance()->UnloadPipeline(pipelineName);
+#endif
 }
 
 void LogtailPlugin::StopAllPipelines(bool withInputFlag) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (mPluginValid && mStopAllPipelinesFun != NULL) {
         LOG_INFO(sLogger, ("Go pipelines stop all", "starts"));
         auto stopAllStart = GetCurrentTimeInMilliSeconds();
@@ -145,6 +155,9 @@ void LogtailPlugin::StopAllPipelines(bool withInputFlag) {
                                                    "Stopping all Go pipelines took " + ToString(stopAllCost) + "ms");
         }
     }
+#else
+    LogtailPluginMock::GetInstance()->StopAllPipelines(withInputFlag);
+#endif
 }
 
 void LogtailPlugin::Stop(const std::string& configName, bool removedFlag) {

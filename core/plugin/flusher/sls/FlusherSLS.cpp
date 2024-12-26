@@ -672,11 +672,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
     string configName = HasContext() ? GetContext().GetConfigName() : "";
-#ifndef APSARA_UNIT_TEST_MAIN
     bool isProfileData = GetProfileSender()->IsProfileData(mRegion, mProject, data->mLogstore);
-#else
-    bool isProfileData = false;
-#endif
     int32_t curTime = time(NULL);
     auto curSystemTime = chrono::system_clock::now();
     bool hasAuthError = false;

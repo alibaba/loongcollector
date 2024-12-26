@@ -24,6 +24,9 @@
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SenderQueueItem.h"
 #include "runner/FlusherRunner.h"
+#ifdef APSARA_UNIT_TEST_MAIN
+#include "unittest/pipeline/HttpSinkMock.h"
+#endif
 
 DEFINE_FLAG_INT32(http_sink_exit_timeout_secs, "", 5);
 
@@ -103,6 +106,14 @@ void HttpSink::Run() {
     if (mc != CURLM_OK) {
         LOG_ERROR(sLogger, ("failed to cleanup curl multi handle", "exit anyway")("errMsg", curl_multi_strerror(mc)));
     }
+}
+
+bool HttpSink::AddRequest(std::unique_ptr<HttpSinkRequest>&& request) {
+#ifndef APSARA_UNIT_TEST_MAIN
+    return Sink<HttpSinkRequest>::AddRequest(std::move(request));
+#else
+    return HttpSinkMock::GetInstance()->AddRequest(std::move(request));
+#endif
 }
 
 bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {

@@ -141,7 +141,6 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         eventGroupList.emplace_back(std::move(item->mEventGroup));
         pipeline->Process(eventGroupList, item->mInputIndex);
         // if the pipeline is updated, the pointer will be released, so we need to update it to the new pipeline
-        shared_ptr<Pipeline> oldPipeline;
         if (hasOldPipeline) {
             pipeline = PipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
             if (!pipeline) {

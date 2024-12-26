@@ -33,6 +33,19 @@ public:
     void BlockStop() { stopBlockFlag = true; }
     void UnblockStop() { stopBlockFlag = false; }
 
+    bool LoadPipeline(const std::string& pipelineName,
+                      const std::string& pipeline,
+                      const std::string& project,
+                      const std::string& logstore,
+                      const std::string& region,
+                      logtail::QueueKey logstoreKey) {
+        return true;
+    }
+
+    bool UnloadPipeline(const std::string& pipelineName) { return true; }
+
+    void StopAllPipelines(bool withInputFlag) {}
+
     void Start(const std::string& configName) {
         while (startBlockFlag) {
             LOG_DEBUG(sLogger, ("LogtailPluginMock start", "block")("config", configName));

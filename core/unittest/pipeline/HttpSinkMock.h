@@ -39,7 +39,7 @@ public:
 
     bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request) {
         if (useRealHttpSink) {
-            return HttpSink::GetInstance()->AddRequest(std::move(request));
+            return Sink<HttpSinkRequest>::AddRequest(std::move(request));
         }
         {
             std::lock_guard<std::mutex> lock(mMutex);

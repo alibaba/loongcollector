@@ -489,7 +489,6 @@ void Pipeline::CopyNativeGlobalParamToGoPipeline(Json::Value& pipeline) {
 }
 
 bool Pipeline::LoadGoPipelines() const {
-#ifndef APSARA_UNIT_TEST_MAIN
     if (!mGoPipelineWithoutInput.isNull()) {
         string content = mGoPipelineWithoutInput.toStyledString();
         if (!LogtailPlugin::GetInstance()->LoadPipeline(GetConfigNameOfGoPipelineWithoutInput(),
@@ -531,7 +530,6 @@ bool Pipeline::LoadGoPipelines() const {
             return false;
         }
     }
-#endif
     return true;
 }
 

@@ -42,6 +42,8 @@ public:
     bool Init() override;
     void Stop() override;
 
+    bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request);
+
 private:
     HttpSink() = default;
     ~HttpSink() = default;

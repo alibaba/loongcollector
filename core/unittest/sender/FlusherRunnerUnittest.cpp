@@ -57,7 +57,7 @@ void FlusherRunnerUnittest::TestDispatch() {
         FlusherRunner::GetInstance()->Dispatch(realItem);
 
         unique_ptr<HttpSinkRequest> req;
-        APSARA_TEST_TRUE(HttpSink::GetInstance()->mQueue.TryPop(req));
+        APSARA_TEST_TRUE(HttpSinkMock::GetInstance()->mQueue.TryPop(req));
         APSARA_TEST_NOT_EQUAL(nullptr, req);
     }
     {
