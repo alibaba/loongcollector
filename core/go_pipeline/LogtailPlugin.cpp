@@ -514,6 +514,7 @@ void LogtailPlugin::ProcessLog(const std::string& configName,
 void LogtailPlugin::ProcessLogGroup(const std::string& configName,
                                     const std::string& logGroup,
                                     const std::string& packId) {
+#ifndef APSARA_UNIT_TEST_MAIN
     if (logGroup.empty() || !(mPluginValid && mProcessLogsFun != NULL)) {
         return;
     }
@@ -532,6 +533,9 @@ void LogtailPlugin::ProcessLogGroup(const std::string& configName,
     if (rst != (GoInt)0) {
         LOG_WARNING(sLogger, ("process loggroup error", configName)("result", rst));
     }
+#else
+    LogtailPluginMock::GetInstance()->ProcessLogGroup(configName, logGroup, packId);
+#endif
 }
 
 void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList,

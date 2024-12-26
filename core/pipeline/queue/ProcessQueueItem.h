@@ -35,13 +35,9 @@ struct ProcessQueueItem {
     ProcessQueueItem(PipelineEventGroup&& group, size_t index) : mEventGroup(std::move(group)), mInputIndex(index) {}
 
     void AddPipelineInProcessCnt(const std::string& configName) {
-        if (mPipeline) {
-            mPipeline->AddInProcessCnt();
-        } else {
-            const auto& p = PipelineManager::GetInstance()->FindConfigByName(configName);
-            if (p) {
-                p->AddInProcessCnt();
-            }
+        const auto& p = PipelineManager::GetInstance()->FindConfigByName(configName);
+        if (p) {
+            p->AddInProcessCnt();
         }
     }
 };

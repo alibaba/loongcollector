@@ -106,11 +106,19 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override { return true; }
+    bool Init(const Json::Value& config) override {
+        std::string errorMsg;
+        bool block = false;
+        if (GetOptionalBoolParam(config, "Block", block, errorMsg)) {
+            mBlockFlag = block;
+        }
+        return true;
+    }
     void Process(PipelineEventGroup& logGroup) override {
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            LOG_DEBUG(sLogger, ("processor mock", "block")("cnt", mCnt));
+            LOG_DEBUG(sLogger,
+                      ("processor mock", "block")("cnt", mCnt)("data", logGroup.GetEvents()[0]->ToJsonString()));
         }
         ++mCnt;
     };

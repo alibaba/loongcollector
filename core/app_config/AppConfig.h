@@ -518,6 +518,7 @@ public:
     friend class InputPrometheusUnittest;
     friend class InputContainerStdioUnittest;
     friend class BatcherUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

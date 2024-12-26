@@ -143,7 +143,6 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         // if the pipeline is updated, the pointer will be released, so we need to update it to the new pipeline
         shared_ptr<Pipeline> oldPipeline;
         if (hasOldPipeline) {
-            pipeline->SubInProcessCnt(); // old pipeline
             pipeline = PipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
             if (!pipeline) {
                 LOG_INFO(sLogger,
@@ -151,7 +150,6 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                           "discard data")("config", configName));
                 continue;
             }
-            pipeline->AddInProcessCnt();
         }
 
         if (pipeline->IsFlushingThroughGoPipeline()) {

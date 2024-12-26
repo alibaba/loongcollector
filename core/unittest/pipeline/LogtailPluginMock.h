@@ -17,9 +17,6 @@
 #pragma once
 
 #include "go_pipeline/LogtailPlugin.h"
-#ifdef APSARA_UNIT_TEST_MAIN
-#include "unittest/pipeline/LogtailPluginMock.h"
-#endif
 
 namespace logtail {
 class LogtailPluginMock : public LogtailPlugin {
@@ -56,7 +53,6 @@ public:
 
 
     void ProcessLogGroup(const std::string& configName, const std::string& logGroup, const std::string& packId) {
-#ifndef APSARA_UNIT_TEST_MAIN
         while (processBlockFlag) {
             LOG_DEBUG(sLogger, ("LogtailPluginMock process log group", "block")("config", configName));
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -73,9 +69,6 @@ public:
         LOG_INFO(sLogger,
                  ("LogtailPluginMock process log group", "success")("config", configName)("logGroup",
                                                                                           logGroup)("packId", packId));
-#else
-        LogtailPluginMock::GetInstance()->ProcessLogGroup(configName, logGroup, packId);
-#endif
     }
 
     bool IsStarted() const { return startFlag; }

@@ -19,6 +19,7 @@
 #include "logger/Logger.h"
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 #include "runner/FlusherRunner.h"
 #include "runner/sink/http/HttpSink.h"
 #include "sdk/Common.h"
@@ -42,7 +43,13 @@ public:
         }
         {
             std::lock_guard<std::mutex> lock(mMutex);
-            mRequests.push_back(request->mBody);
+            std::string logstore = "default";
+            if (static_cast<HttpFlusher*>(request->mItem->mFlusher)->Name().find("sls") != std::string::npos) {
+                auto flusher = static_cast<FlusherSLS*>(request->mItem->mFlusher);
+                logstore = flusher->mLogstore;
+            }
+            LOG_DEBUG(sLogger, ("http sink mock", "add request")("logstore", logstore)("body", request->mBody));
+            mRequests[logstore].push_back(request->mBody);
         }
         request->mResponse.SetStatusCode(200);
         request->mResponse.mHeader[sdk::X_LOG_REQUEST_ID] = "request_id";
@@ -53,9 +60,9 @@ public:
         return true;
     }
 
-    std::vector<std::string> GetRequests() {
+    std::vector<std::string> GetRequests(std::string logstore) {
         std::lock_guard<std::mutex> lock(mMutex);
-        return mRequests;
+        return mRequests[logstore];
     }
 
     void ClearRequests() {
@@ -73,7 +80,7 @@ private:
 
     std::atomic_bool mIsFlush = false;
     mutable std::mutex mMutex;
-    std::vector<std::string> mRequests;
+    std::unordered_map<std::string, std::vector<std::string>> mRequests;
 };
 
 } // namespace logtail
