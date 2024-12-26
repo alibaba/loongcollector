@@ -30,9 +30,6 @@ public:
     bool Stop(bool isPipelineRemoving) override;
     bool SupportAck() const override { return true; }
 
-private:
-    bool CreateInnerProcessors(const Json::Value& config);
-
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputHostMetaUnittest;
 #endif

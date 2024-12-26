@@ -25,9 +25,10 @@
 #include <vector>
 
 #include "HostMonitorTimerEvent.h"
+#include "ProcessEntityCollector.h"
 #include "common/Lock.h"
 #include "common/timer/Timer.h"
-#include "host_monitor/collector/ProcessCollector.h"
+#include "host_monitor/collector/ProcessEntityCollector.h"
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
 
@@ -35,7 +36,7 @@
 namespace logtail {
 
 HostMonitorInputRunner::HostMonitorInputRunner() : mThreadPool(ThreadPool(3)) {
-    RegisterCollector<ProcessCollector>();
+    RegisterCollector<ProcessEntityCollector>();
 }
 
 void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
@@ -53,11 +54,11 @@ void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
     }
     for (const auto& collectorName : newCollectors) {
         LOG_INFO(sLogger, ("add new host monitor collector", configName)("collector", collectorName));
-        auto collectConfig = std::make_unique<HostMonitorTimerEvent::CollectConfig>(
+        HostMonitorTimerEvent::CollectConfig collectConfig(
             configName, collectorName, processQueueKey, inputIndex, std::chrono::seconds(DEFAULT_SCHEDULE_INTERVAL));
         // only push event when the collector is new added
         if (std::find(oldCollectors.begin(), oldCollectors.end(), collectorName) == oldCollectors.end()) {
-            Timer::GetInstance()->PushEvent(BuildTimerEvent(std::move(collectConfig)));
+            Timer::GetInstance()->PushEvent(BuildTimerEvent(collectConfig));
         }
     }
 }
@@ -109,35 +110,39 @@ bool HostMonitorInputRunner::IsCollectTaskValid(const std::string& configName, c
     return false;
 }
 
-void HostMonitorInputRunner::ScheduleOnce(std::unique_ptr<HostMonitorTimerEvent::CollectConfig> collectConfig) {
-    mThreadPool.Add([this, &collectConfig]() {
+void HostMonitorInputRunner::ScheduleOnce(HostMonitorTimerEvent::CollectConfig& config) {
+    auto collectFn = [this, config]() mutable {
         PipelineEventGroup group(std::make_shared<SourceBuffer>());
-        auto collector = GetCollector(collectConfig->mCollectorName);
+        auto collector = GetCollector(config.mCollectorName);
         if (!collector) {
             collector->Collect(group);
+        } else {
+            LOG_ERROR(sLogger,
+                      ("collector not found, will not collect",
+                       "discard data")("config", config.mConfigName)("collector", config.mCollectorName));
+            return;
         }
 
         bool result = ProcessorRunner::GetInstance()->PushQueue(
-            collectConfig->mProcessQueueKey, collectConfig->mInputIndex, std::move(group), 3);
+            config.mProcessQueueKey, config.mInputIndex, std::move(group), 3);
         if (!result) {
             LOG_WARNING(sLogger,
-                        ("push queue failed", "discard data")("config", collectConfig->mConfigName)(
-                            "collector", collectConfig->mCollectorName));
+                        ("push queue failed", "discard data")("config", config.mConfigName)("collector",
+                                                                                            config.mCollectorName));
         }
         LOG_DEBUG(sLogger,
-                  ("schedule host monitor collector again", collectConfig->mConfigName)("collector",
-                                                                                        collectConfig->mCollectorName));
-
-        auto event = BuildTimerEvent(std::move(collectConfig));
+                  ("schedule host monitor collector again", config.mConfigName)("collector", config.mCollectorName));
+        auto event = BuildTimerEvent(config);
         event->ResetForNextExec();
         Timer::GetInstance()->PushEvent(std::move(event));
-    });
+    };
+    mThreadPool.Add(collectFn);
 }
 
 std::unique_ptr<HostMonitorTimerEvent>
-HostMonitorInputRunner::BuildTimerEvent(std::unique_ptr<HostMonitorTimerEvent::CollectConfig> collectConfig) {
+HostMonitorInputRunner::BuildTimerEvent(HostMonitorTimerEvent::CollectConfig& collectConfig) {
     auto now = std::chrono::steady_clock::now();
-    auto event = std::make_unique<HostMonitorTimerEvent>(now, std::move(collectConfig));
+    auto event = std::make_unique<HostMonitorTimerEvent>(now, collectConfig);
     return event;
 }
 
@@ -152,7 +157,7 @@ std::shared_ptr<BaseCollector> HostMonitorInputRunner::GetCollector(const std::s
 template <typename T>
 void HostMonitorInputRunner::RegisterCollector() {
     auto collector = std::make_shared<T>();
-    mCollectorInstanceMap[collector->GetName()] = collector;
+    mCollectorInstanceMap[collector->Name()] = collector;
 }
 
 } // namespace logtail

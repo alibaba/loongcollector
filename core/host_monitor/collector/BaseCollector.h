@@ -27,11 +27,10 @@ public:
 
     bool IsValid() const { return mValidState; }
     virtual void Collect(PipelineEventGroup& group) = 0;
-
-    const std::string GetName() const { return mName; }
+    virtual const std::string& Name() const = 0;
 
 protected:
-    std::string mName;
+    const std::string mName;
     bool mValidState = false;
 };
 

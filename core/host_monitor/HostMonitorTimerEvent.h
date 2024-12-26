@@ -48,15 +48,15 @@ public:
         std::chrono::seconds mInterval;
     };
 
-    HostMonitorTimerEvent(std::chrono::steady_clock::time_point execTime, std::unique_ptr<CollectConfig> collectConfig)
-        : TimerEvent(execTime), mCollectConfig(std::move(collectConfig)) {}
+    HostMonitorTimerEvent(std::chrono::steady_clock::time_point execTime, CollectConfig collectConfig)
+        : TimerEvent(execTime), mCollectConfig(collectConfig) {}
 
     bool IsValid() const override;
     bool Execute() override;
-    void ResetForNextExec() { SetExecTime(GetExecTime() + mCollectConfig->mInterval); }
+    void ResetForNextExec() { SetExecTime(GetExecTime() + mCollectConfig.mInterval); }
 
 private:
-    std::unique_ptr<CollectConfig> mCollectConfig;
+    CollectConfig mCollectConfig;
 };
 
 } // namespace logtail

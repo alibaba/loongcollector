@@ -35,14 +35,14 @@ const std::string DEFAULT_CONTENT_VALUE_METHOD_EXPIRE = "expire";
 
 // for process entity
 const std::string DEFAULT_CONTENT_VALUE_ENTITY_TYPE_PROCESS = "process";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_PID = "process_pid";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_PPID = "process_ppid";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_USER = "process_user";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_COMM = "process_comm";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_CREATE_TIME = "process_create_time";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_CWD = "process_cwd";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_BINARY = "process_binary";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_ARGUMENTS = "process_arguments";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_LANGUAGE = "process_language";
-const std::string DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID = "process_container_id";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_PID = "pid";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_PPID = "ppid";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_USER = "user";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_COMM = "comm";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_CREATE_TIME = "create_time";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_CWD = "cwd";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_BINARY = "binary";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_ARGUMENTS = "arguments";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_LANGUAGE = "language";
+const std::string DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID = "container_id";
 } // namespace logtail

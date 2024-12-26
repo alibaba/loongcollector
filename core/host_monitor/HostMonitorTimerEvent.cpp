@@ -23,12 +23,12 @@
 namespace logtail {
 
 bool HostMonitorTimerEvent::IsValid() const {
-    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(mCollectConfig->mConfigName,
-                                                                     mCollectConfig->mCollectorName);
+    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(mCollectConfig.mConfigName,
+                                                                     mCollectConfig.mCollectorName);
 }
 
 bool HostMonitorTimerEvent::Execute() {
-    HostMonitorInputRunner::GetInstance()->ScheduleOnce(std::move(mCollectConfig));
+    HostMonitorInputRunner::GetInstance()->ScheduleOnce(mCollectConfig);
     return true;
 }
 

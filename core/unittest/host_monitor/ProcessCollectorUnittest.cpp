@@ -39,8 +39,8 @@ void ProcessCollectorUnittest::TestSortProcessByCpu() const {
     PROCESS_DIR = "/proc";
     auto collector = ProcessCollector();
     auto processes = vector<ProcessStatPtr>();
-    collector.SortProcessByCpu(processes, 5); // fist time will be ignored
-    collector.SortProcessByCpu(processes, 5);
+    collector.GetSortedProcess(processes, 5); // fist time will be ignored
+    collector.GetSortedProcess(processes, 5);
     APSARA_TEST_EQUAL(5, processes.size());
     auto prev = processes[0];
     for (auto i = 1; i < processes.size(); i++) {

@@ -24,7 +24,7 @@ public:
     void DelayExecTime(uint64_t delaySeconds);
     virtual void Cancel();
 
-    void SetComponent(std::shared_ptr<Timer> timer, EventPool* eventPool);
+    void SetComponent(EventPool* eventPool);
 
 protected:
     bool IsCancelled();
@@ -39,7 +39,7 @@ protected:
     std::shared_ptr<PromFuture<HttpResponse&, uint64_t>> mFuture;
     std::shared_ptr<PromFuture<>> mIsContextValidFuture;
 
-    std::shared_ptr<Timer> mTimer;
+    Timer* mTimer;
     EventPool* mEventPool = nullptr;
 };
 } // namespace logtail

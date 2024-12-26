@@ -14,24 +14,17 @@
 
 #include "InputHostMeta.h"
 
-#include <memory>
-#include <utility>
-
 #include "HostMonitorInputRunner.h"
 #include "Logger.h"
-#include "PluginRegistry.h"
-#include "ProcessorInstance.h"
 #include "constants/EntityConstants.h"
 #include "json/value.h"
-#include "pipeline/Pipeline.h"
-#include "plugin/processor/inner/ProcessorHostMetaNative.h"
 
 namespace logtail {
 
 const std::string InputHostMeta::sName = "input_host_meta";
 
 bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    return CreateInnerProcessors(config);
+    return true;
 }
 
 bool InputHostMeta::Start() {
@@ -46,20 +39,6 @@ bool InputHostMeta::Stop(bool isPipelineRemoving) {
     LOG_INFO(sLogger, ("input host meta stop", mContext->GetConfigName()));
     if (isPipelineRemoving) {
         HostMonitorInputRunner::GetInstance()->RemoveCollector(mContext->GetConfigName());
-    }
-    return true;
-}
-
-bool InputHostMeta::CreateInnerProcessors(const Json::Value& config) {
-    std::unique_ptr<ProcessorInstance> processor;
-    {
-        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorHostMetaNative::sName,
-                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
-        Json::Value detail;
-        if (!processor->Init(detail, *mContext)) {
-            return false;
-        }
-        mInnerProcessors.emplace_back(std::move(processor));
     }
     return true;
 }

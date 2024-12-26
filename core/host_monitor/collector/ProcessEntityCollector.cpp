@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ProcessCollector.h"
+#include "ProcessEntityCollector.h"
 
 #include <sched.h>
 #include <unistd.h>
@@ -24,12 +24,12 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <queue>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "Common.h"
 #include "FileSystemUtil.h"
 #include "Logger.h"
 #include "PipelineEventGroup.h"
@@ -41,23 +41,67 @@ namespace logtail {
 
 const size_t ProcessTopN = 20;
 
-void ProcessCollector::Collect(PipelineEventGroup& group) {
+const std::string ProcessEntityCollector::sName = "process_entity";
+
+ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLAG(process_collect_silent_count)) {
+    // try to read process dir
+    if (access(PROCESS_DIR.c_str(), R_OK) != 0) {
+        LOG_ERROR(sLogger, ("process collector init failed", "process dir not exist or ")("dir", PROCESS_DIR));
+        mValidState = false;
+    } else {
+        mValidState = true;
+    }
+    auto hostType = ToString(getenv(DEFAULT_ENV_KEY_HOST_TYPE.c_str()));
+    std::ostringstream oss;
+    if (hostType == DEFAULT_ENV_VALUE_ECS) {
+        oss << DEFAULT_CONTENT_VALUE_DOMAIN_ACS << "." << DEFAULT_ENV_VALUE_ECS << "."
+            << DEFAULT_CONTENT_VALUE_ENTITY_TYPE_PROCESS;
+        mDomain = DEFAULT_CONTENT_VALUE_DOMAIN_ACS;
+    } else {
+        oss << DEFAULT_CONTENT_VALUE_DOMAIN_INFRA << "." << DEFAULT_ENV_VALUE_HOST << "."
+            << DEFAULT_CONTENT_VALUE_ENTITY_TYPE_PROCESS;
+        mDomain = DEFAULT_CONTENT_VALUE_DOMAIN_INFRA;
+    }
+    mHostEntityID = FetchHostId();
+    mEntityType = oss.str();
+};
+
+void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
     group.SetMetadata(EventGroupMetaKey::COLLECT_TIME, std::to_string(time(nullptr)));
     std::vector<ProcessStatPtr> processes;
-    SortProcessByCpu(processes, ProcessTopN);
+    GetSortedProcess(processes, ProcessTopN);
     for (auto process : processes) {
         auto event = group.AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
 
+        std::string processCreateTime
+            = std::to_string(duration_cast<seconds>(process->startTime.time_since_epoch()).count());
+
+        // common fields
+        event->SetContent(DEFAULT_CONTENT_KEY_ENTITY_TYPE, mEntityType);
+        event->SetContent(DEFAULT_CONTENT_KEY_ENTITY_ID,
+                          GetProcessEntityID(std::to_string(process->pid), processCreateTime));
+        event->SetContent(DEFAULT_CONTENT_KEY_DOMAIN, mDomain);
+        event->SetContent(DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME, processCreateTime);
+        event->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
+        event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, "30");
+
+        // custom fields
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_PID, std::to_string(process->pid));
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_PPID, std::to_string(process->parentPid));
-        event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CREATE_TIME,
-                          std::to_string(duration_cast<seconds>(process->startTime.time_since_epoch()).count()));
+        // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_USER, ""); TODO: get user name
+        event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_COMM, process->name);
+        event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CREATE_TIME, processCreateTime);
+        // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CWD, ""); TODO: get cwd
+        // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_BINARY, ""); TODO: get binary
+        // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_ARGUMENTS, ""); TODO: get arguments
+        // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_LANGUAGE, ""); TODO: get language
+        // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID, ""); TODO: get container id
     }
 }
 
-void ProcessCollector::SortProcessByCpu(std::vector<ProcessStatPtr>& processStats, size_t topN) {
+void ProcessEntityCollector::GetSortedProcess(std::vector<ProcessStatPtr>& processStats, size_t topN) {
     steady_clock::time_point now = steady_clock::now();
     auto compare = [](const std::pair<ProcessStatPtr, uint64_t>& a, const std::pair<ProcessStatPtr, uint64_t>& b) {
         return a.second < b.second;
@@ -103,7 +147,7 @@ void ProcessCollector::SortProcessByCpu(std::vector<ProcessStatPtr>& processStat
     mSortProcessStats = processStats;
 }
 
-ProcessStatPtr ProcessCollector::GetProcessStat(pid_t pid, bool& isFirstCollect) {
+ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCollect) {
     const auto now = steady_clock::now();
 
     // TODO: more accurate cache
@@ -140,7 +184,7 @@ ProcessStatPtr ProcessCollector::GetProcessStat(pid_t pid, bool& isFirstCollect)
     return ptr;
 }
 
-ProcessStatPtr ProcessCollector::ReadProcessStat(pid_t pid) {
+ProcessStatPtr ProcessEntityCollector::ReadProcessStat(pid_t pid) {
     LOG_DEBUG(sLogger, ("read process stat", pid));
     auto processStat = PROCESS_DIR / std::to_string(pid) / PROCESS_STAT;
 
@@ -157,7 +201,7 @@ ProcessStatPtr ProcessCollector::ReadProcessStat(pid_t pid) {
 // 1 (cat) R 0 1 1 34816 1 4194560 1110 0 0 0 1 1 0 0 20 0 1 0 18938584 4505600 171 18446744073709551615 4194304 4238788
 // 140727020025920 0 0 0 0 0 0 0 0 0 17 3 0 0 0 0 0 6336016 6337300 21442560 140727020027760 140727020027777
 // 140727020027777 140727020027887 0
-ProcessStatPtr ProcessCollector::ParseProcessStat(pid_t pid, std::string& line) {
+ProcessStatPtr ProcessEntityCollector::ParseProcessStat(pid_t pid, std::string& line) {
     ProcessStatPtr ptr = std::make_shared<ProcessStat>();
     ptr->pid = pid;
     auto nameStartPos = line.find_first_of('(');
@@ -203,10 +247,10 @@ ProcessStatPtr ProcessCollector::ParseProcessStat(pid_t pid, std::string& line) 
     return ptr;
 }
 
-bool ProcessCollector::WalkAllProcess(const std::filesystem::path& root,
-                                      const std::function<void(const std::string&)>& callback) {
+bool ProcessEntityCollector::WalkAllProcess(const std::filesystem::path& root,
+                                            const std::function<void(const std::string&)>& callback) {
     if (!std::filesystem::exists(root) || !std::filesystem::is_directory(root)) {
-        LOG_ERROR(sLogger, ("ProcessCollector", "root path is not a directory or not exist")("root", root));
+        LOG_ERROR(sLogger, ("ProcessEntityCollector", "root path is not a directory or not exist")("root", root));
         return false;
     }
 
@@ -218,6 +262,14 @@ bool ProcessCollector::WalkAllProcess(const std::filesystem::path& root,
         }
     }
     return true;
+}
+
+const std::string ProcessEntityCollector::GetProcessEntityID(StringView pid, StringView createTime) {
+    std::ostringstream oss;
+    oss << mHostEntityID << pid << createTime;
+    auto bigID = sdk::CalcMD5(oss.str());
+    std::transform(bigID.begin(), bigID.end(), bigID.begin(), ::tolower);
+    return bigID;
 }
 
 } // namespace logtail

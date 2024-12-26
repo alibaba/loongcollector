@@ -29,6 +29,8 @@
 
 #include "Flags.h"
 #include "Logger.h"
+#include "MachineInfoUtil.h"
+#include "StringTools.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/collector/BaseCollector.h"
@@ -38,7 +40,6 @@ DECLARE_FLAG_INT32(process_collect_silent_count);
 using namespace std::chrono;
 
 namespace logtail {
-
 
 struct ProcessCpuInfo {
     uint64_t user = 0;
@@ -140,30 +141,24 @@ constexpr int operator-(EnumProcessStat a, EnumProcessStat b) {
     return (int)a - (int)b;
 }
 
-class ProcessCollector : public BaseCollector {
+class ProcessEntityCollector : public BaseCollector {
 public:
-    ProcessCollector() : mProcessSilentCount(INT32_FLAG(process_collect_silent_count)) {
-        mName = "process";
-
-        // try to read process dir
-        if (access(PROCESS_DIR.c_str(), R_OK) != 0) {
-            LOG_ERROR(sLogger, ("process collector init failed", "process dir not exist or ")("dir", PROCESS_DIR));
-            mValidState = false;
-        } else {
-            mValidState = true;
-        }
-    };
-    ~ProcessCollector() override = default;
+    ProcessEntityCollector();
+    ~ProcessEntityCollector() override = default;
 
     void Collect(PipelineEventGroup& group) override;
 
+    static const std::string sName;
+    const std::string& Name() const override { return sName; }
+
 private:
-    void SortProcessByCpu(std::vector<ProcessStatPtr>& processStats, size_t topN);
+    void GetSortedProcess(std::vector<ProcessStatPtr>& processStats, size_t topN);
     ProcessStatPtr GetProcessStat(pid_t pid, bool& isFirstCollect);
     ProcessStatPtr ReadProcessStat(pid_t pid);
     ProcessStatPtr ParseProcessStat(pid_t pid, std::string& line);
 
     bool WalkAllProcess(const std::filesystem::path& root, const std::function<void(const std::string&)>& callback);
+    const std::string GetProcessEntityID(StringView pid, StringView createTime);
 
     ProcessStatPtr GetPreProcessStat(pid_t pid) { return mPrevProcessStat[pid]; }
 
@@ -172,9 +167,12 @@ private:
     std::unordered_map<pid_t, ProcessStatPtr> mPrevProcessStat;
 
     const int mProcessSilentCount;
+    std::string mHostEntityID;
+    std::string mEntityType;
+    std::string mDomain;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class ProcessCollectorUnittest;
+    friend class ProcessEntityCollectorUnittest;
 #endif
 };
 

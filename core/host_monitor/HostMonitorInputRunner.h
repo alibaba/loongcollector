@@ -23,12 +23,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "BaseCollector.h"
-#include "InputRunner.h"
-#include "Lock.h"
-#include "QueueKey.h"
-#include "ThreadPool.h"
+#include "common/ThreadPool.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
+#include "host_monitor/collector/BaseCollector.h"
+#include "host_monitor/collector/ProcessEntityCollector.h"
+#include "pipeline/queue/QueueKey.h"
+#include "runner/InputRunner.h"
 
 namespace logtail {
 
@@ -57,12 +57,11 @@ public:
     bool HasRegisteredPlugins() const override;
 
     bool IsCollectTaskValid(const std::string& configName, const std::string& collectorName) const;
-    void ScheduleOnce(std::unique_ptr<HostMonitorTimerEvent::CollectConfig> collectConfig);
+    void ScheduleOnce(HostMonitorTimerEvent::CollectConfig& collectConfig);
 
 private:
     HostMonitorInputRunner();
-    std::unique_ptr<HostMonitorTimerEvent>
-    BuildTimerEvent(std::unique_ptr<HostMonitorTimerEvent::CollectConfig> collectConfig);
+    std::unique_ptr<HostMonitorTimerEvent> BuildTimerEvent(HostMonitorTimerEvent::CollectConfig& collectConfig);
 
     template <typename T>
     void RegisterCollector();

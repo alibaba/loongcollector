@@ -530,12 +530,9 @@ std::string RandomHostid() {
     return hostId;
 }
 
-const std::string& GetLocalHostId() {
+const std::string GetLocalHostId() {
     static std::string fileName = AppConfig::GetInstance()->GetLoongcollectorConfDir() + PATH_SEPARATOR + "host_id";
-    static std::string hostId;
-    if (!hostId.empty()) {
-        return hostId;
-    }
+    std::string hostId;
     if (CheckExistance(fileName)) {
         if (!ReadFileContent(fileName, hostId)) {
             hostId = "";
@@ -571,16 +568,16 @@ std::string FetchHostId() {
     if (!hostId.empty()) {
         return hostId;
     }
-    hostId = STRING_FLAG(agent_host_id);
-    if (!hostId.empty()) {
-        return hostId;
-    }
     ECSMeta meta = FetchECSMeta();
     hostId = meta.instanceID;
     if (!hostId.empty()) {
         return hostId;
     }
     hostId = GetSerialNumberFromEcsAssist();
+    if (!hostId.empty()) {
+        return hostId;
+    }
+    hostId = STRING_FLAG(agent_host_id);
     if (!hostId.empty()) {
         return hostId;
     }
