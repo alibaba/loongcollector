@@ -53,9 +53,6 @@ private:
 
     int32_t mLogTimeZoneOffsetSecond = 0;
 
-    int* mParseTimeFailures = nullptr;
-    int* mHistoryFailures = nullptr;
-
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;
     CounterPtr mOutKeyNotFoundEventsTotal;

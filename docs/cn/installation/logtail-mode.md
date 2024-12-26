@@ -41,26 +41,26 @@ export logtail_mode=true
 
 1. 需要给LoongCollector容器添加环境变量：
 
-```bash
-logtail_mode=true
-```
+    ```bash
+    logtail_mode=true
+    ```
 
 2. 需要调整LoongCollector挂载路径映射：
 
-将所有 `/usr/local/ilogtail` 路径替换为 `/usr/local/loongcollector`：
+    将所有 `/usr/local/ilogtail` 路径替换为 `/usr/local/loongcollector`：
 
-```plaintext
-# 常用目录映射示例
-数据检查点：
-/usr/local/ilogtail/checkpoint → /usr/local/loongcollector/checkpoint
+    ```plaintext
+    # 常用目录映射示例
+    数据检查点：
+    /usr/local/ilogtail/checkpoint → /usr/local/loongcollector/checkpoint
 
-采集配置目录：
-/usr/local/ilogtail/config → /usr/local/loongcollector/config
-```
+    采集配置目录：
+    /usr/local/ilogtail/config → /usr/local/loongcollector/config
+    ```
 
 3. 修改容器镜像地址为LoongCollector镜像地址
 
-`sls-opensource-registry-vpc.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:版本号`
+    `sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:版本号`
 
 ## 迁移建议
 

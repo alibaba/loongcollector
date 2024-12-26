@@ -39,6 +39,9 @@ bool AsynCurlRunner::Init() {
 void AsynCurlRunner::Stop() {
     mIsFlush = true;
     future_status s = mThreadRes.wait_for(chrono::seconds(1));
+    if (!mThreadRes.valid()) {
+        return;
+    }
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("async curl runner", "stopped successfully"));
     } else {
@@ -94,6 +97,7 @@ bool AsynCurlRunner::AddRequestToClient(unique_ptr<AsynHttpRequest>&& request) {
 
     if (curl == nullptr) {
         LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));
+        request->mResponse.SetNetworkStatus(CURLE_FAILED_INIT);
         request->OnSendDone(request->mResponse);
         return false;
     }
@@ -106,6 +110,7 @@ bool AsynCurlRunner::AddRequestToClient(unique_ptr<AsynHttpRequest>&& request) {
         LOG_ERROR(sLogger,
                   ("failed to send request", "failed to add the easy curl handle to multi_handle")(
                       "errMsg", curl_multi_strerror(res))("request address", request.get()));
+        request->mResponse.SetNetworkStatus(CURLE_FAILED_INIT);
         request->OnSendDone(request->mResponse);
         curl_easy_cleanup(curl);
         return false;
@@ -190,6 +195,7 @@ void AsynCurlRunner::HandleCompletedRequests(int& runningHandlers) {
                 case CURLE_OK: {
                     long statusCode = 0;
                     curl_easy_getinfo(handler, CURLINFO_RESPONSE_CODE, &statusCode);
+                    request->mResponse.SetNetworkStatus(CURLE_OK);
                     request->mResponse.SetStatusCode(statusCode);
                     request->OnSendDone(request->mResponse);
                     LOG_DEBUG(sLogger,
@@ -214,6 +220,7 @@ void AsynCurlRunner::HandleCompletedRequests(int& runningHandlers) {
                         ++runningHandlers;
                         requestReused = true;
                     } else {
+                        request->mResponse.SetNetworkStatus(msg->data.result);
                         request->OnSendDone(request->mResponse);
                         LOG_DEBUG(
                             sLogger,

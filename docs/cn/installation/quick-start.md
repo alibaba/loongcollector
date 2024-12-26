@@ -2,28 +2,26 @@
 
 ## 采集主机日志
 
-1. 下载预编译的iLogtail包，解压后进入目录，该目录下文均称为部署目录。
+1. 下载预编译的 LoongCollector 包，解压后进入目录，该目录下文均称为部署目录。
 
     ```bash
-    wget https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/latest/ilogtail-latest.linux-amd64.tar.gz
-    tar -xzvf ilogtail-latest.linux-amd64.tar.gz
-    cd ilogtail-<version>
+    wget https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/0.2.0/loongcollector-0.2.0.linux-amd64.tar.gz
+    tar -xzvf loongcollector-0.2.0.linux-amd64.tar.gz
+    cd loongcollector-0.2.0
     ```
 
-2. 对iLogtail进行配置
+2. 对 LoongCollector 进行配置
 
-    部署目录中`ilogtail_config.json`是iLogtail的系统参数配置文件，`config/local`是iLogtail的本地采集配置目录。
-
-    这里我们在采集配置目录中创建`file_simple.yaml`文件，配置采集当前目录simple.log文件并输出到标准输出：
+    部署目录中`conf/instance_config/local/loongcollector_config.json`是 LoongCollector 的系统参数配置文件，`conf/continuous_pipeline_config/local`是 LoongCollector 的本地采集配置目录。 这里我们在采集配置目录中创建`file_simple.yaml`文件，配置采集当前目录`simple.log`文件并输出到标准输出：
 
     ```yaml
     enable: true
     inputs:
-      - Type: input_file          # 文件输入类型
+    - Type: input_file          # 文件输入类型
         FilePaths: 
-          - ./simple.log
+        - ./simple.log
     flushers:
-      - Type: flusher_stdout    # 标准输出流输出类型
+    - Type: flusher_stdout    # 标准输出流输出类型
         OnlyStdout: true
     ```
 
@@ -31,22 +29,22 @@
 
     ```bash
     cd ./config/local
-    wget https://raw.githubusercontent.com/alibaba/ilogtail/main/example_config/quick_start/config/file_simple.yaml
+    wget https://raw.githubusercontent.com/alibaba/loongcollector/main/example_config/quick_start/config/file_simple.yaml
     cd -
     ```
 
-3. 后台启动iLogtail
+3. 后台启动 LoongCollector
 
     ```bash
-    nohup ./ilogtail > stdout.log 2> stderr.log &
+    nohup ./loongcollector > stdout.log 2> stderr.log &
     ```
 
-    以上命令将标准输出重定向到stdout.log以便观察。
+    以上命令将标准输出重定向到 `stdout.log`以便观察。
 
 4. 构造示例日志
 
     ```bash
-    echo 'Hello, iLogtail!' >> simple.log
+    echo 'Hello, LoongCollector!' >> simple.log
     ```
 
 5. 查看采集到的文件日志
@@ -58,11 +56,11 @@
     结果为
 
     ```json
-    2022-07-15 00:20:29 {"__tag__:__path__":"./simple.log","content":"Hello, iLogtail!","__time__":"1657815627"}
+    2024-12-05 15:50:29 {"__tag__:__path__":"./simple.log","content":"Hello, LoongCollector!","__time__":"1733385029"}
     ```
 
 ## 更多采集配置
 
 了解采集配置结构：[采集配置](../configuration/collection-config.md)
 
-参考更多可组合的日志采集和处理配置样例：<https://github.com/alibaba/ilogtail/blob/main/example_config>
+参考更多可组合的日志采集和处理配置样例：<https://github.com/alibaba/loongcollector/blob/main/example_config>

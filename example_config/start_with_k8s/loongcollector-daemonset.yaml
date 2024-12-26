@@ -1,0 +1,121 @@
+# Copyright 2022 loongcollector Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: loongcollector-ds
+  namespace: loongcollector
+  labels:
+    k8s-app: loongcollector-ds
+spec:
+  selector:
+    matchLabels:
+      k8s-app: loongcollector-ds
+  template:
+    metadata:
+      labels:
+        k8s-app: loongcollector-ds
+    spec:
+      tolerations:
+        - operator: Exists # deploy on all nodes
+      containers:
+        - name: loongcollector
+          env:
+            - name: ALIYUN_LOG_ENV_TAGS # add log tags from env
+              value: _node_name_|_node_ip_
+            - name: _node_name_
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: _node_ip_
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: cpu_usage_limit # loongcollector's self monitor cpu limit
+              value: "1"
+            - name: mem_usage_limit # loongcollector's self monitor mem limit
+              value: "512"
+            - name: default_access_key_id # accesskey id if you want to flush to SLS
+              valueFrom:
+                secretKeyRef:
+                  name: loongcollector-secret
+                  key: access_key_id
+                  optional: true
+            - name: default_access_key # accesskey secret if you want to flush to SLS
+              valueFrom:
+                secretKeyRef:
+                  name: loongcollector-secret
+                  key: access_key
+                  optional: true
+          image: >-
+            sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 400m
+              memory: 384Mi
+          volumeMounts:
+            - mountPath: /var/run # for container runtime socket
+              name: run
+            - mountPath: /logtail_host # for log access on the node
+              mountPropagation: HostToContainer
+              name: root
+              readOnly: true
+            - mountPath: /usr/local/loongcollector/data # for checkpoint between container restart
+              name: checkpoint
+            - mountPath: /usr/local/loongcollector/conf/continuous_pipeline_config/local # mount config dir
+              name: user-config
+              readOnly: true
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /usr/local/loongcollector/loongcollector_control.sh
+                  - stop
+                  - "3"
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /liveness
+              port: 7953
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      volumes:
+        - hostPath:
+            path: /var/run
+            type: Directory
+          name: run
+        - hostPath:
+            path: /
+            type: Directory
+          name: root
+        - hostPath:
+            path: /etc/loongcollector-loongcollector-ds/checkpoint
+            type: DirectoryOrCreate
+          name: checkpoint
+        - configMap:
+            defaultMode: 420
+            name: loongcollector-user-cm
+          name: user-config

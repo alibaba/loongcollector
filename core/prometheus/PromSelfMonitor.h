@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 #include "monitor/MetricManager.h"
-#include "monitor/PluginMetricManager.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
 

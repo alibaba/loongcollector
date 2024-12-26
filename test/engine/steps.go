@@ -32,6 +32,8 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.Given(`^subcribe data from \{(\S+)\} with config`, subscriber.InitSubscriber)
 	ctx.Given(`^mkdir \{(.*)\}`, setup.Mkdir)
 	ctx.Given(`^docker-compose boot type \{(\S+)\}$`, setup.SetDockerComposeBootType)
+	ctx.Given(`^run command on datasource \{(.*)\}$`, setup.RunCommandOnSource)
+	ctx.Given(`^run command on loongcollector \{(.*)\}$`, setup.RunCommandOnLoongCollector)
 
 	// chaos
 	ctx.Given(`^network delay package \{(\d+)\}ms for ip \{(.*)\}`, chaos.NetworkDelay)

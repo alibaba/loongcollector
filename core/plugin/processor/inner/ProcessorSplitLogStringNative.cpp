@@ -81,8 +81,6 @@ bool ProcessorSplitLogStringNative::Init(const Json::Value& config) {
                               mContext->GetRegion());
     }
 
-    mSplitLines = &(GetContext().GetProcessProfile().splitLines);
-
     return true;
 }
 
@@ -94,7 +92,6 @@ void ProcessorSplitLogStringNative::Process(PipelineEventGroup& logGroup) {
     for (PipelineEventPtr& e : logGroup.MutableEvents()) {
         ProcessEvent(logGroup, std::move(e), newEvents);
     }
-    *mSplitLines = newEvents.size();
     logGroup.SwapEvents(newEvents);
 }
 

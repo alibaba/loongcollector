@@ -30,6 +30,7 @@ option(BUILD_LOGTAIL_SHARED_LIBRARY "Build Logtail shared library")
 option(ENABLE_ENTERPRISE "enable enterprise feature")
 cmake_dependent_option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF "LINUX" OFF)
 cmake_dependent_option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF "LINUX" OFF)
+cmake_dependent_option(ENABLE_CORP_FEATURE "Enable corp feature" OFF "ENABLE_ENTERPRISE" OFF)
 option(WITHOUTGDB "Build Logtail without gdb")
 option(WITHSPL "Build Logtail and UT with SPL" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
@@ -46,6 +47,10 @@ if (ENABLE_ENTERPRISE)
     message(STATUS "Enable Enterprise Feature.")
     add_definitions(-D__ENTERPRISE__)
     include(${CMAKE_CURRENT_SOURCE_DIR}/enterprise_options.cmake)
+    if (ENABLE_CORP_FEATURE)
+        message(STATUS "Enable Corp Feature.")
+        add_definitions(-D__CORP__)
+    endif ()
 else ()
     include(${CMAKE_CURRENT_SOURCE_DIR}/options.cmake)
 endif ()
@@ -72,6 +77,7 @@ if (UNIX)
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
         SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
+        add_definitions(-DAPSARA_UNIT_TEST_MAIN)
     endif ()
 elseif (MSVC)
     add_definitions(-DNOMINMAX)
@@ -114,7 +120,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/links.cmake)
 
 # Subdirectories (modules). except for common, input, processor, flusher, observer, helper, spl, and provider.
 set(SUB_DIRECTORIES_LIST
-        application app_config checkpoint container_manager metadata logger go_pipeline monitor monitor/metric_constants monitor/profile_sender models
+        application app_config checkpoint container_manager metadata logger go_pipeline monitor monitor/metric_constants monitor/metric_models monitor/profile_sender models
         config config/watcher constants
         pipeline pipeline/batch pipeline/limiter pipeline/plugin pipeline/plugin/creator pipeline/plugin/instance pipeline/plugin/interface pipeline/queue pipeline/route pipeline/serializer
         task_pipeline

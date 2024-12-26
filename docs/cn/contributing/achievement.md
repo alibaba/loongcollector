@@ -105,16 +105,16 @@
 ```html
 <p align="center">
   <!-- 初级开发者 -->
-  <a href="https://github.com/alibaba/ilogtail/blob/main/docs/cn/contributing/achievement.md#junior-developer"><img alt="Junior Developer" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Dev.png" /></a>
+  <a href="https://github.com/alibaba/loongcollector/blob/main/docs/cn/contributing/achievement.md#junior-developer"><img alt="Junior Developer" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Dev.png" /></a>
   <!-- 高级开发者 -->
-  <a href="https://github.com/alibaba/ilogtail/blob/main/docs/cn/contributing/achievement.md#senior-developer"><img alt="Senior Developer" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Dev.png" /></a>
+  <a href="https://github.com/alibaba/loongcollector/blob/main/docs/cn/contributing/achievement.md#senior-developer"><img alt="Senior Developer" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Dev.png" /></a>
   <!-- 初级布道师 -->
-  <a href="https://github.com/alibaba/ilogtail/blob/main/docs/cn/contributing/achievement.md#junior-ambassador"><img alt="Junior Ambassador" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Amb.png" /></a>
+  <a href="https://github.com/alibaba/loongcollector/blob/main/docs/cn/contributing/achievement.md#junior-ambassador"><img alt="Junior Ambassador" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Amb.png" /></a>
   <!-- 高级布道师 -->
-  <a href="https://github.com/alibaba/ilogtail/blob/main/docs/cn/contributing/achievement.md#senior-ambassador"><img alt="Senior Ambassador" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Amb.png" /></a>
+  <a href="https://github.com/alibaba/loongcollector/blob/main/docs/cn/contributing/achievement.md#senior-ambassador"><img alt="Senior Ambassador" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Amb.png" /></a>
   <!-- 初级答题王 -->
-  <a href="https://github.com/alibaba/ilogtail/blob/main/docs/cn/contributing/achievement.md#junior-moderator"><img alt="Junior Moderator" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Mod.png" /></a>
+  <a href="https://github.com/alibaba/loongcollector/blob/main/docs/cn/contributing/achievement.md#junior-moderator"><img alt="Junior Moderator" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Jr.Mod.png" /></a>
   <!-- 高级答题王 -->
-  <a href="https://github.com/alibaba/ilogtail/blob/main/docs/cn/contributing/achievement.md#senior-moderator"><img alt="Senior Moderator" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Mod.png" /></a>
+  <a href="https://github.com/alibaba/loongcollector/blob/main/docs/cn/contributing/achievement.md#senior-moderator"><img alt="Senior Moderator" width="200" height="200" src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/contributing/achievement/Sr.Mod.png" /></a>
 </p>
 ```

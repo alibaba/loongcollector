@@ -44,6 +44,10 @@ func logDriverSupported(container types.ContainerJSON) bool {
 	}
 }
 
+func logPathEmpty(container types.ContainerJSON) bool {
+	return len(container.LogPath) == 0
+}
+
 type DockerFileSyner struct {
 	dockerFileReader    *helper.LogFileReader
 	dockerFileProcessor *DockerStdoutProcessor
@@ -304,6 +308,9 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 	sds.avgInstanceMetric.Add(int64(len(dockerInfos)))
 	for id, info := range dockerInfos {
 		if !logDriverSupported(info.ContainerInfo) {
+			continue
+		}
+		if logPathEmpty(info.ContainerInfo) {
 			continue
 		}
 		if _, ok := sds.synerMap[id]; !ok || firstStart {

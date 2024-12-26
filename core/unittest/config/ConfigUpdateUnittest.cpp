@@ -19,53 +19,23 @@
 #include <vector>
 
 #include "config/PipelineConfig.h"
+#include "config/common_provider/CommonConfigProvider.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 #include "config/watcher/PipelineConfigWatcher.h"
+#include "file_server/FileServer.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/PipelineManager.h"
 #include "pipeline/plugin/PluginRegistry.h"
 #include "task_pipeline/TaskPipelineManager.h"
 #include "unittest/Unittest.h"
+#include "unittest/config/PipelineManagerMock.h"
 #include "unittest/plugin/PluginMock.h"
 
 using namespace std;
 
 namespace logtail {
-
-class PipelineMock : public Pipeline {
-public:
-    bool Init(PipelineConfig&& config) {
-        mConfig = std::move(config.mDetail);
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
-            mMetricsRecordRef,
-            MetricCategory::METRIC_CATEGORY_PIPELINE,
-            {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()}, {METRIC_LABEL_KEY_PIPELINE_NAME, mName}});
-        mStartTime = mMetricsRecordRef.CreateIntGauge(METRIC_PIPELINE_START_TIME);
-        return (*mConfig)["valid"].asBool();
-    }
-};
-
-class PipelineManagerMock : public PipelineManager {
-public:
-    static PipelineManagerMock* GetInstance() {
-        static PipelineManagerMock instance;
-        return &instance;
-    }
-
-    void ClearEnvironment() {
-        mPipelineNameEntityMap.clear();
-        mPluginCntMap.clear();
-    }
-
-private:
-    shared_ptr<Pipeline> BuildPipeline(PipelineConfig&& config) override {
-        // this should be synchronized with PipelineManager::BuildPipeline, except for the pointer type.
-        shared_ptr<PipelineMock> p = make_shared<PipelineMock>();
-        if (!p->Init(std::move(config))) {
-            return nullptr;
-        }
-        return p;
-    }
-};
 
 class ConfigUpdateUnittest : public testing::Test {
 public:
@@ -88,11 +58,15 @@ protected:
     static void TearDownTestCase() {
         PluginRegistry::GetInstance()->UnloadPlugins();
         TaskRegistry::GetInstance()->UnloadPlugins();
+        FileServer::GetInstance()->Stop();
     }
 
     void SetUp() override {
         filesystem::create_directories(configDir);
         PipelineConfigWatcher::GetInstance()->AddSource(configDir.string());
+#ifdef __ENTERPRISE__
+        builtinPipelineCnt = EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
     }
 
     void TearDown() override {
@@ -106,6 +80,7 @@ private:
     void PrepareInitialSettings() const;
     void GenerateInitialConfigs() const;
 
+    size_t builtinPipelineCnt = 0;
     filesystem::path configDir = "./continuous_pipeline_config";
     vector<filesystem::path> pipelineConfigPaths = {configDir / "pipeline_invalid_format.json",
                                                     configDir / "pipeline_invalid_detail.json",
@@ -267,8 +242,9 @@ private:
 
 void ConfigUpdateUnittest::OnStartUp() const {
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_EQUAL(1U, diff.first.mAdded.size());
+    APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
     APSARA_TEST_TRUE(diff.second.IsEmpty());
+    PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
 
     GenerateInitialConfigs();
     diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
@@ -282,7 +258,7 @@ void ConfigUpdateUnittest::OnStartUp() const {
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
     auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
@@ -293,7 +269,7 @@ void ConfigUpdateUnittest::OnStartUp() const {
 
 void ConfigUpdateUnittest::OnConfigDelete() const {
     PrepareInitialSettings();
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     filesystem::remove_all(configDir);
@@ -308,14 +284,14 @@ void ConfigUpdateUnittest::OnConfigDelete() const {
     APSARA_TEST_EQUAL(1U, diff.second.mRemoved.size());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-    APSARA_TEST_TRUE(PipelineManagerMock::GetInstance()->GetAllConfigNames().empty());
+    APSARA_TEST_EQUAL(builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_TRUE(TaskPipelineManager::GetInstance()->GetAllPipelineNames().empty());
 }
 
 void ConfigUpdateUnittest::OnConfigToInvalidFormat() const {
     PrepareInitialSettings();
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     for (const auto& path : pipelineConfigPaths) {
@@ -333,7 +309,7 @@ void ConfigUpdateUnittest::OnConfigToInvalidFormat() const {
 
 void ConfigUpdateUnittest::OnConfigToInvalidDetail() const {
     PrepareInitialSettings();
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     for (const auto& path : pipelineConfigPaths) {
@@ -355,7 +331,7 @@ void ConfigUpdateUnittest::OnConfigToInvalidDetail() const {
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
@@ -367,7 +343,7 @@ void ConfigUpdateUnittest::OnConfigToInvalidDetail() const {
 
 void ConfigUpdateUnittest::OnConfigToEnabledValid() const {
     PrepareInitialSettings();
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     for (const auto& path : pipelineConfigPaths) {
@@ -389,7 +365,7 @@ void ConfigUpdateUnittest::OnConfigToEnabledValid() const {
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-    APSARA_TEST_EQUAL(4U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(4U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_EQUAL(4U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
     {
@@ -420,7 +396,7 @@ void ConfigUpdateUnittest::OnConfigToEnabledValid() const {
 
 void ConfigUpdateUnittest::OnConfigToDisabledValid() const {
     PrepareInitialSettings();
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     for (const auto& path : pipelineConfigPaths) {
@@ -438,14 +414,14 @@ void ConfigUpdateUnittest::OnConfigToDisabledValid() const {
     APSARA_TEST_EQUAL(1U, diff.first.mRemoved.size());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-    APSARA_TEST_TRUE(PipelineManagerMock::GetInstance()->GetAllConfigNames().empty());
+    APSARA_TEST_EQUAL(builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_TRUE(TaskPipelineManager::GetInstance()->GetAllPipelineNames().empty());
 }
 
 void ConfigUpdateUnittest::OnConfigUnchanged() const {
     PrepareInitialSettings();
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
@@ -473,7 +449,7 @@ void ConfigUpdateUnittest::OnConfigUnchanged() const {
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
@@ -485,7 +461,7 @@ void ConfigUpdateUnittest::OnConfigUnchanged() const {
 
 void ConfigUpdateUnittest::OnConfigAdded() const {
     PrepareInitialSettings();
-    APSARA_TEST_EQUAL(1U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     {
@@ -531,7 +507,7 @@ void ConfigUpdateUnittest::OnConfigAdded() const {
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
 
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
-    APSARA_TEST_EQUAL(2U, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
+    APSARA_TEST_EQUAL(2U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_EQUAL(2U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());

@@ -1,6 +1,6 @@
 # 协议转换
 
-在开发Flusher插件时，用户往往需要将日志数据从sls协议转换成其他协议。在扩展Metric数据模型后，v2版本的Flusher插件还需要支持从PipelineGroupEvents数据转换成其他协议的场景。为了加快开发插件流程，iLogtail提供了通用协议转换模块，用户只需要指定目标协议的名称和编码方式即可获得编码后的字节流。
+在开发Flusher插件时，用户往往需要将日志数据从sls协议转换成其他协议。在扩展Metric数据模型后，v2版本的Flusher插件还需要支持从PipelineGroupEvents数据转换成其他协议的场景。为了加快开发插件流程，LoongCollector 提供了通用协议转换模块，用户只需要指定目标协议的名称和编码方式即可获得编码后的字节流。
 
 ## Converter结构
 
@@ -63,7 +63,7 @@ func (c *Converter) ToByteStreamWithSelectedFieldsV2(groupEvents *models.Pipelin
 1. 在当前文件中引入`protocol`包：
 
     ```Go
-    import "github.com/alibaba/ilogtail/pkg/protocol"
+    import "github.com/alibaba/loongcollector/pkg/protocol"
     ```
 
 2. 使用选定的转换参数创建`Converter`对象实例：
@@ -129,12 +129,12 @@ c, err := protocol.NewConverter("custom_single", "json", map[string]string{"host
 
     | 字段名 | 描述 |
     | ------ | ------ |
-    | host.ip | iLogtail所属机器或容器的ip地址 |
+    | host.ip | LoongCollector所属机器或容器的ip地址 |
     | log.topic | 日志的topic |
     | log.file.path | 被采集文件的路径 |
-    | host.name | iLogtail所属机器或容器的主机名 |
-    | k8s.node.ip | iLogtail容器所处K8s节点的ip |
-    | k8s.node.name | iLogtail容器所处K8s节点的名称 |
+    | host.name | LoongCollector所属机器或容器的主机名 |
+    | k8s.node.ip | LoongCollector容器所处K8s节点的ip |
+    | k8s.node.name | LoongCollector容器所处K8s节点的名称 |
     | k8s.namespace.name | 业务容器所属的K8s命名空间 |
     | k8s.pod.name | 业务容器所属的K8s Pod名称 |
     | k8s.pod.ip | 业务容器所属的K8s Pod ip |

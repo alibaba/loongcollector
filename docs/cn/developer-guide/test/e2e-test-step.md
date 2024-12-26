@@ -1,6 +1,6 @@
 # E2E测试——如何添加新的测试行为
 
-iLogtail提供了一个完整的E2E测试引擎，方便您快速开展集成测试，从而进一步保证代码质量。在大部分情况下，您只需要编写一个配置文件来定义测试行为，即可轻松完成测试。
+LoongCollector 提供了一个完整的E2E测试引擎，方便您快速开展集成测试，从而进一步保证代码质量。在大部分情况下，您只需要编写一个配置文件来定义测试行为，即可轻松完成测试。
 
 ## 目前支持的测试行为
 
@@ -9,14 +9,14 @@ iLogtail提供了一个完整的E2E测试引擎，方便您快速开展集成测
 | 行为类型 | 模板 | 参数 | 说明 |
 | --- | --- | --- | --- |
 | Given | ^\{(\S+)\} environment$ | 环境类型 | 初始化远程测试环境 |
-| Given | ^iLogtail depends on containers \{(.*)\} | 容器 | iLogtail依赖容器，可多次执行，累积添加 |
-| Given | ^iLogtail expose port \{(.*)\} to \{(.*)\} | 端口号 | iLogtail暴露端口，可多次执行，累积添加 |
+| Given | ^LoongCollector depends on containers \{(.*)\} | 容器 | LoongCollector依赖容器，可多次执行，累积添加 |
+| Given | ^LoongCollector expose port \{(.*)\} to \{(.*)\} | 端口号 | LoongCollector暴露端口，可多次执行，累积添加 |
 | Given | ^\{(.*)\} local config as below | 1. 配置名 2. 配置文件内容 | 添加本地配置 |
 | Given | ^\{(.*)\} http config as below | 1. 配置名 2. 配置文件内容 | 通过http添加配置 |
 | Given | ^remove http config \{(.*)\} | 配置名 | 通过http移除配置 |
 | Given | ^subcribe data from \{(\S+)\} with config | 1. 数据源 2. 配置文件内容 | 订阅数据源 |
 | When | ^generate \{(\d+)\} regex logs, with interval \{(\d+)\}ms$ | 1. 生成日志数量 2. 生成日志间隔 | 生成正则文本日志（路径为/tmp/ilogtail/regex_single.log） |
-| When | ^generate \{(\d+)\} http logs, with interval \{(\d+)\}ms, url: \{(.*)\}, method: \{(.*)\}, body: | 1. 生成日志数量 2. 生成日志间隔 3. url 4. method 5. body | 生成http日志，发送到iLogtail input_http_server |
+| When | ^generate \{(\d+)\} http logs, with interval \{(\d+)\}ms, url: \{(.*)\}, method: \{(.*)\}, body: | 1. 生成日志数量 2. 生成日志间隔 3. url 4. method 5. body | 生成http日志，发送到LoongCollector input_http_server |
 | When | ^add k8s label \{(.*)\} | k8s标签 | 为k8s资源添加标签 |
 | When | ^remove k8s label \{(.*)\} | k8s标签 | 为k8s资源移除标签 |
 | When | ^start docker-compose dependencies \{(\S+)\} | 依赖服务 | 启动docker-compose依赖服务 |
@@ -39,6 +39,7 @@ iLogtail提供了一个完整的E2E测试引擎，方便您快速开展集成测
 ### 1. 编写行为函数
 
 如果您需要添加新的行为函数，可以在`engine`目录下添加一个Go函数。不同目录下的行为函数的职责有所不同：
+
 - `cleanup`：清理测试环境，其中的测试函数会默认在测试结束后执行。无需在配置文件中显式声明使用。
 - `control`：管控相关的行为函数，如初始化环境、添加配置等。
 - `setup`：初始化测试环境，并提供远程调用的相关功能。
@@ -65,12 +66,12 @@ return context.WithValue(ctx, key, value), nil
 
 ```go
 func scenarioInitializer(ctx *godog.ScenarioContext) {
-	// Given
+    // Given
 
-	// When
+    // When
 
-	// Then
-	ctx.Then(`^there is \{(\d+)\} logs$`, verify.LogCount)
+    // Then
+    ctx.Then(`^there is \{(\d+)\} logs$`, verify.LogCount)
 }
 ```
 

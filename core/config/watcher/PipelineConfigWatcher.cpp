@@ -18,6 +18,10 @@
 
 #include "common/FileSystemUtil.h"
 #include "config/ConfigUtil.h"
+#include "config/common_provider/CommonConfigProvider.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
@@ -37,11 +41,13 @@ pair<PipelineConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff(
     PipelineConfigDiff pDiff;
     TaskConfigDiff tDiff;
     unordered_set<string> configSet;
-    // inner configs
-    InsertInnerPipelines(pDiff, tDiff, configSet);
-    // configs from file
-    InsertPipelines(pDiff, tDiff, configSet);
+    SingletonConfigCache singletonCache;
+    // builtin pipeline configs
+    InsertBuiltInPipelines(pDiff, tDiff, configSet, singletonCache);
+    // file pipeline configs
+    InsertPipelines(pDiff, tDiff, configSet, singletonCache);
 
+    CheckSingletonInput(pDiff, singletonCache);
     for (const auto& name : mPipelineManager->GetAllConfigNames()) {
         if (configSet.find(name) == configSet.end()) {
             pDiff.mRemoved.push_back(name);
@@ -83,92 +89,97 @@ pair<PipelineConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff(
     return make_pair(std::move(pDiff), std::move(tDiff));
 }
 
-void PipelineConfigWatcher::InsertInnerPipelines(PipelineConfigDiff& pDiff,
-                                                 TaskConfigDiff& tDiff,
-                                                 unordered_set<string>& configSet) {
-    std::map<std::string, std::string> innerPipelines;
-    // self-monitor metric
-    innerPipelines[LoongCollectorMonitor::GetInnerSelfMonitorMetricPipelineName()]
-        = LoongCollectorMonitor::GetInnerSelfMonitorMetricPipeline();
+void PipelineConfigWatcher::InsertBuiltInPipelines(PipelineConfigDiff& pDiff,
+                                                   TaskConfigDiff& tDiff,
+                                                   unordered_set<string>& configSet,
+                                                   SingletonConfigCache& singletonCache) {
+#ifdef __ENTERPRISE__
+    const std::map<std::string, std::string>& builtInPipelines
+        = EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs();
 
-    // process
-    for (const auto& pipeline : innerPipelines) {
-        if (configSet.find(pipeline.first) != configSet.end()) {
+    for (const auto& pipeline : builtInPipelines) {
+        const string& pipelineName = pipeline.first;
+        const string& pipleineDetail = pipeline.second;
+        if (configSet.find(pipelineName) != configSet.end()) {
             LOG_WARNING(sLogger,
                         ("more than 1 config with the same name is found", "skip current config")("inner pipeline",
-                                                                                                  pipeline.first));
+                                                                                                  pipelineName));
             continue;
         }
-        configSet.insert(pipeline.first);
+        configSet.insert(pipelineName);
 
         string errorMsg;
-        auto iter = mInnerConfigMap.find(pipeline.first);
+        auto iter = mInnerConfigMap.find(pipelineName);
         if (iter == mInnerConfigMap.end()) {
-            mInnerConfigMap[pipeline.first] = pipeline.second;
+            mInnerConfigMap[pipelineName] = pipleineDetail;
             unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-            if (!ParseConfigDetail(pipeline.second, ".json", *detail, errorMsg)) {
+            if (!ParseConfigDetail(pipleineDetail, ".json", *detail, errorMsg)) {
                 LOG_WARNING(sLogger,
                             ("config format error", "skip current object")("error msg", errorMsg)("inner pipeline",
-                                                                                                  pipeline.first));
+                                                                                                  pipelineName));
                 continue;
             }
-            if (!IsConfigEnabled(pipeline.first, *detail)) {
-                LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", pipeline.first));
+            if (!IsConfigEnabled(pipelineName, *detail)) {
+                LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", pipelineName));
                 continue;
             }
-            if (!CheckAddedConfig(pipeline.first, std::move(detail), pDiff, tDiff)) {
+            if (!CheckAddedConfig(pipelineName, std::move(detail), pDiff, tDiff, singletonCache)) {
                 continue;
             }
-        } else if (pipeline.second != iter->second) {
-            mInnerConfigMap[pipeline.first] = pipeline.second;
+        } else if (pipleineDetail != iter->second) {
+            mInnerConfigMap[pipelineName] = pipleineDetail;
             unique_ptr<Json::Value> detail = make_unique<Json::Value>();
-            if (!ParseConfigDetail(pipeline.second, ".json", *detail, errorMsg)) {
+            if (!ParseConfigDetail(pipleineDetail, ".json", *detail, errorMsg)) {
                 LOG_WARNING(sLogger,
                             ("config format error", "skip current object")("error msg", errorMsg)("inner pipeline",
-                                                                                                  pipeline.first));
+                                                                                                  pipelineName));
                 continue;
             }
-            if (!IsConfigEnabled(pipeline.first, *detail)) {
+            if (!IsConfigEnabled(pipelineName, *detail)) {
                 switch (GetConfigType(*detail)) {
                     case ConfigType::Pipeline:
-                        if (mPipelineManager->FindConfigByName(pipeline.first)) {
-                            pDiff.mRemoved.push_back(pipeline.first);
+                        if (mPipelineManager->FindConfigByName(pipelineName)) {
+                            pDiff.mRemoved.push_back(pipelineName);
                             LOG_INFO(sLogger,
                                      ("existing valid config modified and disabled",
-                                      "prepare to stop current running pipeline")("config", pipeline.first));
+                                      "prepare to stop current running pipeline")("config", pipelineName));
                         } else {
                             LOG_INFO(sLogger,
                                      ("existing invalid config modified and disabled",
-                                      "skip current object")("config", pipeline.first));
+                                      "skip current object")("config", pipelineName));
                         }
                         break;
                     case ConfigType::Task:
-                        if (mTaskPipelineManager->FindPipelineByName(pipeline.first)) {
-                            tDiff.mRemoved.push_back(pipeline.first);
+                        if (mTaskPipelineManager->FindPipelineByName(pipelineName)) {
+                            tDiff.mRemoved.push_back(pipelineName);
                             LOG_INFO(sLogger,
                                      ("existing valid config modified and disabled",
-                                      "prepare to stop current running task")("config", pipeline.first));
+                                      "prepare to stop current running task")("config", pipelineName));
                         } else {
                             LOG_INFO(sLogger,
                                      ("existing invalid config modified and disabled",
-                                      "skip current object")("config", pipeline.first));
+                                      "skip current object")("config", pipelineName));
                         }
                         break;
                 }
                 continue;
             }
-            if (!CheckModifiedConfig(pipeline.first, std::move(detail), pDiff, tDiff)) {
+            if (!CheckModifiedConfig(pipelineName, std::move(detail), pDiff, tDiff, singletonCache)) {
                 continue;
             }
         } else {
             LOG_DEBUG(sLogger, ("existing inner config unchanged", "skip current object"));
         }
     }
+#else
+    return;
+#endif
 }
 
 void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
                                             TaskConfigDiff& tDiff,
-                                            std::unordered_set<std::string>& configSet) {
+                                            std::unordered_set<std::string>& configSet,
+                                            SingletonConfigCache& singletonCache) {
     for (const auto& dir : mSourceDir) {
         error_code ec;
         filesystem::file_status s = filesystem::status(dir, ec);
@@ -224,7 +235,7 @@ void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
                     LOG_INFO(sLogger, ("new config found and disabled", "skip current object")("config", configName));
                     continue;
                 }
-                if (!CheckAddedConfig(configName, std::move(detail), pDiff, tDiff)) {
+                if (!CheckAddedConfig(configName, std::move(detail), pDiff, tDiff, singletonCache)) {
                     continue;
                 }
             } else if (iter->second.first != size || iter->second.second != mTime) {
@@ -263,11 +274,12 @@ void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
                     }
                     continue;
                 }
-                if (!CheckModifiedConfig(configName, std::move(detail), pDiff, tDiff)) {
+                if (!CheckModifiedConfig(configName, std::move(detail), pDiff, tDiff, singletonCache)) {
                     continue;
                 }
             } else {
                 LOG_DEBUG(sLogger, ("existing config file unchanged", "skip current object"));
+                CheckUnchangedConfig(configName, path, pDiff, tDiff, singletonCache);
             }
         }
     }
@@ -276,7 +288,8 @@ void PipelineConfigWatcher::InsertPipelines(PipelineConfigDiff& pDiff,
 bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
                                              unique_ptr<Json::Value>&& configDetail,
                                              PipelineConfigDiff& pDiff,
-                                             TaskConfigDiff& tDiff) {
+                                             TaskConfigDiff& tDiff,
+                                             SingletonConfigCache& singletonCache) {
     switch (GetConfigType(*configDetail)) {
         case ConfigType::Pipeline: {
             PipelineConfig config(configName, std::move(configDetail));
@@ -290,7 +303,7 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
                                                        config.mRegion);
                 return false;
             }
-            pDiff.mAdded.push_back(std::move(config));
+            PushPipelineConfig(std::move(config), ConfigDiffEnum::Added, pDiff, singletonCache);
             LOG_INFO(sLogger,
                      ("new config found and passed topology check", "prepare to build pipeline")("config", configName));
             break;
@@ -315,7 +328,8 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
 bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                                                 unique_ptr<Json::Value>&& configDetail,
                                                 PipelineConfigDiff& pDiff,
-                                                TaskConfigDiff& tDiff) {
+                                                TaskConfigDiff& tDiff,
+                                                SingletonConfigCache& singletonCache) {
     switch (GetConfigType(*configDetail)) {
         case ConfigType::Pipeline: {
             shared_ptr<Pipeline> p = mPipelineManager->FindConfigByName(configName);
@@ -334,10 +348,10 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                         config.mRegion);
                     return false;
                 }
-                pDiff.mAdded.push_back(std::move(config));
                 LOG_INFO(sLogger,
                          ("existing invalid config modified and passed topology check",
                           "prepare to build pipeline")("config", configName));
+                PushPipelineConfig(std::move(config), ConfigDiffEnum::Added, pDiff, singletonCache);
             } else if (*configDetail != p->GetConfig()) {
                 PipelineConfig config(configName, std::move(configDetail));
                 if (!config.Parse()) {
@@ -353,10 +367,10 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                         config.mRegion);
                     return false;
                 }
-                pDiff.mModified.push_back(std::move(config));
                 LOG_INFO(sLogger,
                          ("existing valid config modified and passed topology check",
                           "prepare to rebuild pipeline")("config", configName));
+                PushPipelineConfig(std::move(config), ConfigDiffEnum::Modified, pDiff, singletonCache);
             } else {
                 LOG_DEBUG(sLogger, ("existing valid config file modified, but no change found", "skip current object"));
             }
@@ -403,6 +417,134 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
         }
     }
     return true;
+}
+
+bool PipelineConfigWatcher::CheckUnchangedConfig(const std::string& configName,
+                                                 const filesystem::path& path,
+                                                 PipelineConfigDiff& pDiff,
+                                                 TaskConfigDiff& tDiff,
+                                                 SingletonConfigCache& singletonCache) {
+    auto pipeline = mPipelineManager->FindConfigByName(configName);
+    auto task = mTaskPipelineManager->FindPipelineByName(configName).get();
+    if (task) {
+        return true;
+    } else if (pipeline) { // running pipeline in last config update
+        std::unique_ptr<Json::Value> configDetail = make_unique<Json::Value>();
+        PipelineConfig config(configName, std::move(configDetail));
+        config.mCreateTime = pipeline->GetContext().GetCreateTime();
+        config.mSingletonInput = pipeline->GetSingletonInput();
+        PushPipelineConfig(std::move(config), ConfigDiffEnum::Unchanged, pDiff, singletonCache);
+    } else { // low priority singleton input in last config update, sort it again
+        unique_ptr<Json::Value> detail = make_unique<Json::Value>();
+        if (!LoadConfigDetailFromFile(path, *detail)) {
+            return false;
+        }
+        if (!IsConfigEnabled(configName, *detail)) {
+            LOG_INFO(sLogger, ("unchanged config found and disabled", "skip current object")("config", configName));
+            return false;
+        }
+        PipelineConfig config(configName, std::move(detail));
+        if (!config.Parse()) {
+            LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName));
+            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
+                                                   "new config found but invalid: skip current object, config: "
+                                                       + configName,
+                                                   config.mProject,
+                                                   config.mLogstore,
+                                                   config.mRegion);
+            return false;
+        }
+        if (config.mSingletonInput) {
+            singletonCache[config.mSingletonInput.value()].push_back(
+                make_shared<PipelineConfigWithDiffInfo>(std::move(config), ConfigDiffEnum::Added));
+        }
+    }
+    return true;
+}
+
+void PipelineConfigWatcher::PushPipelineConfig(PipelineConfig&& config,
+                                               ConfigDiffEnum diffEnum,
+                                               PipelineConfigDiff& pDiff,
+                                               SingletonConfigCache& singletonCache) {
+    // singleton input
+    if (config.mSingletonInput) {
+        if (diffEnum == ConfigDiffEnum::Added || diffEnum == ConfigDiffEnum::Modified
+            || diffEnum == ConfigDiffEnum::Unchanged) {
+            singletonCache[config.mSingletonInput.value()].push_back(
+                make_shared<PipelineConfigWithDiffInfo>(std::move(config), diffEnum));
+        } else {
+            LOG_ERROR(sLogger, ("should not reach here", "invalid diff enum")("diff", diffEnum));
+        }
+        return;
+    }
+    // no singleton input
+    switch (diffEnum) {
+        case ConfigDiffEnum::Added:
+            pDiff.mAdded.push_back(std::move(config));
+            break;
+        case ConfigDiffEnum::Modified:
+            pDiff.mModified.push_back(std::move(config));
+            break;
+        default:
+            break;
+    }
+}
+
+void PipelineConfigWatcher::CheckSingletonInput(PipelineConfigDiff& pDiff, SingletonConfigCache& singletonCache) {
+    for (auto& [name, configs] : singletonCache) {
+        std::sort(configs.begin(),
+                  configs.end(),
+                  [](const std::shared_ptr<PipelineConfigWithDiffInfo>& a,
+                     const std::shared_ptr<PipelineConfigWithDiffInfo>& b) -> bool {
+                      if (a->config.mCreateTime == b->config.mCreateTime) {
+                          return a->config.mName < b->config.mName;
+                      }
+                      return a->config.mCreateTime < b->config.mCreateTime;
+                  });
+        for (size_t i = 0; i < configs.size(); ++i) {
+            const auto& diffEnum = configs[i]->diffEnum;
+            const auto& configName = configs[i]->config.mName;
+            if (i == 0) {
+                switch (diffEnum) {
+                    // greatest priority config
+                    case ConfigDiffEnum::Added:
+                        LOG_INFO(sLogger,
+                                 ("new config with singleton input found and passed topology check",
+                                  "prepare to build pipeline")("config", configName));
+                        pDiff.mAdded.push_back(std::move(configs[0]->config));
+                        break;
+                    case ConfigDiffEnum::Modified:
+                        LOG_INFO(sLogger,
+                                 ("existing config with singleton input modified and passed topology check",
+                                  "prepare to build pipeline")("config", configName));
+                        pDiff.mModified.push_back(std::move(configs[0]->config));
+                        break;
+                    default:
+                        break;
+                }
+            } else {
+                // other low priority configs
+                switch (diffEnum) {
+                    case ConfigDiffEnum::Modified:
+                        LOG_WARNING(sLogger,
+                                    ("global singleton plugin found, but another older config or smaller name config "
+                                     "already exists",
+                                     "skip current object")("config", configName));
+                        pDiff.mRemoved.push_back(configName);
+                        break;
+                    case ConfigDiffEnum::Unchanged:
+                        LOG_WARNING(sLogger,
+                                    ("existing valid config with global singleton plugin, but another older config or "
+                                     "smaller name config found",
+                                     "prepare to stop current running pipeline")("config", configName));
+                        pDiff.mRemoved.push_back(configName);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
 }
 
 } // namespace logtail

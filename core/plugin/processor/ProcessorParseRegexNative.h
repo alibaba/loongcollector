@@ -59,10 +59,6 @@ private:
     bool mIsWholeLineMode = false;
     boost::regex mReg;
 
-    int* mParseFailures = nullptr;
-    int* mRegexMatchFailures = nullptr;
-    int* mLogGroupSize = nullptr;
-
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;
     CounterPtr mOutKeyNotFoundEventsTotal;

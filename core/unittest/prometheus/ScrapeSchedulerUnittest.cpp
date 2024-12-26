@@ -32,7 +32,6 @@
 using namespace std;
 
 namespace logtail {
-
 class ScrapeSchedulerUnittest : public testing::Test {
 public:
     void TestInitscrapeScheduler();
@@ -42,6 +41,7 @@ public:
 
     void TestScheduler();
     void TestQueueIsFull();
+    void TestExactlyScrape();
 
 protected:
     void SetUp() override {
@@ -81,12 +81,22 @@ void ScrapeSchedulerUnittest::TestProcess() {
     // if status code is not 200, no data will be processed
     // but will continue running, sending self-monitoring metrics
     httpResponse.SetStatusCode(503);
+    httpResponse.SetNetworkStatus(CURLE_OK);
     event.OnMetricResult(httpResponse, 0);
     APSARA_TEST_EQUAL(1UL, event.mItem.size());
     event.mItem.clear();
 
     httpResponse.GetBody<PromMetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
+    httpResponse.SetStatusCode(503);
+    httpResponse.SetNetworkStatus(CURLE_COULDNT_CONNECT);
+    event.OnMetricResult(httpResponse, 0);
+    APSARA_TEST_EQUAL(event.mScrapeState, "ERR_CONN_FAILED");
+    APSARA_TEST_EQUAL(1UL, event.mItem.size());
+    event.mItem.clear();
+
+    httpResponse.GetBody<PromMetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
     httpResponse.SetStatusCode(200);
+    httpResponse.SetNetworkStatus(CURLE_OK);
     string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
                    "# TYPE go_gc_duration_seconds summary\n"
                    "go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05\n"
@@ -218,7 +228,8 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     EventPool eventPool{true};
     event.SetComponent(&eventPool);
     auto now = std::chrono::steady_clock::now();
-    event.SetFirstExecTime(now);
+    auto nowScrape = std::chrono::system_clock::now();
+    event.SetFirstExecTime(now, nowScrape);
     event.ScheduleNext();
 
     APSARA_TEST_TRUE(Timer::GetInstance()->mQueue.size() == 1);
@@ -233,11 +244,41 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     APSARA_TEST_EQUAL(now + std::chrono::seconds(1), next->GetExecTime());
 }
 
+void ScrapeSchedulerUnittest::TestExactlyScrape() {
+    Labels labels;
+    labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    auto defaultLabels = MetricLabels();
+    event.InitSelfMonitor(defaultLabels);
+    auto timer = make_shared<Timer>();
+    EventPool eventPool{true};
+    event.SetComponent(timer, &eventPool);
+    auto execTime = std::chrono::steady_clock::now();
+    auto scrapeTime = std::chrono::system_clock::now();
+    event.SetFirstExecTime(execTime, scrapeTime);
+
+    auto firstScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    auto secondScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    event.DelayExecTime(1);
+    auto thirdScrapeTime = event.mLatestScrapeTime;
+    event.ExecDone();
+    auto fourthScrapeTime = event.mLatestScrapeTime;
+    APSARA_TEST_EQUAL(firstScrapeTime, scrapeTime);
+    APSARA_TEST_EQUAL(secondScrapeTime - firstScrapeTime, std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds));
+    APSARA_TEST_EQUAL(thirdScrapeTime - firstScrapeTime,
+                      std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds * 2 + 1));
+    APSARA_TEST_EQUAL(fourthScrapeTime - firstScrapeTime,
+                      std::chrono::seconds(mScrapeConfig->mScrapeIntervalSeconds * 3));
+}
+
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestInitscrapeScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestStreamMetricWriteCallback)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestQueueIsFull)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestExactlyScrape)
 
 
 } // namespace logtail

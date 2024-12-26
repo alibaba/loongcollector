@@ -14,18 +14,32 @@
 
 #include "plugin/flusher/sls/SLSClientManager.h"
 
+#ifdef __linux__
+#include <sys/utsname.h>
+#endif
+
+#include <curl/curl.h>
+
 #include "app_config/AppConfig.h"
 #include "common/EndpointUtil.h"
 #include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "common/version.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#endif
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/SendResult.h"
 #include "sdk/Exception.h"
-#include "sls_control/SLSControl.h"
+
+// for windows compatability, to avoid conflict with the same function defined in windows.h
+#ifdef SetPort
+#undef SetPort
+#endif
 
 DEFINE_FLAG_STRING(data_endpoint_policy,
                    "policy for switching between data server endpoints, possible options include "
@@ -37,9 +51,9 @@ DEFINE_FLAG_INT32(test_network_normal_interval, "if last check is normal, test n
 DEFINE_FLAG_INT32(test_unavailable_endpoint_interval, "test unavailable endpoint interval", 60);
 DEFINE_FLAG_INT32(send_switch_real_ip_interval, "seconds", 60);
 DEFINE_FLAG_BOOL(send_prefer_real_ip, "use real ip to send data", false);
-
-DECLARE_FLAG_STRING(default_access_key_id);
-DECLARE_FLAG_STRING(default_access_key);
+DEFINE_FLAG_STRING(default_access_key_id, "", "");
+DEFINE_FLAG_STRING(default_access_key, "", "");
+DEFINE_FLAG_STRING(custom_user_agent, "custom user agent appended at the end of the exsiting ones", "");
 
 using namespace std;
 
@@ -115,26 +129,30 @@ std::string SLSClientManager::RegionEndpointsInfo::GetAvailableEndpointWithTopPr
     return mDefaultEndpoint;
 }
 
+SLSClientManager* SLSClientManager::GetInstance() {
+#ifdef __ENTERPRISE__
+    static auto ptr = unique_ptr<SLSClientManager>(new EnterpriseSLSClientManager());
+#else
+    static auto ptr = unique_ptr<SLSClientManager>(new SLSClientManager());
+#endif
+    return ptr.get();
+}
+
 void SLSClientManager::Init() {
     InitEndpointSwitchPolicy();
+    GenerateUserAgent();
     if (mDataServerSwitchPolicy == EndpointSwitchPolicy::DESIGNATED_FIRST) {
         mProbeNetworkClient.reset(new sdk::Client("",
-                                                  STRING_FLAG(default_access_key_id),
-                                                  STRING_FLAG(default_access_key),
-                                                  INT32_FLAG(sls_client_send_timeout),
-                                                  LoongCollectorMonitor::mIpAddr,
-                                                  AppConfig::GetInstance()->GetBindInterface()));
-        SLSControl::GetInstance()->SetSlsSendClientCommonParam(mProbeNetworkClient.get());
+                                                  "",
+                                                  INT32_FLAG(sls_client_send_timeout)));
+        mProbeNetworkClient->SetPort(AppConfig::GetInstance()->GetDataServerPort());
         mProbeNetworkThreadRes = async(launch::async, &SLSClientManager::ProbeNetworkThread, this);
     }
     if (BOOL_FLAG(send_prefer_real_ip)) {
         mUpdateRealIpClient.reset(new sdk::Client("",
-                                                  STRING_FLAG(default_access_key_id),
-                                                  STRING_FLAG(default_access_key),
-                                                  INT32_FLAG(sls_client_send_timeout),
-                                                  LoongCollectorMonitor::mIpAddr,
-                                                  AppConfig::GetInstance()->GetBindInterface()));
-        SLSControl::GetInstance()->SetSlsSendClientCommonParam(mUpdateRealIpClient.get());
+                                                  "",
+                                                  INT32_FLAG(sls_client_send_timeout)));
+        mUpdateRealIpClient->SetPort(AppConfig::GetInstance()->GetDataServerPort());
         mUpdateRealIpThreadRes = async(launch::async, &SLSClientManager::UpdateRealIpThread, this);
     }
 }
@@ -228,25 +246,19 @@ sdk::Client* SLSClientManager::GetClient(const string& region, const string& ali
     }
 
     string endpoint = GetAvailableEndpointWithTopPriority(region);
-    unique_ptr<sdk::Client> client = make_unique<sdk::Client>(endpoint,
-                                                              "",
-                                                              "",
-                                                              INT32_FLAG(sls_client_send_timeout),
-                                                              LoongCollectorMonitor::mIpAddr,
-                                                              AppConfig::GetInstance()->GetBindInterface());
-    SLSControl::GetInstance()->SetSlsSendClientCommonParam(client.get());
+    auto client = make_unique<sdk::Client>(aliuid,
+                                           endpoint,
+                                           INT32_FLAG(sls_client_send_timeout));
     ResetClientPort(region, client.get());
     LOG_INFO(sLogger,
              ("init endpoint for sender, region", region)("uid", aliuid)("hostname", GetHostFromEndpoint(endpoint))(
                  "use https", ToString(client->IsUsingHTTPS())));
-    int32_t lastUpdateTime;
-    SLSControl::GetInstance()->SetSlsSendClientAuth(aliuid, true, client.get(), lastUpdateTime);
-    sdk::Client* res = client.get();
+    auto ptr = client.get();
     {
         lock_guard<mutex> lock(mClientMapMux);
         mClientMap.insert(make_pair(key, make_pair(std::move(client), time(nullptr))));
     }
-    return res;
+    return ptr;
 }
 
 bool SLSClientManager::ResetClientEndpoint(const string& aliuid, const string& region, time_t curTime) {
@@ -276,6 +288,7 @@ bool SLSClientManager::ResetClientEndpoint(const string& aliuid, const string& r
 }
 
 void SLSClientManager::ResetClientPort(const string& region, sdk::Client* sendClient) {
+    sendClient->SetPort(AppConfig::GetInstance()->GetDataServerPort());
     if (AppConfig::GetInstance()->GetDataServerPort() == 80) {
         lock_guard<mutex> lock(mRegionEndpointEntryMapLock);
         auto iter = mRegionEndpointEntryMap.find(region);
@@ -304,6 +317,16 @@ void SLSClientManager::CleanTimeoutClient() {
             ++iter;
         }
     }
+}
+
+bool SLSClientManager::GetAccessKey(const std::string& aliuid,
+                                    AuthType& type,
+                                    std::string& accessKeyId,
+                                    std::string& accessKeySecret) {
+    accessKeyId = STRING_FLAG(default_access_key_id);
+    accessKeySecret = STRING_FLAG(default_access_key);
+    type = AuthType::AK;
+    return true;
 }
 
 void SLSClientManager::AddEndpointEntry(const string& region,
@@ -647,5 +670,99 @@ void SLSClientManager::SetRealIp(const string& region, const string& ip) {
     pInfo->SetRealIp(ip);
 }
 
+void SLSClientManager::GenerateUserAgent() {
+    string os;
+#if defined(__linux__)
+    utsname* buf = new utsname;
+    if (-1 == uname(buf)) {
+        LOG_WARNING(
+            sLogger,
+            ("get os info part of user agent failed", errno)("use default os info", LoongCollectorMonitor::mOsDetail));
+        os = LoongCollectorMonitor::mOsDetail;
+    } else {
+        char* pch = strchr(buf->release, '-');
+        if (pch) {
+            *pch = '\0';
+        }
+        os.append(buf->sysname);
+        os.append("; ");
+        os.append(buf->release);
+        os.append("; ");
+        os.append(buf->machine);
+    }
+    delete buf;
+#elif defined(_MSC_VER)
+    os = LoongCollectorMonitor::mOsDetail;
+#endif
+
+    mUserAgent = string("ilogtail/") + ILOGTAIL_VERSION + " (" + os + ") ip/" + LoongCollectorMonitor::mIpAddr + " env/"
+        + GetRunningEnvironment();
+    if (!STRING_FLAG(custom_user_agent).empty()) {
+        mUserAgent += " " + STRING_FLAG(custom_user_agent);
+    }
+    LOG_INFO(sLogger, ("user agent", mUserAgent));
+}
+
+string SLSClientManager::GetRunningEnvironment() {
+    string env;
+    if (getenv("ALIYUN_LOG_STATIC_CONTAINER_INFO")) {
+        env = "ECI";
+    } else if (getenv("ACK_NODE_LOCAL_DNS_ADMISSION_CONTROLLER_SERVICE_HOST")) {
+        // logtail-ds installed by ACK will possess the above env
+        env = "ACK-Daemonset";
+    } else if (getenv("KUBERNETES_SERVICE_HOST")) {
+        // containers in K8S will possess the above env
+        if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+            env = "K8S-Daemonset";
+        } else if (TryCurlEndpoint("http://100.100.100.200/latest/meta-data")) {
+            // containers in ACK can be connected to the above address, see
+            // https://help.aliyun.com/document_detail/108460.html#section-akf-lwh-1gb.
+            // Note: we can not distinguish ACK from K8S built on ECS
+            env = "ACK-Sidecar";
+        } else {
+            env = "K8S-Sidecar";
+        }
+    } else if (AppConfig::GetInstance()->IsPurageContainerMode() || getenv("ALIYUN_LOGTAIL_CONFIG")) {
+        env = "Docker";
+    } else if (TryCurlEndpoint("http://100.100.100.200/latest/meta-data")) {
+        env = "ECS";
+    } else {
+        env = "Others";
+    }
+    return env;
+}
+
+bool SLSClientManager::TryCurlEndpoint(const string& endpoint) {
+    CURL* curl;
+    for (size_t retryTimes = 1; retryTimes <= 5; retryTimes++) {
+        curl = curl_easy_init();
+        if (curl) {
+            break;
+        }
+        this_thread::sleep_for(chrono::seconds(1));
+    }
+
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, endpoint.c_str());
+        curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
+        if (curl_easy_perform(curl) != CURLE_OK) {
+            curl_easy_cleanup(curl);
+            return false;
+        }
+        curl_easy_cleanup(curl);
+        return true;
+    }
+
+    LOG_WARNING(
+        sLogger,
+        ("curl handler cannot be initialized during user environment identification", "user agent may be mislabeled"));
+    return false;
+}
 
 } // namespace logtail

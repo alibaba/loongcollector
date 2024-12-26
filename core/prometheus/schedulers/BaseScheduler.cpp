@@ -8,20 +8,25 @@ using namespace std;
 namespace logtail {
 void BaseScheduler::ExecDone() {
     mExecCount++;
-    mLatestExecTime = mFirstExecTime + std::chrono::seconds(mExecCount * mInterval);
+    mLatestExecTime = mFirstExecTime + chrono::seconds(mExecCount * mInterval);
+    mLatestScrapeTime = mFirstScrapeTime + chrono::seconds(mExecCount * mInterval);
 }
 
-std::chrono::steady_clock::time_point BaseScheduler::GetNextExecTime() {
+chrono::steady_clock::time_point BaseScheduler::GetNextExecTime() {
     return mLatestExecTime;
 }
 
-void BaseScheduler::SetFirstExecTime(std::chrono::steady_clock::time_point firstExecTime) {
+void BaseScheduler::SetFirstExecTime(chrono::steady_clock::time_point firstExecTime,
+                                     chrono::system_clock::time_point firstScrapeTime) {
     mFirstExecTime = firstExecTime;
     mLatestExecTime = mFirstExecTime;
+    mFirstScrapeTime = firstScrapeTime;
+    mLatestScrapeTime = mFirstScrapeTime;
 }
 
 void BaseScheduler::DelayExecTime(uint64_t delaySeconds) {
-    mLatestExecTime = mLatestExecTime + std::chrono::seconds(delaySeconds);
+    mLatestExecTime = mLatestExecTime + chrono::seconds(delaySeconds);
+    mLatestScrapeTime = mLatestScrapeTime + chrono::seconds(delaySeconds);
 }
 
 void BaseScheduler::Cancel() {

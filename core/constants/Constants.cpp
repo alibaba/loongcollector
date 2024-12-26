@@ -39,6 +39,7 @@ const char* SLS_EMPTY_STR_FOR_INDEX = "\01";
 // profile project
 const std::string PROFILE_PROJECT = "profile_project";
 const std::string PROFILE_PROJECT_REGION = "profile_project_region";
+const std::string PROFILE_LOGSTORE = "profile_logstore";
 
 // global config
 const std::string GLOBAL_CONFIG_NODE = "config";

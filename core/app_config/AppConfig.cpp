@@ -40,11 +40,13 @@
 
 using namespace std;
 
-#define ILOGTAIL_PREFIX "ilogtail_"
-#define ILOGTAIL_PIDFILE_SUFFIX ".pid"
 #define LOONGCOLLECTOR_PREFIX "loongcollector_"
 
+#ifdef __ENTERPRISE__
+DEFINE_FLAG_BOOL(logtail_mode, "logtail mode", true);
+#else
 DEFINE_FLAG_BOOL(logtail_mode, "logtail mode", false);
+#endif
 DEFINE_FLAG_INT32(max_buffer_num, "max size", 40);
 DEFINE_FLAG_INT32(pub_max_buffer_num, "max size", 8);
 DEFINE_FLAG_INT32(pub_max_send_byte_per_sec, "the max send speed per sec, realtime thread", 20 * 1024 * 1024);
@@ -424,27 +426,7 @@ string GetAgentLoggersPrefix() {
 }
 
 string GetAgentLogName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return "ilogtail.LOG";
-    } else {
-        return "loongcollector.LOG";
-    }
-}
-
-string GetAgentSnapshotDir() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return GetProcessExecutionDir() + STRING_FLAG(logtail_snapshot_dir);
-    } else {
-        return GetAgentLogDir() + "snapshot";
-    }
-}
-
-string GetAgentStatusLogName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return "ilogtail_status.LOG";
-    } else {
-        return "loongcollector_status.LOG";
-    }
+    return "loongcollector.LOG";
 }
 
 string GetObserverEbpfHostPath() {
@@ -498,19 +480,11 @@ string GetContinuousPipelineConfigDir() {
 }
 
 string GetPluginLogName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return "logtail_plugin.LOG";
-    } else {
-        return "go_plugin.LOG";
-    }
+    return "go_plugin.LOG";
 }
 
 std::string GetVersionTag() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return "logtail_version";
-    } else {
-        return "loongcollector_version";
-    }
+    return "loongcollector_version";
 }
 
 std::string GetGoPluginCheckpoint() {
@@ -522,43 +496,19 @@ std::string GetGoPluginCheckpoint() {
 }
 
 std::string GetAgentName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return "ilogtail";
-    } else {
-        return "loongcollector";
-    }
+    return "loongcollector";
 }
 
 std::string GetMonitorInfoFileName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return "logtail_monitor_info";
-    } else {
-        return "loongcollector_monitor_info";
-    }
+    return "loongcollector_monitor_info";
 }
 
 std::string GetSymLinkName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return GetProcessExecutionDir() + "ilogtail";
-    } else {
-        return GetProcessExecutionDir() + "loongcollector";
-    }
-}
-
-std::string GetPidFileName() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return GetProcessExecutionDir() + ILOGTAIL_PREFIX + ILOGTAIL_VERSION + ILOGTAIL_PIDFILE_SUFFIX;
-    } else {
-        return GetAgentRunDir() + "loongcollector.pid";
-    }
+    return GetProcessExecutionDir() + "loongcollector";
 }
 
 std::string GetAgentPrefix() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return ILOGTAIL_PREFIX;
-    } else {
-        return LOONGCOLLECTOR_PREFIX;
-    }
+    return LOONGCOLLECTOR_PREFIX;
 }
 
 AppConfig::AppConfig() {
@@ -585,7 +535,12 @@ AppConfig::AppConfig() {
     mNoInotify = false;
     mSendDataPort = 80;
     mShennongSocket = true;
-    // mInotifyBlackList.insert("/tmp");
+#ifdef __CORP__
+    // for internal systems which read and write frequently on small files in /tmp，it may lead to increased resource
+    // consumption and system fluctuations which rely on inotify_add_watch and inotify_rm_watch for filesystem
+    // monitoring.
+    mInotifyBlackList.insert("/tmp");
+#endif
 
     mPurageContainerMode = false;
     mForceQuitReadTimeout = 7200;
@@ -910,7 +865,6 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
         mSendRequestConcurrency = confJson["send_request_concurrency"].asInt();
     else
         mSendRequestConcurrency = INT32_FLAG(send_request_concurrency);
-    LogtailMonitor::GetInstance()->UpdateConstMetric("send_request_concurrency", mSendRequestConcurrency);
 
     if (confJson.isMember("process_thread_count") && confJson["process_thread_count"].isInt())
         mProcessThreadCount = confJson["process_thread_count"].asInt();

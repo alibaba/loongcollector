@@ -23,7 +23,7 @@ var Env TestEnv
 
 type TestEnv interface {
 	GetType() string
-	ExecOnLogtail(command string) (string, error)
+	ExecOnLoongCollector(command string) (string, error)
 	ExecOnSource(ctx context.Context, command string) (string, error)
 }
 
@@ -49,7 +49,7 @@ func Mkdir(ctx context.Context, dir string) (context.Context, error) {
 
 func SetAgentPID(ctx context.Context) (context.Context, error) {
 	command := "ps -e | grep loongcollector | grep -v grep | awk '{print $1}'"
-	result, err := Env.ExecOnLogtail(command)
+	result, err := Env.ExecOnLoongCollector(command)
 	if err != nil {
 		if err.Error() == "not implemented" {
 			return ctx, nil
@@ -57,4 +57,14 @@ func SetAgentPID(ctx context.Context) (context.Context, error) {
 		return ctx, err
 	}
 	return context.WithValue(ctx, config.AgentPIDKey, result), nil
+}
+
+func RunCommandOnSource(ctx context.Context, command string) (context.Context, error) {
+	_, err := Env.ExecOnSource(ctx, command)
+	return ctx, err
+}
+
+func RunCommandOnLoongCollector(ctx context.Context, command string) (context.Context, error) {
+	_, err := Env.ExecOnLoongCollector(command)
+	return ctx, err
 }

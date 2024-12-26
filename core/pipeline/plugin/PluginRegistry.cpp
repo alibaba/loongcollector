@@ -28,6 +28,9 @@
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseFlusherSLSMonitor.h"
+#endif
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputHostMeta.h"
@@ -128,13 +131,13 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 void PluginRegistry::LoadStaticPlugins() {
     RegisterInputCreator(new StaticInputCreator<InputFile>());
     RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
-    RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>());
+    RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
-    RegisterInputCreator(new StaticInputCreator<InputFileSecurity>());
-    RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>());
-    RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>());
-    RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>());
+    RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
+    RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
     RegisterInputCreator(new StaticInputCreator<InputHostMeta>());
 #endif
 
@@ -162,6 +165,9 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
+#ifdef __ENTERPRISE__
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());
+#endif
 }
 
 void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {
@@ -185,16 +191,16 @@ void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {
     }
 }
 
-void PluginRegistry::RegisterInputCreator(PluginCreator* creator) {
-    RegisterCreator(INPUT_PLUGIN, creator);
+void PluginRegistry::RegisterInputCreator(PluginCreator* creator, bool isSingleton) {
+    RegisterCreator(INPUT_PLUGIN, creator, isSingleton);
 }
 
 void PluginRegistry::RegisterProcessorCreator(PluginCreator* creator) {
-    RegisterCreator(PROCESSOR_PLUGIN, creator);
+    RegisterCreator(PROCESSOR_PLUGIN, creator, false);
 }
 
-void PluginRegistry::RegisterFlusherCreator(PluginCreator* creator) {
-    RegisterCreator(FLUSHER_PLUGIN, creator);
+void PluginRegistry::RegisterFlusherCreator(PluginCreator* creator, bool isSingleton) {
+    RegisterCreator(FLUSHER_PLUGIN, creator, isSingleton);
 }
 
 PluginCreator* PluginRegistry::LoadProcessorPlugin(DynamicLibLoader& loader, const string pluginType) {
@@ -219,11 +225,12 @@ PluginCreator* PluginRegistry::LoadProcessorPlugin(DynamicLibLoader& loader, con
     return new DynamicCProcessorCreator(plugin, loader.Release());
 }
 
-void PluginRegistry::RegisterCreator(PluginCat cat, PluginCreator* creator) {
+void PluginRegistry::RegisterCreator(PluginCat cat, PluginCreator* creator, bool isSingleton) {
     if (!creator) {
         return;
     }
-    mPluginDict.emplace(PluginKey(cat, creator->Name()), shared_ptr<PluginCreator>(creator));
+    mPluginDict.emplace(PluginKey(cat, creator->Name()),
+                        PluginCreatorWithInfo(shared_ptr<PluginCreator>(creator), isSingleton));
 }
 
 unique_ptr<PluginInstance>
@@ -231,9 +238,21 @@ PluginRegistry::Create(PluginCat cat, const string& name, const PluginInstance::
     unique_ptr<PluginInstance> ins;
     auto creatorEntry = mPluginDict.find(PluginKey(cat, name));
     if (creatorEntry != mPluginDict.end()) {
-        ins = creatorEntry->second->Create(pluginMeta);
+        ins = creatorEntry->second.first->Create(pluginMeta);
     }
     return ins;
+}
+
+bool PluginRegistry::IsGlobalSingletonInputPlugin(const string& name) const {
+    return IsGlobalSingleton(INPUT_PLUGIN, name);
+}
+
+bool PluginRegistry::IsGlobalSingleton(PluginCat cat, const string& name) const {
+    auto creatorEntry = mPluginDict.find(PluginKey(cat, name));
+    if (creatorEntry != mPluginDict.end()) {
+        return creatorEntry->second.second;
+    }
+    return false;
 }
 
 } // namespace logtail

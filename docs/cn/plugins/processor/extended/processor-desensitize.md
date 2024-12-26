@@ -2,11 +2,11 @@
 
 ## 简介
 
-`processor_desensitize`插件可以通过正则表达式匹配并实现文本日志中敏感数据的脱敏。[源代码](https://github.com/alibaba/ilogtail/tree/main/plugins/processor/processor_desensitize.go)
+`processor_desensitize`插件可以通过正则表达式匹配并实现文本日志中敏感数据的脱敏。[源代码](https://github.com/alibaba/loongcollector/tree/main/plugins/processor/processor_desensitize.go)
 
 ## 版本
 
-[Beta](../stability-level.md)
+[Beta](../../stability-level.md)
 
 ## 配置参数
 

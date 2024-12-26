@@ -38,4 +38,6 @@ using PipelineConfigDiff = ConfigDiff<PipelineConfig>;
 using TaskConfigDiff = ConfigDiff<TaskConfig>;
 using InstanceConfigDiff = ConfigDiff<InstanceConfig>;
 
+enum ConfigDiffEnum { Added, Modified, Removed, Unchanged };
+
 } // namespace logtail

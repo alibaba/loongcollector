@@ -73,8 +73,6 @@ bool ProcessorMergeMultilineLogNative::Init(const Json::Value& config) {
                            mContext->GetRegion());
     }
 
-    mSplitLines = &(GetContext().GetProcessProfile().splitLines);
-
     mMergedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_MERGED_EVENTS_TOTAL);
     mUnmatchedEventsTotal
         = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_UNMATCHED_EVENTS_TOTAL);
@@ -93,7 +91,6 @@ void ProcessorMergeMultilineLogNative::Process(PipelineEventGroup& logGroup) {
         MergeLogsByFlag(logGroup);
         logGroup.DelMetadata(EventGroupMetaKey::HAS_PART_LOG);
     }
-    *mSplitLines = logGroup.GetEvents().size();
 }
 
 bool ProcessorMergeMultilineLogNative::IsSupportedEvent(const PipelineEventPtr& e) const {

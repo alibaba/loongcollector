@@ -61,6 +61,7 @@ public:
     const std::string& Name() const { return mName; }
     PipelineContext& GetContext() const { return mContext; }
     const Json::Value& GetConfig() const { return *mConfig; }
+    const std::optional<std::string>& GetSingletonInput() const { return mSingletonInput; }
     const std::vector<std::unique_ptr<FlusherInstance>>& GetFlushers() const { return mFlushers; }
     bool IsFlushingThroughGoPipeline() const { return !mGoPipelineWithoutInput.isNull(); }
     const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& GetPluginStatistics() const {
@@ -100,6 +101,7 @@ private:
     mutable PipelineContext mContext;
     std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> mPluginCntMap;
     std::unique_ptr<Json::Value> mConfig;
+    std::optional<std::string> mSingletonInput;
     std::atomic_uint16_t mPluginID;
     std::atomic_int16_t mInProcessCnt;
 

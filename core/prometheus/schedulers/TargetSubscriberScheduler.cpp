@@ -228,7 +228,8 @@ TargetSubscriberScheduler::BuildScrapeSchedulerSet(std::vector<Labels>& targetGr
         auto randSleepMilliSec = GetRandSleepMilliSec(
             scrapeScheduler->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, GetCurrentTimeInMilliSeconds());
         auto firstExecTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
-        scrapeScheduler->SetFirstExecTime(firstExecTime);
+        auto firstScrapeTIme = std::chrono::system_clock::now() + std::chrono::milliseconds(randSleepMilliSec);
+        scrapeScheduler->SetFirstExecTime(firstExecTime, firstScrapeTIme);
         scrapeScheduler->InitSelfMonitor(mDefaultLabels);
 
         scrapeSchedulerMap[scrapeScheduler->GetId()] = scrapeScheduler;

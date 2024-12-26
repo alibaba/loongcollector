@@ -2,11 +2,11 @@
 
 ## 简介
 
-`processor_grok`插件可以通过 Grok 语法匹配的模式，实现文本日志的字段提取。[源代码](https://github.com/alibaba/ilogtail/tree/main/plugins/processor/processor_grok.go)
+`processor_grok`插件可以通过 Grok 语法匹配的模式，实现文本日志的字段提取。[源代码](https://github.com/alibaba/loongcollector/tree/main/plugins/processor/processor_grok.go)
 
 ## 版本
 
-[Beta](../stability-level.md)
+[Beta](../../stability-level.md)
 
 ## 配置参数
 
@@ -134,13 +134,13 @@ echo '10.0.0.0 GET /index.html 15824 0.043' >> /home/test-ilogtail/test-log/proc
 
 `processor_grok` 插件主要使用 SLS 的 [GROK 模式](https://help.aliyun.com/document_detail/129387.html)。SLS数据加工提供了 70+ 常用的 GROK 模式，例如身份证号、邮箱、MAC 地址、IPV4、IPV6、时间解析、URL 解析等。此外，还整合了一些其他通用的 Grok 模式。
 
-所有的 Grok 模式模版请见[链接](https://github.com/alibaba/ilogtail/tree/main/example_config/processor_grok_patterns)。
+所有的 Grok 模式模版请见[链接](https://github.com/alibaba/loongcollector/tree/main/example_config/processor_grok_patterns)。
 
 ## 效率与优化
 
 ### 正则引擎
 
-由于 Golang 原生的 `regexp` 库不支持一些高级的正则语法，故 `processor_grok` 的正则引擎使用第三方的 [regexp2](https://github.com/dlclark/regexp2) 库。`regexp2` 库与 Golang 原生的 `regexp` 的简单性能对比可以参考源代码中的 [Benchmark 测试](https://github.com/alibaba/ilogtail/tree/main/plugins/processor/processor_grok_benchmark_test.go)。
+由于 Golang 原生的 `regexp` 库不支持一些高级的正则语法，故 `processor_grok` 的正则引擎使用第三方的 [regexp2](https://github.com/dlclark/regexp2) 库。`regexp2` 库与 Golang 原生的 `regexp` 的简单性能对比可以参考源代码中的 [Benchmark 测试](https://github.com/alibaba/loongcollector/tree/main/plugins/processor/processor_grok_benchmark_test.go)。
 
 ### 优化匹配失败时间
 
@@ -152,7 +152,7 @@ Grok 语法在匹配失败的情况下时间开销巨大。为了提高插件解
 
 ### 多项匹配优化
 
-`processor_grok` 插件支持多项匹配，即可以在 Match 中设置多个 Grok 表达式，依次对日志进行匹配尝试。但使用多项匹配时，由于需要一个个匹配合适的表达式，会经历很多匹配失败的情况。可以参考源代码中的 [Benchmark 测试](https://github.com/alibaba/ilogtail/tree/main/plugins/processor/processor_grok_benchmark_test.go)，其对 Match 中有1、2、3、5条表达式的情况，分别做了简单的模拟匹配失败的性能测试，可以看出效率是成倍降低的。
+`processor_grok` 插件支持多项匹配，即可以在 Match 中设置多个 Grok 表达式，依次对日志进行匹配尝试。但使用多项匹配时，由于需要一个个匹配合适的表达式，会经历很多匹配失败的情况。可以参考源代码中的 [Benchmark 测试](https://github.com/alibaba/loongcollector/tree/main/plugins/processor/processor_grok_benchmark_test.go)，其对 Match 中有1、2、3、5条表达式的情况，分别做了简单的模拟匹配失败的性能测试，可以看出效率是成倍降低的。
 
 因此，在使用 `processor_grok` 插件时，最好尽量不使用多项匹配，或者 Match 中设置尽可能少的 Grok 表达式。也可以通过减少重复的匹配，来优化效率。下面是使用分层策略减少重复匹配的一个样例。
 

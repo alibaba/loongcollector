@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <curl/curl.h>
+
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -27,6 +29,24 @@ class curl_slist;
 namespace logtail {
 
 struct CurlTLS;
+
+enum NetworkCode {
+    Ok = 0,
+    ConnectionFailed,
+    RemoteAccessDenied,
+    SSLConnectError,
+    SSLCertError,
+    SSLOtherProblem,
+    SendDataFailed,
+    RecvDataFailed,
+    Timeout,
+    Other
+};
+
+struct NetworkStatus {
+    NetworkCode mCode = NetworkCode::Ok;
+    std::string mMessage;
+};
 
 bool caseInsensitiveComp(const char lhs, const char rhs);
 
@@ -76,8 +96,62 @@ public:
 
     void SetStatusCode(int32_t code) { mStatusCode = code; }
 
+    void SetNetworkStatus(CURLcode code) {
+        mNetworkStatus.mMessage = curl_easy_strerror(code);
+        // please refer to https://curl.se/libcurl/c/libcurl-errors.html
+        switch (code) {
+            case CURLE_OK:
+                mNetworkStatus.mCode = NetworkCode::Ok;
+                break;
+            case CURLE_COULDNT_CONNECT:
+                mNetworkStatus.mCode = NetworkCode::ConnectionFailed;
+                break;
+            case CURLE_LOGIN_DENIED:
+            case CURLE_REMOTE_ACCESS_DENIED:
+                mNetworkStatus.mCode = NetworkCode::RemoteAccessDenied;
+                break;
+            case CURLE_OPERATION_TIMEDOUT:
+                mNetworkStatus.mCode = NetworkCode::Timeout;
+                break;
+            case CURLE_SSL_CONNECT_ERROR:
+                mNetworkStatus.mCode = NetworkCode::SSLConnectError;
+                break;
+            case CURLE_SSL_CERTPROBLEM:
+            case CURLE_SSL_CACERT:
+                mNetworkStatus.mCode = NetworkCode::SSLCertError;
+                break;
+            case CURLE_SEND_ERROR:
+            case CURLE_SEND_FAIL_REWIND:
+                mNetworkStatus.mCode = NetworkCode::SendDataFailed;
+                break;
+            case CURLE_RECV_ERROR:
+                mNetworkStatus.mCode = NetworkCode::RecvDataFailed;
+                break;
+            case CURLE_SSL_PINNEDPUBKEYNOTMATCH:
+            case CURLE_SSL_INVALIDCERTSTATUS:
+            case CURLE_SSL_CACERT_BADFILE:
+            case CURLE_SSL_CIPHER:
+            case CURLE_SSL_ENGINE_NOTFOUND:
+            case CURLE_SSL_ENGINE_SETFAILED:
+            case CURLE_USE_SSL_FAILED:
+            case CURLE_SSL_ENGINE_INITFAILED:
+            case CURLE_SSL_CRL_BADFILE:
+            case CURLE_SSL_ISSUER_ERROR:
+            case CURLE_SSL_SHUTDOWN_FAILED:
+                mNetworkStatus.mCode = NetworkCode::SSLOtherProblem;
+                break;
+            case CURLE_FAILED_INIT:
+            default:
+                mNetworkStatus.mCode = NetworkCode::Other;
+                break;
+        }
+    }
+
+    const NetworkStatus& GetNetworkStatus() { return mNetworkStatus; }
+
 private:
     int32_t mStatusCode = 0; // 0 means no response from server
+    NetworkStatus mNetworkStatus; // 0 means no error
     std::map<std::string, std::string, decltype(compareHeader)*> mHeader;
     std::unique_ptr<void, std::function<void(void*)>> mBody;
     size_t (*mWriteCallback)(char*, size_t, size_t, void*) = nullptr;

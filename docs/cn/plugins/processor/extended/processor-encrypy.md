@@ -6,7 +6,7 @@
 
 ## 版本
 
-[Stable](../stability-level.md)
+[Stable](../../stability-level.md)
 
 ### 参数说明
 

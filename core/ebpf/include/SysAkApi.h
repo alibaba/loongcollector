@@ -4,8 +4,10 @@
 
 #pragma once
 
-using init_func = int (*)(void *);
-using remove_func = int (*)(void *);
-using suspend_func = int(*)(void *);
+#include "ebpf/include/export.h"
+
+using init_func = int (*)(nami::eBPFConfig*);
+using remove_func = int (*)(nami::eBPFConfig*);
 using deinit_func = void (*)(void);
-using update_func = int(*)(void*);
+using suspend_func = int (*)(nami::eBPFConfig*);
+using update_func = int (*)(nami::eBPFConfig*);

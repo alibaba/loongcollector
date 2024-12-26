@@ -21,9 +21,7 @@
 #include <mutex>
 #include <string>
 
-#include "MetricConstants.h"
 #include "MetricManager.h"
-#include "MetricStore.h"
 
 #if defined(_MSC_VER)
 #include <Windows.h>
@@ -78,7 +76,7 @@ struct OsCpuStat {
     }
 };
 
-class LogtailMonitor : public MetricStore {
+class LogtailMonitor {
 public:
     LogtailMonitor(const LogtailMonitor&) = delete;
     LogtailMonitor& operator=(const LogtailMonitor&) = delete;
@@ -123,9 +121,6 @@ private:
     //   Because sending is an asynchronous procedure, the caller should wait for
     //   several seconds after calling this method and before _exit(1).
     bool SendStatusProfile(bool suicide);
-
-    // DumpToLocal dumps the @logGroup to local status log.
-    void DumpToLocal(const sls_logs::LogGroup& logGroup);
 
     // DumpMonitorInfo dumps simple monitor information to local.
     bool DumpMonitorInfo(time_t monitorTime);
@@ -192,17 +187,20 @@ public:
     void Init();
     void Stop();
 
-    static const std::string GetInnerSelfMonitorAlarmPipelineName() { return ""; }
-    static const std::string GetInnerSelfMonitorAlarmPipeline() { return ""; }
-    static const std::string GetInnerSelfMonitorMetricPipelineName() { return "inner-self-monitor-metric-pipeline"; }
-    static const std::string GetInnerSelfMonitorMetricPipeline();
-
     void SetAgentCpu(double cpu) { mAgentCpu->Set(cpu); }
     void SetAgentMemory(uint64_t mem) { mAgentMemory->Set(mem); }
     void SetAgentGoMemory(uint64_t mem) { mAgentGoMemory->Set(mem); }
     void SetAgentGoRoutinesTotal(uint64_t total) { mAgentGoRoutinesTotal->Set(total); }
-    void SetAgentOpenFdTotal(uint64_t total) { mAgentOpenFdTotal->Set(total); }
-    void SetAgentConfigTotal(uint64_t total) { mAgentConfigTotal->Set(total); }
+    void SetAgentOpenFdTotal(uint64_t total) {
+#ifndef APSARA_UNIT_TEST_MAIN
+        mAgentOpenFdTotal->Set(total);
+#endif
+    }
+    void SetAgentConfigTotal(uint64_t total) {
+#ifndef APSARA_UNIT_TEST_MAIN
+        mAgentConfigTotal->Set(total);
+#endif
+    }
 
     static std::string mHostname;
     static std::string mIpAddr;

@@ -238,6 +238,7 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
             CURL* handler = msg->easy_handle;
             HttpSinkRequest* request = nullptr;
             curl_easy_getinfo(handler, CURLINFO_PRIVATE, &request);
+            auto pipelinePlaceHolder = request->mItem->mPipeline; // keep pipeline alive
             auto responseTime = chrono::system_clock::now() - request->mLastSendTime;
             auto responseTimeMs = chrono::duration_cast<chrono::milliseconds>(responseTime).count();
             switch (msg->data.result) {

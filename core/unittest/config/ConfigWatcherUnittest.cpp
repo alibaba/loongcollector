@@ -16,6 +16,10 @@
 #include <fstream>
 
 #include "config/ConfigDiff.h"
+#include "config/common_provider/CommonConfigProvider.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "pipeline/plugin/PluginRegistry.h"
@@ -50,7 +54,11 @@ const filesystem::path ConfigWatcherUnittest::instanceConfigDir = "./instance_co
 void ConfigWatcherUnittest::InvalidConfigDirFound() const {
     {
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL(1U, diff.first.mAdded.size());
+        size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+        builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
+        APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
         APSARA_TEST_TRUE(diff.second.IsEmpty());
 
         { ofstream fout("continuous_pipeline_config"); }
@@ -82,7 +90,11 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
             fout << "[}";
         }
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_EQUAL(1U, diff.first.mAdded.size());
+        size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+        builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
+        APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
         APSARA_TEST_TRUE(diff.second.IsEmpty());
         filesystem::remove_all(configDir);
     }
@@ -131,8 +143,12 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         }
         { ofstream fout("dir2/config.json"); }
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+        size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+        builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
         APSARA_TEST_FALSE(diff.first.IsEmpty());
-        APSARA_TEST_EQUAL(2U, diff.first.mAdded.size());
+        APSARA_TEST_EQUAL(1U + builtinPipelineCnt, diff.first.mAdded.size());
 
         filesystem::remove_all("dir1");
         filesystem::remove_all("dir2");

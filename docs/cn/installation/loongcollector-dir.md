@@ -141,16 +141,16 @@ LoongCollector 提供以下参数用于自定义各类目录位置：
 
 1. 命令行参数:
 
-```bash
-./loongcollector --loongcollector_conf_dir=/custom/path/conf
-```
+   ```bash
+   ./loongcollector --loongcollector_conf_dir=/custom/path/conf
+   ```
 
 2. 环境变量:
 
-```bash
-export loongcollector_conf_dir=/custom/path/conf
-./loongcollector
-```
+   ```bash
+   export loongcollector_conf_dir=/custom/path/conf
+   ./loongcollector
+   ```
 
 ## 命名变更对照表
 
@@ -199,7 +199,7 @@ export loongcollector_conf_dir=/custom/path/conf
 
 ## 升级建议
 
-1. **兼容模式**: 如需保持与 Logtail 的兼容性,请参考 [LoongCollector 的 Logtail 兼容模式使用指南](logtail-mode.md)
+1. **兼容模式**: 如需保持与 Logtail 的兼容性,请参考 [Logtail 兼容模式使用指南](logtail-mode.md)
 
 2. **新版迁移**: 如果选择使用新版目录结构:
    - 建议先备份原有配置和数据

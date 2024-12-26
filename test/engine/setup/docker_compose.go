@@ -124,7 +124,7 @@ func (d *DockerComposeEnv) Clean() error {
 	return nil
 }
 
-func (d *DockerComposeEnv) ExecOnLogtail(command string) (string, error) {
+func (d *DockerComposeEnv) ExecOnLoongCollector(command string) (string, error) {
 	// exec on host of docker compose
 	fmt.Println(command)
 	cmd := exec.Command("sh", "-c", command)

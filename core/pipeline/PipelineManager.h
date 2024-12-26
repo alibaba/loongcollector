@@ -59,7 +59,7 @@ private:
         const std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>>& statistics);
     void FlushAllBatch();
     // TODO: 长期过渡使用
-    bool CheckIfFileServerUpdated(const Json::Value& config);
+    bool CheckIfFileServerUpdated(PipelineConfigDiff& diff);
 
     std::unordered_map<std::string, std::shared_ptr<Pipeline>> mPipelineNameEntityMap;
     mutable SpinLock mPluginCntMapLock;

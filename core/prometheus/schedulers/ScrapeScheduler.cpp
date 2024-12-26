@@ -86,38 +86,49 @@ ScrapeScheduler::ScrapeScheduler(std::shared_ptr<ScrapeConfig> scrapeConfigPtr,
     mInterval = mScrapeConfigPtr->mScrapeIntervalSeconds;
 }
 
-void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t timestampMilliSec) {
+void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
+    static double sRate = 0.001;
+    auto now = GetCurrentTimeInMilliSeconds();
+    mScrapeTimestampMilliSec
+        = chrono::duration_cast<chrono::milliseconds>(mLatestScrapeTime.time_since_epoch()).count();
+    auto scrapeDurationMilliSeconds = now - mScrapeTimestampMilliSec;
+
     auto& responseBody = *response.GetBody<PromMetricResponseBody>();
     responseBody.FlushCache();
     mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL, response.GetStatusCode());
     mSelfMonitor->AddCounter(METRIC_PLUGIN_OUT_SIZE_BYTES, response.GetStatusCode(), responseBody.mRawSize);
-    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SCRAPE_TIME_MS,
-                             response.GetStatusCode(),
-                             GetCurrentTimeInMilliSeconds() - timestampMilliSec);
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, response.GetStatusCode(), scrapeDurationMilliSeconds);
 
-    mScrapeTimestampMilliSec = timestampMilliSec;
-    mScrapeDurationSeconds = 1.0 * (GetCurrentTimeInMilliSeconds() - timestampMilliSec) / 1000;
+    const auto& networkStatus = response.GetNetworkStatus();
+    if (networkStatus.mCode != NetworkCode::Ok) {
+        // not 0 means curl error
+        mScrapeState = prom::NetworkCodeToState(networkStatus.mCode);
+    } else if (response.GetStatusCode() != 200) {
+        mScrapeState = prom::HttpCodeToState(response.GetStatusCode());
+    } else {
+        // 0 means success
+        mScrapeState = prom::NetworkCodeToState(NetworkCode::Ok);
+    }
+
+    mScrapeDurationSeconds = scrapeDurationMilliSeconds * sRate;
     mScrapeResponseSizeBytes = responseBody.mRawSize;
     mUpState = response.GetStatusCode() == 200;
     if (response.GetStatusCode() != 200) {
         mScrapeResponseSizeBytes = 0;
-        string headerStr;
-        for (const auto& [k, v] : mScrapeConfigPtr->mRequestHeaders) {
-            headerStr.append(k).append(":").append(v).append(";");
-        }
-        LOG_WARNING(
-            sLogger,
-            ("scrape failed, status code", response.GetStatusCode())("target", mHash)("http header", headerStr));
+        LOG_WARNING(sLogger,
+                    ("scrape failed, status code",
+                     response.GetStatusCode())("target", mHash)("curl msg", response.GetNetworkStatus().mMessage));
     }
     auto& eventGroup = responseBody.mEventGroup;
 
     SetAutoMetricMeta(eventGroup);
     SetTargetLabels(eventGroup);
     PushEventGroup(std::move(eventGroup));
-    mPluginTotalDelayMs->Add(GetCurrentTimeInMilliSeconds() - timestampMilliSec);
+    mPluginTotalDelayMs->Add(scrapeDurationMilliSeconds);
 }
 
 void ScrapeScheduler::SetAutoMetricMeta(PipelineEventGroup& eGroup) {
+    eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE, mScrapeState);
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC, ToString(mScrapeTimestampMilliSec));
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION, ToString(mScrapeDurationSeconds));
     eGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE, ToString(mScrapeResponseSizeBytes));
@@ -241,11 +252,10 @@ void ScrapeScheduler::InitSelfMonitor(const MetricLabels& defaultLabels) {
     MetricLabels labels = defaultLabels;
     labels.emplace_back(METRIC_LABEL_KEY_INSTANCE, mInstance);
 
-    static const std::unordered_map<std::string, MetricType> sScrapeMetricKeys = {
-        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
-        {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
-        {METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, MetricType::METRIC_TYPE_COUNTER},
-    };
+    static const std::unordered_map<std::string, MetricType> sScrapeMetricKeys
+        = {{METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+           {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+           {METRIC_PLUGIN_PROM_SCRAPE_TIME_MS, MetricType::METRIC_TYPE_COUNTER}};
 
     mSelfMonitor->InitMetricManager(sScrapeMetricKeys, labels);
 

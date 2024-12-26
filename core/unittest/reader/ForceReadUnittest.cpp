@@ -19,16 +19,16 @@
 #include <memory>
 #include <string>
 
-#include "constants/Constants.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
+#include "constants/Constants.h"
 #include "file_server/ConfigManager.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
-#include "file_server/FileServer.h"
 #include "logger/Logger.h"
 #include "pipeline/Pipeline.h"
 #include "pipeline/queue/ProcessQueueManager.h"
@@ -119,7 +119,17 @@ protected:
         ProcessQueueManager::GetInstance()->EnablePop(mConfigName);
     }
 
-    void TearDown() override { remove(utf8File.c_str()); }
+    void TearDown() override {
+        remove(utf8File.c_str());
+        for (auto iter = BlockedEventManager::GetInstance()->mEventMap.begin();
+             iter != BlockedEventManager::GetInstance()->mEventMap.end();
+             ++iter) {
+            if (iter->second.mEvent != nullptr) {
+                delete iter->second.mEvent;
+            }
+        }
+        BlockedEventManager::GetInstance()->mEventMap.clear();
+    }
 
 private:
     std::unique_ptr<char[]> expectedContent;
@@ -345,8 +355,6 @@ void ForceReadUnittest::TestAddTimeoutEvent() {
         reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
         reader.CheckFileSignatureAndOffset(true);
         LogFileReader::BUFFER_SIZE = 10;
-        BlockedEventManager::GetInstance()->mEventMap.clear();
-        APSARA_TEST_EQUAL_FATAL(BlockedEventManager::GetInstance()->mEventMap.size(), 0U);
 
         auto pHanlder = make_unique<ModifyHandler>(mConfigName, mConfig);
         pHanlder->mReadFileTimeSlice = 0; // force one read for one event

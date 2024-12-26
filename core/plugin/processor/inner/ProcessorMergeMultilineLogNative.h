@@ -55,8 +55,6 @@ private:
     CounterPtr mUnmatchedEventsTotal; // 未成功合并的日志条数
     // CounterPtr mProcUnmatchedEventsBytes; // 未成功合并的日志字节数
 
-    int* mSplitLines = nullptr;
-
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorMergeMultilineLogNativeUnittest;
     friend class ProcessorMergeMultilineLogDisacardUnmatchUnittest;

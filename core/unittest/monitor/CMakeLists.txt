@@ -21,6 +21,10 @@ target_link_libraries(metric_manager_unittest ${UT_BASE_TARGET})
 add_executable(plugin_metric_manager_unittest PluginMetricManagerUnittest.cpp)
 target_link_libraries(plugin_metric_manager_unittest ${UT_BASE_TARGET})
 
+add_executable(self_monitor_metric_event_unittest SelfMonitorMetricEventUnittest.cpp)
+target_link_libraries(self_monitor_metric_event_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(metric_manager_unittest)
 gtest_discover_tests(plugin_metric_manager_unittest)
+gtest_discover_tests(self_monitor_metric_event_unittest)

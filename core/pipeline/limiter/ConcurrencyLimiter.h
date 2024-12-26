@@ -17,10 +17,10 @@
 #pragma once
 
 #include <atomic>
-#include <mutex>
-#include <cstdint>
-#include <string>
 #include <chrono>
+#include <cstdint>
+#include <mutex>
+#include <string>
 
 #include "monitor/metric_constants/MetricConstants.h"
 
@@ -28,11 +28,20 @@ namespace logtail {
 
 class ConcurrencyLimiter {
 public:
-    ConcurrencyLimiter(uint32_t maxConcurrency, uint32_t maxRetryIntervalSecs = 3600, 
-        uint32_t minRetryIntervalSecs = 30, double retryIntervalUpRatio = 1.5, double concurrencyDownRatio = 0.5) : 
-        mMaxConcurrency(maxConcurrency), mCurrenctConcurrency(maxConcurrency),
-        mMaxRetryIntervalSecs(maxRetryIntervalSecs), mMinRetryIntervalSecs(minRetryIntervalSecs), 
-        mRetryIntervalSecs(minRetryIntervalSecs), mRetryIntervalUpRatio(retryIntervalUpRatio), mConcurrencyDownRatio(concurrencyDownRatio) {}
+    ConcurrencyLimiter(const std::string& description,
+                       uint32_t maxConcurrency,
+                       uint32_t maxRetryIntervalSecs = 3600,
+                       uint32_t minRetryIntervalSecs = 30,
+                       double retryIntervalUpRatio = 1.5,
+                       double concurrencyDownRatio = 0.5)
+        : mDescription(description),
+          mMaxConcurrency(maxConcurrency),
+          mCurrenctConcurrency(maxConcurrency),
+          mMaxRetryIntervalSecs(maxRetryIntervalSecs),
+          mMinRetryIntervalSecs(minRetryIntervalSecs),
+          mRetryIntervalSecs(minRetryIntervalSecs),
+          mRetryIntervalUpRatio(retryIntervalUpRatio),
+          mConcurrencyDownRatio(concurrencyDownRatio) {}
 
     bool IsValidToPop();
     void PostPop();
@@ -43,12 +52,12 @@ public:
 
     static std::string GetLimiterMetricName(const std::string& limiter) {
         if (limiter == "region") {
-            return  METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_REGION_LIMITER_TIMES_TOTAL;
+            return METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_REGION_LIMITER_TIMES_TOTAL;
         } else if (limiter == "project") {
-            return  METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_PROJECT_LIMITER_TIMES_TOTAL;
+            return METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_PROJECT_LIMITER_TIMES_TOTAL;
         } else if (limiter == "logstore") {
-            return  METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_LOGSTORE_LIMITER_TIMES_TOTAL;
-        } 
+            return METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_LOGSTORE_LIMITER_TIMES_TOTAL;
+        }
         return limiter;
     }
 
@@ -63,6 +72,8 @@ public:
 #endif
 
 private:
+    const std::string mDescription;
+
     std::atomic_uint32_t mInSendingCnt = 0U;
 
     uint32_t mMaxConcurrency = 0;

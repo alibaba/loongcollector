@@ -40,6 +40,7 @@ extern const char* SLS_EMPTY_STR_FOR_INDEX;
 // profile project
 extern const std::string PROFILE_PROJECT;
 extern const std::string PROFILE_PROJECT_REGION;
+extern const std::string PROFILE_LOGSTORE;
 
 // global config
 extern const std::string GLOBAL_CONFIG_NODE;

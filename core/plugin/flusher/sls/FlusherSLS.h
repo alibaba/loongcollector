@@ -49,6 +49,7 @@ public:
     static void SetDefaultRegion(const std::string& region);
     static std::string GetAllProjects();
     static bool IsRegionContainingConfig(const std::string& region);
+    static std::string GetProjectRegion(const std::string& project);
 
     // TODO: should be moved to enterprise config provider
     static bool GetRegionStatus(const std::string& region);
@@ -65,7 +66,7 @@ public:
     bool Send(PipelineEventGroup&& g) override;
     bool Flush(size_t key) override;
     bool FlushAll() override;
-    std::unique_ptr<HttpSinkRequest> BuildRequest(SenderQueueItem* item) const override;
+    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) const override;
     void OnSendDone(const HttpResponse& response, SenderQueueItem* item) override;
 
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
@@ -90,10 +91,8 @@ private:
 
     static void InitResource();
 
-    static void IncreaseProjectReferenceCnt(const std::string& project);
-    static void DecreaseProjectReferenceCnt(const std::string& project);
-    static void IncreaseRegionReferenceCnt(const std::string& region);
-    static void DecreaseRegionReferenceCnt(const std::string& region);
+    static void IncreaseProjectRegionReferenceCnt(const std::string& project, const std::string& region);
+    static void DecreaseProjectRegionReferenceCnt(const std::string& project, const std::string& region);
 
     static std::mutex sMux;
     static std::unordered_map<std::string, std::weak_ptr<ConcurrencyLimiter>> sProjectConcurrencyLimiterMap;
@@ -103,10 +102,10 @@ private:
     static std::mutex sDefaultRegionLock;
     static std::string sDefaultRegion;
 
-    static std::mutex sProjectRefCntMapLock;
+    static std::mutex sProjectRegionMapLock;
     static std::unordered_map<std::string, int32_t> sProjectRefCntMap;
-    static std::mutex sRegionRefCntMapLock;
     static std::unordered_map<std::string, int32_t> sRegionRefCntMap;
+    static std::unordered_map<std::string, std::string> sProjectRegionMap;
 
     // TODO: should be moved to enterprise config provider
     static std::mutex sRegionStatusLock;

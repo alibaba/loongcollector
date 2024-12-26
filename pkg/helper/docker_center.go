@@ -16,7 +16,6 @@ package helper
 
 import (
 	"context"
-	"errors"
 	"hash/fnv"
 	"path"
 	"regexp"
@@ -28,7 +27,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
-	docker "github.com/docker/docker/client"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -458,7 +456,8 @@ type DockerCenter struct {
 	// For the CRI scenario, the container list only contains the real containers and excludes the sandbox containers. But the
 	// sandbox meta would be saved to its bound container.
 	containerMap                   map[string]*DockerInfoDetail // all containers will in this map
-	client                         *docker.Client
+	client                         DockerCenterClientInterface
+	containerHelper                ContainerHelperInterface
 	lastErrMu                      sync.Mutex
 	lastErr                        error
 	lock                           sync.RWMutex
@@ -469,6 +468,24 @@ type DockerCenter struct {
 	imageLock                      sync.RWMutex
 	imageCache                     map[string]string
 	initStaticContainerInfoSuccess bool
+}
+
+type DockerCenterClientInterface interface {
+	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
+	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
+	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	Events(ctx context.Context, options types.EventsOptions) (<-chan events.Message, <-chan error)
+}
+
+type ContainerHelperInterface interface {
+	ContainerProcessAlive(pid int) bool
+}
+
+type ContainerHelperWrapper struct {
+}
+
+func (r *ContainerHelperWrapper) ContainerProcessAlive(pid int) bool {
+	return ContainerProcessAlive(pid)
 }
 
 func getIPByHosts(hostFileName, hostname string) string {
@@ -635,7 +652,9 @@ func getDockerCenterInstance() *DockerCenter {
 		logger.InitLogger()
 		// load EnvTags first
 		LoadEnvTags()
-		dockerCenterInstance = &DockerCenter{}
+		dockerCenterInstance = &DockerCenter{
+			containerHelper: &ContainerHelperWrapper{},
+		}
 		dockerCenterInstance.imageCache = make(map[string]string)
 		dockerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
 		// containerFindingManager works in a producer-consumer model
@@ -1023,35 +1042,6 @@ func (dc *DockerCenter) updateContainer(id string, container *DockerInfoDetail) 
 	dc.refreshLastUpdateMapTime()
 }
 
-func (dc *DockerCenter) inspectOneContainer(containerID string) (types.ContainerJSON, error) {
-	var err error
-	var containerDetail types.ContainerJSON
-	for idx := 0; idx < 3; idx++ {
-		if containerDetail, err = dc.client.ContainerInspect(context.Background(), containerID); err == nil {
-			break
-		}
-		time.Sleep(time.Second * 5)
-	}
-	if err != nil {
-		dc.setLastError(err, "inspect container error "+containerID)
-		return types.ContainerJSON{}, err
-	}
-	if !ContainerProcessAlive(containerDetail.State.Pid) {
-		containerDetail.State.Status = ContainerStatusExited
-		finishedAt := containerDetail.State.FinishedAt
-		finishedAtTime, _ := time.Parse(time.RFC3339, finishedAt)
-		now := time.Now()
-		duration := now.Sub(finishedAtTime)
-		if duration >= ContainerInfoDeletedTimeout {
-			errMsg := "inspect time out container " + containerID
-			err = errors.New(errMsg)
-			dc.setLastError(err, errMsg)
-			return types.ContainerJSON{}, err
-		}
-	}
-	return containerDetail, nil
-}
-
 func (dc *DockerCenter) fetchAll() error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
@@ -1065,22 +1055,35 @@ func (dc *DockerCenter) fetchAll() error {
 
 	for _, container := range containers {
 		var containerDetail types.ContainerJSON
-		containerDetail, err = dc.inspectOneContainer(container.ID)
+		for idx := 0; idx < 3; idx++ {
+			if containerDetail, err = dc.client.ContainerInspect(context.Background(), container.ID); err == nil {
+				break
+			}
+			time.Sleep(time.Second * 5)
+		}
 		if err == nil {
+			if !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
+				continue
+			}
 			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
+		} else {
+			dc.setLastError(err, "inspect container error "+container.ID)
 		}
 	}
 	dc.updateContainers(containerMap)
-
 	return nil
 }
 
 func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
-	containerDetail, err := dc.inspectOneContainer(containerID)
+	containerDetail, err := dc.client.ContainerInspect(context.Background(), containerID)
 	if err != nil {
+		dc.setLastError(err, "inspect container error "+containerID)
 		return err
+	}
+	if containerDetail.State.Status == ContainerStatusRunning && !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
+		containerDetail.State.Status = ContainerStatusExited
 	}
 	// docker 场景下
 	// tryFindSandbox如果是false, 那么fetchOne的地方应该会调用两次，一次是sandbox的id，一次是业务容器的id
@@ -1093,7 +1096,7 @@ func (dc *DockerCenter) fetchOne(containerID string, tryFindSandbox bool) error 
 			if err != nil {
 				dc.setLastError(err, "inspect sandbox container error "+id)
 			} else {
-				if containerDetail.State.Status == ContainerStatusRunning && !ContainerProcessAlive(containerDetail.State.Pid) {
+				if containerDetail.State.Status == ContainerStatusRunning && !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
 					containerDetail.State.Status = ContainerStatusExited
 				}
 				dc.updateContainer(id, dc.CreateInfoDetail(containerDetail, envConfigPrefix, false))
@@ -1171,10 +1174,12 @@ func dockerCenterRecover() {
 
 func (dc *DockerCenter) initClient() error {
 	var err error
-	// DockerCenterTimeout should only be used by context.WithTimeout() in specific methods
-	if dc.client, err = CreateDockerClient(); err != nil {
-		dc.setLastError(err, "init docker client from env error")
-		return err
+	// do not CreateDockerClient multi times
+	if dc.client == nil {
+		if dc.client, err = CreateDockerClient(); err != nil {
+			dc.setLastError(err, "init docker client from env error")
+			return err
+		}
 	}
 	return nil
 }

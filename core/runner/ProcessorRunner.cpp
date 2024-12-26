@@ -124,7 +124,8 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         sInGroupDataSizeBytes->Add(item->mEventGroup.DataSize());
 
         shared_ptr<Pipeline>& pipeline = item->mPipeline;
-        if (!pipeline) {
+        bool hasOldPipeline = pipeline != nullptr;
+        if (!hasOldPipeline) {
             pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
         }
         if (!pipeline) {
@@ -139,6 +140,16 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         vector<PipelineEventGroup> eventGroupList;
         eventGroupList.emplace_back(std::move(item->mEventGroup));
         pipeline->Process(eventGroupList, item->mInputIndex);
+        // if the pipeline is updated, the pointer will be released, so we need to update it to the new pipeline
+        if (hasOldPipeline) {
+            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
+            if (!pipeline) {
+                LOG_INFO(sLogger,
+                         ("pipeline not found during processing, perhaps due to config deletion",
+                          "discard data")("config", configName));
+                continue;
+            }
+        }
 
         if (pipeline->IsFlushingThroughGoPipeline()) {
             // TODO:

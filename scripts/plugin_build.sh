@@ -30,7 +30,7 @@ OUT_DIR=${3:-output}
 VERSION=${4:-0.0.1}
 PLUGINS_CONFIG_FILE=${5:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml}}
 GO_MOD_FILE=${6:-${GO_MOD_FILE:-go.mod}}
-NAME=ilogtail
+NAME=loongcollector
 LDFLAGS="${GO_LDFLAGS:-}"' -X "github.com/alibaba/ilogtail/pkg/config.BaseVersion='$VERSION'"'
 BUILD_FLAG=${BUILD_FLAG:-}
 

@@ -1,6 +1,6 @@
 # 开源协议
 
-[iLogtail](https://github.com/alibaba/ilogtail)，包括内核、插件和工具均遵循[Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0)分发：
+[LoongCollector](https://github.com/alibaba/loongcollector)，包括内核、插件和工具均遵循[Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0)分发：
 
 ```plain
                                  Apache License

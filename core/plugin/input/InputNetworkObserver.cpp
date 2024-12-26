@@ -14,11 +14,11 @@
 
 #include "plugin/input/InputNetworkObserver.h"
 
-#include "ebpf/include/export.h"
+#include "ebpf/Config.h"
 #include "ebpf/eBPFServer.h"
-#include "ebpf/config.h"
+#include "ebpf/include/export.h"
 #include "logger/Logger.h"
-#include "monitor/PluginMetricManager.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 using namespace std;
 

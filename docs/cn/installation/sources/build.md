@@ -16,15 +16,15 @@ Makefile描述了整个项目的所有编译目标，主要的包括：
 | --- | --- |
 | core | 仅编译C++核心 |
 | plugin | 仅编译Go插件 |
-| all | 编译完整iLogtail |
+| all | 编译完整 LoongCollector |
 | dist | 打包发行 |
-| docker | 制作iLogtail镜像 |
+| docker | 制作 LoongCollector 镜像 |
 | plugin_local | 本地编译Go插件 |
 
 使用`make <target>`命令编译所选目标，如果需要指定生成的版本号则在编译命令前加上VERSION环境变量，如：
 
 ```shell
-VERSION=1.8.3 make dist
+VERSION=0.0.2 make dist
 ```
 
 如果发生编译错误，如
@@ -42,11 +42,11 @@ compilation terminated.
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux
 ```
 
-### 使用镜像编译完整iLogtail
+### 使用镜像编译完整 LoongCollector
 
-编译完整iLogtail的命令是`make all`，由于all是默认的编译目标，因此也可以直接`make`。该命令首先清理`output`目录，然后调用`./scripts/gen_build_scripts.sh`脚本生成编译用的脚本和镜像描述保存到`./gen`目录，调用 docker 制作镜像，制作的过程即镜像内的编译过程，最后将镜像内的编译结果复制到`output`目录。
+编译完整 LoongCollector 的命令是`make all`，由于all是默认的编译目标，因此也可以直接`make`。该命令首先清理`output`目录，然后调用`./scripts/gen_build_scripts.sh`脚本生成编译用的脚本和镜像描述保存到`./gen`目录，调用 docker 制作镜像，制作的过程即镜像内的编译过程，最后将镜像内的编译结果复制到`output`目录。
 
-以下命令可以快速编译出iLogtail的可执行程序和插件。
+以下命令可以快速编译出 LoongCollector 的可执行程序和插件。
 
 1\. 进入源代码顶层目录。
 
@@ -56,7 +56,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-c
 
 ```text
 ./output
-├── ilogtail （主程序）
+├── loongcollector （主程序）
 ├── libPluginAdapter.so（插件接口）
 ├── libPluginBase.h
 └── libPluginBase.so （插件lib）
@@ -77,52 +77,9 @@ make plugin_local # 每次更新插件代码后从这里开始
 
 如果未对只是对插件依赖库进行修改，则只需要执行最后一行命令即可。
 
-## Windows版本编译
-
-### 编译前准备
-
-- 装备一台windows机器
-- 安装Visual Studio Community Edition，推荐2017版本
-- 安装golang
-- 安装MinGW(根据windows机器位数选择对应版本)
-- 下载相应位数的C++ boost库，安装
-  - [boost_1_68_0-msvc-14.1-64.exe](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/boost_1_68_0-msvc-14.1-64.exe)
-  - [boost_1_68_0-msvc-14.1-32.exe](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/boost_1_68_0-msvc-14.1-32.exe)
-- 下载相应位数的ilogtail-deps编译依赖，解压
-  - [64位依赖](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.windows-x64.zip)
-  - [32位依赖](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.windows-386.zip)
-
-### 修改编译脚本
-
-将ilogtail/scripts/windows64_build.bat(windows32_build.bat)脚本中的的BOOST_ROOT、ILOGTAIL_DEPS_PATH、CMAKE_BIN、DEVENV_BIN、MINGW_PATH五个环境变量值替换成编译机器上实际的路径
-
-``` bat
-set ILOGTAIL_PLUGIN_SRC_PATH=%P1Path%
-REM Change to where boost_1_68_0 locates
-set BOOST_ROOT=C:\workspace\boost_1_68_0
-REM Change to where ilogtail-deps.windows-x64 locates, path seperator must be /
-set ILOGTAIL_DEPS_PATH=C:/workspace/ilogtail-deps.windows-x64
-REM Change to where cmake locates
-set CMAKE_BIN=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake
-REM Change to where devenv locates
-set DEVENV_BIN=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\devenv.com
-REM Change to where mingw locates
-set MINGW_PATH=C:\workspace\mingw64\bin
-```
-
-### 执行编译脚本
-
-cd 到ilogtail/scripts目录下，执行windows64_build.bat(windows32_build.bat)脚本，等待约6分钟，完成编译。
-编译产物列表：
-
-- ilogtail.exe (主程序)
-- PluginAdapter.dll (插件接口)
-- PluginBase.dll (插件lib)
-- PluginBase.h
-
-
 ## 编译时替换外部模块
-iLogtail通过 Provider 模块暴露出一些拓展点，这些拓展点可以由用户自行实现，并通过编译时CMAKE DPROVIDER_PATH选项替换掉默认的实现。
+
+LoongCollector 通过 Provider 模块暴露出一些拓展点，这些拓展点可以由用户自行实现，并通过编译时CMAKE DPROVIDER_PATH选项替换掉默认的实现。
 
 示例：
 

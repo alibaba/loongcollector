@@ -70,6 +70,7 @@ void AddExtendedGlobalParamToGoPipeline(const Json::Value& extendedParams, Json:
 bool Pipeline::Init(PipelineConfig&& config) {
     mName = config.mName;
     mConfig = std::move(config.mDetail);
+    mSingletonInput = config.mSingletonInput;
     mContext.SetConfigName(mName);
     mContext.SetCreateTime(config.mCreateTime);
     mContext.SetPipeline(*this);

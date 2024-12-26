@@ -74,10 +74,6 @@ bool ProcessorParseApsaraNative::Init(const Json::Value& config) {
         return false;
     }
 
-    mLogGroupSize = &(GetContext().GetProcessProfile().logGroupSize);
-    mParseFailures = &(GetContext().GetProcessProfile().parseFailures);
-    mHistoryFailures = &(GetContext().GetProcessProfile().historyFailures);
-
     mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
     mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
     mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
@@ -159,7 +155,6 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
                                           GetContext().GetLogstoreName(),
                                           GetContext().GetRegion());
         mOutFailedEventsTotal->Add(1);
-        ++(*mParseFailures);
         sourceEvent.DelContent(mSourceKey);
         if (mCommonParserOptions.ShouldAddSourceContent(false)) {
             AddLog(mCommonParserOptions.mRenamedSourceKey, buffer, sourceEvent, false);
@@ -195,7 +190,6 @@ bool ProcessorParseApsaraNative::ProcessEvent(const StringView& logPath,
                                               GetContext().GetLogstoreName(),
                                               GetContext().GetRegion());
         }
-        ++(*mHistoryFailures);
         mHistoryFailureTotal->Add(1);
         mDiscardedEventsTotal->Add(1);
         return false;
@@ -473,7 +467,6 @@ void ProcessorParseApsaraNative::AddLog(const StringView& key,
         return;
     }
     targetEvent.AppendContentNoCopy(key, value);
-    *mLogGroupSize += key.size() + value.size() + 5;
 }
 
 bool ProcessorParseApsaraNative::IsSupportedEvent(const PipelineEventPtr& e) const {
