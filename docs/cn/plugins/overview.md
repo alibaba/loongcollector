@@ -13,6 +13,7 @@
 | `input_ebpf_network_security`<br>[eBPF网络安全数据](input/native/input-network-security.md) | SLS官方 | eBPF网络安全数据采集。 |
 | `input_ebpf_process_security`<br>[eBPF进程安全数据](input/native/input-process-security.md) | SLS官方 | eBPF进程安全数据采集。 |
 | `input_observer_network`<br>[eBPF网络调用数据](input/native/metric-observer.md) | SLS官方 | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。 |
+| `input_internal_metrics`<br>[自监控指标数据](input/native/input-internal-metrics.md) | SLS官方 | 导出自监控指标数据。 |
 
 ### 扩展插件
 
@@ -97,6 +98,7 @@
 | 名称 | 提供方 | 简介 |
 | --- | --- | --- |
 | `flusher_sls`<br>[SLS](flusher/native/flusher-sls.md) | SLS官方 | 将采集到的数据输出到SLS。 |
+| `flusher_file`<br>[本地文件](flusher/native/flusher-file.md) | SLS官方 | 将采集到的数据写到本地文件。 |
 | `flusher_blackhole`<br>[原生Flusher测试](flusher/native/flusher-blackhole.md) | SLS官方 | 直接丢弃采集的事件，属于原生输出插件，主要用于测试。 |
 
 ### 扩展插件

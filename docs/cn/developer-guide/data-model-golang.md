@@ -1,6 +1,7 @@
-# 数据模型
+# 数据模型（Golang）
 
-LoongCollector 目前支持 `SLS Log Protocol` 和 `Pipeline Event` 两种数据模型，两种模型的描述和对比如下：  
+LoongCollector Golang 部分目前支持 `SLS Log Protocol` 和 `Pipeline Event` 两种数据模型，两种模型的描述和对比如下：  
+
 |  | SLS Log Protocol | Pipeline Event |
 |  ----  | ----  |  ---- |
 | 描述 | SLS 日志的专用处理结构 | 可扩展的可观测性数据模型，支持Metrics、Trace、Logging、Bytes、Profile等 |

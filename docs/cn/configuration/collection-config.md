@@ -1,6 +1,6 @@
 # 采集配置
 
-`iLogtail`流水线是通过采集配置文件来定义的，每一个采集配置文件对应一条流水线。
+`LoongCollector`流水线是通过采集配置文件来定义的，每一个采集配置文件对应一条流水线。
 
 ## 格式
 
@@ -24,11 +24,11 @@
 
 ## 组织形式
 
-本地的采集配置文件默认均存放在`./config/local`目录下，每个采集配置一个文件，文件名即为采集配置的名称。
+本地的采集配置文件默认均存放在`./conf/continuous_pipeline_config/local`目录下，每个采集配置一个文件，文件名即为采集配置的名称。
 
 ## 热加载
 
-采集配置文件支持热加载，当您在`./config/local`目录下新增或修改已有配置文件，iLogtail将自动感知并重新加载配置。生效等待时间最长默认为10秒，可通过启动参数`config_scan_interval`进行调整。
+采集配置文件支持热加载，当您在`./conf/continuous_pipeline_config/local`目录下新增或修改已有配置文件，LoongCollector 将自动感知并重新加载配置。生效等待时间最长默认为10秒，可通过启动参数`config_scan_interval`进行调整。
 
 ## 示例
 
@@ -52,4 +52,4 @@ flushers:
     OnlyStdout: true
 ```
 
-其它常见的采集配置可参考[`example_config`](../../../example_config/)目录.
+其它常见的采集配置可参考源代码中的[`example_config`](https://github.com/alibaba/loongcollector/tree/main/example_config)目录.
