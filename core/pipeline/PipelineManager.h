@@ -76,6 +76,7 @@ private:
     friend class CircularProcessQueueUnittest;
     friend class CommonConfigProviderUnittest;
     friend class FlusherUnittest;
+    friend class PipelineUnittest;
 #endif
 };
 
