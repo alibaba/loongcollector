@@ -53,7 +53,7 @@ cp -r example_config/quick_start/* output
 cd output
 ./loongcollector
 # Now, LoongCollector is collecting data from output/simple.log,
-# and outputing the result to stdout
+# and outputing the result to stdout.
 ```
 
 
