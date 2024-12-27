@@ -97,9 +97,9 @@ struct AsynHttpRequest : public HttpRequest {
                     const std::string& query,
                     const std::map<std::string, std::string>& header,
                     const std::string& body,
-                    HttpResponse&& response = HttpResponse(),
                     uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)),
                     uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
+                    HttpResponse&& response = HttpResponse(),
                     bool followRedirects = false,
                     std::optional<CurlTLS> tls = std::nullopt)
         : HttpRequest(
