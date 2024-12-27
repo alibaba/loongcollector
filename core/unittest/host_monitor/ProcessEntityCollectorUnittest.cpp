@@ -30,7 +30,7 @@ public:
 void ProcessEntityCollectorUnittest::TestGetNewProcessStat() const {
     PROCESS_DIR = ".";
     auto collector = ProcessEntityCollector();
-    auto ptr = collector.GetNewProcessStat(1);
+    auto ptr = collector.ReadNewProcessStat(1);
     APSARA_TEST_NOT_EQUAL(nullptr, ptr);
     APSARA_TEST_EQUAL(1, ptr->pid);
     APSARA_TEST_EQUAL("cat", ptr->name);

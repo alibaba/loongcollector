@@ -51,6 +51,13 @@ void Timer::Stop() {
     }
 }
 
+void Timer::Clear() {
+    lock_guard<mutex> lock(mQueueMux);
+    while (!mQueue.empty()) {
+        mQueue.pop();
+    }
+}
+
 void Timer::PushEvent(unique_ptr<TimerEvent>&& e) {
     lock_guard<mutex> lock(mQueueMux);
     if (mQueue.empty() || e->GetExecTime() < mQueue.top()->GetExecTime()) {

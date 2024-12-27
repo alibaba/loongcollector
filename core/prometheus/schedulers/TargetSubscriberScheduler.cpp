@@ -106,25 +106,23 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
         for (const auto& [k, v] : newScrapeSchedulerMap) {
             if (mScrapeSchedulerMap.find(k) == mScrapeSchedulerMap.end()) {
                 mScrapeSchedulerMap[k] = v;
-                if (mTimer) {
-                    auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
-                    auto tmpRandSleepMilliSec = GetRandSleepMilliSec(
-                        v->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, tmpCurrentMilliSeconds);
+                auto tmpCurrentMilliSeconds = GetCurrentTimeInMilliSeconds();
+                auto tmpRandSleepMilliSec = GetRandSleepMilliSec(
+                    v->GetId(), mScrapeConfigPtr->mScrapeIntervalSeconds, tmpCurrentMilliSeconds);
 
-                    // zero-cost upgrade
-                    if (mUnRegisterMs > 0
-                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
-                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
-                            > mUnRegisterMs)
-                        && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
-                                - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
-                            < mUnRegisterMs)) {
-                        // scrape once just now
-                        LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
-                        v->ScrapeOnce(std::chrono::steady_clock::now());
-                    }
-                    v->ScheduleNext();
+                // zero-cost upgrade
+                if (mUnRegisterMs > 0
+                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
+                            - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000
+                        > mUnRegisterMs)
+                    && (tmpCurrentMilliSeconds + tmpRandSleepMilliSec
+                            - (uint64_t)mScrapeConfigPtr->mScrapeIntervalSeconds * 1000 * 2
+                        < mUnRegisterMs)) {
+                    // scrape once just now
+                    LOG_INFO(sLogger, ("scrape zero cost", ToString(tmpCurrentMilliSeconds)));
+                    v->ScrapeOnce(std::chrono::steady_clock::now());
                 }
+                v->ScheduleNext();
             }
         }
     }
@@ -261,7 +259,7 @@ void TargetSubscriberScheduler::ScheduleNext() {
     }
 
     auto event = BuildSubscriberTimerEvent(GetNextExecTime());
-    mTimer->PushEvent(std::move(event));
+    Timer::GetInstance()->PushEvent(std::move(event));
 }
 
 void TargetSubscriberScheduler::Cancel() {
@@ -281,9 +279,7 @@ void TargetSubscriberScheduler::SubscribeOnce(std::chrono::steady_clock::time_po
     });
     mFuture = future;
     auto event = BuildSubscriberTimerEvent(execTime);
-    if (mTimer) {
-        mTimer->PushEvent(std::move(event));
-    }
+    Timer::GetInstance()->PushEvent(std::move(event));
 }
 
 std::unique_ptr<TimerEvent>

@@ -30,7 +30,7 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
 bool InputHostMeta::Start() {
     LOG_INFO(sLogger, ("input host meta start", mContext->GetConfigName()));
     HostMonitorInputRunner::GetInstance()->Init();
-    HostMonitorInputRunner::GetInstance()->UpdateCollector({"process"}, mContext->GetProcessQueueKey(), mIndex);
+    HostMonitorInputRunner::GetInstance()->UpdateCollector({"process_entity"}, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 

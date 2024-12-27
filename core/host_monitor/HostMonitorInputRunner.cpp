@@ -45,12 +45,17 @@ void HostMonitorInputRunner::UpdateCollector(const std::vector<std::string>& new
     for (auto& collector : newCollectors) {
         auto oldCollector = mRegisteredCollectorMap.find(collector);
         if (oldCollector == mRegisteredCollectorMap.end()) {
+            if (mCollectorInstanceMap.find(collector) == mCollectorInstanceMap.end()) {
+                LOG_ERROR(sLogger, ("host monitor", "collector not found")("collector", collector));
+                continue;
+            }
             mRegisteredCollectorMap[collector] = true;
             HostMonitorTimerEvent::CollectConfig collectConfig(
                 collector, processQueueKey, inputIndex, std::chrono::seconds(DEFAULT_SCHEDULE_INTERVAL));
             auto now = std::chrono::steady_clock::now();
             auto event = std::make_unique<HostMonitorTimerEvent>(now + collectConfig.mInterval, collectConfig);
             Timer::GetInstance()->PushEvent(std::move(event));
+            LOG_INFO(sLogger, ("host monitor", "add new collector")("collector", collector));
         } else {
             // config removed and added again, timer event is still in the queue
             if (!oldCollector->second) {
@@ -122,6 +127,7 @@ void HostMonitorInputRunner::ScheduleOnce(HostMonitorTimerEvent::CollectConfig& 
             return;
         }
 
+        LOG_DEBUG(sLogger, ("host monitor collect", "collector")(config.mCollectorName, group.GetEvents().size()));
         if (group.GetEvents().size() > 0) {
             bool result = ProcessorRunner::GetInstance()->PushQueue(
                 config.mProcessQueueKey, config.mInputIndex, std::move(group));

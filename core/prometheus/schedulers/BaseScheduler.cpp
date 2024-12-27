@@ -40,7 +40,6 @@ bool BaseScheduler::IsCancelled() {
 }
 
 void BaseScheduler::SetComponent(EventPool* eventPool) {
-    mTimer = Timer::GetInstance();
     mEventPool = eventPool;
 }
 } // namespace logtail

@@ -54,6 +54,8 @@ protected:
         mScrapeConfig->mRequestHeaders = {{"Authorization", "Bearer xxxxx"}};
     }
 
+    void TearDown() override { Timer::GetInstance()->Clear(); }
+
 private:
     std::shared_ptr<ScrapeConfig> mScrapeConfig;
 };

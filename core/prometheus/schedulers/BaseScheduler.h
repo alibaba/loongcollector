@@ -20,7 +20,8 @@ public:
 
     std::chrono::steady_clock::time_point GetNextExecTime();
 
-    void SetFirstExecTime(std::chrono::steady_clock::time_point firstExecTime,std::chrono::system_clock::time_point firstScrapeTime);
+    void SetFirstExecTime(std::chrono::steady_clock::time_point firstExecTime,
+                          std::chrono::system_clock::time_point firstScrapeTime);
     void DelayExecTime(uint64_t delaySeconds);
     virtual void Cancel();
 
@@ -44,7 +45,6 @@ protected:
     std::shared_ptr<PromFuture<HttpResponse&, uint64_t>> mFuture;
     std::shared_ptr<PromFuture<>> mIsContextValidFuture;
 
-    Timer* mTimer;
     EventPool* mEventPool = nullptr;
 };
 } // namespace logtail

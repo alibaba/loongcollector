@@ -137,7 +137,6 @@ void PrometheusInputRunner::Init() {
     mIsStarted = true;
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    mTimer->Init();
     AsynCurlRunner::GetInstance()->Init();
 #endif
 
@@ -203,7 +202,6 @@ void PrometheusInputRunner::Stop() {
     }
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    mTimer->Stop();
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
 #endif

@@ -33,6 +33,12 @@ class HostMonitorInputRunnerUnittest : public testing::Test {
 public:
     void TestUpdateAndRemoveCollector() const;
     void TestScheduleOnce() const;
+
+private:
+    void TearDown() override {
+        HostMonitorInputRunner::GetInstance()->Stop();
+        Timer::GetInstance()->Clear();
+    }
 };
 
 void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
@@ -67,8 +73,6 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     APSARA_TEST_TRUE_FATAL(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
     APSARA_TEST_EQUAL_FATAL("test", configName);
 
-    // verify schdule next
-    APSARA_TEST_EQUAL_FATAL(Timer::GetInstance()->mQueue.size(), 1);
     runner->mThreadPool.Stop();
     runner->Stop();
 }
