@@ -56,6 +56,9 @@ private:
 
     PipelineContext* mAlarmPipelineCtx;
     std::mutex mAlarmPipelineMux;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class InputInternalMetricsUnittest;
+#endif
 };
 
 } // namespace logtail
