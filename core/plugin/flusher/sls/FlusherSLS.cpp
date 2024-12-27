@@ -637,9 +637,6 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
                                                                       item,
                                                                       data->mShardHashKey);
     }
-    if (req) {
-        req->mMaxTryCnt = 1;
-    }
     if (!req) {
         *keepItem = true;
         return false;

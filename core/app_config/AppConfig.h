@@ -31,6 +31,14 @@
 namespace logtail {
 extern const int32_t kDefaultMaxSendBytePerSec;
 
+extern const double GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION;
+extern const int32_t MIN_SEND_REQUEST_CONCURRENCY;
+extern const int32_t MAX_SEND_REQUEST_CONCURRENCY;
+extern const uint32_t CONCURRENCY_STATISTIC_THRESHOLD;
+extern const uint32_t CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS;    
+extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;  
+extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE; 
+
 void CreateAgentDir();
 
 std::string GetAgentLogDir();
@@ -209,10 +217,7 @@ private:
 
     std::string mBindInterface;
 
-    // 全局并发度对单地域占比保留的余量
-    const double mGlobalConcurrencyFreePercentageForOneRegion = 0.5;
-    const int32_t mMinSendRequestConcurrency = 15;
-    const int32_t mMaxSendRequestConcurrency = 80;
+
 
     // /**
     //  * @brief Load ConfigServer, DataServer and network interface
@@ -446,7 +451,7 @@ public:
     // 全局并发度
     int32_t GetSendRequestGlobalConcurrency() const { return mSendRequestGlobalConcurrency; }
 
-    double GetGlobalConcurrencyFreePercentageForOneRegion() const { return mGlobalConcurrencyFreePercentageForOneRegion; }
+    double GetGlobalConcurrencyFreePercentageForOneRegion() const { return GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION; }
 
     int32_t GetProcessThreadCount() const { return mProcessThreadCount; }
 

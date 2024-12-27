@@ -20,7 +20,6 @@
 using namespace std;
 
 namespace logtail {
-
 #ifdef APSARA_UNIT_TEST_MAIN
 uint32_t ConcurrencyLimiter::GetCurrentLimit() const {
     lock_guard<mutex> lock(mLimiterMux);
@@ -40,7 +39,7 @@ uint32_t ConcurrencyLimiter::GetInSendingCount() const {
 }
 
 uint32_t ConcurrencyLimiter::GetStatisticThreshold() const {
-    return mStatisticThreshold;
+    return CONCURRENCY_STATISTIC_THRESHOLD;
 }
 
 #endif
@@ -111,7 +110,7 @@ void ConcurrencyLimiter::AdjustConcurrency(bool success, std::chrono::system_clo
         if (mLastStatisticsTime == std::chrono::system_clock::time_point()) {
             mLastStatisticsTime = currentTime;
         }
-        if (mStatisticsTotal == mStatisticThreshold || chrono::duration_cast<chrono::seconds>(currentTime - mLastStatisticsTime).count() > mStatisticIntervalThresholdSeconds) {
+        if (mStatisticsTotal == CONCURRENCY_STATISTIC_THRESHOLD || chrono::duration_cast<chrono::seconds>(currentTime - mLastStatisticsTime).count() > CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS) {
             failPercentage =  mStatisticsFailTotal*100/mStatisticsTotal;
             LOG_DEBUG(sLogger,("AdjustConcurrency", mDescription)("mStatisticsFailTotal", mStatisticsFailTotal)("mStatisticsTotal", mStatisticsTotal));
             mStatisticsTotal = 0;
@@ -124,9 +123,9 @@ void ConcurrencyLimiter::AdjustConcurrency(bool success, std::chrono::system_clo
         if (failPercentage == 0) {
             // 成功
             Increase();
-        } else if (failPercentage <= mNoFallBackFailPercentage) {
+        } else if (failPercentage <= NO_FALL_BACK_FAIL_PERCENTAGE) {
             // 不调整
-        } else if (failPercentage <= mSlowFallBackFailPercentage) {
+        } else if (failPercentage <= SLOW_FALL_BACK_FAIL_PERCENTAGE) {
             // 慢回退
             Decrease(mConcurrencySlowFallBackRatio);
         } else  {

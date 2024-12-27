@@ -22,10 +22,10 @@
 #include <mutex>
 #include <string>
 
+#include "app_config/AppConfig.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
-
 class ConcurrencyLimiter {
 public:
     ConcurrencyLimiter(const std::string& description,
@@ -89,14 +89,6 @@ private:
     std::chrono::system_clock::time_point mLastStatisticsTime;
     uint32_t mStatisticsTotal = 0;
     uint32_t mStatisticsFailTotal = 0;
-
-    // 统计10个数据，最多等3s
-    const uint32_t mStatisticThreshold = 10;
-    const uint32_t mStatisticIntervalThresholdSeconds = 3;
-    
-    const uint32_t mNoFallBackFailPercentage = 10;
-    const uint32_t mSlowFallBackFailPercentage = 40;
-
 
     void Increase();
     void Decrease(double fallBackRatio);

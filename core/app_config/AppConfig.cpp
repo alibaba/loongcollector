@@ -193,6 +193,21 @@ DEFINE_FLAG_STRING(sls_observer_ebpf_host_path,
 namespace logtail {
 constexpr int32_t kDefaultMaxSendBytePerSec = 25 * 1024 * 1024; // the max send speed per sec, realtime thread
 
+
+// 全局并发度保留余量百分比
+const double GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION = 0.5;
+// 单地域并发度最小值
+const int32_t MIN_SEND_REQUEST_CONCURRENCY = 15;
+// 单地域并发度最大值
+const int32_t MAX_SEND_REQUEST_CONCURRENCY = 80;
+// 并发度统计数量&&时间间隔 
+const uint32_t CONCURRENCY_STATISTIC_THRESHOLD = 10;
+const uint32_t CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS = 3;
+// 并发度不回退百分比阈值
+const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE = 10;
+// 并发度慢回退百分比阈值
+const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE = 40;
+
 std::string AppConfig::sLocalConfigDir = "local";
 void CreateAgentDir() {
     try {
@@ -1193,13 +1208,13 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
     }
 
     // mSendRequestConcurrency was limited 
-    if (mSendRequestConcurrency < mMinSendRequestConcurrency) {
-        mSendRequestConcurrency = mMinSendRequestConcurrency;
+    if (mSendRequestConcurrency < MIN_SEND_REQUEST_CONCURRENCY) {
+        mSendRequestConcurrency = MIN_SEND_REQUEST_CONCURRENCY;
     } 
-    if (mSendRequestConcurrency > mMaxSendRequestConcurrency) {
-        mSendRequestConcurrency = mMaxSendRequestConcurrency;
+    if (mSendRequestConcurrency > MAX_SEND_REQUEST_CONCURRENCY) {
+        mSendRequestConcurrency = MAX_SEND_REQUEST_CONCURRENCY;
     }
-    mSendRequestGlobalConcurrency = mSendRequestConcurrency * (1 + mGlobalConcurrencyFreePercentageForOneRegion);
+    mSendRequestGlobalConcurrency = mSendRequestConcurrency * (1 + GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION);
 }
 
 bool AppConfig::CheckAndResetProxyEnv() {
