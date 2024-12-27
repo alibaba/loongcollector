@@ -1,4 +1,4 @@
-# 插件自监控接口
+# Golang 插件自监控接口
 
 LoongCollector 提供了指标接口，可以方便地为插件增加一些自监控指标，目前支持Counter，Gauge，String，Latency等类型。
 

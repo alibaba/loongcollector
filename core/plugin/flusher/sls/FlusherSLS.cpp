@@ -126,12 +126,12 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
 
     auto iter = sLogstoreConcurrencyLimiterMap.find(key);
     if (iter == sLogstoreConcurrencyLimiterMap.end()) {
-        auto limiter = GetConcurrencyLimiter(sName + "#quota#logstore#" + key);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key, AppConfig::GetInstance()->GetSendRequestConcurrency());
         sLogstoreConcurrencyLimiterMap.try_emplace(key, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = GetConcurrencyLimiter(sName + "#quota#logstore#" + key);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key, AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
         return limiter;
     }
@@ -142,12 +142,12 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
     lock_guard<mutex> lock(sMux);
     auto iter = sProjectConcurrencyLimiterMap.find(project);
     if (iter == sProjectConcurrencyLimiterMap.end()) {
-        auto limiter = GetConcurrencyLimiter(sName + "#quota#project#" + project);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project, AppConfig::GetInstance()->GetSendRequestConcurrency());
         sProjectConcurrencyLimiterMap.try_emplace(project, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = GetConcurrencyLimiter(sName + "#quota#project#" + project);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project, AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
         return limiter;
     }
@@ -158,12 +158,12 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetRegionConcurrencyLimiter(const str
     lock_guard<mutex> lock(sMux);
     auto iter = sRegionConcurrencyLimiterMap.find(region);
     if (iter == sRegionConcurrencyLimiterMap.end()) {
-        auto limiter = GetConcurrencyLimiter(sName + "#network#region#" + region);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         sRegionConcurrencyLimiterMap.try_emplace(region, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = GetConcurrencyLimiter(sName + "#network#region#" + region);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         iter->second = limiter;
         return limiter;
     }
@@ -693,9 +693,9 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mFirstEnqueTime).count())
                     + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentEndpoint)("is profile data",
                                                                                           isProfileData));
-        GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
-        GetProjectConcurrencyLimiter(mProject)->OnSuccess();
-        GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();
+        GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
+        GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
+        GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
         SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
         if (mSuccessCnt) {
             mSuccessCnt->Add(1);
@@ -736,17 +736,17 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 }
             }
             operation = data->mBufferOrNot ? OperationOnFail::RETRY_LATER : OperationOnFail::DISCARD;
-            GetRegionConcurrencyLimiter(mRegion)->OnFail();
-            GetProjectConcurrencyLimiter(mProject)->OnSuccess();
-            GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();
+            GetRegionConcurrencyLimiter(mRegion)->OnFail(curSystemTime);
+            GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
+            GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
         } else if (sendResult == SEND_QUOTA_EXCEED) {
             BOOL_FLAG(global_network_success) = true;
             if (slsResponse.mErrorCode == sdk::LOGE_SHARD_WRITE_QUOTA_EXCEED) {
                 failDetail << "shard write quota exceed";
                 suggestion << "Split logstore shards. https://help.aliyun.com/zh/sls/user-guide/expansion-of-resources";
-                GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnFail();
-                GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
-                GetProjectConcurrencyLimiter(mProject)->OnSuccess();
+                GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnFail(curSystemTime);
+                GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
+                GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
                 if (mShardWriteQuotaErrorCnt) {
                     mShardWriteQuotaErrorCnt->Add(1);
                 }
@@ -754,9 +754,9 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 failDetail << "project write quota exceed";
                 suggestion << "Submit quota modification request. "
                               "https://help.aliyun.com/zh/sls/user-guide/expansion-of-resources";
-                GetProjectConcurrencyLimiter(mProject)->OnFail();
-                GetRegionConcurrencyLimiter(mRegion)->OnSuccess();
-                GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess();
+                GetProjectConcurrencyLimiter(mProject)->OnFail(curSystemTime);
+                GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
+                GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
                 if (mProjectQuotaErrorCnt) {
                     mProjectQuotaErrorCnt->Add(1);
                 }

@@ -58,7 +58,7 @@ bool HttpSink::Init() {
     mSendConcurrency = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_SINK_SEND_CONCURRENCY);
 
     // TODO: should be dynamic
-    mSendConcurrency->Set(AppConfig::GetInstance()->GetSendRequestConcurrency());
+    mSendConcurrency->Set(AppConfig::GetInstance()->GetSendRequestGlobalConcurrency());
 
     mThreadRes = async(launch::async, &HttpSink::Run, this);
     return true;

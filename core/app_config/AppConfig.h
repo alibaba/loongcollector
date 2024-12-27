@@ -31,6 +31,14 @@
 namespace logtail {
 extern const int32_t kDefaultMaxSendBytePerSec;
 
+extern const double GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION;
+extern const int32_t MIN_SEND_REQUEST_CONCURRENCY;
+extern const int32_t MAX_SEND_REQUEST_CONCURRENCY;
+extern const uint32_t CONCURRENCY_STATISTIC_THRESHOLD;
+extern const uint32_t CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS;    
+extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;  
+extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE; 
+
 void CreateAgentDir();
 
 std::string GetAgentLogDir();
@@ -131,6 +139,7 @@ private:
     int32_t mNumOfBufferFile;
     int32_t mLocalFileSize;
     int32_t mSendRequestConcurrency;
+    int32_t mSendRequestGlobalConcurrency;
     std::string mBufferFilePath;
 
     // checkpoint
@@ -206,6 +215,8 @@ private:
     std::vector<std::string> mHostPathBlacklist;
 
     std::string mBindInterface;
+
+
 
     // /**
     //  * @brief Load ConfigServer, DataServer and network interface
@@ -434,8 +445,12 @@ public:
     int32_t GetLocalFileSize() const { return mLocalFileSize; }
 
     const std::string& GetBufferFilePath() const { return mBufferFilePath; }
-
+    // 单地域并发度
     int32_t GetSendRequestConcurrency() const { return mSendRequestConcurrency; }
+    // 全局并发度
+    int32_t GetSendRequestGlobalConcurrency() const { return mSendRequestGlobalConcurrency; }
+
+    double GetGlobalConcurrencyFreePercentageForOneRegion() const { return GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION; }
 
     int32_t GetProcessThreadCount() const { return mProcessThreadCount; }
 

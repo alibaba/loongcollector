@@ -17,13 +17,14 @@
 
 | 名称 | 提供方 | 功能简介 |
 |------|--------|----------|
-| [`input_file`](native/input-file.md)<br> 文本日志                                      | SLS官方 | 文本采集。                                                 |
-| [`input_container_stdio`](native/input-container-stdio.md)<br> 容器标准输出（原生插件）                                      | SLS官方 | 从容器标准输出/标准错误流中采集日志。                                                 |
-| [`input_observer_network`](native/metric-observer.md)<br>eBPF网络调用数据         | SLS官方                                                      | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。 |
-| [`input_file_security`](native/input-file-security.md)<br> 文件安全数据                                      | SLS官方 | 文件安全数据采集。                                                 |
-| [`input_network_observer`](native/input-network-observer.md)<br> 网络可观测数据                                      | SLS官方 | 网络可观测数据采集。                                                 |
-| [`input_network_security`](native/input-network-security.md)<br> 网络安全数据                                      | SLS官方 | 网络安全数据采集。                                                 |
-| [`input_process_security`](native/input-process-security.md)<br> 进程安全数据                                      | SLS官方 | 进程安全数据采集。                                                 |
+| `input_file`<br>[文本日志](native/input-file.md) | SLS官方 | 文本采集。 |
+| `input_container_stdio`<br> [容器标准输出](native/input-container-stdio.md) | SLS官方 | 从容器标准输出/标准错误流中采集日志。 |
+| `input_observer_network`<br>[eBPF网络调用数据](native/metric-observer.md) | SLS官方 | 支持从网络系统调用中收集四层网络调用，并借助网络解析模块，可以观测七层网络调用细节。 |
+| `input_file_security`<br>[文件安全数据](native/input-file-security.md) | SLS官方 | 文件安全数据采集。 |
+| `input_network_observer`<br>[网络可观测数据](native/input-network-observer.md) | SLS官方 | 网络可观测数据采集。 |
+| `input_network_security`<br>[网络安全数据](native/input-network-security.md) | SLS官方 | 网络安全数据采集。 |
+| `input_process_security`<br>[进程安全数据](native/input-process-security.md) | SLS官方 | 进程安全数据采集。 |
+| `input_internal_metrics`<br>[自监控指标数据](native/input-internal-metrics.md) | SLS官方 | 导出自监控指标数据。 |
 
 ### 扩展插件
 
@@ -36,25 +37,25 @@
 
 | 名称 | 提供方 | 功能简介 |
 |------|--------|----------|
-| [`input_command`](extended/input-command.md)<br>脚本执行数据                           | 社区<br>[`didachuxing`](https://github.com/didachuxing)      | 采集脚本执行数据。                                             |
-| [`input_docker_stdout`](extended/service-docker-stdout.md)<br>容器标准输出             | SLS官方                                                      | 从容器标准输出/标准错误流中采集日志。                                   |
-| [`metric_debug_file`](extended/metric-debug-file.md)<br>文本日志（debug）              | SLS官方                                                      | 用于调试的读取文件内容的插件。                                       |
-| [`metric_input_example`](extended/metric-input-example.md)<br>MetricInput示例插件    | SLS官方                                                      | MetricInput示例插件。                                      |
-| [`metric_meta_host`](extended/metric-meta-host.md)<br>主机Meta数据                   | SLS官方                                                      | 主机Meta数据。                                             |
-| [`metric_mock`](extended/metric-mock.md)<br>Mock数据-Metric                        | SLS官方                                                      | 生成metric模拟数据的插件。                                      |
-| [`metric_system_v2`](extended/metric-system.md)<br>主机监控数据                        | SLS官方                                                      | 主机监控数据。                                               |
-| [`service_canal`](extended/service-canal.md)<br>MySQL Binlog                     | SLS官方                                                      | 将MySQL Binlog输入到iLogtail。                             |
-| [`service_go_profile`](extended/service-goprofile.md)<br>GO Profile              | SLS官方                                                      | 采集Golang pprof 性能数据。                                  |
-| [`service_gpu_metric`](extended/service-gpu.md)<br>GPU数据                         | SLS官方                                                      | 支持收集英伟达GPU指标。                                         |
-| [`service_http_server`](extended/service-http-server.md)<br>HTTP数据               | SLS官方                                                      | 接收来自unix socket、http/https、tcp的请求，并支持sls协议、otlp等多种协议。 |
-| [`service_input_example`](extended/service-input-example.md)<br>ServiceInput示例插件 | SLS官方                                                      | ServiceInput示例插件。                                     |
-| [`service_journal`](extended/service-journal.md)<br>Journal数据                    | SLS官方                                                      | 从原始的二进制文件中采集Linux系统的Journal（systemd）日志。               |
-| [`service_kafka`](extended/service-kafka.md)<br>Kafka                            | SLS官方                                                      | 将Kafka数据输入到iLogtail。                                  |
-| [`service_mock`](extended/service-mock.md)<br>Mock数据-Service                     | SLS官方                                                      | 生成service模拟数据的插件。                                     |
-| [`service_mssql`](extended/service-mssql.md)<br>SqlServer查询数据                    | SLS官方                                                      | 将Sql Server数据输入到iLogtail。                             |
-| [`service_otlp`](extended/service-otlp.md)<br>OTLP数据                             | 社区<br>[`Zhu Shunjia`](https://github.com/shunjiazhu)       | 通过http/grpc协议，接收OTLP数据。                               |
-| [`service_pgsql`](extended/service-pgsql.md)<br>PostgreSQL查询数据                   | SLS官方                                                      | 将PostgresSQL数据输入到iLogtail。                            |
-| [`service_syslog`](extended/service-syslog.md)<br>Syslog数据                       | SLS官方                                                      | 采集syslog数据。                                           |
+| `input_command`<br>[脚本执行数据](extended/input-command.md) | 社区<br>[didachuxing](https://github.com/didachuxing) | 采集脚本执行数据。 |
+| `input_docker_stdout`<br>[容器标准输出](extended/service-docker-stdout.md) | SLS官方 | 从容器标准输出/标准错误流中采集日志。 |
+| `metric_debug_file`<br>[文本日志（debug）](extended/metric-debug-file.md) | SLS官方 | 用于调试的读取文件内容的插件。 |
+| `metric_input_example`<br>[MetricInput示例插件](extended/metric-input-example.md) | SLS官方 | MetricInput示例插件。 |
+| `metric_meta_host`<br>[主机Meta数据](extended/metric-meta-host.md) | SLS官方 | 主机Meta数据。 |
+| `metric_mock`<br>[Mock数据-Metric](extended/metric-mock.md) | SLS官方 | 生成metric模拟数据的插件。 |
+| `metric_system_v2`<br>[主机监控数据](extended/metric-system.md) | SLS官方 | 主机监控数据。 |
+| `service_canal`<br>[MySQL Binlog](extended/service-canal.md) | SLS官方 | 将MySQL Binlog输入到iLogtail。 |
+| `service_go_profile`<br>[GO Profile](extended/service-goprofile.md) | SLS官方 | 采集Golang pprof 性能数据。 |
+| `service_gpu_metric`<br>[GPU数据](extended/service-gpu.md) | SLS官方 | 支持收集英伟达GPU指标。 |
+| `service_http_server`<br>[HTTP数据](extended/service-http-server.md) | SLS官方 | 接收来自unix socket、http/https、tcp的请求，并支持sls协议、otlp等多种协议。 |
+| `service_input_example`<br>[ServiceInput示例插件](extended/service-input-example.md) | SLS官方 | ServiceInput示例插件。 |
+| `service_journal`<br>[Journal数据](extended/service-journal.md) | SLS官方 | 从原始的二进制文件中采集Linux系统的Journal（systemd）日志。 |
+| `service_kafka`<br>[Kafka](extended/service-kafka.md) | SLS官方 | 将Kafka数据输入到iLogtail。 |
+| `service_mock`<br>[Mock数据-Service](extended/service-mock.md) | SLS官方 | 生成service模拟数据的插件。 |
+| `service_mssql`<br>[SqlServer查询数据](extended/service-mssql.md) | SLS官方 | 将Sql Server数据输入到iLogtail。 |
+| `service_otlp`<br>[OTLP数据](extended/service-otlp.md) | 社区<br>[Zhu Shunjia](https://github.com/shunjiazhu) | 通过http/grpc协议，接收OTLP数据。 |
+| `service_pgsql`<br>[PostgreSQL查询数据](extended/service-pgsql.md) | SLS官方 | 将PostgresSQL数据输入到iLogtail。 |
+| `service_syslog`<br>[Syslog数据](extended/service-syslog.md) | SLS官方 | 采集syslog数据。 |
 
 ## 插件特性对比
 
