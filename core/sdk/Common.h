@@ -36,6 +36,8 @@ namespace sdk {
     const int64_t kFirstHashKeySeqID = 1;
 
     const uint32_t LOG_REQUEST_TIMEOUT = 20;
+    const uint32_t LOG_REQUEST_TRY_TIMES = 1;
+
     const uint32_t MD5_BYTES = 16;
 #define DATE_FORMAT_RFC822 "%a, %d %b %Y %H:%M:%S GMT" ///< RFC822 date formate, GMT time.
 

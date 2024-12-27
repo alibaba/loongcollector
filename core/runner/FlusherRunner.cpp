@@ -115,7 +115,7 @@ void FlusherRunner::DecreaseHttpSendingCnt() {
 void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
     // TODO: use semaphore instead
     while (withLimit && !Application::GetInstance()->IsExiting()
-           && GetSendingBufferCount() >= AppConfig::GetInstance()->GetSendRequestConcurrency()) {
+           && GetSendingBufferCount() >= AppConfig::GetInstance()->GetSendRequestGlobalConcurrency()) {
         this_thread::sleep_for(chrono::milliseconds(10));
     }
 
@@ -155,7 +155,7 @@ void FlusherRunner::Run() {
 
         vector<SenderQueueItem*> items;
         int32_t limit
-            = Application::GetInstance()->IsExiting() ? -1 : AppConfig::GetInstance()->GetSendRequestConcurrency();
+            = Application::GetInstance()->IsExiting() ? -1 : AppConfig::GetInstance()->GetSendRequestGlobalConcurrency();
         SenderQueueManager::GetInstance()->GetAvailableItems(items, limit);
         if (items.empty()) {
             SenderQueueManager::GetInstance()->Wait(1000);

@@ -47,6 +47,8 @@ void FlusherRunnerUnittest::TestDispatch() {
         flusher->SetMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
 
+        AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 10;
+
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());
         auto realItem = item.get();
         flusher->PushToQueue(std::move(item));
