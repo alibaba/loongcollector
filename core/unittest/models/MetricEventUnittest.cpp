@@ -346,7 +346,7 @@ void MetricEventUnittest::TestTagsIterator() {
 void MetricEventUnittest::TestCopy() {
     MetricEvent* oldMetricEvent = mEventGroup->AddMetricEvent();
     oldMetricEvent->SetValue(map<StringView, double>{{"test-1", 10.0}, {"test-2", 2.0}});
-    APSARA_TEST_EQUAL(1, mEventGroup->GetEvents().size());
+    APSARA_TEST_EQUAL(1U, mEventGroup->GetEvents().size());
 
     PipelineEventGroup newGroup = mEventGroup->Copy();
     MetricEvent newMetricEvent = newGroup.GetEvents().at(0).Cast<MetricEvent>();

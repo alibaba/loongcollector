@@ -652,7 +652,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
     }
     if (data->mCurrentHost.empty()) {
         if (mCandidateHostsInfo->IsInitialized()) {
-            GetRegionConcurrencyLimiter(mRegion)->OnFail();
+            GetRegionConcurrencyLimiter(mRegion)->OnFail(chrono::system_clock::now());
         }
         *errMsg = "failed to get available host";
         *keepItem = true;
