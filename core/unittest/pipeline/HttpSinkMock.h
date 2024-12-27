@@ -35,34 +35,63 @@ public:
         return &instance;
     }
 
-    bool Init() override { return true; }
-
-    bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request) {
-        if (useRealHttpSink) {
-            return Sink<HttpSinkRequest>::AddRequest(std::move(request));
-        }
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            std::string logstore = "default";
-            if (static_cast<HttpFlusher*>(request->mItem->mFlusher)->Name().find("sls") != std::string::npos) {
-                auto flusher = static_cast<FlusherSLS*>(request->mItem->mFlusher);
-                logstore = flusher->mLogstore;
-            }
-            LOG_DEBUG(sLogger, ("http sink mock", "add request")("logstore", logstore)("body", request->mBody));
-            mRequests[logstore].push_back(request->mBody);
-        }
-        request->mResponse.SetStatusCode(200);
-        request->mResponse.mHeader[sdk::X_LOG_REQUEST_ID] = "request_id";
-        static_cast<SLSSenderQueueItem*>(request->mItem)->mExactlyOnceCheckpoint = nullptr;
-        static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
-        FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
-        request.reset();
+    bool Init() override {
+        mThreadRes = async(std::launch::async, &HttpSinkMock::Run, this);
+        mIsFlush = false;
         return true;
     }
 
-    std::vector<std::string> GetRequests(std::string logstore) {
+    void Stop() override {
+        mIsFlush = true;
+        if (!mThreadRes.valid()) {
+            return;
+        }
+        std::future_status s = mThreadRes.wait_for(std::chrono::seconds(1));
+        if (s == std::future_status::ready) {
+            LOG_INFO(sLogger, ("http sink mock", "stopped successfully"));
+        } else {
+            LOG_WARNING(sLogger, ("http sink mock", "forced to stopped"));
+        }
+    }
+
+    void Run() {
+        LOG_INFO(sLogger, ("http sink mock", "started"));
+        while (true) {
+            LOG_DEBUG(sLogger, ("http sink mock", "running")("mIsFlush", mIsFlush.load())("mQueueSize", mQueue.Size()));
+            std::unique_ptr<HttpSinkRequest> request;
+            if (mQueue.WaitAndPop(request, 500)) {
+                {
+                    std::lock_guard<std::mutex> lock(mMutex);
+                    std::string logstore = "default";
+                    if (static_cast<HttpFlusher*>(request->mItem->mFlusher)->Name().find("sls") != std::string::npos) {
+                        auto flusher = static_cast<FlusherSLS*>(request->mItem->mFlusher);
+                        logstore = flusher->mLogstore;
+                    }
+                    mRequests.push_back(*(request->mItem));
+                }
+                request->mResponse.SetStatusCode(200);
+                request->mResponse.mHeader[sdk::X_LOG_REQUEST_ID] = "request_id";
+                static_cast<SLSSenderQueueItem*>(request->mItem)->mExactlyOnceCheckpoint = nullptr;
+                static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
+                FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
+                request.reset();
+                LOG_DEBUG(sLogger, ("http sink mock", "pop one request"));
+            } else if (mIsFlush && mQueue.Empty()) {
+                break;
+            } else {
+                continue;
+            }
+        }
+    }
+
+    bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request) {
+        mQueue.Push(std::move(request));
+        return true;
+    }
+
+    std::vector<SenderQueueItem>& GetRequests() {
         std::lock_guard<std::mutex> lock(mMutex);
-        return mRequests[logstore];
+        return mRequests;
     }
 
     void ClearRequests() {
@@ -70,17 +99,13 @@ public:
         mRequests.clear();
     }
 
-    void SetUseRealHttpSink(bool useReal) { useRealHttpSink = useReal; }
-
 private:
     HttpSinkMock() = default;
     ~HttpSinkMock() = default;
 
-    bool useRealHttpSink = false;
-
     std::atomic_bool mIsFlush = false;
     mutable std::mutex mMutex;
-    std::unordered_map<std::string, std::vector<std::string>> mRequests;
+    std::vector<SenderQueueItem> mRequests;
 };
 
 } // namespace logtail

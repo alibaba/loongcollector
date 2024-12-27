@@ -35,6 +35,7 @@ using namespace std;
 namespace logtail {
 
 bool HttpSink::Init() {
+#ifndef APSARA_UNIT_TEST_MAIN
     mClient = curl_multi_init();
     if (mClient == nullptr) {
         LOG_ERROR(sLogger, ("failed to init http sink", "failed to init curl multi client"));
@@ -61,6 +62,9 @@ bool HttpSink::Init() {
 
     mThreadRes = async(launch::async, &HttpSink::Run, this);
     return true;
+#else
+    return HttpSinkMock::GetInstance()->Init();
+#endif
 }
 
 void HttpSink::Stop() {

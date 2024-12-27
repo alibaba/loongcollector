@@ -31,8 +31,6 @@ public:
     void TestDispatch();
     void TestPushToHttpSink();
 
-    static void SetUpTestCase() { HttpSinkMock::GetInstance()->SetUseRealHttpSink(true); }
-
 protected:
     void TearDown() override {
         SenderQueueManager::GetInstance()->Clear();

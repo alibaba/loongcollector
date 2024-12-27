@@ -38,6 +38,48 @@ using namespace std;
 
 namespace logtail {
 
+class InputFileMock : public InputMock {
+public:
+    static const std::string sName;
+};
+
+const std::string InputFileMock::sName = "input_file_mock";
+
+class InputFileMock2 : public InputMock {
+public:
+    static const std::string sName;
+};
+
+const std::string InputFileMock2::sName = "input_file_mock2";
+
+class ProcessorMock2 : public ProcessorMock {
+public:
+    static const std::string sName;
+};
+
+const std::string ProcessorMock2::sName = "processor_mock2";
+
+class FlusherSLSMock : public FlusherSLS {
+public:
+    static const std::string sName;
+
+    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) const override {
+        auto data = static_cast<SLSSenderQueueItem*>(item);
+        std::map<std::string, std::string> header;
+        req = std::make_unique<HttpSinkRequest>(
+            "POST", false, "test-host", 80, "/test-operation", "", header, data->mData, item);
+        return true;
+    }
+};
+
+const std::string FlusherSLSMock::sName = "flusher_sls_mock";
+
+class FlusherSLSMock2 : public FlusherSLSMock {
+public:
+    static const std::string sName;
+};
+
+const std::string FlusherSLSMock2::sName = "flusher_sls_mock2";
 
 class PipelineUpdateUnittest : public testing::Test {
 public:
@@ -82,6 +124,11 @@ protected:
     static void SetUpTestCase() {
         PluginRegistry::GetInstance()->LoadPlugins();
         LoadPluginMock();
+        PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputFileMock>());
+        PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputFileMock2>());
+        PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock2>());
+        PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock>());
+        PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock2>());
 
         FlusherRunner::GetInstance()->mEnableRateLimiter = false;
 #ifdef __ENTERPRISE__
@@ -178,6 +225,13 @@ private:
         }
     }
 
+    void BlockProcessor(std::string configName) const {
+        auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
+        auto processor
+            = static_cast<ProcessorMock*>(const_cast<Processor*>(pipeline->mProcessorLine[0].get()->mPlugin.get()));
+        processor->Block();
+    }
+
     void UnBlockProcessor(std::string configName) const {
         auto pipeline = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
         auto processor
@@ -188,19 +242,30 @@ private:
     void VerifyData(std::string logstore, size_t from, size_t to) const {
         size_t i = from;
         size_t j = 0;
-        for (size_t retry = 0; retry < 8; ++retry) {
-            auto requests = HttpSinkMock::GetInstance()->GetRequests(logstore);
+        size_t retryTimes = 15;
+        for (size_t retry = 0; retry < retryTimes; ++retry) {
+            auto requests = HttpSinkMock::GetInstance()->GetRequests();
             i = from;
             j = 0;
+            for (auto request : requests) {
+                LOG_DEBUG(
+                    sLogger,
+                    ("request", request.mData)("logstore", static_cast<FlusherSLS*>(requests[j].mFlusher)->mLogstore));
+            }
             while ((i < to + 1) && j < requests.size()) {
-                if (requests[j].find("test-data-" + to_string(i)) != string::npos) {
+                auto content = requests[j].mData;
+                auto actualLogstore = static_cast<FlusherSLS*>(requests[j].mFlusher)->mLogstore;
+                if (actualLogstore != logstore) {
+                    ++j;
+                    continue;
+                }
+                if (content.find("test-data-" + to_string(i)) != string::npos) {
                     ++i;
                     continue;
                 }
                 ++j;
             }
-            if (i == to + 1 || retry == 7) {
-                APSARA_TEST_EQUAL_FATAL(requests.size() - 1, j);
+            if (i == to + 1 || retry == retryTimes - 1) {
                 APSARA_TEST_EQUAL_FATAL(to + 1, i);
                 return;
             }
@@ -238,19 +303,16 @@ private:
         })";
     string nativeProcessorConfig = R"(
         {
-            "Type": "processor_mock",
-            "Block": true
+            "Type": "processor_mock"
         })";
     string nativeProcessorConfig2 = R"(
         {
             "Type": "processor_mock",
-            "Regex": ".*",
-            "Block": true
+            "Regex": ".*"
         })";
     string nativeProcessorConfig3 = R"(
         {
-            "Type": "processor_mock2",
-            "Block": true
+            "Type": "processor_mock2"
         })";
     string nativeFlusherConfig = R"(
         {
@@ -352,6 +414,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -389,7 +452,6 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
     AddDataToProcessor(configName, "test-data-9");
     AddDataToProcessor(configName, "test-data-10");
 
-    UnBlockProcessor(configName);
     HttpSinkMock::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
     VerifyData("test_logstore_1", 1, 4);
@@ -536,6 +598,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -573,7 +636,6 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
     AddDataToProcessor(configName, "test-data-9");
     AddDataToProcessor(configName, "test-data-10");
 
-    UnBlockProcessor(configName);
     HttpSinkMock::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
     VerifyData("test_logstore_1", 1, 4);
@@ -720,6 +782,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase1() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -771,6 +834,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -829,6 +893,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase3() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -896,6 +961,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase4() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(false, LogtailPluginMock::GetInstance()->IsStarted());
 
@@ -1011,6 +1077,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase7() const {
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(false, LogtailPluginMock::GetInstance()->IsStarted());
 
@@ -1148,6 +1215,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase10() const {
         LogtailPluginMock::GetInstance()->UnblockProcess();
     });
     pipelineManager->UpdatePipelines(diffUpdate);
+    BlockProcessor(configName);
     result.get();
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(false, LogtailPluginMock::GetInstance()->IsStarted());
@@ -1285,6 +1353,7 @@ void PipelineUpdateUnittest::TestPipelineInputBlock() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -1312,7 +1381,10 @@ void PipelineUpdateUnittest::TestPipelineInputBlock() const {
         = PipelineConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
-    auto result1 = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
+    auto result1 = async(launch::async, [&]() {
+        pipelineManager->UpdatePipelines(diffUpdate);
+        BlockProcessor(configName);
+    });
     this_thread::sleep_for(chrono::milliseconds(1000));
     APSARA_TEST_NOT_EQUAL_FATAL(future_status::ready, result1.wait_for(chrono::milliseconds(0)));
     input->Unblock();
@@ -1531,7 +1603,6 @@ void PipelineUpdateUnittest::TestPipelineIsolationCase2() const {
     auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
     { // add data to C++ -> C++ -> C++
         std::string configName = "test1";
-        UnBlockProcessor(configName);
         AddDataToProcessor(configName, "test-data-1");
         AddDataToProcessor(configName, "test-data-2");
         AddDataToProcessor(configName, "test-data-3");
@@ -1568,6 +1639,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -1591,6 +1663,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
@@ -1647,6 +1720,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -1670,6 +1744,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
@@ -1723,6 +1798,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -1743,6 +1819,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
@@ -1799,6 +1876,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -1819,6 +1897,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
@@ -1872,6 +1951,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -1890,6 +1970,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
@@ -1945,6 +2026,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -1963,6 +2045,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
@@ -2015,6 +2098,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -2030,6 +2114,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
@@ -2085,6 +2170,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -2100,6 +2186,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     auto pipeline2 = PipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
@@ -2152,6 +2239,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -2188,6 +2276,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     pipelineManager->UpdatePipelines(diffUpdate3);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     AddDataToProcessQueue(configName, "test-data-7");
@@ -2217,6 +2306,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
@@ -2235,6 +2325,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
+    BlockProcessor(configName);
     APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt, pipelineManager->GetAllPipelines().size());
 
     ProcessorRunner::GetInstance()->Init();

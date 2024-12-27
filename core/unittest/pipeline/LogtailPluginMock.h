@@ -48,7 +48,6 @@ public:
 
     void Start(const std::string& configName) {
         while (startBlockFlag) {
-            LOG_DEBUG(sLogger, ("LogtailPluginMock start", "block")("config", configName));
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         startFlag = true;
@@ -57,7 +56,6 @@ public:
 
     void Stop(const std::string& configName, bool removingFlag) {
         while (stopBlockFlag) {
-            LOG_DEBUG(sLogger, ("LogtailPluginMock stop", "block")("config", configName));
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         startFlag = false;
@@ -67,7 +65,6 @@ public:
 
     void ProcessLogGroup(const std::string& configName, const std::string& logGroup, const std::string& packId) {
         while (processBlockFlag) {
-            LOG_DEBUG(sLogger, ("LogtailPluginMock process log group", "block")("config", configName));
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         LogtailPlugin::SendPbV2(configName.c_str(),
