@@ -132,12 +132,14 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
 
     auto iter = sLogstoreConcurrencyLimiterMap.find(key);
     if (iter == sLogstoreConcurrencyLimiterMap.end()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key, AppConfig::GetInstance()->GetSendRequestConcurrency());
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         sLogstoreConcurrencyLimiterMap.try_emplace(key, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key, AppConfig::GetInstance()->GetSendRequestConcurrency());
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
         return limiter;
     }
@@ -148,12 +150,14 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
     lock_guard<mutex> lock(sMux);
     auto iter = sProjectConcurrencyLimiterMap.find(project);
     if (iter == sProjectConcurrencyLimiterMap.end()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project, AppConfig::GetInstance()->GetSendRequestConcurrency());
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         sProjectConcurrencyLimiterMap.try_emplace(project, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project, AppConfig::GetInstance()->GetSendRequestConcurrency());
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
         return limiter;
     }
@@ -164,12 +168,20 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetRegionConcurrencyLimiter(const str
     lock_guard<mutex> lock(sMux);
     auto iter = sRegionConcurrencyLimiterMap.find(region);
     if (iter == sRegionConcurrencyLimiterMap.end()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
+        auto limiter = make_shared<ConcurrencyLimiter>(
+            sName + "#network#region#" + region,
+            AppConfig::GetInstance()->GetSendRequestConcurrency(),
+            AppConfig::GetInstance()->GetSendRequestConcurrency()
+                * AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         sRegionConcurrencyLimiterMap.try_emplace(region, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
+        auto limiter = make_shared<ConcurrencyLimiter>(
+            sName + "#network#region#" + region,
+            AppConfig::GetInstance()->GetSendRequestConcurrency(),
+            AppConfig::GetInstance()->GetSendRequestConcurrency()
+                * AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         iter->second = limiter;
         return limiter;
     }
@@ -889,7 +901,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
     EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(
         mProject, mCandidateHostsInfo->GetMode(), data->mCurrentHost, !hasNetworkError);
     mCandidateHostsInfo->SelectBestHost();
-    
+
     if (!hasNetworkError) {
         bool hasAuthError = sendResult == SEND_UNAUTHORIZED;
         EnterpriseSLSClientManager::GetInstance()->UpdateAccessKeyStatus(mAliuid, !hasAuthError);
@@ -1188,8 +1200,17 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                    query,
                                    header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
-    return make_unique<HttpSinkRequest>(
-        HTTP_POST, httpsFlag, item->mCurrentHost, httpsFlag ? 443 : 80, path, query, header, item->mData, item);
+    return make_unique<HttpSinkRequest>(HTTP_POST,
+                                        httpsFlag,
+                                        item->mCurrentHost,
+                                        httpsFlag ? 443 : 80,
+                                        path,
+                                        query,
+                                        header,
+                                        item->mData,
+                                        item,
+                                        INT32_FLAG(default_http_request_timeout_sec),
+                                        1);
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const string& accessKeyId,
@@ -1211,8 +1232,17 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                       path,
                                       header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
-    return make_unique<HttpSinkRequest>(
-        HTTP_POST, httpsFlag, item->mCurrentHost, httpsFlag ? 443 : 80, path, "", header, item->mData, item);
+    return make_unique<HttpSinkRequest>(HTTP_POST,
+                                        httpsFlag,
+                                        item->mCurrentHost,
+                                        httpsFlag ? 443 : 80,
+                                        path,
+                                        "",
+                                        header,
+                                        item->mData,
+                                        item,
+                                        INT32_FLAG(default_http_request_timeout_sec),
+                                        1);
 }
 
 sls_logs::SlsCompressType ConvertCompressType(CompressType type) {
