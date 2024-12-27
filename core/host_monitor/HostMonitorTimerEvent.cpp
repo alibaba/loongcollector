@@ -16,9 +16,8 @@
 
 #include "HostMonitorTimerEvent.h"
 
-#include <utility>
-
-#include "HostMonitorInputRunner.h"
+#include "common/timer/Timer.h"
+#include "host_monitor/HostMonitorInputRunner.h"
 
 namespace logtail {
 
@@ -28,7 +27,10 @@ bool HostMonitorTimerEvent::IsValid() const {
 }
 
 bool HostMonitorTimerEvent::Execute() {
+    LOG_DEBUG(sLogger, ("schedule host monitor collector", mCollectConfig.mConfigName));
     HostMonitorInputRunner::GetInstance()->ScheduleOnce(mCollectConfig);
+    auto event = std::make_unique<HostMonitorTimerEvent>(GetExecTime() + mCollectConfig.mInterval, mCollectConfig);
+    Timer::GetInstance()->PushEvent(std::move(event));
     return true;
 }
 

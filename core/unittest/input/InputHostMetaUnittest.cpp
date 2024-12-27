@@ -16,7 +16,6 @@
 
 #include "PluginRegistry.h"
 #include "common/JsonUtil.h"
-#include "ebpf/config.h"
 #include "pipeline/Pipeline.h"
 #include "plugin/input/InputHostMeta.h"
 #include "unittest/Unittest.h"
@@ -57,7 +56,7 @@ void InputHostMetaUnittest::TestName() {
 void InputHostMetaUnittest::TestSupportAck() {
     InputHostMeta input;
     bool supportAck = input.SupportAck();
-    APSARA_TEST_FALSE(supportAck);
+    APSARA_TEST_TRUE(supportAck);
 }
 
 void InputHostMetaUnittest::OnSuccessfulInit() {

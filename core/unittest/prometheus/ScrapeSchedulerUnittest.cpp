@@ -250,9 +250,8 @@ void ScrapeSchedulerUnittest::TestExactlyScrape() {
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
-    auto timer = make_shared<Timer>();
     EventPool eventPool{true};
-    event.SetComponent(timer, &eventPool);
+    event.SetComponent(&eventPool);
     auto execTime = std::chrono::steady_clock::now();
     auto scrapeTime = std::chrono::system_clock::now();
     event.SetFirstExecTime(execTime, scrapeTime);

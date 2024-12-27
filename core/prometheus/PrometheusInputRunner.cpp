@@ -83,7 +83,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     targetSubscriber->InitSelfMonitor(defaultLabels);
 
     targetSubscriber->mUnRegisterMs = mUnRegisterMs.load();
-    targetSubscriber->SetComponent(mTimer, &mEventPool);
+    targetSubscriber->SetComponent(&mEventPool);
     auto currSystemTime = chrono::system_clock::now();
     auto randSleepMilliSec
         = GetRandSleepMilliSec(targetSubscriber->GetId(),

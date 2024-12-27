@@ -18,9 +18,8 @@
 
 namespace logtail {
 
-const std::string DEFAULT_ENV_KEY_HOST_TYPE = "HOST_TYPE";
-const std::string DEFAULT_ENV_VALUE_ECS = "ecs";
-const std::string DEFAULT_ENV_VALUE_HOST = "host";
+const std::string DEFAULT_HOST_TYPE_ECS = "ecs";
+const std::string DEFAULT_HOST_TYPE_HOST = "host";
 const std::string DEFAULT_CONTENT_KEY_ENTITY_TYPE = "__entity_type__";
 const std::string DEFAULT_CONTENT_KEY_ENTITY_ID = "__entity_id__";
 const std::string DEFAULT_CONTENT_KEY_DOMAIN = "__domain__";

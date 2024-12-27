@@ -21,6 +21,8 @@
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/ThreadPool.h"
@@ -46,22 +48,19 @@ public:
         return &sInstance;
     }
 
-    void UpdateCollector(const std::string& configName,
-                         const std::vector<std::string>& collectorNames,
-                         QueueKey processQueueKey,
-                         int inputIndex);
-    void RemoveCollector(const std::string& configName);
+    // Only support singleton mode
+    void UpdateCollector(const std::vector<std::string>& collectorNames, QueueKey processQueueKey, int inputIndex);
+    void RemoveCollector();
 
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
 
-    bool IsCollectTaskValid(const std::string& configName, const std::string& collectorName) const;
+    bool IsCollectTaskValid(const std::string& configName, const std::string& collectorName);
     void ScheduleOnce(HostMonitorTimerEvent::CollectConfig& collectConfig);
 
 private:
     HostMonitorInputRunner();
-    std::unique_ptr<HostMonitorTimerEvent> BuildTimerEvent(HostMonitorTimerEvent::CollectConfig& collectConfig);
 
     template <typename T>
     void RegisterCollector();
@@ -71,8 +70,8 @@ private:
 
     ThreadPool mThreadPool;
 
-    mutable std::shared_mutex mCollectorRegisterMapMutex;
-    std::unordered_map<std::string, std::vector<std::string>> mCollectorRegisterMap;
+    mutable std::shared_mutex mRegisteredCollectorMapMutex;
+    std::unordered_map<std::string, bool> mRegisteredCollectorMap;
     std::unordered_map<std::string, std::shared_ptr<BaseCollector>> mCollectorInstanceMap;
 
 #ifdef APSARA_UNIT_TEST_MAIN

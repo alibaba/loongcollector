@@ -15,8 +15,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(host_monitor_unittest)
 
-add_executable(process_collector_unittest ProcessCollectorUnittest.cpp)
-target_link_libraries(process_collector_unittest ${UT_BASE_TARGET})
+add_executable(process_entity_collector_unittest ProcessEntityCollectorUnittest.cpp)
+target_link_libraries(process_entity_collector_unittest ${UT_BASE_TARGET})
 
 add_executable(host_monitor_input_runner_unittest HostMonitorInputRunnerUnittest.cpp)
 target_link_libraries(host_monitor_input_runner_unittest ${UT_BASE_TARGET})
@@ -29,6 +29,6 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/1/ DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/stat DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 include(GoogleTest)
-gtest_discover_tests(process_collector_unittest)
+gtest_discover_tests(process_entity_collector_unittest)
 gtest_discover_tests(host_monitor_input_runner_unittest)
 gtest_discover_tests(system_information_tools_unittest)

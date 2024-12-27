@@ -46,23 +46,25 @@ const std::string ProcessEntityCollector::sName = "process_entity";
 ProcessEntityCollector::ProcessEntityCollector() : mProcessSilentCount(INT32_FLAG(process_collect_silent_count)) {
     // try to read process dir
     if (access(PROCESS_DIR.c_str(), R_OK) != 0) {
-        LOG_ERROR(sLogger, ("process collector init failed", "process dir not exist or ")("dir", PROCESS_DIR));
+        LOG_ERROR(sLogger,
+                  ("process collector init failed", "process dir not exist or no permission")("dir", PROCESS_DIR));
         mValidState = false;
     } else {
         mValidState = true;
     }
-    auto hostType = ToString(getenv(DEFAULT_ENV_KEY_HOST_TYPE.c_str()));
+    // TODO: fix after host id ready
+    mHostEntityID = ""; // FetchHostId();
+    mDomain = "";
     std::ostringstream oss;
-    if (hostType == DEFAULT_ENV_VALUE_ECS) {
-        oss << DEFAULT_CONTENT_VALUE_DOMAIN_ACS << "." << DEFAULT_ENV_VALUE_ECS << "."
+    if (mDomain == DEFAULT_HOST_TYPE_ECS) {
+        oss << DEFAULT_CONTENT_VALUE_DOMAIN_ACS << "." << DEFAULT_HOST_TYPE_ECS << "."
             << DEFAULT_CONTENT_VALUE_ENTITY_TYPE_PROCESS;
         mDomain = DEFAULT_CONTENT_VALUE_DOMAIN_ACS;
     } else {
-        oss << DEFAULT_CONTENT_VALUE_DOMAIN_INFRA << "." << DEFAULT_ENV_VALUE_HOST << "."
+        oss << DEFAULT_CONTENT_VALUE_DOMAIN_INFRA << "." << DEFAULT_HOST_TYPE_HOST << "."
             << DEFAULT_CONTENT_VALUE_ENTITY_TYPE_PROCESS;
         mDomain = DEFAULT_CONTENT_VALUE_DOMAIN_INFRA;
     }
-    mHostEntityID = FetchHostId();
     mEntityType = oss.str();
 };
 
@@ -90,9 +92,9 @@ void ProcessEntityCollector::Collect(PipelineEventGroup& group) {
         // custom fields
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_PID, std::to_string(process->pid));
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_PPID, std::to_string(process->parentPid));
-        // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_USER, ""); TODO: get user name
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_COMM, process->name);
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CREATE_TIME, processCreateTime);
+        // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_USER, ""); TODO: get user name
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CWD, ""); TODO: get cwd
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_BINARY, ""); TODO: get binary
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_ARGUMENTS, ""); TODO: get arguments
@@ -151,13 +153,13 @@ ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCo
     const auto now = steady_clock::now();
 
     // TODO: more accurate cache
-    auto prev = GetPreProcessStat(pid);
+    auto prev = mPrevProcessStat[pid];
     isFirstCollect = prev == nullptr || prev->lastTime.time_since_epoch().count() == 0;
     // proc/[pid]/stat的统计粒度通常为10ms，两次采样之间需要足够大才能平滑。
     if (prev && now < prev->lastTime + seconds{1}) {
         return prev;
     }
-    auto ptr = ReadProcessStat(pid);
+    auto ptr = ReadNewProcessStat(pid);
     if (!ptr) {
         return nullptr;
     }
@@ -184,7 +186,7 @@ ProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCo
     return ptr;
 }
 
-ProcessStatPtr ProcessEntityCollector::ReadProcessStat(pid_t pid) {
+ProcessStatPtr ProcessEntityCollector::ReadNewProcessStat(pid_t pid) {
     LOG_DEBUG(sLogger, ("read process stat", pid));
     auto processStat = PROCESS_DIR / std::to_string(pid) / PROCESS_STAT;
 

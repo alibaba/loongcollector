@@ -30,13 +30,11 @@ namespace logtail {
 class HostMonitorTimerEvent : public TimerEvent {
 public:
     struct CollectConfig {
-        CollectConfig(std::string configName,
-                      std::string collectorName,
+        CollectConfig(std::string collectorName,
                       QueueKey processQueueKey,
                       int inputIndex,
                       std::chrono::seconds interval)
-            : mConfigName(configName),
-              mCollectorName(collectorName),
+            : mCollectorName(collectorName),
               mProcessQueueKey(processQueueKey),
               mInputIndex(inputIndex),
               mInterval(interval) {}
@@ -48,14 +46,13 @@ public:
         std::chrono::seconds mInterval;
     };
 
+    bool IsValid() const override;
+    bool Execute() override;
+
+private:
     HostMonitorTimerEvent(std::chrono::steady_clock::time_point execTime, CollectConfig collectConfig)
         : TimerEvent(execTime), mCollectConfig(collectConfig) {}
 
-    bool IsValid() const override;
-    bool Execute() override;
-    void ResetForNextExec() { SetExecTime(GetExecTime() + mCollectConfig.mInterval); }
-
-private:
     CollectConfig mCollectConfig;
 };
 

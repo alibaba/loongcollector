@@ -19,8 +19,8 @@
 namespace logtail {
 
 extern const std::string DEFAULT_ENV_KEY_HOST_TYPE;
-extern const std::string DEFAULT_ENV_VALUE_ECS;
-extern const std::string DEFAULT_ENV_VALUE_HOST;
+extern const std::string DEFAULT_HOST_TYPE_ECS;
+extern const std::string DEFAULT_HOST_TYPE_HOST;
 extern const std::string DEFAULT_CONTENT_KEY_ENTITY_TYPE;
 extern const std::string DEFAULT_CONTENT_KEY_ENTITY_ID;
 extern const std::string DEFAULT_CONTENT_KEY_DOMAIN;

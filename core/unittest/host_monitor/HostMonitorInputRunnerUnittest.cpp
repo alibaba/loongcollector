@@ -17,6 +17,7 @@
 
 #include "HostMonitorInputRunner.h"
 #include "HostMonitorTimerEvent.h"
+#include "Logger.h"
 #include "ProcessQueueItem.h"
 #include "ProcessQueueManager.h"
 #include "QueueKey.h"
@@ -37,10 +38,10 @@ public:
 void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
     auto runner = HostMonitorInputRunner::GetInstance();
     runner->Init();
-    runner->UpdateCollector("test", {"mock"}, QueueKey{}, 0);
+    runner->UpdateCollector({"mock"}, QueueKey{}, 0);
     APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid("test", "mock"));
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
-    runner->RemoveCollector("test");
+    runner->RemoveCollector();
     APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test", "mock"));
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
@@ -56,14 +57,15 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     ctx.SetConfigName(configName);
     ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(queueKey, 0, ctx);
 
-    HostMonitorTimerEvent::CollectConfig collectConfig(configName, "process", queueKey, 0, std::chrono::seconds(1));
+    HostMonitorTimerEvent::CollectConfig collectConfig("process_entity", queueKey, 0, std::chrono::seconds(60));
+    runner->ScheduleOnce(collectConfig);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     runner->ScheduleOnce(collectConfig);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     auto item = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::make_shared<SourceBuffer>(), 0));
     ProcessQueueManager::GetInstance()->EnablePop(configName);
     APSARA_TEST_TRUE_FATAL(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
     APSARA_TEST_EQUAL_FATAL("test", configName);
-    APSARA_TEST_TRUE_FATAL(item->mEventGroup.GetEvents().size() == 1);
 
     // verify schdule next
     APSARA_TEST_EQUAL_FATAL(Timer::GetInstance()->mQueue.size(), 1);

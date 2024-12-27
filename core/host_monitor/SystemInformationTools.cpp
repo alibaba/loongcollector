@@ -30,8 +30,8 @@ int64_t GetSystemBootSeconds() {
     std::vector<std::string> cpuLines = {};
     std::string errorMessage;
     int ret = GetFileLines(PROCESS_DIR / PROCESS_STAT, cpuLines, true, &errorMessage);
-    LOG_WARNING(sLogger, ("failed to get cpu lines", errorMessage)("ret", ret)("cpuLines", cpuLines.size()));
     if (ret != 0 || cpuLines.empty()) {
+        LOG_WARNING(sLogger, ("failed to get cpu lines", errorMessage)("ret", ret)("cpuLines", cpuLines.size()));
         return duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
     }
 

@@ -154,13 +154,11 @@ public:
 private:
     void GetSortedProcess(std::vector<ProcessStatPtr>& processStats, size_t topN);
     ProcessStatPtr GetProcessStat(pid_t pid, bool& isFirstCollect);
-    ProcessStatPtr ReadProcessStat(pid_t pid);
+    ProcessStatPtr ReadNewProcessStat(pid_t pid);
     ProcessStatPtr ParseProcessStat(pid_t pid, std::string& line);
-
     bool WalkAllProcess(const std::filesystem::path& root, const std::function<void(const std::string&)>& callback);
-    const std::string GetProcessEntityID(StringView pid, StringView createTime);
 
-    ProcessStatPtr GetPreProcessStat(pid_t pid) { return mPrevProcessStat[pid]; }
+    const std::string GetProcessEntityID(StringView pid, StringView createTime);
 
     steady_clock::time_point mProcessSortTime;
     std::vector<ProcessStatPtr> mSortProcessStats;

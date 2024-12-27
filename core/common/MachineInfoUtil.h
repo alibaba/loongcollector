@@ -40,7 +40,6 @@ bool GetKernelInfo(std::string& kernelRelease, int64_t& kernelVersion);
 bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashPath = "");
 bool IsDigitsDotsHostname(const char* hostname);
 ECSMeta FetchECSMeta();
-std::string FetchHostId();
 
 // GetAnyAvailableIP walks through all interfaces (AF_INET) to find an available IP.
 // Priority:

@@ -12,32 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ProcessCollector.h"
 #include "host_monitor/Constants.h"
+#include "host_monitor/collector/ProcessEntityCollector.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
 
 namespace logtail {
 
-class ProcessCollectorUnittest : public testing::Test {
+class ProcessEntityCollectorUnittest : public testing::Test {
 public:
-    void TestReadProcessStat() const;
+    void TestGetNewProcessStat() const;
     void TestSortProcessByCpu() const;
+    void TestGetProcessEntityID() const;
 };
 
-void ProcessCollectorUnittest::TestReadProcessStat() const {
+void ProcessEntityCollectorUnittest::TestGetNewProcessStat() const {
     PROCESS_DIR = ".";
-    auto collector = ProcessCollector();
-    auto ptr = collector.ReadProcessStat(1);
+    auto collector = ProcessEntityCollector();
+    auto ptr = collector.GetNewProcessStat(1);
     APSARA_TEST_NOT_EQUAL(nullptr, ptr);
     APSARA_TEST_EQUAL(1, ptr->pid);
     APSARA_TEST_EQUAL("cat", ptr->name);
 }
 
-void ProcessCollectorUnittest::TestSortProcessByCpu() const {
+void ProcessEntityCollectorUnittest::TestSortProcessByCpu() const {
     PROCESS_DIR = "/proc";
-    auto collector = ProcessCollector();
+    auto collector = ProcessEntityCollector();
     auto processes = vector<ProcessStatPtr>();
     collector.GetSortedProcess(processes, 5); // fist time will be ignored
     collector.GetSortedProcess(processes, 5);
@@ -50,8 +51,15 @@ void ProcessCollectorUnittest::TestSortProcessByCpu() const {
     }
 }
 
-UNIT_TEST_CASE(ProcessCollectorUnittest, TestReadProcessStat);
-UNIT_TEST_CASE(ProcessCollectorUnittest, TestSortProcessByCpu);
+void ProcessEntityCollectorUnittest::TestGetProcessEntityID() const {
+    ProcessEntityCollector collect;
+    collect.mHostEntityID = "123";
+    APSARA_TEST_EQUAL(collect.GetProcessEntityID("123", "123"), "f5bb0c8de146c67b44babbf4e6584cc0");
+}
+
+UNIT_TEST_CASE(ProcessEntityCollectorUnittest, TestGetNewProcessStat);
+UNIT_TEST_CASE(ProcessEntityCollectorUnittest, TestSortProcessByCpu);
+UNIT_TEST_CASE(ProcessEntityCollectorUnittest, TestGetProcessEntityID);
 
 } // namespace logtail
 
