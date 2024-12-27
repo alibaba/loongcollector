@@ -46,13 +46,13 @@ public:
         std::chrono::seconds mInterval;
     };
 
+    HostMonitorTimerEvent(std::chrono::steady_clock::time_point execTime, CollectConfig collectConfig)
+        : TimerEvent(execTime), mCollectConfig(collectConfig) {}
+
     bool IsValid() const override;
     bool Execute() override;
 
 private:
-    HostMonitorTimerEvent(std::chrono::steady_clock::time_point execTime, CollectConfig collectConfig)
-        : TimerEvent(execTime), mCollectConfig(collectConfig) {}
-
     CollectConfig mCollectConfig;
 };
 
