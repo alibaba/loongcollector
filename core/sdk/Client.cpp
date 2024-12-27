@@ -266,7 +266,7 @@ namespace sdk {
         SetCommonHeader(httpHeader, (int32_t)(body.length()), "");
         string signature = GetUrlSignature(HTTP_POST, operation, httpHeader, parameterList, body, accessKeySecret);
         httpHeader[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + accessKeyId + ':' + signature;
-        return make_unique<HttpSinkRequest>(HTTP_POST, mUsingHTTPS, host, mPort, operation, "", httpHeader, body, item, INT32_FLAG(default_http_request_timeout_secs), 1);
+        return make_unique<HttpSinkRequest>(HTTP_POST, mUsingHTTPS, host, mPort, operation, "", httpHeader, body, item, INT32_FLAG(default_http_request_timeout_secs), LOG_REQUEST_TRY_TIMES);
     }
 
     unique_ptr<HttpSinkRequest>
@@ -312,7 +312,7 @@ namespace sdk {
         GetQueryString(parameterList, queryString);
 
         return make_unique<HttpSinkRequest>(
-            HTTP_POST, mUsingHTTPS, host, mPort, operation, queryString, httpHeader, body, item, INT32_FLAG(default_http_request_timeout_secs), 1);
+            HTTP_POST, mUsingHTTPS, host, mPort, operation, queryString, httpHeader, body, item, INT32_FLAG(default_http_request_timeout_secs), LOG_REQUEST_TRY_TIMES);
     }
 
     PostLogStoreLogsResponse
