@@ -44,11 +44,11 @@ private:
 void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
     auto runner = HostMonitorInputRunner::GetInstance();
     runner->Init();
-    runner->UpdateCollector({"mock"}, QueueKey{}, 0);
-    APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid("test", "mock"));
+    runner->UpdateCollector({"process_entity"}, QueueKey{}, 0);
+    APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid("test", "process_entity"));
     APSARA_TEST_TRUE_FATAL(runner->HasRegisteredPlugins());
     runner->RemoveCollector();
-    APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test", "mock"));
+    APSARA_TEST_FALSE_FATAL(runner->IsCollectTaskValid("test", "process_entity"));
     APSARA_TEST_FALSE_FATAL(runner->HasRegisteredPlugins());
     runner->Stop();
 }
