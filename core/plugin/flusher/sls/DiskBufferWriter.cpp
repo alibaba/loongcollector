@@ -76,7 +76,11 @@ static sls_logs::EndpointMode GetEndpointMode(EndpointMode mode) {
     }
     return sls_logs::EndpointMode::DEFAULT;
 }
+
+static const string kAKErrorMsg = "can not get valid access key";
 #endif
+
+static const string kNoHostErrorMsg = "can not get available host";
 
 static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compressType) {
     switch (compressType) {
@@ -545,7 +549,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                 break;
                             case SEND_NETWORK_ERROR:
                             case SEND_SERVER_ERROR:
-                                if (response.mErrorMsg != "can not get available host") {
+                                if (response.mErrorMsg != kNoHostErrorMsg) {
                                     LOG_WARNING(
                                         sLogger,
                                         ("send data to SLS fail", "retry later")("request id", response.mRequestId)(
@@ -583,7 +587,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
 #ifdef __ENTERPRISE__
                         if (sendRes != SEND_NETWORK_ERROR && sendRes != SEND_SERVER_ERROR) {
                             bool hasAuthError
-                                = sendRes == SEND_UNAUTHORIZED && response.mErrorMsg != "can not get valid access key";
+                                = sendRes == SEND_UNAUTHORIZED && response.mErrorMsg != kAKErrorMsg;
                             EnterpriseSLSClientManager::GetInstance()->UpdateAccessKeyStatus(bufferMeta.aliuid(),
                                                                                              !hasAuthError);
                             EnterpriseSLSClientManager::GetInstance()->UpdateProjectAnonymousWriteStatus(
@@ -829,7 +833,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                 bufferMeta.project(), type, accessKeyId, accessKeySecret)) {
             SLSResponse response;
             response.mErrorCode = LOGE_UNAUTHORIZED;
-            response.mErrorMsg = "can not get valid access key";
+            response.mErrorMsg = kAKErrorMsg;
             return response;
         }
 #endif
@@ -848,7 +852,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
     if (host.empty()) {
         SLSResponse response;
         response.mErrorCode = LOGE_REQUEST_ERROR;
-        response.mErrorMsg = "can not get available host";
+        response.mErrorMsg = kNoHostErrorMsg;
         return response;
     }
 #else
