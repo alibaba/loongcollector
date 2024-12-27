@@ -246,11 +246,13 @@ bool PipelineConfig::Parse() {
             }
         }
         mInputs.push_back(&plugin);
+#ifndef APSARA_UNIT_TEST_MAIN
         // TODO: remove these special restrictions
         if (pluginType == "input_file" || pluginType == "input_container_stdio") {
             hasFileInput = true;
         }
-#ifdef APSARA_UNIT_TEST_MAIN
+#else
+        // TODO: remove these special restrictions after all C++ inputs support Go processors
         if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos) {
             hasFileInput = true;
         }

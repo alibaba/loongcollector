@@ -33,7 +33,6 @@ public:
     ProcessorInstance(Processor* plugin, const PluginMeta& pluginMeta) : PluginInstance(pluginMeta), mPlugin(plugin) {}
 
     const std::string& Name() const override { return mPlugin->Name(); };
-    const Processor* GetPlugin() const { return mPlugin.get(); }
 
     bool Init(const Json::Value& config, PipelineContext& context);
     void Process(std::vector<PipelineEventGroup>& logGroupList);
@@ -60,6 +59,7 @@ private:
     friend class InputFileUnittest;
     friend class InputPrometheusUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

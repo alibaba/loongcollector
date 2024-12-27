@@ -395,9 +395,8 @@ bool Pipeline::Send(vector<PipelineEventGroup>&& groupList) {
         auto res = mRouter.Route(group);
         for (auto& item : res) {
             if (item.first >= mFlushers.size()) {
-                LOG_WARNING(sLogger,
-                            ("pipeline send", "discard data")("config", mName)(
-                                "reason", "invalid flusher index or config update flusher from C++ to Go"));
+                LOG_ERROR(sLogger,
+                          ("unexpected error", "invalid flusher index")("flusher index", item.first)("config", mName));
                 allSucceeded = false;
                 continue;
             }
