@@ -95,8 +95,6 @@ public:
     void Process(PipelineEventGroup& logGroup) override {
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            LOG_DEBUG(sLogger,
-                      ("processor mock", "block")("cnt", mCnt)("data", logGroup.GetEvents()[0]->ToJsonString()));
         }
         ++mCnt;
     };

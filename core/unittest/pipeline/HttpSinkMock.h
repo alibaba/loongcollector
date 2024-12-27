@@ -57,7 +57,6 @@ public:
     void Run() {
         LOG_INFO(sLogger, ("http sink mock", "started"));
         while (true) {
-            LOG_DEBUG(sLogger, ("http sink mock", "running")("mIsFlush", mIsFlush.load())("mQueueSize", mQueue.Size()));
             std::unique_ptr<HttpSinkRequest> request;
             if (mQueue.WaitAndPop(request, 500)) {
                 {
@@ -75,7 +74,6 @@ public:
                 static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
                 FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
                 request.reset();
-                LOG_DEBUG(sLogger, ("http sink mock", "pop one request"));
             } else if (mIsFlush && mQueue.Empty()) {
                 break;
             } else {
