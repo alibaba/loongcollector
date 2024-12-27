@@ -38,6 +38,9 @@ bool AsynCurlRunner::Init() {
 void AsynCurlRunner::Stop() {
     mIsFlush = true;
     future_status s = mThreadRes.wait_for(chrono::seconds(1));
+    if (!mThreadRes.valid()) {
+        return;
+    }
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("async curl runner", "stopped successfully"));
     } else {

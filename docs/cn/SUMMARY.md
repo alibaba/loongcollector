@@ -47,6 +47,7 @@
     * [eBPF网络安全数据](plugins/input/native/input-network-security.md)
     * [eBPF文件安全数据](plugins/input/native/input-file-security.md)
     * [eBPF网络调用数据](plugins/input/native/metric-observer.md)
+    * [自监控指标数据](plugins/input/native/input-internal-metrics.md)
   * 扩展输入插件
     * [容器标准输出](plugins/input/extended/service-docker-stdout.md)
     * [脚本执行数据](plugins/input/extended/input-command.md)
@@ -111,6 +112,7 @@
   * [什么是输出插件](plugins/flusher/flushers.md)
   * 原生输出插件
     * [SLS](plugins/flusher/native/flusher-sls.md)
+    * [本地文件](plugins/flusher/native/flusher-file.md)
     * [【Debug】Blackhole](plugins/flusher/native/flusher-blackhole.md)
     * [多Flusher路由](plugins/flusher/native/router.md)
   * 扩展输出插件
@@ -140,7 +142,8 @@
 
 * [开发环境](developer-guide/development-environment.md)
 * [代码风格](developer-guide/codestyle.md)
-* [数据模型](developer-guide/data-model.md)
+* [数据模型（C++）](developer-guide/data-model-cpp.md)
+* [数据模型（Golang）](developer-guide/data-model-golang.md)
 * 日志协议
   * [什么是日志协议](developer-guide/log-protocol/log-protocol.md)
   * [协议转换](developer-guide/log-protocol/converter.md)
@@ -149,6 +152,11 @@
     * [sls协议](developer-guide/log-protocol/protocol-spec/sls.md)
     * [单条协议](developer-guide/log-protocol/protocol-spec/custom-single.md)
     * [raw协议](developer-guide/log-protocol/protocol-spec/raw.md)
+* 自监控
+  * 指标
+    * [自监控指标说明](developer-guide/self-monitor/metrics/internal-metrics-description.md)
+    * [如何收集自监控指标](developer-guide/self-monitor/metrics/how-to-collect-internal-metrics.md)
+    * [如何添加自监控指标](developer-guide/self-monitor/metrics/how-to-add-internal-metrics.md)
 * 插件开发
   * [开源插件开发引导](developer-guide/plugin-development/plugin-development-guide.md)
   * 原生插件开发
@@ -168,7 +176,7 @@
     * [插件文档规范](developer-guide/plugin-development/plugin-docs/plugin-doc-templete.md)
   * 插件调试
     * [Logger接口](developer-guide/plugin-development/plugin-debug/logger-api.md)
-    * [自监控指标接口](developer-guide/plugin-development/plugin-debug/plugin-self-monitor-guide.md)
+    * [Golang 自监控指标接口](developer-guide/plugin-development/plugin-debug/plugin-self-monitor-guide.md)
     * [纯插件模式启动](developer-guide/plugin-development/plugin-debug/pure-plugin-start.md)
 * 测试
   * [单元测试](developer-guide/test/unit-test.md)
