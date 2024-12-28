@@ -40,9 +40,9 @@ void ProcessEntityCollectorUnittest::TestSortProcessByCpu() const {
     PROCESS_DIR = "/proc";
     auto collector = ProcessEntityCollector();
     auto processes = vector<ProcessStatPtr>();
-    collector.GetSortedProcess(processes, 5); // fist time will be ignored
-    collector.GetSortedProcess(processes, 5);
-    APSARA_TEST_EQUAL(5, processes.size());
+    collector.GetSortedProcess(processes, 3); // fist time will be ignored
+    collector.GetSortedProcess(processes, 3);
+    APSARA_TEST_EQUAL(3, processes.size());
     auto prev = processes[0];
     for (auto i = 1; i < processes.size(); i++) {
         auto process = processes[i];
