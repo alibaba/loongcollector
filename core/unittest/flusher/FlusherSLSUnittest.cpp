@@ -714,7 +714,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(nullptr, req);
         APSARA_TEST_TRUE(keepItem);
-        APSARA_TEST_EQUAL(static_cast<uint32_t>(AppConfig::GetInstance()->GetSendRequestConcurrency()) / 2,
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(AppConfig::GetInstance()->GetSendRequestConcurrency()),
                           FlusherSLS::GetRegionConcurrencyLimiter(flusher.mRegion)->GetCurrentLimit());
     }
     EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency("test_project",
