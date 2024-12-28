@@ -31,6 +31,10 @@ public:
     void TestPushToHttpSink();
 
 protected:
+    static void SetUpTestCase() {
+        AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 10;
+    }
+    
     void TearDown() override {
         SenderQueueManager::GetInstance()->Clear();
         HttpSink::GetInstance()->mQueue.Clear();
@@ -46,8 +50,6 @@ void FlusherRunnerUnittest::TestDispatch() {
         flusher->SetContext(ctx);
         flusher->SetMetricsRecordRef("name", "1");
         flusher->Init(Json::Value(), tmp);
-
-        AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 10;
 
         auto item = make_unique<SenderQueueItem>("content", 10, flusher.get(), flusher->GetQueueKey());
         auto realItem = item.get();

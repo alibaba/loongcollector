@@ -534,6 +534,7 @@ public:
     friend class InputContainerStdioUnittest;
     friend class BatcherUnittest;
     friend class EnterpriseSLSClientManagerUnittest;
+    friend class FlusherRunnerUnittest;
 #endif
 };
 
