@@ -54,6 +54,8 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^delete yaml \{(.*)\} from k8s`, control.DeleteYaml)
 	ctx.When(`^restart agent`, control.RestartAgent)
 	ctx.When(`^force restart agent`, control.ForceRestartAgent)
+	ctx.When(`^apply remote config \{(.*)\} to machine group \{(.*)\}`, control.ApplyRemoteConfig)
+	ctx.When(`^remove remote config \{(.*)\} from machine group \{(.*)\}`, control.RemoveRemoteConfig)
 
 	// generate
 	ctx.When(`^begin trigger`, trigger.BeginTrigger)

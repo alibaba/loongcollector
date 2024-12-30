@@ -136,6 +136,28 @@ func AddRemoteConfig(ctx context.Context, configName, c string) (context.Context
 	return ctx, nil
 }
 
+func ApplyRemoteConfig(ctx context.Context, configName, machineGroup string) (context.Context, error) {
+	if subscriber.TestSubscriber.Name() != "sls" {
+		return ctx, fmt.Errorf("only support sls subscriber")
+	}
+	slsSubscriber := subscriber.TestSubscriber.(*subscriber.SLSSubscriber)
+	if err := slsSubscriber.ApplyConfig(configName, machineGroup); err != nil {
+		return ctx, err
+	}
+	return ctx, nil
+}
+
+func RemoveRemoteConfig(ctx context.Context, configName, machineGroup string) (context.Context, error) {
+	if subscriber.TestSubscriber.Name() != "sls" {
+		return ctx, fmt.Errorf("only support sls subscriber")
+	}
+	slsSubscriber := subscriber.TestSubscriber.(*subscriber.SLSSubscriber)
+	if err := slsSubscriber.RemoveConfig(configName, machineGroup); err != nil {
+		return ctx, err
+	}
+	return ctx, nil
+}
+
 func completeConfigWithFlusher(c string) string {
 	if strings.Contains(c, "flushers") {
 		return c

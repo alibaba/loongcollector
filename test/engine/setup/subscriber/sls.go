@@ -87,9 +87,9 @@ func (s *SLSSubscriber) Stop() error {
 	return nil
 }
 
-func (s *SLSSubscriber) UpdateConfig(configName, c string) error {
-	if !strings.Contains(c, "flushers") {
-		c += s.FlusherConfig()
+func (s *SLSSubscriber) UpdateConfig(configName, configYaml string) error {
+	if !strings.Contains(configYaml, "flushers") {
+		configYaml += s.FlusherConfig()
 	}
 	// Get old config first
 	response, err := s.client.GetLogtailPipelineConfig(tea.String(s.Project), tea.String(configName))
@@ -102,7 +102,7 @@ func (s *SLSSubscriber) UpdateConfig(configName, c string) error {
 	config := response.Body
 	// Merge config
 	newConfig := make(map[string]interface{})
-	err = yaml.Unmarshal([]byte(c), newConfig)
+	err = yaml.Unmarshal([]byte(configYaml), newConfig)
 	if err != nil {
 		return err
 	}
@@ -177,6 +177,28 @@ func (s *SLSSubscriber) UpdateConfig(configName, c string) error {
 	}
 	if *updateResponse.StatusCode != 200 {
 		return fmt.Errorf("update config %s failed, status code %d, message %s", configName, *updateResponse.StatusCode, updateResponse.GoString())
+	}
+	return nil
+}
+
+func (s *SLSSubscriber) ApplyConfig(configName, machineGroup string) error {
+	response, err := s.client.ApplyConfigToMachineGroup(tea.String(s.Project), tea.String(machineGroup), tea.String(configName))
+	if err != nil {
+		return err
+	}
+	if *response.StatusCode != 200 {
+		return fmt.Errorf("apply config %s to machine group %s failed, status code %d, message %s", configName, machineGroup, *response.StatusCode, response.GoString())
+	}
+	return nil
+}
+
+func (s *SLSSubscriber) RemoveConfig(configName, machineGroup string) error {
+	response, err := s.client.RemoveConfigFromMachineGroup(tea.String(s.Project), tea.String(machineGroup), tea.String(configName))
+	if err != nil {
+		return err
+	}
+	if *response.StatusCode != 200 {
+		return fmt.Errorf("remove config %s from machine group %s failed, status code %d, message %s", configName, machineGroup, *response.StatusCode, response.GoString())
 	}
 	return nil
 }
