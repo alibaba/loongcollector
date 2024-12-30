@@ -27,6 +27,7 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.Given(`^loongcollector container mount \{(.*)\} to \{(.*)\}`, setup.MountVolume)
 	ctx.Given(`^loongcollector expose port \{(.*)\} to \{(.*)\}`, setup.ExposePort)
 	ctx.Given(`^\{(.*)\} local config as below`, control.AddLocalConfig)
+	ctx.Given(`^\{(.*)\} remote config as below`, control.AddRemoteConfig)
 	ctx.Given(`^\{(.*)\} http config as below`, control.AddHTTPConfig)
 	ctx.Given(`^remove http config \{(.*)\}`, control.RemoveHTTPConfig)
 	ctx.Given(`^subcribe data from \{(\S+)\} with config`, subscriber.InitSubscriber)
@@ -43,8 +44,9 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 
 	// When
 	// ------------------------------------------
-	ctx.When(`^add k8s label \{(.*)\}`, control.AddLabel)
-	ctx.When(`^remove k8s label \{(.*)\}`, control.RemoveLabel)
+	ctx.When(`^add k8s label \{(.*)\} to \{(.*)\}`, control.AddLabel)
+	ctx.When(`^remove k8s label \{(.*)\} to \{(.*)\}`, control.RemoveLabel)
+	ctx.When(`^scale deployment \{(.*)\} in namespace \{(.*)\} to \{(\d+)\}`, control.Scale)
 	ctx.When(`^start docker-compose \{(\S+)\}`, setup.StartDockerComposeEnv)
 	ctx.When(`^switch working on deployment \{(.*)\}`, setup.SwitchCurrentWorkingDeployment)
 	ctx.When(`^query through \{(.*)\}`, control.SetQuery)
