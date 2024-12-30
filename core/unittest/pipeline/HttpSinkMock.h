@@ -52,6 +52,7 @@ public:
         } else {
             LOG_WARNING(sLogger, ("http sink mock", "forced to stopped"));
         }
+        ClearRequests();
     }
 
     void Run() {
@@ -61,16 +62,10 @@ public:
             if (mQueue.WaitAndPop(request, 500)) {
                 {
                     std::lock_guard<std::mutex> lock(mMutex);
-                    std::string logstore = "default";
-                    if (static_cast<HttpFlusher*>(request->mItem->mFlusher)->Name().find("sls") != std::string::npos) {
-                        auto flusher = static_cast<FlusherSLS*>(request->mItem->mFlusher);
-                        logstore = flusher->mLogstore;
-                    }
                     mRequests.push_back(*(request->mItem));
                 }
                 request->mResponse.SetStatusCode(200);
                 request->mResponse.mHeader[sdk::X_LOG_REQUEST_ID] = "request_id";
-                static_cast<SLSSenderQueueItem*>(request->mItem)->mExactlyOnceCheckpoint = nullptr;
                 static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
                 FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
                 request.reset();
@@ -83,8 +78,7 @@ public:
     }
 
     bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request) {
-        mQueue.Push(std::move(request));
-        return true;
+        return Sink<HttpSinkRequest>::AddRequest(std::move(request));
     }
 
     std::vector<SenderQueueItem>& GetRequests() {

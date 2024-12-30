@@ -34,6 +34,15 @@ using namespace std;
 
 namespace logtail {
 
+HttpSink* HttpSink::GetInstance() {
+#ifndef APSARA_UNIT_TEST_MAIN
+    static HttpSink instance;
+    return &instance;
+#else
+    return HttpSinkMock::GetInstance();
+#endif
+}
+
 bool HttpSink::Init() {
 #ifndef APSARA_UNIT_TEST_MAIN
     mClient = curl_multi_init();
@@ -68,6 +77,7 @@ bool HttpSink::Init() {
 }
 
 void HttpSink::Stop() {
+#ifdef APSARA_UNIT_TEST_MAIN
     mIsFlush = true;
     if (!mThreadRes.valid()) {
         return;
@@ -78,6 +88,9 @@ void HttpSink::Stop() {
     } else {
         LOG_WARNING(sLogger, ("http sink", "forced to stopped"));
     }
+#else
+    HttpSinkMock::GetInstance()->Stop();
+#endif
 }
 
 void HttpSink::Run() {

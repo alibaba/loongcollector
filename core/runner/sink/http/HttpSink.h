@@ -26,7 +26,6 @@
 #include "monitor/MetricManager.h"
 #include "runner/sink/Sink.h"
 #include "runner/sink/http/HttpSinkRequest.h"
-
 namespace logtail {
 
 class HttpSink : public Sink<HttpSinkRequest> {
@@ -34,14 +33,12 @@ public:
     HttpSink(const HttpSink&) = delete;
     HttpSink& operator=(const HttpSink&) = delete;
 
-    static HttpSink* GetInstance() {
-        static HttpSink instance;
-        return &instance;
-    }
+    static HttpSink* GetInstance();
 
     bool Init() override;
     void Stop() override;
 
+    // rewrite for unittest
     bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request);
 
 private:
