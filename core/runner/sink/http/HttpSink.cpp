@@ -77,7 +77,7 @@ bool HttpSink::Init() {
 }
 
 void HttpSink::Stop() {
-#ifdef APSARA_UNIT_TEST_MAIN
+#ifndef APSARA_UNIT_TEST_MAIN
     mIsFlush = true;
     if (!mThreadRes.valid()) {
         return;
