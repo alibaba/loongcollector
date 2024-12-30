@@ -2702,7 +2702,8 @@ void PipelineUnittest::TestProcess() const {
     processor->Init(Json::Value(), ctx);
     pipeline.mProcessorLine.emplace_back(std::move(processor));
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
+    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
     pipeline.mProcessorsInEventsTotal
         = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL);
     pipeline.mProcessorsInGroupsTotal
@@ -2750,7 +2751,8 @@ void PipelineUnittest::TestSend() const {
         configs.emplace_back(1, nullptr);
         pipeline.mRouter.Init(configs, ctx);
 
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
         pipeline.mFlushersInGroupsTotal
             = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL);
         pipeline.mFlushersInEventsTotal
@@ -2816,7 +2818,8 @@ void PipelineUnittest::TestSend() const {
         configs.emplace_back(configJson.size(), nullptr);
         pipeline.mRouter.Init(configs, ctx);
 
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
+        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+            pipeline.mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_UNKNOWN, {});
         pipeline.mFlushersInGroupsTotal
             = pipeline.mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL);
         pipeline.mFlushersInEventsTotal
@@ -2893,15 +2896,19 @@ void PipelineUnittest::TestInProcessingCount() const {
     vector<PipelineEventGroup> group;
     group.emplace_back(make_shared<SourceBuffer>());
 
+    auto pipeline2 = make_shared<Pipeline>();
+    PipelineManager::GetInstance()->mPipelineNameEntityMap[""] = pipeline2;
     processQueue->EnablePop();
     processQueue->Push(GenerateProcessItem(pipeline));
     APSARA_TEST_EQUAL(0, pipeline->mInProcessCnt.load());
+    APSARA_TEST_EQUAL(0, pipeline2->mInProcessCnt.load());
     unique_ptr<ProcessQueueItem> item;
     APSARA_TEST_TRUE(processQueue->Pop(item));
-    APSARA_TEST_EQUAL(1, pipeline->mInProcessCnt.load());
-
-    pipeline->SubInProcessCnt();
     APSARA_TEST_EQUAL(0, pipeline->mInProcessCnt.load());
+    APSARA_TEST_EQUAL(1, pipeline2->mInProcessCnt.load());
+
+    pipeline2->SubInProcessCnt();
+    APSARA_TEST_EQUAL(0, pipeline2->mInProcessCnt.load());
 }
 
 void PipelineUnittest::TestWaitAllItemsInProcessFinished() const {

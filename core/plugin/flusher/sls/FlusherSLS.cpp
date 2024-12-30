@@ -810,8 +810,8 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 //  the possibility of hash key conflict is very low, so data is
                 //  dropped here.
                 cpt->Commit();
-                failDetail << ", drop exactly once log group and commit checkpoint"
-                           << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
+                failDetail << ", drop exactly once log group and commit checkpoint" << " checkpointKey:" << cpt->key
+                           << " checkpoint:" << cpt->data.DebugString();
                 suggestion << "no suggestion";
                 AlarmManager::GetInstance()->SendAlarm(
                     EXACTLY_ONCE_ALARM,

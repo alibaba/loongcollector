@@ -26,7 +26,6 @@
 #include "pipeline/queue/SenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
-#include "runner/sink/http/HttpSink.h"
 // TODO: temporarily used here
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -59,6 +58,7 @@ bool FlusherRunner::Init() {
 
     mThreadRes = async(launch::async, &FlusherRunner::Run, this);
     mLastCheckSendClientTime = time(nullptr);
+    mIsFlush = false;
 
     return true;
 }
@@ -139,12 +139,12 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
     }
 
     req->mEnqueTime = item->mLastSendTime = chrono::system_clock::now();
-    HttpSink::GetInstance()->AddRequest(std::move(req));
-    ++mHttpSendingCnt;
     LOG_DEBUG(sLogger,
               ("send item to http sink, item address", item)("config-flusher-dst",
                                                              QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
-                  "sending cnt", ToString(mHttpSendingCnt.load())));
+                  "sending cnt", ToString(mHttpSendingCnt.load() + 1)));
+    HttpSink::GetInstance()->AddRequest(std::move(req));
+    ++mHttpSendingCnt;
 }
 
 void FlusherRunner::Run() {
@@ -195,7 +195,6 @@ void FlusherRunner::Run() {
             PackIdManager::GetInstance()->CleanTimeoutEntry();
             mLastCheckSendClientTime = time(NULL);
         }
-
         if (mIsFlush && SenderQueueManager::GetInstance()->IsAllQueueEmpty()) {
             break;
         }

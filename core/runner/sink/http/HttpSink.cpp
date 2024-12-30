@@ -24,12 +24,24 @@
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SenderQueueItem.h"
 #include "runner/FlusherRunner.h"
+#ifdef APSARA_UNIT_TEST_MAIN
+#include "unittest/pipeline/HttpSinkMock.h"
+#endif
 
 DEFINE_FLAG_INT32(http_sink_exit_timeout_secs, "", 5);
 
 using namespace std;
 
 namespace logtail {
+
+HttpSink* HttpSink::GetInstance() {
+#ifndef APSARA_UNIT_TEST_MAIN
+    static HttpSink instance;
+    return &instance;
+#else
+    return HttpSinkMock::GetInstance();
+#endif
+}
 
 bool HttpSink::Init() {
     mClient = curl_multi_init();

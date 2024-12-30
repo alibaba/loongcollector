@@ -246,10 +246,17 @@ bool PipelineConfig::Parse() {
             }
         }
         mInputs.push_back(&plugin);
+#ifndef APSARA_UNIT_TEST_MAIN
         // TODO: remove these special restrictions
         if (pluginType == "input_file" || pluginType == "input_container_stdio") {
             hasFileInput = true;
         }
+#else
+        // TODO: remove these special restrictions after all C++ inputs support Go processors
+        if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos) {
+            hasFileInput = true;
+        }
+#endif
     }
     // TODO: remove these special restrictions
     if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
@@ -530,7 +537,9 @@ bool PipelineConfig::Parse() {
             }
             mRouter.emplace_back(i, itr);
         } else {
-            mRouter.emplace_back(i, nullptr);
+            if (!IsFlushingThroughGoPipelineExisted()) {
+                mRouter.emplace_back(i, nullptr);
+            }
         }
     }
 

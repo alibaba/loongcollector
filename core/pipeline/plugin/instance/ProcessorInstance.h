@@ -59,6 +59,7 @@ private:
     friend class InputFileUnittest;
     friend class InputPrometheusUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

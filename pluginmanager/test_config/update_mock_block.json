@@ -6,39 +6,41 @@
         "DefaultLogQueueSize": 2,
         "DefaultLogGroupQueueSize": 1
     },
-    "inputs" : [
+    "inputs": [
         {
-            "type" : "service_mock",
-            "detail" : {
+            "type": "service_mock",
+            "detail": {
+                "Block": true,
                 "LogsPerSecond": 10000,
                 "MaxLogCount": 20000,
-                "Fields" : {
-                    "content" : "time:2017.09.12 20:55:36\tjson:{\"array\" : [1, 2, 3, 4], \"key1\" : \"xx\", \"key2\": false, \"key3\":123.456, \"key4\" : { \"inner1\" : 1, \"inner2\" : {\"xxxx\" : \"yyyy\", \"zzzz\" : \"中文\"}}}\n"
+                "Fields": {
+                    "content": "time:2017.09.12 20:55:36\tjson:{\"array\" : [1, 2, 3, 4], \"key1\" : \"xx\", \"key2\": false, \"key3\":123.456, \"key4\" : { \"inner1\" : 1, \"inner2\" : {\"xxxx\" : \"yyyy\", \"zzzz\" : \"中文\"}}}\n"
                 }
             }
         }
     ],
-    "processors" : [
+    "processors": [
         {
-            "type" : "processor_anchor",
-            "detail" : {"SourceKey" : "content",
-                "NoAnchorError" : true,
-                "Anchors" : [
+            "type": "processor_anchor",
+            "detail": {
+                "SourceKey": "content",
+                "NoAnchorError": true,
+                "Anchors": [
                     {
-                        "Start" : "time",
-                        "Stop" : "\t",
-                        "FieldName" : "time",
-                        "FieldType" : "string",
-                        "ExpondJson" : false
+                        "Start": "time",
+                        "Stop": "\t",
+                        "FieldName": "time",
+                        "FieldType": "string",
+                        "ExpondJson": false
                     },
                     {
-                        "Start" : "json:",
-                        "Stop" : "\n",
-                        "FieldName" : "val",
-                        "FieldType" : "json",
-                        "ExpondJson" : true,
-                        "MaxExpondDepth" : 2,
-                        "ExpondConnecter" : "#"
+                        "Start": "json:",
+                        "Stop": "\n",
+                        "FieldName": "val",
+                        "FieldType": "json",
+                        "ExpondJson": true,
+                        "MaxExpondDepth": 2,
+                        "ExpondConnecter": "#"
                     }
                 ]
             }
@@ -53,12 +55,10 @@
             }
         }
     ],
-    "flushers" : [
+    "flushers": [
         {
-            "type" : "flusher_checker",
-            "detail" : {
-                "Block" : true
-            }
+            "type": "flusher_checker",
+            "detail": {}
         }
     ]
 }

@@ -27,7 +27,9 @@
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/plugin/interface/Input.h"
 #include "pipeline/plugin/interface/Processor.h"
+#include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 #include "task_pipeline/Task.h"
 #include "task_pipeline/TaskRegistry.h"
 
@@ -65,10 +67,21 @@ public:
         return true;
     }
     bool Start() override { return true; }
-    bool Stop(bool isPipelineRemoving) override { return true; }
+    bool Stop(bool isPipelineRemoving) override {
+        while (mBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        return true;
+    }
     bool SupportAck() const override { return mSupportAck; }
 
+    void Block() { mBlockFlag = true; }
+    void Unblock() { mBlockFlag = false; }
+
     bool mSupportAck = true;
+
+private:
+    std::atomic_bool mBlockFlag = false;
 };
 
 const std::string InputMock::sName = "input_mock";
@@ -79,12 +92,22 @@ public:
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config) override { return true; }
-    void Process(PipelineEventGroup& logGroup) override { ++mCnt; };
+    void Process(PipelineEventGroup& logGroup) override {
+        while (mBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        ++mCnt;
+    };
+
+    void Block() { mBlockFlag = true; }
+    void Unblock() { mBlockFlag = false; }
 
     uint32_t mCnt = 0;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; };
+
+    std::atomic_bool mBlockFlag = false;
 };
 
 const std::string ProcessorMock::sName = "processor_mock";
