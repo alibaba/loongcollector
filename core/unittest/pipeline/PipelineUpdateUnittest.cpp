@@ -63,7 +63,7 @@ class FlusherSLSMock : public FlusherSLS {
 public:
     static const std::string sName;
 
-    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) const override {
+    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem, std::string* errMsg) override {
         auto data = static_cast<SLSSenderQueueItem*>(item);
         std::map<std::string, std::string> header;
         req = std::make_unique<HttpSinkRequest>(
