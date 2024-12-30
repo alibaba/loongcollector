@@ -66,7 +66,7 @@ public:
                 }
                 request->mResponse.SetNetworkStatus(NetworkCode::Ok, "");
                 request->mResponse.SetStatusCode(200);
-                request->mResponse.SetResponseTime(chrono::milliseconds(10));
+                request->mResponse.SetResponseTime(std::chrono::milliseconds(10));
                 // for sls only
                 request->mResponse.mHeader[X_LOG_REQUEST_ID] = "request_id";
                 static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
