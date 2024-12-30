@@ -128,6 +128,7 @@ private:
     friend class InputProcessSecurityUnittest;
     friend class InputNetworkSecurityUnittest;
     friend class InputNetworkObserverUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

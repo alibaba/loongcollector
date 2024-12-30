@@ -22,7 +22,6 @@
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/PipelineManager.h"
-#include "queue/ExactlyOnceQueueManager.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 
@@ -49,6 +48,7 @@ void ProcessorRunner::Init() {
     for (uint32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
         mThreadRes[threadNo] = async(launch::async, &ProcessorRunner::Run, this, threadNo);
     }
+    mIsFlush = false;
 }
 
 void ProcessorRunner::Stop() {
@@ -142,7 +142,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         pipeline->Process(eventGroupList, item->mInputIndex);
         // if the pipeline is updated, the pointer will be released, so we need to update it to the new pipeline
         if (hasOldPipeline) {
-            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName);
+            pipeline = PipelineManager::GetInstance()->FindConfigByName(configName); // update to new pipeline
             if (!pipeline) {
                 LOG_INFO(sLogger,
                          ("pipeline not found during processing, perhaps due to config deletion",

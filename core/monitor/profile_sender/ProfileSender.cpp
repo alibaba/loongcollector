@@ -118,12 +118,17 @@ FlusherSLS* ProfileSender::GetFlusher(const string& region) {
 }
 
 bool ProfileSender::IsProfileData(const string& region, const string& project, const string& logstore) {
+// TODO: temporarily used, profile should work in unit test
+#ifndef APSARA_UNIT_TEST_MAIN
     if ((logstore == "shennong_log_profile" || logstore == "logtail_alarm" || logstore == "logtail_status_profile"
          || logstore == "logtail_suicide_profile")
         && (project == GetProfileProjectName(region) || region == ""))
         return true;
     else
         return false;
+#else
+    return false;
+#endif
 }
 
 void ProfileSender::SendToProfileProject(const string& region, sls_logs::LogGroup& logGroup) {

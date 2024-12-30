@@ -23,10 +23,9 @@
 #include <future>
 #include <mutex>
 
+#include "monitor/MetricManager.h"
 #include "runner/sink/Sink.h"
 #include "runner/sink/http/HttpSinkRequest.h"
-#include "monitor/MetricManager.h"
-
 namespace logtail {
 
 class HttpSink : public Sink<HttpSinkRequest> {
@@ -34,10 +33,7 @@ public:
     HttpSink(const HttpSink&) = delete;
     HttpSink& operator=(const HttpSink&) = delete;
 
-    static HttpSink* GetInstance() {
-        static HttpSink instance;
-        return &instance;
-    }
+    static HttpSink* GetInstance();
 
     bool Init() override;
     void Stop() override;
@@ -68,6 +64,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherRunnerUnittest;
+    friend class HttpSinkMock;
 #endif
 };
 

@@ -535,6 +535,7 @@ public:
     friend class BatcherUnittest;
     friend class EnterpriseSLSClientManagerUnittest;
     friend class FlusherRunnerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

@@ -83,6 +83,7 @@ private:
     friend class PluginRegistryUnittest;
     friend class FlusherRunnerUnittest;
     friend class InstanceConfigManagerUnittest;
+    friend class PipelineUpdateUnittest;
 #endif
 };
 

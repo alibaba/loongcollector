@@ -27,7 +27,7 @@ class Sink {
 public:
     virtual bool Init() = 0;
     virtual void Stop() = 0;
-    
+
     bool AddRequest(std::unique_ptr<T>&& request) {
         mQueue.Push(std::move(request));
         return true;

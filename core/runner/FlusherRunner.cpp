@@ -55,6 +55,7 @@ bool FlusherRunner::Init() {
 
     mThreadRes = async(launch::async, &FlusherRunner::Run, this);
     mLastCheckSendClientTime = time(nullptr);
+    mIsFlush = false;
 
     return true;
 }
@@ -138,12 +139,12 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
     }
 
     req->mEnqueTime = item->mLastSendTime = chrono::system_clock::now();
-    HttpSink::GetInstance()->AddRequest(std::move(req));
-    ++mHttpSendingCnt;
     LOG_DEBUG(sLogger,
               ("send item to http sink, item address", item)("config-flusher-dst",
                                                              QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
-                  "sending cnt", ToString(mHttpSendingCnt.load())));
+                  "sending cnt", ToString(mHttpSendingCnt.load() + 1)));
+    HttpSink::GetInstance()->AddRequest(std::move(req));
+    ++mHttpSendingCnt;
 }
 
 void FlusherRunner::Run() {
