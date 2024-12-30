@@ -24,6 +24,12 @@ void BaseScheduler::SetFirstExecTime(chrono::steady_clock::time_point firstExecT
     mLatestScrapeTime = mFirstScrapeTime;
 }
 
+void BaseScheduler::SetScrapeOnceTime(chrono::steady_clock::time_point onceExecTime,
+                                      chrono::system_clock::time_point onceScrapeTime) {
+    mLatestExecTime = onceExecTime;
+    mLatestScrapeTime = onceScrapeTime;
+}
+
 void BaseScheduler::DelayExecTime(uint64_t delaySeconds) {
     mLatestExecTime = mLatestExecTime + chrono::seconds(delaySeconds);
     mLatestScrapeTime = mLatestScrapeTime + chrono::seconds(delaySeconds);
