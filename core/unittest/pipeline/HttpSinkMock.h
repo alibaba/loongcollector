@@ -77,10 +77,6 @@ public:
         }
     }
 
-    bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request) {
-        return Sink<HttpSinkRequest>::AddRequest(std::move(request));
-    }
-
     std::vector<SenderQueueItem>& GetRequests() {
         std::lock_guard<std::mutex> lock(mMutex);
         return mRequests;

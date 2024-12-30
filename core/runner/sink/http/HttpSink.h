@@ -38,9 +38,6 @@ public:
     bool Init() override;
     void Stop() override;
 
-    // rewrite for unittest
-    bool AddRequest(std::unique_ptr<HttpSinkRequest>&& request);
-
 private:
     HttpSink() = default;
     ~HttpSink() = default;

@@ -44,7 +44,6 @@ HttpSink* HttpSink::GetInstance() {
 }
 
 bool HttpSink::Init() {
-#ifndef APSARA_UNIT_TEST_MAIN
     mClient = curl_multi_init();
     if (mClient == nullptr) {
         LOG_ERROR(sLogger, ("failed to init http sink", "failed to init curl multi client"));
@@ -71,13 +70,9 @@ bool HttpSink::Init() {
 
     mThreadRes = async(launch::async, &HttpSink::Run, this);
     return true;
-#else
-    return HttpSinkMock::GetInstance()->Init();
-#endif
 }
 
 void HttpSink::Stop() {
-#ifndef APSARA_UNIT_TEST_MAIN
     mIsFlush = true;
     if (!mThreadRes.valid()) {
         return;
@@ -88,9 +83,6 @@ void HttpSink::Stop() {
     } else {
         LOG_WARNING(sLogger, ("http sink", "forced to stopped"));
     }
-#else
-    HttpSinkMock::GetInstance()->Stop();
-#endif
 }
 
 void HttpSink::Run() {
@@ -123,14 +115,6 @@ void HttpSink::Run() {
     if (mc != CURLM_OK) {
         LOG_ERROR(sLogger, ("failed to cleanup curl multi handle", "exit anyway")("errMsg", curl_multi_strerror(mc)));
     }
-}
-
-bool HttpSink::AddRequest(std::unique_ptr<HttpSinkRequest>&& request) {
-#ifndef APSARA_UNIT_TEST_MAIN
-    return Sink<HttpSinkRequest>::AddRequest(std::move(request));
-#else
-    return HttpSinkMock::GetInstance()->AddRequest(std::move(request));
-#endif
 }
 
 bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
