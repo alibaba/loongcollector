@@ -45,8 +45,8 @@ SLSClientManager* SLSClientManager::GetInstance() {
 #ifdef __ENTERPRISE__
     return EnterpriseSLSClientManager::GetInstance();
 #else
-    static auto ptr = unique_ptr<SLSClientManager>(new SLSClientManager());
-    return ptr.get();
+    static SLSClientManager instance;
+    return &instance;
 #endif
 }
 
