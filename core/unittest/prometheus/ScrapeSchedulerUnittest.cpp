@@ -67,14 +67,13 @@ void ScrapeSchedulerUnittest::TestInitscrapeScheduler() {
 
 void ScrapeSchedulerUnittest::TestProcess() {
     EventPool eventPool{true};
-    HttpResponse httpResponse = HttpResponse(
-        new PromMetricResponseBody(&eventPool),
-        [](void* ptr) { delete static_cast<PromMetricResponseBody*>(ptr); },
-        PromMetricWriteCallback);
+
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    HttpResponse httpResponse
+        = HttpResponse(&event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
@@ -83,18 +82,19 @@ void ScrapeSchedulerUnittest::TestProcess() {
     httpResponse.SetStatusCode(503);
     httpResponse.SetNetworkStatus(CURLE_OK);
     event.OnMetricResult(httpResponse, 0);
-    APSARA_TEST_EQUAL(1UL, event.mItem.size());
-    event.mItem.clear();
+    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
+    event.mPromStreamScraper.mItem.clear();
 
-    httpResponse.GetBody<PromMetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
     httpResponse.SetStatusCode(503);
     httpResponse.SetNetworkStatus(CURLE_COULDNT_CONNECT);
     event.OnMetricResult(httpResponse, 0);
-    APSARA_TEST_EQUAL(event.mScrapeState, "ERR_CONN_FAILED");
-    APSARA_TEST_EQUAL(1UL, event.mItem.size());
-    event.mItem.clear();
+    APSARA_TEST_EQUAL(event.mPromStreamScraper.mItem[0]
+                          ->mEventGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE)
+                          .to_string(),
+                      "ERR_CONN_FAILED");
+    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
+    event.mPromStreamScraper.mItem.clear();
 
-    httpResponse.GetBody<PromMetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
     httpResponse.SetStatusCode(200);
     httpResponse.SetNetworkStatus(CURLE_OK);
     string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
@@ -118,23 +118,22 @@ void ScrapeSchedulerUnittest::TestProcess() {
                    "# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.\n"
                    "# TYPE go_memstats_alloc_bytes_total counter\n"
                    "go_memstats_alloc_bytes_total 1.5159292e+08";
-    PromMetricWriteCallback(
-        body1.data(), (size_t)1, (size_t)body1.length(), (void*)httpResponse.GetBody<PromMetricResponseBody>());
+    prom::StreamScraper::MetricWriteCallback(
+        body1.data(), (size_t)1, (size_t)body1.length(), (void*)httpResponse.GetBody<prom::StreamScraper>());
     event.OnMetricResult(httpResponse, 0);
-    APSARA_TEST_EQUAL(1UL, event.mItem.size());
-    APSARA_TEST_EQUAL(11UL, event.mItem[0]->mEventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL(1UL, event.mPromStreamScraper.mItem.size());
+    APSARA_TEST_EQUAL(11UL, event.mPromStreamScraper.mItem[0]->mEventGroup.GetEvents().size());
 }
 
 void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
     EventPool eventPool{true};
-    HttpResponse httpResponse = HttpResponse(
-        new PromMetricResponseBody(&eventPool),
-        [](void* ptr) { delete static_cast<PromMetricResponseBody*>(ptr); },
-        PromMetricWriteCallback);
+
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, labels, 0, 0);
+    HttpResponse httpResponse
+        = HttpResponse(&event.mPromStreamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
 
     string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
@@ -160,9 +159,9 @@ void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
                    "# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.\n"
                    "# TYPE go_memstats_alloc_bytes_total counter\n"
                    "go_memstats_alloc_bytes_total 1.5159292e+08";
-    PromMetricWriteCallback(
-        body1.data(), (size_t)1, (size_t)body1.length(), (void*)httpResponse.GetBody<PromMetricResponseBody>());
-    auto& res = httpResponse.GetBody<PromMetricResponseBody>()->mEventGroup;
+    prom::StreamScraper::MetricWriteCallback(
+        body1.data(), (size_t)1, (size_t)body1.length(), (void*)httpResponse.GetBody<prom::StreamScraper>());
+    auto& res = httpResponse.GetBody<prom::StreamScraper>()->mEventGroup;
     APSARA_TEST_EQUAL(7UL, res.GetEvents().size());
     APSARA_TEST_EQUAL("go_gc_duration_seconds{quantile=\"0\"} 1.5531e-05",
                       res.GetEvents()[0].Cast<RawEvent>().GetContent());
@@ -177,9 +176,9 @@ void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
     APSARA_TEST_EQUAL("go_gc_duration_seconds_sum 0.034885631", res.GetEvents()[5].Cast<RawEvent>().GetContent());
     APSARA_TEST_EQUAL("go_gc_duration_seconds_count 850", res.GetEvents()[6].Cast<RawEvent>().GetContent());
     // httpResponse.GetBody<MetricResponseBody>()->mEventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
-    PromMetricWriteCallback(
-        body2.data(), (size_t)1, (size_t)body2.length(), (void*)httpResponse.GetBody<PromMetricResponseBody>());
-    httpResponse.GetBody<PromMetricResponseBody>()->FlushCache();
+    prom::StreamScraper::MetricWriteCallback(
+        body2.data(), (size_t)1, (size_t)body2.length(), (void*)httpResponse.GetBody<prom::StreamScraper>());
+    httpResponse.GetBody<prom::StreamScraper>()->FlushCache();
     APSARA_TEST_EQUAL(11UL, res.GetEvents().size());
 
     APSARA_TEST_EQUAL("go_goroutines 7", res.GetEvents()[7].Cast<RawEvent>().GetContent());

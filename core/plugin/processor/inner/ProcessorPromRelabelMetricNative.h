@@ -24,6 +24,20 @@
 #include "prometheus/schedulers/ScrapeConfig.h"
 
 namespace logtail {
+
+namespace prom {
+    struct AutoMetric {
+        double mScrapeDurationSeconds;
+        uint64_t mScrapeResponseSizeBytes;
+        uint64_t mScrapeSamplesLimit;
+        // uint64_t mPostRelabel;
+        uint64_t mScrapeSamplesScraped;
+        uint64_t mScrapeTimeoutSeconds;
+        std::string mScrapeState;
+        bool mUp;
+    };
+} // namespace prom
+
 class ProcessorPromRelabelMetricNative : public Processor {
 public:
     static const std::string sName;
@@ -39,13 +53,14 @@ private:
     bool ProcessEvent(PipelineEventPtr& e, const GroupTags& targetTags, const std::vector<StringView>& toDelete);
     std::vector<StringView> GetToDeleteTargetLabels(const GroupTags& targetTags) const;
 
-    void AddAutoMetrics(PipelineEventGroup& metricGroup);
+    void AddAutoMetrics(PipelineEventGroup& eGroup, const prom::AutoMetric& autoMetric) const;
+    void UpdateAutoMetrics(const PipelineEventGroup& eGroup, prom::AutoMetric& autoMetric) const;
     void AddMetric(PipelineEventGroup& metricGroup,
                    const std::string& name,
                    double value,
                    time_t timestamp,
                    uint32_t nanoSec,
-                   const GroupTags& targetTags);
+                   const GroupTags& targetTags) const;
 
     std::unique_ptr<ScrapeConfig> mScrapeConfigPtr;
     std::string mLoongCollectorScraper;

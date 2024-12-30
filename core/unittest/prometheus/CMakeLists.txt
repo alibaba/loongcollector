@@ -45,6 +45,9 @@ target_link_libraries(prom_utils_unittest ${UT_BASE_TARGET})
 add_executable(prom_asyn_unittest PromAsynUnittest.cpp)
 target_link_libraries(prom_asyn_unittest ${UT_BASE_TARGET})
 
+add_executable(stream_scraper_unittest StreamScraperUnittest.cpp)
+target_link_libraries(stream_scraper_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 
 gtest_discover_tests(prom_self_monitor_unittest)
@@ -57,6 +60,7 @@ gtest_discover_tests(textparser_unittest)
 gtest_discover_tests(scrape_config_unittest)
 gtest_discover_tests(prom_utils_unittest)
 gtest_discover_tests(prom_asyn_unittest)
+gtest_discover_tests(stream_scraper_unittest)
 
 add_executable(textparser_benchmark TextParserBenchmark.cpp)
 target_link_libraries(textparser_benchmark ${UT_BASE_TARGET})
