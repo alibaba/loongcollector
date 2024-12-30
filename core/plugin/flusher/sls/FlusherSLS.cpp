@@ -126,12 +126,14 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
 
     auto iter = sLogstoreConcurrencyLimiterMap.find(key);
     if (iter == sLogstoreConcurrencyLimiterMap.end()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key, AppConfig::GetInstance()->GetSendRequestConcurrency());
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         sLogstoreConcurrencyLimiterMap.try_emplace(key, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key, AppConfig::GetInstance()->GetSendRequestConcurrency());
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
         return limiter;
     }
@@ -142,12 +144,14 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
     lock_guard<mutex> lock(sMux);
     auto iter = sProjectConcurrencyLimiterMap.find(project);
     if (iter == sProjectConcurrencyLimiterMap.end()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project, AppConfig::GetInstance()->GetSendRequestConcurrency());
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         sProjectConcurrencyLimiterMap.try_emplace(project, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project, AppConfig::GetInstance()->GetSendRequestConcurrency());
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
         return limiter;
     }
@@ -158,12 +162,20 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetRegionConcurrencyLimiter(const str
     lock_guard<mutex> lock(sMux);
     auto iter = sRegionConcurrencyLimiterMap.find(region);
     if (iter == sRegionConcurrencyLimiterMap.end()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
+        auto limiter = make_shared<ConcurrencyLimiter>(
+            sName + "#network#region#" + region,
+            AppConfig::GetInstance()->GetSendRequestConcurrency(),
+            AppConfig::GetInstance()->GetSendRequestConcurrency()
+                * AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         sRegionConcurrencyLimiterMap.try_emplace(region, limiter);
         return limiter;
     }
     if (iter->second.expired()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#network#region#" + region, AppConfig::GetInstance()->GetSendRequestConcurrency(), AppConfig::GetInstance()->GetSendRequestConcurrency()*AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
+        auto limiter = make_shared<ConcurrencyLimiter>(
+            sName + "#network#region#" + region,
+            AppConfig::GetInstance()->GetSendRequestConcurrency(),
+            AppConfig::GetInstance()->GetSendRequestConcurrency()
+                * AppConfig::GetInstance()->GetGlobalConcurrencyFreePercentageForOneRegion());
         iter->second = limiter;
         return limiter;
     }
@@ -524,6 +536,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
     mSendDoneCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL);
     mSuccessCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL);
+    mDiscardCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_DISCARD_TOTAL);
     mNetworkErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL);
     mServerErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL);
     mShardWriteQuotaErrorCnt
@@ -878,6 +891,9 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 DealSenderQueueItemAfterSend(item, true);
                 break;
             case OperationOnFail::DISCARD:
+                if (mDiscardCnt) {
+                    mDiscardCnt->Add(1);
+                }
             default:
                 LOG_WARNING(sLogger, LOG_PATTERN);
                 if (!isProfileData) {
