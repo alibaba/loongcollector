@@ -32,6 +32,9 @@ public:
     bool SupportAck() const override { return true; }
 private:
     SelfMonitorMetricRules mSelfMonitorMetricRules;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class InputInternalMetricsUnittest;
+#endif
 };
 
 } // namespace logtail
