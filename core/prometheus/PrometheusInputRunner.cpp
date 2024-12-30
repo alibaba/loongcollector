@@ -50,7 +50,6 @@ PrometheusInputRunner::PrometheusInputRunner()
       mEventPool(true),
       mUnRegisterMs(0) {
     mClient = std::make_unique<sdk::CurlClient>();
-    mTimer = std::make_shared<Timer>();
 
     // self monitor
     MetricLabels labels;
@@ -84,7 +83,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
     targetSubscriber->InitSelfMonitor(defaultLabels);
 
     targetSubscriber->mUnRegisterMs = mUnRegisterMs.load();
-    targetSubscriber->SetComponent(mTimer, &mEventPool);
+    targetSubscriber->SetComponent(&mEventPool);
     auto currSystemTime = chrono::system_clock::now();
     auto randSleepMilliSec
         = GetRandSleepMilliSec(targetSubscriber->GetId(),
@@ -138,7 +137,6 @@ void PrometheusInputRunner::Init() {
     mIsStarted = true;
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    mTimer->Init();
     AsynCurlRunner::GetInstance()->Init();
 #endif
 
@@ -204,7 +202,6 @@ void PrometheusInputRunner::Stop() {
     }
 
 #ifndef APSARA_UNIT_TEST_MAIN
-    mTimer->Stop();
     LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
     AsynCurlRunner::GetInstance()->Stop();
 #endif

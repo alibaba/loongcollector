@@ -363,4 +363,12 @@ void RemoveFilePathTrailingSlash(std::string& filePath) {
     filePath = path.string();
 }
 
+bool IsInt(const char* sz) {
+    bool ok = (sz != nullptr && *sz != '\0');
+    for (auto* it = sz; ok && *it; ++it) {
+        ok = (0 != std::isdigit(*it));
+    }
+    return ok;
+}
+
 } // namespace logtail

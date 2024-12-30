@@ -75,7 +75,6 @@ private:
     std::string mPodName;
 
     std::unique_ptr<sdk::CurlClient> mClient;
-    std::shared_ptr<Timer> mTimer;
     EventPool mEventPool;
 
     mutable ReadWriteLock mSubscriberMapRWLock;

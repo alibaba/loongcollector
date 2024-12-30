@@ -34,11 +34,22 @@ struct TimerEventCompare {
 
 class Timer {
 public:
+    Timer(const Timer&) = delete;
+    Timer(Timer&&) = delete;
+    Timer& operator=(const Timer&) = delete;
+    Timer& operator=(Timer&&) = delete;
+    ~Timer() = default;
+    static Timer* GetInstance() {
+        static Timer sInstance;
+        return &sInstance;
+    }
     void Init();
     void Stop();
     void PushEvent(std::unique_ptr<TimerEvent>&& e);
+    void Clear();
 
 private:
+    Timer() = default;
     void Run();
 
     mutable std::mutex mQueueMux;
@@ -47,12 +58,13 @@ private:
 
     std::future<void> mThreadRes;
     mutable std::mutex mThreadRunningMux;
-    bool mIsThreadRunning = true;
+    bool mIsThreadRunning = false;
     mutable std::condition_variable mCV;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TimerUnittest;
     friend class ScrapeSchedulerUnittest;
+    friend class HostMonitorInputRunnerUnittest;
 #endif
 };
 

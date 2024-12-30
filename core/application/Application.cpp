@@ -14,6 +14,8 @@
 
 #include "application/Application.h"
 
+#include "timer/Timer.h"
+
 #ifndef LOGTAIL_NO_TC_MALLOC
 #include <gperftools/malloc_extension.h>
 #endif
@@ -259,9 +261,9 @@ void Application::Start() { // GCOVR_EXCL_START
     }
 
     ProcessorRunner::GetInstance()->Init();
+    Timer::GetInstance()->Init();
 
-    time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
-           lastCheckTagsTime = 0, lastQueueGCTime = 0;
+    time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0;
 #ifndef LOGTAIL_NO_TC_MALLOC
     time_t lastTcmallocReleaseMemTime = 0;
 #endif
