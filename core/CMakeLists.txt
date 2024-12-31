@@ -35,8 +35,8 @@ option(WITHOUTGDB "Build Logtail without gdb")
 option(WITHSPL "Build Logtail and UT with SPL" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
 cmake_dependent_option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" ON "CMAKE_BUILD_TYPE STREQUAL Debug;NOT ANDROID" OFF)
-set(PROVIDER_PATH "provider" CACHE PATH "Path to the provider module") # external provider path can be set with -DPROVIDER_PATH
-set(UNITTEST_PATH "unittest" CACHE PATH "Path to the unittest module") # external unittest path can be set with -DUNITTEST_PATH
+set(PROVIDER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/provider CACHE PATH "Path to the provider module") # external provider path can be set with -DPROVIDER_PATH
+set(UNITTEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/unittest CACHE PATH "Path to the unittest module") # external unittest path can be set with -DUNITTEST_PATH
 
 if (BUILD_LOGTAIL_SHARED_LIBRARY AND WITHSPL)
     message(FATEL_ERROR, "Generating logtail shared library is not supported to be linked with SPL. WITHSPL should be set OFF.")
@@ -77,7 +77,6 @@ if (UNIX)
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
         SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
-        add_definitions(-DAPSARA_UNIT_TEST_MAIN)
     endif ()
 elseif (MSVC)
     add_definitions(-DNOMINMAX)
@@ -164,9 +163,6 @@ endif()
 # remove several files in go_pipeline
 list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.cpp ${CMAKE_CURRENT_SOURCE_DIR}/go_pipeline/LogtailPluginAdapter.h)
 
-# add provider
-add_subdirectory("${PROVIDER_PATH}" "${CMAKE_BINARY_DIR}/provider")
-
 if(MSVC)
     # remove linux event listener
     file(GLOB REMOVE_EVENT_LISTENER_SOURCES file_server/event_listener/*_Linux.cpp file_server/event_listener/*_Linux.h)
@@ -185,6 +181,9 @@ set(SRC_FILES ${SRC_FILES} ${FRAMEWORK_SOURCE_FILES} ${PLUGIN_SOURCE_FILES_CORE}
 
 # Logtail executable or shared library.
 if (BUILD_LOGTAIL)
+    # add provider
+    set(PROVIDER_BASE_TARGET "provider")
+    add_subdirectory("${PROVIDER_PATH}" ${CMAKE_BINARY_DIR}/${PROVIDER_BASE_TARGET})
     if (ENABLE_ENTERPRISE)
         if (UNIX)
             add_executable(${LOGTAIL_TARGET} enterprise_logtail.cpp ${SRC_FILES})
@@ -201,6 +200,9 @@ if (BUILD_LOGTAIL)
 endif()
 
 if (BUILD_LOGTAIL_SHARED_LIBRARY)  
+    # add provider
+    set(PROVIDER_BASE_TARGET "provider")
+    add_subdirectory("${PROVIDER_PATH}" ${CMAKE_BINARY_DIR}/${PROVIDER_BASE_TARGET})
     if (ENABLE_ENTERPRISE)
         if (UNIX)
             add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail.cpp ${SRC_FILES})
