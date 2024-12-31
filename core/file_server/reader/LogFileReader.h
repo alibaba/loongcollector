@@ -56,6 +56,19 @@ struct LineInfo {
     int32_t lineEnd;
     int32_t rollbackLineFeedCount;
     bool fullLine;
+    int32_t forceRollbackLineFeedCount;
+    LineInfo(StringView data = StringView(),
+             int32_t lineBegin = 0,
+             int32_t lineEnd = 0,
+             int32_t rollbackLineFeedCount = 0,
+             bool fullLine = false,
+             int32_t forceRollbackLineFeedCount = 0)
+        : data(data),
+          lineBegin(lineBegin),
+          lineEnd(lineEnd),
+          rollbackLineFeedCount(rollbackLineFeedCount),
+          fullLine(fullLine),
+          forceRollbackLineFeedCount(forceRollbackLineFeedCount) {}
 };
 
 class BaseLineParse {
@@ -685,6 +698,7 @@ private:
     friend class LogSplitNoDiscardUnmatchUnittest;
     friend class RemoveLastIncompleteLogMultilineUnittest;
     friend class LogFileReaderCheckpointUnittest;
+    friend class GetLastLineUnittest;
     friend class LastMatchedContainerdTextLineUnittest;
     friend class LastMatchedDockerJsonFileUnittest;
     friend class LastMatchedContainerdTextWithDockerJsonUnittest;
