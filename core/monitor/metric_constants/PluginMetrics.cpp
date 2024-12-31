@@ -140,6 +140,7 @@ const string METRIC_PLUGIN_FLUSHER_TOTAL_PACKAGE_TIME_MS = "total_package_time_m
 const string METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL = "send_total";
 const string METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL = "send_done_total";
 const string METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL = "success_total";
+const string METRIC_PLUGIN_FLUSHER_DISCARD_TOTAL = "discard_total";
 const string METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL = "network_error_total";
 const string METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL = "server_error_total";
 const string METRIC_PLUGIN_FLUSHER_UNAUTH_ERROR_TOTAL = "unauth_error_total";

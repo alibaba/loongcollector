@@ -83,8 +83,8 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                     eventJson[METRIC_RESERVED_KEY_VALUE] = e.GetValue<UntypedSingleValue>()->mValue;
                 } else if (e.Is<UntypedMultiDoubleValues>()) {
                     eventJson[METRIC_RESERVED_KEY_VALUE] = Json::Value();
-                    for (auto value = e.GetValue<UntypedMultiDoubleValues>()->ValusBegin();
-                         value != e.GetValue<UntypedMultiDoubleValues>()->ValusEnd();
+                    for (auto value = e.GetValue<UntypedMultiDoubleValues>()->ValuesBegin();
+                         value != e.GetValue<UntypedMultiDoubleValues>()->ValuesEnd();
                          value++) {
                         eventJson[METRIC_RESERVED_KEY_VALUE][value->first.to_string()] = value->second;
                     }
