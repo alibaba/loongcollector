@@ -16,6 +16,7 @@
 #include <curl/curl.h>
 #include "common/LRUCache.h"
 #include "app_config/AppConfig.h"
+#include "TagConstants.h"
 #include <json/json.h>
 #include "common/Flags.h"
 
@@ -24,13 +25,12 @@ DECLARE_FLAG_INT32(loong_collector_k8s_meta_service_port);
 
 namespace logtail {
 
-    const static std::string appIdKey = "armsAppId";
-    const static std::string imageKey = "images";
-    const static std::string labelsKey = "labels";
-    const static std::string namespaceKey = "namespace";
-    const static std::string workloadKindKey = "workloadKind";
-    const static std::string workloadNameKey = "workloadName";
-    const static std::string serviceNameKey = "serviceName";
+    const std::string TAG_NAMESPACE = "namespace";
+    const std::string TAG_IMAGES = "images";
+    const std::string TAG_WORKLOADNAME = "workloadName";
+    const std::string TAG_WORKLOADKIND = "workloadKind"; 
+    const std::string TAG_SERVICENAME = "serviceName";
+    const std::string TAG_LABELS = "labels";
 
     struct k8sContainerInfo {
         std::unordered_map<std::string, std::string> images;

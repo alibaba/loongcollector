@@ -24,7 +24,7 @@
 #include "models/SpanEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include <boost/utility/string_view.hpp>
-#include "K8sMetadata.h"
+
 
 using logtail::StringView; 
 
@@ -75,7 +75,7 @@ bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containe
     bool res = true;
     
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    StringView containerIdViewKey(containerIdKey);
+    StringView containerIdViewKey(DEFAULT_TRACE_TAG_CONTAINER_ID);
     StringView containerIdView = e.HasTag(containerIdViewKey) ? e.GetTag(containerIdViewKey) : StringView{};
     if (!containerIdView.empty()) {
         std::string containerId(containerIdView);
@@ -84,14 +84,14 @@ bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containe
             containerVec.push_back(containerId);
             res = false;
         } else {
-            e.SetTag(workloadNameKey, containerInfo->workloadName);
-            e.SetTag(workloadKindKey, containerInfo->workloadKind);
-            e.SetTag(namespaceKey, containerInfo->k8sNamespace);
-            e.SetTag(serviceNameKey, containerInfo->serviceName);
-            e.SetTag(pidKey, containerInfo->appId);
+            e.SetTag(DEFAULT_TRACE_TAG_WORKLOAD_NAME, containerInfo->workloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_WORKLOAD_KIND, containerInfo->workloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_NAMESPACE, containerInfo->k8sNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_SERVICENAME, containerInfo->serviceName);
+            e.SetTag(DEFAULT_TRACE_TAG_PID, containerInfo->appId);
         }
     }
-    StringView ipView(remoteIpKey);
+    StringView ipView(DEFAULT_TRACE_TAG_REMOTE_IP);
     StringView remoteIpView = e.HasTag(ipView) ? e.GetTag(ipView) : StringView{};
     if (!remoteIpView.empty()) {
         std::string remoteIp(remoteIpView);
@@ -100,9 +100,9 @@ bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containe
             remoteIpVec.push_back(remoteIp);
             res = false;
         } else {
-            e.SetTag(peerWorkloadNameKey, ipInfo->workloadName);
-            e.SetTag(peerWorkloadKindKey, ipInfo->workloadKind);
-            e.SetTag(peerNamespaceKey, ipInfo->k8sNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_PEER_WORKLOAD_NAME, ipInfo->workloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_PEER_WORKLOAD_KIND, ipInfo->workloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_PEER_NAMESPACE, ipInfo->k8sNamespace);
         }
     }
     return res;

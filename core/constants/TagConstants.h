@@ -36,6 +36,21 @@ namespace logtail {
     extern const std::string DEFAULT_LOG_TAG_USER_DEFINED_ID;
 #endif
 
+////////////////////////// TRACE ////////////////////////
+    extern const std::string DEFAULT_TRACE_TAG_NAMESPACE;
+    extern const std::string DEFAULT_TRACE_TAG_CONTAINER_ID;
+    extern const std::string DEFAULT_TRACE_TAG_PID;
+    extern const std::string DEFAULT_TRACE_TAG_REMOTE_IP;
+    extern const std::string DEFAULT_TRACE_TAG_PEER_WORKLOAD_NAME;
+    extern const std::string DEFAULT_TRACE_TAG_PEER_WORKLOAD_KIND;
+    extern const std::string DEFAULT_TRACE_TAG_PEER_NAMESPACE;
+    extern const std::string DEFAULT_TRACE_TAG_APPID;
+    extern const std::string DEFAULT_TRACE_TAG_IMAGES;
+    extern const std::string DEFAULT_TRACE_TAG_LABELS;
+    extern const std::string DEFAULT_TRACE_TAG_WORKLOAD_KIND;
+    extern const std::string DEFAULT_TRACE_TAG_WORKLOAD_NAME;
+    extern const std::string DEFAULT_TRACE_TAG_SERVICENAME;
+
 ////////////////////////// METRIC ////////////////////////
     extern const std::string DEFAULT_METRIC_TAG_NAMESPACE;
     extern const std::string DEFAULT_METRIC_TAG_POD_NAME;

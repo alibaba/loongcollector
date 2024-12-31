@@ -24,6 +24,7 @@ namespace logtail {
     const std::string DEFAULT_TAG_POD_UID = "pod_uid";
     const std::string DEFAULT_TAG_CONTAINER_NAME = "container_name";
     const std::string DEFAULT_TAG_CONTAINER_IP = "container_ip";
+    const std::string DEFAULT_TAG_CONTAINER_ID = "container_id";
     const std::string DEFAULT_TAG_IMAGE_NAME = "image_name";
 
 ////////////////////////// LOG ////////////////////////
@@ -54,6 +55,39 @@ namespace logtail {
     
     const std::string DEFAULT_LOG_TAG_USER_DEFINED_ID = "__user_defined_id__";
 #endif
+
+////////////////////////// Trace ////////////////////////
+#ifndef __ENTERPRISE__ // 开源版
+    const std::string DEFAULT_TRACE_TAG_NAMESPACE = "k8s.namespace.name";
+    const std::string DEFAULT_TRACE_TAG_CONTAINER_ID = "k8s.container.id";
+    const std::string DEFAULT_TRACE_TAG_PID = "process.pid";
+    const std::string DEFAULT_TRACE_TAG_REMOTE_IP = "remote.ip";
+    const std::string DEFAULT_TRACE_TAG_PEER_WORKLOAD_NAME = "peer.workload.name";
+    const std::string DEFAULT_TRACE_TAG_PEER_WORKLOAD_KIND = "peer.workload.kind";
+    const std::string DEFAULT_TRACE_TAG_PEER_NAMESPACE = "peer.namespace";
+    const std::string DEFAULT_TRACE_TAG_APPID = "service.id";
+    const std::string DEFAULT_TRACE_TAG_IMAGES = "container.image.name";
+    const std::string DEFAULT_TRACE_TAG_LABELS = "k8s.pod.label";
+    const std::string DEFAULT_TRACE_TAG_WORKLOAD_KIND = "workload.kind";
+    const std::string DEFAULT_TRACE_TAG_WORKLOAD_NAME = "workload.name";
+    const std::string DEFAULT_TRACE_TAG_SERVICENAME = "service.name";
+#else
+    const std::string DEFAULT_TRACE_TAG_NAMESPACE = "namespace";
+    const std::string DEFAULT_TRACE_TAG_CONTAINER_ID = "container.id";
+    const std::string DEFAULT_TRACE_TAG_PID = "pid";
+    const std::string DEFAULT_TRACE_TAG_REMOTE_IP = "remote_ip";
+    const std::string DEFAULT_TRACE_TAG_PEER_WORKLOAD_NAME = "peerWorkloadName";
+    const std::string DEFAULT_TRACE_TAG_PEER_WORKLOAD_KIND = "peerWorkloadKind";
+    const std::string DEFAULT_TRACE_TAG_PEER_NAMESPACE = "peerNamespace";
+    const std::string DEFAULT_TRACE_TAG_APPID = "armsAppId";
+    const std::string DEFAULT_TRACE_TAG_IMAGES = "images";
+    const std::string DEFAULT_TRACE_TAG_LABELS = "labels";
+    const std::string DEFAULT_TRACE_TAG_WORKLOAD_KIND = "workloadKind";
+    const std::string DEFAULT_TRACE_TAG_WORKLOAD_NAME = "workloadName";
+    const std::string DEFAULT_TRACE_TAG_SERVICENAME = "serviceName";
+
+#endif
+
 
 ////////////////////////// METRIC ////////////////////////
     const std::string DEFAULT_METRIC_TAG_NAMESPACE = DEFAULT_TAG_NAMESPACE;
