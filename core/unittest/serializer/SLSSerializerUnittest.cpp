@@ -218,7 +218,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         // span
         string res, errorMsg;
         auto events = CreateBatchedSpanEvents();
-        APSARA_TEST_EQUAL(events.mEvents.size(), 1);
+        APSARA_TEST_EQUAL(events.mEvents.size(), 1U);
         APSARA_TEST_TRUE(events.mEvents[0]->GetType() == PipelineEvent::Type::SPAN);
         APSARA_TEST_TRUE(serializer.DoSerialize(std::move(events), res, errorMsg));
         sls_logs::LogGroup logGroup;
@@ -256,7 +256,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         std::istringstream s(attrs);
         bool ret = Json::parseFromStream(readerBuilder, s, &jsonVal, &errs);
         APSARA_TEST_TRUE(ret);
-        APSARA_TEST_EQUAL(jsonVal.size(), 10);
+        APSARA_TEST_EQUAL(jsonVal.size(), 10U);
         APSARA_TEST_EQUAL(jsonVal["rpcType"].asString(), "25");
         APSARA_TEST_EQUAL(jsonVal["scope-tag-0"].asString(), "scope-value-0");
         // APSARA_TEST_EQUAL(logGroup.logs(0).contents(7).value(), "");
@@ -268,7 +268,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         std::istringstream ss(linksStr);
         ret = Json::parseFromStream(readerBuilder, ss, &jsonVal, &errs);
         APSARA_TEST_TRUE(ret);
-        APSARA_TEST_EQUAL(jsonVal.size(), 1);
+        APSARA_TEST_EQUAL(jsonVal.size(), 1U);
         for (auto& link : jsonVal) {
             APSARA_TEST_EQUAL(link["spanId"].asString(), "inner-link-spanid");
             APSARA_TEST_EQUAL(link["traceId"].asString(), "inner-link-traceid");
@@ -280,7 +280,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         std::istringstream sss(eventsStr);
         ret = Json::parseFromStream(readerBuilder, sss, &jsonVal, &errs);
         APSARA_TEST_TRUE(ret);
-        APSARA_TEST_EQUAL(jsonVal.size(), 1);
+        APSARA_TEST_EQUAL(jsonVal.size(), 1U);
         for (auto& event : jsonVal) {
             APSARA_TEST_EQUAL(event["name"].asString(), "inner-event");
             APSARA_TEST_EQUAL(event["timestamp"].asString(), "1000");

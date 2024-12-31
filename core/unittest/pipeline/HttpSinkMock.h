@@ -22,7 +22,7 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "runner/FlusherRunner.h"
 #include "runner/sink/http/HttpSink.h"
-#include "sdk/Common.h"
+#include "plugin/flusher/sls/SLSConstant.h"
 
 namespace logtail {
 class HttpSinkMock : public HttpSink {
@@ -64,8 +64,11 @@ public:
                     std::lock_guard<std::mutex> lock(mMutex);
                     mRequests.push_back(*(request->mItem));
                 }
+                request->mResponse.SetNetworkStatus(NetworkCode::Ok, "");
                 request->mResponse.SetStatusCode(200);
-                request->mResponse.mHeader[sdk::X_LOG_REQUEST_ID] = "request_id";
+                request->mResponse.SetResponseTime(std::chrono::milliseconds(10));
+                // for sls only
+                request->mResponse.mHeader[X_LOG_REQUEST_ID] = "request_id";
                 static_cast<HttpFlusher*>(request->mItem->mFlusher)->OnSendDone(request->mResponse, request->mItem);
                 FlusherRunner::GetInstance()->DecreaseHttpSendingCnt();
                 request.reset();

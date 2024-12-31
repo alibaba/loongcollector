@@ -440,7 +440,7 @@ bool PipelineConfigWatcher::CheckUnchangedConfig(const std::string& configName,
             return false;
         }
         if (!IsConfigEnabled(configName, *detail)) {
-            LOG_INFO(sLogger, ("unchanged config found and disabled", "skip current object")("config", configName));
+            LOG_DEBUG(sLogger, ("unchanged config found and disabled", "skip current object")("config", configName));
             return false;
         }
         PipelineConfig config(configName, std::move(detail));

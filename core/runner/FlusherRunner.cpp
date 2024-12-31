@@ -26,12 +26,9 @@
 #include "pipeline/queue/SenderQueueItem.h"
 #include "pipeline/queue/SenderQueueManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
-// TODO: temporarily used here
-#include "plugin/flusher/sls/PackIdManager.h"
-#include "plugin/flusher/sls/SLSClientManager.h"
+#include "runner/sink/http/HttpSink.h"
 
-DEFINE_FLAG_INT32(flusher_runner_exit_timeout_secs, "", 60);
-DEFINE_FLAG_INT32(check_send_client_timeout_interval, "", 600);
+DEFINE_FLAG_INT32(flusher_runner_exit_timeout_sec, "", 60);
 
 DECLARE_FLAG_INT32(discard_send_fail_interval);
 
@@ -99,7 +96,7 @@ void FlusherRunner::Stop() {
     if (!mThreadRes.valid()) {
         return;
     }
-    future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(flusher_runner_exit_timeout_secs)));
+    future_status s = mThreadRes.wait_for(chrono::seconds(INT32_FLAG(flusher_runner_exit_timeout_sec)));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("flusher runner", "stopped successfully"));
     } else {
@@ -121,7 +118,8 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
 
     unique_ptr<HttpSinkRequest> req;
     bool keepItem = false;
-    if (!static_cast<HttpFlusher*>(item->mFlusher)->BuildRequest(item, req, &keepItem)) {
+    string errMsg;
+    if (!static_cast<HttpFlusher*>(item->mFlusher)->BuildRequest(item, req, &keepItem, &errMsg)) {
         if (keepItem
             && chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - item->mFirstEnqueTime).count()
                 < INT32_FLAG(discard_send_fail_interval)) {
@@ -129,10 +127,12 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
             LOG_DEBUG(sLogger,
                       ("failed to build request", "retry later")("item address", item)(
                           "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey)));
+            SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
         } else {
             LOG_WARNING(sLogger,
                         ("failed to build request", "discard item")("item address", item)(
                             "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey)));
+            SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
             SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
         }
         return;
@@ -189,12 +189,6 @@ void FlusherRunner::Run() {
             mTotalDelayMs->Add(chrono::system_clock::now() - curTime);
         }
 
-        // TODO: move the following logic to scheduler
-        if ((time(NULL) - mLastCheckSendClientTime) > INT32_FLAG(check_send_client_timeout_interval)) {
-            SLSClientManager::GetInstance()->CleanTimeoutClient();
-            PackIdManager::GetInstance()->CleanTimeoutEntry();
-            mLastCheckSendClientTime = time(NULL);
-        }
         if (mIsFlush && SenderQueueManager::GetInstance()->IsAllQueueEmpty()) {
             break;
         }

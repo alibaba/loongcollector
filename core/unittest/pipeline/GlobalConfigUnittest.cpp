@@ -43,6 +43,8 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
 
     // only mandatory param
     config.reset(new GlobalConfig());
+    APSARA_TEST_TRUE(config->Init(Json::Value(Json::ValueType::objectValue), ctx, extendedParams));
+    APSARA_TEST_TRUE(extendedParams.isNull());
     APSARA_TEST_EQUAL(GlobalConfig::TopicType::NONE, config->mTopicType);
     APSARA_TEST_EQUAL("", config->mTopicFormat);
     APSARA_TEST_EQUAL(1U, config->mPriority);

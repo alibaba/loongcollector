@@ -39,9 +39,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
 #include "file_server/FileServer.h"
 
 using namespace std;
@@ -59,8 +56,6 @@ DEFINE_FLAG_INT32(read_local_event_interval, "seconds", 60);
 DEFINE_FLAG_BOOL(force_close_file_on_container_stopped,
                  "whether close file handler immediately when associate container stopped",
                  false);
-
-DECLARE_FLAG_BOOL(send_prefer_real_ip);
 
 
 namespace logtail {

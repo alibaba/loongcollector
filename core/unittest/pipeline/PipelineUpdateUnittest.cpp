@@ -33,6 +33,9 @@
 #include "unittest/pipeline/HttpSinkMock.h"
 #include "unittest/pipeline/LogtailPluginMock.h"
 #include "unittest/plugin/PluginMock.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 using namespace std;
 
@@ -63,7 +66,7 @@ class FlusherSLSMock : public FlusherSLS {
 public:
     static const std::string sName;
 
-    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem) const override {
+    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem, std::string* errMsg) override {
         auto data = static_cast<SLSSenderQueueItem*>(item);
         std::map<std::string, std::string> header;
         req = std::make_unique<HttpSinkRequest>(
@@ -372,9 +375,11 @@ private:
             "Type": "flusher_stdout2"
         })";
 
-    size_t builtinPipelineCnt = 0;
+    static size_t builtinPipelineCnt;
     bool isFileServerStart = false;
 };
+
+size_t PipelineUpdateUnittest::builtinPipelineCnt = 0;
 
 void PipelineUpdateUnittest::TestFileServerStart() {
     isFileServerStart = true;

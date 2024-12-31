@@ -16,6 +16,7 @@
 
 #include "common/EndpointUtil.h"
 
+#include "common/StringTools.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -23,10 +24,11 @@ using namespace std;
 namespace logtail {
 
 bool IsHttpsEndpoint(const string& endpoint) {
-    return endpoint.find("https://") == 0;
+    string trimmedEndpoint = TrimString(endpoint);
+    return trimmedEndpoint.find("https://") == 0;
 }
-    
-string StandardizeEndpoint(const string& endpoint, const string& defaultEndpoint) {
+
+string StandardizeHost(const string& endpoint, const string& defaultEndpoint) {
     string res = endpoint;
     if (endpoint.find("https://") == 0) {
         if (endpoint.size() < string("https://x").size()) {
@@ -47,6 +49,22 @@ string StandardizeEndpoint(const string& endpoint, const string& defaultEndpoint
         return res.substr(0, res.size() - 1);
     }
     return res;
+}
+
+string ExtractEndpoint(const string& endpoint) {
+    string trimmedEndpoint = TrimString(endpoint);
+    auto bpos = trimmedEndpoint.find("://");
+    if (bpos == string::npos) {
+        bpos = 0;
+    } else {
+        bpos += strlen("://");
+    }
+
+    auto epos = trimmedEndpoint.find("/", bpos);
+    if (epos == string::npos) {
+        epos = trimmedEndpoint.length();
+    }
+    return trimmedEndpoint.substr(bpos, epos - bpos);
 }
 
 string GetHostFromEndpoint(const std::string& endpoint) {

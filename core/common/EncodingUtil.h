@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,10 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include <string>
 
 namespace logtail {
 
-bool CompressLz4(const std::string& src, std::string& dst);
-bool CompressLz4(const char* srcPtr, const uint32_t srcSize, std::string& dest);
+std::string Base64Enconde(const std::string& message);
 
 } // namespace logtail

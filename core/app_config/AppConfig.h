@@ -316,7 +316,7 @@ private:
 
 public:
     AppConfig();
-    ~AppConfig(){};
+    ~AppConfig() {};
 
     void LoadInstanceConfig(const std::map<std::string, std::shared_ptr<InstanceConfig>>&);
 
@@ -533,6 +533,8 @@ public:
     friend class InputPrometheusUnittest;
     friend class InputContainerStdioUnittest;
     friend class BatcherUnittest;
+    friend class EnterpriseSLSClientManagerUnittest;
+    friend class FlusherRunnerUnittest;
     friend class PipelineUpdateUnittest;
 #endif
 };

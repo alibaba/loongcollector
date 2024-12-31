@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "DNSCache.h"
+
 #include <cstring>
 #if defined(__linux__)
 #include <arpa/inet.h>
@@ -22,86 +23,91 @@
 #include <ws2tcpip.h>
 #endif
 
+DEFINE_FLAG_INT32(dns_cache_ttl_sec, "", 600);
+
 namespace logtail {
-    // ParseHost only supports IPv4 now.
-    bool DnsCache::ParseHost(const char* host, std::string& ip) {
+DnsCache::DnsCache(const int32_t ttlSeconds) : mUpdateTime(time(NULL)), mDnsTTL(ttlSeconds) {
+}
+
+// ParseHost only supports IPv4 now.
+bool DnsCache::ParseHost(const char* host, std::string& ip) {
 #if defined(__linux__)
-        struct sockaddr_in addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
 
-        char* buffer = NULL;
-        if (host && host[0]) {
-            if (IsRawIp(host)) {
-                if ((addr.sin_addr.s_addr = inet_addr(host)) == INADDR_NONE)
-                    return false;
-            } else {
-                int bufferLen = 2048;
-                int rc, res;
-                struct hostent* hp = NULL;
-                struct hostent h;
-                while (true) {
-                    buffer = new char[bufferLen];
-                    res = gethostbyname_r(host, &h, buffer, bufferLen, &hp, &rc);
-                    if (res == ERANGE) {
-                        if (buffer != NULL)
-                            delete[] buffer;
-                        bufferLen *= 4;
-                        if (bufferLen > 32768) // 32KB
-                            return false;
-                        continue;
-                    }
-                    if (res != 0 || hp == NULL || hp->h_addr == NULL) {
-                        if (buffer != NULL)
-                            delete[] buffer;
+    char* buffer = NULL;
+    if (host && host[0]) {
+        if (IsRawIp(host)) {
+            if ((addr.sin_addr.s_addr = inet_addr(host)) == INADDR_NONE)
+                return false;
+        } else {
+            int bufferLen = 2048;
+            int rc, res;
+            struct hostent* hp = NULL;
+            struct hostent h;
+            while (true) {
+                buffer = new char[bufferLen];
+                res = gethostbyname_r(host, &h, buffer, bufferLen, &hp, &rc);
+                if (res == ERANGE) {
+                    if (buffer != NULL)
+                        delete[] buffer;
+                    bufferLen *= 4;
+                    if (bufferLen > 32768) // 32KB
                         return false;
-                    } else
-                        break;
+                    continue;
                 }
-                addr.sin_addr.s_addr = *((in_addr_t*)(hp->h_addr));
+                if (res != 0 || hp == NULL || hp->h_addr == NULL) {
+                    if (buffer != NULL)
+                        delete[] buffer;
+                    return false;
+                } else
+                    break;
             }
-        } else {
-            addr.sin_addr.s_addr = htonl(INADDR_ANY);
+            addr.sin_addr.s_addr = *((in_addr_t*)(hp->h_addr));
         }
-        ip = inet_ntoa(addr.sin_addr);
-        if (buffer != NULL)
-            delete[] buffer;
-        return true;
-#elif defined(_MSC_VER)
-        struct sockaddr_in addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        if (host && host[0]) {
-            if (IsRawIp(host)) {
-                if ((addr.sin_addr.s_addr = inet_addr(host)) == INADDR_NONE)
-                    return false;
-            } else {
-                addrinfo hints;
-                struct addrinfo* result = NULL;
-                std::memset(&hints, 0, sizeof(hints));
-                auto ret = ::getaddrinfo(host, NULL, &hints, &result);
-                if (ret != 0) {
-                    return false;
-                }
-
-                bool found = false;
-                for (auto ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-                    if (AF_INET == ptr->ai_family) {
-                        addr.sin_addr = ((struct sockaddr_in*)ptr->ai_addr)->sin_addr;
-                        found = true;
-                        break;
-                    }
-                }
-                freeaddrinfo(result);
-                if (!found)
-                    return false;
-            }
-        } else {
-            addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        }
-        ip = inet_ntoa(addr.sin_addr);
-        return true;
-#endif
+    } else {
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
     }
+    ip = inet_ntoa(addr.sin_addr);
+    if (buffer != NULL)
+        delete[] buffer;
+    return true;
+#elif defined(_MSC_VER)
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    if (host && host[0]) {
+        if (IsRawIp(host)) {
+            if ((addr.sin_addr.s_addr = inet_addr(host)) == INADDR_NONE)
+                return false;
+        } else {
+            addrinfo hints;
+            struct addrinfo* result = NULL;
+            std::memset(&hints, 0, sizeof(hints));
+            auto ret = ::getaddrinfo(host, NULL, &hints, &result);
+            if (ret != 0) {
+                return false;
+            }
+
+            bool found = false;
+            for (auto ptr = result; ptr != NULL; ptr = ptr->ai_next) {
+                if (AF_INET == ptr->ai_family) {
+                    addr.sin_addr = ((struct sockaddr_in*)ptr->ai_addr)->sin_addr;
+                    found = true;
+                    break;
+                }
+            }
+            freeaddrinfo(result);
+            if (!found)
+                return false;
+        }
+    } else {
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+    ip = inet_ntoa(addr.sin_addr);
+    return true;
+#endif
+}
 
 } // namespace logtail

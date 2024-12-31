@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,21 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include <string>
 
 namespace logtail {
 
-bool CompressLz4(const std::string& src, std::string& dst);
-bool CompressLz4(const char* srcPtr, const uint32_t srcSize, std::string& dest);
+extern const std::string HTTP_POST;
+extern const std::string HTTP_GET;
+
+extern const std::string HOST;
+extern const std::string DATE;
+extern const std::string USER_AGENT;
+extern const std::string CONTENT_LENGTH;
+extern const std::string CONTENT_TYPE;
+extern const std::string AUTHORIZATION;
+extern const std::string SIGNATURE;
+
+extern const std::string TYPE_LOG_PROTOBUF;
 
 } // namespace logtail

@@ -33,7 +33,7 @@ struct HttpSinkRequest : public AsynHttpRequest {
                     const std::map<std::string, std::string>& header,
                     const std::string& body,
                     SenderQueueItem* item,
-                    uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_secs)),
+                    uint32_t timeout = static_cast<uint32_t>(INT32_FLAG(default_http_request_timeout_sec)),
                     uint32_t maxTryCnt = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt))
                     )
         : AsynHttpRequest(method, httpsFlag, host, port, url, query, header, body, HttpResponse(), timeout, maxTryCnt), mItem(item) {}

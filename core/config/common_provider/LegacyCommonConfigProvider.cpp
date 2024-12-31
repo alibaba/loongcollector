@@ -22,20 +22,22 @@
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
+#include "common/EncodingUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
+#include "common/http/Constant.h"
+#include "common/http/Curl.h"
 #include "common/version.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
-#include "sdk/Common.h"
-#include "sdk/CurlImp.h"
-#include "sdk/Exception.h"
 
 using namespace std;
 
 DEFINE_FLAG_INT32(config_update_interval, "second", 10);
 
 namespace logtail {
+
+const string AGENT = "/Agent";
 
 void LegacyCommonConfigProvider::Init(const string& dir) {
     ConfigProvider::Init(dir);
@@ -157,7 +159,7 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>
 LegacyCommonConfigProvider::SendHeartbeat(const ConfigServerAddress& configServerAddress) {
     configserver::proto::HeartBeatRequest heartBeatReq;
     configserver::proto::AgentAttributes attributes;
-    string requestID = sdk::Base64Enconde(string("heartbeat").append(to_string(time(NULL))));
+    string requestID = Base64Enconde(string("heartbeat").append(to_string(time(NULL))));
     heartBeatReq.set_request_id(requestID);
     heartBeatReq.set_agent_id(Application::GetInstance()->GetInstanceId());
     heartBeatReq.set_agent_type("iLogtail");
@@ -179,46 +181,41 @@ LegacyCommonConfigProvider::SendHeartbeat(const ConfigServerAddress& configServe
     }
     heartBeatReq.mutable_pipeline_configs()->MergeFrom(pipelineConfigs);
 
-    string operation = sdk::CONFIGSERVERAGENT;
+    string operation = AGENT;
     operation.append("/").append("HeartBeat");
     map<string, string> httpHeader;
-    httpHeader[sdk::CONTENT_TYPE] = sdk::TYPE_LOG_PROTOBUF;
+    httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
     string reqBody;
     heartBeatReq.SerializeToString(&reqBody);
-    sdk::HttpMessage httpResponse;
-    httpResponse.header[sdk::X_LOG_REQUEST_ID] = "ConfigServer";
 
-    sdk::CurlClient client;
     google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult> emptyResult;
-    try {
-        client.Send(sdk::HTTP_POST,
-                    configServerAddress.host,
-                    configServerAddress.port,
-                    operation,
-                    "",
-                    httpHeader,
-                    reqBody,
-                    INT32_FLAG(sls_client_send_timeout),
-                    httpResponse,
-                    "",
-                    false);
-        configserver::proto::HeartBeatResponse heartBeatResp;
-        heartBeatResp.ParseFromString(httpResponse.content);
-
-        if (0 != strcmp(heartBeatResp.request_id().c_str(), requestID.c_str()))
-            return emptyResult;
-
-        LOG_DEBUG(sLogger,
-                  ("SendHeartbeat", "success")("reqBody", reqBody)("requestId", heartBeatResp.request_id())(
-                      "statusCode", heartBeatResp.code()));
-
-        return heartBeatResp.pipeline_check_results();
-    } catch (const sdk::LOGException& e) {
+    HttpResponse httpResponse;
+    if (!logtail::SendHttpRequest(make_unique<HttpRequest>(HTTP_POST,
+                                                           false,
+                                                           configServerAddress.host,
+                                                           configServerAddress.port,
+                                                           operation,
+                                                           "",
+                                                           httpHeader,
+                                                           reqBody),
+                                  httpResponse)) {
         LOG_WARNING(sLogger,
-                    ("SendHeartbeat", "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())(
-                        "errMsg", e.GetMessage())("host", configServerAddress.host)("port", configServerAddress.port));
+                    ("SendHeartbeat",
+                     "fail")("reqBody", reqBody)("host", configServerAddress.host)("port", configServerAddress.port));
         return emptyResult;
     }
+
+    configserver::proto::HeartBeatResponse heartBeatResp;
+    heartBeatResp.ParseFromString(*httpResponse.GetBody<string>());
+
+    if (0 != strcmp(heartBeatResp.request_id().c_str(), requestID.c_str()))
+        return emptyResult;
+
+    LOG_DEBUG(sLogger,
+              ("SendHeartbeat", "success")("reqBody", reqBody)("requestId", heartBeatResp.request_id())(
+                  "statusCode", heartBeatResp.code()));
+
+    return heartBeatResp.pipeline_check_results();
 }
 
 google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> LegacyCommonConfigProvider::FetchPipelineConfig(
@@ -226,7 +223,7 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> LegacyComm
     const google::protobuf::RepeatedPtrField<configserver::proto::ConfigCheckResult>& requestConfigs) {
     configserver::proto::FetchPipelineConfigRequest fetchConfigReq;
     string requestID
-        = sdk::Base64Enconde(Application::GetInstance()->GetInstanceId().append("_").append(to_string(time(NULL))));
+        = Base64Enconde(Application::GetInstance()->GetInstanceId().append("_").append(to_string(time(NULL))));
     fetchConfigReq.set_request_id(requestID);
     fetchConfigReq.set_agent_id(Application::GetInstance()->GetInstanceId());
 
@@ -242,47 +239,39 @@ google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> LegacyComm
     }
     fetchConfigReq.mutable_req_configs()->MergeFrom(configInfos);
 
-    string operation = sdk::CONFIGSERVERAGENT;
+    string operation = AGENT;
     operation.append("/").append("FetchPipelineConfig");
     map<string, string> httpHeader;
-    httpHeader[sdk::CONTENT_TYPE] = sdk::TYPE_LOG_PROTOBUF;
+    httpHeader[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
     string reqBody;
     fetchConfigReq.SerializeToString(&reqBody);
-    sdk::HttpMessage httpResponse;
-    httpResponse.header[sdk::X_LOG_REQUEST_ID] = "ConfigServer";
 
-    sdk::CurlClient client;
     google::protobuf::RepeatedPtrField<configserver::proto::ConfigDetail> emptyResult;
-    try {
-        client.Send(sdk::HTTP_POST,
-                    configServerAddress.host,
-                    configServerAddress.port,
-                    operation,
-                    "",
-                    httpHeader,
-                    reqBody,
-                    INT32_FLAG(sls_client_send_timeout),
-                    httpResponse,
-                    "",
-                    false);
-
-        configserver::proto::FetchPipelineConfigResponse fetchConfigResp;
-        fetchConfigResp.ParseFromString(httpResponse.content);
-
-        if (0 != strcmp(fetchConfigResp.request_id().c_str(), requestID.c_str()))
-            return emptyResult;
-
-        LOG_DEBUG(sLogger,
-                  ("GetConfigUpdateInfos", "success")("reqBody", reqBody)("requestId", fetchConfigResp.request_id())(
-                      "statusCode", fetchConfigResp.code()));
-
-        return fetchConfigResp.config_details();
-    } catch (const sdk::LOGException& e) {
-        LOG_WARNING(sLogger,
-                    ("GetConfigUpdateInfos", "fail")("reqBody", reqBody)("errCode", e.GetErrorCode())("errMsg",
-                                                                                                      e.GetMessage()));
+    HttpResponse httpResponse;
+    if (!logtail::SendHttpRequest(make_unique<HttpRequest>(HTTP_POST,
+                                                           false,
+                                                           configServerAddress.host,
+                                                           configServerAddress.port,
+                                                           operation,
+                                                           "",
+                                                           httpHeader,
+                                                           reqBody),
+                                  httpResponse)) {
+        LOG_WARNING(sLogger, ("GetConfigUpdateInfos", "fail")("reqBody", reqBody));
         return emptyResult;
     }
+
+    configserver::proto::FetchPipelineConfigResponse fetchConfigResp;
+    fetchConfigResp.ParseFromString(*httpResponse.GetBody<string>());
+
+    if (0 != strcmp(fetchConfigResp.request_id().c_str(), requestID.c_str()))
+        return emptyResult;
+
+    LOG_DEBUG(sLogger,
+              ("GetConfigUpdateInfos", "success")("reqBody", reqBody)("requestId", fetchConfigResp.request_id())(
+                  "statusCode", fetchConfigResp.code()));
+
+    return fetchConfigResp.config_details();
 }
 
 void LegacyCommonConfigProvider::UpdateRemoteConfig(

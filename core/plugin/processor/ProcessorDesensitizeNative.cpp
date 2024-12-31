@@ -20,7 +20,7 @@
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
-#include "sdk/Common.h"
+#include "common/HashUtil.h"
 
 namespace logtail {
 
@@ -230,7 +230,7 @@ void ProcessorDesensitizeNative::CastOneSensitiveWord(std::string* value) {
             // add : xxxx, psw
             destStr.append(pVal->substr(beginPos, beginOffset - beginPos));
             // md5: 123abc
-            destStr.append(sdk::CalcMD5(pVal->substr(beginOffset, endOffset - beginOffset)));
+            destStr.append(CalcMD5(pVal->substr(beginOffset, endOffset - beginOffset)));
             beginPos = endOffset;
             // refine for  : xxxx. psw=123abc
             if (endOffset >= maxSize) {

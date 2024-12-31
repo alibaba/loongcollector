@@ -16,18 +16,27 @@
 
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#include <ctime>
 #include <future>
+#include <memory>
 #include <mutex>
 #include <string>
+#ifdef __ENTERPRIRSE__
+#include <unordered_set>
+#endif
 #include <vector>
 
 #include "common/SafeQueue.h"
 #include "pipeline/queue/SenderQueueItem.h"
-#include "plugin/flusher/sls/SendResult.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#endif
+#include "plugin/flusher/sls/SLSClientManager.h"
+#include "plugin/flusher/sls/SLSResponse.h"
 #include "protobuf/sls/logtail_buffer_meta.pb.h"
-#include "sdk/Client.h"
 
 namespace logtail {
 
@@ -64,15 +73,8 @@ private:
     void BufferWriterThread();
     void BufferSenderThread();
 
-    SendResult SendToNetSync(sdk::Client* sendClient,
-                             const std::string& region,
-                             const std::string& endpoint,
-                             const sls_logs::LogtailBufferMeta& bufferMeta,
-                             const std::string& logData,
-                             std::string& errorCode);
-    SendResult SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta,
-                                  const std::string& logData,
-                                  std::string& errorCode);
+    SLSResponse
+    SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta, const std::string& logData, std::string& host);
     bool SendToBufferFile(SenderQueueItem* dataPtr);
     bool LoadFileToSend(time_t timeLine, std::vector<std::string>& filesToSend);
     bool CreateNewFile();
@@ -100,12 +102,28 @@ private:
     bool mIsSendBufferThreadRunning = true;
     mutable std::condition_variable mStopCV;
 
+#ifdef __ENTERPRISE__
+    struct PointerHash {
+        std::size_t operator()(const std::shared_ptr<CandidateHostsInfo>& ptr) const {
+            return std::hash<CandidateHostsInfo*>()(ptr.get());
+        }
+    };
+
+    struct PointerEqual {
+        bool operator()(const std::shared_ptr<CandidateHostsInfo>& lhs,
+                        const std::shared_ptr<CandidateHostsInfo>& rhs) const {
+            return lhs.get() == rhs.get();
+        }
+    };
+
+    std::unordered_set<std::shared_ptr<CandidateHostsInfo>, PointerHash, PointerEqual> mCandidateHostsInfos;
+#endif
+
     mutable std::mutex mBufferFileLock;
     std::string mBufferFilePath;
     std::string mBufferFileName;
 
     volatile time_t mBufferDivideTime = 0;
-    // volatile bool mIsSendingBuffer = false;
     int64_t mCheckPeriod = 0;
 
     int64_t mSendLastTime = 0;

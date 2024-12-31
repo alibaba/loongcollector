@@ -24,6 +24,8 @@
 
 namespace logtail {
 
+static constexpr uint32_t MD5_BYTES = 16;
+
 /////////////////////////////////////////////// MACRO //////////////////////////////////////////////////
 #define SHIFT_LEFT(a, b) ((a) << (b) | (a) >> (32 - b))
 
@@ -309,6 +311,22 @@ void DoMd5(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t md5[16])
         DoMd5Big(poolIn, inputBytesNum, md5);
     }
 } /// DoMd5
+
+static std::string HexToString(const uint8_t md5[16]) {
+    static const char* table = "0123456789ABCDEF";
+    std::string ss(32, 'a');
+    for (int i = 0; i < 16; ++i) {
+        ss[i * 2] = table[md5[i] >> 4];
+        ss[i * 2 + 1] = table[md5[i] & 0x0F];
+    }
+    return ss;
+}
+
+std::string CalcMD5(const std::string& message) {
+    uint8_t md5[MD5_BYTES];
+    DoMd5((const uint8_t*)message.data(), message.length(), md5);
+    return HexToString(md5);
+}
 
 bool SignatureToHash(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize) {
     sigSize = (uint32_t)signature.size();
