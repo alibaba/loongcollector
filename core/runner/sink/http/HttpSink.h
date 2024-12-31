@@ -21,6 +21,8 @@
 #include <future>
 #include <mutex>
 
+#include "curl/multi.h"
+
 #include "monitor/MetricManager.h"
 #include "runner/sink/Sink.h"
 #include "runner/sink/http/HttpSinkRequest.h"
