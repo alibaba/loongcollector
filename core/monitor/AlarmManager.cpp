@@ -223,8 +223,7 @@ void AlarmManager::SendAllRegionAlarm() {
             logGroup.set_source(LoongCollectorMonitor::mIpAddr);
             logGroup.set_category(ALARM_SLS_LOGSTORE_NAME);
             auto now = GetCurrentLogtailTime();
-            for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin();
-                 mapIter != alarmMap.end();
+            for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
                  ++mapIter) {
                 auto& messagePtr = mapIter->second;
 

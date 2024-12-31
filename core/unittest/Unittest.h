@@ -19,13 +19,15 @@
 #include <Winsock2.h>
 #endif
 #include <cstdlib>
-#include <gtest/gtest.h>
-#include <boost/filesystem.hpp>
-#include "logger/Logger.h"
+
+#include "boost/filesystem.hpp"
+#include "gtest/gtest.h"
+
+#include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
-#include "common/HashUtil.h"
 #include "common/TimeUtil.h"
+#include "logger/Logger.h"
 
 namespace bfs = boost::filesystem;
 

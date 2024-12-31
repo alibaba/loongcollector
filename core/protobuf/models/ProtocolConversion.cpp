@@ -4,52 +4,53 @@ using namespace std;
 
 namespace logtail {
 
-bool TransferPBToPipelineEventGroup(const logtail::models::PipelineEventGroup& src, logtail::PipelineEventGroup& dst, std::string& errMsg) {
+bool TransferPBToPipelineEventGroup(const logtail::models::PipelineEventGroup& src,
+                                    logtail::PipelineEventGroup& dst,
+                                    std::string& errMsg) {
     // events
-    switch (src.PipelineEvents_case())
-    {
-    case logtail::models::PipelineEventGroup::PipelineEventsCase::kLogs:
-        if (src.logs().events_size() == 0) {
-            errMsg = "error transfer PB to PipelineEventGroup: no log events";
-            return false;
-        }
-        dst.MutableEvents().reserve(src.logs().events_size());
-        for (auto& logSrc : src.logs().events()) {
-            auto logDst = dst.AddLogEvent();
-            if (!TransferPBToLogEvent(logSrc, *logDst, errMsg)) {
+    switch (src.PipelineEvents_case()) {
+        case logtail::models::PipelineEventGroup::PipelineEventsCase::kLogs:
+            if (src.logs().events_size() == 0) {
+                errMsg = "error transfer PB to PipelineEventGroup: no log events";
                 return false;
             }
-        }
-        break;
-    case logtail::models::PipelineEventGroup::PipelineEventsCase::kMetrics:
-        if (src.metrics().events_size() == 0) {
-            errMsg = "error transfer PB to PipelineEventGroup: no metric events";
-            return false;
-        }
-        dst.MutableEvents().reserve(src.metrics().events_size());
-        for (auto& metricSrc : src.metrics().events()) {
-            auto metricDst = dst.AddMetricEvent();
-            if (!TransferPBToMetricEvent(metricSrc, *metricDst, errMsg)) {
+            dst.MutableEvents().reserve(src.logs().events_size());
+            for (auto& logSrc : src.logs().events()) {
+                auto logDst = dst.AddLogEvent();
+                if (!TransferPBToLogEvent(logSrc, *logDst, errMsg)) {
+                    return false;
+                }
+            }
+            break;
+        case logtail::models::PipelineEventGroup::PipelineEventsCase::kMetrics:
+            if (src.metrics().events_size() == 0) {
+                errMsg = "error transfer PB to PipelineEventGroup: no metric events";
                 return false;
             }
-        }
-        break;
-    case logtail::models::PipelineEventGroup::PipelineEventsCase::kSpans:
-        if (src.spans().events_size() == 0) {
-            errMsg = "error transfer PB to PipelineEventGroup: no span events";
-            return false;
-        }
-        dst.MutableEvents().reserve(src.spans().events_size());
-        for (auto& spanSrc : src.spans().events()) {
-            auto spanDst = dst.AddSpanEvent();
-            if (!TransferPBToSpanEvent(spanSrc, *spanDst, errMsg)) {
+            dst.MutableEvents().reserve(src.metrics().events_size());
+            for (auto& metricSrc : src.metrics().events()) {
+                auto metricDst = dst.AddMetricEvent();
+                if (!TransferPBToMetricEvent(metricSrc, *metricDst, errMsg)) {
+                    return false;
+                }
+            }
+            break;
+        case logtail::models::PipelineEventGroup::PipelineEventsCase::kSpans:
+            if (src.spans().events_size() == 0) {
+                errMsg = "error transfer PB to PipelineEventGroup: no span events";
                 return false;
             }
-        }
-        break;
-    default:
-        errMsg = "error transfer PB to PipelineEventGroup: unsupported event type";
-        return false;
+            dst.MutableEvents().reserve(src.spans().events_size());
+            for (auto& spanSrc : src.spans().events()) {
+                auto spanDst = dst.AddSpanEvent();
+                if (!TransferPBToSpanEvent(spanSrc, *spanDst, errMsg)) {
+                    return false;
+                }
+            }
+            break;
+        default:
+            errMsg = "error transfer PB to PipelineEventGroup: unsupported event type";
+            return false;
     }
 
     // tags
@@ -69,8 +70,8 @@ bool TransferPBToPipelineEventGroup(const logtail::models::PipelineEventGroup& s
 
 bool TransferPBToLogEvent(const logtail::models::LogEvent& src, logtail::LogEvent& dst, std::string& errMsg) {
     // timestamp
-    std::chrono::nanoseconds tns(src.timestamp()); 
-    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns); 
+    std::chrono::nanoseconds tns(src.timestamp());
+    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns);
     dst.SetTimestamp(ts.count(), tns.count() - ts.count() * 1000000000);
     // contents
     for (auto& contentPair : src.contents()) {
@@ -85,19 +86,19 @@ bool TransferPBToLogEvent(const logtail::models::LogEvent& src, logtail::LogEven
 
 bool TransferPBToMetricEvent(const logtail::models::MetricEvent& src, logtail::MetricEvent& dst, std::string& errMsg) {
     // timestamp
-    std::chrono::nanoseconds tns(src.timestamp()); 
-    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns); 
+    std::chrono::nanoseconds tns(src.timestamp());
+    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns);
     dst.SetTimestamp(ts.count(), tns.count() - ts.count() * 1000000000);
     // name
     dst.SetName(src.name());
     // value
     switch (src.Value_case()) {
-    case logtail::models::MetricEvent::ValueCase::kUntypedSingleValue:
-        dst.SetValue(logtail::UntypedSingleValue{src.untypedsinglevalue().value()});
-        break;
-    default:
-        errMsg = "error transfer PB to MetricEvent: unsupported value type";
-        return false;
+        case logtail::models::MetricEvent::ValueCase::kUntypedSingleValue:
+            dst.SetValue(logtail::UntypedSingleValue{src.untypedsinglevalue().value()});
+            break;
+        default:
+            errMsg = "error transfer PB to MetricEvent: unsupported value type";
+            return false;
     }
     // tags
     for (auto& tagPair : src.tags()) {
@@ -108,8 +109,8 @@ bool TransferPBToMetricEvent(const logtail::models::MetricEvent& src, logtail::M
 
 bool TransferPBToSpanEvent(const logtail::models::SpanEvent& src, logtail::SpanEvent& dst, std::string& errMsg) {
     // timestamp
-    std::chrono::nanoseconds tns(src.timestamp()); 
-    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns); 
+    std::chrono::nanoseconds tns(src.timestamp());
+    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns);
     dst.SetTimestamp(ts.count(), tns.count() - ts.count() * 1000000000);
 
     dst.SetTraceId(src.traceid());
@@ -155,7 +156,9 @@ bool TransferPBToSpanEvent(const logtail::models::SpanEvent& src, logtail::SpanE
     return true;
 }
 
-bool TransferPipelineEventGroupToPB(const logtail::PipelineEventGroup& src, logtail::models::PipelineEventGroup& dst, std::string& errMsg) {
+bool TransferPipelineEventGroupToPB(const logtail::PipelineEventGroup& src,
+                                    logtail::models::PipelineEventGroup& dst,
+                                    std::string& errMsg) {
     // events
     if (src.GetEvents().empty()) {
         errMsg = "error transfer PipelineEventGroup to PB: events empty";
@@ -163,51 +166,54 @@ bool TransferPipelineEventGroupToPB(const logtail::PipelineEventGroup& src, logt
     }
 
     switch (src.GetEvents()[0]->GetType()) {
-    case logtail::PipelineEvent::Type::LOG:
-        dst.mutable_logs()->mutable_events()->Reserve(src.GetEvents().size());
-        for (const auto& event : src.GetEvents()) {
-            if (!event.Is<logtail::LogEvent>()) {
-                errMsg = "error transfer PipelineEventGroup to PB: unsupport pipelineEventGroup with multi types of events";
-                return false;
+        case logtail::PipelineEvent::Type::LOG:
+            dst.mutable_logs()->mutable_events()->Reserve(src.GetEvents().size());
+            for (const auto& event : src.GetEvents()) {
+                if (!event.Is<logtail::LogEvent>()) {
+                    errMsg = "error transfer PipelineEventGroup to PB: unsupport pipelineEventGroup with multi types "
+                             "of events";
+                    return false;
+                }
+                const auto& logSrc = event.Cast<logtail::LogEvent>();
+                auto logDst = dst.mutable_logs()->add_events();
+                if (!TransferLogEventToPB(logSrc, *logDst, errMsg)) {
+                    return false;
+                }
             }
-            const auto& logSrc = event.Cast<logtail::LogEvent>();
-            auto logDst = dst.mutable_logs()->add_events();
-            if (!TransferLogEventToPB(logSrc, *logDst, errMsg)) {
-                return false;
+            break;
+        case logtail::PipelineEvent::Type::METRIC:
+            dst.mutable_metrics()->mutable_events()->Reserve(src.GetEvents().size());
+            for (const auto& event : src.GetEvents()) {
+                if (!event.Is<logtail::MetricEvent>()) {
+                    errMsg = "error transfer PipelineEventGroup to PB: unsupport pipelineEventGroup with multi types "
+                             "of events";
+                    return false;
+                }
+                const auto& metricSrc = event.Cast<logtail::MetricEvent>();
+                auto metricDst = dst.mutable_metrics()->add_events();
+                if (!TransferMetricEventToPB(metricSrc, *metricDst, errMsg)) {
+                    return false;
+                }
             }
-        }
-        break;
-    case logtail::PipelineEvent::Type::METRIC:
-        dst.mutable_metrics()->mutable_events()->Reserve(src.GetEvents().size());
-        for (const auto& event : src.GetEvents()) {
-            if (!event.Is<logtail::MetricEvent>()) {
-                errMsg = "error transfer PipelineEventGroup to PB: unsupport pipelineEventGroup with multi types of events";
-                return false;
+            break;
+        case logtail::PipelineEvent::Type::SPAN:
+            dst.mutable_spans()->mutable_events()->Reserve(src.GetEvents().size());
+            for (const auto& event : src.GetEvents()) {
+                if (!event.Is<logtail::SpanEvent>()) {
+                    errMsg = "error transfer PipelineEventGroup to PB: unsupport pipelineEventGroup with multi types "
+                             "of events";
+                    return false;
+                }
+                const auto& spanSrc = event.Cast<logtail::SpanEvent>();
+                auto spanDst = dst.mutable_spans()->add_events();
+                if (!TransferSpanEventToPB(spanSrc, *spanDst, errMsg)) {
+                    return false;
+                }
             }
-            const auto& metricSrc = event.Cast<logtail::MetricEvent>();
-            auto metricDst = dst.mutable_metrics()->add_events();
-            if (!TransferMetricEventToPB(metricSrc, *metricDst, errMsg)) {
-                return false;
-            }
-        }
-        break;
-    case logtail::PipelineEvent::Type::SPAN:
-        dst.mutable_spans()->mutable_events()->Reserve(src.GetEvents().size());
-        for (const auto& event : src.GetEvents()) {
-            if (!event.Is<logtail::SpanEvent>()) {
-                errMsg = "error transfer PipelineEventGroup to PB: unsupport pipelineEventGroup with multi types of events";
-                return false;
-            }
-            const auto& spanSrc = event.Cast<logtail::SpanEvent>();
-            auto spanDst = dst.mutable_spans()->add_events();
-            if (!TransferSpanEventToPB(spanSrc, *spanDst, errMsg)) {
-                return false;
-            }
-        }
-        break;
-    default:
-        errMsg = "error transfer PipelineEventGroup to PB: unsupported event type";
-        return false;
+            break;
+        default:
+            errMsg = "error transfer PipelineEventGroup to PB: unsupported event type";
+            return false;
     }
 
     // tags
@@ -225,7 +231,7 @@ bool TransferPipelineEventGroupToPB(const logtail::PipelineEventGroup& src, logt
 
 bool TransferLogEventToPB(const logtail::LogEvent& src, logtail::models::LogEvent& dst, std::string& errMsg) {
     // timestamp
-    std::chrono::seconds ts(src.GetTimestamp()); 
+    std::chrono::seconds ts(src.GetTimestamp());
     dst.set_timestamp(ts.count() * 1000000000 + src.GetTimestampNanosecond().value_or(0));
 
     // contents
@@ -248,7 +254,7 @@ bool TransferLogEventToPB(const logtail::LogEvent& src, logtail::models::LogEven
 
 bool TransferMetricEventToPB(const logtail::MetricEvent& src, logtail::models::MetricEvent& dst, std::string& errMsg) {
     // timestamp
-    std::chrono::seconds ts(src.GetTimestamp()); 
+    std::chrono::seconds ts(src.GetTimestamp());
     dst.set_timestamp(ts.count() * 1000000000 + src.GetTimestampNanosecond().value_or(0));
 
     // name
@@ -273,7 +279,7 @@ bool TransferMetricEventToPB(const logtail::MetricEvent& src, logtail::models::M
 
 bool TransferSpanEventToPB(const logtail::SpanEvent& src, logtail::models::SpanEvent& dst, std::string& errMsg) {
     // timestamp
-    std::chrono::seconds ts(src.GetTimestamp()); 
+    std::chrono::seconds ts(src.GetTimestamp());
     dst.set_timestamp(ts.count() * 1000000000 + src.GetTimestampNanosecond().value_or(0));
 
     dst.set_traceid(src.GetTraceId().to_string());

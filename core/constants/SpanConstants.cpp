@@ -16,28 +16,28 @@
 
 namespace logtail {
 
-    const std::string DEFAULT_TRACE_TAG_TRACE_ID = "traceId";
-    const std::string DEFAULT_TRACE_TAG_SPAN_ID = "spanId";
-    const std::string DEFAULT_TRACE_TAG_PARENT_ID = "parentSpanId";
-    const std::string DEFAULT_TRACE_TAG_SPAN_NAME = "spanName";
-    const std::string DEFAULT_TRACE_TAG_SERVICE_NAME = "serviceName";
-    const std::string DEFAULT_TRACE_TAG_START_TIME_NANO = "startTime";
-    const std::string DEFAULT_TRACE_TAG_END_TIME_NANO = "endTime";
-    const std::string DEFAULT_TRACE_TAG_DURATION = "duration";
-    const std::string DEFAULT_TRACE_TAG_ATTRIBUTES = "attributes";
-    const std::string DEFAULT_TRACE_TAG_RESOURCE = "resources";
-    const std::string DEFAULT_TRACE_TAG_LINKS = "links";
-    const std::string DEFAULT_TRACE_TAG_EVENTS = "events";
-    const std::string DEFAULT_TRACE_TAG_TIMESTAMP = "timestamp";
-    const std::string DEFAULT_TRACE_TAG_STATUS_CODE = "statusCode";
-    const std::string DEFAULT_TRACE_TAG_STATUS_MESSAGE = "statusMessage";
-    const std::string DEFAULT_TRACE_TAG_SPAN_KIND = "kind";
-    const std::string DEFAULT_TRACE_TAG_TRACE_STATE = "traceState";
-    const std::string DEFAULT_TRACE_TAG_SPAN_EVENT_NAME = "name";
+const std::string DEFAULT_TRACE_TAG_TRACE_ID = "traceId";
+const std::string DEFAULT_TRACE_TAG_SPAN_ID = "spanId";
+const std::string DEFAULT_TRACE_TAG_PARENT_ID = "parentSpanId";
+const std::string DEFAULT_TRACE_TAG_SPAN_NAME = "spanName";
+const std::string DEFAULT_TRACE_TAG_SERVICE_NAME = "serviceName";
+const std::string DEFAULT_TRACE_TAG_START_TIME_NANO = "startTime";
+const std::string DEFAULT_TRACE_TAG_END_TIME_NANO = "endTime";
+const std::string DEFAULT_TRACE_TAG_DURATION = "duration";
+const std::string DEFAULT_TRACE_TAG_ATTRIBUTES = "attributes";
+const std::string DEFAULT_TRACE_TAG_RESOURCE = "resources";
+const std::string DEFAULT_TRACE_TAG_LINKS = "links";
+const std::string DEFAULT_TRACE_TAG_EVENTS = "events";
+const std::string DEFAULT_TRACE_TAG_TIMESTAMP = "timestamp";
+const std::string DEFAULT_TRACE_TAG_STATUS_CODE = "statusCode";
+const std::string DEFAULT_TRACE_TAG_STATUS_MESSAGE = "statusMessage";
+const std::string DEFAULT_TRACE_TAG_SPAN_KIND = "kind";
+const std::string DEFAULT_TRACE_TAG_TRACE_STATE = "traceState";
+const std::string DEFAULT_TRACE_TAG_SPAN_EVENT_NAME = "name";
 #ifdef __ENTERPRISE__
-    // for arms
-    const std::string DEFAULT_TRACE_TAG_APP_ID = "pid";
-    const std::string DEFAULT_TRACE_TAG_IP = "ip";
+// for arms
+const std::string DEFAULT_TRACE_TAG_APP_ID = "pid";
+const std::string DEFAULT_TRACE_TAG_IP = "ip";
 #endif
 
 } // namespace logtail

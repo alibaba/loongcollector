@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include <curl/multi.h>
-
 #include <atomic>
 #include <condition_variable>
 #include <future>
 #include <memory>
 #include <mutex>
+
+#include "curl/multi.h"
 
 #include "common/SafeQueue.h"
 #include "common/http/HttpRequest.h"

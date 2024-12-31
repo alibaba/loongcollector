@@ -16,7 +16,7 @@
 
 #include <string>
 
-#include <json/json.h>
+#include "json/json.h"
 #include "yaml-cpp/yaml.h"
 
 namespace logtail {

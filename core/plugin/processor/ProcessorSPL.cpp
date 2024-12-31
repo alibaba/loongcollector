@@ -16,10 +16,6 @@
 
 #include "plugin/processor/ProcessorSPL.h"
 
-#include <curl/curl.h>
-
-#include <iostream>
-
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"

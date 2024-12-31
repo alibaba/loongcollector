@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "RandomUtil.h"
+
 #include <sstream>
 #if defined(__linux__)
 #include <uuid/uuid.h>
@@ -22,26 +23,26 @@ namespace logtail {
 
 namespace detail {
 
-    size_t countBitSize(size_t maxVal) {
-        if (0 == maxVal) {
-            return 1;
-        }
-
-        size_t count = 0;
-        while (maxVal != 0) {
-            count++;
-            maxVal = maxVal >> 1;
-        }
-        return count;
+size_t countBitSize(size_t maxVal) {
+    if (0 == maxVal) {
+        return 1;
     }
 
-    inline char valToHex(size_t val) {
-        return val < 10 ? ('0' + val) : ('A' + val - 10);
+    size_t count = 0;
+    while (maxVal != 0) {
+        count++;
+        maxVal = maxVal >> 1;
     }
+    return count;
+}
 
-    inline size_t hexToVal(char hex) {
-        return hex >= 'A' ? 10 + hex - 'A' : hex - '0';
-    }
+inline char valToHex(size_t val) {
+    return val < 10 ? ('0' + val) : ('A' + val - 10);
+}
+
+inline size_t hexToVal(char hex) {
+    return hex >= 'A' ? 10 + hex - 'A' : hex - '0';
+}
 
 } // namespace detail
 

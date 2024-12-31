@@ -13,11 +13,12 @@
 // limitations under the License.
 
 #include <cstdlib>
+
 #include <sstream>
 
-#include "constants/Constants.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
+#include "constants/Constants.h"
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "unittest/Unittest.h"
@@ -41,7 +42,7 @@ UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessJson)
 UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestProcessCommon)
 UNIT_TEST_CASE(ProcessorSplitLogStringNativeUnittest, TestEnableRawContent)
 
-PluginInstance::PluginMeta getPluginMeta(){
+PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }

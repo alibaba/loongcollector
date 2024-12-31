@@ -22,6 +22,6 @@ namespace logtail {
 void SetEnv(const char* key, const char* value);
 void UnsetEnv(const char* key);
 
-}
+} // namespace logtail
 
 #endif

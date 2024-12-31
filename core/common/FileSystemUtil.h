@@ -17,7 +17,6 @@
 #pragma once
 #include <sys/stat.h>
 
-#include <boost/regex.hpp>
 #include <memory>
 #include <string>
 #include <vector>
@@ -122,137 +121,138 @@ void Chmod(const char* filePath, mode_t mode);
 
 namespace fsutil {
 
-    class Entry {
-    public:
-        enum class Type { UNKNOWN, DIR, REG_FILE };
+class Entry {
+public:
+    enum class Type { UNKNOWN, DIR, REG_FILE };
 
-        Entry() {}
-        Entry(const std::string& name, Type type, bool isSymbolic)
-            : mName(name), mType(type), mIsSymbolic(isSymbolic) {}
+    Entry() {}
+    Entry(const std::string& name, Type type, bool isSymbolic) : mName(name), mType(type), mIsSymbolic(isSymbolic) {}
 
-        std::string Name() const { return mName; }
-        bool IsDir() const { return Type::DIR == mType; }
-        bool IsRegFile() const { return Type::REG_FILE == mType; }
-        bool IsSymbolic() const { return mIsSymbolic; }
+    std::string Name() const { return mName; }
+    bool IsDir() const { return Type::DIR == mType; }
+    bool IsRegFile() const { return Type::REG_FILE == mType; }
+    bool IsSymbolic() const { return mIsSymbolic; }
 
-        // It's caller's job to deal unknown entry type.
-        operator bool() const { return !mName.empty(); }
+    // It's caller's job to deal unknown entry type.
+    operator bool() const { return !mName.empty(); }
 
-    private:
-        std::string mName;
-        Type mType = Type::UNKNOWN;
-        bool mIsSymbolic = false;
-    };
+private:
+    std::string mName;
+    Type mType = Type::UNKNOWN;
+    bool mIsSymbolic = false;
+};
 
-    class Dir {
-        Dir(const Dir&) = delete;
-        Dir& operator=(const Dir&) = delete;
+class Dir {
+    Dir(const Dir&) = delete;
+    Dir& operator=(const Dir&) = delete;
 
-    public:
-        Dir(const std::string& dirPath);
-        ~Dir();
+public:
+    Dir(const std::string& dirPath);
+    ~Dir();
 
-        bool Open();
+    bool Open();
 
-        // Utility function to decide why Open failed.
-        inline static bool IsENOENT(int e) {
+    // Utility function to decide why Open failed.
+    inline static bool IsENOENT(int e) {
 #if defined(__linux__)
-            return (ENOENT == e);
+        return (ENOENT == e);
 #elif defined(_MSC_VER)
-            return (ERROR_PATH_NOT_FOUND == e || ERROR_FILE_NOT_FOUND == e);
+        return (ERROR_PATH_NOT_FOUND == e || ERROR_FILE_NOT_FOUND == e);
 #endif
-        }
-        inline static bool IsENOTDIR(int e) {
+    }
+    inline static bool IsENOTDIR(int e) {
 #if defined(__linux__)
-            return (ENOTDIR == e);
+        return (ENOTDIR == e);
 #elif defined(_MSC_VER)
-            return (ERROR_DIRECTORY == e);
+        return (ERROR_DIRECTORY == e);
 #endif
-        }
-        inline static bool IsEACCES(int e) {
+    }
+    inline static bool IsEACCES(int e) {
 #if defined(__linux__)
-            return (EACCES == e);
+        return (EACCES == e);
 #elif defined(_MSC_VER)
-            return (ERROR_ACCESS_DENIED == e);
+        return (ERROR_ACCESS_DENIED == e);
 #endif
-        }
+    }
 
-        // ReadNext reads next entry (FILE or DIR).
-        // @param resolveWithStat: if true, use stat to check entry type when the entry
-        //   type from filesystem directory iteration API is not FILE or DIR,
-        //   eg. LNK type under Linux.
-        // @return: the entry of the file. If it is sure that we reached the end, an
-        //   'false' entry will be returned. Otherwise, we will use UNKNOWN type entry
-        //   to indicate some errors, it is caller's job to handle this (eg. skip it).
-        // TODO: Most error happened when the entry is symbolic, maybe we can ignore
-        //   this and let caller to call something else to deal it.
-        Entry ReadNext(bool resolveWithStat = true);
+    // ReadNext reads next entry (FILE or DIR).
+    // @param resolveWithStat: if true, use stat to check entry type when the entry
+    //   type from filesystem directory iteration API is not FILE or DIR,
+    //   eg. LNK type under Linux.
+    // @return: the entry of the file. If it is sure that we reached the end, an
+    //   'false' entry will be returned. Otherwise, we will use UNKNOWN type entry
+    //   to indicate some errors, it is caller's job to handle this (eg. skip it).
+    // TODO: Most error happened when the entry is symbolic, maybe we can ignore
+    //   this and let caller to call something else to deal it.
+    Entry ReadNext(bool resolveWithStat = true);
 
-        void Close();
+    void Close();
 
-    private:
-        std::string mDirPath;
+private:
+    std::string mDirPath;
 #if defined(__linux__)
-        DIR* mDir;
+    DIR* mDir;
 #elif defined(_MSC_VER)
-        HANDLE mFind;
-        // Because FindFirstFile will return first entry, we have to cache it.
-        Entry mCachedEntry;
-#endif
-
-        bool IsOpened() const;
-    };
-#if defined(__linux__)
-    typedef struct stat RawStatType;
-#elif defined(_MSC_VER)
-    typedef struct _stat64 RawStatType;
+    HANDLE mFind;
+    // Because FindFirstFile will return first entry, we have to cache it.
+    Entry mCachedEntry;
 #endif
 
-    class PathStat {
-        std::string mPath;
-        RawStatType mRawStat;
+    bool IsOpened() const;
+};
+#if defined(__linux__)
+typedef struct stat RawStatType;
+#elif defined(_MSC_VER)
+typedef struct _stat64 RawStatType;
+#endif
 
-    public:
-        PathStat();
-        ~PathStat();
+class PathStat {
+    std::string mPath;
+    RawStatType mRawStat;
 
-        RawStatType* GetRawStat() { return &mRawStat; }
+public:
+    PathStat();
+    ~PathStat();
 
-        // stat wrappers ::stat.
-        static bool stat(const std::string& path, PathStat& ps);
-        bool IsDir() const;
-        bool IsRegFile() const;
+    RawStatType* GetRawStat() { return &mRawStat; }
 
-        // lstat wrappers Linux ::lstat and implements it with ::stat on Windows.
-        static bool lstat(const std::string& path, PathStat& ps);
-        bool IsLink() const;
+    // stat wrappers ::stat.
+    static bool stat(const std::string& path, PathStat& ps);
+    bool IsDir() const;
+    bool IsRegFile() const;
 
-        // fstat wrappers ::fstat.
-        // @resolvePath only works on Windows.
-        //   If it is true, fstat will get corresponding file path according to @file and
-        //   set it to @ps.mPath, however, if this procedure failed, false will be returned
-        //   although the call to ::fstat succeeded.
-        //   **Use it when you want to call GetDevInode() or GetLastWriteTime().**
-        //   **Disable it if you only want to call GetMtime() or GetFileSize().**
-        static bool fstat(FILE* file, PathStat& ps, bool resolvePath = true);
-        static bool fstat(int fd, PathStat& ps, bool resolvePath = true);
+    // lstat wrappers Linux ::lstat and implements it with ::stat on Windows.
+    static bool lstat(const std::string& path, PathStat& ps);
+    bool IsLink() const;
+
+    // fstat wrappers ::fstat.
+    // @resolvePath only works on Windows.
+    //   If it is true, fstat will get corresponding file path according to @file and
+    //   set it to @ps.mPath, however, if this procedure failed, false will be returned
+    //   although the call to ::fstat succeeded.
+    //   **Use it when you want to call GetDevInode() or GetLastWriteTime().**
+    //   **Disable it if you only want to call GetMtime() or GetFileSize().**
+    static bool fstat(FILE* file, PathStat& ps, bool resolvePath = true);
+    static bool fstat(int fd, PathStat& ps, bool resolvePath = true);
 #if defined(_MSC_VER)
-        static bool fstat(HANDLE hFile, PathStat& ps, bool resolvePath = true);
+    static bool fstat(HANDLE hFile, PathStat& ps, bool resolvePath = true);
 #endif
 
-        // For Windows, GetDevInode and GetLastWriteTime have to call other system APIs to
-        // get information (by mPath), this will spend extra costs.
-        DevInode GetDevInode() const;
-        void GetLastWriteTime(int64_t& sec, int64_t& nsec) const;
+    // For Windows, GetDevInode and GetLastWriteTime have to call other system APIs to
+    // get information (by mPath), this will spend extra costs.
+    DevInode GetDevInode() const;
+    void GetLastWriteTime(int64_t& sec, int64_t& nsec) const;
 
-        // GetMtime and GetFileSize return st_mtime and st_size in struct stat. They needn't
-        // to call another system APIs.
-        time_t GetMtime() const;
-        int64_t GetFileSize() const;
+    // GetMtime and GetFileSize return st_mtime and st_size in struct stat. They needn't
+    // to call another system APIs.
+    time_t GetMtime() const;
+    int64_t GetFileSize() const;
 
-        // GetMode returns st_mode.
-        int GetMode() const { return static_cast<int>(mRawStat.st_mode); }
-    };
+    // GetMode returns st_mode.
+    int GetMode() const {
+        return static_cast<int>(mRawStat.st_mode);
+    }
+};
 
 } // namespace fsutil
 

@@ -15,9 +15,10 @@
  */
 
 #pragma once
-#include <vector>
 #include <deque>
 #include <string>
+#include <vector>
+
 #include "common/Lock.h"
 
 namespace logtail {

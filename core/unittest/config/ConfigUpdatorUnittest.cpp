@@ -16,14 +16,15 @@
 #if defined(__linux__)
 #include <unistd.h>
 #endif
+#include <cstdlib>
 #include <fcntl.h>
-#include <json/json.h>
 #include <string.h>
 
-#include <cstdlib>
 #include <fstream>
 #include <memory>
 #include <thread>
+
+#include "json/json.h"
 
 #include "AlarmManager.h"
 #include "AppConfig.h"

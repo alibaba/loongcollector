@@ -16,9 +16,10 @@
 
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <cstdint>
+
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
@@ -52,7 +53,7 @@ public:
 class TimeCounter : public Counter {
 public:
     TimeCounter(const std::string& name, uint64_t val = 0) : Counter(name, val) {}
-    uint64_t GetValue() const { return mVal.load()/1000000; }
+    uint64_t GetValue() const { return mVal.load() / 1000000; }
     void Add(std::chrono::nanoseconds val) { mVal.fetch_add(val.count()); }
     TimeCounter* Collect() { return new TimeCounter(mName, mVal.exchange(0)); }
 };

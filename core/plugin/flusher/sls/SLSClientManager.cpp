@@ -27,11 +27,11 @@
 #include "common/version.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
+#include "plugin/flusher/sls/SLSConstant.h"
+#include "plugin/flusher/sls/SLSUtil.h"
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 #endif
-#include "plugin/flusher/sls/SLSConstant.h"
-#include "plugin/flusher/sls/SLSUtil.h"
 
 DEFINE_FLAG_STRING(custom_user_agent, "custom user agent appended at the end of the exsiting ones", "");
 DEFINE_FLAG_STRING(default_access_key_id, "", "");

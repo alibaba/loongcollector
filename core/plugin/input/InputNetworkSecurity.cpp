@@ -14,8 +14,8 @@
 
 #include "plugin/input/InputNetworkSecurity.h"
 
-#include "ebpf/include/export.h"
 #include "ebpf/eBPFServer.h"
+#include "ebpf/include/export.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -32,10 +32,13 @@ bool InputNetworkSecurity::Init(const Json::Value& config, Json::Value& optional
     if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_SECURITY)) {
         return false;
     }
-    std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
+    std::string prev_pipeline_name
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
-        LOG_WARNING(sLogger, ("pipeline already loaded", "NETWORK_SECURITY")("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
+        LOG_WARNING(sLogger,
+                    ("pipeline already loaded",
+                     "NETWORK_SECURITY")("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
         return false;
     }
     static const std::unordered_map<std::string, MetricType> metricKeys = {
@@ -45,13 +48,15 @@ bool InputNetworkSecurity::Init(const Json::Value& config, Json::Value& optional
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
-    mPluginMgr = std::make_shared<PluginMetricManager>(GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+    mPluginMgr = std::make_shared<PluginMetricManager>(
+        GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
 
     return mSecurityOptions.Init(ebpf::SecurityProbeType::NETWORK, config, mContext, sName);
 }
 
 bool InputNetworkSecurity::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
+        mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
 }
 
 bool InputNetworkSecurity::Stop(bool isPipelineRemoving) {
@@ -59,7 +64,8 @@ bool InputNetworkSecurity::Stop(bool isPipelineRemoving) {
         ebpf::eBPFServer::GetInstance()->SuspendPlugin(mContext->GetConfigName(), nami::PluginType::NETWORK_SECURITY);
         return true;
     }
-    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(), nami::PluginType::NETWORK_SECURITY);
+    return ebpf::eBPFServer::GetInstance()->DisablePlugin(mContext->GetConfigName(),
+                                                          nami::PluginType::NETWORK_SECURITY);
 }
 
 } // namespace logtail

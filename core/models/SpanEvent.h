@@ -19,7 +19,8 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <json/json.h>
+
+#include "json/json.h"
 
 #include "common/memory/SourceBuffer.h"
 #include "models/PipelineEvent.h"
@@ -74,7 +75,8 @@ public:
 #endif
 
     private:
-        SpanLink(SpanEvent* parent) : mParent(parent) {}
+        SpanLink(SpanEvent* parent) : mParent(parent) {
+        }
 
         StringView mTraceId;
         StringView mSpanId;
@@ -114,7 +116,8 @@ public:
 #endif
 
     private:
-        InnerEvent(SpanEvent* parent) : mParent(parent) {}
+        InnerEvent(SpanEvent* parent) : mParent(parent) {
+        }
 
         uint64_t mTimestampNs = 0;
         StringView mName;
@@ -131,29 +134,51 @@ public:
     std::unique_ptr<PipelineEvent> Copy() const override;
     void Reset() override;
 
-    StringView GetTraceId() const { return mTraceId; }
+    StringView GetTraceId() const {
+        return mTraceId;
+    }
     void SetTraceId(const std::string& traceId);
 
-    StringView GetSpanId() const { return mSpanId; }
+    StringView GetSpanId() const {
+        return mSpanId;
+    }
     void SetSpanId(const std::string& spanId);
 
-    StringView GetTraceState() const { return mTraceState; }
+    StringView GetTraceState() const {
+        return mTraceState;
+    }
     void SetTraceState(const std::string& traceState);
 
-    StringView GetParentSpanId() const { return mParentSpanId; }
+    StringView GetParentSpanId() const {
+        return mParentSpanId;
+    }
     void SetParentSpanId(const std::string& parentSpanId);
 
-    StringView GetName() const { return mName; }
+    StringView GetName() const {
+        return mName;
+    }
     void SetName(const std::string& name);
 
-    Kind GetKind() const { return mKind; }
-    void SetKind(Kind kind) { mKind = kind; }
+    Kind GetKind() const {
+        return mKind;
+    }
+    void SetKind(Kind kind) {
+        mKind = kind;
+    }
 
-    uint64_t GetStartTimeNs() const { return mStartTimeNs; }
-    void SetStartTimeNs(uint64_t startTimeNs) { mStartTimeNs = startTimeNs; }
+    uint64_t GetStartTimeNs() const {
+        return mStartTimeNs;
+    }
+    void SetStartTimeNs(uint64_t startTimeNs) {
+        mStartTimeNs = startTimeNs;
+    }
 
-    uint64_t GetEndTimeNs() const { return mEndTimeNs; }
-    void SetEndTimeNs(uint64_t endTimeNs) { mEndTimeNs = endTimeNs; }
+    uint64_t GetEndTimeNs() const {
+        return mEndTimeNs;
+    }
+    void SetEndTimeNs(uint64_t endTimeNs) {
+        mEndTimeNs = endTimeNs;
+    }
 
     StringView GetTag(StringView key) const;
     bool HasTag(StringView key) const;
@@ -162,18 +187,32 @@ public:
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
-    std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
-    std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
-    size_t TagsSize() const { return mTags.mInner.size(); }
+    std::map<StringView, StringView>::const_iterator TagsBegin() const {
+        return mTags.mInner.begin();
+    }
+    std::map<StringView, StringView>::const_iterator TagsEnd() const {
+        return mTags.mInner.end();
+    }
+    size_t TagsSize() const {
+        return mTags.mInner.size();
+    }
 
-    const std::vector<InnerEvent>& GetEvents() const { return mEvents; }
+    const std::vector<InnerEvent>& GetEvents() const {
+        return mEvents;
+    }
     InnerEvent* AddEvent();
 
-    const std::vector<SpanLink>& GetLinks() const { return mLinks; }
+    const std::vector<SpanLink>& GetLinks() const {
+        return mLinks;
+    }
     SpanLink* AddLink();
 
-    StatusCode GetStatus() const { return mStatus; }
-    void SetStatus(StatusCode status) { mStatus = status; }
+    StatusCode GetStatus() const {
+        return mStatus;
+    }
+    void SetStatus(StatusCode status) {
+        mStatus = status;
+    }
 
     StringView GetScopeTag(StringView key) const;
     bool HasScopeTag(StringView key) const;
@@ -182,9 +221,15 @@ public:
     void SetScopeTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetScopeTagNoCopy(StringView key, StringView val);
     void DelScopeTag(StringView key);
-    std::map<StringView, StringView>::const_iterator ScopeTagsBegin() const { return mScopeTags.mInner.begin(); }
-    std::map<StringView, StringView>::const_iterator ScopeTagsEnd() const { return mScopeTags.mInner.end(); }
-    size_t ScopeTagsSize() const { return mScopeTags.mInner.size(); }
+    std::map<StringView, StringView>::const_iterator ScopeTagsBegin() const {
+        return mScopeTags.mInner.begin();
+    }
+    std::map<StringView, StringView>::const_iterator ScopeTagsEnd() const {
+        return mScopeTags.mInner.end();
+    }
+    size_t ScopeTagsSize() const {
+        return mScopeTags.mInner.size();
+    }
 
     size_t DataSize() const override;
 

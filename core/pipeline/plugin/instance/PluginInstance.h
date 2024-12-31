@@ -23,8 +23,7 @@ namespace logtail {
 class PluginInstance {
 public:
     struct PluginMeta {
-        PluginMeta(std::string pluginID)
-            : mPluginID(pluginID) {}
+        PluginMeta(std::string pluginID) : mPluginID(pluginID) {}
         std::string mPluginID;
     };
     PluginInstance(const PluginMeta& pluginMeta) : mMeta(pluginMeta) {}

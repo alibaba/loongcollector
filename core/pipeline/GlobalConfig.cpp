@@ -14,7 +14,7 @@
 
 #include "pipeline/GlobalConfig.h"
 
-#include <json/json.h>
+#include "json/json.h"
 
 #include "common/ParamExtractor.h"
 #include "pipeline/PipelineContext.h"

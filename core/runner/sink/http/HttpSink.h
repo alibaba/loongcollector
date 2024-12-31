@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <curl/multi.h>
-
 #include <atomic>
 #include <condition_variable>
 #include <future>
@@ -26,6 +24,7 @@
 #include "monitor/MetricManager.h"
 #include "runner/sink/Sink.h"
 #include "runner/sink/http/HttpSinkRequest.h"
+
 namespace logtail {
 
 class HttpSink : public Sink<HttpSinkRequest> {

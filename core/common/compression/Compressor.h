@@ -18,8 +18,8 @@
 
 #include <string>
 
-#include "monitor/MetricManager.h"
 #include "common/compression/CompressType.h"
+#include "monitor/MetricManager.h"
 
 namespace logtail {
 
@@ -35,7 +35,9 @@ public:
     virtual bool UnCompress(const std::string& input, std::string& output, std::string& errorMsg) = 0;
 #endif
 
-    CompressType GetCompressType() const { return mType; }
+    CompressType GetCompressType() const {
+        return mType;
+    }
     void SetMetricRecordRef(MetricLabels&& labels, DynamicMetricLabels&& dynamicLabels = {});
 
 protected:

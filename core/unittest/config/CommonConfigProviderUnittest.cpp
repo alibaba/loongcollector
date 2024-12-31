@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-#include <json/json.h>
+#include "json/json.h"
 
 #include "AppConfig.h"
 #include "common/FileSystemUtil.h"
@@ -21,9 +21,6 @@
 #include "config/ConfigDiff.h"
 #include "config/InstanceConfigManager.h"
 #include "config/common_provider/CommonConfigProvider.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "file_server/FileServer.h"
@@ -31,6 +28,9 @@
 #include "monitor/Monitor.h"
 #include "pipeline/PipelineManager.h"
 #include "unittest/Unittest.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 DECLARE_FLAG_BOOL(logtail_mode);
 

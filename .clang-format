@@ -67,3 +67,16 @@ SpacesInContainerLiterals: true
 SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
+IncludeCategories:
+  - Regex: '^<.*\.h>'
+    Priority: 1
+  - Regex: '^<co.*>'
+    Priority: 2
+  - Regex: '^<c.*'
+    Priority: 1
+  - Regex: '^<.*'
+    Priority: 2
+  - Regex: '^"(spl|curl|spdlog|gflags|gperftools|gtest|boost|json|rapidjson|yaml-cpp|re2|lz4|zstd|zlib).*'
+    Priority: 3
+  - Regex: '.*'
+    Priority: 4

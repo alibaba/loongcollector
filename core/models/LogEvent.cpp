@@ -88,7 +88,7 @@ void LogEvent::DelContent(StringView key) {
 }
 
 void LogEvent::SetLevel(const std::string& level) {
-    const StringBuffer& b = GetSourceBuffer()->CopyString(level); 
+    const StringBuffer& b = GetSourceBuffer()->CopyString(level);
     mLevel = StringView(b.data, b.size);
 }
 

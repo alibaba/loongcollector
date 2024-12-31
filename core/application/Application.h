@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <atomic>
 #include <cstdint>
+
+#include <atomic>
 #include <string>
 
 #include "common/Lock.h"
@@ -42,7 +43,7 @@ public:
 
     std::string GetInstanceId() { return mInstanceId; }
     bool TryGetUUID();
-    int32_t GetStartTime() {return mStartTime;}
+    int32_t GetStartTime() { return mStartTime; }
     std::string GetUUID() {
         mUUIDLock.lock();
         std::string uuid(mUUID);

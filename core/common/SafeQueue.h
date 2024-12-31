@@ -75,7 +75,9 @@ public:
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void Clear() { std::queue<T>().swap(mQueue); }
+    void Clear() {
+        std::queue<T>().swap(mQueue);
+    }
 #endif
 
 private:

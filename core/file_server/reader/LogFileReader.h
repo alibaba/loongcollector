@@ -31,16 +31,15 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/memory/SourceBuffer.h"
-#include "file_server/event/Event.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileServer.h"
 #include "file_server/MultilineOptions.h"
-#include "protobuf/sls/sls_logs.pb.h"
+#include "file_server/event/Event.h"
+#include "file_server/reader/FileReaderOptions.h"
 #include "logger/Logger.h"
 #include "models/StringView.h"
 #include "pipeline/queue/QueueKey.h"
-#include "rapidjson/allocators.h"
-#include "file_server/reader/FileReaderOptions.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
 
@@ -234,7 +233,7 @@ public:
 
     /// @return e.g. `/home/admin/access.log`
     const std::string& GetConvertedPath() const;
-    
+
     const std::string& GetHostLogPathFile() const { return mHostLogPathFile; }
 
     int64_t GetFileSize() const { return mLastFileSize; }

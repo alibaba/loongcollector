@@ -66,7 +66,10 @@ class FlusherSLSMock : public FlusherSLS {
 public:
     static const std::string sName;
 
-    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem, std::string* errMsg) override {
+    bool BuildRequest(SenderQueueItem* item,
+                      std::unique_ptr<HttpSinkRequest>& req,
+                      bool* keepItem,
+                      std::string* errMsg) override {
         auto data = static_cast<SLSSenderQueueItem*>(item);
         std::map<std::string, std::string> header;
         req = std::make_unique<HttpSinkRequest>(
@@ -144,7 +147,9 @@ protected:
         AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 200;
     }
 
-    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+    static void TearDownTestCase() {
+        PluginRegistry::GetInstance()->UnloadPlugins();
+    }
 
     void SetUp() override {
         LogInput::GetInstance()->CleanEnviroments();

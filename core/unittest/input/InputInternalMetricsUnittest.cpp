@@ -44,7 +44,7 @@ protected:
         PluginRegistry::GetInstance()->LoadPlugins();
     }
 
-    static void TearDownTestCase() { 
+    static void TearDownTestCase() {
         PluginRegistry::GetInstance()->UnloadPlugins();
         LoongCollectorMonitor::GetInstance()->Stop();
     }
@@ -166,8 +166,10 @@ void InputInternalMetricsUnittest::OnPipelineUpdate() {
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPipelineMetricsRule.mInterval, 9);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginMetricsRule.mEnable, false);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginMetricsRule.mInterval, 11);
-    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginSourceMetricsRule.mEnable, false);
-    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginSourceMetricsRule.mInterval, 10);
+    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginSourceMetricsRule.mEnable,
+                      false);
+    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginSourceMetricsRule.mInterval,
+                      10);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mRunnerMetricsRule.mEnable, true);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mRunnerMetricsRule.mInterval, 8);
 

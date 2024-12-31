@@ -14,8 +14,8 @@
 
 #include "pipeline/plugin/creator/StaticProcessorCreator.h"
 #include "pipeline/plugin/instance/PluginInstance.h"
-#include "unittest/plugin/PluginMock.h"
 #include "unittest/Unittest.h"
+#include "unittest/plugin/PluginMock.h"
 
 using namespace std;
 

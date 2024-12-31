@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <memory>
+
+#include "json/json.h"
 
 #include "models/PipelineEventGroup.h"
 #include "pipeline/plugin/interface/Plugin.h"

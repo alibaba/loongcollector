@@ -33,4 +33,4 @@ extern const std::string METRIC_OUT_SIZE_BYTES;
 extern const std::string METRIC_TOTAL_DELAY_MS;
 extern const std::string METRIC_TOTAL_PROCESS_TIME_MS;
 
-}
+} // namespace logtail

@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
-#include <string>
 #include <memory>
+#include <string>
 #include <vector>
-#include "metadata/LabelingK8sMetadata.h"
+
 #include "metadata/K8sMetadata.h"
+#include "metadata/LabelingK8sMetadata.h"
 #include "models/PipelineEventGroup.h"
+#include "unittest/Unittest.h"
 
 using namespace std;
 
@@ -32,11 +33,12 @@ protected:
     void TearDown() override {
         // Clean up after each test case if needed
     }
-    
+
 public:
     void TestGetByContainerIds() {
         LOG_INFO(sLogger, ("TestGetByContainerIds() begin", time(NULL)));
-                const std::string jsonData = R"({"containerd://286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144":{"namespace":"default","workloadName":"oneagent-demo-658648895b","workloadKind":"replicaset","serviceName":"","labels":{"app":"oneagent-demo","pod-template-hash":"658648895b"},"envs":{},"images":{"oneagent-demo":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/centos7-cve-fix:1.0.0"}}})";
+        const std::string jsonData
+            = R"({"containerd://286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144":{"namespace":"default","workloadName":"oneagent-demo-658648895b","workloadKind":"replicaset","serviceName":"","labels":{"app":"oneagent-demo","pod-template-hash":"658648895b"},"envs":{},"images":{"oneagent-demo":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail-community-edition/centos7-cve-fix:1.0.0"}}})";
 
         Json::Value root;
         Json::CharReaderBuilder readerBuilder;
@@ -51,11 +53,12 @@ public:
         auto& k8sMetadata = K8sMetadata::GetInstance();
         k8sMetadata.SetContainerCache(root);
         k8sMetadata.GetByLocalHostFromServer();
-        
+
         // Assume GetInfoByContainerIdFromCache returns non-null shared_ptr for valid IDs,
         // and check for some expectations.
-        APSARA_TEST_TRUE_FATAL(k8sMetadata.GetInfoByContainerIdFromCache("containerd://286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144") != nullptr);
-
+        APSARA_TEST_TRUE_FATAL(k8sMetadata.GetInfoByContainerIdFromCache(
+                                   "containerd://286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144")
+                               != nullptr);
     }
 
     void TestGetByLocalHost() {
@@ -139,7 +142,7 @@ public:
 
         auto& k8sMetadata = K8sMetadata::GetInstance();
         k8sMetadata.SetIpCache(root);
-        
+
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string eventStr = R"({
@@ -178,7 +181,7 @@ public:
         APSARA_TEST_TRUE_FATAL(k8sMetadata.GetInfoByIpFromCache("10.41.0.2") != nullptr);
     }
 
-        void TestAddLabelToSpan() {
+    void TestAddLabelToSpan() {
         LOG_INFO(sLogger, ("TestProcessEventForSpan() begin", time(NULL)));
         // Sample JSON data
         const std::string jsonData = R"({
@@ -292,7 +295,7 @@ public:
     }
 
 
-        void TestAddLabelToMetric() {
+    void TestAddLabelToMetric() {
         LOG_INFO(sLogger, ("TestGetByLocalHost() begin", time(NULL)));
         // Sample JSON data
         const std::string jsonData = R"({
@@ -374,7 +377,7 @@ public:
         auto& k8sMetadata = K8sMetadata::GetInstance();
         k8sMetadata.SetIpCache(root);
         k8sMetadata.GetByLocalHostFromServer();
-        
+
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
         std::string eventStr = R"({
@@ -421,7 +424,6 @@ APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestGetByContainerIds, 0);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestGetByLocalHost, 1);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToMetric, 2);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToSpan, 3);
-
 
 
 } // end of namespace logtail

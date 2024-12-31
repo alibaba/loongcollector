@@ -27,14 +27,16 @@ InstanceConfigManager::InstanceConfigManager() = default;
 
 void InstanceConfigManager::UpdateInstanceConfigs(InstanceConfigDiff& diff) {
     for (auto& config : diff.mAdded) {
-        mInstanceConfigMap[config.mConfigName] = 
-            std::make_shared<InstanceConfig>(config.mConfigName, std::move(config.mDetail), config.mDirName);
-        ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(config.mConfigName, ConfigFeedbackStatus::APPLIED);
+        mInstanceConfigMap[config.mConfigName]
+            = std::make_shared<InstanceConfig>(config.mConfigName, std::move(config.mDetail), config.mDirName);
+        ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(config.mConfigName,
+                                                                           ConfigFeedbackStatus::APPLIED);
     }
     for (auto& config : diff.mModified) {
-        mInstanceConfigMap[config.mConfigName] = 
-            std::make_shared<InstanceConfig>(config.mConfigName, std::move(config.mDetail), config.mDirName);
-        ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(config.mConfigName, ConfigFeedbackStatus::APPLIED);
+        mInstanceConfigMap[config.mConfigName]
+            = std::make_shared<InstanceConfig>(config.mConfigName, std::move(config.mDetail), config.mDirName);
+        ConfigFeedbackReceiver::GetInstance().FeedbackInstanceConfigStatus(config.mConfigName,
+                                                                           ConfigFeedbackStatus::APPLIED);
     }
     for (const auto& configName : diff.mRemoved) {
         mInstanceConfigMap.erase(configName);

@@ -16,13 +16,14 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
+
+#include "json/json.h"
 
 #include "common/compression/Compressor.h"
 #include "models/PipelineEventGroup.h"
@@ -32,11 +33,11 @@
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "pipeline/serializer/SLSSerializer.h"
+#include "plugin/flusher/sls/SLSClientManager.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 #endif
-#include "plugin/flusher/sls/SLSClientManager.h"
-#include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
 
@@ -67,7 +68,10 @@ public:
     bool Send(PipelineEventGroup&& g) override;
     bool Flush(size_t key) override;
     bool FlushAll() override;
-    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem, std::string* errMsg) override;
+    bool BuildRequest(SenderQueueItem* item,
+                      std::unique_ptr<HttpSinkRequest>& req,
+                      bool* keepItem,
+                      std::string* errMsg) override;
     void OnSendDone(const HttpResponse& response, SenderQueueItem* item) override;
 
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }

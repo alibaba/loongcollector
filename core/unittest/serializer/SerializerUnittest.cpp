@@ -24,7 +24,7 @@ namespace logtail {
 
 class SerializerMock : public Serializer<BatchedEvents> {
 public:
-    SerializerMock(Flusher* f) : Serializer<BatchedEvents>(f) {};
+    SerializerMock(Flusher* f) : Serializer<BatchedEvents>(f){};
 
 private:
     bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override {

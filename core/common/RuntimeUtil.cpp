@@ -12,24 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "RuntimeUtil.h"
+
 #include "Flags.h"
 #include "app_config/AppConfig.h"
-#include "RuntimeUtil.h"
 #if defined(__linux__)
-#include <unistd.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <dirent.h>
+#include <unistd.h>
 #elif defined(_MSC_VER)
-#include <Windows.h>
 #include <Psapi.h>
+#include <Windows.h>
 #endif
-#include <errno.h>
 #include <cstdio>
+#include <errno.h>
+
 #include <sstream>
-#include "logger/Logger.h"
-#include "LogtailCommonFlags.h"
+
 #include "FileSystemUtil.h"
+#include "LogtailCommonFlags.h"
+#include "logger/Logger.h"
 
 DECLARE_FLAG_STRING(logtail_sys_conf_dir);
 DECLARE_FLAG_BOOL(logtail_mode);

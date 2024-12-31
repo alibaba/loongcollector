@@ -32,11 +32,10 @@
 #include <WinSock2.h>
 #include <Windows.h>
 #endif
-#include <curl/curl.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
-
 #include <thread>
+
+#include "curl/curl.h"
+#include "rapidjson/document.h"
 
 #include "FileSystemUtil.h"
 #include "StringTools.h"

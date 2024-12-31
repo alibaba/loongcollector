@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdlib>
+
 #include <string>
 #include <vector>
 
@@ -52,7 +53,7 @@ UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestProcessHistoryDiscard)
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestProcessEventPreciseTimestampLegacy);
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestCheckTime);
 
-PluginInstance::PluginMeta getPluginMeta(){
+PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
     return pluginMeta;
 }
@@ -364,7 +365,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormat() {
     std::vector<PipelineEventGroup> eventGroupList;
     eventGroupList.emplace_back(std::move(eventGroup));
     processorInstance.Process(eventGroupList);
-    
+
     // judge result
     std::string outJson = eventGroupList[0].ToJsonString();
     std::stringstream expectJsonSs;
@@ -541,7 +542,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
     std::vector<PipelineEventGroup> eventGroupList;
     eventGroupList.emplace_back(std::move(eventGroup));
     processorInstance.Process(eventGroupList);
-    
+
     // judge result
     std::string outJson = eventGroupList[0].ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(inJson).c_str(), CompactJson(outJson).c_str());
@@ -598,7 +599,7 @@ void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
     std::vector<PipelineEventGroup> eventGroupList;
     eventGroupList.emplace_back(std::move(eventGroup));
     processorInstance.Process(eventGroupList);
-    
+
     // check observablity
     APSARA_TEST_EQUAL_FATAL(2UL, processorInstance.mInEventsTotal->GetValue());
     // discard history, so output is 0

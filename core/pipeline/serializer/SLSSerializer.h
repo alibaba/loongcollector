@@ -38,8 +38,10 @@ struct CompressedLogGroup {
     CompressedLogGroup(std::string&& data, size_t rawSize) : mData(std::move(data)), mRawSize(rawSize) {}
 };
 
-template<>
-bool Serializer<std::vector<CompressedLogGroup>>::DoSerialize(std::vector<CompressedLogGroup>&& p, std::string& output, std::string& errorMsg);
+template <>
+bool Serializer<std::vector<CompressedLogGroup>>::DoSerialize(std::vector<CompressedLogGroup>&& p,
+                                                              std::string& output,
+                                                              std::string& errorMsg);
 
 class SLSEventGroupListSerializer : public Serializer<std::vector<CompressedLogGroup>> {
 public:

@@ -28,14 +28,14 @@
 #include "pipeline/queue/QueueKeyManager.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
-#ifdef __ENTERPRISE__
-#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
-#endif
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "plugin/flusher/sls/SLSConstant.h"
 #include "plugin/flusher/sls/SendResult.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
+#endif
 
 DEFINE_FLAG_INT32(write_secondary_wait_timeout, "interval of dump seconary buffer from memory to file, seconds", 2);
 DEFINE_FLAG_INT32(buffer_file_alive_interval, "the max alive time of a bufferfile, 5 minutes", 300);
@@ -586,8 +586,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                         }
 #ifdef __ENTERPRISE__
                         if (sendRes != SEND_NETWORK_ERROR && sendRes != SEND_SERVER_ERROR) {
-                            bool hasAuthError
-                                = sendRes == SEND_UNAUTHORIZED && response.mErrorMsg != kAKErrorMsg;
+                            bool hasAuthError = sendRes == SEND_UNAUTHORIZED && response.mErrorMsg != kAKErrorMsg;
                             EnterpriseSLSClientManager::GetInstance()->UpdateAccessKeyStatus(bufferMeta.aliuid(),
                                                                                              !hasAuthError);
                             EnterpriseSLSClientManager::GetInstance()->UpdateProjectAnonymousWriteStatus(

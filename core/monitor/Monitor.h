@@ -50,7 +50,9 @@ struct CpuStat {
     int32_t mViolateNum;
     float mCpuUsage;
 
-    CpuStat() { Reset(); }
+    CpuStat() {
+        Reset();
+    }
     void Reset();
 };
 

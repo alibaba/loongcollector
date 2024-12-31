@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "plugin/flusher/sls/FlusherSLS.h"
 #include "pipeline/queue/ExactlyOnceSenderQueue.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 #include "unittest/Unittest.h"
 #include "unittest/queue/FeedbackInterfaceMock.h"
 
@@ -81,8 +81,8 @@ void ExactlyOnceSenderQueueUnittest::TestPush() {
     APSARA_TEST_EQUAL(100U, mQueue->mRateLimiter->mMaxSendBytesPerSecond);
     APSARA_TEST_EQUAL(3U, mQueue->mConcurrencyLimiters.size());
 
-    //APSARA_TEST_EQUAL(FlusherSLS::GetRegionConcurrencyLimiter("region"), mQueue->mConcurrencyLimiters[0]);
-    //APSARA_TEST_EQUAL(FlusherSLS::GetProjectConcurrencyLimiter("project"), mQueue->mConcurrencyLimiters[1]);
+    // APSARA_TEST_EQUAL(FlusherSLS::GetRegionConcurrencyLimiter("region"), mQueue->mConcurrencyLimiters[0]);
+    // APSARA_TEST_EQUAL(FlusherSLS::GetProjectConcurrencyLimiter("project"), mQueue->mConcurrencyLimiters[1]);
 
     // reach high water mark
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));

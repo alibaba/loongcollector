@@ -15,7 +15,7 @@
 #include "application/Application.h"
 
 #ifndef LOGTAIL_NO_TC_MALLOC
-#include <gperftools/malloc_extension.h>
+#include "gperftools/malloc_extension.h"
 #endif
 
 #include <thread>

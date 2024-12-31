@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <boost/regex.hpp>
-
 #include <vector>
+
+#include "boost/regex.hpp"
 
 #include "models/LogEvent.h"
 #include "pipeline/plugin/interface/Processor.h"

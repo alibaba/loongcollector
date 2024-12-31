@@ -15,8 +15,6 @@
  */
 #pragma once
 
-#include <rapidjson/document.h>
-
 #include "models/LogEvent.h"
 #include "pipeline/plugin/interface/Processor.h"
 #include "plugin/processor/CommonParserOptions.h"
@@ -39,10 +37,12 @@ protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
 private:
-    bool JsonLogLineParser(LogEvent& sourceEvent, const StringView& logPath, PipelineEventPtr& e, bool& sourceKeyOverwritten);
+    bool JsonLogLineParser(LogEvent& sourceEvent,
+                           const StringView& logPath,
+                           PipelineEventPtr& e,
+                           bool& sourceKeyOverwritten);
     void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
     bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e);
-    static std::string RapidjsonValueToString(const rapidjson::Value& value);
 
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;

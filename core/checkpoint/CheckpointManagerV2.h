@@ -15,15 +15,17 @@
  */
 
 #pragma once
-#include <string>
-#include <unordered_map>
-#include <thread>
+#include <leveldb/db.h>
+
 #include <memory>
 #include <mutex>
+#include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
-#include <leveldb/db.h>
-#include "protobuf/sls/checkpoint.pb.h"
+
 #include "plugin/input/InputFile.h"
+#include "protobuf/sls/checkpoint.pb.h"
 
 namespace logtail {
 

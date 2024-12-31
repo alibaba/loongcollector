@@ -32,10 +32,8 @@ public:
     void TestPushToHttpSink();
 
 protected:
-    static void SetUpTestCase() {
-        AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 10;
-    }
-    
+    static void SetUpTestCase() { AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 10; }
+
     void TearDown() override {
         SenderQueueManager::GetInstance()->Clear();
         HttpSink::GetInstance()->mQueue.Clear();

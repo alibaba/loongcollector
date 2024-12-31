@@ -58,7 +58,7 @@ private:
     CounterPtr mOutKeyNotFoundEventsTotal;
     CounterPtr mOutSuccessfulEventsTotal;
     CounterPtr mHistoryFailureTotal;
-    
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParseTimestampNativeUnittest;
     friend class ProcessorParseLogTimeUnittest;

@@ -18,15 +18,16 @@
 #include <fcntl.h>
 #include <io.h>
 #endif
-#include <cityhash/city.h>
 #include <time.h>
 
 #include <algorithm>
-#include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
 #include <limits>
 #include <numeric>
 #include <random>
+
+#include "boost/filesystem.hpp"
+#include "boost/regex.hpp"
+#include "rapidjson/document.h"
 
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
@@ -52,7 +53,6 @@
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
-#include "rapidjson/document.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -350,26 +350,25 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
 
 namespace detail {
 
-    void updatePrimaryCheckpoint(const std::string& key, PrimaryCheckpointPB& cpt, const std::string& field) {
-        cpt.set_update_time(time(NULL));
-        if (CheckpointManagerV2::GetInstance()->SetPB(key, cpt)) {
-            LOG_INFO(sLogger, ("update primary checkpoint", key)("field", field)("checkpoint", cpt.DebugString()));
-        } else {
-            LOG_WARNING(sLogger,
-                        ("update primary checkpoint error", key)("field", field)("checkpoint", cpt.DebugString()));
-        }
+void updatePrimaryCheckpoint(const std::string& key, PrimaryCheckpointPB& cpt, const std::string& field) {
+    cpt.set_update_time(time(NULL));
+    if (CheckpointManagerV2::GetInstance()->SetPB(key, cpt)) {
+        LOG_INFO(sLogger, ("update primary checkpoint", key)("field", field)("checkpoint", cpt.DebugString()));
+    } else {
+        LOG_WARNING(sLogger, ("update primary checkpoint error", key)("field", field)("checkpoint", cpt.DebugString()));
     }
+}
 
-    std::pair<size_t, size_t> getPartitionRange(size_t idx, size_t concurrency, size_t totalPartitionCount) {
-        auto base = totalPartitionCount / concurrency;
-        auto extra = totalPartitionCount % concurrency;
-        if (extra == 0) {
-            return std::make_pair(idx * base, (idx + 1) * base - 1);
-        }
-        size_t min = idx <= extra ? idx * (base + 1) : extra * (base + 1) + (idx - extra) * base;
-        size_t max = idx < extra ? min + base : min + base - 1;
-        return std::make_pair(min, max);
+std::pair<size_t, size_t> getPartitionRange(size_t idx, size_t concurrency, size_t totalPartitionCount) {
+    auto base = totalPartitionCount / concurrency;
+    auto extra = totalPartitionCount % concurrency;
+    if (extra == 0) {
+        return std::make_pair(idx * base, (idx + 1) * base - 1);
     }
+    size_t min = idx <= extra ? idx * (base + 1) : extra * (base + 1) + (idx - extra) * base;
+    size_t max = idx < extra ? min + base : min + base - 1;
+    return std::make_pair(min, max);
+}
 
 } // namespace detail
 

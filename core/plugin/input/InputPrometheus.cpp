@@ -16,11 +16,11 @@
 
 #include "plugin/input/InputPrometheus.h"
 
-#include <json/json.h>
-#include <json/value.h>
-
 #include <memory>
 #include <string>
+
+#include "json/json.h"
+#include "json/value.h"
 
 #include "PluginRegistry.h"
 #include "logger/Logger.h"
@@ -70,7 +70,8 @@ bool InputPrometheus::Start() {
     mTargetSubscirber->mQueueKey = mContext->GetProcessQueueKey();
     auto defaultLabels = GetMetricsRecordRef()->GetLabels();
 
-    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(std::move(mTargetSubscirber), *defaultLabels, mContext->GetProjectName());
+    PrometheusInputRunner::GetInstance()->UpdateScrapeInput(
+        std::move(mTargetSubscirber), *defaultLabels, mContext->GetProjectName());
     return true;
 }
 
