@@ -207,9 +207,6 @@ public:
     static std::string mOsDetail;
     static std::string mUsername;
     static int32_t mSystemBootTime;
-    static std::string mECSInstanceID;
-    static std::string mECSUserID;
-    static std::string mECSRegionID;
     static std::string mStartTime;
 
 private:

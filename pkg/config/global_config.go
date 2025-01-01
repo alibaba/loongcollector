@@ -28,8 +28,12 @@ type GlobalConfig struct {
 	DefaultLogQueueSize         int
 	DefaultLogGroupQueueSize    int
 	Tags                        map[string]string
+	// Directory to store prometheus configuration file.
+	LoongcollectorPrometheusAuthorizationPath string
 	// Directory to store loongcollector data, such as checkpoint, etc.
 	LoongcollectorConfDir string
+	// Directory to store loongcollector log config.
+	LoongcollectorLogConfDir string
 	// Directory to store loongcollector log.
 	LoongcollectorLogDir string
 	// Directory to store loongcollector data.
@@ -65,21 +69,23 @@ var UserAgent = fmt.Sprintf("ilogtail/%v (%v)", BaseVersion, runtime.GOOS) // se
 
 func newGlobalConfig() (cfg GlobalConfig) {
 	cfg = GlobalConfig{
-		InputMaxFirstCollectDelayMs:  10000, // 10s
-		InputIntervalMs:              1000,  // 1s
-		AggregatIntervalMs:           3000,
-		FlushIntervalMs:              3000,
-		DefaultLogQueueSize:          1000,
-		DefaultLogGroupQueueSize:     4,
-		LoongcollectorConfDir:        "./conf/",
-		LoongcollectorLogDir:         "./log/",
-		LoongcollectorPluginLogName:  "go_plugin.LOG",
-		LoongcollectorVersionTag:     "loongcollector_version",
-		LoongcollectorCheckPointFile: "go_plugin_checkpoint",
-		LoongcollectorDataDir:        "./data/",
-		LoongcollectorDebugDir:       "./debug/",
-		LoongcollectorThirdPartyDir:  "./thirdparty/",
-		DelayStopSec:                 300,
+		InputMaxFirstCollectDelayMs:               10000, // 10s
+		InputIntervalMs:                           1000,  // 1s
+		AggregatIntervalMs:                        3000,
+		FlushIntervalMs:                           3000,
+		DefaultLogQueueSize:                       1000,
+		DefaultLogGroupQueueSize:                  4,
+		LoongcollectorConfDir:                     "./conf/",
+		LoongcollectorLogConfDir:                  "./conf/",
+		LoongcollectorLogDir:                      "./log/",
+		LoongcollectorPluginLogName:               "go_plugin.LOG",
+		LoongcollectorVersionTag:                  "loongcollector_version",
+		LoongcollectorCheckPointFile:              "go_plugin_checkpoint",
+		LoongcollectorDataDir:                     "./data/",
+		LoongcollectorDebugDir:                    "./debug/",
+		LoongcollectorThirdPartyDir:               "./thirdparty/",
+		LoongcollectorPrometheusAuthorizationPath: "./conf/",
+		DelayStopSec:                              300,
 	}
 	return
 }
