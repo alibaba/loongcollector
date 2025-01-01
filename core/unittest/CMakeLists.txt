@@ -18,6 +18,7 @@ project(unittest_base)
 # Unittest should be able to visit private members
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
+add_definitions(-DAPSARA_UNIT_TEST_MAIN)
 set(NO_TCMALLOC TRUE)
 add_definitions(-DLOGTAIL_NO_TC_MALLOC)
 if (MSVC)
@@ -73,11 +74,15 @@ macro(ut_link ut_link_withspl)
     flusher_link(${UT_BASE_TARGET})
     all_link(${UT_BASE_TARGET})
     common_link(${UT_BASE_TARGET})
-    target_link_libraries(${UT_BASE_TARGET} provider)
+    target_link_libraries(${UT_BASE_TARGET} provider_unittest_base)
 endmacro()
 
 set(SOURCE_FILES_CORE ${FRAMEWORK_SOURCE_FILES} ${PLUGIN_SOURCE_FILES_CORE})
 set(SOURCE_FILES_CORE_WITHSPL ${SOURCE_FILES_CORE} ${PLUGIN_SOURCE_FILES_SPL})
+
+# add provider
+set(PROVIDER_BASE_TARGET "provider_unittest_base")
+add_subdirectory("${PROVIDER_PATH}" ${CMAKE_BINARY_DIR}/${PROVIDER_BASE_TARGET})
 
 if (UNIX)
     if (LINUX)
