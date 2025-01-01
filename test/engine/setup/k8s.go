@@ -115,12 +115,16 @@ func (k *K8sEnv) ExecOnSource(ctx context.Context, command string) (string, erro
 	return k.execInPod(k.config, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, []string{"sh", "-c", command})
 }
 
-func (k *K8sEnv) AddFilter(filter controller.ContainerFilter) error {
-	return k.deploymentController.AddFilter("e2e-generator", filter)
+func (k *K8sEnv) AddFilter(deploymentName string, filter controller.ContainerFilter) error {
+	return k.deploymentController.AddFilter(deploymentName, filter)
 }
 
-func (k *K8sEnv) RemoveFilter(filter controller.ContainerFilter) error {
-	return k.deploymentController.RemoveFilter("e2e-generator", filter)
+func (k *K8sEnv) RemoveFilter(deploymentName string, filter controller.ContainerFilter) error {
+	return k.deploymentController.RemoveFilter(deploymentName, filter)
+}
+
+func (k *K8sEnv) Scale(deploymentName string, namespace string, replicas int) error {
+	return k.deploymentController.Scale(deploymentName, namespace, replicas)
 }
 
 func (k *K8sEnv) Apply(filePath string) error {
