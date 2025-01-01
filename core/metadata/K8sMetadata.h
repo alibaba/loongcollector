@@ -71,11 +71,14 @@ namespace logtail {
             void SetContainerCache(const Json::Value& root);
             bool FromInfoJson(const Json::Value& json, k8sContainerInfo& info);
             bool FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data);
-
         public:
-            static K8sMetadata& GetInstance() {
+            // Destructor
+            ~K8sMetadata() {
+               ClearCache();
+            }
+            static K8sMetadata* GetInstance() {
                 static K8sMetadata instance(500);
-                return instance;
+                return &instance;
             }
             // 公共方法
             //if cache not have,get from server
@@ -87,6 +90,7 @@ namespace logtail {
             // get info by ip from cache
             std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const std::string& ip);
             bool SendRequestToOperator(const std::string& urlHost, const std::string& output, containerInfoType infoType);
+            void ClearCache();
     
     #ifdef APSARA_UNIT_TEST_MAIN
         friend class k8sMetadataUnittest;
