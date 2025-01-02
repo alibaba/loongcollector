@@ -68,7 +68,7 @@ private:
     void DeleteTimeoutReader(int32_t timeoutInterval);
     void DeleteRollbackReader();
     void MakeSpaceForNewReader();
-
+    const std::string& GetConfigName() const { return mConfigName; }
 
     static bool CompareReaderByUpdateTime(const LogFileReader* left, const LogFileReader* right) {
         return left->GetLastUpdateTime() < right->GetLastUpdateTime();
