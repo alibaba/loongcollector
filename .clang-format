@@ -70,7 +70,7 @@ SpacesInSquareBrackets: false
 IncludeCategories:
   - Regex: '^<.*\.h>'
     Priority: 1
-  - Regex: '^<co.*>'
+  - Regex: '^<co.*>' # exclude non-c standard library headers like <complex> or <conditional_variable>
     Priority: 2
   - Regex: '^<c.*'
     Priority: 1
