@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-#include <json/json.h>
 #include "AdhocJobCheckpoint.h"
+
+#include "json/json.h"
+
 #include "common/FileSystemUtil.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"

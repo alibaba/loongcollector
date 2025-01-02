@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "RangeCheckpoint.h"
+
 #include "CheckpointManagerV2.h"
 
 namespace logtail {

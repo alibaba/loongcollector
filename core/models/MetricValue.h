@@ -20,9 +20,9 @@
 #include <variant>
 
 #ifdef APSARA_UNIT_TEST_MAIN
-#include <json/json.h>
-
 #include <string>
+
+#include "json/json.h"
 #endif
 
 #include "common/memory/SourceBuffer.h"

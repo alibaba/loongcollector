@@ -1,6 +1,6 @@
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 
-#include <json/json.h>
+#include "json/json.h"
 
 #include "common/StringTools.h"
 #include "models/MetricEvent.h"

@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <cstdint>
+
+#include <condition_variable>
 #include <list>
 #include <memory>
 #include <mutex>

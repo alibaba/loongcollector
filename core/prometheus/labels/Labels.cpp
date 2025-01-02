@@ -85,12 +85,12 @@ void Labels::Set(const string& k, const string& v) {
 
 void Labels::Del(const string& k) {
     if (mMetricEventPtr) {
-        if(mMetricEventPtr->HasTag(k)){
+        if (mMetricEventPtr->HasTag(k)) {
             mMetricEventPtr->DelTag(k);
         }
         return;
     }
-    if(mLabels.count(k)){
+    if (mLabels.count(k)) {
         mLabels.erase(k);
     }
 }

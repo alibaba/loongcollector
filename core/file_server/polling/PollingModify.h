@@ -19,10 +19,10 @@
 #include <map>
 #include <vector>
 
-#include "file_server/polling/PollingCache.h"
 #include "common/Lock.h"
 #include "common/LogRunnable.h"
 #include "common/Thread.h"
+#include "file_server/polling/PollingCache.h"
 #ifdef APSARA_UINT_TEST_MAIN
 #include "common/SplitedFilePath.h"
 #endif

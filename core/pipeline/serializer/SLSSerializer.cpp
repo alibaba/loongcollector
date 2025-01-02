@@ -14,9 +14,9 @@
 
 #include "pipeline/serializer/SLSSerializer.h"
 
-#include <json/json.h>
-
 #include <array>
+
+#include "json/json.h"
 
 #include "common/Flags.h"
 #include "common/compression/CompressType.h"

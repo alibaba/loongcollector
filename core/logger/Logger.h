@@ -15,10 +15,11 @@
  */
 
 #pragma once
-#include <sstream>
 #include <fstream>
 #include <map>
-#include <spdlog/spdlog.h>
+#include <sstream>
+
+#include "spdlog/spdlog.h"
 
 namespace logtail {
 

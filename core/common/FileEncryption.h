@@ -17,9 +17,10 @@
 #ifndef __OAS_SHENNONG_FILE_ENCRYPTION_H__
 #define __OAS_SHENNONG_FILE_ENCRYPTION_H__
 
+#include <map>
 #include <string>
 #include <unordered_map>
-#include <map>
+
 #include "Flags.h"
 
 namespace logtail {

@@ -14,13 +14,13 @@
 
 #include "pipeline/plugin/PluginRegistry.h"
 
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <unistd.h>
 
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <string>
 
 #include "app_config/AppConfig.h"
@@ -28,9 +28,6 @@
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
-#ifdef __ENTERPRISE__
-#include "plugin/flusher/sls/EnterpriseFlusherSLSMonitor.h"
-#endif
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputPrometheus.h"
@@ -64,7 +61,9 @@
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
 #include "plugin/processor/ProcessorSPL.h"
 #endif
-
+#ifdef __ENTERPRISE__
+#include "plugin/flusher/sls/EnterpriseFlusherSLSMonitor.h"
+#endif
 
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
 

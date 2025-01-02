@@ -13,9 +13,9 @@
 // limitations under the License.
 #include <cstdlib>
 
-#include "constants/Constants.h"
 #include "common/JsonUtil.h"
 #include "config/PipelineConfig.h"
+#include "constants/Constants.h"
 #include "models/LogEvent.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
@@ -44,234 +44,228 @@ UNIT_TEST_CASE(ProcessorMergeMultilineLogNativeUnittest, TestProcess);
 
 void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
     // 测试合法的正则配置
+    {// start init通过，IsMultiline为true
+     {Json::Value config;
+    config["StartPattern"] = "123123123.*";
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
+}
+// start + continue init通过，IsMultiline为true
+{
+    Json::Value config;
+    config["StartPattern"] = "123123123.*";
+    config["ContinuePattern"] = "123123.*";
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
+}
+// continue + end init通过，IsMultiline为true
+{
+    Json::Value config;
+    config["ContinuePattern"] = "123123.*";
+    config["EndPattern"] = "123.*";
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
+}
+// end init通过，IsMultiline为true
+{
+    Json::Value config;
+    config["EndPattern"] = "123.*";
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
+}
+// start + end init通过，IsMultiline为true
+{
+    Json::Value config;
+    config["StartPattern"] = "123123123.*";
+    config["EndPattern"] = "123.*";
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
+}
+} // namespace logtail
+// 测试非法的正则配置
+{// start + continue + end init通过，IsMultiline为true
+ {Json::Value config;
+config["StartPattern"] = "123123123.*";
+config["ContinuePattern"] = "123123.*";
+config["EndPattern"] = "123.*";
+config["MergeType"] = "regex";
+ProcessorMergeMultilineLogNative processor;
+processor.SetContext(mContext);
+processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+APSARA_TEST_TRUE(processor.Init(config));
+APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
+}
+// continue init通过，IsMultiline为false
+{
+    Json::Value config;
+    config["ContinuePattern"] = "123123.*";
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
+}
+// 正则格式非法 init通过，IsMultiline为false
+{
+    Json::Value config;
+    config["StartPattern"] = 1;
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
+}
+// 正则格式非法 init通过，IsMultiline为false
+{
+    Json::Value config;
+    config["StartPattern"] = "******";
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
+}
+// 正则格式缺失 init通过，IsMultiline为false
+{
+    Json::Value config;
+    config["MergeType"] = "regex";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+    APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
+}
+}
+// 测试mergetype
+{// regex init通过
+ {Json::Value config;
+config["StartPattern"] = ".*";
+config["MergeType"] = "regex";
+ProcessorMergeMultilineLogNative processor;
+processor.SetContext(mContext);
+processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+APSARA_TEST_TRUE(processor.Init(config));
+APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
+}
+// flag init通过
+{
+    Json::Value config;
+    config["MergeType"] = "flag";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE(processor.Init(config));
+}
+// unknown init不通过
+{
+    Json::Value config;
+    config["StartPattern"] = ".*";
+    config["MergeType"] = "unknown";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_FALSE(processor.Init(config));
+}
+// 格式错误 init不通过
+{
+    Json::Value config;
+    config["StartPattern"] = ".*";
+    config["MergeType"] = 1;
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_FALSE(processor.Init(config));
+}
+// 不存在 init不通过
+{
+    Json::Value config;
+    config["StartPattern"] = ".*";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_FALSE(processor.Init(config));
+}
+}
+// 测试UnmatchedContentTreatment
+{
+    // single_line init通过
     {
-        // start init通过，IsMultiline为true
-        {
-            Json::Value config;
-            config["StartPattern"] = "123123123.*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
-        }
-        // start + continue init通过，IsMultiline为true
-        {
-            Json::Value config;
-            config["StartPattern"] = "123123123.*";
-            config["ContinuePattern"] = "123123.*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
-        }
-        // continue + end init通过，IsMultiline为true
-        {
-            Json::Value config;
-            config["ContinuePattern"] = "123123.*";
-            config["EndPattern"] = "123.*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
-        }
-        // end init通过，IsMultiline为true
-        {
-            Json::Value config;
-            config["EndPattern"] = "123.*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
-        }
-        // start + end init通过，IsMultiline为true
-        {
-            Json::Value config;
-            config["StartPattern"] = "123123123.*";
-            config["EndPattern"] = "123.*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
-        }
+        Json::Value config;
+        config["StartPattern"] = ".*";
+        config["MergeType"] = "regex";
+        config["UnmatchedContentTreatment"] = "single_line";
+        ProcessorMergeMultilineLogNative processor;
+        processor.SetContext(mContext);
+        processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+        APSARA_TEST_TRUE(processor.Init(config));
     }
-    // 测试非法的正则配置
+    // discard init通过
     {
-        // start + continue + end init通过，IsMultiline为true
-        {
-            Json::Value config;
-            config["StartPattern"] = "123123123.*";
-            config["ContinuePattern"] = "123123.*";
-            config["EndPattern"] = "123.*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_TRUE(processor.mMultiline.IsMultiline());
-        }
-        // continue init通过，IsMultiline为false
-        {
-            Json::Value config;
-            config["ContinuePattern"] = "123123.*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
-        }
-        // 正则格式非法 init通过，IsMultiline为false
-        {
-            Json::Value config;
-            config["StartPattern"] = 1;
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
-        }
-        // 正则格式非法 init通过，IsMultiline为false
-        {
-            Json::Value config;
-            config["StartPattern"] = "******";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
-        }
-        // 正则格式缺失 init通过，IsMultiline为false
-        {
-            Json::Value config;
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
-        }
+        Json::Value config;
+        config["StartPattern"] = ".*";
+        config["MergeType"] = "regex";
+        config["UnmatchedContentTreatment"] = "discard";
+        ProcessorMergeMultilineLogNative processor;
+        processor.SetContext(mContext);
+        processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+        APSARA_TEST_TRUE(processor.Init(config));
     }
-    // 测试mergetype
+    // unknown init通过
     {
-        // regex init通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-            APSARA_TEST_FALSE(processor.mMultiline.IsMultiline());
-        }
-        // flag init通过
-        {
-            Json::Value config;
-            config["MergeType"] = "flag";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-        }
-        // unknown init不通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            config["MergeType"] = "unknown";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_FALSE(processor.Init(config));
-        }
-        // 格式错误 init不通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            config["MergeType"] = 1;
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_FALSE(processor.Init(config));
-        }
-        // 不存在 init不通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_FALSE(processor.Init(config));
-        }
+        Json::Value config;
+        config["StartPattern"] = ".*";
+        config["MergeType"] = "regex";
+        config["UnmatchedContentTreatment"] = "unknown";
+        ProcessorMergeMultilineLogNative processor;
+        processor.SetContext(mContext);
+        processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+        APSARA_TEST_TRUE(processor.Init(config));
     }
-    // 测试UnmatchedContentTreatment
+    // 格式错误 init通过
     {
-        // single_line init通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            config["MergeType"] = "regex";
-            config["UnmatchedContentTreatment"] = "single_line";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-        }
-        // discard init通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            config["MergeType"] = "regex";
-            config["UnmatchedContentTreatment"] = "discard";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-        }
-        // unknown init通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            config["MergeType"] = "regex";
-            config["UnmatchedContentTreatment"] = "unknown";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-        }
-        // 格式错误 init通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            config["MergeType"] = "regex";
-            config["UnmatchedContentTreatment"] = 1;
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-        }
-        // 不存在 init通过
-        {
-            Json::Value config;
-            config["StartPattern"] = ".*";
-            config["MergeType"] = "regex";
-            ProcessorMergeMultilineLogNative processor;
-            processor.SetContext(mContext);
-            processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
-            APSARA_TEST_TRUE(processor.Init(config));
-        }
+        Json::Value config;
+        config["StartPattern"] = ".*";
+        config["MergeType"] = "regex";
+        config["UnmatchedContentTreatment"] = 1;
+        ProcessorMergeMultilineLogNative processor;
+        processor.SetContext(mContext);
+        processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+        APSARA_TEST_TRUE(processor.Init(config));
     }
+    // 不存在 init通过
+    {
+        Json::Value config;
+        config["StartPattern"] = ".*";
+        config["MergeType"] = "regex";
+        ProcessorMergeMultilineLogNative processor;
+        processor.SetContext(mContext);
+        processor.SetMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+        APSARA_TEST_TRUE(processor.Init(config));
+    }
+}
 }
 
 void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
@@ -304,12 +298,10 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
     }
 
     // 存在不支持的event类型
-    {
-        // 某个unmatch 后出现了一个不支持
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::string inJson1 = R"({
+    {// 某个unmatch 后出现了一个不支持
+     {auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson1 = R"({
                 "events" :
                 [
                     {
@@ -323,9 +315,9 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson1);
-            eventGroup.AddMetricEvent();
-            std::string inJson2 = R"({
+    eventGroup.FromJsonString(inJson1);
+    eventGroup.AddMetricEvent();
+    std::string inJson2 = R"({
                 "events" :
                 [
                     {
@@ -339,12 +331,12 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson2);
-            // run test function
-            processorSplitLogStringNative.Process(eventGroup);
-            processorMergeMultilineLogNative.Process(eventGroup);
-            std::stringstream expectJson;
-            expectJson << R"({
+    eventGroup.FromJsonString(inJson2);
+    // run test function
+    processorSplitLogStringNative.Process(eventGroup);
+    processorMergeMultilineLogNative.Process(eventGroup);
+    std::stringstream expectJson;
+    expectJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -404,15 +396,15 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
 
-        // 正在匹配过程中 出现了一个不支持
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::string inJson = R"({
+// 正在匹配过程中 出现了一个不支持
+{
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
                 "events" :
                 [
                     {
@@ -426,9 +418,9 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson);
-            eventGroup.AddMetricEvent();
-            inJson = R"({
+    eventGroup.FromJsonString(inJson);
+    eventGroup.AddMetricEvent();
+    inJson = R"({
                 "events" :
                 [
                     {
@@ -442,12 +434,12 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson);
-            // run test function
-            processorSplitLogStringNative.Process(eventGroup);
-            processorMergeMultilineLogNative.Process(eventGroup);
-            std::stringstream expectJson;
-            expectJson << R"({
+    eventGroup.FromJsonString(inJson);
+    // run test function
+    processorSplitLogStringNative.Process(eventGroup);
+    processorMergeMultilineLogNative.Process(eventGroup);
+    std::stringstream expectJson;
+    expectJson << R"({
                 "events": [
                     {
                         "contents": {
@@ -491,15 +483,15 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
 
-        // 第一个event就是不支持
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::string inJson = R"({
+// 第一个event就是不支持
+{
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
                 "events" :
                 [
                     {
@@ -513,13 +505,13 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            eventGroup.AddMetricEvent();
-            eventGroup.FromJsonString(inJson);
-            // run test function
-            processorSplitLogStringNative.Process(eventGroup);
-            processorMergeMultilineLogNative.Process(eventGroup);
-            std::stringstream expectJson;
-            expectJson << R"({
+    eventGroup.AddMetricEvent();
+    eventGroup.FromJsonString(inJson);
+    // run test function
+    processorSplitLogStringNative.Process(eventGroup);
+    processorMergeMultilineLogNative.Process(eventGroup);
+    std::stringstream expectJson;
+    expectJson << R"({
                 "events": [
                     {
                         "name": "",
@@ -563,17 +555,17 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-    }
-    // event group中某条event没有mSourceKey
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+}
+// event group中某条event没有mSourceKey
+{
+    // 某个unmatch 后出现一个没有mSourceKey的event
     {
-        // 某个unmatch 后出现一个没有mSourceKey的event
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::string inJson = R"({
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::string inJson = R"({
                 "events" :
                 [
                     {
@@ -605,12 +597,12 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson);
-            // run test function
-            processorSplitLogStringNative.Process(eventGroup);
-            processorMergeMultilineLogNative.Process(eventGroup);
-            std::stringstream expectJson;
-            expectJson << R"({
+        eventGroup.FromJsonString(inJson);
+        // run test function
+        processorSplitLogStringNative.Process(eventGroup);
+        processorMergeMultilineLogNative.Process(eventGroup);
+        std::stringstream expectJson;
+        expectJson << R"({
                 "events" :
                 [
                     {
@@ -674,14 +666,14 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-        // 正在匹配过程中出现没有mSourceKey的event
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::string inJson = R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+    // 正在匹配过程中出现没有mSourceKey的event
+    {
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::string inJson = R"({
                 "events" :
                 [
                     {
@@ -713,12 +705,12 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson);
-            // run test function
-            processorSplitLogStringNative.Process(eventGroup);
-            processorMergeMultilineLogNative.Process(eventGroup);
-            std::stringstream expectJson;
-            expectJson << R"({
+        eventGroup.FromJsonString(inJson);
+        // run test function
+        processorSplitLogStringNative.Process(eventGroup);
+        processorMergeMultilineLogNative.Process(eventGroup);
+        std::stringstream expectJson;
+        expectJson << R"({
                 "events" :
                 [
                     {
@@ -768,14 +760,14 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
-        // 第一个就出现没有mSourceKey的event
-        {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            PipelineEventGroup eventGroup(sourceBuffer);
-            std::string inJson = R"({
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+    }
+    // 第一个就出现没有mSourceKey的event
+    {
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        std::string inJson = R"({
                 "events" :
                 [
                     {
@@ -798,12 +790,12 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            eventGroup.FromJsonString(inJson);
-            // run test function
-            processorSplitLogStringNative.Process(eventGroup);
-            processorMergeMultilineLogNative.Process(eventGroup);
-            std::stringstream expectJson;
-            expectJson << R"({
+        eventGroup.FromJsonString(inJson);
+        // run test function
+        processorSplitLogStringNative.Process(eventGroup);
+        processorMergeMultilineLogNative.Process(eventGroup);
+        std::stringstream expectJson;
+        expectJson << R"({
                 "events" :
                 [
                     {
@@ -853,10 +845,10 @@ void ProcessorMergeMultilineLogNativeUnittest::TestProcess() {
                     }
                 ]
             })";
-            std::string outJson = eventGroup.ToJsonString();
-            APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
-        }
+        std::string outJson = eventGroup.ToJsonString();
+        APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
     }
+}
 }
 
 class ProcessEventsWithPartLogUnittest : public ::testing::Test {

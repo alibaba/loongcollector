@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-#include "unittest/Unittest.h"
 #include <string>
 #include <vector>
-#include "common/TimeUtil.h"
+
 #include "common/StringTools.h"
 #include "common/Strptime.h"
+#include "common/TimeUtil.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
@@ -132,12 +133,36 @@ void TimeUtilUnittest::TestStrptimeNanosecond() {
 
     std::vector<Case> cases{
         {"2012-01-01 15:05:07.123456", "%Y-%m-%d %H:%M:%S.%f", "2012-01-01 15:05:07", "%Y-%m-%d %H:%M:%S", 123456000},
-        {"[2012-01-01 15:05:07.123456]", "[%Y-%m-%d %H:%M:%S.%f]", "[2012-01-01 15:05:07]", "[%Y-%m-%d %H:%M:%S]", 123456000},
-        {"01 Jan 12 15:05:07.123456 MST", "%d %b %y %H:%M:%S.%f", "01 Jan 12 15:05:07 MST", "%d %b %y %H:%M:%S", 123456000},
-        {"01 Jan 12 15:05:07.123456 -0700", "%d %b %y %H:%M:%S.%f", "01 Jan 12 15:05:07 -0700", "%d %b %y %H:%M:%S", 123456000},
-        {"Sunday, 01-Jan-12 15:05:07.123456 MST", "%A, %d-%b-%y %H:%M:%S.%f", "Sunday, 01-Jan-12 15:05:07 MST", "%A, %d-%b-%y %H:%M:%S", 123456000},
-        {"Sun, 01 Jan 12 15:05:07.123456 MST", "%A, %d %b %Y %H:%M:%S.%f", "Sun, 01 Jan 12 15:05:07 MST", "%A, %d %b %Y %H:%M:%S", 123456000},
-        {"2012-01-01T15:05:07.123456Z07:00", "%Y-%m-%dT%H:%M:%S.%f", "2012-01-01T15:05:07Z07:00", "%Y-%m-%dT%H:%M:%S", 123456000},
+        {"[2012-01-01 15:05:07.123456]",
+         "[%Y-%m-%d %H:%M:%S.%f]",
+         "[2012-01-01 15:05:07]",
+         "[%Y-%m-%d %H:%M:%S]",
+         123456000},
+        {"01 Jan 12 15:05:07.123456 MST",
+         "%d %b %y %H:%M:%S.%f",
+         "01 Jan 12 15:05:07 MST",
+         "%d %b %y %H:%M:%S",
+         123456000},
+        {"01 Jan 12 15:05:07.123456 -0700",
+         "%d %b %y %H:%M:%S.%f",
+         "01 Jan 12 15:05:07 -0700",
+         "%d %b %y %H:%M:%S",
+         123456000},
+        {"Sunday, 01-Jan-12 15:05:07.123456 MST",
+         "%A, %d-%b-%y %H:%M:%S.%f",
+         "Sunday, 01-Jan-12 15:05:07 MST",
+         "%A, %d-%b-%y %H:%M:%S",
+         123456000},
+        {"Sun, 01 Jan 12 15:05:07.123456 MST",
+         "%A, %d %b %Y %H:%M:%S.%f",
+         "Sun, 01 Jan 12 15:05:07 MST",
+         "%A, %d %b %Y %H:%M:%S",
+         123456000},
+        {"2012-01-01T15:05:07.123456Z07:00",
+         "%Y-%m-%dT%H:%M:%S.%f",
+         "2012-01-01T15:05:07Z07:00",
+         "%Y-%m-%dT%H:%M:%S",
+         123456000},
         {"1325430307", "%s", "1325430307", "%s", 0},
         {"325430307", "%s", "325430307", "%s", 0},
         // the behavior of `strptime_ns` is different with C++ `strptime` in this case

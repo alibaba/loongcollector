@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include "unittest/Unittest.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
-#include "common/StringTools.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/StringTools.h"
+#include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(batch_send_interval);
 DECLARE_FLAG_STRING(check_point_filename);

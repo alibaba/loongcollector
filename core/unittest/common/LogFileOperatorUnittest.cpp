@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
-#include <string>
 #include <cstdlib>
+
+#include <string>
+
+#include "unittest/Unittest.h"
 #if defined(__linux__)
 #include <unistd.h>
 #endif
-#include "common/LogFileOperator.h"
 #include "common/FileSystemUtil.h"
+#include "common/LogFileOperator.h"
 #if defined(__linux__)
 #include "unittest/UnittestHelper.h"
 #endif

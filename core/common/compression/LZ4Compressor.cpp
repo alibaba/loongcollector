@@ -14,7 +14,7 @@
 
 #include "common/compression/LZ4Compressor.h"
 
-#include <lz4/lz4.h>
+#include "lz4/lz4.h"
 
 #include "common/StringTools.h"
 

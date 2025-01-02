@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
-#include "common/Flags.h"
 #include "app_config/AppConfig.h"
-#include "protobuf/sls/sls_logs.pb.h"
 #include "checkpoint/CheckpointManagerV2.h"
+#include "common/Flags.h"
+#include "protobuf/sls/sls_logs.pb.h"
+#include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(logtail_checkpoint_check_gc_interval_sec);
 DECLARE_FLAG_INT32(logtail_checkpoint_expired_threshold_sec);
@@ -274,7 +274,7 @@ void CheckpointManagerV2Unittest::TestScanCheckpoints() {
 
 namespace detail {
 
-    std::string extractPrimaryKeyFromRangeKey(const char* data, size_t size);
+std::string extractPrimaryKeyFromRangeKey(const char* data, size_t size);
 
 }
 

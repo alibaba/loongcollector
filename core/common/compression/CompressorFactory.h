@@ -16,14 +16,14 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <memory>
 #include <string>
 
-#include "pipeline/PipelineContext.h"
+#include "json/json.h"
+
 #include "common/compression/CompressType.h"
 #include "common/compression/Compressor.h"
+#include "pipeline/PipelineContext.h"
 
 namespace logtail {
 

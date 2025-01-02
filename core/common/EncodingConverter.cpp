@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "EncodingConverter.h"
+
 #include "AlarmManager.h"
 #include "logger/Logger.h"
 #if defined(__linux__)

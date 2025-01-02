@@ -16,12 +16,13 @@
 
 #pragma once
 
-#include <curl/curl.h>
-
 #include <cstdint>
+
 #include <map>
 #include <memory>
 #include <string>
+
+#include "curl/curl.h"
 
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"

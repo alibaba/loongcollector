@@ -16,12 +16,7 @@
 
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 
-#include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
-
 #include <codecvt>
-#include <locale>
 
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"

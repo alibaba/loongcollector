@@ -16,11 +16,11 @@
 
 #pragma once
 
+#include "boost/regex.hpp"
+
 #include "app_config/AppConfig.h"
 #include "models/LogEvent.h"
 #include "pipeline/plugin/interface/Processor.h"
-
-#include <boost/regex.hpp>
 
 namespace logtail {
 
@@ -83,8 +83,7 @@ private:
 // UnaryFilterOperatorNode
 class UnaryFilterOperatorNode : public BaseFilterNode {
 public:
-    UnaryFilterOperatorNode(BaseFilterNodePtr child)
-        : BaseFilterNode(OPERATOR_NODE), child(child) {}
+    UnaryFilterOperatorNode(BaseFilterNodePtr child) : BaseFilterNode(OPERATOR_NODE), child(child) {}
 
     virtual ~UnaryFilterOperatorNode(){};
 

@@ -176,4 +176,4 @@ bool MetricsRecordRef::HasLabel(const std::string& key, const std::string& value
 }
 #endif
 
-}
+} // namespace logtail

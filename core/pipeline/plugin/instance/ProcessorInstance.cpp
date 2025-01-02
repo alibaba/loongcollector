@@ -46,7 +46,7 @@ bool ProcessorInstance::Init(const Json::Value& config, PipelineContext& context
 void ProcessorInstance::Process(vector<PipelineEventGroup>& eventGroupList) {
     if (eventGroupList.empty()) {
         return;
-    } 
+    }
     for (const auto& eventGroup : eventGroupList) {
         mInEventsTotal->Add(eventGroup.GetEvents().size());
         mInSizeBytes->Add(eventGroup.DataSize());
@@ -59,7 +59,7 @@ void ProcessorInstance::Process(vector<PipelineEventGroup>& eventGroupList) {
     for (const auto& eventGroup : eventGroupList) {
         mOutEventsTotal->Add(eventGroup.GetEvents().size());
         mOutSizeBytes->Add(eventGroup.DataSize());
-    }    
+    }
 }
 
 } // namespace logtail

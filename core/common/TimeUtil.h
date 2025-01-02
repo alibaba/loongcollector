@@ -16,13 +16,14 @@
 
 #pragma once
 #include <ctime>
+
 #include <optional>
 #include <string>
 #include <thread>
 
 #include "common/Strptime.h"
-#include "protobuf/sls/sls_logs.pb.h"
 #include "pipeline/PipelineContext.h"
+#include "protobuf/sls/sls_logs.pb.h"
 
 // Time and timestamp utility.
 namespace logtail {

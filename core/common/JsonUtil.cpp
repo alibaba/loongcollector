@@ -14,8 +14,8 @@
 
 #include "common/JsonUtil.h"
 
-#include <sstream>
 #include <memory>
+#include <sstream>
 
 #include "common/ExceptionBase.h"
 #include "common/StringTools.h"
@@ -169,22 +169,22 @@ int64_t GetInt64Value(const Json::Value& value, const string& name, const int64_
 
 namespace {
 
-    // @return true if succeed to load value from env.
-    template <typename T>
-    bool LoadEnvValueIfExisting(const char* envKey, T& cfgValue) {
-        try {
-            const char* value = getenv(envKey);
-            if (value != NULL) {
-                T val = StringTo<T>(value);
-                cfgValue = val;
-                APSARA_LOG_INFO(sLogger, ("load config from env", envKey)("value", val));
-                return true;
-            }
-        } catch (const exception& e) {
-            APSARA_LOG_WARNING(sLogger, ("load config from env error", envKey)("error", e.what()));
+// @return true if succeed to load value from env.
+template <typename T>
+bool LoadEnvValueIfExisting(const char* envKey, T& cfgValue) {
+    try {
+        const char* value = getenv(envKey);
+        if (value != NULL) {
+            T val = StringTo<T>(value);
+            cfgValue = val;
+            APSARA_LOG_INFO(sLogger, ("load config from env", envKey)("value", val));
+            return true;
         }
-        return false;
+    } catch (const exception& e) {
+        APSARA_LOG_WARNING(sLogger, ("load config from env error", envKey)("error", e.what()));
     }
+    return false;
+}
 
 } // namespace
 

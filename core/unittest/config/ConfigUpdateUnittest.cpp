@@ -20,9 +20,6 @@
 
 #include "config/PipelineConfig.h"
 #include "config/common_provider/CommonConfigProvider.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
-#endif
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "file_server/FileServer.h"
 #include "pipeline/Pipeline.h"
@@ -32,6 +29,9 @@
 #include "unittest/Unittest.h"
 #include "unittest/config/PipelineManagerMock.h"
 #include "unittest/plugin/PluginMock.h"
+#ifdef __ENTERPRISE__
+#include "config/provider/EnterpriseConfigProvider.h"
+#endif
 
 using namespace std;
 

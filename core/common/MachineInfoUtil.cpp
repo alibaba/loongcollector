@@ -14,12 +14,20 @@
 
 #include "MachineInfoUtil.h"
 
-#include <rapidjson/document.h>
-#include <rapidjson/rapidjson.h>
-#include <string.h>
+#include <cstring>
+
+#include <thread>
+
+#include "curl/curl.h"
+#include "rapidjson/document.h"
+#include "rapidjson/rapidjson.h"
 
 #include "AppConfig.h"
-
+#include "FileSystemUtil.h"
+#include "StringTools.h"
+#include "common/FileSystemUtil.h"
+#include "common/UUIDUtil.h"
+#include "logger/Logger.h"
 #if defined(__linux__)
 #include <arpa/inet.h>
 #include <ifaddrs.h>
@@ -37,17 +45,6 @@
 #include <WinSock2.h>
 #include <Windows.h>
 #endif
-#include <curl/curl.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
-
-#include <thread>
-
-#include "FileSystemUtil.h"
-#include "StringTools.h"
-#include "common/FileSystemUtil.h"
-#include "common/UUIDUtil.h"
-#include "logger/Logger.h"
 
 DEFINE_FLAG_STRING(agent_host_id, "", "");
 

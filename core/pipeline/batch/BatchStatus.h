@@ -19,15 +19,15 @@
 #include <cstdint>
 #include <ctime>
 
-#include "pipeline/batch/BatchedEvents.h"
 #include "models/PipelineEventPtr.h"
+#include "pipeline/batch/BatchedEvents.h"
 
 namespace logtail {
 
 class EventBatchStatus {
 public:
     virtual ~EventBatchStatus() = default;
-    
+
     virtual void Reset() {
         mCnt = 0;
         mSizeBytes = 0;

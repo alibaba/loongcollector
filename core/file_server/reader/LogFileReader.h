@@ -40,7 +40,6 @@
 #include "models/StringView.h"
 #include "pipeline/queue/QueueKey.h"
 #include "protobuf/sls/sls_logs.pb.h"
-#include "rapidjson/allocators.h"
 
 namespace logtail {
 

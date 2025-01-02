@@ -58,8 +58,7 @@ void ProcessorRunner::Stop() {
         if (!mThreadRes[threadNo].valid()) {
             continue;
         }
-        future_status s
-            = mThreadRes[threadNo].wait_for(chrono::seconds(INT32_FLAG(processor_runner_exit_timeout_sec)));
+        future_status s = mThreadRes[threadNo].wait_for(chrono::seconds(INT32_FLAG(processor_runner_exit_timeout_sec)));
         if (s == future_status::ready) {
             LOG_INFO(sLogger, ("processor runner", "stopped successfully")("threadNo", threadNo));
         } else {
