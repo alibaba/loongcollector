@@ -244,10 +244,14 @@ void CreateModifyHandler::Handle(const Event& event) {
         mCreateHandlerPtr->Handle(event);
     } else if (event.IsContainerStopped() && isDir) {
         for (auto& pair : mModifyHandlerPtrMap) {
-            LOG_DEBUG(sLogger,
-                      ("Handle container stopped event, config", pair.first)("Source", event.GetSource())(
-                          "Object", event.GetObject())("Dev", event.GetDev())("Inode", event.GetInode()));
-            pair.second->Handle(event);
+            LOG_INFO(sLogger,
+                     ("pair config name", pair.second->GetConfigName())("event config name", event.GetConfigName()));
+            if (pair.second->GetConfigName() == event.GetConfigName()) {
+                LOG_DEBUG(sLogger,
+                          ("Handle container stopped event, config", pair.first)("Source", event.GetSource())(
+                              "Object", event.GetObject())("Dev", event.GetDev())("Inode", event.GetInode()));
+                pair.second->Handle(event);
+            }
         }
     } else if (event.IsCreate() || event.IsModify() || event.IsMoveFrom() || event.IsMoveTo() || event.IsDeleted()) {
         if (!event.GetConfigName().empty()) {
@@ -529,6 +533,9 @@ void ModifyHandler::Handle(const Event& event) {
         for (auto& pair : mNameReaderMap) {
             LogFileReaderPtrArray& readerArray = pair.second;
             for (auto& reader : readerArray) {
+                if (reader->GetContainerID() != event.GetObject()) {
+                    continue;
+                }
                 reader->SetContainerStopped();
                 if (reader->IsReadToEnd() || reader->ShouldForceReleaseDeletedFileFd()) {
                     if (reader->IsFileOpened()) {
