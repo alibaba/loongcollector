@@ -20,11 +20,13 @@
 
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
+#include "models/StringView.h"
 
-namespace logtail {
+namespace logtail::prom {
 
 enum class TextState { Start, Done, Error };
 
+// no strict grammar for prom
 class TextParser {
 public:
     TextParser() = default;
@@ -37,30 +39,26 @@ public:
     bool ParseLine(StringView line, MetricEvent& metricEvent);
 
 private:
+    std::optional<size_t> FindFirstLetter(const char* s, size_t len, char target);
+    std::optional<size_t> FindFirstWhiteSpace(const char* s, size_t len);
+    std::optional<size_t> FindWhiteSpaceAndExemplar(const char* s, size_t len);
+
+    std::optional<size_t> SkipTrailingWhitespace(const char* s, size_t pos);
+    inline size_t SkipLeadingWhitespace(const char* s, size_t len, size_t pos);
+
     void HandleError(const std::string& errMsg);
 
-    void HandleStart(MetricEvent& metricEvent);
-    void HandleMetricName(MetricEvent& metricEvent);
-    void HandleOpenBrace(MetricEvent& metricEvent);
-    void HandleLabelName(MetricEvent& metricEvent);
-    void HandleEqualSign(MetricEvent& metricEvent);
-    void HandleLabelValue(MetricEvent& metricEvent);
-    void HandleCommaOrCloseBrace(MetricEvent& metricEvent);
-    void HandleSampleValue(MetricEvent& metricEvent);
-    void HandleTimestamp(MetricEvent& metricEvent);
-    void HandleSpace(MetricEvent& metricEvent);
-
-    inline void SkipLeadingWhitespace();
+    void HandleStart(MetricEvent& metricEvent, const char* s, size_t len);
+    void HandleMetricName(MetricEvent& metricEvent, const char* s, size_t len);
+    void HandleLabelName(MetricEvent& metricEvent, const char* s, size_t len);
+    void HandleLabelValue(MetricEvent& metricEvent, const char* s, size_t len);
+    void HandleSampleValue(MetricEvent& metricEvent, const char* s, size_t len);
+    void HandleTimestamp(MetricEvent& metricEvent, const char* s, size_t len);
 
     TextState mState{TextState::Start};
-    StringView mLine;
-    std::size_t mPos{0};
+    bool mEscape{false};
 
     StringView mLabelName;
-    std::string mEscapedLabelValue;
-    double mSampleValue{0.0};
-    std::size_t mTokenLength{0};
-    std::string mDoubleStr;
 
     bool mHonorTimestamps{true};
     time_t mDefaultTimestamp{0};
@@ -71,4 +69,4 @@ private:
 #endif
 };
 
-} // namespace logtail
+} // namespace logtail::prom
