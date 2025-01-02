@@ -44,24 +44,31 @@ private:
 
     std::function<void(std::unique_ptr<Data> &base, const Value &n)> aggregate_;
 
+    std::function<std::unique_ptr<Data>(const Value &n)> generate_;
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class eBPFServerUnittest;
+#endif
 public:
 
     AggTree(size_t max_nodes,
-            const std::function<void(std::unique_ptr<Data> &, const Value &)> &aggregate)
-            : max_nodes(max_nodes), aggregate_(aggregate),
+            const std::function<void(std::unique_ptr<Data> &, const Value &)> &aggregate, 
+            const std::function<std::unique_ptr<Data>(const Value &n)> &generate)
+            : max_nodes(max_nodes), aggregate_(aggregate), generate_(generate),
               root_node_(std::make_unique<AggNode<Data, KeyType>>()) {}
 
     AggTree(AggTree<Data, Value, KeyType> &&other) noexcept
             : max_nodes(other.max_nodes),
               root_node_(std::move(other.root_node_)),
               aggregate_(other.aggregate_),
+              generate_(other.generate_),
               now_nodes(other.now_nodes) { other.Clear(); }
 
-    AggTree& operator=(AggTree&& other) noexcept { 
+    AggTree& operator=(AggTree&& other) noexcept {
         if (this != &other) {
             max_nodes = other.max_nodes;
             root_node_ = std::move(other.root_node_);
             aggregate_ = std::move(other.aggregate_);
+            generate_ = std::move(other.generate_);
             now_nodes = other.now_nodes;
         }
         return *this;
@@ -85,6 +92,10 @@ public:
             } else {
                 p = result->second.get();
             }
+        }
+        if (!p->data) {
+            // generate new node ... 
+            p->data = generate_(d);
         }
         aggregate_(p->data, d);
         return true;

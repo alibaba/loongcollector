@@ -127,7 +127,7 @@ set(SUB_DIRECTORIES_LIST
         protobuf/sls protobuf/models
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        ebpf ebpf/util ebpf/plugin ebpf/observer ebpf/security ebpf/handler ebpf/driver
+        ebpf ebpf/util ebpf/util/sampler ebpf/plugin ebpf/observer ebpf/security ebpf/handler
         parser
         )
 if (LINUX)
@@ -221,6 +221,8 @@ endif ()
 # Generate independent libraries.
 add_subdirectory(go_pipeline)
 add_subdirectory(common)
+# Build eBPF dependencies
+# add_subdirectory(ebpf/driver)
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
