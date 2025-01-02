@@ -81,17 +81,8 @@ std::string GetBinaryName(void) {
 bool RebuildExecutionDir(const std::string& ilogtailConfigJson,
                          std::string& errorMessage,
                          const std::string& executionDir) {
-    std::string path = GetAgentDataDir();
-    if (CheckExistance(path))
-        return true;
-    if (!Mkdirs(path)) {
-        std::stringstream ss;
-        ss << "create data dir failed, errno is " << errno;
-        errorMessage = ss.str();
-        return false;
-    }
     if (BOOL_FLAG(logtail_mode)) {
-        path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
+        std::string path = executionDir.empty() ? GetProcessExecutionDir() : executionDir;
         if (CheckExistance(path))
             return true;
         if (!Mkdir(path)) {
@@ -114,6 +105,16 @@ bool RebuildExecutionDir(const std::string& ilogtailConfigJson,
 
         fwrite(ilogtailConfigJson.c_str(), 1, ilogtailConfigJson.size(), pFile);
         fclose(pFile);
+    } else {
+        std::string path = GetAgentDataDir();
+        if (CheckExistance(path))
+            return true;
+        if (!Mkdirs(path)) {
+            std::stringstream ss;
+            ss << "create data dir failed, errno is " << errno;
+            errorMessage = ss.str();
+            return false;
+        }
     }
     return true;
 }

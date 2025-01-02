@@ -60,9 +60,6 @@ string LoongCollectorMonitor::mIpAddr;
 string LoongCollectorMonitor::mOsDetail;
 string LoongCollectorMonitor::mUsername;
 int32_t LoongCollectorMonitor::mSystemBootTime = -1;
-string LoongCollectorMonitor::mECSInstanceID;
-string LoongCollectorMonitor::mECSUserID;
-string LoongCollectorMonitor::mECSRegionID;
 string LoongCollectorMonitor::mStartTime;
 
 inline void CpuStat::Reset() {
@@ -590,11 +587,6 @@ LoongCollectorMonitor::LoongCollectorMonitor() {
     mIpAddr = GetHostIp();
     mOsDetail = GetOsDetail();
     mUsername = GetUsername();
-    // TODO: This may take up to 3s to construct the object. This is bad.
-    ECSMeta ecsMeta = FetchECSMeta();
-    mECSInstanceID = ecsMeta.instanceID;
-    mECSUserID = ecsMeta.userID;
-    mECSRegionID = ecsMeta.regionID;
 }
 
 LoongCollectorMonitor::~LoongCollectorMonitor() {

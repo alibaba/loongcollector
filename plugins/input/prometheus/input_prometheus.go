@@ -85,7 +85,7 @@ func (p *ServiceStaticPrometheus) Init(context pipeline.Context) (int, error) {
 	case p.Yaml != "":
 		detail = []byte(p.Yaml)
 		if p.AuthorizationPath == "" {
-			p.AuthorizationPath = config.LoongcollectorGlobalConfig.LoongcollectorConfDir
+			p.AuthorizationPath = config.LoongcollectorGlobalConfig.LoongcollectorPrometheusAuthorizationPath
 		}
 	case p.ConfigFilePath != "":
 		f, err := os.Open(p.ConfigFilePath)
