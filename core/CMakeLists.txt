@@ -222,7 +222,7 @@ endif ()
 add_subdirectory(go_pipeline)
 add_subdirectory(common)
 # Build eBPF dependencies
-# add_subdirectory(ebpf/driver)
+add_subdirectory(ebpf/driver)
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)

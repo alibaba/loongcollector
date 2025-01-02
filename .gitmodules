@@ -1,0 +1,4 @@
+[submodule "core/ebpf/driver/coolbpf"]
+	path = core/ebpf/driver/coolbpf
+	url = https://gitee.com/anolis/coolbpf.git
+	branch = loongcollector-base

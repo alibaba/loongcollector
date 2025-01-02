@@ -34,63 +34,63 @@ class Consumer {
 public:
     using ProcessFunc = std::function<bool(const std::vector<T>&, size_t)>;
     Consumer(moodycamel::BlockingConcurrentQueue<T>& queue, std::chrono::milliseconds maxWaitTime, const ProcessFunc& func)
-        : queue(queue), maxWaitTime(maxWaitTime), stopFlag(false), suspendFlag(false), processFunc(func) {}
+        : mQueue(queue), mMaxWaitTime(maxWaitTime), mStopFlag(false), mSuspendFlag(false), mProcessFunc(func) {}
 
     void start() {
-        worker = std::thread(&Consumer::run, this);
+        mWorker = std::thread(&Consumer::run, this);
     }
 
     void stop() {
         {
-            std::lock_guard<std::mutex> lock(mtx);
-            stopFlag = true;
-            cv.notify_all();
+            std::lock_guard<std::mutex> lock(mMtx);
+            mStopFlag = true;
+            mCv.notify_all();
         }
-        if (worker.joinable()) {
-            worker.join();
+        if (mWorker.joinable()) {
+            mWorker.join();
         }
     }
 
     void suspend() {
-        std::unique_lock<std::mutex> lock(mtx);
-        suspendFlag = true;
+        std::unique_lock<std::mutex> lock(mMtx);
+        mSuspendFlag = true;
     }
 
     void resume() {
         {
-            std::unique_lock<std::mutex> lock(mtx);
-            suspendFlag = false;
+            std::unique_lock<std::mutex> lock(mMtx);
+            mSuspendFlag = false;
         }
-        cv.notify_all();
+        mCv.notify_all();
     }
 
 private:
     void run() {
         std::vector<T> items(1024);
-        while (!stopFlag) {
+        while (!mStopFlag) {
             {
-                std::unique_lock<std::mutex> lock(mtx);
-                cv.wait(lock, [this] { return !suspendFlag || stopFlag; });
+                std::unique_lock<std::mutex> lock(mMtx);
+                mCv.wait(lock, [this] { return !mSuspendFlag || mStopFlag; });
             }
 
-            if (stopFlag) break;
+            if (mStopFlag) break;
 
             LOG_INFO(sLogger, ("begin process", ""));
-            size_t numItemsDequeued = queue.wait_dequeue_bulk_timed(items.begin(), items.size(), maxWaitTime);
+            size_t numItemsDequeued = mQueue.wait_dequeue_bulk_timed(items.begin(), items.size(), mMaxWaitTime);
             if (numItemsDequeued > 0) {
-                processFunc(items, numItemsDequeued);
+                mProcessFunc(items, numItemsDequeued);
             }
         }
     }
 
-    moodycamel::BlockingConcurrentQueue<T>& queue;
-    std::thread worker;
-    std::chrono::milliseconds maxWaitTime;
-    std::atomic<bool> stopFlag;
-    std::atomic<bool> suspendFlag;
-    std::mutex mtx;
-    std::condition_variable cv;
-    ProcessFunc processFunc;
+    moodycamel::BlockingConcurrentQueue<T>& mQueue;
+    std::thread mWorker;
+    std::chrono::milliseconds mMaxWaitTime;
+    std::atomic<bool> mStopFlag;
+    std::atomic<bool> mSuspendFlag;
+    std::mutex mMtx;
+    std::condition_variable mCv;
+    ProcessFunc mProcessFunc;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConsumerUnittest;
 #endif
