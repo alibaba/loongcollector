@@ -69,7 +69,6 @@ private:
     void DeleteRollbackReader();
     void MakeSpaceForNewReader();
 
-
     static bool CompareReaderByUpdateTime(const LogFileReader* left, const LogFileReader* right) {
         return left->GetLastUpdateTime() < right->GetLastUpdateTime();
     }
@@ -113,6 +112,7 @@ public:
     virtual void HandleTimeOut();
     virtual bool DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag);
     bool IsAllFileRead() override;
+    const std::string& GetConfigName() const { return mConfigName; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ConfigUpdatorUnittest;

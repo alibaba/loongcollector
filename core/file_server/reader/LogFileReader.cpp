@@ -122,6 +122,7 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                           ? discoveryConfig.first->GetWildcardPaths()[0]
                                           : discoveryConfig.first->GetBasePath(),
                                       containerPath->mRealBaseDir.size());
+                reader->SetContainerID(containerPath->mID);
                 reader->AddExtraTags(containerPath->mMetadatas);
                 reader->AddExtraTags(containerPath->mTags);
             }
@@ -265,6 +266,7 @@ void LogFileReader::DumpMetaToMem(bool checkConfigFlag, int32_t idxInReaderArray
                                                mRealLogPath,
                                                mLogFileOp.IsOpen(),
                                                mContainerStopped,
+                                               mContainerID,
                                                mLastForceRead);
     // use last event time as checkpoint's last update time
     checkPointPtr->mLastUpdateTime = mLastEventTime;
