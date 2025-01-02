@@ -15,10 +15,10 @@
  */
 
 #pragma once
-#include <json/json.h>
-
-#include <boost/regex.hpp>
 #include <string>
+
+#include "boost/regex.hpp"
+#include "json/json.h"
 
 #include "prometheus/labels/Labels.h"
 

@@ -15,8 +15,8 @@
 #include "plugin/input/InputFileSecurity.h"
 
 // #include "ebpf/security/SecurityServer.h"
-#include "ebpf/include/export.h"
 #include "ebpf/eBPFServer.h"
+#include "ebpf/include/export.h"
 
 
 using namespace std;
@@ -30,10 +30,13 @@ bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoP
     if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::FILE_SECURITY)) {
         return false;
     }
-    std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
+    std::string prev_pipeline_name
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::FILE_SECURITY);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
-        LOG_WARNING(sLogger, ("pipeline already loaded", "FILE_SECURITY")("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
+        LOG_WARNING(sLogger,
+                    ("pipeline already loaded", "FILE_SECURITY")("prev pipeline", prev_pipeline_name)("curr pipeline",
+                                                                                                      pipeline_name));
         return false;
     }
     static const std::unordered_map<std::string, MetricType> metricKeys = {
@@ -43,12 +46,14 @@ bool InputFileSecurity::Init(const Json::Value& config, Json::Value& optionalGoP
         {METRIC_PLUGIN_EBPF_PROCESS_CACHE_MISS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
-    mPluginMgr = std::make_shared<PluginMetricManager>(GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+    mPluginMgr = std::make_shared<PluginMetricManager>(
+        GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     return mSecurityOptions.Init(ebpf::SecurityProbeType::FILE, config, mContext, sName);
 }
 
 bool InputFileSecurity::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::FILE_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
+        mContext->GetConfigName(), mIndex, nami::PluginType::FILE_SECURITY, mContext, &mSecurityOptions, mPluginMgr);
 }
 
 bool InputFileSecurity::Stop(bool isPipelineRemoving) {

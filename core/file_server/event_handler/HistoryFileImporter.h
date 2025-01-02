@@ -17,8 +17,9 @@
 #pragma once
 #include <string>
 #include <unordered_map>
-#include "common/StringTools.h"
+
 #include "common/CircularBuffer.h"
+#include "common/StringTools.h"
 #include "common/Thread.h"
 #include "plugin/input/InputFile.h"
 

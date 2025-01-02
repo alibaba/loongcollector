@@ -16,6 +16,7 @@
 
 #pragma once
 #include <vector>
+
 #include "AdhocFileCheckpoint.h"
 
 namespace logtail {

@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-#include "unittest/Unittest.h"
-#include <thread>
 #include <iostream>
+#include <thread>
+
 #include "common/Lock.h"
 #include "common/TimeUtil.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 

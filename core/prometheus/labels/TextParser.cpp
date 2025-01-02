@@ -16,9 +16,11 @@
 
 #include "prometheus/labels/TextParser.h"
 
-#include <boost/algorithm/string.hpp>
 #include <cmath>
+
 #include <string>
+
+#include "boost/algorithm/string.hpp"
 
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"

@@ -50,7 +50,9 @@ public:
     std::pair<PipelineConfigDiff, TaskConfigDiff> CheckConfigDiff();
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void SetPipelineManager(const PipelineManager* pm) { mPipelineManager = pm; }
+    void SetPipelineManager(const PipelineManager* pm) {
+        mPipelineManager = pm;
+    }
 #endif
 
 private:

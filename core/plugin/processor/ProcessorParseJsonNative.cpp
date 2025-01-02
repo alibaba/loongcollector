@@ -16,8 +16,9 @@
 
 #include "plugin/processor/ProcessorParseJsonNative.h"
 
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 #include "common/ParamExtractor.h"
 #include "models/LogEvent.h"
@@ -25,6 +26,32 @@
 #include "pipeline/plugin/instance/ProcessorInstance.h"
 
 namespace logtail {
+
+static std::string RapidjsonValueToString(const rapidjson::Value& value) {
+    if (value.IsString())
+        return std::string(value.GetString(), value.GetStringLength());
+    else if (value.IsBool())
+        return ToString(value.GetBool());
+    else if (value.IsInt())
+        return ToString(value.GetInt());
+    else if (value.IsUint())
+        return ToString(value.GetUint());
+    else if (value.IsInt64())
+        return ToString(value.GetInt64());
+    else if (value.IsUint64())
+        return ToString(value.GetUint64());
+    else if (value.IsDouble())
+        return ToString(value.GetDouble());
+    else if (value.IsNull())
+        return "";
+    else // if (value.IsObject() || value.IsArray())
+    {
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        value.Accept(writer);
+        return std::string(buffer.GetString(), buffer.GetLength());
+    }
+}
 
 const std::string ProcessorParseJsonNative::sName = "processor_parse_json_native";
 
@@ -168,32 +195,6 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
                sourceEvent);
     }
     return true;
-}
-
-std::string ProcessorParseJsonNative::RapidjsonValueToString(const rapidjson::Value& value) {
-    if (value.IsString())
-        return std::string(value.GetString(), value.GetStringLength());
-    else if (value.IsBool())
-        return ToString(value.GetBool());
-    else if (value.IsInt())
-        return ToString(value.GetInt());
-    else if (value.IsUint())
-        return ToString(value.GetUint());
-    else if (value.IsInt64())
-        return ToString(value.GetInt64());
-    else if (value.IsUint64())
-        return ToString(value.GetUint64());
-    else if (value.IsDouble())
-        return ToString(value.GetDouble());
-    else if (value.IsNull())
-        return "";
-    else // if (value.IsObject() || value.IsArray())
-    {
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        value.Accept(writer);
-        return std::string(buffer.GetString(), buffer.GetLength());
-    }
 }
 
 void ProcessorParseJsonNative::AddLog(const StringView& key,

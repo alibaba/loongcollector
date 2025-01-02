@@ -18,15 +18,16 @@
 #include <fcntl.h>
 #include <io.h>
 #endif
-#include <cityhash/city.h>
 #include <time.h>
 
 #include <algorithm>
-#include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
 #include <limits>
 #include <numeric>
 #include <random>
+
+#include "boost/filesystem.hpp"
+#include "boost/regex.hpp"
+#include "rapidjson/document.h"
 
 #include "app_config/AppConfig.h"
 #include "checkpoint/CheckPointManager.h"
@@ -52,7 +53,6 @@
 #include "pipeline/queue/ProcessQueueManager.h"
 #include "pipeline/queue/QueueKeyManager.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
-#include "rapidjson/document.h"
 
 using namespace sls_logs;
 using namespace std;

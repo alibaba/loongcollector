@@ -20,13 +20,14 @@
 #include <stddef.h>
 #endif
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <numeric>
 #include <sstream>
 #include <unordered_map>
 #include <utility>
+
+#include "json/json.h"
 
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/sls_logs.pb.h"

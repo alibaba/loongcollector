@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
 #include "common/EncodingConverter.h"
+#include "unittest/Unittest.h"
 #if defined(__linux__)
 #include "unittest/UnittestHelper.h"
 #endif

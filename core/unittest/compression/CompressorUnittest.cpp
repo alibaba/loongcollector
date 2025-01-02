@@ -22,7 +22,7 @@ namespace logtail {
 
 class CompressorMock : public Compressor {
 public:
-    CompressorMock(CompressType type) : Compressor(type) {};
+    CompressorMock(CompressType type) : Compressor(type){};
 
     bool UnCompress(const std::string& input, std::string& output, std::string& errorMsg) override { return true; }
 

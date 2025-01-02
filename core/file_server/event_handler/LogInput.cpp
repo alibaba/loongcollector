@@ -27,6 +27,7 @@
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/event_handler/HistoryFileImporter.h"
@@ -39,7 +40,6 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
-#include "file_server/FileServer.h"
 
 using namespace std;
 

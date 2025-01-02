@@ -14,7 +14,7 @@
 
 #include "CompressTools.h"
 
-#include <lz4/lz4.h>
+#include "lz4/lz4.h"
 
 namespace logtail {
 

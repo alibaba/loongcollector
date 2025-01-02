@@ -31,10 +31,13 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
     if (!ebpf::eBPFServer::GetInstance()->IsSupportedEnv(nami::PluginType::NETWORK_OBSERVE)) {
         return false;
     }
-    std::string prev_pipeline_name = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
+    std::string prev_pipeline_name
+        = ebpf::eBPFServer::GetInstance()->CheckLoadedPipelineName(nami::PluginType::NETWORK_OBSERVE);
     std::string pipeline_name = mContext->GetConfigName();
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
-        LOG_WARNING(sLogger, ("pipeline already loaded", "NETWORK_OBSERVE")("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
+        LOG_WARNING(sLogger,
+                    ("pipeline already loaded", "NETWORK_OBSERVE")("prev pipeline", prev_pipeline_name)("curr pipeline",
+                                                                                                        pipeline_name));
         return false;
     }
 
@@ -49,12 +52,14 @@ bool InputNetworkObserver::Init(const Json::Value& config, Json::Value& optional
         {METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
 
-    mPluginMgr = std::make_shared<PluginMetricManager>(GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+    mPluginMgr = std::make_shared<PluginMetricManager>(
+        GetMetricsRecordRef().GetLabels(), metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     return ebpf::InitObserverNetworkOption(config, mNetworkOption, mContext, sName);
 }
 
 bool InputNetworkObserver::Start() {
-    return ebpf::eBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_OBSERVE, mContext, &mNetworkOption, mPluginMgr);
+    return ebpf::eBPFServer::GetInstance()->EnablePlugin(
+        mContext->GetConfigName(), mIndex, nami::PluginType::NETWORK_OBSERVE, mContext, &mNetworkOption, mPluginMgr);
 }
 
 bool InputNetworkObserver::Stop(bool isPipelineRemoving) {

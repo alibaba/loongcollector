@@ -1,11 +1,12 @@
 #pragma once
 
-#include <json/value.h>
-
 #include <cstdint>
+
 #include <map>
 #include <string>
 #include <vector>
+
+#include "json/value.h"
 
 #include "common/http/HttpRequest.h"
 #include "prometheus/labels/Relabel.h"

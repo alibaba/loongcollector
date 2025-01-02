@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#include "unittest/Unittest.h"
 #include <string>
-#include "common/RuntimeUtil.h"
+
 #include "common/DevInode.h"
+#include "common/RuntimeUtil.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 

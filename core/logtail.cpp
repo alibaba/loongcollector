@@ -75,7 +75,7 @@ void enable_core(void) {
 
 static void overwrite_community_edition_flags() {
     // support run in installation dir on default
-    if(BOOL_FLAG(logtail_mode)) {
+    if (BOOL_FLAG(logtail_mode)) {
         STRING_FLAG(logtail_sys_conf_dir) = ".";
         STRING_FLAG(check_point_filename) = "checkpoint/logtail_check_point";
         STRING_FLAG(default_buffer_file_path) = "checkpoint";

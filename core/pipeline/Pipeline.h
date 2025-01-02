@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "json/json.h"
 
 #include "config/PipelineConfig.h"
 #include "models/PipelineEventGroup.h"

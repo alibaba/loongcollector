@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "DynamicLibHelper.h"
+
 #include "Logger.h"
 
 #if defined(__linux__)
@@ -24,8 +25,8 @@
 namespace logtail {
 
 namespace glibc {
-    glibc_setns_func g_setns_func = nullptr;
-    DynamicLibLoader* g_loader = nullptr;
+glibc_setns_func g_setns_func = nullptr;
+DynamicLibLoader* g_loader = nullptr;
 } // namespace glibc
 
 

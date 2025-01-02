@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <cstdint>
+
 #include <string>
+
+#include "json/json.h"
 
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
@@ -60,7 +61,7 @@ public:
     QueueKey GetLogstoreKey() const;
     const FlusherSLS* GetSLSInfo() const { return mSLSInfo; }
     void SetSLSInfo(const FlusherSLS* flusherSLS) { mSLSInfo = flusherSLS; }
-    
+
     bool RequiringJsonReader() const { return mRequiringJsonReader; }
     void SetRequiringJsonReaderFlag(bool flag) { mRequiringJsonReader = flag; }
     bool IsFirstProcessorApsara() const { return mIsFirstProcessorApsara; }

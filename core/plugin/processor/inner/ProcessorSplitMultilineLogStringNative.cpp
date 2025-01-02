@@ -16,8 +16,9 @@
 
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 
-#include <boost/regex.hpp>
 #include <string>
+
+#include "boost/regex.hpp"
 
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"

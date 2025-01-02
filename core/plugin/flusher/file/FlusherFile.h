@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <spdlog/spdlog.h>
-
 #include <vector>
+
+#include "spdlog/spdlog.h"
 
 #include "pipeline/batch/Batcher.h"
 #include "pipeline/plugin/interface/Flusher.h"

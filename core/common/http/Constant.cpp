@@ -17,7 +17,7 @@
 using namespace std;
 
 namespace logtail {
-    
+
 const string HTTP_POST = "POST";
 const string HTTP_GET = "GET";
 

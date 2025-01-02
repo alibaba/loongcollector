@@ -118,10 +118,10 @@ TEST_F(StringToolsUnittest, TestGetTopicNames) {
 TEST_F(StringToolsUnittest, TestRemoveFilePathTrailingSlash) {
     std::string filePath = "/aaa/aa/";
     RemoveFilePathTrailingSlash(filePath);
-    APSARA_TEST_EQUAL("/aaa/aa",filePath);
+    APSARA_TEST_EQUAL("/aaa/aa", filePath);
     filePath = "/";
     RemoveFilePathTrailingSlash(filePath);
-    APSARA_TEST_EQUAL("/",filePath);
+    APSARA_TEST_EQUAL("/", filePath);
 }
 
 TEST_F(StringToolsUnittest, TestBoostRegexSearch) {

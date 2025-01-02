@@ -15,13 +15,13 @@
  */
 
 #pragma once
-#include <thread>
-#include <mutex>
 #include <atomic>
 #include <condition_variable>
 #include <functional>
-#include <vector>
+#include <mutex>
 #include <queue>
+#include <thread>
+#include <vector>
 
 namespace logtail {
 

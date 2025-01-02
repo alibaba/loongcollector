@@ -16,6 +16,7 @@
 
 #pragma once
 #include <cstdint>
+
 #include <string>
 
 // Hash and file signature utility.

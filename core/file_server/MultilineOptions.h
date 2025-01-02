@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include <json/json.h>
-
 #include <string>
 #include <utility>
 
 #include "boost/regex.hpp"
+#include "json/json.h"
+
 #include "pipeline/PipelineContext.h"
 
 namespace logtail {

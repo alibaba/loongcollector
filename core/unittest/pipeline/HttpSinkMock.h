@@ -20,9 +20,9 @@
 #include "pipeline/plugin/interface/HttpFlusher.h"
 #include "pipeline/queue/SLSSenderQueueItem.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/flusher/sls/SLSConstant.h"
 #include "runner/FlusherRunner.h"
 #include "runner/sink/http/HttpSink.h"
-#include "plugin/flusher/sls/SLSConstant.h"
 
 namespace logtail {
 class HttpSinkMock : public HttpSink {

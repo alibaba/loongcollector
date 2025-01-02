@@ -15,12 +15,13 @@
  */
 
 #include "AdhocFileManager.h"
+
 #include "logger/Logger.h"
 
 namespace logtail {
 
-AdhocFileManager::AdhocFileManager() {
-    // mRunFlag = false; 
+AdhocFileManager::AdhocFileManager(){
+    // mRunFlag = false;
 };
 
 void AdhocFileManager::Run() {
@@ -125,8 +126,8 @@ void AdhocFileManager::AddJob(std::string jobName, std::vector<StaticFile> fileL
 
     // // push first file to queue
     // if  (fileList.size() > 0) {
-    //     Event* ev = new Event(fileList[0].filePath, fileList[0].fileName, EVENT_STATIC_FILE, -1, 0, fileList[0].Dev, fileList[0].Inode);
-    //     PushEventQueue(ev);
+    //     Event* ev = new Event(fileList[0].filePath, fileList[0].fileName, EVENT_STATIC_FILE, -1, 0, fileList[0].Dev,
+    //     fileList[0].Inode); PushEventQueue(ev);
     // }
 
     // Run();
@@ -139,4 +140,4 @@ void AdhocFileManager::DeleteJob(std::string jobName) {
     // PushEventQueue(stopEvent);
 }
 
-}
+} // namespace logtail

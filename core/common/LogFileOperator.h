@@ -15,22 +15,23 @@
  */
 
 #pragma once
-#include <cstdio>
-#include <string>
 #include <cstdint>
+#include <cstdio>
+
+#include <string>
 #if defined(_MSC_VER)
 #include <Windows.h>
 #elif defined(__linux__)
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <fcntl.h>
 #include <unistd.h>
 #endif
 
 namespace logtail {
 
 namespace fsutil {
-    class PathStat;
+class PathStat;
 }
 
 class LogFileOperator {

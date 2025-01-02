@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include "unittest/Unittest.h"
-#include "common/RandomUtil.h"
 #include <unordered_set>
+
+#include "common/RandomUtil.h"
+#include "unittest/Unittest.h"
 
 namespace logtail {
 
@@ -45,7 +46,7 @@ void RandomUtilUnittest::TestGenerateRandomHashKey() {
 }
 
 namespace detail {
-    size_t countBitSize(size_t maxVal);
+size_t countBitSize(size_t maxVal);
 }
 
 void RandomUtilUnittest::TestCountBitSize() {

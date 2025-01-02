@@ -14,14 +14,13 @@
 
 #include "ebpf/eBPFServer.h"
 
-#include <gflags/gflags.h>
-
 #include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
 
 #include "app_config/AppConfig.h"
+#include "common/Flags.h"
 #include "common/Lock.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"

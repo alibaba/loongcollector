@@ -73,8 +73,9 @@ void ConcurrencyLimiter::Increase() {
     if (mCurrenctConcurrency != mMaxConcurrency) {
         ++mCurrenctConcurrency;
         if (mCurrenctConcurrency == mMaxConcurrency) {
-            LOG_DEBUG(sLogger,
-                     ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrenctConcurrency));
+            LOG_DEBUG(
+                sLogger,
+                ("increase send concurrency to maximum, type", mDescription)("concurrency", mCurrenctConcurrency));
         } else {
             LOG_DEBUG(sLogger,
                       ("increase send concurrency, type",
@@ -101,23 +102,27 @@ void ConcurrencyLimiter::Decrease(double fallBackRatio) {
 void ConcurrencyLimiter::AdjustConcurrency(bool success, std::chrono::system_clock::time_point currentTime) {
     uint32_t failPercentage = 0;
     bool finishStatistics = false;
-    {   
+    {
         lock_guard<mutex> lock(mStatisticsMux);
-        mStatisticsTotal ++;
+        mStatisticsTotal++;
         if (!success) {
-            mStatisticsFailTotal ++;
+            mStatisticsFailTotal++;
         }
         if (mLastStatisticsTime == std::chrono::system_clock::time_point()) {
             mLastStatisticsTime = currentTime;
         }
-        if (mStatisticsTotal == CONCURRENCY_STATISTIC_THRESHOLD || chrono::duration_cast<chrono::seconds>(currentTime - mLastStatisticsTime).count() > CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS) {
-            failPercentage =  mStatisticsFailTotal*100/mStatisticsTotal;
-            LOG_DEBUG(sLogger,("AdjustConcurrency", mDescription)("mStatisticsFailTotal", mStatisticsFailTotal)("mStatisticsTotal", mStatisticsTotal));
+        if (mStatisticsTotal == CONCURRENCY_STATISTIC_THRESHOLD
+            || chrono::duration_cast<chrono::seconds>(currentTime - mLastStatisticsTime).count()
+                > CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS) {
+            failPercentage = mStatisticsFailTotal * 100 / mStatisticsTotal;
+            LOG_DEBUG(sLogger,
+                      ("AdjustConcurrency", mDescription)("mStatisticsFailTotal",
+                                                          mStatisticsFailTotal)("mStatisticsTotal", mStatisticsTotal));
             mStatisticsTotal = 0;
             mStatisticsFailTotal = 0;
             mLastStatisticsTime = currentTime;
             finishStatistics = true;
-        } 
+        }
     }
     if (finishStatistics) {
         if (failPercentage == 0) {
@@ -128,10 +133,10 @@ void ConcurrencyLimiter::AdjustConcurrency(bool success, std::chrono::system_clo
         } else if (failPercentage <= SLOW_FALL_BACK_FAIL_PERCENTAGE) {
             // 慢回退
             Decrease(mConcurrencySlowFallBackRatio);
-        } else  {
+        } else {
             // 快速回退
             Decrease(mConcurrencyFastFallBackRatio);
-        } 
+        }
     }
 }
 

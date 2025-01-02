@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
 #include "provider/Provider.h"
+#include "unittest/Unittest.h"
 
 
 namespace logtail {
@@ -22,7 +22,6 @@ class ProviderUnittest : public testing::Test {
 public:
     void TestGetRemoteConfigProvider();
     void TestGetProfileSender();
-
 };
 void ProviderUnittest::TestGetRemoteConfigProvider() {
     auto remoteConfigProviders = GetRemoteConfigProviders();

@@ -1,6 +1,7 @@
 #include "prometheus/component/StreamScraper.h"
 
 #include <cstddef>
+
 #include <memory>
 #include <string>
 #include <utility>

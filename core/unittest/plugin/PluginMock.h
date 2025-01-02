@@ -151,7 +151,10 @@ public:
         return true;
     }
     bool FlushAll() override { return mIsValid; }
-    bool BuildRequest(SenderQueueItem* item, std::unique_ptr<HttpSinkRequest>& req, bool* keepItem, std::string* errMsg) override {
+    bool BuildRequest(SenderQueueItem* item,
+                      std::unique_ptr<HttpSinkRequest>& req,
+                      bool* keepItem,
+                      std::string* errMsg) override {
         if (item->mData == "invalid_keep") {
             *keepItem = true;
             return false;

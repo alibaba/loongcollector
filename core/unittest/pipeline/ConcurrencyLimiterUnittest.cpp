@@ -29,7 +29,8 @@ void ConcurrencyLimiterUnittest::TestLimiter() const {
     int maxConcurrency = 80;
     int minConcurrency = 20;
 
-    shared_ptr<ConcurrencyLimiter> sConcurrencyLimiter = make_shared<ConcurrencyLimiter>("", maxConcurrency, minConcurrency);
+    shared_ptr<ConcurrencyLimiter> sConcurrencyLimiter
+        = make_shared<ConcurrencyLimiter>("", maxConcurrency, minConcurrency);
     // fastFallBack
     APSARA_TEST_EQUAL(true, sConcurrencyLimiter->IsValidToPop());
     for (uint32_t i = 0; i < sConcurrencyLimiter->GetStatisticThreshold(); i++) {
@@ -42,7 +43,7 @@ void ConcurrencyLimiterUnittest::TestLimiter() const {
     APSARA_TEST_EQUAL(40U, sConcurrencyLimiter->GetCurrentLimit());
     APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
 
-    // success one time 
+    // success one time
     APSARA_TEST_EQUAL(true, sConcurrencyLimiter->IsValidToPop());
     for (uint32_t i = 0; i < sConcurrencyLimiter->GetStatisticThreshold(); i++) {
         APSARA_TEST_EQUAL(true, sConcurrencyLimiter->IsValidToPop());
@@ -71,7 +72,7 @@ void ConcurrencyLimiterUnittest::TestLimiter() const {
         sConcurrencyLimiter->OnFail(curSystemTime);
         sConcurrencyLimiter->OnSendDone();
     }
-    uint32_t expect = 41*0.8;
+    uint32_t expect = 41 * 0.8;
     APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
     APSARA_TEST_EQUAL(expect, sConcurrencyLimiter->GetCurrentLimit());
 
@@ -134,7 +135,7 @@ void ConcurrencyLimiterUnittest::TestLimiter() const {
         sConcurrencyLimiter->OnSuccess(curSystemTime);
         sConcurrencyLimiter->OnSendDone();
     }
-    expect = 40*0.8;
+    expect = 40 * 0.8;
     APSARA_TEST_EQUAL(0U, sConcurrencyLimiter->GetInSendingCount());
     APSARA_TEST_EQUAL(expect, sConcurrencyLimiter->GetCurrentLimit());
 }

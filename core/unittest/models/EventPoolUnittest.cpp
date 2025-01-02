@@ -116,7 +116,6 @@ void EventPoolUnittest::TestLock() {
         APSARA_TEST_EQUAL(0U, pool.mLogEventPoolBak.size());
         APSARA_TEST_EQUAL(1U, pool.mLogEventPool.size());
         delete e2;
-
     }
     {
         auto e = pool.AcquireMetricEvent(mGroup.get());

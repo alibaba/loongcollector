@@ -15,6 +15,7 @@
  */
 
 #include "models/SpanEvent.h"
+
 #include "constants/SpanConstants.h"
 
 using namespace std;
@@ -445,10 +446,14 @@ const static std::string sSpanStatusCodeError = "ERROR";
 
 const std::string& GetStatusString(SpanEvent::StatusCode status) {
     switch (status) {
-        case SpanEvent::StatusCode::Unset: return sSpanStatusCodeUnSet;
-        case SpanEvent::StatusCode::Ok:   return sSpanStatusCodeOk;
-        case SpanEvent::StatusCode::Error:     return sSpanStatusCodeError;
-        default:               return sSpanStatusCodeUnSet;
+        case SpanEvent::StatusCode::Unset:
+            return sSpanStatusCodeUnSet;
+        case SpanEvent::StatusCode::Ok:
+            return sSpanStatusCodeOk;
+        case SpanEvent::StatusCode::Error:
+            return sSpanStatusCodeError;
+        default:
+            return sSpanStatusCodeUnSet;
     }
 }
 
@@ -462,13 +467,20 @@ const static std::string sSpanKindUnknown = "unknown";
 
 const std::string& GetKindString(SpanEvent::Kind kind) {
     switch (kind) {
-        case SpanEvent::Kind::Unspecified: return sSpanKindUnspecified;
-        case SpanEvent::Kind::Internal:   return sSpanKindInternal;
-        case SpanEvent::Kind::Server:     return sSpanKindServer;
-        case SpanEvent::Kind::Client:     return sSpanKindClient;
-        case SpanEvent::Kind::Producer:   return sSpanKindProducer;
-        case SpanEvent::Kind::Consumer:   return sSpanKindConsumer;
-        default:               return sSpanKindUnknown;
+        case SpanEvent::Kind::Unspecified:
+            return sSpanKindUnspecified;
+        case SpanEvent::Kind::Internal:
+            return sSpanKindInternal;
+        case SpanEvent::Kind::Server:
+            return sSpanKindServer;
+        case SpanEvent::Kind::Client:
+            return sSpanKindClient;
+        case SpanEvent::Kind::Producer:
+            return sSpanKindProducer;
+        case SpanEvent::Kind::Consumer:
+            return sSpanKindConsumer;
+        default:
+            return sSpanKindUnknown;
     }
 }
 

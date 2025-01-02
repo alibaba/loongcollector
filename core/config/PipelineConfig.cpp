@@ -16,6 +16,8 @@
 
 #include <string>
 
+#include "boost/regex.hpp"
+
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"

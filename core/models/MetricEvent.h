@@ -33,7 +33,7 @@ class MetricEvent : public PipelineEvent {
 public:
     std::unique_ptr<PipelineEvent> Copy() const override;
     void Reset() override;
-    
+
     StringView GetName() const { return mName; }
     void SetName(const std::string& name);
     void SetNameNoCopy(StringView name);

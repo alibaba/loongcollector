@@ -14,7 +14,7 @@
 
 #include "go_pipeline/LogtailPlugin.h"
 
-#include <json/json.h>
+#include "json/json.h"
 
 #include "app_config/AppConfig.h"
 #include "common/DynamicLibHelper.h"

@@ -15,10 +15,11 @@
  */
 
 #pragma once
-#include <mutex>
-#include <condition_variable>
-#include <cstdint>
 #include <chrono>
+#include <cstdint>
+
+#include <condition_variable>
+#include <mutex>
 
 namespace logtail {
 

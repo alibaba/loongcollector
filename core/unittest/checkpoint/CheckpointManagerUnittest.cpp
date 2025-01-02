@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unittest/Unittest.h"
 #include "checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
+#include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
 

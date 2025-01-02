@@ -111,4 +111,4 @@ inline bool operator!=(std::nullptr_t lhs, const MetricsRecordRef& rhs) {
     return !(lhs == rhs);
 }
 
-}
+} // namespace logtail

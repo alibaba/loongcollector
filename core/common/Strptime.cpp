@@ -28,9 +28,11 @@
  */
 
 #include "Strptime.h"
+
 #include <ctype.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include "common/StringTools.h"
 
 namespace logtail {
@@ -95,13 +97,13 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
         if (n == 0 || (long long)(t = n) != n) {
             return NULL;
         }
-        #ifdef _MSC_VER
+#ifdef _MSC_VER
         if (localtime_s(tm, &t) != 0)
             return NULL;
-        #else
+#else
         if (NULL == localtime_r(&t, tm))
             return NULL;
-        #endif
+#endif
 
         *nanosecond = 0;
         *nanosecondLength = 0;
@@ -143,9 +145,9 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                 continue;
 
                 /*
-             * "Alternative" modifiers. Just set the appropriate flag
-             * and start over again.
-             */
+                 * "Alternative" modifiers. Just set the appropriate flag
+                 * and start over again.
+                 */
             case 'E': /* "%E?" alternative conversion modifier. */
                 LEGAL_ALT(0);
                 alt_format |= ALT_E;
@@ -157,8 +159,8 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                 goto again;
 
                 /*
-             * "Complex" conversion rules, implemented through recursion.
-             */
+                 * "Complex" conversion rules, implemented through recursion.
+                 */
             case 'c': /* Date and time, using the locale's format. */
                 // Tue Nov 20 14:12:58 2020
                 new_fmt = "%a %b %d %H:%M:%S %Y";
@@ -201,8 +203,8 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                 continue;
 
                 /*
-             * "Elementary" conversion rules.
-             */
+                 * "Elementary" conversion rules.
+                 */
             case 'A': /* The day of week, using the locale's form. */
             case 'a':
                 bp = find_string(bp, &tm->tm_wday, day, abday, 7);
@@ -292,11 +294,11 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
             case 'U': /* The week of year, beginning on sunday. */
             case 'W': /* The week of year, beginning on monday. */
                 /*
-           * XXX This is bogus, as we can not assume any valid
-           * information present in the tm structure at this
-           * point to calculate a real value, so just check the
-           * range for now.
-           */
+                 * XXX This is bogus, as we can not assume any valid
+                 * information present in the tm structure at this
+                 * point to calculate a real value, so just check the
+                 * range for now.
+                 */
                 bp = conv_num(bp, &i, 0, 53);
                 LEGAL_ALT(ALT_O);
                 continue;
@@ -314,15 +316,15 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
 
             case 'g':
                 /* The year corresponding to the ISO week
-             * number but without the century.
-             */
+                 * number but without the century.
+                 */
                 bp = conv_num(bp, &i, 0, 99);
                 continue;
 
             case 'G':
                 /* The year corresponding to the ISO week
-             * number with century.
-             */
+                 * number with century.
+                 */
                 do
                     bp++;
                 while (isdigit(*bp));
@@ -357,7 +359,8 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                 continue;
 
             case 'Z':
-                if (CStringNCaseInsensitiveCmp((const char*)bp, gmt, 3) == 0 || CStringNCaseInsensitiveCmp((const char *)bp, utc, 3) == 0) {
+                if (CStringNCaseInsensitiveCmp((const char*)bp, gmt, 3) == 0
+                    || CStringNCaseInsensitiveCmp((const char*)bp, utc, 3) == 0) {
                     tm->tm_isdst = 0;
 #ifdef TM_GMTOFF
                     tm->TM_GMTOFF = 0;
@@ -386,22 +389,22 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
 
             case 'z':
                 /*
-             * We recognize all ISO 8601 formats:
-             * Z = Zulu time/UTC
-             * [+-]hhmm
-             * [+-]hh:mm
-             * [+-]hh
-             * We recognize all RFC-822/RFC-2822 formats:
-             * UT|GMT
-             *    North American : UTC offsets
-             * E[DS]T = Eastern : -4 | -5
-             * C[DS]T = Central : -5 | -6
-             * M[DS]T = Mountain: -6 | -7
-             * P[DS]T = Pacific : -7 | -8
-             *    Military
-             * [A-IL-M] = -1 ... -9 (J not used)
-             * [N-Y]  = +1 ... +12
-             */
+                 * We recognize all ISO 8601 formats:
+                 * Z = Zulu time/UTC
+                 * [+-]hhmm
+                 * [+-]hh:mm
+                 * [+-]hh
+                 * We recognize all RFC-822/RFC-2822 formats:
+                 * UT|GMT
+                 *    North American : UTC offsets
+                 * E[DS]T = Eastern : -4 | -5
+                 * C[DS]T = Central : -5 | -6
+                 * M[DS]T = Mountain: -6 | -7
+                 * P[DS]T = Pacific : -7 | -8
+                 *    Military
+                 * [A-IL-M] = -1 ... -9 (J not used)
+                 * [N-Y]  = +1 ... +12
+                 */
                 while (isspace(*bp))
                     bp++;
 
@@ -437,7 +440,7 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                             tm->TM_GMTOFF = -5 - i;
 #endif
 #ifdef TM_ZONE
-                            tm->TM_ZONE = (char *)(nast[i]);
+                            tm->TM_ZONE = (char*)(nast[i]);
 #endif
                             bp = ep;
                             continue;
@@ -449,7 +452,7 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                             tm->TM_GMTOFF = -4 - i;
 #endif
 #ifdef TM_ZONE
-                            tm->TM_ZONE = (char *)(nadt[i]);
+                            tm->TM_ZONE = (char*)(nadt[i]);
 #endif
                             bp = ep;
                             continue;
@@ -512,8 +515,8 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
                 continue;
 
                 /*
-             * Miscellaneous conversions.
-             */
+                 * Miscellaneous conversions.
+                 */
             case 'n': /* Any kind of white-space. */
             case 't':
                 while (isspace(*bp))
